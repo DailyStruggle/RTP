@@ -18,28 +18,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 /**
  * Curated submenu reached from the admin panel "Visualizations" row.
- *
- * <p>Two pages are produced by this builder:
- * <ul>
- *   <li>{@link #build(UUID)} - the top-level <b>chart-kind picker</b>: one
- *       row per supported visualization kind (bad-locations, biomes, ...).
- *       Clicking a row runs {@code /rtp visualization &lt;verb&gt;} with no
- *       {@code region=} argument; the visualization leaf's no-region
- *       selector-fallback then lands on {@link #buildRegionList(UUID,
- *       ChartSpec.Kind)} via
- *       {@code MenuRedeemSubcommand.dispatchOpenVisualizationRegions}.</li>
- *   <li>{@link #buildRegionList(UUID, ChartSpec.Kind)} - the kind-scoped
- *       <b>region picker</b>: one row per configured region, each emitting
- *       {@link MenuAction.OpenMap} carrying the kind + region name. Same
- *       per-row shape as the legacy flat submenu, only kind-parameterised.</li>
- * </ul>
- *
- * <p>The admin-permission gate ({@code rtp.menu.admin}) is enforced
- * upstream by the dispatch arm; this builder trusts that contract and
- * does not re-probe it. The back row of the chart-kind picker returns to
- * the admin panel via {@link MenuAction.OpenAdminPanel}; the back row of
- * a kind-scoped region picker returns to the chart-kind picker via
- * {@link MenuAction.OpenVisualizations}.
+ * Produces chart-kind picker and kind-scoped region picker pages.
  */
 public final class VisualizationsSubmenuBuilder {
 
@@ -126,19 +105,10 @@ public final class VisualizationsSubmenuBuilder {
     }
 
     /**
-     * Build the kind-scoped Visualizations <b>region picker</b> for
-     * {@code viewer}: one row per configured region, each emitting
-     * {@link MenuAction.OpenMap} carrying {@code (kind, regionName)}. Reads
-     * the live region list from {@code RTP.selectionAPI.regionNames()} on
-     * every call (post-write rebuild contract). The back row returns to the
-     * top-level chart-kind picker via {@link MenuAction.OpenVisualizations}.
+     * Builds kind-scoped Visualizations region picker for {@code viewer}.
      *
-     * @param viewer the clicking player's UUID.
-     * @param kind   the chart-kind scope; the only valid values today are
-     *               {@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE} and
-     *               {@link ChartSpec.Kind#REGION_BIOMES}. Other kinds throw
-     *               {@link IllegalArgumentException} (caught by the dispatch
-     *               arm as a builder failure -> S-004 reject).
+     * @param viewer clicking player UUID
+     * @param kind   chart-kind scope (REGION_BAD_LOCATIONS_SHAPE or REGION_BIOMES)
      */
     public MenuModel buildRegionList(UUID viewer, ChartSpec.Kind kind) {
         Objects.requireNonNull(viewer, "viewer");

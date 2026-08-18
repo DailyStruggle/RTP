@@ -10,7 +10,7 @@
  * <p>{@link io.github.dailystruggle.rtp.anvil.AnvilPrefilter#probeSyncDetailed}
  * returns {@link io.github.dailystruggle.rtp.anvil.Verdict#REJECT},
  * {@link io.github.dailystruggle.rtp.anvil.Verdict#ACCEPT}, or
- * {@link io.github.dailystruggle.rtp.anvil.Verdict#UNKNOWN} — advisory only;
+ * {@link io.github.dailystruggle.rtp.anvil.Verdict#UNKNOWN} - advisory only;
  * the live {@code RTPChunk.isSafe(...)} at teleport commit remains authoritative.
  *
  * <p>Palette identifier reconciliation: the default

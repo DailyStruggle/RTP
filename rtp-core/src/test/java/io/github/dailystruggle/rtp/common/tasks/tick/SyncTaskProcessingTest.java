@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Tests for {@link SyncTaskProcessing}.
  *
- * <p>All execution is synchronous — no real threads are spawned.
+ * <p>All execution is synchronous - no real threads are spawned.
  */
 class SyncTaskProcessingTest {
 
@@ -130,13 +130,13 @@ class SyncTaskProcessingTest {
     void cancelled_SyncTaskProcessing_is_still_runnable_without_throw() {
         SyncTaskProcessing proc = new SyncTaskProcessing(Long.MAX_VALUE);
         proc.setCancelled(true);
-        // SyncTaskProcessing.run() does not check isCancelled() itself — it delegates
+        // SyncTaskProcessing.run() does not check isCancelled() itself - it delegates
         // to the pipes. Verify it does not throw.
         assertDoesNotThrow(proc::run);
     }
 
     // -----------------------------------------------------------------------
-    // availableTime boundary — zero time
+    // availableTime boundary - zero time
     // -----------------------------------------------------------------------
 
     @Test

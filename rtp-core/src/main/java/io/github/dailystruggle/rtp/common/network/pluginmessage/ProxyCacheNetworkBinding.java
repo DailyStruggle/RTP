@@ -24,35 +24,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Tier-1 (DB-free) {@link NetworkTransport} that uses the proxy companion as
- * the availability store (PROPOSAL-proxy-as-availability-store). It is the
- * peer of {@link PluginMessageNetworkBinding}, and shares its snapshot / TTL /
- * subscriber machinery, but differs in <em>where availability lives</em>:
+ * Tier-1 (DB-free) {@link NetworkTransport} storing availability in the proxy companion.
  *
- * <ul>
- *   <li><strong>Publish:</strong> {@link #publishBackendHeartbeat(BackendHeartbeat)}
- *       pushes the row to the proxy companion's cache
- *       ({@link NetworkBridge#pushHeartbeatToProxy(byte[])}) rather than
- *       gossiping it to peer backends. It also asks the companion to send back
- *       the current cached snapshot ({@link NetworkBridge#requestSnapshot()}),
- *       so a lobby's view refreshes on the same cadence with no second
- *       scheduler.</li>
- *   <li><strong>Inbound:</strong> the companion replays each cached backend
- *       heartbeat through the same inbound sink the gossip tier uses, so
- *       {@link #readSnapshot()} returns every entry seen within
- *       {@code staleTimeoutMillis}.</li>
- * </ul>
- *
- * <p>Because the proxy holds the cache independently of player presence, a
- * lobby gets real per-region availability even when the contributing backend
- * currently has no players online (within the stale window) - the convergence
- * the pure backend-to-backend gossip tier could not achieve.</p>
- *
- * <p><strong>Non-durable reservation tier.</strong> Identical posture to
- * {@link PluginMessageNetworkBinding}: {@link #claim} never mints a token,
- * {@link #release}/{@link #publishProxyHeartbeat} are no-ops, and the inherited
- * reservation-listing defaults return empties. Durable atomic claims require
- * the Pro SQL/Redis tiers.</p>
+ * <p>Pushes heartbeats and requests cached snapshots via {@link NetworkBridge} plugin messages.</p>
  */
 public final class ProxyCacheNetworkBinding implements NetworkTransport {
 

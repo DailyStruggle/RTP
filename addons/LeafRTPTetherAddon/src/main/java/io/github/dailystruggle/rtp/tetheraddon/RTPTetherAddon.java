@@ -24,7 +24,6 @@ import io.github.dailystruggle.rtp.common.configuration.Configs;
  * <p><b>Status.</b> This class wires configuration and lifecycle only. The tether enforcement
  * consumes a platform-neutral player-move event SPI that does not yet exist in {@code rtp-api} /
  * {@code rtp-core}; that addition is a cross-module core change specified in
- * {@code docs/dev/PROPOSAL-tether-and-move-event-spi.md} and
  * {@code docs/adr/ADR-075-platform-neutral-player-move-event-spi.md} (Proposed, D-005 gated). Until
  * the SPI is approved and lands, this addon loads as a safe no-op. See {@code REQUIREMENTS.md} and
  * {@code docs/adr/leafrtp-tether-addon-ADR-001-cross-platform-region-confinement.md} for the full

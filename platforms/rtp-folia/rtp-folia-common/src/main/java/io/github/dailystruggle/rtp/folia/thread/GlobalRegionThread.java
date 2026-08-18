@@ -9,7 +9,7 @@ import org.checkerframework.framework.qual.SubtypeOf;
 
 /**
  * Declares that the annotated method or constructor must execute on Folia's
- * {@code GlobalRegionThread} — the single thread managed by
+ * {@code GlobalRegionThread} - the single thread managed by
  * {@code Bukkit.getGlobalRegionScheduler()}.
  *
  * <p><b>Thread-affinity contract</b>
@@ -26,7 +26,7 @@ import org.checkerframework.framework.qual.SubtypeOf;
  * <p><b>Systems engineering analogy</b>
  * The global region thread is analogous to a privileged kernel thread that arbitrates shared
  * global state. Region threads are user-space processes that must use a syscall (the scheduler
- * API) to request global-state mutations — direct access is forbidden.
+ * API) to request global-state mutations - direct access is forbidden.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

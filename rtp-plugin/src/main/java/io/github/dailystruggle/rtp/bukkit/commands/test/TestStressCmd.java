@@ -27,8 +27,8 @@ import org.jetbrains.annotations.Nullable;
  * pipeline for each listed player, on the async scheduler, with a bounded
  * iteration count and tick interval. Delegation (as opposed to constructing
  * {@code TeleportPipelineTask} directly) is deliberate: it preserves every
- * safety guard — cooldowns, {@code processingPlayers}, economy, claim
- * verifiers, and the async chunk path — so stress results reflect real
+ * safety guard - cooldowns, {@code processingPlayers}, economy, claim
+ * verifiers, and the async chunk path - so stress results reflect real
  * user-triggered traffic.
  *
  * <p>The {@code player} argument uses {@link OnlinePlayerParameter} so
@@ -38,11 +38,11 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>Safety compliance:
  * <ul>
- *   <li><b>REQ-RTP-S-004</b> — every skipped player emits a WARNING log; per
+ *   <li><b>REQ-RTP-S-004</b> - every skipped player emits a WARNING log; per
  *       iteration outcomes are reported to the caller at completion.</li>
- *   <li><b>REQ-RTP-S-005</b> — timer runs on {@code runTaskTimerAsynchronously};
+ *   <li><b>REQ-RTP-S-005</b> - timer runs on {@code runTaskTimerAsynchronously};
  *       no chunk I/O on the main thread.</li>
- *   <li><b>REQ-RTP-S-002</b> — no direct ticket acquisition; delegation reuses
+ *   <li><b>REQ-RTP-S-002</b> - no direct ticket acquisition; delegation reuses
  *       the pipeline's existing release paths.</li>
  * </ul>
  */

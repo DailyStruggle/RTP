@@ -14,7 +14,7 @@ import java.util.Set;
  * the ADR-025 §Context enumeration.
  *
  * <p>The handle holds a back-reference to the underlying {@link RtpYamlMapping}
- * — mutations performed through {@link #set(String, Object)} go directly
+ * - mutations performed through {@link #set(String, Object)} go directly
  * to the AST, so subsequent saves see them.</p>
  *
  * <p>Dotted-path keys (e.g. {@code "database.type"}) are supported and
@@ -80,7 +80,7 @@ public class RtpYamlSection {
         return resolve(key, false) != null;
     }
 
-    /** Mirrors {@code simpleyaml}'s {@code isSet} — true iff key is present. */
+    /** Mirrors {@code simpleyaml}'s {@code isSet} - true iff key is present. */
     public boolean isSet(String key) { return contains(key); }
 
     public boolean isConfigurationSection(String key) {

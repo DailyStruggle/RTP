@@ -30,25 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Stage B tests for {@link FrontPageBuilder} — the curated landing page for
- * {@code /rtp menu} (no args).
- *
- * <p>Covers REQ-RTP-MENU-005:
- * <ul>
- *   <li>Player view always renders Teleport + Help and only those rows when
- *       no region / biome parameter is registered on the root.</li>
- *   <li>Player view exposes the region / biome picker rows only when the
- *       corresponding parameter exists <em>and</em> {@code relevantValues}
- *       is non-empty (so an unprivileged caller doesn't see broken pickers).</li>
- *   <li>Admin view (granted by {@code rtp.menu.admin}) replaces the picker
- *       block with the admin row catalogue (Info / Config / Scan / Diagnostics /
- *       Reload) — each row appearing only when its target subcommand exists.</li>
- *   <li>The reload row carries a non-null warning hover (Stage B redline #2).</li>
- *   <li>Permission probe is invoked safely (a throwing probe degrades to
- *       hiding the admin view, not breaking the page).</li>
- * </ul>
- *
- * Traceability: REQ-RTP-MENU-005, REQ-RTP-F-013 (all row labels configurable).
+ * Unit tests for {@link FrontPageBuilder} landing page (REQ-RTP-MENU-005, REQ-RTP-F-013).
  */
 final class FrontPageBuilderTest {
 
@@ -72,7 +54,7 @@ final class FrontPageBuilderTest {
         MenuModel model = new FrontPageBuilder()
                 .build(root, UUID.randomUUID(), perm -> false);
 
-        // Teleport row: RunRtpCommand([]) — bare /rtp execute, args are
+        // Teleport row: RunRtpCommand([]) - bare /rtp execute, args are
         // the sub-command path under the /rtp root (no leading "rtp").
         MenuAction teleport = findRunWithArgs(model);
         assertNotNull(teleport, "Teleport row must be present in player view");
@@ -137,7 +119,7 @@ final class FrontPageBuilderTest {
     }
 
     // ------------------------------------------------------------------------
-    // Admin view (PROPOSAL-admin-panel.md v2: collapsed to a single entry row)
+    // Admin view (collapsed to a single entry row)
     // ------------------------------------------------------------------------
 
     @Test
@@ -222,7 +204,7 @@ final class FrontPageBuilderTest {
         }
         assertTrue(clickable >= 2, "at least Teleport + Help should be clickable");
         // We can't directly count mints without registry introspection, so we
-        // assert that the page is renderable — the absence of an exception
+        // assert that the page is renderable - the absence of an exception
         // during build() is the contract (token registry .mint always succeeds).
         assertNotNull(model);
     }

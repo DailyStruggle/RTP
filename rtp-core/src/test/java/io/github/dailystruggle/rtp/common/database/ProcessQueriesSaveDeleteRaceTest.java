@@ -16,13 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression for the "Successfully loaded N locations" ghost-row bug.
- * Race: {@code saveCachedLocation} parks rows in {@code dirtyCache} (promoted
- * onto {@code writeQueue} only every 5 min by {@code flushDirtyCache}), while
- * {@code deleteCachedLocation} bypasses {@code dirtyCache} and goes straight
- * to {@code deleteQueue}. The per-tick {@code processQueries} drain can run
- * the delete before the save is promoted, leaving the delete a no-op; the
- * later {@code flushDirtyCache} then merges the orphaned row.
+ * Regression test for dirtyCache/deleteQueue race condition causing ghost rows in database.
  */
 class ProcessQueriesSaveDeleteRaceTest {
 

@@ -25,24 +25,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Regression guard for the {@code inFlightCalculations} leak observed as
- * {@code [cached]} freezing one slot below {@code cacheCap + activeChunkCap}
- * (e.g. perpetual {@code "cached: 59"} against a 60-slot total).
- *
- * <p>Root cause (prior to fix): {@link RegionCacheTask#run()} incremented
- * {@code region.inFlightCalculations} but {@code processResult(null)}
- * early-returned without decrementing on the normal-null completion paths
- * exposed by {@code LocationGenerator.getLocationFuture} (malformed region,
- * pregen dispatch failure, attempts exhausted). The leaked counter then
- * pinned the cache top-up gate at {@code Region.execute()} one slot short,
- * so the public placeholder never recovered.
- *
- * <p>The fix routes every terminal branch of {@link RegionCacheTask} through
- * an idempotent {@code releaseInFlight()} helper guarded by a single
- * {@link java.util.concurrent.atomic.AtomicBoolean}. This test exercises the
- * normal-null path explicitly: an {@link ILocationGenerator} stub that
- * returns {@code CompletableFuture.completedFuture(null)}, which previously
- * leaked and now must net to zero.
+ * Regression guard for {@code inFlightCalculations} accounting in {@link RegionCacheTask}.
  */
 public class RegionCacheTaskInFlightLeakTest {
 
@@ -109,13 +92,7 @@ public class RegionCacheTaskInFlightLeakTest {
     }
 
     /**
-     * Same guarantee under the {@code exceptionally} path: a future that
-     * completes with a thrown exception goes through {@code exceptionally}
-     * (which now intentionally does <i>not</i> decrement) and then
-     * {@code thenAccept(null)} → {@code processResult(null)} →
-     * {@code releaseInFlight()}. The CAS in {@code releaseInFlight()} must
-     * also tolerate being called more than once without underflowing the
-     * counter.
+     * Completing exceptionally releases in-flight counter exactly once.
      */
     @Test
     @Timeout(value = 2, unit = TimeUnit.SECONDS)

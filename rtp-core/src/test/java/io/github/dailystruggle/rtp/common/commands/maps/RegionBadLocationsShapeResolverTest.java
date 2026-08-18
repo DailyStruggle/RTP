@@ -32,28 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-MAP-006 - {@link RegionBadLocationsShapeResolver} contract under
- * the 2026-05-26 rewrite: the resolver now emits a pre-classified palette
- * buffer (canvas-sized) by leap-sampling
- * {@link MemoryShape#locationToXZ(long)} for bounds and pixel-driving
- * {@link MemoryShape#contains(int, int)} / {@link MemoryShape#isKnownBad(int, int)}
- * for the in/out + bad/good classification. Empty bad-set is no longer a
- * failure: it produces an all-green disk over a black backdrop.
- *
- * <ul>
- *   <li>Happy path: non-empty cache -> palette buffer containing at least
- *       one {@link PaletteIndex#RED} pixel, paired with
- *       {@link RegionBadLocationsRenderer#INSTANCE}.</li>
- *   <li>Empty cache: still resolves, palette buffer contains no RED but
- *       does contain {@link PaletteIndex#GREEN} (the region's in-shape
- *       fill).</li>
- *   <li>Failure: unknown region -> {@code UnresolvableChartSpecException}.</li>
- *   <li>Failure: wrong {@code ChartSpec.Kind} -> {@code UnresolvableChartSpecException}.</li>
- *   <li>Failure: null spec -> {@code UnresolvableChartSpecException}, not NPE.</li>
- * </ul>
- *
- * <p>S-005: no chunk I/O on any path. S-004: every failure exits via a
- * thrown exception, never a silent {@code null}.
+ * REQ-RTP-MAP-006 - {@link RegionBadLocationsShapeResolver} tests.
  */
 @DisplayName("REQ-RTP-MAP-006 - RegionBadLocationsShapeResolver contract")
 class RegionBadLocationsShapeResolverTest {

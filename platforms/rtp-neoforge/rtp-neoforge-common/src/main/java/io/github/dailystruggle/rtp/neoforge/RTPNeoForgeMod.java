@@ -135,12 +135,12 @@ public final class RTPNeoForgeMod {
    * {@link NeoForgeServerAccessor}, the {@code RTP.serverAccessor} /
    * {@code RTP.scheduler} bindings, and the rtp-core {@link RTP} singleton
    * (which builds {@code Configs} from {@code accessor.getPluginDirectory()},
-   * backed by {@code FMLPaths.CONFIGDIR} — no {@link MinecraftServer} needed).
+   * backed by {@code FMLPaths.CONFIGDIR} - no {@link MinecraftServer} needed).
    *
    * <p>This is split out of {@link #bootCore(MinecraftServer)} because NeoForge
    * fires {@link RegisterCommandsEvent} (where the {@code /rtp} tree is built)
    * <b>before</b> the server object exists and before {@link ServerStartedEvent}
-   * — in {@code Main.main}'s initial datapack/{@code ReloadableServerResources}
+   * - in {@code Main.main}'s initial datapack/{@code ReloadableServerResources}
    * load, on a worker thread. Building the command tree dereferences
    * {@code RTP.getInstance()} and {@code RTP.configs} (e.g. {@code ReloadCmd}),
    * so the core must already exist at that point. {@link #onRegisterCommands}
@@ -238,7 +238,7 @@ public final class RTPNeoForgeMod {
     // mod jar. Mirrors RTPBukkitPlugin's `JarUtils.extractDocs(...)` and
     // RTPFabricMod's `FabricJarUtils.extractDocs(...)` so the admin-facing
     // reference material (architecture diagrams, requirements, ADRs) ships
-    // alongside the config tree on NeoForge. Idempotent + fail-soft — see
+    // alongside the config tree on NeoForge. Idempotent + fail-soft - see
     // NeoForgeJarUtils Javadoc.
     try {
       String modVersion = net.neoforged.fml.ModList.get()
@@ -253,14 +253,14 @@ public final class RTPNeoForgeMod {
               + t.getClass().getSimpleName() + ": " + t.getMessage());
     }
 
-    // N2.3 — register the game-bus event bridge (player join/quit, world
+    // N2.3 - register the game-bus event bridge (player join/quit, world
     // load/unload). Created here (not in the constructor) because it needs the
     // accessor, which only exists once the server has started.
     NeoForgeEventBridge bridge = new NeoForgeEventBridge(acc);
     this.eventBridge = bridge;
     bridge.register();
 
-    // Register every already-loaded ServerLevel — overworld + nether + end (and
+    // Register every already-loaded ServerLevel - overworld + nether + end (and
     // any datapack dimensions) come up before ServerStartedEvent fires, so the
     // LevelEvent.Load callbacks have already passed. Mirrors the Fabric
     // SERVER_STARTED world sweep.
@@ -308,7 +308,7 @@ public final class RTPNeoForgeMod {
           + "NoopMapBinding: " + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
     }
 
-    // N2.3 — database bootstrap (mirrors BukkitDatabaseHandler / Fabric's
+    // N2.3 - database bootstrap (mirrors BukkitDatabaseHandler / Fabric's
     // SERVER_STARTED setupDatabase): selects the accessor from config, runs
     // the migration chain, and schedules databaseAccessor.startup(). Then start
     // the periodic async query drain (needed for SQL-transport network mode).
@@ -329,7 +329,7 @@ public final class RTPNeoForgeMod {
           + t.getClass().getSimpleName() + ": " + t.getMessage());
     }
 
-    // effects-api-ADR-003 / ADR-005 — wire the effect layer to the teleport
+    // effects-api-ADR-003 / ADR-005 - wire the effect layer to the teleport
     // pipeline (SOUND/PARTICLE/TITLE/POTION on the rtp.effect.* lifecycle
     // hooks, driven by effects/<group>.yml + permissions). Reuses the Mojmap
     // effectsapi.fabric runtime (shared with Fabric; flagged for rename).
@@ -341,7 +341,7 @@ public final class RTPNeoForgeMod {
           + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
     }
 
-    // ADR-023 — login reserve cache on the default-world region (no-op unless
+    // ADR-023 - login reserve cache on the default-world region (no-op unless
     // PerformanceKeys.loginCacheEnabled). Runs after setupDatabase so regions
     // have been (re)built.
     bridge.initLoginReserveCache(server);

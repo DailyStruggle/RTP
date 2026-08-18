@@ -8,30 +8,10 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
 /**
- * Stage 1 resolver for {@link ChartSpec.Kind#BAD_POINTS_HEATMAP}.
- * Composes a {@link Heatmap2D} whose cells count the bad-location keys
- * persisted by the region's {@link MemoryShape}, bucketed into a
- * {@value #BINS}x{@value #BINS} grid that matches the vanilla 128x128
- * cartography canvas.
+ * Resolves {@link ChartSpec.Kind#BAD_POINTS_HEATMAP} into a {@link Heatmap2D}.
  *
- * <p>Data source: {@link MemoryShape#badKeysSnapshot()} - a copy of the
- * {@code volatile} {@code badKeysCache} field, already maintained by the
- * scan/anvil pipeline. No chunk I/O, no blocking futures (REQ-RTP-S-005,
- * REQ-RTP-F-008). The drawable extent is computed from the snapshot itself
- * (axis-aligned bounding box of every decoded XZ pair) so the resolver is
- * shape-agnostic: SQUARE, CIRCLE, and any future {@link MemoryShape}
- * subtype all map the same way. A single-point snapshot is widened by one
- * pixel on each axis so {@link Heatmap2D}'s strictly-greater range
- * invariant ({@code maxValue > minValue}) is satisfied even with one bad
- * key.
- *
- * <p>Failure path: throws {@link ChartSpecResolver.UnresolvableChartSpecException}
- * when the named region is unknown, when its shape is not a
- * {@link MemoryShape} (no badKeys cache to read), or when the snapshot is
- * empty (no admin signal to draw). {@link MapDispatch} surfaces this as
- * the configurable {@code mapUnavailable} message (REQ-RTP-F-013 / S-004).
- *
- * <p>ADR-047 (REQ-RTP-MAP-006); extends REQ-RTP-F-008 / S-005.
+ * <p>Reads {@link MemoryShape#badKeysSnapshot()} without chunk I/O (S-005, REQ-RTP-MAP-006).
+ * Bins bad-location coordinates into a {@value #BINS}x{@value #BINS} grid matching the canvas.
  */
 public final class BadPointsHeatmapResolver implements ChartSpecResolver {
 

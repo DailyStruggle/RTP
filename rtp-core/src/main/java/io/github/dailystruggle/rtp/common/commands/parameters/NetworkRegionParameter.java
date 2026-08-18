@@ -11,33 +11,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Cross-server region parameter (approved plugin-message proposal §7). A value
- * is either a bare local region name ({@code default}) or a peer-qualified
- * {@code server:region} entry ({@code backend-a:default}). Reads a pluggable
- * {@link RegionAvailabilityProvider} so the command layer stays transport-
- * agnostic: the same parameter works over the config overlay (lite), the
- * plugin-message snapshot (lite + Pro), or the SQL/Redis tiers (Pro).
- *
- * <p><b>Suggestion vs. validation split</b> (commands-api-ADR-001 addendum):</p>
- * <ul>
- *   <li>{@link #values()} / {@link #isSuggestionRelevant(UUID, String)} are
- *       <em>strict</em>: tab-completion only surfaces the local regions plus
- *       the currently-advertised {@code server:region} entries. A region that
- *       has drained out of the snapshot stops being suggested.</li>
- *   <li>{@link #isRelevant} (the execute-time gate) is <em>forgiving</em>: it
- *       rejects only when the provider <em>positively knows</em> the target
- *       server and that server is not advertising the region
- *       ({@link RegionAvailabilityProvider.Availability#KNOWN_UNAVAILABLE}).
- *       When the snapshot is unknown / stale (the common transport-lag case,
- *       and the only state the non-durable plugin-message tier can guarantee)
- *       it <em>accepts</em> and lets the destination backend decide on arrival.
- *       This is the load-bearing rule: transport lag must never become a
- *       command rejection (proposal §6.2).</li>
- * </ul>
- *
- * <p>Local region names (no {@code ':'}) are validated against
- * {@code RTP.selectionAPI.regionNames()} exactly as the legacy
- * {@link RegionParameter} would, so single-server behaviour is unchanged.</p>
+ * Cross-server region parameter supporting local names or qualified {@code server:region}.
+ * Uses {@link RegionAvailabilityProvider} with strict suggestion and forgiving execution validation.
  */
 public class NetworkRegionParameter extends CommandParameter {
 

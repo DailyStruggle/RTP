@@ -26,7 +26,7 @@ import java.util.function.BiFunction;
 
 /**
  * Adventure-{@code Book} renderer for {@link MenuModel} (ADR-035 §Renderers
- * + ADR-044). Shared between Paper and Folia — Adventure's {@code Book} API
+ * + ADR-044). Shared between Paper and Folia - Adventure's {@code Book} API
  * is identical on both platforms; Folia inherits {@link Player#openBook(Book)}
  * unchanged.
  *
@@ -89,7 +89,7 @@ public final class BookMenuRenderer implements MenuRenderer {
         if (player == null) {
             // S-006: never silent no-op for a missing player. The caller is
             // expected to translate this into a configurable failure message
-            // (menuUnknownPlayer / menuInvalid), not the renderer itself —
+            // (menuUnknownPlayer / menuInvalid), not the renderer itself -
             // the renderer is platform-only.
             throw new IllegalStateException(
                     "BookMenuRenderer.render: no online player for UUID " + playerId);

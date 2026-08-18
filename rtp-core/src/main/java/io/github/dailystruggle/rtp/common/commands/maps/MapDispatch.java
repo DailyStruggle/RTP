@@ -19,36 +19,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 /**
- * Orchestrator for the ADR-047 declarative chart-composition bridge
- * (REQ-RTP-MAP-006): given a {@link ChartSpec} and a viewer UUID,
- * resolves a {@link ChartSpecResolver}, allocates a {@link MapHandle} from
- * the active {@link MapBinding}, paints the resolved model, and surfaces
- * failures through the configurable {@link MessagesKeys} family.
+ * Orchestrator for declarative chart composition (REQ-RTP-MAP-006, ADR-047).
+ * Resolves {@link ChartSpecResolver}, allocates {@link MapHandle} from active
+ * {@link MapBinding}, paints the model, and surfaces errors via configured messages.
  *
- * <p>Pipeline (all async to the platform main thread via
- * {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTaskAsynchronously}):
- *
- * <ol>
- *   <li>If the active {@code MapBinding} is the {@link NoopMapBinding},
- *       send {@link CommandMessages#mapBindingMissing} and log WARNING.</li>
- *   <li>Look up {@link ChartSpecResolvers#get}; on {@code null}, send
- *       {@link CommandMessages#mapResolverMissing} and log WARNING.</li>
- *   <li>Call {@link ChartSpecResolver#resolve}; on
- *       {@link ChartSpecResolver.UnresolvableChartSpecException}, send
- *       {@link CommandMessages#mapUnavailable} and log WARNING.</li>
- *   <li>Allocate a handle via {@link MapBinding#allocate}; on any
- *       {@link RuntimeException}, send {@link CommandMessages#mapBusy} and log
- *       WARNING.</li>
- *   <li>Paint via {@link MapBinding#renderEphemeral}.</li>
- * </ol>
- *
- * <p>S-004: every failure exits via a WARNING-level
- * {@link RTP#log(Level, String)} entry plus a viewer-facing message.
- * S-005: the resolver path is the only thing that reads world state, and
- * resolvers contractually forbid chunk I/O / blocking futures.
- * REQ-RTP-S-006: when {@link RTP#serverAccessor} is {@code null} (require-by-contract
- * not yet installed), {@code paint} throws {@link IllegalStateException}
- * rather than silently no-opping.
+ * <p>S-004: all failures log WARNING and notify viewer. S-005: zero synchronous chunk I/O.
+ * S-006: throws {@link IllegalStateException} if core is not initialized.
  */
 public final class MapDispatch {
 
@@ -56,7 +32,7 @@ public final class MapDispatch {
       new AtomicReference<>(new NoopMapBinding());
 
   /**
-   * Lifecycle registry (CHECKLIST-maps-api.md Stage 2.2, REQ-RTP-MAP-003).
+   * Lifecycle registry (REQ-RTP-MAP-003).
    * Platform bridges (see {@code BukkitMapBindingListener} in
    * {@code rtp-bukkit-common}) call {@link #firePlayerQuit} / {@link
    * #fireDisable}; {@link #setMapBinding} additionally auto-registers
@@ -74,26 +50,7 @@ public final class MapDispatch {
 
   /**
    * Chart kinds that {@link #paint} drives through {@link MapBinding#bindLive}
-   * (a self-refreshing live binding) instead of a one-shot
-   * {@link MapBinding#renderEphemeral}. Every other kind renders once.
-   *
-   * <ul>
-   *   <li>{@link ChartSpec.Kind#METRIC_SPARKLINE}: MSPT / heap evolve over
-   *       time, so the chart is only useful when it refreshes.</li>
-   *   <li>{@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE}: a running
-   *       world-scan ({@code ScanTask}) flags new unsafe sectors into the
-   *       region's {@code MemoryShape} bad-keys cache; binding live lets an
-   *       admin watch the bad-locations map fill in as the scan progresses
-   *       (ROADMAP Tier 2: world-scan UX). The resolver is pure and
-   *       re-runnable per tick (no chunk I/O; REQ-RTP-S-005).</li>
-   *   <li>{@link ChartSpec.Kind#REGION_BIOMES}: a running world-scan
-   *       ({@code ScanTask}) records newly-sampled biomes into the
-   *       region's {@code MemoryShape} saved biome-location cache; binding
-   *       live lets an admin watch the biome map fill in as the scan
-   *       progresses. {@code RegionBiomesResolver} is pure and re-runnable
-   *       per tick (no chunk I/O; it reads only the in-memory, persisted
-   *       biome cache via {@code biomeAt()}; REQ-RTP-S-005).</li>
-   * </ul>
+   * (self-refreshing live binding) instead of one-shot {@link MapBinding#renderEphemeral}.
    */
   private static final java.util.EnumSet<ChartSpec.Kind> LIVE_REFRESH_KINDS =
       java.util.EnumSet.of(
@@ -104,19 +61,7 @@ public final class MapDispatch {
   private MapDispatch() {}
 
   /**
-   * Installs the active {@link MapBinding}. Returns the previously-installed
-   * binding (never {@code null}; defaults to a {@link NoopMapBinding}
-   * sentinel before the first call). Intended for platform adapters
-   * (Stage 2: {@code BukkitMapBinding}, {@code FoliaMapBinding},
-   * {@code FabricMapBinding}) and addon override hooks.
-   *
-   * <p>If {@code binding} additionally implements {@link MapBindingLifecycle},
-   * it is auto-registered with the lifecycle bus so the platform bridge
-   * does not need a second call. The previously-installed binding (if any)
-   * is implicitly retired: {@link #fireDisable} is <em>not</em> invoked on
-   * it here because installation churn is not a server-disable event;
-   * callers that want explicit teardown shall call {@link #fireDisable}
-   * before installing a replacement.
+   * Installs the active {@link MapBinding}. Auto-registers if it implements {@link MapBindingLifecycle}.
    *
    * @param binding the new {@link MapBinding} to install; never {@code null}
    * @return the previously-installed binding; never {@code null}
@@ -131,13 +76,7 @@ public final class MapDispatch {
   }
 
   /**
-   * Registers a {@link MapBindingLifecycle} with the dispatch lifecycle bus.
-   * Idempotent: a listener already present is not re-registered. Platform
-   * adapters whose {@link MapBinding} implementation also implements
-   * {@link MapBindingLifecycle} are auto-registered via
-   * {@link #setMapBinding}; this entry point exists for tests and for
-   * standalone lifecycle observers that aren't themselves the active
-   * binding.
+   * Registers a {@link MapBindingLifecycle} with the dispatch lifecycle bus. Idempotent.
    *
    * @param lifecycle the lifecycle listener to register; never {@code null}
    */
@@ -220,16 +159,12 @@ public final class MapDispatch {
   }
 
   /**
-   * Synchronous entry point: resolve and paint {@code spec} for
-   * {@code viewer}. Callers from the main thread shall hop to
-   * {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTaskAsynchronously}
-   * first; the dispatcher itself does not schedule.
+   * Synchronous entry point: resolve and paint {@code spec} for {@code viewer}.
+   * Callers on the main thread must dispatch asynchronously first.
    *
    * @param spec   the declarative chart request; never {@code null}
    * @param viewer the viewer UUID for player-facing failure messages; never {@code null}
-   * @return {@code true} on successful paint; {@code false} if any failure
-   *         path was hit (and the viewer has already been notified via
-   *         {@link MessagesKeys})
+   * @return {@code true} on successful paint; {@code false} on failure
    */
   public static boolean paint(ChartSpec spec, UUID viewer) {
     Objects.requireNonNull(spec, "spec");
@@ -289,7 +224,7 @@ public final class MapDispatch {
     }
 
     // ChartSpec carries tilesRows/tilesCols for the Stage-2/3 mosaic path;
-    // ADR-046 Stage 1 only ships single-tile allocation, so the tile counts
+    // Single-tile allocation: the tile counts match the layout dimensions.
     // are recorded in spec but not forwarded to the binding yet.
     MapAllocationRequest request = new MapAllocationRequest(
         spec.kind().name(),
@@ -312,27 +247,11 @@ public final class MapDispatch {
       return false;
     }
 
-    // CHECKLIST-maps-api.md Stage 2.2 / REQ-RTP-MAP-003: register the freshly
-    // allocated handle with the active-GC safety net so a leak from a
-    // renderEphemeral that never returns (platform fault, viewer disconnect
-    // mid-paint, etc.) is reaped by the periodic sweep instead of pinning
-    // the MapView reference forever. Untracked on every exit path below.
+    // REQ-RTP-MAP-003: register handle with active GC to reap leaks.
     UUID trackingId = MemoryTracker.track(handle, MEMORY_TRACKER_LABEL, MEMORY_TRACKER_TTL_MS);
     try {
       if (LIVE_REFRESH_KINDS.contains(spec.kind())) {
-        // Live-refresh path: the chart pulls a fresh model from the
-        // resolver on every CraftMapView tick (~1 Hz while held), so the
-        // viewer sees the underlying state evolve in real time. For
-        // METRIC_SPARKLINE this surfaces MSPT + heap; for
-        // REGION_BAD_LOCATIONS_SHAPE it surfaces newly-flagged unsafe
-        // sectors as a world-scan (ScanTask) records them into the
-        // region's MemoryShape bad-keys cache (ROADMAP Tier 2: world-scan
-        // UX). The Supplier re-invokes resolver.resolve(spec); any
-        // UnresolvableChartSpec / runtime fault inside the supplier is
-        // caught by LiveChartRenderer and logged without crashing the
-        // tick. Initial Resolution is discarded (its model is a stale
-        // snapshot by the next tick anyway); the supplier is the source
-        // of truth from here on.
+        // Live-refresh: re-invokes resolver per tick; faults handled inside LiveChartRenderer.
         final ChartSpecResolver resolverRef = resolver;
         RTP.log(Level.FINE,
             "[viz/live] binding.bindLive invoking for kind=" + spec.kind()
@@ -367,19 +286,7 @@ public final class MapDispatch {
       MemoryTracker.untrack(trackingId);
     }
 
-    // Delivery: a freshly-rendered MapView is invisible to the client unless
-    // a FILLED_MAP item referencing its id reaches the viewer. The binding
-    // drops a FILLED_MAP item entity at the viewer's feet, which mutates
-    // world state and must therefore run on the thread that owns the
-    // viewer's location. We hop there via RTP.scheduler.runTask(location,..)
-    // rather than letting each platform binding reimplement the hop: on
-    // Paper/Spigot the scheduler runs the task inline (main thread); on
-    // Folia it dispatches onto the region thread that owns the viewer's
-    // chunk (a foreign region thread would otherwise throw, surfacing as an
-    // NPE in ServerLevel.getCurrentWorldData()). S-004: delivery faults exit
-    // through the same WARNING + mapUnavailable message path as
-    // renderEphemeral, evaluated inside the scheduled runnable since the
-    // hop may run after this method returns.
+    // Delivery: drop FILLED_MAP item on viewer's owning thread (S-005/Folia region thread).
     final MapBinding deliverBinding = binding;
     final MapHandle deliverHandle = handle;
     Runnable deliver = () -> {

@@ -20,8 +20,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Verifies two contracts:
  * <ol>
  *   <li>{@link ServerAccessorImpl#getBiomes()} delegates to
- *       {@code io.papermc.paper.registry.RegistryAccess} — the Paper 1.21.3+
- *       registry path — and returns a non-empty, upper-case set of biome keys.
+ *       {@code io.papermc.paper.registry.RegistryAccess} - the Paper 1.21.3+
+ *       registry path - and returns a non-empty, upper-case set of biome keys.
  *       This test is disabled under MockBukkit because {@code RegistryAccess}
  *       is not stubbed by MockBukkit; it requires a live Paper server context.</li>
  *   <li>The Paper {@link BukkitSchedulerImpl} dispatches synchronous tasks
@@ -60,7 +60,7 @@ class ServerAccessorImplTest {
      * <p>This test is disabled until MockBukkit provides a {@code RegistryAccess} stub
      * or an integration test environment is available.
      *
-     * <p>Traceability: REQ-CORE-F-002 (world/biome awareness) — partial coverage.
+     * <p>Traceability: REQ-CORE-F-002 (world/biome awareness) - partial coverage.
      */
     @Test
     @Timeout(30)

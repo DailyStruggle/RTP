@@ -204,18 +204,18 @@ public class ParameterParsingTest {
         assertEquals("a region param",   param.description());
     }
 
-    // ── ShapeParameter (class-loadable only — needs RTP.factoryMap) ───────────
+    // ── ShapeParameter (class-loadable only - needs RTP.factoryMap) ───────────
 
     @Test
     void shapeParameter_classIsLoadable() {
         assertNotNull(ShapeParameter.class);
     }
 
-    // ── IntegerParameter — additional edge cases ──────────────────────────────
+    // ── IntegerParameter - additional edge cases ──────────────────────────────
 
     @Test
     void integerParameter_isRelevant_longMaxValuePlusOneOverflow_rejected() {
-        // Long.MAX_VALUE + 1 as a string overflows Long — must be rejected
+        // Long.MAX_VALUE + 1 as a string overflows Long - must be rejected
         IntegerParameter param = new IntegerParameter("perm", "desc", (u, s) -> true);
         assertFalse(param.isRelevant.apply(uuid, "9223372036854775808"),
                 "Value exceeding Long.MAX_VALUE should be rejected");
@@ -238,7 +238,7 @@ public class ParameterParsingTest {
     void integerParameter_isRelevant_leadingPlusSign_rejected() {
         // Long.parseLong does not accept leading '+' in all JVM versions
         IntegerParameter param = new IntegerParameter("perm", "desc", (u, s) -> true);
-        // Java 7+ Long.parseLong does accept '+' prefix — result depends on JVM; just must not throw
+        // Java 7+ Long.parseLong does accept '+' prefix - result depends on JVM; just must not throw
         assertDoesNotThrow(() -> param.isRelevant.apply(uuid, "+5"));
     }
 
@@ -251,12 +251,12 @@ public class ParameterParsingTest {
         assertEquals("42", captured[0]);
     }
 
-    // ── FloatParameter — additional edge cases ────────────────────────────────
+    // ── FloatParameter - additional edge cases ────────────────────────────────
 
     @ParameterizedTest
     @ValueSource(strings = {"NaN", "Infinity", "-Infinity"})
     void floatParameter_isRelevant_specialDoubleValues_accepted(String input) {
-        // Double.parseDouble accepts NaN and Infinity — downstream decides relevance
+        // Double.parseDouble accepts NaN and Infinity - downstream decides relevance
         FloatParameter param = new FloatParameter("perm", "desc", (u, s) -> true);
         assertTrue(param.isRelevant.apply(uuid, input),
                 "Double.parseDouble accepts '" + input + "'; downstream returns true");
@@ -286,7 +286,7 @@ public class ParameterParsingTest {
         assertFalse(called[0], "Downstream predicate must not be called when parse fails");
     }
 
-    // ── BooleanParameter — additional edge cases ──────────────────────────────
+    // ── BooleanParameter - additional edge cases ──────────────────────────────
 
     @Test
     void booleanParameter_isRelevantDelegatesToSupplied_returnsTrue() {
@@ -301,12 +301,12 @@ public class ParameterParsingTest {
         BooleanParameter param = new BooleanParameter("perm", "desc", (u, s) -> true);
         Set<String> v1 = param.values();
         Set<String> v2 = param.values();
-        // Each call returns a fresh set — modifying one does not affect the other
+        // Each call returns a fresh set - modifying one does not affect the other
         v1.add("maybe");
         assertFalse(v2.contains("maybe"), "values() should return independent sets");
     }
 
-    // ── CommandParameter base — priority field ────────────────────────────────
+    // ── CommandParameter base - priority field ────────────────────────────────
 
     @Test
     void commandParameter_priorityDefaultIsZero() {

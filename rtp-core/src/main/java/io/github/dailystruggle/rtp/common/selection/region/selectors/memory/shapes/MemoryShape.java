@@ -17,20 +17,10 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 
 /**
- * Abstract class for shapes that store data in memory.
+ * Abstract base class for memory-backed shapes storing bad and biome locations.
+ * Uses Archimedean spiral 1D mapping for efficient spatial lookups.
  *
- * <p>This class implements the "learning algorithm" of the RTP plugin. It maintains
- * caches of known "bad" locations (e.g., oceans, lava) and known biome locations.
- * By keeping track of this data in memory (and persisting it via the database),
- * the shape avoids randomly selecting previously checked invalid coordinates.
- *
- * <p>It relies on custom implementations of Archimedean spirals (used in CIRCLE and SQUARE shapes)
- * to map 2D coordinate spaces into 1D sequences. This algorithm was specifically chosen over
- * alternatives like image compression algorithms because it enables the use of efficient 1D data
- * structures (like parallel arrays for keys and prefix sums) to perform extremely fast spatial
- * lookups and binary searches when generating random points.
- *
- * @param <E> enum for configuration values
+ * @param <E> enum type for configuration values
  */
 public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public long spatialResolution = 1L;
@@ -234,32 +224,24 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Returns the recorded rejection cause for the bad-location run that
-   * contains {@code (x, z)}, or {@code -1} if the coordinate is not known
-   * bad. The returned byte (when {@code >= 0}) is a
-   * {@link LocationGenerator.FailTypes} ordinal, mirroring the per-run
-   * {@link #badCauseCache}. Used by the region bad-locations chart bridge to
-   * colorize each unsafe pixel by outcome rather than a single hazard color.
+   * Returns rejection cause for bad-location run containing {@code (x, z)}, or {@code -1}.
+   * Non-negative return is a {@link LocationGenerator.FailTypes} ordinal.
    *
    * @param x the x coordinate
    * @param z the z coordinate
-   * @return the {@link LocationGenerator.FailTypes} ordinal, or {@code -1}
-   *     if {@code (x, z)} is not known bad
+   * @return {@link LocationGenerator.FailTypes} ordinal, or {@code -1} if not known bad
    */
   public int causeAt(int x, int z) {
     return causeAt((long) xzToLocation(x, z));
   }
 
   /**
-   * Returns the recorded rejection cause for the bad-location run that
-   * contains {@code location}, or {@code -1} if it is not known bad. The
-   * returned byte (when {@code >= 0}) is a
-   * {@link LocationGenerator.FailTypes} ordinal. Pending / rebuilding
+   * Returns rejection cause for bad-location run containing {@code location}, or {@code -1}.
+   * Non-negative return is a {@link LocationGenerator.FailTypes} ordinal. Pending/rebuilding
    * entries with no resolved run cause read as {@code misc}.
    *
    * @param location the location value
-   * @return the {@link LocationGenerator.FailTypes} ordinal, or {@code -1}
-   *     if {@code location} is not known bad
+   * @return {@link LocationGenerator.FailTypes} ordinal, or {@code -1} if not known bad
    */
   public int causeAt(long location) {
     if (pendingBadLocations.get().containsKey(location)) return MISC_CAUSE & 0xFF;
@@ -293,14 +275,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Returns an immutable snapshot of the current bad-location key array
-   * (sorted, packed long-encoded XZ keys). Used by the ADR-047 declarative
-   * chart bridge ({@code BadPointsHeatmapResolver} in rtp-core) to compose a
-   * {@code Heatmap2D} without touching internal state. No chunk I/O, no
-   * locking on the read path (the field is {@code volatile} and reassigned
-   * atomically by writers under {@code writeLock}).
+   * Returns an immutable snapshot of current bad-location key array (sorted packed XZ keys).
+   * Used by {@code BadPointsHeatmapResolver}. Volatile read without locking.
    *
-   * @return a fresh array copy; never {@code null}, may be zero-length
+   * @return fresh array copy; never {@code null}
    */
   public long[] badKeysSnapshot() {
     long[] keys = badKeysCache;
@@ -648,58 +626,31 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected static final long[] EMPTY_LONG_ARRAY = new long[0];
 
   /**
-   * Maximum walk distance (in 1D index steps) used by the default
-   * {@link #chunkToLocations(int, int)} implementation when probing for the
-   * (≤ 1) twin spiral index that may also decode to the same chunk.
-   *
-   * <p>The spiral's chunk-unit parameterisation guarantees that the second
-   * preimage, if any, lies within a small constant offset of the representative
-   * index (angular neighbour {@code ±1}, or radial neighbour on the adjacent
-   * ring whose offset scales with ring circumference). Subclasses that have an
-   * exact ring-circumference formula may override
-   * {@link #neighbourRingOffset(int, int)} to short-circuit the walk.
+   * Maximum walk distance (1D steps) used by default {@link #chunkToLocations(int, int)}
+   * when probing for twin spiral index decoding to the same chunk.
    */
   protected static final int CHUNK_TO_LOCATIONS_WALK_BUDGET = 8;
 
   /**
-   * Override hook: estimated number of 1D indices between two spiral cells at
-   * the same angle on adjacent rings, evaluated at the ring containing the
-   * given chunk. Shape-specific subclasses (notably {@code Circle} and
-   * {@code Square}) may return an exact value to let
-   * {@link #chunkToLocations(int, int)} probe the radial-twin candidate
-   * directly. The default returns {@code 0}, which causes the default
-   * implementation to skip the radial probe and rely on the angular walk only.
+   * Estimated 1D index offset between adjacent spiral rings at the same angle for given chunk.
+   * Override hook for subclasses with exact geometry (e.g. Circle, Square). Returns 0 by default.
    *
-   * @param cx chunk x in the shape's chunk-unit coordinate system
-   * @param cz chunk z in the shape's chunk-unit coordinate system
-   * @return non-negative offset, or {@code 0} to disable the radial probe
+   * @param cx chunk x in shape chunk-units
+   * @param cz chunk z in shape chunk-units
+   * @return non-negative ring offset, or 0 to rely solely on angular walk
    */
   protected long neighbourRingOffset(int cx, int cz) {
     return 0L;
   }
 
   /**
-   * Inverse of {@link #xzToLocation(long, long)} at chunk granularity. Returns
-   * every 1D index {@code n} in {@code [0, getRange())} for which
-   * {@code locationToXZ(n)} decodes to the chunk {@code (cx, cz)}.
+   * Inverse of {@link #xzToLocation(long, long)} at chunk granularity. Returns every 1D index
+   * in {@code [0, getRange())} where {@code locationToXZ(n)} decodes to chunk {@code (cx, cz)}.
+   * Bounded by <= 2 elements for Archimedean spirals (ADR-001).
    *
-   * <p>The result is bounded by <strong>≤ 2 elements</strong> for the
-   * spiral-based shapes ({@code CIRCLE}, {@code SQUARE}): the spiral's
-   * inter-turn radial spacing is one chunk, and a chunk's diagonal is
-   * {@code √2 &lt; 2}, so at most two consecutive turns of the curve can
-   * intersect a unit-square chunk. See ADR-001 and
-   * {@code docs/dev/scratch/CHECKLIST-chunk-to-locations-inverse.md}.
-   *
-   * <p>Returned indices are sorted ascending and distinct. May be empty for
-   * chunks outside the shape's annulus. Never {@code null}.
-   *
-   * <p>The default implementation is shape-agnostic and uses only
-   * {@link #xzToLocation(long, long)}, {@link #locationToXZ(long)} and
-   * {@link #contains(int, int)}. It is O(1) with a small constant.
-   *
-   * @param cx chunk x in the shape's chunk-unit coordinate system
-   * @param cz chunk z in the shape's chunk-unit coordinate system
-   * @return 0-, 1- or 2-element array of 1D indices; never {@code null}.
+   * @param cx chunk x in shape chunk-units
+   * @param cz chunk z in shape chunk-units
+   * @return sorted distinct array of 0, 1, or 2 1D indices; never {@code null}
    */
   public long[] chunkToLocations(int cx, int cz) {
     if (!contains(cx, cz)) return EMPTY_LONG_ARRAY;
@@ -720,7 +671,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     }
 
     // Angular walk: ±1 .. ±CHUNK_TO_LOCATIONS_WALK_BUDGET. We stop in each
-    // direction as soon as the decoded coordinate leaves the chunk — the
+    // direction as soon as the decoded coordinate leaves the chunk - the
     // representative is on the curve so the chunk's intersection with the
     // curve is contiguous in either direction.
     for (int delta = 1; delta <= CHUNK_TO_LOCATIONS_WALK_BUDGET; delta++) {
@@ -754,7 +705,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     // Radial probe (twin on adjacent ring at roughly the same angle). Skip
     // when subclass has no exact ring offset, or when we already have 2 hits.
     // The candidate must be at least one ring away from any already-found
-    // index — otherwise the angular walk would already have found it and we
+    // index - otherwise the angular walk would already have found it and we
     // would be double-counting a chunk that touches a single arc of the curve.
     if (second < 0L) {
       long ringOffset = neighbourRingOffset(cx, cz);
@@ -764,7 +715,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         for (long cand : candidates) {
           if (cand < 0L || cand >= range) continue;
           // Reject candidates that fall within the angular-walk window of an
-          // already-found index — they aren't on the adjacent ring.
+          // already-found index - they aren't on the adjacent ring.
           if (first >= 0L
               && Math.abs(cand - first) <= (long) CHUNK_TO_LOCATIONS_WALK_BUDGET) {
             continue;
@@ -784,37 +735,22 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Marks the given 1D index plus every other 1D index that decodes to the
-   * same chunk as bad. Use only for <strong>chunk-attributable</strong>
-   * rejections (biome, claim/protection, force-load mask, world-border,
-   * anvil pre-filter, ocean). Do <strong>not</strong> use for per-column
-   * safety failures ({@code FailTypes.safety}, {@code FailTypes.vert}) or
-   * for the {@code uniqueplacements} bookkeeping — those would mark valid
-   * locations bad (false positives), shrinking the effective region.
+   * Marks given 1D index and every twin index in the same chunk as bad.
+   * Use only for chunk-attributable failures (biome, claims, borders, anvil).
    *
-   * <p>By the ≤ 2 preimage bound on {@link #chunkToLocations(int, int)},
-   * this method marks at most 2 indices per call. The expected amplification
-   * over a circular annulus is {@code 1 + p₂ ≈ 1.57} (worst case 2.0 on
-   * pathologically narrow annuli) — see the scratch checklist for the
-   * derivation.
-   *
-   * @param location any 1D index that decodes to the target chunk.
-   * @return number of indices newly marked (0, 1 or 2). A return of 0 means
-   *         every preimage was already marked bad.
+   * @param location 1D index decoding to target chunk
+   * @return count of newly marked indices (0, 1, or 2)
    */
   public int addBadChunk(long location) {
     return addBadChunk(location, LocationGenerator.FailTypes.misc);
   }
 
   /**
-   * Cause-tagged variant of {@link #addBadChunk(long)}. Every preimage marked bad
-   * records {@code cause} (carried through to the per-run {@link #badCauseCache}
-   * after the next rebuild). See {@link #addBadChunk(long)} for the preimage
-   * semantics and amplification bound.
+   * Cause-tagged variant of {@link #addBadChunk(long)}.
    *
-   * @param location any 1D index that decodes to the target chunk.
-   * @param cause the rejection cause to attribute to the marked indices.
-   * @return number of indices newly marked (0, 1 or 2).
+   * @param location 1D index decoding to target chunk
+   * @param cause rejection cause attributed to marked indices
+   * @return count of newly marked indices (0, 1, or 2)
    */
   public int addBadChunk(long location, LocationGenerator.FailTypes cause) {
     int[] xz = locationToXZ(location);
@@ -839,25 +775,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Coerces a raw {@code uniquePlacements} config value into a non-negative
-   * chunk radius. The knob is an integer (default {@code 0} = off), but the
-   * loader may hand back a {@link Boolean} (legacy {@code true}/{@code false}
-   * configs), a {@link Number}, or a {@link String}. Coercion rules:
+   * Coerces uniquePlacements config value into a non-negative chunk radius.
+   * Handles Boolean (true->1, false->0), Number, String. 0 disables unique placements.
    *
-   * <ul>
-   *   <li>{@code null} -&gt; {@code 0}</li>
-   *   <li>{@link Boolean}: {@code true} -&gt; {@code 1}, {@code false} -&gt; {@code 0}</li>
-   *   <li>{@link Number}: truncated to {@code int}, clamped to {@code >= 0}</li>
-   *   <li>{@link String}: {@code "true"}/{@code "false"} map to {@code 1}/{@code 0};
-   *       otherwise parsed as an integer (unparseable -&gt; {@code 0})</li>
-   * </ul>
-   *
-   * <p>A return of {@code 0} means unique-placement marking is disabled; a
-   * value {@code n >= 1} marks a {@code (2n-1) x (2n-1)} chunk square centered
-   * on the landing chunk (so {@code 1} == the legacy single-chunk behavior).
-   *
-   * @param raw the raw config value (any type, or {@code null}).
-   * @return a non-negative chunk radius.
+   * @param raw raw config object or {@code null}
+   * @return non-negative chunk radius
    */
   public static int uniquePlacementsRadius(Object raw) {
     if (raw == null) return 0;
@@ -874,17 +796,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Marks every chunk within Chebyshev radius {@code chunkRadius - 1} of the
-   * chunk containing {@code location} as bad (a {@code (2r-1) x (2r-1)} square
-   * of chunks, where {@code r == chunkRadius}). Used for the
-   * {@code uniquePlacements} knob: {@code chunkRadius == 1} marks only the
-   * landing chunk (equivalent to {@link #addBadChunk(long)}), while larger
-   * values clear a radius of chunks around the selection so subsequent
-   * placements are spread out.
+   * Marks chunks within Chebyshev radius {@code chunkRadius - 1} around {@code location} as bad.
    *
-   * @param location any 1D index that decodes to the center chunk.
-   * @param chunkRadius the unique-placements radius ({@code <= 0} is a no-op).
-   * @return number of indices newly marked bad across all touched chunks.
+   * @param location center 1D index
+   * @param chunkRadius Chebyshev radius (<= 0 is no-op)
+   * @return newly marked index count
    */
   public int addBadChunkRadius(long location, int chunkRadius) {
     if (chunkRadius <= 0) return 0;
@@ -945,31 +861,23 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Returns the saved biome identifier recorded for the location run that
-   * contains {@code (x, z)}, or {@code null} if no saved biome data covers
-   * that coordinate. Reads only the in-memory, persisted biome-location cache
-   * ({@link #biomeKeysCache} / {@link #biomePrefixSumsCache}); performs no
-   * chunk I/O. Used by the region biome chart bridge to colorize each pixel
-   * from saved region data rather than live / on-disk anvil reads.
+   * Returns saved biome identifier for location run containing {@code (x, z)}, or {@code null}.
+   * Reads in-memory persisted cache without chunk I/O.
    *
    * @param x the x coordinate
    * @param z the z coordinate
-   * @return the canonical biome name, or {@code null} if not recorded
+   * @return canonical biome name, or {@code null}
    */
   public String biomeAt(int x, int z) {
     return biomeAt((long) xzToLocation(x, z));
   }
 
   /**
-   * Returns the saved biome identifier recorded for the location run that
-   * contains {@code location}, or {@code null} if no saved biome data covers
-   * it. Mirrors the floor-search used by {@link #causeAt(long)} but scans each
-   * per-biome run table in {@link #biomeKeysCache} /
-   * {@link #biomePrefixSumsCache}. Reads only persisted, in-memory data; no
-   * chunk I/O.
+   * Returns saved biome identifier for location run containing {@code location}, or {@code null}.
+   * Scans in-memory per-biome run tables without chunk I/O.
    *
    * @param location the location value
-   * @return the canonical biome name, or {@code null} if not recorded
+   * @return canonical biome name, or {@code null}
    */
   public String biomeAt(long location) {
     for (Map.Entry<String, long[]> e : biomeKeysCache.entrySet()) {
@@ -1000,19 +908,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Returns the union of biome identifiers that have been observed producing at least one
-   * candidate within this shape. The returned set is a live, unmodifiable view of
-   * {@link #biomePrefixSumsCache}'s key set and reflects subsequent updates.
+   * Returns union of biome identifiers observed producing at least one candidate.
+   * Unmodifiable view of {@link #biomePrefixSumsCache} keys, populated via Anvil observations.
    *
-   * <p>This is the authoritative enumeration consulted by the biome-allow-list inversion
-   * path in {@code LocationGenerator} — it is strictly tighter than
-   * {@code RTPServerAccessor#getBiomes(world)} and, by virtue of being populated only
-   * through the `LocationGenerator` pipeline (which is Anvil-first on every platform),
-   * is upgrade-drift proof: observations reflect what `.mca` palettes actually contain
-   * rather than what the current server seed / algorithm would synthesise live.</p>
-   *
-   * @return unmodifiable view of observed biome identifiers; empty before the first
-   *         successful candidate selection.
+   * @return unmodifiable set of observed biome identifiers
    */
   public Set<String> getObservedBiomes() {
     return Collections.unmodifiableSet(biomePrefixSumsCache.keySet());

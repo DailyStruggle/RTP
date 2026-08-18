@@ -22,16 +22,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * {@code /rtp admin prefab rollback <id>} - restore the most recent
  * {@code .bak.&lt;ts&gt;} siblings produced by a prior confirm. Per the
- * locked design decision (last-3 retention with the {@code prefab.bakRetention}
+ * design decision (last-3 retention with the {@code prefab.bakRetention}
  * knob), rollback walks the retention chain from newest to oldest.
- *
- * <p><strong>Session 4a scope:</strong> stub. The disk-touching side of
- * rollback - locating the {@code .bak.&lt;ts&gt;} siblings, restoring them
- * via atomic rename, and invoking the reload pipeline - is paired with the
- * Session 4b on-disk write path; until that lands there are no backups to
- * restore. This verb therefore audit-logs and rejects with an explicit "lands
- * in Session 4b" notice. The argument parsing is real so the command surface
- * is exercisable today.
  */
 public class PrefabRollbackCmd extends BaseRTPCmdImpl {
 

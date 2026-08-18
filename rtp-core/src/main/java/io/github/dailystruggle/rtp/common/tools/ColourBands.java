@@ -3,25 +3,8 @@ package io.github.dailystruggle.rtp.common.tools;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 /**
- * Resolves {@code /rtp info} health colour bands per {@code METRICS_PLAN.md > Health
- * colour coding} (B12). Returns a legacy {@code &}-code prefix ({@code &a} green,
- * {@code &e} yellow, {@code &c} red) for the supplied raw numeric value, looking
- * up threshold knobs from {@link MessagesKeys}. Missing or malformed keys fall
- * back to the documented defaults so operators never trip an exception when
- * downgrading from a customised {@code messages.yml}.
- *
- * <p>Threshold semantics:
- * <ul>
- *   <li>TPS, cache fill: <em>higher is better</em>. Green when value &ge; green
- *       threshold; yellow when value &ge; yellow threshold; otherwise red.</li>
- *   <li>MSPT: <em>lower is better</em>. Green when value &le; green threshold;
- *       yellow when value &le; yellow threshold; otherwise red.</li>
- *   <li>Network age: <em>lower is better</em>. Green when value &lt; yellow
- *       threshold; yellow otherwise.</li>
- * </ul>
- *
- * <p>NaN inputs render as {@code &7} (grey) so unavailable-metric sentinels do
- * not falsely paint red.
+ * Resolves {@code /rtp info} health colour bands (green, yellow, red).
+ * Looks up thresholds from {@link CommandMessages} with documented fallbacks.
  */
 public final class ColourBands {
 
@@ -84,14 +67,7 @@ public final class ColourBands {
     }
 
     /**
-     * Pick the {@code &}-code prefix for a tick-budget utilisation reading
-     * (fraction in {@code [0.0, 1.0]}, lower-is-better). Reuses the MSPT
-     * thresholds by converting to the equivalent MSPT figure assuming a 50 ms
-     * tick budget so a single set of knobs governs both readings.
-     *
-     * @param utilisation the raw utilisation value; {@link Double#NaN} renders
-     *                    as {@link #UNKNOWN}
-     * @return one of {@link #GREEN}, {@link #YELLOW}, {@link #RED}, {@link #UNKNOWN}
+     * Pick the {@code &}-code prefix for a tick-budget utilisation reading (fraction in [0.0, 1.0]).
      */
     public static String forTickBudgetUtilisation(double utilisation) {
         if (Double.isNaN(utilisation)) return UNKNOWN;
@@ -130,9 +106,7 @@ public final class ColourBands {
     }
 
     /**
-     * Resolve a numeric threshold from {@link MessagesKeys}, falling back to
-     * {@code fallback} when the key is absent, holds a non-numeric value, or
-     * when the configuration system is not yet initialised. Never throws.
+     * Resolve a numeric threshold from configuration, falling back to {@code fallback} if absent/invalid.
      */
     @SuppressWarnings("unchecked")
     static double resolveDouble(Enum<?> key, double fallback) {

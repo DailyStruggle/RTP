@@ -15,20 +15,10 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Session 4b on-disk side of the prefab pipeline. Pure static helpers; no
- * dependency on {@link io.github.dailystruggle.rtp.common.RTP} so each
- * method is unit-testable against a {@code @TempDir} plugin directory.
+ * On-disk helpers for the prefab pipeline. Pure static methods testable
+ * against temporary directories.
  *
- * <p>File-id convention (matches {@link PrefabApplier}):
- * <ul>
- *   <li>{@code "performance"} -> {@code <pluginDir>/performance.yml}</li>
- *   <li>{@code "regions/<id>"} -> {@code <pluginDir>/regions/<id>.yml}</li>
- * </ul>
- *
- * <p>Backup naming: {@code <originalFileName>.bak.<epochMillis>} as a sibling
- * of the original file. Rotation is FIFO by epoch (lexicographic on the
- * fixed-width suffix), oldest pruned first once the count exceeds the
- * retention cap.
+ * <p>Handles YAML reading, diff application, and timestamped {@code .bak} rotation.
  */
 public final class PrefabDiskIO {
 
@@ -94,25 +84,11 @@ public final class PrefabDiskIO {
     }
 
     /**
-     * Write the new tree to disk for a single file id. Behaviour:
-     * <ol>
-     *   <li>If the original file exists, copy it sideways as
-     *       {@code <name>.bak.<epochMillis>} via
-     *       {@link ConfigBackups#backup(File, int)}.</li>
-     *   <li>Load the original with comments preserved (or create an empty
-     *       config when the file is brand-new) so structural comments survive.</li>
-     *   <li>Apply each diff entry via {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection#set}
-     *       (dot-delimited key paths).</li>
-     *   <li>Save with comments preserved.</li>
-     *   <li>Prune sibling backups beyond {@code bakRetention}, oldest first.</li>
-     * </ol>
+     * Writes changes for a single file id to disk, saving a {@code .bak} copy first.
+     * Preserves comments and prunes excess backups beyond {@code bakRetention}.
      *
-     * @param bakRetention number of {@code .bak.<ts>} siblings to keep
-     *                     <strong>after</strong> the new backup is written.
-     *                     Clamped to {@code >= 1}; pass at least 1 so the
-     *                     just-written backup survives.
-     * @return the path of the freshly-written backup file, or {@code null}
-     *         if the original did not exist (new-file prefab).
+     * @param bakRetention number of backups to keep (clamped to >= 1).
+     * @return path of created backup, or {@code null} if target was a new file.
      */
     public static Path writeWithBackup(File pluginDirectory,
                                        String fileId,
@@ -123,17 +99,10 @@ public final class PrefabDiskIO {
     }
 
     /**
-     * Overload that seeds the comments of a brand-new target file from a
-     * {@code templateFileId} (e.g. {@code "regions/default"}). When the target
-     * already exists this argument is ignored - the live file's own comments
-     * are preserved as usual. When the target does not exist and the template
-     * file does, the template is loaded (with comments) and re-bound to the
-     * target path before the changes are applied, so a synthesised per-world
-     * region overlay inherits the structural comments of the reference
-     * {@code regions/default.yml} instead of writing a comment-less file.
+     * Overload that seeds comments of a brand-new target file from {@code templateFileId}
+     * (e.g. {@code "regions/default"}). Ignored if the target already exists.
      *
-     * @param templateFileId optional file id whose comments seed a new target;
-     *                       {@code null} disables template seeding.
+     * @param templateFileId optional template file id; {@code null} disables seeding.
      */
     public static Path writeWithBackup(File pluginDirectory,
                                        String fileId,

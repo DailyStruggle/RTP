@@ -14,29 +14,10 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 /**
- * Self-contained dispatcher for the {@code /rtp visualization &lt;kind&gt;}
- * sub-command family. Owns nothing menu/cart-related: it is intentionally
- * decoupled from {@link MenuRedeemSubcommand} so that visualization wiring
- * does not accrete onto the legacy redeem god-class (which the ADR-050
- * Stage 3β cleanup did not split). New visualization kinds belong here, not
- * on the redeem subcommand.
+ * Dispatcher for {@code /rtp visualization <kind>} subcommands.
  *
- * <p>Each entry point:
- * <ol>
- *   <li>Gates on {@link MenuPermissionGates#ADMIN_MENU_PERMISSION} (chart
- *       data surfaces admin-facing internals). Denial logs WARN and rejects
- *       through {@link CommandMessages#menuInvalid} (S-004).</li>
- *   <li>Builds a {@link ChartSpec} from {@code (kind, regionName)} inline.
- *       Invalid inputs reject through {@code menuInvalid}.</li>
- *   <li>Hands off to {@link MapDispatch#paint(ChartSpec, UUID)}, which owns
- *       the configurable viewer-facing failure surfaces
- *       ({@link CommandMessages#mapBindingMissing} /
- *       {@code mapResolverMissing} / {@code mapUnavailable} /
- *       {@code mapBusy}).</li>
- * </ol>
- *
- * <p>Package-private: only the visualization leaves in
- * {@link MenuConcreteCommandLeaves} construct one.
+ * <p>Validates admin permissions, constructs {@link ChartSpec}, and delegates
+ * rendering to {@link MapDispatch#paint(ChartSpec, UUID)}.
  */
 final class VisualizationDispatch {
 

@@ -14,16 +14,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for the {@link Polygon} memory shape (ADR-034).
- *
- * <p>Covers:
- * <ul>
- *   <li>Self-intersection rejection at {@code setVertices}</li>
- *   <li>Sub-3 vertex rejection and collinear (zero-area AABB) rejection</li>
- *   <li>Point-in-polygon correctness for convex and concave (L-shape) polygons</li>
- *   <li>AABB mirrored onto the inherited Square (radius/centerX/centerZ)</li>
- *   <li>{@code expand=true} forced to false on {@code rand()}</li>
- * </ul>
+ * Unit tests for {@link Polygon} memory shape (ADR-034): vertex validation,
+ * point-in-polygon containment, AABB bounds, and random selection.
  */
 public class PolygonTest {
 
@@ -52,7 +44,7 @@ public class PolygonTest {
   @Test
   void setVertices_collinear_rejected() {
     Polygon p = new Polygon();
-    // All vertices on z=0 line → zero-extent AABB on z-axis.
+    // All vertices on z=0 line -> zero-extent AABB on z-axis.
     assertThrows(IllegalArgumentException.class,
         () -> p.setVertices(Arrays.asList(
             new int[] {0, 0}, new int[] {10, 0}, new int[] {20, 0})));

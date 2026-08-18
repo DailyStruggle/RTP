@@ -12,16 +12,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Platform-neutral driver for the world-scan on-screen progress bar.
- *
- * <p>Each invocation reads the live {@link RTP#scanTasks} map, computes an aggregate title
- * from the {@code scanBossBar} message template, and delegates rendering to the active
- * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#updateProgressBars(Map)}.
- * The accessor (Bukkit boss-bar, Fabric/NeoForge boss-bar, or the default no-op) owns all
- * platform UI decisions, so this driver references no platform type and runs identically on
- * every platform.
- *
- * <p>Scheduled from {@code RTP.start()} as a periodic main/server-thread task; an empty
- * {@code scanBossBar} template or an empty scan-task map clears any bars.
+ * Aggregates active {@link RTP#scanTasks} metrics and updates progress bars.
  */
 public final class ScanProgressBars {
   /** Permission a player must hold to see a scan progress bar. */

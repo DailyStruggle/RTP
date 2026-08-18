@@ -11,24 +11,8 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test cancel [all]} &mdash; aborts any in-flight {@code rtp test *}
- * job registered with {@link ActiveTestJobs}. Without arguments, cancels jobs
- * owned by the caller; with literal argument {@code all}, cancels every
- * active job (requires {@code rtp.test.admin}).
- *
- * <p>This exists because a bad {@code iterations:1000 intervalTicks:10}
- * invocation currently has no in-band stop switch short of a server
- * restart. See {@code RUNTIME_TEST_SUITE_PLAN.md §3.3 (cancel)}.
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>REQ-RTP-S-004</b> &mdash; every cancel outcome (including
- *       &quot;nothing to cancel&quot;) produces a caller-visible message
- *       and an {@link Level#INFO} or {@link Level#WARNING} log entry.
- *       Permission denial on {@code all} is logged at WARNING.</li>
- *   <li>Cancel itself performs no chunk I/O and no synchronous blocking,
- *       so S-005 is trivially satisfied.</li>
- * </ul>
+ * {@code rtp test cancel [all]} - aborts in-flight {@code rtp test *} jobs in {@link ActiveTestJobs}.
+ * Cancels caller-owned jobs by default, or all jobs if 'all' token is passed (REQ-RTP-S-004).
  */
 public class TestCancelCmd extends BaseRTPCmdImpl {
 

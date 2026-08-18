@@ -203,7 +203,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         sb.append("p50: ").append(fmtMs(MetricsRecorder.percentile(lat, 50))).append('\n');
         sb.append("p95: ").append(fmtMs(MetricsRecorder.percentile(lat, 95))).append('\n');
         sb.append("p99: ").append(fmtMs(MetricsRecorder.percentile(lat, 99))).append('\n');
-        // Per-target breakdown — the whole point of supporting multiple
+        // Per-target breakdown - the whole point of supporting multiple
         // target-commands is the head-to-head comparison.
         var observed = rec.observedTargetLabels();
         if (observed.size() > 1) {

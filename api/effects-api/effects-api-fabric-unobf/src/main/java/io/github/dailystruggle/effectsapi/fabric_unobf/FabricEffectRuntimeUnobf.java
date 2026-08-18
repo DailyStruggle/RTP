@@ -61,7 +61,7 @@ public final class FabricEffectRuntimeUnobf {
      * @param strict if {@code true}, {@link #schedule(Runnable, long)} throws
      *               on no-server-bound (test-friendly); if {@code false} it
      *               warns once to {@code System.err} and drops the task
-     *               (production-friendly — RTP shouldn't crash if effects fire
+     *               (production-friendly - RTP shouldn't crash if effects fire
      *               between disabling and JVM exit).
      */
     public FabricEffectRuntimeUnobf(boolean strict) {
@@ -102,7 +102,7 @@ public final class FabricEffectRuntimeUnobf {
     // is fragile (constructor arity changes, Holder<SoundEvent> vs raw
     // SoundEvent, boolean-prefix on sendParticles, intermediary remapping).
     // Per-version adapters compile against Yarn/intermediary mappings via
-    // Loom and don't have those degrees of freedom — registering a lambda
+    // Loom and don't have those degrees of freedom - registering a lambda
     // from there bypasses the resolver entirely.
     //
     // See effects-api/docs/adr/effects-api-ADR-003-… (Fabric platform split)
@@ -111,7 +111,7 @@ public final class FabricEffectRuntimeUnobf {
 
     /**
      * Plays a sound directly to {@code player}. Implementations may target the
-     * player's connection (preferred — bypasses the chunk tracker, which drops
+     * player's connection (preferred - bypasses the chunk tracker, which drops
      * broadcast packets right after a long teleport) or fall back to a level
      * broadcast.
      */
@@ -181,7 +181,7 @@ public final class FabricEffectRuntimeUnobf {
      * 1.20.5 ({@code MobEffect} → {@code Holder<MobEffect>}); effects-api is
      * non-Loom and cannot pick the correct ctor at compile time. Per-version
      * Loom adapters (rtp-fabric-v*) register an implementation that calls the
-     * mapped ctor directly. Per AGENTS.md "no reflection in the api — if we
+     * mapped ctor directly. Per AGENTS.md "no reflection in the api - if we
      * need Mojang mappings we use an interface completed by each server
      * version adapter".
      */

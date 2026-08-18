@@ -23,8 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice D row D8 - lifecycle + idempotency coverage for the reference
- * {@link InMemoryNetworkRequestQueue}.
+ * Lifecycle and idempotency coverage for the reference {@link InMemoryNetworkRequestQueue}.
  */
 final class InMemoryNetworkRequestQueueTest {
 

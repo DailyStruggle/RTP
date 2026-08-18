@@ -14,17 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 /**
- * Owns the in-memory set of enrolled emergency-platform restore jobs (ADR-060) and the
- * periodic, chunk-loaded-gated countdown reaper. Persistence (resume across restarts) is
- * delegated to {@link PlatformRestoreSqlStore} when the active database accessor is SQL-backed;
- * otherwise the manager runs in-memory only (countdowns do not survive a restart, which is the
- * pre-feature behaviour for non-SQL stores).
- *
- * <p>The reaper never force-loads a chunk to run the timer (S-005): an entry whose footprint
- * chunk is unloaded is simply skipped that pulse, freezing its countdown. When an entry reaches
- * zero remaining chunk-loaded seconds, the restore is scheduled on the region-owning thread via
- * {@code RTP.scheduler.runTask(RTPLocation, ...)} and, on completion, both the in-memory entry
- * and the DB row are removed (S-004: every skip/failure is audited via {@code RTP.log}).
+ * Manages enrolled emergency-platform restore jobs (ADR-060) and periodic countdown reaper.
+ * Skips unloaded chunks without force loading (S-005) and dispatches block restores to owning threads.
  */
 public final class PlatformRestoreManager {
   /** Process-wide manager handle, lazily created and started during core init. */

@@ -13,13 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Covers compile-time tag expansion (ADR-017).
- *
- * <p>Verifies that {@link SafetyCompilationCache#getOrCompile(java.util.Collection,
- * Map, java.util.function.Consumer)} produces a tag-free
- * {@link CompiledUnsafeSet} whose {@code plainMaterials} and
- * {@code materialStatePredicates} contain everything that would otherwise be
- * matched by a live tag-membership check in the hot path.
+ * Tests compile-time tag expansion into tag-free {@link CompiledUnsafeSet} instances (ADR-017).
  */
 class SafetyCompilationCacheTagExpansionTest {
 

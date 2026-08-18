@@ -51,7 +51,7 @@ public final class FabricCommandRegistrar {
         // CommandBuildContext (intermediary class_7157) and CommandSelection
         // (class_5364) in the constant pool. On MC 26.1.2's deobfuscated
         // runtime those intermediary aliases are absent, so the JVM verifier
-        // throws NoClassDefFoundError when the lambda class is loaded —
+        // throws NoClassDefFoundError when the lambda class is loaded -
         // which happens at register() time, not at invocation.
         // Build the SAM via Proxy.newProxyInstance against the reflectively
         // loaded callback interface so no intermediary symbol enters this

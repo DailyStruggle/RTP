@@ -195,7 +195,7 @@ public final class FabricHandles implements HandleProvider {
             }
 
             // Arm a landing watchdog on the server thread. Integer.MAX_VALUE is
-            // treated as "no timeout" — skip scheduling entirely.
+            // treated as "no timeout" - skip scheduling entirely.
             if (landingTimeoutTicks > 0 && landingTimeoutTicks < Integer.MAX_VALUE) {
                 final UUID id = player.getUUID();
                 net.minecraft.server.MinecraftServer server = player.getServer();

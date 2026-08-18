@@ -102,11 +102,10 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       }
     }
 
-    // Phase 1.5 (CHECKLIST-fabric-rtp-test-full.md): install the Bukkit
-    // implementations of the /rtp test ... umbrella SPI onto RTP. Doing
-    // this once RTP.serverAccessor + RTP.scheduler are wired guarantees
-    // both adapter dependencies are usable. Idempotent: the field is
-    // volatile and may be overwritten on a hot reload.
+    // Install the Bukkit implementations of the /rtp test ... umbrella SPI onto RTP.
+    // Doing this once RTP.serverAccessor + RTP.scheduler are wired guarantees both
+    // adapter dependencies are usable. Idempotent: the field is volatile and may be
+    // overwritten on a hot reload.
     RTP.testUmbrellaContext =
         new io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext(
             new io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestUmbrellaSender(),
@@ -116,15 +115,13 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable ENTER -- initializing bStats Metrics(id=30865)");
     metrics = new Metrics(this, 30865);
     // Register the RTP cost-metrics chart catalogue. All chart lambdas read
-    // RTP.metrics.snapshot() (METRICS_PLAN.md SPI) and bucketise to keep
-    // submissions privacy-safe and low-cardinality. See METRICS_PLAN.md
-    // > bStats Integration and BStatsChartIds for the catalogue.
+    // RTP.metrics.snapshot() and bucketise to keep submissions privacy-safe and
+    // low-cardinality.
     io.github.dailystruggle.rtp.bukkit.metrics.RTPCostMetricsCharts.register(metrics, "full");
 
-    // CHECKLIST-metrics-and-multiserver.md row B9: install the platform-
-    // appropriate MetricsBinding so /rtp info, RTPCostMetricsCharts, and
-    // every other Metrics.snapshot() consumer report live values instead
-    // of UNSAMPLED sentinels. Best-effort; never aborts plugin enable.
+    // Install the platform-appropriate MetricsBinding so /rtp info, RTPCostMetricsCharts,
+    // and every other Metrics.snapshot() consumer report live values instead of
+    // UNSAMPLED sentinels. Best-effort; never aborts plugin enable.
     io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.install();
 
     if (RTP.getInstance() == null) {
@@ -211,12 +208,10 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // regions configured for a late-loaded world to never rebind.
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable setupBukkitEvents (synchronous)");
     setupBukkitEvents();
-    // CHECKLIST-maps-api.md Stage 2.6 - install the Bukkit-family MapBinding
-    // so that MapDispatch (ADR-047 / REQ-RTP-MAP-006) can satisfy chart
-    // requests issued from /rtp info etc. Stage 2.3 selects FoliaMapBinding
-    // on Folia (per-viewer EntityScheduler hop available for Stage 3 live
-    // charts); other backends get the plain BukkitMapBinding. bindLive
-    // remains deferred on both paths (Stage 3 of CHECKLIST-metrics-to-maps).
+    // Install the Bukkit-family MapBinding so MapDispatch (ADR-047 / REQ-RTP-MAP-006)
+    // can satisfy chart requests issued from /rtp info etc. Folia gets FoliaMapBinding
+    // (per-viewer EntityScheduler hop available for live charts); other backends get
+    // the plain BukkitMapBinding. Live binding is not yet enabled on either path.
     try {
       io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding binding =
           isFolia()
@@ -363,7 +358,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable JarUtils.extractDocs version=" + getDescription().getVersion());
     JarUtils.extractDocs(getDataFolder(), getDescription().getVersion());
 
-    // ADR-023 — Login Reserve Cache: snapshot max-players at startup, allocate
+    // ADR-023 - Login Reserve Cache: snapshot max-players at startup, allocate
     // the buffer on the default-world region (Bukkit.getWorlds().get(0)), and
     // dispatch the startup burst. Decoupled from Region.execute() per ADR-023.
     initLoginReserveCache();
@@ -372,7 +367,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   }
 
   /**
-   * ADR-023 — initialise the Login Reserve Cache on the default-world region
+   * ADR-023 - initialise the Login Reserve Cache on the default-world region
    * if {@code PerformanceKeys.loginCacheEnabled=true}. Sized to
    * {@code loginCacheCap} (or {@code Bukkit.getMaxPlayers()} when
    * {@code loginCacheCap=0}). Idempotent: safe to call after reload.
@@ -390,9 +385,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       if (!enabled) return;
 
       long configuredCap = perf.getNumber(PerformanceKeys.loginCacheCap, 0L).longValue();
-      // C6 (Section C of CHECKLIST-metrics-and-multiserver) — read soft cap
-      // from the M2 metrics snapshot when a binding is installed; fall back
-      // to Bukkit.getMaxPlayers() only on the NOOP path (snapshot.softCap=0).
+      // Read soft cap from the metrics snapshot when a binding is installed; fall
+      // back to Bukkit.getMaxPlayers() only on the NOOP path (snapshot.softCap=0).
       io.github.dailystruggle.metrics.api.MetricsSnapshot bootSnap =
           RTP.metrics.snapshot();
       int snapshotCap = bootSnap.softCap;
@@ -424,10 +418,10 @@ public final class RTPBukkitPlugin extends JavaPlugin {
               + "' cap=" + cap + " (default world '" + defaultWorldName + "')");
 
       // Startup burst: dispatch up to (cap - currentOnline) async promotions.
-      // C6 — prefer the M2 snapshot when bound; fall back to the Bukkit API
-      // on the NOOP path (snapshot.playerCount=0 on first boot before the
-      // sampler has run, which is also the value Bukkit returns at this
-      // lifecycle point, so the two paths are semantically aligned).
+      // Prefer the metrics snapshot when bound; fall back to the Bukkit API on the
+      // NOOP path (snapshot.playerCount=0 on first boot before the sampler has run,
+      // which is also the value Bukkit returns at this lifecycle point, so the two
+      // paths are semantically aligned).
       io.github.dailystruggle.metrics.api.MetricsSnapshot burstSnap =
           RTP.metrics.snapshot();
       int online = (burstSnap.playerCount > 0)
@@ -462,18 +456,16 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       RTP.log(java.util.logging.Level.WARNING,
           "[RTP] onDisable network-mode shutdown failed (continuing): " + t.getMessage(), t);
     }
-    // CHECKLIST-metrics-and-multiserver.md row B9: tear down the metrics
-    // binding and cancel the Spigot tick sampler (if installed) so a
-    // /reload cycle reinstalls cleanly. Idempotent.
+    // Tear down the metrics binding and cancel the Spigot tick sampler (if installed)
+    // so a /reload cycle reinstalls cleanly. Idempotent.
     try {
       io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.uninstall();
     } catch (NoClassDefFoundError ignored) {
     }
-    // CHECKLIST-maps-api.md Stage 2.2 / REQ-RTP-MAP-003 - fan out the
-    // host-plugin disable to every registered MapBindingLifecycle so the
-    // active BukkitMapBinding (installed in onEnable) releases its cached
-    // MapHandles and the active-GC tracker no longer sees the binding's
-    // entries. Idempotent; safe if MapDispatch was never used this lifecycle.
+    // REQ-RTP-MAP-003 - fan out the host-plugin disable to every registered
+    // MapBindingLifecycle so the active BukkitMapBinding (installed in onEnable)
+    // releases its cached MapHandles and the active-GC tracker no longer sees the
+    // binding's entries. Idempotent; safe if MapDispatch was never used this lifecycle.
     try {
       io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.fireDisable();
     } catch (Throwable t) {
@@ -612,7 +604,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerRespawn(), this);
     // Deprecated external-teleport interceptor; kept wired for one release cycle, slated for
-    // removal. See OnPlayerTeleport class Javadoc and MULTI_PLATFORM_PLAN.md Step E-tail.
+    // removal. See OnPlayerTeleport class Javadoc.
     @SuppressWarnings("deprecation")
     OnPlayerTeleport legacyTeleportListener = new OnPlayerTeleport();
     Bukkit.getPluginManager().registerEvents(legacyTeleportListener, this);
@@ -622,10 +614,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // config flag, so a disabled flag costs only a cheap boolean check.
     Bukkit.getPluginManager().registerEvents(new OnChunkLoad(), this);
 
-    // L2 of CHECKLIST-cross-server-rtp.md: hand the network-mode bootstrap a
-    // plugin reference so it can register its JoinTriggerSource alongside
-    // the other listeners. No-op when network mode is disabled (boot() left
-    // joinTriggerSource null).
+    // Hand the network-mode bootstrap a plugin reference so it can register its
+    // JoinTriggerSource alongside the other listeners. No-op when network mode is
+    // disabled (boot() left joinTriggerSource null).
     try {
       networkBootstrap.registerJoinTriggerSource();
     } catch (Throwable t) {

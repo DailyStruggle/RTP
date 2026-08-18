@@ -12,18 +12,9 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /rtp clear cooldown} child verb (alias {@code data}). Drops a player's
- * latest teleport data, which is what gates the teleport cooldown: the cooldown
- * is derived from {@code now - TeleportData.time} against {@code player.cooldown()},
- * so removing the player's {@link RTP#latestTeleportData} (and
- * {@link RTP#priorTeleportData}) entry immediately lifts the cooldown for the
- * live session. When a database accessor is present the persisted row is
- * overwritten with a zeroed timestamp so the cleared cooldown survives a restart.
- *
- * <p>Targeting (self / listed players / console-global) is inherited from
- * {@link PlayerTargetedClearCmd}.
- *
- * <p>Permission: {@code rtp.admin}.
+ * {@code /rtp clear cooldown} child verb (alias {@code data}).
+ * Drops latest teleport data to reset cooldown in memory and writes zeroed timestamp to DB.
+ * Permission: {@code rtp.admin}.
  */
 public class ClearCooldownCmd extends PlayerTargetedClearCmd {
 

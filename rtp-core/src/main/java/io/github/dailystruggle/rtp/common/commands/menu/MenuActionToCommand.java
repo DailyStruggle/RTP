@@ -6,32 +6,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Locale;
 
 /**
- * Translates a {@link MenuAction} into its concrete-command wire form
- * (ADR-050 Stage 3β.D.2b, 2026-05-24).
- *
- * <p>Single source of truth for the {@code MenuAction -> /rtp menu ...}
- * mapping shared by {@code BookMenuRenderer} (Paper / Folia book pages) and
- * {@code ChatMenuRenderer} (Fabric chat lines, future Bukkit chat fallback).
- * Without a shared helper the two renderers drift on every new
- * {@code MenuAction} variant; with it, only the call sites differ
- * (Adventure {@code ClickEvent.runCommand(...)} vs. Fabric / mojmap
- * {@code ClickEvent.Action.RUN_COMMAND}).
- *
- * <p>Renderer-only variants - {@link MenuAction.ChangePage},
- * {@link MenuAction.SuggestInput}, {@link MenuAction.OpenExternalUrl} - are
- * included for completeness but produce no concrete command:
- * <ul>
- *   <li>{@code ChangePage} emits {@code /rtp menu page n=<n+1>} where
- *       {@code n} is the 1-based wire page index (the
- *       {@link MenuAction.ChangePage#pageIndex()} record stores the
- *       0-based array index).</li>
- *   <li>{@code SuggestInput} returns {@code null} - the renderer should
- *       fall back to a non-running click (e.g. Adventure
- *       {@code ClickEvent.suggestCommand}) or degrade to plain text.</li>
- *   <li>{@code OpenExternalUrl} returns {@code null} - same fallback
- *       contract; the chat renderer degrades to plain text since no
- *       chat-channel URL-click is offered today.</li>
- * </ul>
+ * Translates a {@link MenuAction} into its concrete command wire form.
+ * Single source of truth for menu action mapping shared across renderers.
  */
 public final class MenuActionToCommand {
 
@@ -126,15 +102,7 @@ public final class MenuActionToCommand {
                             + " kind=" + mm.parserKind()
                             + " entry=" + mm.entryName()
                             + " op=" + mm.op().name().toLowerCase(Locale.ROOT);
-            // ADR-050 Stage 3β + bad-locations leaf (2026-05-26): OpenMap
-            // dispatches to the per-Kind typed sub-command under
-            // `/rtp visualization`. The legacy `x=<kind>:<region>` wire
-            // form (root-level `x=` parameter on VisualizationRootCmd) was
-            // removed when the typed sub-commands landed; the framework
-            // refuses it as "invalid command argument". One literal per
-            // ChartSpec.Kind; reserved (no-leaf-yet) kinds still emit a
-            // best-guess literal so they're ready when the corresponding
-            // leaf lands. See MenuConcreteCommandLeaves.VisualizationRootCmd.
+            // OpenMap dispatches to typed sub-command under /rtp visualization (ADR-050).
             case MenuAction.OpenMap openMap ->
                     "/rtp visualization " + visualizationKindLiteral(openMap.kind())
                             + " region=" + openMap.regionName();
@@ -142,14 +110,10 @@ public final class MenuActionToCommand {
     }
 
     /**
-     * Chat-renderer helper: a {@link MenuAction.ChangePage} maps to a
-     * concrete {@code /rtp menu page n=<n>} command (1-indexed wire form;
-     * the record stores 0-indexed array positions). The book renderer
-     * prefers Adventure's native {@code ClickEvent.changePage(int)} and
-     * does not need this.
+     * Maps {@link MenuAction.ChangePage} to 1-indexed {@code /rtp menu page n=<n>}.
      *
-     * @param change the change-page action; never {@code null}
-     * @return the literal {@code /rtp menu page n=<n>} command
+     * @param change change-page action; never {@code null}
+     * @return literal {@code /rtp menu page n=<n>} command
      */
     public static String changePageCommand(MenuAction.ChangePage change) {
         // 0-based -> 1-based wire form.
@@ -213,15 +177,11 @@ public final class MenuActionToCommand {
     }
 
     /**
-     * Returns {@code " path=<dotted>"} when the path is non-empty, or the
-     * empty string when it is null/empty. The commands-api parameter parser
-     * rejects any argument that ends in {@code =} (empty value) before the
-     * leaf's onCommand runs (TreeCommand.java:224), so an empty path must
-     * NOT be emitted as {@code path=}; instead the leaf treats a missing
-     * {@code path=} as root.
+     * Returns {@code " path=<dotted>"} or empty string if path is empty/null.
+     * Prevents generating trailing {@code path=} arguments rejected by parser.
      *
-     * @param path the path segments; {@code null} or empty returns the empty string
-     * @return {@code " path=<dotted>"} or the empty string
+     * @param path path segments
+     * @return {@code " path=<dotted>"} or empty string
      */
     public static String pathArg(String[] path) {
         String d = dotted(path);
@@ -229,13 +189,10 @@ public final class MenuActionToCommand {
     }
 
     /**
-     * Encodes an {@link MenuAction.InfoScopeToken} for the {@code scope=}
-     * parameter of {@code /rtp menu info}. Format matches
-     * {@code InfoCmd.parseScope}: {@code global}, {@code world:<name>},
-     * {@code region:<name>}.
+     * Encodes {@link MenuAction.InfoScopeToken} for the {@code scope=} parameter of {@code /rtp menu info}.
      *
-     * @param scope the scope token to encode; never {@code null}
-     * @return the wire-form scope string
+     * @param scope scope token to encode; never {@code null}
+     * @return wire-form scope string
      */
     public static String scopeWire(MenuAction.InfoScopeToken scope) {
         return switch (scope.kind()) {

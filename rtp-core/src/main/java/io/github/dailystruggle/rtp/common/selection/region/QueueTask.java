@@ -23,13 +23,7 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /**
- * State machine for the queue path of
- * {@link LocationGenerator#getLocationFuture(Region, RTPCommandSender, RTPPlayer, Set)}.
- *
- * <p>Non-blocking port of the original {@code while (!custom) { poll(); evaluate; }}
- * loop. Each polled pair is evaluated via chained {@link CompletableFuture}s; on
- * rejection, the task polls again without returning to the worker pool unless a
- * stage completed on a different thread.
+ * Non-blocking state machine evaluating queued pre-generated locations.
  */
 final class QueueTask {
 
@@ -163,12 +157,8 @@ final class QueueTask {
             return;
         }
 
-        // BIOME_LOOKUP_PERF_PLAN.md Stage 1 — probe-first gate (QUEUETASK_PROBE_FIRST_PLAN.md
-        // Mirrors PregenTask.tryProbeFirst / ScanTask.tryProbeFirstScan: try to
-        // reject the candidate from a lean column probe before paying for the full
-        // getOrLoadChunk decode. On probe-accept / probe-UNKNOWN / probe-exception we
-        // fall through to the original load path unchanged; the post-load evaluateSafety
-        // and Region.execute unkept→kept recheck remain authoritative.
+        // Probe-first gate: try to reject candidate from lean column probe
+        // before paying for full chunk decode.
         if (tryProbeFirstQueue(pair, left, world, cx, cz)) {
             return;
         }
@@ -176,26 +166,12 @@ final class QueueTask {
     }
 
     /**
-     * Stage-1 probe-first gate for the location caching loop
-     * (both {@code RegionCacheTask}-driven fills of {@code unkeptLocations}
-     * and player-triggered {@code LocationGenerator.getLocation} attempts).
+     * Probe-first gate for the location caching loop.
      *
      * <p>Returns {@code true} iff the probe committed a verdict that the caller
-     * must honour without running the full load path:
-     * <ul>
-     *   <li><b>Reject</b> — {@link #pollNext()} has been (or will be) invoked
-     *       via {@link #reenterAsync(Runnable)}. No chunk load, no reservation,
-     *       no DB write.</li>
-     *   <li><b>Accept-via-async</b> — the probe completed asynchronously and
-     *       {@link #runFullLoadAndResolve} was dispatched from the callback.</li>
-     * </ul>
-     * Returns {@code false} on synchronous probe-UNKNOWN (default no-op adapter,
-     * probe future null, adapter threw) so the caller runs the load path inline —
-     * preserving zero behaviour change on platforms without an Anvil-backed probe.</p>
+     * must honour without running the full load path.
      *
-     * <p>S-005: all probe work stays on the async pool; the
-     * {@link java.util.concurrent.CompletableFuture} chain matches the shape used by
-     * {@code ScanTask.tryProbeFirstScan} / {@code PregenTask.tryProbeFirst}.</p>
+     * <p>S-005: all probe work stays on the async pool.</p>
      */
     private boolean tryProbeFirstQueue(
             RTPLocation pair, RTPCoords left, RTPWorld<?> world, int cx, int cz) {
@@ -212,7 +188,7 @@ final class QueueTask {
 
         CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
         try {
-            // PR-18 window: widen by one block below minY so adjustFromProbe's
+            // Widen window by one block below minY so adjustFromProbe's
             // standing-surface y-1 read doesn't trivially reject.
             fut = world.probeChunkColumn(cx, cz, minY - 1, maxY);
         } catch (Throwable t) {
@@ -237,7 +213,7 @@ final class QueueTask {
             try {
                 picked = vert.adjustFromProbe(probe, world.name());
             } catch (Throwable t) {
-                // Adjustor misbehaved — treat as UNKNOWN, fall through.
+                // Adjustor misbehaved - treat as UNKNOWN, fall through.
                 return false;
             }
             if (picked == null) {
@@ -245,7 +221,7 @@ final class QueueTask {
                 reenterAsync(this::pollNext);
                 return true;
             }
-            return false; // probe-accept — caller runs full load.
+            return false; // probe-accept - caller runs full load.
         }
 
         // Async completion: we've committed to this candidate; continuation happens
@@ -364,7 +340,7 @@ final class QueueTask {
         // Defensive re-resolve (Option 2+3, 2026-05-08): a chunk can be unloaded
         // between getOrLoadChunk completing and this consumer reading block state.
         // For live-backed chunks (isSelfContained==false) re-fetch the cached
-        // reference and re-check isChunkLoaded — rejection routes through the
+        // reference and re-check isChunkLoaded - rejection routes through the
         // existing FailTypes.nullChunk attribution path. Anvil-backed chunks
         // (isSelfContained==true) are off-disk snapshots that cannot go stale,
         // so they bypass the guard and proceed unchanged.
@@ -416,7 +392,7 @@ final class QueueTask {
             LocationGenerator.lastUpdate.set(t);
             safetyRadiusVal = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
             LocationGenerator.safetyRadiusCache.set(safetyRadiusVal);
-            // Ground-sweep depth — reuses SafetyKeys.safetyRadius so it stays
+            // Ground-sweep depth - reuses SafetyKeys.safetyRadius so it stays
             // distinct from SafetyKeys.platformDepth (which exclusively sizes the
             // platform-creation tool in BukkitRTPWorld.platform / FoliaRTPWorld.platform).
             // Floor of 1 so the live-chunk re-check in runSafetyScan always validates
@@ -513,11 +489,11 @@ final class QueueTask {
             ChunkReservation reservation) {
 
         // Safety scan must run on the centre chunk's owning region thread on
-        // Folia — live-backed RTPChunk.isSafe reads Level.getBlockState, which
+        // Folia - live-backed RTPChunk.isSafe reads Level.getBlockState, which
         // is thread-local. On Spigot/Paper, RTP.scheduler.runTask(world,cx,cz,..)
         // hops to the MAIN server thread, which would dump a region-hop onto
         // the tick loop per candidate (unacceptable). Only Folia needs the
-        // region-thread hop — dispatch inline on other platforms where the
+        // region-thread hop - dispatch inline on other platforms where the
         // current async-worker context is fine for the read.
         Runnable scan = () -> runSafetyScan(pair, left, world, localChunks, L,
             centerChunkX, centerChunkZ, safe, unsafeBlocks, reservation);
@@ -575,18 +551,7 @@ final class QueueTask {
                 }
             }
 
-            // Always-on commit-time re-validation of the candidate's own column on
-            // the live center chunk, independent of safetyRadius. This mirrors the
-            // gate that LinearAdjustor / JumpAdjustor used at probe time:
-            //   - head cell (y+1) must not be in unsafeBlocks,
-            //   - ground sweep (y-1 .. y-platformDepth) must not be in unsafeBlocks.
-            // Rationale: with safetyRadius:0 the cube loop above only inspected the
-            // feet air cell (trivially safe), so any probe-vs-live drift on the
-            // ground (e.g. ice that melted to water, source water that flowed in,
-            // a waterlogged-state block whose Set<String> isSafe path missed it)
-            // went unchallenged. Re-running the predicate on the live center chunk
-            // closes that window without changing the meaning of safetyRadius for
-            // operators who configured a wider neighbourhood scan.
+            // Ground and head re-validation on the live center chunk, independent of safetyRadius.
             if (pass) {
                 RTPChunk<?> centerLive = (L > 0)
                         ? localChunks[safe * L + safe]
@@ -646,7 +611,7 @@ final class QueueTask {
                         // into GenerationResult and is closed by TeleportPipelineTask.runCleanup
                         // on every exit path. Calling transferOwnership() flips the
                         // reservation's `transferred` flag, which makes its later close()
-                        // a no-op — leaking the kept entry's pinned chunk ticket on every
+                        // a no-op - leaking the kept entry's pinned chunk ticket on every
                         // successful queue-path teleport (kept count growth observed via
                         // /rtp info). The downstream load/verify code only needs the
                         // ChunkSet *view*, not ownership.
@@ -687,18 +652,8 @@ final class QueueTask {
     }
 
     /**
-     * Determines whether {@code region} is pumped by {@link io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing},
-     * i.e. whether {@code Region.execute()} is periodically invoked for it.
-     *
-     * <p>Only the permanently-configured regions in {@code permRegionLookup} are
-     * ticked; synthetic temp regions (shape/vert overrides and ADR-065
-     * world-override regions such as {@code default_world_nether}) are never
-     * pumped, so their teleport waitlist ({@code queueManager.playerQueue}) is
-     * never drained. Enqueuing a player on such a region traps them in the
-     * teleporting state forever. The check is by object identity because
-     * {@link Region#equals(Object)} is value-based (shape/vert/world) and a
-     * temp region cloned from {@code default} would otherwise compare equal to
-     * the pumped {@code default} region.
+     * Determines whether {@code region} is pumped by AsyncTaskProcessing.
+     * Synthetic temp regions are not pumped and do not drain their waitlist.
      */
     private boolean isRegionPumped() {
         for (Region r : RTP.selectionAPI.permRegionLookup.values()) {

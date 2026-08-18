@@ -31,18 +31,8 @@ public class PlaceholderProvider {
     public static final Map<String, Function<UUID, String>> placeholders = new ConcurrentHashMap<>();
 
     /**
-     * Per-thread cache for a single {@link MetricsSnapshot} so that all metrics-backed
-     * placeholders in one message-formatting pass observe the same atomic snapshot and
-     * the underlying {@code RTP.metrics.snapshot()} (and its binding) is invoked exactly
-     * once per caller-defined scope (e.g. one {@code /rtp info} invocation).
-     *
-     * <p>Callers wrap their formatting block with {@link #withSnapshot(Runnable)}
-     * or {@link #pushSnapshot(MetricsSnapshot)} / {@link #popSnapshot()}. Placeholders that
-     * read metrics call {@link #currentSnapshot()}, which lazily falls back to
-     * {@code RTP.metrics.snapshot()} when no caller-supplied snapshot is in scope.
-     *
-     * <p>Plan reference: {@code docs/dev/METRICS_PLAN.md} — "one snapshot per
-     * {@code /rtp info} invocation" (Section M1 / row B11).
+     * Per-thread cache for {@link MetricsSnapshot} so message-formatting passes
+     * observe a consistent atomic snapshot across all placeholder resolutions.
      */
     private static final ThreadLocal<MetricsSnapshot> METRICS_SNAPSHOT_CACHE = new ThreadLocal<>();
 
@@ -389,22 +379,8 @@ public class PlaceholderProvider {
         placeholders.put(
                 "leakRate",
                 uuid -> {
-                    // Defensive leak-rate accounting: rather than trusting that everything in
-                    // each region's kept cache / per-player queues is genuinely kept (which
-                    // would silently hide bugs where a "kept" entry has no live ticket, or a
-                    // ticket exists for a chunk no longer in any cache), we rely on the
-                    // makeshift GC sweep in MemoryTracker — it scans world.chunkTickets,
-                    // compares against the keep-alive set, and increments
-                    // RTPWorld.lifetimeOrphanedTicketsScanned for every unexpected ticket it
-                    // finds. The leak rate is therefore the cumulative count of unexpected
-                    // tickets ever observed, divided by the cumulative number of chunk
-                    // tickets we have ever issued (lifetimeTicketsIssued). Note: we
-                    // deliberately do NOT use totalChunkLoads as the divisor — that counter
-                    // tracks only live chunk-load attempts, so it would undercount the
-                    // denominator by missing tickets that were ref-counted onto an
-                    // already-loaded chunk (a kept-cache replay or sibling-of-already-pinned
-                    // candidate). lifetimeTicketsIssued increments on every acquire and is
-                    // the correct denominator for "fraction of issued tickets that leaked".
+                    // Leak rate: fraction of cumulative issued tickets flagged as orphaned by GC sweep.
+                    // Uses lifetimeTicketsIssued as denominator to account for all ticket acquisitions.
                     long lifetimeOrphaned = 0;
                     long ticketsIssued = 0;
                     for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
@@ -415,12 +391,8 @@ public class PlaceholderProvider {
                     return String.format("%.4f%%", leakRate);
                 });
 
-        // --- Metrics SPI placeholders (METRICS_PLAN.md > /rtp info Surface) ---
-        // All read a single MetricsSnapshot via currentSnapshot(): callers (e.g. InfoCmd)
-        // wrap their formatting pass in PlaceholderProvider.withSnapshot(...) so that one
-        // /rtp info invocation produces exactly one MetricsBinding round-trip. If no
-        // caller scope is active, currentSnapshot() falls back to RTP.metrics.snapshot()
-        // per call — safe, just slightly less efficient (B11 cleanup, METRICS_PLAN.md).
+        // --- Metrics SPI placeholders ---
+        // All read a single MetricsSnapshot via currentSnapshot().
         placeholders.put(
                 "queueDepth",
                 uuid -> String.valueOf(currentRtpExt().queueDepth));
@@ -475,7 +447,7 @@ public class PlaceholderProvider {
         placeholders.put(
                 "chunkLoadBacklog",
                 uuid -> String.valueOf(currentRtpExt().chunkLoadBacklog));
-        // Additional Metrics SPI placeholders (B11 scope) — TPS / MSPT / capacity /
+        // Additional Metrics SPI placeholders - TPS / MSPT / capacity /
         // database latency / tick budget. Each renders the documented sentinel (NaN
         // tps/mspt, -1 db latency, 0 softCap) as "n/a" / "unbounded" so locales can
         // surface "metrics unavailable" deterministically when the NOOP binding is live.
@@ -591,13 +563,7 @@ public class PlaceholderProvider {
                     if (total == 0L) return "n/a";
                     return String.format("%.1f%%", ((double) top / total) * 100.0);
                 });
-        // B12 (METRICS_PLAN.md > Health colour coding): coloured-wrapper variants of the
-        // numeric Health-Pipeline placeholders. Each prepends a legacy &-code chosen by
-        // ColourBands (green/yellow/red/grey) and trails &r so adjacent template text keeps
-        // its own colour. NaN / unavailable values render as "n/a" prefixed by &7 (grey) so
-        // operators do not see false-red on first start. Operators may opt out of colouring
-        // by switching templates back to the bare placeholders (e.g. [tps1m]); the coloured
-        // variants are additive and never replace the originals.
+        // Coloured-wrapper variants of numeric health-pipeline placeholders.
         placeholders.put(
                 "tps1mColoured",
                 uuid -> {
@@ -1064,14 +1030,14 @@ public class PlaceholderProvider {
             return "0";
         });
 
-        // L2 — pre-verified locations whose chunks have been released ("cold" / "unkept").
+        // L2 - pre-verified locations whose chunks have been released ("cold" / "unkept").
         placeholders.put("unkeptCache", uuid -> {
             Region region = RTP.regionContext.get();
             if (region != null) return String.valueOf(region.queueManager.unkeptLocations.size());
             return "0";
         });
 
-        // L3 — optional verified-pile size from the backlog buffer (ADR-028).
+        // L3 - optional verified-pile size from the backlog buffer (ADR-028).
         // Reports the number of Anvil-pre-filter VALIDATED entries currently
         // waiting to be promoted into L2 (the "success" pile), not the raw
         // buffer occupancy. INVALIDATED entries are ejected eagerly in

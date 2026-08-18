@@ -22,15 +22,8 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration-style tests for the full region location-generation pipeline,
- * using only mock server components ({@link MockRTPWorld}, {@link MockRTPServerAccessor}).
- *
- * <p>All tests inject a seeded {@link java.util.Random} via
- * {@link LocationGenerator#setRng} and {@link Circle#setRng} so results are
- * fully deterministic across CI runs, eliminating RNG as a source of flakiness.
- *
- * <p>Requirements covered: REQ-RTP-F-001, REQ-RTP-F-006, REQ-CORE-F-003,
- * REQ-CORE-F-004, REQ-RTP-S-004.
+ * Integration tests for region location-generation pipeline using mock components.
+ * Traces REQ-RTP-F-001, REQ-RTP-F-006, REQ-CORE-F-003, REQ-CORE-F-004, REQ-RTP-S-004.
  */
 public class RegionPipelineTest {
 
@@ -122,21 +115,7 @@ public class RegionPipelineTest {
     }
 
     /**
-     * Regression for the mid-air placement bug (S-001).
-     *
-     * <p>The L3 backlog refill stamps a placeholder Y into unverified
-     * {@link RTPLocation} entries — historically {@code (vert.maxY+vert.minY)/2},
-     * a window midpoint that is almost certainly mid-air for any non-trivial
-     * vert window (e.g. {@code minY=32, maxY=255 → y=143}). The previous
-     * unkept→kept safety re-verification trusted that stored Y and only
-     * called {@code rtpChunk.isSafe(localX, y, localZ, ...)}, which passes
-     * trivially because the block at mid-air *is* air. Players ended up
-     * placed mid-air at the placeholder Y.
-     *
-     * <p>The fix routes promotion through {@code vert.adjust(rtpChunk)}, which
-     * performs the full ground+headroom sweep every adjustor enforces on the
-     * live-spiral path. After promotion the kept location's Y must be the
-     * vert-resolved Y, not the mid-air placeholder.
+     * S-001 regression: verifies promotion overwrites placeholder mid-air Y with vert-resolved ground Y.
      */
     @Test
     @Timeout(value = 2, unit = TimeUnit.SECONDS)
@@ -191,7 +170,7 @@ public class RegionPipelineTest {
     }
 
     // -----------------------------------------------------------------------
-    // Full LocationGenerator pipeline — seeded RNG
+    // Full LocationGenerator pipeline - seeded RNG
     // -----------------------------------------------------------------------
 
     @Test

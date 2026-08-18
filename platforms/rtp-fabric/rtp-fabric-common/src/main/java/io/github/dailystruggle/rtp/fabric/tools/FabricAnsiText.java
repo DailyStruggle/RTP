@@ -9,13 +9,13 @@ import java.util.regex.Pattern;
  * <p>This class deliberately has <b>no</b> {@code net.minecraft.*} imports
  * or static references. It exists because {@link FabricLegacyText} (which
  * builds {@code Component} trees) imports {@code net.minecraft.network.chat.*}
- * — and on the MC 26.1 deobfuscated runtime
+ * - and on the MC 26.1 deobfuscated runtime
  * (see {@code rtp-fabric-ADR-007}) those intermediary names
  * (e.g. {@code class_2561 = Component}) are not exposed on the Fabric
  * loader's classpath the way prior versions exposed them. Loading
  * {@code FabricLegacyText} from a classloader that can't resolve
  * {@code class_2561} fails verification with
- * {@code NoClassDefFoundError: net/minecraft/class_2561} — which crashes
+ * {@code NoClassDefFoundError: net/minecraft/class_2561} - which crashes
  * {@code FabricServerAccessor.log} (and therefore every plugin startup
  * log line) on 26.1 before {@code onInitialize} can finish.
  *

@@ -39,8 +39,7 @@ import java.util.Set;
  *                           {@code regionKey} is requested. Default {@code 0}.
  * @param networkReservedCount count of in-flight cross-server reservations
  *                           held against {@code networkKeptLocations} on this
- *                           backend (one extra HSET field per
- *                           PROPOSAL §12.3). Default {@code 0}.
+ *                           backend. Default {@code 0}.
  * @param regions            region keys this backend hosts as a {@link Set}
  *                           (superset of {@link #regionsAvailable()},
  *                           kept distinct so the selector can filter by exact

@@ -15,23 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Contract test for {@link PrefabRegistry}.
- *
- * <p>Guards:
- * <ul>
- *   <li>Curated five-prefab list and panel ordering, per
- *       {@code PROPOSAL-prefab-cleanup.md} (2026-05-22 trim of the original
- *       seven-prefab lock; Lightweight and FastPaced removed as redundant
- *       with LowPerformance on the low-end-server axis).</li>
- *   <li>Ids are unique and stable.</li>
- *   <li>Overlay maps are non-null and immutable (defends against accidental
- *       mutation in later sessions).</li>
- *   <li><strong>No prefab references {@code backlogCacheCap}.</strong> That
- *       is a pro-vs-lite assembly-time knob; runtime prefabs must remain
- *       assembly-agnostic per the locked design decision.</li>
- *   <li>{@link PrefabRegistry#byId(String)} round-trips and rejects unknown
- *       / null ids.</li>
- * </ul>
+ * Contract tests for {@link PrefabRegistry}: curated list ordering, id uniqueness,
+ * overlay immutability, exclusion of backlogCacheCap, and lookup behavior.
  */
 class PrefabRegistryTest {
 

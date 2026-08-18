@@ -1,18 +1,10 @@
 package io.github.dailystruggle.rtp.api.hooks;
 
 /**
- * Enumerated outcomes for the optional PvP / combat-tag pre-flight gate (ROADMAP
- * Tier 2, "Optional PvP / combat-tag check").
+ * Configured outcomes for PvP/combat-tag pre-flight checks.
  *
- * <p>The gate is consulted at two points: when a player issues {@code /rtp}
- * (pre-dispatch, before queue enrolment) and again immediately before the chosen
- * destination is applied (pre-execution prefilter). The configured action decides
- * what happens when the requesting player is currently considered "in combat" by
- * the active {@link PvPCombatStateRegistry.Provider} (or the native fallback when
- * none is bound).
- *
- * <p>Configured via {@code safety.yml#pvpOnCombat}. The lookup is case-insensitive
- * and unknown values resolve to {@link #DENY} (fail-safe).
+ * <p>Consulted at dispatch and execution time when a player is in combat.
+ * Configured via {@code safety.yml#pvpOnCombat}. Defaults to {@link #DENY}.
  */
 public enum PvPCombatAction {
 

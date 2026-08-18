@@ -67,7 +67,7 @@ public class CircleTest {
     }
 
     // -------------------------------------------------------------------------
-    // xzToLocation() — quadrant branch coverage
+    // xzToLocation() - quadrant branch coverage
     // -------------------------------------------------------------------------
 
     /**
@@ -129,7 +129,7 @@ public class CircleTest {
     }
 
     // -------------------------------------------------------------------------
-    // xzToLocation() — center offset
+    // xzToLocation() - center offset
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "center=({0},{1}), point=({2},{3})")

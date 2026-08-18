@@ -130,16 +130,16 @@ public final class FabricEventBridge {
                                 // deobfuscated runtime and would fail JVM verify on instanceof.
                                 if (player != null) {
                                     accessor.registerPlayerObject(player);
-                                    // ADR-023 — drive the join-time RTP path
+                                    // ADR-023 - drive the join-time RTP path
                                     // (cooldown / permission gate +
                                     // primeFromLoginCache + teleportAction).
                                     // Routed through an Object-typed bridge
                                     // so this proxy's synthetic class does
                                     // not pin ServerPlayer (intermediary
-                                    // class_3222) — see the JOIN proxy
+                                    // class_3222) - see the JOIN proxy
                                     // comment above.
                                     dispatchJoinRtp(player);
-                                    // ADR-049 — fan a UUID join event out to
+                                    // ADR-049 - fan a UUID join event out to
                                     // platform-agnostic subscribers (e.g. the
                                     // network-mode reservation-redeem path).
                                     accessor.getFabricPlayerLifecycleHook()
@@ -160,20 +160,20 @@ public final class FabricEventBridge {
                                 Object handler = args[0];
                                 Object player = extractPlayerFromHandler(handler);
                                 if (player != null) {
-                                    // ADR-049 — fan UUID quit out before the
+                                    // ADR-049 - fan UUID quit out before the
                                     // accessor forgets the player wrapper, so
                                     // subscribers (network-mode waitlist
                                     // cleanup, etc.) can still resolve the
                                     // UUID off the live ServerPlayer.
                                     accessor.getFabricPlayerLifecycleHook()
                                             .fireQuitFromPlayer(player);
-                                    // ADR-055 — forget any native PvP combat tag
+                                    // ADR-055 - forget any native PvP combat tag
                                     // so the tracker does not leak across sessions.
                                     clearPvpCombatTag(player);
                                     accessor.unregisterPlayerObject(player);
                                 }
                             }
-                            // ADR-023 — Login Reserve Cache refill on quit.
+                            // ADR-023 - Login Reserve Cache refill on quit.
                             // Mirror of OnPlayerQuit (Bukkit): for every region with a
                             // login buffer, dispatch one async promotion to top it up.
                             // Fail-soft: never throw from the disconnect handler.
@@ -275,7 +275,7 @@ public final class FabricEventBridge {
     private void onServerStarted(MinecraftServer server) {
         try {
             accessor.bindServer(server);
-            // Register every already-loaded ServerLevel — overworld + nether + end
+            // Register every already-loaded ServerLevel - overworld + nether + end
             // (and any datapack dimensions) come up before SERVER_STARTED fires.
             // Method name has drifted across MC versions (getAllLevels / levels / getWorlds /
             // method_3738 / etc.), so resolve reflectively and tolerate failure.
@@ -302,7 +302,7 @@ public final class FabricEventBridge {
             // BukkitDatabaseHandler being kicked from onEnable().
             FabricDatabaseHandler.setupDatabase(RTP.getInstance());
 
-            // ADR-023 — Login Reserve Cache: allocate the buffer on the
+            // ADR-023 - Login Reserve Cache: allocate the buffer on the
             // default-world region and dispatch the startup burst. Mirrors
             // RTPBukkitPlugin.initLoginReserveCache(); decoupled from
             // Region.execute() per ADR-023.
@@ -314,7 +314,7 @@ public final class FabricEventBridge {
     }
 
     /**
-     * ADR-023 — initialise the Login Reserve Cache on the default-world
+     * ADR-023 - initialise the Login Reserve Cache on the default-world
      * (overworld) region when {@code PerformanceKeys.loginCacheEnabled=true}.
      * Sized to {@code loginCacheCap} (or {@code MinecraftServer.getMaxPlayers()}
      * when {@code loginCacheCap=0}). Mirror of
@@ -355,10 +355,9 @@ public final class FabricEventBridge {
             if (configuredCap > 0) {
                 cap = (int) Math.min(configuredCap, Integer.MAX_VALUE);
             } else {
-                // C6 (Section C of CHECKLIST-metrics-and-multiserver) — prefer
-                // the M2 snapshot when a FabricMetricsBinding is installed; fall
+                // Prefer the snapshot when a FabricMetricsBinding is installed; fall
                 // back to the reflective Mojang/intermediary probe (which the
-                // binding itself already uses internally) on the M0 NOOP path.
+                // binding itself already uses internally) on the NOOP path.
                 int snapCap = 0;
                 try {
                     snapCap = RTP.metrics.snapshot().softCap;
@@ -400,7 +399,7 @@ public final class FabricEventBridge {
                             + "' cap=" + cap + " (default world '" + defaultWorldName + "')");
 
             // Startup burst: dispatch up to (cap - currentOnline) async promotions.
-            // C6 — prefer the M2 snapshot when bound; fall back to the
+            // Prefer the snapshot when bound; fall back to the
             // reflective intermediary lookup when the binding is the NOOP
             // (snapshot.playerCount == 0 also matches the empty-server case
             // a freshly-started Fabric runtime returns, so the two paths
@@ -427,10 +426,10 @@ public final class FabricEventBridge {
     }
 
     /**
-     * ADR-023 — Object-typed bridge into {@link FabricOnEventTeleports#onJoin}.
+     * ADR-023 - Object-typed bridge into {@link FabricOnEventTeleports#onJoin}.
      * Centralised here (rather than directly in the JOIN proxy) so the
      * proxy's synthetic class does not pin {@code ServerPlayer} (intermediary
-     * {@code class_3222}) into its bytecode constant pool — same pattern as
+     * {@code class_3222}) into its bytecode constant pool - same pattern as
      * {@code FabricServerAccessor#registerPlayerObject}, see comment on the
      * JOIN proxy. The {@code ServerPlayer} cast lives here, where
      * {@code ServerPlayer} is already on the resolved-class set.
@@ -443,7 +442,7 @@ public final class FabricEventBridge {
             if (player == null) return;
             MinecraftServer server = accessor.getServer();
             if (server == null) return;
-            // Pass the player as Object — FabricOnEventTeleports.onJoin resolves
+            // Pass the player as Object - FabricOnEventTeleports.onJoin resolves
             // UUID via the FabricVersionAdapter SPI and display name reflectively.
             // Naming ServerPlayer here would pin intermediary class_3222 into the
             // obf-carrier bytecode and fail to link on MC 26.1 deobf runtimes.
@@ -456,7 +455,7 @@ public final class FabricEventBridge {
     }
 
     /**
-     * ADR-023 — refill the login reserve cache on player disconnect.
+     * ADR-023 - refill the login reserve cache on player disconnect.
      * Iterates {@code RTP.selectionAPI.permRegionLookup} and dispatches one
      * async {@code LoginCacheTask.promoteUpTo(1)} per region whose
      * {@code loginLocations} buffer is non-null. Mirror of the Bukkit
@@ -573,7 +572,7 @@ public final class FabricEventBridge {
     private void onServerStopping(MinecraftServer server) {
         try {
             // Flush + close DB before clearing accessor state so any pending
-            // writes complete (LESSONS_LEARNED.md 2026-04-18 — shutdown flush).
+            // writes complete (LESSONS_LEARNED.md 2026-04-18 - shutdown flush).
             if (RTP.getInstance() != null) {
                 RTP.stop();
             }
@@ -594,7 +593,7 @@ public final class FabricEventBridge {
         } catch (Throwable t) {
             RTP.log(Level.WARNING, "[RTP] FabricEventBridge tick raised", t);
         }
-        // ADR-075 — sample watched players' block positions and fire
+        // ADR-075 - sample watched players' block positions and fire
         // PlayerMoveEvents for block changes. Best-effort; a failure here must
         // not break the tick loop.
         try {
@@ -604,7 +603,7 @@ public final class FabricEventBridge {
                     "[RTP] FabricEventBridge player-move tick raised "
                             + t.getClass().getSimpleName() + ": " + t.getMessage());
         }
-        // Section C, C2 — drive the metrics sampler if a FabricMetricsBinding
+        // Section C, C2 - drive the metrics sampler if a FabricMetricsBinding
         // is installed. Best-effort; failures must not break the tick loop
         // (observability is never allowed to take down the pipeline). The
         // type probe is reflective so this module compiles without a hard
@@ -642,7 +641,7 @@ public final class FabricEventBridge {
     }
 
     // -------------------------------------------------------------------------
-    // ADR-055 — native PvP combat tag plumbing
+    // ADR-055 - native PvP combat tag plumbing
     // -------------------------------------------------------------------------
 
     /**
@@ -769,7 +768,7 @@ public final class FabricEventBridge {
         return false;
     }
 
-    /** ADR-055 — clear a player's native combat tag on disconnect. */
+    /** ADR-055 - clear a player's native combat tag on disconnect. */
     private static void clearPvpCombatTag(Object player) {
         try {
             java.util.UUID uuid = playerUuidOrNull(player);

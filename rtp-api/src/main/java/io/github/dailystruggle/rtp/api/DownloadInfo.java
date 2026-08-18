@@ -1,23 +1,11 @@
 package io.github.dailystruggle.rtp.api;
 
 /**
- * DRM / audit metadata captured from marketplace download pipelines.
+ * DRM and audit metadata captured from marketplace download pipelines.
  *
- * <p>Each marketplace (SpigotMC, BuiltByBit, Polymart) performs a byte-level
- * string replacement inside the published JAR before serving it to the buyer,
- * substituting marketplace-specific placeholder tokens. SpigotMC and BuiltByBit
- * share the same {@code %%__USER__%%} / {@code %%__NONCE__%%} literals, while
- * BuiltByBit additionally substitutes {@code %%__RESOURCE__%%} and
- * {@code %%__TIMESTAMP__%%}. Polymart uses its own distinct tokens.
- *
- * <p>Whichever marketplace served the JAR is the only one whose tokens get
- * replaced in that copy; the other marketplaces' tokens remain as literals.
- * {@link #source()} keys off this asymmetry to identify the originating
- * marketplace.
- *
- * <p>These values are <b>opaque audit strings</b>, suitable for support
- * correlation and DRM nudge messages — not for authenticating callers or
- * gating functionality.
+ * <p>Marketplace replacers (SpigotMC, BuiltByBit, Polymart) substitute byte tokens.
+ * {@link #source()} identifies originating marketplace from substituted tokens.
+ * Values are opaque audit strings, not security/auth tokens.
  */
 public final class DownloadInfo {
 
@@ -29,7 +17,7 @@ public final class DownloadInfo {
         BUILTBYBIT,
         /** Polymart. Substitutes its own POLYMART/SIGNATURE tokens. */
         POLYMART,
-        /** Local development build — no marketplace tokens substituted. */
+        /** Local development build - no marketplace tokens substituted. */
         DEV
     }
 

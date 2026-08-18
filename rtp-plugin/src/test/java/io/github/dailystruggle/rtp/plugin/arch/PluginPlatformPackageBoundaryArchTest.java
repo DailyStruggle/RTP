@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * MULTI_PLATFORM_PLAN Phase 2 — ArchUnit guard for disjoint
+ * ArchUnit guard for disjoint
  * {@code io.github.dailystruggle.rtp.bukkit.**} and
  * {@code io.github.dailystruggle.rtp.fabric.**} package trees inside
  * {@code rtp-plugin}.
@@ -27,7 +27,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * <p>Scope: imports only the {@code rtp-plugin} module's own compiled output.
  * Cross-module Fabric types under {@code rtp.fabric.*} that live in
  * {@code rtp-fabric-common} (e.g. {@code rtp.fabric.player.FabricRTPPlayer})
- * are deliberately out of scope here — those modules already enforce their
+ * are deliberately out of scope here - those modules already enforce their
  * own boundaries via their own ArchUnit suites.
  *
  * <p>Companion to {@code MetricsConsolidationArchTest}; the import-filter
@@ -74,9 +74,8 @@ class PluginPlatformPackageBoundaryArchTest {
         // org.bukkit.*, rtp.bukkitplatform.*, or commandsapi.bukkit.* imports).
         // Its location under the `bukkit.commands.test` package is a legacy
         // artifact predating the Fabric platform; RTPFabricMod intentionally
-        // constructs it as documented in that file (~line 460-469). Relocating
-        // it is out of scope for the dual-runtime guard — see MULTI_PLATFORM_PLAN
-        // Phase 2 "Step G2 follow-up". The exception is keyed by FQN so any
+        // constructs it as documented in that file (~line 460-469).
+        // The exception is keyed by FQN so any
         // future bukkit-tree class that creeps into Fabric init still trips
         // the guard. Sibling Bukkit-only TestCmd subcommands stay forbidden.
         com.tngtech.archunit.base.DescribedPredicate<com.tngtech.archunit.core.domain.JavaClass> inBukkitSubtreeExceptLegacyTestCmd =
@@ -99,7 +98,7 @@ class PluginPlatformPackageBoundaryArchTest {
     void bukkit_subtree_must_not_depend_on_net_minecraft() {
         // Bukkit-family code must route through org.bukkit.*; touching
         // net.minecraft.* in the Bukkit tree is the dual-runtime regression
-        // this plan-item exists to guard.
+        // this guard protects against.
         ArchRule rule = noClasses()
                 .that().resideInAPackage("io.github.dailystruggle.rtp.bukkit..")
                 .should().dependOnClassesThat()

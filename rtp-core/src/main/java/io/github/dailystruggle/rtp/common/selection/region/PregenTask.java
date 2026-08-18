@@ -15,16 +15,11 @@ import java.util.logging.Level;
 
 /**
  * State machine for the pregen path of {@link LocationGenerator}. One task instance
- * drives the attempt loop; between I/O-bearing stages it reschedules itself on the
- * async scheduler so the worker thread is released during
- * {@link RTPWorld#getChunkAtAsync}, {@link ChunkReservation#readyFuture},
- * neighbour chunk loads, and
- * {@link GlobalRegionVerifiers#checkGlobalRegionVerifiers}.
+ * drives the attempt loop, rescheduling across async stages (chunk I/O, verifiers)
+ * to avoid blocking worker threads.
  *
- * <p>Preserves every {@link LocationGenerator.FailTypes} attribution from the previous
- * blocking implementation, including {@code ticketFailed}, {@code chunkLoadTimeout},
- * {@code asyncLoadNull}, {@code staleChunkBeforeVert}, {@code ticketApplyTimeout},
- * {@code neighborNull}, and the worldborder {@code OUTSIDE_BORDER} counter.
+ * <p>Preserves all {@link LocationGenerator.FailTypes} attributions from the blocking
+ * implementation.
  */
 final class PregenTask implements Runnable {
 
@@ -48,15 +43,8 @@ final class PregenTask implements Runnable {
     }
 
     /**
-     * Advance to the next attempt. If we are currently inside {@link #runAttempt()}
-     * on this thread (synchronous trampoline path), set a flag so the while-loop
-     * in {@link #run()} continues. Otherwise — typically when invoked from a
-     * {@link CompletableFuture} callback after an async chunk-load resolves —
-     * submit a fresh task to the async scheduler. Calling {@link #run()}
-     * directly from a CF callback would attach the next attempt's dependents
-     * to the current callback's future, growing the {@code BiApply}/
-     * {@code CoCompletion} graph by one node per iteration until the source
-     * upstream future drains.
+     * Advance to the next attempt. Synchronous paths set a flag for the loop in {@link #run()};
+     * async callback paths submit a fresh task to prevent {@link CompletableFuture} graph growth.
      */
     private void rescheduleNextAttempt() {
         i++;
@@ -65,18 +53,8 @@ final class PregenTask implements Runnable {
         if (inRunAttempt) {
             needsReschedule = true;
         } else {
-            // Critical: never call run() directly from a CompletableFuture
-            // callback. Doing so attaches the next attempt's whenComplete
-            // node as a *dependent* of the current callback's source future,
-            // which is itself retained as a dependent of an upstream future.
-            // With maxAttempts × in-flight pregens × neighbour-grid allOf
-            // depth, the dependents graph grows multiplicatively and pins
-            // tens of millions of BiApply/CoCompletion nodes (heap-histogram
-            // signature observed 2026-05-08, ~6 GB retained on a 16 GB heap).
-            // Always submit fresh so each iteration starts a new dependents
-            // tree that drains on its own. Mirrors the Folia fix shape.
-            // See LESSONS_LEARNED.md "Don't reschedule via continueInline
-            // from a CompletableFuture callback".
+            // Prevent CompletableFuture graph leak: do not call run() directly from callbacks.
+            // Fresh submission bounds BiApply/CoCompletion chain depth (see LESSONS_LEARNED.md).
             RTP.serverAccessor.getScheduler().runTaskAsynchronously(this);
         }
     }
@@ -94,7 +72,7 @@ final class PregenTask implements Runnable {
         }
         // Always-on outcome metrics (independent of verbose). The breadcrumb name
         // begins with the cause token ("biome/...", "safetyExternal/...", etc.) or
-        // "success ..." — parse the leading token and feed the process-global
+        // "success ..." - parse the leading token and feed the process-global
         // accumulator so success/failure rates and the per-cause breakdown fill
         // from real traffic. Best-effort: never let metrics break the pipeline.
         try {
@@ -142,44 +120,24 @@ final class PregenTask implements Runnable {
     }
 
     /**
-     * ADR-062 bounded biome-probability weighted draw. Given the per-biome run
-     * tables ({@code perBiome} entries are {@code {keys, widths}} parallel arrays,
-     * already filtered to non-empty biomes), selects a target biome with equal
-     * probability among those present in spatial memory, then a run within that
-     * biome weighted by run width (so placement stays spatially uniform inside the
-     * chosen biome), then a uniform offset within the run.
+     * ADR-062 bounded biome-probability weighted draw.
+     * Selects a target biome with equal probability among those in spatial memory,
+     * then a run within that biome weighted by run width, then a uniform offset.
      *
-     * <p>This counteracts the run-count dominance of the legacy uniform-over-runs
-     * draw: a common biome occupying thousands of runs no longer drowns out a rare
-     * requested biome occupying a handful. The draw is bounded - a finite weighted
-     * pick over the pre-mapped, Anvil-sourced occupancy map with no reroll loop and
-     * no chunk I/O.
-     *
-     * @param perBiome non-empty list of {@code {keys, widths}} parallel-array pairs,
-     *     one per biome that has at least one recorded run.
-     * @return the drawn 1D location index.
+     * @param perBiome non-empty list of {@code {keys, widths}} parallel-array pairs.
+     * @return drawn 1D location index.
      */
     static long drawWeightedBiome(List<long[][]> perBiome) {
         return drawWeightedBiome(perBiome, null);
     }
 
     /**
-     * ADR-062 Phase 2 weighted-biome overload. Behaves like
-     * {@link #drawWeightedBiome(List)} but selects the target biome in
-     * proportion to {@code biomeWeights} (parallel to {@code perBiome}) instead
-     * of with equal probability. Passing {@code null} - or a weight array that
-     * sums to a non-positive total - falls back to the equal-probability pick,
-     * so the Phase 1 (all-equal) behavior is the degenerate case of this draw.
-     * A biome's weight is its relative selection share among the requested
-     * biomes present in memory; within the chosen biome, the run/offset pick is
-     * unchanged (width-weighted, spatially uniform). Stays bounded - a finite
-     * weighted pick with no reroll loop and no chunk I/O.
+     * ADR-062 weighted-biome overload. Selects target biome in proportion to
+     * {@code biomeWeights}. Falls back to equal pick if weights are null or sum <= 0.
      *
-     * @param perBiome non-empty list of {@code {keys, widths}} parallel-array
-     *     pairs, one per biome that has at least one recorded run.
-     * @param biomeWeights optional per-biome relative weights, parallel to
-     *     {@code perBiome}; {@code null} for an equal-probability pick.
-     * @return the drawn 1D location index.
+     * @param perBiome parallel {@code {keys, widths}} array list.
+     * @param biomeWeights optional per-biome weights.
+     * @return drawn 1D location index.
      */
     static long drawWeightedBiome(List<long[][]> perBiome, double @org.jetbrains.annotations.Nullable [] biomeWeights) {
         int chosenIdx;
@@ -233,27 +191,19 @@ final class PregenTask implements Runnable {
     }
 
     /**
-     * ADR-062 Phase 3 minimum-diversity threshold: the number of distinct
-     * recorded runs at or above which a requested biome is treated as
-     * "well-recorded" and steered purely from recall memory. Below it, a
-     * proportional share of the biome's selection weight is deferred to
-     * gray-space exploration so a thinly-recorded biome (in the limit, a single
-     * recorded run) cannot funnel every weighted teleport onto the same
-     * coordinate.
+     * ADR-062 minimum-diversity threshold: distinct recorded run count at which
+     * a biome is treated as well-recorded. Below this, weight is partially deferred
+     * to gray-space exploration to prevent single-run clustering.
      */
     static final long GRAY_SPACE_MIN_RUNS = 8L;
 
     /**
-     * ADR-062 Phase 3 - the fraction of a requested biome's selection weight that
-     * should be deferred to gray-space exploration given how thinly it is recorded.
-     * A biome with {@code runs >= minRuns} is fully recall-steered (returns
-     * {@code 0.0}); an unrecorded biome ({@code runs <= 0}) is fully gray
-     * (returns {@code 1.0}); in between, the fraction ramps linearly so a
-     * single-run biome defers most of its weight to exploration.
+     * ADR-062: fraction of biome selection weight deferred to gray space.
+     * Ramps linearly from 1.0 (unrecorded) to 0.0 (>= minRuns).
      *
-     * @param runs the number of distinct recorded runs for the biome.
-     * @param minRuns the well-recorded threshold ({@code <= 0} disables the ramp).
-     * @return the gray-space deferral fraction in {@code [0.0, 1.0]}.
+     * @param runs distinct recorded run count for the biome.
+     * @param minRuns well-recorded threshold (<= 0 disables ramp).
+     * @return gray-space deferral fraction in {@code [0.0, 1.0]}.
      */
     static double grayFraction(long runs, long minRuns) {
         if (minRuns <= 0L) return 0.0d;
@@ -263,17 +213,12 @@ final class PregenTask implements Runnable {
     }
 
     /**
-     * ADR-062 Phase 3 - probability that a weighted draw should explore gray
-     * space (a fresh bounded-spiral position whose biome is confirmed downstream)
-     * instead of drawing from recall memory. This is the gray-space share of the
-     * total selection weight: registered-but-unrecorded requested biomes plus the
-     * deferred share of thinly-recorded ones. A higher configured weight on an
-     * under-recorded biome therefore defers <em>more</em> to exploration, so a
-     * weight can never amplify single-run clustering.
+     * ADR-062: exploration probability for gray space (unrecorded / thinly recorded biomes)
+     * versus recall memory draw.
      *
-     * @param recordedWeight summed (run-adjusted) weight steered from recall.
-     * @param grayWeight summed weight deferred to gray-space exploration.
-     * @return the exploration probability in {@code [0.0, 1.0]}.
+     * @param recordedWeight summed run-adjusted recall weight.
+     * @param grayWeight summed gray-space exploration weight.
+     * @return exploration probability in {@code [0.0, 1.0]}.
      */
     static double graySpaceProbability(double recordedWeight, double grayWeight) {
         if (grayWeight <= 0.0d) return 0.0d;
@@ -333,10 +278,10 @@ final class PregenTask implements Runnable {
                 // equal-probability-per-biome weighted draw.
                 List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
                 List<long[][]> perBiome = new ArrayList<>();
-                // ADR-062 Phase 2: relative selection weight per perBiome entry,
+                // ADR-062: relative selection weight per perBiome entry,
                 // looked up by biome name (biomes not configured default to 1.0).
                 List<Double> perBiomeWeights = new ArrayList<>();
-                // ADR-062 Phase 3: distinct recorded-run count per perBiome entry
+                // ADR-062: distinct recorded-run count per perBiome entry
                 // (drives the gray-space deferral ramp) and the set of recorded
                 // requested biome names (so the unrecorded-but-registered set can
                 // be derived below).
@@ -361,28 +306,9 @@ final class PregenTask implements Runnable {
                 }
                 if (!biomes.isEmpty()) {
                     if (state.biomeWeighted) {
-                        // ADR-062: pick a biome among those present in spatial
-                        // memory, then a run within it weighted by width. Steers
-                        // toward rare requested biomes instead of letting a common
-                        // biome's many runs dominate the uniform draw. Phase 1
-                        // (no biomeWeights configured) picks the biome with equal
-                        // probability; Phase 2 picks it in proportion to the
-                        // configured per-biome weights.
-                        //
-                        // ADR-062 Phase 3: registry-aware gray-space steering.
-                        // Each recorded biome defers a share of its weight
-                        // (grayFraction, by run count) to bounded-spiral
-                        // exploration, and each requested biome that the world's
-                        // registry can produce but that has not been recorded yet
-                        // contributes its full weight to gray space instead of
-                        // being an implicit weight 0. With probability equal to the
-                        // gray-space share of total weight we explore a fresh
-                        // spiral position (biome confirmed downstream), which
-                        // dissolves single-run clustering and keeps unrecorded
-                        // registered biomes reachable. Forced recall opts out
-                        // (it must draw from memory). The recall draw itself uses
-                        // run-adjusted weights so a thin biome is also less likely
-                        // to be over-picked within recall.
+                        // ADR-062: pick biome weighted by perBiomeWeights and width.
+                        // Thinly-recorded biomes defer weight (grayFraction) to spiral
+                        // exploration, and unrecorded biomes contribute to grayWeight.
                         double recordedWeight = 0.0d;
                         double grayWeight = 0.0d;
                         double[] weights = new double[perBiome.size()];
@@ -445,7 +371,7 @@ final class PregenTask implements Runnable {
         // Null-guard: a platform adapter may return no border for a world (e.g. a
         // per-version Fabric RTPWorld impl that the common accessor's
         // createNativeWorldBorder doesn't recognise via its instanceof check).
-        // Treat absent border as "no border in effect" — accept the candidate
+        // Treat absent border as "no border in effect" - accept the candidate
         // rather than NPE'ing this attempt every tick. The downstream
         // shape/region constraints still bound the selection space.
         WorldBorder border = (WorldBorder) RTP.serverAccessor.getWorldBorder(state.world.name());
@@ -477,20 +403,8 @@ final class PregenTask implements Runnable {
         int cz = select[1];
         final long finalL = l;
 
-        // --- pregenerated-area preference (PerformanceKeys.pregeneratedPreference) ---
-        //
-        // Probabilistically reject candidates whose chunk has not yet been
-        // generated on disk, biasing the selector toward pregenerated terrain
-        // without losing the ability to fall back to ungenerated land. The
-        // weight is a double in [0.0, 1.0]:
-        //   0.0 → never reject (no differentiation, default)
-        //   1.0 → always reject ungenerated chunks (hard preference)
-        //   x   → reject ungenerated with probability x
-        //
-        // Uses RTPWorld.isChunkGenerated, which is contracted to be
-        // non-blocking and never trigger generation (S-005 safe). Adapters
-        // that have not overridden it return true and the gate is a no-op.
-        // Generated chunks always pass.
+        // Probabilistically reject ungenerated chunks (PerformanceKeys.pregeneratedPreference).
+        // Uses non-blocking RTPWorld.isChunkGenerated (S-005 safe).
         double pregenPref;
         try {
             Object o = state.performance.getConfigValue(PerformanceKeys.pregeneratedPreference, 0.0d);
@@ -511,20 +425,10 @@ final class PregenTask implements Runnable {
             }
         }
 
-        // --- probe-first fast path (BIOME_LOOKUP_PERF_PLAN.md PR-3) ---
-        //
-        // Ask the world for a lean center-column probe covering the adjustor's Y window.
-        // Platform adapters that can cheaply satisfy the probe (Bukkit-family worlds
-        // with an .mca-backed chunk store) return a non-null probe; all others return
-        // a null future and we fall through to the authoritative full-chunk path below.
-        //
-        // On a probe hit we run the adjustor's probe-backed scan + a center-column
-        // biome check. Any rejection here is bucketed as FailTypes.prefilter* and
-        // skips the expensive full-chunk decode entirely. Accepted candidates still
-        // fall through to the full pipeline, which remains authoritative for safety
-        // radius scanning and block-level evaluation.
+        // --- probe-first fast path ---
+        // Probe-first fast path: reject early via ChunkColumnProbe if available.
         if (tryProbeFirst(cx, cz, finalL)) {
-            // Probe rejected — a rescheduleNextAttempt has already been queued.
+            // Probe rejected - a rescheduleNextAttempt has already been queued.
             return;
         }
 
@@ -533,21 +437,11 @@ final class PregenTask implements Runnable {
     }
 
     /**
-     * Probe-first gate (ADR-016 §13 follow-up, BIOME_LOOKUP_PERF_PLAN.md PR-3).
+     * Probe-first gate (ADR-016 §13). Attempts early reject using a lean
+     * {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe}.
      *
-     * <p>Attempts to reject the candidate chunk before paying for the full
-     * {@link RTPWorld#getOrLoadChunk(int, int)} decode, by asking the world for a
-     * lean {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe} covering
-     * the adjustor's {@code [minY, maxY]} window. Returns {@code true} iff a
-     * reject verdict has been recorded and {@link #rescheduleNextAttempt()} has
-     * been queued; returns {@code false} on UNKNOWN (no probe available, default
-     * adapter) or probe-accept (authoritative path still runs).</p>
-     *
-     * <p>S-005: the probe future is resolved asynchronously; the reject-and-reschedule
-     * path is continued via {@link #continueInline(Runnable)} so we never block the
-     * caller. The default {@link RTPWorld#probeChunkColumn} returns
-     * {@code completedFuture(null)}, keeping this method a no-op on adapters that
-     * have not yet wired a real backend.</p>
+     * @return {@code true} if candidate was rejected and reschedule was queued;
+     *         {@code false} on accept or unavailable probe.
      */
     private boolean tryProbeFirst(int cx, int cz, long finalL) {
         io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?> vert =
@@ -558,15 +452,15 @@ final class PregenTask implements Runnable {
 
         CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
         try {
-            // PR-18: widen probe window by one block below minY so that
+            // Widen probe window by one block below minY so that
             // LinearAdjustor/JumpAdjustor.adjustFromProbe (which consults the
             // block at y-1 for standing-surface safety) doesn't trivially
             // reject with probe.minY() > minY - 1. Without this, the fast path
-            // was inert on every candidate and every probe-accept degraded to
-            // a full chunk load.
+            // would be inert on every candidate and every probe-accept would
+            // degrade to a full chunk load.
             fut = state.world.probeChunkColumn(cx, cz, minY - 1, maxY);
         } catch (Throwable t) {
-            // Adapter threw — treat as UNKNOWN, fall through to full path.
+            // Adapter threw - treat as UNKNOWN, fall through to full path.
             RTP.log(Level.FINE,
                     "[RTP] probeChunkColumn threw for world=" + state.world.name()
                             + " chunk=(" + cx + "," + cz + "): " + t);
@@ -575,7 +469,7 @@ final class PregenTask implements Runnable {
         if (fut == null) return false;
 
         // If the future is already complete (default no-op adapter), handle synchronously
-        // to avoid scheduling overhead and preserve the pre-PR-3 runAttempt call shape.
+        // to avoid scheduling overhead and preserve the synchronous runAttempt call shape.
         if (fut.isDone() && !fut.isCompletedExceptionally()) {
             io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe;
             try {
@@ -587,7 +481,7 @@ final class PregenTask implements Runnable {
             return evaluateProbe(probe, cx, cz, finalL);
         }
 
-        // Async completion — dispatch the evaluation and return true to prevent the
+        // Async completion - dispatch the evaluation and return true to prevent the
         // caller from also invoking requestChunk. On UNKNOWN / accept, we re-enter
         // the full path from the callback via requestChunk; on reject we reschedule.
         fut.whenComplete((probe, ex) -> {
@@ -618,19 +512,19 @@ final class PregenTask implements Runnable {
      * the accepted Y. Returns {@code true} iff the probe produced a reject
      * verdict (caller must not fall through to the full path) and queues
      * {@link #rescheduleNextAttempt()}. Returns {@code false} on
-     * adjustor-UNKNOWN (probe cannot answer — fall back) or probe-accept.
+     * adjustor-UNKNOWN (probe cannot answer - fall back) or probe-accept.
      */
     private boolean evaluateProbe(
             io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe,
             int cx, int cz, long finalL) {
         RTPCoords picked = state.vert.adjustFromProbe(probe, state.world.name());
         if (picked == null) {
-            // UNKNOWN — adjustor could not commit from probe data. Fall through.
+            // UNKNOWN - adjustor could not commit from probe data. Fall through.
             return false;
         }
         int py = picked.y();
 
-        // Center-column biome check (ADR-016 §13.1 — probe is equivalent to
+        // Center-column biome check (ADR-016 §13.1 - probe is equivalent to
         // post-chunk-load biomeAt at center column).
         String probeBiome = probe.biomeAt(py);
         if (probeBiome != null) {
@@ -669,14 +563,9 @@ final class PregenTask implements Runnable {
     }
 
     /**
-     * Request the candidate chunk via {@link RTPWorld#getOrLoadChunk(int, int)}.
-     * The returned chunk's {@link RTPChunk#isSelfContained()} flag is the traffic-cop
-     * signal: Anvil-backed chunks stay on the current async thread (thread-safe reads),
-     * live-backed chunks allocate a {@link ChunkReservation} and dispatch block
-     * evaluation to the region-owning thread via
-     * {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTask(io.github.dailystruggle.rtp.api.world.RTPLocation, Runnable)}.
-     * On a stale-chunk detection inside the region-thread dispatch, re-request up to
-     * {@link PregenState#staleChunkRetryLimit} times before advancing the spiral index.
+     * Request candidate chunk via {@link RTPWorld#getOrLoadChunk(int, int)}.
+     * Anvil-backed chunks evaluate on async worker; live-backed chunks allocate
+     * a {@link ChunkReservation} and dispatch to the region-owning thread.
      */
     private void requestChunk(int cx, int cz, long finalL, int staleRetries) {
         // Per-attempt chunk-load: per-chunk deadline lives in the world adapter
@@ -713,22 +602,9 @@ final class PregenTask implements Runnable {
     }
 
     /**
-     * Traffic-cop entry point: branch on {@link RTPChunk#isSelfContained()}.
-     * <ul>
-     *   <li><b>Anvil-backed</b> ({@code isSelfContained==true}): no live chunk
-     *       state is touched; evaluate inline on the current async worker with
-     *       {@code reservation=null}. No ticket application needed, no stale
-     *       guard needed (Anvil snapshots do not race against server GC).</li>
-     *   <li><b>Live-backed</b>: allocate a {@link ChunkReservation}, await
-     *       {@link ChunkReservation#readyFuture} (ADR-015 Paper chunk-system-v2
-     *       ticket-apply race), then dispatch block evaluation to the
-     *       region-owning thread via
-     *       {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTask(io.github.dailystruggle.rtp.api.world.RTPLocation, Runnable)}.
-     *       Inside the region-thread runnable, the stale-chunk guard is
-     *       authoritative; on a stale detection we re-request via
-     *       {@link #requestChunk(int, int, long, int)} up to
-     *       {@link PregenState#staleChunkRetryLimit} times.</li>
-     * </ul>
+     * Branch on {@link RTPChunk#isSelfContained()}.
+     * Anvil chunks evaluate inline on async worker; live chunks await reservation
+     * readiness then dispatch to the region thread for stale guard and evaluation.
      */
     @SuppressWarnings("resource")
     private void onChunkResolved(int cx, int cz, long finalL, RTPChunk<?> chunk, int staleRetries) {
@@ -792,7 +668,7 @@ final class PregenTask implements Runnable {
                                             + state.world.name() + " " + cx + "," + cz
                                             + "); re-requesting (attempt " + (staleRetries + 1)
                                             + "/" + state.staleChunkRetryLimit + ")");
-                            // Bounce back to async pool — the async scheduler is
+                            // Bounce back to async pool - the async scheduler is
                             // where the CF chain is safe.
                             RTP.serverAccessor.getScheduler().runTaskAsynchronously(
                                     () -> requestChunk(cx, cz, finalL, staleRetries + 1));
@@ -832,7 +708,7 @@ final class PregenTask implements Runnable {
     private void proceedWithEvaluation(int cx, int cz, long finalL, RTPChunk<?> chunk,
                                        @org.jetbrains.annotations.Nullable ChunkReservation reservation) {
 
-        // Defensive re-resolve (Option 2+3, 2026-05-08): for live-backed chunks
+        // Defensive re-resolve: for live-backed chunks
         // a window exists between the dispatchLiveEvaluation isChunkLoaded guard
         // and this consumer reading block state. Re-fetch the cached reference;
         // on null, reject via existing FailTypes.nullChunk attribution. Anvil
@@ -857,7 +733,7 @@ final class PregenTask implements Runnable {
         RTPCoords res = state.vert.adjust(chunk);
         if (res == null) {
             if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
-                // addBadChunk: chunk-uniform — within a chunk the per-column selection order
+                // addBadChunk: chunk-uniform - within a chunk the per-column selection order
                 // is deterministic, so the twin spiral index picks the same column and
                 // vert.adjust returns null identically.
                 ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.vert);
@@ -876,12 +752,12 @@ final class PregenTask implements Runnable {
         final int finalY = res.y();
         final int finalZ = res.z();
 
-        // --- biome filter (ADR-016 §13.1 — read from the resolved chunk) ---
+        // --- biome filter (ADR-016 §13.1 - read from the resolved chunk) ---
         String currBiome = chunk.getBiome(finalX, finalY, finalZ).toUpperCase();
         if (BiomeNames.matches(state.biomeNames, currBiome) != state.biomeWhitelist) {
             if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
             if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
-                // addBadChunk: chunk-uniform — biome is a per-chunk property; the twin spiral
+                // addBadChunk: chunk-uniform - biome is a per-chunk property; the twin spiral
                 // index decodes to the same chunk and is guaranteed to fail the same biome check.
                 ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.biome);
             }
@@ -926,17 +802,8 @@ final class PregenTask implements Runnable {
             return;
         }
 
-        // Neighbour-grid load: per-chunk deadlines live inside the world adapter,
-        // BUT we still need an outer ceiling here so that a single never-completing
-        // neighbour future (e.g. a Fabric live-load whose downstream gate-release
-        // never fires due to a server-shutdown drop) does not pin this allOf node
-        // and its dependents graph forever. Without this orTimeout, the heap
-        // signature (~48M BiApply / ~48M BiRelay / ~94M CoCompletion observed in
-        // the 2026-05-08 Fabric dump) accumulates one full neighbour-grid fan-out
-        // per stuck attempt because the whenComplete below never fires →
-        // rescheduleNextAttempt never runs → the per-task maxAttempts cap can't
-        // engage. 5 s is generous for a (2r+1)² grid where each chunk has its
-        // own platform-internal load deadline.
+        // Safety neighbour grid: 5s outer timeout prevents hanging futures from
+        // permanently retaining the allOf dependents graph if a load drops.
         CfDiag.pregenAllOfDispatch.increment();
         CompletableFuture.allOf(neighbourFutures.toArray(new CompletableFuture[0]))
                 .orTimeout(5, TimeUnit.SECONDS)
@@ -1040,7 +907,7 @@ final class PregenTask implements Runnable {
             }
             recordOutcome("safety/blockReject (" + finalX + "," + finalY + "," + finalZ + ")");
             if (state.shape instanceof MemoryShape) {
-                // addBadChunk: chunk-uniform — within a chunk the per-column selection order
+                // addBadChunk: chunk-uniform - within a chunk the per-column selection order
                 // is deterministic, so the twin spiral index picks the same column and the
                 // same (2r+1)^3 safety scan rejects it again.
                 ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safety);
@@ -1063,7 +930,7 @@ final class PregenTask implements Runnable {
                         }
                         recordOutcome("safetyExternal/verifier ex=" + (verEx == null ? "null" : verEx.getClass().getSimpleName()));
                         if (state.shape instanceof MemoryShape) {
-                            // addBadChunk: chunk-uniform — within a chunk the per-column
+                            // addBadChunk: chunk-uniform - within a chunk the per-column
                             // selection order is deterministic, so the twin spiral index picks
                             // the same column and the verifier rejects it identically.
                             ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safetyExternal);
@@ -1105,7 +972,7 @@ final class PregenTask implements Runnable {
 
     private void completeExhausted() {
         long reported = Math.min(i, state.maxAttempts);
-        // Verbose failure summary — preserves the historical log shape.
+        // Verbose failure summary - preserves the historical log shape.
         if (state.verbose && i >= state.maxAttempts) {
             RTP.log(Level.INFO,
                     "#00ff80[RTP] ["
@@ -1141,7 +1008,7 @@ final class PregenTask implements Runnable {
             selectionsStr.append("}");
             RTP.log(Level.INFO, "#0f0080[RTP] [" + state.region.name + "] selections: " + selectionsStr);
 
-            // Per-attempt outcome breadcrumb — always printed (diagnostic: reveals
+            // Per-attempt outcome breadcrumb - always printed (diagnostic: reveals
             // which code path actually fired when the failMap bucketing is
             // ambiguous or appears silent).
             if (state.attemptOutcomes.isEmpty()) {

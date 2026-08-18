@@ -19,16 +19,6 @@ import static org.mockito.Mockito.*;
 
 /**
  * Tests for SQLite-specific read/write logic using Mockito mocks.
- *
- * SQLite's {@code read} uses a raw {@link Statement} + PRAGMA, and {@code write}
- * uses {@code INSERT OR REPLACE} with dynamic column creation — both differ
- * significantly from the MySQL/PostgreSQL implementations.
- *
- * A testable subclass of {@link AbstractSQLDatabaseAccessor} is used to avoid
- * any real DriverManager / SQLite file initialisation.  The SQLite-specific
- * {@code read} and {@code write} implementations are copied verbatim from
- * {@link SQLiteDatabaseAccessor} so that every {@code catch (SQLException)}
- * block is exercised.
  */
 class SQLiteDatabaseAccessorTest {
 
@@ -36,7 +26,7 @@ class SQLiteDatabaseAccessorTest {
     Path tempDir;
 
     // -------------------------------------------------------------------------
-    // Testable subclass — mirrors SQLiteDatabaseAccessor read/write exactly
+    // Testable subclass - mirrors SQLiteDatabaseAccessor read/write exactly
     // -------------------------------------------------------------------------
 
     static class TestableSQLiteAccessor extends AbstractSQLDatabaseAccessor {
@@ -131,7 +121,7 @@ class SQLiteDatabaseAccessorTest {
             return Optional.empty();
         }
 
-        /** Exact copy of SQLiteDatabaseAccessor.write (simplified — only the happy-path
+        /** Exact copy of SQLiteDatabaseAccessor.write (simplified - only the happy-path
          *  and SQLException branches; the full dynamic-column-creation path is also tested
          *  via the SQLException-on-getResultSet branch below). */
         @Override
@@ -150,7 +140,7 @@ class SQLiteDatabaseAccessorTest {
                 try {
                     resultSet = statement.getResultSet();
                 } catch (SQLException e) {
-                    // Build CREATE TABLE and retry — mirrors SQLiteDatabaseAccessor exactly
+                    // Build CREATE TABLE and retry - mirrors SQLiteDatabaseAccessor exactly
                     StringBuilder create = new StringBuilder("CREATE TABLE IF NOT EXISTS " + tableName + " ( ");
                     for (Map.Entry<DatabaseAccessor.TableObj, DatabaseAccessor.TableObj> entry : keyValuePairs.entrySet()) {
                         create.append("\"").append(entry.getKey().object.toString()).append("\" TEXT, ");
@@ -241,7 +231,7 @@ class SQLiteDatabaseAccessorTest {
                 try {
                     statement.execute(alterSql);
                 } catch (SQLException e) {
-                    // logged — swallowed
+                    // logged - swallowed
                 }
             }
 
@@ -292,7 +282,7 @@ class SQLiteDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // read() — happy path
+    // read() - happy path
     // -------------------------------------------------------------------------
 
     @Test
@@ -386,7 +376,7 @@ class SQLiteDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // read() — SQLException coverage
+    // read() - SQLException coverage
     // -------------------------------------------------------------------------
 
     @Test
@@ -435,7 +425,7 @@ class SQLiteDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // write() — happy path
+    // write() - happy path
     // -------------------------------------------------------------------------
 
     @Test
@@ -472,7 +462,7 @@ class SQLiteDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // write() — SQLException coverage
+    // write() - SQLException coverage
     // -------------------------------------------------------------------------
 
     @Test
@@ -589,7 +579,7 @@ class SQLiteDatabaseAccessorTest {
         when(pragmaRs.getString("name")).thenReturn("otherCol");
         when(pragmaRs.getString("type")).thenReturn("TEXT");
 
-        // ALTER TABLE throws — should be swallowed
+        // ALTER TABLE throws - should be swallowed
         doAnswer(inv -> {
             String sql = inv.getArgument(0);
             if (sql.contains("ALTER TABLE")) throw new SQLException("alter failed");
@@ -602,7 +592,7 @@ class SQLiteDatabaseAccessorTest {
 
         // The INSERT OR REPLACE will also throw (since we throw on all non-ALTER executes too),
         // but we only care that ALTER TABLE's exception is swallowed (IllegalStateException from
-        // INSERT is acceptable here — we just verify no exception from ALTER propagates alone).
+        // INSERT is acceptable here - we just verify no exception from ALTER propagates alone).
         // To isolate: make INSERT succeed.
         doAnswer(inv -> {
             String sql = inv.getArgument(0);
@@ -610,14 +600,14 @@ class SQLiteDatabaseAccessorTest {
             return null; // everything else succeeds
         }).when(stmt).execute(anyString());
 
-        // Should not throw from ALTER TABLE — may throw IllegalStateException from INSERT
+        // Should not throw from ALTER TABLE - may throw IllegalStateException from INSERT
         // if INSERT itself fails, but that is a separate branch already tested above.
         // Here INSERT succeeds (mock returns null = no exception), so no throw at all.
         assertDoesNotThrow(() -> accessor.write(mockConn, "rtp_teleport_data", pairs));
     }
 
     // -------------------------------------------------------------------------
-    // delete() — inherited from AbstractSQLDatabaseAccessor
+    // delete() - inherited from AbstractSQLDatabaseAccessor
     // -------------------------------------------------------------------------
 
     @Test
@@ -641,7 +631,7 @@ class SQLiteDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // connect() / disconnect() — inherited
+    // connect() / disconnect() - inherited
     // -------------------------------------------------------------------------
 
     @Test
@@ -707,7 +697,7 @@ class SQLiteDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // flush() — inherited, uses getConnection()
+    // flush() - inherited, uses getConnection()
     // -------------------------------------------------------------------------
 
     @Test
@@ -771,7 +761,7 @@ class SQLiteDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // loadCachedLocations() — inherited, uses getConnection()
+    // loadCachedLocations() - inherited, uses getConnection()
     // -------------------------------------------------------------------------
 
     @Test

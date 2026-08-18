@@ -9,35 +9,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Base {@link SchematicPaster} for platforms that read the in-repo Sponge {@code .schem}
- * format (ADR-058 Amendment 1). It implements the platform-neutral half of the contract:
- *
- * <ul>
- *   <li>{@link #load} decodes the file with {@link SpongeSchematicDecoder} and wraps the
- *       result in a completed future. The decode is blocking I/O, so {@code load} MUST be
- *       called off any tick / region thread (S-005); a missing or malformed file yields a
- *       {@code null}-completed future (the caller maps that to a {@code MISSING_SOURCE} /
- *       {@code DECODE_ERROR} audit, never an exception that aborts the teleport).
- *   <li>{@link #supports} accepts {@code .schem} / {@code .schematic} sources whose file
- *       exists.
- * </ul>
- *
- * <p>Subclasses implement only {@link #paste}, applying the planned
- * {@link BlockPlacement}s (see {@link SchematicPlacementPlanner}) through the platform's
- * native block parser on the region-owning thread.
+ * Base {@link SchematicPaster} for Sponge {@code .schem} files (ADR-058).
+ * Handles off-tick async decoding and memory caching (S-004, S-005).
+ * Subclasses implement {@link #paste} for platform-specific block placement.
  */
 public abstract class AbstractFileSchematicPaster implements SchematicPaster {
 
-  /**
-   * Decoded-schematic cache keyed by the absolute, normalized file path. Decoding a
-   * {@code .schem} file is blocking disk I/O plus NBT parsing; since RTP teleports can resolve
-   * the same region schematic many times per second, we decode each file only on its first
-   * {@link #load} and serve subsequent loads from memory (the issue's "we can't do file
-   * operations so often" requirement). {@link LoadedSchematic} is immutable so the cached
-   * instance is safe to share across threads and teleports. Entries are dropped (and the file
-   * re-read) whenever the file is missing/unreadable at lookup time, so deleting or replacing a
-   * schematic and reloading still picks up the change.
-   */
+  /** Decoded-schematic cache keyed by absolute normalized file path. */
   private static final Map<String, LoadedSchematic> CACHE = new ConcurrentHashMap<>();
 
   /**
@@ -68,7 +46,7 @@ public abstract class AbstractFileSchematicPaster implements SchematicPaster {
       return CompletableFuture.completedFuture(loaded);
     } catch (IOException | RuntimeException e) {
       // Decode failure is reported as a null result so it never aborts the teleport, but the
-      // cause MUST be visible (S-004) — a silent null here is exactly the "no information around
+      // cause MUST be visible (S-004) - a silent null here is exactly the "no information around
       // its failure" gap. Log the real reason (bad magic, unsupported NBT tag, cell-count
       // mismatch, ...) via the API-level accessor when one is bound.
       io.github.dailystruggle.rtp.api.server.RTPServerAccessor accessor =

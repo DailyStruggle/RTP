@@ -8,8 +8,8 @@ import java.util.Optional;
 
 /**
  * Immutable view of the latest backend (and optionally proxy) heartbeats the
- * transport has observed. Assembled by the {@link NetworkTransport} —
- * <strong>never</strong> fetched by the selector — and passed by value into
+ * transport has observed. Assembled by the {@link NetworkTransport} -
+ * <strong>never</strong> fetched by the selector - and passed by value into
  * {@link BackendSelector#choose(RtpRequest, NetworkSnapshot)} so the selector
  * stays a pure function (REQ-RTP-PROXY-COMMON-002).
  *

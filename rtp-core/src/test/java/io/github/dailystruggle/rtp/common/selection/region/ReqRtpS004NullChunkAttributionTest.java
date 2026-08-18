@@ -30,29 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-S-004 / ADR-016 follow-up — nullChunk attribution in pregen diagnostics.
- *
- * <p>Before this fix, {@link LocationGenerator#getLocation(Region, Set)} silently
- * {@code continue}d whenever the async chunk load resolved to a {@code null} key.
- * On vanilla Spigot that null-key path is the deliberate signal produced by the
- * ADR-016 Anvil pre-filter {@code REJECT} verdict (see
- * {@code BukkitRTPWorld.getChunkAt}), so operators saw
- * "failed to generate a location within N tries" reports whose {@code cause=*}
- * buckets summed to far less than N — with the difference entirely unattributed.
- * This violated the REQ-RTP-S-004 "no silent discards" contract on the pregen
- * path.</p>
- *
- * <p>The fix introduces {@link LocationGenerator.FailTypes#nullChunk} and
- * increments it at both null-chunk exit sites in {@code getLocation}. The
- * pregen summary loop iterates {@code failMap} unchanged, so the new bucket
- * appears in the "cause=nullChunk fails=N" line automatically.</p>
- *
- * <p>This test simulates that regression: it forces {@link TrackedMockWorld}'s
- * {@code nullChunkKeyPredicate} to return {@code true} for every chunk (i.e.
- * every candidate is treated as an Anvil {@code REJECT}), runs
- * {@code getLocation} with {@code verbose=true} so the summary is emitted, and
- * asserts that the captured log output explicitly attributes the failures to
- * {@code cause=nullChunk} with {@code reason=asyncLoadNull}.</p>
+ * REQ-RTP-S-004 / ADR-016 verification: nullChunk attribution in pregen diagnostics.
+ * Asserts that rejected/null chunk loads are tracked in {@link LocationGenerator.FailTypes#nullChunk}
+ * with {@code reason=asyncLoadNull} rather than silently dropped.
  */
 @DisplayName("REQ-RTP-S-004 / ADR-016: null-chunk drops are attributed to FailTypes.nullChunk")
 public class ReqRtpS004NullChunkAttributionTest {
@@ -72,15 +52,9 @@ public class ReqRtpS004NullChunkAttributionTest {
         world = new TrackedMockWorld("null_chunk_attribution_world");
         accessor.addWorld(world);
 
-        // Same reflection trick as ReqRtpS005StaleChunkGuardTest: mutate the in-memory
-        // EnumMap directly because the YAML-backed parser is not materialised in tests.
-        // We override two keys:
-        //  - SafetyKeys.safetyRadius=0: skip the neighbour-chunk safetyCheck loop (we're
-        //    asserting the *first* null-chunk site, not the neighbour site).
-        //  - LoggingKeys.selection_failure=true: force the 2-arg getLocation(Region, Set)
-        //    overload to run its verbose block (including the pregen summary emission and
-        //    failMap increments). Without this the "failed to generate a location within N
-        //    tries" summary is silenced and cause=nullChunk cannot be observed.
+        // Override config keys via in-memory reflection:
+        // SafetyKeys.safetyRadius=0: skip neighbour-chunk safety loop.
+        // LoggingKeys.selection_failure=true: enable verbose pregen summary log output.
         try {
             java.lang.reflect.Field dataField = FactoryValue.class.getDeclaredField("data");
             dataField.setAccessible(true);
@@ -147,13 +121,13 @@ public class ReqRtpS004NullChunkAttributionTest {
         assertNotNull(result, "Generator must return a GenerationResult envelope even on total failure.");
         assertNull(result.coords(), "Coords must be null when every candidate was null-chunked.");
 
-        // The safetyCheck loop must never run — chunk is null before we reach it.
+        // The safetyCheck loop must never run - chunk is null before we reach it.
         assertEquals(0, world.isSafeCallCount.get(),
                 "MockRTPChunk.isSafe must never be invoked when the async load resolves to null.");
 
         // REQ-RTP-S-004 attribution: the pregen summary must explicitly report the
         // drops under cause=nullChunk reason=asyncLoadNull. Before the fix, the
-        // drops were invisible — this assertion is the regression guard.
+        // drops were invisible - this assertion is the regression guard.
         List<String> logs;
         synchronized (accessor.logMessages) {
             logs = new ArrayList<>(accessor.logMessages);

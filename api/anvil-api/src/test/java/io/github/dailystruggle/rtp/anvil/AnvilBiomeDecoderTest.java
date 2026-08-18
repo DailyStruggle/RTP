@@ -18,14 +18,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * ADR-016 Phase 2, landing-order step 1: biome-palette decode in
+ * ADR-016: biome-palette decode in
  * {@link BiomePaletteSection} and the public {@link AnvilChunkView#getBiomeAt(int, int, int)} /
  * {@link AnvilChunkView#getBiomesPresent()} surface.
  *
  * <p>These tests are decoder-level only (no platform wiring, no Iris/Terra path).
- * They cover §3 of the plan (packed-palette decode with the biome-specific min-1-bit
- * rule), §4 (the two new view methods, single-entry + multi-entry palette paths,
- * out-of-window null return, missing-biomes-container fallthrough), and the §5
+ * They cover packed-palette decode with the biome-specific min-1-bit
+ * rule, the two new view methods, single-entry + multi-entry palette paths,
+ * out-of-window null return, missing-biomes-container fallthrough, and the
  * trust-model contract that the raw on-disk identifier is preserved verbatim
  * (namespaced strings like {@code iris:volcanic_ash_plains} round-trip without
  * being collapsed).
@@ -202,7 +202,7 @@ class AnvilBiomeDecoderTest {
                 () -> assertNull(view.getBiomeAt(0, 0, 0),
                         "no biome container → caller must fall through to live world.getBiome (§5)"),
                 () -> assertTrue(view.getBiomesPresent().isEmpty()));
-        // Paranoia: the block side must still decode — this guards against an edit that
+        // Paranoia: the block side must still decode - this guards against an edit that
         // accidentally conflates the two containers.
         assertFalse(view.sections().isEmpty());
         assertEquals("minecraft:stone", view.blockIdAt(0, 0, 0));

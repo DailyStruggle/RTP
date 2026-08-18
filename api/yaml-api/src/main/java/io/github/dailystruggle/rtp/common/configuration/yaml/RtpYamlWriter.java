@@ -40,7 +40,7 @@ public final class RtpYamlWriter {
         w.writeMapping(root, 0, true);
         if (!root.trailingComments().isEmpty()) {
             // Separate trailing comments from the last entry with a blank
-            // line — preserves the layout convention used by shipped YAMLs
+            // line - preserves the layout convention used by shipped YAMLs
             // (e.g. "# DO NOT TOUCH VERSION NUMBER" above the version key).
             w.out.append(NL);
             w.writeBlockComments(root.trailingComments(), 0);
@@ -231,7 +231,7 @@ public final class RtpYamlWriter {
     private static String quoteKeyIfNeeded(String key) {
         // Our YAML subset does not require quoting for any plain key that
         // doesn't contain ':', '#', leading/trailing spaces, or quote chars.
-        // Be conservative — only emit a double-quoted form when necessary.
+        // Be conservative - only emit a double-quoted form when necessary.
         if (key.isEmpty()) return "\"\"";
         for (int i = 0; i < key.length(); i++) {
             char c = key.charAt(i);

@@ -85,7 +85,7 @@ public final class BStatsChartIds {
   // Additive only: existing IDs above are unchanged. These charts consume the
   // same MetricsSnapshot already populated on every platform (Paper, Bukkit,
   // Folia, Fabric), so they "just work" without any per-platform branch.
-  // foliaRegionCount is structurally fingerprint-safe — non-Folia platforms
+  // foliaRegionCount is structurally fingerprint-safe - non-Folia platforms
   // bucket into "0" (FoliaRegionSample list is empty); only Folia operators
   // ever produce non-zero buckets.
   public static final String TPS_TRENDLINES = "tps_trendlines";

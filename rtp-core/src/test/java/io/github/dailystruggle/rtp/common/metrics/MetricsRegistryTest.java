@@ -15,20 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Phase C parity test for the cross-plugin static registry on {@link Metrics}.
- * Verifies the registry semantics recorded in
- * {@code metrics-api-ADR-001} §7 (last-writer-wins, extension cardinality):
- * <ol>
- *   <li>{@link Metrics#currentBinding()} defaults to {@link MetricsBinding#NOOP}.</li>
- *   <li>{@link Metrics#registerBinding(MetricsBinding)} is last-writer-wins and
- *       returns the prior binding.</li>
- *   <li>{@link CoreMetrics#setBinding(MetricsBinding)} mirrors into the registry
- *       so sibling-plugin readers observe the live RTP binding without owning
- *       the {@link CoreMetrics} instance.</li>
- *   <li>{@link Metrics#registerExtension(java.util.function.Supplier)} extensions
- *       are folded onto {@link CoreMetrics#snapshot()} alongside the RTP one.</li>
- *   <li>A throwing extension supplier does not poison the snapshot.</li>
- * </ol>
+ * Cross-plugin static registry tests for {@link Metrics}.
+ *
+ * <p>Verifies registration semantics, binding mirroring, and extension folding.
  */
 class MetricsRegistryTest {
 

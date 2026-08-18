@@ -33,12 +33,12 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Fabric {@link RTPChunk}. Dual-mode:
  * <ol>
- *   <li><b>Live mode</b> — wraps a {@link ChunkAccess} at
+ *   <li><b>Live mode</b> - wraps a {@link ChunkAccess} at
  *       {@link net.minecraft.world.level.chunk.status.ChunkStatus#FULL}.
  *       Block-data queries hit the live world state (S-005-safe: no synchronous
- *       loads — the {@code ChunkAccess} is handed in by callers that already
+ *       loads - the {@code ChunkAccess} is handed in by callers that already
  *       performed an off-tick load).</li>
- *   <li><b>Anvil mode</b> (ADR-016 / rtp-fabric-ADR-005 follow-up) — wraps an
+ *   <li><b>Anvil mode</b> (ADR-016 / rtp-fabric-ADR-005 follow-up) - wraps an
  *       {@link AnvilChunkView} produced by {@code rtp-anvil} from the persisted
  *       {@code r.X.Z.mca} region file. The instance answers every block-data
  *       query from the decoded snapshot, never touching live world state, so
@@ -48,11 +48,11 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * <p>ADR-022 §4: no {@code org.bukkit.*}; queries do not trigger loads (S-005);
  * stale-chunk guard is caller-side (ADR-015) for live mode and moot for anvil
- * mode (the snapshot is self-contained — see {@link #isSelfContained()}).
+ * mode (the snapshot is self-contained - see {@link #isSelfContained()}).
  * Material IDs are upper-cased {@code NAMESPACE:PATH} on the live path; the
  * anvil path delegates to {@link AnvilChunkView}, which already speaks the
  * canonical reconciled form. The {@link CompiledUnsafeSet} overload of
- * {@link #isSafe} delegates to the plain-material bucket only — state-predicate
+ * {@link #isSafe} delegates to the plain-material bucket only - state-predicate
  * parity with Bukkit is deferred (mirrors Spigot's anvil-mode behaviour);
  * commit-time recheck still guards landing.</p>
  */
@@ -69,7 +69,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
     /**
      * Anvil mode only: a pre-reconciled unsafe-block set produced by
      * {@link PaletteNormalizer#reconcileAll}. {@code null} when the chunk
-     * was built without a caller-supplied unsafe list — in which case
+     * was built without a caller-supplied unsafe list - in which case
      * {@link #isSafe(int, int, int, Set)} reconciles the per-call set.
      */
     private final @Nullable Set<String> reconciledUnsafe;
@@ -89,7 +89,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
 
     /**
      * Anvil-backed constructor (rtp-fabric-ADR-005 follow-up). {@code chunk}
-     * is {@code null} because no live chunk was loaded — this instance answers
+     * is {@code null} because no live chunk was loaded - this instance answers
      * every query from {@code view}. The {@code reconciledUnsafe} set, when
      * non-null, short-circuits {@link #isSafe(int, int, int, Set)} to skip
      * per-call reconciliation; pass {@code null} to force per-call
@@ -147,14 +147,14 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
         // An Anvil view exists only because the region file entry for the chunk
         // existed, which is the definition of "generated and persisted". Live
         // path: a constructed FabricRTPChunkUnobf wraps a ChunkAccess obtained at
-        // ChunkStatus.FULL — by definition generated. Defensive on null.
+        // ChunkStatus.FULL - by definition generated. Defensive on null.
         if (anvilView != null) return true;
         return chunk != null;
     }
 
     @Override
     public boolean isLoaded() {
-        // An Anvil-backed chunk is by construction NOT loaded — that's the whole
+        // An Anvil-backed chunk is by construction NOT loaded - that's the whole
         // point. Downstream callers needing a loaded chunk (e.g. teleport commit)
         // re-fetch via FabricRTPWorldUnobf.getChunkAt to trigger a live load.
         if (anvilView != null) return false;
@@ -192,8 +192,8 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
 
     @Override
     public void unload() {
-        if (anvilView != null) return; // Nothing to unload — see keep().
-        // Vanilla Fabric has no analogue to Bukkit's Chunk#unload(false) —
+        if (anvilView != null) return; // Nothing to unload - see keep().
+        // Vanilla Fabric has no analogue to Bukkit's Chunk#unload(false) -
         // chunk eviction is driven by the ticket system. Releasing our keep()
         // ticket is the closest approximation; if no caller is keeping this
         // chunk, the chunk system will evict it on its own schedule.
@@ -206,7 +206,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
 
     /**
      * Returns the upper-cased {@code namespace:path} block id for the block at
-     * the given chunk-local coords (Y is absolute world Y). Live-mode only —
+     * the given chunk-local coords (Y is absolute world Y). Live-mode only -
      * anvil-mode queries route through {@link AnvilChunkView} which speaks the
      * already-reconciled form. Returns {@code ""} on registry lookup failure.
      */
@@ -347,7 +347,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
         if (chunk == null) return 0;
         try {
             // Mojang's MOTION_BLOCKING_NO_LEAVES maps directly to Bukkit's
-            // HeightMap.MOTION_BLOCKING_NO_LEAVES — the same height map used
+            // HeightMap.MOTION_BLOCKING_NO_LEAVES - the same height map used
             // by BukkitRTPChunk#getSurfaceHeight.
             return chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         } catch (Throwable t) {
@@ -379,7 +379,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
 
     /**
      * Compiled-form safety check (ADR-017). Plain-material bucket only on
-     * Fabric for now — see class-level note. Hot-path fast exits mirror the
+     * Fabric for now - see class-level note. Hot-path fast exits mirror the
      * Bukkit implementation: empty compiled set short-circuits to safe with
      * zero allocations. Anvil-backed instances also delegate to the plain
      * bucket via {@link #isSafe(int, int, int, Set)}

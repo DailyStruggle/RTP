@@ -197,7 +197,7 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
       // catches Spigot / pre-Folia Paper).
       Object bukkitLocation = buildBukkitLocation(loc, bukkitLoc);
       if (bukkitLocation == null) {
-        // Not Folia (or RTPWorld handle isn't a Bukkit World) — record
+        // Not Folia (or RTPWorld handle isn't a Bukkit World) - record
         // unsupported only when we are also certain the Folia entry-point
         // isn't on the classpath; otherwise this would be a regression on
         // the very platform the probe exists for.

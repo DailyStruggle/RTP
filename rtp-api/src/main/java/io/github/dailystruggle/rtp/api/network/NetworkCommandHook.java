@@ -7,45 +7,22 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Pre-dispatch hook consulted by the {@code /rtp} command pipeline before
- * the local teleport selection runs. Lets the network-mode adapter (Bukkit's
- * {@code NetworkModeBootstrap}, Fabric's pending equivalent, etc.) intercept
- * a request and route it across the cross-server wait queue without leaking
- * proxy SPI types into {@code rtp-core}.
+ * Pre-dispatch hook consulted by {@code /rtp} to route requests across servers.
  *
- * <p>Default install ({@link #LOCAL_ONLY}) returns {@link RoutingResult.Local}
- * unconditionally, so plain single-server deployments incur zero behavioural
- * change. Network-mode adapters install a richer impl that consults
- * the live network snapshot, the per-backend region inventory, and the
- * enrolment buffer.</p>
+ * <p>S-004: implementations shall not swallow teleport intent silently. On failure,
+ * fallback to {@link RoutingResult.Local} or return {@link RoutingResult.Reject}.
  *
- * <p>S-004 contract: implementations <em>must not</em> swallow teleport
- * intent silently. On failure they must either return {@link RoutingResult.Local}
- * (graceful fallback to the local pipeline) or {@link RoutingResult.Reject}
- * with a localized reason key. Throwing is permitted; the caller catches
- * and degrades to local with a WARNING log entry.</p>
- *
- * <p>Threading: invoked from the {@code /rtp} command thread (server main
- * on Bukkit/Paper, region-owned on Folia, dispatcher on Fabric). Must be
- * non-blocking and side-effect-free on the {@link RoutingResult.Local} path;
- * {@link RoutingResult.CrossServer} implementations may offer a record to
- * the async enrolment buffer as their only side effect.</p>
- *
- * @since rtp-proxy-ADR-014
+ * <p>Threading: invoked on command dispatch thread; must be non-blocking.
  */
 @FunctionalInterface
 public interface NetworkCommandHook {
 
   /**
-   * Decide whether this {@code /rtp} call should be served locally,
-   * enrolled on the cross-server wait queue, or rejected outright.
+   * Evaluates whether {@code /rtp} should route locally, cross-server, or reject.
    *
-   * @param playerId the invoking player; never {@code null}
-   * @param args     the parsed argument map from commands-api (e.g.
-   *                 {@code {"region": ["east"], "biome": ["plains"]}}).
-   *                 Never {@code null}; may be empty
-   * @return a {@link RoutingResult} describing the chosen path; never
-   *         {@code null}
+   * @param playerId invoking player; never {@code null}
+   * @param args     parsed argument map; never {@code null}
+   * @return routing decision; never {@code null}
    */
   RoutingResult route(UUID playerId, Map<String, List<String>> args);
 
@@ -90,12 +67,8 @@ public interface NetworkCommandHook {
     /**
      * Static factory for the reject outcome.
      *
-     * @param messageKey   localized message key (typically a {@code MessagesKeys}
-     *                     enum {@code name()}) the caller should emit; never
-     *                     {@code null}
-     * @param placeholder  optional placeholder value (e.g. the region name)
-     *                     substituted into the message via {@code [region]}
-     *                     or similar; {@code null}/empty for none
+     * @param messageKey  localized message key; never {@code null}
+     * @param placeholder optional placeholder value (e.g. region name); empty if none
      */
     static Reject reject(String messageKey, String placeholder) {
       return new Reject(

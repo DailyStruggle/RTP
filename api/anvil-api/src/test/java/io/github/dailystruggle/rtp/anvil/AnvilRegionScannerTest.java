@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Contract test for {@link AnvilRegionScanner} — the pregen biome-enumeration
+ * Contract test for {@link AnvilRegionScanner} - the pregen biome-enumeration
  * utility that feeds the platform adapter's {@code setBiomesGetter} hook
- * (ADR-016 (biome) §6.1, Step 2 of §10).
+ * (ADR-016 (biome) §6.1).
  *
  * <p>Covers: happy-path union across multiple region files, mtime-keyed cache
  * hit/invalidation, empty-directory and missing-directory fallthrough, silent
@@ -39,7 +39,7 @@ class AnvilRegionScannerTest {
 
     @BeforeEach
     void resetCache() {
-        // Each test gets a fresh global cache — mtime-signature collisions between
+        // Each test gets a fresh global cache - mtime-signature collisions between
         // tempdirs would otherwise leak a previous test's result across tests.
         AnvilRegionScanner.invalidateCache();
     }
@@ -55,7 +55,7 @@ class AnvilRegionScannerTest {
     @DisplayName("World folder with no region/ subdirectory yields an empty set")
     void missingRegionSubfolderReturnsEmpty() throws IOException {
         Path world = Files.createDirectory(tmp.resolve("world"));
-        // No region/ folder created — this is the initial-generation / unpopulated case.
+        // No region/ folder created - this is the initial-generation / unpopulated case.
         Set<String> result = AnvilRegionScanner.scanBiomes(world, "");
         assertTrue(result.isEmpty());
     }
@@ -77,7 +77,7 @@ class AnvilRegionScannerTest {
         // r.0.0.mca carries minecraft:plains
         writeSingleChunkRegionFile(region.resolve("r.0.0.mca"),
                 List.of("minecraft:plains"));
-        // r.-1.0.mca carries iris:volcanic_ash_plains (namespaced, non-vanilla —
+        // r.-1.0.mca carries iris:volcanic_ash_plains (namespaced, non-vanilla -
         // validates that the §5 verbatim-identifier promise propagates through
         // the scanner, not just the view).
         writeSingleChunkRegionFile(region.resolve("r.-1.0.mca"),
@@ -135,7 +135,7 @@ class AnvilRegionScannerTest {
         assertEquals(Set.of("minecraft:plains"), first);
 
         // Rewrite the region file with a richer biome palette *and* bump its mtime
-        // explicitly — some filesystems (notably older FAT variants on CI) only
+        // explicitly - some filesystems (notably older FAT variants on CI) only
         // carry 1-2 s mtime resolution, so we set the timestamp explicitly rather
         // than relying on a wall-clock difference between the two writes.
         writeSingleChunkRegionFile(rf, List.of("minecraft:plains", "iris:volcanic_ash_plains"));

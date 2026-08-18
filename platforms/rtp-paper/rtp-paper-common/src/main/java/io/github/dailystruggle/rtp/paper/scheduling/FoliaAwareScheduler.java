@@ -22,7 +22,7 @@ import org.bukkit.plugin.java.JavaPlugin;
  * Basic Folia-aware {@link RTPScheduler} for the free (lite) build (ADR-024 / ADR-061).
  *
  * <p>The free LeafRTP build ships the Paper adapter, which the Bukkit-family {@code
- * BukkitSchedulerImpl} drives through {@code Bukkit.getScheduler()} — calls that throw on
+ * BukkitSchedulerImpl} drives through {@code Bukkit.getScheduler()} - calls that throw on
  * Folia. This implementation provides a correctness-first regionized path so the free build
  * runs on Folia without locking the operator out of the software: it routes work through the
  * regionized scheduler statics that paper-api exposes (global / region / async) and the
@@ -75,7 +75,7 @@ public class FoliaAwareScheduler implements RTPScheduler {
     }
     if (!plugin.isEnabled()) {
       // Plugin disabling/disabled; Folia's AsyncScheduler would throw. Shutdown is an
-      // expected, non-teleport path — drop silently rather than spam the log.
+      // expected, non-teleport path - drop silently rather than spam the log.
       return trackedTask;
     }
     asyncScheduler.runNow(plugin, scheduledTask -> trackedTask.run());
@@ -191,7 +191,7 @@ public class FoliaAwareScheduler implements RTPScheduler {
     // Prefer the player's own entity scheduler so the runnable lands on the region thread
     // that owns the player (correct for teleports). Synthetic/mock players or a player the
     // scheduler refuses (e.g. mid-disconnect) fall through to the global region scheduler so
-    // the task still fires — REQ-RTP-S-004: never silently drop a teleport task.
+    // the task still fires - REQ-RTP-S-004: never silently drop a teleport task.
     boolean scheduled = false;
     Player bukkitPlayer = null;
     if (player instanceof io.github.dailystruggle.rtp.bukkitplatform.entity.BukkitRTPPlayer) {

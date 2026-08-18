@@ -12,7 +12,7 @@ import java.util.UUID;
  * {@code PlayerQuitEvent} / plugin {@code onDisable} to the registry in
  * {@code rtp-core} ({@code MapDispatch}).
  *
- * <p>Lifecycle triggers (CHECKLIST-maps-api.md Stage 2.2, REQ-RTP-MAP-003):
+ * <p>Lifecycle triggers (REQ-RTP-MAP-003):
  * <ul>
  *   <li>{@link #onPlayerQuit(UUID)} - called when a viewer disconnects.
  *       Implementations release any cached handles, map views, or other

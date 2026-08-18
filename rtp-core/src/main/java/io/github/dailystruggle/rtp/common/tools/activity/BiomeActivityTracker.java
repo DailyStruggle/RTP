@@ -18,30 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 /**
- * In-memory accumulator of <em>biome occupancy</em> - how much of their time
- * online players spend standing in each biome, sampled periodically over the
- * server's lifetime. This is deliberately distinct from teleport landings
- * (which mirror biome surface area) and from the player-requested biome filter
- * (players cannot generally pick a destination biome): it answers the
- * world-designer question "where do players actually choose to stay?".
- *
- * <p><b>Collector model.</b> {@link #sample(Collection)} does not read player
- * positions itself. Reading a player's location and biome must happen on the
- * thread that owns that player (the entity-region thread on Folia; the main
- * thread elsewhere), so each player is dispatched to its owning thread via
- * {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTaskForPlayer
- * RTP.scheduler.runTaskForPlayer(...)} and reports back through its own
- * {@link CompletableFuture}. The futures are independent, so a slow or stalled
- * region never blocks the collection of the others. Counts accumulate as each
- * future resolves; callers may ignore the returned futures (fire-and-forget) or
- * await them for deterministic tests.
- *
- * <p><b>Lifetime.</b> Counts live only in memory and reset on restart/reload
- * (no schema, no persistence) - matching the project's flat-file/in-memory
- * metrics posture and keeping behaviour identical between the full and lite
- * editions.
- *
- * <p>All mutating operations are thread-safe.
+ * In-memory accumulator of player biome occupancy.
  */
 public final class BiomeActivityTracker {
 
@@ -69,13 +46,10 @@ public final class BiomeActivityTracker {
   }
 
   /**
-   * Dispatches one occupancy read per online player to that player's owning
-   * thread and records the resolved biome as each read completes.
+   * Dispatches one occupancy read per online player to owning thread and records resolved biome.
    *
-   * @param players the players to sample; {@code null} entries and offline
-   *                players are skipped
-   * @return one future per dispatched player, each completing with the resolved
-   *         biome name (or {@code null} if the location/world could not be read)
+   * @param players players to sample
+   * @return list of futures completing with resolved biome name or {@code null}
    */
   public List<CompletableFuture<String>> sample(Collection<? extends RTPPlayer> players) {
     List<CompletableFuture<String>> futures = new ArrayList<>();

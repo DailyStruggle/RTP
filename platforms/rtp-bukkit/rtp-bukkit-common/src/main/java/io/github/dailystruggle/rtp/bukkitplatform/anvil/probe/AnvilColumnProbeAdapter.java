@@ -10,8 +10,7 @@ import java.util.function.UnaryOperator;
 /**
  * Adapter that exposes an {@code rtp-anvil} {@link ColumnProbe} as the
  * platform-neutral {@link ChunkColumnProbe} consumed by
- * {@code VerticalAdjustor.adjustFromProbe} and {@code PregenTask.evaluateProbe}
- * (see {@code docs/dev/BIOME_LOOKUP_PERF_PLAN.md}).
+ * {@code VerticalAdjustor.adjustFromProbe} and {@code PregenTask.evaluateProbe}.
  *
  * <p>Lives in {@code rtp-spigot-common} because {@code rtp-anvil} is deliberately
  * kept platform-neutral (no dependency on {@code rtp-api}), while {@code rtp-core}
@@ -59,7 +58,7 @@ public final class AnvilColumnProbeAdapter implements ChunkColumnProbe {
    * Off-center column read. The backing {@link ColumnProbe} already retains
    * the entire decoded section palette, so this is an O(1) palette-index
    * lookup with the same {@link PaletteNormalizer#reconcile reconciliation}
-   * applied as the center-column entry point — keeping safety / air-set
+   * applied as the center-column entry point - keeping safety / air-set
    * comparisons consistent across all five {@code testCoords} columns the
    * adjustor probe path now scans.
    */
@@ -81,7 +80,7 @@ public final class AnvilColumnProbeAdapter implements ChunkColumnProbe {
    * {@code unsafeBlocks.contains(...)} lookups (which are populated from config as
    * {@link org.bukkit.Material#name()} upper-case tokens like {@code "LAVA"}) match.
    * As a side effect, reconciled air returns as {@code "AIR"} / {@code "CAVE_AIR"} /
-   * {@code "VOID_AIR"} — the default {@code isAirAt} would then report every air block
+   * {@code "VOID_AIR"} - the default {@code isAirAt} would then report every air block
    * as non-air, which in turn makes {@code JumpAdjustor.acceptProbeY} and
    * {@code LinearAdjustor.acceptY} reject every candidate Y. That routed 100% of
    * probes back through the full-load path (observed as {@code adjustNull=activeChecks}

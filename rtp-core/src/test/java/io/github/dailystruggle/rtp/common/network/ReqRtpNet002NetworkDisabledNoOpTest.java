@@ -21,8 +21,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * network-state member adjacent to {@link AbstractSQLDatabaseAccessor}
  * must be a pure plumbing slot. No threads spawned, no log lines, no
  * side effects on the accessor's behaviour.
- *
- * <p>Refines item 6 of {@code MULTI_SERVER_PLAN.md} Phase 1.
  */
 @DisplayName("REQ-RTP-NET-002 — network.enabled:false is a byte-identical no-op for the network-state member")
 class ReqRtpNet002NetworkDisabledNoOpTest {

@@ -127,11 +127,11 @@ class TestCommandsCmdAuditTest {
     TestCommandsCmd.AuditReport r = TestCommandsCmd.auditForTest(root);
 
     assertNotNull(r);
-    // root visited once, a visited once — the second visit to root is
+    // root visited once, a visited once - the second visit to root is
     // short-circuited by the visited set.
     assertEquals(2, r.auditedCount);
     // The `ROOT` key under `a` legitimately mismatches its child's name `root`
-    // only by case — the audit's equalsIgnoreCase check means this is NOT
+    // only by case - the audit's equalsIgnoreCase check means this is NOT
     // flagged as a mismatch. Assert that explicitly so the test documents it.
     assertFalse(
         r.keyNameMismatch.stream().anyMatch(s -> s.contains("key=ROOT")),

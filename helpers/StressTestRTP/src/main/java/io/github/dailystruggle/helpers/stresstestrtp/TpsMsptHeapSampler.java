@@ -34,12 +34,12 @@ import java.util.function.IntSupplier;
  *       {@code min(20, 20 / secs)}.</li>
  *   <li><b>MSPT</b>: a 1-tick timer measures the wall delta between
  *       consecutive ticks. The reported value is <em>tick wall time</em>,
- *       not Paper's "work performed per tick" — when the server is idle
+ *       not Paper's "work performed per tick" - when the server is idle
  *       it is padded to ~50 ms by the scheduler. During a stress run
  *       (the only regime we publish from) the server is never idle, so
  *       wall-MSPT and Paper's MSPT converge above 50 ms and the same
  *       p95/max aggregates are meaningful. Below 50 ms wall-MSPT is
- *       capped — finer resolution would require NMS/agent instrumentation
+ *       capped - finer resolution would require NMS/agent instrumentation
  *       and is intentionally out of scope.</li>
  * </ul>
  *
@@ -73,19 +73,19 @@ public final class TpsMsptHeapSampler {
     private final AtomicReference<Double> spigotTps = new AtomicReference<>(-1.0);
     private final AtomicReference<Double> spigotMspt = new AtomicReference<>(-1.0);
 
-    // Reflective access — resolved once.
+    // Reflective access - resolved once.
     private final Method getTpsMethod;
     private final Method getAvgTickTimeMethod;
     // Whether the native methods actually return a usable value. They exist on
     // Folia but throw UnsupportedOperationException (TPS/MSPT are per-region
-    // there, with no global aggregate), so method presence is not enough — we
+    // there, with no global aggregate), so method presence is not enough - we
     // probe once and fall back to wall-clock tick sampling when they throw.
     private final boolean tpsNativeWorks;
     private final boolean msptNativeWorks;
 
     // Heap-pressure-over-time series. Optional per-run CSV that records one
     // row per sample so heap-used can be plotted against cumulative /rtp
-    // attempts — the slope is RAM consumed per teleport. Started by
+    // attempts - the slope is RAM consumed per teleport. Started by
     // beginRun() and stopped on run-stop / disable. All access is guarded by
     // heapSeriesLock because start/stop run on the command thread while the
     // writes happen on the async sampler thread.
@@ -131,12 +131,12 @@ public final class TpsMsptHeapSampler {
 
     public void start() {
         if (taskId != null) return;
-        // Snapshot loop runs async — pure JMX + already-computed Bukkit values.
+        // Snapshot loop runs async - pure JMX + already-computed Bukkit values.
         taskId = Sched.runAsyncTimer(plugin, this::sample, periodMs);
 
         // Wall-clock TPS fallback: tick a counter on a tick-aligned timer once
         // per second and report 20 / wall-seconds. Enabled whenever the native
-        // getTPS is unusable — including Folia, where getTPS exists but throws
+        // getTPS is unusable - including Folia, where getTPS exists but throws
         // (no global TPS aggregate). Routed through Sched.runGlobalTimer so it
         // lands on the global region scheduler on Folia and the main thread on
         // Spigot/Paper, instead of the BukkitScheduler that Folia rejects.
@@ -171,7 +171,7 @@ public final class TpsMsptHeapSampler {
             if (tps  >= 0) tpsSamples.add(tps);
             // On Paper/Folia, push the polled MSPT into the rolling list.
             // On Spigot, msptSamples is fed by spigotMsptTick() at 1-tick
-            // resolution — pushing the polled value here would double-count
+            // resolution - pushing the polled value here would double-count
             // and bias the p95 toward whichever value happens to be cached
             // in spigotMspt at sample time.
             if (mspt >= 0 && msptNativeWorks) msptSamples.add(mspt);
@@ -289,7 +289,7 @@ public final class TpsMsptHeapSampler {
 
     private void spigotMsptTick() {
         // Scheduled every tick. The wall delta between consecutive
-        // invocations is the wall time of one tick — equivalent to
+        // invocations is the wall time of one tick - equivalent to
         // Paper's MSPT above 50 ms (the regime we care about), padded
         // to ~50 ms when the server is idle. See class Javadoc.
         long now = System.nanoTime();
@@ -308,7 +308,7 @@ public final class TpsMsptHeapSampler {
     private void spigotTpsTick() {
         // Scheduled every 20 ticks. If 20 ticks took ~1s wall, TPS == 20.
         // Wall delta < 1s shouldn't happen (BukkitScheduler is tick-driven),
-        // but wall delta > 1s means the server fell behind — that's exactly
+        // but wall delta > 1s means the server fell behind - that's exactly
         // the TPS dip we want to surface.
         long now = System.nanoTime();
         if (spigotTpsLastWallNs > 0) {

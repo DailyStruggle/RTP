@@ -50,7 +50,7 @@ public class BukkitServerProvider {
     /**
      * Basic Folia-aware scheduler shipped in the Paper adapter (and therefore in the free / lite
      * jar). Used on Folia only when the tuned {@code rtp-folia} adapter is absent from the
-     * classpath — i.e. the free build, which excludes {@code io/.../folia/**} (ADR-024 / ADR-061).
+     * classpath - i.e. the free build, which excludes {@code io/.../folia/**} (ADR-024 / ADR-061).
      */
     private static final String BASIC_FOLIA_SCHEDULER =
             "io.github.dailystruggle.rtp.paper.scheduling.FoliaAwareScheduler";

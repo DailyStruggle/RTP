@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * {@code io.github.dailystruggle.effectsapi.common.**} may reference any
  * platform-specific type ({@code org/bukkit/**} or {@code net/minecraft/**}).
  *
- * <p>Implemented as a constant-pool scan against compiled {@code .class} files —
+ * <p>Implemented as a constant-pool scan against compiled {@code .class} files -
  * no ArchUnit dependency. The scan walks every UTF-8 entry in each class file's
  * constant pool (CONSTANT_Utf8 = tag 1) and fails if any references a forbidden
  * package prefix.
@@ -106,7 +106,7 @@ class EffectsApiCommonNoPlatformImportsTest {
                     i++; // long/double take two cp slots
                     break;
                 default:
-                    // Unknown tag — bail out of this file rather than misalign.
+                    // Unknown tag - bail out of this file rather than misalign.
                     return;
             }
         }

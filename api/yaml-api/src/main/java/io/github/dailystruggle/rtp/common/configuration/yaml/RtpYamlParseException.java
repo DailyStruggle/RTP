@@ -8,7 +8,7 @@ package io.github.dailystruggle.rtp.common.configuration.yaml;
  * <p>Carries 1-based line/column information so callers can surface
  * actionable diagnostics. The {@link #messageKey()} accessor returns
  * the stable identifier intended to map to a {@code messages.yml} key
- * (see ADR-025 §Migration Step 5).</p>
+ * (see ADR-025).</p>
  */
 public final class RtpYamlParseException extends RuntimeException {
 

@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Focused contract test for {@link AnvilChunkView#getBiomesPresent()} — the enumeration
+ * Focused contract test for {@link AnvilChunkView#getBiomesPresent()} - the enumeration
  * surface feeding {@link AnvilRegionScanner} (ADR-016 (biome) §4, §10.2).
  *
  * <p>Extends the Step-1 sanity in {@code AnvilBiomeDecoderTest} with the properties
@@ -48,7 +48,7 @@ class AnvilBiomesPresentTest {
         assertNotNull(view);
         Set<String> present = view.getBiomesPresent();
 
-        // Expected: plains, forest, iris:volcanic_ash_plains — in that order.
+        // Expected: plains, forest, iris:volcanic_ash_plains - in that order.
         Iterator<String> it = present.iterator();
         assertAll(
                 () -> assertEquals(3, present.size()),
@@ -99,7 +99,7 @@ class AnvilBiomesPresentTest {
         return AnvilTestFixtures.packBiomeIndices(2, cells);
     }
 
-    // Avoid "unused import" noise — ArrayList is referenced indirectly through asList; keep the
+    // Avoid "unused import" noise - ArrayList is referenced indirectly through asList; keep the
     // import list matching the other tests in the suite for readability.
     @SuppressWarnings("unused")
     private static final List<String> UNUSED_MARKER = new ArrayList<>();

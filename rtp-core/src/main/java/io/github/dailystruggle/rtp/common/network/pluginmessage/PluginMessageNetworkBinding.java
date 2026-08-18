@@ -24,32 +24,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Tier-1, DB-free {@link NetworkTransport} backed by the proxy's built-in
- * plugin-messaging vocabulary via a {@link NetworkBridge}. This is the default
- * cross-server transport (ships in the lite assembly and Pro) and the peer of
- * {@code InMemoryNetworkStateBinding}; it requires no Redis/SQL driver.
- *
- * <p><strong>Region-availability gossip.</strong>
- * {@link #publishBackendHeartbeat(BackendHeartbeat)} serialises the row with
- * the shared {@link BackendHeartbeatCodec} (identical wire field set to the
- * Redis/SQL tiers) and broadcasts it to peer backends. Inbound heartbeats are
- * cached per {@code serverId}; {@link #readSnapshot()} returns only the entries
- * seen within {@code staleTimeoutMillis} (the plugin-message analogue of
- * ezRTP's ping timeout). A backend that has gone quiet (e.g. a Fabric/NeoForge
- * server that self-paused with no players) simply ages out of the snapshot and
- * is treated as "unknown" by the command layer.</p>
- *
- * <p><strong>Non-durable reservation tier.</strong> This transport carries
- * <em>intent</em>, not a pre-allocated coordinate. The atomic-claim /
- * reservation-token methods are best-effort no-ops: {@link #claim} never mints
- * a token, {@link #release}/{@link #publishProxyHeartbeat} are no-ops, and the
- * inherited defaults for {@code findReservation}/{@code reapExpired}/
- * {@code listActiveForServer} return empties. On arrival the destination
- * backend runs its normal local pipeline and bounces with a configurable
- * busy / no-such-region message (S-007) on a miss; the player re-issues. This
- * is the same correctness posture ezRTP lives with, but with real region
- * availability rather than just server up/down. Durable atomic claims require
- * the Pro SQL/Redis tiers.</p>
+ * Database-free {@link NetworkTransport} backed by proxy plugin-messaging via {@link NetworkBridge}.
+ * Gossips {@link BackendHeartbeat} records across backends without Redis or SQL requirements.
  */
 public final class PluginMessageNetworkBinding implements NetworkTransport {
 

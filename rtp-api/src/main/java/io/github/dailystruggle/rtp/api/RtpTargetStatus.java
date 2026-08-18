@@ -4,21 +4,11 @@ import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import java.util.Objects;
 
 /**
- * Immutable, per-player status of a single {@link RtpTarget}, intended for
- * populating menu items in a third-party GUI without reaching into
- * {@code rtp-core} internals.
+ * Immutable point-in-time status snapshot of a single {@link RtpTarget} for a player.
  *
- * <p>It answers the three questions a GUI needs to decorate a destination
- * button: <em>can this player use it right now</em> ({@link #availability()}),
- * <em>how long until they can</em> ({@link #remainingCooldownMillis()}), and
- * <em>what will it cost</em> ({@link #cost()}). The values are a point-in-time
- * read; they carry no history and are not refreshed after construction.
+ * <p>Exposes availability, remaining cooldown, cost, and display hints for GUI rendering.
  *
- * <p>Obtain instances through {@link RTPAPI#getTargetStatus(java.util.UUID, RtpTarget)}.
- * This is a read-only DTO: it never causes a teleport, charges a player, or
- * mutates any RTP state. The teleport itself still runs through
- * {@link RTPAPI#teleport(java.util.UUID, RtpTarget)}, which re-enforces every
- * safety and permission check regardless of what this status reported.
+ * <p>Obtain instances via {@link RTPAPI#getTargetStatus(java.util.UUID, RtpTarget)}.
  */
 @PublicApi
 public final class RtpTargetStatus {
@@ -54,37 +44,24 @@ public final class RtpTargetStatus {
   private final String label;
 
   /**
-   * Creates a status snapshot with no icon / environment hints (equivalent to
-   * the richer constructor with both hint arguments {@code null}).
+   * Creates a status snapshot with default null display hints.
    *
-   * @param availability            the availability verdict; must not be {@code null}
-   * @param remainingCooldownMillis remaining cooldown in milliseconds; clamped to
-   *     {@code >= 0}
-   * @param cost                    the monetary cost of this teleport; clamped to
-   *     {@code >= 0}
-   * @throws IllegalArgumentException if {@code availability} is {@code null}
+   * @param availability            availability verdict; must not be {@code null}
+   * @param remainingCooldownMillis remaining cooldown in milliseconds (>= 0)
+   * @param cost                    teleport monetary cost (>= 0)
    */
   public RtpTargetStatus(Availability availability, long remainingCooldownMillis, double cost) {
     this(availability, remainingCooldownMillis, cost, null, null);
   }
 
   /**
-   * Creates a status snapshot, including optional display hints a menu can use
-   * to decorate the destination (especially for a cross-server target, whose
-   * environment / representative block cannot be resolved locally).
+   * Creates a status snapshot with optional icon and environment display hints.
    *
-   * @param availability            the availability verdict; must not be {@code null}
-   * @param remainingCooldownMillis remaining cooldown in milliseconds; clamped to
-   *     {@code >= 0}
-   * @param cost                    the monetary cost of this teleport; clamped to
-   *     {@code >= 0}
-   * @param iconBlock               a representative block material name advertised
-   *     for this target (e.g. {@code "NETHERRACK"}), or {@code null} when none was
-   *     advertised
-   * @param environment             the destination world's environment string
-   *     (e.g. {@code "NORMAL"}, {@code "NETHER"}, {@code "THE_END"}, or a custom
-   *     dimension name), or {@code null} when unknown
-   * @throws IllegalArgumentException if {@code availability} is {@code null}
+   * @param availability            availability verdict; must not be {@code null}
+   * @param remainingCooldownMillis remaining cooldown in milliseconds (>= 0)
+   * @param cost                    teleport monetary cost (>= 0)
+   * @param iconBlock               advertised block material name hint, or {@code null}
+   * @param environment             destination dimension environment hint, or {@code null}
    */
   public RtpTargetStatus(Availability availability, long remainingCooldownMillis, double cost,
       String iconBlock, String environment) {
@@ -92,22 +69,14 @@ public final class RtpTargetStatus {
   }
 
   /**
-   * Creates a status snapshot, including optional display hints a menu can use
-   * to decorate the destination, plus an optional cosmetic display label.
+   * Creates a status snapshot with display hints and cosmetic label.
    *
-   * @param availability            the availability verdict; must not be {@code null}
-   * @param remainingCooldownMillis remaining cooldown in milliseconds; clamped to
-   *     {@code >= 0}
-   * @param cost                    the monetary cost of this teleport; clamped to
-   *     {@code >= 0}
-   * @param iconBlock               a representative block material name advertised
-   *     for this target, or {@code null} when none was advertised
-   * @param environment             the destination world's environment string, or
-   *     {@code null} when unknown
-   * @param label                   an operator-configured cosmetic display label
-   *     for this target (may contain RTP color/gradient codes), or {@code null}
-   *     when none was configured/advertised
-   * @throws IllegalArgumentException if {@code availability} is {@code null}
+   * @param availability            availability verdict; must not be {@code null}
+   * @param remainingCooldownMillis remaining cooldown in milliseconds (>= 0)
+   * @param cost                    teleport monetary cost (>= 0)
+   * @param iconBlock               advertised block material name hint, or {@code null}
+   * @param environment             destination dimension environment hint, or {@code null}
+   * @param label                   cosmetic display label, or {@code null}
    */
   public RtpTargetStatus(Availability availability, long remainingCooldownMillis, double cost,
       String iconBlock, String environment, String label) {
@@ -184,13 +153,9 @@ public final class RtpTargetStatus {
   }
 
   /**
-   * Returns the operator-configured cosmetic display label for this target, if
-   * any. For a local target this is the region's configured display name; for a
-   * cross-server target it is the label the destination backend advertised. May
-   * contain RTP color/gradient codes; a menu should render it through the usual
-   * color path. When {@code null}, callers should fall back to the target's name.
+   * Returns the operator-configured cosmetic display label for this target, if any.
    *
-   * @return the display label, or {@code null} when none
+   * @return display label (possibly with color codes), or {@code null} for default name
    */
   public String label() {
     return label;

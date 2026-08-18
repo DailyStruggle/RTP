@@ -33,14 +33,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Regression: a region whose {@code shape} value is an inheritance-reference
- * String (e.g. {@code @config}) must still register the shape sub-knob dotted
- * parameters ({@code shape.centerX}, {@code shape.centerZ}, {@code shape.radius},
- * ...) so {@code /rtp config regions <entry> shape.centerZ=-512} is accepted
- * (both signs) and the sub-knobs tab-complete - the v2 behavior. Before the fix
- * the String branch registered only a bare {@code shape} parameter, so the
- * dotted keys were rejected with "invalid command argument" and never
- * tab-completed.
+ * Regression test: regions with shape inheritance references (e.g. {@code @config})
+ * must register dotted sub-parameters (such as {@code shape.centerZ}) and accept negative values.
  */
 public class RegionCenterZReproTest {
     @TempDir

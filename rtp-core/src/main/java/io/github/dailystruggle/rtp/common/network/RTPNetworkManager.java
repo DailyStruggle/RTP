@@ -3,17 +3,9 @@ package io.github.dailystruggle.rtp.common.network;
 import java.util.UUID;
 
 /**
- * Optional cross-server messaging + ephemeral coordination contract (ADR-024).
- * TTL-based player cooldowns and pub/sub fan-out;
- * {@link io.github.dailystruggle.rtp.common.RTP#networkManager} is {@code null}
- * unless network YAML enables a backend. Keeping the static type at this
- * interface lets the lite assembly resolve {@code RTP.class} without ever
- * touching driver classes ({@code redis.clients.jedis.*}, ...).
+ * Optional cross-server messaging and ephemeral coordination contract (ADR-024).
  *
- * <p>Distinct from {@link io.github.dailystruggle.rtp.common.database.DatabaseAccessor}:
- * no TTL primitive, no pub/sub there. Implementations must not import
- * {@code org.bukkit.*} and must log via
- * {@link io.github.dailystruggle.rtp.common.RTP#log}.
+ * <p>Provides TTL-based player cooldowns and pub/sub fan-out across server instances.
  */
 public interface RTPNetworkManager {
 

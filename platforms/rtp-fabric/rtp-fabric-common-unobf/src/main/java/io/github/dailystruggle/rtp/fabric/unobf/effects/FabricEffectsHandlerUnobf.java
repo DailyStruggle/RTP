@@ -39,19 +39,14 @@ import java.util.logging.Level;
  *       Bukkit shape so admin-facing behavior stays parity.</li>
  * </ol>
  *
- * <p>Phase-1 limitation: Fabric servers without a permissions manager have
- * an empty {@code getEffectivePermissions()} {@link Set}, so 0 effects fire
- * per player. Operators get audible/visible feedback once either
- * (a) {@code fabric-permissions-api} is integrated and effect nodes are
- * granted, or (b) the deferred {@code effects.yml} from checklist step 11
- * lands. This is the same behavior the Bukkit side has when no permission
- * plugin is present.
+ * <p>Effect dispatch requires a permissions manager providing granted effect nodes
+ * in {@code getEffectivePermissions()}. Without permissions, 0 effects fire per player.
  *
  * <p>S-005: all effect dispatch is funneled through {@link FabricEffectRuntimeUnobf#schedule}
  * (→ {@code MinecraftServer#execute}). Effect <em>resolution</em> (the
  * {@code EffectFactory.buildEffects} call) runs on the calling thread (which
  * is the pipeline thread on Fabric per ADR-022 §4) and is pure in-memory
- * lookup against {@code BuiltInRegistries} — no chunk I/O.
+ * lookup against {@code BuiltInRegistries} - no chunk I/O.
  */
 public final class FabricEffectsHandlerUnobf {
 
@@ -136,7 +131,7 @@ public final class FabricEffectsHandlerUnobf {
      * @param prefix    permission-node prefix (e.g. {@code "rtp.effect.presetup"})
      * @param player    the RTPPlayer for this stage; must expose {@code handle()} returning a
      *                  {@link ServerPlayer} and {@code getEffectivePermissions()} (structural typing).
-     * @param runtime   scheduler chokepoint — funnels each effect run() onto the server thread
+     * @param runtime   scheduler chokepoint - funnels each effect run() onto the server thread
      */
     /** UUID-resolving variant for cancel / queue-push / queue-pop hooks. */
     private static void dispatchByUuid(String prefix, UUID uuid, FabricEffectRuntimeUnobf runtime) {
@@ -161,7 +156,7 @@ public final class FabricEffectsHandlerUnobf {
                 return;
             }
             // The platform-versioned RTPPlayer (e.g. V26_1_R1FabricRTPPlayer) does NOT
-            // extend FabricRTPPlayerUnobf — both are `final implements RTPPlayer`. To
+            // extend FabricRTPPlayerUnobf - both are `final implements RTPPlayer`. To
             // stay platform-agnostic and avoid forcing a class-hierarchy refactor,
             // resolve handle() + getEffectivePermissions() reflectively, mirroring the
             // existing reflective EffectsResolver dispatch below.
@@ -196,13 +191,13 @@ public final class FabricEffectsHandlerUnobf {
             // the multiConfigParserMap) is honored without local cache invalidation.
             // Union permission-derived nodes with the effects.yml-driven token list
             // (effects-api-ADR-005). On Fabric servers without fabric-permissions-api,
-            // perms is empty and the union becomes effects/ only — which is the
+            // perms is empty and the union becomes effects/ only - which is the
             // primary path on this platform per ADR-005.
             RTPPlayer fp = player;
             String stage = stageOf(prefix);
             RTP.log(Level.FINE, "[RTP][FX-trace] resolving prefix=" + prefix + " stage=" + stage
                     + " permsCount=" + (perms == null ? -1 : perms.size()));
-            // EffectsResolver lives in rtp-plugin (not on this module's classpath —
+            // EffectsResolver lives in rtp-plugin (not on this module's classpath -
             // common-unobf must not depend on rtp-plugin). Reflective dispatch keeps
             // the dependency one-way: rtp-plugin pulls in common-unobf, not the
             // reverse. Same shape as Fabric perms-api access in FabricRTPPlayerUnobf.

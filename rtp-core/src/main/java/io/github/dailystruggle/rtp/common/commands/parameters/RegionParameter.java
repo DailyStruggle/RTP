@@ -12,18 +12,7 @@ import java.util.function.Supplier;
 
 public class RegionParameter extends CommandParameter {
 
-  /**
-   * Optional supplier of <em>additional</em> values to surface in
-   * tab-completion alongside the local {@code RTP.selectionAPI.regionNames()}
-   * set. Used in network mode (rtp-proxy-ADR-014) to advertise
-   * peer-qualified entries such as {@code backend-a:default} so a player
-   * can target a specific remote backend's region without leaving the
-   * single {@code /rtp region=} arg slot.
-   *
-   * <p>Default supplier returns an empty set, so single-server deployments
-   * see byte-identical behaviour. Installed by {@code NetworkModeBootstrap}
-   * (in {@code rtp-plugin}) via the 4-arg ctor when network mode is enabled.</p>
-   */
+  /** Optional supplier of additional values for tab-completion. */
   private final Supplier<Set<String>> extraValues;
 
   public RegionParameter(

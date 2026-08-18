@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for {@link TeleportPipelineTask} phase state machine, action hooks,
- * and cancellation behaviour — all executed synchronously (no real threads).
+ * and cancellation behaviour - all executed synchronously (no real threads).
  */
 class TeleportPipelineTaskPhaseTest {
 
@@ -115,7 +115,7 @@ class TeleportPipelineTaskPhaseTest {
     }
 
     // -----------------------------------------------------------------------
-    // run() when cancelled — must transition to CLEANUP without throwing
+    // run() when cancelled - must transition to CLEANUP without throwing
     // -----------------------------------------------------------------------
 
     @Test
@@ -129,7 +129,7 @@ class TeleportPipelineTaskPhaseTest {
     }
 
     // -----------------------------------------------------------------------
-    // Static action hook lists — add / clear
+    // Static action hook lists - add / clear
     // -----------------------------------------------------------------------
 
     @Test
@@ -249,7 +249,7 @@ class TeleportPipelineTaskPhaseTest {
     }
 
     // -----------------------------------------------------------------------
-    // Phase M1 — pipeline histogram wiring
+    // Pipeline histogram wiring
     // -----------------------------------------------------------------------
 
     /** Regression guard for REQ-RTP-OBS-002 (Single-Sample Pipeline Recording). */

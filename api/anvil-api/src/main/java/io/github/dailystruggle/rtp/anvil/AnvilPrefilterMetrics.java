@@ -7,11 +7,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * pre-filter. Each counter is incremented exactly once per probe, keyed by the
  * returned {@link Verdict}:
  * <ul>
- *   <li>{@link #accepts} — probe returned {@link Verdict#ACCEPT}
+ *   <li>{@link #accepts} - probe returned {@link Verdict#ACCEPT}
  *       (candidate fell through to the live-load / Anvil-backed chunk path).</li>
- *   <li>{@link #rejects} — probe returned {@link Verdict#REJECT}
+ *   <li>{@link #rejects} - probe returned {@link Verdict#REJECT}
  *       (candidate short-circuited off-thread without a live chunk load).</li>
- *   <li>{@link #unknowns} — probe returned {@link Verdict#UNKNOWN}
+ *   <li>{@link #unknowns} - probe returned {@link Verdict#UNKNOWN}
  *       (decode failure / unsupported format / ungenerated chunk; live load
  *       remains authoritative).</li>
  * </ul>
@@ -24,11 +24,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * only ever increments.
  *
  * <p>Exposed via {@code TestAnvilPrefilterCmd.snapshot()} per
- * {@code ADR-016 §10} (Phase 4).
+ * {@code ADR-016 §10}.
  *
  * <p>Safety compliance:
  * <ul>
- *   <li><b>S-005:</b> no chunk I/O, no main-thread wait — three atomics only.</li>
+ *   <li><b>S-005:</b> no chunk I/O, no main-thread wait - three atomics only.</li>
  * </ul>
  */
 public final class AnvilPrefilterMetrics {

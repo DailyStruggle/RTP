@@ -58,7 +58,7 @@ public class MockGlobalRegionScheduler implements GlobalRegionScheduler {
 
     @Override
     public ScheduledTask runDelayed(Plugin plugin, Consumer<ScheduledTask> task, long delayTicks) {
-        // Delay is ignored in the mock — task is queued immediately.
+        // Delay is ignored in the mock - task is queued immediately.
         return run(plugin, task);
     }
 

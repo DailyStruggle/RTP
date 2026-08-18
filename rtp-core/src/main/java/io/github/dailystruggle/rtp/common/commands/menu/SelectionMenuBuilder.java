@@ -14,50 +14,21 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 /**
- * A clean, reusable "pick one of these" selection page.
- *
- * <p>Unlike {@link CommandTreeMenuBuilder#buildParamPicker}, which is the
- * generic command-navigation value picker (it shows the assembled command and
- * a "type a custom value" anvil row), this builder renders a single curated
- * list: a clean colored header, a back row, and one color-coded row per entry.
- *
- * <p>The builder is intentionally <em>agnostic</em> of <em>what</em> it
- * displays. The caller (a dedicated menu leaf command such as
- * {@code /rtp menu world} / {@code region} / {@code biome} / {@code prefab})
- * supplies everything that varies:
- * <ul>
- *   <li>the {@code displayName} for the {@code "pick a <displayName>"} header,</li>
- *   <li>the {@code entries} to list (resolved from the owning command's
- *       {@code relevantValues} - the menu never computes suggestions itself),</li>
- *   <li>the {@code colorSupplier} that tints each row.</li>
- * </ul>
- * This keeps the page reusable for any future "list of choices" submenu.
- *
- * <p>The per-entry click stages the choice exactly like the generic picker:
- * it re-opens the parent menu page with {@code paramName=value} appended to
- * the assembled path, so a subsequent Execute row runs the assembled command.
+ * Reusable "pick one of these" selection page builder for curated choice menus.
+ * Renders a header, back row, and color-coded rows staging {@code paramName=value} on click.
  */
 public final class SelectionMenuBuilder {
 
     /**
      * Build the selection page.
      *
-     * @param parentPath    assembled path from {@code /rtp} to the parent page;
-     *                      the Back row reopens it and each entry stages onto it
-     *                      (an empty path means the {@code /rtp} root / front page)
-     * @param paramName     parameter the selected value is staged under
-     * @param displayName   human label for the {@code "pick a <displayName>"} header
-     * @param entries       the values to list (already the caller's relevant set)
-     * @param colorSupplier maps an entry to its {@code &x}/{@code #rrggbb} prefix;
-     *                      may be {@code null} (rows default to dark green)
-     * @param executeOnClick when {@code true} each entry row <em>runs</em> the
-     *                      assembled {@code /rtp <path> paramName=value} command
-     *                      directly on click (e.g. a destination selector that
-     *                      teleports immediately); when {@code false} the row
-     *                      instead re-opens the parent menu page with the choice
-     *                      staged, so a subsequent Execute row dispatches it
-     *                      (e.g. the prefab apply/confirm flow)
-     * @return the assembled {@link MenuModel}
+     * @param parentPath     assembled path from {@code /rtp} to parent page
+     * @param paramName      parameter the selected value is staged under
+     * @param displayName    label for header
+     * @param entries        values to list
+     * @param colorSupplier  maps entry to color prefix (null defaults to &2)
+     * @param executeOnClick when true, entry row dispatches command immediately
+     * @return assembled {@link MenuModel}
      */
     public MenuModel build(List<String> parentPath,
                            String paramName,
@@ -70,19 +41,9 @@ public final class SelectionMenuBuilder {
     }
 
     /**
-     * Build the selection page with an explicit Back-row destination.
+     * Build selection page with explicit Back-row destination.
      *
-     * <p>Identical to {@link #build(List, String, String, Collection, Function,
-     * boolean)} except the Back row dispatches {@code backAction} instead of
-     * re-opening {@code parentPath}. This matters when the value-staging
-     * {@code parentPath} (which entry rows append onto) is <em>not</em> a
-     * navigable menu page: the prefab picker stages onto
-     * {@code admin prefab apply} but is reached from the admin panel, so its
-     * Back row must return to the admin panel rather than loop onto the
-     * staging path.
-     *
-     * @param backAction the action the Back row dispatches; when {@code null}
-     *                   the Back row defaults to re-opening {@code parentPath}
+     * @param backAction action Back row dispatches (defaults to re-opening parentPath when null)
      */
     public MenuModel build(List<String> parentPath,
                            String paramName,

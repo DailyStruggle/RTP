@@ -16,54 +16,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 /**
- * Backend-side join-time trigger: when a player arrives on this backend
- * carrying an outstanding cross-server reservation token (issued by a proxy
- * at {@code /rtp} time via {@link NetworkTransport#claim}), atomically
- * redeem the token and dispatch a local {@code /rtp} on the player's
- * behalf.
- *
- * <h2>Pipeline placement</h2>
- *
- * <p>This is the join end of the cross-server pipeline. The proxy executed
- * the per-request hot path (selector + claim + transfer) and is structurally
- * unaware of coordinates; this class executes the per-request <em>local</em>
- * hot path (region poll + safety + teleport) on the backend that owns the
- * world data. Pre-warmed {@code keptLocations} carry the request the same
- * way they do for a same-server {@code /rtp}, so cross-server arrivals
- * inherit the load-distribution properties documented in
- * {@code MULTI_SERVER_PLAN.md} (the proxy never computes coordinates).</p>
- *
- * <h2>Threading</h2>
- *
- * <p>All transport interaction is async via the transport's own executor
- * ({@link NetworkTransport#findReservation} and
- * {@link NetworkTransport#redeem} both return {@link java.util.concurrent.CompletableFuture}).
- * The final teleport hop is hopped back to the main thread via
- * {@link RTP#scheduler} so {@code Bukkit.dispatchCommand} runs on the
- * tick thread (S-005 nuance: command execution may touch world state).</p>
- *
- * <h2>Outcome handling (REQ-RTP-F-013, REQ-RTP-S-004)</h2>
- *
- * <ul>
- *   <li>{@link RedeemOutcome#REDEEMED}: dispatch {@code /rtp} as the
- *       joining player. The local pipeline applies the player's cooldown,
- *       economy, claim, and safety checks the same way as an in-game
- *       command, so no proxy-side debit is double-charged when the local
- *       pipeline declines.</li>
- *   <li>{@link RedeemOutcome#ALREADY_CONSUMED} / {@link RedeemOutcome#WRONG_SERVER}:
- *       silent no-op. A racing peer redeem or a misrouted arrival are
- *       legitimate races, not failures the player should see.</li>
- *   <li>{@link RedeemOutcome#NOT_FOUND} / {@link RedeemOutcome#EXPIRED}:
- *       WARNING log. The TTL reaper or the proxy is racing the join; the
- *       player still arrives, just without the bonus teleport.</li>
- *   <li>{@link RedeemOutcome#BAD_STATE} / {@link RedeemOutcome#HMAC_INVALID} /
- *       {@link RedeemOutcome#TRANSPORT_ERROR}: WARNING per REQ-RTP-S-004.</li>
- * </ul>
- *
- * <p>L2 of {@code CHECKLIST-cross-server-rtp.md}. New configurable
- * {@code Enum<?>}s for cross-server-only feedback ({@code rtp.network.expired},
- * {@code rtp.network.failed}) are deferred to L5 row 41 per the L2 proposal;
- * this slice ships server-side WARNING-only diagnostics.</p>
+ * Backend-side join trigger that redeems cross-server reservation tokens.
+ * Handles async token validation via {@link NetworkTransport#redeem} and
+ * dispatches local {@code /rtp} on the player's owning thread (REQ-RTP-S-004).
  */
 public final class JoinTriggerSource {
 
@@ -75,14 +30,8 @@ public final class JoinTriggerSource {
     private AutoCloseable quitSubscription;
 
     /**
-     * Local lobby-side / proxy-poller-seeded status cache. May be
-     * {@code null} when this trigger source is constructed in a context
-     * without a status cache (e.g. older test fixtures, or platforms
-     * that have not yet wired {@code NetworkStatusCache}). When non-null,
-     * {@link #onRedeemed} evicts the arriving player's row before
-     * dispatching {@code /rtp} so {@link NetworkWaitlistGuard} does not
-     * short-circuit the post-arrival teleport with {@code msgAlreadyQueued}
-     * (REQ-RTP-S-004 / REQ-RTP-NET-015).
+     * Local status cache for waitlist-guard eviction on REDEEMED (REQ-RTP-S-004 / REQ-RTP-NET-015).
+     * Null when constructing without a status cache.
      */
     private volatile NetworkStatusCache statusCache;
 
@@ -244,21 +193,7 @@ public final class JoinTriggerSource {
                 && !regionKey.get().isEmpty())
                 ? "rtp region=" + regionKey.get()
                 : "rtp";
-        // Hop to the player's owning thread: Bukkit.dispatchCommand must run
-        // on the tick thread that owns the player's entity. On Folia that
-        // is the player's *entity scheduler*, NOT the global region scheduler
-        // (CraftServer.dispatchCommand calls TickThread.ensureTickThread
-        // against the player's region; running on the Global Region thread
-        // throws IllegalStateException "Thread failed main thread check:
-        // Dispatching command async"). On Bukkit/Paper/Spigot the entity
-        // scheduler does not exist and the main-thread runTaskLater path
-        // is correct. We detect Folia by attempting Player#getScheduler
-        // reflectively (added in Paper 1.20.1 / Folia); when present we
-        // use it, otherwise fall through to the legacy main-thread hop.
-        // The local /rtp pipeline applies cooldown / economy / claim /
-        // safety the same way as an in-game invocation; the proxy is the
-        // source of truth for cross-server reservation, the backend is the
-        // source of truth for local policy.
+        // Hop to the player's owning thread (entity scheduler on Folia, main thread on Bukkit).
         Runnable hop = () -> {
             RTPPlayer player = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPlayer(id) : null;
             if (player == null || !player.isOnline()) {
@@ -281,18 +216,7 @@ public final class JoinTriggerSource {
                                 + ": " + t.getMessage(), t);
             }
         };
-        // RTPScheduler.runTaskForPlayer routes player-owned work to the
-        // correct thread:
-        // - Bukkit / Paper / Spigot: main thread
-        // - Folia: the player's *entity scheduler*, the only thread on which
-        //   CraftServer.dispatchCommand will pass TickThread.ensureTickThread.
-        // The bare runTaskLater overload on Folia lands on the Global Region
-        // Scheduler thread, which trips "Thread failed main thread check:
-        // Dispatching command async". The renamed runTaskForPlayer (formerly
-        // scheduleTeleport - the name was a historical artifact; the method
-        // is a generic "run this on a thread owning the player after N ticks")
-        // is the canonical primitive for any work that touches a player's
-        // owned region on Folia.
+        // RTPScheduler.runTaskForPlayer routes player-owned dispatch to the owning thread/scheduler.
         try {
             io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer =
                     (RTP.serverAccessor != null) ? RTP.serverAccessor.getPlayer(id) : null;
@@ -317,29 +241,12 @@ public final class JoinTriggerSource {
     }
 
     /**
-     * The proxy chose this backend and earmarked a coord
-     * via {@link io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager#reserveFromNetworkKept}.
-     * Try {@code redeemReserved} on every region. First non-null hit:
-     * (a) record the playerId-&gt;tokenId mapping so {@link #onQuit(UUID)}
-     * can release on disconnect, (b) pin the redeemed coord into the
-     * player's personal queue via {@code acceptRedeemedReservation}, and
-     * (c) dispatch /rtp so the local pipeline polls that coord first. If
-     * no region has the reservation (TTL-reaped, F1 pulse hadn't fired, or
-     * this backend restarted), fall through to the existing /rtp dispatch
-     * (the L2 baseline).
+     * Redeems reserved coordinate across regions and pins it to the player's queue.
+     * Dispatches /rtp or falls back to regular dispatch if no reservation is held.
      */
     private void onRedeemed(UUID id, ReservationToken token) {
-        // REQ-RTP-S-004 / REQ-RTP-NET-015: the proxy token just
-        // transitioned to CONSUMED (terminal), but the local
-        // NetworkStatusCache row for this player is still the lobby-seeded
-        // / poller-seeded non-terminal state (QUEUED / RESERVED /
-        // TRANSFERRING). Without an eviction here, the post-arrival
-        // Bukkit.dispatchCommand(player, "rtp") below would be rejected
-        // by NetworkWaitlistGuard with msgAlreadyQueued and the player
-        // would never be teleported despite the redeem succeeding. The
-        // next supplier poll will reconcile the row authoritatively;
-        // evictLocal is a local-state correction only (does not fire the
-        // terminal listener). Null-tolerant for older test fixtures.
+        // REQ-RTP-S-004 / REQ-RTP-NET-015: evict local status cache row so post-arrival
+        // command dispatch is not blocked by NetworkWaitlistGuard.
         RTP.log(Level.FINE,
                 "[RTP][trace] JoinTriggerSource.onRedeemed: entered for " + id
                         + " token=" + token.tokenId() + " statusCache=" + (statusCache != null));
@@ -411,7 +318,7 @@ public final class JoinTriggerSource {
      * queue yet), call {@code releaseToNetworkKept} so the earmarked coord
      * returns to the network sibling pool and CAS-transition the proxy-side
      * token to {@code CONSUMED} via {@code transport.release(...,
-     * PLAYER_DISCONNECTED)}. Two-writer carve-out documented in checklist.
+     * PLAYER_DISCONNECTED)}.
      */
     void onQuit(UUID id) {
         UUID networkTokenId = activeReservations.remove(id);
@@ -496,17 +403,8 @@ public final class JoinTriggerSource {
     }
 
     /**
-     * Find the region that still holds a binding for {@code networkTokenId}.
-     * Used after a successful redeem to address the same region for the
-     * {@code acceptRedeemedReservation} / {@code releaseToNetworkKept}
-     * follow-up; since {@code redeemReserved} removed the entry we cannot
-     * locate by map presence, so we accept the first region whose
-     * {@code networkReservedCount() > 0} as a best-effort heuristic.
-     *
-     * <p>In the current scope all backends bind to one region per
-     * world; for multi-region deployments the proxy-issued token id would
-     * need to carry the region key (a follow-up SPI extension). Documented
-     * in the F1 boot-reconcile notes.</p>
+     * Finds the region associated with {@code networkTokenId} for reservation release.
+     * Falls back to first active region when the reservation mapping was already removed.
      */
     private static Region findRegionForReservation(UUID networkTokenId) {
         try {

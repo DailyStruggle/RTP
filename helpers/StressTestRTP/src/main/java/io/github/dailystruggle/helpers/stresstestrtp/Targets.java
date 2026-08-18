@@ -45,7 +45,7 @@ public final class Targets {
     /**
      * Returns the configured target commands in declaration order. The
      * {@code logger} parameter is accepted for backwards compatibility with
-     * earlier filtering implementations but is no longer used here — target
+     * earlier filtering implementations but is no longer used here - target
      * pruning has moved to {@link Runner}'s post-warm-up step (a target with
      * zero successful warm-up attempts is dropped before measurement starts).
      * Trial-and-error against the live server is more reliable than guessing

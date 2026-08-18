@@ -3,13 +3,7 @@ package io.github.dailystruggle.rtp.api.server;
 import java.util.Objects;
 
 /**
- * Platform-neutral description of a single on-screen progress bar (e.g. a Bukkit
- * {@code BossBar}). Carries only platform-agnostic data so that {@code rtp-core} and the
- * platform-neutral adapters can request progress feedback without depending on any
- * platform UI type.
- *
- * <p>The concrete rendering (boss-bar vs. action-bar vs. no-op) is decided by the platform
- * implementation of {@link RTPServerAccessor#updateProgressBars(java.util.Map)}.
+ * Platform-neutral description of an on-screen progress bar (e.g. Bukkit BossBar).
  */
 public final class ProgressBar {
   private final String title;

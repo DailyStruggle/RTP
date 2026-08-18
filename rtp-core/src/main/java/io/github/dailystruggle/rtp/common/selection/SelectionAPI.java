@@ -37,16 +37,8 @@ public class SelectionAPI {
       new ConcurrentLinkedQueue<>();
 
   /**
-   * A cache for temporary, on-the-fly regions, keyed by UUID.
-   *
-   * <p>Two distinct key spaces share this map: shape/vert parameter overrides
-   * are keyed by the requesting <em>sender</em> UUID (one-shot, per-command),
-   * while world-override regions (ADR-065) are keyed by the target
-   * <em>world</em> UUID ({@code RTPWorld.id()}) so a {@code "<region>_<world>"}
-   * region is created once per world and reused across requests. Storing them
-   * here reuses the existing shutdown/flush/clear lifecycle (reload + server
-   * stop) and DB dump without a separate map. The two UUID spaces do not
-   * collide in practice (player ids vs world ids).
+   * Cache for temporary regions keyed by UUID (sender UUID for parameter overrides,
+   * target world UUID for world overrides).
    */
   public final ConcurrentHashMap<UUID, Region> tempRegions = new ConcurrentHashMap<>();
 
@@ -141,20 +133,8 @@ public class SelectionAPI {
   }
 
   /**
-   * Opportunistic on-load biome harvest. Invoked by the platform chunk-load
-   * notification when a chunk has just been loaded by the server for its own
-   * reasons. When {@code PerformanceKeys.checkOnChunkLoads} is enabled, the
-   * already-resident chunk's center-column biome is recorded into the
-   * {@link MemoryShape} of every configured region whose shape range contains
-   * that column, feeding the biome-recall / biome-weighted selection bias
-   * without any extra chunk I/O.
-   *
-   * <p>S-005 safe: the chunk is already loaded (nothing is force-loaded or
-   * generated) and {@link RTPWorld#getBiome(int, int, int)} reads only resident
-   * / cached data. The work is O(regions) per load event, gated O(1) by the
-   * config flag, and out-of-range regions are clipped by a cheap range test
-   * before any biome read. No-op when the flag is off, when no region targets
-   * the world, or when the column falls outside every region's shape.
+   * Opportunistic on-load biome harvest for resident chunks when enabled by config.
+   * Records center-column biome to MemoryShape without extra chunk I/O (S-005 safe).
    *
    * @param world the world the chunk belongs to
    * @param cx    the chunk x coordinate
@@ -302,23 +282,8 @@ public class SelectionAPI {
   }
 
   /**
-   * Returns a world-override region (ADR-065): a region with {@code baseRegionName}'s
-   * settings but rebound to the world {@code worldName} (and that world's shape).
-   * Used so {@code /rtp world:<w>} and {@code /rtp region:<r> world:<w>} land in
-   * world {@code w} rather than following the base region's configured world.
-   *
-   * <p>The result is cached in {@link #tempRegions} keyed by the target world's
-   * UUID ({@code RTPWorld.id()}), and named {@code "<baseRegion>_<world>"} (e.g.
-   * {@code default_nether}), so repeated requests reuse the same region and it
-   * is cleaned up by the existing temp-region lifecycle. When the base region
-   * already targets {@code worldName}, the base region is returned unchanged
-   * (no synthetic region is created).
-   *
-   * @param baseRegionName the base region to clone settings from; falls back to
-   *                       {@code "default"} when null/empty/unknown.
-   * @param worldName      the target world name (as returned by {@code RTPWorld.name()}).
-   * @return the world-override region, the base region when it already targets the
-   *         world, or {@code null} when the world is unknown or no base region exists.
+   * Returns a world-override region (ADR-065) with {@code baseRegionName}'s settings
+   * bound to {@code worldName}. Cached in {@link #tempRegions}.
    */
   @Nullable
   public Region worldRegion(@Nullable String baseRegionName, @Nullable String worldName) {
@@ -343,18 +308,7 @@ public class SelectionAPI {
     final RTPWorld<?> worldFinal = world;
     return tempRegions.computeIfAbsent(worldId, k -> {
       RegionSettings base = baseRegionFinal.getSettings();
-      // The shape is inherited from the base region the user specified - that is
-      // the whole point of /rtp region:<r> world:<w>. The target world's own
-      // configured shape is irrelevant here, and a world need not have a
-      // dedicated region at all. The world border only comes into play when the
-      // base region's worldBorderOverride is set, which is carried through below.
-      //
-      // Clone the base shape rather than sharing it: a MemoryShape carries the
-      // base region's accumulated spatial memory (bad-location caches, biome
-      // maps), which is specific to the base world. Sharing the live object
-      // would let the world-override region inherit that spatial memory on init
-      // (and write back into the base region's). Shape#clone resets the
-      // spatial-memory caches, giving the new region a clean slate.
+      // Clone base shape with clean spatial-memory state for the target world.
       Shape<?> baseShape = base.shape();
       Shape<?> shape = baseShape != null ? baseShape.clone() : null;
       RegionSettings newSettings = new RegionSettings(
@@ -377,19 +331,8 @@ public class SelectionAPI {
   }
 
   /**
-   * Resolve a dimension-appropriate vertical adjustor for a synthesized
-   * world-override region. For overworld-style worlds the {@code baseVert} is
-   * returned unchanged; for worlds whose name ends with {@code _nether} or
-   * {@code _the_end} the vert is seeded to {@code LINEAR} searching downward
-   * (direction {@code 2}) with skylight not required and the vertical window
-   * clamped to the dimension - matching the seeding applied on every other
-   * region-creation path via {@code NetherEndConfigAmender} when the vert is
-   * unspecified.
-   *
-   * @param world    the target world the synthesized region will use.
-   * @param baseVert the base region's vert, used as the fallback and as the
-   *                 source of the initial {@code [minY, maxY]} window.
-   * @return a dimension-tuned vert for nether/end worlds, otherwise {@code baseVert}.
+   * Resolves dimension-appropriate vertical adjustor for synthesized world-override regions.
+   * Clamps nether/end dimensions to linear downward search where applicable.
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   private VerticalAdjustor<?> dimensionVert(RTPWorld<?> world, VerticalAdjustor<?> baseVert) {

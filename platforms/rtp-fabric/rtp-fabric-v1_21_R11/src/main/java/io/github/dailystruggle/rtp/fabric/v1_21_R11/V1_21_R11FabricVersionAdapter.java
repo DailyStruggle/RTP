@@ -37,7 +37,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 /**
- * MC 1.21.11+ implementation of {@link FabricVersionAdapter} — covers the
+ * MC 1.21.11+ implementation of {@link FabricVersionAdapter} - covers the
  * post-{@code TicketUse} refactor. See {@code rtp-fabric-ADR-007}.
  *
  * <p><b>Why a separate module from {@code v1_21_R5}:</b> Mojang refactored
@@ -55,13 +55,13 @@ import java.util.logging.Level;
  * net/minecraft/class_3230$class_10558}.</p>
  *
  * <p><b>Mojmap-name decoupling (ADR-007):</b> the chunk/ticket SPI is
- * wrapper-typed — {@code RTPLevelHandle}, {@code RTPChunkHandle} — so
+ * wrapper-typed - {@code RTPLevelHandle}, {@code RTPChunkHandle} - so
  * 1.21.11's {@code ResourceLocation → Identifier} rename does not affect
  * the interface. This adapter unwraps via {@code handle.as(MojmapType.class)}
  * on entry and wraps results on exit.</p>
  *
- * <p><b>Implementation:</b> direct typed Mojang-mappings calls — no
- * reflection — using {@link ServerChunkCache#addTicketWithRadius} /
+ * <p><b>Implementation:</b> direct typed Mojang-mappings calls - no
+ * reflection - using {@link ServerChunkCache#addTicketWithRadius} /
  * {@link ServerChunkCache#removeTicketWithRadius} with an RTP-owned
  * {@link TicketType} constructed as
  * {@code new TicketType(NO_TIMEOUT, FLAG_LOADING | FLAG_SIMULATION)}.
@@ -106,13 +106,13 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
 
     /**
      * Typed block-tag snapshot for MC 1.21.11+ (rtp-fabric-ADR-010). Walks
-     * {@link BuiltInRegistries#BLOCK} via Loom-mapped types — no reflection —
+     * {@link BuiltInRegistries#BLOCK} via Loom-mapped types - no reflection -
      * and inverts each block's {@code builtInRegistryHolder().tags()} stream.
      *
      * <p>1.21.11 renamed {@code ResourceLocation} → {@link Identifier}; this
      * implementation uses the new name directly so Loom remaps the symbol
      * against the running runtime's mapping (intermediary or mojmap) at
-     * compile time — there is no reflection on the hot path.
+     * compile time - there is no reflection on the hot path.
      */
     @Override
     public @Nullable Map<String, Set<String>> snapshotBlockTags() {
@@ -164,7 +164,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
     }
 
 
-    // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008.
+    // Non-blocking chunk-future dispatch - see rtp-fabric-ADR-008.
     private static volatile Method GET_CHUNK_FUTURE_METHOD;
 
     private static Method resolveGetChunkFutureMethod(ServerChunkCache cache) throws ReflectiveOperationException {
@@ -207,7 +207,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
             ServerChunkCache cache = sl.getChunkSource();
             Method getter = resolveGetChunkFutureMethod(cache);
 
-            // Temporary load-ticket — see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
+            // Temporary load-ticket - see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
             // for the rationale.
             ChunkPos cp = new ChunkPos(cx, cz);
             boolean ticketAdded = false;
@@ -283,7 +283,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
 
     @Override
     public void installEffectsDispatchers() {
-        // Direct, mapped vanilla calls — see V1_21_R11FabricEffectDispatchers
+        // Direct, mapped vanilla calls - see V1_21_R11FabricEffectDispatchers
         // for rationale (Holder vs Holder.direct on 1.21.11; targeted
         // sendParticles overload for chunk-tracker bypass post-teleport).
         V1_21_R11FabricEffectDispatchers.install();
@@ -348,7 +348,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
     }
 
     /**
-     * Typed override — direct {@code MinecraftServer.getCommands().performPrefixedCommand(
+     * Typed override - direct {@code MinecraftServer.getCommands().performPrefixedCommand(
      * server.createCommandSourceStack(), command)}. Loom remaps the descriptors
      * to intermediary {@code class_3176#method_3734} / {@code method_3739} at
      * compile time, eliminating the reflective {@code getMethod("getCommands")}
@@ -387,7 +387,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
 
     /**
      * Typed cross-dimension teleport for MC 1.21.11. Drives
-     * {@code ServerPlayer#teleportTo(TeleportTransition)} — Loom remaps the
+     * {@code ServerPlayer#teleportTo(TeleportTransition)} - Loom remaps the
      * {@code TeleportTransition} constructor and {@code teleportTo} descriptors
      * to the correct intermediary symbols at compile time. This single call
      * handles both same-dimension and cross-dimension destinations and resets
@@ -479,7 +479,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
     }
 
     // -------------------------------------------------------------------------
-    // Maps-api parity — rtp-fabric-ADR-015. Vanilla filled-map rendering for the
+    // Maps-api parity - rtp-fabric-ADR-015. Vanilla filled-map rendering for the
     // MC 1.21.11+ runtime. Mirrors the v26_1_R1 carrier; the maps types (MapId,
     // MapItemSavedData.MapPatch, ClientboundMapItemDataPacket, DataComponents
     // .MAP_ID, MapColor) are stable across this line and Loom remaps the typed

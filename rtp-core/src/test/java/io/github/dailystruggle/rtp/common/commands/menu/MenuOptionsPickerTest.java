@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests for {@code CommandTreeMenuBuilder.buildOptionsPicker} — the generic
+ * Tests for {@code CommandTreeMenuBuilder.buildOptionsPicker} - the generic
  * finite-value picker driven by a key's {@code @options}/{@code @source}
  * directive (ADR-064 amendment). Each option row must stage
  * {@code paramName = value} via {@link MenuAction.StageConfigValue}.

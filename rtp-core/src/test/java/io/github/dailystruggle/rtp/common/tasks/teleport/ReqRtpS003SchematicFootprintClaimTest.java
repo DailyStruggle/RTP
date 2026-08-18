@@ -14,7 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * REQ-RTP-S-003 — region-schematic paste must respect claims (ADR-058). The teleport pipeline
+ * REQ-RTP-S-003 - region-schematic paste must respect claims (ADR-058). The teleport pipeline
  * runs the schematic's horizontal footprint through {@link GlobalRegionVerifiers} (the sanctioned
  * claim/protection registry the bundled claim integrations register into) before writing any
  * block, and suppresses the paste when any footprint cell is inside a claim. These tests exercise

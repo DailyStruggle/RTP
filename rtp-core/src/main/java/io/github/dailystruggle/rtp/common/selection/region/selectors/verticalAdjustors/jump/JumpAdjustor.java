@@ -28,28 +28,16 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
       new EnumMap<>(JumpAdjustorKeys.class);
 
   /**
-   * Snapshot of the configured safety state read at adjustor entry: the
-   * canonicalised {@link BlocksKeys#unsafeBlocks} and {@link BlocksKeys#airBlocks}
-   * sets (with ADR-017 tag tokens flattened through {@code RTP.serverAccessor
-   * .blockTagSnapshot()}) and {@link SafetyKeys#platformDepth}. Plumbed by
-   * reference through every helper predicate so a single {@code adjust(...)} /
-   * {@code adjustFromProbeWithReason(...)} invocation evaluates the entire scan
-   * against one consistent snapshot. No static cache — the parser already holds
-   * the tag-expanded list (written back by {@code SafetyTokenExpander} at config
-   * load and on {@code /rtp reload}), and the per-call {@code blockTagSnapshot()}
-   * lookup is a hash read against the cached registry map.
+   * Snapshot of configured safety state read at adjustor entry: canonicalised
+   * {@link BlocksKeys#unsafeBlocks} and {@link BlocksKeys#airBlocks} (with tag tokens expanded)
+   * and {@link SafetyKeys#platformDepth}. Evaluated consistently across one scan invocation.
    */
   private record SafetySnapshot(
       Set<String> unsafeBlocks, Set<String> airBlocks, int platformDepth) {}
 
   /**
-   * Read the current safety configuration directly from {@link RTP#configs}
-   * and the {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#blockTagSnapshot()
-   * block-tag snapshot}. Tokens are normalised on the fly: bare materials are
-   * canonicalised, {@code #namespace:tag} tokens are expanded into their
-   * registered material members, and {@code MATERIAL[prop=val]} state-predicated
-   * tokens are dropped (the probe path has no property map; the compiled-form
-   * consumer still honours them via {@code SafetyCompilationCache}).
+   * Reads safety configuration from {@link RTP#configs} and block-tag registry snapshot.
+   * Normalises tokens on the fly and resolves {@code #namespace:tag} members.
    */
   @SuppressWarnings("unchecked")
   private static SafetySnapshot readSafetySnapshot() {
@@ -62,7 +50,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         Map<String, Set<String>> snap = RTP.serverAccessor.blockTagSnapshot();
         if (snap != null) tagSnapshot = snap;
       } catch (Throwable ignored) {
-        // Best-effort — fall through with the empty snapshot.
+        // Best-effort - fall through with the empty snapshot.
       }
     }
 
@@ -74,7 +62,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
           RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>()), tagSnapshot, unsafe);
       expandTokens(
           RTP.configs.getConfigValue(BlocksKeys.airBlocks, new ArrayList<>()), tagSnapshot, air);
-      // Ground-sweep depth — reuses SafetyKeys.safetyRadius so it stays
+      // Ground-sweep depth - reuses SafetyKeys.safetyRadius so it stays
       // distinct from SafetyKeys.platformDepth (which exclusively sizes the
       // platform-creation tool in BukkitRTPWorld.platform / FoliaRTPWorld.platform).
       // Floor of 1 so the [1..depth] sweep below feet always includes y-1.
@@ -97,7 +85,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
       if (item == null) continue;
       String token = item.toString().trim();
       if (token.isEmpty()) continue;
-      if (token.indexOf('[') >= 0) continue; // state-predicated — drop on probe path
+      if (token.indexOf('[') >= 0) continue; // state-predicated - drop on probe path
       if (token.charAt(0) == '#') {
         String tagId = token.substring(1);
         if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
@@ -180,13 +168,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
 
   /**
    * Live-chunk analogue of {@link #computeColumnSkyFloor(ChunkColumnProbe, int, int)}:
-   * the highest non-air Y on chunk-local column {@code (x, z)} derived purely
-   * from block data. Any {@code y+1} strictly above this floor has unobstructed
-   * sky access by construction. Stored sky-light nibbles ({@code getSkyLight})
-   * are unreliable on freshly-generated / unticked chunks (the server may report
-   * a stale full 15 before relighting), which let cave candidates pass the legacy
-   * {@code skyLight > 7} gate; walking the palette is deterministic and always
-   * available. Returns {@link Integer#MIN_VALUE} for a fully-air column.
+   * highest non-air Y on column {@code (x, z)}. Returns {@link Integer#MIN_VALUE} for fully-air column.
    */
   private static int computeColumnSkyFloor(RTPChunk chunk, int x, int z) {
     int top = chunk.getWorld().getMaxHeight() - 1;
@@ -255,14 +237,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         }
       }
 
-      // Phase 3 scans inclusively up to maxY. Phase 2 narrows maxY DOWN onto
-      // the lowest air-pair it samples, which on simple terrain is exactly the
-      // valid standing Y (feet just above the ground). An exclusive `i < maxY`
-      // bound never re-tested that converged candidate, so a live, generated
-      // land chunk whose only landing aligned with the Phase-2 step grid was
-      // silently dropped at cold->hot promotion ([PROMOTE_DIAG] vert.adjust=null).
-      // Cap the head read (i + 1) at the world top so the inclusive bound never
-      // reads past getMaxHeight().
+      // Final linear scan to maxY inclusively with a one-cell headroom cap.
       int scanTop = Math.min(maxY, chunk.getWorld().getMaxHeight() - 2);
       for (int i = minY; i <= scanTop; i++) {
         int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
@@ -285,12 +260,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
 
   /**
    * Re-validates a single, caller-specified column using the same ground +
-   * headroom + safety predicate as Phase 3 of {@link #adjust(RTPChunk,
-   * MutableRTPCoords)}. The cold-&gt;hot promotion path uses this to re-verify
-   * the exact column where a candidate was originally selected, rather than
-   * re-sampling the fixed {@code testCoords} sub-columns (which silently
-   * dropped good land locations whose only safe column was not one of the
-   * sampled few - the {@code [PROMOTE_DIAG] vert.adjust=null} drop).
+   * headroom + safety predicate as {@link #adjust(RTPChunk, MutableRTPCoords)}.
    */
   @Override
   public @Nullable RTPCoords adjustColumn(@NotNull RTPChunk chunk, int localX, int localZ) {
@@ -316,7 +286,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     int globalZ = (chunk.z() << 4) + z;
     int columnSkyFloor = requireSkyLight ? computeColumnSkyFloor(chunk, x, z) : Integer.MIN_VALUE;
 
-    // Inclusive scan to maxY with a one-cell headroom cap (mirrors Phase 3).
+    // Inclusive scan to maxY with a one-cell headroom cap.
     int scanTop = Math.min(maxY, chunk.getWorld().getMaxHeight() - 2);
     for (int i = minY; i <= scanTop; i++) {
       int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
@@ -345,7 +315,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
   }
 
   /**
-   * Typed probe-path entry point mirroring {@code LinearAdjustor}'s —
+   * Typed probe-path entry point mirroring {@code LinearAdjustor}'s -
    * {@link #adjustFromProbe} delegates here so the two paths share a single
    * source of truth.
    */
@@ -367,18 +337,8 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
 
     SafetySnapshot snap = readSafetySnapshot();
 
-    // Multi-column probe sweep. Mirrors the live adjust(RTPChunk,...) path,
-    // which iterates testCoords (5 sub-columns within the chunk). Aligning
-    // the probe and live column sets makes a probe SCAN_MISS authoritative
-    // (no acceptable Y exists at any of the five live-path columns either),
-    // which lets ScanTask short-circuit instead of paying a full chunk load.
-    //
-    // Sky-light gating uses a per-column block-data scan (computeColumnSkyFloor):
-    // the highest non-air Y on the column is the sky floor; any y+1 strictly
-    // above it has open sky by construction. This replaces the heightmap +
-    // isLightOn fallbacks (stored sky-light data is unreliable on unticked /
-    // freshly generated chunks) and makes the probe verdict authoritative
-    // enough that ScanTask can skip the Pass-2 vert.adjust re-scan.
+    // Multi-column probe sweep mirroring live adjust(RTPChunk,...) testCoords (5 sub-columns).
+    // Sky-light gating derives open-sky from computeColumnSkyFloor block-data scan.
     for (int j = 0; j < testCoords.size(); j++) {
       List<Integer> xz = testCoords.get(j);
       int lx = xz.get(0);
@@ -397,26 +357,9 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
   }
 
   /**
-   * Per-column sky-floor derived purely from block data (palette identifiers).
-   * The sky floor is the highest non-air Y on column {@code (lx, lz)} within
-   * the probe window; any {@code y+1} strictly above the floor has unobstructed
-   * sky access by construction (no overhang, no cave ceiling, no structure
-   * roof — every cell above the floor is air).
-   *
-   * <p>This replaces the previous {@code isLightOn} / stored-sky-light /
-   * heightmap-proxy chain. Stored sky-light nibbles and heightmaps are
-   * unreliable on unticked or freshly-generated chunks (the server may not
-   * have relit them yet, the {@code MOTION_BLOCKING_NO_LEAVES} heightmap may
-   * be absent on older formats, and player edits invalidate both). Walking
-   * the palette directly gives a deterministic, always-available answer.
-   *
-   * <p>Returns {@link Integer#MIN_VALUE} when the column is fully air across
-   * the probe window — caller treats every Y as sky-lit (no foothold means
-   * the {@code y-1} solid check will reject anyway).
-   *
-   * <p>Walks {@code probe.maxY()} down to {@code probe.minY()} rather than
-   * the adjustor's narrower {@code [minY, maxY]} because anything above the
-   * adjustor's range still blocks sky access to candidates below it.
+   * Derives highest non-air Y on column {@code (lx, lz)} within probe window.
+   * Any {@code y+1} above this floor has unobstructed sky access.
+   * Walks {@code probe.maxY()} down to {@code probe.minY()}. Returns {@link Integer#MIN_VALUE} if all air.
    */
   private static int computeColumnSkyFloor(ChunkColumnProbe probe, int lx, int lz) {
     int top = probe.maxY();
@@ -480,7 +423,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     }
     // Sky-light gate (block-data only): accept iff y+1 is strictly above the
     // highest non-air block on this column (computeColumnSkyFloor). This
-    // ignores stored sky-light nibbles and heightmap data — both are unreliable
+    // ignores stored sky-light nibbles and heightmap data - both are unreliable
     // on unticked / freshly-generated chunks. Block data is always present and
     // deterministic.
     if (requireSkyLight) {

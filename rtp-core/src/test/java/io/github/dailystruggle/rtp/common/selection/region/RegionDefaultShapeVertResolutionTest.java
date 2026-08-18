@@ -16,14 +16,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
- * ADR-073 regression: a region whose {@code shape}/{@code vert} carry an unresolvable
- * {@code @config} reference (e.g. a stale {@code config.yml} whose {@code defaults} block
- * predates ADR-073 and lacks the {@code shape}/{@code vert} sub-blocks, so the reference
- * resolves to {@code null}) must still be read with a valid, non-null shape and vert.
- *
- * <p>Before the fix this surfaced as the operator-visible
- * "Shape for region default was invalid. Falling back to SQUARE." warning plus a repeated
- * "invalid state, null vert" {@link IllegalStateException} from {@code PregenState.build}.
+ * ADR-073 regression: region with unresolvable {@code @config} shape/vert references
+ * recovers valid non-null default shape and vert instead of failing with {@link IllegalStateException}.
  */
 @DisplayName("ADR-073 - region with unresolvable @config shape/vert reads a sane default")
 class RegionDefaultShapeVertResolutionTest {

@@ -8,13 +8,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Guards the platform-gate selection rule {@link MenuBindingSupport} applies to
- * discovered {@code MenuRendererProvider} / {@code AnvilInputOpenerProvider}
- * instances. The gate exists because a universal jar shades the Paper, Fabric,
- * and NeoForge adapters together, so all three {@code "book"} providers are on
- * the runtime classpath at once; without it the wrong platform's renderer (e.g.
- * the Fabric book renderer on Paper) could be selected and would degrade to the
- * chat fallback (ADR-070).
+ * Guards platform-gate selection in {@link MenuBindingSupport} (ADR-070).
+ * Ensures shaded multi-platform providers match the active {@link PlatformFamily}.
  */
 @DisplayName("MenuBindingSupport platform gate")
 final class MenuBindingPlatformGateTest {

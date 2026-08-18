@@ -50,8 +50,7 @@ public class ConfigCmd extends BaseRTPCmdImpl {
       addSubCommand(new LanguageCmd(this));
     }
 
-    // PROPOSAL-rtp-menu-config-search.md §6 Q4 Decision A — register the
-    // submit-landing leaf for the menu config-search anvil prompt. The
+    // Register the submit-landing leaf for the menu config-search anvil prompt. The
     // handler is filled in later by the platform wiring (e.g. RTPCmdBukkit)
     // once a renderer is available; without a handler the leaf is a no-op
     // with WARN log, which is also the disabled-state contract.
@@ -83,7 +82,7 @@ public class ConfigCmd extends BaseRTPCmdImpl {
       // MultiConfigParser names ("regions", "worlds") do not carry a .yml
       // suffix, but the same alias-via-bare-name rule is harmless: stripping
       // ".yml" from a name that doesn't contain it is a no-op, so the alias
-      // and primary key collide on the same value — idempotent put.
+      // and primary key collide on the same value - idempotent put.
       String bare = value.name.replace(".yml", "");
       getCommandLookup().put(bare.toUpperCase(java.util.Locale.ROOT), sub);
     }

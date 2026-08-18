@@ -6,27 +6,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * Process-wide registry mapping {@code MultiConfigParser} kind strings
- * (e.g. {@code "regions"}, {@code "worlds"}) to their registered
- * {@link MultiConfigRemovalGuard}.
- *
- * <p>Thread-safe. Lookups for unregistered kinds return
- * {@link MultiConfigRemovalGuard#ALLOW_ALL} so callers never have to
- * null-check. Adding support for a new kind means: register one guard
- * here at startup and add one row to the admin panel - the rest of the
- * MultiConfig submenu picks it up automatically.
- *
- * <p>Wiring: the two default guards (regions, worlds) are registered
- * during plugin enable from {@code RTPCmdBukkit} / the equivalent
- * Fabric wiring (see step 14 of {@code CHECKLIST-multiconfig-menu.md}).
- * Tests should call {@link #clear()} in their {@code @AfterEach} to
- * avoid leaking guards across tests.
- *
- * <p>{@code parserKind} is normalized to lowercase via
- * {@link Locale#ROOT} on both register and lookup so callers do not
- * have to agree on a casing convention.
- *
- * <p>See {@code docs/dev/scratch/PROPOSAL-multiconfig-menu.md} §3.2.
+ * Process-wide registry mapping {@code MultiConfigParser} kinds to {@link MultiConfigRemovalGuard}.
+ * Unregistered kinds fall back to {@link MultiConfigRemovalGuard#ALLOW_ALL}.
  */
 public final class MultiConfigRemovalGuards {
 

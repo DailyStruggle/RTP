@@ -67,7 +67,7 @@ class PlaceholderProviderTest {
     }
 
     // -------------------------------------------------------------------------
-    // fillPlaceholders — bracket syntax [key]
+    // fillPlaceholders - bracket syntax [key]
     // -------------------------------------------------------------------------
 
     @Test
@@ -93,7 +93,7 @@ class PlaceholderProviderTest {
     }
 
     // -------------------------------------------------------------------------
-    // fillPlaceholders — percent syntax %key%
+    // fillPlaceholders - percent syntax %key%
     // -------------------------------------------------------------------------
 
     @Test
@@ -111,7 +111,7 @@ class PlaceholderProviderTest {
     }
 
     // -------------------------------------------------------------------------
-    // fillPlaceholders — no-op / edge cases
+    // fillPlaceholders - no-op / edge cases
     // -------------------------------------------------------------------------
 
     @Test
@@ -151,7 +151,7 @@ class PlaceholderProviderTest {
 
     @Test
     void fillPlaceholders_valueWithSpecialRegexChars_noException() {
-        // Ensure Matcher.quoteReplacement is used — value contains $ and \
+        // Ensure Matcher.quoteReplacement is used - value contains $ and \
         PlaceholderProvider.placeholders.put(TEST_KEY + "_special", uuid -> "$1 \\n");
         try {
             String result = PlaceholderProvider.fillPlaceholders("[" + TEST_KEY + "_special]", DUMMY_UUID);
@@ -162,21 +162,21 @@ class PlaceholderProviderTest {
     }
 
     // -------------------------------------------------------------------------
-    // fillNumericPlaceholders — configs absent (null guard)
+    // fillNumericPlaceholders - configs absent (null guard)
     // -------------------------------------------------------------------------
 
     @Test
     void fillNumericPlaceholders_noConfigs_returnsTextUnchanged() {
-        // RTP.configs is null by default in a plain unit test — method should return text as-is
+        // RTP.configs is null by default in a plain unit test - method should return text as-is
         String input = "some text [p0] more";
         // If configs is null the method returns early
         String result = PlaceholderProvider.fillNumericPlaceholders(input);
-        // Either unchanged (null guard) or resolved — must not throw
+        // Either unchanged (null guard) or resolved - must not throw
         assertNotNull(result);
     }
 
     // -------------------------------------------------------------------------
-    // fillNumericPlaceholders — with configs wired via RTPTestSetup
+    // fillNumericPlaceholders - with configs wired via RTPTestSetup
     // -------------------------------------------------------------------------
 
     @Test
@@ -190,7 +190,7 @@ class PlaceholderProviderTest {
     @Test
     void fillNumericPlaceholders_withConfigs_nonNumericSuffix_skipped() {
         RTPTestSetup.install(tempDir.toFile());
-        // [Pabc] has a non-numeric index — should be skipped (continue branch)
+        // [Pabc] has a non-numeric index - should be skipped (continue branch)
         String input = "value=[Pabc]";
         String result = PlaceholderProvider.fillNumericPlaceholders(input);
         // Non-numeric group triggers NumberFormatException → continue; text unchanged
@@ -200,17 +200,17 @@ class PlaceholderProviderTest {
     @Test
     void fillNumericPlaceholders_withConfigs_outOfBoundsIndex_replacedWithInvalid() {
         RTPTestSetup.install(tempDir.toFile());
-        // [p999] — index 999 is beyond any configured placeholder list → "[invalid]"
+        // [p999] - index 999 is beyond any configured placeholder list → "[invalid]"
         String input = "[p999]";
         String result = PlaceholderProvider.fillNumericPlaceholders(input);
         // The replacement is "[invalid]" but then the removeRegex strips [p\d*] patterns from it,
-        // leaving just "invalid" or "[invalid]" depending on the regex — either way, not the original
+        // leaving just "invalid" or "[invalid]" depending on the regex - either way, not the original
         assertNotNull(result);
         assertNotEquals(input, result);
     }
 
     // -------------------------------------------------------------------------
-    // fillPlaceholders — case-insensitive pattern replacement
+    // fillPlaceholders - case-insensitive pattern replacement
     // -------------------------------------------------------------------------
 
     @Test
@@ -242,7 +242,7 @@ class PlaceholderProviderTest {
     }
 
     // -------------------------------------------------------------------------
-    // fillPlaceholders — placeholder returning empty string
+    // fillPlaceholders - placeholder returning empty string
     // -------------------------------------------------------------------------
 
     @Test
@@ -257,7 +257,7 @@ class PlaceholderProviderTest {
     }
 
     // -------------------------------------------------------------------------
-    // fillPlaceholders — multiple distinct placeholders in one string
+    // fillPlaceholders - multiple distinct placeholders in one string
     // -------------------------------------------------------------------------
 
     @Test
@@ -275,7 +275,7 @@ class PlaceholderProviderTest {
     }
 
     // -------------------------------------------------------------------------
-    // fillNumericPlaceholders — percent syntax
+    // fillNumericPlaceholders - percent syntax
     // -------------------------------------------------------------------------
 
     @Test
@@ -296,7 +296,7 @@ class PlaceholderProviderTest {
     }
 
     // -------------------------------------------------------------------------
-    // fillPlaceholders — UUID variation
+    // fillPlaceholders - UUID variation
     // -------------------------------------------------------------------------
 
     @ParameterizedTest
@@ -313,7 +313,7 @@ class PlaceholderProviderTest {
     }
 
     // -------------------------------------------------------------------------
-    // placeholders map — static built-in keys present
+    // placeholders map - static built-in keys present
     // -------------------------------------------------------------------------
 
     @ParameterizedTest

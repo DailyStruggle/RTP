@@ -5,14 +5,8 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Platform-neutral description of a single block entity decoded from a schematic
- * (a chest with items, a sign with text, etc.). Coordinates are relative to the
- * schematic's own origin (the same frame as {@link LoadedSchematic#paletteIndexAt}).
- *
- * <p>{@link #nbt()} is the raw decoded NBT payload (the Sponge v3 {@code Data} compound)
- * as a nested {@code Map}/{@code List}/boxed-primitive tree. Platform pasters apply what
- * they can on a best-effort basis (S-004): a paster that cannot reconstruct a block
- * entity simply places the block without its NBT and audits, never aborting the teleport.
+ * Platform-neutral description of a single block entity decoded from a schematic (ADR-058).
+ * Coordinates are relative to the schematic origin.
  */
 public final class BlockEntityData {
   private final int x;

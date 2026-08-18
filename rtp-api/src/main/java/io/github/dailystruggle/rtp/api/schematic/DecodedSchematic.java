@@ -24,14 +24,12 @@ public final class DecodedSchematic implements LoadedSchematic {
   private final int offsetZ;
 
   /**
-   * @param source        the source this was decoded from; never {@code null}
-   * @param width         X extent (&gt;= 0)
-   * @param height        Y extent (&gt;= 0)
-   * @param length        Z extent (&gt;= 0)
-   * @param palette       palette index -&gt; block-state string; never {@code null}
-   * @param indices       dense {@code width*height*length} palette indices in Sponge order
-   * @param blockEntities decoded block entities; never {@code null}
-   * @param offset        origin offset {@code [x, y, z]}; never {@code null}, length 3
+   * Constructs an in-memory decoded schematic.
+   *
+   * @param source        source descriptor (non-null)
+   * @param indices       dense {@code width*height*length} Sponge-ordered palette indices
+   * @param blockEntities decoded block entities (non-null)
+   * @param offset        origin offset {@code [x, y, z]} of length 3 (non-null)
    */
   public DecodedSchematic(SchematicSource source, int width, int height, int length,
                           List<String> palette, int[] indices,

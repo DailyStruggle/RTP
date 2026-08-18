@@ -11,15 +11,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.logging.Level;
 
 /**
- * Bootstrap loader for the active locale.
- *
- * <p>Reads {@code <pluginDirectory>/language.yml} (creating it on first run with the default
- * {@code language: en}) and returns a sanitized locale string. This is intentionally tiny and
- * dependency-free so it can run <em>before</em> any {@link ConfigParser} is constructed —
- * enabling all subsequent parsers to load their locale-specific YAML directly instead of
- * post-loading an English baseline and overlaying.
- *
- * <p>See ADR-020 for design rationale.
+ * Bootstrap loader for active locale (ADR-020).
+ * Reads {@code language.yml} before {@link ConfigParser} construction to allow direct locale loading.
  */
 public final class LanguageBootstrap {
 

@@ -9,33 +9,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Converts MiniMessage {@code <tag>} color/format markup into legacy
- * {@code &}-prefixed color/format codes so that MiniMessage-authored config
- * strings render correctly on platforms that do not bundle Adventure
- * (Fabric, NeoForge). It is the counterpart to the Adventure MiniMessage path
- * used on Paper/Folia.
- *
- * <p>Supported markup (colors and formatting only - hover/click and other
- * interactive tags are intentionally out of scope):
- * <ul>
- *   <li>Named colors: {@code <red>}, {@code <dark_blue>}, {@code <gray>}, ...</li>
- *   <li>Hex colors: {@code <#rrggbb>}, {@code <color:#rrggbb>}, {@code <c:red>}</li>
- *   <li>Formatting: {@code <bold>}/{@code <b>}, {@code <italic>}/{@code <i>},
- *       {@code <underlined>}/{@code <u>}, {@code <strikethrough>}/{@code <st>},
- *       {@code <obfuscated>}/{@code <obf>}, {@code <reset>}</li>
- *   <li>Gradient/rainbow/transition via {@link GradientExpander} (expanded into
- *       per-character legacy hex codes).</li>
- * </ul>
- *
- * <p>Closing tags for the supported color/format tags are mapped to a reset
- * ({@code &r}), matching the common {@code <color>text</color>} usage. Known
- * unsupported tags (hover, click, insertion, font, ...) and their closing tags
- * are dropped so they don't print literally. Anything that doesn't look like a
- * recognized MiniMessage tag is left untouched.
- *
- * <p>The emitted {@code &} / {@code &#rrggbb} codes are designed to be fed into
- * the existing legacy normalisers ({@code FabricLegacyText}/{@code NeoForgeLegacyText})
- * which translate them to section-sign sequences.
+ * Converts MiniMessage color/format markup (named colors, hex, tags, gradients)
+ * into legacy {@code &}-prefixed codes for platforms without native Adventure support.
  */
 public final class MiniMessageColorExpander {
 

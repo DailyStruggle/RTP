@@ -8,14 +8,13 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * commands-api-ADR-001 — Brigadier Bridge: Fabric-side registration shim.
+ * commands-api-ADR-001 - Brigadier Bridge: Fabric-side registration shim.
  *
  * <p>Thin wrapper that turns a {@code commands-api} root command into a
  * Brigadier {@link LiteralArgumentBuilder} and registers it with a Fabric
  * {@link CommandDispatcher}. The actual conversion lives in
- * {@link BrigadierCommandAdapter}; this class exists so the eventual
- * Fabric mod entrypoint (Phase 3 / 4 — not yet wired pending Loom blocker
- * resolution per {@code MULTI_PLATFORM_PLAN.md}) can call a single method.
+ * {@link BrigadierCommandAdapter}; this class exists so the
+ * Fabric mod entrypoint can call a single method.
  *
  * <p>This class intentionally does not import any
  * {@code net.minecraft.*} / {@code net.fabricmc.*} types: keeping the

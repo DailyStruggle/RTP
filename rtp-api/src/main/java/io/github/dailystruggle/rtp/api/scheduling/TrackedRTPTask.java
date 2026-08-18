@@ -5,13 +5,9 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.UUID;
 
 /**
- * {@link RTPRunnable} wrapper recording queued/start/end timestamps and unregistering
- * itself from {@code RTPServerAccessor#activeTasks} in {@code finally} (REQ-API-ARCH-003).
- * Powers the in-flight count and per-task age in {@code /rtp info}.
+ * {@link RTPRunnable} wrapper tracking timestamps and lifecycle in active-tasks registry (REQ-API-ARCH-003).
  *
- * <p>States: PENDING → RUNNING (on {@link #run()} entry) → COMPLETED (in {@code finally}).
- * Timing fields are written once by the executing thread; getters are safe to call from
- * any thread once the task has started.
+ * <p>States: PENDING -> RUNNING -> COMPLETED. Thread safety: timing getters safe after start.
  *
  * @see io.github.dailystruggle.rtp.api.server.RTPServerAccessor#activeTasks
  * @see TaskState
@@ -104,13 +100,9 @@ public class TrackedRTPTask extends RTPRunnable {
   }
 
   /**
-   * Returns the elapsed execution time in milliseconds.
+   * Returns elapsed execution time in milliseconds.
    *
-   * <p>If the task has not started, returns {@code 0}. If the task is still
-   * running, returns the time since it started. If completed, returns the total
-   * wall-clock execution time.
-   *
-   * @return duration in milliseconds; {@code 0} if the task has not started
+   * @return duration in milliseconds; 0 if not started
    */
   public long getDuration() {
     if (startTime == -1) return 0;

@@ -23,59 +23,20 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 /**
- * Curated book-mode builder for {@code /rtp info} (PROPOSAL-info-as-book.md
- * section 4.6). Produces a {@link MenuModel} whose pages mirror, line-for-line,
- * the chat output that {@link InfoCmd} would have produced for the same
- * {@code scope} and viewer, paginated into book pages so a player can leaf
- * through the same information that the console reader sees.
- *
- * <p>How the mirror works: this builder installs a
- * {@link RTP#messageTap} {@code ThreadLocal} sink, invokes
- * {@link InfoCmd#onCommand(UUID, Map, CommandsAPICommand)} synchronously, then
- * removes the tap. The {@code InfoCmd} body routes every line that would have
- * gone to {@code RTP.serverAccessor.sendMessage(callerId, ...)} into the sink
- * instead (see {@code InfoCmd.emit}), so the book content is guaranteed to
- * stay in lockstep with the chat path. The chat output is suppressed for the
- * duration of the tap so the player is not double-served.
- *
- * <p>Dynamic refresh: the trailing {@code Refresh} row mints an
- * {@link MenuAction.OpenInfo} token, which routes through
- * {@code MenuRedeemSubcommand.dispatchOpenInfo} back into this builder with a
- * fresh metrics snapshot. Periodic (timer-driven) auto-refresh is deferred to
- * a later milestone (see {@code PROPOSAL-info-as-book.md} section 9 and the
- * matching note row at the bottom of the book).
- *
- * <p>Token minting follows the same pattern as {@link AdminPanelBuilder}: one
- * token per clickable fragment, with the supplied TTL.
+ * Curated book-mode builder for {@code /rtp info}. Produces a {@link MenuModel}
+ * mirroring chat output line-for-line via {@link RTP#messageTap} (ThreadLocal sink).
  */
 public final class InfoBookBuilder {
 
-    /**
-     * Lines per book page. Vanilla Minecraft books cap at ~14 lines per page;
-     * we use a slightly conservative cap so chrome (page number, hover text)
-     * does not overflow. Pagination breaks lines across pages; no line is
-     * split mid-content.
-     */
+    /** Lines per book page. Fits vanilla book viewport with chrome headroom. */
     public static final int LINES_PER_PAGE = 13;
 
-    /**
-     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
-     * emits concrete {@code /rtp menu info ...} commands, so no token
-     * registry or TTL is consulted any more.
-     */
+    /** No-arg constructor. Concrete commands emitted directly by renderer. */
     public InfoBookBuilder() {
     }
 
     /**
-     * Build the {@code /rtp info} book for {@code viewer} at {@code scope}.
-     * The caller is responsible for enforcing the {@code rtp.info} permission
-     * gate upstream (the dispatch arm does this for token-driven invocations).
-     *
-     * @param rtpRoot the {@code /rtp} root command, forwarded to
-     *                {@code InfoCmd.onCommand} as the dispatch context.
-     * @param viewer  the calling player UUID.
-     * @param scope   what slice of {@code /rtp info} to render (global,
-     *                per-world, per-region).
+     * Builds the {@code /rtp info} book model for {@code viewer} at {@code scope}.
      */
     public MenuModel build(TreeCommand rtpRoot, UUID viewer, MenuAction.InfoScopeToken scope) {
         Objects.requireNonNull(rtpRoot, "rtpRoot");
@@ -191,10 +152,9 @@ public final class InfoBookBuilder {
         MenuPage last = out.get(out.size() - 1);
         List<MenuLine> lines = new ArrayList<>(last.lines());
 
-        // If the last page is already at the cap, push the footer to a new page.
-        // ADR-047 row (bad-points map) is conditional and may add one more line;
-        // size for the worst case so an overflow does not push the note off-page.
-        int footerRows = 5; // blank spacer + refresh + switch-to-text + (optional map) + note
+        // If the last page is already at the cap, push footer to new page.
+        // footerRows accounts for spacer, refresh, switch-to-chat, optional map, and note.
+        int footerRows = 5;
         if (lines.size() + footerRows > LINES_PER_PAGE) {
             out.set(out.size() - 1, new MenuPage(lines));
             lines = new ArrayList<>();
@@ -213,7 +173,7 @@ public final class InfoBookBuilder {
         String refreshHover = lookupMsg(
                 CommandMessages.infoBookRefreshHover,
                 "Re-render this page against a fresh metrics snapshot.");
-        // ADR-050 Stage 3α: tokenRegistry.mint removed (dead side-effect; renderer emits concrete /rtp menu info commands).
+        // ADR-050: renderer emits concrete /rtp menu info commands.
         MenuAction refreshAction = new MenuAction.OpenInfo(scope);
         lines.add(MenuLine.of(new MenuFragment(refreshLabel, refreshHover, refreshAction)));
 
@@ -226,17 +186,7 @@ public final class InfoBookBuilder {
         MenuAction switchAction = new MenuAction.SwitchInfoToText(scope);
         lines.add(MenuLine.of(new MenuFragment(switchLabel, switchHover, switchAction)));
 
-        // ADR-047 / REQ-RTP-MAP-006 declarative chart bridge: bad-points
-        // heatmap row. Only rendered when (a) a real MapBinding is installed
-        // (the NoopMapBinding sentinel means the binding slot is empty, so
-        // clicking would only produce the configurable mapBindingMissing
-        // message) and (b) the scope is REGION (BadPointsHeatmapResolver
-        // needs a region name; the GLOBAL / WORLD scopes have no canonical
-        // region to project). The dispatch arm
-        // (MenuRedeemSubcommand.dispatchOpenMap) enforces the rtp.menu.admin
-        // permission server-side, so the row only acts as a discoverability
-        // affordance: a non-admin who somehow clicks it will be denied with
-        // the standard menuInvalid path.
+        // ADR-047 / REQ-RTP-MAP-006: bad-points heatmap row for REGION scope when MapBinding active.
         if (scope.kind() == MenuAction.InfoScopeToken.Kind.REGION
                 && !(MapDispatch.getMapBinding() instanceof NoopMapBinding)) {
             String mapLabel = lookupMsg(

@@ -15,7 +15,7 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test async-chunk-load} — runtime probe for REQ-RTP-S-005.
+ * {@code rtp test async-chunk-load} - runtime probe for REQ-RTP-S-005.
  * Calls {@link RTPWorld#getChunkAt(int, int)} on chunk {@code (0,0)} of the
  * first registered world, captures the resolving thread, and asserts the
  * future did not complete inline on the primary thread. Targets a chunk
@@ -61,7 +61,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
     }
 
     // Optional --samples N for a serial per-chunk latency harness
-    // (REQ-RTP-S-005 regression-spotting — isolates per-stage cost from
+    // (REQ-RTP-S-005 regression-spotting - isolates per-stage cost from
     // the `scan` command's parallel/batched effective-throughput number).
     // N=1 preserves the original single-probe behaviour and log shape.
     int samples = clampSamples(parseFirstInt(parameterValues.get("samples"), 1));
@@ -80,7 +80,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
    * Archimedean-ish spiral around {@code (0,0)} and aggregates per-probe
    * elapsed times.
    *
-   * <p>Serial — not batched — on purpose. The {@code scan} command's ~cps
+   * <p>Serial - not batched - on purpose. The {@code scan} command's ~cps
    * figure is an aggregate of batched parallel loads; this harness
    * deliberately walks one candidate at a time so each sample's
    * {@code elapsedMs} is a genuine per-chunk wall-clock latency through the
@@ -100,7 +100,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
     int ok = 0;
     int fail = 0;
     int offPrimary = 0;
-    // Simple radial walk — stride 2 chunks so we don't alias the spawn
+    // Simple radial walk - stride 2 chunks so we don't alias the spawn
     // chunk on every sample; kept bounded to ±(samples+4) to avoid
     // straying outside a typical generated region.
     for (int i = 0; i < samples; i++) {
@@ -127,7 +127,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
 
   private static int clampSamples(int n) {
     if (n < 1) return 1;
-    // Hard cap — per-chunk latency harness is a diagnostic, not a benchmark
+    // Hard cap - per-chunk latency harness is a diagnostic, not a benchmark
     // rig; anything above this belongs in a dedicated performance test.
     if (n > 256) return 256;
     return n;
@@ -291,7 +291,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
     //
     // If the caller is NOT the primary thread (typical for unit tests or
     // operators invoking the command from an async CommandsAPI
-    // dispatch), inline completion is legal — S-005 only forbids
+    // dispatch), inline completion is legal - S-005 only forbids
     // main-thread chunk loads. We therefore downgrade the violation
     // check to fire only when caller-is-primary AND completion was
     // observed inline on that same primary thread.
@@ -309,7 +309,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
 
   private static boolean isBukkitPrimaryThread() {
     // Reflection so rtp-plugin's own test classpath (which does not always
-    // have a running Bukkit) does not blow up — falls back to "not primary"
+    // have a running Bukkit) does not blow up - falls back to "not primary"
     // when Bukkit is unavailable, which is the correct answer for the
     // unit-test harness.
     try {

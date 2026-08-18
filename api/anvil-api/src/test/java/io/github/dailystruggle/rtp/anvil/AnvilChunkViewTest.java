@@ -21,11 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Phase 2 of ADR-016: {@link AnvilChunkView} / {@link PaletteSection} /
+ * ADR-016: {@link AnvilChunkView} / {@link PaletteSection} /
  * {@link PackedPaletteDecoder} semantics.
  *
- * <p>The decoder does not yet produce a pre-filter verdict — that's Phase 3 — but it must
- * correctly translate on-disk palette-packed bytes into raw identifier strings, because
+ * <p>The decoder translates on-disk palette-packed bytes into raw identifier strings, because
  * a silent off-by-one in this layer would cause the verdict layer to misclassify safe as
  * unsafe (or vice versa) everywhere on vanilla Spigot. These tests exercise both
  * synthetic fixtures (for precise placement assertions) and real server-produced region
@@ -184,7 +183,7 @@ class AnvilChunkViewTest {
         // Spot-check: at least one section somewhere in the chunk decodes to a non-null,
         // non-empty, namespaced identifier. We don't pin the exact material because that's
         // a function of whatever biome/biomesource the server used when producing this
-        // fixture — that precision is for Phase 3 integration tests, not decoder tests.
+        // fixture - that precision is for integration tests, not decoder tests.
         boolean sawNamespacedId = false;
         for (PaletteSection ps : view.sections()) {
             String id = ps.blockIdAt(0, 0, 0);

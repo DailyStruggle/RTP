@@ -76,7 +76,7 @@ public class FixedAdjustorTest {
   }
 
   /**
-   * Head clearance: a solid block at {@code y+1} must also reject — a
+   * Head clearance: a solid block at {@code y+1} must also reject - a
    * standing player would suffocate against it.
    */
   @Test
@@ -90,9 +90,8 @@ public class FixedAdjustorTest {
   }
 
   /**
-   * The {@code adjust(chunk, output)} overload mirrors {@link FixedAdjustor#adjust(io.github.dailystruggle.rtp.api.world.RTPChunk)}
-   * but writes into a caller-owned {@link MutableRTPCoords}. Verifies the
-   * boolean contract and the populated fields.
+   * The {@code adjust(chunk, output)} overload mirrors {@link FixedAdjustor#adjust(RTPChunk)}
+   * writing into caller-owned {@link MutableRTPCoords}.
    */
   @Test
   void adjustWithOutput_emptyChunk_returnsTrueAndSetsCoords() {

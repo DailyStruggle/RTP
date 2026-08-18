@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * commands-api-ADR-001 (Brigadier Bridge) — regression test for permission
+ * commands-api-ADR-001 (Brigadier Bridge) - regression test for permission
  * filtering of the greedy {@code args} slot suggestions.
  *
  * <p>Fabric and NeoForge dispatch the {@code /rtp} command tree through

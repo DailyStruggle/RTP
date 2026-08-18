@@ -18,7 +18,7 @@ import java.util.logging.Level;
  *
  * <p>LuckPerms exposes the same platform-agnostic API
  * ({@code net.luckperms.api.LuckPermsProvider#get()}) on every platform, so the
- * reflective probe is identical to the Fabric enumerator — only the class doc
+ * reflective probe is identical to the Fabric enumerator - only the class doc
  * differs. All access is reflective so {@code rtp-neoforge-common} does not gain
  * a hard dependency on {@code net.luckperms:api}: if the LP API jar is absent at
  * runtime (the admin has not installed LuckPerms), every call returns an empty

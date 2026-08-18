@@ -8,9 +8,10 @@ inter-module project-dependency closure) are published to a public Maven coordin
 
 This document covers the channels:
 
-1. **JitPack** - active now, zero-credentials, builds straight from a git tag.
-2. **GitHub Packages** - repo-scoped Maven registry, credentialed; wiring is in place.
-3. **Maven Central** - the durable, discoverable channel; not yet enabled, full how-to below.
+1. **Maven Central** - active now; the durable, discoverable, zero-credentials channel for
+   consumers (`io.github.dailystruggle:rtp-api` / `:rtp-core`, currently `3.2.1`).
+2. **JitPack** - active now, zero-credentials, builds straight from a git tag / branch / commit.
+3. **GitHub Packages** - repo-scoped Maven registry, credentialed; wiring is in place.
 
 The publication wiring itself lives in the root `build.gradle` (`maven-publish` applied to
 the `publishedModulePaths` closure) and is shared by all channels.
@@ -72,7 +73,9 @@ JitPack handles the inter-module references (the generated POMs use the
 `io.github.dailystruggle` group; JitPack maps the same-group cross-references to the
 `com.github.DailyStruggle.RTP` group it serves), so a consumer only needs the JitPack repo.
 
-### Consumer build.gradle (out-of-repo addon)
+### Consumer config (out-of-repo addon)
+
+Gradle (`build.gradle`):
 
 ```gradle
 repositories {
@@ -81,12 +84,39 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'com.github.DailyStruggle.RTP:rtp-api:3.0.1'
-    compileOnly 'com.github.DailyStruggle.RTP:rtp-core:3.0.1'
+    compileOnly 'com.github.DailyStruggle.RTP:rtp-api:3.2.1'
+    compileOnly 'com.github.DailyStruggle.RTP:rtp-core:3.2.1'
 }
 ```
 
-Replace `3.0.1` with any git tag, a branch (`master-SNAPSHOT`), or a commit SHA. The first
+Maven (`pom.xml`) - JitPack is not a default Maven repository, so declare it explicitly
+(`compileOnly` maps to Maven `<scope>provided</scope>`):
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>com.github.DailyStruggle.RTP</groupId>
+        <artifactId>rtp-api</artifactId>
+        <version>3.2.1</version>
+        <scope>provided</scope>
+    </dependency>
+    <dependency>
+        <groupId>com.github.DailyStruggle.RTP</groupId>
+        <artifactId>rtp-core</artifactId>
+        <version>3.2.1</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+```
+
+Replace `3.2.1` with any git tag, a branch (`master-SNAPSHOT`), or a commit SHA. The first
 build for a new tag triggers JitPack to compile; subsequent resolves are cached.
 
 ### Triggering / verifying a build
@@ -220,9 +250,11 @@ For the Jenkins pipeline, inject a PAT as `gpr.user` / `gpr.key` (or `GITHUB_ACT
 `GITHUB_TOKEN`) secrets and swap the `publishToMavenLocal` tasks in `PUBLISH_TASKS` for the
 `...ToGitHubPackagesRepository` targets.
 
-### Consumer build.gradle (out-of-repo addon)
+### Consumer config (out-of-repo addon)
 
-GitHub Packages requires the consumer to authenticate too (there is no anonymous read):
+GitHub Packages requires the consumer to authenticate too (there is no anonymous read).
+
+Gradle (`build.gradle`):
 
 ```gradle
 repositories {
@@ -242,6 +274,34 @@ dependencies {
 }
 ```
 
+Maven (`pom.xml`) - declare the repository and put the credentials in `~/.m2/settings.xml`
+under a matching `<server><id>github</id>...</server>` (username = GitHub user, password = a
+PAT with `read:packages`):
+
+```xml
+<repositories>
+    <repository>
+        <id>github</id>
+        <url>https://maven.pkg.github.com/DailyStruggle/RTP</url>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>io.github.dailystruggle</groupId>
+        <artifactId>rtp-api</artifactId>
+        <version>3.2.1</version>
+        <scope>provided</scope>
+    </dependency>
+    <dependency>
+        <groupId>io.github.dailystruggle</groupId>
+        <artifactId>rtp-core</artifactId>
+        <version>3.2.1</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+```
+
 The consumer's token only needs `read:packages`. Because of this read-time credential
 requirement, JitPack remains the friendlier choice for public addon authors; GitHub Packages
 is best for internal / org-scoped consumers who already authenticate to GitHub.
@@ -250,9 +310,11 @@ is best for internal / org-scoped consumers who already authenticate to GitHub.
 
 ## Maven Central (first-party wiring, manual Portal upload)
 
-Maven Central is the right destination once the `rtp-api` contract is stable and you expect
-real third-party volume. It is more work than JitPack (one-time account + signing setup) but
-gives discoverable, permanent coordinates with no per-tag build step on the consumer side.
+Maven Central is **live** - `io.github.dailystruggle:rtp-api` / `:rtp-core` (and their published
+closure) are available at `3.2.1`, resolvable with a bare `mavenCentral()` and no credentials.
+It gives discoverable, permanent coordinates with no per-tag build step on the consumer side.
+The rest of this section is the release procedure for cutting the *next* version; consumers only
+need the [consumer snippet below](#consumer-buildgradle-maven-central).
 
 **Trust posture:** this build deliberately uses **only first-party Gradle tooling** for the
 Central path - `maven-publish` and the built-in `signing` plugin, both of which ship inside
@@ -443,18 +505,43 @@ that `.asc` signatures were actually produced before uploading (fail-loud per S-
 Portal. To auto-release instead, append `?publishingType=AUTOMATIC` to the upload URL in the
 workflow.
 
-### Consumer build.gradle (after Central release)
+### Consumer config (Maven Central)
+
+Central is in the default repository set of both Gradle and Maven, so no repository block or
+credentials are needed.
+
+Gradle (`build.gradle`):
 
 ```gradle
 repositories { mavenCentral() }
 
 dependencies {
-    compileOnly 'io.github.dailystruggle:rtp-api:<version>'
-    compileOnly 'io.github.dailystruggle:rtp-core:<version>'
+    compileOnly 'io.github.dailystruggle:rtp-api:3.2.1'
+    compileOnly 'io.github.dailystruggle:rtp-core:3.2.1'
 }
 ```
 
-No special repository block needed - Central is in every build's default set.
+Maven (`pom.xml`) - `compileOnly` maps to Maven `<scope>provided</scope>`:
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>io.github.dailystruggle</groupId>
+        <artifactId>rtp-api</artifactId>
+        <version>3.2.1</version>
+        <scope>provided</scope>
+    </dependency>
+    <dependency>
+        <groupId>io.github.dailystruggle</groupId>
+        <artifactId>rtp-core</artifactId>
+        <version>3.2.1</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+```
+
+This is the recommended dependency for out-of-repo addon authors (see
+`docs/FOR_ADDON_DEVELOPERS.md` and `docs/ADDON_QUICKSTART.md`).
 
 ---
 

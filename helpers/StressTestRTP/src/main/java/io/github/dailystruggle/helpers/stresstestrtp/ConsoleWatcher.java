@@ -20,8 +20,8 @@ import java.util.regex.Pattern;
  * immediately rather than waiting for {@code attempt-timeout-ms}.
  *
  * <p>Why this exists: target plugins reject duplicate / mid-flight / cooldown
- * dispatches by sending the player a chat message — which goes through
- * Bukkit's logger to console — but they do <strong>not</strong> fire
+ * dispatches by sending the player a chat message - which goes through
+ * Bukkit's logger to console - but they do <strong>not</strong> fire
  * {@link org.bukkit.event.player.PlayerTeleportEvent}. From {@link Runner}'s
  * point of view the dispatch then sits "in flight" until the timeout reaper
  * runs (default 5 s), starving the concurrency cap and producing the symptom

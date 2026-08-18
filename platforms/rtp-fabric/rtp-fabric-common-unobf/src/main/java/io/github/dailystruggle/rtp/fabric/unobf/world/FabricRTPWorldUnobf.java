@@ -82,7 +82,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * memory under pressure, but that let a freshly loaded cold->hot promotion
      * candidate be GC'd (and vanilla unload its ticket-less chunk) in the window
      * between {@link #getChunkAtAsync(int, int)} completing and the promotion's
-     * safety re-verify reading {@link #getCachedChunk(long)} — surfacing as the
+     * safety re-verify reading {@link #getCachedChunk(long)} - surfacing as the
      * "getCachedChunk returned null" promotion-drop flood on Fabric backends.
      *
      * <p>Pinning the backing {@code ChunkAccess} with a strong reference here
@@ -118,7 +118,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     public FabricRTPWorldUnobf(@NotNull ServerLevel level) {
         super(level);
         // dimension() returns ResourceKey<Level>; its location is the canonical
-        // dimension id (e.g. minecraft:overworld). Use that as the world name —
+        // dimension id (e.g. minecraft:overworld). Use that as the world name -
         // this matches how Fabric command/log output identifies dimensions and
         // avoids depending on save-folder names which are server-config-specific.
         this.name = level.dimension().identifier().toString();
@@ -143,7 +143,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * {@link RTPWorld#world} field is {@code protected}; expose it for
      * Fabric-side adapters (player teleport, event bridge) that legitimately
      * need the native handle. Callers in {@code rtp-core} / {@code rtp-api}
-     * must NOT use this — keep the API platform-free.
+     * must NOT use this - keep the API platform-free.
      */
     public ServerLevel level() {
         return world;
@@ -159,7 +159,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * <p><b>Generation contract.</b> Calls
      * {@code ServerChunkCache#getChunk(x, z, ChunkStatus.FULL, /*load=*&#47;true)}
      * inside {@link MinecraftServer#submit}. The {@code load=true} flag is
-     * what tells vanilla to <i>generate the chunk if absent</i> — without it,
+     * what tells vanilla to <i>generate the chunk if absent</i> - without it,
      * an unloaded coordinate resolves to {@code null} and the RTP pipeline
      * attributes every attempt to {@code nullChunk/asyncLoadNull}, which is
      * exactly what we observed in the 2026-05-03 Fabric 1.21.1 smoke test.
@@ -169,7 +169,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * to avoid blocking the tick thread on generation, but that method's
      * intermediary mapping varies across MC patch releases AND it can resolve
      * with an "unloaded" payload that the unwrapper legitimately
-     * decodes as {@code null} — producing the same 32×{@code asyncLoadNull}
+     * decodes as {@code null} - producing the same 32×{@code asyncLoadNull}
      * failure mode but for a different reason. The simpler
      * {@code cache.getChunk(..., true)} call is the public, version-stable
      * vanilla API and is the same call vanilla itself uses for
@@ -191,7 +191,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         // the Javadoc on RTPWorld.totalChunkLoads.
         final long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
 
-        // ADR-016 — Anvil read-only data source (parity with BukkitRTPWorld#getChunkAt).
+        // ADR-016 - Anvil read-only data source (parity with BukkitRTPWorld#getChunkAt).
         //
         // For candidate chunks that are not currently loaded we probe the
         // persisted r.X.Z.mca region file off-thread. The prefilter is a
@@ -247,7 +247,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
 
     /**
      * Snapshot the current {@code BlocksKeys.unsafeBlocks} list as a plain
-     * {@code Set<String>}. Returns an empty set on any lookup failure — the
+     * {@code Set<String>}. Returns an empty set on any lookup failure - the
      * pre-filter treats an empty set as "never reject", which is the safe
      * default. Mirrors {@code BukkitRTPWorld.currentUnsafeBlocks}.
      */
@@ -274,7 +274,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * <p><b>Non-blocking dispatch (rtp-fabric-ADR-008).</b> Calls
      * {@code FabricVersionAdapter#requestFullChunkAsync}, which under the
      * hood invokes {@code ServerChunkCache#getChunkFuture(cx, cz, FULL,
-     * /*create=*&#47;true)} — vanilla's non-blocking generation entry point.
+     * /*create=*&#47;true)} - vanilla's non-blocking generation entry point.
      * The dispatch itself runs on the server tick thread via
      * {@link MinecraftServer#submit} and returns in microseconds; vanilla's
      * own internal scheduler drives generation across {@code Worker-Main}
@@ -285,7 +285,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * {@code ServerChunkCache#getChunk(cx, cz, FULL, /*load=*&#47;true)} from
      * inside an {@code AsyncSupply} we submitted to the server thread. That
      * variant parks the calling thread on the server's own task queue while
-     * waiting for generation — when the calling thread <i>is</i> the server
+     * waiting for generation - when the calling thread <i>is</i> the server
      * tick thread (which it always is, here), it ends up driving its own
      * queue from inside one of its tasks, deadlocking with any other task
      * in the chunk-generation dependency graph. Crash report
@@ -293,7 +293,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * parked on {@code class_3215.method_12121}, all 14 commonPool workers
      * parked on {@code liveLoadPipe}, two never-released permits.</p>
      *
-     * <p>Per-coordinate dedup ({@link #inFlightLiveLoads}) is preserved —
+     * <p>Per-coordinate dedup ({@link #inFlightLiveLoads}) is preserved -
      * concurrent callers for the same {@code (cx,cz)} still share one
      * future. The bounded-pipe {@code Semaphore} is gone: with non-blocking
      * dispatch there is no multi-second wait to back-pressure, and vanilla's
@@ -308,14 +308,14 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
             // Defensive: a ServerLevel without a server is a torn-down state.
             // Complete exceptionally rather than throwing on the caller thread
             // so the pipeline's existing failure-attribution path picks it up
-            // (REQ-RTP-S-004 — no silent discards).
+            // (REQ-RTP-S-004 - no silent discards).
             CompletableFuture<Long> failed = new CompletableFuture<>();
             failed.completeExceptionally(new IllegalStateException(
                 "FabricRTPWorldUnobf.getChunkAt: ServerLevel has no MinecraftServer (world=" + name + ")"));
             return failed;
         }
 
-        // (1) Per-coordinate de-duplication — concurrent callers for the
+        // (1) Per-coordinate de-duplication - concurrent callers for the
         // same (cx,cz) share one in-flight future.
         CompletableFuture<Long> existing = inFlightLiveLoads.get(key);
         if (existing != null) return existing;
@@ -344,7 +344,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         // future that completes on whichever worker vanilla finishes on.
         //
         // CRITICAL: do NOT wrap this call in server.submit(...). Crash report
-        // 2026-05-08_11.19.30 captured the failure mode — when invoked from
+        // 2026-05-08_11.19.30 captured the failure mode - when invoked from
         // an AsyncSupply running on the tick thread, getChunkFutureMainThread
         // ran inline and drove its own task queue (yielding via
         // BlockableEventLoop#managedBlock), tripping the watchdog. Letting
@@ -359,7 +359,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         // generation work into the chunk system's pulse loop when invoked on
         // the tick thread; off-thread invocations resolve immediately to a
         // ChunkLoadingFailure (Either.right) and our adapter unwraps that to
-        // null — manifesting as the nullChunk/asyncLoadNull burst seen in
+        // null - manifesting as the nullChunk/asyncLoadNull burst seen in
         // the 2026-05-08 13:27 test run with C2ME 0.2.0-alpha.11.16.
         //
         // Routing the dispatch via server.execute(...) hands the request to
@@ -379,7 +379,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
             return result;
         }
 
-        // (4) Concurrency gate — see liveLoadGate javadoc. Tries an immediate
+        // (4) Concurrency gate - see liveLoadGate javadoc. Tries an immediate
         // permit; if none is available the dispatch is parked on a bounded FIFO
         // and resumed by the next chunk's whenComplete (no recursion). When the
         // queue is also full we fail-fast with BusyException so the pipeline
@@ -433,7 +433,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         // when the server is stopping. Without this, bridge would never complete,
         // dispatch would never complete, attachDispatchCompletion's whenComplete
         // would never fire, the gate permit would never release, and
-        // inFlightLiveLoads would retain a dead future for this key forever —
+        // inFlightLiveLoads would retain a dead future for this key forever -
         // every subsequent getChunkAt(cx,cz) caller would receive the dead future
         // immediately, return null upstream, and the orchestration layer
         // (QueueTask/PregenTask, both with 5 s orTimeout) would re-issue
@@ -445,7 +445,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                 bridge.thenCompose(f -> f == null ? CompletableFuture.completedFuture(null) : f);
         // Hard per-load deadline. If vanilla's chunk system never completes the
         // future (server stopping, C2ME stall, watchdog crash mid-generation),
-        // the timeout completes `dispatch` exceptionally — which fires the
+        // the timeout completes `dispatch` exceptionally - which fires the
         // whenComplete in attachDispatchCompletion, releasing the gate permit,
         // removing the inFlightLiveLoads entry, and propagating the failure to
         // the caller's result CF. Sized (30 s) to let vanilla finish a cold
@@ -460,17 +460,17 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     /**
      * Watchdog timeout for {@code dispatchServer.execute(...)} → adapter.
      * If the server's execute() drops the runnable (shutdown), bridge never
-     * completes — this timeout converts that into an exceptional completion
+     * completes - this timeout converts that into an exceptional completion
      * so the gate-release path runs. Tight because the body of the runnable
      * is "create a CompletableFuture and complete it with the adapter's
-     * inner future" — microseconds of work.
+     * inner future" - microseconds of work.
      */
     private static final long BRIDGE_DISPATCH_DEADLINE_MS = 1_500L;
 
     /**
      * Hard ceiling on how long a single live-load future may stay pinned in
      * {@link #inFlightLiveLoads}. Crucially this acts on the inner adapter
-     * future, NOT on the outer {@link #getOrLoadChunk} CF — the previous
+     * future, NOT on the outer {@link #getOrLoadChunk} CF - the previous
      * design used {@code completeOnTimeout(null, …)} which resolved the
      * outer caller but left the inner future (and its gate permit and
      * inFlightLiveLoads entry) live forever. See the bridge-watchdog javadoc
@@ -480,7 +480,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * coordinate. Fabric vanilla cold-start generation routinely runs 5-10 s
      * under early-server scan/pre-fill load (see LESSONS_LEARNED 2026-05-08),
      * so the earlier 4 s ceiling abandoned ungenerated chunks before they
-     * finished — surfacing as the "rtp scan" generation failures this value
+     * finished - surfacing as the "rtp scan" generation failures this value
      * was raised to fix. The orchestration layer no longer undercuts this:
      * {@code QueueTask} dropped its 5 s {@code orTimeout} (per the 2026-05-08
      * decision that per-chunk deadlines live in the adapter) and
@@ -508,7 +508,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         dispatch.whenComplete((handle, error) -> {
             try {
                 // Lifecycle bookkeeping on EVERY exit path (success,
-                // exception, deadline) — mirrors the MemoryTracker contract.
+                // exception, deadline) - mirrors the MemoryTracker contract.
                 fabricLiveLoadInFlight.decrementAndGet();
                 inFlightLiveLoads.remove(key, result);
                 if (error != null) {
@@ -532,7 +532,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                         // promotion's getCachedChunk(key) read, which produced
                         // the "getCachedChunk returned null" drop flood.
                         recentlyLoadedChunks.put(key, chunk);
-                        // A live chunk supersedes any anvil snapshot — drop the
+                        // A live chunk supersedes any anvil snapshot - drop the
                         // stale view so subsequent getCachedChunk lookups don't
                         // return outdated palette data.
                         anvilProbeSupport.evict(key);
@@ -562,7 +562,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     /**
      * Pull the next parked dispatch off {@link #liveLoadWaiters} if a permit
      * is currently free. Loops only while we successfully claim a permit AND
-     * find a waiter — bounded by the number of currently-released permits, so
+     * find a waiter - bounded by the number of currently-released permits, so
      * the call is O(permits) per invocation, never recursive.
      */
     private void drainWaitersIfPermitFree() {
@@ -621,12 +621,12 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * Concurrent-generation cap for {@link #loadLiveChunk}.
      *
      * <p>1.20.1's chunk-system implementation holds onto significantly more
-     * working memory per in-flight generation than 1.21.11+ — empirically the
+     * working memory per in-flight generation than 1.21.11+ - empirically the
      * backend OOMs on 1.20.1 with the unbounded dispatch that the rest of the
      * version line tolerates without issue. The gate caps how many adapter
      * calls can be parked in vanilla's chunk-future pipeline at once. Excess
      * callers park on {@link #liveLoadWaiters}; on each completion the gate
-     * pulls the next waiter (non-recursive — see {@link #drainWaitersIfPermitFree}).</p>
+     * pulls the next waiter (non-recursive - see {@link #drainWaitersIfPermitFree}).</p>
      *
      * <p>Hardcoded for now (per 2026-05-08 user direction); a config knob may
      * be added if dynamic tuning proves necessary. Permit count is selected
@@ -639,7 +639,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * Bounded FIFO of dispatch tasks parked because {@link #liveLoadGate} was
      * full at request time. Bounded so we fail-fast (with a clean exceptional
      * future) rather than letting a stuck chunk system grow this queue
-     * without limit. The size is generous relative to the gate width — under
+     * without limit. The size is generous relative to the gate width - under
      * normal load the queue stays empty; it only fills during pre-fill bursts
      * or while vanilla is recovering from a slow tick.
      */
@@ -664,7 +664,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * Pick the permit count for {@link #liveLoadGate} based on the active
      * version adapter's {@code mcVersion()}. 1.20.x is the heavy line (2);
      * everything else (1.21+, 26.1) gets 4. Defaults to 2 (conservative) if
-     * the adapter isn't yet installed at construction time — this is safe:
+     * the adapter isn't yet installed at construction time - this is safe:
      * the world is created before adapter installation only in tests, and a
      * tighter cap there is harmless.
      */
@@ -699,14 +699,14 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * <p><b>Strategy.</b> Probe-first: cached → anvil → live-load. The
      * live-load future is bounded by {@link #LIVE_LOAD_DEADLINE_MS} via
      * {@code dispatch.orTimeout(...)} inside
-     * {@link #dispatchAdapterCall} — failing the inner future
+     * {@link #dispatchAdapterCall} - failing the inner future
      * exceptionally on deadline so the gate permit, the
      * {@link #inFlightLiveLoads} entry, and any attached cleanup release
      * cleanly. The outer caller sees a {@link TimeoutException} mapped to
      * {@code null} via the {@code exceptionally} stage below.</p>
      *
      * <p>S-004 compliance: a deadline-{@code null} resolution is not a
-     * silent discard — the calling task ({@code QueueTask}) treats it as a
+     * silent discard - the calling task ({@code QueueTask}) treats it as a
      * "no chunk available right now" rejection and routes the attempt
      * through the standard {@code FailTypes.nullChunk} attribution path.
      * Genuine load failures (exceptions thrown inside
@@ -748,7 +748,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
             // FailTypes.nullChunk attribution path, satisfying REQ-RTP-S-004.
             // We map TimeoutException + adapter throwables to null here rather
             // than re-throw because the caller side uses .whenComplete(chunk,ex)
-            // and ex != null is logged at WARNING — and a routine deadline is
+            // and ex != null is logged at WARNING - and a routine deadline is
             // not warning-worthy. Genuine bugs (NPE, IllegalStateException
             // thrown synchronously) still propagate via the exceptional path
             // above this catch.
@@ -787,7 +787,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      *
      * <p><b>Why this matters.</b> Prior to 2026-05-08 the {@code done} future
      * was deliberately left uncompleted because the Fabric pipeline did not
-     * consume it. But {@code rtp-core} is platform-agnostic — any future
+     * consume it. But {@code rtp-core} is platform-agnostic - any future
      * cross-platform feature attaching to {@code done} would silently leak its
      * entire dependent-stage graph until JVM exit on Fabric. The completed-on-
      * resolve contract here matches Bukkit semantics (where {@code done} is
@@ -806,7 +806,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
             // Fire-and-forget release so any attached dependents (cross-
             // platform stale-chunk guards, future allOf consumers) drain
             // their CF graph instead of pinning it. Completion value mirrors
-            // whether a chunk key was resolved — the Bukkit consumers only
+            // whether a chunk key was resolved - the Bukkit consumers only
             // branch on completion, not on the value, but Boolean.TRUE on
             // success / FALSE on null preserves a useful signal for future
             // cross-platform listeners.
@@ -817,7 +817,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
 
     /**
      * Non-blocking loaded-chunk lookup. {@link ServerChunkCache#hasChunk(int, int)}
-     * is the documented non-loading state query — used by the stale-chunk guard
+     * is the documented non-loading state query - used by the stale-chunk guard
      * (ADR-015 / REQ-RTP-S-005) between an async load future resolution and the
      * subsequent block-evaluation task on a Count-Bound pipe. Defensive on torn-down
      * worlds.
@@ -833,7 +833,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     }
 
     // ---------------------------------------------------------------------------
-    // ADR-016 anvil pre-filter — column probe (parity with BukkitRTPWorld)
+    // ADR-016 anvil pre-filter - column probe (parity with BukkitRTPWorld)
     // ---------------------------------------------------------------------------
 
     /**
@@ -843,7 +843,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * {@code cache.getChunk(..., FULL, true)} generation).
      *
      * <p>This is the Fabric mirror of {@code BukkitRTPWorld#probeChunkColumn}
-     * (see {@code rtp-spigot-common}, lines 227–268, and ADR-016). The only
+     * (see {@code rtp-spigot-common}, lines 227-268, and ADR-016). The only
      * platform deltas are world-folder resolution
      * ({@link MinecraftServer#getWorldPath(LevelResource)}) and dimension
      * subpath derivation ({@link #dimensionRegionSubpath(ServerLevel)}),
@@ -856,7 +856,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * </ul>
      * On a closed gate or any decode failure the future resolves to {@code null}
      * (UNKNOWN) and {@code ScanTask} / {@code QueueTask} / {@code PregenTask}
-     * fall back to the live-load path — preserving the
+     * fall back to the live-load path - preserving the
      * {@code .mca}-as-advisory invariant of ADR-016.
      *
      * <p>S-005: file I/O is dispatched onto
@@ -877,7 +877,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         try {
             // Mojang official mappings: MinecraftServer#getWorldPath(LevelResource)
             // returns the per-server save root for the requested resource. ROOT
-            // points at the world's base directory — the Fabric equivalent of
+            // points at the world's base directory - the Fabric equivalent of
             // Bukkit's World#getWorldFolder().
             worldFolder = server.getWorldPath(LevelResource.ROOT);
         } catch (Throwable t) {
@@ -893,7 +893,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         // Mirrors the Spigot dispatch contract: AnvilIoPool runs blocking .mca
         // reads off-tick with disk-parallelism sizing. Probe-cache hit / miss
         // metrics are owned by ScanTask's probeOutcome* counters and the anvil
-        // module's own diagLog channel — no per-call counter is owned here.
+        // module's own diagLog channel - no per-call counter is owned here.
         return CompletableFuture.supplyAsync(() -> {
             try {
                 java.nio.file.Path regionFile =
@@ -988,7 +988,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     }
 
     /**
-     * Applicability gate for the column probe — parity with
+     * Applicability gate for the column probe - parity with
      * {@code BukkitRTPWorld#shouldPrefilter}. Returns {@code true} only when
      * the chunk is not currently loaded and the
      * {@code SafetyKeys.anvilPrefilterEnabled} config is truthy. Any failure
@@ -1006,7 +1006,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
             @SuppressWarnings("unchecked")
             ConfigParser<SafetyKeys> safety =
                 (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-            if (safety == null) return true; // Config not yet loaded — default-on.
+            if (safety == null) return true; // Config not yet loaded - default-on.
             Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
             if (raw instanceof Boolean b) return b;
             if (raw != null) return Boolean.parseBoolean(raw.toString());
@@ -1060,7 +1060,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * &quot;does an .mca entry exist for this chunk?&quot; question. Lazily
      * resolved on first use; cached for the JVM lifetime. Reflection is used
      * (rather than an AccessWidener / accessor mixin) to keep this change
-     * self-contained — {@code rtp-fabric-common} has no AW/mixin config today.
+     * self-contained - {@code rtp-fabric-common} has no AW/mixin config today.
      *
      * <p>Resolution chain: {@code ServerChunkCache#chunkMap} field →
      * {@code ChunkMap#read(ChunkPos)} method returning
@@ -1079,7 +1079,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         synchronized (FabricRTPWorldUnobf.class) {
             if (REFLECTION_RESOLVED) return;
             try {
-                // ServerChunkCache#chunkMap — package-private final field; mappings
+                // ServerChunkCache#chunkMap - package-private final field; mappings
                 // stable since 1.18 under the deobf name "chunkMap".
                 java.lang.reflect.Field f = null;
                 for (java.lang.reflect.Field cand : sample.getClass().getDeclaredFields()) {
@@ -1096,7 +1096,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                 f.setAccessible(true);
                 CHUNK_MAP_FIELD = f;
 
-                // ChunkMap#read(ChunkPos) — protected method; returns
+                // ChunkMap#read(ChunkPos) - protected method; returns
                 // CompletableFuture<Optional<CompoundTag>>.
                 Class<?> chunkMapClass = f.getType();
                 java.lang.reflect.Method read = null;
@@ -1129,21 +1129,21 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     /**
      * Non-blocking check for whether the chunk has been generated and persisted
      * to disk. Implements the {@link RTPWorld#isChunkGenerated(int, int)}
-     * contract using region-file probes — same primitive Bukkit's
+     * contract using region-file probes - same primitive Bukkit's
      * {@code World#isChunkGenerated} reduces to. Used by ADR-016 §13.3 to gate
      * the vanilla seed-biome pre-check fast path.
      *
      * <p>Resolution order:</p>
      * <ol>
-     *   <li>{@code ServerChunkCache#hasChunk} — loaded chunks are by definition
+     *   <li>{@code ServerChunkCache#hasChunk} - loaded chunks are by definition
      *       generated; cheapest answer.</li>
-     *   <li>{@code ChunkMap#read(ChunkPos).join().isPresent()} — IOWorker async
+     *   <li>{@code ChunkMap#read(ChunkPos).join().isPresent()} - IOWorker async
      *       region-file read; non-loading, non-generating. The join is bounded
      *       (a single header-table lookup against a cached
      *       {@code RegionFileStorage}); it does NOT block on the chunk system
      *       and is safe to call off-tick.</li>
      *   <li>If reflection is unavailable or throws, fall back to {@code true}
-     *       per the conservative default — false-positives are harmless
+     *       per the conservative default - false-positives are harmless
      *       (only skip the perf fast path); false-negatives would risk the
      *       ADR-016 §13.3 palette-drift bug.</li>
      * </ol>
@@ -1204,11 +1204,11 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * Vanilla {@code setChunkForced} writes through to
      * {@code level.dat#ForcedChunks}, so a watchdog crash mid-pipeline (or any
      * unclean shutdown) leaves RTP-owned forced flags persisted to disk and
-     * re-applied on the next world load — an S-002 hazard specific to Fabric
+     * re-applied on the next world load - an S-002 hazard specific to Fabric
      * (the Bukkit/Folia plugin-ticket APIs are non-persistent). We instead
      * delegate to the active {@code FabricVersionAdapter}, which issues a
      * {@code DistanceManager#addRegionTicket} call with a custom
-     * {@code TicketType("rtp", …, timeout=0)} — non-persistent, removed on
+     * {@code TicketType("rtp", …, timeout=0)} - non-persistent, removed on
      * shutdown automatically.</p>
      *
      * <p>The native ticket call MUST run on the server tick thread (it mutates
@@ -1232,7 +1232,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         }
         // Delegate to the per-MC-version adapter, which issues a non-persistent
         // RTP-owned chunk ticket via DistanceManager#addRegionTicket. We must
-        // NOT call ServerLevel#setChunkForced — that writes through to
+        // NOT call ServerLevel#setChunkForced - that writes through to
         // level.dat#ForcedChunks and a watchdog crash mid-pipeline would
         // permanently leak forced flags (S-002). The adapter dispatches
         // synchronously assuming the caller is on the server thread; we hop
@@ -1240,7 +1240,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         final io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
                 io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
         if (adapter == null) {
-            // Pre-bootstrap call (should not happen — RTPFabricMod installs the
+            // Pre-bootstrap call (should not happen - RTPFabricMod installs the
             // adapter before any keep/forget call site is reachable). Fail loud
             // per S-006 rather than silently no-op.
             CompletableFuture<Void> failed = new CompletableFuture<>();
@@ -1260,7 +1260,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                         ? adapter.applyTicket(levelHandle, cx, cz)
                         : adapter.releaseTicket(levelHandle, cx, cz);
                 // Adapter completes its own future inline (single tick-thread call)
-                // — getNow short-circuits without blocking and surfaces any
+                // - getNow short-circuits without blocking and surfaces any
                 // exception via join below. Reduces to a no-op if already done.
                 f.getNow(null);
                 return null;
@@ -1279,14 +1279,14 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * On MC 26.1.2 the public {@code getForcedChunks()} accessor was removed,
      * and RTP issues non-persistent {@code DistanceManager} tickets rather
      * than {@code setChunkForced}, so this returns {@link RTPWorld#chunkTickets}
-     * size — the only count RTP can authoritatively report on this MC version.
+     * size - the only count RTP can authoritatively report on this MC version.
      */
     @Override
     public CompletableFuture<Integer> getServerForceLoadedCount() {
         // 26.1.2's ServerLevel does not expose a public getForcedChunks() accessor.
         // Since RTP uses non-persistent DistanceManager tickets (not setChunkForced),
         // the relevant count is the plugin's own active-ticket count tracked by
-        // RTPWorld#chunkTickets — mirrors V26_1_R1FabricRTPWorld pattern.
+        // RTPWorld#chunkTickets - mirrors V26_1_R1FabricRTPWorld pattern.
         return CompletableFuture.completedFuture((int) numForceLoaded());
     }
 
@@ -1296,12 +1296,12 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * {@link #getChunkAt(int, int)}; fall back to lazily wrapping a still-live
      * {@link ChunkAccess} from {@link #chunkCache} if the wrapper was GC'd
      * but the backing chunk wasn't. Returns {@code null} when neither tier
-     * has a live entry — every {@code rtp-core} caller already gates on a
+     * has a live entry - every {@code rtp-core} caller already gates on a
      * non-null result before invoking {@code isSafe} / {@code getBiome}.
      */
     @Override
     public RTPChunk<?> getCachedChunk(long key) {
-        // Live chunk takes precedence over any Anvil snapshot — once a real
+        // Live chunk takes precedence over any Anvil snapshot - once a real
         // chunk has been loaded, the live path is authoritative.
         WeakReference<FabricRTPChunkUnobf> rtpRef = rtpChunkCache.get(key);
         if (rtpRef != null) {
@@ -1358,7 +1358,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
 
     @Override
     public void forgetChunks() {
-        // Mirror BukkitRTPWorld#forgetChunks — drain the parent's ref-counted
+        // Mirror BukkitRTPWorld#forgetChunks - drain the parent's ref-counted
         // ticket map by issuing decrements until each count reaches zero, then
         // clear the local cache. The decrements route through setForceLoaded
         // which hops to the server thread per ticket, so this is safe to call
@@ -1394,7 +1394,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * <p>S-005 / threading: the dynamic biome registry read is generally safe
      * off the server thread (it's a read-only registry view), matching how
      * {@code Level#getBiome} behaves on Paper. If a future Mojang change makes
-     * this thread-unsafe, switch to a {@link MinecraftServer#submit} hop —
+     * this thread-unsafe, switch to a {@link MinecraftServer#submit} hop -
      * the cost is one tick of latency per biome lookup, acceptable on the
      * vert-adjustor / safety-check path.</p>
      *
@@ -1454,7 +1454,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     public void platform(RTPLocation location) {
         // Fabric platform-block writes require a server-thread hop and a
         // BlockState lookup that depends on Material → Block parity work
-        // (no MaterialRegistry on Fabric —
+        // (no MaterialRegistry on Fabric -
         // we'd need to parse the configured platform-material identifier
         // through BuiltInRegistries.BLOCK directly). Until then, the
         // platform sub-feature is a no-op: the safety pipeline's primary
@@ -1477,14 +1477,14 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         // Fabric's chunk system persists generated chunks via its own
         // dirty-tracking and the vanilla autosave path; the forced
         // World.save() that the Spigot adapter performs (to work around
-        // Bukkit autosave not flushing Chunky-generated chunks — see
+        // Bukkit autosave not flushing Chunky-generated chunks - see
         // docs/dev/LESSONS_LEARNED.md "Pre-Generation & Shutdown") is not
         // needed here.
     }
 
     @Override
     public int getMaxHeight() {
-        // LevelHeightAccessor#getMaxY() on MC 26.1.2 — inclusive max build Y
+        // LevelHeightAccessor#getMaxY() on MC 26.1.2 - inclusive max build Y
         // (renamed from getMaxBuildHeight in earlier mojmap mappings).
         try {
             return world.getMaxY();

@@ -52,7 +52,7 @@ class BukkitSchedulerImplTest {
 
     /**
      * When called from the primary thread, {@code runTask} must execute the
-     * runnable immediately and synchronously — no tick advance required.
+     * runnable immediately and synchronously - no tick advance required.
      * MockBukkit designates the test thread as the primary (main) thread.
      */
     @Test

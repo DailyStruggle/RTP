@@ -18,28 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-NET-015 (ADR-015): lobby-side cross-server waitlist UX.
- *
- * <p>REQ-RTP-NET-015 covers four pieces of behavior, each exercised by a nested
- * suite below:
- * <ol>
- *   <li>{@code WAITLISTED} is non-terminal for the command-lock predicate.</li>
- *   <li>{@link NetworkWaitlistGuard#formatMessage(NetworkStatusCache.QueueStatus)}
- *       renders the configured (placeholder) body with the player's current
- *       position when one is known, and a position-less variant otherwise.</li>
- *   <li>{@link NetworkWaitlistNotifier} dedupes identical bodies, re-notifies
- *       on body change (position move), re-notifies on interval elapse, and
- *       evicts cache-evicted UUIDs from its dedup table.</li>
- *   <li>{@link NetworkStatusCache.QueueStatus#nonTerminal()} returns the
- *       correct truth table.</li>
- * </ol>
- *
- * <p>The PlayerQuitEvent listener is exercised at the SPI boundary in
- * {@code NetworkWaitlistQuitListener} - it forwards to
- * {@code NetworkRequestQueue.cancel(uuid, PLAYER_DISCONNECT)}, which is
- * itself covered by the in-memory transport's own suite. No additional
- * Bukkit event-bus harness is set up here; the listener class is tiny and
- * the assertions below would only repeat that SPI contract.</p>
+ * REQ-RTP-NET-015: lobby-side cross-server waitlist UX tests.
+ * Exercises status non-terminal checks, message formatting, and notification deduplication.
  */
 @DisplayName("REQ-RTP-NET-015 lobby-side cross-server waitlist UX")
 class ReqRtpNet015NetworkWaitlistTest {

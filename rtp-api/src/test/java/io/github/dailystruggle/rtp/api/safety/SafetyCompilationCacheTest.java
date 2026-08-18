@@ -16,18 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link SafetyCompilationCache}.
- *
- * <p>Verifies the caching contract (ADR-017):</p>
- * <ul>
- *   <li>Same input set → same compiled result instance (memoization).</li>
- *   <li>Different input sets → different compiled instances.</li>
- *   <li>{@code null} / empty inputs short-circuit to {@link CompiledUnsafeSet#EMPTY}
- *       without touching the cache.</li>
- *   <li>Rejected tokens are surfaced to the caller-supplied sink exactly once per
- *       distinct key (REQ-RTP-S-004 "never silent" without log spam).</li>
- *   <li>A misbehaving sink does not break the pipeline.</li>
- * </ul>
+ * Unit tests for {@link SafetyCompilationCache} (ADR-017, REQ-RTP-S-004).
  */
 @DisplayName("REQ-RTP-S-001 / ADR-017 § SafetyCompilationCache")
 class SafetyCompilationCacheTest {
@@ -98,9 +87,9 @@ class SafetyCompilationCacheTest {
     mutable.add("FIRE");
 
     CompiledUnsafeSet first = SafetyCompilationCache.getOrCompile(mutable);
-    mutable.add("MAGMA_BLOCK"); // mutate post-compile — must not invalidate
+    mutable.add("MAGMA_BLOCK"); // mutate post-compile - must not invalidate
 
-    // Re-query with the original contents in a fresh collection — should still be the same instance.
+    // Re-query with the original contents in a fresh collection - should still be the same instance.
     CompiledUnsafeSet second = SafetyCompilationCache.getOrCompile(Arrays.asList("LAVA", "FIRE"));
     assertSame(first, second);
   }
@@ -116,7 +105,7 @@ class SafetyCompilationCacheTest {
     assertTrue(rejectionsAfterFirst >= 1,
         "At least one token must be rejected (bare '*' and unterminated bracket)");
 
-    // Second call with the same input — rejection sink must NOT fire again (cache hit).
+    // Second call with the same input - rejection sink must NOT fire again (cache hit).
     CompiledUnsafeSet second = SafetyCompilationCache.getOrCompile(input, seen::add);
     assertSame(first, second);
     assertEquals(rejectionsAfterFirst, seen.size(),

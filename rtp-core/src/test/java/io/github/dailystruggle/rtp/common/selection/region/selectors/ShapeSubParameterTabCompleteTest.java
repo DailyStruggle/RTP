@@ -18,19 +18,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Regression test for the V2 → V3 sub-parameter tab-completion regression.
- *
- * <p>In V2 typing {@code /rtp shape:square <TAB>} would reveal sub-parameters
- * such as {@code radius:}, {@code centerradius:}, {@code mode:}, etc. After the
- * V3 split between {@code rtp-core} (no Bukkit) and the platform adapters, the
- * static {@code subParameters} maps were emptied with the comment "moved to
- * platform-specific code or refactored" and never repopulated, so
- * {@link io.github.dailystruggle.rtp.common.commands.parameters.ShapeParameter#subParams(String)}
- * began returning empty maps and tab completion silently offered no hints.
- *
- * <p>This test pins the shape and vertical-adjustor curated sub-parameter sets
- * so the regression cannot reappear silently. The values themselves come from
- * V2 — see git history of this issue.
+ * Regression test for shape and vertical adjustor sub-parameter tab-completion,
+ * verifying parameter maps and suggestions on {@code ShapeParameter.subParams}.
  */
 public class ShapeSubParameterTabCompleteTest {
 

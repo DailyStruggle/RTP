@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Phase 2b skeleton coverage for {@link ProxyStatePublisher}:
+ * Unit coverage for {@link ProxyStatePublisher}:
  * payload assembly via the registered {@link RTPProxyAccessor}, kill-switch
  * default false (ADR-010), cadence start/stop idempotency, and routing into
  * the bound transport.

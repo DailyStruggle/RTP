@@ -8,22 +8,10 @@ import java.util.OptionalInt;
 
 /**
  * Platform-neutral adapter exposing an {@code rtp-anvil} {@link ColumnProbe} as
- * the {@link ChunkColumnProbe} consumed by {@code VerticalAdjustor.adjustFromProbe},
- * {@code PregenTask.evaluateProbe}, and {@code ScanTask.evaluateScanProbe}
- * (ADR-016 / BIOME_LOOKUP_PERF_PLAN).
+ * {@link ChunkColumnProbe} for off-tick pre-filtering (ADR-016).
  *
- * <p>Companion to {@code rtp-spigot-common}'s Material-based
- * {@code AnvilColumnProbeAdapter}. This variant has no {@code org.bukkit.Material}
- * enum to reconcile against, so the reconciler is the platform-neutral
- * {@link PaletteIdentifierNormalizer} (namespace-strip + upper-case) — exactly
- * the form {@code SafetyKeys.unsafeBlocks} entries are normalised into for
- * matching on non-Bukkit platforms. Modded ids round-trip unchanged beyond
- * namespace strip + case fold, matching the {@code isSafe(...)} comparison
- * shape of the string-based {@code RTPChunk} implementations.</p>
- *
- * <p>S-005: read-only, off-tick. The backing {@link ColumnProbe} retains
- * the entire decoded section palette, so per-Y lookups are O(1) palette-index
- * indexes — no chunk load, no main-thread work.</p>
+ * <p>Uses {@link PaletteIdentifierNormalizer} to upper-case and strip namespaces
+ * for non-Bukkit matching. S-005 compliant (no chunk loading or main-thread work).
  */
 public final class AnvilColumnProbeAdapter implements ChunkColumnProbe {
 
@@ -71,18 +59,8 @@ public final class AnvilColumnProbeAdapter implements ChunkColumnProbe {
   }
 
   /**
-   * Override the default {@link ChunkColumnProbe#isAirAt(int)} which compares
-   * the path segment case-sensitively against lowercase {@code "air"} /
-   * {@code "cave_air"} / {@code "void_air"}. {@link #blockAt(int)} above runs
-   * every identifier through {@link PaletteIdentifierNormalizer#normalize(String)},
-   * which folds the path to upper-case. Without this override, every air block
-   * would be reported as non-air and the adjustor would reject every candidate
-   * Y — routing 100% of probes back through the full live-load path (the same
-   * regression mode previously caught on Spigot — see ADR-016 §10 and the
-   * {@code AnvilColumnProbeAdapterIsAirAtTest} regression guard).
-   *
-   * <p>Tolerate both reconciled upper-case and the raw namespaced form so the
-   * override stays correct if a future change loosens the reconciler.</p>
+   * Overrides {@link ChunkColumnProbe#isAirAt(int)} to support upper-cased normalized identifiers.
+   * Tolerates both normalized upper-case and raw namespaced air variants.
    */
   @Override
   public boolean isAirAt(int y) {

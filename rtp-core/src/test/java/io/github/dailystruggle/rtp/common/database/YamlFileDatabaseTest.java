@@ -223,11 +223,11 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
         yf.set("x", 1);
         yf.save();
 
-        // First connect — loads the file
+        // First connect - loads the file
         db.connect();
         int sizeBefore = db.cachedLookup.get().size();
 
-        // Second connect — file unchanged, should use cache
+        // Second connect - file unchanged, should use cache
         db.connect();
         int sizeAfter = db.cachedLookup.get().size();
 

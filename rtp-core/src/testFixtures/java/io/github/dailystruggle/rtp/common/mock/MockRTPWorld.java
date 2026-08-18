@@ -44,14 +44,9 @@ public class MockRTPWorld extends RTPWorld<String> {
     public final AtomicInteger chunkAsyncLoadCount = new AtomicInteger();
 
     /**
-     * Test hook: when this predicate returns {@code true} for a given encoded chunk key,
-     * both {@link #getChunkAt(int,int)} and {@link #getChunkAtAsync(int,int)} complete
-     * their long-key future with {@code null}. This simulates the ADR-016
-     * Anvil pre-filter {@code REJECT} path on vanilla Spigot (where
-     * {@code BukkitRTPWorld.getChunkAt} completes with {@code null} by design) and lets
-     * the REQ-RTP-S-004 nullChunk attribution tests exercise
-     * {@link io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes#nullChunk}.
-     * Default: never returns null.
+     * Test hook: when predicate returns {@code true} for an encoded key,
+     * {@link #getChunkAt} and {@link #getChunkAtAsync} complete with {@code null}.
+     * Simulates Anvil prefilter REJECT (ADR-016) and tests nullChunk attribution (S-004).
      */
     public volatile LongPredicate nullChunkKeyPredicate = key -> false;
 
@@ -81,7 +76,10 @@ public class MockRTPWorld extends RTPWorld<String> {
         return ((long) cx << 32) | (cz & 0xFFFFFFFFL);
     }
 
-    /** Returns a future that completes immediately with the encoded chunk key, or {@code null} if {@link #nullChunkKeyPredicate} signals rejection. */
+    /**
+     * Returns future completing immediately with encoded key, or {@code null}
+     * if {@link #nullChunkKeyPredicate} matches.
+     */
     @Override
     public CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ) {
         long key = encodeKey(chunkX, chunkZ);
@@ -92,15 +90,8 @@ public class MockRTPWorld extends RTPWorld<String> {
     }
 
     /**
-     * Returns a {@link ChunkSet} whose {@code complete} future and every chunk future
-     * resolve immediately and synchronously.
-     *
-     * <p>The single entry in the {@code chunks} list is pre-completed with the encoded
-     * chunk key so that {@link #getCachedChunk(long)} can reconstruct a
-     * {@link MockRTPChunk} with the correct chunk coordinates.  {@code allOf} on that
-     * already-completed future fires the compact-constructor's {@code whenComplete}
-     * callback synchronously, completing the {@code complete} future to {@code true}
-     * before this method returns.
+     * Returns a {@link ChunkSet} whose chunk futures resolve synchronously.
+     * Passes the encoded key or {@code null} per {@link #nullChunkKeyPredicate}.
      */
     @Override
     public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
@@ -133,7 +124,7 @@ public class MockRTPWorld extends RTPWorld<String> {
 
     @Override
     protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
-        // no-op in tests — synchronous apply, completed future.
+        // no-op in tests - synchronous apply, completed future.
         return CompletableFuture.completedFuture(null);
     }
 
@@ -182,7 +173,7 @@ public class MockRTPWorld extends RTPWorld<String> {
 
     @Override
     public void platform(RTPLocation location) {
-        // no-op in tests — no platform to apply
+        // no-op in tests - no platform to apply
     }
 
     /**

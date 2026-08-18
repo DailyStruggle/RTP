@@ -11,21 +11,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 /**
- * Default {@link io.github.dailystruggle.metrics.api.Metrics} implementation that combines a platform-supplied
- * {@link io.github.dailystruggle.metrics.api.MetricsBinding} with core-readable fields (queue depth, memory tracker,
- * heap, pipeline histogram).
- *
- * <p>This class is intentionally platform-agnostic &mdash; the only platform-specific
- * fields go through the injected {@link io.github.dailystruggle.metrics.api.MetricsBinding}. No {@code org.bukkit.*} or
- * other platform imports may appear here (S-005 spirit; ArchUnit core-package guard).
- *
- * <p>Lifecycle: a single {@link CoreMetrics} instance is owned by the {@code RTP}
- * facade. Platform adapters install their {@link io.github.dailystruggle.metrics.api.MetricsBinding} via
- * {@link #setBinding(io.github.dailystruggle.metrics.api.MetricsBinding)} during plugin/mod startup; the default is
- * {@link io.github.dailystruggle.metrics.api.MetricsBinding#NOOP}.
- *
- * <p>Per {@code METRICS_PLAN.md > Goals}: snapshot-not-stream, no tick-thread blocking.
- * All reads here are O(R) where R is the count of configured regions.
+ * Platform-neutral {@link io.github.dailystruggle.metrics.api.Metrics} implementation (ADR-053).
+ * Aggregates core telemetry (queue depth, memory tracker, heap, pipeline histogram)
+ * with platform-provided {@link io.github.dailystruggle.metrics.api.MetricsBinding}.
  */
 public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Metrics {
 
@@ -53,9 +41,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
      */
     public void setBinding(io.github.dailystruggle.metrics.api.MetricsBinding binding) {
         this.binding = (binding == null) ? io.github.dailystruggle.metrics.api.MetricsBinding.NOOP : binding;
-        // Phase C (metrics-api §1.1): mirror into the cross-plugin static registry
-        // so sibling plugins observing Metrics.currentBinding() see the live RTP
-        // binding without owning this CoreMetrics instance.
+        // Mirror into the cross-plugin static registry so sibling plugins
+        // observing Metrics.currentBinding() see the live RTP binding without owning this CoreMetrics instance.
         io.github.dailystruggle.metrics.api.Metrics.registerBinding(this.binding);
     }
 
@@ -132,14 +119,10 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     }
 
     /**
-     * Audits a completed <em>immediate/unqueued</em> teleport (ADR-053 §2a, REQ-RTP-OBS-005).
-     * Queued at-rate teleports must not call this method &mdash; their elapsed window includes
-     * queue-wait time and would false-positive. When the audit is enabled
-     * ({@code slowPipelineThresholdMs > 0}) and {@code elapsedMs} exceeds it, increments the
-     * cumulative slow-teleport counter and emits a {@code WARN} log. Never throws.
+     * Audits an unqueued teleport latency against {@code slowPipelineThresholdMs} (ADR-053, REQ-RTP-OBS-005).
      *
-     * @param elapsedMs the recorded pipeline latency in milliseconds
-     * @param context   short human-readable identifier (player/region) for the log line
+     * @param elapsedMs recorded pipeline latency in ms
+     * @param context   identifier for logging
      */
     public void auditImmediateTeleport(long elapsedMs, String context) {
         try {
@@ -206,8 +189,6 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
         io.github.dailystruggle.metrics.api.MetricsBinding b = this.binding;
         int queueDepth = computeQueueDepth();
         int memoryTrackerEntries = MemoryTracker.trackedCount();
-        // Phase M0: best-effort attribution. TeleportPipelineTask wrapping in M1
-        // will yield a more accurate count via a dedicated label.
         int pendingTeleports = MemoryTracker.trackedCountByLabel("TeleportPipelineTask");
 
         double avgPipelineMs = pipelineHistogram.mean();
@@ -233,10 +214,9 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
                 System.currentTimeMillis(),
                 b.foliaRegions()
         );
-        // Phase B: attach RTP-specific extension carrying the same values as the
-        // legacy public-final fields. Sibling plugins consuming the future
-        // metrics-api module read host-runtime fields directly; RTP-specific
-        // counters live on this extension. See metrics-api-ADR-001 (docs/adr/).
+        // Attach RTP-specific extension carrying RTP metric values. Sibling plugins
+        // consuming metrics-api read host-runtime fields directly; RTP-specific
+        // counters live on this extension (see metrics-api-ADR-001).
         snap = snap.withExtension(new RTPMetricsExtension(
                 queueDepth,
                 pendingTeleports,
@@ -249,9 +229,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
                 queueGrowthCount,
                 queueGrowthThreshold
         ));
-        // Phase C (metrics-api §1.1): compose sibling-plugin extensions registered
-        // via Metrics.registerExtension(...). Suppliers are evaluated in registration
-        // order; nulls are skipped; failures are swallowed so snapshot() never throws.
+        // Compose sibling-plugin extensions registered via Metrics.registerExtension(...).
+        // Suppliers are evaluated in registration order; nulls are skipped; failures are swallowed.
         for (java.util.function.Supplier<? extends io.github.dailystruggle.metrics.api.MetricsExtension<?>> sup :
                 io.github.dailystruggle.metrics.api.Metrics.registeredExtensions()) {
             try {

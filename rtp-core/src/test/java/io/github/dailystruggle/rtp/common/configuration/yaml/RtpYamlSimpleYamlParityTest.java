@@ -16,17 +16,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Focused parity-surface tests for the simpleyaml → in-house
- * YAML substrate migration (see {@code docs/dev/scratch/CHECKLIST-simpleyaml-migration.md}
- * and ADR-025).
- *
- * <p>These tests pin the simpleyaml-compatible API shapes used by production
- * call sites (ConfigParser, MultiConfigParser, YamlFileDatabase, command code,
- * etc.) so that Sessions 2 and 3 can be pure mechanical type swaps. The
- * substrate's deeper read/write/comment behavior is already covered by the
- * pre-existing yaml-package tests (golden file, deep-keys parity, comment
- * round-trip, write behavior); this class only exercises the parity surface
- * itself.</p>
+ * Parity-surface tests for simpleyaml to in-house YAML substrate migration (ADR-025).
+ * Pins API compatibility shapes across typed getters, predicates, and mutation methods.
  */
 class RtpYamlSimpleYamlParityTest {
 

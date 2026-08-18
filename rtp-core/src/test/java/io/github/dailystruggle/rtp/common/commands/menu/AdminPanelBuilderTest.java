@@ -29,28 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * PROPOSAL-admin-panel.md v2 tests for {@link AdminPanelBuilder} - the curated
- * admin-panel page reached from the front page's single {@code Admin panel}
- * entry row.
- *
- * <p>Covers:
- * <ul>
- *   <li>Section ordering: Configuration -> Diagnostics -> Lifecycle -> Browse,
- *       with the back row at the bottom.</li>
- *   <li>Per-row self-hide: every row drops silently when its underlying
- *       subcommand is missing or the viewer lacks the row's permission.</li>
- *   <li>Section-divider auto-suppression: a section whose body is entirely
- *       hidden produces no divider line (no orphan "Lifecycle" header with
- *       zero rows under it).</li>
- *   <li>Back row emits {@link MenuAction.OpenFrontPage}, not
- *       {@link MenuAction.OpenMenu} with an empty path.</li>
- *   <li>{@code Browse all commands} row is always present and emits
- *       {@link MenuAction.OpenMenu} with an empty path.</li>
- *   <li>Reload row carries a non-null warning hover.</li>
- * </ul>
- *
- * Traceability: PROPOSAL-admin-panel.md v2, REQ-RTP-F-013 (all labels
- * configurable).
+ * Tests for {@link AdminPanelBuilder} curated admin-panel page.
+ * Traceability: REQ-RTP-F-013 (all labels configurable).
  */
 final class AdminPanelBuilderTest {
 
@@ -80,16 +60,15 @@ final class AdminPanelBuilderTest {
         // Configuration
         assertNotNull(findOpenConfigSelector(model),
                 "Config row must appear when /rtp config is registered and viewer has rtp.config.view");
-        // CHECKLIST-multiconfig-menu: Regions / Worlds rows live on the
-        // config selector page, not the admin panel.
+        // Regions / Worlds rows live on the config selector page, not the
+        // admin panel.
         assertNull(findOpenMultiConfigSelector(model, "regions"),
                 "Regions submenu row must NOT appear on the admin panel");
         assertNull(findOpenMultiConfigSelector(model, "worlds"),
                 "Worlds submenu row must NOT appear on the admin panel");
 
-        // Diagnostics: per PROPOSAL-info-as-book.md section 4.6, the info
-        // row now opens the curated info book via OpenInfo(global) rather
-        // than synthesising a RunRtpCommand(["info"]).
+        // Diagnostics: the info row opens the curated info book via
+        // OpenInfo(global) rather than synthesising a RunRtpCommand(["info"]).
         assertNotNull(findOpenInfoGlobal(model),
                 "Server info row must appear and open the info book");
         assertNotNull(findRunWithArgs(model, "test", "full"),
@@ -345,7 +324,7 @@ final class AdminPanelBuilderTest {
     }
 
     // ------------------------------------------------------------------------
-    // Setup section (PROPOSAL-admin-panel-prefabs.md v3.1)
+    // Setup section
     // ------------------------------------------------------------------------
 
     @Test
@@ -356,15 +335,7 @@ final class AdminPanelBuilderTest {
         MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
-        // The Setup section is a single entry-point row that opens the
-        // prefab `id` parameter picker directly (server-resolved by
-        // MenuRedeemSubcommand, rendering one clickable row per value
-        // from PrefabIdParameter.values()), giving the operator the
-        // clickable prefab-selection book menu without flooding the
-        // admin panel page itself with per-prefab rows. The chat-list
-        // dispatch, the one-row-per-prefab inline layout, and the
-        // intermediate OpenMenu({admin,prefab}) subcommand-list page
-        // are all prior regressions.
+        // Setup section: single entry row opening prefab id parameter picker.
         assertNotNull(
                 findOpenParamPicker(model, "id", "admin", "prefab", "apply"),
                 "Setup section must emit an OpenParamPicker({admin,prefab,apply}, id) row");
@@ -433,10 +404,9 @@ final class AdminPanelBuilderTest {
     }
 
     /**
-     * CHECKLIST-multiconfig-menu step 10: locates an
-     * {@link MenuAction.OpenMultiConfigSelector} row whose {@code parserKind}
-     * matches the requested string (case-sensitive on the wire; kind is
-     * normalised to lower-case at construction).
+     * Locates an {@link MenuAction.OpenMultiConfigSelector} row whose
+     * {@code parserKind} matches the requested string (case-sensitive on the
+     * wire; kind is normalised to lower-case at construction).
      */
     private static MenuAction findOpenMultiConfigSelector(MenuModel model, String parserKind) {
         for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
@@ -453,9 +423,8 @@ final class AdminPanelBuilderTest {
     }
 
     /**
-     * PROPOSAL-info-as-book.md section 4.6: the admin-panel info row emits
-     * an {@link MenuAction.OpenInfo} with the {@code GLOBAL} scope instead of
-     * the legacy {@code RunRtpCommand(["info"])}.
+     * The admin-panel info row emits an {@link MenuAction.OpenInfo} with the
+     * {@code GLOBAL} scope instead of the legacy {@code RunRtpCommand(["info"])}.
      */
     private static MenuAction findOpenInfoGlobal(MenuModel model) {
         for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {

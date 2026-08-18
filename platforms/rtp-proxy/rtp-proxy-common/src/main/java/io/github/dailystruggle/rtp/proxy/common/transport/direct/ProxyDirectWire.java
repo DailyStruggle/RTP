@@ -14,7 +14,7 @@ import java.util.UUID;
 
 /**
  * Shared wire protocol for the {@code proxy-direct} transport tier
- * (rtp-proxy-ADR-017, refined by PROPOSAL-proxy-direct-as-remote-store).
+ * (rtp-proxy-ADR-017).
  *
  * <p>A backend opens its OWN short-lived outbound TCP connection to the proxy
  * companion - it does not ride a player's Minecraft plugin-message session - so

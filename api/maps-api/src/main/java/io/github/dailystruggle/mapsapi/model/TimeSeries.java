@@ -4,8 +4,8 @@ import java.util.Objects;
 
 /**
  * Equally-spaced time-series samples for a single metric. Used by the
- * {@code SparklineRenderer} (Stage 4) for TPS / MSPT / pipeline-latency
- * traces sourced from {@code METRICS_PLAN.md}.
+ * {@code SparklineRenderer} for TPS / MSPT / pipeline-latency
+ * traces.
  *
  * <p>The constructor defensively copies {@code samples} so the caller may
  * mutate the supplied array after construction (REQ-RTP-MAP-002).
@@ -31,7 +31,7 @@ public record TimeSeries(String label, double[] samples, double yMin, double yMa
         samples = samples.clone();
     }
 
-    /** Defensive accessor — returns a clone of the internal sample array. */
+    /** Defensive accessor - returns a clone of the internal sample array. */
     @Override
     public double[] samples() {
         return samples.clone();

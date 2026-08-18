@@ -41,11 +41,11 @@ import java.util.logging.Level;
  *
  * <p><b>First-join detection.</b> Probes the on-disk
  * {@code <world>/playerdata/<uuid>.dat} file under
- * {@link MinecraftServer#getWorldPath(LevelResource)} — Vanilla writes this on
+ * {@link MinecraftServer#getWorldPath(LevelResource)} - Vanilla writes this on
  * first save after a player joins, so its absence at JOIN time is a reliable
  * "first join" signal.</p>
  *
- * <p><b>S-005 compliance.</b> This method does no chunk I/O — it dispatches a
+ * <p><b>S-005 compliance.</b> This method does no chunk I/O - it dispatches a
  * {@code TeleportPipelineTask} via {@code RTP.scheduler.runTaskAsynchronously};
  * all chunk-touching work happens off the server thread inside the pipeline.</p>
  *
@@ -179,7 +179,7 @@ public final class NeoForgeOnEventTeleports {
 
     /**
      * NeoForge analogue of Bukkit's {@code Player#hasPlayedBefore()}. Probes
-     * {@code <world-root>/playerdata/<uuid>.dat} — Vanilla writes this file on
+     * {@code <world-root>/playerdata/<uuid>.dat} - Vanilla writes this file on
      * the first auto-save after a player joins, so its absence at JOIN time
      * means "fresh UUID, never seen before".
      */

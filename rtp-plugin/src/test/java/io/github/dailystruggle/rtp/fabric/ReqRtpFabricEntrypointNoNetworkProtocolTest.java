@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>This test scans the compiled {@code RTPFabricMod.class} constant pool
  * (UTF-8 entries) for any reference to forbidden NM packages. We use a
  * raw byte-substring search rather than ASM to avoid pulling a new test
- * dependency — the constant pool stores type names as plain UTF-8.
+ * dependency - the constant pool stores type names as plain UTF-8.
  *
  * <p>Allowed: {@code net.minecraft.commands.CommandSourceStack} and
  * {@code net.minecraft.server.level.ServerPlayer} are used by the private
@@ -101,7 +101,7 @@ public class ReqRtpFabricEntrypointNoNetworkProtocolTest {
         for (Path p : candidates) {
             if (Files.isRegularFile(p)) return p;
         }
-        // Fallback — return the first candidate so the assertion failure
+        // Fallback - return the first candidate so the assertion failure
         // message points at the expected Gradle location.
         return candidates[0];
     }

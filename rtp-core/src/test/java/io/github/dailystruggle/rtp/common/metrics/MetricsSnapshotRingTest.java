@@ -11,14 +11,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for {@link MetricsSnapshotRing}, the rolling MSPT + heap
- * time-series that feeds the {@code METRIC_SPARKLINE} chart kind.
- *
- * <p>Focus: the Folia MSPT aggregation contract. The ring records the host
- * scalar {@code snapshot.mspt} (which the platform binding has already
- * aggregated per the configurable {@code foliaAggregationMspt} mode), so the
- * sparkline stays consistent with every other MSPT surface. The per-region
- * {@code max} derivation is only a fallback for an unsampled host scalar.
+ * Unit tests for {@link MetricsSnapshotRing} rolling MSPT and heap time-series.
+ * Verifies Folia MSPT aggregation and per-region fallbacks.
  */
 class MetricsSnapshotRingTest {
 

@@ -8,37 +8,9 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Pure-function applier: given the current parsed YAML trees of the affected
- * config files and a {@link Prefab}, returns the new trees plus a per-file
- * diff suitable for both the confirmation menu and the audit log.
- *
- * <p>No disk I/O lives here; the on-disk write happens in session 4
- * ({@code PrefabCommand.confirm}). All input maps are treated as read-only;
- * the returned trees are fresh {@link LinkedHashMap} copies safe for the
- * caller to mutate or serialise.
- *
- * <p><strong>Merge semantics</strong> (locked by {@code PROPOSAL} §3.1):
- * <ul>
- *   <li>Keys present in the overlay overwrite the matching key in the base.</li>
- *   <li>Keys absent from the overlay are preserved untouched.</li>
- *   <li>If both the overlay value and the base value are {@link Map}s, the
- *       merge recurses into them.</li>
- *   <li>{@link List}s and any other non-map values are replaced wholesale -
- *       no element-wise merging.</li>
- * </ul>
- *
- * <p><strong>File-key convention</strong> for {@code currentTrees}: top-level
- * keys are file ids - {@code "performance"} for {@code performance.yml} and
- * {@code "regions/<regionId>"} for each {@code regions/<regionId>.yml}.
- * {@link #apply} synthesises any region file id present in
- * {@link Prefab#regionOverlays()} but missing from {@code currentTrees}
- * (a new-region prefab) by treating the base as an empty map; the regional
- * overlay is then responsible for carrying the complete required shape.
- *
- * <p>Per the locked design decision (2026-05-20), <strong>no</strong> prefab
- * overlay touches {@code backlogCacheCap}. {@code PrefabRegistryTest} guards
- * this at the registry level, and {@code PrefabApplierTest} re-asserts it
- * survives the merge.
+ * Pure-function applier that merges a {@link Prefab} into current parsed YAML trees
+ * and produces the updated trees alongside a per-file diff.
+ * Inputs are treated as read-only; maps are deep-copied.
  */
 public final class PrefabApplier {
 
@@ -133,21 +105,8 @@ public final class PrefabApplier {
     }
 
     /**
-     * Overload that wires {@link MultiWorldExpander} in front of the merge.
-     * For prefabs with {@link Prefab#expandPerWorld()} {@code false} this is
-     * equivalent to {@link #apply(Map, Prefab)} (the {@code worldNames}
-     * argument is ignored). For prefabs with the flag set (in v1, only
-     * {@code MultiWorld.INSTANCE}), the expander synthesises a per-world
-     * region overlay from the {@code regions/default} tree, the resulting
-     * effective prefab is built with {@code expandPerWorld = false}, and the
-     * merge proceeds normally.
-     *
-     * @param currentTrees parsed YAML trees keyed by file id; see
-     *                     {@link #apply(Map, Prefab)}.
-     * @param prefab       the prefab to apply.
-     * @param worldNames   names of currently enabled worlds; ignored when
-     *                     {@code prefab.expandPerWorld()} is {@code false}.
-     * @return merged trees + per-file diff.
+     * Overload wiring {@link MultiWorldExpander} before merging.
+     * For prefabs with {@code expandPerWorld = true}, synthesises per-world region overlays.
      */
     public static Result apply(
             Map<String, Map<String, Object>> currentTrees,
@@ -158,16 +117,8 @@ public final class PrefabApplier {
     }
 
     /**
-     * Variant of {@link #apply(Map, Prefab, List)} that threads a
-     * {@link MultiWorldExpander.RegionOverlayAmender} into the per-world
-     * expansion so each synthesised region overlay can be repaired for its
-     * destination world's dimension <em>before</em> the merge/diff is
-     * computed. This keeps the preview diff consistent with what the confirm
-     * step writes. A {@code null} amender behaves exactly like the 3-arg
-     * overload.
-     *
-     * @param amender invoked on each freshly-synthesised overlay; may be
-     *                {@code null}.
+     * Variant of {@link #apply(Map, Prefab, List)} accepting an optional
+     * {@link MultiWorldExpander.RegionOverlayAmender} for per-world dimension adjustments.
      */
     public static Result apply(
             Map<String, Map<String, Object>> currentTrees,

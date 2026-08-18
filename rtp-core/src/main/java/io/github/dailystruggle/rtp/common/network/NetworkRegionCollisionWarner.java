@@ -18,7 +18,7 @@ import java.util.logging.Level;
  * the snapshot for region-name overlap across backends and logs one WARN
  * per overlap. {@code network.regionCollisionPolicy: warn} is the only
  * value; the {@code rename-local} and {@code reject-startup}
- * policies are deferred follow-ups (see Out-of-Scope in the checklist).
+ * policies are deferred follow-ups.
  */
 public final class NetworkRegionCollisionWarner {
 

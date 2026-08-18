@@ -22,15 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Injection-focused regression tests for the regex token expansion in
- * {@link TreeCommand}. Each test pins a specific abuse vector so that future
- * refactors of {@code expandRegexToken} or the surrounding {@code onCommand}
- * pipeline cannot silently widen the security envelope.
- *
- * <p>Security invariant under test: regex expansion must never surface a value
- * that {@code CommandParameter.isRelevant(callerId, v) == false}. This is the
- * same guarantee tab completion already provides via
- * {@link CommandParameter#relevantValues(UUID)}.
+ * Regression tests for regex token expansion security in {@link TreeCommand}.
+ * Verifies that expansions cannot bypass {@code CommandParameter#isRelevant}.
  */
 public class RegexParameterSecurityTest {
 
@@ -380,19 +373,18 @@ public class RegexParameterSecurityTest {
                 setOf("Mallory"),
                 (u, s) -> !s.equals("Mallory"));
 
-        // Build a token that LOOKS like a regex but is malformed AND happens
-        // to equal a hidden literal.
-        String evil = "reg:Mallory[";  // PatternSyntaxException -> falls back to literal "reg:Mallory["
+        // PatternSyntaxException -> falls back to literal
+        String evil = "reg:Mallory[";
 
         // Direct expansion just emits the literal token (security boundary is
         // upstream/downstream; expandRegexToken does not consult isRelevant
-        // for literal tokens — that's the caller's job and is verified by the
+        // for literal tokens - that's the caller's job and is verified by the
         // pipeline test below).
         List<String> raw = TreeCommand.expandRegexToken(evil, p, UUID.randomUUID())
                 .collect(Collectors.toList());
         assertEquals(List.of("reg:Mallory["), raw);
 
-        // Pipeline-shape test: flatMap then isRelevant — Mallory must not appear.
+        // Pipeline-shape test: flatMap then isRelevant - Mallory must not appear.
         UUID caller = UUID.randomUUID();
         Set<String> filtered = Stream.of(evil)
                 .flatMap(t -> TreeCommand.expandRegexToken(t, p, caller))

@@ -1,16 +1,9 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 /**
- * Extends {@link Runnable} with a scheduler-facing delay contract.
+ * Extends {@link Runnable} with a scheduler-facing delay in server ticks.
  *
- * <p>The delay value is a hint to the scheduler indicating how many server ticks
- * should elapse before the task is first dispatched. A value of {@code 0} means
- * the task should be run as soon as possible on the next available scheduling
- * opportunity.
- *
- * <p><b>Thread safety:</b> Implementations must allow {@link #getDelay()} and
- * {@link #setDelay(long)} to be called from any thread. Changing the delay after
- * the task has already been submitted to a scheduler has no effect.
+ * <p>Thread safety: {@link #getDelay()} and {@link #setDelay(long)} are safe from any thread.
  *
  * @see RTPRunnable
  */
@@ -24,13 +17,9 @@ public interface RTPDelayable extends Runnable {
   long getDelay();
 
   /**
-   * Sets the number of server ticks the scheduler should wait before executing
-   * this task.
+   * Sets server ticks to wait before executing task.
    *
-   * <p>Must be called before submitting the task to a scheduler; changes after
-   * submission are silently ignored.
-   *
-   * @param delay delay in ticks; must be &ge; 0
+   * @param delay delay in ticks; must be >= 0
    */
   void setDelay(long delay);
 }

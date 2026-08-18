@@ -12,27 +12,9 @@ import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 /**
- * Decides whether one {@code /rtp} invocation is served locally or routed
- * across the network. Pure-function entry: {@link #route(UUID, String)} reads
- * injected suppliers and produces a {@link RoutingDecision}; the caller acts.
- *
- * <p>Cross-server routing logic (rtp-proxy-ADR-014).
- * Decision matrix (PROPOSAL §3, locked D2/D6):</p>
- *
- * <ol>
- *   <li>If network is disabled or no snapshot is available -&gt; {@link RoutingDecision.Local}.</li>
- *   <li>{@code routing.mode = local} -&gt; {@link RoutingDecision.Local} (D2 default).</li>
- *   <li>Implicit local-first (D6 A): if local backend hosts {@code regionKey}
- *       and local {@code keptCount &gt; 0} and the user did not pin a
- *       {@code serverHint} -&gt; {@link RoutingDecision.Local}.</li>
- *   <li>{@code routing.mode = cross-server} or {@code auto} with no local
- *       option: enrol unless one of the {@link RoutingDecision.FallbackReason}
- *       gates rejects (queue full, token bucket exhausted, region unavailable,
- *       no live peer) -&gt; {@link RoutingDecision.LocalFallback}.</li>
- * </ol>
- *
- * <p>S-004: every degraded path returns a typed reason so the caller writes
- * a terminal status / message - never a silent return.</p>
+ * Decides whether {@code /rtp} is served locally or routed across the network (rtp-proxy-ADR-014).
+ * Reads snapshot state and produces a typed {@link RoutingDecision}.
+ * S-004: degraded paths return typed reasons for terminal feedback.
  */
 public final class NetworkRouter {
 

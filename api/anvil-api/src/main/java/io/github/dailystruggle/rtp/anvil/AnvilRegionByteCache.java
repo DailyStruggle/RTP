@@ -10,33 +10,31 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * BIOME_LOOKUP_PERF_PLAN.md PR-10 — tiny LRU cache of raw {@code r.X.Z.mca} region-file
- * bytes keyed by absolute file path.
+ * Tiny LRU cache of raw {@code r.X.Z.mca} region-file bytes keyed by absolute file path.
  *
  * <p>Rationale: ScanTask's in-flight probes (up to {@code Semaphore(50)} per region) all
  * hit the same {@code r.X.Z.mca} sequentially. Without this cache, each probe calls
- * {@link Files#readAllBytes(Path)} independently — 50 × 2–8 MB allocations + syscalls
+ * {@link Files#readAllBytes(Path)} independently - 50 × 2-8 MB allocations + syscalls
  * for a file that changes at most on chunk-save. Caching the bytes collapses 1024
  * sibling-chunk probes into a single disk read.</p>
  *
  * <p>Staleness: each entry records {@code lastModified} at read time; {@link #get(Path)}
- * re-reads when the on-disk mtime advances. No listener — the server's chunk-save cadence
+ * re-reads when the on-disk mtime advances. No listener - the server's chunk-save cadence
  * (~every 30s by default) is coarse enough that stat-on-every-get is cheap relative to
  * the read it saves.</p>
  *
  * <p>Thread-safety: all operations go through a {@code synchronized} block on the
  * underlying {@link LinkedHashMap}. Contention on a 4-entry map is negligible compared
- * to the ~1–2ms of downstream inflate+parse each caller does. Two concurrent misses for
+ * to the ~1-2ms of downstream inflate+parse each caller does. Two concurrent misses for
  * the same region each read the file once (first-write-wins); acceptable waste vs the
  * complexity of a per-key loading future.</p>
  */
 public final class AnvilRegionByteCache {
 
   /**
-   * Max distinct region files retained simultaneously. PR-11 measurement showed a 4-entry cache
-   * hit rate of only ~0.31 under ScanTask's 50-in-flight workload — the scan frontier routinely
-   * spans 6–10 region files concurrently, thrashing a 4-entry LRU. Bumped to 16 in PR-12 to cover
-   * the working set with headroom; steady-state memory ~64 MB (16 × ~4 MB avg per {@code .mca}).
+   * Max distinct region files retained simultaneously. Scan frontier routinely spans
+   * 6-10 region files concurrently; capacity 16 covers the working set with headroom;
+   * steady-state memory ~64 MB (16 × ~4 MB avg per {@code .mca}).
    */
   private static final int CAPACITY = 16;
 
@@ -59,7 +57,7 @@ public final class AnvilRegionByteCache {
   private static final AtomicLong MISSES = new AtomicLong();
   private static final AtomicLong STALE = new AtomicLong();
   private static final AtomicLong COALESCED = new AtomicLong();
-  /** PR-16 diagnostic: cumulative {@code Files.readAllBytes} wall time for cold misses. */
+  /** Diagnostic: cumulative {@code Files.readAllBytes} wall time for cold misses. */
   private static final AtomicLong COLD_READ_NANOS = new AtomicLong();
 
   /**
@@ -69,11 +67,9 @@ public final class AnvilRegionByteCache {
    *
    * <p>The returned array is shared with other callers and must not be mutated.</p>
    *
-   * <p>PR-15: concurrent misses for the same region file are coalesced — the first miss
+   * <p>Concurrent misses for the same region file are coalesced: the first miss
    * reads disk, all concurrent followers await the same {@code CompletableFuture} and
-   * receive the same {@code byte[]}. Prior behavior let 50 concurrent ScanTask probes each
-   * {@code Files.readAllBytes} the same 4 MB file in parallel, making the LRU's hit rate
-   * meaningless on fresh bins.</p>
+   * receive the same {@code byte[]}.</p>
    */
   public static byte[] get(Path regionFile) {
     if (regionFile == null) return null;
@@ -137,7 +133,7 @@ public final class AnvilRegionByteCache {
     }
   }
 
-  /** Snapshot of hit/miss/stale/coalesced/coldReadNanos counters. PR-11 + PR-16 diagnostic. */
+  /** Snapshot of hit/miss/stale/coalesced/coldReadNanos counters. Diagnostic metrics. */
   public record Stats(long hits, long misses, long stale, long coalesced, long coldReadNanos) {
     public long total() { return hits + misses + coalesced; }
     public double hitRate() { return total() == 0 ? 0.0 : (double) (hits + coalesced) / (double) total(); }

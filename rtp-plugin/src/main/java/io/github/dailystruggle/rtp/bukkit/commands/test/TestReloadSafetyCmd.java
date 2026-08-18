@@ -118,7 +118,7 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
             // RTP.configs.reload() is itself safe to call from the async
             // scheduler; it schedules its own sync completion work via
             // miscSyncTasks. A `false` return value means at least one
-            // parser failed to reload — that is a real S-004 signal.
+            // parser failed to reload - that is a real S-004 signal.
             boolean ok = RTP.configs.reload();
             if (ok) {
               reloadsOk.incrementAndGet();

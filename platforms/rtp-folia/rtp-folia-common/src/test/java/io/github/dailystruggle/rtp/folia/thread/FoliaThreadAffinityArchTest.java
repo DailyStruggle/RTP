@@ -25,9 +25,9 @@ import org.junit.jupiter.api.Test;
  * <h2>Systems engineering framing</h2>
  * Think of each thread context as a hardware memory-protection ring:
  * <ul>
- *   <li>{@code @RegionThread} — Ring 3 (user space, spatially isolated per chunk region)</li>
- *   <li>{@code @AsyncThread} — Ring 1 (I/O driver space; economy/Vault, database)</li>
- *   <li>{@code @GlobalRegionThread} — Ring 0 (kernel space; global server state)</li>
+ *   <li>{@code @RegionThread} - Ring 3 (user space, spatially isolated per chunk region)</li>
+ *   <li>{@code @AsyncThread} - Ring 1 (I/O driver space; economy/Vault, database)</li>
+ *   <li>{@code @GlobalRegionThread} - Ring 0 (kernel space; global server state)</li>
  * </ul>
  * A Ring-3 process cannot directly invoke a Ring-1 or Ring-0 routine; it must issue a
  * syscall (submit a lambda to the appropriate Folia scheduler). ArchUnit enforces this by
@@ -45,7 +45,7 @@ class FoliaThreadAffinityArchTest {
     }
 
     // -----------------------------------------------------------------------
-    // Rule 1 — Economy / Vault isolation
+    // Rule 1 - Economy / Vault isolation
     // @RegionThread classes must not import or reference Vault Economy classes.
     // Vault's net.milkbowl.vault.economy package is the "Ring-1 I/O driver space";
     // direct access from a region thread bypasses the async scheduler bridge.
@@ -68,7 +68,7 @@ class FoliaThreadAffinityArchTest {
     }
 
     // -----------------------------------------------------------------------
-    // Rule 2 — @RegionThread methods must not call @AsyncThread methods directly.
+    // Rule 2 - @RegionThread methods must not call @AsyncThread methods directly.
     // The only legal crossing is via a scheduler-bridge lambda.
     // -----------------------------------------------------------------------
 
@@ -93,7 +93,7 @@ class FoliaThreadAffinityArchTest {
     }
 
     // -----------------------------------------------------------------------
-    // Rule 3 — @RegionThread methods must not call @GlobalRegionThread methods directly.
+    // Rule 3 - @RegionThread methods must not call @GlobalRegionThread methods directly.
     // -----------------------------------------------------------------------
 
     @Test
@@ -117,7 +117,7 @@ class FoliaThreadAffinityArchTest {
     }
 
     // -----------------------------------------------------------------------
-    // Rule 4 — @AsyncThread methods must not depend on Folia RegionScheduler directly.
+    // Rule 4 - @AsyncThread methods must not depend on Folia RegionScheduler directly.
     // Economy/Vault code running on the async pool must not attempt to acquire a region lock.
     // -----------------------------------------------------------------------
 

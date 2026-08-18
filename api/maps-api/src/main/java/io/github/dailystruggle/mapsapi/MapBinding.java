@@ -20,7 +20,7 @@ import java.util.function.Supplier;
  * <ul>
  *   <li><strong>REQ-RTP-MAP-001 (extends REQ-RTP-S-006):</strong> when no
  *       binding is installed via {@code RTPHooks}, every entry-point shall
- *       throw {@link IllegalStateException} — never return {@code null} and
+ *       throw {@link IllegalStateException} - never return {@code null} and
  *       never silently no-op.</li>
  *   <li><strong>REQ-RTP-MAP-002 (extends REQ-RTP-F-008 / REQ-RTP-S-005):</strong>
  *       no method on this interface shall block on chunk I/O or call

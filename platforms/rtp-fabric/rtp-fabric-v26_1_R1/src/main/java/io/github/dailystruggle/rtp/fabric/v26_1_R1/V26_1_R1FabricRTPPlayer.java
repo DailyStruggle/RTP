@@ -23,7 +23,7 @@ import java.util.logging.Level;
  *
  * <p>Lives in {@code rtp-fabric-v26_1_R1} (Loom unobfuscated plugin, no
  * intermediary remapping) so its class file's NM references survive linkage
- * on the deobfuscated 26.1.2 runtime — unlike {@code FabricRTPPlayer} in
+ * on the deobfuscated 26.1.2 runtime - unlike {@code FabricRTPPlayer} in
  * {@code rtp-fabric-common}, whose intermediary aliases ({@code class_3222},
  * {@code class_2596}, ...) are absent at runtime and cause
  * {@link NoClassDefFoundError} on any class-linkage operation.
@@ -50,7 +50,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
     }
 
     private static String resolveName(ServerPlayer player) {
-        // authlib's GameProfile is a record on MC 26.1+ — use name() (record component).
+        // authlib's GameProfile is a record on MC 26.1+ - use name() (record component).
         try {
             return player.getGameProfile().name();
         } catch (NoSuchMethodError | NoSuchFieldError ignored) {
@@ -150,7 +150,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
                 if (state == falseVal) return false;
             }
         } catch (LinkageError | ClassNotFoundException | NoSuchMethodException | NoSuchFieldException ignored) {
-            // perms-api jar not on runtime classpath — fall through to ops.json.
+            // perms-api jar not on runtime classpath - fall through to ops.json.
         } catch (Throwable ignored) {
             // defensive
         }
@@ -163,7 +163,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
                 io.github.dailystruggle.rtp.fabric.player.FabricDefaultPermissions.resolve(permission);
         if (verdict == io.github.dailystruggle.rtp.fabric.player.FabricDefaultPermissions.Verdict.TRUE) return true;
         if (verdict == io.github.dailystruggle.rtp.fabric.player.FabricDefaultPermissions.Verdict.FALSE) return false;
-        // verdict == OP — fall through to the ops.json scan below.
+        // verdict == OP - fall through to the ops.json scan below.
 
         // FALLBACK: scan ops.json for this UUID. Stable across MC versions.
         try {
@@ -232,7 +232,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
     /**
      * Send a title / subtitle pair with explicit fade/stay timings (ticks).
      *
-     * <p>Mojmap-typed mirror of {@code FabricRTPPlayerUnobf#sendTitle} —
+     * <p>Mojmap-typed mirror of {@code FabricRTPPlayerUnobf#sendTitle} -
      * required for {@code RTPFabricMod}'s messages.yml title/subtitle/actionbar
      * hook to render on the deobf MC 26.1.x runtime (the common
      * {@code FabricRTPPlayer} class doesn't link there, so its sibling
@@ -313,7 +313,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         // FabricRTPWorld, whose intermediary aliases don't link on the deobf
         // 26.1.2 runtime). Accept either: V26_1_R1FabricRTPWorld via direct
         // instanceof, or any other RTPWorld whose world() handle is a
-        // ServerLevel (defensive — keeps the path working if a different
+        // ServerLevel (defensive - keeps the path working if a different
         // RTPWorld subtype is registered for the dimension).
         ServerLevel target;
         if (rtpWorld instanceof V26_1_R1FabricRTPWorld v26w) {
@@ -424,7 +424,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
     private static boolean performTeleport(ServerPlayer cur, ServerLevel target,
                                            double x, double y, double z,
                                            float yaw, float pitch) {
-        // Reflective teleportTo(ServerLevel,double*4,float*2) — present on most MC
+        // Reflective teleportTo(ServerLevel,double*4,float*2) - present on most MC
         // releases including 26.1.2.
         try {
             java.lang.reflect.Method m = ServerPlayer.class.getMethod(
@@ -476,7 +476,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         ServerLevel level = (ServerLevel) p.level();
         if (level == null) return null;
         // On MC 26.1.2 (verified via javap on the deobf jar) the accessor is
-        // dimension() — no `get` prefix — and on this MC release ResourceKey was
+        // dimension() - no `get` prefix - and on this MC release ResourceKey was
         // renamed location() -> identifier(). Direct typed calls because this v26
         // module compiles against Mojang names.
         String worldName;

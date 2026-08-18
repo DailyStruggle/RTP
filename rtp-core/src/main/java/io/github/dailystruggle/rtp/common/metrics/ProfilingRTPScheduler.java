@@ -8,23 +8,8 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 /**
- * {@link RTPScheduler} decorator that times every task it forwards to the wrapped
- * platform scheduler and records the elapsed wall-clock time into
- * {@link RtpSchedulerProfile#GLOBAL}, classified as {@code sync} (main-thread /
- * region) or {@code async}.
- *
- * <p>Because {@code RTP.scheduler} only ever runs RTP's own work, the totals are
- * RTP-attributable cost (the question {@code mspt} cannot answer, since it
- * measures whole-server tick utilisation). The wrapper adds a single
- * {@link System#nanoTime()} pair per executed task and never alters scheduling
- * behaviour: it delegates verbatim and returns the wrapped scheduler's handles.
- *
- * <p>Repeating timers are timed per iteration (the per-fire body is wrapped, not
- * the one-time scheduling call), so a long-lived timer contributes the cost of
- * each pulse rather than being counted once. {@link #runTaskForPlayer} forwards
- * its {@link RTPRunnable} unwrapped - that path carries a typed runnable whose
- * self-scheduling contract (ADR-054) must be preserved - so the teleport-delay
- * hop is intentionally not profiled.
+ * {@link RTPScheduler} decorator that profiles task execution time into
+ * {@link RtpSchedulerProfile#GLOBAL}, classifying work as sync or async.
  */
 public final class ProfilingRTPScheduler implements RTPScheduler {
 

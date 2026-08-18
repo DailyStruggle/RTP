@@ -27,7 +27,7 @@ import org.junit.jupiter.api.io.TempDir;
  * regressions would silently re-introduce the Fabric class-loading hazard.
  *
  * <p>Resolves the Step G2 follow-up flagged in {@code MULTI_PLATFORM_PLAN.md}
- * and the {@code RTPCmdFabricRoot} Javadoc — {@code rtp test} is now reachable
+ * and the {@code RTPCmdFabricRoot} Javadoc - {@code rtp test} is now reachable
  * on Fabric (every platform-neutral subcommand) without lifting any class out
  * of {@code rtp-plugin}.
  */

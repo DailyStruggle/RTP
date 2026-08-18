@@ -22,18 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Smoke test for the unified external-hook facade introduced in ADR-026.
- *
- * <p>Verifies:
- * <ul>
- *   <li>{@code RTPAPI.hooks()} throws {@link IllegalStateException} when core
- *       has not registered the facade (REQ-RTP-S-006).</li>
- *   <li>The {@code RTP} class' static initialiser publishes a non-null facade.</li>
- *   <li>The verifier registry is bidirectionally compatible with the legacy
- *       {@link GlobalRegionVerifiers} static API (backward compat per ADR-026).</li>
- *   <li>Economy, placeholder, world-border and anvil-prefilter registries each
- *       round-trip a registration.</li>
- * </ul>
+ * Tests for unified external-hook facade (ADR-026, REQ-RTP-S-006).
  */
 class RTPHooksFacadeTest {
 

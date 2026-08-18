@@ -147,7 +147,7 @@ public class ListParameterTest {
         file.createOrLoad();
         file.set("myList", Arrays.asList("x", "y"));
 
-        // ListCmd requires RTP.getInstance() in constructor — use addCommands() directly
+        // ListCmd requires RTP.getInstance() in constructor - use addCommands() directly
         // by constructing a minimal ListCmd via reflection-free approach:
         // We test addCommands indirectly through the parameter objects it creates.
         ListAddParameter addParam = new ListAddParameter(HashSet::new, file, "myList");
@@ -159,7 +159,7 @@ public class ListParameterTest {
         assertEquals("rtp.update", removeParam.permission());
     }
 
-    // ── ListAddParameter — supplier independence ──────────────────────────────
+    // ── ListAddParameter - supplier independence ──────────────────────────────
 
     @Test
     void listAddParameter_values_returnsIndependentSets() {
@@ -172,7 +172,7 @@ public class ListParameterTest {
         assertFalse(s2.contains("extra"), "Each call should return an independent set");
     }
 
-    // ── ListRemoveParameter — values returns independent set ──────────────────
+    // ── ListRemoveParameter - values returns independent set ──────────────────
 
     @Test
     void listRemoveParameter_values_returnsIndependentSets() throws Exception {
@@ -188,7 +188,7 @@ public class ListParameterTest {
         assertFalse(s2.contains("extra"), "Each call should return an independent set");
     }
 
-    // ── ListAddParameter — large supplier set ─────────────────────────────────
+    // ── ListAddParameter - large supplier set ─────────────────────────────────
 
     @Test
     void listAddParameter_values_handlesLargeSupplierSet() {
@@ -198,7 +198,7 @@ public class ListParameterTest {
         assertEquals(1000, param.values().size());
     }
 
-    // ── ListRemoveParameter — key with dots ───────────────────────────────────
+    // ── ListRemoveParameter - key with dots ───────────────────────────────────
 
     @Test
     void listRemoveParameter_values_keyWithDots() throws Exception {

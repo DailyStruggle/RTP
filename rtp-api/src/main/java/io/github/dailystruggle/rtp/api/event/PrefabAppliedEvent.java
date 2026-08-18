@@ -9,30 +9,13 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Immutable, post-apply notification fired after an admin-panel prefab has been
- * written to disk and the affected configs have (best-effort) been reloaded.
+ * Immutable post-apply event fired after an admin-panel prefab has been applied.
  *
- * <p>This is a fire-and-forget notification: subscribers cannot veto or mutate
- * the apply, which has already happened by the time the event is delivered.
- * Register a subscriber through
- * {@code RTPAPI.onPrefabApplied(java.util.function.Consumer)}.
- *
- * <p><b>Threading:</b> the event is delivered on whatever thread executes the
- * prefab confirm command. Subscribers that need to touch the world must
- * re-schedule onto the RTP scheduler themselves rather than working inline.
- *
- * @param prefabId        the canonical id of the applied prefab; never {@code null}.
- * @param callerId        the UUID of the command caller that applied the prefab;
- *                        never {@code null}.
- * @param writtenFiles    the file ids written to disk (e.g. {@code "performance"},
- *                        {@code "regions/default"}); never {@code null}, may be
- *                        empty. Returned as an unmodifiable list.
- * @param changes         per-file list of {@link PrefabChange}s keyed by file id,
- *                        in stable iteration order; never {@code null}, may be
- *                        empty. Returned as an unmodifiable map.
- * @param reloadSucceeded {@code true} iff the best-effort config reload completed
- *                        successfully after the write.
- *
+ * @param prefabId canonical id of the applied prefab
+ * @param callerId UUID of the command caller
+ * @param writtenFiles file ids written to disk
+ * @param changes per-file list of changes keyed by file id
+ * @param reloadSucceeded {@code true} iff config reload completed successfully
  * @since 3.1.4
  */
 @PublicApi

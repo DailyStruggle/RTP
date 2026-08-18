@@ -20,28 +20,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Machine-verifiable tests for <b>REQ-RTP-F-001</b>:
- * "Teleport response time: 0–2 game ticks (0–100 ms) on average."
- *
- * <p>Three complementary cases are covered:
- * <ol>
- *   <li><b>Cache-hit (0 ticks)</b> — a pre-generated location is returned by
- *       {@link MockLocationGenerator} as an already-completed future; no tick
- *       advance is required and no thread is blocked.</li>
- *   <li><b>Deferred dispatch (≤ 2 ticks)</b> — a task submitted via
- *       {@link MockRTPScheduler#runTaskLater(Runnable, long)} with a 1-tick
- *       delay completes after exactly one {@link MockRTPScheduler#tick(long)}
- *       advance, well within the 2-tick SLA.</li>
- *   <li><b>Absolute 100 ms ceiling</b> — the {@code @Timeout(100ms)} annotation
- *       acts as a hard trip-wire: any blocking call inadvertently introduced into
- *       the mock stack will cause this test to fail before any assertion is
- *       reached, making regressions immediately visible in CI.</li>
- * </ol>
- *
- * <p>All three cases also carry {@code @Timeout(100ms)} so a frozen pipeline is
- * detected regardless of which assertion would otherwise catch it.
- *
- * @see <a href="../../docs/dev/REQUIREMENTS.md">REQ-RTP-F-001</a>
+ * REQ-RTP-F-001 tests: teleport response time SLA (0-2 ticks / 0-100 ms).
+ * Covers cache-hit (0 ticks), deferred dispatch (<= 2 ticks), and 100 ms timeout bounds.
  */
 class SLATest {
 
@@ -57,11 +37,11 @@ class SLATest {
     }
 
     // -------------------------------------------------------------------------
-    // Case 1: cache-hit path — 0 ticks
+    // Case 1: cache-hit path - 0 ticks
     // -------------------------------------------------------------------------
 
     /**
-     * REQ-RTP-F-001 — When a location is pre-generated and sitting in the mock
+     * REQ-RTP-F-001 - When a location is pre-generated and sitting in the mock
      * queue, {@link MockLocationGenerator#getLocation} returns an already-completed
      * future before any tick advance occurs.
      */
@@ -84,13 +64,13 @@ class SLATest {
     }
 
     // -------------------------------------------------------------------------
-    // Case 2: deferred dispatch — ≤ 2 ticks
+    // Case 2: deferred dispatch - ≤ 2 ticks
     // -------------------------------------------------------------------------
 
     /**
-     * REQ-RTP-F-001 — A task dispatched with a 1-tick delay (worst-case within
+     * REQ-RTP-F-001 - A task dispatched with a 1-tick delay (worst-case within
      * the stated SLA) completes after exactly one {@link MockRTPScheduler#tick}
-     * advance.  The total ticks consumed remains within the 0–2 tick window.
+     * advance.  The total ticks consumed remains within the 0-2 tick window.
      */
     @Test
     @Timeout(value = 100, unit = TimeUnit.MILLISECONDS)
@@ -104,7 +84,7 @@ class SLATest {
         assertFalse(taskRan.get(),
                 "Task must not run before the scheduler is advanced");
 
-        // Advance exactly 1 tick — still within the 2-tick SLA budget
+        // Advance exactly 1 tick - still within the 2-tick SLA budget
         scheduler.tick(1);
 
         assertTrue(taskRan.get(),
@@ -120,14 +100,8 @@ class SLATest {
     // -------------------------------------------------------------------------
 
     /**
-     * REQ-RTP-F-001 — The full mock pipeline (generate + advance max-SLA ticks)
-     * must complete in under 100 ms wall-clock time.
-     *
-     * <p>The {@code @Timeout(100ms)} annotation is the primary regression guard:
-     * it fails the test immediately if the pipeline blocks, even before any
-     * assertion inside the method is reached.  The explicit elapsed-time assertion
-     * provides a diagnostic message if timing is tight but within the JUnit
-     * timeout window.
+     * REQ-RTP-F-001: Pipeline completes in under 100 ms wall-clock time.
+     * Timeout annotation fails the test immediately if execution blocks.
      */
     @Test
     @Timeout(value = 100, unit = TimeUnit.MILLISECONDS)

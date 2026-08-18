@@ -25,15 +25,8 @@ import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 /**
- * Full in-memory implementation of {@link RTPServerAccessor} for use in unit tests.
- *
- * <p>All futures returned by the underlying mock types complete immediately and
- * synchronously — there is no need for a real Spigot/Paper/Folia server to be
- * running. Register players and worlds via {@link #addWorld} / {@link #addPlayer}
- * before exercising code under test.
- *
- * <p>Use {@code RTPTestSetup.install(File)} to wire this accessor into the static
- * {@code RTP} and {@code RTPAPI} singletons with a single call.
+ * In-memory implementation of {@link RTPServerAccessor} for unit tests.
+ * All futures complete immediately. Wire into singletons via {@code RTPTestSetup.install(File)}.
  */
 public class MockRTPServerAccessor implements RTPServerAccessor {
 
@@ -44,10 +37,10 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     private final MockRTPPlayer consolePlayer = new MockRTPPlayer(RTP.serverId, "CONSOLE", null);
     private final MockRTPScheduler scheduler = new MockRTPScheduler();
-    /** Replaceable via {@link #setLocationGenerator} — defaults to {@link MockLocationGenerator}. */
+    /** Replaceable via {@link #setLocationGenerator} - defaults to {@link MockLocationGenerator}. */
     private ILocationGenerator locationGenerator;
     private final File pluginDirectory;
-    /** World border that always reports every location as inside — no real border in tests. */
+    /** World border that always reports every location as inside - no real border in tests. */
     private static final WorldBorder ALWAYS_INSIDE_BORDER =
             new WorldBorder(() -> null, loc -> true);
 
@@ -103,7 +96,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — server metadata
+    // RTPServerAccessor - server metadata
     // -------------------------------------------------------------------------
 
     @Override
@@ -131,7 +124,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — worlds
+    // RTPServerAccessor - worlds
     // -------------------------------------------------------------------------
 
     @Override
@@ -150,7 +143,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — players / senders
+    // RTPServerAccessor - players / senders
     // -------------------------------------------------------------------------
 
     @Override
@@ -183,7 +176,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — timing / filesystem
+    // RTPServerAccessor - timing / filesystem
     // -------------------------------------------------------------------------
 
     @Override
@@ -197,7 +190,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — messaging (all no-ops; capture via MockRTPPlayer)
+    // RTPServerAccessor - messaging (all no-ops; capture via MockRTPPlayer)
     // -------------------------------------------------------------------------
 
     @Override
@@ -235,7 +228,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     public void sendMessage(RTPCommandSender target, String message, String hover, String click, String tag) { }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — text formatting
+    // RTPServerAccessor - text formatting
     // -------------------------------------------------------------------------
 
     @Override
@@ -249,7 +242,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — logging
+    // RTPServerAccessor - logging
     // -------------------------------------------------------------------------
 
     /**
@@ -272,7 +265,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
         Logger.getLogger("RTP-Mock").log(level, msg, throwable);
     }
 
-    /** Messages passed to {@link #announce} — inspectable in tests. */
+    /** Messages passed to {@link #announce} - inspectable in tests. */
     public final List<String> announcedMessages = new ArrayList<>();
 
     @Override
@@ -281,7 +274,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — biomes / materials
+    // RTPServerAccessor - biomes / materials
     // -------------------------------------------------------------------------
 
     @Override
@@ -305,7 +298,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — lifecycle
+    // RTPServerAccessor - lifecycle
     // -------------------------------------------------------------------------
 
     @Override
@@ -318,7 +311,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     public void start(Object plugin) { }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — biome / shape getters and setters
+    // RTPServerAccessor - biome / shape getters and setters
     // -------------------------------------------------------------------------
 
     @Override
@@ -327,7 +320,11 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     @Override
     public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) { }
 
-    /** Returns an always-inside world border so {@link io.github.dailystruggle.rtp.common.selection.region.LocationGenerator} never rejects locations in tests. */
+    /**
+     * Returns an always-inside world border so
+     * {@link io.github.dailystruggle.rtp.common.selection.region.LocationGenerator}
+     * never rejects locations in tests.
+     */
     @Override
     public Object getWorldBorder(String worldName) {
         return ALWAYS_INSIDE_BORDER;
@@ -349,7 +346,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — task pipes / plugin handle
+    // RTPServerAccessor - task pipes / plugin handle
     // -------------------------------------------------------------------------
 
     @Override
@@ -368,7 +365,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — scheduler / location generator
+    // RTPServerAccessor - scheduler / location generator
     // -------------------------------------------------------------------------
 
     @Override
@@ -382,7 +379,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     // -------------------------------------------------------------------------
-    // RTPServerAccessor — TPS
+    // RTPServerAccessor - TPS
     // -------------------------------------------------------------------------
 
     @Override

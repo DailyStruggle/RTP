@@ -5,24 +5,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Per-caller serialization permit for {@code rtp test *} subcommand
- * dispatch. At most one test may be in flight per caller UUID at any
- * time, preventing intra-caller test overlap (notably between
- * {@code rtp test full} steps and any concurrent standalone
- * {@code rtp test <sub>} invocation issued by the same operator).
+ * Per-caller serialization permit for {@code rtp test *} subcommand dispatch.
  *
- * <p>Granularity is <em>per-caller</em> (decision locked in
- * {@code RTP_TEST_ISOLATION_PLAN.md}): two distinct operators may run
- * tests concurrently, but a single operator (or the console) cannot.
- *
- * <p>Thread-safety: backed by a {@link ConcurrentHashMap}. Acquire and
- * release are CAS-style operations on the per-owner mapping; a
- * mismatched release is a no-op.
- *
- * <p>S-006 note: this class is package-private and only invoked from
- * {@code TestCmd} after the test command tree has been registered, so
- * the &quot;before core load&quot; null-guard required of public
- * {@code rtp-api} entry points does not apply here.
+ * <p>Ensures at most one test is in flight per caller UUID at a time.
  */
 public final class TestSemaphore {
 

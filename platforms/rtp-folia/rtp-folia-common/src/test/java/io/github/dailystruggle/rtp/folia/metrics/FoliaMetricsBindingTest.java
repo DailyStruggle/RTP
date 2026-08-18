@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>RTP-static config readers ({@code readIncludeRegions} /
  * {@code readAggregation}) degrade to their documented defaults when
  * {@code RTP.getInstance()} is null, which is exactly the state these
- * tests run under — so the defaults
+ * tests run under - so the defaults
  * ({@code includeRegions=true}, {@code tps=mean}, {@code mspt=max}) are
  * what the assertions below assume.
  */
@@ -195,7 +195,7 @@ final class FoliaMetricsBindingTest {
      */
     @Test
     void scalar_tps_aggregation_default_mean_two_regions() {
-        // Two regions ticked in lock-step at 50ms intervals each — both
+        // Two regions ticked in lock-step at 50ms intervals each - both
         // converge to ~20 TPS, so mean aggregation collapses to ~20.
         AtomicLong now = new AtomicLong(0L);
         FoliaMetricsBinding b = new FoliaMetricsBinding(now::get, () -> 0, () -> 0);

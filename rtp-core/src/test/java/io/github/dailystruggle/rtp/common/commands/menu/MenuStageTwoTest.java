@@ -38,12 +38,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Stage 2 of CHECKLIST-generalized-menu.md: covers the rtp-core registry, the
+ * Generalized menu tests: covers the rtp-core registry, the
  * {@code MenuRedeemSubcommand}, the {@code CommandTreeMenuBuilder} reflector,
  * and the {@code ConfigMenuConsumerProfile} hover-text fallback chain.
- *
- * <p>Each block carries an explicit reference to the checklist item it
- * exercises.
  */
 public class MenuStageTwoTest {
 
@@ -56,19 +53,10 @@ public class MenuStageTwoTest {
         RTPTestSetup.install(tempDir.toFile());
     }
 
-    // ------------------------------------------------------------------------
-    // ADR-050 Stage 3beta.D.1 (2026-05-24): the six token-mechanic tests
-    // (registry CAS/sweep/cap/argcheck, redeemRejectsMissingToken,
-    // redeemRejectsNonRunActionAsProtocolError) were deleted with the
-    // token-redeem dispatch path. They asserted invariants of the
-    // MenuTokenRegistry + the `token=` redeem branch, both of which are
-    // gone. Concrete-command grammar coverage lives in
-    // ReqRtpMenuConcreteCommandsTest (36 cases); renderer command-string
-    // emission lives in BookMenuRendererTest (34 cases).
-    // ------------------------------------------------------------------------
+    // Concrete-command grammar coverage is tested in ReqRtpMenuConcreteCommandsTest.
 
     // ------------------------------------------------------------------------
-    // 2.3 — Reflector hides inaccessible nodes; emits correct fragments
+    // 2.3 - Reflector hides inaccessible nodes; emits correct fragments
     // ------------------------------------------------------------------------
 
     @Test
@@ -103,10 +91,7 @@ public class MenuStageTwoTest {
 
     @Test
     void reflectorEmitsRunForSubcommandAndPickerForEnumerableParameter() {
-        // Stage A.2: a parameter with non-empty suggestions (here:
-        // IntegerParameter with curated values 1/2/4) opens a value-picker
-        // sub-page on click. A parameter without suggestions falls back to
-        // the pre-Stage-A.2 SuggestInput chat-prefill (covered separately).
+        // Parameters with suggestions open a value-picker sub-page.
         TestableRoot root = new TestableRoot();
         root.getCommandLookup().put("config",
                 new StubSub("", "config desc"));
@@ -138,13 +123,7 @@ public class MenuStageTwoTest {
 
     @Test
     void reflectorOpensParamPickerEvenWhenParameterHasNoSuggestions() {
-        // Updated contract: parameters with no suggestions still emit an
-        // OpenParamPicker so the player reaches a sub-page that renders the
-        // "✎ type a custom value..." chat-prefill row plus any (empty)
-        // suggestion list. The earlier SuggestInput-only fallback meant a
-        // free-form parameter such as `regions add` was "stuck" — clicking
-        // it produced no visible prompt under renderers that don't surface
-        // chat suggestions inline.
+        // Parameters with no suggestions emit OpenParamPicker so player reaches custom value prompt.
         TestableRoot root = new TestableRoot();
         root.getParameterLookup().put("freeform", anonParam("", "no suggestions"));
 
@@ -163,7 +142,7 @@ public class MenuStageTwoTest {
     }
 
     // ------------------------------------------------------------------------
-    // 2.4 / 2.5 — Hover-text three-step fallback
+    // 2.4 / 2.5 - Hover-text three-step fallback
     // ------------------------------------------------------------------------
 
     @Test
@@ -209,7 +188,7 @@ public class MenuStageTwoTest {
     }
 
     // ------------------------------------------------------------------------
-    // 2.4 — ConfigMenuConsumerProfile suggest prefix shape
+    // 2.4 - ConfigMenuConsumerProfile suggest prefix shape
     // ------------------------------------------------------------------------
 
     @Test
@@ -233,7 +212,7 @@ public class MenuStageTwoTest {
     }
 
     // ------------------------------------------------------------------------
-    // 4.2.a — Open-page path on token-less /rtp menu invocations
+    // 4.2.a - Open-page path on token-less /rtp menu invocations
     // ------------------------------------------------------------------------
 
     @Test
@@ -277,9 +256,7 @@ public class MenuStageTwoTest {
 
     @Test
     void openPageFallsBackToMenuInvalidWhenNoRendererWired() {
-        // Backward-compat: the Stage 3 wire-up uses the 3-arg constructor (no
-        // renderer/builder). A token-less invocation must still reject with
-        // menuInvalid + WARN, unchanged from pre-Stage-4 behaviour.
+        // Without a renderer/builder, a token-less invocation rejects with menuInvalid.
         TestableRoot root = new TestableRoot();
         MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root,
                 uuid -> perm -> true);
@@ -319,7 +296,7 @@ public class MenuStageTwoTest {
 
     @Test
     void openPagePlumbsOneIndexedPageParameterAsZeroBasedToBuilder() {
-        // CHECKLIST 5.3.b/g: `/rtp menu page:3` must arrive at the page builder
+        // `/rtp menu page:3` must arrive at the page builder
         // as MenuOpenRequest.pageIndex() == 2 (1-indexed wire → 0-indexed model).
         // Missing/invalid values must default to page 1 / index 0.
         TestableRoot root = new TestableRoot();

@@ -112,7 +112,7 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
       s.clearInvulnerable(probeId);
       s.processingPlayers.remove(probeId);
       // OnPlayerQuit sets cancelled=true and re-schedules the task; here
-      // we invoke the cancellation directly — the re-schedule is for the
+      // we invoke the cancellation directly - the re-schedule is for the
       // pipeline to observe cancellation on its own thread, which we do
       // not exercise.
       if (data.nextTask != null) {

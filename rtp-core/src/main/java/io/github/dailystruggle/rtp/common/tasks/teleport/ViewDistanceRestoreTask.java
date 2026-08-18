@@ -7,33 +7,9 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.logging.Level;
 
 /**
- * Teleport view-distance clamp and steady restore (ADR-072).
- *
- * <p>The dominant cost of a teleport is the implicit chunk-tracking ring the engine expands when
- * the player is placed at the destination. That burst grows with the square of the player's view
- * distance, so shrinking the view distance immediately before the teleport caps the burst, and
- * restoring it gradually afterward spreads the residual loads across many ticks instead of one.
- *
- * <p>This task owns the restore ramp. It is created and started via
- * {@link #clampAndSchedule(RTPPlayer, int, long)} immediately before the teleport call: that helper
- * captures the player's pre-teleport view distance, applies the clamp, and (when there is anything
- * to restore) schedules this self-rescheduling task. Each run raises the view distance by one chunk
- * and reschedules itself after a chunk-cost-weighted dwell, so the chunks-delivered-per-tick rate
- * stays roughly flat across the whole window rather than back-loading the heaviest increments.
- *
- * <p>Only the server-side <i>tracking</i> view distance is clamped and ramped. Before clamping,
- * the helper pins the player's <i>send</i> view distance to the captured value
- * ({@link RTPPlayer#setSendViewDistance(int)}), so the client's negotiated render radius never
- * changes and the player sees no view-distance "flash" while the tracking ring shrinks and grows.
- * The send-distance pin is released (reset to follow the default) once the ramp reaches the target,
- * defers to a larger external value, or the read fails; it is left untouched on disconnect so an
- * offline player is never mutated. On a platform without a separate send-view-distance API the pin
- * is a no-op and the feature degrades to mutating the tracking distance alone.
- *
- * <p>The ramp is session-scoped and self-terminating: it stops (and releases its tracking) when the
- * target view distance is reached, when the player disconnects, or when another tool has already
- * raised the view distance to or beyond the restore target. Per-player view distance is never
- * persisted, so a restart cannot leak a clamp.
+ * Teleport view-distance clamp and steady restore ramp (ADR-072).
+ * Clamps tracking view distance immediately before teleport to limit chunk load burst,
+ * then incrementally restores view distance over a configured tick duration.
  */
 public final class ViewDistanceRestoreTask extends RTPRunnable {
   /** Minimum renderable view distance in chunks; clients cannot render below this. */
@@ -58,19 +34,11 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
   }
 
   /**
-   * Captures the player's pre-teleport view distance, clamps it for the arrival, and schedules the
-   * steady-restore ramp. Must be called immediately before the teleport call, on the thread that
-   * owns the player (the main server thread, or the owning region thread on Folia), so the clamp
-   * shrinks the tracked ring the engine expands during placement.
+   * Clamps pre-teleport tracking view distance and schedules incremental restore.
    *
-   * <p>No-ops when the feature is disabled ({@code interval <= 0}), when the platform exposes no
-   * per-player view-distance API ({@code getViewDistance() < 0}), or when the clamp would not
-   * actually shrink the player's view distance.
-   *
-   * @param player          the player about to be teleported; must not be {@code null}
-   * @param preloadRadius   the configured {@code viewDistanceTeleport} preload radius, reused as the
-   *                        initial clamp value (floored at {@link #MIN_VD})
-   * @param intervalTicks   total ticks over which to restore the view distance ({@code 0} disables)
+   * @param player        teleporting player; must not be {@code null}
+   * @param preloadRadius preload radius clamp value (floored at {@link #MIN_VD})
+   * @param intervalTicks total ticks over which to restore view distance ({@code 0} disables)
    */
   public static void clampAndSchedule(RTPPlayer player, int preloadRadius, long intervalTicks) {
     if (player == null || intervalTicks <= 0L) {

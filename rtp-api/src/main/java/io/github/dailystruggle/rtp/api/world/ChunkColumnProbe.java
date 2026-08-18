@@ -3,25 +3,9 @@ package io.github.dailystruggle.rtp.api.world;
 import java.util.OptionalInt;
 
 /**
- * Lean view of a single chunk's center column used by the biome-lookup fast path
- * (see {@code docs/dev/BIOME_LOOKUP_PERF_PLAN.md}).
- *
- * <p>Implementations answer block- and biome-identifier queries for the chunk's
- * center column (local {@code x=8, z=8}) over a caller-supplied
- * {@code [minY, maxY]} window, without materialising a full {@link RTPChunk}.
- * The on-disk Anvil fast path is the primary producer; live-world adapters
- * that have a cheaper way to answer point queries may also implement this
- * interface.</p>
- *
- * <p>A probe represents a single chunk at world coordinates
- * ({@link #chunkX()}, {@link #chunkZ()}) and is otherwise stateless —
- * callers may cache it, share it across threads where the producer permits,
- * or discard it immediately after use.</p>
- *
- * <p>This interface lives in {@code rtp-api} so that both {@code rtp-core}
- * consumers (e.g. {@code VerticalAdjustor.adjustFromProbe}) and platform
- * adapters that wrap a module-local probe carrier (e.g. {@code rtp-anvil}'s
- * {@code ColumnProbe}) can reference a single type.</p>
+ * Lean point-query view of a single chunk's column data.
+ * Answers block and biome queries across a {@code [minY, maxY]} window
+ * without materialising a full {@link RTPChunk}.
  */
 public interface ChunkColumnProbe {
 
@@ -46,17 +30,9 @@ public interface ChunkColumnProbe {
   int maxY();
 
   /**
-   * Returns the top-of-solid Y for the center column, sourced from the chunk's
-   * {@code MOTION_BLOCKING_NO_LEAVES} heightmap when available.
+   * Returns top-of-solid Y hint from {@code MOTION_BLOCKING_NO_LEAVES} heightmap.
    *
-   * <p>Producers that cannot cheaply obtain a heightmap (e.g. older chunk
-   * formats or fabricated probes in tests) may return
-   * {@link OptionalInt#empty()}. Callers must treat this as a hint only:
-   * a present value is <em>not</em> guaranteed to fall inside
-   * {@code [minY, maxY]}, and the authoritative Y must still be validated
-   * against {@link #blockAt(int)} / {@link #biomeAt(int)}.</p>
-   *
-   * @return heightmap-derived top-of-solid Y for the center column, or empty.
+   * @return heightmap top-of-solid Y hint, or empty if unavailable
    */
   OptionalInt heightmapTopY();
 
@@ -71,23 +47,13 @@ public interface ChunkColumnProbe {
   String blockAt(int y);
 
   /**
-   * Returns the block identifier at chunk-local column {@code (localX, localZ)}
-   * at the given world Y.
+   * Returns block identifier at chunk-local column {@code (localX, localZ)} at {@code y}.
+   * Default delegates to {@link #blockAt(int)}.
    *
-   * <p>The default implementation delegates to {@link #blockAt(int)} regardless
-   * of {@code localX}/{@code localZ}, preserving back-compat for legacy
-   * single-column producers (the adjustor probe path then evaluates the same
-   * data five times instead of five distinct columns — semantically a no-op
-   * vs. the pre-multi-column behaviour). Producers whose backing data covers
-   * the full chunk (e.g. {@code AnvilColumnProbeAdapter}) override to return
-   * the actual off-center palette identifier so the probe-side
-   * {@code adjustFromProbeWithReason} sweep can scan all live-path
-   * {@code testCoords} columns and so {@code SCAN_MISS} becomes authoritative.</p>
-   *
-   * @param localX chunk-local X in {@code [0..15]}.
-   * @param localZ chunk-local Z in {@code [0..15]}.
-   * @param y      world Y to query; must satisfy {@code minY <= y <= maxY}.
-   * @return namespaced block identifier or {@code null} as in {@link #blockAt(int)}.
+   * @param localX chunk-local X in {@code [0..15]}
+   * @param localZ chunk-local Z in {@code [0..15]}
+   * @param y      world Y query in {@code [minY..maxY]}
+   * @return namespaced block identifier, or null if unavailable
    */
   default String blockAt(int localX, int localZ, int y) {
     return blockAt(y);
@@ -104,17 +70,10 @@ public interface ChunkColumnProbe {
   String biomeAt(int y);
 
   /**
-   * Convenience: whether the block at the given Y on the center column is
-   * considered air.
+   * Returns whether center-column block at {@code y} is air.
    *
-   * <p>The default implementation tests for any namespaced {@code *:air}
-   * identifier ({@code minecraft:air}, {@code minecraft:cave_air},
-   * {@code minecraft:void_air}). Producers with a cheaper representation
-   * (e.g. direct palette-index comparison) may override.</p>
-   *
-   * @param y world Y to query.
-   * @return true iff {@link #blockAt(int)} returns a non-null identifier
-   *     whose path segment is {@code "air"}.
+   * @param y world Y query
+   * @return true if block identifier represents air
    */
   default boolean isAirAt(int y) {
     String b = blockAt(y);
@@ -125,15 +84,12 @@ public interface ChunkColumnProbe {
   }
 
   /**
-   * Convenience: whether the block at chunk-local column {@code (localX, localZ)}
-   * at the given Y is considered air. Default delegates to
-   * {@link #blockAt(int, int, int)} and applies the same path-segment test as
-   * {@link #isAirAt(int)}. Producers that override {@link #isAirAt(int)} for a
-   * cheaper representation should also override this overload.
+   * Returns whether block at chunk-local column {@code (localX, localZ)} at {@code y} is air.
    *
-   * @param localX chunk-local X in {@code [0..15]}.
-   * @param localZ chunk-local Z in {@code [0..15]}.
-   * @param y      world Y to query.
+   * @param localX chunk-local X in {@code [0..15]}
+   * @param localZ chunk-local Z in {@code [0..15]}
+   * @param y      world Y query
+   * @return true if block identifier represents air
    */
   default boolean isAirAt(int localX, int localZ, int y) {
     String b = blockAt(localX, localZ, y);

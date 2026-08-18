@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice C row C8 / C9: gate-by-gate coverage of {@link NetworkRouter} plus
+ * Gate-by-gate coverage of {@link NetworkRouter} plus
  * the {@link NetworkRouter#parseRegionArg(String)} stub.
  */
 class NetworkRouterTest {

@@ -59,7 +59,7 @@ public class RTPTeleportCancelTest {
     }
 
     // -----------------------------------------------------------------------
-    // No teleport data — no-op
+    // No teleport data - no-op
     // -----------------------------------------------------------------------
 
     @Test
@@ -99,7 +99,7 @@ public class RTPTeleportCancelTest {
     }
 
     // -----------------------------------------------------------------------
-    // Active teleport — cancellation
+    // Active teleport - cancellation
     // -----------------------------------------------------------------------
 
     @Test
@@ -227,7 +227,7 @@ public class RTPTeleportCancelTest {
         new RTPTeleportCancel(playerId).run();
 
         assertEquals(1, preCount.get(), "preAction must fire even with no teleport data");
-        // postActions fire only after the early-return checks — no data means early return
+        // postActions fire only after the early-return checks - no data means early return
         // so postActions are NOT invoked in that case
     }
 

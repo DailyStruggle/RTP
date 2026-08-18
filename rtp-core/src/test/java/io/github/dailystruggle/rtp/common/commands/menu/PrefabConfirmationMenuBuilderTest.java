@@ -30,22 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link PrefabConfirmationMenuBuilder}.
- *
- * <p>Covers:
- * <ul>
- *   <li>Title carries the prefab display name via the {@code [prefab]}
- *       placeholder substitution.</li>
- *   <li>Diff ordering matches the {@link PrefabApplier.Result#perFileDiff()}
- *       iteration order (file order + per-file change order).</li>
- *   <li>{@code Confirm} row dispatches
- *       {@code RunRtpCommand({admin,prefab,confirm,<id>,<token>})}.</li>
- *   <li>{@code Cancel} row dispatches {@link MenuAction.OpenAdminPanel}.</li>
- *   <li>Empty diff renders an identity-overlay notice but still emits the
- *       {@code Confirm} / {@code Cancel} footer.</li>
- *   <li>Overflow tail when a single file exceeds
- *       {@link PrefabConfirmationMenuBuilder#MAX_LINES_PER_FILE}.</li>
- *   <li>Null / empty argument rejection.</li>
- * </ul>
+ * Verifies title formatting, diff ordering, action dispatch, and pagination overflow.
  */
 final class PrefabConfirmationMenuBuilderTest {
 

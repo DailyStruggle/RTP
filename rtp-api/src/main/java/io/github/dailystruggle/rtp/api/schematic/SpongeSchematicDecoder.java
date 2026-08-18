@@ -13,18 +13,9 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Dependency-free decoder for the Sponge schematic format (v2 and v3), the modern
- * WorldEdit / FAWE {@code .schem} container. A Sponge schematic is GZIP-compressed,
- * big-endian NBT; this reader needs no WorldEdit, no Minecraft types, and no live world,
- * so it is platform-neutral and shared by every adapter (ADR-058 Amendment 1).
- *
- * <p>The output {@link DecodedSchematic} exposes the bounding box (so {@code rtp-core} can
- * run the S-003 footprint claim check before any block write), the block-state palette,
- * a dense palette-index grid, and the decoded block entities. Block-state strings are
- * handed verbatim to each platform's native parser at paste time.
- *
- * <p>This class performs blocking file I/O and MUST be invoked off any tick / region
- * thread (S-005); {@link AbstractFileSchematicPaster} wraps it accordingly.
+ * Dependency-free GZIP-NBT decoder for Sponge schematics (v2/v3; ADR-058).
+ * Extracts bounds, block-state palette, grid indices, and block entities.
+ * Blocking I/O: must be invoked off the tick/region thread (S-005).
  */
 public final class SpongeSchematicDecoder {
 

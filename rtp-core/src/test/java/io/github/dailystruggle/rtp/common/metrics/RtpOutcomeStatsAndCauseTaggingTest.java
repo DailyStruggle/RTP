@@ -15,9 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Covers the always-on location-generation outcome metrics and the per-run
  * rejection-cause tagging of {@code MemoryShape}'s bad-location cache.
  *
- * <p>Feature reference: METRICS_PLAN.md (outcome success / failure rates and the
- * per-cause rejection breakdown) plus the cause-tagged {@code .bin} persistence
- * format. The pipeline records every terminal attempt outcome into
+ * <p>The pipeline records every terminal attempt outcome into
  * {@link RtpOutcomeStats#GLOBAL} regardless of {@code verbose}, and persists one
  * rejection cause per coalesced bad-location run (first-cause-wins).
  */

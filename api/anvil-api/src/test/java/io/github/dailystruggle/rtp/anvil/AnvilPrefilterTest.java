@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * REQ-RTP-S-005 / ADR-016 Phase 3a — verdict-matrix tests for {@link AnvilPrefilter}.
+ * REQ-RTP-S-005 / ADR-016 - verdict-matrix tests for {@link AnvilPrefilter}.
  *
  * <p>Each test assembles a minimal single-chunk region buffer (via
  * {@link AnvilTestFixtures}) with a known surface block, writes it into a temp
@@ -98,7 +98,7 @@ class AnvilPrefilterTest {
   @DisplayName("Missing region file ⇒ UNKNOWN (fall through to live load / generation)")
   void missingRegionFileUnknown(@TempDir Path worldFolder) throws IOException {
     // Intentionally write nothing. The probe must treat the absent file as UNKNOWN
-    // rather than REJECT — per ADR-016, ungenerated chunks are the live load's job.
+    // rather than REJECT - per ADR-016, ungenerated chunks are the live load's job.
     Verdict v = AnvilPrefilter.probeSync(
         worldFolder, "", 0, 0, Set.of("LAVA"));
     assertEquals(Verdict.UNKNOWN, v);
@@ -111,7 +111,7 @@ class AnvilPrefilterTest {
     // Every DataVersion is admitted; the decoder (`AnvilReader`) is the only
     // gate, and decode failures surface as WARNING + UNKNOWN. Here we feed
     // DataVersion=1 (well outside any real MC range) but with a valid
-    // synthetic chunk payload containing lava at the surface — the probe
+    // synthetic chunk payload containing lava at the surface - the probe
     // must now parse it and return REJECT rather than the old UNKNOWN.
     writeSyntheticRegion(worldFolder, 0, 0, rootAtDataVersion(1));
     Verdict v = AnvilPrefilter.probeSync(
@@ -153,8 +153,8 @@ class AnvilPrefilterTest {
   void prefilterRoutesThroughRegionByteCache(@TempDir Path worldFolder) throws IOException {
     // Regression guard for the 2026-04-23 OOM: AnvilPrefilter.probeSyncDetailed used
     // to call Files.readAllBytes directly, bypassing the 16-entry LRU cache and the
-    // PR-15 miss-coalescing path. Under ScanTask's 50-in-flight workload this let 50
-    // concurrent probes each allocate the same 2–8 MB .mca byte[], triggering
+    // miss-coalescing path. Under ScanTask's 50-in-flight workload this let 50
+    // concurrent probes each allocate the same 2-8 MB .mca byte[], triggering
     // "Retried waiting for GCLocker too often" and OOM on the ForkJoin common pool.
     // This test asserts the prefilter now shares the same cache as
     // BukkitRTPWorld / FoliaRTPWorld: a second probe of the same chunk must register

@@ -17,8 +17,7 @@ import java.util.logging.Level;
  * S-004 / S-006 contracts are still honored &mdash; no silent drop.
  *
  * <p>Installed onto {@code RTP.testUmbrellaContext} from
- * {@code RTPBukkitPlugin} during {@code onEnable}; see
- * {@code docs/dev/scratch/CHECKLIST-fabric-rtp-test-full.md} Phase 1.4.
+ * {@code RTPBukkitPlugin} during {@code onEnable}.
  */
 public final class BukkitTestUmbrellaScheduler implements TestUmbrellaScheduler {
 
@@ -44,7 +43,7 @@ public final class BukkitTestUmbrellaScheduler implements TestUmbrellaScheduler 
         // RTPScheduler#runTaskTimerAsynchronously contract. A holder
         // array carries the platform task token into the runnable so it
         // can self-cancel on first fire (mirrors TestFullCmd watchdog
-        // pattern). See checklist Phase 1.4.
+        // pattern).
         long delayTicks = Math.max(1L, (delay + 49L) / 50L);
         final Object[] handle = new Object[1];
         handle[0] = RTP.scheduler.runTaskTimerAsynchronously(

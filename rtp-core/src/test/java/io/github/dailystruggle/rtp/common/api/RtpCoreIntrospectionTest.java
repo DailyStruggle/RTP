@@ -21,16 +21,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Coverage for the unstable {@code rtp-core} GUI-author introspection hook
- * ({@link RtpCoreIntrospection} + {@link RegionQueueDepths}), Phase 2 of
- * {@code docs/dev/scratch/PROPOSAL-gui-author-spi.md} §3.2.
- *
- * <p>Verifies the read-only facade reports live kept/unkept buffer depths per
- * region, resolves a region by name, degrades safely (empty list / {@code null}
- * / {@code false}) rather than throwing when state is absent, and never exposes
- * a mutator. This hook deliberately does NOT follow the REQ-RTP-S-006
- * throw-on-pre-init contract (that governs the {@code rtp-api} surface), so a
- * dashboard polling before startup renders "nothing ready" instead of crashing.
+ * Tests for {@link RtpCoreIntrospection} and {@link RegionQueueDepths}.
+ * Verifies read-only inspection of region queue depths and graceful degradation.
  */
 class RtpCoreIntrospectionTest {
 

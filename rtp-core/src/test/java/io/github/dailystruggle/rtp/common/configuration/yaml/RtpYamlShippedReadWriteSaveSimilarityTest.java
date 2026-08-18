@@ -17,20 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 /**
- * End-to-end read → write → save → reload → similarity test over every
- * shipped {@code .yml} under {@code rtp-plugin/src/main/resources/}.
- *
- * <p>Unlike {@link RtpYamlShippedDefaultsGoldenFileTest}, which only
- * exercises in-memory parse∘emit∘parse∘emit byte-stability, this test
- * runs the full disk round-trip through {@link RtpYamlConfig#load(File)}
- * and {@link RtpYamlConfig#save(File)} (temp-file + atomic rename),
- * then reloads from disk and asserts:
- * <ul>
- *     <li>the saved bytes equal the canonical re-emit of the loaded source
- *         (idempotence under the file-backed write path); and</li>
- *     <li>the reloaded document's structural key surface
- *         ({@code getKeys(deep=true)}) matches the original's.</li>
- * </ul>
+ * End-to-end read -> write -> save -> reload disk similarity tests over shipped YAML files.
  */
 class RtpYamlShippedReadWriteSaveSimilarityTest {
 
@@ -74,7 +61,7 @@ class RtpYamlShippedReadWriteSaveSimilarityTest {
         // 2. Canonical emit (what save() should write).
         String canonical = loaded.saveToString();
 
-        // 3. Write to a fresh temp location via save(File) — exercises the
+        // 3. Write to a fresh temp location via save(File) - exercises the
         //    temp-file + atomic-rename code path.
         Path target = tmpDir.resolve(source.getFileName().toString());
         loaded.save(target.toFile());
@@ -84,7 +71,7 @@ class RtpYamlShippedReadWriteSaveSimilarityTest {
         assertEquals(canonical, onDisk,
                 "save(File) bytes differ from saveToString() for " + source);
 
-        // 5. Reload from disk — must succeed and round-trip byte-stably.
+        // 5. Reload from disk - must succeed and round-trip byte-stably.
         RtpYamlConfig reloaded = RtpYamlConfig.load(target.toFile());
         String reemitted = reloaded.saveToString();
         assertEquals(canonical, reemitted,

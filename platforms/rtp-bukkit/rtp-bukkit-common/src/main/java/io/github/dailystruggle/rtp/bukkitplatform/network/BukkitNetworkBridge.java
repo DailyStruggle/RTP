@@ -52,7 +52,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
 
     /**
      * Dedicated backend&lt;-&gt;proxy-companion channel for the proxy-cache
-     * tier (PROPOSAL-proxy-as-availability-store). Distinct from
+     * tier. Distinct from
      * {@link #CHANNEL}, whose built-in {@code Forward}/{@code Connect}/
      * {@code GetServers} vocabulary the proxy itself consumes; messages on
      * this channel are addressed to the RTP proxy companion plugin, which

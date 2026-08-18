@@ -13,15 +13,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for {@link MemoryShape#chunkToLocations(int, int)} and
- * {@link MemoryShape#addBadChunk(long)}.
- *
- * <p>Geometric property under test (see ADR-001 and
- * {@code docs/dev/scratch/CHECKLIST-chunk-to-locations-inverse.md}): for any
- * chunk {@code (cx, cz)} inside a spiral-based shape, at most two 1D spiral
- * indices decode to that chunk. The expected fraction with exactly 2 preimages
- * on {@code Circle} is {@code p₂ ≈ 0.57}, giving an expected amplification of
- * {@code E[marked per addBadChunk] = 1 + p₂ ≈ 1.57}.
+ * Tests for {@link MemoryShape#chunkToLocations(int, int)} and {@link MemoryShape#addBadChunk(long)} (ADR-001).
  */
 public class MemoryShapeChunkToLocationsTest {
 
@@ -145,7 +137,7 @@ public class MemoryShapeChunkToLocationsTest {
         // The empirical p₂ for the Archimedean spiral at this chunk granularity
         // is dominated by intra-ring cell coverage (≈ 1/R angular extent per
         // cell, chunks span ≥ 1 cell at most radii), not by inter-ring
-        // straddling — so it sits closer to 1.0 than the earlier 0.57 estimate
+        // straddling - so it sits closer to 1.0 than the earlier 0.57 estimate
         // (which only accounted for radial-twin overlap). The bound below just
         // guards against "always 1" regressions.
         assertTrue(p2 > 0.05,
@@ -213,7 +205,7 @@ public class MemoryShapeChunkToLocationsTest {
     @DisplayName("addBadChunk on a 1-preimage chunk marks exactly 1 index")
     void addBadChunk_singletonPreimage() {
         // Force the 1-preimage case by stubbing chunkToLocations via a tiny
-        // subclass — the empirical 1-preimage rate on Circle is low (most
+        // subclass - the empirical 1-preimage rate on Circle is low (most
         // chunks are intra-ring-covered) so we don't rely on finding one in
         // a bounded grid sweep.
         Circle shape = new Circle() {
@@ -286,7 +278,7 @@ public class MemoryShapeChunkToLocationsTest {
             }
         }
         if (pickedLocation < 0L) {
-            // Couldn't find one — skip rather than fail, the fallback path is also
+            // Couldn't find one - skip rather than fail, the fallback path is also
             // exercised when chunkToLocations returns empty for FP slop.
             System.out.println("[DEBUG_LOG] No outside-shape decode found; skipping fallback assertion");
             return;

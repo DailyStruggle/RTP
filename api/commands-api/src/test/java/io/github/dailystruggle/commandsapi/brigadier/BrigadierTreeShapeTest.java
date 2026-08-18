@@ -23,19 +23,18 @@ import java.util.function.Predicate;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * commands-api-ADR-001 (Brigadier Bridge) — recursion / sibling-chain / cycle-guard
- * regression test added 2026-05-06 by CHECKLIST-fabric-tabcompletion-audit P4.
+ * commands-api-ADR-001 (Brigadier Bridge) - recursion / sibling-chain / cycle-guard regression test.
  *
  * <p>Validates that {@link BrigadierCommandAdapter#toBrigadier} produces a Brigadier
  * tree that is reachable for the typical RTP-style usage:
  *
  * <ul>
- *   <li>{@code root sub p:value} — sub-command with a parameter parses cleanly.</li>
- *   <li>{@code root a:v b:v} — sibling parameters can be chained in any order
+ *   <li>{@code root sub p:value} - sub-command with a parameter parses cleanly.</li>
+ *   <li>{@code root a:v b:v} - sibling parameters can be chained in any order
  *       (mirrors Bukkit's free-token wire format).</li>
- *   <li>{@code root a:v x:v} — nested ({@code subParams}) parameters under a parent
+ *   <li>{@code root a:v x:v} - nested ({@code subParams}) parameters under a parent
  *       parameter are reachable.</li>
- *   <li>{@code root a:v a:v} — repeating the same parameter name is rejected (cycle
+ *   <li>{@code root a:v a:v} - repeating the same parameter name is rejected (cycle
  *       guard prevents factorial fanout).</li>
  *   <li>The total node count stays under a documented bound, so an accidental loss
  *       of the cycle guard surfaces as a test failure rather than a runtime DoS on
@@ -119,7 +118,7 @@ class BrigadierTreeShapeTest {
     void cycleGuardBlocksRepeat() {
         CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(fixtureRoot(), permissive()));
-        // The second 'a=' must not parse against the same param node — Brigadier
+        // The second 'a=' must not parse against the same param node - Brigadier
         // sees no graph edge for it, so dispatch raises CommandSyntaxException.
         // We can't trigger "the same parameter twice" via positional tokens
         // because Brigadier would just walk the next available edge. Instead
@@ -151,7 +150,7 @@ class BrigadierTreeShapeTest {
     void subCommandNotReachableAfterParameter() {
         // commands-api-ADR-001 addendum 2026-05-06e ("Option A" / vanilla-only
         // greedy slot): per-parameter Brigadier nodes ('a', 'b', etc.) no
-        // longer exist — all wire-format params are captured by a single
+        // longer exist - all wire-format params are captured by a single
         // RequiredArgument("args", greedyString()) child of the root literal.
         // The original audit invariant ("sub-commands stay positional, not
         // children of a parameter slot") is now expressed structurally as:
@@ -178,7 +177,7 @@ class BrigadierTreeShapeTest {
         // a tight count: root + greedy `args` slot + 'sub' literal + 'sub's
         // greedy `args` slot = 4 nodes for this fixture. The previous bound
         // (<= 64) still holds and is left in place as a generous regression
-        // ceiling — if a future change re-introduces sibling chaining the
+        // ceiling - if a future change re-introduces sibling chaining the
         // bound is what catches a factorial blow-up.
         assertTrue(count <= 64,
                 "Brigadier tree node count " + count + " exceeds documented bound (<= 64); "
@@ -199,7 +198,7 @@ class BrigadierTreeShapeTest {
     @DisplayName("Throwing subcommand is skipped, sibling subcommand and base /root still register")
     void throwingSubcommandIsIsolated() {
         StubTreeCommand root = new StubTreeCommand("rtp");
-        // A subcommand whose getParameterLookup() throws — simulates a
+        // A subcommand whose getParameterLookup() throws - simulates a
         // misbehaving plugin that NPEs while the dispatcher is being built
         // (e.g., a lazy-init parameter map blowing up because the server
         // accessor isn't bound yet on Fabric early init).
@@ -227,7 +226,7 @@ class BrigadierTreeShapeTest {
         // commands-api-ADR-001 addendum 2026-05-06e: parameters are no longer
         // attached as their own Brigadier nodes, so a throw inside a single
         // parameter's metadata callbacks (e.g., subParams()) cannot strip a
-        // sibling node — there are no per-parameter Brigadier nodes to strip.
+        // sibling node - there are no per-parameter Brigadier nodes to strip.
         // The relevant isolation invariant is now: the throwing parameter must
         // not abort the whole tree-build (root + greedy `args` slot must still
         // exist) AND `/rtp good=val` must still execute through the greedy slot.
@@ -246,7 +245,7 @@ class BrigadierTreeShapeTest {
         CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(root, permissive()));
         // The well-behaved parameter is still reachable through the greedy
-        // slot — wire-format token parses and executes server-side.
+        // slot - wire-format token parses and executes server-side.
         dispatcher.execute("rtp good=foo", new Source());
     }
 
@@ -254,7 +253,7 @@ class BrigadierTreeShapeTest {
     @DisplayName("Throwing suggestion provider does not propagate; player still sees the parameter node")
     void throwingSuggestionProviderIsIsolated() throws CommandSyntaxException {
         StubTreeCommand root = new StubTreeCommand("rtp");
-        // values() throws — the SuggestionProvider lambda must catch it and
+        // values() throws - the SuggestionProvider lambda must catch it and
         // return an empty suggestion future rather than letting the throw kill
         // the whole tab-completion path for /rtp.
         root.addParameter("p", new StringParam() {

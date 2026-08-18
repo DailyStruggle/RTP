@@ -17,13 +17,13 @@ import java.util.logging.Level;
  *   <li>{@code onEnable}: load config, start the {@link TpsMsptHeapSampler},
  *       register the {@link TeleportProbe} listener, register the
  *       {@code /rtpstress} command. No {@link MetricsRecorder} is created
- *       until the first run starts — {@link #beginRun()} rolls a fresh CSV
+ *       until the first run starts - {@link #beginRun()} rolls a fresh CSV
  *       file per run, named after the run's start timestamp.</li>
  *   <li>{@code onDisable}: stop any running test, flush the sampler,
  *       unregister the listener.</li>
  * </ol>
  *
- * <p>The class is deliberately thin — every responsibility lives in a
+ * <p>The class is deliberately thin - every responsibility lives in a
  * dedicated component (Sched / MetricsRecorder / TpsMsptHeapSampler /
  * TeleportProbe / Runner / StressCommand). This mirrors the helpers/
  * convention set by {@code PeriodicWorldSaver}: a single {@link JavaPlugin}
@@ -50,7 +50,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         // The main-thread id is whichever thread runs a one-shot sync Bukkit
         // task, which on Spigot/Paper is the server tick thread, and on Folia
         // is the global region scheduler thread (the closest analogue of "main"
-        // — region threads aren't pinned, but the global scheduler runs on the
+        // - region threads aren't pinned, but the global scheduler runs on the
         // primary scheduler dispatch thread).
         cpuSampler = new CpuSampler();
         Sched.runGlobal(this, () -> cpuSampler.recordCurrentThreadAsMain());
@@ -178,7 +178,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
     /**
      * Recorder that delegates to the plugin's current per-run
      * {@link MetricsRecorder}. When no run has started yet, completion
-     * callbacks are dropped silently — they correspond to teleports we
+     * callbacks are dropped silently - they correspond to teleports we
      * never expected anyway, since the probe's expectation map is empty.
      */
     private static final class RecorderProxy extends MetricsRecorder {

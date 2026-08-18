@@ -46,7 +46,7 @@ import java.util.logging.Level;
  *
  * <p><b>Mojmap-at-runtime simplification.</b> NeoForge ships Mojang-mapped names
  * at runtime, so this class compiles directly against {@code net.minecraft} and
- * constructs {@link NeoForgeRTPWorld} / {@link NeoForgeRTPPlayer} directly —
+ * constructs {@link NeoForgeRTPWorld} / {@link NeoForgeRTPPlayer} directly -
  * none of Fabric's reflective obf/deobf carrier dispatch is needed.</p>
  *
  * <p>No {@code org.bukkit.*} imports.</p>
@@ -96,7 +96,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     }
 
     // ---------------------------------------------------------------------------
-    // World / player registration (typed — Mojmap, no reflective dispatch)
+    // World / player registration (typed - Mojmap, no reflective dispatch)
     // ---------------------------------------------------------------------------
 
     public NeoForgeRTPWorld registerWorld(ServerLevel level) {

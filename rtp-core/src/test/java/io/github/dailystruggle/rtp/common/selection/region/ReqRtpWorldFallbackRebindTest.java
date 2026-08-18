@@ -32,19 +32,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
- * Regression test for the "deferred region binding" fix: when an automatic world generator
- * (e.g. Multiverse) loads the configured world after {@code rtp-plugin} has already
- * constructed its regions, the region must:
- *
- * <ol>
- *   <li>Detect the fallback condition via
- *       {@link RegionConfigLoader#detectFallbackConfiguredWorld}.</li>
- *   <li>Skip the destructive database hydrate at construction time (otherwise the
- *       seed-mismatch check would delete every cached-location row for the real world on
- *       each startup).</li>
- *   <li>Hydrate the cache once {@link Region#rebindWorld} is invoked after the configured
- *       world has loaded.</li>
- * </ol>
+ * Regression test for deferred region binding on late-loading worlds.
+ * Verifies fallback detection, skipped DB hydration during fallback, and proper rebind behavior.
  */
 public class ReqRtpWorldFallbackRebindTest {
 
@@ -66,7 +55,7 @@ public class ReqRtpWorldFallbackRebindTest {
     }
 
     // ------------------------------------------------------------------
-    // RegionConfigLoader.detectFallbackConfiguredWorld — pure logic
+    // RegionConfigLoader.detectFallbackConfiguredWorld - pure logic
     // ------------------------------------------------------------------
 
     @Test
@@ -117,7 +106,7 @@ public class ReqRtpWorldFallbackRebindTest {
     }
 
     // ------------------------------------------------------------------
-    // Region construction — hydrate deferral
+    // Region construction - hydrate deferral
     // ------------------------------------------------------------------
 
     @Test
@@ -170,7 +159,7 @@ public class ReqRtpWorldFallbackRebindTest {
     }
 
     // ------------------------------------------------------------------
-    // Region.rebindWorld — flips state + hydrates once
+    // Region.rebindWorld - flips state + hydrates once
     // ------------------------------------------------------------------
 
     @Test
@@ -186,7 +175,7 @@ public class ReqRtpWorldFallbackRebindTest {
             new Region("deferred_region", initial, true, "test");
         verify(db, never()).loadCachedLocations(anyString());
 
-        // Simulate WorldLoadEvent — the configured world is now available.
+        // Simulate WorldLoadEvent - the configured world is now available.
         accessor.addWorld(configuredWorld);
         RegionSettings rebound = settings("deferred_region", configuredWorld);
         region.rebindWorld(rebound);
@@ -200,7 +189,7 @@ public class ReqRtpWorldFallbackRebindTest {
     }
 
     // ------------------------------------------------------------------
-    // hydrateCacheFromDatabase — flush-after-consumption
+    // hydrateCacheFromDatabase - flush-after-consumption
     // ------------------------------------------------------------------
 
     @Test
@@ -230,7 +219,7 @@ public class ReqRtpWorldFallbackRebindTest {
 
         region.hydrateCacheFromDatabase(rows);
 
-        // Every row — consumed, per-player, or seed-rejected — must be removed from the DB.
+        // Every row - consumed, per-player, or seed-rejected - must be removed from the DB.
         verify(db).removeCachedLocation("id-1");
         verify(db).removeCachedLocation("id-2");
         verify(db).removeCachedLocation("id-3");

@@ -20,14 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Wiring coverage for the central {@link PvPGate} decision point (ADR-055).
- *
- * <p>This locks in the contract consumed by the two production call sites - the
- * {@code /rtp} pre-dispatch surface ({@code RTPCmd}) and the pre-execution
- * prefilter ({@code TeleportPipelineTask#runTeleport}) - so the later combat-tag
- * implementation has a stable, testable seam. It uses the native combat source
- * (no external provider bound) and drives state through
- * {@link PvPGate#nativeTracker()}.
+ * Unit coverage for {@link PvPGate} combat evaluation and configuration actions (ADR-055).
  */
 class PvPGateTest {
 

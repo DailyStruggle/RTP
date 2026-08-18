@@ -8,41 +8,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 
 /**
- * Fixed-size rolling time-series of selected scalar fields from
- * {@link MetricsSnapshot}, used by the {@code METRIC_SPARKLINE} chart kind.
- *
- * <p>Design:
- * <ul>
- *   <li>{@link #CAPACITY 128} slots per series (matches the vanilla map
- *       width: one column per slot in the renderer's fast path).</li>
- *   <li>Two parallel series: MSPT (milliseconds-per-tick, double encoded as
- *       millibits in a {@code long}) and heap-used bytes. Both indexed by
- *       the same monotonically-increasing {@code writeIndex} so the
- *       caller's i-th MSPT sample matches the i-th heap sample.</li>
- *   <li>Wait-free writes (CAS-free via {@link AtomicLong#getAndIncrement()}
- *       + {@link AtomicLongArray#set}). Reads are lock-free snapshots that
- *       walk the populated portion of each ring.</li>
- * </ul>
- *
- * <p>MSPT encoding: stored as {@code Double.doubleToLongBits(mspt)}; the
- * snapshot accessor unpacks via {@code Double.longBitsToDouble}. {@code NaN}
- * is preserved unchanged (the {@code UNSAMPLED} sentinel from
- * {@link MetricsSnapshot#UNSAMPLED}).
- *
- * <p>Heap encoding: stored as raw bytes ({@code long}).
- *
- * <p>Aggregation: the MSPT recorded is {@code snapshot.mspt}, which the
- * platform binding has already aggregated across Folia regions per the
- * admin-configurable {@code foliaAggregationMspt} mode ({@code max} default,
- * or {@code mean}). This keeps the sparkline consistent with the scalar MSPT
- * surfaced by {@code /rtp info} and the telemetry publishers. Only when the
- * binding leaves {@code snapshot.mspt} unsampled (e.g. per-region detail is
- * enabled but no host-scalar was produced) does the ring fall back to the
- * {@code max} across {@code MetricsSnapshot#foliaRegions} so a worst-region
- * spike still renders. Heap is a per-JVM scalar, no aggregation needed.
- * See {@link #recordFromSnapshot}.
- *
- * <p>No tick-thread blocking. No locking.
+ * Fixed-size rolling time-series of selected scalar fields from {@link MetricsSnapshot}.
+ * Used by {@code METRIC_SPARKLINE} chart rendering. Lock-free ring of 128 samples.
  */
 public final class MetricsSnapshotRing {
 
@@ -53,13 +20,7 @@ public final class MetricsSnapshotRing {
     private final AtomicLong writeIndex = new AtomicLong(0L);
 
     /**
-     * Records one sample from {@code snapshot}. MSPT is taken from
-     * {@code snapshot.mspt} (already aggregated per the configurable
-     * {@code foliaAggregationMspt} mode by the platform binding on Folia,
-     * and the single-thread value on every other runtime), falling back to
-     * the {@code max} across {@code snapshot.foliaRegions} only when the
-     * host scalar is unsampled. Heap is taken from
-     * {@code snapshot.heapUsedBytes} directly.
+     * Records one sample from {@code snapshot} (MSPT and heapUsedBytes).
      */
     public void recordFromSnapshot(MetricsSnapshot snapshot) {
         if (snapshot == null) return;

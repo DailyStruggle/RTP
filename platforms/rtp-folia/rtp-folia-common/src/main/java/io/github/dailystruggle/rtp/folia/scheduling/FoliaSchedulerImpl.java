@@ -48,7 +48,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
     }
     if (!plugin.isEnabled()) {
       // Plugin is disabling/disabled; Folia's AsyncScheduler would throw IllegalPluginAccessException.
-      // Drop the task silently — shutdown is an expected, non-teleport code path.
+      // Drop the task silently - shutdown is an expected, non-teleport code path.
       return trackedTask;
     }
     asyncScheduler.runNow(plugin, scheduledTask -> trackedTask.run());

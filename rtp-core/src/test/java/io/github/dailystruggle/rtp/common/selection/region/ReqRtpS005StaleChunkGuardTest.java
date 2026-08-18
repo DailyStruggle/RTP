@@ -26,27 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-S-005 / ADR-015 — Stale-Chunk Guard for Count-Bound Pipes.
+ * REQ-RTP-S-005 / ADR-015 - Stale-Chunk Guard for Count-Bound Pipes.
  *
- * <p>When {@code getChunkAtAsync} resolves, the follow-up block-evaluation task is
- * dispatched onto a Count-Bound task pipe (on Folia: the Region Thread scheduler).
- * If the pipe is backlogged, Folia's native chunk GC may unload the chunk before
- * the task runs. Without a guard, the subsequent {@code chunk1.isSafe(...)} call
- * would force a synchronous chunk load on the Region Thread and trip the
- * Folia Watchdog.</p>
- *
- * <p>This test flips {@link TrackedMockWorld}'s {@code isChunkLoadedPredicate} to
- * always return {@code false}, simulating the window in which Folia's native GC
- * has evicted the chunk. It then runs {@link LocationGenerator#getLocation(Region, Set)}
- * and asserts:
- * <ol>
- *   <li>The {@code safetyCheck} loop was never entered — {@code MockRTPChunk.isSafe}
- *       was never called, proving the guard aborted block evaluation before any
- *       unsafe native call could have occurred.</li>
- *   <li>The generator still returned a result object (not {@code null}) — we
- *       rejected candidates gracefully rather than throwing, preserving the
- *       REQ-RTP-S-004 "no silent discards" contract via the normal pipeline.</li>
- * </ol>
+ * <p>Asserts that unloaded center chunks bypass block evaluation to prevent sync chunk loading.
  */
 @DisplayName("REQ-RTP-S-005 / ADR-015: stale-chunk guard bypasses block evaluation")
 public class ReqRtpS005StaleChunkGuardTest {
@@ -120,7 +102,7 @@ public class ReqRtpS005StaleChunkGuardTest {
 
         GenerationResult result = LocationGenerator.getLocation(region, (Set<String>) null);
 
-        // Guard must entirely bypass MockRTPChunk.isSafe — if even one call leaked
+        // Guard must entirely bypass MockRTPChunk.isSafe - if even one call leaked
         // through, we would have been vulnerable to the synchronous-load crash on
         // a real Folia server.
         assertEquals(0, world.isSafeCallCount.get(),
@@ -148,7 +130,7 @@ public class ReqRtpS005StaleChunkGuardTest {
     void loaded_chunk_allows_block_evaluation() {
         LocationGenerator.setRng(new Random(42L));
 
-        // Default predicate (always loaded): baseline — the safetyCheck loop must run
+        // Default predicate (always loaded): baseline - the safetyCheck loop must run
         // and therefore MockRTPChunk.isSafe must be called at least once.
         world.isChunkLoadedPredicate = key -> true;
 

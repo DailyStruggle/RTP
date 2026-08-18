@@ -16,27 +16,9 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test scheduler} &mdash; actively probes each tier exposed by
- * {@link RTPScheduler} (async, primary/sync, region) and reports
- * round-trip dispatch latency. Complements the passive {@code rtp test
- * platform} probe documented in {@code RUNTIME_TEST_SUITE_PLAN.md §4}:
- * {@code platform} reports <i>what</i> is wired in, {@code scheduler}
- * proves each tier actually dispatches &mdash; which matters on Folia,
- * where a mis-routed task can stall a region thread silently.
- *
- * <p>The async path is always probed. The primary and region paths are
- * probed when a player caller is available (so we have a location for
- * region routing); from the console we skip the region probe and log an
- * INFO note rather than failing.
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>REQ-RTP-S-004</b> &mdash; every tier outcome (success, timeout,
- *       unsupported) produces a player-visible line and a
- *       {@link Level#INFO} / {@link Level#WARNING} log entry.</li>
- *   <li><b>REQ-RTP-S-005</b> &mdash; the probe does not touch chunks; it
- *       dispatches an empty {@link Runnable} to each scheduler.</li>
- * </ul>
+ * {@code rtp test scheduler} - probes {@link RTPScheduler} tiers (async, primary, region)
+ * and reports dispatch latency.
+ * Complies with REQ-RTP-S-004 (explicit feedback) and REQ-RTP-S-005 (non-blocking).
  */
 public class TestSchedulerCmd extends BaseRTPCmdImpl {
 

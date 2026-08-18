@@ -19,26 +19,10 @@ import java.util.logging.Level;
 
 /**
  * Platform-agnostic registry and lifecycle driver for {@link RTPAddon}s.
+ * Uses {@link ServiceLoader} discovery and explicit registration.
  *
- * <p>This replaces the Bukkit-only addon loading path (a {@code JavaPlugin} subclass
- * discovered by the server's plugin manager) with a pure-JDK
- * {@link ServiceLoader}-based mechanism that works identically on every platform.
- * Each addon jar declares its implementation in
- * {@code META-INF/services/io.github.dailystruggle.rtp.api.addon.RTPAddon}.
- *
- * <p>Two discovery paths are supported and may be combined:
- * <ul>
- *   <li>{@link #discover()} / {@link #discover(ClassLoader)} - {@code ServiceLoader}
- *       enumeration over a classloader (the core classloader by default).</li>
- *   <li>{@link #register(RTPAddon)} - programmatic registration, used by a platform
- *       adapter that has already loaded an addon jar (e.g. a Bukkit back-compat shim
- *       or a Fabric mod entry) and wants to hand the instance to the registry.</li>
- * </ul>
- *
- * <p>{@link #loadAll()} invokes {@link RTPAddon#onLoad()} on every registered addon
- * exactly once; {@link #unloadAll()} invokes {@link RTPAddon#onUnload()} on shutdown.
- * Both methods isolate per-addon failures so one misbehaving addon cannot abort core
- * startup or shutdown.
+ * <p>{@link #loadAll()} and {@link #unloadAll()} manage addon lifecycles
+ * while isolating per-addon errors.
  */
 public final class AddonRegistry {
 
@@ -102,19 +86,10 @@ public final class AddonRegistry {
   }
 
   /**
-   * Discovers addons from a standalone folder of jar files (e.g. {@code plugins/RTP/addons/}).
+   * Discovers addons from jar files in {@code directory}.
+   * Jars are loaded into a child {@link URLClassLoader} and scanned via {@link ServiceLoader}.
    *
-   * <p>Each {@code .jar} directly inside {@code directory} is added to a child
-   * {@link URLClassLoader} whose parent is the classloader that loaded {@code rtp-core}, so the
-   * addon's {@link RTPAddon} implementation and the {@code rtp-api}/{@code rtp-core} types it
-   * depends on resolve to the same classes the running plugin uses. {@link ServiceLoader}
-   * enumeration then registers every discovered implementation.
-   *
-   * <p>This lets server operators drop an addon jar into a dedicated RTP-owned folder instead of
-   * {@code plugins/}, where the server's plugin loader would reject it for lacking a
-   * {@code plugin.yml}. A missing or empty folder is a no-op.
-   *
-   * @param directory the folder to scan for addon jars
+   * @param directory folder to scan for addon jars
    */
   public void discoverFromDirectory(File directory) {
     if (directory == null) return;
@@ -143,31 +118,11 @@ public final class AddonRegistry {
   }
 
   /**
-   * Extracts addon jars bundled inside the running RTP jar into {@code directory}.
+   * Extracts bundled addon jars into {@code directory}.
+   * Uses a hidden {@code .bundled-addons} hash manifest to support in-place updates
+   * while respecting operator deletions and custom modifications.
    *
-   * <p>RTP ships demo/companion addons (e.g. the GUI destination picker and the
-   * claim-plugin integrations) as ordinary jars embedded on its own classpath under
-   * {@code bundled-addons/}. These are unpacked here so the operator gets them out of
-   * the box without a second download, while still being able to opt out simply by
-   * deleting the extracted jar (the deletion is recorded so the addon is not
-   * re-installed on a later run).
-   *
-   * <p>The set of bundled jars is listed, one resource name per line, in the
-   * classpath resource {@code bundled-addons/index}. A missing index, a missing jar
-   * resource, or an unwritable target is logged and skipped; extraction never aborts
-   * startup.
-   *
-   * <p>Extraction is idempotent and update-aware via a hidden {@code .bundled-addons}
-   * manifest (name + content hash of the last copy RTP wrote). On a later run an
-   * unmodified extracted jar whose bundled content has changed (i.e. the RTP jar was
-   * updated) is refreshed in place, so a fix shipped in a newer RTP build actually
-   * reaches the server instead of the first-extracted jar being loaded forever. A jar
-   * the operator has edited (its bytes differ from what RTP last wrote) is never
-   * clobbered, and a jar the operator has deleted stays deleted (a deliberate opt-out
-   * recorded in the manifest). A pre-manifest extracted jar (from a build before this
-   * mechanism) is treated as unmodified and refreshed once when its content differs.
-   *
-   * @param directory the {@code addons/} folder to populate (created here if absent)
+   * @param directory destination addons folder
    */
   public void extractBundledAddons(File directory) {
     extractBundledAddons(directory, AddonRegistry.class.getClassLoader());

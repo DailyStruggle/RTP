@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * non-blocking, CPU-bound work. Blocking it on {@link
  * java.nio.file.Files#readAllBytes} starves every other common-pool task and
  * caps effective I/O parallelism at ~CPU count. ScanTask/PregenTask probe
- * workloads want higher I/O concurrency than that — disk read + zlib inflate
+ * workloads want higher I/O concurrency than that - disk read + zlib inflate
  * parallelizes well past CPU count when there's any disk-queue capacity.</p>
  *
  * <p>Sized at {@code max(8, 2 * availableProcessors)} daemon threads. Small

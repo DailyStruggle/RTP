@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * Sequence node: an ordered list of child nodes (block-style only).
  *
- * <p>Per ADR-025 the YAML subset is block-style only — flow sequences
+ * <p>Per ADR-025 the YAML subset is block-style only - flow sequences
  * ({@code [a, b, c]}) are rejected at parse time.</p>
  */
 public final class RtpYamlSequence extends RtpYamlNode {

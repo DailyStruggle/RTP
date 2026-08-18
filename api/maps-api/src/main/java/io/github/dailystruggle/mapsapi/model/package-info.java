@@ -8,7 +8,7 @@
  *
  * <p>Every model is an immutable record with defensive copies of array /
  * collection fields so a {@code ChartRenderer} may be invoked from any thread
- * without aliasing the producer's state — see REQ-RTP-MAP-002.
+ * without aliasing the producer's state - see REQ-RTP-MAP-002.
  *
  * <p>New chart shapes shall be added to the {@code permits} clause on
  * {@code ChartModel} and documented in

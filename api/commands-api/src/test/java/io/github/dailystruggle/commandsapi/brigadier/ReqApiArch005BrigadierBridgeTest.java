@@ -25,7 +25,7 @@ import java.util.function.Predicate;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * REQ-API-ARCH-005 — Brigadier boundary (commands-api-ADR-001).
+ * REQ-API-ARCH-005 - Brigadier boundary (commands-api-ADR-001).
  *
  * Verifies the Brigadier bridge produced by {@link BrigadierCommandAdapter}:
  *  - emits literal nodes for sub-commands,
@@ -115,7 +115,7 @@ class ReqApiArch005BrigadierBridgeTest {
         CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(root, ctx));
 
-        // Execute the root literal — root's stub onCommand should fire.
+        // Execute the root literal - root's stub onCommand should fire.
         int result = dispatcher.execute("rtp", source);
         assertEquals(1, result, "Brigadier should report success on commands-api TRUE result");
         assertEquals(source.id, capturedCaller.get(), "caller UUID propagated through bridge");

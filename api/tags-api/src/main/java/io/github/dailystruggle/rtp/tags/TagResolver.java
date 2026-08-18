@@ -121,7 +121,7 @@ public final class TagResolver {
 
   /**
    * Ensure a reference has a namespace, defaulting to {@code "minecraft"} for
-   * bare ids — matching vanilla loader behaviour.
+   * bare ids - matching vanilla loader behaviour.
    */
   private static String normaliseReference(String ref) {
     return ref.indexOf(':') >= 0 ? ref : "minecraft:" + ref;

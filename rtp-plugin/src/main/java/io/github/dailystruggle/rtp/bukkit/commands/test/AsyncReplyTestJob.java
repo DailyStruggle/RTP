@@ -269,7 +269,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
               // tier on Folia: RTP.scheduler.runTaskAsynchronously and the
               // async chunk-load CompletableFuture chain frequently complete
               // there. The hard rule from REQUIREMENTS.md §3 is "no blocking
-              // on a region/main thread" — FJP satisfies that.
+              // on a region/main thread" - FJP satisfies that.
               || lower.contains("forkjoinpool");
       reason =
           permitted
@@ -280,7 +280,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
       // "craft scheduler" matches CraftBukkit's async scheduler thread names
       // (e.g. "Craft Scheduler Thread - 3 - RTP"), which is the canonical
       // worker pool for BukkitScheduler#runTaskAsynchronously and is safe
-      // for CommandSender#sendMessage. Intentionally permissive — see
+      // for CommandSender#sendMessage. Intentionally permissive - see
       // REQ-RTP-S-004 auditor notes in AGENTS.md.
       String lower = threadName.toLowerCase(Locale.ROOT);
       permitted =

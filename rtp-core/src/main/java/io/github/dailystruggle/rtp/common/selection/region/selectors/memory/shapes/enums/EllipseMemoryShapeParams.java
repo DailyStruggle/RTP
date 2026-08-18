@@ -2,14 +2,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 /**
  * Configurable parameters for the {@link
- * io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Ellipse}
- * shape.
- *
- * <p>Mirrors {@link GenericMemoryShapeParams} and adds the second semi-axis
- * {@link #radius2}. Hosted on a dedicated enum so {@code Circle}, {@code Square}
- * and other single-radius shapes do not need to carry a meaningless {@code
- * radius2} default just to satisfy the {@code Shape} constructor's "all enum
- * constants present" invariant.
+ * io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Ellipse} shape.
+ * Extends {@link GenericMemoryShapeParams} with second semi-axes {@code radius2} and {@code centerRadius2}.
  */
 public enum EllipseMemoryShapeParams {
   /** Selection mode. @see GenericMemoryShapeParams#mode */

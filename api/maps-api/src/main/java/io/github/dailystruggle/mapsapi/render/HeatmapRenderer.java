@@ -13,7 +13,7 @@ import io.github.dailystruggle.mapsapi.model.Heatmap2D;
  * <p>Renders nearest-neighbour: each canvas pixel samples the model cell at
  * {@code (x * model.width() / canvas.width(), y * model.height() / canvas.height())}.
  * Samples outside {@code [minValue, maxValue]} are clamped before
- * normalisation. No chunk I/O, no blocking futures — REQ-RTP-MAP-002.
+ * normalisation. No chunk I/O, no blocking futures - REQ-RTP-MAP-002.
  */
 public final class HeatmapRenderer implements ChartRenderer<Heatmap2D> {
 

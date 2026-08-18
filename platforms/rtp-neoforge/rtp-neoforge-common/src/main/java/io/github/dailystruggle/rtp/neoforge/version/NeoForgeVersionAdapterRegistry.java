@@ -14,7 +14,7 @@ import java.util.logging.Level;
  * adapter. Lookups before the bootstrap has run throw
  * {@link IllegalStateException} per S-006 (no silent no-op on early-API calls).</p>
  *
- * <p>Internal NeoForge platform glue — not part of the public {@code rtp-api}
+ * <p>Internal NeoForge platform glue - not part of the public {@code rtp-api}
  * surface. See rtp-neoforge-ADR-001.</p>
  */
 public final class NeoForgeVersionAdapterRegistry {
@@ -53,7 +53,7 @@ public final class NeoForgeVersionAdapterRegistry {
 
     /**
      * Returns the active adapter, or throws {@link IllegalStateException} if the
-     * bootstrap has not yet installed one (REQ-RTP-S-006 — fail loud, do not
+     * bootstrap has not yet installed one (REQ-RTP-S-006 - fail loud, do not
      * silently no-op).
      */
     public static NeoForgeVersionAdapter require() {
@@ -68,7 +68,7 @@ public final class NeoForgeVersionAdapterRegistry {
 
     /**
      * Returns the active adapter, or {@code null} if not yet installed. Prefer
-     * {@link #require()} on hot paths — null returns are reserved for defensive
+     * {@link #require()} on hot paths - null returns are reserved for defensive
      * shutdown and test plumbing.
      */
     public static NeoForgeVersionAdapter peek() {
@@ -81,7 +81,7 @@ public final class NeoForgeVersionAdapterRegistry {
     }
 
     /**
-     * Tests-only — clears the active adapter. Production code shall not call
+     * Tests-only - clears the active adapter. Production code shall not call
      * this; it exists so tests can simulate cold bootstrap.
      */
     public static void clearForTesting() {

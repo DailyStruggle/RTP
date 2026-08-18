@@ -24,7 +24,7 @@ import java.util.logging.Level;
  * helpers; genuinely divergent steps (login cache, language bootstrap, integrations,
  * effect parsing, Folia branch) stay in {@code RTPBukkitPlugin} alone.
  *
- * <p>This class is intentionally package-private at construction time — it is a
+ * <p>This class is intentionally package-private at construction time - it is a
  * static-helper holder, not a service.
  */
 public final class BootstrapSupport {

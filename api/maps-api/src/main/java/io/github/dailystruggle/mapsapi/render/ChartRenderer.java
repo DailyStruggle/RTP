@@ -26,7 +26,7 @@ public interface ChartRenderer<M extends ChartModel> {
 
     /**
      * Renders {@code model} onto {@code canvas}. Implementations shall not
-     * call {@link MapCanvas#commit()} — the binding owns commit timing so it
+     * call {@link MapCanvas#commit()} - the binding owns commit timing so it
      * can hop to the correct platform thread (REQ-RTP-MAP-003).
      */
     void render(MapCanvas canvas, M model);

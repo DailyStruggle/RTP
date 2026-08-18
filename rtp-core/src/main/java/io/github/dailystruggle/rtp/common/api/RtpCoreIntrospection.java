@@ -10,28 +10,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Read-only introspection facade over RTP's live region/cache state, exposed
- * for third-party GUI and dashboard authors.
+ * Read-only introspection facade over RTP's live region and cache state.
  *
- * <p><b>Stability: UNSTABLE.</b> This type lives in {@code rtp-core}, not
- * {@code rtp-api}, by design (see {@code docs/dev/scratch/PROPOSAL-gui-author-spi.md}
- * §3.2). It is "callable but unstable": authors who want deeper access than the
- * semver-stable {@code rtp-api} surface ({@code RTPAPI.queueDepth},
- * {@code RTPAPI.getAllowedTargets}, ...) may link {@code rtp-core} and use this,
- * accepting that its shape may change between minor versions.
- *
- * <p><b>Safety:</b> every method here is strictly read-only. No mutator, no
- * teleport primitive, and nothing that could bypass permission gating or the
- * S-001..S-007 prohibitions is exposed. Teleports still route only through the
- * validated {@code RTPAPI.teleport(UUID, RtpTarget)} intent. Reads are
- * instantaneous samples of in-memory lock-free buffers and never perform chunk
- * I/O (S-005) or block.
- *
- * <p>Unlike the {@code rtp-api} entry points, these methods do <em>not</em>
- * throw when core is not yet loaded: they degrade to an empty result, since a
- * dashboard polling before startup should render "nothing ready" rather than
- * crash. This is a deliberate departure from REQ-RTP-S-006, which governs the
- * {@code rtp-api} contract, not this unstable hook.
+ * <p>Exposes unstable internal state for GUI and dashboard integrations without chunk I/O.</p>
  */
 public final class RtpCoreIntrospection {
 

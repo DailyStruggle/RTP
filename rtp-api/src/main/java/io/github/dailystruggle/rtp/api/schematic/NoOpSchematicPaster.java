@@ -5,15 +5,9 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Default {@link SchematicPaster} installed in every adapter's swappable holder until a
- * native (WorldEdit/FAWE or Fabric-NBT) paster, or an addon-supplied one, replaces it.
+ * Default no-op {@link SchematicPaster} singleton (ADR-058, S-006).
  *
- * <p>Being a no-op singleton (never {@code null}) satisfies S-006: schematic API entry
- * points never NPE. Every call reports {@link PasteResult#SKIPPED_UNSUPPORTED} so the
- * core invocation point audits the absence of a real paster exactly once and proceeds
- * with the teleport unmodified.
- *
- * <p>See ADR-058 §2.
+ * <p>Returns {@link PasteResult#SKIPPED_UNSUPPORTED} and completes empty futures.
  */
 public final class NoOpSchematicPaster implements SchematicPaster {
   /** Shared stateless instance. */

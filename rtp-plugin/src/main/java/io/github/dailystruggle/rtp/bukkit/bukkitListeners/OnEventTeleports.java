@@ -322,7 +322,7 @@ public class OnEventTeleports implements Listener {
   }
 
   /**
-   * ADR-023 — pre-fill the player's {@code fastLocations} entry with a
+   * ADR-023 - pre-fill the player's {@code fastLocations} entry with a
    * pre-generated location from the default-world region's login reserve
    * cache, when {@code PerformanceKeys.loginCacheEnabled=true}.
    *

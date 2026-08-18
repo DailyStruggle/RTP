@@ -31,19 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-MAP-006 / ADR-047 — Stage 1 resolver coverage:
- *
- * <ul>
- *   <li>Happy path: known region + non-empty {@code badKeysCache} ->
- *       {@link Heatmap2D} bucketed into {@code BINS x BINS}.</li>
- *   <li>Failure: unknown region -> {@code UnresolvableChartSpecException}.</li>
- *   <li>Failure: empty {@code badKeysCache} -> {@code UnresolvableChartSpecException}.</li>
- *   <li>Failure: wrong {@code ChartSpec.Kind} -> {@code UnresolvableChartSpecException}.</li>
- * </ul>
- *
- * <p>S-005: no chunk I/O on any path (resolver reads only the volatile
- * snapshot). S-004: every failure exits via a thrown exception, never a
- * silent {@code null}.
+ * Resolver tests for {@link BadPointsHeatmapResolver} (REQ-RTP-MAP-006 / ADR-047).
+ * Verifies heatmap generation, error throwing (S-004), and no chunk I/O (S-005).
  */
 @DisplayName("REQ-RTP-MAP-006 - BadPointsHeatmapResolver Stage 1 contract")
 class BadPointsHeatmapResolverTest {

@@ -5,8 +5,8 @@ import java.util.Objects;
 
 /**
  * Immutable view of a section's biome palette + packed-index array (ADR-016
- * Phase 2 / §4). Like {@link PaletteSection} but: 4×4×4 cell resolution
- * (64 cells/section) and bits-per-entry {@code max(1, ceil(log2(size)))} —
+ * §4). Like {@link PaletteSection} but: 4×4×4 cell resolution
+ * (64 cells/section) and bits-per-entry {@code max(1, ceil(log2(size)))} -
  * biome palettes have a 1-bit minimum (blocks: 4-bit), so this carries its
  * own decoder. Layout is YZX-major: {@code idx = (cellY<<4)|(cellZ<<2)|cellX}.
  * Identifiers are raw on-disk strings; caller normalises.

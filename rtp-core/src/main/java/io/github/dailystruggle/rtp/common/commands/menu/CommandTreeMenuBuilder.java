@@ -31,62 +31,27 @@ import java.util.UUID;
 import java.util.function.Predicate;
 /**
  * Command-tree menu reflector (ADR-044).
- *
- * <p>Given a {@code commands-api} {@link TreeCommand} node, the caller's UUID, a
- * permission {@link Predicate}, and a {@link MenuConsumerProfile}, walks
- * {@link TreeCommand#getCommandLookup()} and {@link TreeCommand#getParameterLookup()}
- * filtered by {@link CommandsAPICommand#permission()} to produce a {@link MenuModel}.
- *
- * <p>Hover-text resolution per ADR-044 §4:
- *
- * <ol>
- *   <li>{@code commentLookup().commentFor(fileBasename, dottedKeyPath)} — the
- *       per-consumer {@link YamlCommentLookup}.</li>
- *   <li>Declared parameter type + bounds, formatted from
- *       {@code messages.yml → menu.hoverFallback.type} / {@code .bounds}.</li>
- *   <li>{@code null} (no hover) when neither path produced text.</li>
- * </ol>
- *
- * <p>Command-fragment hover always comes from
- * {@link CommandsAPICommand#description()} (resolved from {@code messages.yml}).
- *
- * <p>The reflector does not store renderer or platform types; the returned
- * {@link MenuModel} is plain-text and consumed by a {@code MenuRenderer}.
- * It mints one token per clickable fragment so the rendered click event can
- * carry the opaque {@code menu:<token>} payload per ADR-035 §3.
+ * Reflects {@link TreeCommand} nodes into plain-text {@link MenuModel}s for
+ * rendering by {@code MenuRenderer}. Resolves hover text from {@link YamlCommentLookup},
+ * parameter types/bounds, or command descriptions.
  */
 public final class CommandTreeMenuBuilder {
 
     /**
-     * Stage A.6 — number of suggestion value rows packed onto a single
-     * parameter-value picker page before overflow rows are sliced onto
-     * subsequent {@link MenuPage}s. Picked so the back + header + type +
-     * value rows + optional prev/next nav rows all fit comfortably within
-     * a typical Adventure {@code Book} page (~14 visible lines). Large
-     * suggestion sets (e.g. biome names) span multiple pages with
-     * {@link MenuAction.ChangePage} nav rows.
+     * Number of suggestion value rows per parameter-value picker page before
+     * overflow rows are sliced onto subsequent {@link MenuPage}s. Fits within ~14 lines.
      */
     public static final int PICKER_VALUES_PER_PAGE = 10;
 
     /**
-     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
-     * emits concrete {@code /rtp menu ...} commands, so no token registry or
-     * TTL is consulted any more.
+     * No-arg constructor. The renderer emits concrete {@code /rtp menu ...}
+     * commands, so no token registry or TTL is consulted.
      */
     public CommandTreeMenuBuilder() {
     }
 
     /**
-     * Back-compatible 4-arg form. Delegates to the 5-arg
-     * {@link #build(TreeCommand, UUID, Predicate, MenuConsumerProfile, List)}
-     * with an empty {@code assembledPath} (i.e. treats {@code root} as the
-     * top-level {@code /rtp} menu page - no Back row, no Execute row).
-     *
-     * @param root       the command tree node to reflect
-     * @param callerId   UUID of the viewing player
-     * @param permission permission probe for the viewer
-     * @param profile    consumer profile controlling label/prefix rendering
-     * @return the assembled {@link MenuModel}
+     * Back-compatible 4-arg overload. Delegates to 5-arg build with empty path.
      */
     public MenuModel build(TreeCommand root,
                            UUID callerId,
@@ -96,44 +61,8 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Reflect {@code root} for {@code callerId} filtered by {@code permission}
-     * and parameterized by {@code profile}, returning a single-page
-     * {@link MenuModel}. {@code assembledPath} is the args from the {@code /rtp}
-     * root down to (and including) {@code root}'s position in the live command
-     * tree (e.g. {@code ["config", "performance"]} for {@code /rtp config performance});
-     * an empty list means {@code root} is the top-level {@code /rtp} menu page.
-     *
-     * <p>Layout of the produced page (Stage A.1 — minimum viable navigation):
-     * <ol>
-     *   <li><b>Back row</b> ({@code OpenMenu(<assembledPath minus last>)}) —
-     *       prepended only when {@code assembledPath} is non-empty.</li>
-     *   <li><b>Execute row</b> ({@code RunRtpCommand(<assembledPath>)}) —
-     *       prepended only when {@code assembledPath} is non-empty (i.e. the
-     *       node is a runnable {@code /rtp …} tail).</li>
-     *   <li><b>Subcommand rows</b> — for each visible sub of {@code root},
-     *       skipping {@code help} and {@code menu}. Subs with navigable
-     *       content (further subs after exclusions, or any parameters) emit
-     *       {@link MenuAction.OpenMenu} so clicking descends. Pure-leaf subs
-     *       emit {@link MenuAction.RunRtpCommand} so clicking executes.</li>
-     *   <li><b>Parameter rows</b> — {@link MenuAction.SuggestInput} chat
-     *       prefill (unchanged from pre-Stage-A behaviour; enumerable-param
-     *       sub-pages are deferred to Stage A.2).</li>
-     * </ol>
-     *
-     * <p>Inaccessible subcommands (those whose {@link CommandsAPICommand#permission()}
-     * is non-empty and rejected by {@code permission.test(...)}) are
-     * <em>fully hidden</em>, not greyed out (ADR-035 amendment 2026-05-15,
-     * checklist scope answer A). Both {@code help} and {@code menu} are
-     * additionally excluded: the menu is already the navigable rendering of
-     * the tree, so a clickable {@code help} would dump plaintext, and a
-     * clickable {@code menu} would loop the player back into the same page.
-     *
-     * @param root          the command tree node to reflect
-     * @param callerId      UUID of the viewing player
-     * @param permission    permission probe for the viewer
-     * @param profile       consumer profile controlling label/prefix rendering
-     * @param assembledPath path segments from {@code /rtp} root down to this node
-     * @return the assembled {@link MenuModel}
+     * Reflects {@code root} for {@code callerId} into a single-page {@link MenuModel}.
+     * Emits back/execute rows if {@code assembledPath} is non-empty.
      */
     public MenuModel build(TreeCommand root,
                            UUID callerId,
@@ -148,10 +77,10 @@ public final class CommandTreeMenuBuilder {
 
         List<MenuLine> lines = new ArrayList<>();
 
-        // 0root. Root-page UX framing — non-clickable title + hint rows
+        // 0root. Root-page UX framing - non-clickable title + hint rows
         //    prepended only on the root /rtp menu page (assembledPath empty)
         //    so the menu has visible framing before the player descends
-        //    into any subcommand. Stage A.5 — REQ-RTP-F-013.
+        //    into any subcommand. REQ-RTP-F-013.
         if (assembledPath.isEmpty()) {
             String title = lookupMsg(CommandMessages.menuRootTitle, "&6&l⚡ RTP menu");
             if (title != null && !title.isEmpty()) {
@@ -164,11 +93,11 @@ public final class CommandTreeMenuBuilder {
             }
         }
 
-        // 0. Constructed-command header — non-clickable breadcrumb showing
+        // 0. Constructed-command header - non-clickable breadcrumb showing
         //    the full /rtp invocation currently being assembled, including
         //    any staged `name:value` parameter assignments riding in
         //    assembledPath. Prepended only on non-root pages (the root /rtp
-        //    menu page has nothing to show). Stage A.4 — REQ-RTP-F-013.
+        //    menu page has nothing to show). REQ-RTP-F-013.
         if (!assembledPath.isEmpty()) {
             String headerTmpl = lookupMsg(CommandMessages.menuConstructed,
                     "building: /rtp [command]");
@@ -177,7 +106,7 @@ public final class CommandTreeMenuBuilder {
             lines.add(MenuLine.of(new MenuFragment(headerLabel, null, null)));
         }
 
-        // 0a. Back row — only for non-root pages.
+        // 0a. Back row - only for non-root pages.
         if (!assembledPath.isEmpty()) {
             String[] parentPath = assembledPath.subList(0, assembledPath.size() - 1)
                     .toArray(new String[0]);
@@ -186,7 +115,7 @@ public final class CommandTreeMenuBuilder {
                     new MenuAction.OpenMenu(parentPath))));
         }
 
-        // 0b. Execute row — only for non-root pages (root /rtp menu has no
+        // 0b. Execute row - only for non-root pages (root /rtp menu has no
         //     useful assembled command to execute; it would just re-open the
         //     menu page we're already on).
         if (!assembledPath.isEmpty()) {
@@ -206,7 +135,7 @@ public final class CommandTreeMenuBuilder {
                 String name = e.getKey();
                 // `help` is a meta-command (renders text help); excluded from
                 // menus because the menu itself is the navigable rendering of
-                // the same tree — a clickable `help` would dispatch a plaintext
+                // the same tree - a clickable `help` would dispatch a plaintext
                 // help dump on click. `menu` is excluded because clicking it
                 // would re-open the very page the player is on.
                 if (name != null
@@ -246,8 +175,8 @@ public final class CommandTreeMenuBuilder {
             }
         }
 
-        // 2. Parameter rows. Stage A.2: when the parameter exposes any
-        //    suggestions (via relevantValues(callerId) — the same source that
+        // 2. Parameter rows. When the parameter exposes any
+        //    suggestions (via relevantValues(callerId) - the same source that
         //    feeds tab-completion), clicking opens a value-picker sub-page
         //    (MenuAction.OpenParamPicker, server-resolved by
         //    MenuRedeemSubcommand). Otherwise we fall back to SuggestInput
@@ -275,7 +204,6 @@ public final class CommandTreeMenuBuilder {
             }
         }
 
-        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
         // Renderer emits concrete /rtp menu ... commands; no token is consulted.
 
         String title = root.name() == null ? "" : root.name();
@@ -283,11 +211,11 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * "Navigable content" predicate (Stage A.1): a sub-{@link TreeCommand} is
+     * "Navigable content" predicate: a sub-{@link TreeCommand} is
      * treated as menu-navigable (clicking it opens its own page) when, after
      * excluding {@code help} and {@code menu}, it exposes at least one visible
      * sub-command <em>or</em> at least one visible parameter under the caller's
-     * permission view. Otherwise it is a pure leaf — clicking it executes the
+     * permission view. Otherwise it is a pure leaf - clicking it executes the
      * subcommand directly.
      */
     private static boolean hasNavigableContent(TreeCommand sub, Predicate<String> permission) {
@@ -369,13 +297,9 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Stage A.2 suggestion source for the parameter-value picker. Prefers
-     * {@link CommandParameter#relevantValues(UUID)} (the same set that feeds
-     * tab-completion and is already filtered by
-     * {@code isSuggestionRelevant(senderId, value)}); falls back to
-     * {@link CommandParameter#values()} if the relevance hook throws. Returns
-     * {@code null} only on a thrown exception from both calls — an empty set
-     * is returned literally so the caller can branch on emptiness alone.
+     * Suggestion source for parameter-value picker. Prefers
+     * {@link CommandParameter#relevantValues(UUID)}, falling back to
+     * {@link CommandParameter#values()} if relevance check throws.
      */
     private static Set<String> safeSuggestions(CommandParameter param, UUID senderId) {
         try {
@@ -388,37 +312,8 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Stage A.2: build a parameter-value picker sub-page for {@code paramName}
-     * declared on {@code parent} (the {@link TreeCommand} reached by
-     * {@code parentPath} under {@code /rtp}).
-     *
-     * <p>Layout:
-     * <ol>
-     *   <li><b>Back row</b> — {@code OpenMenu(parentPath)} so the player can
-     *       return to the parent command page.</li>
-     *   <li><b>Header row</b> — non-clickable label from {@code messages.yml}
-     *       key {@code menuPickValue} with the parameter name and assembled
-     *       command interpolated in. Acts as breadcrumb / orientation.</li>
-     *   <li><b>"Type a value" fallback</b> — {@link MenuAction.SuggestInput}
-     *       prefill, lets the player enter values outside the suggestion list.</li>
-     *   <li><b>Value rows</b> — one {@link MenuAction.RunRtpCommand} per
-     *       suggestion from {@link CommandParameter#relevantValues(UUID)},
-     *       each carrying the assembled command tail with
-     *       {@code paramName:value} appended.</li>
-     * </ol>
-     *
-     * <p>If the parameter doesn't exist on {@code parent} or has no
-     * suggestions, the page contains just Back + a header row indicating
-     * the empty state - the caller (MenuRedeemSubcommand) is expected to
-     * have already validated reachability, so this branch is defensive only.
-     *
-     * @param parent     the command tree node that owns the parameter
-     * @param callerId   UUID of the viewing player
-     * @param permission permission probe for the viewer
-     * @param profile    consumer profile controlling label/prefix rendering
-     * @param parentPath path segments from {@code /rtp} root down to {@code parent}
-     * @param paramName  name of the parameter to pick a value for
-     * @return the assembled {@link MenuModel}
+     * Builds parameter-value picker sub-page for {@code paramName} on {@code parent}.
+     * Emits back, header, optional anvil/type prompt, and paginated suggestion rows.
      */
     public MenuModel buildParamPicker(TreeCommand parent,
                                       UUID callerId,
@@ -438,7 +333,7 @@ public final class CommandTreeMenuBuilder {
         MenuLine backLine = MenuLine.of(new MenuFragment(backLabel, null,
                 new MenuAction.OpenMenu(parentPath.toArray(new String[0]))));
 
-        // Header row (non-clickable, no action — orientation only).
+        // Header row (non-clickable, no action - orientation only).
         String assembledStr = String.join(" ", parentPath);
         String headerTmpl = lookupMsg(CommandMessages.menuPickValue,
                 "pick a value for [param] (will run: /rtp [command] [param]:<value>)");
@@ -465,7 +360,7 @@ public final class CommandTreeMenuBuilder {
             }
         }
 
-        // "Type a value..." fallback — chat-prefill, lets the player enter
+        // "Type a value..." fallback - chat-prefill, lets the player enter
         // free-form values (numeric ranges, custom strings) without leaving
         // the menu flow.
         Deque<String> chatPath = new ArrayDeque<>();
@@ -488,19 +383,19 @@ public final class CommandTreeMenuBuilder {
         }
         String typeLabel = lookupMsg(CommandMessages.menuTypeValue,
                 "✎ type a custom value...");
-        // ADR-045 — on renderers that support it (Paper/Folia BookMenuRenderer),
+        // ADR-045 - on renderers that support it (Paper/Folia BookMenuRenderer),
         // this row opens an anvil GUI; the renderer mints a token bound to a
         // sibling subcommand which opens the anvil server-side and submits
         // `/rtp <parentPath...> <paramName>=<typed>` on confirm. Renderers
         // that don't support anvil input fall back to chat-prefill semantics
         // by re-rendering this action as a `SuggestInput(typePrefix)` click.
         String[] parentPathArr = parentPath.toArray(new String[0]);
-        // PROPOSAL-config-staging-cart §6 — when the picker is rendered from a
-        // /rtp config <file> context, mint the anvil prompt in STAGE mode so
-        // anvil-confirm pushes (file, key, value) into the per-player staging
-        // cart and reopens /rtp config <file> instead of running the single
-        // assignment immediately. Non-config contexts (regular command param
-        // pickers) keep the legacy RUN behavior via the 3-arg constructor.
+        // When the picker is rendered from a /rtp config <file> context, mint
+        // the anvil prompt in STAGE mode so anvil-confirm pushes (file, key,
+        // value) into the per-player staging cart and reopens /rtp config
+        // <file> instead of running the single assignment immediately.
+        // Non-config contexts (regular command param pickers) keep the RUN
+        // behavior via the 3-arg constructor.
         MenuAction.Mode promptMode =
                 (!parentPath.isEmpty()
                         && "config".equalsIgnoreCase(parentPath.get(0)))
@@ -509,15 +404,7 @@ public final class CommandTreeMenuBuilder {
         MenuLine typeLine = MenuLine.of(new MenuFragment(typeLabel, null,
                 new MenuAction.PromptAnvilInput(parentPathArr, paramName, "", promptMode)));
 
-        // The region / world pickers enumerate a closed set of destinations
-        // (the configured regions / worlds). A free-form "type a custom
-        // value..." row only invites invalid input there and clutters what
-        // should be a clean, colorized list of destinations, so it is omitted
-        // for those two pickers. The prefab selection picker (the `id`
-        // parameter under `admin prefab apply`) is likewise a closed set of
-        // bundled prefabs: a custom value can never resolve to a real prefab,
-        // so the row is just noise there too. Every other parameter (free-form
-        // numerics, config keys, etc.) keeps the chat/anvil prefill fallback.
+        // Omit custom "type a value..." row for closed enumerable sets (regions/worlds/prefabs).
         boolean prefabIdPicker =
                 "id".equalsIgnoreCase(paramName)
                         && parentPath.stream().anyMatch("prefab"::equalsIgnoreCase);
@@ -526,7 +413,7 @@ public final class CommandTreeMenuBuilder {
                         || "world".equalsIgnoreCase(paramName)
                         || prefabIdPicker;
 
-        // Build value rows — Stage A.3: clicking a suggested value *stages*
+        // Build value rows: clicking a suggested value *stages*
         // the assignment into the assembled path (re-opens the parent command
         // page with `paramName=value` appended) rather than executing
         // immediately. Execution is then explicit via the parent page's
@@ -546,15 +433,7 @@ public final class CommandTreeMenuBuilder {
                         openArgs[i] = parentPath.get(i);
                     }
                     openArgs[parentPath.size()] = paramName + "=" + value;
-                    // Book parchment contrast: clickable value rows default to
-                    // vanilla book yellow on Paper Books; prefix &2 (dark
-                    // green) so the row reads cleanly against parchment. Per
-                    // .junie/AGENTS.md 'Book Menu Color Contrast'. ADR-063:
-                    // biome rows are tinted by their map color (parchment-safe
-                    // dark legacy code) so each biome is visually distinct;
-                    // world rows are tinted by the average of the biome map
-                    // colors observed in that world, again clamped for the
-                    // parchment background.
+                    // Contrast & tint (ADR-063): use parchment-safe color prefixes (&2 or tinted).
                     String colorPrefix;
                     if ("biome".equalsIgnoreCase(paramName)) {
                         colorPrefix = MenuColor.biomeColorPrefix(value);
@@ -571,15 +450,7 @@ public final class CommandTreeMenuBuilder {
             }
         }
 
-        // Stage A.6 — paginate value rows. The Adventure Book renderer caps
-        // visible lines per page (~14 typical); large suggestion sets such
-        // as biome names overflow a single page and the tail would be
-        // invisible. Split into chunks of {@code PICKER_VALUES_PER_PAGE},
-        // repeating back+header+type on every page so navigation works from
-        // any page, and append prev/next ChangePage rows where applicable.
-        // Single-page case (suggestions <= cap) preserves the original
-        // 3-row scaffold + N value rows layout, so existing tests / book
-        // renderings are unchanged.
+        // Paginate value rows across pages with prev/next navigation (fits ~14 lines/page).
         final int valuesPerPage = PICKER_VALUES_PER_PAGE;
         int totalPages = valueLines.isEmpty()
                 ? 1
@@ -614,36 +485,16 @@ public final class CommandTreeMenuBuilder {
 
         // Mint tokens for every clickable fragment (same contract as build()).
         // Each page repeats back/type rows, so each repeat mints its own
-        // fresh token — ChangePage clicks are renderer-resolved and don't
+        // fresh token - ChangePage clicks are renderer-resolved and don't
         // need a server token, but the renderer still mints one uniformly
         // (matches build() and the existing ChangePage handling in tests).
-        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
 
         String title = (parent.name() == null ? "" : parent.name()) + ":" + paramName;
         return new MenuModel(title, pages);
     }
 
     /**
-     * Build the curated config-selector page (PROPOSAL-config-view-as-book.md
-     * v3.7 — checklist step 3).
-     *
-     * <p>Layout: a Back row (to the {@code /rtp} root, i.e. empty path), a
-     * non-clickable header row, and one row per entry in {@code fileNames}.
-     * Each file row carries {@link MenuAction.OpenConfigFile} whose redeem
-     * (server-side, deferred to checklist step 5) shall render the per-file
-     * key list page via {@link #buildConfigFile}.
-     *
-     * <p>The caller supplies the file-name list explicitly (rather than the
-     * builder reaching into {@link RTP#configs}) so this method stays unit-
-     * testable without a fully-wired runtime. Production callers shall pass
-     * the keys of {@code RTP.configs.configParserMap} translated to their
-     * baseline file names. The list is iterated in encounter order — the
-     * caller is responsible for stable ordering.
-     *
-     * <p>This builder is platform-neutral plumbing. It does <em>not</em>
-     * enforce the {@code rtp.config.view} permission: gating happens (a) at
-     * the row that opens the selector from the root page and (b) in the
-     * redeem dispatch (checklist step 5).
+     * Builds curated config-selector page listing config files in encounter order.
      *
      * @param callerId  UUID of the viewing player
      * @param fileNames ordered list of config file names to display
@@ -654,28 +505,8 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Build the recursive config-directory selector page (ADR-071 rule 7).
-     *
-     * <p>A directory page is the uniform primitive the editor walks at every
-     * level: it lists the directory's child directories (each descending via a
-     * fresh {@link MenuAction.OpenConfigSelector} for the deeper path) and its
-     * member files (each opening the per-file key page via
-     * {@link MenuAction.OpenConfigFile}). The root page ({@code subDir == ""})
-     * additionally carries the cross-config search row and the
-     * {@code regions}/{@code worlds}/{@code effects} {@code MultiConfigParser}
-     * directory nodes; a nested page's Back row returns to its parent
-     * directory instead of the {@code /rtp menu} root.
-     *
-     * <p>The caller supplies the child-directory and file-name lists explicitly
-     * (rather than the builder reaching into {@link RTP#configs}) so this method
-     * stays unit-testable. Both lists are rendered in encounter order — the
-     * caller is responsible for stable ordering.
-     *
-     * @param callerId  UUID of the viewing player
-     * @param subDir    forward-slashed relative directory path; {@code ""} is root
-     * @param childDirs immediate child directory names under {@code subDir}
-     * @param fileNames config file names directly in {@code subDir}
-     * @return the assembled {@link MenuModel}
+     * Builds recursive config-directory selector page (ADR-071 rule 7).
+     * Lists child directories and member files with Back navigation.
      */
     public MenuModel buildConfigSelector(UUID callerId, String subDir,
                                          List<String> childDirs, List<String> fileNames) {
@@ -696,20 +527,19 @@ public final class CommandTreeMenuBuilder {
         lines.add(MenuLine.of(new MenuFragment(backLabel, null, backAction)));
 
         if (root) {
-            // Search row — opens an anvil-input prompt for a cross-config
-            // substring search (PROPOSAL-rtp-menu-config-search.md §10 item 6).
-            // Only meaningful at the root since search spans all configs.
+            // Search row - opens an anvil-input prompt for a cross-config
+            // substring search. Only meaningful at the root since search spans all configs.
             lines.add(MenuLine.of(new MenuFragment("&b&l⚲ search configs", null,
                     new MenuAction.OpenConfigSearchPrompt())));
         }
 
-        // Header — non-clickable orientation row.
+        // Header - non-clickable orientation row.
         String headerText = root ? "&1&lconfig files" : "&1&l" + subDir + "/";
         lines.add(MenuLine.of(new MenuFragment(headerText, null, null)));
 
         if (root) {
-            // CHECKLIST-multiconfig-menu: Regions / Worlds / Effects submenu
-            // entry points. These per-kind MultiConfigParser selectors are
+            // Regions / Worlds / Effects submenu entry points.
+            // These per-kind MultiConfigParser selectors are
             // directory nodes in the recursive walk (ADR-071 rule 7) and are
             // handled by MultiConfigMenuBuilder.
             String regionsLabel = lookupMsg(
@@ -769,30 +599,7 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Build the per-file config page (PROPOSAL-config-view-as-book.md v3.7
-     * — checklist step 3).
-     *
-     * <p>Layout: a Back row (to the config selector), a non-clickable header
-     * row, and one row per enum key in {@code parser}'s {@code myClass}.
-     * Each key row carries {@link MenuAction.OpenConfigKey} whose redeem
-     * (server-side, deferred to checklist step 5) shall delegate to
-     * {@link #buildParamPicker} over the typed {@code CommandParameter}.
-     *
-     * <p>The row label is {@code "<key>: <currentValue>"} where the current
-     * value is read via {@link ConfigParser#getConfigValue(Enum, Object)}
-     * with a {@code null} default. Keys whose current value is {@code null}
-     * render with an English fallback placeholder; the localized form is
-     * deferred to checklist step 8.
-     *
-     * <p>If the parser has zero enum constants (degenerate case, kept for
-     * v3.7.4 empty-file handling parity) the page contains Back + header +
-     * a non-clickable empty-state hint row.
-     *
-     * @param <E>      the enum type of the config parser
-     * @param callerId UUID of the viewing player
-     * @param fileName the config file name (used as page title and Back target)
-     * @param parser   the config parser whose keys populate the page
-     * @return the assembled {@link MenuModel}
+     * Builds per-file config page for {@code parser}'s enum keys.
      */
     public <E extends Enum<E>> MenuModel buildConfigFile(UUID callerId,
                                                          String fileName,
@@ -801,22 +608,7 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Cart-aware overload (item 6 of the staging-cart redesign). Renders the
-     * per-file curated page with the viewer's currently staged
-     * {@code (paramName -> typed value)} pairs surfaced as a "Pending changes"
-     * list (each row clickable to {@link MenuAction.UnstageConfigValue}) and
-     * with an Apply ({@link MenuAction.ApplyStagedConfig}) and Discard
-     * ({@link MenuAction.DiscardStagedConfig}) row appended after the
-     * Changeable list when the cart is non-empty. Keys present in
-     * {@code cartSnapshot} are removed from the Changeable list so the same
-     * key never appears twice on the page.
-     *
-     * @param <E>          the enum type of the config parser
-     * @param callerId     UUID of the viewing player
-     * @param fileName     the config file name
-     * @param parser       the config parser whose keys populate the page
-     * @param cartSnapshot snapshot of the viewer's staged changes; may be empty
-     * @return the assembled {@link MenuModel}
+     * Cart-aware overload. Surfaces staged changes under pending section.
      */
     public <E extends Enum<E>> MenuModel buildConfigFile(UUID callerId,
                                                          String fileName,
@@ -826,19 +618,7 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Directory-aware overload. {@code backSubDir} is the forward-slashed
-     * relative directory the file lives in (empty for the config root); the
-     * Back row returns to that directory's selector page so a file opened from
-     * a nested folder (e.g. {@code advanced/}) returns to the folder listing it
-     * came from rather than jumping all the way back to the root config menu.
-     *
-     * @param <E>          the enum type of the config parser
-     * @param callerId     UUID of the viewing player
-     * @param fileName     the config file name
-     * @param parser       the config parser whose keys populate the page
-     * @param cartSnapshot snapshot of the viewer's staged changes; may be empty
-     * @param backSubDir   directory the file lives in; empty for the config root
-     * @return the assembled {@link MenuModel}
+     * Directory-aware overload. Scopes Back row to {@code backSubDir}.
      */
     public <E extends Enum<E>> MenuModel buildConfigFile(UUID callerId,
                                                          String fileName,
@@ -864,12 +644,12 @@ public final class CommandTreeMenuBuilder {
                 : new MenuAction.OpenConfigSelector(backSubDir);
         MenuLine backRow = MenuLine.of(new MenuFragment(backLabel, null,
                 backAction));
-        // Header — locale key deferred to step 8; English fallback only.
+        // Header - English fallback only.
         MenuLine headerRow = MenuLine.of(new MenuFragment("&1&l" + fileName, null, null));
 
         // Source of truth for visible keys is the loaded parser data, NOT the
         // raw enum declaration. The two diverge whenever a packaging variant
-        // omits a key from its shipped YAML on purpose — the in-code default
+        // omits a key from its shipped YAML on purpose - the in-code default
         // still works at runtime, but admins are not meant to discover or edit
         // an omitted knob through the menu. Iterating `myClass.getEnumConstants()` would re-expose every
         // such key just because it exists in the Java enum, which is the bug
@@ -877,7 +657,7 @@ public final class CommandTreeMenuBuilder {
         // the constants and gating on `data.containsKey`.
         E[] enumValues = parser.myClass.getEnumConstants();
         java.util.EnumMap<E, Object> loaded = parser.getData();
-        // Item 6 of the staging-cart redesign: keys present in cartSnapshot
+        // Keys present in cartSnapshot
         // move from the Changeable list into the Pending list, so the same
         // key never renders twice on the page. cartSnapshot keys are matched
         // case-insensitively against enum names (the cart stores raw param
@@ -918,15 +698,7 @@ public final class CommandTreeMenuBuilder {
                     "&7(no editable keys in this file)", null, null)));
             pages.add(new MenuPage(lines));
         } else {
-            // Paginate to avoid Paper's 32767-char-per-page limit and, more
-            // pressingly in practice, to keep every row visible without
-            // running past a Minecraft book page's vertical line budget once
-            // long colorized labels (`&2shape.radius&7: &0<value>`) wrap to
-            // a second visual line. A simple "rows per page" cap mis-counts
-            // wrapped rows (one logical MenuLine can render as 2+ visual
-            // lines), so we instead track a *visual line* budget per page
-            // and charge each row its predicted wrap-line count from
-            // {@link #predictVisualLines}.
+            // Paginate by visual line budget (~14 lines/page) to prevent overflowing book pages.
             final int visualLinesPerPage = 14;
             // Back + header consume ~1 visual line each (short labels).
             int visualLinesUsed = predictVisualLines(backLabel)
@@ -934,17 +706,7 @@ public final class CommandTreeMenuBuilder {
             List<MenuLine> lines = new ArrayList<>();
             lines.add(backRow);
             lines.add(headerRow);
-            // Pending + Apply / Discard rows now render *before* the
-            // Changeable list (updated 2026-05-21 per user request "return
-            // to the config menu with the updated value set at the top").
-            // Previously appended after the Changeable list, which buried
-            // the freshly-staged entry below ~12 rows on the first page
-            // and forced the operator to scroll or paginate to confirm
-            // their edit landed. Cart entries are insertion-ordered, so
-            // the most-recently-staged entry naturally sits at the top of
-            // the pending list. The Pending header is non-clickable; each
-            // pending row is UnstageConfigValue; Apply / Discard rows close
-            // the section before the Changeable list begins.
+            // Render pending changes and apply row before changeable list.
             if (hasCart) {
                 // Book parchment contrast: avoid yellow (&e/&6) and white
                 // (&f) per .junie/AGENTS.md 'Book Menu Color Contrast'.
@@ -960,7 +722,7 @@ public final class CommandTreeMenuBuilder {
                 String applyLabel = lookupMsg(CommandMessages.configApplyRow, "&2&l[apply]");
                 // Discard row intentionally removed (2026-05-22 per user
                 // request): clicking any pending row already unstages that
-                // entry, and the Back row leaves the page without applying —
+                // entry, and the Back row leaves the page without applying -
                 // a dedicated Discard button is redundant and noisy.
                 lines.add(MenuLine.of(new MenuFragment(pendingHeader, null, null)));
                 // Iterate in reverse insertion order so the freshest entry
@@ -1010,35 +772,14 @@ public final class CommandTreeMenuBuilder {
                     parser.getYamlRoot();
             for (E key : visibleKeys) {
                 Object current = loaded.get(key);
-                // ADR-073: a key may hold an @<file> inheritance token (e.g.
-                // shape/vert ship `@config` in region/world files). The raw
-                // token is meaningful only on disk; surfacing it in the menu
-                // is confusing and, for the type-bearing shape/vert blocks,
-                // hides the editable name/sub-parameter rows. Resolve the
-                // token to its effective value for display only (the on-disk
-                // token is preserved until the operator actually edits the
-                // key), so a shape/vert block flattens into shape.name /
-                // shape.radius rows just like any other nested section.
+                // ADR-073: resolve @<file> inheritance token to effective value for display.
                 boolean inheritedRef = io.github.dailystruggle.rtp.common.configuration
                         .ConfigDefaultResolver.isReference(current);
                 if (inheritedRef) {
                     current = io.github.dailystruggle.rtp.common.configuration
                             .ConfigDefaultResolver.resolve(current, key.name(), current);
                 }
-                // Nested config values (e.g. database/network/menu under
-                // config.yml whose stored value is an RtpYamlSection or
-                // Map; or `shape`/`vert` on a freshly added multi-config
-                // entry that has not yet had its FactoryValue merge pass
-                // run) render via String.valueOf as garbage like
-                // "RtpYamlSection@1a2b3c". Flatten them into one row per
-                // scalar leaf with a dotted path label (database.dbType,
-                // database.connectionPool.maxPoolSize, ...). Each row
-                // mints a clickable `OpenConfigKey(fileName,
-                // "<parent>.<sub>")`; the SubConfigCmd parser registers
-                // those dotted names as parameters via
-                // `addSectionParameters`, and the dispatcher's dotted-
-                // key write branch (SubConfigCmd.onCommand line 254-258)
-                // routes the typed value through `RtpYamlConfig.set`.
+                // Flatten nested RtpYamlSection, Map, or FactoryValue into dotted leaf rows.
                 java.util.List<String[]> flattened = flattenNestedConfigValue(current);
                 if (flattened != null) {
                     for (String[] kv : flattened) {
@@ -1086,35 +827,11 @@ public final class CommandTreeMenuBuilder {
             }
         }
 
-        // Mint tokens for clickable rows across all pages.
-        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
-
         return new MenuModel("config:" + fileName, pages);
     }
 
     /**
-     * Build a generic finite-value picker page for a config key whose valid
-     * values are a predetermined set (declared via the key's {@code @options}
-     * or {@code @source} directive; see {@link
-     * io.github.dailystruggle.rtp.common.configuration.ConfigDirectives} and
-     * ADR-064). Each option row stages {@code paramName = value} into the
-     * viewer's per-file cart via {@link MenuAction.StageConfigValue} (the same
-     * write path a free-text anvil confirm uses), then the stage dispatch
-     * re-renders the file page with the choice surfaced under "Pending".
-     *
-     * <p>Layout mirrors {@link #buildShapeVertTypePicker}: a Back row (to the
-     * per-file config page via {@link MenuAction.OpenConfigFile}), a
-     * non-clickable header row showing the current value, and one row per
-     * option with the current value starred. Rows use parchment-safe colors
-     * (no {@code &e}/{@code &6}/{@code &f}) per the Book Menu Color Contrast
-     * rule.
-     *
-     * @param callerId     UUID of the viewing player
-     * @param fileName     config file name (Back target; also the stage scope)
-     * @param paramName    the (possibly dotted) config key being edited
-     * @param currentValue the current value string, or {@code null} if unset
-     * @param options      ordered list of valid values (must be non-empty)
-     * @return the assembled {@link MenuModel}
+     * Builds finite-value picker page for declared options or source directives (ADR-064).
      */
     public MenuModel buildOptionsPicker(UUID callerId,
                                         String fileName,
@@ -1172,44 +889,7 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Build the shape/vert type-picker page (PROPOSAL-config-view-as-book.md
-     * v3.7.5 — checklist step 4, page 3a).
-     *
-     * <p>Layout: a Back row (to the per-file config page, via
-     * {@link MenuAction.OpenConfigFile}), a non-clickable header row, and one
-     * row per known type name in {@code typeNames} (factory keys such as
-     * {@code SQUARE}, {@code CIRCLE} for {@code shape}; {@code DEFAULT_VERT},
-     * {@code SOFT_PLATFORMS}, etc. for {@code vert}).
-     *
-     * <p>Clicking a type row writes the type name to the parser via
-     * {@link MenuAction.OpenMenu} of {@code writeCommandPath} extended with
-     * {@code "name:<typeName>"} (the user-confirmed discriminator key — see
-     * PROPOSAL-config-view-as-book.md v3.7.5 / Q4-2). The parser's
-     * {@code SubConfigCmd.onCommand} shape/vert merge path (lines 158-203)
-     * handles the rest. After the write completes, the player can re-issue
-     * {@link MenuAction.OpenConfigKey} to re-render this page with the new
-     * current type shown in the header.
-     *
-     * <p>{@code currentTypeName} is rendered in the header for orientation
-     * and may be {@code null} (parser has no stored type yet); the row list
-     * does <em>not</em> filter it out (the user can re-pick the same type to
-     * reset orphan sub-params if needed, matching the stateless contract).
-     *
-     * <p>The caller (the production {@code MenuConfigSubtreeBuilder} impl, to
-     * be authored in checklist step 6) supplies {@code typeNames} and
-     * {@code writeCommandPath} explicitly so the builder stays unit-testable
-     * without a live {@link RTP#factoryMap}.
-     *
-     * <p>Permission gating ({@code rtp.config.view}) belongs in the redeem
-     * dispatch arm (checklist step 5 ext), not in the builder.
-     *
-     * @param callerId        UUID of the viewing player
-     * @param fileName        config file name
-     * @param paramName       the shape/vert parameter name (e.g. {@code "shape"})
-     * @param currentTypeName the currently stored type name, or {@code null} if unset
-     * @param typeNames       ordered list of available type names
-     * @param writeCommandPath command path segments used to build the write command
-     * @return the assembled {@link MenuModel}
+     * Builds shape/vert type-picker page (page 3a).
      */
     public MenuModel buildShapeVertTypePicker(UUID callerId,
                                               String fileName,
@@ -1236,14 +916,14 @@ public final class CommandTreeMenuBuilder {
         lines.add(MenuLine.of(new MenuFragment(backLabel, null,
                 new MenuAction.OpenConfigFile(fileName))));
 
-        // Header — English fallback only; locale key deferred to step 8.
+        // Header - English fallback only.
         String currentLabel = currentTypeName == null ? "&8(unset)" : "&0" + currentTypeName;
         lines.add(MenuLine.of(new MenuFragment(
                 "&1&l" + paramName + " type &7(current: " + currentLabel + "&7)",
                 null, null)));
 
         // One row per known type. Clicking writes name:<typeName> through the
-        // reflected command tree (OpenMenu redeem path). Per Q4-2, `name` is
+        // reflected command tree (OpenMenu redeem path). `name` is
         // the canonical discriminator key for both shape and vert in the
         // existing SubConfigCmd grammar.
         for (String typeName : typeNames) {
@@ -1258,47 +938,12 @@ public final class CommandTreeMenuBuilder {
                     new MenuAction.OpenMenu(writeArgs))));
         }
 
-        // Mint a token per clickable action.
         MenuPage page = new MenuPage(lines);
-        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
-
         return new MenuModel("config:" + fileName + ":" + paramName + ":type", List.of(page));
     }
 
     /**
-     * Build the shape/vert sub-parameter page (PROPOSAL-config-view-as-book.md
-     * v3.7.5 — checklist step 4, page 3b).
-     *
-     * <p>Layout: a Back row (to the type-picker, via
-     * {@link MenuAction.OpenConfigKey} which re-renders page 3a), a non-
-     * clickable header row, and one row per entry in {@code subParamValues}.
-     * The {@code name} discriminator is intentionally <em>not</em> rendered
-     * as a row on this page — it lives on the type-picker (page 3a). Each
-     * sub-parameter row carries a {@link MenuAction.OpenParamPicker} whose
-     * redeem opens {@link #buildParamPicker} over the sub-parameter's typed
-     * {@code CommandParameter}, with {@code parentPath = writeCommandPath}
-     * and the sub-parameter name as the picker target.
-     *
-     * <p>Writes are stateless (Q13): every sub-parameter write targets the
-     * flat key {@code <subParamName>:<value>}, e.g.
-     * {@code /rtp config regions set default radius:1000}. The parser's
-     * currently-stored type discriminates which sub-parameters are valid
-     * (handled by {@code SubConfigCmd.onCommand} lines 158-203). The page
-     * shows the activated type's <em>current state as-is</em> per the user-
-     * confirmed Q4-2 reframing.
-     *
-     * <p>If {@code subParamValues} is empty (factory type with no tunables,
-     * or pre-load defensive state) the page degrades to Back + header + a
-     * non-clickable hint row (mirrors {@link #buildConfigFile}'s empty-enum
-     * branch).
-     *
-     * @param callerId        UUID of the viewing player
-     * @param fileName        config file name
-     * @param paramName       the shape/vert parameter name
-     * @param typeName        the currently active type name
-     * @param subParamValues  map of sub-parameter names to their current values
-     * @param writeCommandPath command path segments used to build write commands
-     * @return the assembled {@link MenuModel}
+     * Builds shape/vert sub-parameter page (page 3b).
      */
     public MenuModel buildShapeVertSubParamPage(UUID callerId,
                                                 String fileName,
@@ -1330,7 +975,7 @@ public final class CommandTreeMenuBuilder {
         lines.add(MenuLine.of(new MenuFragment(backLabel, null,
                 new MenuAction.OpenConfigKey(fileName, paramName))));
 
-        // Header — English fallback only; locale key deferred to step 8.
+        // Header - English fallback only.
         lines.add(MenuLine.of(new MenuFragment(
                 "&1&l" + paramName + " &7/ &0" + typeName, null, null)));
 
@@ -1352,33 +997,18 @@ public final class CommandTreeMenuBuilder {
             }
         }
 
-        // Mint tokens for clickable rows.
         MenuPage page = new MenuPage(lines);
-        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
-
         return new MenuModel(
                 "config:" + fileName + ":" + paramName + ":" + typeName,
                 List.of(page));
     }
 
     /**
-     * Predict the number of *visual* lines a row's label will occupy on a
-     * Minecraft book page. Book pages are ~114 pixels wide; the default
-     * font averages about 6 pixels per character, giving ~19 displayable
-     * characters per visual line. Legacy color codes ({@code &x} / section
-     * markers) are stripped because they do not render as glyphs. Bold
-     * runs are slightly wider but we deliberately round generously (i.e.
-     * over-predict wrapping rather than under-predict) so the page budget
-     * never runs past the visible book area.
-     *
-     * <p>Returns at least {@code 1} for any non-null/non-empty label.
+     * Predicts visual line count of a label on a book page (~19 displayable chars per line).
+     * Strips legacy color codes and rounds up.
      */
     static int predictVisualLines(String raw) {
         if (raw == null || raw.isEmpty()) return 1;
-        // Strip legacy ampersand and section-sign color codes: `&x` or `§x`
-        // (one trailing alnum). Hex sequences `&#RRGGBB` are not used in
-        // any of the menu labels right now, so the simple pair-strip is
-        // sufficient.
         int visibleChars = 0;
         int i = 0;
         int n = raw.length();
@@ -1392,32 +1022,14 @@ public final class CommandTreeMenuBuilder {
             i++;
         }
         if (visibleChars == 0) return 1;
-        // ~19 chars per visual line on the parchment background. Round up.
         final int charsPerLine = 19;
         return (visibleChars + charsPerLine - 1) / charsPerLine;
     }
 
     /**
-     * Flatten a nested config value (an {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection},
-     * a generic {@link Map}, or a {@link io.github.dailystruggle.rtp.common.factory.FactoryValue}
-     * such as {@code Shape}/{@code vert}) into an ordered list of
-     * {@code [dottedSubPath, scalarValue]} pairs whose dotted path is suitable
-     * for rendering as nested {@code parent.a}, {@code parent.a.b.c} rows on a
-     * config book page. Returns {@code null} for scalar inputs (caller renders
-     * them as a single editable row); returns an empty list when the value is
-     * a nested container but has no leaves.
-     *
-     * <p>{@code FactoryValue} support (2026-05-24): {@code shape}/{@code vert}
-     * region keys hold a typed {@code FactoryValue<E>} whose {@code getData()}
-     * returns an {@code EnumMap<E, Object>} of tunables (e.g. {@code radius},
-     * {@code centerX}). This method exposes those as flat dotted rows
-     * (e.g. {@code shape.radius}) so the curated config page renders shape/vert
-     * the same way it renders {@code database}/{@code network} (which are
-     * {@code RtpYamlSection}-backed). The downstream {@code SubConfigCmd}
-     * dotted-key write branch then stages {@code <subKey>:<value>} into the
-     * cart with the dotted name visible, instead of showing the opaque
-     * top-level {@code shape} key whose value would be the {@code FactoryValue}
-     * instance's {@code toString} ("SQUARE", "CIRCLE", ...).
+     * Flattens nested {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection},
+     * {@link Map}, or {@link io.github.dailystruggle.rtp.common.factory.FactoryValue} into
+     * dotted {@code [path, value]} leaf pairs.
      */
     private static java.util.List<String[]> flattenNestedConfigValue(Object value) {
         if (value == null) return null;
@@ -1488,20 +1100,13 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Convert a {@link io.github.dailystruggle.rtp.common.factory.FactoryValue}
-     * (e.g. a {@code Shape} or vert config) into an ordered
-     * {@code Map<String, Object>} keyed by the underlying enum names, so
-     * {@link #flattenNestedConfigValue} can emit dotted rows like
-     * {@code shape.radius}, {@code shape.centerX}. The {@code name} field
-     * (the factory discriminator: {@code SQUARE}, {@code CIRCLE},
-     * {@code DEFAULT_VERT}, ...) is included as a leading {@code name}
-     * entry so the operator can change the type from the same flat view.
+     * Converts {@link io.github.dailystruggle.rtp.common.factory.FactoryValue} into an ordered map
+     * with leading {@code name} discriminator followed by enum data entries.
      */
     private static Map<String, Object> factoryValueToMap(
             io.github.dailystruggle.rtp.common.factory.FactoryValue<?> fv) {
         java.util.LinkedHashMap<String, Object> out = new java.util.LinkedHashMap<>();
-        // Discriminator first so the type row sits at the top of the flattened
-        // view (mirrors PROPOSAL-config-view-as-book.md page 3a / Q4-2).
+        // Discriminator first so the type row sits at the top of the flattened view.
         out.put("name", fv.name);
         java.util.EnumMap<?, Object> data = fv.getData();
         if (data != null) {
@@ -1515,17 +1120,12 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Resolve hover text for a config row from the key's YAML block comment.
-     * Returns the comment with leading {@code #} markers stripped (one optional
-     * space after each {@code #} removed), joined with {@code \n}, or
-     * {@code null} when {@code yamlRoot} is {@code null}, the key has no
-     * comment, or the stripped result is blank. Dotted keys (e.g.
-     * {@code database.dbType}) are accepted by
-     * {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection#getComment(String)}.
+     * Resolves hover text for a config key from its YAML block comment.
+     * Strips leading {@code #} markers and escapes color codes.
      *
-     * @param yamlRoot the loaded YAML document root, or {@code null}
-     * @param key      the (possibly dotted) config key
-     * @return the cleaned comment text, or {@code null} when unavailable
+     * @param yamlRoot loaded YAML document root, or {@code null}
+     * @param key      config key
+     * @return cleaned comment text, or {@code null} when unavailable
      */
     private static String resolveConfigHover(
             io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection yamlRoot,

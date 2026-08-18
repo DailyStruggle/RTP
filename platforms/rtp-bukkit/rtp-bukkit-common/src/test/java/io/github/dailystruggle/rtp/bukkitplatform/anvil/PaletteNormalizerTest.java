@@ -99,7 +99,7 @@ class PaletteNormalizerTest {
   @DisplayName("matches() returns false on null / empty unsafe set rather than throwing")
   void matchesEmptySet() {
     // Unlike PaletteIdentifierNormalizer.matches (rtp-api, fail-fast), the Spigot-side
-    // reconciler is called on a hot path and must be tolerant — an absent unsafe set
+    // reconciler is called on a hot path and must be tolerant - an absent unsafe set
     // simply means nothing is unsafe, which is a meaningful runtime state.
     assertFalse(PaletteNormalizer.matches("minecraft:lava", null));
     assertFalse(PaletteNormalizer.matches("minecraft:lava", Collections.emptySet()));

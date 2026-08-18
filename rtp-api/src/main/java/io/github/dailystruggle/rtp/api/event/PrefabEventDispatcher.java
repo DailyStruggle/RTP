@@ -6,23 +6,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
- * Thread-safe registry of {@link PrefabAppliedEvent} subscribers, modelled on
- * {@code DispatchingPlayerLifecycleHook}: it maintains a
- * {@link CopyOnWriteArrayList} of subscribers, hands back an
- * {@link AutoCloseable} for unregistration, and isolates each subscriber under
- * a {@code try}/{@code catch} during fan-out so one faulty addon cannot abort
- * delivery to the others.
- *
- * <p>An instance of this dispatcher is created eagerly by {@code RTPAPI}, so
- * subscribers may register at any time (including before {@code rtp-core} has
- * finished loading). {@code rtp-core} invokes {@link #fire(PrefabAppliedEvent)}
- * after a prefab has been applied.
- *
- * <p><b>Threading:</b> subscribers may be invoked from whatever thread fires
- * the event (the thread executing the prefab confirm command). Exceptions
- * thrown by individual subscribers are caught and discarded so fan-out
- * continues; subscribers that need diagnostic visibility should log inside
- * their own consumer.
+ * Thread-safe registry and dispatcher of {@link PrefabAppliedEvent} subscribers.
+ * Subscribers are isolated so exceptions do not abort fan-out.
  *
  * @since 3.1.4
  */

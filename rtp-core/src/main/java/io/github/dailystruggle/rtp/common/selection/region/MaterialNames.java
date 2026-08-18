@@ -5,33 +5,7 @@ import java.util.Set;
 /**
  * Material / block-name equivalence helper.
  *
- * <p>Direct analog of {@link BiomeNames} for {@code Material}-style block ids
- * in {@code safety.yml::unsafeBlocks} and equivalent block-name sets.
- * Different Bukkit-family platforms expose block ids in different shapes: enum-
- * based releases yield bare uppercase names like {@code "LAVA"}; once a release
- * line moves {@code Material} (or the equivalent block registry) to {@code Keyed},
- * the same accessor will yield the namespaced form like {@code "MINECRAFT:LAVA"}.
- * The same input typed by an operator into {@code safety.yml} may follow either
- * convention.
- *
- * <p>This helper provides a single comparator that treats the vanilla
- * {@code minecraft:} namespace as optional on either side of the comparison
- * while preserving modded namespaces (e.g. {@code createdeco:limestone},
- * {@code terralith:smouldering_woods}) verbatim. The contract mirrors
- * {@link BiomeNames#matches(Set, String)}:
- *
- * <ul>
- *   <li>{@code matches({"LAVA"}, "MINECRAFT:LAVA")} - {@code true}</li>
- *   <li>{@code matches({"MINECRAFT:LAVA"}, "LAVA")} - {@code true}</li>
- *   <li>{@code matches({"MINECRAFT:LAVA"}, "MINECRAFT:LAVA")} - {@code true}</li>
- *   <li>{@code matches({"LAVA"}, "LAVA")} - {@code true}</li>
- *   <li>{@code matches({"CREATEDECO:LIMESTONE"}, "LIMESTONE")} - {@code false}</li>
- *   <li>{@code matches({"CREATEDECO:LIMESTONE"}, "CREATEDECO:LIMESTONE")} - {@code true}</li>
- * </ul>
- *
- * <p>Callers are expected to have already uppercased both sides for
- * case-insensitivity; this helper deals solely with namespace equivalence.
- * Inputs must be non-null.
+ * <p>Treats vanilla {@code minecraft:} prefix as optional while preserving custom namespaces.
  */
 public final class MaterialNames {
 

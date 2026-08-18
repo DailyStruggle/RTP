@@ -16,7 +16,7 @@ import java.util.List;
  *       indented child).</li>
  *   <li>Block-style sequences ({@code - item} at consistent indent).</li>
  *   <li>Plain, single-quoted, and double-quoted scalars.</li>
- *   <li>{@code #} comments (whole-line only — inline trailing comments
+ *   <li>{@code #} comments (whole-line only - inline trailing comments
  *       are also accepted on parse for legacy files, but are dropped
  *       and not written back; this matches ADR-042's block-only
  *       contract on the write side).</li>
@@ -25,14 +25,14 @@ import java.util.List;
  * <p>Rejected (each raises {@link RtpYamlParseException} with a stable
  * {@code messageKey}):</p>
  * <ul>
- *   <li>Anchors ({@code &name}) — {@code rtpYaml.unsupported.anchor}</li>
- *   <li>Aliases ({@code *name}) — {@code rtpYaml.unsupported.alias}</li>
- *   <li>Merge keys ({@code <<:}) — {@code rtpYaml.unsupported.mergeKey}</li>
- *   <li>Flow mappings ({@code {a: b}}) — {@code rtpYaml.unsupported.flowMap}</li>
- *   <li>Flow sequences ({@code [a, b]}) — {@code rtpYaml.unsupported.flowSeq}</li>
- *   <li>Tags ({@code !!str}) — {@code rtpYaml.unsupported.tag}</li>
- *   <li>Document separators ({@code ---}, {@code ...}) — {@code rtpYaml.unsupported.docSep}</li>
- *   <li>Block scalars ({@code |}, {@code >}) — {@code rtpYaml.unsupported.blockScalar}</li>
+ *   <li>Anchors ({@code &name}) - {@code rtpYaml.unsupported.anchor}</li>
+ *   <li>Aliases ({@code *name}) - {@code rtpYaml.unsupported.alias}</li>
+ *   <li>Merge keys ({@code <<:}) - {@code rtpYaml.unsupported.mergeKey}</li>
+ *   <li>Flow mappings ({@code {a: b}}) - {@code rtpYaml.unsupported.flowMap}</li>
+ *   <li>Flow sequences ({@code [a, b]}) - {@code rtpYaml.unsupported.flowSeq}</li>
+ *   <li>Tags ({@code !!str}) - {@code rtpYaml.unsupported.tag}</li>
+ *   <li>Document separators ({@code ---}, {@code ...}) - {@code rtpYaml.unsupported.docSep}</li>
+ *   <li>Block scalars ({@code |}, {@code >}) - {@code rtpYaml.unsupported.blockScalar}</li>
  * </ul>
  */
 public final class RtpYamlReader {
@@ -190,7 +190,7 @@ public final class RtpYamlReader {
         for (int i = 0; i < count; i++) {
             String raw = split[i];
             int lineNo = i + 1;
-            // Reject tabs in indentation explicitly — YAML disallows them and our
+            // Reject tabs in indentation explicitly - YAML disallows them and our
             // emitter only produces spaces, so this guard prevents silent corruption.
             int indent = 0;
             while (indent < raw.length() && raw.charAt(indent) == ' ') indent++;
@@ -244,7 +244,7 @@ public final class RtpYamlReader {
                 continue;
             }
             if (ln.indent < expectedIndent) {
-                // Caller's scope ended. Leave pendingComments alone — they
+                // Caller's scope ended. Leave pendingComments alone - they
                 // belong to whatever the outer scope sees next (or to the
                 // root's trailing-comment slot if we're at EOF).
                 return;
@@ -265,7 +265,7 @@ public final class RtpYamlReader {
                         "merge keys (<<:) are not supported", ln.lineNo, ln.indent);
             }
             pos++;
-            // Snapshot pendingComments now — they belong to THIS key. Then
+            // Snapshot pendingComments now - they belong to THIS key. Then
             // clear the shared buffer so a recursive parseChildBlock can't
             // see them and steal them for a deeper key.
             List<String> attached = new ArrayList<>(pendingComments);

@@ -13,25 +13,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 
 /**
- * A deterministic {@link AutoCloseable} lifecycle wrapper that ties a {@link ChunkSet}'s
- * force-loaded ticket to a bounded scope.
- *
- * <p>Every chunk loaded for teleport validation must be held via a {@code ChunkReservation}
- * opened in a {@code try-with-resources} block. This guarantees that the force-loaded ticket
- * is released even if an exception is thrown mid-validation, preventing the permanent
- * force-load leak described in hazard H-004.
- *
- * <p><b>Invariant:</b> Between construction and the first call to {@link #close()} or
- * {@link #transferOwnership()}, the underlying chunks are force-loaded in the target world.
- * After {@link #close()} or a successful {@link #transferOwnership()}, the reservation no
- * longer holds any ticket.
- *
- * <p><b>Internal use only:</b> {@code ChunkReservation} is not intended to be constructed
- * by addon code. Addons should consume {@code GenerationResult.reservation()} rather than
- * managing chunk tickets directly. See ADR-012 and hazard H-010.
- *
- * <p><b>Thread safety:</b> Instances are not thread-safe. A reservation must be created,
- * used, and closed on the same thread or with external synchronisation.
+ * Deterministic {@link AutoCloseable} wrapper tying a {@link ChunkSet}'s
+ * force-loaded ticket to a bounded scope (S-002, ADR-012). Not thread-safe.
  */
 // @InheritableMustCall is used instead of @MustCall because ChunkReservation is not final.
 // It propagates the close() obligation to any subclass, ensuring the checker enforces
@@ -84,7 +67,7 @@ public class ChunkReservation implements AutoCloseable {
     this.world = world;
     CompletableFuture<Void> f = world.setForceLoaded(chunkSet.getX(), chunkSet.getZ(), true);
     this.applyFuture = (f != null) ? f : CompletableFuture.completedFuture(null);
-    // Architecture diagram 03 — ReqTicket: addPluginChunkTicket() invoked, apply future captured.
+    // Architecture diagram 03 - ReqTicket: addPluginChunkTicket() invoked, apply future captured.
     log(Level.FINE, "ChunkReservation opened: world={0}, chunk=({1},{2}), size={3}",
             worldName(), chunkSet.getX(), chunkSet.getZ(),
             chunkSet.chunks() != null ? chunkSet.chunks().size() : -1);
@@ -110,34 +93,20 @@ public class ChunkReservation implements AutoCloseable {
   }
 
   /**
-   * Returns the future that completes when the initial {@code addPluginChunkTicket} call has
-   * actually been applied on the underlying platform. Callers on off-thread contexts must
-   * await this before relying on the chunk being pinned.
-   *
-   * <p>ADR-015 Paper chunk-system-v2 follow-up: on the Bukkit/Paper adapter the raw
-   * {@code addPluginChunkTicket} call is scheduled onto the primary thread when invoked
-   * off-thread. Before this follow-up, the location generator would return from
-   * {@code new ChunkReservation(...)} before the ticket was actually applied and the stale-
-   * chunk guard (REQ-RTP-S-005) would then reject the still-not-pinned chunk.</p>
-   *
-   * @return the apply future; never {@code null}
+   * Future that completes when the initial chunk ticket has been applied.
    */
   public CompletableFuture<Void> readyFuture() {
     return applyFuture;
   }
 
   /**
-   * Blocks the current thread (up to {@code timeout}) until the initial ticket application
-   * has been confirmed. This is a bounded wait and MUST NOT be called on any tick thread
-   * (REQ-RTP-S-005 prohibits blocking on tick threads, but scheduler / async threads are
-   * permitted).
+   * Blocks current thread (up to {@code timeout}) until the initial ticket is applied.
+   * MUST NOT be called on tick threads (REQ-RTP-S-005).
    *
-   * @param timeout the maximum time to wait
-   * @param unit    the time unit of the {@code timeout} argument
-   * @return {@code true} if the ticket application completed within the timeout;
-   *         {@code false} if the wait timed out (the caller SHOULD treat this as a
-   *         ticket-apply failure and reject the candidate)
-   * @throws InterruptedException if the current thread was interrupted while waiting
+   * @param timeout maximum time to wait
+   * @param unit time unit of {@code timeout}
+   * @return {@code true} if applied within timeout, {@code false} on timeout
+   * @throws InterruptedException if interrupted while waiting
    */
   public boolean awaitReady(long timeout, TimeUnit unit) throws InterruptedException {
     try {
@@ -193,7 +162,7 @@ public class ChunkReservation implements AutoCloseable {
   @Override
   public void close() {
     if (!transferred) {
-      // Architecture diagram 03 — CloseRes: try-finally release path; keep(false) drops the
+      // Architecture diagram 03 - CloseRes: try-finally release path; keep(false) drops the
       // plugin chunk ticket and feeds DropTicket -> UntrackRes downstream.
       log(Level.FINE, "ChunkReservation closed: world={0}, chunk=({1},{2})",
               worldName(), chunkSet.getX(), chunkSet.getZ());

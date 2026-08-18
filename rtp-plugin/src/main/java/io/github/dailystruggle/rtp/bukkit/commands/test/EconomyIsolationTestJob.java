@@ -16,7 +16,7 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test economy-isolation} — verifies Vault-style debits dispatch off
+ * {@code rtp test economy-isolation} - verifies Vault-style debits dispatch off
  * Folia Region Tick Threads (AGENTS.md "Vault Isolation"). Injects a synthetic
  * Runnable, asserts it runs within {@link #PROBE_TIMEOUT_MS} on a thread other
  * than the caller's region thread, and reports any {@code ThreadAccessException}

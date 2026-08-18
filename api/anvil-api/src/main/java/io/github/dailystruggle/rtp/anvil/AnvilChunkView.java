@@ -34,13 +34,8 @@ public final class AnvilChunkView {
     }
 
     /**
-     * Back-compat constructor used by pre-Phase-2 call sites that predate the biome
-     * palette (ADR-016 (biome) §4). Defaults {@code biomeSections} to an empty
-     * list, which makes {@link #getBiomeAt(int, int, int)} return {@code null}
-     * everywhere and {@link #getBiomesPresent()} return an empty set — i.e. the view
-     * reports "no biome data available" and the platform adapter falls through to
-     * the live {@code world.getBiome(loc)} path. This is the correct pre-Phase-2
-     * baseline.
+     * Back-compat constructor for call sites that predate the biome palette (ADR-016).
+     * Defaults {@code biomeSections} to an empty list.
      */
     public AnvilChunkView(int dataVersion, List<PaletteSection> sections, long[] motionBlockingNoLeaves) {
         this(dataVersion, sections, motionBlockingNoLeaves, Collections.emptyList());
@@ -58,7 +53,7 @@ public final class AnvilChunkView {
      * this chunk. {@code x} and {@code z} are chunk-local (0..15); {@code worldY} is the
      * absolute world Y (e.g. {@code -64..319} in 1.18+ overworld). Returns {@code null} if
      * no section covers that Y range, or {@code "minecraft:air"} semantics are the caller's
-     * responsibility — this method never synthesises absent sections.
+     * responsibility - this method never synthesises absent sections.
      *
      * @param x       chunk-local x, 0..15
      * @param worldY  absolute world Y
@@ -78,7 +73,7 @@ public final class AnvilChunkView {
         return null;
     }
 
-    // ---------------------------------------------------------- Phase 3b (ADR-016) typed queries
+    // --- Typed queries (ADR-016) ---
 
     /**
      * Returns the world-Y of the lowest emitted section floor, or {@code 0} when this
@@ -97,7 +92,7 @@ public final class AnvilChunkView {
      * True iff the block at {@code (x, worldY, z)} is air. Matches the live
      * {@code BukkitRTPChunk.isAir} semantics for the vanilla air identifiers.
      * Coordinates in a section not present on disk are treated as air (Y above the
-     * highest emitted section) — this matches the live-chunk behaviour where a
+     * highest emitted section) - this matches the live-chunk behaviour where a
      * never-written column reads as air all the way up to the build ceiling.
      *
      * <p>Vanilla-air-only overload: returns {@code true} only for the three vanilla
@@ -114,14 +109,14 @@ public final class AnvilChunkView {
      * supplied reconciled {@code airBlocks} set. This is the same
      * "passable / not solid feet support" predicate the probe-fast-path
      * {@code JumpAdjustor.acceptProbeY} applies. Use this overload from any
-     * code path that needs to mirror the {@code airBlocks} semantics — i.e.
-     * "tall grass / leaf litter / snow layer / leaves canopy is passable" —
+     * code path that needs to mirror the {@code airBlocks} semantics - i.e.
+     * "tall grass / leaf litter / snow layer / leaves canopy is passable" -
      * so that off-thread Anvil-backed reads agree with the live-path
      * {@code chunk.isAir(...) || airBlocks.contains(...)} predicate.
      *
      * <p>The set must already be reconciled to the canonical form (upper-case,
      * namespace-stripped, with {@code #namespace:tag} tokens already expanded
-     * to their material members) — produced by {@code PaletteNormalizer.reconcileAll}
+     * to their material members) - produced by {@code PaletteNormalizer.reconcileAll}
      * on Spigot/Paper/Folia or by the equivalent core-side normalizer. The vanilla
      * air identifiers ({@code AIR}, {@code CAVE_AIR}, {@code VOID_AIR}) are
      * always treated as air regardless of whether they appear in
@@ -155,7 +150,7 @@ public final class AnvilChunkView {
      * reconciled unsafe set. The set must already be reconciled (canonical form,
      * produced by {@code PaletteNormalizer.reconcileAll}); callers that still hold a
      * raw config-side set should reconcile once at call-site and cache. Out-of-range
-     * Y values are treated as safe — they cannot carry unsafe blocks.
+     * Y values are treated as safe - they cannot carry unsafe blocks.
      */
     public boolean isSafe(int x, int worldY, int z, Set<String> reconciledUnsafe) {
         if (reconciledUnsafe == null || reconciledUnsafe.isEmpty()) return true;
@@ -170,7 +165,7 @@ public final class AnvilChunkView {
      * section-local {@code (x, z)}. Mirrors
      * {@code World#getHighestBlockYAt(x, z, MOTION_BLOCKING_NO_LEAVES)} on the live
      * chunk. Returns {@link #minHeight()} (the bottom of the lowest emitted section)
-     * when the column is empty or the heightmap is absent — conservative, keeps
+     * when the column is empty or the heightmap is absent - conservative, keeps
      * callers on valid Y ranges.
      */
     public int getSurfaceHeight(int x, int z) {
@@ -188,7 +183,7 @@ public final class AnvilChunkView {
         return floor + raw - 1;
     }
 
-    // ---------------------------------------------------------- Phase 2 (ADR-016) biome queries
+    // --- Biome queries (ADR-016) ---
 
     /**
      * Returns the raw namespaced biome identifier at world coordinate {@code (x, worldY, z)},

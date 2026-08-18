@@ -37,20 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-MAP-006 / ADR-047 — {@link MapDispatch} orchestration coverage:
+ * REQ-RTP-MAP-006 / ADR-047 - {@link MapDispatch} orchestration coverage.
  *
- * <ul>
- *   <li>Happy path: real binding + healthy resolver -> {@code paint()}
- *       returns true; binding observed exactly one allocate + one
- *       renderEphemeral.</li>
- *   <li>Failure: {@link NoopMapBinding} active -> {@code paint()} returns
- *       false; no allocate observed.</li>
- *   <li>Failure: resolver throws -> {@code paint()} returns false; no
- *       allocate observed.</li>
- *   <li>Failure: binding rejects allocate -> {@code paint()} returns false;
- *       no renderEphemeral observed.</li>
- *   <li>Argument validation: null spec / null viewer -> NPE.</li>
- * </ul>
+ * <p>Tests map allocation, ephemeral and live rendering pipelines, and error fallbacks.
  */
 @DisplayName("REQ-RTP-MAP-006 - MapDispatch orchestration contract")
 class MapDispatchTest {

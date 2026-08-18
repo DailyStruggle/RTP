@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Session 4b on-disk path tests for {@link PrefabDiskIO}. All file I/O is
+ * On-disk path tests for {@link PrefabDiskIO}. All file I/O is
  * confined to a JUnit {@code @TempDir} so the suite runs without
  * {@link io.github.dailystruggle.rtp.common.RTP} bootstrap.
  */

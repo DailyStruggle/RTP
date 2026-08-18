@@ -10,27 +10,9 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 
 /**
- * Always-present {@link TeleportLimitStore} backed by an in-memory
- * {@link UsageCapTracker}, with best-effort write-through persistence of each
- * player's rolling usage-cap window to the configured {@link DatabaseAccessor}
- * (ADR-068, durability axis {@code local}).
- *
- * <p>The cooldown anchor is persisted independently (via
- * {@code cacheValue(TeleportData)}), so only the usage-cap window is persisted
- * here. Persistence closes the BetterRTP {@code LockAfter} restart gap: before
- * this, the usage cap lived purely in memory and was lost on every reload.
- *
- * <p>State is stored in the accessor's generic key/value table
- * {@value #TABLE} keyed by the player UUID, value {@code "count:start"}. The
- * file-backed {@code YamlFileDatabase} (the lite-assembly default) reloads this
- * table on startup, so usage caps survive a restart there with zero driver
- * dependencies. SQL accessors persist the write-through but do not preload the
- * generic table on startup; cross-restart SQL reload is handled by the
- * cross-server durability phases of ADR-068 and is not relied upon here.
- *
- * <p>All persistence is enqueued onto the accessor's asynchronous write path, so
- * no method blocks a tick thread (S-005). A persistence failure is logged, never
- * swallowed silently (S-004), and never prevents the in-memory enforcement.
+ * {@link TeleportLimitStore} backed by {@link UsageCapTracker} with best-effort write-through
+ * persistence to {@link DatabaseAccessor} (ADR-068).
+ * Stored in table {@value #TABLE} as {@code "count:start"}.
  */
 public final class LocalTeleportLimitStore implements TeleportLimitStore {
   /** Generic accessor table holding per-player usage-cap windows. */

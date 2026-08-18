@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * </ul>
  *
  * <p>All public methods are thread-safe. The class never touches Bukkit
- * directly — it is fed values from {@link TeleportProbe} and
+ * directly - it is fed values from {@link TeleportProbe} and
  * {@link TpsMsptHeapSampler}.
  */
 public class MetricsRecorder {
@@ -36,10 +36,10 @@ public class MetricsRecorder {
         public final String targetLabel;
         public final long dispatchEpochMs;
         /** Wall-clock epoch (ms) at which the command was actually handed to
-         *  {@code Bukkit.dispatchCommand} — i.e. <em>after</em> the
+         *  {@code Bukkit.dispatchCommand} - i.e. <em>after</em> the
          *  {@code Sched.runOnPlayer} hop. On Spigot/Paper that hop is a
          *  {@code BukkitScheduler.runTask} which defers to the next tick
-         *  boundary (0–50 ms, avg ~25 ms); attributing that wait to the
+         *  boundary (0-50 ms, avg ~25 ms); attributing that wait to the
          *  target plugin would inflate every measurement by up to one tick.
          *  Set by {@link Runner#dispatchOne}. {@code -1} until the runnable
          *  fires; {@link #latencyMs()} falls back to {@link #dispatchEpochMs}
@@ -138,7 +138,7 @@ public class MetricsRecorder {
 
     /** Optional CPU sampler for phase-aggregate CPU/TP measurement. May be null. */
     private volatile CpuSampler cpuSampler;
-    /** Optional chunk-load counter (set by the plugin on enable). May be null —
+    /** Optional chunk-load counter (set by the plugin on enable). May be null -
      *  in which case per-attempt and per-phase chunk columns are written empty. */
     private volatile ChunkLoadCounter chunkCounter;
     // Active phase snapshot; written to phases CSV by endPhase().
@@ -365,7 +365,7 @@ public class MetricsRecorder {
      * Closes the current phase (if any) and appends one row to the phases
      * CSV. The {@code label} argument is allowed to differ from the
      * {@code beginPhase} label (e.g. SEQUENCE end-of-target uses the
-     * advancing target's name) — the recorded label is whichever was active.
+     * advancing target's name) - the recorded label is whichever was active.
      */
     public void endPhase(@SuppressWarnings("unused") String label) {
         if (!recording) return;
@@ -469,7 +469,7 @@ public class MetricsRecorder {
         // Chunk-load cost amendment. When a calibration value is set
         // (chunkLoadCostNs > 0, typically obtained from `/rtp test
         // chunk-probe-perf`), we estimate the CPU cost the server attributed
-        // to its own chunk-system threads — work that the per-process JMX
+        // to its own chunk-system threads - work that the per-process JMX
         // sampler counts in process_cpu_ms but that the per-thread main
         // sampler does NOT, and which the cpu_ms_per_attempt_total column
         // therefore underweights for plugins that synchronously load many

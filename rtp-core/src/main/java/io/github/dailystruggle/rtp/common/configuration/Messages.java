@@ -10,17 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Thin index facade over the per-concern message enums introduced by ADR-071.
- *
- * <p>The former monolithic {@code MessagesKeys} enum is split into one enum per
- * {@code messages/<concern>.yml} file ({@link PlaceholderMessages},
- * {@link PlayerMessages}, {@link NetworkMessages}, {@link CommandMessages},
- * {@link SystemMessages}). Value resolution itself reuses the existing config
- * path - {@code RTP.configs.getConfigValue(key, def)} routes any enum constant to
- * the parser registered under its declaring class. This facade only adds the one
- * thing that path cannot do: look up a message constant by its YAML name
- * (built once), for the dynamic {@code _description} command lookup and the
- * network-reject {@code messageKey()} string.
+ * Index facade over per-concern message enums (ADR-071).
  */
 public final class Messages {
   private Messages() {}

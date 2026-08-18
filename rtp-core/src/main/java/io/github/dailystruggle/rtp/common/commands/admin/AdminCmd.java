@@ -15,24 +15,10 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Top-level {@code /rtp admin} verb. Per the locked design decision
- * (2026-05-20, {@code PROPOSAL-admin-panel-prefabs.md} v3.1), the bare form
- * dispatches {@link io.github.dailystruggle.rtp.api.menu.MenuAction.OpenAdminPanel}
- * - i.e. opens the same curated admin panel that the {@code Admin panel} entry
- * row in {@code /rtp menu} opens. The {@code prefab} child hosts the
- * prefab subtree ({@code list} / {@code apply} / {@code confirm} / {@code rollback}).
- *
- * <p>The actual panel-opening is delegated to a {@link Consumer Consumer&lt;UUID&gt;}
- * injected at registration time by the platform adapter (see {@code RTPCmdBukkit}'s
- * menu wiring): {@code rtp-core} does not depend on a renderer or on
- * {@code MenuRedeemSubcommand} directly. When the opener is {@code null}
- * (tests, headless wiring, console caller without a menu surface), the bare
- * form rejects with the configurable {@code menuInvalid} message and logs at
- * WARNING per REQ-RTP-S-004 / S-007.
- *
- * <p>Permission: the <strong>bare</strong> form gates on {@code rtp.menu.admin}
- * (same key as the {@code Admin panel} entry row); the {@code prefab} child
- * gates on {@code rtp.admin.prefab} (see {@code PrefabCommand}).
+ * Top-level {@code /rtp admin} command.
+ * Bare invocation delegates to injected admin-panel opener (gates on {@code rtp.menu.admin}).
+ * Subcommands manage prefabs (gates on {@code rtp.admin.prefab}).
+ * Rejects with {@code menuInvalid} when no opener is wired (REQ-RTP-S-004, S-007).
  */
 public class AdminCmd extends BaseRTPCmdImpl {
 

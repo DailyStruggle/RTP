@@ -133,26 +133,12 @@ public class Rectangle extends MemoryShape<RectangleParams> {
   }
 
   /**
-   * Rectangle-specific inverse of {@link #xzToLocation(long, long)}.
+   * Rectangle inverse mapping for {@code chunkToLocations(cx, cz)}.
+   * Unrotated case is a strict bijection (1 preimage); rotated case bounded by <= 2 preimages.
    *
-   * <p>The row-major curve makes the unrotated case a strict bijection: every
-   * chunk in the rectangle has exactly one 1D index decode to it (so the
-   * preimage is a 1-element array). When {@code rotation} is non-zero the
-   * floating-point rotation matrix lets adjacent row indices round to the
-   * same integer chunk, capped at 2 by the unit-chunk √2-diagonal argument
-   * (the bound also held for the spiral shapes; the same upper bound applies
-   * to any 1-chunk-spaced curve).
-   *
-   * <p>This override bypasses the default {@code MemoryShape.chunkToLocations}
-   * angular-walk-with-{@code contains}-gate because {@link #contains(int, int)}
-   * here is parameterised in <em>blocks</em> (its {@code >>4} conversion is
-   * authored for the block-coordinate call sites), while the spiral curve and
-   * the inverse contract are in <em>chunk</em> units. We re-implement the
-   * gate using the row-major bounds directly.
-   *
-   * @param cx chunk x in the rectangle's chunk-unit coordinate system
-   * @param cz chunk z in the rectangle's chunk-unit coordinate system
-   * @return 0-, 1- or 2-element array of 1D indices; never {@code null}.
+   * @param cx chunk x in rectangle chunk-units
+   * @param cz chunk z in rectangle chunk-units
+   * @return 0-, 1-, or 2-element array of 1D indices; never {@code null}
    */
   @Override
   public long[] chunkToLocations(int cx, int cz) {
@@ -165,17 +151,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     final long ccx = getNumber(RectangleParams.centerX, 0L).longValue();
     final long ccz = getNumber(RectangleParams.centerZ, 0L).longValue();
 
-    // Invert {@link #locationToXZ(long, long)} directly. The forward map is:
-    //   row = n / width, col = n % width
-    //   x' = col - width/2, z' = row - height/2
-    //   (x, z) = rotate((x', z'), degrees) + (centerX, centerZ)
-    // So:
-    //   (x', z') = rotateInverse((cx - centerX, cz - centerZ), degrees)
-    //   col = x' + width/2, row = z' + height/2
-    //   n = row * width + col
-    // {@link #xzToLocation(long, long)} omits the {@code width/2}/{@code height/2}
-    // shifts that {@code locationToXZ} subtracts, so it is *not* the true
-    // inverse of {@code locationToXZ}; we cannot use it here.
+    // Invert locationToXZ: centered -> unrotated col/row -> representative 1D index
     int[] centered = rotate(new int[]{(int) (cx - ccx), (int) (cz - ccz)}, -degrees);
     long col = centered[0] + (width / 2);
     long row = centered[1] + (height / 2);
@@ -348,7 +324,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
 
     int uniqueRadius =
         uniquePlacementsRadius(data.getOrDefault(RectangleParams.uniquePlacements, 0));
-    // addBadChunkRadius: chunk-uniform (uniqueplacements knob) — within a chunk the per-column
+    // addBadChunkRadius: chunk-uniform (uniqueplacements knob) - within a chunk the per-column
     // selection order is deterministic, so re-rolling onto the same chunk produces the
     // same effective placement. Marking the landing chunk (radius 1) prevents that chunk-level
     // re-roll; a larger radius additionally clears the surrounding chunks so placements spread out.

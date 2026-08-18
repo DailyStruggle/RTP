@@ -28,13 +28,11 @@ import java.util.function.Function;
  * literals previously living in {@code RtpVelocityPlugin.onCommandTrigger}
  * are funnelled through here instead.</p>
  *
- * <p>Localized {@code messages.yml} on the Velocity adapter is out of scope
- * for L1 (see {@code PROPOSAL-cross-server-rtp-L1.md} §5). Until that lands,
+ * <p>Until localized {@code messages.yml} support lands,
  * {@link #sendMessage} resolves each {@link MessageKey} via the static
  * baseline-fallback table {@link #BASELINE_FALLBACK}; missing keys log a
  * single WARNING per key (deduplicated via {@link #warnedKeys}) and the
- * player receives the raw key. This is consistent with the
- * "log-once-and-use-baseline" decision approved in the L1 proposal §7.4.</p>
+ * player receives the raw key.</p>
  */
 public final class VelocityProxySender implements ProxySender {
 

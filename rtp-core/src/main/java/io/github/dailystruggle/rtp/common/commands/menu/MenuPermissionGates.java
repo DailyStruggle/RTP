@@ -9,26 +9,12 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 
 /**
- * Permission gates shared by every menu leaf and the legacy redeem dispatch
- * chain. Extracted from {@code MenuRedeemSubcommand} as part of the ADR-050
- * menu-package split (see {@code CHECKLIST-concrete-menu-commands.md}).
- *
- * <p>Each gate:
- * <ul>
- *   <li>Returns {@code false} (deny-by-default) when the probe factory yields
- *       a {@code null} probe.</li>
- *   <li>Returns {@code false} and logs WARN when the probe throws
- *       {@link RuntimeException} — REQ-RTP-S-007 (exception in a permission
- *       probe is a denial, never a silent allow).</li>
- * </ul>
- *
- * <p>Package-private: only the menu leaves and {@code MenuRedeemSubcommand}
- * may hold an instance.
+ * Permission gates shared by menu leaves and the legacy redeem dispatch chain (ADR-050).
+ * Denies by default on null probe; logs WARN on probe exception (REQ-RTP-S-007).
  */
 final class MenuPermissionGates {
 
-    // Mirrors of the public constants on MenuRedeemSubcommand (kept in sync;
-    // tests and AdminPanelBuilder still reference the latter directly).
+    // Mirrors of MenuRedeemSubcommand permission constants.
     static final String CONFIG_VIEW_PERMISSION = MenuRedeemSubcommand.CONFIG_VIEW_PERMISSION;
     static final String ADMIN_MENU_PERMISSION = MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
     static final String INFO_PERMISSION = "rtp.info";

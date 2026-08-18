@@ -19,30 +19,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Vertical adjustor that places the player at a single configured Y level in
- * mid-air, with no terrain scan.
- *
- * <p>Intended for skyblock-style worlds where the platform tool (see the
- * Bukkit / Folia world adapters' {@code platform} method) builds a foothold
- * around the player after teleport. Sibling of
- * {@link io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor}
- * and
- * {@link io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor}:
- * those scan for solid ground in pregenerated terrain; this adjustor returns
- * a fixed Y and lets the platform tool create the foothold instead.</p>
- *
- * <p>Acceptance rule: the destination cell {@code (x, y, z)} and the head
- * cell {@code (x, y+1, z)} must both be air. Any non-air block in either
- * cell is treated as unsafe (the player would suffocate or be displaced),
- * and the adjustor reports no acceptable Y for that chunk so the
- * {@link io.github.dailystruggle.rtp.common.tasks.ScanTask} pipeline can
- * roll a different one. No ground-column or sky-light gating is performed —
- * mid-air placement has neither.</p>
- *
- * <p>S-005 compliance: the live {@link #adjust(RTPChunk, MutableRTPCoords)}
- * path uses only the supplied {@link RTPChunk}'s already-loaded data; the
- * probe path uses only the supplied {@link ChunkColumnProbe}. Neither path
- * triggers a synchronous chunk load.</p>
+ * Vertical adjustor placing players at a fixed Y level in mid-air (skyblock worlds).
+ * Requires air at destination and head cells; uses no synchronous chunk I/O (S-005 compliant).
  */
 public class FixedAdjustor extends VerticalAdjustor<FixedAdjustorKeys> {
   /** Command parameters for tab-completion of {@code /rtp vert:fixed}. */
@@ -105,7 +83,7 @@ public class FixedAdjustor extends VerticalAdjustor<FixedAdjustorKeys> {
   public boolean adjust(@NotNull RTPChunk chunk, @NotNull MutableRTPCoords output) {
     int y = getNumber(FixedAdjustorKeys.y, 64L).intValue();
 
-    // Clamp to the world's vertical bounds — a configured Y outside the
+    // Clamp to the world's vertical bounds - a configured Y outside the
     // world (e.g. 320 in a 1.16-style world) would otherwise produce coords
     // the platform pipeline cannot honour.
     int worldMax = chunk.getWorld().getMaxHeight();
@@ -119,7 +97,7 @@ public class FixedAdjustor extends VerticalAdjustor<FixedAdjustorKeys> {
     // Mid-air rule: every non-air block at the destination is unsafe.
     // The configured Y intentionally lies above any pregenerated terrain
     // (skyblock-style worlds), so a non-air hit usually means the user
-    // mis-configured Y into terrain — better to reject and let ScanTask
+    // mis-configured Y into terrain - better to reject and let ScanTask
     // pick a different chunk than to silently teleport into a wall.
     if (!chunk.isAir(lx, y, lz)) return false;
     if (!chunk.isAir(lx, y + 1, lz)) return false;
@@ -144,7 +122,7 @@ public class FixedAdjustor extends VerticalAdjustor<FixedAdjustorKeys> {
     int y = getNumber(FixedAdjustorKeys.y, 64L).intValue();
 
     // Probe window must cover the chosen Y and its head cell. If it doesn't,
-    // fall back to the live path rather than guess — same contract used by
+    // fall back to the live path rather than guess - same contract used by
     // LinearAdjustor / JumpAdjustor.
     if (probe.minY() > y || probe.maxY() < y + 1) return AdjustResult.WINDOW_REJECT;
 

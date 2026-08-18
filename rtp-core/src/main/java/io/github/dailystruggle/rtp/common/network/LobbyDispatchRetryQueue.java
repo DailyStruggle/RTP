@@ -10,58 +10,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 /**
- * Lobby-side auto-retry queue for {@code /rtp} attempts that hit a
- * <em>transient</em> {@link RoutingDecision.LocalFallback} reason.
- *
- * <p>Motivation (user-confirmed design): on a lobby backend
- * ({@code network.routing.lobbyMode: true}) the local pipeline has no
- * RTP regions to fall back to, so the existing
- * {@link BukkitNetworkCommandHook} behaviour of silently mapping
- * {@code LocalFallback} -&gt; {@link io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult#local()}
- * lands the player in a "non-processing" state: no message, no
- * teleport, and the next {@code /rtp} re-runs from scratch. The
- * transient gates that produce {@code LocalFallback}
- * ({@link RoutingDecision.FallbackReason#NETWORK_DISABLED} during
- * snapshot warm-up, {@link RoutingDecision.FallbackReason#NO_LIVE_PEER}
- * during heartbeat lapse, {@link RoutingDecision.FallbackReason#QUEUE_FULL}
- * spike, {@link RoutingDecision.FallbackReason#TOKEN_BUCKET_EXHAUSTED}
- * burst) all clear on their own within seconds, so the right UX is for
- * the lobby itself to keep re-trying on the player's behalf instead of
- * making them retype the command.</p>
- *
- * <p>This queue is bounded by both <em>attempt count</em> and
- * <em>wall-clock TTL</em>: whichever fires first ends the retry and the
- * player gets a terminal "could not place you" message.
- * {@link RoutingDecision.FallbackReason#REGION_UNAVAILABLE} and
- * {@link RoutingDecision.FallbackReason#UNKNOWN} are treated as terminal
- * - retrying them just spins until the TTL because the player asked
- * for a region/server that does not exist or hard-pinned a dead peer.</p>
- *
- * <p>Threading:
- * <ul>
- *   <li>Producers ({@code /rtp} command path inside
- *       {@link BukkitNetworkCommandHook}) call
- *       {@link #enqueue(UUID, Map, RoutingDecision.FallbackReason, java.util.function.Consumer)}
- *       cheaply on whatever thread Bukkit gave them.</li>
- *   <li>A single async timer pulse iterates the entries and calls
- *       {@link NetworkRouter#route} synchronously per entry. The router
- *       is a pure-function read of the cached snapshot so the pulse
- *       stays cheap even with many parked players.</li>
- *   <li>{@link #cancel(UUID, MessagesKeys)} is called from
- *       {@code PlayerQuitEvent} and from {@link #shutdown()}; both clear
- *       {@code processingPlayers} so the player can re-attempt cleanly.</li>
- * </ul>
- *
- * <p>S-004 compliance: every exit path emits a player-visible message
- * (success template, terminal-rejection template, or hardcoded English
- * fallback) and releases {@code processingPlayers} on every non-success
- * exit. The success path retains the lock so the
- * {@code NetworkWaitlistNotifier} can take over.</p>
- *
- * <p>Scheduler usage: timer dispatched via
- * {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTaskTimerAsynchronously}
- * per the AGENTS.md "Scheduler Usage" rule (no raw {@code java.util.concurrent}
- * executors in backend JVMs).</p>
+ * Lobby-side retry queue for {@code /rtp} attempts hitting transient fallback conditions.
+ * Periodically re-evaluates routing decisions for parked players up to configured limits
+ * before emitting terminal failure and releasing locks (REQ-RTP-S-004).
  */
 public final class LobbyDispatchRetryQueue {
 
@@ -96,14 +47,7 @@ public final class LobbyDispatchRetryQueue {
     private final NetworkEnrolmentBuffer enrolmentBuffer;
     private final ConcurrentHashMap<UUID, Entry> parked = new ConcurrentHashMap<>();
     /**
-     * Players who successfully enrolled cross-server and whose original
-     * {@code (args, messageMethod)} we remember so that if the proxy
-     * never produces a terminal transition (sticky-TTL expiry in
-     * {@link NetworkStatusCache}), {@link #onTerminalFailure(UUID)} can
-     * re-park them into {@link #parked} for a fresh transient retry
-     * rather than forcing the player to retype {@code /rtp}. Cleared
-     * on {@link #remove}, {@link #cancel}, supplier-confirmed terminal,
-     * and successful re-enrolment.
+     * Enrolled players cached for auto-recovery on proxy timeout in {@link #onTerminalFailure(UUID)}.
      */
     private final ConcurrentHashMap<UUID, Entry> enrolled = new ConcurrentHashMap<>();
     private final long pulseIntervalMs;
@@ -130,22 +74,12 @@ public final class LobbyDispatchRetryQueue {
     }
 
     /**
-     * Park a player whose {@code /rtp} hit a transient
-     * {@link RoutingDecision.LocalFallback}. The player keeps their
-     * {@code processingPlayers} lock; the queue is now responsible for
-     * either enrolling them (lock-retain path) or terminating with a
-     * rejection message (lock-release path).
+     * Parks a player hitting transient fallback, retaining the processing lock until resolution.
      *
-     * <p>Idempotent: a second {@link #enqueue} for the same UUID is a
-     * no-op. This is safe because the outer {@code processingPlayers}
-     * guard at {@code RTPCmd.onCommand} already short-circuits repeated
-     * commands with {@code alreadyTeleporting}, so we should never see
-     * a second enqueue under normal conditions; the no-op is defensive.
-     *
-     * @param messageMethod the player-facing message sink captured from
-     *                      {@code RTPCmd.compute}. Allowed to be
-     *                      {@code null}; when null we route messages via
-     *                      {@link RTP#serverAccessor}{@code .sendMessage(UUID,String)}.
+     * @param playerId      player UUID
+     * @param args          command arguments
+     * @param firstReason   initial fallback cause
+     * @param messageMethod player message consumer or null for default
      */
     public void enqueue(UUID playerId,
                         Map<String, List<String>> args,
@@ -177,14 +111,7 @@ public final class LobbyDispatchRetryQueue {
     }
 
     /**
-     * Record a successful cross-server enrolment so that if the proxy
-     * never reports a terminal transition (sticky-TTL expiry), we can
-     * automatically re-park the player for a fresh retry pulse instead
-     * of forcing them to retype {@code /rtp}. Idempotent.
-     *
-     * <p>Called from {@code BukkitNetworkCommandHook} on the real
-     * {@link RoutingDecision.CrossServer} branch (not the synthetic
-     * CrossServer return used after {@link #enqueue}).</p>
+     * Records cross-server enrolment for timeout recovery.
      */
     public void recordEnrolment(UUID playerId,
                                 Map<String, List<String>> args,
@@ -199,16 +126,10 @@ public final class LobbyDispatchRetryQueue {
     }
 
     /**
-     * Called by the lobby's {@code NetworkStatusCache} terminal listener
-     * when a previously-enrolled player transitions to FAILED via the
-     * sticky-TTL timeout (i.e. the proxy never reported a terminal
-     * state). If we remembered the player's original
-     * {@code (args, messageMethod)} via {@link #recordEnrolment}, we
-     * re-park them for a fresh transient retry pulse and return
-     * {@code true} so the caller knows NOT to release the
-     * {@code processingPlayers} lock. Returns {@code false} when no
-     * recorded enrolment exists, in which case the caller should
-     * release the lock as before.
+     * Handles sticky-TTL timeout by re-parking the player if an enrolment record exists.
+     *
+     * @param playerId player UUID
+     * @return true if re-parked (retaining processing lock), false otherwise
      */
     public boolean onTerminalFailure(UUID playerId) {
         if (playerId == null) return false;

@@ -81,7 +81,7 @@ public final class V26_1_R1FabricRTPChunk extends RTPChunk<ChunkAccess> {
 
     @Override
     public void unload() {
-        // No analogue to Bukkit's Chunk#unload(false) on Fabric — eviction is
+        // No analogue to Bukkit's Chunk#unload(false) on Fabric - eviction is
         // ticket-driven. Releasing our keep-ticket is the closest approximation.
         keep(false);
     }

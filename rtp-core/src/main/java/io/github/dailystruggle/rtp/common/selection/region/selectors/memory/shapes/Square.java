@@ -426,7 +426,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
 
     int uniqueRadius =
         uniquePlacementsRadius(data.getOrDefault(GenericMemoryShapeParams.uniquePlacements, 0));
-    // addBadChunkRadius: chunk-uniform (uniqueplacements knob) — within a chunk the per-column
+    // addBadChunkRadius: chunk-uniform (uniqueplacements knob) - within a chunk the per-column
     // selection order is deterministic, so re-rolling onto the same chunk produces the
     // same effective placement. Marking the landing chunk (radius 1) prevents that chunk-level
     // re-roll; a larger radius additionally clears the surrounding chunks so placements spread out.

@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Phase 2c coverage for {@link RtpVelocityPlugin#onServerPreConnect}: the
+ * Coverage for {@link RtpVelocityPlugin#onServerPreConnect}: the
  * connect-time {@link ReservationToken} redemption path. Exercises the four
  * branches the listener has to handle correctly (REQ-RTP-PROXY-VELOCITY-002,
  * REQ-RTP-PROXY-VELOCITY-003, REQ-RTP-S-004).

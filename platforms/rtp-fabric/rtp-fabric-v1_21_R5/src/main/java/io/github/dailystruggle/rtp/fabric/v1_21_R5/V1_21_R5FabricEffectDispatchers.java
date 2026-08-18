@@ -15,7 +15,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import java.util.logging.Level;
 
 /**
- * Loom-compiled effect dispatchers for MC 1.21.5–1.21.10. Sibling of
+ * Loom-compiled effect dispatchers for MC 1.21.5-1.21.10. Sibling of
  * {@code V1_21_R11FabricEffectDispatchers}; same shape, mapped against
  * the 1.21.5 MC jar. See that class for rationale.
  */

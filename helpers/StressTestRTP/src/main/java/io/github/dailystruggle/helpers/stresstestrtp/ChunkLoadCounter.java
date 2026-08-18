@@ -27,12 +27,12 @@ import java.util.logging.Level;
  * every {@code ChunkLoadEvent} and let callers diff snapshots at dispatch and
  * completion to estimate "chunks loaded by this teleport". That heuristic
  * silently double-counts in any concurrent run because the in-flight windows
- * of two players overlap completely on Spigot — every chunk loaded for
+ * of two players overlap completely on Spigot - every chunk loaded for
  * player B's pipeline lands inside player A's snapshot window and vice versa.
  * With queueing-style RTP plugins (RTP's own {@code keptLocations}, BetterRTP's
  * {@code Queue.Enabled}, JakesRTP's pre-cache) it also lies about <em>when</em>
  * the chunk-loading work happened: the plugin paid the cost during the
- * pre-warm phase, and the in-flight window's delta is zero — but the global
+ * pre-warm phase, and the in-flight window's delta is zero - but the global
  * counter caught view-distance follow-ups from the previous teleport and
  * billed them to this one.
  *
@@ -52,7 +52,7 @@ import java.util.logging.Level;
  *   <li><b>Main-thread temporal (Spigot fallback).</b> If the event fires on
  *       the server tick thread (i.e. {@link Bukkit#isPrimaryThread()}) while
  *       at least one attempt is in flight, the load is attributed to the
- *       <em>most-recently-dispatched</em> in-flight attempt — the one whose
+ *       <em>most-recently-dispatched</em> in-flight attempt - the one whose
  *       {@code dispatchCommand} stack frame is, by construction, the only
  *       caller currently on the main thread that could have triggered a
  *       chunk load. With concurrency-cap = 1 this is exact; with concurrency
@@ -99,7 +99,7 @@ public final class ChunkLoadCounter implements Listener {
      *  Concurrent deque so the event handler can iterate it without locking;
      *  attempts are added in {@link #beginAttempt} and removed in
      *  {@link #endAttempt}. Iteration cost is bounded by the runner's
-     *  concurrency cap (typically 1–4). */
+     *  concurrency cap (typically 1-4). */
     private final Deque<MetricsRecorder.Attempt> inFlight = new ConcurrentLinkedDeque<>();
     /** Per-attempt load tally, keyed by attempt id. Removed by
      *  {@link #endAttempt}, which copies the raw count into
@@ -141,7 +141,7 @@ public final class ChunkLoadCounter implements Listener {
         if (registered) return;
         // Reflectively probe for Paper's per-chunk plugin-tickets API. This
         // is the only cross-platform discriminator we have for "which plugin
-        // owns this chunk load" — Spigot's ChunkLoadEvent exposes nothing
+        // owns this chunk load" - Spigot's ChunkLoadEvent exposes nothing
         // beyond `isNewChunk()`, and neither platform exposes a load-cause
         // enum on the event itself.
         try {
@@ -174,7 +174,7 @@ public final class ChunkLoadCounter implements Listener {
         final int cx = event.getChunk().getX();
         final int cz = event.getChunk().getZ();
 
-        // Step 1: plugin-ticket attribution (Paper only).
+        // Plugin-ticket attribution (Paper only).
         if (pluginTicketsSupported) {
             MetricsRecorder.Attempt a = attributeByPluginTicket(event.getChunk());
             if (a != null) {
@@ -183,7 +183,7 @@ public final class ChunkLoadCounter implements Listener {
             }
         }
 
-        // Step 2: main-thread temporal attribution.
+        // Main-thread temporal attribution.
         if (Bukkit.isPrimaryThread()) {
             MetricsRecorder.Attempt a = inFlight.peekLast();
             if (a != null) {
@@ -192,14 +192,14 @@ public final class ChunkLoadCounter implements Listener {
             }
         }
 
-        // Step 3: background.
+        // Background.
         phaseBackgroundLoads.incrementAndGet();
     }
 
     /**
      * Walks the chunk's plugin-ticket list and matches against the labels of
      * currently-in-flight attempts. The match is case-insensitive on
-     * {@code Plugin#getName()} vs {@code Attempt#targetLabel} — for the
+     * {@code Plugin#getName()} vs {@code Attempt#targetLabel} - for the
      * harness's normal labels ({@code rtp}, {@code betterrtp}, {@code huskhomes},
      * {@code jakesrtp}) the plugin name and label match by convention. If the
      * label does not match a real plugin (e.g. the operator used a custom
@@ -295,7 +295,7 @@ public final class ChunkLoadCounter implements Listener {
     }
 
     /** Called by {@link MetricsRecorder#onDispatch} to register an attempt
-     *  for chunk-load attribution. Idempotent — re-registering an already-known
+     *  for chunk-load attribution. Idempotent - re-registering an already-known
      *  attempt is a no-op. */
     public void beginAttempt(MetricsRecorder.Attempt a) {
         if (a == null) return;
@@ -326,7 +326,7 @@ public final class ChunkLoadCounter implements Listener {
         return totalLoads.get();
     }
 
-    /** Reset phase counters. Per-attempt accumulators are <em>not</em> cleared —
+    /** Reset phase counters. Per-attempt accumulators are <em>not</em> cleared -
      *  in-flight attempts keep counting across the phase boundary, which is
      *  correct: an attempt that started near the end of phase N and finishes
      *  in phase N+1 should report its full chunk-load cost on its CSV row. */

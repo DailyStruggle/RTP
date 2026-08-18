@@ -13,21 +13,8 @@ import java.util.logging.Level;
 
 /**
  * ADR-073 config-default inheritance resolver.
- *
- * <p>A region/world setting may carry an {@code @<file>} reference token instead of a
- * literal value. The token names the base name (no extension) of the resource that owns
- * the corresponding global default, so the resolver knows which parser to ask:
- *
- * <ul>
- *   <li>{@code @config} resolves from {@code config.yml#defaults.<setting>},</li>
- *   <li>{@code @economy} resolves from {@code economy.yml#<setting>},</li>
- *   <li>{@code @safety} resolves from {@code safety.yml#<setting>}.</li>
- * </ul>
- *
- * <p>Resolution happens at read time and never rewrites a file. When a reference cannot
- * be resolved (missing global default or unknown file) the supplied fallback is returned
- * and a warning is logged, so a misconfigured reference can never produce a zero-radius
- * teleport or an NPE.
+ * Resolves {@code @<file>} reference tokens in region/world settings to global defaults
+ * (e.g. {@code @config}, {@code @economy}, {@code @safety}).
  */
 public final class ConfigDefaultResolver {
 
@@ -43,8 +30,7 @@ public final class ConfigDefaultResolver {
 
   /**
    * @param value a config value
-   * @return the lower-cased base file name a reference names (e.g. {@code "config"} for
-   *     {@code "@config"}), or {@code null} when {@code value} is not a reference token
+   * @return lower-cased base file name (e.g. {@code "config"} for {@code "@config"}), or {@code null}
    */
   public static String referencedFile(Object value) {
     if (!isReference(value)) return null;
@@ -54,14 +40,10 @@ public final class ConfigDefaultResolver {
   /**
    * Resolves a scalar/block reference token for the given canonical setting name.
    *
-   * <p>For the type-bearing {@code shape}/{@code vert} blocks the {@code settingName} is
-   * {@code "shape"}/{@code "vert"} and the returned value is the whole named block
-   * ({@link RtpYamlSection} or {@link Map}) as stored under {@code config.yml#defaults}.
-   *
-   * @param raw the raw configured value (a reference token or a literal)
-   * @param settingName the canonical setting name (matches the key inside the owning file)
-   * @param fallback the value to return when the reference cannot be resolved
-   * @return the resolved value, or {@code raw} when it is a literal, or {@code fallback}
+   * @param raw raw configured value (reference token or literal)
+   * @param settingName canonical setting name matching key in owning file
+   * @param fallback value returned if reference cannot be resolved
+   * @return resolved value, {@code raw} if literal, or {@code fallback}
    */
   public static Object resolve(Object raw, String settingName, Object fallback) {
     String file = referencedFile(raw);

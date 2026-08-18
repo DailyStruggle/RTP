@@ -8,15 +8,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Mutable data object that tracks the state of a single teleport request as it
- * moves through the asynchronous processing pipeline.
- *
- * <p>A new instance is created for each {@code /rtp} command and is passed between
- * the various {@link RTPRunnable} stages (e.g., delay, location selection,
- * teleport dispatch).
- *
- * <p><b>Thread safety:</b> This class is <em>not</em> thread-safe. Access must be
- * synchronized externally or confined to a single thread.
+ * Tracks the state of a single teleport request through the processing pipeline.
  */
 public class TeleportData implements Cloneable {
   /** The command sender who initiated the teleport. */
@@ -60,15 +52,7 @@ public class TeleportData implements Cloneable {
   /** Flag indicating whether the teleport data has been written to the database. */
   public boolean written = false;
 
-  /**
-   * Optional one-shot completion callback used by the public API entry point
-   * ({@code RTPAPI.teleport}) to complete its returned future. Invoked exactly
-   * once at the pipeline's terminal cleanup phase via {@link #fireOnComplete()},
-   * regardless of whether the teleport succeeded, failed, or was cancelled
-   * (REQ-RTP-S-004). {@code null} for teleports that were not initiated through
-   * the public API (e.g. the {@code /rtp} command path), in which case
-   * {@link #fireOnComplete()} is a no-op. Not persisted and not copied to clones.
-   */
+  /** Optional one-shot completion callback for API teleports (REQ-RTP-S-004). */
   public transient java.util.function.Consumer<TeleportData> onComplete = null;
 
   private transient final java.util.concurrent.atomic.AtomicBoolean completionDelivered =

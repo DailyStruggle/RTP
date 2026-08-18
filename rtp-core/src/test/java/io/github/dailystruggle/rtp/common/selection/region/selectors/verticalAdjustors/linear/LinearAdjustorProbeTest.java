@@ -15,13 +15,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Unit tests for {@link LinearAdjustor#adjustFromProbe}. The probe is a fake in-memory
- * {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe}; no chunk I/O is performed.
+ * Unit tests for {@link LinearAdjustor#adjustFromProbe} using in-memory {@link FakeChunkColumnProbe}.
  *
- * <p>Acceptance predicate mirrors the legacy {@code adjust(chunk)} path:
- * {@code !isAir(y-1) && isAir(y) && isAir(y+1) && none-in-unsafeBlocks(y-1,y,y+1)}.
- * These tests cover scan-mode dispatch, probe-window/minY-maxY gating, sky-light
- * fallthrough, and world-coordinate emission at the chunk center (lx=8, lz=8).
+ * <p>Covers scan-mode dispatch, probe-window/minY-maxY gating, and coordinate resolution.
  */
 public class LinearAdjustorProbeTest {
 
@@ -44,7 +40,7 @@ public class LinearAdjustorProbeTest {
   /**
    * Bottom-up: first acceptable Y is 64 (solid floor at 63, air at 64/65). The
    * multi-column probe sweep visits {@code testCoords[0] = (7, 7)} first, so
-   * the returned global x/z reports that column — matching the live
+   * the returned global x/z reports that column - matching the live
    * {@code adjust(RTPChunk,...)} path; uniform fake data means every column
    * accepts at the same Y, so the column choice is deterministic.
    */
@@ -221,7 +217,7 @@ public class LinearAdjustorProbeTest {
    * cave roof / structure ceiling). The block-data sky-floor binds at the
    * overhang Y; every adjustor candidate at {@code y+1 <= overhang} fails
    * the sky-light gate. With the overhang at y=90 and the adjustor range
-   * [60,80), no Y passes — the result is null (SCAN_MISS rather than the
+   * [60,80), no Y passes - the result is null (SCAN_MISS rather than the
    * legacy LIGHT_GATE).
    */
   @Test
@@ -240,7 +236,7 @@ public class LinearAdjustorProbeTest {
   }
 
   /**
-   * When {@code requireSkyLight=false}, the probe's {@code isLightOn} is irrelevant —
+   * When {@code requireSkyLight=false}, the probe's {@code isLightOn} is irrelevant -
    * the scan proceeds and accepts the first air-pair regardless of stale lighting data.
    */
   @Test
@@ -283,14 +279,8 @@ public class LinearAdjustorProbeTest {
   }
 
   /**
-   * Regression: probe ids returned by the anvil column probe are
-   * lowercase namespaced (e.g. {@code "minecraft:water"}), while the
-   * yml-loaded {@code unsafeBlocks} set is uppercase / namespace-stripped
-   * (e.g. {@code "WATER"}). Before the canonicalisation fix in
-   * {@code LinearAdjustor.acceptY}, the raw lookup never matched and
-   * water at the feet-Y was silently accepted, putting players in lakes.
-   * This guard fixes feet to {@code minecraft:water} and asserts the
-   * adjustor rejects Y=64 and walks up to a stone-floored Y instead.
+   * Verifies that lowercase namespaced probe IDs (e.g. {@code minecraft:water})
+   * match uppercase {@code unsafeBlocks} tokens ({@code WATER}) and trigger rejection.
    */
   @Test
   void lowercaseNamespacedFluidAtFeetRejects() {
@@ -309,7 +299,7 @@ public class LinearAdjustorProbeTest {
         "expected the stone-floored y=65, not the water-floored y=64");
   }
 
-  /** Same as above but with lava instead of water — covers the other common fluid. */
+  /** Same as above but with lava instead of water - covers the other common fluid. */
   @Test
   void lowercaseNamespacedLavaAtFeetRejects() {
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
@@ -332,10 +322,10 @@ public class LinearAdjustorProbeTest {
   }
 
   // ---------------------------------------------------------------------------
-  // PR-20: adjustFromProbeWithReason rejection-reason attribution.
+  // adjustFromProbeWithReason rejection-reason attribution.
   // One test per ProbeRejectReason so ScanTask's sub-counters have a pinned
   // contract. Adding a new null-return branch to LinearAdjustor without a
-  // matching reason here will fail one of these — which is the point.
+  // matching reason here will fail one of these - which is the point.
   // ---------------------------------------------------------------------------
 
   /** Window too narrow → {@code WINDOW}. Mirrors {@link #probeWindowTooNarrow_returnsNull}. */

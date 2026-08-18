@@ -6,20 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Platform-agnostic native fallback for PvP combat detection.
- *
- * <p>Records the last instant (epoch millis) at which each player was involved in
- * PvP, and answers {@link #isInCombat(UUID, long, long)} by comparing against a
- * configurable combat-tag window. Platform adapters feed it from their damage
- * event listeners ({@code EntityDamageByEntityEvent} on Bukkit/Paper/Folia, the
- * Fabric equivalent), stamping both the victim and the aggressor as configured.
- *
- * <p>This is the authority consulted by {@code PvPGate} when no external
- * {@code PvPCombatStateRegistry.Provider} is bound (or when the configured source
- * is {@code NATIVE}). It holds no platform types and performs no I/O, so it is
- * safe to call from any thread and to unit-test directly with an injectable clock.
- *
- * <p>The map is self-pruning on read of an expired entry; a coarse opportunistic
- * sweep also runs on {@link #stamp} to bound memory on busy servers.
+ * Tracks epoch millis of PvP involvement and compares against combat-tag window.
  */
 public final class NativePvPCombatTracker {
 

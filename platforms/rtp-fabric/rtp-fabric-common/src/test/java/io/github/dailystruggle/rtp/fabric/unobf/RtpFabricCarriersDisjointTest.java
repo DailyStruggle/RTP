@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  *   <li>The pre-26 adapter modules ({@code rtp-fabric-v1_20_R1},
  *       {@code rtp-fabric-v1_21_R1}, {@code rtp-fabric-v1_21_R5},
  *       {@code rtp-fabric-v1_21_R11}) must not reference any class under
- *       {@code rtp.fabric.unobf.*} — they live on the obf carrier exclusively.</li>
+ *       {@code rtp.fabric.unobf.*} - they live on the obf carrier exclusively.</li>
  * </ol>
  *
  * <p>Source-scan based (no ASM dependency); reads {@code import} declarations
@@ -44,7 +44,7 @@ class RtpFabricCarriersDisjointTest {
     void commonDoesNotReferenceUnobf() throws IOException {
         Path root = projectDir().resolve("src/main/java/io/github/dailystruggle/rtp/fabric");
         assertTrue(Files.isDirectory(root), "common source root not found: " + root);
-        // Skip the unobf subtree itself when scanning common — but unobf lives in
+        // Skip the unobf subtree itself when scanning common - but unobf lives in
         // a sibling module, not under common, so the recursion is naturally clean.
         List<String> offenders = scanForForbiddenImport(root, UNOBF_PKG, /*excludeUnobfSubtree=*/false);
         if (!offenders.isEmpty()) {
@@ -97,7 +97,7 @@ class RtpFabricCarriersDisjointTest {
         for (String mod : modules) {
             Path root = projectDir().resolve("../" + mod + "/src/main/java").normalize();
             if (!Files.isDirectory(root)) {
-                // Module may not exist in this checkout — skip rather than fail.
+                // Module may not exist in this checkout - skip rather than fail.
                 continue;
             }
             offenders.addAll(prefixed(mod, scanForForbiddenImport(root, UNOBF_PKG, false)));

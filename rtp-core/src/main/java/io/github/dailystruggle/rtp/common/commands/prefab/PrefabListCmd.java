@@ -12,14 +12,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /rtp admin prefab list} - print every bundled prefab's id, English
- * description, and a usage hint. Permission-gated via the shared
- * {@link PrefabCommand#PERMISSION}.
- *
- * <p>Output is plain text (no localised keys yet -
- * the {@code MessagesKeys} entries through the locale TSV pipeline). The
- * English description on each row is the {@link Prefab#description()} carried
- * directly by the in-code registry, so this verb stays useful pre-locale.
+ * {@code /rtp admin prefab list} - print bundled prefab IDs, descriptions, and usage hints.
  */
 public class PrefabListCmd extends BaseRTPCmdImpl {
 

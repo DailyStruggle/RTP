@@ -8,17 +8,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Process-wide registry of synthetic ("mock") players used for testing on a live
- * server when real accounts are scarce.
- *
- * <p>Platform server accessors consult this registry from their player-resolution
- * chokepoints ({@code getPlayer(UUID)}, {@code getPlayer(String)},
- * {@code getSender(UUID)}) and message-routing paths <b>before</b> falling back to
- * the native server lookup (e.g. {@code Bukkit.getPlayer(...)}). This lets a single
- * operator drive one or more fake players through the queue and teleport pipeline.
- *
- * <p>The registry is empty by default; nothing is mocked unless a caller explicitly
- * {@link #register(RTPPlayer) registers} a mock. All methods are thread-safe.
+ * Process-wide registry of synthetic mock players consulted by platform server accessors
+ * before native player lookups. Thread-safe.
  */
 public final class MockPlayerRegistry {
 

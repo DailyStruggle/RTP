@@ -10,26 +10,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
- * Thread-safe, opt-in, per-player registry for {@link PlayerMoveEvent}
- * notifications (ADR-075).
- *
- * <p>Unlike a "listen to everyone" model, a consumer must explicitly
- * {@linkplain #watch(UUID, Consumer) watch} the specific players it cares about
- * and withdraws interest by closing the returned handle. Platform adapters call
- * {@link #isWatched(UUID)} to decide whether to do any movement work for a
- * player at all, so per-move cost scales with the number of watched players, not
- * the total online count. This makes edge-triggered features (arm on teleport,
- * watch only the armed set) cheap.
- *
- * <p>An instance of this dispatcher is created eagerly by {@code RTPAPI}, so
- * consumers may register at any time (including before {@code rtp-core} has
- * finished loading). Each platform adapter invokes {@link #fire(PlayerMoveEvent)}
- * when a watched player crosses into a new block.
- *
- * <p><b>Threading:</b> handlers are invoked on whatever thread fires the event
- * (the platform's natural thread for that player). Exceptions thrown by an
- * individual handler are caught and discarded so fan-out continues; handlers
- * that need diagnostic visibility should log inside their own consumer.
+ * Thread-safe, opt-in registry for {@link PlayerMoveEvent} notifications (ADR-075).
+ * Only watched players incur platform adapter movement tracking cost.
  *
  * @since 3.1.4
  */
@@ -40,19 +22,12 @@ public final class PlayerMoveDispatcher {
             new ConcurrentHashMap<>();
 
     /**
-     * Register interest in a specific player's block-granularity movement.
+     * Registers interest in block-granularity movement for {@code player}.
      *
-     * <p>Multiple handlers may watch the same player; each is delivered every
-     * event and each is unregistered independently through the returned handle.
-     * The player leaves the {@linkplain #isWatched(UUID) watched set} only once
-     * the last handler for that player is closed.
-     *
-     * @param player  the player to watch; must not be {@code null}.
-     * @param handler the handler to notify on each block change; must not be
-     *                {@code null}.
-     * @return an {@link AutoCloseable} that withdraws this handler when closed.
-     * @throws IllegalArgumentException if {@code player} or {@code handler} is
-     *                                  {@code null}.
+     * @param player  player to watch; non-null
+     * @param handler callback for block changes; non-null
+     * @return handle that withdraws interest when closed
+     * @throws IllegalArgumentException if {@code player} or {@code handler} is null
      */
     @PublicApi
     public AutoCloseable watch(UUID player, Consumer<PlayerMoveEvent> handler) {

@@ -5,15 +5,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Platform-agnostic representation of an entity that can send commands, such as
- * a player or the server console.
+ * Platform-neutral representation of a command sender (player or server console).
  *
- * <p>This interface abstracts over the platform's native command sender object
- * (e.g. {@code org.bukkit.command.CommandSender}) to decouple command handling
- * from server-specific APIs. Implementations are provided by the platform adapter.
- *
- * <p><b>Thread safety:</b> All methods on this interface must be called from the
- * main server thread.
+ * <p>Thread safety: calls must execute on the platform's primary command thread.
  */
 public interface RTPCommandSender extends Cloneable {
   /**

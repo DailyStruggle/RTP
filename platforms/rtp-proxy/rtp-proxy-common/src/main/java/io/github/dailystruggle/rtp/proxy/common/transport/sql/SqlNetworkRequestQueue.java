@@ -355,7 +355,7 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
      */
     private Optional<QueueEnvelope> tryClaimOne() throws SQLException {
         try (Connection c = dataSource.getConnection()) {
-            // Step 1: pick a candidate. We do this in a short autocommit
+            // Pick a candidate. We do this in a short autocommit
             // SELECT so we don't hold a transaction across the network.
             // MySQL/SQLite use LIMIT 1; H2/Postgres support FETCH FIRST.
             String pick;
@@ -383,7 +383,7 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
                 serverHint = rs.getString(4);
                 enqueuedAt = rs.getLong(5);
             }
-            // Step 2: try to claim it. UPDATE returns row count; 0 means a
+            // Try to claim it. UPDATE returns row count; 0 means a
             // peer beat us (no exception, just retry the picker).
             long now = System.currentTimeMillis();
             String upd = "UPDATE rtp_net_wq_ready SET state = 'CLAIMED', claimed_at_ms = ? "
@@ -395,7 +395,7 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
                 claimed = ps.executeUpdate();
             }
             if (claimed == 0) return Optional.empty();
-            // Step 3: terminal-state convention - once an envelope is
+            // Terminal-state convention: once an envelope is
             // claimed it is no longer subject to re-dequeue, so we delete
             // the ready row in the same connection to avoid CLAIMED rows
             // accumulating. The status row stays (transitions handle it).

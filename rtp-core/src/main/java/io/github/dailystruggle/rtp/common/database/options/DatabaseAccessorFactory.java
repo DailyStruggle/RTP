@@ -8,24 +8,8 @@ import java.util.Locale;
 import java.util.logging.Level;
 
 /**
- * Shared factory for {@link DatabaseAccessor} construction across platform handlers
- * (Bukkit, Fabric, etc.).
- *
- * <p>Because RTP cannot shade in every JDBC driver (size budget, license, native
- * binaries — see {@code ADR-024-rtp-lite-assembly-variant.md}), the factory probes
- * driver availability and instantiation success at the call site and falls back along
- * a fixed chain:
- *
- * <ol>
- *     <li>Requested backend (whatever the user configured).</li>
- *     <li>H2 — bundled into the standard RTP jar; embedded, no native deps.</li>
- *     <li>{@link YamlFileDatabase} — flat-file, no JDBC driver required at all.</li>
- * </ol>
- *
- * <p>Each rung is attempted only if the previous one is unreachable (driver class
- * absent or constructor throws). A loud {@link Level#WARNING} is logged on every
- * fallback so server admins can correct the config or drop the missing driver jar
- * onto the classpath.
+ * Shared factory for {@link DatabaseAccessor} construction across platform handlers.
+ * Falls back along requested backend -> H2 -> {@link YamlFileDatabase}.
  */
 public final class DatabaseAccessorFactory {
 
@@ -39,16 +23,15 @@ public final class DatabaseAccessorFactory {
             case "sqlite":     return "org.sqlite.JDBC";
             case "mysql":      return "com.mysql.cj.jdbc.Driver";
             case "postgresql": return "org.postgresql.Driver";
-            default:           return null; // yaml or unknown — no driver needed
+            default:           return null; // yaml or unknown - no driver needed
         }
     }
 
     /**
-     * Probe whether the given JDBC driver class is reachable from the current
-     * classloader. Returns {@code true} for {@code null} (no driver required, e.g. yaml).
+     * Probe whether the given JDBC driver class is reachable.
      *
-     * @param driverClass the fully-qualified JDBC driver class name, or {@code null}
-     * @return {@code true} if the driver is available or {@code driverClass} is {@code null}
+     * @param driverClass the JDBC driver class name, or {@code null}
+     * @return {@code true} if available or {@code driverClass} is {@code null}
      */
     public static boolean isDriverAvailable(String driverClass) {
         if (driverClass == null) return true;
@@ -58,25 +41,18 @@ public final class DatabaseAccessorFactory {
         } catch (ClassNotFoundException e) {
             return false;
         } catch (Throwable t) {
-            // Linkage / init error in the driver — treat as unavailable.
+            // Linkage / init error in the driver - treat as unavailable.
             return false;
         }
     }
 
     /**
-     * Build the accessor for the requested {@code type}. If the driver is missing or
-     * construction throws, falls back to H2; if H2 is also unavailable, falls back to
-     * {@link YamlFileDatabase}. Never returns {@code null}.
+     * Builds database accessor for requested {@code type} with fallback to H2/YAML.
      *
-     * @param type              configured backend type ({@code yaml}, {@code h2}, {@code sqlite},
-     *                          {@code mysql}, {@code postgresql}, or anything else → defaults to sqlite).
-     * @param databaseDirectory directory used by yaml + sqlite + h2 backends.
-     * @param host              JDBC host (mysql / postgresql).
-     * @param port              JDBC port (mysql / postgresql).
-     * @param name              database name (mysql / postgresql).
-     * @param username          credentials (mysql / postgresql).
-     * @param password          credentials (mysql / postgresql).
-     * @return an accessor and the effective type string actually used (after any fallback).
+     * @param type backend type
+     * @param databaseDirectory directory for local databases
+     * @param host host; port port; name database name; username user; password password
+     * @return accessor and effective backend type
      */
     public static Result create(String type,
                                 File databaseDirectory,
@@ -123,7 +99,7 @@ public final class DatabaseAccessorFactory {
                             + "(driver missing or construction failed). Falling back to flat-file (yaml) storage.");
         }
 
-        // Final rung — flat file. YamlFileDatabase only depends on the JVM + RTP itself.
+        // Final rung - flat file. YamlFileDatabase only depends on the JVM + RTP itself.
         return new Result(new YamlFileDatabase(databaseDirectory), "yaml");
     }
 
@@ -147,7 +123,7 @@ public final class DatabaseAccessorFactory {
         // classes. The lite assembly (ADR-024) excludes those accessor classes from the
         // jar entirely; if `tryCreate` referenced them by name, the JVM's eager
         // verification/resolution at frame-link time would raise NoClassDefFoundError
-        // up to the caller — bypassing this method's try/catch and breaking the
+        // up to the caller - bypassing this method's try/catch and breaking the
         // requested -> H2 -> yaml fallback chain. YamlFileDatabase stays direct because
         // lite always ships it.
         try {
@@ -179,7 +155,7 @@ public final class DatabaseAccessorFactory {
                             .newInstance("jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
-            // Accessor class excluded from this assembly (lite) — silent fall through.
+            // Accessor class excluded from this assembly (lite) - silent fall through.
             return null;
         } catch (java.lang.reflect.InvocationTargetException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;

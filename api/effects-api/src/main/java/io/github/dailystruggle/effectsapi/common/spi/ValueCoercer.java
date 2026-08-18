@@ -18,7 +18,7 @@ import java.util.List;
  * </ul>
  *
  * <p><b>Determinism (contractual):</b> {@link #canParse(TypeKey, String)} must
- * be a pure function of {@code (type, raw)} — no I/O, no chunk loads
+ * be a pure function of {@code (type, raw)} - no I/O, no chunk loads
  * (S-005), no exceptions on rejection.
  *
  * <p><b>S-004 (no silent failures):</b> {@link #parse(TypeKey, String)} must
@@ -56,7 +56,7 @@ public interface ValueCoercer {
 
     /**
      * Reflective fallback used by {@code Effect#fixData} when
-     * {@link #classify(Object)} returns {@link TypeKey#UNKNOWN} — the default
+     * {@link #classify(Object)} returns {@link TypeKey#UNKNOWN} - the default
      * value's runtime class is not one of the known logical types and the
      * coercer should try {@code valueOf(String)} / {@code getByName(String)}
      * / a registry lookup keyed by {@code targetType}.

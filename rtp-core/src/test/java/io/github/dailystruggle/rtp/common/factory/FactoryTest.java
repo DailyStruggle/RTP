@@ -165,7 +165,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // FactoryValue — setData(EnumMap) branches
+    // FactoryValue - setData(EnumMap) branches
     // -----------------------------------------------------------------------
 
     @Test
@@ -188,7 +188,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // FactoryValue — setData(Map<String,Object>) branches
+    // FactoryValue - setData(Map<String,Object>) branches
     // -----------------------------------------------------------------------
 
     @Test
@@ -219,7 +219,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // FactoryValue — getNumber branches
+    // FactoryValue - getNumber branches
     // -----------------------------------------------------------------------
 
     @Test
@@ -246,7 +246,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // FactoryValue — getData() returns clone
+    // FactoryValue - getData() returns clone
     // -----------------------------------------------------------------------
 
     @Test
@@ -259,7 +259,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // FactoryValue — keys() caching
+    // FactoryValue - keys() caching
     // -----------------------------------------------------------------------
 
     @Test
@@ -272,7 +272,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // FactoryValue — toString()
+    // FactoryValue - toString()
     // -----------------------------------------------------------------------
 
     @Test
@@ -285,7 +285,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // FactoryValue — equals() branches
+    // FactoryValue - equals() branches
     // -----------------------------------------------------------------------
 
     @Test
@@ -313,7 +313,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // FactoryValue — toYAML() branches
+    // FactoryValue - toYAML() branches
     // -----------------------------------------------------------------------
 
     @Test
@@ -352,7 +352,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // FactoryValue — clone() with nested Map value (via base FactoryValue.clone())
+    // FactoryValue - clone() with nested Map value (via base FactoryValue.clone())
     // -----------------------------------------------------------------------
 
     @Test
@@ -377,7 +377,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // Factory — getOrDefault when map is empty (prints stack trace, returns clone)
+    // Factory - getOrDefault when map is empty (prints stack trace, returns clone)
     // -----------------------------------------------------------------------
 
     @Test
@@ -388,7 +388,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // Factory — add with .YML suffix already present
+    // Factory - add with .YML suffix already present
     // -----------------------------------------------------------------------
 
     @Test
@@ -400,7 +400,7 @@ class FactoryTest {
     }
 
     // -----------------------------------------------------------------------
-    // Factory — remove with .YML suffix already present
+    // Factory - remove with .YML suffix already present
     // -----------------------------------------------------------------------
 
     @Test

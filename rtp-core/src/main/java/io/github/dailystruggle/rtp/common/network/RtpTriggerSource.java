@@ -4,32 +4,8 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
- * Producer-side abstraction for "something asked for an RTP" events.
- *
- * <p>Item 1 of {@code MULTI_SERVER_PLAN.md} Phase 1 stipulates that
- * trigger sources live in {@code rtp-core}. Trigger sources fan in to a
- * single consumer (the dispatcher, wherever it physically lives): the
- * {@code /rtp} command handler, the join-event listener, and any
- * programmatic event hook each implement this interface, register a
- * consumer at boot, and emit {@link Trigger} records as triggers fire.
- *
- * <p>This abstraction is deliberately decoupled from
- * {@code rtp-proxy-common}'s {@code RtpDispatcher} / {@code RtpRequest}:
- * {@code rtp-core} is platform- and proxy-agnostic and shall not depend
- * on the proxy SPI. Proxy-side code (or single-server core code) adapts
- * {@link Trigger} into whatever request shape its dispatcher consumes.
- *
- * <p><b>Lifecycle.</b> Implementations are passive between {@link
- * #start(Consumer)} and {@link #stop()}; calls to the consumer outside
- * that window are an implementation defect.
- *
- * <p><b>Threading.</b> Implementations shall document on which thread
- * the consumer is invoked. Consumers that touch world or player state
- * must hop to the appropriate scheduler before doing so (see
- * {@code AGENTS.md} -- Folia Threading).
- *
- * <p>Refines: {@code MULTI_SERVER_PLAN.md} Phase 1 item 1 (amended
- * 2026-05-18); {@code rtp-proxy-ADR-001} §1; REQ-RTP-PROXY-COMMON-005.
+ * Producer-side abstraction for RTP trigger events (commands, player joins, external events).
+ * Emits {@link Trigger} records to a registered consumer between {@link #start(Consumer)} and {@link #stop()}.
  */
 public interface RtpTriggerSource {
 

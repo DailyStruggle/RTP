@@ -12,18 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Surface guard for {@link ChartSpec} — REQ-RTP-MAP-006 / ADR-047 Stage 1.
- *
- * <p>Stage 1 contract:
- * <ul>
- *   <li>null-reject {@code kind} / {@code regionName};</li>
- *   <li>reject {@code tilesRows < 1} and {@code tilesCols < 1};</li>
- *   <li>reject negative {@code windowSeconds};</li>
- *   <li>equality / hashCode follow the record contract;</li>
- *   <li>{@link ChartSpec.Kind} exposes exactly the five Stage-1 / Stage-3
- *       reserved values, with {@code BAD_POINTS_HEATMAP} being the only
- *       Stage-1-active value.</li>
- * </ul>
+ * Surface guard for {@link ChartSpec} (REQ-RTP-MAP-006, ADR-047).
+ * Validates null handling, dimension bounds, and record equality.
  */
 class ChartSpecSurfaceTest {
 

@@ -30,12 +30,12 @@ import org.bukkit.block.data.BlockData;
  * branch on the populated source field.
  *
  * <p>Anvil-backed instances are constructed by {@code BukkitRTPWorld.getChunkAt}
- * when the Phase 3a pre-filter returns {@code ACCEPT} and the caller opted into
- * the Phase 3b {@code probeDetailed} path. They carry the decoded snapshot plus
+ * when the pre-filter returns {@code ACCEPT} and the caller opted into
+ * the detailed probe path. They carry the decoded snapshot plus
  * the world identity + chunk coordinates needed to answer RTPChunk queries without
  * touching any tick-thread state. The authoritative live
  * {@code chunk.isSafe(...)} re-check at teleport-commit time (ADR-016 §4) is
- * preserved — the Anvil-backed instance is never promoted to a live chunk
+ * preserved - the Anvil-backed instance is never promoted to a live chunk
  * in-place; it is replaced by the live-loaded {@code BukkitRTPChunk} once the
  * teleport pipeline commits.
  */
@@ -69,7 +69,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
 
   /**
    * Anvil-backed constructor (ADR-016). {@code chunk} is {@code null} because no live
-   * chunk was loaded — this instance answers every query from {@code view}. The
+   * chunk was loaded - this instance answers every query from {@code view}. The
    * {@code reconciledUnsafe} set, when non-null, short-circuits
    * {@link #isSafe(int, int, int, Set)} to skip per-call reconciliation; pass
    * {@code null} to force per-call reconciliation of the caller-supplied set.
@@ -132,7 +132,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
 
   @Override
   public boolean isLoaded() {
-    // An Anvil-backed chunk is by construction NOT loaded — that's the whole point.
+    // An Anvil-backed chunk is by construction NOT loaded - that's the whole point.
     // If a downstream caller needs a loaded chunk (e.g. teleport commit), they must
     // re-fetch via BukkitRTPWorld.getChunkAt to trigger a live load.
     if (anvilView != null) return false;
@@ -319,15 +319,15 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
 
   /**
    * Compiled-form safety check (ADR-017). Extracts the candidate block's material name
-   * and — only when the {@link CompiledUnsafeSet} has any state predicate that could
-   * apply — its {@link BlockData#getAsString()} property map, then delegates to
+   * and - only when the {@link CompiledUnsafeSet} has any state predicate that could
+   * apply - its {@link BlockData#getAsString()} property map, then delegates to
    * {@link CompiledUnsafeSet#isUnsafe(String, java.util.Collection, Map)}.
    *
    * <p>Hot-path fast exits per ADR-017 &sect;4:</p>
    * <ul>
    *   <li>{@link CompiledUnsafeSet#isEmpty()} → always safe, zero allocations.</li>
    *   <li>Anvil-backed chunks fall back to the legacy {@code Set<String>} path using
-   *       {@link CompiledUnsafeSet#plainMaterials()} — state-predicate evaluation on
+   *       {@link CompiledUnsafeSet#plainMaterials()} - state-predicate evaluation on
    *       off-tick Anvil data is not yet supported.</li>
    *   <li>No state predicate configured for this material / tag / wildcard →
    *       {@link BlockData} is never materialised.</li>

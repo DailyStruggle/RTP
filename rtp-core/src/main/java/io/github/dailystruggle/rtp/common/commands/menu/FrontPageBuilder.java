@@ -18,36 +18,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
 /**
- * Stage B — curated front-page builder for {@code /rtp menu} (no args).
- *
- * <p>Unlike {@link CommandTreeMenuBuilder}, which reflects the live
- * {@code commands-api} tree into a flat list of subcommand rows, this builder
- * produces a curated landing page with permission-gated, status-aware rows
- * representing the most common entry points for players and administrators.
- * See {@code docs/dev/scratch/CHECKLIST-menu-navigation.md} Stage B for the
- * approved row catalogue.
- *
- * <p>Every viewer sees the player picker rows (region / world / biome); a
- * viewer holding the {@code rtp.menu.admin} permission additionally gets a
- * single {@code Admin panel} entry row that descends into the dedicated
- * admin submenu. Rows are dropped silently when their underlying subtree or
- * parameter is not registered on the live {@code /rtp} tree, so the page
- * stays clean rather than rendering broken {@code OpenMenu} /
- * {@code OpenParamPicker} actions.
- *
- * <p>Architecture notes:
- * <ul>
- *   <li>This builder lives in {@code rtp-core}; the curated catalogue is
- *       platform-agnostic. Platform modules wire it via the existing
- *       {@code MenuRedeemSubcommand.MenuPageBuilder} SAM by branching on
- *       {@code node == rtpRoot && assembledPath.isEmpty()}.</li>
- *   <li>One token is minted per clickable fragment, mirroring
- *       {@link CommandTreeMenuBuilder}'s contract so renderers can carry
- *       opaque {@code menu:<token>} payloads (ADR-035 §3).</li>
- *   <li>Title and hint rows reuse {@link CommandMessages#menuRootTitle} /
- *       {@link CommandMessages#menuRootHint} from Stage A.5, keeping visual
- *       consistency with the reflector page when an admin disables Stage B.</li>
- * </ul>
+ * Curated front-page builder for {@code /rtp menu} (no args).
+ * Produces permission-gated landing page with entry points for players and admins.
  */
 public final class FrontPageBuilder {
 
@@ -56,18 +28,16 @@ public final class FrontPageBuilder {
 
     /**
      * Permission gating the curated "config editor" row on the admin
-     * front page (proposal v3.7.1, checklist step 7). When the viewer
-     * holds this permission, the row dispatches an
-     * {@link MenuAction.OpenConfigSelector} that opens the curated
+     * front page. When the viewer holds this permission, the row dispatches
+     * an {@link MenuAction.OpenConfigSelector} that opens the curated
      * config selector page; when missing, the row is hidden entirely
      * (not greyed) so the page stays clean.
      */
     public static final String CONFIG_VIEW_PERMISSION = "rtp.config.view";
 
     /**
-     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
-     * emits concrete {@code /rtp menu ...} commands, so no token registry or
-     * TTL is consulted any more.
+     * ADR-050: no-arg constructor. The renderer emits concrete
+     * {@code /rtp menu ...} commands.
      */
     public FrontPageBuilder() {
     }
@@ -75,13 +45,9 @@ public final class FrontPageBuilder {
     /**
      * Build the curated front-page {@link MenuModel} for {@code viewer}.
      *
-     * @param rtpRoot    the {@code /rtp} root {@link TreeCommand}; used to
-     *                   probe for subcommand and parameter availability.
-     * @param viewer     the calling player UUID.
-     * @param permission permission probe for {@code viewer}. The admin entry
-     *                   row is appended in addition to the player picker rows
-     *                   when {@code permission.test("rtp.menu.admin")}
-     *                   returns {@code true}.
+     * @param rtpRoot {@code /rtp} root {@link TreeCommand} to probe for available subcommands
+     * @param viewer calling player UUID
+     * @param permission permission check predicate for {@code viewer}
      */
     public MenuModel build(TreeCommand rtpRoot, UUID viewer, Predicate<String> permission) {
         Objects.requireNonNull(rtpRoot, "rtpRoot");
@@ -114,7 +80,7 @@ public final class FrontPageBuilder {
             lines.add(MenuLine.of(new MenuFragment(teleportSection, null, null)));
         }
 
-        // Row 1 — instant teleport (always visible; /rtp itself decides
+        // Row 1 - instant teleport (always visible; /rtp itself decides
         // whether the caller can teleport).
         addParsedRow(
                 lines,
@@ -138,7 +104,7 @@ public final class FrontPageBuilder {
 
         // Blank spacer before the always-on help footer.
         addSpacer(lines);
-        // Help footer — always last, always visible.
+        // Help footer - always last, always visible.
         addParsedRow(
                 lines,
                 lookupMsg(CommandMessages.menuFrontPageRowHelp, "#7A4FB8❓ list commands &7- /rtp help"),
@@ -147,10 +113,7 @@ public final class FrontPageBuilder {
         MenuPage page = new MenuPage(lines);
         List<MenuPage> pages = List.of(page);
 
-        // ADR-050 Stage 3α (2026-05-24): pre-mint loop removed. The renderer
-        // emits concrete /rtp menu ... commands per fragment action; tokens
-        // are no longer consulted. `tokenRegistry` / `tokenTtl` ctor params
-        // remain for source/binary compat; Stage 3β drops them outright.
+        // ADR-050: return MenuModel.
         return new MenuModel(title == null ? "" : title, pages);
     }
 
@@ -195,17 +158,8 @@ public final class FrontPageBuilder {
     }
 
     /**
-     * Admin-view rows after the always-on Teleport row
-     * (PROPOSAL-admin-panel.md v2). Collapses the previous inline admin block
-     * to a single {@code Admin panel} entry row that emits a
-     * {@link MenuAction.OpenAdminPanel}. The actual operator-facing rows
-     * (Config editor, Server info, Full diagnostics, Memory tracker, Scan
-     * control, Reload, Browse) now live on the dedicated admin-panel page
-     * built by {@link AdminPanelBuilder}.
-     *
-     * <p>The previous {@code menuFrontPageSectionAdmin} divider is gone: a
-     * single entry row needs no section header, and dropping the divider
-     * keeps the front page uniform between admin and non-admin viewers.
+     * Admin-view rows after the Teleport row.
+     * Appends a single {@code Admin panel} row emitting {@link MenuAction.OpenAdminPanel}.
      */
     private void appendAdminRows(List<MenuLine> lines) {
         String[] labelHover = splitRowLabel(
@@ -222,16 +176,8 @@ public final class FrontPageBuilder {
     // ---- helpers ----------------------------------------------------------
 
     /**
-     * Splits a curated front-page row message into a clean clickable label
-     * and a hover tooltip. The shipped {@code menuFrontPageRow*} messages
-     * embed the human explanation as a trailing gray {@code "- <description>"}
-     * run and, for the picker rows, a {@code "command:&7..."} placeholder echo
-     * (e.g. {@code "&2▶ /rtp region:&7... &7- pick a region"}). Rendering both
-     * inline turns the row text into gray clutter; the explanation belongs in
-     * the hover tooltip instead. Returns {@code {label, hover}}; {@code hover}
-     * is {@code null} when the message carries no {@code "- "} description
-     * separator (cleaner translations pass through with the whole message as
-     * the label).
+     * Splits row message into a clean clickable label and hover tooltip.
+     * Separates trailing description at {@code "- "} into hover tooltip.
      */
     static String[] splitRowLabel(String raw) {
         if (raw == null) return new String[]{null, null};
@@ -281,13 +227,8 @@ public final class FrontPageBuilder {
     }
 
     /**
-     * Adds a curated front-page row whose {@code raw} message carries the
-     * visible label (topical emoji + human description) first and the
-     * {@code /rtp ...} command after a trailing {@code "- "} separator. The
-     * label is rendered as the clickable text and the command becomes the
-     * hover tooltip, via {@link #splitRowLabel}. When a translation carries no
-     * {@code "- "} separator, the whole message becomes the label and there is
-     * no command hover.
+     * Adds a curated front-page row whose {@code raw} message carries visible label
+     * and optional command tooltip separated by {@code "- "}.
      */
     private static void addParsedRow(List<MenuLine> lines, String raw, MenuAction action) {
         String[] labelHover = splitRowLabel(raw);

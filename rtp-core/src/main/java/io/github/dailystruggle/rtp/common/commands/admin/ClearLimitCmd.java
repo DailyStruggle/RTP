@@ -8,18 +8,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /rtp clear limit} child verb. Clears a player's rolling usage-cap state
- * backing the BetterRTP {@code LockAfter} parity feature
- * ({@code lockAfterUses} / {@code lockAfterResetSeconds}): the in-memory window
- * in {@link RTP#usageCaps} and, via {@link RTP#teleportLimitStore}, the
- * best-effort persisted window. This lifts a {@code lockAfterUses} lockout the
- * same way {@code /rtp clear cooldown} lifts a cooldown - the two are separate
- * teleport gates.
+ * {@code /rtp clear limit} subcommand to clear player rolling usage-cap state
+ * ({@code lockAfterUses} / {@code lockAfterResetSeconds}).
  *
- * <p>Targeting (self / listed players / console-global) is inherited from
- * {@link PlayerTargetedClearCmd}.
- *
- * <p>Permission: {@code rtp.admin}.
+ * <p>Permission: {@code rtp.admin}.</p>
  */
 public class ClearLimitCmd extends PlayerTargetedClearCmd {
 

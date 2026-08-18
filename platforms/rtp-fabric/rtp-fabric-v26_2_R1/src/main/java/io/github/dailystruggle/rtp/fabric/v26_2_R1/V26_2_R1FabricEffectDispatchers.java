@@ -17,8 +17,8 @@ import java.util.logging.Level;
 
 /**
  * Loom-compiled effect dispatchers for MC 26.1.x. Sibling of the R11
- * dispatchers — same {@code Holder<SoundEvent>} ctor, same 2-boolean
- * targeted {@code sendParticles} overload — recompiled against the 26.1
+ * dispatchers - same {@code Holder<SoundEvent>} ctor, same 2-boolean
+ * targeted {@code sendParticles} overload - recompiled against the 26.1
  * MC jar so any post-1.21.11 mapping drift is absorbed by the compiler
  * rather than reflection.
  *
@@ -42,7 +42,7 @@ final class V26_2_R1FabricEffectDispatchers {
                     "[RTP][Fabric 26.1.x] effects-api (obf) not on classpath; skipping obf dispatcher registration: "
                             + ncdfe.getMessage());
         }
-        // ADR-006 amendment 2026-05-11 — on the deobf 26.1.2 runtime,
+        // ADR-006 amendment 2026-05-11 - on the deobf 26.1.2 runtime,
         // FabricEffectsInitializer (fabric_unobf) is the variant used by
         // EffectFactory, so its LocalEffects read FabricEffectRuntimeUnobf
         // (not FabricEffectRuntime). FabricParticleEffect/FabricSoundEffect

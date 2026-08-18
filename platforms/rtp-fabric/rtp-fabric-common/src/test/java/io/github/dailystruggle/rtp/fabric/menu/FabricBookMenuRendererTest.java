@@ -18,8 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Unit tests for {@link FabricBookMenuRenderer} (rtp-fabric-ADR-012 §4
- * un-defer, MULTI_PLATFORM_PLAN Step I Session 3). Covers the pure
+ * Unit tests for {@link FabricBookMenuRenderer} (rtp-fabric-ADR-012). Covers the pure
  * {@code MenuModel} → {@link FabricBookSpec} conversion (page/line/fragment
  * shape, click-command mapping, decorative fragments) and the chat-fallback
  * dispatch when no live Fabric server / player is present. No live server is

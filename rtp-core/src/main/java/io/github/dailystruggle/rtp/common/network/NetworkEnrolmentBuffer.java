@@ -13,30 +13,19 @@ import java.util.logging.Level;
 
 /**
  * Dirty-write batching buffer for cross-server enrolments.
- *
- * <p>Threading: producers ({@code /rtp} command path) call
- * {@link #offer(EnrolmentRecord)} cheaply on whatever thread Bukkit gave
- * them. A single async timer started by {@link #start(long)} drains the
- * deque on a fixed interval (default {@code network.queueFlushIntervalMs =
- * 250ms}) and hands the batch to the injected {@code flushSink}. The sink
- * does the actual transport-specific write (one pipelined Redis {@code EVAL}
- * per flush; in-memory no-op in tests).</p>
- *
- * <p>S-004: if the sink throws, the failed batch is re-enqueued at the head
- * so the next pulse retries; the exception is logged. Silent drop would
- * violate S-004's "no swallowed teleport failures" rule.</p>
+ * Drains deque periodically via async timer task and forwards batch to {@code flushSink}.
+ * S-004: re-enqueues failed batches at head on sink exception.
  */
 public final class NetworkEnrolmentBuffer {
 
     /**
-     * One pending cross-server enrolment. Carries everything the Lua
-     * {@code enqueue_batch.lua} needs.
+     * One pending cross-server enrolment.
      *
-     * @param playerId      UUID of the player being enrolled
+     * @param playerId UUID of the player being enrolled
      * @param correlationId correlation UUID for this enrolment request
-     * @param regionKey     optional preferred region key
-     * @param serverHint    optional preferred backend server id
-     * @param createdAtMs   wall-clock creation time in milliseconds
+     * @param regionKey optional preferred region key
+     * @param serverHint optional preferred backend server id
+     * @param createdAtMs creation timestamp in milliseconds
      */
     public record EnrolmentRecord(
             UUID playerId,

@@ -11,48 +11,8 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Bukkit-platform implementation of the {@link NetworkCommandHook} SPI.
- * Network command hook (rtp-proxy-ADR-014).
- *
- * <p>Wires the cross-server router + enrolment buffer + peer-region registry
- * into the {@code /rtp} command pre-dispatch path defined by
- * {@code RTPCmd.compute(...)}. Responsibilities, in order on each call:</p>
- *
- * <ol>
- *   <li>Extract {@code region=<arg>} from the parsed args map (if any).</li>
- *   <li>Parse via {@link NetworkRouter#parseRegionArgQualified(String)} to
- *       split out an optional {@code server:region} qualifier. Malformed
- *       input rejects with the localized
- *       {@link NetworkMessages#networkRegionUnavailable} message; the player's
- *       region argument never silently falls through to the local pipeline.</li>
- *   <li>Ask {@link NetworkRouter#route(UUID, String, String)} for a routing
- *       decision (hard-pin to {@code serverHint} when present).</li>
- *   <li>Translate the {@link RoutingDecision} into the SPI's
- *       {@link NetworkCommandHook.RoutingResult}:
- *       <ul>
- *         <li>{@link RoutingDecision.Local} -&gt; {@link NetworkCommandHook.RoutingResult#local()}
- *             (fall through to local pipeline).</li>
- *         <li>{@link RoutingDecision.CrossServer} -&gt; offer an
- *             {@link NetworkEnrolmentBuffer.EnrolmentRecord} to the buffer
- *             and return {@link NetworkCommandHook.RoutingResult#crossServer}.</li>
- *         <li>{@link RoutingDecision.LocalFallback} -&gt; mostly silent
- *             local fallback per the configured UX (see
- *             notes); the one exception is
- *             {@link RoutingDecision.FallbackReason#REGION_UNAVAILABLE},
- *             which fires the {@code networkRegionUnavailable} reject so the
- *             player learns that the explicitly-named region/server they
- *             asked for is not actually reachable.</li>
- *       </ul>
- *   </li>
- * </ol>
- *
- * <p>S-004: any internal exception propagates so {@code RTPCmd.compute}'s
- * outer try/catch can degrade to local with a WARNING log. We never
- * swallow the error silently.</p>
- *
- * <p>Threading: invoked from the {@code /rtp} command thread. The router
- * call is non-blocking (pure-function read of the cached snapshot); the
- * enrolment buffer's {@link NetworkEnrolmentBuffer#offer} is lock-free.</p>
+ * Bukkit implementation of the {@link NetworkCommandHook} SPI (rtp-proxy-ADR-014).
+ * Wires cross-server routing, enrolment buffering, and peer regions into command pre-dispatch.
  */
 public final class BukkitNetworkCommandHook implements NetworkCommandHook {
 
@@ -72,28 +32,13 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
      */
     private final BackendStatePublisher backendStatePublisher;
     /**
-     * Optional. When non-null AND {@link #lobbyMode} is true, transient
-     * {@link RoutingDecision.LocalFallback} reasons (NETWORK_DISABLED /
-     * NO_LIVE_PEER / QUEUE_FULL / TOKEN_BUCKET_EXHAUSTED) park the player
-     * on this queue instead of silently falling through to the local
-     * pipeline (which is a dead path on a lobby). The hook then returns a
-     * synthetic {@link RoutingResult#crossServer} so {@code RTPCmd}
-     * sends the {@code networkQueued} message and retains the
-     * {@code processingPlayers} lock until the retry succeeds, times
-     * out, or is cancelled on disconnect.
+     * Optional retry queue. When non-null in lobbyMode, transient fallbacks park here
+     * with synthetic {@link RoutingResult#crossServer} instead of dead-ending locally.
      */
     private final LobbyDispatchRetryQueue lobbyRetryQueue;
     /**
-     * Optional lobby-side enrolment seeder. When set, every real cross-
-     * server enrolment (i.e. {@link RoutingDecision.CrossServer}, not the
-     * synthetic one used for the lobby auto-retry queue) calls this with
-     * the player's UUID so the {@link NetworkStatusCache} can pre-seed a
-     * sticky {@code QUEUED} row. Without this seed the cache only learns
-     * about the player after the proxy round-trips a status row, and if
-     * the proxy never reports back the lobby never observes the
-     * non-terminal -&gt; terminal transition that releases the
-     * {@code processingPlayers} lock. The seeder's sticky TTL provides
-     * the bounded-failure release path. Default: no-op.
+     * Optional lobby enrolment seeder. Pre-seeds sticky {@code QUEUED} in status cache
+     * so proxy dropouts time out and release the {@code processingPlayers} lock.
      */
     private volatile java.util.function.Consumer<UUID> enrolmentSeeder = u -> {};
 

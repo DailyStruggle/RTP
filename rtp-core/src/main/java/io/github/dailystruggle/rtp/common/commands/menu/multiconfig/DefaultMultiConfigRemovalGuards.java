@@ -3,26 +3,8 @@ package io.github.dailystruggle.rtp.common.commands.menu.multiconfig;
 import io.github.dailystruggle.rtp.common.RTP;
 
 /**
- * Factory for the two default {@link MultiConfigRemovalGuard} bodies wired on
- * plugin enable for the {@code regions} and {@code worlds} multi-config kinds.
- *
- * <p>CHECKLIST-multiconfig-menu step 12 / PROPOSAL §3.2:
- *
- * <ul>
- *   <li><b>regions</b>: locks the entry named {@code default} (case-insensitive).
- *       The default region is the seed clone source for {@code MultiConfigMutate.ADD}
- *       and must not be deletable, mirroring the existing {@code /rtp region remove}
- *       CLI guard.
- *   <li><b>worlds</b>: locks any entry whose name resolves to a live world on the
- *       server via {@code RTP.serverAccessor.getRTPWorld(name)}. Orphan world
- *       config entries (no longer loaded by the server) remain removable. Tolerates
- *       a null {@code RTP.serverAccessor} and a throwing accessor by reporting
- *       "not locked" (safer to allow removal than to NPE the dispatcher).
- * </ul>
- *
- * <p>These bodies match the anonymous classes pinned by
- * {@code MultiConfigRemovalGuardsTest} (step 9) verbatim, so any behavioral drift
- * here will be caught by that test.
+ * Factory for default {@link MultiConfigRemovalGuard} bodies (regions and worlds).
+ * Locks 'default' region and loaded worlds from deletion.
  */
 public final class DefaultMultiConfigRemovalGuards {
 

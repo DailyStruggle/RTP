@@ -8,7 +8,7 @@
  * detail). The contract is deliberately plugin-agnostic: it carries
  * host-runtime fields only. Plugin-specific counters (e.g. RTP's teleport
  * pipeline queue depth) belong on a typed extension slot, not on the shared
- * surface — see {@code metrics-api-ADR-001} (docs/adr/).
+ * surface - see {@code metrics-api-ADR-001} (docs/adr/).
  *
  * <p>This package intentionally has no {@code org.bukkit} / {@code net.minecraft} /
  * Folia imports. Consumers depend on this module via

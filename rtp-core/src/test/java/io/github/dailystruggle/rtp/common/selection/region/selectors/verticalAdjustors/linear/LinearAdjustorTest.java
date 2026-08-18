@@ -17,27 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Exercises all 5 directional states of {@link LinearAdjustor}:
- * <ol>
- *   <li>Bottom Up  (state 0)</li>
- *   <li>Top Down   (state 1)</li>
- *   <li>Middle Out (state 2)</li>
- *   <li>Outer In   (state 3)</li>
- *   <li>Shuffled   (state 4)</li>
- * </ol>
- *
- * <p>Each test uses a {@link ConfigurableMockChunk} with solid blocks placed at
- * specific Y-coordinates so that only one valid landing position exists (or a
- * predictable first-found position), making assertions deterministic.
- *
- * <p>A valid landing at Y={@code i} requires all of the following:
- * <ul>
- *   <li>{@code !isAir(i-1)} — a solid floor block beneath the player's feet</li>
- *   <li>{@code isAir(i)} and {@code isAir(i+1)} — two clear blocks for the player body</li>
- *   <li>{@code isSafe(i-1)}, {@code isSafe(i)}, {@code isSafe(i+1)} — no unsafe blocks in the
- *       triplet</li>
- * </ul>
- * Use {@link ConfigurableMockChunk#setSolidSafe(int)} for the floor block (non-air, safe)
- * and {@link ConfigurableMockChunk#setSolid(int)} for impassable unsafe blocks (ceilings/walls).
+ * Bottom Up (0), Top Down (1), Middle Out (2), Outer In (3), and Shuffled (4).
  */
 public class LinearAdjustorTest {
 
@@ -66,23 +46,17 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // State 1 — Top Down
+    // State 1 - Top Down
     // -----------------------------------------------------------------------
 
     /**
-     * Top-Down scan (state 1): range 60–80, unsafe ceiling at 67–80, safe floor at 64.
-     * Air gap: 65–66.
-     * <ul>
-     *   <li>i=67–80: solidY, isAir=false → skip</li>
-     *   <li>i=66: !isAir(65) → 65 is air → skip</li>
-     *   <li>i=65: !isAir(64) → 64 is solidSafe ✓, isAir(65,66) ✓, isSafe(64,65,66) ✓ → <b>Y=65</b></li>
-     * </ul>
+     * Top-Down scan (state 1): finds the first valid safe landing from the top down.
      */
     @Test
     void topDown_findsFirstSafeBlockFromTop() {
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
         for (int y = 67; y <= 80; y++) chunk.setSolid(y);
-        chunk.setSolidSafe(64); // safe floor — player lands at Y=65
+        chunk.setSolidSafe(64); // safe floor - player lands at Y=65
 
         LinearAdjustor adj = buildAdjustor(1, 60, 80);
         RTPCoords result = adj.adjust(chunk);
@@ -92,14 +66,14 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // State 0 — Bottom Up
+    // State 0 - Bottom Up
     // -----------------------------------------------------------------------
 
     /**
-     * Bottom-Up scan (state 0): range 60–80, safe floor at 63, unsafe ceiling at 67–80.
-     * Air gap: 64–66.
+     * Bottom-Up scan (state 0): range 60-80, safe floor at 63, unsafe ceiling at 67-80.
+     * Air gap: 64-66.
      * <ul>
-     *   <li>i=60–63: !isAir(i-1) → i-1 is air → skip</li>
+     *   <li>i=60-63: !isAir(i-1) → i-1 is air → skip</li>
      *   <li>i=64: !isAir(63) → 63 is solidSafe ✓, isAir(64,65) ✓, isSafe(63,64,65) ✓ → <b>Y=64</b></li>
      * </ul>
      */
@@ -107,7 +81,7 @@ public class LinearAdjustorTest {
     void bottomUp_findsFirstSafeBlockFromBottom() {
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
         for (int y = 67; y <= 80; y++) chunk.setSolid(y);
-        chunk.setSolidSafe(63); // safe floor — player lands at Y=64
+        chunk.setSolidSafe(63); // safe floor - player lands at Y=64
 
         LinearAdjustor adj = buildAdjustor(0, 60, 80);
         RTPCoords result = adj.adjust(chunk);
@@ -117,12 +91,12 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // State 2 — Middle Out
+    // State 2 - Middle Out
     // -----------------------------------------------------------------------
 
     /**
-     * Middle-Out scan (state 2): range 60–80 → {@code middle = 60 + (80-60)/2 = 70}.
-     * Safe floor at 69, unsafe ceiling at 74–80. Air gap: 70–73.
+     * Middle-Out scan (state 2): range 60-80 → {@code middle = 60 + (80-60)/2 = 70}.
+     * Safe floor at 69, unsafe ceiling at 74-80. Air gap: 70-73.
      * <ul>
      *   <li>offset i=0: try top y=70 → !isAir(69) ✓, isAir(70,71) ✓, isSafe(69,70,71) ✓
      *       → <b>Y=70</b></li>
@@ -131,7 +105,7 @@ public class LinearAdjustorTest {
     @Test
     void middleOut_findsGapExpandingFromCenter() {
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
-        chunk.setSolidSafe(69); // safe floor — player lands at Y=70
+        chunk.setSolidSafe(69); // safe floor - player lands at Y=70
         for (int y = 74; y <= 80; y++) chunk.setSolid(y);
 
         LinearAdjustor adj = buildAdjustor(2, 60, 80);
@@ -142,24 +116,16 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // State 3 — Outer In
+    // State 3 - Outer In
     // -----------------------------------------------------------------------
 
     /**
-     * Outer-In scan (state 3): range 60–80 → {@code middle=70}, {@code maxDistance=10}.
-     * Safe floor at 73, unsafe blocks at 60–68. Air gap: 74–80.
-     * The scan converges from the edges inward:
-     * <ul>
-     *   <li>offsets 10→5: top candidates are all-air (no solid floor) → skip; bottom candidates
-     *       are solidY (unsafe) → skip</li>
-     *   <li>offset 4: top y=74 → !isAir(73) ✓, isAir(74,75) ✓, isSafe(73,74,75) ✓
-     *       → <b>Y=74</b></li>
-     * </ul>
+     * Outer-In scan (state 3): converges from outer bounds inward to find a valid landing.
      */
     @Test
     void outerIn_convergesFromEdgesToFindSafeBlock() {
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
-        chunk.setSolidSafe(73); // safe floor — player lands at Y=74
+        chunk.setSolidSafe(73); // safe floor - player lands at Y=74
         for (int y = 60; y <= 68; y++) chunk.setSolid(y);
 
         LinearAdjustor adj = buildAdjustor(3, 60, 80);
@@ -170,19 +136,11 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // State 4 — Shuffled (deterministic via seeded RNG)
+    // State 4 - Shuffled (deterministic via seeded RNG)
     // -----------------------------------------------------------------------
 
     /**
-     * Shuffled scan (state 4): a seeded {@link Random} is injected via
-     * {@link LinearAdjustor#setRng(Random)} to make the shuffle order reproducible.
-     *
-     * <p>Setup: range 60–80; Y=70 is a solid-safe floor, Y=71 and Y=72 are air, all other
-     * Y-coordinates are unsafe solid blocks. The sole valid landing is Y=71
-     * ({@code !isAir(70)} ✓, {@code isAir(71,72)} ✓, {@code isSafe(70,71,72)} ✓).
-     * Two adjustors seeded identically must return the same Y, proving determinism.
-     * The adjustor must also find Y=71 despite it being buried in an otherwise solid column,
-     * proving the shuffled collection exhaustively checks all candidates.
+     * Shuffled scan (state 4): seeded RNG ensures deterministic shuffle order.
      */
     @Test
     void shuffled_deterministicWithSeedAndFindsHiddenGap() {
@@ -190,7 +148,7 @@ public class LinearAdjustorTest {
         for (int y = 60; y <= 80; y++) {
             if (y != 70 && y != 71 && y != 72) chunk.setSolid(y);
         }
-        chunk.setSolidSafe(70); // safe floor at 70 — only valid landing is Y=71
+        chunk.setSolidSafe(70); // safe floor at 70 - only valid landing is Y=71
         // Only valid landing: Y=71 (!isAir(70)✓, isAir(71,72)✓, isSafe(70,71,72)✓)
 
         long seed = 42L;
@@ -210,11 +168,11 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // No valid landing — all directions
+    // No valid landing - all directions
     // -----------------------------------------------------------------------
 
     /**
-     * Bottom-Up (state 0): entire range solid — should return null.
+     * Bottom-Up (state 0): entire range solid - should return null.
      */
     @Test
     void bottomUp_entireRangeSolid_returnsNull() {
@@ -226,7 +184,7 @@ public class LinearAdjustorTest {
     }
 
     /**
-     * Top-Down (state 1): entire range solid — should return null.
+     * Top-Down (state 1): entire range solid - should return null.
      */
     @Test
     void topDown_entireRangeSolid_returnsNull() {
@@ -238,7 +196,7 @@ public class LinearAdjustorTest {
     }
 
     /**
-     * Middle-Out (state 2): entire range solid — should return null.
+     * Middle-Out (state 2): entire range solid - should return null.
      */
     @Test
     void middleOut_entireRangeSolid_returnsNull() {
@@ -250,7 +208,7 @@ public class LinearAdjustorTest {
     }
 
     /**
-     * Outer-In (state 3): entire range solid — should return null.
+     * Outer-In (state 3): entire range solid - should return null.
      */
     @Test
     void outerIn_entireRangeSolid_returnsNull() {
@@ -262,7 +220,7 @@ public class LinearAdjustorTest {
     }
 
     /**
-     * Shuffled (state 4): entire range solid — should return null.
+     * Shuffled (state 4): entire range solid - should return null.
      */
     @Test
     void shuffled_entireRangeSolid_returnsNull() {
@@ -275,7 +233,7 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // requireSkyLight = true — per-Y sky-light gate (V2 behavior, not a fast-path)
+    // requireSkyLight = true - per-Y sky-light gate (V2 behavior, not a fast-path)
     // -----------------------------------------------------------------------
 
     /**
@@ -347,7 +305,7 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // testPlacement — verifier integration
+    // testPlacement - verifier integration
     // -----------------------------------------------------------------------
 
     @Test
@@ -405,7 +363,7 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // safetyRadius — live full-load path sweeps [1..safetyRadius] below feet
+    // safetyRadius - live full-load path sweeps [1..safetyRadius] below feet
     // -----------------------------------------------------------------------
 
     /**
@@ -413,7 +371,7 @@ public class LinearAdjustorTest {
      * safe crust at {@code y-1} over an unsafe block at {@code y-2} (classic
      * sand-over-water / magma-under-cobblestone) must reject the candidate. Before
      * aligning the live path with the probe-path sweep, only {@code y-1} was checked
-     * and the crust alone would pass — players would drop through into the fluid.
+     * and the crust alone would pass - players would drop through into the fluid.
      */
     @Test
     void safetyRadius_liveFullLoad_rejectsUnsafeUnderSafeCrust() throws Exception {
@@ -438,7 +396,7 @@ public class LinearAdjustorTest {
         safetyData.put(
                 io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.safetyRadius, 2);
 
-        // No static cache to reset — LinearAdjustor reads safety config directly
+        // No static cache to reset - LinearAdjustor reads safety config directly
         // from RTP.configs at the top of each adjust(...) call now.
 
         try {
@@ -450,7 +408,7 @@ public class LinearAdjustorTest {
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
         chunk.setSolidSafe(63); // thin safe crust
         chunk.setSolid(62);     // unsafe block (lava/water analogue) under the crust
-        chunk.setSolidSafe(71); // higher safe floor — acceptable landing at y=72
+        chunk.setSolidSafe(71); // higher safe floor - acceptable landing at y=72
 
         LinearAdjustor adj = buildAdjustor(0, 60, 80);
         RTPCoords result = adj.adjust(chunk);

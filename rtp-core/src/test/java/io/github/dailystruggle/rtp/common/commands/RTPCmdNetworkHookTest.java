@@ -129,7 +129,7 @@ public class RTPCmdNetworkHookTest {
     assertTrue(msg.get().contains("QUEUED"), "expected QUEUED message, got: " + msg.get());
     assertTrue(msg.get().contains("region=east"), "region placeholder must substitute: " + msg.get());
     assertTrue(msg.get().contains("server=backend-b"), "server placeholder must substitute: " + msg.get());
-    // No local pipeline teleport scheduled — processingPlayers was added then removed,
+    // No local pipeline teleport scheduled - processingPlayers was added then removed,
     // OR was never added because of short-circuit. Either way we just rely on res=true.
   }
 
@@ -226,22 +226,8 @@ public class RTPCmdNetworkHookTest {
   // TeleportData / MemoryTracker entries into adjacent tests. Live coverage
   // is provided by the Bukkit-adapter integration tests.
 
-  // ── 3c. Network short-circuits and the processingPlayers lock ───────────────
-  //
-  // CrossServer: the lobby's local `processingPlayers` lock is the
-  // anti-spam primitive that prevents the player from re-enrolling a
-  // duplicate envelope on the proxy every time they spam /rtp while
-  // already parked on the cross-proxy waitlist. The lock is released
-  // authoritatively by (a) PlayerQuitEvent (OnPlayerQuit listener),
-  // (b) NetworkStatusCache terminal transitions, or (c) plugin
-  // shutdown. It MUST NOT be released by the CrossServer short-circuit
-  // itself - that was the regression behind "I have to type /rtp twice"
-  // and "spam with no response" (every subsequent /rtp got REJECTED_
-  // DUPLICATE on the proxy silently while still re-emitting networkQueued
-  // here).
-  //
-  // Reject: terminal outcome, no follow-up routing, lock is released
-  // immediately so the player can retry against a different region.
+  // CrossServer retains processingPlayers lock to prevent duplicate waitlist requests;
+  // lock is cleared on quit, terminal network status, or shutdown. Reject releases immediately.
 
   @Test
   void crossServerOutcome_retainsProcessingPlayersLockForAntiSpam() {

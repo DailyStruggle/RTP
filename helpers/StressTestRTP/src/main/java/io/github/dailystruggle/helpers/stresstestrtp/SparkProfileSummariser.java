@@ -386,7 +386,7 @@ public final class SparkProfileSummariser {
     }
 
     // ------------------------------------------------------------------
-    // JSON emission — minimal, hand-rolled (no Gson dependency)
+    // JSON emission - minimal, hand-rolled (no Gson dependency)
     // ------------------------------------------------------------------
 
     private static Double percentile(List<Double> sorted, double q) {

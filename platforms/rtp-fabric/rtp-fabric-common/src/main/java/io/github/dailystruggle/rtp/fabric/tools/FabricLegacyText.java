@@ -26,7 +26,7 @@ import io.github.dailystruggle.rtp.common.RTP;
  * accepted, allowing plugin output that has already been pre-converted to
  * Bukkit legacy hex to be displayed without losing colour.
  *
- * <p>This class has no dependency on rtp-core / Bukkit / Adventure — it
+ * <p>This class has no dependency on rtp-core / Bukkit / Adventure - it
  * only uses Minecraft's own {@code net.minecraft.network.chat} API, which
  * is the same surface FabricRTPPlayer.sendMessage already speaks.
  */
@@ -184,7 +184,7 @@ public final class FabricLegacyText {
                             style = style.withColor(
                                     TextColor.fromRgb(Integer.parseInt(hex.toString(), 16)));
                         } catch (NumberFormatException ignored) {
-                            // shouldn't happen — isHex gated above
+                            // shouldn't happen - isHex gated above
                         }
                         i += 14;
                         continue;
@@ -227,10 +227,10 @@ public final class FabricLegacyText {
      * Convert a legacy/{@code &}/{@code #RRGGBB} string into ANSI escape sequences for
      * direct console output. Used by the Fabric log path because Minecraft's
      * TerminalConsoleAppender does not translate {@code §}-codes when our
-     * Log4j2 logger writes them — and on Windows consoles the raw {@code §}
+     * Log4j2 logger writes them - and on Windows consoles the raw {@code §}
      * (UTF-8 0xC2 0xA7) renders as {@code ┬º} mojibake.
      *
-     * <p>The basic 16 colours map to ANSI 30–37 / 90–97; bold/italic/underline
+     * <p>The basic 16 colours map to ANSI 30-37 / 90-97; bold/italic/underline
      * map to their SGR codes; reset is {@code \u001b[0m}; truecolor (hex /
      * {@code §x}) maps to {@code \u001b[38;2;R;G;Bm}. A trailing reset is always
      * appended so subsequent unstyled console output isn't tinted.
@@ -248,7 +248,7 @@ public final class FabricLegacyText {
             if (c == SECTION && i + 1 < n) {
                 char code = text.charAt(i + 1);
                 if ((code == 'x' || code == 'X') && i + 13 < n) {
-                    // §x§R§R§G§G§B§B — 6 hex digits each preceded by §
+                    // §x§R§R§G§G§B§B - 6 hex digits each preceded by §
                     int r = (hexVal(text.charAt(i + 3)) << 4) | hexVal(text.charAt(i + 5));
                     int g = (hexVal(text.charAt(i + 7)) << 4) | hexVal(text.charAt(i + 9));
                     int b = (hexVal(text.charAt(i + 11)) << 4) | hexVal(text.charAt(i + 13));
@@ -301,7 +301,7 @@ public final class FabricLegacyText {
             case 'm': return "\u001b[9m";    // strikethrough
             case 'n': return "\u001b[4m";    // underline
             case 'o': return "\u001b[3m";    // italic
-            case 'k': return "";              // obfuscated — no ANSI equivalent
+            case 'k': return "";              // obfuscated - no ANSI equivalent
             case 'r': return "\u001b[0m";    // reset
             default:  return null;
         }
@@ -421,7 +421,7 @@ public final class FabricLegacyText {
                 return (HoverEvent) HOVER_CTOR_SHOWTEXT.newInstance(hoverComp);
             }
         } catch (Throwable t) {
-            // fall through to null — caller will skip the hover decoration.
+            // fall through to null - caller will skip the hover decoration.
             logHoverBuildFailureOnce(t);
         }
         return null;
@@ -465,7 +465,7 @@ public final class FabricLegacyText {
             // 1.21.5+: per-action records nested under HoverEvent. The mojmap name
             // is "ShowText", but on intermediary-mapped runtimes (Fabric production)
             // the nested class is "class_2568$class_NNNN". String.forName with the
-            // mojmap literal won't resolve there — enumerate nested classes of the
+            // mojmap literal won't resolve there - enumerate nested classes of the
             // (already-remapped) HoverEvent.class symbol instead and pick the
             // unique subclass whose single-arg ctor takes a Component.
             try {
@@ -494,7 +494,7 @@ public final class FabricLegacyText {
             // are "SuggestCommand" / "RunCommand", but on intermediary-mapped
             // runtimes those are "class_2558$class_NNNN". Enumerate nested
             // (String)-ctor subclasses, instantiate each, and dispatch by the
-            // result of its action() accessor — robust across mappings.
+            // result of its action() accessor - robust across mappings.
             try {
                 for (Class<?> nested : ClickEvent.class.getDeclaredClasses()) {
                     if (!ClickEvent.class.isAssignableFrom(nested)) continue;

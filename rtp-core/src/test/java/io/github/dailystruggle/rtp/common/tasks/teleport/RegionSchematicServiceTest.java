@@ -30,16 +30,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies the {@code rtp-core} region-schematic wiring (ADR-058 Amendment 1) end-to-end
- * against the committed {@code skyblock_island.schem} fixture:
+ * Verifies {@code rtp-core} region-schematic wiring (ADR-058).
  *
- * <ul>
- *   <li>{@link RegionSchematicService#resolveSource} treats the presence of a file at
- *       {@code <pluginDir>/schematics/<region>.schem} as the only knob (no config key); and
- *   <li>the load-then-paste split the teleport pipeline runs produces the island's blocks at
- *       a {@link io.github.dailystruggle.rtp.api.schematic.PasteAnchor#BOTTOM_CENTER}-anchored
- *       footprint centered under the arrival location.
- * </ul>
+ * <p>Tests file-presence source resolution and bottom-center anchored schematic pasting.
  */
 class RegionSchematicServiceTest {
 

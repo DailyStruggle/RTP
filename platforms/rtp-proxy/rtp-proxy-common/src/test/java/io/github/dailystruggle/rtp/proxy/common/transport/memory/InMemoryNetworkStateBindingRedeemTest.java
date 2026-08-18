@@ -21,8 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * L2 of {@code CHECKLIST-cross-server-rtp.md}: exercises every
- * {@link RedeemOutcome} branch on the in-memory binding so the backend's
+ * Exercises every {@link RedeemOutcome} branch on the in-memory binding so the backend's
  * {@code JoinTriggerSource} can rely on the documented contract without
  * standing up a real Redis/SQL instance.
  */

@@ -126,7 +126,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private ChunkSet chunkSet;
 
   /**
-   * ADR-058 — region-specific schematic paste. When a {@code schematics/<region>.schem} file
+   * ADR-058 - region-specific schematic paste. When a {@code schematics/<region>.schem} file
    * is present, {@link #runLoad} (off the region thread) kicks off the decode into this future
    * and {@link #runTeleport} (on the region thread) pastes the result in place of the emergency
    * platform. Both stay {@code null} when no schematic file exists for the region.
@@ -135,7 +135,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       io.github.dailystruggle.rtp.api.schematic.LoadedSchematic> schematicLoad;
   private io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster;
   /**
-   * ADR-058 / S-004 — the schematic source resolved for this teleport, kept so {@link #runTeleport}
+   * ADR-058 / S-004 - the schematic source resolved for this teleport, kept so {@link #runTeleport}
    * can emit an operator-visible WARNING if a region had a schematic file on disk but it never
    * reached a successful paste (decode failure, no paster, or zero placed blocks). Stays
    * {@code null} when no {@code schematics/<region>.schem} file exists (the silent, expected case).
@@ -143,26 +143,15 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private io.github.dailystruggle.rtp.api.schematic.SchematicSource schematicSource;
 
   /**
-   * ADR-058 / S-004 — regions for which a <em>platform-level</em> schematic fallback reason
-   * (no schematic paster installed, or the installed paster does not support the file's format)
-   * has already been logged. Both reasons are static for a given platform + region, so emitting
-   * them on every single teleport is pure log spam (observed on Fabric, which ships
-   * {@code NoOpSchematicPaster}). This guard collapses them to one WARNING per region per reason
-   * while still satisfying S-004 (the operator is told once, not silently). Keyed
-   * {@code <regionName>|<reason>}.
+   * ADR-058 / S-004: regions where platform-level schematic fallback was logged.
+   * Collapses duplicate warnings for unsupported paster formats. Keyed {@code <regionName>|<reason>}.
    */
   private static final java.util.Set<String> loggedSchematicPlatformFallback =
       java.util.concurrent.ConcurrentHashMap.newKeySet();
 
   /**
-   * ADR-026 / ADR-058 — addon-bound arrival platform creator (the {@code RTPHooks#platformCreator()}
-   * registry). Resolved once in {@link #runLoad} (off the region thread) so its two-phase
-   * contract can run its blocking {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator#prepare}
-   * phase off-thread; the resulting handle is consumed by
-   * {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator#createPlatform(RTPLocation, Object)}
-   * on the region thread in {@link #buildArrivalPlatform}. Both stay {@code null} when no creator
-   * is bound. This is the same two-phase shape the region schematic uses — a {@code SchematicPaster}
-   * is no longer special-cased at the dispatch site.
+   * ADR-026 / ADR-058: addon-bound arrival platform creator ({@code RTPHooks#platformCreator()}).
+   * Prepared off-thread in {@link #runLoad} and applied on-thread in {@link #buildArrivalPlatform}.
    */
   private io.github.dailystruggle.rtp.api.platform.PlatformCreator platformCreator;
   private java.util.concurrent.CompletableFuture<?> platformPrepare;
@@ -453,7 +442,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
         return;
       }
 
-      // ADR-058 — region-specific schematic. The presence of <pluginDir>/schematics/<region>.schem
+      // ADR-058 - region-specific schematic. The presence of <pluginDir>/schematics/<region>.schem
       // is the knob (no config key). The file read + decode is blocking I/O, so it is started here
       // on the load (non-region) thread; the resulting blocks are written on the region thread in
       // runTeleport. Resolution / decode failure is best-effort and never aborts the teleport
@@ -512,10 +501,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
         }
       }
 
-      // ADR-026 — addon-bound arrival platform creator. Resolve it here, on the load (non-region)
+      // ADR-026 - addon-bound arrival platform creator. Resolve it here, on the load (non-region)
       // thread, and kick off its blocking prepare() phase off-thread so the region-thread paste in
       // buildArrivalPlatform only has to write blocks (S-005). A bound SchematicPaster is driven
-      // through this same two-phase path — it is no longer special-cased at the dispatch site; its
+      // through this same two-phase path - it is no longer special-cased at the dispatch site; its
       // default prepare()/createPlatform() decline gracefully when no source applies.
       if (platformCreator == null) {
         try {
@@ -616,17 +605,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     UUID playerId = player.uuid();
 
     // --- Optional PvP / combat-tag execution prefilter (ADR-055) -------------
-    // Re-consult the combat authority immediately before the chosen destination
-    // is applied. A player who entered combat after the request was enrolled (or
-    // who was waiting in a queue) must not be teleported out of a fight, so the
-    // pre-dispatch check in RTPCmd is not sufficient on its own. No-op when the
-    // gate is disabled (pvpCheckEnabled=false, the default) or the player is not
-    // in combat. At this surface there is an in-progress teleport, so any
-    // non-ALLOW action (DENY / DELAY / CANCEL) collapses to "do not apply this
-    // destination": abort to CLEANUP, surface the configurable pvpInCombat
-    // message, and audit at WARNING (REQ-RTP-S-004: never a silent discard).
-    // The gate fails open (PvPGate guards its own provider call), and the call
-    // site is guarded too, so a broken integration never blocks a teleport.
+    // Re-consult combat authority before applying destination. Aborts on combat if configured.
     io.github.dailystruggle.rtp.api.hooks.PvPCombatAction pvpAction;
     try {
       pvpAction = io.github.dailystruggle.rtp.common.pvp.PvPGate.evaluate(playerId);
@@ -661,15 +640,15 @@ public final class TeleportPipelineTask extends RTPRunnable {
       RTP.log(Level.FINER, "[PIPELINE_TRACE] runTeleport platformDecision=" + buildPlatform
               + " worldNull=" + (world == null));
 
-      // ADR-058 — region-specific schematic paste (region thread). When the region has a
+      // ADR-058 - region-specific schematic paste (region thread). When the region has a
       // schematic file, paste it at the arrival location instead of the emergency platform:
       // the schematic provides the footing the platform would have. The paste is best-effort
-      // (S-004) — any skip/failure is audited and the default platform path still runs so the
+      // (S-004) - any skip/failure is audited and the default platform path still runs so the
       // player never lands without footing.
       boolean pastedSchematic = false;
       io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedSchematic =
           (schematicLoad != null && schematicLoad.isDone()) ? schematicLoad.join() : null;
-      // S-004 — a region with a schematic file on disk that nonetheless reaches this point
+      // S-004 - a region with a schematic file on disk that nonetheless reaches this point
       // with nothing loaded must not fall through to the platform silently: tell the operator
       // why the island/structure they configured did not appear. The {@code schematicLoad == null}
       // sub-case (no paster installed / unsupported format) is deliberately NOT re-logged here:
@@ -687,8 +666,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
         // that owns the *destination* chunk(s), not on whatever scheduler thread invoked
         // runTeleport (typically the player's current entity-region thread). Pasting directly
         // here throws Folia's "Cannot read world asynchronously" TickThread check whenever the
-        // destination region differs from the player's current region. Bounce the paste — and
-        // its platform fallback — to the destination region via RTP.scheduler.runTask(location).
+        // destination region differs from the player's current region. Bounce the paste - and
+        // its platform fallback - to the destination region via RTP.scheduler.runTask(location).
         // On non-Folia platforms this dispatches to the main thread / runs inline.
         final io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedFinal =
             loadedSchematic;
@@ -698,7 +677,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
         pastedSchematic = true; // platform fallback is handled inside the region task below
         RTP.scheduler.runTask(locFinal, () -> {
           boolean pasted = false;
-          // ADR-058 — anchor SURFACE_CENTER (not the BOTTOM_CENTER default): the schematic is
+          // ADR-058 - anchor SURFACE_CENTER (not the BOTTOM_CENTER default): the schematic is
           // dropped so the player lands on a standable floor in its center column instead of
           // being buried under blocks pasted around their feet. The drop is computed from the
           // schematic data in one pass, so the arrival point is standable without re-pasting.
@@ -706,9 +685,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
               new io.github.dailystruggle.rtp.api.schematic.PasteOptions(
                   io.github.dailystruggle.rtp.api.schematic.PasteAnchor.SURFACE_CENTER,
                   false, true);
-          // ADR-058 / REQ-RTP-S-003 — footprint claim check. Before writing any block, verify
+          // ADR-058 / REQ-RTP-S-003 - footprint claim check. Before writing any block, verify
           // the schematic's horizontal footprint against the GlobalRegionVerifiers registry (the
-          // sanctioned claim/protection mechanism — never an inline claim-plugin call). If any
+          // sanctioned claim/protection mechanism - never an inline claim-plugin call). If any
           // footprint cell intersects protected land, the paste is suppressed and the default
           // platform path runs instead, so the paste never overwrites a claim.
           if (pasteOptions.claimAware()
@@ -865,22 +844,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   /**
-   * Decide whether the emergency {@link RTPWorld#platform(RTPLocation)} call is warranted for
-   * this teleport.
-   *
-   * <p>Historically this method was invoked unconditionally, and subsequently gated on
-   * {@code reservation == null} — a heuristic that silently misfires for the kept-queue and
-   * DB-rehydrated paths (which legitimately carry a null reservation) and ends up stamping a
-   * glass block under every teleport. Gate instead on an actual look at the landing column:
-   * build a platform only when the block below the landing Y is non-solid (air / liquid / unsafe)
-   * OR the landing block itself is in {@link BlocksKeys#unsafeBlocks}.
-   *
-   * <p>The check is read-only against {@link RTPWorld#getCachedChunk(long)}, so no chunk load
-   * is triggered (REQ-RTP-S-005). If the landing chunk is not cached — which can happen during
-   * tests or if the reservation was dropped — we fall back to the safe-by-construction value
-   * {@code false}: the authoritative {@code chunk.isSafe(...)} re-check in the selection loop
-   * already ran, and the configurable {@code platformRadius: -1} escape hatch remains for
-   * operators who want the mechanism fully disabled.
+   * Decide whether emergency arrival platform is required (ADR-015, REQ-RTP-S-005).
+   * Checks cached chunk without triggering synchronous chunk I/O.
    */
   private static boolean shouldBuildPlatform(RTPWorld<?> world, RTPCoords coords) {
     if (world == null || coords == null) return false;
@@ -915,11 +880,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
       int minY = world.getMinHeight();
 
       // Landing block itself unsafe (unsafe-material list covers lava/fire/magma/void_air/etc.)
-      // — build platform to preserve S-001 semantics when the vert-adjustor placed us on top of
+      // - build platform to preserve S-001 semantics when the vert-adjustor placed us on top of
       // or inside an unsafe block.
       if (!chunk.isSafe(lx, y, lz, unsafe)) return true;
 
-      // Block directly below is air or liquid — vert-adjustor gave us an airborne or swimming
+      // Block directly below is air or liquid - vert-adjustor gave us an airborne or swimming
       // landing; platform provides footing. Uses isAir for air/void_air and the unsafe set for
       // lava (which is the common water/lava case; pure water will fall through to `false`,
       // which is the prior behaviour for swim-spawn configs).
@@ -937,21 +902,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   /**
-   * Build the arrival platform at {@code at}, preferring the addon-bound
-   * {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator} (ADR-026/ADR-058) resolved
-   * in {@link #runLoad} over the built-in emergency block disc.
-   *
-   * <p>The creator is driven through its uniform two-phase contract: the blocking
-   * {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator#prepare prepare} phase
-   * already ran off-thread in {@code runLoad} (its handle is {@link #platformPrepare}); here, on
-   * the region-owning thread, only
-   * {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator#createPlatform(RTPLocation, Object)}
-   * runs. A {@code SchematicPaster} is no longer special-cased — it is just a creator whose
-   * default two-phase methods decline when no region source applies. Any failure is logged and
-   * falls back to the default platform; the creator is never allowed to abort the teleport
-   * (S-004).
-   *
-   * <p>Invoked on the region-owning thread, mirroring the platform write it replaces.
+   * Build arrival platform at {@code at}, preferring addon-bound
+   * {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator} (ADR-026/ADR-058).
    */
   private void buildArrivalPlatform(RTPLocation at) {
     if (at == null || at.world() == null) return;
@@ -982,18 +934,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   /**
-   * ADR-058 / REQ-RTP-S-003 — footprint claim guard for region schematic pastes.
+   * ADR-058 / REQ-RTP-S-003: footprint claim guard for region schematic pastes.
    *
-   * <p>Walks the schematic's horizontal footprint (the same anchor math the
-   * {@link io.github.dailystruggle.rtp.api.schematic.SchematicPlacementPlanner} applies) and
-   * runs each cell through {@link GlobalRegionVerifiers}, the sanctioned claim/protection
-   * registry (never an inline claim-plugin call). Returns {@code false} as soon as one cell is
-   * reported inside a claim, so the caller can suppress the paste before any block is written.
-   * The registered claim verifiers are synchronous, so the per-cell future is normally already
-   * complete; an in-flight async verifier is awaited and any failure of the check itself is
-   * treated as "protected" (fail-safe, S-003).
-   *
-   * @return {@code true} when the whole footprint is clear (or no verifiers are registered)
+   * @return {@code true} when footprint is clear (or no verifiers registered)
    */
   static boolean schematicFootprintClear(
       io.github.dailystruggle.rtp.api.schematic.LoadedSchematic schematic,
@@ -1044,7 +987,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runCleanup() {
-    // Phase M1: record this attempt's wall-clock duration into the global pipeline
+    // Record this attempt's wall-clock duration into the global pipeline
     // histogram exactly once. Cleanup is the unique terminal phase for every code
     // path (success, cancel, exception, GC sweep), so this is the right place. The
     // try/catch is defensive: a metrics record must never abort cleanup (S-004).

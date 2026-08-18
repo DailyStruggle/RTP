@@ -8,21 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Process-wide registry of in-flight {@code rtp test *} jobs, so that
- * {@code rtp test cancel} can interrupt timer loops started by
- * {@code TestStressCmd} (and future subcommands) without each subcommand
- * needing its own bespoke cancellation channel.
- *
- * <p>Rationale (see {@code RUNTIME_TEST_SUITE_PLAN.md §4 &mdash; cancel}):
- * today a mistyped {@code iterations:1000 intervalTicks:10} invocation has
- * no in-band stop switch. A single registry keeps the cancel semantics
- * uniform across subcommands and avoids a proliferation of static fields.
- *
- * <p>Thread-safety: backed by a {@link ConcurrentHashMap} of
- * {@link CopyOnWriteArrayList}s, so jobs may be registered from any
- * thread and cancelled from any thread without external locking. This is
- * important because timer callbacks run on the async scheduler while
- * {@code rtp test cancel} is typically invoked from a command thread.
+ * Process-wide thread-safe registry of in-flight test jobs for cancellation and completion tracking.
  */
 public final class ActiveTestJobs {
 
@@ -51,15 +37,7 @@ public final class ActiveTestJobs {
   private static final Map<UUID, CopyOnWriteArrayList<Job>> JOBS = new ConcurrentHashMap<>();
 
   /**
-   * One-shot "owner is now drained" listeners, used by {@code TestFullCmd}
-   * to chain shipped subcommands without parking an async-pool worker on
-   * a polling drain loop. Each listener fires at most once: either when
-   * the owner's job list transitions to empty (last unregister hook), or
-   * synchronously at registration time if the owner already has no jobs.
-   *
-   * <p>Listeners are removed from the map at fire time, and any throwable
-   * is swallowed — drain notification must be best-effort, mirroring the
-   * cancel semantics in {@link #cancelOwned(UUID)}.
+   * One-shot listeners fired when an owner's active job list transitions to empty.
    */
   private static final Map<UUID, CopyOnWriteArrayList<Runnable>> ON_EMPTY_LISTENERS =
       new ConcurrentHashMap<>();
@@ -90,17 +68,8 @@ public final class ActiveTestJobs {
   }
 
   /**
-   * Registers a one-shot listener that fires when {@code owner} has no
-   * outstanding jobs. If the owner is already drained the listener fires
-   * inline on the calling thread; otherwise it fires on whatever thread
-   * removes the owner's last job. The listener is removed after firing
-   * regardless of outcome, so it cannot fire twice.
-   *
-   * <p>This exists so {@code TestFullCmd} can convert its cross-subcommand
-   * drain wait from a parked-thread polling loop into an event-driven
-   * chain that releases its async-pool slot between subcommands. Without
-   * this hook, the umbrella sweep occupies one async worker for its full
-   * wall-clock duration, starving other server async work.
+   * Registers a one-shot listener that fires when {@code owner} has no outstanding jobs.
+   * Fires immediately if the owner is already drained.
    *
    * @param owner    the player or console UUID to watch
    * @param listener the one-shot callback to fire when the owner is drained

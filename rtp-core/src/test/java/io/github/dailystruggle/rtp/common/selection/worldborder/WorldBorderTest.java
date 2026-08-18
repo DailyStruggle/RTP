@@ -28,7 +28,7 @@ public class WorldBorderTest {
 
     private static final MockRTPWorld WORLD = new MockRTPWorld("border_world");
 
-    /** Minimal stub RTPLocation — only x/z matter for boundary checks. */
+    /** Minimal stub RTPLocation - only x/z matter for boundary checks. */
     private static RTPLocation loc(double x, double z) {
         return new RTPLocation(WORLD, (int) x, 64, (int) z);
     }
@@ -51,7 +51,7 @@ public class WorldBorderTest {
     }
 
     // -----------------------------------------------------------------------
-    // isInside predicate — always-true
+    // isInside predicate - always-true
     // -----------------------------------------------------------------------
 
     @Test
@@ -64,7 +64,7 @@ public class WorldBorderTest {
     }
 
     // -----------------------------------------------------------------------
-    // isInside predicate — always-false
+    // isInside predicate - always-false
     // -----------------------------------------------------------------------
 
     @Test
@@ -76,7 +76,7 @@ public class WorldBorderTest {
     }
 
     // -----------------------------------------------------------------------
-    // isInside predicate — boundary calculation
+    // isInside predicate - boundary calculation
     // -----------------------------------------------------------------------
 
     @Test

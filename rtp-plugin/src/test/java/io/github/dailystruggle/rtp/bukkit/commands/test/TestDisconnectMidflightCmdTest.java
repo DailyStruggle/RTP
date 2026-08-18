@@ -95,7 +95,7 @@ class TestDisconnectMidflightCmdTest {
         r.probeId.equals(existing),
         "probe must pick a UUID distinct from pre-existing state");
 
-    // Pre-seeded entries must be preserved — the probe only cleans up after
+    // Pre-seeded entries must be preserved - the probe only cleans up after
     // itself, never after unrelated traffic.
     assertTrue(
         s.processingPlayers.contains(existing),
@@ -119,7 +119,7 @@ class TestDisconnectMidflightCmdTest {
     TestDisconnectMidflightCmd.Result r3 = TestDisconnectMidflightCmd.runProbe(s, cancel);
 
     assertTrue(r1.pass && r2.pass && r3.pass, "every repeat must pass");
-    // After three runs the state must still be empty — no cross-invocation leak.
+    // After three runs the state must still be empty - no cross-invocation leak.
     assertEquals(
         0, s.processingPlayers.size(), "processingPlayers must be empty after repeats");
     assertEquals(

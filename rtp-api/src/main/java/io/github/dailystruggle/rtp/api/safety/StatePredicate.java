@@ -9,49 +9,37 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Immutable AND-of-conditions predicate over a block's {@code BlockData} properties —
- * the bracketed part of a safety-list token, e.g. {@code [waterlogged=true]} in
- * {@code OAK_SLAB[waterlogged=true]} (ADR-017 §1). Two condition flavours are carried:
- * <ul>
- *   <li><b>String equalities</b> ({@code key=value}) — keys and values stored lowercase
- *       (Turkish-i safe) and compared as strings against the parsed form of
- *       {@code BlockData#getAsString()}.</li>
- *   <li><b>Numeric range comparisons</b> ({@code key>=n}, {@code key<=n}, {@code key>n},
- *       {@code key<n}) — the live property value is parsed as a {@code long} and compared
- *       against the configured bound (ADR-017 amendment, "numeric range
- *       predicates"). A live value that is absent or not an integer is a <b>miss</b>,
- *       consistent with the fail-open policy in ADR-017 §4.</li>
- * </ul>
- * No typed Bukkit resolution — {@code rtp-api} stays platform-free. {@link #sourceToken()}
- * retains the original token for REQ-RTP-S-004 diagnostic logging. Deeply immutable,
- * thread-safe.
+ * Immutable AND-predicate over {@code BlockData} properties (ADR-017).
+ *
+ * <p>Supports string equality ({@code key=value}) and numeric comparisons ({@code key>=n}, {@code key<=n}, etc.).
+ * Property names and string values are lowercased under {@link Locale#ROOT}.
  */
 public final class StatePredicate {
 
   /** Numeric comparison operator usable in a range predicate (ADR-017 §1 extension). */
   public enum Comparator {
-    /** {@code >=} — live value greater than or equal to the bound. */
+    /** {@code >=} - live value greater than or equal to the bound. */
     GE(">=") {
       @Override
       boolean test(long live, long bound) {
         return live >= bound;
       }
     },
-    /** {@code <=} — live value less than or equal to the bound. */
+    /** {@code <=} - live value less than or equal to the bound. */
     LE("<=") {
       @Override
       boolean test(long live, long bound) {
         return live <= bound;
       }
     },
-    /** {@code >} — live value strictly greater than the bound. */
+    /** {@code >} - live value strictly greater than the bound. */
     GT(">") {
       @Override
       boolean test(long live, long bound) {
         return live > bound;
       }
     },
-    /** {@code <} — live value strictly less than the bound. */
+    /** {@code <} - live value strictly less than the bound. */
     LT("<") {
       @Override
       boolean test(long live, long bound) {
@@ -151,35 +139,21 @@ public final class StatePredicate {
   private final String sourceToken;
 
   /**
-   * Construct an immutable equality-only state predicate.
+   * Constructs an immutable equality-only state predicate.
    *
-   * @param properties map of property name to expected value. May not be {@code null} or
-   *     empty. Keys and values are lowercased under {@link Locale#ROOT} and copied
-   *     defensively into an insertion-ordered, unmodifiable map.
-   * @param sourceToken the original token string as read from config, retained for
-   *     diagnostics. May not be {@code null}.
-   * @throws NullPointerException if any argument is {@code null} or any property key /
-   *     value is {@code null}.
-   * @throws IllegalArgumentException if {@code properties} is empty.
+   * @param properties  map of property names to expected values (non-null, non-empty)
+   * @param sourceToken original config token for diagnostics (non-null)
    */
   public StatePredicate(Map<String, String> properties, String sourceToken) {
     this(properties, Collections.emptyList(), sourceToken, true);
   }
 
   /**
-   * Construct an immutable state predicate carrying both string equalities and numeric
-   * range comparisons (ADR-017 §1 extension).
+   * Constructs an immutable state predicate with equality and numeric range conditions (ADR-017).
    *
-   * @param properties map of property name to expected value (string equalities). May be
-   *     empty but not {@code null}. Keys and values are lowercased under
-   *     {@link Locale#ROOT}.
-   * @param comparisons list of numeric range comparisons. May be empty but not
-   *     {@code null}.
-   * @param sourceToken the original token string as read from config. May not be
-   *     {@code null}.
-   * @throws NullPointerException if any argument or element is {@code null}.
-   * @throws IllegalArgumentException if both {@code properties} and {@code comparisons}
-   *     are empty.
+   * @param properties  map of property names to expected values (non-null)
+   * @param comparisons list of numeric range comparisons (non-null)
+   * @param sourceToken original config token for diagnostics (non-null)
    */
   public StatePredicate(Map<String, String> properties,
                         List<NumericComparison> comparisons,
@@ -240,18 +214,12 @@ public final class StatePredicate {
   }
 
   /**
-   * Test whether every property in this predicate is satisfied by the supplied live
-   * block property map.
+   * Tests whether every equality and comparison is satisfied by the supplied block properties.
    *
-   * <p>Per ADR-017 &sect;4, if the live block does not carry a property that the
-   * predicate requires, that is treated as a <strong>miss</strong> (return
-   * {@code false}), not a match. This is the fail-open behaviour on an unsafe list —
-   * missing properties cannot cause an over-rejection that would block teleports.</p>
+   * <p>Missing properties result in a miss ({@code false}) per ADR-017 fail-open rules.
    *
-   * @param liveProperties map of lowercase property name to lowercase property value for
-   *     the live block. May be empty. If {@code null}, returns {@code false}.
-   * @return {@code true} iff every configured equality and every numeric range comparison
-   *     is satisfied by {@code liveProperties}.
+   * @param liveProperties lowercase property map for the live block, or {@code null}
+   * @return {@code true} if all conditions match
    */
   public boolean matches(Map<String, String> liveProperties) {
     if (liveProperties == null || liveProperties.isEmpty()) return false;

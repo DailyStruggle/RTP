@@ -8,17 +8,8 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import java.util.Map;
 
 /**
- * Maps a biome name to a legacy Minecraft color code for menu rows (ADR-063).
- *
- * <p>The biome's 24-bit RGB comes from {@code maps-api}'s
- * {@link BiomeColorSource#resolve(String)} - the server's real vanilla map
- * color where known, a deterministic categorical hash for unknown / datapack /
- * custom-generator biomes. That RGB is then matched to the nearest of a
- * curated set of <em>dark</em> legacy color codes so the row stays readable on
- * the parchment-yellow Book menu background (see the "Book Menu Color
- * Contrast" rule in {@code .junie/AGENTS.md}): yellow / white / gold are
- * excluded, and bright colors are darkened before matching. The result is a
- * single {@code &x} prefix usable by every renderer (book and chat).
+ * Maps biome names to dark legacy color codes for parchment-safe book menu rendering (ADR-063).
+ * Biome RGB from {@link BiomeColorSource} is clamped and matched to the nearest dark code.
  */
 public final class MenuColor {
 
@@ -46,57 +37,30 @@ public final class MenuColor {
     }
 
     /**
-     * Returns the legacy color prefix best representing a world, computed as
-     * the observation-count-weighted average of the {@link BiomeColorSource}
-     * map colors of the biomes observed in that world (ADR-063 follow-up:
-     * world rows are colored by the biomes in those worlds). The averaged RGB
-     * is run through the same parchment luminance clamp + nearest-dark-code
-     * match as {@link #biomeColorPrefix(String)}, so a washed-out (pale on
-     * pale parchment) world average is darkened to a readable dark code rather
-     * than emitted raw. Falls back to {@code "&2"} when no biome has been
-     * observed in the world yet (cold-data state). Never {@code null}.
+     * Legacy color prefix for a world, weighted by observed biome colors (ADR-063).
+     * Clamped to parchment-safe palette. Defaults to {@code "&2"}.
      *
-     * @param world world name (as returned by {@code RTPWorld.name()})
+     * @param world world name
      */
     public static String worldColorPrefix(String world) {
         return weightedBiomeColorPrefix(BiomeMenuSource.biomeWeightsForWorld(world));
     }
 
     /**
-     * Returns the legacy color prefix best representing a region, computed as
-     * the observation-count-weighted average of the {@link BiomeColorSource}
-     * map colors of the biomes observed in that region - i.e. the aggregate
-     * of the colors that would appear on that region's map. Uses the same
-     * parchment luminance clamp + nearest-dark-code match as
-     * {@link #biomeColorPrefix(String)} and {@link #worldColorPrefix(String)}.
-     * Falls back to {@code "&2"} when no biome has been observed in the region
-     * yet (cold-data state). Never {@code null}.
+     * Legacy color prefix for a region, weighted by observed biome colors.
+     * Clamped to parchment-safe palette. Defaults to {@code "&2"}.
      *
-     * @param region region name (as returned by region lookup keys)
+     * @param region region name
      */
     public static String regionColorPrefix(String region) {
         return weightedBiomeColorPrefix(BiomeMenuSource.biomeWeightsForRegion(region));
     }
 
     /**
-     * Returns the legacy color prefix for a <em>world destination row</em>,
-     * colored by the region that a {@code /rtp world:<world>} would actually
-     * teleport into rather than by the world's own biome average. A top-level
-     * {@code world:<w>} resolves its region from world {@code w}'s configured
-     * {@link WorldKeys#region} redirect (ADR-065 amendment), so the menu row
-     * is tinted to match the region the player will land in. This keeps the
-     * world picker consistent with the region picker (selecting a world and
-     * selecting the region it points at read as the same color) and avoids the
-     * cold-data "world reads black while region reads green" mismatch, since an
-     * unobserved resolved region falls back to {@code "&2"} via
-     * {@link #regionColorPrefix(String)}. Never {@code null}.
+     * Legacy color prefix for a world row, colored by its resolved destination region (ADR-065).
+     * Defaults to {@code "&2"} if unresolved or cold.
      *
-     * <p>If the world points at a region that itself targets a different world
-     * (a temporary world-override region a careless admin may have wired up),
-     * the color still follows the resolved region by name, so it reflects where
-     * the teleport lands.
-     *
-     * @param world world name (as returned by {@code RTPWorld.name()})
+     * @param world world name
      */
     public static String worldRegionColorPrefix(String world) {
         String regionName = "default";

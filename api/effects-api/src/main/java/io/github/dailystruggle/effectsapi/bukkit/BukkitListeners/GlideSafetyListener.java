@@ -101,7 +101,7 @@ public class GlideSafetyListener implements Listener {
             try {
                 Bukkit.getScheduler().cancelTask(s.watchdogTaskId);
             } catch (Throwable ignored) {
-                // scheduler may be torn down at shutdown — non-fatal
+                // scheduler may be torn down at shutdown - non-fatal
             }
         }
         try {
@@ -138,7 +138,7 @@ public class GlideSafetyListener implements Listener {
 
     /**
      * Suppress firework-rocket use when the glider's effect was configured
-     * with {@code allowFireworks=false}. Cancel silently — no chat spam.
+     * with {@code allowFireworks=false}. Cancel silently - no chat spam.
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent event) {
@@ -211,12 +211,12 @@ public class GlideSafetyListener implements Listener {
         int x = loc.getBlockX();
         int z = loc.getBlockZ();
 
-        // Step 1 — scan downward for the highest safe block (solid top, two air
+        // Scan downward for the highest safe block (solid top, two air
         // blocks above for head clearance).
         for (int y = startY; y >= minY; y--) {
             Block ground = world.getBlockAt(x, y, z);
             if (!ground.getChunk().isLoaded()) {
-                // S-005 — never force-load at shutdown.
+                // S-005 - never force-load at shutdown.
                 if (caller != null) caller.getLogger().log(Level.INFO,
                         "GlideEffect shutdown: chunk for " + player.getName() + " unloaded; skipping column scan");
                 break;
@@ -235,7 +235,7 @@ public class GlideSafetyListener implements Listener {
             }
         }
 
-        // Step 2 — no safe block below; synthesize a 3×3 platform on the first
+        // Fallback when no safe block below: synthesize a 3×3 platform on the first
         // non-air block. Only replace AIR / CAVE_AIR / VOID_AIR cells.
         int platformY = minY;
         for (int y = startY; y >= minY; y--) {

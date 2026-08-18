@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
  * <p>This class deliberately has <b>no</b> {@code net.minecraft.*} imports or
  * static references. It mirrors {@link NeoForgeLegacyText#toAnsiString(String)}
  * and {@link NeoForgeLegacyText#stripColor(String)} so the early-startup log
- * pipeline does not transitively load any chat/network NM types — keeping log
+ * pipeline does not transitively load any chat/network NM types - keeping log
  * emission resilient even before the chat stack is fully linked.</p>
  */
 public final class NeoForgeAnsiText {

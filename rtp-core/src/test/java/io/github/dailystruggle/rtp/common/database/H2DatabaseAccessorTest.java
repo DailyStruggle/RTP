@@ -14,13 +14,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for the H2-backed SQL database accessor.
- *
- * <p>Rather than using the production {@code H2DatabaseAccessor} constructor
- * (which calls {@code RTP.serverAccessor.getPluginDirectory()}), we create a
- * minimal anonymous subclass that opens an in-memory H2 database directly.
- * This keeps the test fast and free of server-coupling while still exercising
- * the real {@link AbstractSQLDatabaseAccessor} logic.
+ * Tests for H2-backed SQL database access via in-memory {@link AbstractSQLDatabaseAccessor}.
  */
 class H2DatabaseAccessorTest extends AbstractDatabaseAccessorTest {
 

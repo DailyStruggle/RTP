@@ -18,14 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Regression test for the bootstrap log buffer.
  *
- * <p>Before this fix, sub-INFO records emitted by {@link RTP#log(Level, String)}
- * during plugin enable / very early {@code reloadConfigs} bypassed the
- * {@code logging.yml#min_level} gate (the platform sink defaults to {@link Level#ALL}
- * when the parser isn't built yet) and rendered as INFO on the console. The fix
- * buffers FINE/FINER/FINEST/CONFIG records while {@link RTP#configs} or its
- * {@code LoggingKeys} parser is unavailable, then replays them through the live
- * sink when {@link RTP#flushPendingLogs()} runs (called from
- * {@code Configs#reloadConfigs()} after the atomic parser swap).
+ * <p>Verifies sub-INFO log buffering prior to config loading and subsequent flush/replay.
  */
 class BootstrapLogBufferTest {
 

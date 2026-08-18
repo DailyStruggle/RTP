@@ -14,14 +14,9 @@ import java.io.File;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Verifies the write-once guard on {@link RTPAPI#setServerAccessor}.
+ * Verifies write-once guard on {@link RTPAPI#setServerAccessor} (REQ-API-ARCH-003).
  *
- * <p>These tests directly cover REQ-API-ARCH-003: the API must prevent a second
- * (different) accessor from silently replacing the one registered during
- * onEnable. (Custom-shape / vertical-adjustor registration moved to the typed
- * {@code RTP.addShape}/{@code RTP.addVerticalAdjustor} extension-tier entry
- * points under the two-tier API model, so the former {@code RTPAPI.addShape}
- * pre-init guards no longer apply here.)
+ * <p>Prevents registration of a second conflicting accessor instance.
  */
 class RTPAPIGuardTest {
 
@@ -38,7 +33,7 @@ class RTPAPIGuardTest {
         RTP.serverId.hashCode();
     }
 
-    /** Saved state — restored after each test so the suite remains order-independent. */
+    /** Saved state - restored after each test so the suite remains order-independent. */
     private io.github.dailystruggle.rtp.api.server.RTPServerAccessor savedAccessor;
 
     @BeforeEach
@@ -52,7 +47,7 @@ class RTPAPIGuardTest {
     }
 
     // -------------------------------------------------------------------------
-    // setServerAccessor — write-once contract
+    // setServerAccessor - write-once contract
     // -------------------------------------------------------------------------
 
     @Test

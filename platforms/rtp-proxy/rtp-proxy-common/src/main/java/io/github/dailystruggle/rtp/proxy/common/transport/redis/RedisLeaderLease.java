@@ -150,7 +150,7 @@ public final class RedisLeaderLease implements WaitlistLeaderLease, AutoCloseabl
         long pxMillis = Math.max(1L, holdFor.toMillis());
         return CompletableFuture.supplyAsync(() -> {
             try (Jedis j = pool.getResource()) {
-                // First try SET NX PX — the common case when no leader holds it.
+                // First try SET NX PX - the common case when no leader holds it.
                 SetParams nx = SetParams.setParams().nx().px(pxMillis);
                 String r = j.set(key, holderId, nx);
                 if ("OK".equals(r)) {

@@ -8,22 +8,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 
 /**
- * Process-global, always-on accumulator of location-generation outcomes.
- *
- * <p>Every terminal outcome of a {@code PregenTask} attempt is recorded here,
- * independent of the per-invocation {@code verbose} flag: a success, or a failure
- * bucketed by {@link LocationGenerator.FailTypes}. This is the data source that lets
- * the plugin report success / failure rates and a per-cause rejection breakdown
- * (the analogue of a competitor's {@code /rtp unsafe-stats}) without simulating
- * traffic &mdash; the live pipeline fills it organically.
- *
- * <p>Wait-free: counters are {@link AtomicLong} / {@link AtomicLongArray}. No locking,
- * no tick-thread blocking (METRICS_PLAN.md &gt; Goals). Reads are eventually-consistent
- * snapshots; callers must tolerate a counter advancing between two reads.
- *
- * <p>Lifecycle: a single {@link #GLOBAL} instance lives for the process. {@link #reset()}
- * exists for tests and an operator-triggered stats reset; it is not called on
- * {@code /reload}.
+ * Process-global, wait-free accumulator of location-generation outcomes and rejection breakdown.
+ * Tracks successes and failures bucketed by {@link LocationGenerator.FailTypes}.
  */
 public final class RtpOutcomeStats {
 

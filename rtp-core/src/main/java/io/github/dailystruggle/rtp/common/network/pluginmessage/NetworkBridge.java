@@ -6,26 +6,10 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
- * Platform-neutral seam for the raw plugin-messaging primitive used by the
- * tier-1 (DB-free) cross-server transport. This is the <em>only</em> surface
- * a platform adapter must implement to participate in the plugin-message
- * network tier; everything above it ({@link PluginMessageNetworkBinding}, the
- * heartbeat codec, the {@code auto} proxy-detection state machine) lives in
- * {@code rtp-core} and is therefore shared by Bukkit/Paper/Folia and, once
- * their shims land, Fabric/NeoForge running behind a Velocity/BungeeCord proxy.
- *
- * <p>The bridge deals only in opaque byte payloads and the proxy's built-in
- * plugin-messaging vocabulary ({@code Forward} for backend-to-backend gossip,
- * {@code Connect} for moving a player). It does not know about
- * {@link io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat} or any
- * SPI type, keeping the platform shim tiny and testable via an in-JVM loopback
- * double.</p>
- *
- * <p><strong>Carrier-player dependency:</strong> proxy plugin messages ride an
- * online player's server&lt;-&gt;proxy connection, so a backend with no players
- * online cannot transmit. {@link #anyOnlinePlayer()} returning
- * {@link Optional#empty()} is a normal "cannot broadcast yet" state, never an
- * error (S-004: the caller logs at FINE and skips, it does not throw).</p>
+ * Platform-neutral seam for the plugin-messaging transport (DB-free network tier).
+ * Bridges opaque byte payloads across proxy channels (Forward/Connect).
+ * Transmissions require an online carrier player; returns {@link Optional#empty()}
+ * when no player is online.
  */
 public interface NetworkBridge {
 
@@ -84,17 +68,8 @@ public interface NetworkBridge {
     }
 
     /**
-     * Active topology handshake: send the proxy's {@code GetServer} (this
-     * backend's own proxy name) and {@code GetServers} (the discovered peer
-     * name set) sub-channel queries on an online player's connection. Like
-     * every other send this requires a carrier player; implementations log at
-     * FINE and drop the request when none is online (the
-     * {@link ProxyAutoDetector} re-probes on the next carrier-available event).
-     *
-     * <p>Default no-op so a platform shim that has not yet implemented the
-     * handshake (or a test double that does not need it) compiles unchanged;
-     * such a bridge simply never produces a {@link Topology}, so the
-     * {@code auto} resolver ages out to {@code DISABLED} (standalone).</p>
+     * Active topology handshake: queries proxy for own server name and peer set.
+     * Default no-op for bridges that do not implement active handshake.
      */
     default void requestTopology() {
     }
@@ -119,15 +94,7 @@ public interface NetworkBridge {
     record Topology(String ownServerId, Set<String> peerServerIds) {
     }
 
-    // ---- proxy-cache tier verbs (PROPOSAL-proxy-as-availability-store) ----
-    // The proxy-cache tier reuses the proxy companion as the availability
-    // store: a backend pushes its heartbeat to the companion (not to peers),
-    // and a lobby requests the cached snapshot from the companion. These ride
-    // an online player's connection like every other send. Default
-    // implementations keep the proxy-cache verbs degrading gracefully on a
-    // bridge / test double that has not implemented them: the push falls back
-    // to peer gossip, and the snapshot request is a no-op (the binding then
-    // sees only whatever gossip delivered).
+    // Proxy-cache tier verbs: push heartbeats to proxy companion and request snapshots.
 
     /**
      * Push a heartbeat payload to the proxy companion's availability cache

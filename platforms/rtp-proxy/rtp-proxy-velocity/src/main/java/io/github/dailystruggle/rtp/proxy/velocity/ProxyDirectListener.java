@@ -27,7 +27,7 @@ import java.util.function.Supplier;
 
 /**
  * Proxy-side TCP listener for the {@code proxy-direct} transport tier
- * (rtp-proxy-ADR-017, refined by PROPOSAL-proxy-direct-as-remote-store).
+ * (rtp-proxy-ADR-017).
  *
  * <p>This is the RPC <em>server</em> half of "{@code proxy-direct} = a simple
  * data-management transport like {@code redis}": backends open their OWN

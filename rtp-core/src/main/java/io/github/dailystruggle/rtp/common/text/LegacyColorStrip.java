@@ -2,29 +2,7 @@ package io.github.dailystruggle.rtp.common.text;
 
 /**
  * Platform-agnostic stripper for legacy Minecraft color and formatting codes.
- *
- * <p>Handles the union of forms used across the project:
- * <ul>
- *   <li>Section-prefixed legacy codes: {@code §a}, {@code §l}, {@code §r}, etc.</li>
- *   <li>Ampersand-prefixed legacy codes: {@code &a}, {@code &l}, {@code &r}, etc.</li>
- *   <li>Bukkit-style hex run: {@code §x§R§R§G§G§B§B} (14 chars).</li>
- *   <li>Hex literals: {@code #RRGGBB} and {@code &#RRGGBB}.</li>
- * </ul>
- *
- * <p>This class has no Bukkit / Fabric / Minecraft dependency and lives in
- * {@code rtp-core} so any platform can call it. It is the canonical strip
- * helper referenced by the {@code rtp menu} config-search feature and
- * supersedes scattered direct calls to {@code ChatColor.stripColor}.
- *
- * <p>Two surfaces are exposed:
- * <ul>
- *   <li>{@link #strip(String)} — returns just the stripped text (drop-in
- *       for {@code ChatColor.stripColor}).</li>
- *   <li>{@link #strip2(String)} — returns a {@link StripResult} containing
- *       the stripped text and an offset map {@code strippedToRaw} so that
- *       highlight ranges computed against the stripped form can be
- *       projected back onto the raw input.</li>
- * </ul>
+ * Strips section codes (§a), ampersand codes (&a), Bukkit hex runs (§x§r§r...), and #RRGGBB.
  */
 public final class LegacyColorStrip {
 
@@ -102,7 +80,7 @@ public final class LegacyColorStrip {
                 i += 7;
                 continue;
             }
-            // Plain character — keep.
+            // Plain character - keep.
             out.append(c);
             map[outLen++] = i;
             i++;
@@ -122,27 +100,11 @@ public final class LegacyColorStrip {
     private static final char ZERO_WIDTH_SPACE = '\u200B';
 
     /**
-     * Neutralize legacy color/format codes in {@code raw} so they render as
-     * <em>literal text</em> rather than being consumed (and applied) by a
-     * color-translating renderer.
+     * Neutralizes legacy color/format codes in {@code raw} by inserting zero-width
+     * spaces so they render as literal text rather than being parsed by color engines.
      *
-     * <p>Unlike {@link #strip(String)} - which deletes the codes entirely -
-     * this keeps every original character visible. It is the right tool for
-     * surfacing operator-authored config <em>comments</em> (which routinely
-     * contain {@code &e}/{@code &6}/{@code §a}/{@code #RRGGBB} examples) as menu
-     * hover text: the menu renderers run the hover string through the standard
-     * {@code &}-to-{@code §} translation and section/hex deserialization, which
-     * would otherwise paint the description or swallow the example codes.
-     *
-     * <p>The neutralization inserts a zero-width space immediately after each
-     * color introducer ({@code &}, {@code §}, or the {@code #}/{@code &#} of a
-     * hex literal). The introducer then no longer abuts a recognized code
-     * character, so no renderer in the pipeline matches it, while the visible
-     * glyphs (e.g. {@code &e}) remain intact.
-     *
-     * @param raw the text to escape (may be {@code null})
-     * @return the escaped text, or {@code raw} when it is {@code null}/empty or
-     *         carries no color codes
+     * @param raw text to escape (may be null)
+     * @return escaped text with intact visible characters
      */
     public static String escape(String raw) {
         if (raw == null || raw.isEmpty()) return raw;

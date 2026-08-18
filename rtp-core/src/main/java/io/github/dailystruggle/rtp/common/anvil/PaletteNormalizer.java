@@ -7,27 +7,9 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Platform-neutral palette-identifier reconciler for the anvil pre-filter
- * (ADR-016 §8.1, rtp-fabric-ADR-005). Lifted into {@code rtp-core} so every
- * platform adapter that lacks a {@code Material} enum (Fabric, and any future
- * non-Bukkit platform) can reconcile against the canonical lookup form without
- * carrying its own copy.
- *
- * <p>Reconciliation is entirely string-based: namespace-strip and {@code
- * Locale.ROOT} upper-case via {@link PaletteIdentifierNormalizer#normalize(String)}.
- * Because the Bukkit {@code Material#name()} form (e.g. {@code "LAVA"}) and
- * the namespace-stripped vanilla palette ID form (e.g. {@code "minecraft:lava"}
- * &#8594; {@code "LAVA"}) coincide for every vanilla block, user configs that were
- * authored against the Bukkit-family Material names continue to match here
- * without any additional alias map. Modded / unknown identifiers fall through
- * to the same pure-string path used by the Spigot reconciler.</p>
- *
- * <p>The output form is the canonical lookup form expected by
- * {@code rtp-anvil}'s {@code AnvilChunkView#isAir} and
- * {@code AnvilChunkView#isSafe}, so callers may pass the reconciled
- * set directly into the Anvil view without further translation.</p>
- *
- * <p>Stateless and thread-safe.</p>
+ * Platform-neutral palette-identifier reconciler for anvil pre-filtering (ADR-016 §8.1).
+ * Normalizes palette IDs to uppercase namespace-stripped strings for lookup matching.
+ * Stateless and thread-safe.
  */
 public final class PaletteNormalizer {
 

@@ -44,8 +44,8 @@ public class JumpAdjustorProbeTest {
 
   /**
    * First acceptable Y on a bottom-up scan is returned, at the first
-   * {@code testCoords} column the multi-column probe sweep visits — which is
-   * {@code (7, 7)} — matching the live {@code adjust(RTPChunk,...)} path. The
+   * {@code testCoords} column the multi-column probe sweep visits - which is
+   * {@code (7, 7)} - matching the live {@code adjust(RTPChunk,...)} path. The
    * fake's data is uniform across columns (default delegation to the center
    * accessor), so every column accepts at the same Y; the column reported is
    * therefore deterministic.
@@ -83,7 +83,7 @@ public class JumpAdjustorProbeTest {
   }
 
   /**
-   * requireSkyLight=true with an open column above the foothold — block-data
+   * requireSkyLight=true with an open column above the foothold - block-data
    * sky-floor accepts regardless of stored sky-light nibble values. The new
    * gate walks the palette top-down and treats any Y above the highest non-air
    * block as fully sky-lit; stored sky-light is ignored because it is
@@ -104,7 +104,7 @@ public class JumpAdjustorProbeTest {
   }
 
   /**
-   * requireSkyLight=true + isLightOn=false + no heightmap — the block-data
+   * requireSkyLight=true + isLightOn=false + no heightmap - the block-data
    * sky-floor still accepts because it derives openness from the palette,
    * not from stored sky-light or heightmap data. This is the headline change:
    * unticked / freshly-generated chunks no longer defer to the live vert path.
@@ -114,7 +114,7 @@ public class JumpAdjustorProbeTest {
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
     probe.setSolidRange(0, 63);
     probe.setAirRange(64, 128);
-    // No heightmap, isLightOn=false — used to be LIGHT_GATE; now block scan wins.
+    // No heightmap, isLightOn=false - used to be LIGHT_GATE; now block scan wins.
 
     JumpAdjustor a = adj(60, 80);
     a.set(JumpAdjustorKeys.requireSkyLight, true);
@@ -152,7 +152,7 @@ public class JumpAdjustorProbeTest {
    * cave roof / structure ceiling). The block-data sky-floor binds at the
    * overhang Y, so every adjustor candidate at {@code y+1 <= overhang} is
    * rejected by the sky-light gate. With the overhang at y=90 and the
-   * adjustor range [60,80), no Y in the window passes — the result is null
+   * adjustor range [60,80), no Y in the window passes - the result is null
    * (SCAN_MISS rather than LIGHT_GATE under the new gate).
    */
   @Test
@@ -205,7 +205,7 @@ public class JumpAdjustorProbeTest {
    * listed in {@code safety.yml}'s {@code airBlocks} (e.g. {@code TALL_GRASS}), the probe
    * path must accept the Y. Prior to wiring {@code airBlocks} into {@code acceptProbeY},
    * the strict {@code ChunkColumnProbe.isAirAt} check rejected every such chunk and
-   * routed the scan back to the full-load path — showing up as the residual
+   * routed the scan back to the full-load path - showing up as the residual
    * {@code adjustNull == activeChecks} tail on the ScanTask concurrency gauge.
    */
   @SuppressWarnings("unchecked")
@@ -221,7 +221,7 @@ public class JumpAdjustorProbeTest {
     EnumMap<BlocksKeys, Object> blocksData = (EnumMap<BlocksKeys, Object>) dataField.get(blocks);
     blocksData.put(BlocksKeys.airBlocks, new ArrayList<>(Arrays.asList("TALL_GRASS")));
 
-    // No static cache to reset — readSafetySnapshot() reads the parser per call.
+    // No static cache to reset - readSafetySnapshot() reads the parser per call.
 
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
     probe.setSolidRange(0, 63);
@@ -235,17 +235,8 @@ public class JumpAdjustorProbeTest {
   }
 
   /**
-   * Regression for the "residual {@code adjustNull} tail" observed on live scan runs: when
-   * an operator lists an ADR-017 tag token (e.g. {@code #minecraft:flowers}) in
-   * {@code airBlocks}, the probe fast path must accept a column whose head cell reports a
-   * tag member (e.g. {@code POPPY}) — not fall through to the ~85 ms full-load path.
-   *
-   * <p>Prior to the tag-expansion wiring in {@code JumpAdjustor#refreshSafetySets()},
-   * {@code airBlocks} held the literal string {@code "#minecraft:flowers"} and
-   * {@code airBlocks.contains("POPPY")} was always {@code false} — every flower-topped
-   * chunk paid the full-load penalty, which is what the {@code adjustNull ≈ 0.39 ×
-   * activeChecks} ratio in the scan logs was showing. See
-   * {@code docs/dev/SAFETY_TAGS_AND_STATES_PLAN.md}.
+   * Regression: tag tokens (e.g. {@code #minecraft:flowers}) in {@code airBlocks}
+   * must be expanded by the probe fast path to accept tag members without full chunk loads.
    */
   @SuppressWarnings("unchecked")
   @Test
@@ -258,7 +249,7 @@ public class JumpAdjustorProbeTest {
     EnumMap<BlocksKeys, Object> blocksData = (EnumMap<BlocksKeys, Object>) dataField.get(blocks);
     blocksData.put(BlocksKeys.airBlocks, new ArrayList<>(Arrays.asList("#minecraft:flowers")));
 
-    // No static cache to reset — readSafetySnapshot() reads the parser per call.
+    // No static cache to reset - readSafetySnapshot() reads the parser per call.
 
     // Install a tag-snapshot-aware accessor that publishes minecraft:flowers → {POPPY}.
     io.github.dailystruggle.rtp.api.server.RTPServerAccessor prev = RTP.serverAccessor;
@@ -276,7 +267,7 @@ public class JumpAdjustorProbeTest {
       probe.setSolidRange(0, 63);
       probe.withBlock(64, "POPPY"); // body cell: tag member, must be passable
       probe.withBlock(65, "POPPY"); // head cell: tag member, must be passable
-      // Y ≥ 66 defaults to stone — the bottom-up scan must land on Y=64.
+      // Y ≥ 66 defaults to stone - the bottom-up scan must land on Y=64.
 
       RTPCoords r = adj(60, 80).adjustFromProbe(probe, "w");
       assertNotNull(
@@ -325,7 +316,7 @@ public class JumpAdjustorProbeTest {
 
     // Behavioural assertion: the probe path drops state-predicated tokens (it has
     // no property map), so a bare CAMPFIRE at the feet must still be accepted by
-    // the probe path — only the compiled-form full-load consumer evaluates the
+    // the probe path - only the compiled-form full-load consumer evaluates the
     // state predicate. Conversely a bare LAVA at the feet must be rejected.
     FakeChunkColumnProbe campfireProbe = new FakeChunkColumnProbe(0, 0, 0, 128);
     campfireProbe.setSolidRange(0, 62);
@@ -340,7 +331,7 @@ public class JumpAdjustorProbeTest {
 
     FakeChunkColumnProbe lavaProbe = new FakeChunkColumnProbe(0, 0, 0, 128);
     lavaProbe.setSolidRange(0, 62);
-    lavaProbe.withBlock(63, "LAVA"); // bare unsafe — must be rejected
+    lavaProbe.withBlock(63, "LAVA"); // bare unsafe - must be rejected
     lavaProbe.withBlock(64, "STONE");
     lavaProbe.setAirRange(65, 128);
     RTPCoords lavaResult = adj(60, 80).adjustFromProbe(lavaProbe, "w");
@@ -374,7 +365,7 @@ public class JumpAdjustorProbeTest {
         "expected the stone-floored y=65, not the water-floored y=64");
   }
 
-  /** Mirror of the water case for lava — the other common plains-biome fluid. */
+  /** Mirror of the water case for lava - the other common plains-biome fluid. */
   @Test
   void lowercaseNamespacedLavaAtFeetRejects() {
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
@@ -389,7 +380,7 @@ public class JumpAdjustorProbeTest {
   }
 
   // ---------------------------------------------------------------------------
-  // PR-20: adjustFromProbeWithReason rejection-reason attribution. Mirrors the
+  // Rejection-reason attribution for adjustFromProbeWithReason. Mirrors the
   // matching block in LinearAdjustorProbeTest. See ScanTask.readProbeOutcome
   // StatsAndReset for the consumer side.
   // ---------------------------------------------------------------------------
@@ -461,27 +452,11 @@ public class JumpAdjustorProbeTest {
         r.reason());
   }
 
-  // ---------------------------------------------------------------------------
-  // Multi-column probe sweep. The probe path now scans the same testCoords
-  // columns ((7,7), (2,2), (12,12), (2,12), (12,2)) the live adjust(RTPChunk,…)
-  // path scans, so a probe SCAN_MISS is authoritative — i.e. no acceptable Y
-  // exists on any of those five live-path columns either, which is what makes
-  // the SCAN_MISS short-circuit in ScanTask.evaluateScanProbe behaviour-safe.
-  // These regression tests pin both halves of that contract:
-  //   1. center-column-only foothold ⟹ probe accepts at the center.
-  //   2. center-column all-air, off-center column has foothold ⟹ probe must
-  //      accept at the off-center column (no SCAN_MISS).
-  //   3. every column has no foothold ⟹ SCAN_MISS (authoritative bad).
-  // ---------------------------------------------------------------------------
+  // Multi-column probe sweep tests: verifies parity with live adjust testCoords columns.
 
   /**
-   * Off-center foothold case: center column (8,8) is fully air, but local
-   * column (2,2) — second {@code testCoords} entry — has solid ground at y=63
-   * and air above. The probe sweep must visit (2,2) after (7,7) fails and
-   * report acceptance at the off-center column with the corresponding global
-   * x/z. This is the scenario that, before the multi-column probe sweep,
-   * caused unnecessary full-chunk loads (probe rejected, live accepted) and
-   * blocked the SCAN_MISS short-circuit.
+   * Off-center foothold: (8,8) center is air, local column (2,2) has foothold at y=63.
+   * Probe sweep must visit (2,2) and report accepted coordinates.
    */
   @Test
   void adjustFromProbe_offCenterFoothold_acceptsAtOffCenterColumn() {

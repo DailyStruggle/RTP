@@ -22,7 +22,7 @@ import net.minecraft.server.MinecraftServer;
 /**
  * Fabric {@link RTPScheduler}.
  * Async: a private cached thread-pool executor (see {@link #ASYNC_EXECUTOR}).
- * We deliberately do NOT use {@code net.minecraft.Util#backgroundExecutor()} —
+ * We deliberately do NOT use {@code net.minecraft.Util#backgroundExecutor()} -
  * its intermediary mapping ({@code class_156.method_18349}) drifts across MC
  * patch versions and triggers {@link NoSuchMethodError} at runtime, mirroring
  * the {@code SharedConstants} drift documented in {@code RTPFabricMod}. A
@@ -159,7 +159,7 @@ public class FabricScheduler implements RTPScheduler {
       s.execute(task);
       return;
     }
-    // No server yet — buffer the task and drain on SERVER_STARTED. This
+    // No server yet - buffer the task and drain on SERVER_STARTED. This
     // matches Bukkit's runTask semantics (always-queue, never fail) and
     // prevents the early-dispatch warning cascade observed on Fabric where
     // region-thread evaluation fired before setServer had been called.
@@ -244,9 +244,8 @@ public class FabricScheduler implements RTPScheduler {
   private static volatile java.lang.reflect.Method GET_RUNNING_THREAD;
 
   private static Thread serverRunningThread(MinecraftServer s) {
-    // Prefer the per-version adapter's typed override (Phase 4 migration of
-    // the prior reflective patch). Falls through to the reflective resolver
-    // for adapters that don't override (1.20 / 1.21 family).
+    // Prefer the per-version adapter's typed override. Falls through to the
+    // reflective resolver for adapters that don't override (1.20 / 1.21 family).
     try {
       io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
           io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
@@ -255,7 +254,7 @@ public class FabricScheduler implements RTPScheduler {
         if (t != null) return t;
       }
     } catch (Throwable ignored) {
-      // adapter registry not yet bound (early bootstrap) — fall through
+      // adapter registry not yet bound (early bootstrap) - fall through
     }
     try {
       java.lang.reflect.Method m = GET_RUNNING_THREAD;

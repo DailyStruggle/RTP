@@ -6,21 +6,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Runtime parser for the machine-readable {@code @…} directive lines carried in
- * a config key's YAML block comment (see {@code docs/dev/CONFIG_COMMENT_STYLE.md}
- * and ADR-064). The in-game config editor is the first runtime consumer of these
- * tags: when a key declares a finite value domain (an {@code @options} literal
- * list or an {@code @source} runtime registry) the editor routes the key to a
- * finite-value picker instead of a free-text prompt.
- *
- * <p>The source comment text is already resident in memory (the cached YAML root
- * populated at load/reload; see {@code ConfigParser#getYamlRoot} /
- * {@code RtpYamlSection#getComment}), so parsing introduces no file I/O.
- *
- * <p>Parsing is intentionally lenient: any line that cannot be understood is
- * skipped and yields an empty directive set. Callers treat "no finite domain"
- * as "keep the free-text prompt", so a malformed directive never breaks the
- * menu.
+ * Runtime parser for {@code @…} directive lines in YAML block comments (ADR-064).
+ * Surfaces finite domains ({@code @options}, {@code @source}) for menu value pickers.
  */
 public final class ConfigDirectives {
 
@@ -38,10 +25,7 @@ public final class ConfigDirectives {
     }
 
     /**
-     * Parse the directive lines from a raw block-comment string (the value
-     * returned by {@code RtpYamlSection#getComment}, with {@code #} markers
-     * still present). Returns an empty directive set when {@code comment} is
-     * {@code null}/blank or carries no recognizable directive.
+     * Parse directives from a raw block-comment string.
      *
      * @param comment the raw block comment, or {@code null}
      * @return the parsed directives (never {@code null})
@@ -65,7 +49,7 @@ public final class ConfigDirectives {
                 case "type" -> type = stripQuotes(value);
                 case "source" -> source = stripQuotes(value);
                 case "options" -> options = parseFlowList(value);
-                default -> { /* @range / @unit / @default etc. — not consumed here */ }
+                default -> { /* @range / @unit / @default etc. - not consumed here */ }
             }
         }
         if (type == null && options.isEmpty() && source == null) return EMPTY;
@@ -120,7 +104,7 @@ public final class ConfigDirectives {
     }
 
     /**
-     * Whether this key declares a finite value domain — either an
+     * Whether this key declares a finite value domain - either an
      * {@code @options} literal list or an {@code @source} registry.
      */
     public boolean hasFiniteDomain() {

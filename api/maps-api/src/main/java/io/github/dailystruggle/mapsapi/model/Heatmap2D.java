@@ -8,7 +8,7 @@ import java.util.Objects;
  *
  * <p>The constructor defensively copies {@code values} so the caller may
  * mutate the supplied array after construction without affecting the model
- * (REQ-RTP-MAP-002 — renderer thread-safety contract).
+ * (REQ-RTP-MAP-002 - renderer thread-safety contract).
  *
  * @param width   number of columns, must be {@code > 0}
  * @param height  number of rows, must be {@code > 0}
@@ -40,7 +40,7 @@ public record Heatmap2D(int width, int height, double[] values,
         values = values.clone();
     }
 
-    /** Defensive accessor — returns a clone of the internal value array. */
+    /** Defensive accessor - returns a clone of the internal value array. */
     @Override
     public double[] values() {
         return values.clone();

@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * {@code level.dat}. ADR-016 anvil pre-filter mirrors the Spigot/Fabric wiring.</p>
  *
  * <p>Mojmap-at-runtime: the SPI passes {@link ServerLevel} / {@link ChunkAccess}
- * directly (no {@code RTPLevelHandle}/{@code RTPChunkHandle} boxing — those were
+ * directly (no {@code RTPLevelHandle}/{@code RTPChunkHandle} boxing - those were
  * dropped for NeoForge since there is no obf/intermediary split).</p>
  */
 public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
@@ -123,11 +123,11 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     }
 
     /**
-     * ADR-058 — region-schematic paster. The decode/plan half is platform-neutral
+     * ADR-058 - region-schematic paster. The decode/plan half is platform-neutral
      * ({@link io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster}); the native
      * block writes route back through {@link #setBlocks(java.util.List)} below. Defaulting to a
      * real paster (rather than {@code NoOpSchematicPaster}) is what enables schematic parsing on
-     * NeoForge — parity with {@code V26_2_R1FabricRTPWorld}.
+     * NeoForge - parity with {@code V26_2_R1FabricRTPWorld}.
      */
     private static @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster =
             new io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster();
@@ -429,7 +429,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     }
 
     // ---------------------------------------------------------------------------
-    // ADR-016 anvil pre-filter — column probe
+    // ADR-016 anvil pre-filter - column probe
     // ---------------------------------------------------------------------------
 
     @Override
@@ -869,7 +869,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                                 .parseForBlock(blockLookup, delta.token(), false)
                                 .blockState();
                 // flags=2 (Block.UPDATE_CLIENTS): send to clients without triggering neighbour
-                // physics updates — a bulk world rewrite, not a player edit.
+                // physics updates - a bulk world rewrite, not a player edit.
                 level.setBlock(new BlockPos(delta.x(), delta.y(), delta.z()), state, 2);
                 placed++;
             } catch (Throwable e) {

@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.fabric.version;
 /**
  * Mojmap-name-stable wrapper around a Fabric {@code ServerLevel} (a.k.a.
  * {@code class_3218}). Lets {@code rtp-fabric-common}'s SPI signature stay
- * Mojmap-immune across point releases — see
+ * Mojmap-immune across point releases - see
  * {@code rtp-fabric-ADR-007-mojmap-name-decoupling.md}.
  *
  * <p>The payload is held as {@link Object} so common's compiled bytecode

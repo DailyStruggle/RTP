@@ -10,28 +10,10 @@ import java.util.List;
 import java.util.logging.Level;
 
 /**
- * Admin-authored closed polygon memory shape.
+ * Closed polygon memory shape (ADR-034).
  *
- * <p>Implementation per ADR-034:
- * <ul>
- *   <li>Extends {@link Square}; the inherited square is sized to the polygon's
- *       axis-aligned bounding box and carries the spiral index, segmented
- *       bad-locations store, persistence, uniqueness, cache-key contribution
- *       (ADR-022), and registry integration unchanged.</li>
- *   <li>Vertices are stored as a list of {@code int[]{x, z}} in traversal order;
- *       the polygon is implicitly closed.</li>
- *   <li>Self-intersecting vertex lists are rejected at {@link #setVertices(List)}
- *       time via a naive O(n^2) edge-pair check; concave polygons are accepted.</li>
- *   <li>{@code expand} is forced to {@code false} on every {@link #rand()} call
- *       regardless of any value carried in the underlying data map; a warning is
- *       logged once if a config attempts to enable it.</li>
- *   <li>An async curve-walker is scheduled at vertex-assignment time iff the
- *       segmented bad-locations store is empty; it walks the inner Square's
- *       spiral and emits per-column outside-polygon entries via
- *       {@link #addBadLocation(long)}. The walker self-cancels the moment any
- *       path adds an entry (prior session's serialized mask or runtime
- *       safety/biome discoveries).</li>
- * </ul>
+ * <p>Extends {@link Square} bounded by the polygon's axis-aligned bounding box.
+ * Populates outside-polygon points into the bad-locations mask.</p>
  */
 public class Polygon extends Square {
 
@@ -64,15 +46,10 @@ public class Polygon extends Square {
   }
 
   /**
-   * Install the polygon's vertex list, derive the AABB, mirror it onto the
-   * inherited Square ({@code radius}, {@code centerX}, {@code centerZ}), validate
-   * for self-intersection, and schedule the async curve-walker if the segmented
-   * bad-locations store is empty.
+   * Install vertex list, derive AABB, validate non-self-intersection, and schedule mask walker.
    *
-   * @param newVertices vertex list (each entry is {@code int[]{x, z}}); must contain
-   *     at least 3 entries.
-   * @throws IllegalArgumentException if the vertex list has fewer than 3 vertices,
-   *     is collinear, or self-intersects (the error names the offending edge pair).
+   * @param newVertices vertex list (each entry {@code int[]{x, z}}); at least 3 vertices
+   * @throws IllegalArgumentException if vertices < 3, collinear, or self-intersecting
    */
   public void setVertices(List<int[]> newVertices) {
     if (newVertices == null || newVertices.size() < 3) {
@@ -209,7 +186,7 @@ public class Polygon extends Square {
       if (sinceYield == 0) {
         long currentBadCount = pendingBadLocations.get().size() + badKeysCache.length;
         if (currentBadCount > lastObservedBadCount + batchSize) {
-          // External writer interleaved with our batch — yield authority.
+          // External writer interleaved with our batch - yield authority.
           return;
         }
         lastObservedBadCount = currentBadCount;
@@ -222,7 +199,7 @@ public class Polygon extends Square {
         continue;
       }
       if (!pointInPolygon(coords.x, coords.z)) {
-        // addBadChunk: chunk-uniform — polygon membership is evaluated at chunk-unit coords,
+        // addBadChunk: chunk-uniform - polygon membership is evaluated at chunk-unit coords,
         // so marking the twin spiral index in the same chunk lets the walker skip the
         // redundant pointInPolygon test when it later visits that index (isKnownBad
         // short-circuits before the polygon test).
@@ -286,7 +263,7 @@ public class Polygon extends Square {
       return location;
     }
     if (!pointInPolygon(coords.x, coords.z)) {
-      // addBadChunk: chunk-uniform — polygon membership is evaluated at chunk-unit
+      // addBadChunk: chunk-uniform - polygon membership is evaluated at chunk-unit
       // coords (locationToXZ output), so the twin spiral index decoding to the same
       // chunk is guaranteed to also fail point-in-polygon. Unlike the bulk walker
       // above, this is a single-shot reject in the hot rand() path so amplification

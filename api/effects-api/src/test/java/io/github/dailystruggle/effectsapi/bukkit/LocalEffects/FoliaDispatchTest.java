@@ -131,7 +131,7 @@ class FoliaDispatchTest {
         assertSame(player, seenPlayer.get(), "Dispatcher must receive the same player");
         assertNotNull(seenTask.get(), "Dispatcher must receive a non-null task");
         // The task supplied to the dispatcher must be the one that calls
-        // addPotionEffect on the player — verify by running it and checking
+        // addPotionEffect on the player - verify by running it and checking
         // the mock interaction.
         verify(player, times(1)).addPotionEffect(pe);
     }
@@ -157,7 +157,7 @@ class FoliaDispatchTest {
             BukkitPotionDispatch.applyOnEntityThread(player, pe);
         } catch (Throwable ignored) {
             // Bukkit.isPrimaryThread() may throw without an initialized server;
-            // that's fine — we only care that the dispatcher was queried first.
+            // that's fine - we only care that the dispatcher was queried first.
         }
 
         assertTrue(dispatcherCalled.get(),
@@ -177,7 +177,7 @@ class FoliaDispatchTest {
         BukkitHandles.regionDispatcher = (caller, location, task) -> {
             dispatched.set(true);
             seenLocation.set(location);
-            // Simulate Folia accepting the task — but do not execute it, since
+            // Simulate Folia accepting the task - but do not execute it, since
             // the Bukkit world / FireworkSafetyListener wiring isn't available
             // in unit tests. The contract under test is "the dispatcher is the
             // chosen path", not "the firework actually spawns".

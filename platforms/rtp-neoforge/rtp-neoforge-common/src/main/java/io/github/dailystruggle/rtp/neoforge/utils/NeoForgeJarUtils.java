@@ -25,7 +25,7 @@ import java.util.logging.Level;
  * <p>Idempotent: existing files are preserved unless the recorded version
  * differs from the running version (then they are overwritten so docs stay in
  * lockstep with the shipped jar). Failures are fail-soft and logged at
- * {@code WARNING} — docs extraction is a convenience, never a hard prerequisite
+ * {@code WARNING} - docs extraction is a convenience, never a hard prerequisite
  * for {@code /rtp} (REQ-RTP-S-004: visible failure, no silent swallow; the mod
  * continues to run without extracted docs).
  *
@@ -35,7 +35,7 @@ import java.util.logging.Level;
 public final class NeoForgeJarUtils {
 
     private NeoForgeJarUtils() {
-        // utility — no instances
+        // utility - no instances
     }
 
     /**
@@ -67,7 +67,7 @@ public final class NeoForgeJarUtils {
             try {
                 lastVersion = new String(Files.readAllBytes(docVersionFile.toPath())).trim();
             } catch (Exception ignored) {
-                // best effort — treat as missing version marker
+                // best effort - treat as missing version marker
             }
         }
 
@@ -77,7 +77,7 @@ public final class NeoForgeJarUtils {
             URI uri = NeoForgeJarUtils.class.getProtectionDomain().getCodeSource().getLocation().toURI();
             File jarFile = new File(uri);
             if (!jarFile.isFile()) {
-                // Running from a classes directory (dev / unit-test) — there
+                // Running from a classes directory (dev / unit-test) - there
                 // is no jar to walk. Silently skip; this is the documented
                 // dev-environment fallback and not an error.
                 return;

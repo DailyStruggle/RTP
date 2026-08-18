@@ -18,7 +18,7 @@ import java.util.logging.Level;
  * respecting concurrency, attempt timeouts, and the run duration.
  *
  * <p>The loop itself is async (via {@link Sched#runAsyncTimer}) at 100ms
- * cadence — fast enough that a freed concurrency slot is filled within
+ * cadence - fast enough that a freed concurrency slot is filled within
  * one dispatch interval, slow enough to avoid burning CPU when the roster
  * is small. Each individual dispatch hops to the player-owning thread via
  * {@link Sched#runOnPlayer} (Folia: EntityScheduler; Spigot/Paper: main).
@@ -47,7 +47,7 @@ public final class Runner {
      *  before the prior one returns. Two concurrent tick bodies both pass the
      *  per-player {@code deadlines.containsKey} guard and dispatch the SAME
      *  player, so {@code inFlight} is incremented twice while only one
-     *  per-player deadline exists — when the (fast) completion removes that
+     *  per-player deadline exists - when the (fast) completion removes that
      *  single deadline, only one decrement runs and the extra increment leaks.
      *  The leak wedges {@code inFlight} at/above the concurrency cap with zero
      *  live deadlines, which blocks all further dispatch and trips the
@@ -59,7 +59,7 @@ public final class Runner {
     /** Cached round-robin target list for non-SEQUENCE modes (TIMED/BURST).
      *  Loaded once at run start so {@link #dispatchOne} does not re-parse the
      *  config and allocate a fresh {@code List<Targets.Entry>} on every single
-     *  dispatch — the dominant source of background object churn during a run.
+     *  dispatch - the dominant source of background object churn during a run.
      *  SEQUENCE mode keeps using its own {@link #seqTargets} snapshot. */
     private volatile List<Targets.Entry> roundRobinTargets = null;
     /** Reusable roster buffer. {@link #roster()} clears and refills this rather
@@ -170,7 +170,7 @@ public final class Runner {
     /** Called by {@link ConsoleWatcher} when a console line matches a
      *  failure pattern but no player name was identifiable in the line.
      *  Attributes the failure to the most-recently dispatched in-flight
-     *  player — the overwhelmingly common case is "the dispatch we just
+     *  player - the overwhelmingly common case is "the dispatch we just
      *  fired produced this rejection". */
     public void onConsoleFailFallback(String reason) {
         UUID id = lastDispatched.get();
@@ -198,7 +198,7 @@ public final class Runner {
      * Run each configured target in turn for {@code perTargetSeconds}, with a
      * {@code gapSeconds} recovery pause between targets. Per-target results are
      * still attributed via {@link MetricsRecorder.Attempt#targetLabel}, so
-     * {@code /rtpstress export} produces the same per-target breakdown — but
+     * {@code /rtpstress export} produces the same per-target breakdown - but
      * targets do not contend with one another within a single phase, which is
      * what the user wants when isolating each plugin's behaviour.
      */
@@ -370,12 +370,12 @@ public final class Runner {
 
             // 0) No-progress watchdog. If the runner has been idle for
             //    `no-progress-kickstart-ms` (default 30s) during a measurement
-            //    phase — not warm-up, not a sequence gap — force-clear all
+            //    phase - not warm-up, not a sequence gap - force-clear all
             //    per-player bookkeeping, log a warning, and re-stamp progress
             //    so the next tick dispatches normally. This recovers from the
             //    sporadic "freeze between targets" symptom without requiring
             //    operator intervention. The watchdog is a safety net, not a
-            //    primary mechanism — every triggered kickstart should be
+            //    primary mechanism - every triggered kickstart should be
             //    logged and investigated, but the run continues either way.
             long kickstartMs = config.getLong("no-progress-kickstart-ms", 30000L);
             boolean inMeasurementPhase = running.get()
@@ -404,7 +404,7 @@ public final class Runner {
             //      and restart the spark profile so each slice is flushed to
             //      disk as a `.sparkprofile` file. Without this, a server
             //      crash mid-phase (OOM, watchdog kill, host reboot) loses
-            //      the entire phase's profiling data — the failure mode that
+            //      the entire phase's profiling data - the failure mode that
             //      occurred during the EssentialsX phase of the
             //      20260502-023640 stress run. The rotation is gated to
             //      measurement phases (skipped during warm-up and sequence
@@ -492,7 +492,7 @@ public final class Runner {
             Targets.Entry pinned = null;
             if (mode == Mode.SEQUENCE && warmupActive) {
                 // Warm-up phase machine: cycle every target for `warmupSliceMs`,
-                // `warmupCycles` times. No CSV, no spark, no gap between slices —
+                // `warmupCycles` times. No CSV, no spark, no gap between slices -
                 // we want sustained dispatch to maximise JIT throughput.
                 if (now >= warmupSliceEndMs) {
                     // Slice ended: log per-target summary, advance.
@@ -532,7 +532,7 @@ public final class Runner {
                         // the measurement sequence. This catches both
                         // "plugin not installed" (no command registered) and
                         // "command syntax wrong for this server" (rejected
-                        // every time) without any plugin-name guessing — the
+                        // every time) without any plugin-name guessing - the
                         // dispatcher itself is the oracle. If pruning would
                         // empty the list (e.g. warm-up was too short to land
                         // any teleport), keep the original roster so the run
@@ -571,7 +571,7 @@ public final class Runner {
                         // measurement phase. Warm-up hammered every target
                         // (including plugins that depress TPS), so the server
                         // needs the same settle time it gets between phases
-                        // before target 0 is measured — otherwise the first
+                        // before target 0 is measured - otherwise the first
                         // plugin in the sequence is billed for warm-up's TPS
                         // aftershock. Arm the gap and set seqIndex to -1; the
                         // gap-phase branch below advances to target 0 and calls
@@ -615,7 +615,7 @@ public final class Runner {
                 pinned = seqTargets.get(warmupTargetIdx);
             } else if (mode == Mode.SEQUENCE) {
                 // If the sequence has already advanced past the final target,
-                // there is nothing left to dispatch — just wait for any
+                // there is nothing left to dispatch - just wait for any
                 // remaining in-flight attempts to drain, then stop. Without
                 // this guard a gap that ends with seqIndex past the end while
                 // inFlight is still positive (see the seqGapEndMs branch below,
@@ -630,7 +630,7 @@ public final class Runner {
                 if (seqGapEndMs > 0L) {
                     // In gap: dispatch nothing, just wait it out.
                     if (now < seqGapEndMs) return;
-                    // Gap finished — advance.
+                    // Gap finished - advance.
                     seqGapEndMs = 0L;
                     seqIndex++;
                     if (seqIndex >= seqTargets.size()) {
@@ -657,7 +657,7 @@ public final class Runner {
                             // `deadlines.remove(id) != null`, which left
                             // inFlight stuck positive whenever a concurrent
                             // onAttemptCompleted/onConsoleFail had already
-                            // removed the same deadline — and any positive
+                            // removed the same deadline - and any positive
                             // residual inFlight at end-of-sequence pins the
                             // line-474 `if (inFlight.get() == 0) stop()`
                             // guard open forever, hanging the run with the
@@ -674,7 +674,7 @@ public final class Runner {
                             return;
                         }
                     }
-                    // Run-phase ended — stop the spark profile for this target
+                    // Run-phase ended - stop the spark profile for this target
                     // BEFORE entering the gap, so the gap's idle ticks don't
                     // dilute the per-target sample.
                     String endingLabel = seqTargets.get(seqIndex).label;
@@ -686,7 +686,7 @@ public final class Runner {
                     // baseline (warmer disk cache, higher resident heap,
                     // skewed chunk-load counters). Forcing a save here gives
                     // each phase a comparable on-disk state. Gated by config
-                    // so Folia / Paper operators can opt out — Folia in
+                    // so Folia / Paper operators can opt out - Folia in
                     // particular has its own per-region save cadence.
                     saveWorldsBetweenPhases(endingLabel);
                     if (seqGapMs <= 0L) {
@@ -724,7 +724,7 @@ public final class Runner {
                 UUID tid = target.getUniqueId();
                 // Bound the scan: regardless of whether we dispatched on
                 // this iteration, after roster.size()*4 picks we have walked
-                // every player multiple times — if no slot has been filled
+                // every player multiple times - if no slot has been filled
                 // by then, every player is either in-flight or cooling down,
                 // and continuing would spin the CPU indefinitely (observed
                 // as an indefinite freeze with fans revving). The break
@@ -749,7 +749,7 @@ public final class Runner {
         TpsMsptHeapSampler.Snapshot snap = sampler.latest();
         Location from = target.getLocation();
         // Round-robin across configured target commands so multiple co-installed
-        // RTP-style plugins are exercised evenly within a single run — unless
+        // RTP-style plugins are exercised evenly within a single run - unless
         // SEQUENCE mode pinned a single target for the current phase.
         Targets.Entry chosen;
         if (pinned != null) {
@@ -786,7 +786,7 @@ public final class Runner {
         // nextDispatchAt, lastDispatched, inFlight) BEFORE registering the
         // probe expectation and BEFORE dispatching the command. Otherwise
         // PlayerTeleportEvent can fire on the main thread between
-        // probe.expect(...) and deadlines.put(...) — observed under low
+        // probe.expect(...) and deadlines.put(...) - observed under low
         // per-player-gap-ticks where queue-served plugins teleport in
         // microseconds. The completion callback's deadlines.remove(...)
         // returns null (entry not yet present), inFlight is never
@@ -815,12 +815,12 @@ public final class Runner {
         //
         // Latency-attribution fix: capture the timestamp inside the runnable,
         // i.e. AFTER the BukkitScheduler.runTask hop on Spigot/Paper (which
-        // always defers to the next tick boundary, 0–50 ms, avg ~25 ms).
-        // Without this, every per-attempt latency includes that wait —
+        // always defers to the next tick boundary, 0-50 ms, avg ~25 ms).
+        // Without this, every per-attempt latency includes that wait -
         // observable as a baseline floor of ~50 ms even when the target
         // plugin teleports in microseconds (e.g. RTP queue-served).
         // Sender selection: by default we dispatch as the target player so
-        // the command runs through the player's default permission set —
+        // the command runs through the player's default permission set -
         // this is the configuration real users hit, and it exercises any
         // permission-gated fast-paths in the target plugin (cooldown
         // bypasses, admin-form rejections, etc.). Set `dispatch-as-player:
@@ -881,19 +881,19 @@ public final class Runner {
     /**
      * Force-save every loaded world between phases. Bukkit's {@code World.save()}
      * must be called on the main thread; the runner tick is async (10 Hz), so we
-     * schedule the actual save via the global scheduler and do not block on it —
+     * schedule the actual save via the global scheduler and do not block on it -
      * the gap (default a few seconds, see {@code sequence.gap-seconds}) absorbs
      * the I/O latency before the next phase begins dispatch.
      *
      * <p>Behaviour is controlled by {@code save-worlds-between-phases} in
      * config.yml:
      * <ul>
-     *   <li>{@code "auto"} (default) — save only when the server is Spigot
+     *   <li>{@code "auto"} (default) - save only when the server is Spigot
      *       (i.e. not Paper / Folia), since Paper/Folia have their own region-
      *       or world-level save cadences and an extra forced save dilutes the
      *       gap.</li>
-     *   <li>{@code "always"} / {@code true} — save unconditionally.</li>
-     *   <li>{@code "never"} / {@code false} — never save.</li>
+     *   <li>{@code "always"} / {@code true} - save unconditionally.</li>
+     *   <li>{@code "never"} / {@code false} - never save.</li>
      * </ul>
      *
      * <p>Rationale: on Spigot, chunks loaded by the prior plugin's RTP path
@@ -929,7 +929,7 @@ public final class Runner {
                 // mis-detected as Spigot, triggering an unnecessary forced
                 // save on a Paper-family or Folia-family server. Instead,
                 // probe for marker classes that only ship with the relevant
-                // upstream — every Paper fork carries Paper's API, and every
+                // upstream - every Paper fork carries Paper's API, and every
                 // Folia fork carries Folia's region scheduler. Mirrors
                 // AbstractServerAccessor#isPaper / #isFolia in rtp-spigot.
                 save = !(isPaperFamily() || isFoliaFamily());

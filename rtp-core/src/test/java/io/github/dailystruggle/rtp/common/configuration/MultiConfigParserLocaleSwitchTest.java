@@ -18,21 +18,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Regression test proving that a language switch propagates through
- * {@link MultiConfigParser} to the per-file child {@link ConfigParser}s it
- * builds, and that the child value files on disk are actually re-checked and
- * rewritten with the new locale's keys and comments after the change.
- *
- * <p>Before the fix, {@code MultiConfigParser} carried no locale and always
- * built children with {@link LanguageBootstrap#DEFAULT_LOCALE}, so the
- * region/world/effect definition files never honored an in-game language
- * switch even though the single-file parsers did.
- *
- * <p>The content-level assertions are backed by two rtp-core test resources:
- * {@code mcplocaletest.yml} (English baseline) and
- * {@code lang/es/mcplocaletest.yml} (Spanish: translated comment and renamed
- * keys). A child parser's name is a bare leaf, so its JAR prefix is empty and
- * these root resources resolve for it.
+ * Verifies language switch propagation in {@link MultiConfigParser} to child {@link ConfigParser}s.
+ * Asserts on-disk files are rewritten with new locale keys, comments, and backups.
  */
 public class MultiConfigParserLocaleSwitchTest {
 

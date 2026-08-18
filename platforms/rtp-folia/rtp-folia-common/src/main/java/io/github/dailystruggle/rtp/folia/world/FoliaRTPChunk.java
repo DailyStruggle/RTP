@@ -36,11 +36,11 @@ import org.bukkit.block.data.BlockData;
  * plus the world identity + chunk coordinates needed to answer RTPChunk queries
  * without ever hopping to the Region Thread. The authoritative live
  * {@code chunk.isSafe(...)} re-check at teleport-commit time (ADR-016 §4)
- * remains the final arbiter — the Anvil-backed instance is replaced by a
+ * remains the final arbiter - the Anvil-backed instance is replaced by a
  * live-loaded {@code FoliaRTPChunk} once the teleport pipeline commits.</p>
  *
  * <p>The Anvil-backed queries do <b>not</b> require the Region-Thread
- * annotation, because they touch no Folia region state — but we keep the
+ * annotation, because they touch no Folia region state - but we keep the
  * {@link RegionThread} annotation on the overrides for consistency with the
  * live-backed path, and because the caller still owns a region-thread context
  * when it enters the candidate loop.</p>
@@ -75,7 +75,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
 
   /**
    * Anvil-backed constructor (ADR-016 §11). {@code chunk} is {@code null} because no live
-   * chunk was loaded — this instance answers every query from {@code view}. The
+   * chunk was loaded - this instance answers every query from {@code view}. The
    * {@code reconciledUnsafe} set, when non-null, short-circuits
    * {@link #isSafe(int, int, int, Set)} to skip per-call reconciliation; pass
    * {@code null} to force per-call reconciliation of the caller-supplied set.
@@ -163,7 +163,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
 
   /**
    * 5-second-throttled reconciled snapshot of {@code BlocksKeys.airBlocks}.
-   * Mirror of the cache in {@code BukkitRTPChunk} — see that class for rationale.
+   * Mirror of the cache in {@code BukkitRTPChunk} - see that class for rationale.
    * Process-global, refreshed lazily on the next {@link #isAir(int,int,int)}
    * call after the throttle window expires.
    */
@@ -314,14 +314,14 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     // Callers are required to invoke this on the chunk's owning region thread
     // (enforced upstream in QueueTask.evaluateSafety / Region.execute, which
     // dispatch via RTP.scheduler.runTask(world, cx, cz, ...)). No defensive
-    // region-ownership guard here — it would fail-closed on legitimate
+    // region-ownership guard here - it would fail-closed on legitimate
     // candidates and pollute the "bad chunk" signal.
     String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
     return !unsafeBlocks.contains(materialName);
   }
 
   /**
-   * Compiled-form safety check (ADR-017). Mirror of {@code BukkitRTPChunk} override —
+   * Compiled-form safety check (ADR-017). Mirror of {@code BukkitRTPChunk} override -
    * see that class's Javadoc for the evaluation contract, hot-path fast exits, and
    * boundary caveats (tag membership stubbed to empty collection; Anvil-backed
    * snapshots evaluate only the plain-material bucket; state / tag predicates

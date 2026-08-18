@@ -24,7 +24,7 @@ import java.util.logging.Logger;
  * profile) are correlated downstream by matching {@code target_label}
  * against the spark comment.
  *
- * <p>No hard dependency on spark — when the plugin is missing the hook
+ * <p>No hard dependency on spark - when the plugin is missing the hook
  * silently no-ops, mirroring {@link ConsoleWatcher}'s posture.
  */
 public final class SparkHook {
@@ -63,11 +63,11 @@ public final class SparkHook {
      *  <p>Rationale: a single phase can run for tens of minutes (a full
      *  stress run is 4×50 min). Spark only flushes to disk on stop; if the
      *  server crashes mid-phase (OOM, watchdog kill, host reboot) all
-     *  profiling data for that phase is lost — exactly the failure mode
+     *  profiling data for that phase is lost - exactly the failure mode
      *  observed in the 20260502-023640 run where the EssentialsX phase
      *  produced no spark output.
      *
-     *  <p>Default: 0 (disabled — preserves prior behaviour). Set to e.g.
+     *  <p>Default: 0 (disabled - preserves prior behaviour). Set to e.g.
      *  300 to rotate every 5 minutes.
      */
     public long rotateSeconds() {
@@ -109,7 +109,7 @@ public final class SparkHook {
         long timeout = Math.max(5L, config.getLong("spark.timeout-seconds", 60L));
         // Default 0 = no filter (capture every sample). Spark's
         // `--only-ticks-over` makes a slice's saved profile effectively empty
-        // when no tick in that slice exceeds the threshold — exactly the
+        // when no tick in that slice exceeds the threshold - exactly the
         // "no data on the website" symptom seen on idle/light phases. The
         // baseline overhead of running `/rtp` is still clearly visible
         // against an idle server, so unfiltered profiling is the safer
@@ -128,7 +128,7 @@ public final class SparkHook {
      *
      *  <p>If {@code spark.save-to-file} is true (default), the profile is
      *  written to {@code plugins/spark/profiles/<stamp>-<label>.sparkprofile}
-     *  via spark's {@code --save-to-file} flag — no bytebin upload, no live
+     *  via spark's {@code --save-to-file} flag - no bytebin upload, no live
      *  webpage required. The file can be opened later with
      *  {@code /spark profiler --open <path>} or uploaded manually with
      *  {@code spark profiler --upload <path>}. Useful for overnight runs
@@ -194,8 +194,8 @@ public final class SparkHook {
 
         // Emit a stop with the current slice's label (suffixed with -rN if
         // we're past the first slice), then bump the rotation index and
-        // start a fresh slice. The next stop — whether triggered by a
-        // subsequent rotation or by stopPhase() at end of phase — will use
+        // start a fresh slice. The next stop - whether triggered by a
+        // subsequent rotation or by stopPhase() at end of phase - will use
         // the new (incremented) rotation index, so each .sparkprofile on
         // disk maps 1:1 with a distinct slice.
         String base = currentPhaseBase;
@@ -225,7 +225,7 @@ public final class SparkHook {
      *  in the spark plugin folder and writes a {@code .summary.json} sidecar
      *  next to it via {@link SparkProfileSummariser}. The sidecar contains
      *  TPS / MSPT / per-thread CPU aggregates suitable for direct AI
-     *  consumption — replacing the spark.lucko.me website round-trip.
+     *  consumption - replacing the spark.lucko.me website round-trip.
      *
      *  <p>No-op if spark isn't installed or the spark folder can't be located. */
     private void scheduleSummarise(String label) {
@@ -240,7 +240,7 @@ public final class SparkHook {
         org.bukkit.plugin.Plugin owner = Bukkit.getPluginManager().getPlugin("StressTestRTP");
         long delayMs = delayTicks * 50L;
         try {
-            // The summary work is pure file I/O — it must run async on every
+            // The summary work is pure file I/O - it must run async on every
             // platform. On Folia, BukkitScheduler#runTaskLaterAsynchronously
             // is still legal for Async tasks, but we route through Sched for
             // consistency: a tiny sleep on a fresh async thread, then summarise.
@@ -249,7 +249,7 @@ public final class SparkHook {
                 doSummarise(sparkDir, label, stopEpochMs);
             });
         } catch (Throwable t) {
-            // Shutdown path or scheduler unavailable — fall back to inline best-effort.
+            // Shutdown path or scheduler unavailable - fall back to inline best-effort.
             doSummarise(sparkDir, label, stopEpochMs);
         }
     }

@@ -19,59 +19,22 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 /**
- * Curated submenu page builder for the generic
- * {@link MultiConfigParser MultiConfig} surface (regions, worlds, and any
- * future kind registered through {@link MultiConfigRemovalGuards}).
+ * Curated submenu page builder for the generic {@link MultiConfigParser MultiConfig}
+ * surface (regions, worlds, and registered kinds).
  *
- * <p>This builder is the page-rendering half of the design captured in
- * {@code docs/dev/scratch/PROPOSAL-multiconfig-menu.md}. It mirrors the
- * shape of {@link io.github.dailystruggle.rtp.common.commands.menu.PrefabConfirmationMenuBuilder}
- * and {@link io.github.dailystruggle.rtp.common.commands.menu.AdminPanelBuilder}:
- *
- * <ul>
- *   <li>ADR-050 Stage 3β.D.2b: click events are now concrete
- *       {@code /rtp menu ...} commands; no token registry is consulted.</li>
- *   <li>Book parchment contrast: yellow ({@code &amp;e}/{@code &amp;6}) and
- *       white ({@code &amp;f}) are avoided; locked rows render in dark
- *       gray ({@code &amp;8}) per the user's session 6 directive.</li>
- *   <li>Entry names are surfaced verbatim from
- *       {@link MultiConfigParser#listParsers()} (file-name origin); they
- *       are not translated through {@code messages.yml}. Only the
- *       surrounding chrome (title, hint, add/remove labels, locked-row
- *       hover) is locale-bound.</li>
- * </ul>
- *
- * <p><strong>Implementation status:</strong> step 5 of
- * {@code CHECKLIST-multiconfig-menu.md} is partial. Only
- * {@link #buildSelector(String, MultiConfigParser, boolean, UUID)} is
- * implemented; {@code buildEntry} and {@code buildConfirmRemove} are
- * deferred to a follow-up session. The dispatcher arms in
- * {@code MenuRedeemSubcommand} (step 7) and the wiring in
- * {@code AdminPanelBuilder} (step 13) are gated on those follow-up
- * additions; do not wire this builder in production until
- * {@code buildEntry} lands.
- *
- * <p>Threading: stateless aside from the injected token registry; safe to
- * call from any platform thread that may also call the registry.
+ * <p>Renders entry lists, entry config pages, and removal confirmation models
+ * using concrete {@code /rtp menu ...} command actions.
  */
 public final class MultiConfigMenuBuilder {
 
     /**
-     * Optional reference to the project-wide {@link CommandTreeMenuBuilder}.
-     * When wired by the platform adapter (see
-     * {@code RTPCmdBukkit#setupMenuRedeem}), {@link #buildEntry} delegates
-     * to {@link CommandTreeMenuBuilder#buildConfigFile} so multiconfig
-     * entries render with the same per-key clickable rows, pagination,
-     * and staging cart parity as flat configs (e.g. {@code config.yml}).
-     * When {@code null} the builder falls back to the legacy display-only
-     * layout for backward-compat with surface tests that do not wire it.
+     * Optional delegate for flat-config editing parity (clickable keys, pagination, cart).
+     * Falls back to display-only layout when unset.
      */
     private volatile @org.jetbrains.annotations.Nullable CommandTreeMenuBuilder commandTreeMenuBuilder;
 
     /**
-     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
-     * emits concrete {@code /rtp menu ...} commands, so no token registry or
-     * TTL is consulted any more.
+     * Constructs a menu builder emitting concrete command actions.
      */
     public MultiConfigMenuBuilder() {
     }
@@ -86,40 +49,13 @@ public final class MultiConfigMenuBuilder {
     }
 
     /**
-     * Build the entry-list page for a {@link MultiConfigParser} of kind
-     * {@code parserKind}.
+     * Build the entry-list page for a {@link MultiConfigParser} kind.
      *
-     * <p>Page layout (proposal §3.3):
-     * <ol>
-     *   <li>Title row (dark blue + bold) - "{@code config &lt;kind&gt;}".</li>
-     *   <li>Hint row (dark gray) - one-line usage prompt.</li>
-     *   <li>Back row - dispatches {@link MenuAction.OpenAdminPanel}.</li>
-     *   <li>Toggle row - flips remove-mode for this viewer (per-viewer
-     *       state lives in {@code MenuRedeemSubcommand}; the toggle row
-     *       dispatches {@link MenuAction.OpenMultiConfigSelector} again
-     *       and the dispatcher arm reads/writes the flag).</li>
-     *   <li>Add row - dispatches a
-     *       {@link MenuAction.MultiConfigMutate} with
-     *       {@link MenuAction.MultiConfigMutate.Op#ADD} and a synthesized
-     *       {@code "default&lt;N&gt;"} name (anvil-prompt to override
-     *       lands in step 7 alongside the dispatcher).</li>
-     *   <li>One row per entry, alphabetical. In normal mode the row
-     *       dispatches {@link MenuAction.OpenMultiConfigEntry}; in
-     *       remove-mode it dispatches a
-     *       {@link MenuAction.MultiConfigMutate} REMOVE token. Rows
-     *       locked by the registered
-     *       {@link MultiConfigRemovalGuard} render gray and (in
-     *       remove-mode) carry no action and a hover reason.</li>
-     * </ol>
-     *
-     * @param parserKind  the kind string (e.g. {@code "regions"},
-     *                    {@code "worlds"}); used only for display and
-     *                    token routing.
-     * @param parser      the live {@link MultiConfigParser} whose
-     *                    entries are listed.
-     * @param removeMode  current per-viewer remove-mode flag; toggled by
-     *                    the dispatcher when the toggle row is clicked.
-     * @param viewer      the calling player UUID; token-mint scope.
+     * @param parserKind  config kind (e.g. {@code "regions"}, {@code "worlds"})
+     * @param parser      live parser providing entries
+     * @param removeMode  whether viewer is currently in entry-removal mode
+     * @param viewer      UUID of calling player
+     * @return populated {@link MenuModel} for the selector
      */
     public MenuModel buildSelector(String parserKind,
                                    MultiConfigParser<?> parser,
@@ -156,19 +92,8 @@ public final class MultiConfigMenuBuilder {
                         : "switch to remove-mode",
                 new MenuAction.OpenMultiConfigSelector("!toggle:" + parserKind));
 
-        // Add row - opens an anvil-input prompt prefilled with a synthesized
-        // unique name so the admin can type a custom region/world name before
-        // the entry is created. On confirm the anvil session submits
-        //   /rtp menu multiaddkind=<parserKind> multiadd=<typedName>
-        // which the MenuRedeemSubcommand dispatch arm routes through
-        // dispatchMultiConfigMutate(ADD). The parentPath carries the parser
-        // kind as a name=value segment so dispatchPromptAnvilInput's walker
-        // skips it (it does not resolve as a TreeCommand child) while the
-        // platform-side AnvilInputSession#buildCommand still appends it
-        // verbatim to the synthesized /rtp menu ... command. Both
-        // parameter names are lowercase because commands-api's TreeCommand
-        // parser lowercases tokens before paramLookup (TreeCommand.java:277);
-        // a camelCase token is unreachable and fires msgBadParameter.
+        // Add row: anvil prompt prefilled with next default name to create entry.
+        // Lowercase parameter names match TreeCommand token parsing requirements.
         String seedName = nextDefaultName(parser.listParsers());
         addRow(lines, "&2&l[+ add new]",
                 "type a name (default: \"" + seedName + "\")",
@@ -210,33 +135,12 @@ public final class MultiConfigMenuBuilder {
 
         MenuPage page = new MenuPage(lines);
         List<MenuPage> pages = List.of(page);
-        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop
-        // collapsed (renderer emits concrete `/rtp menu ...` commands).
+        // Emits concrete /rtp menu command actions directly.
         return new MenuModel(title, pages);
     }
 
     /**
-     * Build the per-entry page for {@code entryName} inside the
-     * {@link MultiConfigParser} of kind {@code parserKind}.
-     *
-     * <p>Page layout (proposal §3.3):
-     * <ol>
-     *   <li>Back row to {@link MenuAction.OpenMultiConfigSelector}.</li>
-     *   <li>Header row "{@code <kind> / <entryName>}" (non-clickable).</li>
-     *   <li>One non-clickable row per enum key in the entry's
-     *       {@link ConfigParser}, label {@code "<key>: <currentValue>"}.
-     *       Per-key clickability is gated on step 7 (the dispatcher
-     *       extends the staging-cart key scope to
-     *       {@code (parserKind, entryName, file)}). Until then the rows
-     *       render as read-only display rows so the entry contents are
-     *       visible from the book.</li>
-     *   <li>Remove row at the bottom. Renders gray + hover-reason and
-     *       carries no action when the registered
-     *       {@link MultiConfigRemovalGuard} locks the entry; otherwise
-     *       dispatches {@link MenuAction.MultiConfigMutate} REMOVE which
-     *       the dispatcher routes through
-     *       {@link #buildConfirmRemove}.</li>
-     * </ol>
+     * Build the per-entry page for {@code entryName} inside {@code parserKind}.
      */
     public MenuModel buildEntry(String parserKind,
                                 String entryName,
@@ -247,28 +151,10 @@ public final class MultiConfigMenuBuilder {
     }
 
     /**
-     * Cart-aware overload. When a {@link CommandTreeMenuBuilder} is wired
-     * via {@link #setCommandTreeMenuBuilder}, this delegates per-entry
-     * rendering to {@link CommandTreeMenuBuilder#buildConfigFile} using
-     * the synthetic fileName {@code "<parserKind>/<entryName>"} so that:
-     * (a) each enum key row mints a clickable
-     * {@link MenuAction.OpenConfigKey} (so admins can edit
-     * {@code default.yml} values like {@code radius}),
-     * (b) pagination kicks in past the ~12-row budget, and
-     * (c) the viewer's staged {@code (paramName -> typed value)} pairs
-     * from {@code cartSnapshot} are surfaced as Pending + Apply +
-     * Discard rows. The slash-aware dispatcher branches resolve the
-     * synthetic fileName back into the entry parser and route Apply to
-     * the {@code /rtp config <kind> <entryName> k=v ...} CLI shape.
+     * Cart-aware entry builder delegating to {@link CommandTreeMenuBuilder} when wired.
      *
-     * <p>Post-processing swaps the delegate's Back row from
-     * {@code OpenConfigSelector} -> {@code OpenMultiConfigSelector} and
-     * appends a Remove row (gray + non-clickable when the registered
-     * {@link MultiConfigRemovalGuard} locks the entry).
-     *
-     * <p>When no {@link CommandTreeMenuBuilder} is wired (surface tests
-     * that omit the setter), falls back to the legacy single-page
-     * display-only layout.
+     * <p>Surfaces clickable keys, pagination, and pending cart changes under
+     * synthetic filename {@code "<parserKind>/<entryName>"}. Falls back to display-only.
      */
     public MenuModel buildEntry(String parserKind,
                                 String entryName,
@@ -357,23 +243,7 @@ public final class MultiConfigMenuBuilder {
     }
 
     /**
-     * Build the confirm-remove page for {@code entryName} of kind
-     * {@code parserKind}. Mirrors the shape of
-     * {@link io.github.dailystruggle.rtp.common.commands.menu.PrefabConfirmationMenuBuilder}:
-     *
-     * <ul>
-     *   <li>Title + warning hint (non-clickable).</li>
-     *   <li>Confirm row dispatching {@link MenuAction.MultiConfigMutate}
-     *       REMOVE.</li>
-     *   <li>Cancel row dispatching
-     *       {@link MenuAction.OpenMultiConfigSelector} for {@code parserKind}.
-     *       </li>
-     * </ul>
-     *
-     * <p>The guard re-check is the dispatcher's job (step 7); this builder
-     * does not consult the guard so a stale confirm page rendered just
-     * before a guard-state change still produces a token that the
-     * dispatcher will reject server-side.
+     * Build removal confirmation page with confirm/cancel action rows.
      */
     public MenuModel buildConfirmRemove(String parserKind,
                                         String entryName,
@@ -411,14 +281,8 @@ public final class MultiConfigMenuBuilder {
     // ---- helpers ----------------------------------------------------------
 
     /**
-     * Reflective bridge to
-     * {@link CommandTreeMenuBuilder#buildConfigFile(UUID, String, ConfigParser, java.util.LinkedHashMap)}.
-     * The signature is generic in the parser's enum type {@code <E>};
-     * calling it through reflection avoids forcing this class to be
-     * generic just to satisfy the wildcard {@code ConfigParser<?>} we
-     * obtain from {@link MultiConfigParser#getParser(String)}. Returns
-     * {@code null} on any failure so the caller can fall back to the
-     * legacy display-only layout.
+     * Reflective bridge to {@link CommandTreeMenuBuilder#buildConfigFile}.
+     * Isolates generic enum type parameters; returns null on invocation failure.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static @org.jetbrains.annotations.Nullable MenuModel invokeBuildConfigFile(
@@ -437,21 +301,7 @@ public final class MultiConfigMenuBuilder {
     }
 
     /**
-     * Post-process the pages returned by
-     * {@link CommandTreeMenuBuilder#buildConfigFile} for an entry render:
-     * <ol>
-     *   <li>On every page, replace the Back row's
-     *       {@link MenuAction.OpenConfigSelector} action with
-     *       {@link MenuAction.OpenMultiConfigSelector} so the operator
-     *       returns to the per-kind entry list (not the flat-config
-     *       selector).</li>
-     *   <li>On the last page, append a Remove row. Locked entries (per
-     *       the registered {@link MultiConfigRemovalGuard}) render gray
-     *       + non-clickable with the guard's hover reason; otherwise the
-     *       row dispatches a REMOVE {@link MenuAction.MultiConfigMutate}
-     *       which the dispatcher routes through
-     *       {@link #buildConfirmRemove}.</li>
-     * </ol>
+     * Rewrites delegate pages: swaps back target to multiconfig selector and appends remove row.
      */
     private static List<MenuPage> rewritePagesForEntry(List<MenuPage> pages,
                                                        String parserKind,

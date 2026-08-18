@@ -16,7 +16,7 @@ public class MessageTagger {
                     : Boolean.parseBoolean(showDevTag.toString());
             if (!enabled) return message;
         } else {
-            // Config not yet loaded — suppress the tag by default
+            // Config not yet loaded - suppress the tag by default
             return message;
         }
 

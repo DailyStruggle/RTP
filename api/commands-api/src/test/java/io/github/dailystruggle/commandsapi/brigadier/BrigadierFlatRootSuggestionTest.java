@@ -23,8 +23,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * commands-api-ADR-001 (Brigadier Bridge) — flat root-suggestion fallback
- * regression test (CHECKLIST-fabric-flat-tabcomplete, 2026-05-06b).
+ * commands-api-ADR-001 (Brigadier Bridge) - flat root-suggestion fallback regression test.
  *
  * <p>The Bukkit-parity flat-suggestion fallback attaches a permissive
  * {@code RequiredArgument("_", greedyString)} sibling under the root literal

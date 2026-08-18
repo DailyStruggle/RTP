@@ -5,19 +5,8 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.util.Objects;
 
 /**
- * Immutable selector describing <em>where</em> an {@link RTPAPI#teleport(java.util.UUID, RtpTarget)}
- * call should send a player, without exposing any {@code rtp-core} region internals.
- *
- * <p>A target resolves, in the core, to a single teleport region:
- * <ul>
- *   <li>{@link Kind#DEFAULT} - the server's default region (same as a bare {@code /rtp}).</li>
- *   <li>{@link Kind#REGION} - a region looked up by its configured name.</li>
- *   <li>{@link Kind#WORLD} - the region configured as the target for a named world.</li>
- * </ul>
- *
- * <p>Instances are created through the static factory methods and are safe to share
- * across threads. Use {@link #defaultRegion()} when you just want "an RTP, anywhere
- * sensible".
+ * Immutable selector describing destination for {@link RTPAPI#teleport(java.util.UUID, RtpTarget)}.
+ * Thread-safe. Use {@link #defaultRegion()} for default region.
  */
 @PublicApi
 public final class RtpTarget {
@@ -31,11 +20,8 @@ public final class RtpTarget {
     /** Resolve to the target region of a world; {@link #name()} is the world name. */
     WORLD,
     /**
-     * Resolve to a region advertised by a specific peer backend across the
-     * network. {@link #name()} is the (unqualified) region name and
-     * {@link #serverId()} is the destination backend's network id. A teleport
-     * to a network target is dispatched across the cross-server wait queue
-     * rather than served from the local pipeline.
+     * Resolve to a region advertised by a peer backend across the network.
+     * Dispatched across the cross-server wait queue.
      */
     NETWORK
   }
@@ -79,16 +65,11 @@ public final class RtpTarget {
 
   /**
    * Target a region advertised by a specific peer backend across the network.
-   * A teleport to this target is routed across the cross-server wait queue
-   * (the same path a {@code /rtp region=<server>:<region>} command takes),
-   * not served from the local pipeline.
    *
-   * @param serverId the destination backend's network id; must not be
-   *     {@code null} or blank
-   * @param regionName the (unqualified) region name as advertised by the
-   *     destination backend; must not be {@code null} or blank
-   * @return a network-kind target
-   * @throws IllegalArgumentException if either argument is {@code null} or blank
+   * @param serverId destination backend network id; must not be null/blank
+   * @param regionName region name as advertised by destination backend; must not be null/blank
+   * @return network-kind target
+   * @throws IllegalArgumentException if either argument is null or blank
    */
   public static RtpTarget network(String serverId, String regionName) {
     if (serverId == null || serverId.trim().isEmpty()) {

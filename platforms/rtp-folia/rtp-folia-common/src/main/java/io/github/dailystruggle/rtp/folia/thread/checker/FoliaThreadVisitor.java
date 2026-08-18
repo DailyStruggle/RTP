@@ -19,10 +19,10 @@ import org.checkerframework.javacutil.TreeUtils;
  * <h2>Enforcement model</h2>
  * Each method call is treated as a <em>context switch request</em>. The visitor checks whether
  * the caller's declared thread context is compatible with the callee's required context. If not,
- * it verifies that the call-site is inside a scheduler-bridge lambda — the only legal
+ * it verifies that the call-site is inside a scheduler-bridge lambda - the only legal
  * "interrupt-vector" that may cross context boundaries.
  *
- * <h2>Rule 1 — Region isolation</h2>
+ * <h2>Rule 1 - Region isolation</h2>
  * A {@code @RegionThread} callee may only be reached from:
  * <ul>
  *   <li>another {@code @RegionThread} method (same context, no crossing), or</li>
@@ -30,7 +30,7 @@ import org.checkerframework.javacutil.TreeUtils;
  *       (explicit scheduler bridge).</li>
  * </ul>
  *
- * <h2>Rule 2 — Economy / Vault isolation</h2>
+ * <h2>Rule 2 - Economy / Vault isolation</h2>
  * A {@code @RegionThread} caller must not directly invoke an {@code @AsyncThread} or
  * {@code @GlobalRegionThread} callee. The only legal bridge is submitting a lambda to
  * {@code Bukkit.getAsyncScheduler().runNow(...)}.
@@ -78,7 +78,7 @@ public class FoliaThreadVisitor extends BaseTypeVisitor<FoliaThreadAnnotatedType
         boolean calleeIsGlobal = callee.getAnnotation(GlobalRegionThread.class) != null;
 
         if (!calleeIsRegion && !calleeIsAsync && !calleeIsGlobal) {
-            // Callee has no thread constraint — no check needed.
+            // Callee has no thread constraint - no check needed.
             return super.visitMethodInvocation(callTree, p);
         }
 
