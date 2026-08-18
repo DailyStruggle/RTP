@@ -1,6 +1,6 @@
 # `rtp-proxy-velocity/` — Requirements
 
-> **Status: draft, D-005 gated on ADR-036 (outstanding).** Module-scope requirements for the primary proxy adapter, targeting Velocity. Complements [`../REQUIREMENTS.md`](../REQUIREMENTS.md) (umbrella), [`../rtp-proxy-common/REQUIREMENTS.md`](../rtp-proxy-common/REQUIREMENTS.md), and [`../../docs/dev/REQUIREMENTS.md` §1.6](../../../docs/dev/REQUIREMENTS.md).
+> **Status: draft, D-005 gated on ADR-036 (outstanding).** Module-scope requirements for the primary proxy adapter, targeting Velocity. Complements [`../REQUIREMENTS.md`](../REQUIREMENTS.md) (umbrella), [`../rtp-proxy-common/REQUIREMENTS.md`](../rtp-proxy-common/REQUIREMENTS.md), and [`../../docs/dev/REQUIREMENTS.md` section 1.6](../../../docs/dev/REQUIREMENTS.md).
 >
 > Authoring style: `shall` / `shall not`, absolute state, no implementation actions.
 

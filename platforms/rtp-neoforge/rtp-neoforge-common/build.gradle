@@ -5,19 +5,19 @@
 // Mojmap MC line purely to typecheck; each rtp-neoforge-vXX_YY_R1 carrier
 // ships its own runtime jar pinned to its MC version.
 //
-// Toolchain: ModDevGradle (net.neoforged.moddev) per NEOFORGE_NOTES.md Â§8 and
+// Toolchain: ModDevGradle (net.neoforged.moddev) per NEOFORGE_NOTES.md section 8 and
 // rtp-neoforge-ADR-001. ModDevGradle is the newer official NeoForge build path
 // and is closest to Loom in spirit. It is applied ONLY under
-// platforms/rtp-neoforge/** (build discipline parity with Loom, ADR-022 Â§3) â€”
+// platforms/rtp-neoforge/** (build discipline parity with Loom, ADR-022 section 3) â€”
 // it must not leak into rtp-core / rtp-api / commands-api / any Bukkit-family
 // or Fabric adapter.
 //
-// Architectural invariants (mirrors ADR-022 Â§4, applied to NeoForge):
+// Architectural invariants (mirrors ADR-022 section 4, applied to NeoForge):
 //   * No org.bukkit.* and no net.fabricmc.* imports in this module.
 //   * Shared business logic stays in :rtp-core / :rtp-api â€” this module is
 //     NeoForge platform glue only.
 //   * NeoForge is Mojmap-at-runtime (1.20.4+), so no obf carrier is required
-//     (NEOFORGE_NOTES.md Â§5), but NM-typed surfaces that drift across MC revs
+//     (NEOFORGE_NOTES.md section 5), but NM-typed surfaces that drift across MC revs
 //     are still isolated in the per-version carriers, never in rtp-core.
 //
 // NOTE: this module is included in the build graph BY DEFAULT and is merged
@@ -55,7 +55,7 @@ neoForge {
 
 dependencies {
     // Platform-free abstractions consumed by every NeoForge adapter class.
-    // Reused 1:1 from the platform-neutral modules (NEOFORGE_NOTES.md Â§3).
+    // Reused 1:1 from the platform-neutral modules (NEOFORGE_NOTES.md section 3).
     api project(':rtp-api')
     api project(':rtp-core')
     // commands-api-ADR-001 â€” Brigadier Bridge. The bridge classes live in
@@ -63,6 +63,6 @@ dependencies {
     // trampoline (RegisterCommandsEvent), see NeoForgeCommandRegistrar.
     api project(':commands-api')
     // ADR-016 â€” anvil pre-filter. Platform-neutral .mca decoder; same .mca
-    // substrate as Fabric (NEOFORGE_NOTES.md Â§3), reused unchanged.
+    // substrate as Fabric (NEOFORGE_NOTES.md section 3), reused unchanged.
     api project(':anvil-api')
 }

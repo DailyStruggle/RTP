@@ -6,7 +6,7 @@
 - **Chunk ticket book-keeping** — see diagram 03; every generated candidate reserves a ticket via `ChunkReservation`.
 - **`/rtp scan` pre-warm** — see diagram 05; scan is an admin tool that *pushes* into the same cache but uses a different crawler.
 
-> Companion walkthrough: [`CODE_TOUR.md` §3 — Budgeted cache generator](../dev/CODE_TOUR.md).
+> Companion walkthrough: [`CODE_TOUR.md` section 3 — Budgeted cache generator](../dev/CODE_TOUR.md).
 
 ```mermaid
 stateDiagram-v2

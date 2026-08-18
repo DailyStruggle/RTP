@@ -25,7 +25,7 @@ under high call volume, and the rest are effectively unmaintained on
 modern versions. Uncomment any of them for a one-off run after verifying
 it loads on the target build. (DonutRTP was reviewed
 and excluded — it is a GUI front-end that dispatches BetterRTP commands,
-not an independent RTP implementation; see `PRE_WRITEUP.md` §6.)
+not an independent RTP implementation; see `PRE_WRITEUP.md` section 6.)
 
 | Column                 | This plugin's measurement                              |
 |------------------------|--------------------------------------------------------|
@@ -291,7 +291,7 @@ checklist top-to-bottom for each comparison campaign.
   (one tick) for every plugin. Changing the cadence between plugins
   makes the p95-MSPT and peak-heap columns incomparable.
 - **World**: pre-generated to a radius larger than the RTP max range,
-  and **byte-for-byte identical** between plugins (see §3).
+  and **byte-for-byte identical** between plugins (see section 3).
 
 ### 2. Pin the workload
 
@@ -351,7 +351,7 @@ source of irreproducible numbers:
   plugins — raise `concurrency` until the box is actually under load.
 - **A flat heap series** (`mb_per_attempt ≈ 0`) means either the run
   was too short to observe growth or the heap was reset mid-run (an
-  `-Xms != -Xmx` resize, or a forced GC). Re-check §1.
+  `-Xms != -Xmx` resize, or a forced GC). Re-check section 1.
 - **`fail_reason=TIMEOUT` on a large fraction of attempts** means the
   target command was rejected without firing `PlayerTeleportEvent`
   (wrong syntax, cooldown, permission). Fix `target-commands` /

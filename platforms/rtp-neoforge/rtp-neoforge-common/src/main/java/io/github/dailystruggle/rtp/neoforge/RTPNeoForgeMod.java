@@ -28,7 +28,7 @@ import java.util.logging.Level;
  * NeoForge {@code @Mod} entry point.
  *
  * <p>This is the NeoForge analogue of Fabric's {@code ModInitializer}. The
- * registration trampoline differs from Fabric (NEOFORGE_NOTES.md §2/§4): the
+ * registration trampoline differs from Fabric (NEOFORGE_NOTES.md sections 2/4): the
  * mod constructor receives the mod-bus {@link IEventBus} and we subscribe the
  * game-bus lifecycle/tick/command events on {@link NeoForge#EVENT_BUS}. The
  * {@code commands-api} Brigadier bridge ({@code commands-api-ADR-001}) is reused

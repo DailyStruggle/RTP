@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * Cross-network reservation handle. One token represents one coordinate
  * allocation against a chosen backend; the {@link #state()} field follows the
  * <code>PENDING → CLAIMED → CONSUMED</code> machine (rtp-proxy-ADR-003
- * §Atomic claim primitive; ADR-036 §5).
+ * section Atomic claim primitive; ADR-036 section 5).
  *
  * <p>Instances are thread-safe: {@link #state} is held in an
  * {@link AtomicReference} and transitions are compare-and-set under the

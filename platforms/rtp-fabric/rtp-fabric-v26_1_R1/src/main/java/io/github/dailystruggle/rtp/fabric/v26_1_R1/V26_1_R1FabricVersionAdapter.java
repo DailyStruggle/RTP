@@ -500,7 +500,7 @@ public final class V26_1_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     /**
-     * Typed written-book modal for deobf MC 26.1.x (rtp-fabric-ADR-012 §4
+     * Typed written-book modal for deobf MC 26.1.x (rtp-fabric-ADR-012 section 4
      * un-defer; book-menu parity for 26.x). Mirrors the v1_21_R11 carrier
      * implementation, but compiles against Mojang names (this is the first
      * deobfuscated MC line, so compile mappings == runtime mappings and the

@@ -5,9 +5,9 @@
 - **How the cache was filled** — see diagram 02 (budgeted cache generator); `QueueWait` simply pops a result prepared by that loop.
 - **How chunk tickets are actually issued and released** — see diagram 03 (chunk ticket lifecycle); `ReqTicket` and `Teardown` are abstractions over it.
 - **Region / world resolution** — see diagram 07 (`/rtp` command region selection); this chart starts after a region has been chosen.
-- **Failure attribution and user-facing messages** — see `CODE_TOUR.md` §7 and S-004 / S-007.
+- **Failure attribution and user-facing messages** — see `CODE_TOUR.md` section 7 and S-004 / S-007.
 
-> Companion walkthrough: [`CODE_TOUR.md` §2 — Teleport pipeline (end-to-end)](../dev/CODE_TOUR.md).
+> Companion walkthrough: [`CODE_TOUR.md` section 2 — Teleport pipeline (end-to-end)](../dev/CODE_TOUR.md).
 
 ```mermaid
 stateDiagram-v2

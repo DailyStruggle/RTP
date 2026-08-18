@@ -164,7 +164,10 @@ docs/dev/scratch/
 .junie/memory/language.json
 .junie/memory/feedback.md
 .junie/memory/errors.md
-/scripts/__pycache__
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*$py.class
 
 # MkDocs generated static site output (built from docs/ into ./site by `mkdocs build`).
 # This is the generated artifact, NOT the tracked narrative source under docs/site/.

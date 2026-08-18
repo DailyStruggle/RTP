@@ -60,7 +60,7 @@ public interface MapCanvas {
      * Draws a one-line ASCII text label at {@code (x, y)} in the supplied logical
      * palette colour. The exact font is binding-defined; renderers shall not assume
      * a specific glyph size beyond a 6-pixel minimum legible width per
-     * {@code maps-api-ADR-001} §Mermaid output.
+     * {@code maps-api-ADR-001} section Mermaid output.
      */
     void drawText(int x, int y, String text, byte paletteIndex);
 

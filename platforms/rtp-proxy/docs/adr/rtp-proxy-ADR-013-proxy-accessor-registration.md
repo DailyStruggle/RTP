@@ -95,7 +95,7 @@ Steps 1 and 2 must complete before step 3. The Phase 2a no-op shell (already shi
 
 ## References
 
-- ADR-002 (network.yml schema; §Validation Rules amended 2026-05-18 to consult this accessor).
+- ADR-002 (network.yml schema; section Validation Rules amended 2026-05-18 to consult this accessor).
 - ADR-012 (proxy-role default; the wiring matrix consults `RTPProxyAccessor.role()`).
 - `rtp-core/src/main/java/.../RTP.java` line 83 (`public static RTPServerAccessor serverAccessor;` precedent).
 - `rtp-api/src/main/java/.../api/server/RTPServerAccessor.java` (shape precedent).

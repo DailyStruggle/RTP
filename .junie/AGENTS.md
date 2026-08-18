@@ -129,8 +129,8 @@ Read only what the task requires. Do not read everything.
 
 | Task | Read before starting |
 |------|----------------------|
-| Any safety-critical code (threading, chunk I/O, teleport) | [`docs/dev/REQUIREMENTS.md §3`](../docs/dev/REQUIREMENTS.md), relevant platform `REQUIREMENTS.md` |
-| Modifying scheduling or concurrency | [`docs/dev/DESIGN.md`](../docs/dev/DESIGN.md), [`docs/dev/REQUIREMENTS.md §3`](../docs/dev/REQUIREMENTS.md) |
+| Any safety-critical code (threading, chunk I/O, teleport) | [`docs/dev/REQUIREMENTS.md section 3`](../docs/dev/REQUIREMENTS.md), relevant platform `REQUIREMENTS.md` |
+| Modifying scheduling or concurrency | [`docs/dev/DESIGN.md`](../docs/dev/DESIGN.md), [`docs/dev/REQUIREMENTS.md section 3`](../docs/dev/REQUIREMENTS.md) |
 | Placing new code in a module | [`docs/dev/ARCHITECTURE.md`](../docs/dev/ARCHITECTURE.md) + *Architecture Boundaries* below |
 | Introducing or renaming a domain term | [`docs/dev/GLOSSARY.md`](../docs/dev/GLOSSARY.md) |
 | Writing or updating tests | [`docs/dev/COVERAGE_PLAN.md`](../docs/dev/COVERAGE_PLAN.md), [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) |
@@ -186,7 +186,7 @@ Cross-references for full term definitions: [`docs/dev/GLOSSARY.md`](../docs/dev
 
 ## Prohibition Requirements (S-00x Quick Reference)
 
-Absolute prohibitions from [`REQUIREMENTS.md §3`](../docs/dev/REQUIREMENTS.md). Violating any is a critical defect. For the implementing class / test that already satisfies each rule, see [`TRACEABILITY.md`](../docs/dev/TRACEABILITY.md).
+Absolute prohibitions from [`REQUIREMENTS.md section 3`](../docs/dev/REQUIREMENTS.md). Violating any is a critical defect. For the implementing class / test that already satisfies each rule, see [`TRACEABILITY.md`](../docs/dev/TRACEABILITY.md).
 
 | ID | Rule | Common wrong move |
 |----|------|-------------------|

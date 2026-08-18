@@ -23,13 +23,13 @@ The subsystem runs for a candidate chunk `(cx, cz)` iff all of:
 - `RTPWorld.isChunkLoaded(cx, cz) == false` — loaded chunks may hold unflushed edits that disagree with the region file; skipping them is the only cheap, correct way to avoid read/write desync without coordinating with the chunk I/O thread.
 - The region file for `(cx, cz)` exists on disk. An absent file means the chunk is ungenerated; the candidate falls through to the real-load path, which drives generation through the platform's native scheduler.
 
-Custom-generator worlds (Iris, Terra, datapacks) are in scope: populated-on-disk ⇒ `.mca` is authoritative; not populated ⇒ `Verdict.UNKNOWN` ⇒ live-load fallback. The live re-check (§5) bounds any residual divergence to "extra retries", never "unsafe teleport".
+Custom-generator worlds (Iris, Terra, datapacks) are in scope: populated-on-disk ⇒ `.mca` is authoritative; not populated ⇒ `Verdict.UNKNOWN` ⇒ live-load fallback. The live re-check (section 5) bounds any residual divergence to "extra retries", never "unsafe teleport".
 
 #### 1.1 Call-site ordering on Paper chunk-system-v2 and Folia
 
-Paper's chunk-system-v2 (and Folia's region scheduler) resolve `World#getChunkAtAsync(cx, cz)` by handing back a live — though non-ticking — `Chunk` reference; Paper's own post-load unloading behaviour then becomes a liveness concern for downstream stages (see ADR-015). As a consequence, any invocation of `RTPWorld#getChunkAt(cx, cz)` that follows an upstream `getChunkAtAsync` resolution observes `isChunkLoaded(cx, cz) == true` at the §1 gate and skips the Anvil probe with `reason=chunk-already-loaded`. The prefilter therefore delivers its intended benefit — *reject the candidate before paying the live-load cost* — only when the probe runs **upstream** of `getChunkAtAsync`, not inside the adapter's `getChunkAt` path.
+Paper's chunk-system-v2 (and Folia's region scheduler) resolve `World#getChunkAtAsync(cx, cz)` by handing back a live — though non-ticking — `Chunk` reference; Paper's own post-load unloading behaviour then becomes a liveness concern for downstream stages (see ADR-015). As a consequence, any invocation of `RTPWorld#getChunkAt(cx, cz)` that follows an upstream `getChunkAtAsync` resolution observes `isChunkLoaded(cx, cz) == true` at the section 1 gate and skips the Anvil probe with `reason=chunk-already-loaded`. The prefilter therefore delivers its intended benefit — *reject the candidate before paying the live-load cost* — only when the probe runs **upstream** of `getChunkAtAsync`, not inside the adapter's `getChunkAt` path.
 
-`LocationGenerator` invokes `AnvilPrefilter.probeAndPublish(world, cx, cz, ForkJoinPool.commonPool(), PaletteNormalizer::reconcile)` as the first chunk-touching stage of each attempt, ahead of any `world.getChunkAtAsync(cx, cz)` call. The `AnvilProbeSupport` cache publishes the view before the adapter's `getChunkAt` is reached; when the publisher returns a non-null view the attempt short-circuits through the source-union `RTPChunk` (§6) without a live load; when it returns `UNKNOWN` the attempt proceeds to `getChunkAtAsync`. The adapter-internal §4 gate remains as a defensive no-op for direct adapter callers that bypass `LocationGenerator` (e.g. `RegionCacheTask` observational mode, future API consumers), and is expected to record `reason=chunk-already-loaded` at `FINE` on the Paper/Folia common path where `LocationGenerator` has already resolved the chunk upstream.
+`LocationGenerator` invokes `AnvilPrefilter.probeAndPublish(world, cx, cz, ForkJoinPool.commonPool(), PaletteNormalizer::reconcile)` as the first chunk-touching stage of each attempt, ahead of any `world.getChunkAtAsync(cx, cz)` call. The `AnvilProbeSupport` cache publishes the view before the adapter's `getChunkAt` is reached; when the publisher returns a non-null view the attempt short-circuits through the source-union `RTPChunk` (section 6) without a live load; when it returns `UNKNOWN` the attempt proceeds to `getChunkAtAsync`. The adapter-internal section 4 gate remains as a defensive no-op for direct adapter callers that bypass `LocationGenerator` (e.g. `RegionCacheTask` observational mode, future API consumers), and is expected to record `reason=chunk-already-loaded` at `FINE` on the Paper/Folia common path where `LocationGenerator` has already resolved the chunk upstream.
 
 ### 2. Format detection with fallback
 
@@ -49,14 +49,14 @@ The verdict is advisory telemetry. Adapters route on `view != null`, not on verd
 
 Every Bukkit-family `RTPWorld#getChunkAt(cx, cz)` implementation:
 
-1. If the applicability gate (§1) fails, delegate to the adapter's native async/sync live-load path.
+1. If the applicability gate (section 1) fails, delegate to the adapter's native async/sync live-load path.
 2. Otherwise call `AnvilPrefilter.probeSyncDetailed(...)` (or the async `probeDetailed(...)` on Folia) on `ForkJoinPool.commonPool()`, with the platform-supplied `PaletteNormalizer::reconcile`.
 3. If the probe returns a non-null view (`ACCEPT` or `REJECT`), publish it into the adapter's `anvilCache` (bounded LRU) and return a completed future with the live-shaped chunk key. The immediately-following `getCachedChunk(key)` call in `LocationGenerator` receives a source-union `RTPChunk`.
 4. If the probe returns a null view (`UNKNOWN`), fall through to the adapter's native live-load path.
 
 `BukkitRTPWorld#getChunkAt` is the canonical implementation. `PaperRTPWorld` and `FoliaRTPWorld` inherit this orchestration (Paper extends `BukkitRTPWorld`; Folia reimplements the same structure atop its native async overload).
 
-On Paper chunk-system-v2 and Folia, this adapter-internal routing is a defensive fallback; the effective prefilter entry point for the selection pipeline is the call-site-level probe in `LocationGenerator` specified in §1.1. The adapter path still runs for direct adapter callers (observational cache-fill, addon API consumers) and for Spigot vanilla where no upstream `getChunkAtAsync` resolution precedes the call.
+On Paper chunk-system-v2 and Folia, this adapter-internal routing is a defensive fallback; the effective prefilter entry point for the selection pipeline is the call-site-level probe in `LocationGenerator` specified in section 1.1. The adapter path still runs for direct adapter callers (observational cache-fill, addon API consumers) and for Spigot vanilla where no upstream `getChunkAtAsync` resolution precedes the call.
 
 ### 5. Authoritative re-check preserved
 
@@ -98,7 +98,7 @@ All region-file I/O runs on `ForkJoinPool.commonPool()` (or an explicit RTP asyn
 
 ### 10. REQ-RTP-S-004 attribution
 
-The `FailTypes.nullChunk` bucket (sub-keys `reason=asyncLoadNull` / `reason=neighborNull`) in `LocationGenerator` covers every `chunk == null` exit in the pregen summary. Since §4 has no null-key short-circuit, the bucket attributes only genuine async-load failures; `prefilterReject` is not a reachable sub-key. Regression guard: `ReqRtpS004NullChunkAttributionTest`.
+The `FailTypes.nullChunk` bucket (sub-keys `reason=asyncLoadNull` / `reason=neighborNull`) in `LocationGenerator` covers every `chunk == null` exit in the pregen summary. Since section 4 has no null-key short-circuit, the bucket attributes only genuine async-load failures; `prefilterReject` is not a reachable sub-key. Regression guard: `ReqRtpS004NullChunkAttributionTest`.
 
 ### 11. Chunk-data precedence over live world getters
 
@@ -125,7 +125,7 @@ Fabric is out of scope for this ADR; an equivalent contract for `rtp-fabric` sha
 
 #### 11.2 Enforcement
 
-New code introducing a live `world.getBiome(...)` or equivalent from `rtp-bukkit-common`, `rtp-paper-*`, or `rtp-folia-*` shall be rejected at review unless gated on the §11.1 exemption **and** on an `AnvilProbeSupport` `UNKNOWN` outcome. Any ADR that narrows §11 shall explicitly supersede this section. Regression guard: `ReqRtpAnvilFirstTest` under `rtp-paper-v1_20_R1` asserts `PaperRTPWorld` does not re-declare `getChunkAt` / `getBiome`.
+New code introducing a live `world.getBiome(...)` or equivalent from `rtp-bukkit-common`, `rtp-paper-*`, or `rtp-folia-*` shall be rejected at review unless gated on the section 11.1 exemption **and** on an `AnvilProbeSupport` `UNKNOWN` outcome. Any ADR that narrows section 11 shall explicitly supersede this section. Regression guard: `ReqRtpAnvilFirstTest` under `rtp-paper-v1_20_R1` asserts `PaperRTPWorld` does not re-declare `getChunkAt` / `getBiome`.
 
 ### 12. Biome-filter evaluation model
 
@@ -140,13 +140,13 @@ New code introducing a live `world.getBiome(...)` or equivalent from `rtp-bukkit
 - On a safe candidate, **discards** the result — not pushed to `unkeptLocations`, not handed to any teleport pipeline.
 - Emits no new sink calls. Existing side effects (`MemoryShape#addBadLocation(long)` for rejected cells, `biomePrefixSumsCache` updates for every evaluated candidate) are inherited from `LocationGenerator` and `MemoryShape.select()` under default mode.
 
-Gated by `PerformanceKeys.visitorEnabled`. Observational mode inherits the §11 precedence chain automatically, so biome observations reflect on-disk palettes whenever disk has an answer on every Bukkit-family platform.
+Gated by `PerformanceKeys.visitorEnabled`. Observational mode inherits the section 11 precedence chain automatically, so biome observations reflect on-disk palettes whenever disk has an answer on every Bukkit-family platform.
 
 ### 14. Telemetry
 
 `BiomeSourceMetrics` exposes two process-global `AtomicLong` totals (`anvilHits`, `liveHits`) plus a reason-keyed `ConcurrentHashMap<String, AtomicLong>` with canonical reasons `anvil-hit`, `no-view-cached`, `view-missing-biome`, `anvil-throw`. `BukkitRTPWorld#getBiome` and `FoliaRTPWorld#getBiome` call `record(reason)` exactly once per read and emit a rate-limited `[RTP] Anvil biome fallthrough reason=<reason> world=<w> chunk=(cx,cz)` line per `BIOME_LOG_BUDGET_PER_REASON = 200` (INFO, then FINE). `AnvilPrefilter.DIAG_LOG_BUDGET_PER_REASON` and the adapter `GATE_SKIP_BUDGET_PER_REASON` constants share the same budget. Surfaced at runtime by `rtp test biome-source` and `rtp test full`.
 
-The adapter `logGateSkip` suppresses `reason=chunk-already-loaded` entirely — the `RTP.log(...)` call is skipped while the counter in `GATE_SKIP_COUNTERS` still increments, preserving the metric surface for `rtp test/anvil-prefilter` and future telemetry consumers. On Paper/Folia this reason is the steady-state outcome for every candidate that reaches the adapter path after `LocationGenerator`'s call-site probe (§1.1), so surfacing it at any operator-visible level carries no diagnostic signal and drowns the log. All other gate-skip reasons (`dimension-unsupported`, `world-save-disabled`, `config-disabled(...)`) retain the rate-limited INFO→FINE budget and remain operator-actionable.
+The adapter `logGateSkip` suppresses `reason=chunk-already-loaded` entirely — the `RTP.log(...)` call is skipped while the counter in `GATE_SKIP_COUNTERS` still increments, preserving the metric surface for `rtp test/anvil-prefilter` and future telemetry consumers. On Paper/Folia this reason is the steady-state outcome for every candidate that reaches the adapter path after `LocationGenerator`'s call-site probe (section 1.1), so surfacing it at any operator-visible level carries no diagnostic signal and drowns the log. All other gate-skip reasons (`dimension-unsupported`, `world-save-disabled`, `config-disabled(...)`) retain the rate-limited INFO→FINE budget and remain operator-actionable.
 
 ## Consequences
 
@@ -154,33 +154,33 @@ The adapter `logGateSkip` suppresses `reason=chunk-already-loaded` entirely — 
 
 - Selection-phase `isAir / isSafe / getSkyLight / getSurfaceHeight` and the vert adjustor run off-tick (Spigot/Paper) or off-region (Folia) for candidates whose region file exists and decodes. The nether false-negative storm is closed because surface-unsafe chunks carry a usable view for sub-surface scanning.
 - Ungenerated chunks drive generation through the platform's native scheduler; the subsystem is additive.
-- Loaded chunks are never read from disk — desync class eliminated by construction (§1 gate).
+- Loaded chunks are never read from disk — desync class eliminated by construction (section 1 gate).
 - Format detection with fall-through means new Minecraft versions never regress teleport correctness; the subsystem abstains until an adapter is written.
 - `rtp-anvil` is reusable by any Bukkit-family adapter without code duplication.
 - REQ-RTP-S-004 attribution is complete: every `chunk == null` path increments a descriptive `failMap` bucket.
-- Upgrade-drift correctness (player-visible biome after a Paper/Folia MC upgrade) is preserved by construction via §11.
-- Cold-start biome filtering is correct on every platform without a one-shot startup scan (§12).
+- Upgrade-drift correctness (player-visible biome after a Paper/Folia MC upgrade) is preserved by construction via section 11.
+- Cold-start biome filtering is correct on every platform without a one-shot startup scan (section 12).
 
 **Negative / trade-offs:**
 
 - Anvil bytes are decoded for candidates that will ultimately be rejected at the live re-check, which is worse than a pure surface-unsafe short-circuit for purely surface-unsafe rejections. Net CPU cost is off-tick and off-region and is paid back by eliminating the sync `getChunkAt(...)` or region-thread hop.
 - Hand-rolled Anvil decoding is maintenance-bearing: palette encoding, heightmap long-packing width, and biome storage layout have changed across Minecraft versions. A stale adapter wrongly claiming to support a newer `DataVersion` could produce `ACCEPT` on misread data; mitigated by the post-load authoritative re-check.
 - Modded identifiers go through namespace-strip + upper-case fallback; the reconciler does not assume the vanilla namespace.
-- Two adapter `*RTPChunk` source-unions must track any future refinement of the §6 invariants. Mitigated by keeping implementations structurally identical and covering both under the same ArchUnit boundary test.
+- Two adapter `*RTPChunk` source-unions must track any future refinement of the section 6 invariants. Mitigated by keeping implementations structurally identical and covering both under the same ArchUnit boundary test.
 - Observational mode contributes to `pendingBadLocations` without an originating teleport request, and claim-plugin predicates run on observational candidates. Escape hatch: `visitor.enabled: false`.
 
 **Neutral:**
 
-- `AnvilPrefilterMetrics` counters retain their prior cardinality; only their operational reading changes (§3).
+- `AnvilPrefilterMetrics` counters retain their prior cardinality; only their operational reading changes (section 3).
 - The stale-chunk guard (ADR-015) and async queue pre-generation (ADR-006) are unaffected — the subsystem allocates no chunk tickets.
 
 ## References
 
-- REQ-RTP-S-001 (no unsafe-block teleport destinations) — `docs/dev/REQUIREMENTS.md §3`.
-- REQ-RTP-S-002 (no permanently force-loaded chunks) — `docs/dev/REQUIREMENTS.md §3`.
-- REQ-RTP-S-004 (no silently discarded teleport failures) — `docs/dev/REQUIREMENTS.md §3`.
-- REQ-RTP-S-005 (no chunk loading on the main thread) — `docs/dev/REQUIREMENTS.md §3`.
-- REQ-RTP-SYS-002 (Spigot support) — `docs/dev/REQUIREMENTS.md §0`.
+- REQ-RTP-S-001 (no unsafe-block teleport destinations) — `docs/dev/REQUIREMENTS.md section 3`.
+- REQ-RTP-S-002 (no permanently force-loaded chunks) — `docs/dev/REQUIREMENTS.md section 3`.
+- REQ-RTP-S-004 (no silently discarded teleport failures) — `docs/dev/REQUIREMENTS.md section 3`.
+- REQ-RTP-S-005 (no chunk loading on the main thread) — `docs/dev/REQUIREMENTS.md section 3`.
+- REQ-RTP-SYS-002 (Spigot support) — `docs/dev/REQUIREMENTS.md section 0`.
 - ADR-004 "Count-Bound Task Pipe on Folia".
 - ADR-006 "Async Queue Pre-Generation".
 - ADR-015 "Stale-Chunk Guard for Count-Bound Pipes".

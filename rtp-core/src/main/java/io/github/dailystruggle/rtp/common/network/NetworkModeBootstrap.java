@@ -759,7 +759,7 @@ public final class NetworkModeBootstrap {
             case "sql": {
                 // SQL: reuse the host's existing
                 // AbstractSQLDatabaseAccessor pool (rtp-proxy-ADR-011
-                // §HikariCP Pool Sharing). Mirrors {@link #openTransport}.
+                // section HikariCP Pool Sharing). Mirrors {@link #openTransport}.
                 AbstractSQLDatabaseAccessor accessor = sqlAccessorOrNull();
                 if (accessor == null) {
                     throw new IllegalStateException(
@@ -1020,7 +1020,7 @@ public final class NetworkModeBootstrap {
             }
             case "sql": {
                 // Reuse the existing AbstractSQLDatabaseAccessor pool via asDataSource()
-                // - REQ-RTP-PROXY-COMMON-010 / ADR-011 §HikariCP Pool Sharing.
+                // - REQ-RTP-PROXY-COMMON-010 / ADR-011 section HikariCP Pool Sharing.
                 AbstractSQLDatabaseAccessor accessor = sqlAccessorOrNull();
                 if (accessor == null) {
                     throw new IllegalStateException(

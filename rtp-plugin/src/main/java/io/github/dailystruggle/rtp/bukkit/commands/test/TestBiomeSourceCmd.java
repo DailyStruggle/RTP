@@ -15,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
  * current {@code BiomeSourceMetrics} counters (Anvil-tier vs. live-tier) plus
  * the derived Anvil-hit rate.
  *
- * <p>Closes the ADR-016 §13.1 runtime verification gap: {@code
+ * <p>Closes the ADR-016 section 13.1 runtime verification gap: {@code
  * rtp test anvil-prefilter} tells operators whether the pre-load probe did
  * useful work, while this command tells them whether the <em>post-load</em>
  * biome read actually came from the persisted {@code .mca} palette rather
@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>Counters are populated on every Bukkit-family adapter
  * ({@code BukkitRTPWorld#getBiome}, {@code FoliaRTPWorld#getBiome}); Paper
- * inherits the Spigot path per §13.2. See {@code
+ * inherits the Spigot path per section 13.2. See {@code
  * docs/dev/RUNTIME_TEST_SUITE_PLAN.md} for the runtime-test suite contract.
  *
  * <p>Safety compliance:
@@ -88,7 +88,7 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
 
   @Override
   public String description() {
-    return "reports BiomeSourceMetrics Anvil-tier vs live-tier counters (ADR-016 §13.1)";
+    return "reports BiomeSourceMetrics Anvil-tier vs live-tier counters (ADR-016 section 13.1)";
   }
 
   @Override
@@ -103,7 +103,7 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
     }
     RTP.log(Level.INFO, summary);
 
-    // Reason-keyed breakdown (ADR-016 §13.1 audit option C). Tells operators
+    // Reason-keyed breakdown (ADR-016 section 13.1 audit option C). Tells operators
     // *why* live-tier reads happened without relying on log-level-gated
     // diagnostic lines.
     try {
@@ -126,7 +126,7 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
       String note =
           "[RTP test/biome-source] no biome reads observed yet — either no teleport "
               + "has triggered candidate evaluation since startup, or the platform "
-              + "adapter does not route getBiome through the ADR-016 §13.1 chain "
+              + "adapter does not route getBiome through the ADR-016 section 13.1 chain "
               + "(Fabric is out of scope).";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
         RTP.serverAccessor.sendMessage(callerId, note);

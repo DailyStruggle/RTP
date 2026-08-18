@@ -124,7 +124,7 @@ RTP uses a permission-based system. Assign these to your permission plugin (e.g.
 | `rtp.reload` | Use `/rtp reload` |
 | `rtp.config.view` | Use `/rtp config <file> view` (read-only inspection) |
 | `rtp.config.set` | Use `/rtp config <file> …` to write any config file (umbrella) |
-| `rtp.config.set.<section>` | Write only the named section (e.g. `rtp.config.set.regions`); see [COMMANDS.md](COMMANDS.md) §`/rtp config` |
+| `rtp.config.set.<section>` | Write only the named section (e.g. `rtp.config.set.regions`); see [COMMANDS.md](COMMANDS.md) section `/rtp config` |
 | `rtp.config` | Legacy alias — grants `rtp.config.view` + `rtp.config.set` |
 | `rtp.info` | Use `/rtp info` |
 | `rtp.scan` | Use `/rtp scan` to pre-generate locations |
@@ -137,7 +137,7 @@ Example LuckPerms command to grant basic use to all players:
 /lp group default permission set rtp.see true
 ```
 
-Full permission reference (including world/region permissions like `rtp.worlds.<world>` and `rtp.regions.<name>`): [COMMANDS.md](COMMANDS.md) §"Full Permission Reference".
+Full permission reference (including world/region permissions like `rtp.worlds.<world>` and `rtp.regions.<name>`): [COMMANDS.md](COMMANDS.md) section "Full Permission Reference".
 
 ---
 
@@ -191,7 +191,7 @@ Instead of editing files by hand, you can read or change any region key at runti
 /rtp config <file> view <key>
 ```
 
-Permissions are additive (see [COMMANDS.md](COMMANDS.md) §`/rtp config`): `rtp.config.set` grants all writes; `rtp.config.set.<section>` (e.g. `rtp.config.set.regions`) grants only that section; `rtp.config.view` grants the read-only `view` form; the legacy `rtp.config` continues to grant view + set.
+Permissions are additive (see [COMMANDS.md](COMMANDS.md) section `/rtp config`): `rtp.config.set` grants all writes; `rtp.config.set.<section>` (e.g. `rtp.config.set.regions`) grants only that section; `rtp.config.view` grants the read-only `view` form; the legacy `rtp.config` continues to grant view + set.
 
 For example, to update the nether region's world after the file already exists:
 
@@ -229,7 +229,7 @@ Once worlds are pregenerated (Step 0) and regions are configured (Steps 4 and 8)
 - Monitor progress live via PlaceholderAPI: `%rtp_scan_chunks%`, `%rtp_scan_totalChunks%`, `%rtp_scan_cps%`, `%rtp_scan_eta%`, `%rtp_scan_landPercentage%`.
 - If a scan is too heavy on the server, lower `performance.yml > scanTaskCount`, then `/rtp scan resume`.
 
-Full sub-command reference: [COMMANDS.md](COMMANDS.md) §`/rtp scan`. Operational playbook (after-safety-edit, chunk-leak, oversized memory file): [RUNBOOK.md](RUNBOOK.md).
+Full sub-command reference: [COMMANDS.md](COMMANDS.md) section `/rtp scan`. Operational playbook (after-safety-edit, chunk-leak, oversized memory file): [RUNBOOK.md](RUNBOOK.md).
 
 ---
 
@@ -255,7 +255,7 @@ Exercise the full pipeline against a real player (every safety guard remains act
 - Per-iteration failures log at `WARNING` — watch the console.
 - `stress` is the only sub-command available today; `queue`, `safety`, `verifiers`, `memory`, `platform`, `full` are planned.
 
-Full reference: [COMMANDS.md](COMMANDS.md) §`/rtp test`.
+Full reference: [COMMANDS.md](COMMANDS.md) section `/rtp test`.
 
 Manual smoke checks:
 

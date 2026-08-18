@@ -24,7 +24,7 @@ import java.util.Set;
  * {@link RTP#metrics} and reads loaded worlds plus available regions from
  * the active {@link RTP} instance.
  *
- * <p>Pinned by rtp-proxy-ADR-011 §Backend Wiring. Lives in
+ * <p>Pinned by rtp-proxy-ADR-011 section Backend Wiring. Lives in
  * {@code rtp-bukkit-common} (not {@code rtp-core}) because it imports
  * {@code org.bukkit.*}; the platform-agnostic surface stays in
  * {@link BackendStateSampler}.</p>

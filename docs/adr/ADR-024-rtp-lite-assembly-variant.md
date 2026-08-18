@@ -376,4 +376,4 @@ ADR-024 is **additive**, not a superseder: each prior ADR continues to govern th
 - `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/RTPBukkitPlugin.java` — full bootstrap; lite bootstrap mirrors only the surviving steps.
 - ADR-002, ADR-005, ADR-016, ADR-017, ADR-019, ADR-020, ADR-022, ADR-023 — prior ADRs whose subsystems are excluded from lite (or, in the case of ADR-005 / ADR-016, whose conclusions are reaffirmed for lite).
 - `docs/dev/LESSONS_LEARNED.md` — entries on database/shutdown-flush, login-cache promotion, and locale-switch reload that motivated the lite scope.
-- `docs/dev/REQUIREMENTS.md` §3 — S-001…S-007 prohibitions; lite must satisfy all of them, identically to full.
+- `docs/dev/REQUIREMENTS.md` section 3 — S-001…S-007 prohibitions; lite must satisfy all of them, identically to full.

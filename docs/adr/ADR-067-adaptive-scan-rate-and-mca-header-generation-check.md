@@ -71,4 +71,4 @@ Scope: `rtp-core` (`ScanTask` rate logic + the PRESCAN-only auto-scan trigger an
 - `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/metrics/ChunkLoadProfile.java` — per-class (generated/ungenerated) floor + totals.
 - [ADR-016](ADR-016-anvil-subsystem.md) — anvil read-only subsystem (PRESCAN prefilter, S-005 safety).
 - [ADR-026](ADR-026-external-hook-api-surface.md) — how `rtp-core` reaches the anvil subsystem.
-- Prohibition S-005 (no chunk loading on the main thread): `docs/dev/REQUIREMENTS.md §3`.
+- Prohibition S-005 (no chunk loading on the main thread): `docs/dev/REQUIREMENTS.md section 3`.

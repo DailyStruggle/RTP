@@ -57,7 +57,7 @@ import java.util.logging.Logger;
  * private executor. The poll loop runs on a single-threaded
  * {@link ScheduledExecutorService}. Subscribers are dispatched on that same
  * poll thread; consumers must hop to their host scheduler before touching
- * shared state, per rtp-proxy-ADR-001 §Threading Contract.</p>
+ * shared state, per rtp-proxy-ADR-001 section Threading Contract.</p>
  *
  * <p><strong>Atomic claim.</strong> Backed by
  * {@code INSERT ... WHERE NOT EXISTS} guarded by the partial unique index

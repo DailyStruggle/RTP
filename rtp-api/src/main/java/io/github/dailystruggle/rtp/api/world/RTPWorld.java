@@ -210,7 +210,7 @@ public abstract class RTPWorld<T> {
     // Record the origin ONLY for calls that actually fall through to a live load -
     // cache hits and probe-cache hits do not increment totalChunkLoads, so recording
     // them here would inflate chunkLoadsByOrigin past the real total. Mirrors the
-    // ADR-016 §13.1 precedence used by the 2-arg getOrLoadChunk: cached → anvil probe → live.
+    // ADR-016 section 13.1 precedence used by the 2-arg getOrLoadChunk: cached → anvil probe → live.
     final long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
     RTPChunk<?> cached = getCachedChunk(key);
     if (cached != null) {
@@ -242,7 +242,7 @@ public abstract class RTPWorld<T> {
 
   /**
    * Resolve an {@link RTPChunk} for {@code (cx, cz)}: cached → anvil probe → live load
-   * (ADR-016 §13.1 precedence). Default composes the primitives; adapters MAY override
+   * (ADR-016 section 13.1 precedence). Default composes the primitives; adapters MAY override
    * to skip redundant work. Returns {@code null} on unrecoverable load failure.
    */
   public CompletableFuture<RTPChunk<?>> getOrLoadChunk(int cx, int cz) {
@@ -309,9 +309,9 @@ public abstract class RTPWorld<T> {
   public abstract String getBiome(int x, int y, int z);
 
   /**
-   * Vanilla-generator exemption flag (ADR-016 §13.3). When {@code true}, the selection
+   * Vanilla-generator exemption flag (ADR-016 section 13.3). When {@code true}, the selection
    * pipeline may use the seed-synthesised {@code world.getBiome(x,y,z)} for ungenerated
-   * chunks; otherwise it must defer to the post-load biome read (§13.1 chain:
+   * chunks; otherwise it must defer to the post-load biome read (section 13.1 chain:
    * loaded chunk → AnvilChunkView → live getter). Default {@code false} (conservative -
    * Iris/Terra/datapack worlds do not match the seed answer).
    */
@@ -330,7 +330,7 @@ public abstract class RTPWorld<T> {
   }
 
   /**
-   * Non-blocking "is this chunk on disk?" check (ADR-016 §13.3). Must not trigger
+   * Non-blocking "is this chunk on disk?" check (ADR-016 section 13.3). Must not trigger
    * generation or block. Gates the seed-synthesised biome pre-check off for already-generated
    * chunks even on vanilla worlds - Mojang's biome source drifts across MC versions, so the
    * persisted {@code .mca} palette is authoritative. Default {@code true} (conservative);
@@ -343,7 +343,7 @@ public abstract class RTPWorld<T> {
   /**
    * Probe-first fast path for {@code PregenTask}: a lean center-column probe over
    * world-Y {@code [minY, maxY]}, or {@code null} when the adapter has no probe (caller
-   * falls back to the ADR-016 §13.1 chain). Adapters with {@code .mca}-backed stores
+   * falls back to the ADR-016 section 13.1 chain). Adapters with {@code .mca}-backed stores
    * SHOULD override.
    */
   public CompletableFuture<ChunkColumnProbe> probeChunkColumn(

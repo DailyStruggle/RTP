@@ -53,7 +53,7 @@ A small, platform-neutral value model so the diff and the pending entry are expr
 A new table, e.g. `rtp_platform_restores`, reusing the existing HikariCP-backed accessor and its `cacheValue` / `flush` / `delete` write path and a dedicated load query (mirroring `loadCachedLocations` / `purgeStaleLocations`):
 
 - Columns: `id` (UUID/text, primary key), `world` (text), `cx` / `cz` (int, the countdown-gate chunk), `remaining_seconds` (int), `blocks` (text/BLOB - the serialized `BlockDelta` list, e.g. newline-delimited `x,y,z,token` records).
-- Written when an entry is enrolled; `remaining_seconds` is periodically updated (or written lazily on shutdown - see §4) so a restart resumes from approximately the right remaining time; **deleted** when the restore completes or is abandoned.
+- Written when an entry is enrolled; `remaining_seconds` is periodically updated (or written lazily on shutdown - see section 4) so a restart resumes from approximately the right remaining time; **deleted** when the restore completes or is abandoned.
 - On core startup, all rows are loaded and re-enrolled into the in-memory reaper so countdowns resume across restarts. This is the "persist across restarts" requirement.
 - Not part of any network/proxy state (`NetworkStateBinding`); this is backend-local world mutation.
 
@@ -108,6 +108,6 @@ The original-block capture happens at platform-build time, but the world may cha
 - Emergency platform implementation: `RTPWorld#platform` (`rtp-api`), `BukkitRTPWorld#platform`, `FoliaRTPWorld#platform`, Fabric world peer; knobs `platformRadius` / `platformDepth` / `platformAirHeight` / `platformMaterial` in `safety.yml` (`SafetyKeys`).
 - Persistence layer: `AbstractSQLDatabaseAccessor` (`cacheValue` / `flush` / `delete` / `loadCachedLocations` / `purgeStaleLocations`).
 - Scheduling contract: [`.junie/AGENTS.md`](../../.junie/AGENTS.md) *Scheduler Usage*; `RTPScheduler` (`runTask(RTPLocation, ...)`); active-GC prior art: `MemoryTracker`.
-- S-003 / S-004 / S-005: [`REQUIREMENTS.md §3`](../dev/REQUIREMENTS.md); claim integration: [ADR-019](ADR-019-claim-plugin-integrations-folded-into-plugin.md).
+- S-003 / S-004 / S-005: [`REQUIREMENTS.md section 3`](../dev/REQUIREMENTS.md); claim integration: [ADR-019](ADR-019-claim-plugin-integrations-folded-into-plugin.md).
 - Decoupled-from-paste rationale: [ADR-058](ADR-058-region-specific-schematic-paste.md) (the `SchematicPaster` path this feature deliberately does **not** use).
 - Roadmap context: [`docs/dev/ROADMAP.md`](../dev/ROADMAP.md).

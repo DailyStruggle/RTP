@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * Immutable paste tuning passed to {@link SchematicPaster#paste}.
  *
- * <p>See ADR-058 §1.
+ * <p>See ADR-058 section 1.
  */
 public final class PasteOptions {
   private final PasteAnchor anchor;

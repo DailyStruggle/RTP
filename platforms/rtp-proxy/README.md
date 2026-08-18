@@ -42,6 +42,6 @@ Per `AGENTS.md`, when an ADR is authored here it must also get a row in the *Sub
 ## Cross-references
 
 - [`docs/dev/MULTI_SERVER_PLAN.md`](../../docs/dev/MULTI_SERVER_PLAN.md) — the design plan this directory implements.
-- [`docs/dev/REQUIREMENTS.md` §1.6](../../docs/dev/REQUIREMENTS.md) — system-level `REQ-RTP-NET-NNN` requirements.
+- [`docs/dev/REQUIREMENTS.md` section 1.6](../../docs/dev/REQUIREMENTS.md) — system-level `REQ-RTP-NET-NNN` requirements.
 - [`docs/admin/proxies/INDEX.md`](../../docs/admin/proxies/INDEX.md) — operator-facing documentation stub.
 - [`.junie/AGENTS.md`](../../.junie/AGENTS.md) — agent / contributor rules (D-005, architecture boundaries, self-updating protocol).

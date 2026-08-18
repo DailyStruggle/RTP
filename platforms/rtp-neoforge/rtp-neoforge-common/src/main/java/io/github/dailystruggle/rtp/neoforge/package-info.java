@@ -6,7 +6,7 @@
  * is a sibling of {@code io.github.dailystruggle.rtp.fabric} and mirrors its
  * shape, but NeoForge is a genuinely distinct adapter (annotation-driven event
  * bus, {@code RegisterCommandsEvent} command trampoline, {@code neoforge.mods.toml}
- * metadata, ModDevGradle toolchain) - see {@code docs/dev/NEOFORGE_NOTES.md} §2.</p>
+ * metadata, ModDevGradle toolchain) - see {@code docs/dev/NEOFORGE_NOTES.md} section 2.</p>
  *
  * <h2>Architectural invariants</h2>
  * <ul>

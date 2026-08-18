@@ -131,7 +131,7 @@ The row carries **no metric-specific schema** — every metric writes the same s
 
 ## Migration / Rollout
 
-- **Phase 1 (beta.5):** Ship the writer behind `metrics.networkTimeSeries.publish` (default `false`). Add `metrics.networkTimeSeries.{tier,retentionDays,perPassWriteCap}` config keys (defaults: tier = `24h@1m`, retention = 7 days, cap = 64 rows/pass). Schema bootstrap on first enabled startup. ADR-039's `NetworkSnapshotReader` extended to range-scan `rtp_metric_bucket`; `MetricChartRenderer` draws the `(min, max)` band when present. Document the new table in `MULTI_SERVER_PLAN.md` and `METRICS_PLAN.md §Phased Roadmap`.
+- **Phase 1 (beta.5):** Ship the writer behind `metrics.networkTimeSeries.publish` (default `false`). Add `metrics.networkTimeSeries.{tier,retentionDays,perPassWriteCap}` config keys (defaults: tier = `24h@1m`, retention = 7 days, cap = 64 rows/pass). Schema bootstrap on first enabled startup. ADR-039's `NetworkSnapshotReader` extended to range-scan `rtp_metric_bucket`; `MetricChartRenderer` draws the `(min, max)` band when present. Document the new table in `MULTI_SERVER_PLAN.md` and `METRICS_PLAN.md section Phased Roadmap`.
 - **Phase 2 (post-beta.5):** Optional per-metric publish allowlist (cap shared-store cost when only a subset of metrics is operationally interesting). Optional second published tier (`1h@10s`) for high-resolution chart pages, gated on shared-store budget.
 - **Phase 3 (post-network-mode-GA):** Evaluate live push (event-bus or similar) for sub-minute cross-backend visibility; gated on a separate ADR and on ADR-035 relaxing its no-live-update stance.
 
@@ -169,4 +169,4 @@ Traceability rows to add when implementation lands (not in this ADR per CHANGELO
 - ADR-039 — `/rtpadmin` Diagnostic Surfaces
 - [`docs/dev/METRICS_PLAN.md`](../dev/METRICS_PLAN.md)
 - [`docs/dev/MULTI_SERVER_PLAN.md`](../dev/MULTI_SERVER_PLAN.md)
-- [`docs/dev/REQUIREMENTS.md §3`](../dev/REQUIREMENTS.md) (S-00x prohibitions)
+- [`docs/dev/REQUIREMENTS.md section 3`](../dev/REQUIREMENTS.md) (S-00x prohibitions)

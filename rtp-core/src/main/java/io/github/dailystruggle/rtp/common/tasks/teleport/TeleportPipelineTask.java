@@ -43,7 +43,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
   /** Wall-clock start (nanos) for {@code avgPipelineMs} histogram, recorded once on cleanup. */
   private final long pipelineStartNanos = System.nanoTime();
   /**
-   * ADR-053 §2a: whether this teleport was served immediately (unqueued) rather than from the
+   * ADR-053 section 2a: whether this teleport was served immediately (unqueued) rather than from the
    * at-rate public wait queue. {@code true} for the {@code QueueTask.unqueuedFast} / custom /
    * on-event immediate paths; {@code false} only for the queue-drain serve path (the 4-arg
    * constructor used exclusively by {@code Region.execute}). The slow-teleport latency audit
@@ -182,8 +182,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
     this.reservation = reservation;
     this.currentPhase = Phase.LOAD;
     // Queue-drain serve path (Region.execute): this is the at-rate public-queue path, so the
-    // slow-teleport latency audit (ADR-053 §2a) must NOT apply. Backpressure on this path is
-    // covered separately by the queue-growth audit (§2b).
+    // slow-teleport latency audit (ADR-053 section 2a) must NOT apply. Backpressure on this path is
+    // covered separately by the queue-growth audit (section 2b).
     this.immediateTeleport = false;
   }
 
@@ -995,10 +995,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
       try {
         long elapsedMs = (System.nanoTime() - pipelineStartNanos) / 1_000_000L;
         RTP.metrics.pipelineHistogram().record(elapsedMs);
-        // ADR-053 §2a (REQ-RTP-OBS-005): audit a slow latency only for immediate/unqueued
+        // ADR-053 section 2a (REQ-RTP-OBS-005): audit a slow latency only for immediate/unqueued
         // teleports. Queued (at-rate) teleports are excluded because their elapsed window
         // includes queue-wait time and would false-positive; their degradation signal is the
-        // queue-growth audit (§2b). The counter/WARN live on CoreMetrics; the audit is opt-out
+        // queue-growth audit (section 2b). The counter/WARN live on CoreMetrics; the audit is opt-out
         // (slowPipelineThresholdMs <= 0 disables) and never aborts cleanup (S-004 posture).
         if (immediateTeleport
                 && RTP.metrics instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics) {

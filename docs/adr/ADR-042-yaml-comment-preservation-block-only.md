@@ -9,7 +9,7 @@
 
 ## Context
 
-`CONFIG_COMMAND_SPEC.md` §2.4 (`view` sub-sub-command) and Appendix A12 flag that the hardened `/rtp config` UX wants to show, on hover, the YAML comment associated with each configuration key, and to round-trip that comment unchanged through the seven-stage save lifecycle (`SPEC §3`). The current YAML substrate (`org.simpleyaml` `YamlFile.loadWithComments()` + `YamlFile.save()`, inherited from v2 and described in `docs/dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON.md`) **cannot guarantee** this round-trip:
+`CONFIG_COMMAND_SPEC.md` section 2.4 (`view` sub-sub-command) and Appendix A12 flag that the hardened `/rtp config` UX wants to show, on hover, the YAML comment associated with each configuration key, and to round-trip that comment unchanged through the seven-stage save lifecycle (`SPEC section 3`). The current YAML substrate (`org.simpleyaml` `YamlFile.loadWithComments()` + `YamlFile.save()`, inherited from v2 and described in `docs/dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON.md`) **cannot guarantee** this round-trip:
 
 - `loadWithComments()` populates an in-memory comment side-table keyed on node identity. Any `set(...)` that re-emits a scalar may detach the comment.
 - `setSection(...)` recursion used for factory values (`shape`, `vert`) replaces whole subtrees; interior comments are lost wholesale.
@@ -51,7 +51,7 @@ This model is **stable under `set`**: the key path is a deterministic identifier
 
 ### 2. Write path (surgical text edit)
 
-`AtomicConfigWriter` (named in ADR-041 §"New classes") is implemented as a text editor, not a serializer:
+`AtomicConfigWriter` (named in ADR-041 section "New classes") is implemented as a text editor, not a serializer:
 
 1. Load the current file bytes (always; the cached read-view is never the write source).
 2. For each `set(path, value)` in the `ConfigTransaction`:
@@ -59,7 +59,7 @@ This model is **stable under `set`**: the key path is a deterministic identifier
    b. Emit the **new value** for that key using the SnakeYAML wrapper's scalar/sequence/mapping emitter, then strip the emitter's leading `key:` prefix (we already have one in place) and reuse the existing key's indentation.
    c. Splice the new value lines into the file in place of the old line range. **Leave the preceding block comment lines untouched.**
    d. If the key did not previously exist, locate the parent section's line range, find the last child of that section (or the section header line if empty), and insert the new `key: value` lines after it — preceded by a single blank line if the convention in this file places blanks between top-level keys. The new key has no leading block comment unless the caller explicitly supplied one (out of scope for `/rtp config set` in beta.3).
-3. After all mutations, write the patched byte sequence to a sibling `.tmp` file (`AtomicConfigWriter` already owns this), `fsync`, and atomically rename per ADR-041 §"Concurrency model".
+3. After all mutations, write the patched byte sequence to a sibling `.tmp` file (`AtomicConfigWriter` already owns this), `fsync`, and atomically rename per ADR-041 section "Concurrency model".
 
 This path **never re-emits unmodified keys, blank lines, or comment blocks**. Bytes outside the affected line ranges are byte-identical to the input. That is the contract.
 
@@ -75,7 +75,7 @@ This eliminates the v2/v3 "section-replacement wipes interior comments" failure 
 
 ### 4. List mutations
 
-`add:` and `remove:` (already in SPEC §2.2) operate on individual list items:
+`add:` and `remove:` (already in SPEC section 2.2) operate on individual list items:
 
 - `add:` appends a new `- item` line at the list's current end, matching the list's indentation. No comment is associated with the new item.
 - `remove:` deletes the matching `- item` line. If the line immediately above the removed item is a `COMMENT` line at the same indent and the line immediately below the removed item is also a `LIST_ITEM`, the comment is treated as belonging to the **next** item and is preserved. If the comment is the only thing between the removed item and the next non-list line, it is treated as belonging to the removed item and is also removed.
@@ -84,11 +84,11 @@ Wholesale list replacement is not exposed at the command surface and is rejected
 
 ### 5. Read path / `view` hover-text
 
-The `view` sub-sub-command (SPEC §2.4) consults the block-comment side-table:
+The `view` sub-sub-command (SPEC section 2.4) consults the block-comment side-table:
 
 - `view <key>` returns `(declaredType, bounds, currentValue, leadingBlockComment | null)`.
 - The hover-text formatter joins the leading-block lines with `\n`, stripping the leading `# ` from each.
-- If `leadingBlockComment` is `null` (no comment present, or the key was added at runtime without a comment), the hover degrades to declared-type + bounds, as already promised in SPEC §2.4.
+- If `leadingBlockComment` is `null` (no comment present, or the key was added at runtime without a comment), the hover degrades to declared-type + bounds, as already promised in SPEC section 2.4.
 
 A **shipped-default comment dictionary** baked into the jar (one comment block per known config key, harvested at build time from the jar-shipped default YAML files) is a fallback when the user's file has no comment for a key (e.g. because they hand-deleted it). This dictionary is read-only and lives at `rtp-core/src/main/resources/config-comments.properties` (one entry per dotted key path, value is the block-comment text with embedded `\n`). Build-time generation is a Gradle task `:rtp-core:generateConfigCommentDictionary` that walks `rtp-core/src/main/resources/*.yml` and emits the properties file; the runtime loader reads it once at startup into a `Map<KeyPath, String>`.
 
@@ -105,7 +105,7 @@ The view UX is therefore robust against on-disk comment loss: the user can wipe 
 
 ## Alternatives Considered
 
-1. **Stay on `simpleyaml` and accept the failure modes.** Rejected: SPEC §2.4 hover-text becomes a permanent best-effort, every `setSection` wipes interior comments, and the user has explicitly said block-comment loss is the main problem to solve. No path forward without a substrate change.
+1. **Stay on `simpleyaml` and accept the failure modes.** Rejected: SPEC section 2.4 hover-text becomes a permanent best-effort, every `setSection` wipes interior comments, and the user has explicitly said block-comment loss is the main problem to solve. No path forward without a substrate change.
 
 2. **Adopt a third-party comment-preserving YAML library wholesale** (e.g. `snakeyaml-engine` + a community comment-preserving emitter, or YamlBeans, or a Java port of `ruamel.yaml`). Rejected for now:
    - `snakeyaml-engine`'s comment events are exposed on the **read** side; its emitter does not faithfully round-trip them across all node kinds.
@@ -136,7 +136,7 @@ The view UX is therefore robust against on-disk comment loss: the user can wipe 
 ### Negative / risks
 
 - Implementation cost is non-trivial: line index, block-comment side-table, surgical splice writer, jar-dictionary build task. Estimated ~6–8 new classes in `rtp-core/.../configuration/text/` plus a Gradle task and a test suite.
-- Inline-comment loss must be documented in `messages.yml` and admin docs so users are not surprised. Mitigation: SPEC §2.4 already softens the hover-text language; this ADR makes the inline-drop explicit.
+- Inline-comment loss must be documented in `messages.yml` and admin docs so users are not surprised. Mitigation: SPEC section 2.4 already softens the hover-text language; this ADR makes the inline-drop explicit.
 - The line index makes assumptions about file encoding (UTF-8, LF or CRLF) and indentation (spaces, not tabs — YAML 1.2 forbids tabs anyway). Tab-indented files are rejected at load time with `reasonCode = MALFORMED_YAML`.
 - A pathological user file (e.g. flow-style mapping `{a: 1, b: 2}` at top level) has no per-key line range. Such files are loaded read-only and any `/rtp config set` against them returns `reasonCode = UNSUPPORTED_FILE_LAYOUT`. The shipped default files are all block-style; this only affects user files re-formatted to flow style.
 
@@ -147,13 +147,13 @@ The view UX is therefore robust against on-disk comment loss: the user can wipe 
 - Phase 3: Implement add-key, add/remove list item, and the `SECTION_REMOVAL_UNSUPPORTED` rejection.
 - Phase 4: Remove `simpleyaml` from `rtp-core`'s dependency graph; close ADR-025 as Accepted (wrapper choice) + this ADR as Accepted (write strategy).
 
-Each phase ships with its own test class under `rtp-core/src/test/java/.../configuration/text/`. The phase split is intentional so that the SPEC §2.4 hover-text improvement (Phase 1) ships independently of the write-path change (Phase 2+).
+Each phase ships with its own test class under `rtp-core/src/test/java/.../configuration/text/`. The phase split is intentional so that the SPEC section 2.4 hover-text improvement (Phase 1) ships independently of the write-path change (Phase 2+).
 
 ---
 
 ## References
 
-- `docs/dev/CONFIG_COMMAND_SPEC.md` §2.4 (`view` UX), Appendix A12 (this ADR closes A12).
+- `docs/dev/CONFIG_COMMAND_SPEC.md` section 2.4 (`view` UX), Appendix A12 (this ADR closes A12).
 - `docs/adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper.md` (parser substrate; this ADR scopes its emit strategy).
 - `docs/adr/ADR-037-harden-rtp-config-commands.md` (decision to harden), `docs/adr/ADR-041-config-command-and-save-implementation.md` (`AtomicConfigWriter` / `ConfigTransaction` ownership).
 - `docs/dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON.md` (v1/v2/v3 evidence; can be deleted once this ADR is Accepted).

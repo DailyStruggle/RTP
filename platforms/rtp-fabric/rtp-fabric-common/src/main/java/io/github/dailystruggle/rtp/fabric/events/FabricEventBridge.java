@@ -22,7 +22,7 @@ import java.util.logging.Level;
  * teleport pipeline cannot leak entity references past session end. World
  * unload removes the {@code FabricRTPWorld} entry.
  *
- * <p><b>No Bukkit imports.</b> ADR-022 §4 invariant.
+ * <p><b>No Bukkit imports.</b> ADR-022 section 4 invariant.
  */
 public final class FabricEventBridge {
 

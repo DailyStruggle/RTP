@@ -196,7 +196,7 @@ public final class AnvilChunkView {
      * the RTP-configuration-comparable form must run it through the platform-side
      * {@code PaletteNormalizer::reconcile}.
      *
-     * <p>See ADR-016 (biome) §4 for the contract and §5 for the trust model (the
+     * <p>See ADR-016 (biome) section 4 for the contract and section 5 for the trust model (the
      * disk palette is authoritative for populated chunks; for an {@code UNKNOWN} /
      * absent section the platform adapter is expected to fall through to the live
      * {@code world.getBiome(loc).name()} getter).
@@ -222,7 +222,7 @@ public final class AnvilChunkView {
     /**
      * Returns the union of every distinct namespaced biome identifier that appears
      * in any decoded section of this chunk. Intended for pregen biome-enumeration
-     * scans (see ADR-016 (biome) §6.1). Does not include biomes from sections
+     * scans (see ADR-016 (biome) section 6.1). Does not include biomes from sections
      * whose biome container failed to decode (those sections are simply absent from
      * {@link #biomeSections()}).
      *

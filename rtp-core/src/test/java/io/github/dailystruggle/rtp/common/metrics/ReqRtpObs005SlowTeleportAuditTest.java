@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * REQ-RTP-OBS-005 (ADR-053 §2a) slow-teleport audit and REQ-RTP-OBS-006 (§2b) queue-growth
+ * REQ-RTP-OBS-005 (ADR-053 section 2a) slow-teleport audit and REQ-RTP-OBS-006 (section 2b) queue-growth
  * audit surfaced through {@link CoreMetrics}. Without a bootstrapped {@code RTP.configs} the
  * threshold readers fall back to their documented defaults (slow = 5000 ms enabled,
  * queue-growth = 0 disabled), which is exactly what these tests exercise.

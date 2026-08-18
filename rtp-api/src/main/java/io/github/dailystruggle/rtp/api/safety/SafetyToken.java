@@ -5,11 +5,11 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Single parsed entry of a safety-list value (ADR-017 §1 grammar). Shapes:
+ * Single parsed entry of a safety-list value (ADR-017 section 1 grammar). Shapes:
  * MATERIAL with upper-snake {@code Material.name()} or wildcard {@code "*"};
  * TAG with lowercase {@code namespace:path} (no leading {@code #}). Predicates
  * may be empty (plain) or non-empty. Bare {@code *} is rejected at parse time.
- * No tag expansion performed here (platform adapter's responsibility, ADR-017 §2).
+ * No tag expansion performed here (platform adapter's responsibility, ADR-017 section 2).
  * Immutable and thread-safe.
  */
 public final class SafetyToken {

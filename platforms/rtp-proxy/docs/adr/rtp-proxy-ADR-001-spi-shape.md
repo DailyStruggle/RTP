@@ -134,5 +134,5 @@ A package-level architecture test (Phase 1 deliverable) enforces the prohibition
 - Umbrella: [`docs/adr/ADR-036`](../../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
 - Plan: [`docs/dev/MULTI_SERVER_PLAN.md`](../../../../docs/dev/MULTI_SERVER_PLAN.md)
 - Requirements: [`rtp-proxy/REQUIREMENTS.md`](../../REQUIREMENTS.md) (`REQ-RTP-PROXY-001…011`), [`rtp-proxy-common/REQUIREMENTS.md`](../../rtp-proxy-common/REQUIREMENTS.md) (`REQ-RTP-PROXY-COMMON-001…008`)
-- Network REQs: [`docs/dev/REQUIREMENTS.md §1.6`](../../../../docs/dev/REQUIREMENTS.md) (`REQ-RTP-NET-007`, `-009`, `-010`, `-012`, `-014`)
+- Network REQs: [`docs/dev/REQUIREMENTS.md section 1.6`](../../../../docs/dev/REQUIREMENTS.md) (`REQ-RTP-NET-007`, `-009`, `-010`, `-012`, `-014`)
 - Architecture Boundaries: [`.junie/AGENTS.md`](../../../../.junie/AGENTS.md)

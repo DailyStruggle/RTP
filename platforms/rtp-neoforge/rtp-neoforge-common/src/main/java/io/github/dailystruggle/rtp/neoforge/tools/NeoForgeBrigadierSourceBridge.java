@@ -16,7 +16,7 @@ import java.util.logging.Level;
  * {@code FabricBrigadierSourceBridge}).
  *
  * <p>Unlike Fabric, NeoForge ships Mojang-mapped names at runtime
- * (rtp-neoforge-ADR-001, {@code NEOFORGE_NOTES.md} §0), so there is no
+ * (rtp-neoforge-ADR-001, {@code NEOFORGE_NOTES.md} section 0), so there is no
  * obf/intermediary split and no need for the reflective hierarchy walk the
  * Fabric bridge uses to stay NM-clean. We reference {@link CommandSourceStack},
  * {@link Entity}, and {@link ServerPlayer} directly.</p>

@@ -8,7 +8,7 @@ import java.util.UUID;
  * Immutable description of one teleport request entering the proxy
  * dispatcher.
  *
- * <p>Pinned by rtp-proxy-ADR-001 §1. Fields are intentionally minimal:
+ * <p>Pinned by rtp-proxy-ADR-001 section 1. Fields are intentionally minimal:
  * the dispatcher reads them, the selector reads them, and the transport
  * reservation primitive uses {@link #playerId()} plus the chosen
  * {@code serverId} to derive its token. Anything richer (placeholders,
@@ -18,7 +18,7 @@ import java.util.UUID;
  * @param triggerType    where this request came from (never {@code null})
  * @param regionKey      optional region constraint; when present, only backends whose
  *                       {@code regionsAvailable[]} contains it qualify (see ADR-004
- *                       §Candidate Filtering rule 3)
+ *                       section Candidate Filtering rule 3)
  * @param worldKey       optional world constraint; when present, only backends whose
  *                       {@code worldsLoaded[]} contains it qualify (rule 4)
  * @param serverHint     optional hard-pin to a specific backend {@code serverId}

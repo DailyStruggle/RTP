@@ -1,12 +1,12 @@
 # Plugin setup lifecycle
 
 **Scope of this diagram.** This chart covers the one-shot Bukkit-family plugin lifecycle — `onLoad` (JDBC probe / fail-fast) → `onEnable` (strictly ordered: metrics, server-model resolution, reflective accessor wiring, DB setup, Chunky probe, startup-task drains, command binding, event registration, fallback-region rebind, integrations, effects, non-Folia `ChunkUnloadProcessor`, DB processing loop, PAPI, doc extraction) → `onDisable` bail-out on any failure. This is the **setup-time counterpart** to every runtime loop in diagrams 01–05 and 08–09. Related-but-separate behavior paths are intentionally **out of scope** here:
-- **Fabric entry point** — Fabric uses a different bootstrap (`ModInitializer`), out of scope per `REQUIREMENTS.md §0`.
+- **Fabric entry point** — Fabric uses a different bootstrap (`ModInitializer`), out of scope per `REQUIREMENTS.md section 0`.
 - **Runtime teleport / cache / GC / scan loops** — see diagrams 01, 02, 04, 05; this chart ends once those loops are running.
 - **Config reload** — a separate code path (`/rtp reload`) that re-runs a subset of `onEnable` steps.
 - **Per-command dispatch** — see diagrams 08 (region selection) and 09 (location selection); this chart stops at `BindCmds`.
 
-> Companion walkthrough: [`CODE_TOUR.md` §10 — Plugin setup lifecycle](../dev/CODE_TOUR.md).
+> Companion walkthrough: [`CODE_TOUR.md` section 10 — Plugin setup lifecycle](../dev/CODE_TOUR.md).
 
 ```mermaid
 stateDiagram-v2

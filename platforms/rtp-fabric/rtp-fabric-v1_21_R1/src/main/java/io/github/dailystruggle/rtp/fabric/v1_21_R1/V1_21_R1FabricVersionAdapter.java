@@ -650,7 +650,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     /**
-     * Typed written-book modal for MC 1.21.0-1.21.4 (rtp-fabric-ADR-012 §4
+     * Typed written-book modal for MC 1.21.0-1.21.4 (rtp-fabric-ADR-012 section 4
      * un-defer). Builds a {@code WRITTEN_BOOK} {@link net.minecraft.world.item.ItemStack}
      * carrying a {@link net.minecraft.world.item.component.WrittenBookContent}
      * data component (one styled {@link net.minecraft.network.chat.Component}

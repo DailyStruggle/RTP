@@ -14,9 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression guard for {@link PaletteNormalizer} canonical lookup forms (ADR-016 §8.1).
+ * Regression guard for {@link PaletteNormalizer} canonical lookup forms (ADR-016 section 8.1).
  */
-@DisplayName("ADR-016 §8.1 — PaletteNormalizer reconciler parity")
+@DisplayName("ADR-016 section 8.1 — PaletteNormalizer reconciler parity")
 class PaletteNormalizerTest {
 
     @Test

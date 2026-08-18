@@ -834,7 +834,7 @@ function Test-KillSwitch {
   $playerId = [System.Guid]::NewGuid().ToString()
   $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   # The claim Lua treats KILL_SWITCH as a control-plane string-arg sentinel.
-  # See claim.lua and ADR-036 §5 for the contract.
+  # See claim.lua and ADR-036 section 5 for the contract.
   $result = Invoke-RedisCli EVALSHA dc7c1b0f2c85f26b513de303369728583aaf7dd1 0 $tokenId $playerId 'KILL_SWITCH' 'backend-a' $now ($now + 30000)
   Write-Evidence 'killswitch' "result=$result"
   if ($result -match 'KILL_SWITCH' -or $result -match '^0$') {

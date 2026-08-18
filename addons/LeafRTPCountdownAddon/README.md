@@ -63,7 +63,7 @@ location. Register through the public `RTPHooks` facade (ADR-026 — see
 RTPAPI.hooks().verifiers().register(coords -> myCheckReturnsTrueIfSafe(coords));
 ```
 
-Rules of engagement (see `AGENTS.md`, `docs/dev/REQUIREMENTS.md §3`):
+Rules of engagement (see `AGENTS.md`, `docs/dev/REQUIREMENTS.md section 3`):
 
 - Must return quickly; the call happens on a worker thread.
 - **No synchronous chunk I/O** on the main thread (**S-005**).
@@ -124,8 +124,8 @@ reference is all you need. To restore RTP's native fallback, call
 `RTPAPI.hooks().pvpCombatState().clear()` (do this from `onUnload()` so your provider does not
 outlive your addon).
 
-Rules of engagement (see `AGENTS.md`, `docs/dev/REQUIREMENTS.md §3`, and
-[`docs/dev/EXTERNAL_HOOKS.md` §6](../../docs/dev/EXTERNAL_HOOKS.md)):
+Rules of engagement (see `AGENTS.md`, `docs/dev/REQUIREMENTS.md section 3`, and
+[`docs/dev/EXTERNAL_HOOKS.md` section 6](../../docs/dev/EXTERNAL_HOOKS.md)):
 
 - **Thread-safe and non-blocking.** `isInCombat(UUID)` is called from the command thread *and* the
   teleport pipeline. Never perform synchronous I/O or block a region/tick thread — read an

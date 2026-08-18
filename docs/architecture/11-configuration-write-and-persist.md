@@ -2,7 +2,7 @@
 
 **Scope of this diagram.** This chart covers the **write path** for runtime configuration changes — what happens between `/rtp config <file> <key>:<value>` (or any other config-mutating command) and a durable on-disk YAML file. It is the companion to diagram 09 (`09-configuration-load-and-reload.md`), which covers the read / reload path; together they cover the full configuration lifecycle. Related-but-separate behavior paths are intentionally **out of scope**:
 
-- **Read-path / reload of the resulting state** — see diagram 09 and `CODE_TOUR.md` §13.
+- **Read-path / reload of the resulting state** — see diagram 09 and `CODE_TOUR.md` section 13.
 - **Per-attempt teleport reads of config values** — see diagrams 01 / 08.
 - **`/rtpadmin` setup-wizard flow** — see [ADR-038](../adr/ADR-038-rtpadmin-setup-wizards.md). A wizard is a *driver* over this lifecycle, not a separate path.
 - **Cross-server propagation of config changes** — see [`MULTI_SERVER_PLAN.md`](../dev/MULTI_SERVER_PLAN.md). Each backend persists locally; cross-backend fan-out is independent work.
@@ -15,23 +15,23 @@ flowchart TD
 
     Trigger{{/rtp config write<br/>or LanguageCmd<br/>or wizard-driven mutation}}:::data
 
-    Parse[ConfigParameterGrammar.parse<br/>tokens to ParsedInvocation<br/>spec §3.1]:::async
-    Authorize[ConfigCommandExecutor.authorize<br/>rtp.config.set.section or umbrella<br/>spec §3.2 / §7]:::async
-    ReloadCheck{ReloadCmd holds<br/>per-file write lock?<br/>spec §4.6}:::data
-    Validate[ConfigParameterValidator.validateAll<br/>per-parameter + composite invariants<br/>spec §3.3 / §5 / §8.2]:::async
-    Snapshot[ConfigTransaction.snapshot<br/>capture FactoryValue map<br/>spec §3.4]:::async
-    ApplyMem[ConfigTransaction.apply<br/>mutate in-memory parser<br/>spec §3.5]:::async
-    PostApplyValidate[Composite-invariant re-check<br/>after all mutations applied<br/>spec §3.5 / §8.2]:::async
-    DryRunFork{dryRun set?<br/>spec §3.7}:::data
+    Parse[ConfigParameterGrammar.parse<br/>tokens to ParsedInvocation<br/>spec section 3.1]:::async
+    Authorize[ConfigCommandExecutor.authorize<br/>rtp.config.set.section or umbrella<br/>spec section 3.2 / section 7]:::async
+    ReloadCheck{ReloadCmd holds<br/>per-file write lock?<br/>spec section 4.6}:::data
+    Validate[ConfigParameterValidator.validateAll<br/>per-parameter + composite invariants<br/>spec section 3.3 / section 5 / section 8.2]:::async
+    Snapshot[ConfigTransaction.snapshot<br/>capture FactoryValue map<br/>spec section 3.4]:::async
+    ApplyMem[ConfigTransaction.apply<br/>mutate in-memory parser<br/>spec section 3.5]:::async
+    PostApplyValidate[Composite-invariant re-check<br/>after all mutations applied<br/>spec section 3.5 / section 8.2]:::async
+    DryRunFork{dryRun set?<br/>spec section 3.7}:::data
 
-    WriteTemp[AtomicConfigWriter.write<br/>1 serialize to target.yml.tmp<br/>2 fsync temp<br/>3 rename over target.yml<br/>4 best-effort parent fsync<br/>spec §4.2]:::async
+    WriteTemp[AtomicConfigWriter.write<br/>1 serialize to target.yml.tmp<br/>2 fsync temp<br/>3 rename over target.yml<br/>4 best-effort parent fsync<br/>spec section 4.2]:::async
     TargetedReload[Configs.reloadOne&#40;targetFile&#41;<br/>swap affected parser<br/>per diagram 09]:::async
 
-    AuditOk[[ConfigAuditFormatter.format<br/>RTP.log INFO<br/>outcome = COMMITTED<br/>spec §6]]:::success
+    AuditOk[[ConfigAuditFormatter.format<br/>RTP.log INFO<br/>outcome = COMMITTED<br/>spec section 6]]:::success
     AuditDry[[ConfigAuditFormatter.format<br/>RTP.log INFO<br/>outcome = DRY_RUN_OK<br/>render diff via config.dryRun.&#42;]]:::success
     AuditFail[[ConfigAuditFormatter.format<br/>RTP.log WARNING<br/>outcome = REJECTED or ROLLED_BACK<br/>caller sees config.error.&lt;reasonCode&gt;]]:::fail
 
-    Rollback[ConfigTransaction.rollback<br/>restore snapshot<br/>delete temp file<br/>spec §3.7]:::fail
+    Rollback[ConfigTransaction.rollback<br/>restore snapshot<br/>delete temp file<br/>spec section 3.7]:::fail
 
     Done([Durable on disk<br/>in-memory matches<br/>downstream readers see new values]):::success
     DoneDry([No state change<br/>caller saw preview]):::success
@@ -75,8 +75,8 @@ flowchart TD
 
 ## How to read this chart
 
-- **Three accepting states:** `Done` (live commit succeeded), `DoneDry` (dry-run preview succeeded), `DoneFail` (any failure). Every invocation ends in exactly one of them, and every accepting state has emitted exactly one audit record. This is the spec §6 / S-004 guarantee made visible.
-- **The seven-stage lifecycle of spec §3 maps 1:1 onto the blue nodes** along the happy path: Parse → Authorize → (reload-check) → Validate → Snapshot → Apply (+ post-apply invariant re-check) → Persist (`WriteTemp` + `TargetedReload`) → Audit. The dashed red transitions show where each stage's failure mode routes — all to `AuditFail` (single record, `WARNING` level, configurable message).
+- **Three accepting states:** `Done` (live commit succeeded), `DoneDry` (dry-run preview succeeded), `DoneFail` (any failure). Every invocation ends in exactly one of them, and every accepting state has emitted exactly one audit record. This is the spec section 6 / S-004 guarantee made visible.
+- **The seven-stage lifecycle of spec section 3 maps 1:1 onto the blue nodes** along the happy path: Parse → Authorize → (reload-check) → Validate → Snapshot → Apply (+ post-apply invariant re-check) → Persist (`WriteTemp` + `TargetedReload`) → Audit. The dashed red transitions show where each stage's failure mode routes — all to `AuditFail` (single record, `WARNING` level, configurable message).
 - **Rollback is shared.** Both `SCHEMA_INVARIANT` (caught after the in-memory mutation) and `PERSIST_IO` (caught after the temp file exists) route through `Rollback` before `AuditFail` — `Rollback` restores the snapshot and deletes the temp file. Validation-stage failures and authorization failures take the dashed direct edge to `AuditFail`: no snapshot was taken, nothing to roll back.
 - **Dry-run takes the same path** through Parse → Validate → Snapshot → Apply → PostApplyValidate, then forks at `DryRunFork`. The dry-run branch calls `Rollback` (to restore the in-memory state from the snapshot — there is no temp file to delete) and emits the audit record with `outcome = DRY_RUN_OK` and the rendered diff. The caller sees the preview; on-disk state is unchanged.
 - **The atomic-rename pattern is one node** (`WriteTemp`) because the four substeps (serialize, fsync, rename, parent-fsync) form a single atomic-by-construction unit from the caller's perspective: either the rename happens (durable) or it doesn't (rollback). The substeps live in `AtomicConfigWriter`; the diagram does not enumerate them to keep the lifecycle visible at one glance.

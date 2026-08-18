@@ -111,7 +111,7 @@ public class ReqRtpS005StaleChunkGuardTest {
                         + "call count would indicate the guard failed to prevent the race.");
 
         // Sanity: the stale-chunk guard was consulted at least once (we exercised the
-        // pipeline). ADR-016 §11 probe-first ordering (2026-04-20) means
+        // pipeline). ADR-016 section 11 probe-first ordering (2026-04-20) means
         // `LocationGenerator` can satisfy a candidate via `getChunkAt` (anvil-backed
         // or mock-cached) without ever reaching `getChunkAtAsync`, so
         // `chunkAsyncLoadCount` is no longer a reliable "pipeline ran" proxy. The

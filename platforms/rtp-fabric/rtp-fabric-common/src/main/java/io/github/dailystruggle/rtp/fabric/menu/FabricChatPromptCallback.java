@@ -14,7 +14,7 @@ import java.util.logging.Level;
 
 /**
  * Fabric substitute for the Paper anvil-input modal (ADR-045) per
- * {@code rtp-fabric-ADR-012 §3}. Implements
+ * {@code rtp-fabric-ADR-012 section 3}. Implements
  * {@link MenuRedeemSubcommand.AnvilInputOpener} by registering the viewer
  * for an inline chat prompt: the next chat message the viewer sends is
  * consumed (cancelled so it does not broadcast) and dispatched as the
@@ -129,7 +129,7 @@ public final class FabricChatPromptCallback implements MenuRedeemSubcommand.Anvi
                 parentPath, paramName, prefill, mode, sink, System.currentTimeMillis()));
         // Send a chat hint so the viewer knows we're waiting on their input.
         // Locale-keyed wording is a follow-up - the wire phrasing here
-        // matches ADR-012 §3 step 1.
+        // matches ADR-012 section 3 step 1.
         String prefillSuffix = (prefill == null || prefill.isEmpty())
                 ? ""
                 : " (current: " + prefill + ")";

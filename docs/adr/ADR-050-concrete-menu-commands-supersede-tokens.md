@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-05-24 (Proposed) / 2026-05-24 (Accepted, all stages landed)
-**Supersedes (in part):** [ADR-035](ADR-035-interactive-menus-book-first.md) sections on `MenuTokenRegistry` (§3 "Click handling", §"Security boundary"); [ADR-047](ADR-047-declarative-chart-composition-bridge.md) sections on `ChartSpecTokens` opaque UUID handles for `OpenMap`.
+**Supersedes (in part):** [ADR-035](ADR-035-interactive-menus-book-first.md) sections on `MenuTokenRegistry` (section 3 "Click handling", section "Security boundary"); [ADR-047](ADR-047-declarative-chart-composition-bridge.md) sections on `ChartSpecTokens` opaque UUID handles for `OpenMap`.
 
 ## Context
 
@@ -58,7 +58,7 @@ This decision retires both token registries in favor of concrete, non-expiring `
 5. Migration is staged across three sessions (see `docs/dev/scratch/CHECKLIST-concrete-menu-commands.md`):
    - **Stage 1 (this ADR's first landing):** concrete-command leaves are added alongside the existing token redeem path. The renderer still mints tokens. Both paths reach the same `dispatch*` helpers. The grammar is reachable end-to-end before any deletion.
    - **Stage 2:** the renderer switches to emitting concrete `runCommand` strings; `BookMenuRenderer`'s `MenuTokenRegistry` constructor dependency is dropped.
-   - **Stage 3:** the token redeem branch, the registries, `ChartSpecTokens`, and the now-orphaned message keys are deleted. This ADR is promoted from Proposed to Accepted at the start of Stage 3. ADR-035 §3 and §"Security boundary" and ADR-047's chart-spec-token sections are marked superseded by this ADR (with date) at the same point.
+   - **Stage 3:** the token redeem branch, the registries, `ChartSpecTokens`, and the now-orphaned message keys are deleted. This ADR is promoted from Proposed to Accepted at the start of Stage 3. ADR-035 section 3 and section "Security boundary" and ADR-047's chart-spec-token sections are marked superseded by this ADR (with date) at the same point.
 
 ## Alternatives Considered
 
@@ -72,7 +72,7 @@ This decision retires both token registries in favor of concrete, non-expiring `
 ## Consequences
 
 - **Positive:**
-  - Operators can read the literal admin command from any click in any rendered book; the menu becomes a discovery surface for the command grammar (the original premise of ADR-035 §1).
+  - Operators can read the literal admin command from any click in any rendered book; the menu becomes a discovery surface for the command grammar (the original premise of ADR-035 section 1).
   - No more `menu.expired` UX failures from a book left open.
   - Net code reduction: `MenuTokenRegistry`, `LocalMenuTokenRegistry`, `ChartSpecTokens`, the cap/eviction logic, the token-cap message keys, and `MenuTokenRegistryTest` all disappear. Estimated 600-800 LoC net negative after Stage 3.
   - Future menu surfaces have no template for adding another opaque token registry; the pattern is the concrete-command grammar.

@@ -10,7 +10,7 @@ import java.util.List;
 /**
  * Recursive-descent parser for the RTP-supported YAML subset.
  *
- * <p>Subset (per ADR-025 §Migration / 2026-05-15 revision):</p>
+ * <p>Subset (per ADR-025 section Migration / 2026-05-15 revision):</p>
  * <ul>
  *   <li>Block-style mappings ({@code key: value} or {@code key:} +
  *       indented child).</li>

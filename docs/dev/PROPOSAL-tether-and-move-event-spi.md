@@ -87,7 +87,7 @@ confinement.
 - [ADR-026](../adr/ADR-026-external-hook-api-surface.md) - external hook surface (optional bounds).
 - [ADR-054](../adr/ADR-054-rtprunnable-self-scheduling-thread-routing.md) - thread routing reused for pull-back.
 - [ADR-002](../adr/ADR-002-h2-sqlite-over-flat-file-cache.md) - the database interface tethers persist through.
-- S-001..S-005 (REQUIREMENTS.md §3) - pull-back destinations must satisfy all teleport safety rules; no chunk I/O on tick/region threads; no silently dropped enforcement.
+- S-001..S-005 (REQUIREMENTS.md section 3) - pull-back destinations must satisfy all teleport safety rules; no chunk I/O on tick/region threads; no silently dropped enforcement.
 
 ## 5. Risks and trade-offs
 

@@ -26,7 +26,7 @@ import org.junit.jupiter.api.io.TempDir;
  * to keep dispatch deterministic; the async {@link AnvilPrefilter#probe} entry
  * point is exercised indirectly via the wire-in in {@code BukkitRTPWorld.getChunkAt}.
  */
-@DisplayName("REQ-RTP-S-005 / ADR-016 § AnvilPrefilter verdict matrix")
+@DisplayName("REQ-RTP-S-005 / ADR-016 - AnvilPrefilter verdict matrix")
 class AnvilPrefilterTest {
 
   // ADR-016: this module is platform-neutral; no MockBukkit setup is required.
@@ -107,7 +107,7 @@ class AnvilPrefilterTest {
   @Test
   @DisplayName("Arbitrary DataVersion ⇒ decoder is authoritative (gate retired 2026-04-20)")
   void arbitraryDataVersionDeferredToDecoder(@TempDir Path worldFolder) throws IOException {
-    // ADR-016 §13.1 follow-up: the DataVersion range gate has been retired.
+    // ADR-016 section 13.1 follow-up: the DataVersion range gate has been retired.
     // Every DataVersion is admitted; the decoder (`AnvilReader`) is the only
     // gate, and decode failures surface as WARNING + UNKNOWN. Here we feed
     // DataVersion=1 (well outside any real MC range) but with a valid

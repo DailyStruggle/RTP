@@ -1,6 +1,6 @@
 # `rtp-proxy/` — Umbrella Requirements
 
-> **Status: draft, D-005 gated on ADR-036 (outstanding).** This document defines module-scope requirements that apply to **every** proxy adapter under `rtp-proxy/`. It complements the system-level `REQ-RTP-NET-NNN` requirements in [`../docs/dev/REQUIREMENTS.md` §1.6](../../docs/dev/REQUIREMENTS.md) and the design narrative in [`../docs/dev/MULTI_SERVER_PLAN.md`](../../docs/dev/MULTI_SERVER_PLAN.md).
+> **Status: draft, D-005 gated on ADR-036 (outstanding).** This document defines module-scope requirements that apply to **every** proxy adapter under `rtp-proxy/`. It complements the system-level `REQ-RTP-NET-NNN` requirements in [`../docs/dev/REQUIREMENTS.md` section 1.6](../../docs/dev/REQUIREMENTS.md) and the design narrative in [`../docs/dev/MULTI_SERVER_PLAN.md`](../../docs/dev/MULTI_SERVER_PLAN.md).
 >
 > Authoring style: `shall` / `shall not`, absolute state, no implementation actions (per [`../docs/dev/RULES.md`](../../docs/dev/RULES.md)).
 
@@ -55,5 +55,5 @@ Each requirement above shall receive a row in [`../docs/dev/TRACEABILITY.md`](..
 
 - [`README.md`](README.md) — umbrella directory overview.
 - [`../docs/dev/MULTI_SERVER_PLAN.md`](../../docs/dev/MULTI_SERVER_PLAN.md) — design narrative.
-- [`../docs/dev/REQUIREMENTS.md`](../../docs/dev/REQUIREMENTS.md) §1.6 — `REQ-RTP-NET-NNN` system-level requirements.
+- [`../docs/dev/REQUIREMENTS.md`](../../docs/dev/REQUIREMENTS.md) section 1.6 — `REQ-RTP-NET-NNN` system-level requirements.
 - [`../docs/dev/RULES.md`](../../docs/dev/RULES.md) — authoring style guide.

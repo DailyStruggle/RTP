@@ -17,8 +17,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit tests for {@link PaletteNormalizer}.
  *
- * <p>Verifies the Spigot-side reconciler contract documented in ADR-016 §3 and
- * {@code ADR-016} §8.1:</p>
+ * <p>Verifies the Spigot-side reconciler contract documented in ADR-016 section 3 and
+ * {@code ADR-016} section 8.1:</p>
  * <ul>
  *   <li>Vanilla identifiers like {@code minecraft:lava} are reconciled to {@code Material#name()}
  *       via {@link org.bukkit.Material#matchMaterial(String)}.</li>
@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
  *       check is sufficient at lookup time.</li>
  * </ul>
  */
-@DisplayName("REQ-RTP-S-001 / ADR-016 § PaletteNormalizer (Spigot reconciler)")
+@DisplayName("REQ-RTP-S-001 / ADR-016 - PaletteNormalizer (Spigot reconciler)")
 class PaletteNormalizerTest {
 
   @BeforeEach

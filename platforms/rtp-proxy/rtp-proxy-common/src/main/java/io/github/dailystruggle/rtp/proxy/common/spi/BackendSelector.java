@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Pure-function backend chooser (rtp-proxy-ADR-001 §2,
+ * Pure-function backend chooser (rtp-proxy-ADR-001 section 2,
  * rtp-proxy-ADR-004, REQ-RTP-PROXY-COMMON-002).
  *
  * <p>Contract:</p>

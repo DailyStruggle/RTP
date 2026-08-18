@@ -6,7 +6,7 @@
 - **Related:**
   - **Companion (mandatory pair):** `effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md` — the corresponding decision in the `effects-api` subtree. Both ADRs must be accepted together; neither is meaningful alone.
   - `rtp-fabric-ADR-001-multiversion-submodule-layout.md` — establishes the per-MC submodule pattern (`rtp-fabric-common` + `rtp-fabric-vXX_YY_R1`). This ADR adds an obf/unobf axis orthogonal to that per-MC axis.
-  - `rtp-fabric-ADR-002-platform-in-scope.md §4 Build Discipline` — the Loom allow-list. This ADR adds **one** new Loom-using module (`rtp-fabric-common-unobf`); the allow-list grows from `{rtp-fabric-common, rtp-fabric-vXX_YY_R1*, rtp-plugin, effects-api}` to additionally include `rtp-fabric-common-unobf`.
+  - `rtp-fabric-ADR-002-platform-in-scope.md section 4 Build Discipline` — the Loom allow-list. This ADR adds **one** new Loom-using module (`rtp-fabric-common-unobf`); the allow-list grows from `{rtp-fabric-common, rtp-fabric-vXX_YY_R1*, rtp-plugin, effects-api}` to additionally include `rtp-fabric-common-unobf`.
   - `rtp-fabric-ADR-007-mojmap-name-decoupling.md` — the prior decision to use unobfuscated Loom in `rtp-fabric-v26_1_R1`; this ADR generalises the same Loom-mode to a version-agnostic common carrier.
   - `effects-api-ADR-003-platform-split-bukkit-fabric.md` — the in-module `common/ + bukkit/ + fabric/` split that effects-api-ADR-006 refines.
   - `docs/dev/scratch/CHECKLIST-fabric-26-1-2-bringup.md` Phase 5 / Phase 5C — the bring-up work this ADR unblocks.
@@ -177,7 +177,7 @@ No other v-modules change.
 
 - `rtp-fabric-common` source layout — KEPT. Only files that demonstrably name `net.minecraft.*` and are version-agnostic are candidates for relocation; the bulk of `rtp-fabric-common` (events bridge, scheduler, commands, world-list helpers that don't cross NM) stays put.
 - `rtp-fabric-v1_20_R1`, `rtp-fabric-v1_21_R1`, `rtp-fabric-v1_21_R5`, `rtp-fabric-v1_21_R11` — UNCHANGED. They remain on `rtp-fabric-common` only.
-- The `rtp-fabric-ADR-002 §4` Loom allow-list is widened by exactly one module (`rtp-fabric-common-unobf`).
+- The `rtp-fabric-ADR-002 section 4` Loom allow-list is widened by exactly one module (`rtp-fabric-common-unobf`).
 - No business logic moves out of `rtp-core` / `rtp-api`. The new module is platform glue only, per *Architecture Boundaries* in `.junie/AGENTS.md`.
 - No public addon API surface changes. Addons depend on `rtp-api` and never on `rtp-fabric-common[-unobf]` directly.
 
@@ -187,7 +187,7 @@ No other v-modules change.
 
 - Resolves the structural half of the deobf-26.x linkage hazard; together with `effects-api-ADR-006` it closes Phase 5 / item 22 once for every current and future deobf-MC line.
 - Per-version v26.x submodules (26.1, 26.2, 26.3, …) thin out to true version-deltas only; the version-agnostic glue lives once, in `rtp-fabric-common-unobf`.
-- Honours `rtp-fabric-ADR-002 §4` — exactly one new Loom-using module, justified by the structural impossibility of compiling intermediary and unobfuscated bytecode in the same source set.
+- Honours `rtp-fabric-ADR-002 section 4` — exactly one new Loom-using module, justified by the structural impossibility of compiling intermediary and unobfuscated bytecode in the same source set.
 - Unblocks `effects-api-ADR-006`'s checklist step 1 (which explicitly requires this ADR or its equivalent to land first or in lockstep).
 - S-005 (no chunk I/O on main thread): unchanged. `FabricWorldUnobf` mirrors `FabricWorld`'s async chunk-load contract from `rtp-fabric-ADR-008`; no new sync chunk-load entry points.
 - S-006 (API-before-core null guards): unchanged. The new module hosts no `rtp-api` entry points.

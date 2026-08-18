@@ -66,7 +66,7 @@ target-commands:
   # EzRTP. plugin.yml: `forcertp <player> [world]` is the admin form that
   # can target another player; `/rtp` itself is self-only. The world arg is
   # required in practice — `/ezrtp:forcertp <player>` (no world) silently
-  # times out (see PRE_WRITEUP §5k). Edit `world` if your test server's
+  # times out (see PRE_WRITEUP section 5k). Edit `world` if your test server's
   # overworld has a different name.
   #
   # Pre-run config: EzRTP `limits.yml` cooldown-seconds zeroed across all
@@ -109,7 +109,7 @@ target-commands:
   # `randomtp`, `wild`) and the admin form is `/rtp <player> <server>
   # [world]`. There is no `forcertp` or other namespace-unique command, so
   # the `sorekillrtp:` prefix collides with our own /rtp registration on
-  # the Bukkit command map (same class as the JakesRTP collision in §5g —
+  # the Bukkit command map (same class as the JakesRTP collision in section 5g —
   # the prefixed lookup may resolve to the wrong PluginCommand depending
   # on plugin load order). Workaround: dispatch via the admin alias
   # `randomtp` which is unique to SorekillRTP. Verify with `/version`
@@ -258,7 +258,7 @@ default-burst: 10
 # state behaviour per plugin rather than interleaved contention.
 sequence:
   # How long each target is exercised, in seconds.
-  # Bumped 60 → 600 (10 min) for the 2026-05-02 long-form run: §5e showed
+  # Bumped 60 → 600 (10 min) for the 2026-05-02 long-form run: section 5e showed
   # huskhomes still drifting at end-of-60s, and per-plugin steady-state
   # claims need a window long enough that JIT, queue-drain transients, and
   # the first GC cycle are all behind us before the publishable window.

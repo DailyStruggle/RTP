@@ -96,7 +96,7 @@ public final class InMemoryNetworkStateBinding implements NetworkTransport {
                     sub.sink.accept(row);
                 } catch (RuntimeException ignored) {
                     // Subscribers are responsible for their own error handling
-                    // per rtp-proxy-ADR-001 §Threading Contract.
+                    // per rtp-proxy-ADR-001 section Threading Contract.
                 }
             }
         }
@@ -294,7 +294,7 @@ public final class InMemoryNetworkStateBinding implements NetworkTransport {
         }
     }
 
-    // ---------- Test affordances (rtp-proxy-ADR-003 §Test Affordances) ----------
+    // ---------- Test affordances (rtp-proxy-ADR-003 section Test Affordances) ----------
 
     /** Returns an immutable snapshot of the reservation table. */
     public Map<String, ReservationToken> dumpTokens() {

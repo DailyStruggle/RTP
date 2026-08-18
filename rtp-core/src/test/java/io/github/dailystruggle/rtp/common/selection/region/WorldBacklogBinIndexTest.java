@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link WorldBacklogBinIndex}, the cross-RTP-region bin index
- * specified by ADR-028 §Architecture. Covers insert/snapshot semantics,
+ * specified by ADR-028 section Architecture. Covers insert/snapshot semantics,
  * cross-region bin sharing, and weak-ref lifecycle (bin survives while any
  * contributing entry is live; bin becomes GC-eligible once no entry retains
  * it via {@code pinBinList}).

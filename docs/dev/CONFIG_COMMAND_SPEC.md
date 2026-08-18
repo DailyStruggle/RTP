@@ -40,7 +40,7 @@
 
 ## 2. Command Grammar
 
-The grammar is **flat** (no nested operator precedence), **single-file** per invocation, and **derived from the parameter registry** — never hand-rolled per command. The same grammar object drives `onCommand` and `onTabComplete` (contract §9).
+The grammar is **flat** (no nested operator precedence), **single-file** per invocation, and **derived from the parameter registry** — never hand-rolled per command. The same grammar object drives `onCommand` and `onTabComplete` (contract section 9).
 
 ### 2.1 Top-level forms
 
@@ -85,7 +85,7 @@ The view is **interactive** on platforms whose chat renderer supports it:
 - Each rendered value carries a **click-suggest** action that pre-fills the caller's chat with `/rtp config <file> <key>:` ready for the new value (or `/rtp config <file> <list-key> add:` / `remove:` for list-typed keys), so the admin's next keystroke is the new value.
 - On consoles and platforms without interactive chat, the view degrades to plain text; the click-suggest and hover are simply absent. No audit-record shape change between modes.
 
-`view` is read-only: it takes no `ConfigTransaction`, never opens a temp file, never enters §3.4–§3.6, and is unaffected by `RELOAD_IN_PROGRESS` (it reads whichever parser snapshot is current at the moment it serializes its output). Failure modes are limited to `NO_PERMISSION`, `UNKNOWN_FILE`, and `UNKNOWN_KEY`.
+`view` is read-only: it takes no `ConfigTransaction`, never opens a temp file, never enters section 3.4–section 3.6, and is unaffected by `RELOAD_IN_PROGRESS` (it reads whichever parser snapshot is current at the moment it serializes its output). Failure modes are limited to `NO_PERMISSION`, `UNKNOWN_FILE`, and `UNKNOWN_KEY`.
 
 ### 2.5 Reserved tokens
 
@@ -95,23 +95,23 @@ The literal tokens `add:`, `remove:`, `view`, and the configured `dryRunFlag` ar
 
 ## 3. Lifecycle of a Single Invocation
 
-Every mutating invocation proceeds through a fixed seven-stage lifecycle. No stage may be reordered, skipped, or short-circuited; failure at any stage routes to *Audit + Reject* (§3.7) without leaving in-memory or on-disk state mutated.
+Every mutating invocation proceeds through a fixed seven-stage lifecycle. No stage may be reordered, skipped, or short-circuited; failure at any stage routes to *Audit + Reject* (section 3.7) without leaving in-memory or on-disk state mutated.
 
 ### 3.1 Parse
 
-The raw argument list is tokenized against the grammar (§2). Output: a `ParsedInvocation { targetFile, mutations[], dryRun }`. Parse-time failures (`UNKNOWN_FILE`, `WRONG_OPERATOR_FOR_TYPE`, `RESERVED_TOKEN_COLLISION`, `MALFORMED_ARGUMENT`) are reported with the offending token's index for tab-complete attribution.
+The raw argument list is tokenized against the grammar (section 2). Output: a `ParsedInvocation { targetFile, mutations[], dryRun }`. Parse-time failures (`UNKNOWN_FILE`, `WRONG_OPERATOR_FOR_TYPE`, `RESERVED_TOKEN_COLLISION`, `MALFORMED_ARGUMENT`) are reported with the offending token's index for tab-complete attribution.
 
 ### 3.2 Authorize
 
-The caller's permissions are checked against the most-specific node implied by `targetFile` (§7). All mutations in one invocation target one file, so authorization is a single check, not per-mutation. Failure → `NO_PERMISSION`.
+The caller's permissions are checked against the most-specific node implied by `targetFile` (section 7). All mutations in one invocation target one file, so authorization is a single check, not per-mutation. Failure → `NO_PERMISSION`.
 
 ### 3.3 Validate
 
-Each mutation is run through `ConfigParameterValidator` (§5). Validators are pure functions over `(parameterPath, attemptedValue, currentInMemoryState)`. No mutation has been applied yet. First failure short-circuits the stage; subsequent mutations are not validated (their state in the audit record is `NOT_REACHED`).
+Each mutation is run through `ConfigParameterValidator` (section 5). Validators are pure functions over `(parameterPath, attemptedValue, currentInMemoryState)`. No mutation has been applied yet. First failure short-circuits the stage; subsequent mutations are not validated (their state in the audit record is `NOT_REACHED`).
 
 ### 3.4 Snapshot
 
-A snapshot of every `FactoryValue` the mutations will touch is captured into the transaction. The snapshot is the rollback source-of-truth (§3.7) and the `oldValue` source for the audit record (§6).
+A snapshot of every `FactoryValue` the mutations will touch is captured into the transaction. The snapshot is the rollback source-of-truth (section 3.7) and the `oldValue` source for the audit record (section 6).
 
 ### 3.5 Apply (in-memory)
 
@@ -119,13 +119,13 @@ Mutations are applied to the in-memory parser state in argument order. Re-valida
 
 ### 3.6 Persist (if not dry-run)
 
-The targeted file is written via the atomic save mechanics of §4. On any I/O failure (temp-file write, fsync, rename), the snapshot is restored to the in-memory parser and the temp file is deleted; the invocation fails with `reasonCode = PERSIST_IO`.
+The targeted file is written via the atomic save mechanics of section 4. On any I/O failure (temp-file write, fsync, rename), the snapshot is restored to the in-memory parser and the temp file is deleted; the invocation fails with `reasonCode = PERSIST_IO`.
 
 ### 3.7 Audit + Reload (or Audit + Reject)
 
-- **Success (live).** A targeted reload of the affected parser is dispatched (per architecture diagram 09). One `INFO` audit record is emitted (§6).
+- **Success (live).** A targeted reload of the affected parser is dispatched (per architecture diagram 09). One `INFO` audit record is emitted (section 6).
 - **Success (dry-run).** No reload. The would-be diff is rendered to the caller via `messages.yml → config.dryRun.*` and an `INFO` audit record is emitted with `dryRun = true`.
-- **Failure (any stage).** Rollback is complete (no in-memory mutation survives, no temp file survives), one `WARNING` audit record is emitted with the failing `reasonCode`, and the configurable failure message (§5.2) is delivered to the caller.
+- **Failure (any stage).** Rollback is complete (no in-memory mutation survives, no temp file survives), one `WARNING` audit record is emitted with the failing `reasonCode`, and the configurable failure message (section 5.2) is delivered to the caller.
 
 > **S-004 (no silently discarded failures).** Every exit path of this lifecycle emits exactly one audit record. Catch-and-swallow, silent `return false`, and `null` returns are prohibited.
 
@@ -164,7 +164,7 @@ Writable via `/rtp config`:
 
 Not writable via the **general** `/rtp config <file> <key>:<value>` path:
 
-- `language.yml` — read by `LanguageBootstrap` before any `ConfigParser` exists ([ADR-020](../adr/ADR-020-language-bootstrap-and-locale-aware-configparser.md)). A live mutation requires re-initializing **every** parser (because the locale-aware `ConfigParser` resolves keys against the active locale at construction), which is a heavier operation than the per-file lifecycle of §3. Therefore `language.yml` is **not** exposed as a generic `SubConfigCmd` target; instead, a dedicated path (the existing `LanguageCmd` family under `commands/config/`, hardened to the same audit + permission + atomic-write contracts as this spec) handles locale changes by running the lifecycle of §3 **and then** triggering a full `Configs.reload`-equivalent re-init in §3.7 of its own invocation. Attempts to address `language` through the generic `/rtp config language …` path shall be **redirected** to the dedicated `LanguageCmd` (not failed) when the grammar allows; if the syntax is ambiguous, the command shall fail with `reasonCode = USE_DEDICATED_COMMAND` and the configurable message shall name the right command.
+- `language.yml` — read by `LanguageBootstrap` before any `ConfigParser` exists ([ADR-020](../adr/ADR-020-language-bootstrap-and-locale-aware-configparser.md)). A live mutation requires re-initializing **every** parser (because the locale-aware `ConfigParser` resolves keys against the active locale at construction), which is a heavier operation than the per-file lifecycle of section 3. Therefore `language.yml` is **not** exposed as a generic `SubConfigCmd` target; instead, a dedicated path (the existing `LanguageCmd` family under `commands/config/`, hardened to the same audit + permission + atomic-write contracts as this spec) handles locale changes by running the lifecycle of section 3 **and then** triggering a full `Configs.reload`-equivalent re-init in section 3.7 of its own invocation. Attempts to address `language` through the generic `/rtp config language …` path shall be **redirected** to the dedicated `LanguageCmd` (not failed) when the grammar allows; if the syntax is ambiguous, the command shall fail with `reasonCode = USE_DEDICATED_COMMAND` and the configurable message shall name the right command.
 - Any non-registered `.yml` file under `plugins/RTP/` (third-party drop-ins, addon configs not exposed through `Configs`). Tab-complete enumerates only registered files; explicit invocation against an unregistered file fails with `UNKNOWN_FILE`.
 
 ### 4.5 Tab-complete enumeration
@@ -176,10 +176,10 @@ Tab-complete for `<file>` shall list every registered `ConfigParser` and `MultiC
 A `/rtp config` write and a `/rtp reload` are mutually serialized:
 
 - A reload in progress (i.e. between the in-memory swap and the post-swap region rebuild of architecture diagram 09) shall reject incoming writes with `reasonCode = RELOAD_IN_PROGRESS`. The reject is fast (no temp file is opened).
-- A write in progress (i.e. between §3.4 *Snapshot* and §3.7 *Reload*) shall block a concurrently-issued reload by deferring it until the write's reload-affected step completes. The deferral is a single short await on the per-file write lock; reloads do not stack.
+- A write in progress (i.e. between section 3.4 *Snapshot* and section 3.7 *Reload*) shall block a concurrently-issued reload by deferring it until the write's reload-affected step completes. The deferral is a single short await on the per-file write lock; reloads do not stack.
 - In-flight teleports holding a pre-write parser snapshot are unaffected — they see the old values until they finish, exactly as documented in architecture diagram 09. This is the same invariant the read path already provides.
 
-> **No background save queue.** Writes are dispatched on the command's caller thread (or its scheduled platform handoff for Folia per the platform adapter's `RTP.scheduler` runAsync), never queued behind unrelated work. There is no risk of a config save being lost on shutdown because none are pending: every successful invocation has already completed §4.2 before the audit record is emitted.
+> **No background save queue.** Writes are dispatched on the command's caller thread (or its scheduled platform handoff for Folia per the platform adapter's `RTP.scheduler` runAsync), never queued behind unrelated work. There is no risk of a config save being lost on shutdown because none are pending: every successful invocation has already completed section 4.2 before the audit record is emitted.
 
 ---
 
@@ -189,7 +189,7 @@ A `/rtp config` write and a `/rtp reload` are mutually serialized:
 
 Validation is centralized in `ConfigParameterValidator` (per [ADR-037](../adr/ADR-037-harden-rtp-config-commands.md) contract 1). One validator instance per parameter type. The validator receives `(parameterPath, attemptedValue, inMemoryStateSnapshot)` and returns either `Ok` or `ConfigValidationFailure(parameterPath, attemptedValue, reasonCode, detail)`.
 
-Validators are pure: no I/O, no chunk access, no scheduling. They run on the calling thread. Composite invariants (cross-parameter, e.g. `Polygon.expand` vs. `Polygon.vertices`) run as a second pass after per-parameter validators pass, before §3.5 *Apply* commits the in-memory state.
+Validators are pure: no I/O, no chunk access, no scheduling. They run on the calling thread. Composite invariants (cross-parameter, e.g. `Polygon.expand` vs. `Polygon.vertices`) run as a second pass after per-parameter validators pass, before section 3.5 *Apply* commits the in-memory state.
 
 ### 5.2 `reasonCode` enumeration
 
@@ -226,22 +226,22 @@ Every invocation — success or failure, live or dry-run — emits **exactly one
 
 | Field | Type | Always present | Meaning |
 |---|---|---|---|
-| `timestamp` | ISO-8601 UTC | yes | When the lifecycle entered §3.1 *Parse*. |
+| `timestamp` | ISO-8601 UTC | yes | When the lifecycle entered section 3.1 *Parse*. |
 | `actor` | string | yes | The caller identity: `console`, `player:<uuid>` (and the player's name in a secondary field), or `addon:<addonName>` for `rtp-api`-driven invocations. |
 | `command` | string | yes | The fully-resolved canonical command string the caller issued, with the configured `dryRunFlag` normalized but argument case and order preserved. |
 | `targetFile` | string | yes | Resolved canonical file path relative to `plugins/RTP/` (e.g. `regions/nether.yml`). |
 | `mutations` | array | yes (may be empty for `view`) | Per-mutation `{ parameterPath, oldValue, newValue, applied: bool, reasonCode? }`. `applied=false` with `reasonCode = NOT_REACHED` indicates a mutation that was queued but never validated because an earlier mutation failed. |
 | `dryRun` | bool | yes | True when the invocation carried `--dry-run`. |
 | `outcome` | enum | yes | `COMMITTED` \| `DRY_RUN_OK` \| `REJECTED` \| `ROLLED_BACK`. |
-| `reasonCode` | string | only when `outcome ∈ {REJECTED, ROLLED_BACK}` | The closed-set code from §5.2. |
+| `reasonCode` | string | only when `outcome ∈ {REJECTED, ROLLED_BACK}` | The closed-set code from section 5.2. |
 | `detail` | string | optional | Free-form human-oriented detail (e.g. the underlying `IOException` message for `PERSIST_IO`). Never used for control flow. |
-| `durationMs` | integer | yes | Wall-clock time from §3.1 to record emission. |
+| `durationMs` | integer | yes | Wall-clock time from section 3.1 to record emission. |
 
 Success records are emitted at `Level.INFO`; failure and rollback records at `Level.WARNING`. The `view` sub-form is `Level.INFO` with `outcome = DRY_RUN_OK` and an empty `mutations` array (its read-only payload, if any, is delivered to the caller, not the audit log, to avoid `messages.yml` content leaking into log files when an admin runs `view` against `messages.yml`).
 
 ### 6.2 Single formatter, single sink
 
-All records flow through one `ConfigAuditFormatter`. Per the existing `SendMessage.addInterceptor(Consumer<String>)` pattern documented in `AGENTS.md → Logging & Feedback`, tests and the `rtp test full` audit pass shall consume the formatted line stream rather than scraping platform-specific logger output. The formatter's output is deterministic given the record (no clock-derived suffix beyond `timestamp`, no `Object#toString` leakage of identity hash codes). The single invocation produces exactly one record; rollback in §3.7 emits the same record (with `outcome = ROLLED_BACK` and the failing `reasonCode`) rather than a paired pre/post record, so no cross-record correlation key is needed.
+All records flow through one `ConfigAuditFormatter`. Per the existing `SendMessage.addInterceptor(Consumer<String>)` pattern documented in `AGENTS.md → Logging & Feedback`, tests and the `rtp test full` audit pass shall consume the formatted line stream rather than scraping platform-specific logger output. The formatter's output is deterministic given the record (no clock-derived suffix beyond `timestamp`, no `Object#toString` leakage of identity hash codes). The single invocation produces exactly one record; rollback in section 3.7 emits the same record (with `outcome = ROLLED_BACK` and the failing `reasonCode`) rather than a paired pre/post record, so no cross-record correlation key is needed.
 
 ---
 
@@ -254,7 +254,7 @@ Permissions are additive over the existing umbrella nodes:
 | Node | Grants |
 |---|---|
 | `rtp.config` | Legacy alias retained for back-compat; equivalent to `rtp.config.view` + `rtp.config.set`. |
-| `rtp.config.view` | The `view` sub-form (§2.4) against any file. |
+| `rtp.config.view` | The `view` sub-form (section 2.4) against any file. |
 | `rtp.config.set` | Any mutation against any file (umbrella). |
 | `rtp.config.set.<section>` | Mutations against the named top-level section only. `<section>` is the basename of the target file or the multi-config group (e.g. `performance`, `economy`, `regions`, `worlds`, `safety`, `messages`, `config`, `logging`). |
 
@@ -276,7 +276,7 @@ Per-region scoping (e.g. "edit only `regions/nether.yml`") is **not** part of th
 
 ## 8. Schema-Checked Reload
 
-`/rtp reload` (whether issued directly, dispatched by §3.7, or triggered by the dedicated `LanguageCmd`) runs the parsed-but-not-applied config through the same `ConfigParameterValidator` chain (§5) **before** swapping it in. The check runs against the same composite-invariant pass §3.5 uses, so a reload of a file that was edited offline (bypassing the command surface) is guarded by the same invariant set as a write through the command surface.
+`/rtp reload` (whether issued directly, dispatched by section 3.7, or triggered by the dedicated `LanguageCmd`) runs the parsed-but-not-applied config through the same `ConfigParameterValidator` chain (section 5) **before** swapping it in. The check runs against the same composite-invariant pass section 3.5 uses, so a reload of a file that was edited offline (bypassing the command surface) is guarded by the same invariant set as a write through the command surface.
 
 ### 8.1 Failure semantics
 
@@ -292,20 +292,20 @@ The shape-specific invariants from [ADR-034](../adr/ADR-034-memory-shape-catalog
 
 `onCommand` and `onTabComplete` consume the **same** `ConfigParameterGrammar` definition per parameter. There is exactly one source of truth for:
 
-- The set of valid `<file>` tokens at position 1 (the `Configs` registry, §4.5).
+- The set of valid `<file>` tokens at position 1 (the `Configs` registry, section 4.5).
 - The set of valid `<subfile>` tokens at position 2 for multi-config groups (filesystem enumeration of the group directory).
 - The set of valid `<key>` tokens at the next position (the file's parameter registry).
 - The set of valid `<value>` completions for a typed key (enum members for enum-typed keys; `add:` / `remove:` literal completions plus current-list-members for `remove:` on `List` keys; numeric placeholder hints with the declared range for numeric keys).
 
 Any completion the player sees is a **parseable** command. The test `ConfigParameterGrammarParseCompleteParityTest` (per ADR-037 *Migration / Rollout*) asserts this by, for every registered parameter, completing one step deeper than the previous tab and round-tripping the completion through the parser; any completion that fails to parse fails the test.
 
-Tab-complete may filter by the caller's permissions (a holder of `rtp.config.set.regions` who tabs at position 1 shall see only `regions`, `worlds`-if-also-granted, etc.). This is a UX nicety and does not change the parser; it only suppresses suggestions the caller could not act on. It is **not** a substitute for the §7 authorization step in the lifecycle.
+Tab-complete may filter by the caller's permissions (a holder of `rtp.config.set.regions` who tabs at position 1 shall see only `regions`, `worlds`-if-also-granted, etc.). This is a UX nicety and does not change the parser; it only suppresses suggestions the caller could not act on. It is **not** a substitute for the section 7 authorization step in the lifecycle.
 
 ---
 
 ## 10. Error Matrix
 
-The matrix below is exhaustive over the §3 lifecycle stages cross-producted with the §5 reasonCodes. Read it as: *for input class X, the expected outcome is Y, with audit `outcome` Z*. Cells marked "n/a" are unreachable by construction (e.g. `PERSIST_IO` cannot occur before §3.6).
+The matrix below is exhaustive over the section 3 lifecycle stages cross-producted with the section 5 reasonCodes. Read it as: *for input class X, the expected outcome is Y, with audit `outcome` Z*. Cells marked "n/a" are unreachable by construction (e.g. `PERSIST_IO` cannot occur before section 3.6).
 
 | Input class | Stage that detects | `reasonCode` | Audit `outcome` | Caller sees |
 |---|---|---|---|---|
@@ -337,17 +337,17 @@ The pre-hardening implementation (`rtp-core/.../commands/config/{ConfigCmd,SubCo
 
 | # | Gap | Spec section | ADR-037 contract |
 |---|---|---|---|
-| A1 | `SubConfigCmd#onCommand` inlines per-type parse-and-coerce with mixed `return false` / silent-fail branches; no central `ConfigParameterValidator`. | §3.3, §5 | 1 |
-| A2 | No `ConfigTransaction`; mutations are applied to in-memory state directly and serialized lazily; rollback is not available. | §3.4, §3.5, §3.7 | 2 |
-| A3 | No `--dry-run` flag; no preview path. | §2.1, §3.7 | 3 |
-| A4 | Audit records are partial: some successful sets are not logged; some failures are silently rejected. | §6 | 4 |
-| A5 | `BukkitBaseRTPCmd#msgInvalidCommand` / `msgBadParameter` carry hardcoded English fallbacks. | §5.3 | 5 |
-| A6 | Permission grain is `rtp.config` (umbrella) only; no scoped `rtp.config.set.<section>` nodes. | §7 | 6 |
-| A7 | `ReloadCmd` re-reads config without running the validator chain against the resulting state; shape-invariant violations surface at sample time. | §8 | 7 |
-| A8 | `onTabComplete` and `onCommand` parse the argument grammar independently; some completions do not round-trip. | §9 | 8 |
-| A9 | Writes are not atomic-rename: the parser serializes directly to the target file. A crash mid-write can leave the file truncated. | §4.2, §4.6 | 2 (persist substep) |
-| A10 | `language.yml` cannot be mutated at runtime through any command surface; locale changes require a server restart. | §4.4 | 2 (LanguageCmd hardening) |
-| A11 | Startup does not log/clean stray `*.tmp` siblings of registered config files (no temp files exist today; this row is "starting state for the new contract," not a regression). | §4.2 | 2 |
-| A12 | The YAML substrate does not guarantee that block / inline comments survive a write-back round-trip. The `view` hover-text feature (§2.4) depends on comment preservation; until the substrate is upgraded (or replaced with an in-house parser), hover-text falls back to declared type + bounds. Comment preservation is also valuable independently of `/rtp config` for admins who hand-edit YAML and reload. | §2.4, §4.2 | — (separate ADR; tracked here for visibility) |
+| A1 | `SubConfigCmd#onCommand` inlines per-type parse-and-coerce with mixed `return false` / silent-fail branches; no central `ConfigParameterValidator`. | section 3.3, section 5 | 1 |
+| A2 | No `ConfigTransaction`; mutations are applied to in-memory state directly and serialized lazily; rollback is not available. | section 3.4, section 3.5, section 3.7 | 2 |
+| A3 | No `--dry-run` flag; no preview path. | section 2.1, section 3.7 | 3 |
+| A4 | Audit records are partial: some successful sets are not logged; some failures are silently rejected. | section 6 | 4 |
+| A5 | `BukkitBaseRTPCmd#msgInvalidCommand` / `msgBadParameter` carry hardcoded English fallbacks. | section 5.3 | 5 |
+| A6 | Permission grain is `rtp.config` (umbrella) only; no scoped `rtp.config.set.<section>` nodes. | section 7 | 6 |
+| A7 | `ReloadCmd` re-reads config without running the validator chain against the resulting state; shape-invariant violations surface at sample time. | section 8 | 7 |
+| A8 | `onTabComplete` and `onCommand` parse the argument grammar independently; some completions do not round-trip. | section 9 | 8 |
+| A9 | Writes are not atomic-rename: the parser serializes directly to the target file. A crash mid-write can leave the file truncated. | section 4.2, section 4.6 | 2 (persist substep) |
+| A10 | `language.yml` cannot be mutated at runtime through any command surface; locale changes require a server restart. | section 4.4 | 2 (LanguageCmd hardening) |
+| A11 | Startup does not log/clean stray `*.tmp` siblings of registered config files (no temp files exist today; this row is "starting state for the new contract," not a regression). | section 4.2 | 2 |
+| A12 | The YAML substrate does not guarantee that block / inline comments survive a write-back round-trip. The `view` hover-text feature (section 2.4) depends on comment preservation; until the substrate is upgraded (or replaced with an in-house parser), hover-text falls back to declared type + bounds. Comment preservation is also valuable independently of `/rtp config` for admins who hand-edit YAML and reload. | section 2.4, section 4.2 | — (separate ADR; tracked here for visibility) |
 
 When this appendix is empty, the implementation has caught up with the spec and ADR-037 may be marked **Implemented** independently of any subsequent revisions to this document.

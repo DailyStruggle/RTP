@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
 /**
- * Platform-neutral handle to a decoded schematic payload and dimensions (ADR-058 §1, S-003).
+ * Platform-neutral handle to a decoded schematic payload and dimensions (ADR-058 section 1, S-003).
  */
 public interface LoadedSchematic {
   /** @return the source this schematic was decoded from. */

@@ -237,7 +237,7 @@ public class RegexParameterSecurityTest {
     @Test
     @DisplayName("S-INJ-13: a value literally named 'reg:foo' is still routable as a literal token")
     void literalTokenWithRegPrefixIsAmbiguousButDocumented() {
-        // The plan §6 documents this ambiguity: a literal value beginning with
+        // The plan section 6 documents this ambiguity: a literal value beginning with
         // 'reg:' is reinterpreted as a pattern. This test pins the documented
         // behaviour so any future change requires a conscious update.
         StubParameter p = new StubParameter(setOf("reg:foo"), (u, s) -> true);

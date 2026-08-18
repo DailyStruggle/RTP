@@ -64,7 +64,7 @@ public final class HmacVerifier implements AutoCloseable {
      *
      * <p>The env var value is Base64-decoded. The decoded byte array must be
      * at least {@link #MIN_SECRET_BYTES} bytes long; shorter secrets throw
-     * {@link NetworkConfigException} per ADR-010 §Key Material.</p>
+     * {@link NetworkConfigException} per ADR-010 section Key Material.</p>
      *
      * @param envVarName            name of the env var to read (typically {@code RTP_NET_SECRET})
      * @param minSchemaVersion      minimum acceptable schema version on verify
@@ -204,7 +204,7 @@ public final class HmacVerifier implements AutoCloseable {
     public int currentSchemaVersion() { return currentSchemaVersion; }
 
     /**
-     * Zero the in-memory secret bytes per rtp-proxy-ADR-010 §Key Material.
+     * Zero the in-memory secret bytes per rtp-proxy-ADR-010 section Key Material.
      * Idempotent: a second call is a no-op (the secret is already zero).
      * After {@code close()}, subsequent {@link #sign} / {@link #verify} calls
      * compute against the zero-filled buffer; callers must drop their

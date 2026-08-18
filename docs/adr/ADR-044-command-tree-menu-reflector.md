@@ -85,7 +85,7 @@ Hover is built at **mint time**, dispatch is **live**. Unchanged from the prior 
 
 ### Per-consumer hooks
 
-The `MenuConsumerProfile` interface in `menu-api` (currently `rtp-api/.../menu/MenuConsumerProfile.java`) carries `suggestPrefix` + `commentLookup` + `defaultProfile()` and an optional `includeParameter` hook. `ConfigMenuConsumerProfile` (in `rtp-core`) binds the comment lookup to the live `Configs` registry and produces the `/rtp config <file> <key>:` prefix from `CONFIG_COMMAND_SPEC §2.4`. Future consumers (region picker, `/rtpadmin` wizards, addon-authored menus) ship their own profiles; no SPI extension is required.
+The `MenuConsumerProfile` interface in `menu-api` (currently `rtp-api/.../menu/MenuConsumerProfile.java`) carries `suggestPrefix` + `commentLookup` + `defaultProfile()` and an optional `includeParameter` hook. `ConfigMenuConsumerProfile` (in `rtp-core`) binds the comment lookup to the live `Configs` registry and produces the `/rtp config <file> <key>:` prefix from `CONFIG_COMMAND_SPEC section 2.4`. Future consumers (region picker, `/rtpadmin` wizards, addon-authored menus) ship their own profiles; no SPI extension is required.
 
 ### Requirements
 
@@ -128,7 +128,7 @@ All four S-00x prohibitions inherited by the menu subsystem (S-004 via `MenuRede
   - `menu-api` and `commands-api` share an explicit module boundary; the Brigadier coupling is visible in the dependency graph rather than buried in `rtp-core`.
   - The Fabric `ChatMenuRenderer` (Stage 5.2) has a natural home (`menu-api-fabric-unobf/`) without dragging Fabric carriers into `rtp-api`.
   - Addons that want to author menus depend on `menu-api` alone, not the entire RTP-domain API.
-  - Future `*-api` modules cite the *sibling DAG* policy in §*Module dependency layering* instead of re-deriving it.
+  - Future `*-api` modules cite the *sibling DAG* policy in section *Module dependency layering* instead of re-deriving it.
 
 - **Negative / Trade-offs:**
   - Module count grows by one (plus optionally `menu-api-fabric-unobf/`). Mitigated: the addition follows the established `effects-api` / `commands-api` / `maps-api` shape; no new build pattern is invented.
@@ -167,7 +167,7 @@ The user-visible delta from `v3.0.0-beta.1` is the new module path; no class or 
 - [effects-api-ADR-006](../../effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md) — obf/unobf carrier dispatch contract reused for Fabric `ChatMenuRenderer`.
 - [rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md) — Fabric carrier split rationale.
 - [commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) — Brigadier bridge; `/rtp menu` registration path.
-- [CONFIG_COMMAND_SPEC §2.4](../dev/CONFIG_COMMAND_SPEC.md) — `view` sub-form; the `/rtp config` consumer mirrors its hover / click-suggest contract.
-- [REQUIREMENTS.md §3](../dev/REQUIREMENTS.md) — Prohibitions; the menu subsystem inherits S-004, S-005, S-006, S-007.
+- [CONFIG_COMMAND_SPEC section 2.4](../dev/CONFIG_COMMAND_SPEC.md) — `view` sub-form; the `/rtp config` consumer mirrors its hover / click-suggest contract.
+- [REQUIREMENTS.md section 3](../dev/REQUIREMENTS.md) — Prohibitions; the menu subsystem inherits S-004, S-005, S-006, S-007.
 - [TRACEABILITY.md](../dev/TRACEABILITY.md) — REQ-RTP-F-013 row covers menu chrome strings; REQ-RTP-MENU-001..004 rows added during Stage 6.
 - [`docs/dev/scratch/CHECKLIST-generalized-menu.md`](../dev/scratch/CHECKLIST-generalized-menu.md) — multi-session implementation plan, including the Stage 6 module-extraction sub-plan ratified by this ADR.

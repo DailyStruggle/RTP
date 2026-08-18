@@ -52,7 +52,7 @@ Adopt a Fabric submodule layout that mirrors the Bukkit-family pattern:
 
 ### Forge / NeoForge
 
-Out of scope. rtp-fabric-ADR-002 (formerly ADR-031) §2 keeps Forge / NeoForge deferred until Fabric stabilises, and this ADR does not change that.
+Out of scope. rtp-fabric-ADR-002 (formerly ADR-031) section 2 keeps Forge / NeoForge deferred until Fabric stabilises, and this ADR does not change that.
 
 ## Alternatives Considered
 

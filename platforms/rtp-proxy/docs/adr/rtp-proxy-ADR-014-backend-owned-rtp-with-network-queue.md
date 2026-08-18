@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-05-21)
 **Refines:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md), [rtp-proxy-ADR-005](rtp-proxy-ADR-005-redis-binding.md), [rtp-proxy-ADR-011](rtp-proxy-ADR-011-sql-network-state-binding.md)
-**Supersedes (in part):** [rtp-proxy-ADR-006](rtp-proxy-ADR-006-velocity-bootstrap.md) §Command Hosting - the Velocity adapter no longer registers a Brigadier `/rtp`; the proxy's role is reduced to dispatch and reservation lifecycle.
+**Supersedes (in part):** [rtp-proxy-ADR-006](rtp-proxy-ADR-006-velocity-bootstrap.md) section Command Hosting - the Velocity adapter no longer registers a Brigadier `/rtp`; the proxy's role is reduced to dispatch and reservation lifecycle.
 **Depends on:** [ADR-036](../../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md), [`MULTI_SERVER_PLAN.md`](../../../../docs/dev/MULTI_SERVER_PLAN.md) L6 row.
 
 ## Context
@@ -125,7 +125,7 @@ The Brigadier `/rtp` command is **deleted** (`registerRtpCommand`, `CommandTrigg
 
 - [`docs/dev/MULTI_SERVER_PLAN.md`](../../../../docs/dev/MULTI_SERVER_PLAN.md) - L6 row.
 - [ADR-036](../../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md) - umbrella network-mode decision.
-- [rtp-proxy-ADR-006](rtp-proxy-ADR-006-velocity-bootstrap.md) - Velocity bootstrap (partially superseded: §Command Hosting).
+- [rtp-proxy-ADR-006](rtp-proxy-ADR-006-velocity-bootstrap.md) - Velocity bootstrap (partially superseded: section Command Hosting).
 - [rtp-proxy-ADR-005](rtp-proxy-ADR-005-redis-binding.md) - Redis binding keyspace conventions reused for `rtp:net:wq:*`.
 - [rtp-proxy-ADR-011](rtp-proxy-ADR-011-sql-network-state-binding.md) - SQL pool sharing for `SqlNetworkRequestQueue`.
 - [REQ-RTP-NET-008](../../../../docs/dev/REQUIREMENTS.md) - network wait queue.

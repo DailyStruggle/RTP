@@ -10,7 +10,7 @@ import java.util.concurrent.CompletableFuture;
  * into its native event surface - {@code ServerPreConnectEvent} on Velocity,
  * {@code ServerConnectEvent} on Bungee.
  *
- * <p>rtp-proxy-ADR-001 §4.</p>
+ * <p>rtp-proxy-ADR-001 section 4.</p>
  */
 public interface ProxySender {
 

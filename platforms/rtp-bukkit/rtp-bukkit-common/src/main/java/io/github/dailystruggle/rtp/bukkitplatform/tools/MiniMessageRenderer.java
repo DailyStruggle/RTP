@@ -78,13 +78,13 @@ final class MiniMessageRenderer {
     LEGACY_CODES.put('r', "reset");
   }
 
-  // Bukkit hex form: §x§r§r§g§g§b§b (the indicator may also be '&').
+  // Bukkit hex form: section xsection rsection rsection gsection gsection bsection b (the indicator may also be '&').
   private static final Pattern LEGACY_HEX_PATTERN =
       Pattern.compile("[&\u00a7]x((?:[&\u00a7][0-9a-fA-F]){6})");
-  // Direct hex form: &#rrggbb, §#rrggbb, or a bare #rrggbb.
+  // Direct hex form: &#rrggbb, section #rrggbb, or a bare #rrggbb.
   private static final Pattern DIRECT_HEX_PATTERN =
       Pattern.compile("[&\u00a7]?#([0-9a-fA-F]{6})");
-  // Single legacy color/format code: &c or §c.
+  // Single legacy color/format code: &c or section c.
   private static final Pattern LEGACY_CODE_PATTERN =
       Pattern.compile("[&\u00a7]([0-9a-fk-orK-OR])");
 
@@ -98,7 +98,7 @@ final class MiniMessageRenderer {
 
   /**
    * Translates leftover legacy color/format codes (both {@code &} and section-sign
-   * forms, including the Bukkit {@code §x§r§r§g§g§b§b} hex sequence and direct
+   * forms, including the Bukkit {@code section xsection rsection rsection gsection gsection bsection b} hex sequence and direct
    * {@code #rrggbb} / {@code &#rrggbb} hex) into the equivalent MiniMessage tags so
    * a single {@link MiniMessage#deserialize} pass renders them instead of printing
    * the raw codes literally. MiniMessage {@code <tag>} markup already present in the
@@ -134,7 +134,7 @@ final class MiniMessageRenderer {
   private static String translateLegacySegment(String text) {
     if (text == null || text.isEmpty()) return text;
 
-    // 1. Bukkit §x hex sequence -> <#rrggbb>.
+    // 1. Bukkit section x hex sequence -> <#rrggbb>.
     Matcher hexMatcher = LEGACY_HEX_PATTERN.matcher(text);
     StringBuffer hexBuf = new StringBuffer();
     while (hexMatcher.find()) {
@@ -144,7 +144,7 @@ final class MiniMessageRenderer {
     hexMatcher.appendTail(hexBuf);
     text = hexBuf.toString();
 
-    // 2. Direct #rrggbb / &#rrggbb / §#rrggbb -> <#rrggbb>.
+    // 2. Direct #rrggbb / &#rrggbb / section #rrggbb -> <#rrggbb>.
     Matcher directMatcher = DIRECT_HEX_PATTERN.matcher(text);
     StringBuffer directBuf = new StringBuffer();
     while (directMatcher.find()) {

@@ -5,7 +5,7 @@
 // No ServerPreConnectEvent, no Brigadier, no transport wiring yet —
 // those land in Phase 2b/2c per rtp-proxy-ADR-006.
 //
-// Architecture (rtp-proxy-ADR-001 §Package Boundary Rules + ADR-006):
+// Architecture (rtp-proxy-ADR-001 section Package Boundary Rules + ADR-006):
 //   - May depend on: rtp-api, rtp-proxy-common, Velocity API, JDK.
 //   - Velocity API stays compileOnly — the host provides it at runtime.
 //

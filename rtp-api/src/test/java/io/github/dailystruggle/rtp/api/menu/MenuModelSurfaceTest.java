@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
  * Surface-shape tests for the {@code rtp-api} menu types (ADR-035, ADR-044).
  * Pins defensive copies, null rejection, sealed-action exhaustiveness, and defaults.
  */
-@DisplayName("ADR-035 / ADR-044 § rtp-api menu surface")
+@DisplayName("ADR-035 / ADR-044 - rtp-api menu surface")
 class MenuModelSurfaceTest {
 
     private static MenuFragment frag() {

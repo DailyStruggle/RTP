@@ -5,7 +5,7 @@ package io.github.dailystruggle.rtp.proxy.common.spi;
  * Closing the subscription cancels delivery; idempotent and safe to call
  * from any thread.
  *
- * <p>rtp-proxy-ADR-001 §3 chose a minimal {@code Subscription} type over
+ * <p>rtp-proxy-ADR-001 section 3 chose a minimal {@code Subscription} type over
  * Reactive Streams to avoid adding {@code org.reactivestreams} to the
  * vendor-neutral surface.</p>
  */

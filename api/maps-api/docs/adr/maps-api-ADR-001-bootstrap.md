@@ -1,6 +1,6 @@
 # maps-api-ADR-001 — Module Bootstrap, Package Layout, and Palette Policy
 
-- **Status:** Accepted (2026-05-16); §Palette policy and §Package layout amended 2026-05-23 (additive); §3 Lite-assembly posture amended 2026-06-04 (REQ-RTP-MAP-004 reversed - map rendering ships in Lite). See *Amendments* below.
+- **Status:** Accepted (2026-05-16); section Palette policy and section Package layout amended 2026-05-23 (additive); section 3 Lite-assembly posture amended 2026-06-04 (REQ-RTP-MAP-004 reversed - map rendering ships in Lite). See *Amendments* below.
 - **Supersedes:** —
 - **Superseded by:** —
 - **Related:**
@@ -21,7 +21,7 @@ It deliberately did **not** lock the in-module bootstrap decisions that Stage 1 
 
 1. **Package layout** under `io.github.dailystruggle.mapsapi.*` — how the three layers, the Noop default, and the platform-binding subpackages partition the source tree, and which subpackage is permitted to import `org.bukkit.*` / `net.minecraft.*`.
 2. **Palette policy** — vanilla cartography maps use a 256-entry colour palette (`MapColor` on Bukkit, `MapColor.Brightness` × base colour on Mojmap) whose byte values are stable across MC versions for the documented entries but whose set has been extended in newer versions. Renderers must commit to *some* palette to produce deterministic byte output (per the existing Stage 1 deliverable 4.3 in the checklist).
-3. **Lite-assembly inclusion / exclusion mechanics** — `REQ-RTP-MAP-004` originally said the Lite assembly ships `NoopMapBinding` only; this ADR pinned down whether the Lite trim is enforced at the assembly level (jar filtering, like `effects-api/effects-api-fabric-unobf`) or at the source level. *(Amended 2026-06-04: REQ-RTP-MAP-004 was reversed - the Lite jar ships the full `mapsapi/**` tree and the platform-backed binding, so there is no maps trim. See* §3 *and the* Amendments *section.)*
+3. **Lite-assembly inclusion / exclusion mechanics** — `REQ-RTP-MAP-004` originally said the Lite assembly ships `NoopMapBinding` only; this ADR pinned down whether the Lite trim is enforced at the assembly level (jar filtering, like `effects-api/effects-api-fabric-unobf`) or at the source level. *(Amended 2026-06-04: REQ-RTP-MAP-004 was reversed - the Lite jar ships the full `mapsapi/**` tree and the platform-backed binding, so there is no maps trim. See* section 3 *and the* Amendments *section.)*
 
 These three are scoped to the module's bootstrap, do not affect the umbrella decisions in ADR-046, and do not impose a cross-module change. ADR-046 explicitly defers them here ("renderers must pick a fixed RTP palette mapping to stay deterministic across MC versions" appears in its Consequences but is not resolved).
 
@@ -74,7 +74,7 @@ This ADR therefore picks a **logical-palette-now, concrete-table-Stage-2** postu
 
 Current posture:
 
-- The `maps-api` Gradle module always compiles every subpackage listed in §1. There is no source-level Lite branch.
+- The `maps-api` Gradle module always compiles every subpackage listed in section 1. There is no source-level Lite branch.
 - The `rtp-plugin` Lite shadow-jar ships the full `mapsapi/**` tree (no maps exclusions). `RTPBukkitLitePlugin#onEnable` installs `BukkitMapBinding` unconditionally; `RTPFabricMod` installs `FabricMapBinding`; `RTPNeoForgeMod` installs `NeoForgeMapBinding`.
 - `NoopMapBinding` remains the require-by-contract default (REQ-RTP-MAP-001) and the fallback installed only when no platform binding is available on the active runtime - not the sole binding on Lite.
 - The `liteJarStructureCheck` Gradle audit task (see [ADR-024](../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md)) asserts `mapsapi/**` is **not** excluded from the Lite jar.
@@ -109,11 +109,11 @@ Current posture:
 
 ### 2026-05-23 — `RegionBadLocations` permit + concrete logical-palette layout
 
-This amendment realises the `PaletteIndex` symbol contract that §Palette policy promised as "the Stage 1 RTP palette index" and adds one new `ChartModel` permit. It is additive: it does not retract or supersede any decision in this ADR, and the slot count remains 32 (logical bytes `0..31`).
+This amendment realises the `PaletteIndex` symbol contract that section Palette policy promised as "the Stage 1 RTP palette index" and adds one new `ChartModel` permit. It is additive: it does not retract or supersede any decision in this ADR, and the slot count remains 32 (logical bytes `0..31`).
 
-**1. `mapsapi.model` (§1):** the sealed `ChartModel` permits clause gains a sixth record, `RegionBadLocations(String regionName, int centerX, int centerZ, int radius, long[] badKeys)`. It carries a snapshot of a region's bad-location set (the same packed-long `chunkKey` encoding used by `MemoryShape.pendingBadLocations`) and is consumed by `RegionBadLocationsRenderer` to paint the admin `Visualizations` -> `Region shape` map: red for bad cells, green for the rest of the inscribed disk, black outside. The biome-overlay variant remains future work (deferred per issue thread, 2026-05-23).
+**1. `mapsapi.model` (section 1):** the sealed `ChartModel` permits clause gains a sixth record, `RegionBadLocations(String regionName, int centerX, int centerZ, int radius, long[] badKeys)`. It carries a snapshot of a region's bad-location set (the same packed-long `chunkKey` encoding used by `MemoryShape.pendingBadLocations`) and is consumed by `RegionBadLocationsRenderer` to paint the admin `Visualizations` -> `Region shape` map: red for bad cells, green for the rest of the inscribed disk, black outside. The biome-overlay variant remains future work (deferred per issue thread, 2026-05-23).
 
-**2. `mapsapi.PaletteIndex` (§2):** the planned 32-symbol logical palette was originally drafted as `BACKGROUND / EDGE / TEXT / HEAT_0..HEAT_15 / PIE_0..PIE_11 / ARROW / GRID / MUTED / SELECTED`. That exact vocabulary was never authored into code; the Stage 1 `HeatmapRenderer` shipped instead with integer constants `RAMP_MIN=0 / RAMP_MAX=31`. The amendment chooses a layout aligned with what is actually used, sized for the renderers shipped (`HeatmapRenderer`) and about to ship (`RegionBadLocationsRenderer`):
+**2. `mapsapi.PaletteIndex` (section 2):** the planned 32-symbol logical palette was originally drafted as `BACKGROUND / EDGE / TEXT / HEAT_0..HEAT_15 / PIE_0..PIE_11 / ARROW / GRID / MUTED / SELECTED`. That exact vocabulary was never authored into code; the Stage 1 `HeatmapRenderer` shipped instead with integer constants `RAMP_MIN=0 / RAMP_MAX=31`. The amendment chooses a layout aligned with what is actually used, sized for the renderers shipped (`HeatmapRenderer`) and about to ship (`RegionBadLocationsRenderer`):
 
 | Index | Symbol | Role |
 |------:|--------|------|
@@ -132,14 +132,14 @@ Rationale for the deviation from the original draft vocabulary:
 
 `HeatmapRenderer.RAMP_MIN` / `RAMP_MAX` are retained as renderer-local constants but now delegate to `PaletteIndex.RAMP_MIN` / `PaletteIndex.RAMP_MAX`, preserving the existing `HeatmapRendererTest` call sites and decoupling the renderer from the numeric values.
 
-**3. Future Fabric / Noop / InMemory bindings (§2):** every binding's palette table shall mirror the layout above. Stage 3 `FabricMapBinding` lands the same shape under the obf/unobf carriers; the test-only `InMemoryMapBinding` already writes raw logical bytes (no per-binding remap) and is unaffected.
+**3. Future Fabric / Noop / InMemory bindings (section 2):** every binding's palette table shall mirror the layout above. Stage 3 `FabricMapBinding` lands the same shape under the obf/unobf carriers; the test-only `InMemoryMapBinding` already writes raw logical bytes (no per-binding remap) and is unaffected.
 
-**4. ADR-046 cross-reference:** the umbrella ADR-046 §Palette policy "renderers must pick a fixed RTP palette mapping to stay deterministic across MC versions" open question is now resolved by the concrete table above. No amendment to ADR-046 itself is required.
+**4. ADR-046 cross-reference:** the umbrella ADR-046 section Palette policy "renderers must pick a fixed RTP palette mapping to stay deterministic across MC versions" open question is now resolved by the concrete table above. No amendment to ADR-046 itself is required.
 
 ## References
 
 - [ADR-046](../../../docs/adr/ADR-046-maps-api-module.md) — umbrella ADR.
-- [`docs/dev/REQUIREMENTS.md`](../../../docs/dev/REQUIREMENTS.md) §1.7 — `REQ-RTP-MAP-001..005`.
+- [`docs/dev/REQUIREMENTS.md`](../../../docs/dev/REQUIREMENTS.md) section 1.7 — `REQ-RTP-MAP-001..005`.
 - [`docs/dev/TRACEABILITY.md`](../../../docs/dev/TRACEABILITY.md) — REQ → class → test rows for the maps surface.
 - [`docs/dev/scratch/CHECKLIST-maps-api.md`](../../../docs/dev/scratch/CHECKLIST-maps-api.md) — multi-session implementation plan.
 - [ADR-024](../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md) — Lite-assembly trim posture.

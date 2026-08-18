@@ -12,7 +12,7 @@ Out of scope (covered elsewhere):
 - Fabric / other-platform shutdown — this diagram is Bukkit-family only; Folia uses the same path with the global-region-scheduler variant of `RTPScheduler.cancelTask`.
 - The synchronous `/reload` pitfall — see `LESSONS_LEARNED.md`.
 
-Companion prose: `docs/dev/CODE_TOUR.md §14`.
+Companion prose: `docs/dev/CODE_TOUR.md section 14`.
 
 ## How to read this chart
 
@@ -92,4 +92,4 @@ flowchart TD
 - `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/RTP.java` — `stop()` (~L382).
 - `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/database/DatabaseAccessor.java` — `stop` flag, `flushDirtyCache`, `rebuildCachedLocationsFromMemory`, `processQueries`, `close`.
 - Regression tests: `MemoryShapeShutdownTest`, `RTPTest#stop_*`, `SyncTaskProcessingTest` (shared-pipe `stop=true` behavior).
-- Background: `docs/dev/LESSONS_LEARNED.md` §"Shutdown ordering", `docs/dev/TRACEABILITY.md` row `REQ-CORE-NF-001`.
+- Background: `docs/dev/LESSONS_LEARNED.md` section "Shutdown ordering", `docs/dev/TRACEABILITY.md` row `REQ-CORE-NF-001`.

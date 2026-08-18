@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
  * future contributor cannot accidentally drag a Bukkit type, an RTP-core type, or a
  * Fabric/Paper-namespaced type back into the shared decoder.</p>
  */
-@DisplayName("ADR-016 § rtp-anvil platform-neutrality boundary")
+@DisplayName("ADR-016 - rtp-anvil platform-neutrality boundary")
 class AnvilPackageBoundaryArchTest {
 
   /**
@@ -45,7 +45,7 @@ class AnvilPackageBoundaryArchTest {
                 "net.minecraft..",
                 "net.fabricmc..")
             .because(
-                "ADR-016 §4: rtp-anvil is platform-neutral and must remain consumable "
+                "ADR-016 section 4: rtp-anvil is platform-neutral and must remain consumable "
                     + "by any platform adapter (Spigot, Paper, Folia, Fabric) without "
                     + "dragging another platform's API onto the classpath.");
 
@@ -72,7 +72,7 @@ class AnvilPackageBoundaryArchTest {
                 "io.github.dailystruggle.commandsapi..",
                 "io.github.dailystruggle.effectsapi..")
             .because(
-                "ADR-016 §4: rtp-anvil sits below every other RTP module in the dependency "
+                "ADR-016 section 4: rtp-anvil sits below every other RTP module in the dependency "
                     + "graph; reaching upward into rtp-api / rtp-core / a platform adapter "
                     + "would invert that and create a module-cycle risk.");
 

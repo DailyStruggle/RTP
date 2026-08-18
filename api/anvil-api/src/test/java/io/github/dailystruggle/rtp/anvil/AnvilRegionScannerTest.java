@@ -25,12 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Contract test for {@link AnvilRegionScanner} - the pregen biome-enumeration
  * utility that feeds the platform adapter's {@code setBiomesGetter} hook
- * (ADR-016 (biome) §6.1).
+ * (ADR-016 (biome) section 6.1).
  *
  * <p>Covers: happy-path union across multiple region files, mtime-keyed cache
  * hit/invalidation, empty-directory and missing-directory fallthrough, silent
  * skip of malformed {@code .mca} files, async dispatch off the caller thread.
- * Tracked in TRACEABILITY.md as the verification for ADR-016 (biome) §6.1.
+ * Tracked in TRACEABILITY.md as the verification for ADR-016 (biome) section 6.1.
  */
 class AnvilRegionScannerTest {
 
@@ -78,7 +78,7 @@ class AnvilRegionScannerTest {
         writeSingleChunkRegionFile(region.resolve("r.0.0.mca"),
                 List.of("minecraft:plains"));
         // r.-1.0.mca carries iris:volcanic_ash_plains (namespaced, non-vanilla -
-        // validates that the §5 verbatim-identifier promise propagates through
+        // validates that the section 5 verbatim-identifier promise propagates through
         // the scanner, not just the view).
         writeSingleChunkRegionFile(region.resolve("r.-1.0.mca"),
                 List.of("iris:volcanic_ash_plains"));
@@ -118,7 +118,7 @@ class AnvilRegionScannerTest {
         Set<String> second = AnvilRegionScanner.scanBiomes(world, "");
 
         // Identity equality proves the second call returned the cached value rather
-        // than re-scanning. This is the performance contract §6.1 depends on
+        // than re-scanning. This is the performance contract section 6.1 depends on
         // (tab-completion must be free on a warm cache).
         assertSame(first, second);
     }
@@ -211,7 +211,7 @@ class AnvilRegionScannerTest {
         CompletableFuture<Set<String>> future = AnvilRegionScanner.scanBiomesAsync(world, "");
         Set<String> asyncResult = future.get();
 
-        // Parity: the async entry point is the supported caller contract (§6.1 dispatches
+        // Parity: the async entry point is the supported caller contract (section 6.1 dispatches
         // the scan on commonPool); the sync entry point is a test/verification shim.
         // Both must see the same bytes on disk and return the same union.
         Set<String> syncResult = AnvilRegionScanner.scanBiomes(world, "");

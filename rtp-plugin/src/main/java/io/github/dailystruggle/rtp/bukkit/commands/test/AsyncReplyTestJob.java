@@ -268,7 +268,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
               // ForkJoinPool.commonPool-worker-* is a legitimate completion
               // tier on Folia: RTP.scheduler.runTaskAsynchronously and the
               // async chunk-load CompletableFuture chain frequently complete
-              // there. The hard rule from REQUIREMENTS.md §3 is "no blocking
+              // there. The hard rule from REQUIREMENTS.md section 3 is "no blocking
               // on a region/main thread" - FJP satisfies that.
               || lower.contains("forkjoinpool");
       reason =

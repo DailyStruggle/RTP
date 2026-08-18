@@ -175,7 +175,7 @@ class TestFullCmdTest {
                 + "or DELIBERATELY_EXCLUDED_SUBCOMMANDS: "
                 + r.unexpectedOnParent
                 + " — add them to the sweep (or to the excluded list) per "
-                + "RUNTIME_TEST_SUITE_PLAN.md §3.2");
+                + "RUNTIME_TEST_SUITE_PLAN.md section 3.2");
   }
 
   @Test

@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.configuration.yaml;
 /**
  * Scalar node: a single value parsed from a YAML scalar token.
  *
- * <p>Supported quoting styles per ADR-025 §Migration:</p>
+ * <p>Supported quoting styles per ADR-025 section Migration:</p>
  * <ul>
  *   <li>{@link Style#PLAIN} - unquoted (e.g. {@code true}, {@code 42}, {@code sqlite}).</li>
  *   <li>{@link Style#SINGLE} - single-quoted (e.g. {@code 'foo'}). Escape is {@code ''}.</li>

@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
- * Velocity-side {@link ProxySender} (rtp-proxy-ADR-001 §4).
+ * Velocity-side {@link ProxySender} (rtp-proxy-ADR-001 section 4).
  *
  * <p>Single chokepoint for player-visible messaging (REQ-RTP-S-007,
  * REQ-RTP-F-013) and {@code Player.createConnectionRequest} transfer

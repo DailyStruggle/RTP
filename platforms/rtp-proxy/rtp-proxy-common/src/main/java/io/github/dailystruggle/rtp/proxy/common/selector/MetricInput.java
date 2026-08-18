@@ -60,7 +60,7 @@ public enum MetricInput {
         }
     },
 
-    /** Online player count, normalized by 100. Higher is worse (lagging indicator; ADR-004 §playerCount). */
+    /** Online player count, normalized by 100. Higher is worse (lagging indicator; ADR-004 section playerCount). */
     PLAYER_COUNT("playerCount") {
         @Override public double normalize(BackendHeartbeat b) {
             return Curve.clamp01(b.playerCount() / 100.0);

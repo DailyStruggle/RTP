@@ -77,7 +77,7 @@ path       := [a-z0-9_/.-]+
   candidate block to have its property map extracted. The compiler
   records whether any wildcard token exists in a boolean flag
   (`hasWildcardStatePredicate`); when the flag is `false` the fast path
-  in §4 remains unchanged. Admins who configure a wildcard are
+  in section 4 remains unchanged. Admins who configure a wildcard are
   opting into the cost.
 
 ### 2. Compiled form and module placement
@@ -164,12 +164,12 @@ Bukkit `BlockData`.
 `AnvilChunkView.isSafe` shall read the palette entry's NBT `Properties`
 compound when evaluating state predicates. An `AnvilPrefilter` verdict
 of `REJECT` on a predicated match is legitimate; an `ACCEPT` remains
-advisory per ADR-016 §3 and is re-checked live at teleport commit.
+advisory per ADR-016 section 3 and is re-checked live at teleport commit.
 
 ### 6. Configuration migration
 
 No schema change. `safety.yml` remains a flat list. The file header
-gains a §"Block tags and states" subsection with three worked examples
+gains a section "Block tags and states" subsection with three worked examples
 (bare material, tag, predicated material). Existing configs keep
 working verbatim; `legacyConfigSupport.yml` emits no SUPERSEDED notice.
 
@@ -195,7 +195,7 @@ The `/rtp config set/add/remove` surface round-trips new tokens verbatim. Every 
 
 **Date:** 2026-05-30 — closes the ROADMAP Tier 2 "Safety-list grammar expansion → numeric range predicates" item. The set-subtraction and hot-reload follow-ups from the same ROADMAP entry are explicitly **not** adopted.
 
-The predicate grammar of §1 is extended so a `pred` may use a numeric comparison operator in addition to string equality:
+The predicate grammar of section 1 is extended so a `pred` may use a numeric comparison operator in addition to string equality:
 
 ```
 pred       := propertyName ( '=' propertyValue | compareOp integer )
@@ -204,15 +204,15 @@ integer    := '-'? [0-9]+
 ```
 
 - `=` retains its existing case-insensitive string-equality semantics; the value is unconstrained except for the reserved characters `[`, `]`, `=`, `<`, `>`.
-- The four comparison operators parse the bound as a signed integer (`long`) at config-load time. A non-integer bound is a **malformed token** (single startup `WARNING`, token dropped — §3, REQ-RTP-S-004), consistent with the existing malformed-token handling.
-- At evaluation time the live property value is parsed as a `long`; an absent or non-numeric live value is a **miss**, not a match (the fail-open policy of §4 is preserved — a range predicate can never cause an over-rejection).
+- The four comparison operators parse the bound as a signed integer (`long`) at config-load time. A non-integer bound is a **malformed token** (single startup `WARNING`, token dropped — section 3, REQ-RTP-S-004), consistent with the existing malformed-token handling.
+- At evaluation time the live property value is parsed as a `long`; an absent or non-numeric live value is a **miss**, not a match (the fail-open policy of section 4 is preserved — a range predicate can never cause an over-rejection).
 - Multiple conditions in one `[ … ]` still combine with **logical AND**, so two bounds on the same key express an interval (`LAVA[level>=2,level<=5]`). Duplicate detection is per `(key, operator)`: `level>=2,level<=5` is accepted; `level>=2,level>=3` and `waterlogged=true,waterlogged=false` are rejected as duplicates.
 
-Implementation: `StatePredicate` gains an immutable `NumericComparison` (key, `Comparator` operator, `long` bound) list alongside the existing equality map; `SafetyTokenParser` locates the operator and routes equalities vs. comparisons. No change to `CompiledUnsafeSet` bucket structure (range predicates ride inside the same per-material / per-tag / wildcard `StatePredicate` buckets), so the §4 hot-path fast-path and `hasWildcardStatePredicate` flag are unaffected. The Anvil path (§5) reads the same NBT `Properties` compound. This stays pure and Bukkit-free in `rtp-api`. Regression coverage: `SafetyTokenParserTest`, `CompiledUnsafeSetTest`.
+Implementation: `StatePredicate` gains an immutable `NumericComparison` (key, `Comparator` operator, `long` bound) list alongside the existing equality map; `SafetyTokenParser` locates the operator and routes equalities vs. comparisons. No change to `CompiledUnsafeSet` bucket structure (range predicates ride inside the same per-material / per-tag / wildcard `StatePredicate` buckets), so the section 4 hot-path fast-path and `hasWildcardStatePredicate` flag are unaffected. The Anvil path (section 5) reads the same NBT `Properties` compound. This stays pure and Bukkit-free in `rtp-api`. Regression coverage: `SafetyTokenParserTest`, `CompiledUnsafeSetTest`.
 
 ## References
 
-- `docs/dev/REQUIREMENTS.md §3` — REQ-RTP-S-001 (unsafe-block prohibition) and REQ-RTP-S-004 (never-silent failure).
+- `docs/dev/REQUIREMENTS.md section 3` — REQ-RTP-S-001 (unsafe-block prohibition) and REQ-RTP-S-004 (never-silent failure).
 - [ADR-011](ADR-011-rtp-api-separate-module.md) — no Bukkit on the `rtp-api` classpath.
 - [ADR-016](ADR-016-anvil-subsystem.md) — Anvil pre-filter advisory semantics; this ADR extends the pre-filter to consult palette `Properties`.
 - `rtp-api/.../RTPChunk.java` — `isSafe` contract.

@@ -8,7 +8,7 @@
 
 ## Context
 
-RTP has historically targeted Bukkit-derived server software only (Spigot, Paper, Folia), as recorded in `docs/dev/REQUIREMENTS.md §0` and `REQ-RTP-SYS-002`. Fabric work has nonetheless been carried in `docs/dev/MULTI_PLATFORM_PLAN.md` as an "active frontier".
+RTP has historically targeted Bukkit-derived server software only (Spigot, Paper, Folia), as recorded in `docs/dev/REQUIREMENTS.md section 0` and `REQ-RTP-SYS-002`. Fabric work has nonetheless been carried in `docs/dev/MULTI_PLATFORM_PLAN.md` as an "active frontier".
 
 The first iteration of this ADR (2026-04-30) committed to a **single** version-agnostic Fabric adapter, `rtp-fabric/rtp-fabric-common`, pinned to one Minecraft version. A 2026-05-01 deployment to a `26.2` (year-based versioning, see *Version Naming* below) Fabric server surfaced the structural flaw:
 
@@ -32,7 +32,7 @@ Four facts inform the rewritten decision:
 
 Fabric is **a first-class, in-scope target platform** for RTP, alongside Spigot, Paper, and Folia. Forge, NeoForge, and other non-Fabric mod loaders remain out of scope and are deferred to Phase 4 of the multi-platform plan.
 
-This decision **supersedes the relevant clause** of `docs/dev/REQUIREMENTS.md §0 Out of Scope` (the *Non-Bukkit platforms* bullet, only insofar as it names Fabric) and broadens `REQ-RTP-SYS-002` to include Fabric.
+This decision **supersedes the relevant clause** of `docs/dev/REQUIREMENTS.md section 0 Out of Scope` (the *Non-Bukkit platforms* bullet, only insofar as it names Fabric) and broadens `REQ-RTP-SYS-002` to include Fabric.
 
 ### 2. Module Layout — Per-MC-Version Submodules
 
@@ -76,7 +76,7 @@ RTP shall ship as a **single JAR** that loads on both Bukkit-family servers and 
   - `io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin` — `JavaPlugin`, declared in `plugin.yml`, dispatches per-NMS-version Bukkit-family adapter as today.
   - `io.github.dailystruggle.rtp.fabric.RTPFabricMod` — `ModInitializer`, declared in `fabric.mod.json`, dispatches per-MC-version Fabric adapter.
 - `RTPFabricMod` shall reference **no `net.minecraft.*` symbols**. It uses only `net.fabricmc.*` (loader API) and `rtp-api` / `rtp-core` types. Any concrete `Component`, `ServerLevel`, `ServerPlayer`, etc. usage lives in the per-version submodules. This is the rule that lets Loom in `rtp-plugin` compile against any chosen MC version without that choice leaking into runtime selection.
-- The shadow JAR ingests each per-version module's **`remapJar` output** (intermediary bytecode), not its raw `compileJava` output. This is the build-discipline change in §4.
+- The shadow JAR ingests each per-version module's **`remapJar` output** (intermediary bytecode), not its raw `compileJava` output. This is the build-discipline change in section 4.
 - Both `plugin.yml` and `fabric.mod.json` ship at the JAR root. Each loader ignores the metadata file it does not recognize.
 
 ### 4. Build Discipline
@@ -114,8 +114,8 @@ A **named maintainer** shall own the Fabric adapter end-to-end (build, mappings,
 
 | Alternative | Why Rejected |
 |-------------|--------------|
-| Single Fabric module pinned to one MC version (the original 2026-04-30 ADR-022 §2 design) | Confirmed unworkable: Loom intermediary→runtime mapping is per-MC, and Fabric Loader provides no runtime fallback equivalent to Bukkit's reflective NMS. Resulted in `NoClassDefFoundError: net.minecraft.class_2561` on a `26.2` server when the JAR was built against `1.21.1`. |
-| Ship one Fabric JAR per MC version (10 separate downloads) | Same BuiltByBit / release-surface problem the original ADR §2 rejected. The per-version submodule structure delivers identical isolation guarantees inside a single JAR via package-disjoint dispatch. |
+| Single Fabric module pinned to one MC version (the original 2026-04-30 ADR-022 section 2 design) | Confirmed unworkable: Loom intermediary→runtime mapping is per-MC, and Fabric Loader provides no runtime fallback equivalent to Bukkit's reflective NMS. Resulted in `NoClassDefFoundError: net.minecraft.class_2561` on a `26.2` server when the JAR was built against `1.21.1`. |
+| Ship one Fabric JAR per MC version (10 separate downloads) | Same BuiltByBit / release-surface problem the original ADR section 2 rejected. The per-version submodule structure delivers identical isolation guarantees inside a single JAR via package-disjoint dispatch. |
 | Use Yarn or hashed mappings instead of Mojmap to share more bytecode across versions | Hashed mappings are not stable across MC versions either (the underlying obfuscation map changes); Yarn introduces a separate maintenance dependency without removing the per-version remap requirement. |
 | Adopt Architectury for cross-loader sharing | Architectury produces N binaries from one source tree, not one binary covering N runtimes. Solves a different problem; reconsider at Phase 4 if Forge/NeoForge re-enter scope. |
 | Move version dispatch into `rtp-fabric-common` rather than `rtp-plugin/RTPFabricMod` | Common would then have to know every version's FQN, defeating its version-agnostic role. Dispatch belongs at the entry point — same place Bukkit-family does it. |
@@ -139,7 +139,7 @@ A **named maintainer** shall own the Fabric adapter end-to-end (build, mappings,
 
 ## References
 
-- `docs/dev/REQUIREMENTS.md §0` (scope), `REQ-RTP-SYS-002`, `REQ-RTP-NF-003` (entry-point isolation, applied per-entry-point under this ADR)
+- `docs/dev/REQUIREMENTS.md section 0` (scope), `REQ-RTP-SYS-002`, `REQ-RTP-NF-003` (entry-point isolation, applied per-entry-point under this ADR)
 - `docs/dev/MULTI_PLATFORM_PLAN.md` — phased plan, abstraction gap summary, acceptance gates, multi-version skeleton-first sub-phase
 - ADR-005 — PaperLib removal (preserves the "no async-chunk shim" stance Fabric must respect)
 - ADR-010 — Versioned platform adapter submodules (this ADR brings Fabric into the same pattern)

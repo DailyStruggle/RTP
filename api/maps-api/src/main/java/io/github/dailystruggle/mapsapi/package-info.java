@@ -9,7 +9,7 @@
  *   <li>{@code docs/adr/ADR-046-maps-api-module.md} - module bootstrap.</li>
  *   <li>{@code maps-api/docs/adr/maps-api-ADR-001-bootstrap.md} - package
  *       layout + palette policy + Lite assembly trim.</li>
- *   <li>{@code docs/dev/REQUIREMENTS.md} §1.7 - REQ-RTP-MAP-001..005.</li>
+ *   <li>{@code docs/dev/REQUIREMENTS.md} section 1.7 - REQ-RTP-MAP-001..005.</li>
  * </ul>
  *
  * <p>Inherited prohibition requirements: REQ-RTP-S-004 (no silent teleport /

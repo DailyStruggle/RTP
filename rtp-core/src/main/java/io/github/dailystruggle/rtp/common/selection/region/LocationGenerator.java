@@ -50,7 +50,7 @@ public class LocationGenerator implements ILocationGenerator {
     static final AtomicInteger platformDepthCache = new AtomicInteger(1);
 
     /**
-     * ADR-016 §13.3 (2026-04-20 revision): pre-chunk-load biome pre-check disabled by
+     * ADR-016 section 13.3 (2026-04-20 revision): pre-chunk-load biome pre-check disabled by
      * default (preserved as dead code for a potential future biome-targeted workload).
      */
     private static final boolean PRE_CHUNK_BIOME_PRECHECK_ENABLED = false;

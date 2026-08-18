@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * </ul>
  *
  * <p>Anchored to <a href="../../../../../../../../docs/adr/rtp-proxy-ADR-010-security-hardening.md">
- * rtp-proxy-ADR-010 §HMAC Envelope</a>.</p>
+ * rtp-proxy-ADR-010 section HMAC Envelope</a>.</p>
  */
 final class HmacVerifierTest {
 

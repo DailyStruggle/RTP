@@ -44,7 +44,7 @@ dependencies {
     // downstream platform adapters and addons can author resolvers without
     // re-declaring the dependency.
     api project(':maps-api')
-    // Phase 2e-SQL slice (rtp-proxy-ADR-011 Â§Module Dependencies): backend-side
+    // Phase 2e-SQL slice (rtp-proxy-ADR-011 section Module Dependencies): backend-side
     // wiring (BackendStatePublisher + BackendStateSampler) lives in rtp-core so
     // every backend platform adapter inherits it without re-implementing.
     // The reverse direction stays clean: rtp-proxy-common does NOT depend on

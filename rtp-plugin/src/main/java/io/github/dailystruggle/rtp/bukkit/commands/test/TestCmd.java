@@ -131,7 +131,7 @@ import org.jetbrains.annotations.Nullable;
  * <p><b>Cross-platform constructor split.</b> The constructor registers only
  * the subcommands that are safe to class-load on every platform that ships
  * {@code rtp-plugin} - currently Bukkit and Fabric (the JAR is multi-loader
- * per ADR-022 §2). Subcommands that hard-import Bukkit / Spigot types
+ * per ADR-022 section 2). Subcommands that hard-import Bukkit / Spigot types
  * ({@link TestStressCmd}, {@link TestChunkProbePerfCmd}, {@link TestFullCmd},
  * {@link AsyncReplyTestJob}) are registered by the {@link BukkitTestCmd}
  * subclass instead, so loading {@code TestCmd} on Fabric does not trigger

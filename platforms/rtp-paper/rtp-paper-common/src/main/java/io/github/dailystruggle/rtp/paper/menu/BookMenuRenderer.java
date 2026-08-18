@@ -25,7 +25,7 @@ import java.util.UUID;
 import java.util.function.BiFunction;
 
 /**
- * Adventure-{@code Book} renderer for {@link MenuModel} (ADR-035 §Renderers
+ * Adventure-{@code Book} renderer for {@link MenuModel} (ADR-035 section Renderers
  * + ADR-044). Shared between Paper and Folia - Adventure's {@code Book} API
  * is identical on both platforms; Folia inherits {@link Player#openBook(Book)}
  * unchanged.
@@ -162,7 +162,7 @@ public final class BookMenuRenderer implements MenuRenderer {
     /**
      * Runs {@code raw} through the project's standard {@link SendMessage#format}
      * pipeline (placeholders, PAPI, legacy {@code &} color codes, hex) and then
-     * deserializes the resulting {@code §}-coded string into an Adventure
+     * deserializes the resulting {@code section }-coded string into an Adventure
      * {@link Component}. Mirrors how {@link SendMessage} renders chat output so
      * menu text obeys the same color/placeholder conventions as everywhere else
      * in the plugin.
@@ -178,7 +178,7 @@ public final class BookMenuRenderer implements MenuRenderer {
             // back to the raw legacy-ampersand string so colors still render.
             formatted = raw;
         }
-        // `SendMessage.format` converts '&' to '§'; on the test-bypass path
+        // `SendMessage.format` converts '&' to 'section '; on the test-bypass path
         // the string may still contain '&' codes. Prefer the section-style
         // deserializer (it's the normal production path), then fall through
         // to the ampersand-style if the input still has '&' markers.

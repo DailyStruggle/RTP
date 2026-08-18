@@ -13,7 +13,7 @@ The plan covers concerns at very different layers — wire format, transport bin
 Cross-references this ADR ratifies in absolute-state form:
 
 - `MULTI_SERVER_PLAN.md` — full design narrative, phased roadmap, open items.
-- `REQUIREMENTS.md §1.6` — `REQ-RTP-NET-001…014`.
+- `REQUIREMENTS.md section 1.6` — `REQ-RTP-NET-001…014`.
 - `platforms/rtp-proxy/REQUIREMENTS.md` — `REQ-RTP-PROXY-001…011`.
 - `platforms/rtp-proxy/rtp-proxy-common/REQUIREMENTS.md` — `REQ-RTP-PROXY-COMMON-001…008`.
 - `platforms/rtp-proxy/rtp-proxy-velocity/REQUIREMENTS.md` — `REQ-RTP-PROXY-VELOCITY-001…007`.
@@ -152,7 +152,7 @@ Ratified by repo owner leaf from the approved D-005 proposal `docs/dev/scratch/P
 ## References
 
 - `docs/dev/MULTI_SERVER_PLAN.md` — full plan narrative and phased roadmap.
-- `docs/dev/REQUIREMENTS.md §1.6` — `REQ-RTP-NET-001…014`.
+- `docs/dev/REQUIREMENTS.md section 1.6` — `REQ-RTP-NET-001…014`.
 - `platforms/rtp-proxy/REQUIREMENTS.md`, `platforms/rtp-proxy/rtp-proxy-common/REQUIREMENTS.md`, `platforms/rtp-proxy/rtp-proxy-velocity/REQUIREMENTS.md`, `platforms/rtp-proxy/rtp-proxy-bungee/REQUIREMENTS.md`.
 - `docs/admin/proxies/INDEX.md` — admin-facing roster (stub).
 - `docs/adr/ADR-018-agents-md-public-release-structure.md` — public release / docs structure.

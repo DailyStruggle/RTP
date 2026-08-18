@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * ADR-016 §8.2 parity gate.
+ * ADR-016 section 8.2 parity gate.
  *
  * <p>Verifies that {@link AnvilReader} parses real server-produced region files across
  * every {@code DataVersion} we claim to support, and that {@link AnvilTestFixtures}
@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * {@code src/test/resources/anvil/real/<mc-version>/} were produced by live vanilla
  * servers, then trimmed to the single chunk at region-local {@code (0,0)} via the
  * one-shot {@code tools/anvil/TrimRegionToSingleChunk.ps1} utility (since removed from
- * the repo). Per ADR-016 §8.2 they are the source of truth - the generator is
+ * the repo). Per ADR-016 section 8.2 they are the source of truth - the generator is
  * considered correct only insofar as its output is structurally equivalent to theirs.
  */
 class AnvilFixtureParityTest {

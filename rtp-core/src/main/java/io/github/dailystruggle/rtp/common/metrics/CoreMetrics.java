@@ -25,9 +25,9 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     private volatile io.github.dailystruggle.metrics.api.MetricsBinding binding =
             io.github.dailystruggle.metrics.api.MetricsBinding.NOOP;
 
-    // ADR-053 §2a: cumulative count of slow immediate/unqueued teleports (REQ-RTP-OBS-005).
+    // ADR-053 section 2a: cumulative count of slow immediate/unqueued teleports (REQ-RTP-OBS-005).
     private final AtomicLong slowPipelineCount = new AtomicLong(0L);
-    // ADR-053 §2b: cumulative count of edge-triggered queue-growth warnings (REQ-RTP-OBS-006).
+    // ADR-053 section 2b: cumulative count of edge-triggered queue-growth warnings (REQ-RTP-OBS-006).
     private final AtomicLong queueGrowthWarnCount = new AtomicLong(0L);
     // Edge state for the queue-growth audit: true while the last observed depth was at-or-above
     // the threshold. The WARN fires only on the false->true transition and re-arms on true->false.
@@ -101,7 +101,7 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     }
 
     /**
-     * Returns the cumulative count of slow immediate/unqueued teleports audited (ADR-053 §2a).
+     * Returns the cumulative count of slow immediate/unqueued teleports audited (ADR-053 section 2a).
      *
      * @return cumulative slow-teleport count
      */
@@ -110,7 +110,7 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     }
 
     /**
-     * Returns the cumulative count of edge-triggered queue-growth warnings (ADR-053 §2b).
+     * Returns the cumulative count of edge-triggered queue-growth warnings (ADR-053 section 2b).
      *
      * @return cumulative queue-growth warning count
      */
@@ -139,7 +139,7 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     }
 
     /**
-     * Evaluates the edge-triggered queue-growth audit (ADR-053 §2b, REQ-RTP-OBS-006) for the
+     * Evaluates the edge-triggered queue-growth audit (ADR-053 section 2b, REQ-RTP-OBS-006) for the
      * observed {@code queueDepth}. Fires a single {@code WARN} (and increments the counter) on
      * the transition from below-threshold to at-or-above-threshold, re-arming only after the
      * depth drops back below. Never throws.
@@ -195,7 +195,7 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
         int chunkLoadBacklog = b.chunkLoadBacklog();
         int databaseLatencyMs = b.databaseLatencyMs();
 
-        // ADR-053 §2b: edge-triggered queue-growth audit rides the snapshot cadence.
+        // ADR-053 section 2b: edge-triggered queue-growth audit rides the snapshot cadence.
         evaluateQueueGrowth(queueDepth);
         long slowCount = slowPipelineCount.get();
         long slowThreshold = slowPipelineThresholdMs();

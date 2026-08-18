@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * One case per YAML feature rejected by the in-house parser
- * (ADR-025 §Migration step 5). Asserts the {@code messageKey} so the
+ * (ADR-025 section Migration step 5). Asserts the {@code messageKey} so the
  * stable identifiers stay stable across refactors.
  */
 class RtpYamlUnsupportedFeatureTest {

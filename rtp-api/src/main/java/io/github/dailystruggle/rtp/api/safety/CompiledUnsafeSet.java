@@ -215,7 +215,7 @@ public final class CompiledUnsafeSet {
   }
 
   /**
-   * Is this block unsafe? Evaluation order, first match wins (ADR-017 §4, cheapest first):
+   * Is this block unsafe? Evaluation order, first match wins (ADR-017 section 4, cheapest first):
    * plain material → plain tag → material-scoped state preds → tag-scoped state preds →
    * wildcard state preds. {@code materialName} {@code null}/empty → no match.
    * {@code liveTagMembership} may be empty (Anvil off-tick has no snapshot).

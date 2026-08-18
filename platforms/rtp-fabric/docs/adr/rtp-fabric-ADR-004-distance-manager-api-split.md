@@ -9,7 +9,7 @@
 `rtp-fabric-ADR-003` introduced non-persistent chunk tickets via
 `DistanceManager#addRegionTicket(TicketType, ChunkPos, int level, T value)` /
 `#removeRegionTicket(...)`, implemented reflectively in
-`V1_21_R1FabricVersionAdapter`. Its Javadoc and ADR-003 §4 claimed the
+`V1_21_R1FabricVersionAdapter`. Its Javadoc and ADR-003 section 4 claimed the
 reflection target was *"stable across 1.21.x patch releases"*.
 
 A user report against an MC **1.21.11** server (running the

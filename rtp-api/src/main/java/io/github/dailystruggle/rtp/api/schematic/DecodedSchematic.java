@@ -8,7 +8,7 @@ import java.util.Objects;
  * Concrete, in-memory {@link LoadedSchematic} produced by {@link SpongeSchematicDecoder}.
  * Holds the palette, a dense per-cell palette-index grid (Sponge ordering
  * {@code index = (y * length + z) * width + x}), the decoded block entities, and the
- * origin offset. Carries no live world references and is safe to cache (ADR-058 §1,
+ * origin offset. Carries no live world references and is safe to cache (ADR-058 section 1,
  * Amendment 1).
  */
 public final class DecodedSchematic implements LoadedSchematic {

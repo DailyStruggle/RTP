@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
  * {@link #restore()} so repeated runs (and interleaving with real biome
  * traffic during a live dev build) stay deterministic.
  *
- * <p>Traces ADR-016 §13.1 biome-source attribution - the runtime evidence
+ * <p>Traces ADR-016 section 13.1 biome-source attribution - the runtime evidence
  * that post-load biome reads on Spigot / Paper / Folia actually consult
  * the Anvil cache before the live getter.
  */

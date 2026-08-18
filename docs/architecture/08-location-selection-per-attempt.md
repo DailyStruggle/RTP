@@ -6,7 +6,7 @@
 - **Outer attempt-loop re-entry plumbing** — `PregenTask.run()` / `rescheduleNextAttempt()` / `continueInline(...)` is the state-machine harness (ADR-015 Option B) that re-invokes `runAttempt` without blocking. See `PregenTask.java` header.
 - **Chunk ticket lifecycle** (`ChunkReservation`, `MemoryTracker`) — see diagram 03.
 - **Stale-chunk guard** on live-backed chunks — see [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md).
-- **Anvil probe ordering** — see [ADR-016](../adr/ADR-016-anvil-subsystem.md) §11 and §13.1.
+- **Anvil probe ordering** — see [ADR-016](../adr/ADR-016-anvil-subsystem.md) section 11 and section 13.1.
 
 ```mermaid
 %% Color legend: green=accepting success; red=hard terminal / fail-fast sink; blue=async or thread-hop work; yellow=config / bookkeeping / data-driven choice.
@@ -40,7 +40,7 @@ flowchart TD
     BorderCap -- No  --> Reschedule[rescheduleNextAttempt<br/>outer loop re-enters]:::async
     BorderCheck -- Yes --> RequestChunk
 
-%% 3. Probe-first chunk resolution (ADR-016 §13.1)
+%% 3. Probe-first chunk resolution (ADR-016 section 13.1)
     subgraph ChunkStage [Chunk resolution — cached then anvil then live]
         RequestChunk[world.getOrLoadChunk cx, cz]:::async --> ChunkOK{resolved<br/>non-null?}
         ChunkOK -- No  --> NullChunk[FailTypes.nullChunk<br/>reason=ticketFailed or<br/>chunkLoadTimeout or<br/>asyncLoadNull]:::fail

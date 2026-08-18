@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Verifies {@link LoadBalancerConfigYaml} parses both the new
  * sub-configuration {@code terms} block and the legacy flat-weight schema.
  * Errors on misconfiguration are surfaced rather than silently degrading
- * (rtp-proxy-ADR-004 §Configuration).
+ * (rtp-proxy-ADR-004 section Configuration).
  */
 class LoadBalancerConfigYamlTest {
 

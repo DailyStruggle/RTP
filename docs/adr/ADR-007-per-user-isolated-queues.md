@@ -35,6 +35,6 @@ This provides a tiered priority model:
 ## References
 
 - Implementing classes: `RegionQueueManager` (global + per-UUID queue management), `RTPBukkitPlugin` (queue initialisation on player join) (`rtp-core`, `rtp-plugin`)
-- Design reference: [`DESIGN.md` §1 — Asynchronous Queue-Based Pre-Generation](../dev/DESIGN.md)
+- Design reference: [`DESIGN.md` section 1 — Asynchronous Queue-Based Pre-Generation](../dev/DESIGN.md)
 - Related: [ADR-006](ADR-006-async-queue-pre-generation.md) (pre-generation queue rationale)
 - Requirements: `REQ-RTP-NF-002` (resource starvation prevention), `REQ-RTP-S-001` (permission-based access control)

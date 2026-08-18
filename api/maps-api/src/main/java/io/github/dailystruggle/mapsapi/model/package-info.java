@@ -12,6 +12,6 @@
  *
  * <p>New chart shapes shall be added to the {@code permits} clause on
  * {@code ChartModel} and documented in
- * {@code maps-api/docs/adr/maps-api-ADR-001-bootstrap.md} §Chart models.
+ * {@code maps-api/docs/adr/maps-api-ADR-001-bootstrap.md} section Chart models.
  */
 package io.github.dailystruggle.mapsapi.model;

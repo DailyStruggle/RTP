@@ -8,7 +8,7 @@ import java.util.Set;
 import org.bukkit.Material;
 
 /**
- * Spigot-side reconciler layered on top of {@link PaletteIdentifierNormalizer} (ADR-016 §8.1).
+ * Spigot-side reconciler layered on top of {@link PaletteIdentifierNormalizer} (ADR-016 section 8.1).
  *
  * <p>Pure-string canonicalisation (namespace-strip + {@code Locale.ROOT} upper-case) lives
  * in {@code rtp-api}; reconciliation against the live Bukkit {@link Material} registry

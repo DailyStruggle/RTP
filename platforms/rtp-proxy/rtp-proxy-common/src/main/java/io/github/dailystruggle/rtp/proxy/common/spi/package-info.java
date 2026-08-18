@@ -3,7 +3,7 @@
  * {@code rtp-proxy-bungee}, and the reference implementations in sibling
  * packages.
  *
- * <p>Per rtp-proxy-ADR-001 §Package Boundary Rules, this package may import
+ * <p>Per rtp-proxy-ADR-001 section Package Boundary Rules, this package may import
  * only {@code rtp-api} and the JDK. Vendor classes
  * ({@code com.velocitypowered.*}, {@code net.md_5.bungee.*},
  * {@code org.bukkit.*}, {@code net.minecraft.*}, {@code net.fabricmc.*}) are

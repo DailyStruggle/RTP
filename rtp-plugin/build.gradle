@@ -1,10 +1,10 @@
-// Per ADR-022 Â§2 (Single-JAR Multi-Loader Packaging) this module is the
+// Per ADR-022 section 2 (Single-JAR Multi-Loader Packaging) this module is the
 // multi-loader bootstrap: it ships both plugin.yml (Bukkit) and
 // fabric.mod.json (Fabric) in one JAR. Loom remaps only the Fabric entry-
 // point package; Bukkit-family classes retain Spigot/Paper-mapped bytecode.
 //
 // Loom is scoped here AND in :rtp-fabric:** only â€” never at root or in any
-// platform-free / Bukkit-family module (ADR-022 Â§3, MULTI_PLATFORM_PLAN
+// platform-free / Bukkit-family module (ADR-022 section 3, MULTI_PLATFORM_PLAN
 // Phase 1).
 import org.apache.tools.ant.filters.ReplaceTokens
 
@@ -253,7 +253,7 @@ dependencies {
     testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation testFixtures(project(':rtp-core'))
     testImplementation project(':rtp-folia:rtp-folia-common')
-    // C6 (CHECKLIST-metrics-and-multiserver Â§1.6.5) â€” ArchUnit guard pinning
+    // C6 (CHECKLIST-metrics-and-multiserver section 1.6.5) â€” ArchUnit guard pinning
     // raw TPS / player-count / max-players reads to the *MetricsBinding and
     // *TpsSampler classes. rtp-plugin is the only module that aggregates
     // every platform-common bytecode on its classpath, so the guard lives

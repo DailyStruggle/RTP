@@ -421,7 +421,7 @@ Fabric mod jar gets the same in-house parser as every other variant.
   2026-05-05). The "Fabric YAML packaging is deferred to a follow-up
   ADR" carve-out is **closed** by this revision: the in-house parser
   ships on Fabric like every other variant.
-- [`CONFIG_COMMAND_SPEC.md`](../dev/CONFIG_COMMAND_SPEC.md) §2.4 +
+- [`CONFIG_COMMAND_SPEC.md`](../dev/CONFIG_COMMAND_SPEC.md) section 2.4 +
   Appendix A row A12 — the comment-preservation contract this ADR
   enables. Block-only scope per 2026-05-14; inline comments tolerated
   on input but not preserved across write-back.

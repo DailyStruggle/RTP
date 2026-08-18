@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Pure-string grammar parser for safety-list tokens (ADR-017 §1).
+ * Pure-string grammar parser for safety-list tokens (ADR-017 section 1).
  * Rejections are reported via {@link ParseResult#rejected()} (REQ-RTP-S-004). Stateless and thread-safe.
  */
 public final class SafetyTokenParser {
@@ -248,7 +248,7 @@ public final class SafetyTokenParser {
         }
         kv.put(lcKey, value.toLowerCase(Locale.ROOT));
       } else {
-        // Numeric range predicate (ADR-017 §1 extension): the bound must be an integer.
+        // Numeric range predicate (ADR-017 section 1 extension): the bound must be an integer.
         long bound;
         try {
           bound = Long.parseLong(value);

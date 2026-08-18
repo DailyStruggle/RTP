@@ -1,10 +1,10 @@
 // Phase 1 â€” Fabric platform adapter, version-agnostic common module.
 //
-// Per ADR-022 Â§3 (Build Discipline) Loom is applied here AND in :rtp-plugin
+// Per ADR-022 section 3 (Build Discipline) Loom is applied here AND in :rtp-plugin
 // (the multi-loader bootstrap), and nowhere else. Mojang official mappings
 // are used; Yarn is reserved for re-evaluation.
 //
-// Architectural invariants (ADR-022 Â§4):
+// Architectural invariants (ADR-022 section 4):
 //   * No org.bukkit.* imports in this module.
 //   * Shared business logic remains in :rtp-core / :rtp-api â€” this module
 //     contains Fabric platform glue only.
@@ -35,7 +35,7 @@ ext {
 }
 
 dependencies {
-    // Mojang official mappings â€” see ADR-022 Â§3.
+    // Mojang official mappings â€” see ADR-022 section 3.
     minecraft "com.mojang:minecraft:${minecraftVersion}"
     mappings  loom.officialMojangMappings()
 

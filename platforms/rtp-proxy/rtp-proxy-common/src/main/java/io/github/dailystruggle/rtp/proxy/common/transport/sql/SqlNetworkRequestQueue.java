@@ -28,7 +28,7 @@ import java.util.logging.Logger;
  * SQL-backed {@link NetworkRequestQueue} implementation.
  *
  * <p>Reuses the shared {@link DataSource} owned by the host's
- * {@code AbstractSQLDatabaseAccessor} (rtp-proxy-ADR-011 §HikariCP Pool
+ * {@code AbstractSQLDatabaseAccessor} (rtp-proxy-ADR-011 section HikariCP Pool
  * Sharing). Schema lives in {@link SqlNetworkStateSchema} as two tables:
  * <ul>
  *   <li>{@code rtp_net_wq_ready} - FIFO of envelopes awaiting proxy

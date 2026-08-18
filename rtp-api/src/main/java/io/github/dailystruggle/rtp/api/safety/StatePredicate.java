@@ -16,7 +16,7 @@ import java.util.Objects;
  */
 public final class StatePredicate {
 
-  /** Numeric comparison operator usable in a range predicate (ADR-017 §1 extension). */
+  /** Numeric comparison operator usable in a range predicate (ADR-017 section 1 extension). */
   public enum Comparator {
     /** {@code >=} - live value greater than or equal to the bound. */
     GE(">=") {

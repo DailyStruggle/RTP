@@ -1,6 +1,6 @@
 # `rtp-proxy-common/` — Requirements
 
-> **Status: draft, D-005 gated on ADR-036 (outstanding).** Module-scope requirements for the shared proxy-side SPI module. Complements [`../REQUIREMENTS.md`](../REQUIREMENTS.md) (umbrella) and [`../../docs/dev/REQUIREMENTS.md` §1.6](../../../docs/dev/REQUIREMENTS.md) (system-level `REQ-RTP-NET-NNN`).
+> **Status: draft, D-005 gated on ADR-036 (outstanding).** Module-scope requirements for the shared proxy-side SPI module. Complements [`../REQUIREMENTS.md`](../REQUIREMENTS.md) (umbrella) and [`../../docs/dev/REQUIREMENTS.md` section 1.6](../../../docs/dev/REQUIREMENTS.md) (system-level `REQ-RTP-NET-NNN`).
 >
 > Authoring style: `shall` / `shall not`, absolute state, no implementation actions.
 
@@ -46,4 +46,4 @@ Each requirement above shall receive a row in [`../../docs/dev/TRACEABILITY.md`]
 
 - [`README.md`](README.md) — module overview.
 - [`../REQUIREMENTS.md`](../REQUIREMENTS.md) — umbrella requirements.
-- [`../../docs/dev/MULTI_SERVER_PLAN.md`](../../../docs/dev/MULTI_SERVER_PLAN.md) §*Load Balancer*, §*Trigger Abstraction*, §*Reservation Tokens*, §*Storage Topology*.
+- [`../../docs/dev/MULTI_SERVER_PLAN.md`](../../../docs/dev/MULTI_SERVER_PLAN.md) section *Load Balancer*, section *Trigger Abstraction*, section *Reservation Tokens*, section *Storage Topology*.

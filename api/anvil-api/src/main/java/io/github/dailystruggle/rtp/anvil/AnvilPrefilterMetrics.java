@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * only ever increments.
  *
  * <p>Exposed via {@code TestAnvilPrefilterCmd.snapshot()} per
- * {@code ADR-016 §10}.
+ * {@code ADR-016 section 10}.
  *
  * <p>Safety compliance:
  * <ul>

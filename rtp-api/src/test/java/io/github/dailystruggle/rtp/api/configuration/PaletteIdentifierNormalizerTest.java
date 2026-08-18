@@ -18,10 +18,10 @@ import org.junit.jupiter.api.Test;
  * Unit tests for {@link PaletteIdentifierNormalizer}.
  *
  * <p>Verifies the symmetric-normalization contract required by ADR-016
- * (Anvil read-only pre-filter) §3: config-side and palette-side entries must collapse to
+ * (Anvil read-only pre-filter) section 3: config-side and palette-side entries must collapse to
  * the same canonical form so that matching is a simple set membership check.</p>
  */
-@DisplayName("REQ-RTP-S-001 / ADR-016 § PaletteIdentifierNormalizer")
+@DisplayName("REQ-RTP-S-001 / ADR-016 - PaletteIdentifierNormalizer")
 class PaletteIdentifierNormalizerTest {
 
   @Test

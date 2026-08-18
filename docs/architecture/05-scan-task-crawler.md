@@ -6,7 +6,7 @@
 - **Background refill without admin intervention** — see diagram 02; the two crawlers both write to the same cache but scan is one-shot, budget-bounded by count rather than `queueLen`.
 - **Command parsing / permissions for `/rtp scan`** — see `commands-api` and `BukkitBaseRTPCmd`; this chart starts after the command has been dispatched.
 
-> Companion walkthrough: [`CODE_TOUR.md` §6 — Scan task crawler](../dev/CODE_TOUR.md).
+> Companion walkthrough: [`CODE_TOUR.md` section 6 — Scan task crawler](../dev/CODE_TOUR.md).
 
 ```mermaid
 stateDiagram-v2

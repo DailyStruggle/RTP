@@ -129,9 +129,9 @@ buckets are typically:
 - For **MSPT, TPS-over-time, per-thread CPU split** → spark profile is canonical.
 - For **chunk-loading attribution per attempt** → harness CSV (per-attempt
   delta), but be aware of the concurrency double-count caveat documented in
-  `PRE_WRITEUP.md §5b`.
+  `PRE_WRITEUP.md section 5b`.
 
-### Recipe: filling out `PRE_WRITEUP.md §5b`
+### Recipe: filling out `PRE_WRITEUP.md section 5b`
 
 After running the per-phase script:
 

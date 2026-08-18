@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Pregen-scan utility (ADR-016 biome §6.1) that walks every {@code r.X.Z.mca}
+ * Pregen-scan utility (ADR-016 biome section 6.1) that walks every {@code r.X.Z.mca}
  * under a dimension's {@code region/} folder and returns the union of every
  * decodable namespaced biome id. Consumed by the platform's {@code setBiomesGetter}
  * tab-completion hook.
@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  * <p>Cache key is {@code (regionFolder, mtimeSignature)} where the signature is
  * the max {@code lastModified} across {@code r.*.*.mca}; any change re-runs.
  *
- * <p>Per ADR-016 §8 "malformed → UNKNOWN, never crash": individual decode
+ * <p>Per ADR-016 section 8 "malformed → UNKNOWN, never crash": individual decode
  * failures are skipped; missing region folder → empty set, never an exception.
  */
 public final class AnvilRegionScanner {

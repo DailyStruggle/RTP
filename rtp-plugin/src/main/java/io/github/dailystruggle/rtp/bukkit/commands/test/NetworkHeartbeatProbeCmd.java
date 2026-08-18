@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>Real subcommand of {@link NetworkSimulationTestJob}; introduced to fix
  * the prior grammar bug where {@code heartbeat}/{@code tokens}/{@code all}
  * were hand-parsed off {@code parameterValues} and dispatched as unknown
- * subcommands (commands-api §2.2: bare tokens are always subcommands).
+ * subcommands (commands-api section 2.2: bare tokens are always subcommands).
  */
 public final class NetworkHeartbeatProbeCmd extends BaseRTPCmdImpl {
 

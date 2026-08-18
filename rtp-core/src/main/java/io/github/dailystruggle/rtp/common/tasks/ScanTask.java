@@ -1433,7 +1433,7 @@ public class ScanTask extends RTPRunnable {
       // Probe-first resolution: anvil cache if available, else live load.
       // The mid-Y biome pre-filter is now performed on the resolved chunk so
       // ungenerated-chunk cases transparently load on demand and cached
-      // anvil/live data is used when available (ADR-016 §13.1 follow-up,
+      // anvil/live data is used when available (ADR-016 section 13.1 follow-up,
       // 2026-04-20).
       final CompletableFuture<RTPChunk<?>> chunkFuture =
               world.getOrLoadChunk(cx, cz)
@@ -1538,7 +1538,7 @@ public class ScanTask extends RTPRunnable {
                       }
 
                       // PHYSICAL BIOME CHECK: ask the resolved chunk for its own biome
-                      // (ADR-016 §13.1 follow-up, 2026-04-20). This bypasses
+                      // (ADR-016 section 13.1 follow-up, 2026-04-20). This bypasses
                       // `anvilProbeSupport.takeCached` so an evicted cache entry cannot
                       // cause a fallthrough to the seed-synth getter on a loaded chunk.
                       String actualBiome = chunk.getBiome(localCursor.x, localCursor.y, localCursor.z);

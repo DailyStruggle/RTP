@@ -23,7 +23,7 @@ import java.util.logging.Logger;
  * {@link ForkJoinPool#commonPool()}; do not block the returned future on a tick thread.
  * Only thread-safe platform accessors are touched (world folder, environment, generator).
  *
- * <p>Callers gate the probe behind the four checks from ADR-016 §3 (config flag,
+ * <p>Callers gate the probe behind the four checks from ADR-016 section 3 (config flag,
  * chunk not loaded, no custom generator, structural cache miss). Internally the only
  * additional gate is {@link DataVersionSupport#isSupported(int)}; out-of-whitelist
  * versions return {@link Verdict#UNKNOWN}.
@@ -262,7 +262,7 @@ public final class AnvilPrefilter {
             // ADR-016: REJECT is now advisory - the view is still returned so the
             // caller (BukkitRTPWorld.getChunkAt) can mint an Anvil-backed RTPChunk
             // and let the vert adjustor scan below the unsafe surface for a safe Y.
-            // The live chunk.isSafe(...) re-check at teleport commit (ADR-016 §4)
+            // The live chunk.isSafe(...) re-check at teleport commit (ADR-016 section 4)
             // remains authoritative.
             return new ProbeResult(Verdict.REJECT, view);
           }

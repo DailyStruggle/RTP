@@ -7,18 +7,18 @@
 
 ---
 
-> **2026-05-02 retraction — JakesRTP rows in §5b–§5e are actually RTP-self-measurements.**
+> **2026-05-02 retraction — JakesRTP rows in sections 5b-5e are actually RTP-self-measurements.**
 > When two plugins register `/rtp`, Bukkit's command map keeps a single
 > `PluginCommand` instance per label and the namespaced form
 > `jakesrtp:rtp` resolved to **our** plugin's command on the test server,
 > not to JakesRTP's. Confirmed via `/jakesrtp:rtp <TAB>` returning our
-> subcommands. Therefore every "JakesRTP" row in §5b/§5c/§5d/§5e is a
+> subcommands. Therefore every "JakesRTP" row in sections 5b/5c/5d/5e is a
 > second `rtp` measurement under a different label, and any "JakesRTP
-> parity with RTP" headline (§5b finding bullet, §5e finding 6) reduces
+> parity with RTP" headline (section 5b finding bullet, section 5e finding 6) reduces
 > to "RTP measured against itself, twice — reproducibility OK". The
-> §5e RTP main-CPU/att reproducibility band (518/542/520/565 ms across
-> §5b/§5c/§5d/§5e slot-1) now extends to 4 effective RTP runs by folding
-> in the §5b–§5e "JakesRTP" slot-N readings. JakesRTP itself remains
+> section 5e RTP main-CPU/att reproducibility band (518/542/520/565 ms across
+> sections 5b/5c/5d/5e slot-1) now extends to 4 effective RTP runs by folding
+> in the sections 5b-5e "JakesRTP" slot-N readings. JakesRTP itself remains
 > un-measured on this rig until a re-run uses
 > `jakesrtp:forcertp {player} -c default-settings` (with
 > `dispatch-as-player: false`) to bypass the command-map collision.
@@ -57,7 +57,7 @@ Plus three diagnostic axes added during iteration:
 | Plugin | Version | Cell center | Notes |
 |---|---|---:|---|
 | RTP | 3.0.0-beta.1 | (0, 0) | Configurable centre. Test subject. |
-| BetterRTP | 3.6.13 | (16384, 0) | Configurable centre. Config reverts on shutdown — see §6. |
+| BetterRTP | 3.6.13 | (16384, 0) | Configurable centre. Config reverts on shutdown — see section 6. |
 | AsyRTP | 1.0.0 | (0, 16384) | Configurable centre. The "async by name" exhibit. |
 | EzRTP | 2.1.0 | (-16384, 0) | Configurable centre. |
 | HuskHomes | Paper-4.10 | (0, 0) | **No centre config** — pinned to `/spawn`. |
@@ -137,9 +137,9 @@ phase wall-time (higher is better). Heap in MB (lower is better).
 ## 5b. Run results — `20260502-125523` (Spigot 1.20.1)
 
 Spigot 1.20.1 pass with reduced roster: `rtp`, `betterrtp`, `huskhomes`, `jakesrtp`.
-Roster intentionally trimmed (EssentialsX `/tpr` excluded per §6 *EssentialsX*; AsyRTP
+Roster intentionally trimmed (EssentialsX `/tpr` excluded per section 6 *EssentialsX*; AsyRTP
 / EzRTP / SorekillRTP / AdvancedRTP either not rated for 1.20.1 or did not complete
-warm-up on Spigot — see §7 caveat 14). Per-phase wall-time ~60 s; spark profiles
+warm-up on Spigot — see section 7 caveat 14). Per-phase wall-time ~60 s; spark profiles
 captured `12:56:38`, `12:57:49`, `12:59:00`, `13:00:12` (one per phase).
 
 Phase-level (`20260502-125523-phases.csv`):
@@ -183,7 +183,7 @@ Caveats specific to this run:
   JakesRTP may not be MC-version compatible; the head-to-head story might be
   Spigot-1.20.1-specific.
 - BetterRTP results here include the `Queue.Enabled` pre-warm but **not** the
-  config-revert mitigation from §6 — destinations scatter must be checked before
+  config-revert mitigation from section 6 — destinations scatter must be checked before
   publication to confirm radius actually took effect on this run.
 - 4-plugin Spigot roster, not the full 7-plugin Paper roster. Do not draw
   cross-plugin conclusions for plugins not in this list from this run.
@@ -223,7 +223,7 @@ Two spark observations dominate:
    thread shows up. On Spigot 1.20.1 (no PaperLib async chunk gen, no
    Folia regions) all four plugins ultimately serialise on the main tick.
    This is not an RTP-specific finding — it's the platform — but it is
-   the cleanest single-line evidence we have for the §6 *AsyRTP* point that
+   the cleanest single-line evidence we have for the section 6 *AsyRTP* point that
    "the platform forces sync chunk-gen unless the plugin explicitly works
    around it" and for our own S-005 stance.
 
@@ -252,7 +252,7 @@ Headlines (vs `5b`):
   run confirming sub-3-ms warm p50 for both.
 - **HuskHomes regressed**: warm p50 1.7 s → 2.5 s, main-CPU/att 868 ms →
   1169 ms, one timeout reproducible. Per-player serialisation is the suspect;
-  see §6 *HuskHomes*.
+  see section 6 *HuskHomes*.
 - **BetterRTP is steady**: ~990 ms p50 vs ~900 ms previously, same 0 timeouts
   same 100 % success; spread up to 4.4 s worst (was 3.8 s). The plugin's own
   budget is roughly the chunk-load cost on the rig, which has not changed.
@@ -274,16 +274,16 @@ Caveats specific to this re-run:
   the CSV for tail-of-tick values.
 - HuskHomes timeout (UUID `20a10906-…`) had `chunks_loaded_during_attempt =
   295` — the largest single-attempt chunk-load count in the file. Worth a
-  per-attempt row in the §6 *HuskHomes* section if we publish.
+  per-attempt row in the section 6 *HuskHomes* section if we publish.
 
 ---
 
-## 5d. Run results — `20260502-135702` (Spigot 1.20.1, "reorder" run — actually a re-run of §5c order)
+## 5d. Run results — `20260502-135702` (Spigot 1.20.1, "reorder" run — actually a re-run of section 5c order)
 
-Intended as the phase-reorder test against §5c's carry-over hypothesis.
+Intended as the phase-reorder test against section 5c's carry-over hypothesis.
 **Important framing correction**: the run did **not** reorder. `phases.csv`
 records phases in the order `betterrtp → rtp → huskhomes → jakesrtp`, which
-is the *same* order as §5c (`rtp → betterrtp → huskhomes → jakesrtp`) only
+is the *same* order as section 5c (`rtp → betterrtp → huskhomes → jakesrtp`) only
 with `rtp` and `betterrtp` swapped at slots 1–2. The original hypothesis
 ("if `rtp` runs in slot 4 instead of slot 1, does its `last1m` collapse?")
 is therefore **not tested** by this run. What we get instead is a partial
@@ -296,8 +296,8 @@ short profiles at phase transitions; only the betterrtp slot has 2 full
 
 | Slot | Phase | Spark `last1m` at boundary | `last5m` | Avg loaded chunks | Server thread CPU |
 |---:|---|---:|---:|---:|---:|
-| 1 | **betterrtp** (was slot 2 in §5c) | **8.81** | 15.70 | 1905 | 100 % |
-| 2 | **rtp** (was slot 1 in §5c) | 8.81 (carry from slot 1) | 15.70 | — | 100 % |
+| 1 | **betterrtp** (was slot 2 in section 5c) | **8.81** | 15.70 | 1905 | 100 % |
+| 2 | **rtp** (was slot 1 in section 5c) | 8.81 (carry from slot 1) | 15.70 | — | 100 % |
 | 3 | huskhomes | **11.01** | 12.72 | 1842 | 100 % |
 | 4 | jakesrtp | **12.72** | 12.39 | 1760 | 100 % |
 
@@ -321,43 +321,43 @@ Per-attempt latency (from `20260502-135702.csv`, ms; eyeballed quantiles):
 
 ### What this tells us about the carry-over hypothesis
 
-Comparing slot-by-slot to §5c at matching plugin:
+Comparing slot-by-slot to section 5c at matching plugin:
 
-| Plugin | §5c slot | §5c `last1m` | §5d slot | §5d `last1m` | Δ |
+| Plugin | section 5c slot | section 5c `last1m` | section 5d slot | section 5d `last1m` | Δ |
 |---|---:|---:|---:|---:|---:|
 | rtp        | 1 | 11.36 | 2 | (no clean window) | n/a |
 | betterrtp  | 2 | 7.58  | 1 | 8.81 | +1.23 |
 | huskhomes  | 3 | 5.31  | 3 | 11.01 | **+5.70** |
 | jakesrtp   | 4 | 5.24  | 4 | 12.72 | **+7.48** |
 
-The two slot-3 / slot-4 figures are **dramatically higher** in §5d than in
-§5c despite identical slot positions and identical plugins — `huskhomes`
-ended slot 3 at 11.01 TPS here vs 5.31 TPS in §5c, and `jakesrtp` ended
-slot 4 at 12.72 vs 5.24. This is a much larger swing than the §5c
-hypothesis predicted (§5c implied a per-slot decay; §5d shows the same
+The two slot-3 / slot-4 figures are **dramatically higher** in section 5d than in
+section 5c despite identical slot positions and identical plugins — `huskhomes`
+ended slot 3 at 11.01 TPS here vs 5.31 TPS in section 5c, and `jakesrtp` ended
+slot 4 at 12.72 vs 5.24. This is a much larger swing than the section 5c
+hypothesis predicted (section 5c implied a per-slot decay; section 5d shows the same
 slots can land in completely different TPS bands depending on what ran
 in slots 1–2).
 
-That makes the §5c "monotonic decay across phases due to chunk residency"
-reading **almost certainly wrong as stated**. Two candidates fit §5d
+That makes the section 5c "monotonic decay across phases due to chunk residency"
+reading **almost certainly wrong as stated**. Two candidates fit section 5d
 better:
 
 1. **Slot-1 plugin choice dominates the JVM's later state.** `betterrtp`
-   in slot 1 (this run) is gentler than `rtp` in slot 1 (§5c) on
+   in slot 1 (this run) is gentler than `rtp` in slot 1 (section 5c) on
    chunks/att and on the chunk-gen backlog spark sees, leaving the JIT /
    chunk cache in a different state for downstream slots. This is
    plausible but doesn't explain the *size* of the swing (5 → 11 TPS).
-2. **n=1 variance is much larger than §5c assumed.** The honest reading:
+2. **n=1 variance is much larger than section 5c assumed.** The honest reading:
    our two Spigot 1.20.1 multi-phase runs disagree by 5–7 TPS in slots 3
    and 4 with no controlled variable changed except slot-1/slot-2 swap.
-   That is bigger than the "carry-over delta" §5c tried to publish, so
+   That is bigger than the "carry-over delta" section 5c tried to publish, so
    the carry-over signal is below our noise floor on this rig.
 
-**Updated stance** (supersedes §5c's monotonic-decay claim):
+**Updated stance** (supersedes section 5c's monotonic-decay claim):
 
-- The §5c-style "TPS decays monotonically across phases" headline is
-  **withdrawn**. §5d falsifies it — same slots, much higher TPS — and
-  §5c's confidence was higher than n=1 vs n=1 supports.
+- The section 5c-style "TPS decays monotonically across phases" headline is
+  **withdrawn**. section 5d falsifies it — same slots, much higher TPS — and
+  section 5c's confidence was higher than n=1 vs n=1 supports.
 - Within-phase TPS is still sync-chunk-gen-bound (both runs show Server
   thread = 100 % of CPU weight, both show `tps_at_dispatch` tracking
   `chunk_load_cost_ms` row-for-row in the per-attempt CSV).
@@ -370,21 +370,21 @@ better:
 
 - **`rtp` in slot 2**: 100 % success, p50 1–2 ms, p99 1308 ms. Cold-start
   2 ms — pre-cache works in slot 2 just as it does in slot 1. Main
-  CPU/att 542 ms (vs 518 ms in §5c slot 1, vs 520 ms solo in
+  CPU/att 542 ms (vs 518 ms in section 5c slot 1, vs 520 ms solo in
   `20260502-135050`). Three independent runs now agree on `rtp`'s main
   CPU cost to within ±2 %. **This is publishable.**
 - **`jakesrtp` in slot 4**: 100 % success, 109 attempts, 1.79 TP/s
   (highest TP/s of the run), p50 1–2 ms. Cold-start 2 ms. End-of-phase
-  `last1m` 12.72. Two clean runs now (§5c and §5d) put `jakesrtp` in
+  `last1m` 12.72. Two clean runs now (section 5c and section 5d) put `jakesrtp` in
   slot 4 with very different TPS outcomes (5.24 vs 12.72) but identical
   100 % success and identical sub-3-ms warm p50.
 - **`betterrtp` in slot 1**: 69 attempts, 97.1 % success (2 TIMEOUTs),
-  warm p50 ~970 ms. Roughly matches §5c slot 2 (`betterrtp` 990 ms p50,
+  warm p50 ~970 ms. Roughly matches section 5c slot 2 (`betterrtp` 990 ms p50,
   100 % success). The slot move did not move the needle.
 - **`huskhomes` in slot 3**: 58 attempts, 96.6 % success (2 TIMEOUTs),
-  warm p50 ~1700 ms — *better* than §5c's 2540 ms p50 in the same slot.
-  Main CPU/att 874 ms vs §5c's 1169 ms. Either §5c caught a bad
-  HuskHomes run or §5d caught a good one; with n=2 we can't tell which
+  warm p50 ~1700 ms — *better* than section 5c's 2540 ms p50 in the same slot.
+  Main CPU/att 874 ms vs section 5c's 1169 ms. Either section 5c caught a bad
+  HuskHomes run or section 5d caught a good one; with n=2 we can't tell which
   is closer to the steady state.
 
 ### Caveats specific to this re-run
@@ -400,7 +400,7 @@ better:
   here, the spark figure is the rolling average from before the boundary,
   not a fresh measurement of the phase end. Treat them as upper bounds
   on the within-phase low.
-- Same n=1 caveat as §5c. With §5c+§5d we have n=2 on Spigot 1.20.1
+- Same n=1 caveat as section 5c. With section 5c+section 5d we have n=2 on Spigot 1.20.1
   multi-phase, and they disagree by 5–7 TPS in slots 3–4 — that's the
   variance floor for any TPS claim from this configuration.
 
@@ -408,12 +408,12 @@ better:
 
 ## 5e. Run results — `20260502-143455` (Spigot 1.20.1, queues-off, 5-min phases, attributed chunks)
 
-First run with three changes from §5b–§5d simultaneously: (1) per-plugin
+First run with three changes from sections 5b-5d simultaneously: (1) per-plugin
 pre-queues (RTP `keptLocations`, BetterRTP `Queue.Enabled`, JakesRTP
 queue) explicitly **disabled** so chunk-load attribution reflects work
 done *during* the dispatched teleport rather than work pre-warmed
 elsewhere; (2) `sequence.per-target-seconds: 300` — five-minute phases
-so we reach steady state instead of the 60 s burst window that §5b–§5d
+so we reach steady state instead of the 60 s burst window that sections 5b-5d
 ended in; (3) `ChunkLoadCounter` rewritten as per-attempt (Paper
 plugin-ticket lookup → main-thread temporal fallback on Spigot), so
 `chunks_loaded_during_attempt` and the new `chunks_loaded_attributed`
@@ -421,7 +421,7 @@ phase column reflect *causal* attribution rather than
 "every chunk load on the server during the window".
 
 Phase order ran `betterrtp → huskhomes → jakesrtp → rtp`. `rtp` in slot 4
-is the partial reorder test §5d failed to produce.
+is the partial reorder test section 5d failed to produce.
 
 Phase-level (`20260502-143455-phases.csv`):
 
@@ -458,13 +458,13 @@ Spark per-minute rolling, end of each minute within each phase
 | rtp       | 11.04 | 7.65 | 5.95 | 4.65 | **3.94** | 1589–1697 |
 
 `Server thread` retains 100 % CPU share on every per-minute spark profile
-across all four phases (platform baseline; see §5c notes — this is what
+across all four phases (platform baseline; see section 5c notes — this is what
 Spigot 1.20.1 looks like under any synchronous chunk-gen workload, not a
 plugin signature).
 
 ### Findings (this run)
 
-> **Reframing note (2026-05-02, post-analysis).** The original §5e
+> **Reframing note (2026-05-02, post-analysis).** The original section 5e
 > reading treated server `last1m` as the comparison axis. With
 > `per-player-gap-ticks: 0` and per-plugin queues off, *offered* load
 > is constant and saturating: the harness re-dispatches each player as
@@ -499,12 +499,12 @@ plugin signature).
 3. **Loaded-chunk count is flat across each 5-min phase** (~1600–1800,
    no monotonic growth). Cross-phase chunk *residency* is **not**
    accumulating, even with `save-worlds-between-phases` reduced to its
-   default. This is a second piece of evidence (alongside §5d) that the
-   §5c carry-over story was not correct.
+   default. This is a second piece of evidence (alongside section 5d) that the
+   section 5c carry-over story was not correct.
 4. **`rtp` running last (slot 4) does not collapse.** 100 % success,
    p99 1454 ms, TP/s 1.66 — the *highest* throughput in the run, in
    the *last* slot. This is the cleanest disproof so far of the
-   "monotonic carry-over" claim §5c published.
+   "monotonic carry-over" claim section 5c published.
 5. **Latency tails are plugin-distinguishing.** With queues off and
    5-min steady-state, RTP and JakesRTP both deliver tight p99
    (1454 / 1457 ms) at 100 % success; BetterRTP and HuskHomes show
@@ -512,42 +512,42 @@ plugin signature).
    timeouts (4 / 2 of 316 / 386). The TP/s ranking and the p99
    ranking agree, which is the cross-check we want: faster plugins
    are also tighter-tailed at saturation.
-6. **`rtp` main CPU/att is reproducible across four runs.** §5b 572 ms,
-   §5c slot-1 518 ms, §5d slot-2 542 ms, §5e slot-4 564.7 ms (queues
+6. **`rtp` main CPU/att is reproducible across four runs.** section 5b 572 ms,
+   section 5c slot-1 518 ms, section 5d slot-2 542 ms, section 5e slot-4 564.7 ms (queues
    off). Spread is ±5 % across configurations — strong publishable
    number for the front-page comparison.
 7. **chunks/att is now meaningful**: 79 (betterrtp) / 70 (huskhomes) /
    76 (jakesrtp) / 77 (rtp) — clustered, no single plugin pathological.
-   Pre-fix runs that reported `295` for a single huskhomes timeout (§5c)
+   Pre-fix runs that reported `295` for a single huskhomes timeout (section 5c)
    were the global-counter artefact; with attribution + queues off the
    per-attempt max is 299 / 254 / 206 / 194, also clustered, and these
    reflect actual pipeline cost.
 8. **Cold-start cost re-emerges with queues off.** RTP cold = 1037 ms
-   (vs 14–52 ms in queue-on §5b–§5d), BetterRTP cold = 1771 ms,
+   (vs 14–52 ms in queue-on sections 5b-5d), BetterRTP cold = 1771 ms,
    HuskHomes cold = 4924 ms (and was a timeout). With pre-warm
    disabled, each plugin pays the full pipeline cost on attempt 1.
    This is the *actual* per-teleport cost; the queue-on cold-starts
    were measuring queue-fetch latency, not teleport latency.
 
-### What this does to §5c and §5d
+### What this does to section 5c and section 5d
 
-- §5c's "monotonic-carry-over" claim is **decisively withdrawn**. §5e
+- section 5c's "monotonic-carry-over" claim is **decisively withdrawn**. section 5e
   is the configuration that should have settled it; it shows the slot-4
   plugin landing in the same TPS band as the slot-1 plugin, with the
   per-minute decay curve being *identical shape* in every phase
   regardless of order.
-- §5b–§5d's `chunks/att` numbers were measured with the global counter
-  and (for §5b–§5c) with queues on. Both inflate the numerator. Don't
-  publish chunks/att values from §5b/§5c/§5d head-to-head against §5e.
-- §5d's slot-3/slot-4 TPS (11.01 / 12.72) is now interpretable: at 60 s
-  phases those slots had not yet decayed off the warm-up minute. §5e
+- sections 5b-5d's `chunks/att` numbers were measured with the global counter
+  and (for sections 5b-5c) with queues on. Both inflate the numerator. Don't
+  publish chunks/att values from sections 5b/5c/section 5d head-to-head against section 5e.
+- section 5d's slot-3/slot-4 TPS (11.01 / 12.72) is now interpretable: at 60 s
+  phases those slots had not yet decayed off the warm-up minute. section 5e
   shows that at 5 min they would have landed near 4–5 TPS just like
   every other plugin.
 
 ### Caveats (this run)
 
 - Still n=1 for this configuration. Every claim above survives the
-  §5b/§5c/§5d data we already have *and* §5e's per-phase reproduction
+  sections 5b/5c/section 5d data we already have *and* section 5e's per-phase reproduction
   of the 11→4 decay shape, but a second multi-phase 5-min run with a
   different phase order would be the strongest single follow-up.
 - Spigot main-thread-temporal attribution is exact only at concurrency
@@ -557,11 +557,11 @@ plugin signature).
 - HuskHomes cold-start (4924 ms, timeout) and BetterRTP's 4 timeouts
   out of 316 are real per-plugin signal, but the underlying causes
   (request/accept handshake for HuskHomes, plugin-internal retry loop
-  for BetterRTP) are documented in §6 already and aren't revisited
+  for BetterRTP) are documented in section 6 already and aren't revisited
   here.
 - Phase order put the cheaper-throughput plugins first. A second
   5-min run with `rtp → jakesrtp → huskhomes → betterrtp` would
-  bracket whether the slot-1 plugin meaningfully changes anything; §5e
+  bracket whether the slot-1 plugin meaningfully changes anything; section 5e
   alone strongly suggests it does not.
 
 ---
@@ -569,7 +569,7 @@ plugin signature).
 ## 5f. Planned run — multiplayer-spam / per-player-queue fallback (Spigot 1.20.1, 2 accounts)
 
 Status: **planned, not yet executed.** Captured here so the run produces
-data that actually answers the question instead of recapitulating §5e.
+data that actually answers the question instead of recapitulating section 5e.
 
 ### 5f.1 What this run is meant to demonstrate
 
@@ -585,7 +585,7 @@ chunk-load pressure by the spam factor.
 The intended headline:
 
 > *Under per-player command spam, RTP's server `last1m` and main-thread
-> CPU per delivered teleport stay close to the §5e baseline, while
+> CPU per delivered teleport stay close to the section 5e baseline, while
 > plugins without per-player serialisation degrade further (lower
 > delivered TP/s, higher main-CPU/att, more timeouts) because each
 > redundant `/rtp` enters the chunk-gen pipeline.*
@@ -602,11 +602,11 @@ Two-account constraint stands (`Runner.roster()` reads
 **dispatches per player**, not from player count.
 
 Suggested phase matrix (one StressTestRTP run, four phases as usual,
-queues-off / `per-player-gap-ticks: 0` already in place from §5e):
+queues-off / `per-player-gap-ticks: 0` already in place from section 5e):
 
 | Phase | Target | Spam factor | Notes |
 |---|---|---:|---|
-| 1 | rtp        | 1× (baseline) | Same as §5e slot 4 — re-establish the baseline. |
+| 1 | rtp        | 1× (baseline) | Same as section 5e slot 4 — re-establish the baseline. |
 | 2 | rtp        | N× spam       | Both accounts dispatch as fast as the harness allows; per-player queue should absorb the burst. |
 | 3 | betterrtp  | N× spam       | Plugin has its own "already rtp'ing" rejection — expect a different failure mode (rejected, not queued). |
 | 4 | huskhomes  | N× spam       | Per-player serialised internally but via request/accept handshake — different again. |
@@ -617,19 +617,19 @@ if time allows, but the four above are the minimum decisive set.
 "Spam factor" in the harness today is implicit: with
 `per-player-gap-ticks: 0` and `default-burst` ≥ player-count, the
 harness already dispatches as fast as it can. To produce a *clean*
-spam phase distinct from the §5e baseline, either:
+spam phase distinct from the section 5e baseline, either:
 
 - (a) Raise `default-burst` for the spam phase only (per-phase override
   is not currently a config knob — would need a small harness change,
   D-005).
 - (b) Lower `per-player-gap-ticks` from 3 to 0 between baseline and
-  spam phases (already done in §5e — so the §5e run *is* the spam
-  case for plugins that don't queue). This means **§5e already
+  spam phases (already done in section 5e — so the section 5e run *is* the spam
+  case for plugins that don't queue). This means **section 5e already
   partially answers the question for the no-queue plugins**; what's
   missing is a same-config baseline phase with `per-player-gap-ticks: 0`
   but only one in-flight per player.
 
-Recommended (least harness churn): run §5e's exact config, but capture
+Recommended (least harness churn): run section 5e's exact config, but capture
 **per-player in-flight depth** in `MetricsRecorder` so we can see RTP's
 queue absorbing repeats while other plugins don't. The `Attempt` record
 already has `commandDispatchedEpochMs`; counting how many attempts for
@@ -637,7 +637,7 @@ the same UUID overlap a single in-flight window is enough.
 
 ### 5f.3 What to publish from this run
 
-Per phase, in addition to §5e's columns:
+Per phase, in addition to section 5e's columns:
 
 - **Offered TP/s** — total dispatches / wall_s.
 - **Delivered TP/s** — successes / wall_s (already published).
@@ -652,12 +652,12 @@ Per phase, in addition to §5e's columns:
   these are the load-multiplier metrics. If RTP's chunks/att stays at
   ~74 under spam while a non-queueing plugin's rises ≥2×, that is the
   publishable evidence.
-- **Server `last1m` floor** — same caveat as §5e: it's a tick-saturation
+- **Server `last1m` floor** — same caveat as section 5e: it's a tick-saturation
   floor, not a per-plugin TPS measurement. We publish it only to show
   *consistency* (RTP's floor under spam ≈ RTP's floor at baseline),
   not to rank plugins.
 
-### 5f.4 What §5f does NOT claim
+### 5f.4 What section 5f does NOT claim
 
 - "RTP is faster under spam" — false framing. RTP delivers *fewer*
   teleports per offered command because it queues; the value is the
@@ -674,21 +674,21 @@ Per phase, in addition to §5e's columns:
 ### 5f.5 Pre-run checklist
 
 - [ ] Confirm `per-player-gap-ticks: 0` and queues off for all four
-      plugins (matches §5e config; no change needed if reusing it).
+      plugins (matches section 5e config; no change needed if reusing it).
 - [ ] Add a per-phase `offered_tps` / `delivered_tps` /
       `saturation_pct` / `max_in_flight_per_player` set of columns to
       `phases.csv` — D-005-gated harness change. Cheaper alternative:
       compute them post-hoc in `spark_summary.py` from the
       per-attempt CSV (`dispatch_epoch_ms` + `success`), no harness
       change.
-- [ ] Decide phase order. To avoid the §5c/§5d carry-over confound,
+- [ ] Decide phase order. To avoid the sections 5c/5d carry-over confound,
       run RTP first (slot 1) so its baseline isn't contaminated by
       whatever the no-queue plugins did to the JVM in earlier slots.
-- [ ] Keep `sequence.per-target-seconds: 300` (§5e value) — short
+- [ ] Keep `sequence.per-target-seconds: 300` (section 5e value) — short
       phases didn't reach steady state and the spam phase needs even
       longer to drain the in-flight backlog after the burst.
 
-The actual run's results section will land here as **§5g** once the
+The actual run's results section will land here as **section 5g** once the
 data is captured.
 
 ---
@@ -697,7 +697,7 @@ data is captured.
 
 First focused four-way head-to-head between **RTP**, **BetterRTP**, **HuskHomes**, and **JakesRTP** after:
 
-- The JakesRTP command-map collision was worked around by switching the harness target to `jakesrtp:forcertp {player} -c default-settings` (§5e retraction box at top of doc).
+- The JakesRTP command-map collision was worked around by switching the harness target to `jakesrtp:forcertp {player} -c default-settings` (section 5e retraction box at top of doc).
 - All four test plugins were aligned to `cooldown=0`, `delay=0`, **queues enabled** (`RTP.regions.default.cacheCap: 10` + `activeChunkCap: 10`; `BetterRTP.Settings.Queue.Enabled: true`; `JakesRTP.location-cache-filler.enabled: true` with `cache-locations: 10`; HuskHomes has no equivalent — N/A).
 - Both real player accounts were OP'd to ensure permission paths don't reject any namespaced or self-form target.
 
@@ -714,7 +714,7 @@ Phase order in this run was `rtp → betterrtp → huskhomes → jakesrtp` (4 ph
 
 Four things jump off the page:
 
-1. **chunks/att collapses for RTP to ~1**. Under the new attributed counter (§5e/§5f apparatus), RTP dispatches are not driving chunk loads — the L1/L2 queues are serving pre-verified locations. BetterRTP attributes **35.9 chunks/att** and HuskHomes **64.0 chunks/att** because both resolve their candidate at dispatch time. This is the single cleanest signal that **RTP's per-player queue + L1 cache is doing its job** under sustained load, and that neither competing plugin has an equivalent in this configuration (BetterRTP's `Settings.Queue.Enabled: true` is on but ineffective at sustained 1 TP/s; HuskHomes has no queue concept at all and the result is the highest per-attempt chunk burden of the three).
+1. **chunks/att collapses for RTP to ~1**. Under the new attributed counter (sections 5e/5f apparatus), RTP dispatches are not driving chunk loads — the L1/L2 queues are serving pre-verified locations. BetterRTP attributes **35.9 chunks/att** and HuskHomes **64.0 chunks/att** because both resolve their candidate at dispatch time. This is the single cleanest signal that **RTP's per-player queue + L1 cache is doing its job** under sustained load, and that neither competing plugin has an equivalent in this configuration (BetterRTP's `Settings.Queue.Enabled: true` is on but ineffective at sustained 1 TP/s; HuskHomes has no queue concept at all and the result is the highest per-attempt chunk burden of the three).
 2. **`chunk_load_cost_ms` ratio**: rtp 4 543 < betterrtp 128 660 < huskhomes 231 045 ms accumulated across the phase. HuskHomes pays ~1.8× BetterRTP's chunk-load cost and ~50× RTP's, integrated over the same wall time at the same offered TP/s.
 3. **The `chunks_loaded_background` columns invert in a meaningful way**: rtp 20 495 (L2 → L1 refill scan running concurrently with dispatch — correctly not charged to attempts), betterrtp 7 330 and huskhomes 2 783 (just Paper/Spigot housekeeping; neither plugin runs a refill scan).
 4. **Main-thread CPU/att monotonically tracks chunks/att**: rtp 625 ms (1.07 chunks) < betterrtp 732 ms (35.9 chunks) < huskhomes 785 ms (64.0 chunks). The 26 % gap between betterrtp and huskhomes main-CPU/att for an ~1.8× chunks/att ratio shows the per-chunk marginal cost is small once the pipeline is paying for the first one — most of the per-attempt main-CPU is fixed pipeline overhead, not linear in chunks loaded.
@@ -731,10 +731,10 @@ Four things jump off the page:
 This is the **headline-quality result** of the run:
 
 - RTP serves attempts in **single-digit milliseconds at every percentile through p99** — the L1 cache is hot, every `/rtp` is a queue read, no chunk-gen on the dispatch path.
-- BetterRTP's p99 is **530× higher** than RTP's (4229 ms vs 8 ms); HuskHomes's p99 is **640× higher** (5124 ms vs 8 ms) and ~1.2× BetterRTP's. Even the *p50* of both non-RTP plugins (581 / 1032 ms) is two orders of magnitude above RTP's p99. This is exactly the queue-vs-no-queue split the test was designed to expose, now without the §5b–§5e confounders (no carry-over question — all three phases at 100 % success — and no JakesRTP collision because JakesRTP isn't in this run).
+- BetterRTP's p99 is **530× higher** than RTP's (4229 ms vs 8 ms); HuskHomes's p99 is **640× higher** (5124 ms vs 8 ms) and ~1.2× BetterRTP's. Even the *p50* of both non-RTP plugins (581 / 1032 ms) is two orders of magnitude above RTP's p99. This is exactly the queue-vs-no-queue split the test was designed to expose, now without the sections 5b-5e confounders (no carry-over question — all three phases at 100 % success — and no JakesRTP collision because JakesRTP isn't in this run).
 - **HuskHomes p50 = 1032 ms vs BetterRTP p50 = 581 ms**: HuskHomes pays ~1.8× BetterRTP's median, consistent with its ~1.8× chunks/att (64 vs 36). The two plugins land in the same order of magnitude — both are paying full synchronous pipeline cost per dispatch — and the ~2× gap is the chunks/att burden. Neither comes anywhere near the L1-cache regime RTP is in.
 
-Cold-start: RTP **2 ms**, BetterRTP **945 ms**, HuskHomes **3178 ms**. RTP's cold-start was **52 ms** in earlier runs (§6 RTP findings); the drop to 2 ms here is consistent with the L1 refill having had the full inter-phase 120 s gap to pre-warm before the rtp phase even started. HuskHomes's 3.2 s cold-start is *worse* than its own warm p95, suggesting first-dispatch initialization cost on top of the per-attempt chunk-gen baseline.
+Cold-start: RTP **2 ms**, BetterRTP **945 ms**, HuskHomes **3178 ms**. RTP's cold-start was **52 ms** in earlier runs (section 6 RTP findings); the drop to 2 ms here is consistent with the L1 refill having had the full inter-phase 120 s gap to pre-warm before the rtp phase even started. HuskHomes's 3.2 s cold-start is *worse* than its own warm p95, suggesting first-dispatch initialization cost on top of the per-attempt chunk-gen baseline.
 
 ### 5g.3 Spark per-phase TPS (server-thread observable)
 
@@ -751,29 +751,29 @@ Two profiles per phase (60 s windows):
 | `16.03.04` | jakesrtp (mid)   | **11.04** | 15.72 |
 | `16.04.04` | jakesrtp (end)   | **7.47**  | 13.83 |
 
-- During the **rtp** phase, server `last1m` stayed at **18.5 → 20.0 TPS** — effectively unsaturated, which matches §5g.2: queue-served attempts cost the main thread nothing.
+- During the **rtp** phase, server `last1m` stayed at **18.5 → 20.0 TPS** — effectively unsaturated, which matches section 5g.2: queue-served attempts cost the main thread nothing.
 - During the **betterrtp** phase, `last1m` dipped to **14.4 TPS** at the midpoint and recovered to 17.2 by end.
 - During the **huskhomes** phase, `last1m` started at **16.6 TPS** mid-phase and **decayed to 11.8 TPS** by end-of-phase. This is the integrated cost of 64 chunks/att at sustained 1 TP/s: chunk-gen pressure accumulates faster than the server can dissipate it within a 2 min window, even at this modest offered rate.
-- The **jakesrtp** phase landed *lowest* on TPS (`last1m` 11.0 mid → **7.47 end**), continuing the cross-phase decay. Per-attempt latency for JakesRTP is much better than HuskHomes (p50=0, p99=2252) because JakesRTP's `location-cache-filler` *is* serving most attempts from cache (the median attempt is instant), but the cache miss path is heavy enough — and the slot-4 carry-over of HuskHomes's residual chunk pressure is large enough — that server TPS continued to fall. **This is exactly the slot-4 carry-over confound that §5c/§5d failed to settle**: jakesrtp ran last, behind two plugins that left the JVM with the highest accumulated chunk residency in any of our runs to date. We cannot cleanly separate "JakesRTP's intrinsic TPS cost" from "slot-4 inheriting HuskHomes's mess" with this data.
-- The phase-end ranking — **rtp 20.0 > betterrtp 17.2 > huskhomes 11.8 > jakesrtp 7.5** — matches the chunks/att and main-CPU/att rankings for the first three but is **not safe to publish for jakesrtp** without a slot-1 jakesrtp-solo or reverse-order rerun. The discriminator inversion that troubled §5e (where server TPS was a flat tick-saturation floor) does not appear here because `per-player-gap-ticks: 30` keeps offered load below saturation; in this regime server TPS *is* a meaningful per-plugin cost signal — but only after carry-over is controlled.
-- This is **not** the §5e tick-saturation floor — none of the four phases is offering load aggressively enough at `per-player-gap-ticks: 30` (the value still in this run's config, not 0). All four plugins have headroom; the difference between them is *quality of headroom use*, not "who hits the floor first".
+- The **jakesrtp** phase landed *lowest* on TPS (`last1m` 11.0 mid → **7.47 end**), continuing the cross-phase decay. Per-attempt latency for JakesRTP is much better than HuskHomes (p50=0, p99=2252) because JakesRTP's `location-cache-filler` *is* serving most attempts from cache (the median attempt is instant), but the cache miss path is heavy enough — and the slot-4 carry-over of HuskHomes's residual chunk pressure is large enough — that server TPS continued to fall. **This is exactly the slot-4 carry-over confound that sections 5c/5d failed to settle**: jakesrtp ran last, behind two plugins that left the JVM with the highest accumulated chunk residency in any of our runs to date. We cannot cleanly separate "JakesRTP's intrinsic TPS cost" from "slot-4 inheriting HuskHomes's mess" with this data.
+- The phase-end ranking — **rtp 20.0 > betterrtp 17.2 > huskhomes 11.8 > jakesrtp 7.5** — matches the chunks/att and main-CPU/att rankings for the first three but is **not safe to publish for jakesrtp** without a slot-1 jakesrtp-solo or reverse-order rerun. The discriminator inversion that troubled section 5e (where server TPS was a flat tick-saturation floor) does not appear here because `per-player-gap-ticks: 30` keeps offered load below saturation; in this regime server TPS *is* a meaningful per-plugin cost signal — but only after carry-over is controlled.
+- This is **not** the section 5e tick-saturation floor — none of the four phases is offering load aggressively enough at `per-player-gap-ticks: 30` (the value still in this run's config, not 0). All four plugins have headroom; the difference between them is *quality of headroom use*, not "who hits the floor first".
 
 ### 5g.4 What this run does and does NOT establish
 
 **Establishes (n=1 but with strong internal consistency):**
 
-- RTP under L1-cache-fed dispatch operates **off the synchronous chunk-load critical path entirely** at this offered rate. The new attributed-chunk counter (§5e refactor) makes this directly measurable for the first time: 1.07 chunks/att is essentially "the destination chunk plus rounding".
+- RTP under L1-cache-fed dispatch operates **off the synchronous chunk-load critical path entirely** at this offered rate. The new attributed-chunk counter (section 5e refactor) makes this directly measurable for the first time: 1.07 chunks/att is essentially "the destination chunk plus rounding".
 - BetterRTP's queue (`Settings.Queue.Enabled: true`, default queue size) does **not** absorb sustained 1.05 TP/s offered load — every attempt still resolves through the synchronous pipeline. Either its queue is too shallow at default size, or its refill is reactive-on-drain rather than proactive (we have not inspected BetterRTP's source for this; treat as observation, not claim about implementation).
 - HuskHomes has no equivalent queue concept and pays the full synchronous-pipeline cost on every dispatch — **64 chunks/att, p99 5.1 s, server TPS still decaying at end of phase**. It is the worst of the four queue-comparison plugins on every published axis except median latency (where JakesRTP's exhausted cache eventually places it lower than HuskHomes's steady-state pipeline cost).
 - **JakesRTP's `location-cache-filler` works**: p50 = 0 ms (median attempt served from cache, the second-best p50 of the four plugins by a wide margin) and chunks/att 17.0 (a third of BetterRTP's, a quarter of HuskHomes's). It is the only non-RTP plugin in this run that demonstrably pre-resolves locations under sustained dispatch. Its tail (p99 = 2252 ms) shows the cache *can* be exhausted under sustained 1 TP/s — `cache-locations: 10` drains and the cache-miss attempt pays the full pipeline — but the 90 %+ of attempts that hit cache stay sub-second.
-- Latency-tail discrimination is **enormous** (p99 ratios vs RTP: jakesrtp ~280×, betterrtp ~530×, huskhomes ~640×; vs each other: huskhomes/betterrtp ~1.2×, betterrtp/jakesrtp ~1.9×) at this regime — easily publishable as a headline, far above the ~2× confidence interval that any of §5b–§5e gave us.
-- The chunks/att axis now ranks plugins linearly with their tail latency: rtp 1.07 (p99 8 ms) < jakesrtp 17.0 (p99 2252 ms) < betterrtp 35.9 (p99 4229 ms) < huskhomes 64.0 (p99 5124 ms). This is the first run where the per-attempt chunk-attribution metric (§5e refactor) produces a clean linear ranking across four plugins that agrees with both main-CPU/att and tail latency.
+- Latency-tail discrimination is **enormous** (p99 ratios vs RTP: jakesrtp ~280×, betterrtp ~530×, huskhomes ~640×; vs each other: huskhomes/betterrtp ~1.2×, betterrtp/jakesrtp ~1.9×) at this regime — easily publishable as a headline, far above the ~2× confidence interval that any of sections 5b-5e gave us.
+- The chunks/att axis now ranks plugins linearly with their tail latency: rtp 1.07 (p99 8 ms) < jakesrtp 17.0 (p99 2252 ms) < betterrtp 35.9 (p99 4229 ms) < huskhomes 64.0 (p99 5124 ms). This is the first run where the per-attempt chunk-attribution metric (section 5e refactor) produces a clean linear ranking across four plugins that agrees with both main-CPU/att and tail latency.
 
 **Does not establish:**
 
-- Throughput ceiling for any of the four plugins. All ran with `per-player-gap-ticks: 30` (artificial 1.33 TP/s cap with 2 players); all delivered ~1.04–1.25 TP/s, near that cap. To get the real ceiling, repeat with `per-player-gap-ticks: 0` (cf. §5e methodology and §6b throughput proposal).
-- Behaviour under **spam** (the §5f intent). This was a steady-rate run, not a burst; per-player-queue-fallback evidence still pending §5f's sequel run.
-- JakesRTP's **standalone** TPS cost or fair end-of-phase TPS. JakesRTP ran in slot 4 behind HuskHomes's heavy chunk-residency phase; its `last1m` 7.47 at end-of-phase is **not separable** from inherited carry-over (cf. the §5c/§5d carry-over question that two prior runs failed to settle). The latency-tail and chunks/att numbers for JakesRTP *are* publishable (those measure dispatch-time work, not accumulated server state); the TPS number is not.
+- Throughput ceiling for any of the four plugins. All ran with `per-player-gap-ticks: 30` (artificial 1.33 TP/s cap with 2 players); all delivered ~1.04–1.25 TP/s, near that cap. To get the real ceiling, repeat with `per-player-gap-ticks: 0` (cf. section 5e methodology and section 6b throughput proposal).
+- Behaviour under **spam** (the section 5f intent). This was a steady-rate run, not a burst; per-player-queue-fallback evidence still pending section 5f's sequel run.
+- JakesRTP's **standalone** TPS cost or fair end-of-phase TPS. JakesRTP ran in slot 4 behind HuskHomes's heavy chunk-residency phase; its `last1m` 7.47 at end-of-phase is **not separable** from inherited carry-over (cf. the sections 5c/5d carry-over question that two prior runs failed to settle). The latency-tail and chunks/att numbers for JakesRTP *are* publishable (those measure dispatch-time work, not accumulated server state); the TPS number is not.
 
 ### 5g.5 Caveats
 
@@ -786,7 +786,7 @@ Two profiles per phase (60 s windows):
 
 ## 5h. Run results — `20260502-161230` (Paper 1.20.1, four-plugin head-to-head, queues enabled, OPed clients, 2-min phases)
 
-First Paper 1.20.1 capture, same plugin set / configs as the Spigot §5g run
+First Paper 1.20.1 capture, same plugin set / configs as the Spigot section 5g run
 (RTP cooldown=0, delay=0, queue enabled with `cacheCap: 10` /
 `activeChunkCap: 10`; BetterRTP `Queue.Enabled: true`; HuskHomes warmup=0;
 JakesRTP cache=10), same 2 OPed clients, `dispatch-as-player: true`,
@@ -796,7 +796,7 @@ the Spigot 1.20.1 series to skip pre-gen. Phase order:
 default-settings` workaround for the Bukkit command-map collision documented
 in the 2026-05-02 LESSONS_LEARNED entry).
 
-The reason this run gets its own §-section rather than a paragraph is that
+The reason this run gets its own section -section rather than a paragraph is that
 **every published axis moves discontinuously vs Spigot 1.20.1** for the same
 plugin and same configuration:
 
@@ -811,7 +811,7 @@ plugin and same configuration:
 
 Spark MSPT (last full-window per phase): rtp 5.2 / betterrtp 5.6 / huskhomes 5.4 / jakesrtp 8.2 ms median; max-spike-in-window 111 / 105 / 110 / 188 ms. Server `last1m` is pinned at 20.00 across **every phase** — Paper has the headroom to absorb the entire offered load on this rig.
 
-#### Same numbers vs Spigot §5g (queues-on, same plugin, same config)
+#### Same numbers vs Spigot section 5g (queues-on, same plugin, same config)
 
 | Metric | Paper 5h | Spigot 5g | Δ |
 |---|---:|---:|---:|
@@ -826,16 +826,16 @@ Spark MSPT (last full-window per phase): rtp 5.2 / betterrtp 5.6 / huskhomes 5.4
 | Server `last1m` (rtp slot) | 20.00 | 20.00 | flat |
 | Server `last1m` (huskhomes slot) | 20.00 | 11.81 | **+8.2 TPS** |
 
-Paper delivers **higher throughput at lower latency** for every plugin, and the per-plugin spread compresses dramatically: on Spigot §5g the chunks/att ranking spanned 60× (1.07 → 64.0) and p99 spanned 640× (8 → 5124 ms). On Paper §5h chunks/att spans 8.6× (3.2 → 27.6) and p99 spans 23× (54 → 1226 ms). The async chunk pipeline is doing most of the work.
+Paper delivers **higher throughput at lower latency** for every plugin, and the per-plugin spread compresses dramatically: on Spigot section 5g the chunks/att ranking spanned 60× (1.07 → 64.0) and p99 spanned 640× (8 → 5124 ms). On Paper section 5h chunks/att spans 8.6× (3.2 → 27.6) and p99 spans 23× (54 → 1226 ms). The async chunk pipeline is doing most of the work.
 
-† Spigot exposes no MSPT API; the §5g/§5e rows here are spark-side only and
+† Spigot exposes no MSPT API; the sections 5g/5e rows here are spark-side only and
 the harness's tick-wall fallback (added 2026-05-02) lands MSPT into
 `mspt_at_dispatch` in the per-attempt CSV instead. On Paper, spark reads
 `Server#getAverageTickTime()` directly and `mspt_median` is populated.
 
 ‡ **The 18.7 chunks/att figure is inflated and should not be published.**
 User confirmation post-run: the *actual* pipeline cost on this run is ~1
-chunk-load per attempt (queue-served from L1, same regime as §5g). The
+chunk-load per attempt (queue-served from L1, same regime as section 5g). The
 inflation comes from RTP's background `ScanTask` pre-filling the L1/L2
 caches (`cacheCap: 10`, `activeChunkCap: 10`) — those loads happen on the
 main thread, by the RTP plugin, while attempts are in flight, so both the
@@ -843,8 +843,8 @@ Paper plugin-tickets attribution path (matches by plugin label) and the
 Spigot temporal fallback (matches by main-thread + in-flight window)
 bill them to the in-flight attempt. Neither path can distinguish
 "pipeline-driven load" from "scan-task-driven cache pre-fill" when both
-originate inside the same plugin. The correct §5h chunks/att for RTP is
-the §5g figure (~1.07); the 24 377 "attributed" loads are
+originate inside the same plugin. The correct section 5h chunks/att for RTP is
+the section 5g figure (~1.07); the 24 377 "attributed" loads are
 *scan-task-attributed-to-attempt-windows*, not
 *per-attempt-pipeline-loads*.
 
@@ -862,7 +862,7 @@ half-cycle. The effective offered rate is the inverse of the per-attempt
 latency, not `1 / gap_ticks`.
 
 This means **this run is *not* gap-capped** the way every Spigot run in
-§5b–§5g was, and the throughput number is a real measurement of "what RTP +
+sections 5b-5g was, and the throughput number is a real measurement of "what RTP +
 Paper 1.20.1 can sustain at the harness's offered rate". It is not a
 saturation measurement — `per-player-gap-ticks: 0` would push higher; but
 unlike Spigot, we are not measuring the gap.
@@ -875,12 +875,12 @@ unlike Spigot, we are not measuring the gap.
   budget), process CPU 6.7 %. The server is *idle* between teleports at this
   load.
 - **Paper's async chunk pipeline absorbs the chunk-gen cost off the main
-  thread.** Main CPU/att = 13.3 ms — ~40× lower than the §5e Spigot
+  thread.** Main CPU/att = 13.3 ms — ~40× lower than the section 5e Spigot
   saturating run's 565 ms for RTP, and only ~9 % of the total CPU/att
   (144.4 ms). The other ~131 ms per teleport is on Paper's chunk worker
   threads, which is what we want and what S-005 / ADR-015 / the Anvil-prefilter
   ADR-016 design implies should happen.
-- ~~**`chunks_per_attempt` jumped from 1.07 (Spigot §5g) to 18.7 (Paper §5h)
+- ~~**`chunks_per_attempt` jumped from 1.07 (Spigot section 5g) to 18.7 (Paper section 5h)
   for the same RTP plugin at higher offered rate.**~~ **Retracted.** The
   18.7 figure is an attribution artefact, not a real per-attempt pipeline
   cost. RTP runs a background `ScanTask` that pre-fills `keptLocations` /
@@ -890,7 +890,7 @@ unlike Spigot, we are not measuring the gap.
   plugin-tickets matching on plugin label, Spigot temporal-fallback
   matching on main-thread + in-flight) bill scan-task loads to the
   attempt. The actual per-attempt pipeline cost on this run is ~1
-  chunk-load (queue-served from L1, same regime as §5g — the L1 cache
+  chunk-load (queue-served from L1, same regime as section 5g — the L1 cache
   was *not* draining at 10.84 TP/s, contrary to my first-pass
   hypothesis). The `chunks_attributed: 24377` figure is closer to "total
   ScanTask + pipeline loads emitted by RTP during the phase" than to
@@ -900,11 +900,11 @@ unlike Spigot, we are not measuring the gap.
   separate *intra-plugin* concurrent work (pipeline vs. background
   cache-fill). Distinguishing them requires either disabling the scan
   task for the duration of a measurement run (e.g. `cacheCap: 0`,
-  `activeChunkCap: 0` — the §5e queues-off configuration), or extending
+  `activeChunkCap: 0` — the section 5e queues-off configuration), or extending
   the counter to subtract a per-tick scan-task baseline. Neither is in
   this run.
 - **Latency tail is bounded and tight** for RTP: p99 = 154 ms, max = 201 ms
-  over 1302 attempts. The p99/p50 ratio is 1.5× (vs §5g's 2.0× and §5e's
+  over 1302 attempts. The p99/p50 ratio is 1.5× (vs section 5g's 2.0× and section 5e's
   not meaningful at saturation). The other three plugins all show longer
   tails (BetterRTP max 1226 ms, HuskHomes max 1214 ms, JakesRTP max 287 ms)
   but all 100 % successful — Paper's tail is bounded for everyone, just
@@ -916,9 +916,9 @@ unlike Spigot, we are not measuring the gap.
   arrival view-distance load), invisible at the `last1m` rolling-TPS axis
   (still 20.00) because Paper's catch-up handles them inside the same
   minute.
-- **Plugin ranking on Paper differs from Spigot.** On Spigot §5g the
+- **Plugin ranking on Paper differs from Spigot.** On Spigot section 5g the
   ranking by p99 was rtp(8) ≪ jakesrtp(2252) < betterrtp(4229) <
-  huskhomes(5124). On Paper §5h the ranking is **jakesrtp(54) <
+  huskhomes(5124). On Paper section 5h the ranking is **jakesrtp(54) <
   rtp(154) < huskhomes(372) < betterrtp(852)** — JakesRTP moves from
   slot-4 (worst tail on Spigot) to fastest, and BetterRTP becomes the
   worst tail. This is consistent with `jakesrtp:forcertp` skipping the
@@ -933,15 +933,15 @@ unlike Spigot, we are not measuring the gap.
   pool can.
 - **HuskHomes p99 collapses 14× from Spigot to Paper** (5124 → 372 ms).
   Same plugin, same config, same world data, same offered rate. The
-  Spigot §5g number was the platform's sync chunk-gen showing through;
+  Spigot section 5g number was the platform's sync chunk-gen showing through;
   Paper's async pipeline lets HuskHomes's per-player serialisation
   proceed at chunk-worker speed.
 
 ### 5h.4 What this does not establish
 
-- **Cross-platform JakesRTP comparison.** The Spigot §5g figures used the
+- **Cross-platform JakesRTP comparison.** The Spigot section 5g figures used the
   collision-affected `jakesrtp:rtp` target (deferring to our plugin per
-  the 2026-05-02 LESSONS_LEARNED entry); §5h is the first clean JakesRTP
+  the 2026-05-02 LESSONS_LEARNED entry); section 5h is the first clean JakesRTP
   measurement. A Spigot rerun with the `jakesrtp:forcertp` workaround is
   needed before publishing a Spigot↔Paper JakesRTP delta.
 - **Saturation throughput.** `per-player-gap-ticks` is still 30 here, even
@@ -955,9 +955,9 @@ unlike Spigot, we are not measuring the gap.
 - **Spigot-vs-Paper chunks/att comparison for RTP.** Both rigs measure ~1
   pipeline-load per attempt (L1-cache-served). The 18.7 Paper figure is
   retracted — see ‡ footnote on the headline table and the third bullet
-  of §5h.3. A clean per-attempt pipeline-cost measurement on either
+  of section 5h.3. A clean per-attempt pipeline-cost measurement on either
   platform requires the scan task disabled (`cacheCap: 0`,
-  `activeChunkCap: 0`); §5e is the only run captured in that
+  `activeChunkCap: 0`); section 5e is the only run captured in that
   configuration so far. The other three plugins' chunks/att numbers
   (BetterRTP 23.0, HuskHomes 27.6, JakesRTP 3.2) are not affected by
   the RTP-specific scan-task confound — they reflect each plugin's own
@@ -988,16 +988,16 @@ unlike Spigot, we are not measuring the gap.
 
 ## 5i. Run results — `20260502-171548` (Paper 1.20.1, RTP `cacheCap: 100` for JakesRTP-cache parity)
 
-Same Paper 1.20.1 rig as §5h, same four-plugin order
+Same Paper 1.20.1 rig as section 5h, same four-plugin order
 (`rtp → betterrtp → huskhomes → jakesrtp`), same `dispatch-as-player: true`,
 OPed clients, queues on, 2-min phases, 120 s gap. The only deliberate
-configuration change vs §5h: **RTP `regions/default.yml` `cacheCap: 10 → 100`**
+configuration change vs section 5h: **RTP `regions/default.yml` `cacheCap: 10 → 100`**
 (and `activeChunkCap: 10`), and **`performance.yml` `period: 10 → 1`** so the
 background scan / refill task runs every tick instead of every 10 ticks.
 Together these make RTP's L1 cache both deeper and re-filled aggressively,
 cache-size-comparable to JakesRTP's `location-cache-filler.cache-locations: 10`
 plus its own backlog. The intent: stop measuring "RTP's L1 draining at
-sustained offered load" (the §5h regime where rtp delivered 19.16 TP/s but
+sustained offered load" (the section 5h regime where rtp delivered 19.16 TP/s but
 chunks/att rose to 18.7) and instead measure both plugins with a queue
 deep enough — and refilled fast enough — to absorb a 2-min sustained burst.
 
@@ -1020,14 +1020,14 @@ all four phases; MSPT median 13–25 ms, max 95–235 ms.
 `chunks_loaded_background = 54 144 / 2381 ≈ 22.74` per attempt — the
 background bucket is RTP's `ScanTask` keeping the deeper L1 hot under
 saturating dispatch and is not pipeline-search cost. The 22.74 figure
-is amplified by `period: 1` (scan/refill every tick); at the §5h default
+is amplified by `period: 1` (scan/refill every tick); at the section 5h default
 `period: 10` it would be ~1/10th. Both BetterRTP (896) and HuskHomes
 (1183) have negligible background buckets and their chunks/att numbers
 are direct.
 
-### 5i.2 What changed vs §5h (same rig, same order, RTP cache only)
+### 5i.2 What changed vs section 5h (same rig, same order, RTP cache only)
 
-| Plugin     | TP/s §5h | TP/s §5i | p99 §5h | p99 §5i | Main CPU/att §5h | Main CPU/att §5i |
+| Plugin     | TP/s section 5h | TP/s section 5i | p99 section 5h | p99 section 5i | Main CPU/att section 5h | Main CPU/att section 5i |
 |------------|---------:|---------:|--------:|--------:|-----------------:|-----------------:|
 | rtp        |   19.16  |   19.83  |   154   |    **4** |       17.0       |       16.9       |
 | betterrtp  |    6.95  |    7.09  |   852   |    771  |       58.5       |       53.6       |
@@ -1061,13 +1061,13 @@ their numbers.
    tick rate — each player can dispatch at most once per tick — so
    `rtp 19.83` and `jakesrtp 20.00` are at the offered ceiling, not the
    plugin's actual throughput ceiling. To measure either plugin's true
-   throughput limit we would need ≥4 clients (a bot-harness ADR; see §6b).
+   throughput limit we would need ≥4 clients (a bot-harness ADR; see section 6b).
 
 3. **BetterRTP / HuskHomes ranking holds, p99 ratio narrows.** Pipeline-served
    plugins are unchanged in this configuration. RTP-vs-BetterRTP p99 ratio
-   on Paper 1.20.1 is now 4 ms : 771 ms = 193× (vs §5g Spigot 8 ms : 4229 ms
-   = 530×; vs §5h Paper 154 ms : 852 ms = 5.5×). The §5h ratio collapse was
-   driven by RTP's L1 draining; the §5i ratio re-opens it because L1 no
+   on Paper 1.20.1 is now 4 ms : 771 ms = 193× (vs section 5g Spigot 8 ms : 4229 ms
+   = 530×; vs section 5h Paper 154 ms : 852 ms = 5.5×). The section 5h ratio collapse was
+   driven by RTP's L1 draining; the section 5i ratio re-opens it because L1 no
    longer drains.
 
 4. **chunks/att (attributed) for the two queue-served plugins is *not* a
@@ -1085,7 +1085,7 @@ their numbers.
 
 ### 5i.4 Caveats
 
-- n=1 phase per plugin; 4 of the 4 plugins ran in the same order as §5h
+- n=1 phase per plugin; 4 of the 4 plugins ran in the same order as section 5h
   so any slot-1-vs-slot-4 carry-over confound persists. A reverse-order
   rerun (`jakesrtp → huskhomes → betterrtp → rtp`) at this RTP cache size
   would settle whether RTP's slot-1 0 ms cold and JakesRTP's slot-4 21 ms
@@ -1102,20 +1102,20 @@ their numbers.
   default `period: 10` the background number would be ~1/10th and the
   attributed/pipeline number unchanged.
 - Worldgen extent reused from earlier runs; cold-start and chunks/att
-  numbers carry the same "pre-generated chunks" caveat as §5h.
+  numbers carry the same "pre-generated chunks" caveat as section 5h.
 
 ---
 
-## 5j. Run results — `20260502-174114` (Paper 1.20.1, second verification of §5i)
+## 5j. Run results — `20260502-174114` (Paper 1.20.1, second verification of section 5i)
 
 Same Paper 1.20.1 rig, same four-plugin order, same RTP `cacheCap: 100` /
-`period: 1` configuration as §5i. Phase length unchanged at 2 min, 120 s
+`period: 1` configuration as section 5i. Phase length unchanged at 2 min, 120 s
 gap, queues on, OPed clients, `dispatch-as-player: true`, `per-player-gap-ticks: 0`.
-This run is a deliberate n=2 verification of §5i — does the §5i ranking
+This run is a deliberate n=2 verification of section 5i — does the section 5i ranking
 and the RTP `cacheCap` / `period` p99 collapse reproduce on a second
 sequence with the same code and the same configs?
 
-### 5j.1 Headline numbers — second-run reproduction of §5i
+### 5j.1 Headline numbers — second-run reproduction of section 5i
 
 | Plugin     | Att  | Succ% | TP/s   | Cold (ms) | p50 (ms) | p95 (ms) | p99 (ms) | Max (ms) | Main CPU/att (ms) | chunks/att (attr) | chunks/att (bg) |
 |------------|-----:|------:|-------:|----------:|---------:|---------:|---------:|---------:|------------------:|------------------:|----------------:|
@@ -1124,14 +1124,14 @@ sequence with the same code and the same configs?
 | huskhomes  |  742 | 100.0 |  6.18  |      263  |     214  |     305  |     313  |     422  |             47.19 |             25.22 |            1.80 |
 | jakesrtp   | 2397 | 100.0 | 19.97  |       13  |      20  |      48  |      89  |     297  |             19.04 |              3.53 |            2.03 |
 
-‡ Same scan-task confound as §5i: RTP's `chunks/att` background = 23.83 is
+‡ Same scan-task confound as section 5i: RTP's `chunks/att` background = 23.83 is
 the per-tick `ScanTask` keeping `cacheCap: 100` hot, not pipeline-search
 cost. The 5.49 attributed figure is cache-refill churn under the
 saturating offered rate, not per-teleport pipeline cost.
 
-### 5j.2 §5i ↔ §5j reproducibility (same config, two consecutive runs)
+### 5j.2 section 5i ↔ section 5j reproducibility (same config, two consecutive runs)
 
-| Plugin     | TP/s §5i | TP/s §5j | Δ%    | p99 §5i | p99 §5j | Main CPU/att §5i | Main CPU/att §5j |
+| Plugin     | TP/s section 5i | TP/s section 5j | Δ%    | p99 section 5i | p99 section 5j | Main CPU/att section 5i | Main CPU/att section 5j |
 |------------|---------:|---------:|------:|--------:|--------:|-----------------:|-----------------:|
 | rtp        |   19.83  |   19.92  | +0.5% |    4    |    3    |       16.9       |       14.7       |
 | betterrtp  |    7.09  |    7.25  | +2.3% |   771   |   722   |       53.6       |       43.0       |
@@ -1143,7 +1143,7 @@ All four plugins reproduce within tight bounds:
   ceiling is deterministic at this rig.
 - **p99** within ±19 ms for the queue-served plugins (rtp 4↔3 ms,
   jakesrtp 70↔89 ms) and within ±49 ms for pipeline-served (betterrtp
-  771↔722 ms, huskhomes 335↔313 ms). The §5i 38× p99 collapse vs §5h
+  771↔722 ms, huskhomes 335↔313 ms). The section 5i 38× p99 collapse vs section 5h
   for RTP is real and not a single-run artefact.
 - **Main-CPU/att** is the noisiest axis (jakesrtp -27 %, rtp -13 %,
   betterrtp -20 %, huskhomes -10 %) — all four plugins ran ~10–27 %
@@ -1155,13 +1155,13 @@ All four plugins reproduce within tight bounds:
 
 ### 5j.3 Findings
 
-1. **§5i headlines reproduce.** The `cacheCap: 10 → 100` + `period: 10 → 1`
-   change really does collapse RTP's p99 from 154 ms (§5h) to ≤ 4 ms (§5i)
-   to ≤ 3 ms (§5j); n=2 is enough to publish this as a real effect rather
+1. **section 5i headlines reproduce.** The `cacheCap: 10 → 100` + `period: 10 → 1`
+   change really does collapse RTP's p99 from 154 ms (section 5h) to ≤ 4 ms (section 5i)
+   to ≤ 3 ms (section 5j); n=2 is enough to publish this as a real effect rather
    than a single-run artefact. The remaining variance (1 ms) is below
    spark-sampling resolution.
 2. **JakesRTP's p99 has a wider band than RTP's** under the same offered
-   load: 70 ms (§5i) ↔ 89 ms (§5j), a 27 % swing on the tail vs RTP's 25 %
+   load: 70 ms (section 5i) ↔ 89 ms (section 5j), a 27 % swing on the tail vs RTP's 25 %
    swing on a much smaller base. The cache-exhaustion regime is real —
    `cache-locations: 10` is shallow enough that tail latency depends on
    *when* in the cache cycle the burst arrives, while RTP's `cacheCap: 100`
@@ -1172,14 +1172,14 @@ All four plugins reproduce within tight bounds:
    no scan task to be sensitive to; they pay the per-attempt pipeline
    cost every time, and that cost is reproducible.
 4. **Chunks/att (attributed) reproduces for pipeline-served plugins
-   but not queue-served.** BetterRTP 19.33 (§5i) ↔ 19.56 (§5j) and
+   but not queue-served.** BetterRTP 19.33 (section 5i) ↔ 19.56 (section 5j) and
    HuskHomes 23.36 ↔ 25.22 are tight, confirming the attribution-counter
    refactor measures the pipeline cost stably. RTP/JakesRTP background
    buckets vary more (RTP 22.74 ↔ 23.83, JakesRTP 1.44 ↔ 2.03) because
    they reflect cache-refill timing, which is not exactly periodic
    under saturating dispatch.
 5. **Server TPS pinned 20.00 on every phase, both runs.** Spark `last1m`
-   ≥ 19.99 across all 8 phases (§5i + §5j combined). MSPT median 9–25 ms
+   ≥ 19.99 across all 8 phases (section 5i + section 5j combined). MSPT median 9–25 ms
    range with single-tick maxes 95–298 ms scattered through every phase.
    Server TPS remains uninformative for ranking these four plugins on
    this rig.
@@ -1187,17 +1187,17 @@ All four plugins reproduce within tight bounds:
 ### 5j.4 Caveats
 
 - This is a same-order rerun, not a reverse-order test. The slot-1-vs-slot-4
-  carry-over question flagged in §5i.4 is *still* untested — both §5i and
-  §5j ran `rtp → betterrtp → huskhomes → jakesrtp`, so any slot-bias
+  carry-over question flagged in section 5i.4 is *still* untested — both section 5i and
+  section 5j ran `rtp → betterrtp → huskhomes → jakesrtp`, so any slot-bias
   is consistent between them and would be common-mode in this comparison.
 - Both queue-served plugins remain at the 2-client offered ceiling on
   both runs; the n=2 reproducibility headline applies to *latency at
   saturated offered load*, not to the actual plugin throughput ceiling.
-- The 10–27 % main-CPU/att drop across runs (§5i → §5j) is rig-side, not
+- The 10–27 % main-CPU/att drop across runs (section 5i → section 5j) is rig-side, not
   plugin-side; the ranking is preserved (rtp < jakesrtp < huskhomes < betterrtp
   on main CPU/att, both runs) but absolute CPU/att should not be quoted
   to two significant figures from a single 2-min phase.
-- Worldgen extent and `chunks_loaded_background` carry-over from §5h/§5i
+- Worldgen extent and `chunks_loaded_background` carry-over from sections 5h/5i
   remain unchanged here; chunks/att for RTP is still scan-task-confounded
   and not directly comparable to BetterRTP/HuskHomes.
 
@@ -1205,10 +1205,10 @@ All four plugins reproduce within tight bounds:
 
 ## 5k. Run results — `20260502-181051` (Paper 1.20.1, AsyRTP / EzRTP / SorekillRTP attempt)
 
-Same Paper 1.20.1 rig (`git-Paper-196 (MC: 1.20.1)`) as §5h–§5j, queues on
+Same Paper 1.20.1 rig (`git-Paper-196 (MC: 1.20.1)`) as sections 5h-5j, queues on
 where applicable, OPed clients, `dispatch-as-player: true`,
 `per-player-gap-ticks: 0`, 2-min phases, 120 s gap. Targets in this run:
-`asyrtp:rtp`, `ezrtp:rtp`, `sorekillrtp:rtp`. Goal: extend §5h's four-plugin
+`asyrtp:rtp`, `ezrtp:rtp`, `sorekillrtp:rtp`. Goal: extend section 5h's four-plugin
 head-to-head with three additional RTP-style plugins.
 
 ### 5k.1 Headline numbers
@@ -1234,14 +1234,14 @@ form) and set `dispatch-as-player: false` for that target only, or re-test
 with the player's cooldown bypassed.
 
 ⊘ **SorekillRTP — REMAPS to another plugin's `/rtp`, identical Bukkit
-command-map collision class as the JakesRTP issue diagnosed in §5g**.
+command-map collision class as the JakesRTP issue diagnosed in section 5g**.
 SorekillRTP's plugin internally re-dispatches the `/rtp` it received as a
 *different* plugin's `/rtp` (here, our own RTP plugin); the harness was
 therefore measuring **our RTP plugin's queue-served path**, not Sorekill's
 own placement / safety / network logic. The 10.0 TP/s, p99=2 ms, 5.77
 chunks-attributed-per-attempt numbers are RTP-self-reproducibility data
-(consistent with §5i / §5j RTP rows at this rig), **not** SorekillRTP
-performance. Same workaround as §5g: switch the target to a SorekillRTP
+(consistent with section 5i / section 5j RTP rows at this rig), **not** SorekillRTP
+performance. Same workaround as section 5g: switch the target to a SorekillRTP
 admin-form command (e.g. `sorekillrtp:rtp {player} local`, the form already
 in `config.yml` line 87 commentary, but without the bare-`rtp` collision
 path) and verify with `/version` that the command resolves only to
@@ -1254,8 +1254,8 @@ Of the three targets, only AsyRTP's data is publishable from this run.
 
 1. **AsyRTP delivers 2.04 TP/s with full success and a long tail.** 245/245
    succeeded (no TIMEOUT, no CONSOLE_FAIL, no fail rows at all), but warm
-   p50 = 401 ms and p99 = 2.07 s — about **170× RTP §5j's p99 (3 ms)** and
-   **3× BetterRTP §5j's p99 (722 ms)** at saturating offered load.
+   p50 = 401 ms and p99 = 2.07 s — about **170× RTP section 5j's p99 (3 ms)** and
+   **3× BetterRTP section 5j's p99 (722 ms)** at saturating offered load.
 2. **AsyRTP saturates the main thread under load.** Spark MSPT_max for the
    asyrtp window is **1343–1768 ms** (single-tick stalls > 1 second); MSPT
    median 3.3–3.7 ms means the main thread is otherwise quiet, so those
@@ -1269,7 +1269,7 @@ Of the three targets, only AsyRTP's data is publishable from this run.
    lives on the main thread (see finding 2) rather than being amortised by
    a queue.
 4. **AsyRTP main-CPU/att = 43.18 ms** is comparable to BetterRTP's 43.01 ms
-   in §5j and HuskHomes's 47.19 ms — i.e. AsyRTP is in the same per-attempt
+   in section 5j and HuskHomes's 47.19 ms — i.e. AsyRTP is in the same per-attempt
    CPU class as the other pipeline-served (queue-less) plugins. Its lower
    TP/s (2.04 vs BetterRTP's 7.25, HuskHomes's 6.18) is therefore *not*
    per-attempt CPU; it is something else (worker-thread contention, internal
@@ -1287,35 +1287,35 @@ Of the three targets, only AsyRTP's data is publishable from this run.
   headline table are our RTP plugin's queue-served path under a SorekillRTP
   *label*. They must not be cited as SorekillRTP performance and have been
   marked ⊘ accordingly. Until a collision-free target form is in place
-  (verified by `/version` + tab-completion as in §5g), SorekillRTP remains
+  (verified by `/version` + tab-completion as in section 5g), SorekillRTP remains
   in the same "pending re-test with workaround" bucket as JakesRTP was
-  before §5g.
+  before section 5g.
 - **AsyRTP n=1 at saturating load on Paper 1.20.1.** A second consecutive
   run with the same target and a reverse-order rerun would settle whether
   the 1343–1768 ms MSPT spikes are reproducible or were single-instance
   pauses (e.g. dirty-chunk write-back coinciding with an attempt).
-- **Reused worldgen extent.** Same caveat as §5h–§5j: cold-start and
+- **Reused worldgen extent.** Same caveat as sections 5h-5j: cold-start and
   chunks/att numbers carry the "pre-generated chunks" context. AsyRTP's
   cold = 440 ms is its first-attempt latency *into a partially-pre-generated
   world*, not first-attempt latency into a fresh world.
 - **No queue knobs explored for AsyRTP.** Whether AsyRTP exposes a cache /
   queue equivalent to RTP's `cacheCap` or JakesRTP's `cache-locations` was
   not investigated in this run; if it does, an "AsyRTP with queue tuned"
-  follow-up would parallel the §5h → §5i p99 collapse for RTP.
+  follow-up would parallel the section 5h → section 5i p99 collapse for RTP.
 
 ---
 
 ## 5L. Run results — `20260502-185238` (Paper 1.20.1, AsyRTP / EzRTP / AdvancedRTP / EssentialsX, post-workaround re-run)
 
-Same Paper 1.20.1 rig (`git-Paper-196 (MC: 1.20.1)`) as §5h–§5k, queues on
+Same Paper 1.20.1 rig (`git-Paper-196 (MC: 1.20.1)`) as sections 5h-5k, queues on
 where applicable, OPed clients, `dispatch-as-player: true`,
 `per-player-gap-ticks: 0`, **2-min phases, 120 s gap**. Targets in this run:
 `asyrtp:rtp world world {player}`, `ezrtp:forcertp {player} world`,
 `advancedrtp:rtp {player}`, `essentialsx:tpr {player}` — i.e. the four
-targets pending after §5k with each plugin's per-player cooldowns / countdowns
+targets pending after section 5k with each plugin's per-player cooldowns / countdowns
 zeroed (see prior config-audit submission). Goal: produce the first
 publishable measurements for EzRTP, AdvancedRTP, and EssentialsX, and
-reproduce AsyRTP §5k as an n=2 control.
+reproduce AsyRTP section 5k as an n=2 control.
 
 ### 5L.1 Headline numbers
 
@@ -1329,34 +1329,34 @@ reproduce AsyRTP §5k as an n=2 control.
 ⚠ Both AdvancedRTP and EssentialsX recorded `fail_reason=TIMEOUT` rows
 (10/270 = 3.7 % and 38/158 = 24.1 % respectively); AsyRTP and EzRTP were
 0-fail. EssentialsX's failure rate at 0-cooldown is structural, not config:
-`/tpr` is teleport-*request*-shaped (see §6 EssentialsX entry and the
+`/tpr` is teleport-*request*-shaped (see section 6 EssentialsX entry and the
 LESSONS_LEARNED Stress-Testing section).
 
 Spark windows for the run (8 phase profiles, 2 per phase): server `last1m`
 TPS held **19.95–20.05** throughout; MSPT_median 3.1–9.9 ms, MSPT_max
-**381–855 ms** spikes (single-tick stalls, comparable to AsyRTP §5k's
+**381–855 ms** spikes (single-tick stalls, comparable to AsyRTP section 5k's
 1343–1768 ms band but smaller in magnitude). Loaded-chunk count drifted
 1413→1463 across the run, consistent with the same partially-pre-generated
-world reused since §5h.
+world reused since section 5h.
 
-### 5L.2 Are these their own plugins, or another §5g/§5k collision?
+### 5L.2 Are these their own plugins, or another sections 5g/5k collision?
 
-The §5g (JakesRTP → bare `/rtp` → our plugin) and §5k (SorekillRTP → bare
+The section 5g (JakesRTP → bare `/rtp` → our plugin) and section 5k (SorekillRTP → bare
 `/rtp` → our plugin) collision class would surface here as
 `chunks_per_attempt_attributed ≈ 1` and very low main-CPU/att, because the
 harness would actually be measuring our queue-served L1-cache path (cf.
-§5j: rtp 0.31 chunks/att, ~17 ms main-CPU/att). The numbers above are
+section 5j: rtp 0.31 chunks/att, ~17 ms main-CPU/att). The numbers above are
 *nothing like* that profile:
 
 - **EzRTP 99.2 chunks/att, 139.6 ms main-CPU/att** — this is by far the
   heaviest pipeline-search profile recorded in any run to date, ~3× HuskHomes
-  §5j (52.0 chunks/att). Cannot be RTP-self.
+  section 5j (52.0 chunks/att). Cannot be RTP-self.
 - **AdvancedRTP 47.7 chunks/att, 92.1 ms main-CPU/att** — similar to
-  HuskHomes §5j (52.0, 47.2). Cannot be RTP-self.
-- **AsyRTP 12.3 chunks/att, 38.8 ms main-CPU/att** — close to AsyRTP §5k
+  HuskHomes section 5j (52.0, 47.2). Cannot be RTP-self.
+- **AsyRTP 12.3 chunks/att, 38.8 ms main-CPU/att** — close to AsyRTP section 5k
   (6.83 chunks/att, 43.18 ms main-CPU/att); n=2 reproduction.
 - **EssentialsX 2.78 chunks/att, 88.9 ms main-CPU/att** — low chunks/att
-  but high main-CPU/att rules out the §5g/§5k collision (which would give
+  but high main-CPU/att rules out the sections 5g/5k collision (which would give
   low CPU/att too). Consistent with `/tpr` doing significant non-chunk work
   (request handshake, message I/O, retry plumbing) before / instead of a
   full pipeline search.
@@ -1372,7 +1372,7 @@ EssentialsX from the harness.
    RTP/JakesRTP 0–1 queue-served) and burns ~140 ms of main-thread time.
    Despite that, success rate is 100 % and p99 is 2.9 s — i.e. EzRTP's
    pipeline is correct and bounded, just expensive. The worldgen-extent
-   caveat (§5h ‡) applies: in a fresh world, both numbers would likely be
+   caveat (section 5h ‡) applies: in a fresh world, both numbers would likely be
    higher.
 2. **AdvancedRTP delivers the highest TP/s of this batch (2.16) at the
    lowest p99 (2.1 s).** chunks/att = 47.7 puts it in the same per-attempt
@@ -1382,11 +1382,11 @@ EssentialsX from the harness.
    failure-mode that needs reproduction before publishing — could be
    transient bad-candidate runs that exhaust an internal retry budget; could
    be a queue-of-one collision if both clients dispatch in the same tick.
-3. **AsyRTP §5k reproduces, with the same diagnostic signature.** §5k:
-   2.04 TP/s, p99 2071 ms, MSPT_max 1343–1768 ms; §5L: 1.67 TP/s, p99
+3. **AsyRTP section 5k reproduces, with the same diagnostic signature.** section 5k:
+   2.04 TP/s, p99 2071 ms, MSPT_max 1343–1768 ms; section 5L: 1.67 TP/s, p99
    4534 ms, MSPT_max 855 ms. The drop in TP/s and rise in p99 between runs
    is the n=2 variance band for AsyRTP and is large (~22 % TP/s, ~2× p99).
-   The 1+ s MSPT-spike profile that motivated the §5k S-005-suspect
+   The 1+ s MSPT-spike profile that motivated the section 5k S-005-suspect
    diagnosis is preserved: AsyRTP main-CPU/att (38.8 ms) is small relative
    to the MSPT_max (855 ms), so a handful of attempts dominate the
    tick-time tail.
@@ -1397,12 +1397,12 @@ EssentialsX from the harness.
    shorter than the request-accept handshake's natural latency for some
    fraction of attempts. The 38 timeouts are *not* an EssentialsX bug per
    se — they are the harness measuring a request-shaped command as if it
-   were a do-shaped one. See §6 EssentialsX and the LESSONS_LEARNED
+   were a do-shaped one. See section 6 EssentialsX and the LESSONS_LEARNED
    Stress-Testing entry; this run is **the first time** the timeout storm
    has reproduced on Paper (prior LESSONS_LEARNED entry called it
    Spigot-only). Update needed there.
-5. **Cross-plugin chunks/att now spans ~150×.** Across the queued (RTP §5j
-   ≈0.3 attributed) and pipeline-served (EzRTP §5L 99.2) extremes, our
+5. **Cross-plugin chunks/att now spans ~150×.** Across the queued (RTP section 5j
+   ≈0.3 attributed) and pipeline-served (EzRTP section 5L 99.2) extremes, our
    attributed-chunk counter discriminates plugins by a factor of ~150 in
    this single run. This is the strongest evidence yet that the
    attribution refactor is producing a meaningful per-plugin metric,
@@ -1418,11 +1418,11 @@ EssentialsX from the harness.
 
 ### 5L.4 Caveats and what this run does NOT establish
 
-- **All n=1 except AsyRTP (n=2 with §5k).** EzRTP, AdvancedRTP, and
-  EssentialsX numbers are single-phase first-measurements; the §5j
+- **All n=1 except AsyRTP (n=2 with section 5k).** EzRTP, AdvancedRTP, and
+  EssentialsX numbers are single-phase first-measurements; the section 5j
   precedent (10–27 % main-CPU/att variance run-to-run) suggests two-figure
   precision for any of these is unjustified.
-- **AdvancedRTP collision-audit pending.** Per the §5g rule, every new
+- **AdvancedRTP collision-audit pending.** Per the section 5g rule, every new
   third-party RTP plugin needs a `/version` + tab-completion check before
   its numbers are published as the plugin's own. The chunks/att=47.7
   signature *strongly* suggests this is its own plugin (cannot be RTP-self
@@ -1431,15 +1431,15 @@ EssentialsX from the harness.
   24.1 % timeout figure is publishable as "fraction of `/tpr` requests
   that did not complete the request-accept-teleport cycle within 5 s on
   this rig", not as "fraction of EssentialsX teleports that fail". Anyone
-  reading the headline must see the §6 EssentialsX caveat alongside.
+  reading the headline must see the section 6 EssentialsX caveat alongside.
 - **EzRTP's 99 chunks/att is partially worldgen-bounded.** The reused
-  partially-pre-generated extent (§5h ‡) means EzRTP probably hit chunks
+  partially-pre-generated extent (section 5h ‡) means EzRTP probably hit chunks
   that were already on disk for some fraction of attempts; in a fresh
   world the figure would be higher.
-- **Reverse-order rerun still owed for §5h–§5L.** All Paper runs to date
-  have run the same plugins in the same slot positions. The §5i/§5j
+- **Reverse-order rerun still owed for sections 5h-5L.** All Paper runs to date
+  have run the same plugins in the same slot positions. The sections 5i/5j
   same-order n=2 confirmation does *not* address slot-bias between
-  different plugins (e.g. EzRTP went last in the prior §5k run and timed
+  different plugins (e.g. EzRTP went last in the prior section 5k run and timed
   out, but went second here and succeeded — that is a config fix, but
   also a slot change).
 
@@ -1460,7 +1460,7 @@ clients, `per-player-gap-ticks: 0`, `dispatch-as-player: true`. AsyRTP rows
 in the per-attempt CSV are pre-warmup probes and are excluded.
 
 > **Correction note (this section was rewritten in place).** An earlier draft
-> of §5M reported BetterRTP at 1.13 TP/s / p99 = 1102 ms based on a partial
+> of section 5M reported BetterRTP at 1.13 TP/s / p99 = 1102 ms based on a partial
 > mid-run snapshot before the BetterRTP phase had completed and before the
 > HuskHomes phase had even started. The numbers below are the final
 > three-phase figures from the completed `phases.csv`.
@@ -1501,22 +1501,22 @@ generation bursts, not pipeline cost.
 
 1. **RTP on Folia delivers 9.87 `/rtp`/s with p99 = 157 ms and 4.00 ms
    main-CPU/att**, 99.97 % success on a 10-min sustained phase. The 4.00 ms
-   main-CPU/att is the **lowest of any platform measured** (vs Paper §5j
-   13–17 ms, Spigot §5g/§5j 60+ ms) — Folia's region scheduler removes the
+   main-CPU/att is the **lowest of any platform measured** (vs Paper section 5j
+   13–17 ms, Spigot sections 5g/5j 60+ ms) — Folia's region scheduler removes the
    main-thread serialization that drove the Paper/Spigot CPU/att.
 
 2. **BetterRTP on Folia delivers 3.82 `/rtp`/s with p99 = 1 200 ms and
    34.8 chunks/att**, 100 % success. The 34.8 chunks/att signature confirms
    it's running its own pipeline (not collapsed to RTP via a command-map
-   collision — see §5g verification rule). p99 = 1 200 ms is roughly **3.5×
-   better than its Spigot §5g p99 (4 229 ms)** and similar to its Paper §5h
+   collision — see section 5g verification rule). p99 = 1 200 ms is roughly **3.5×
+   better than its Spigot section 5g p99 (4 229 ms)** and similar to its Paper section 5h
    p99 (722–852 ms) — Folia helps BetterRTP, but the queueing-vs-pipeline
    gap remains visible.
 
 3. **HuskHomes on Folia delivers 3.32 `/rtp`/s with p99 = 901 ms and
    28.4 chunks/att**, 100 % success — and this is a **dramatic Folia win for
-   HuskHomes**: its Spigot §5g p99 was 5 124 ms (5.7× worse) and its Paper
-   §5h p99 was 313–372 ms (≈ 2.5× *better* than Folia, interestingly). The
+   HuskHomes**: its Spigot section 5g p99 was 5 124 ms (5.7× worse) and its Paper
+   section 5h p99 was 313–372 ms (≈ 2.5× *better* than Folia, interestingly). The
    no-queue Spigot/Paper failure mode disappears almost entirely on Folia
    because the region thread can absorb the per-attempt chunk-gen cost
    without dragging the rest of the server.
@@ -1537,26 +1537,26 @@ generation bursts, not pipeline cost.
    player waits — and with RTP, even they don't.*
 
 6. **`chunks_loaded_attributed` ≈ `chunks_loaded_background` for RTP**
-   (106 727 vs 132 116 for the rtp phase). Same caveat as §5h‡: RTP's
+   (106 727 vs 132 116 for the rtp phase). Same caveat as section 5h‡: RTP's
    `ScanTask` produces background loads on the region thread that the
    per-attempt attribution can't separate from in-flight pipeline work.
    Don't read the 18.0 chunks/att-attributed for RTP as "pipeline cost" —
-   see §5h‡. BetterRTP and HuskHomes have no comparable scan task and their
+   see section 5h‡. BetterRTP and HuskHomes have no comparable scan task and their
    chunks/att (34.8 / 28.4) are direct, unconfounded measurements.
 
 ### 5M.4 Caveats
 
-- **n=1 on Folia for all three plugins.** Reproducibility band from §5j
+- **n=1 on Folia for all three plugins.** Reproducibility band from section 5j
   (10–27 % main-CPU/att, ±2.5 % TP/s) is the working assumption; quote
   ranges, not point numbers, in any public writeup.
-- **MC 1.21.11**, not 1.20.1. Cross-platform comparisons against §5g (Spigot
-  1.20.1) and §5h–§5L (Paper 1.20.1) carry a one-version delta; some of the
+- **MC 1.21.11**, not 1.20.1. Cross-platform comparisons against section 5g (Spigot
+  1.20.1) and sections 5h-5L (Paper 1.20.1) carry a one-version delta; some of the
   Folia speedup is genuine Paper/Folia improvement that landed between
   1.20.1 and 1.21.11, not pure platform difference. Don't attribute the
   full Spigot→Folia gap to "Folia"; some belongs to the version bump.
 - **Sequential phases, not concurrent dispatch.** Each plugin had the rig
   to itself for 10 min with 120 s gaps in between — same structure as the
-  Paper §5g/§5h/§5j runs. There is no plugin-vs-plugin contention confound.
+  Paper sections 5g/5h/section 5j runs. There is no plugin-vs-plugin contention confound.
 - **Pre-warmup contamination**: 73 rtp / 43 betterrtp / 34 huskhomes rows
   dispatched outside their respective phase windows (harness warm-up bursts
   and the late-phase tail). They are not in phases.csv, but they *are* in
@@ -1643,7 +1643,7 @@ RTP Paper configuration, and matches the market-comparison ask.
 ### EssentialsX
 
 - Excluded from the head-to-head comparison. `/tpr` is self-only; cannot be driven from console without per-player chat dispatch. To benchmark properly, log into each alt and run `/rtpstress start` from there with single-player roster.
-- **Separate finding — EssentialsX `/tpr` as a timeout source on Spigot (2026-05-02).** When the EssentialsX `/tpr` target is included in the StressTestRTP roster on a **Spigot** test server, the harness records a high and reproducible rate of teleport timeouts (`MetricsRecorder.onTimeout` rows; `[StressTestRTP]` warm-up "zero successful attempts" warning) **for that target's slice**. Removing the `/tpr` target from the roster — with EssentialsX itself still installed, and all other plugins, world state, and StressTestRTP config unchanged — eliminates the timeouts and the remaining targets complete cleanly. It is the act of dispatching `/tpr`, not EssentialsX's mere presence in `plugins/`, that drives the timeout storm. Failure mode is silent: no crash, no logged exception; the `/tpr` attempts simply never produce a `PlayerTeleportEvent` within the per-attempt deadline. Hypothesis (not yet root-caused): EssentialsX's `/tpr` handler (cooldown/warmup interception, request-accept handshake, or the way it ultimately fires the teleport) does not produce a `PlayerTeleportEvent` of the kind the probe is waiting on within the per-attempt deadline — `/tpr` is a teleport-*request* command rather than a direct teleport. Paper/Folia have not been observed to reproduce this under the same harness. See `docs/dev/LESSONS_LEARNED.md` § *Stress Testing*.
+- **Separate finding — EssentialsX `/tpr` as a timeout source on Spigot (2026-05-02).** When the EssentialsX `/tpr` target is included in the StressTestRTP roster on a **Spigot** test server, the harness records a high and reproducible rate of teleport timeouts (`MetricsRecorder.onTimeout` rows; `[StressTestRTP]` warm-up "zero successful attempts" warning) **for that target's slice**. Removing the `/tpr` target from the roster — with EssentialsX itself still installed, and all other plugins, world state, and StressTestRTP config unchanged — eliminates the timeouts and the remaining targets complete cleanly. It is the act of dispatching `/tpr`, not EssentialsX's mere presence in `plugins/`, that drives the timeout storm. Failure mode is silent: no crash, no logged exception; the `/tpr` attempts simply never produce a `PlayerTeleportEvent` within the per-attempt deadline. Hypothesis (not yet root-caused): EssentialsX's `/tpr` handler (cooldown/warmup interception, request-accept handshake, or the way it ultimately fires the teleport) does not produce a `PlayerTeleportEvent` of the kind the probe is waiting on within the per-attempt deadline — `/tpr` is a teleport-*request* command rather than a direct teleport. Paper/Folia have not been observed to reproduce this under the same harness. See `docs/dev/LESSONS_LEARNED.md` section *Stress Testing*.
 - **Implication for the public write-up**: a Spigot run whose timeout count is dominated by the `/tpr` slice is not valid evidence of an RTP regression and must not be compared head-to-head against rosters that excluded `/tpr`. If a published Spigot row keeps `/tpr` in the roster, say so explicitly in the CSV header / footnote. Default benchmark posture is **EssentialsX `/tpr` excluded from the Spigot roster** (EssentialsX itself may remain installed).
 
 ### DonutRTP
@@ -1668,7 +1668,7 @@ RTP Paper configuration, and matches the market-comparison ask.
 
 ## 6b. Throughput methodology (proposal — pending implementation)
 
-The §5 / §5b / §5c runs treat throughput as a **side-effect** of latency and
+The section 5 / section 5b / section 5c runs treat throughput as a **side-effect** of latency and
 concurrency: `phases.csv` reports `successes / wall_s` and we read TP/s from
 that. That is a delivered-throughput number on a 60 s window with a
 `per-player-gap-ticks: 30` (1.5 s) cap and 2 real connected accounts. It is
@@ -1690,7 +1690,7 @@ make throughput a first-class axis of the public write-up.
   Useful headline for the write-up.
 - **Sustained TP/s** — delivered rate after warm-up, with a *stable* backlog
   (queue not draining, not growing). Closest to "how many players can a
-  server rotate per second under load." Not yet measurable: the §5c
+  server rotate per second under load." Not yet measurable: the section 5c
   per-target wall is 60 s and several plugins (notably HuskHomes) had not
   reached steady state by phase end — `last1m` was still falling at the
   cutoff.
@@ -1706,7 +1706,7 @@ offline-mode test server, but a non-trivial new helper module and an ADR-
 worthy decision).
 
 Until that bot harness exists, every throughput number we publish is
-explicitly a **2-concurrent-client** number. §10 ("What this benchmark does
+explicitly a **2-concurrent-client** number. section 10 ("What this benchmark does
 NOT prove") already calls out the "doesn't generalise to 50 players" caveat;
 6b just makes the 2-client framing explicit at measurement time rather than
 at write-up time.
@@ -1718,12 +1718,12 @@ clients:
 
 1. **`per-player-gap-ticks: 0`** (or 1 tick). Today's value of `30` caps
    each client at 0.67 dispatches/s, i.e. a 2-client ceiling of 1.33 TP/s
-   — *lower than several measured plugin values* in §5c, which means the
+   — *lower than several measured plugin values* in section 5c, which means the
    gap dominates the comparison for slow plugins and underrepresents fast
    ones. Drop to 0 and the next dispatch goes out as soon as the previous
    attempt completes (success or timeout). This measures each plugin's
    **serial** throughput per client, doubled.
-2. **`sequence.per-target-seconds: 300`** (5 min) instead of 60 s. The §5c
+2. **`sequence.per-target-seconds: 300`** (5 min) instead of 60 s. The section 5c
    data shows TPS still dropping at end-of-phase for the slower plugins; a
    60 s window measures a transient, not a steady state. 5 min is enough
    for both the JIT and the per-plugin queue to settle, while staying
@@ -1790,16 +1790,16 @@ the wall-clock cost.
 ### 6b.6 What this section does NOT claim
 
 - That 2-client throughput numbers extrapolate linearly to N clients. They
-  don't, especially under per-player queue fairness contention; §10
+  don't, especially under per-player queue fairness contention; section 10
   already calls this out and 6b inherits that caveat.
 - That `delivered_tps` from a 60 s window with `per-player-gap-ticks: 30`
-  (the §5 / §5b / §5c configuration) is a throughput benchmark. It is a
+  (the section 5 / section 5b / section 5c configuration) is a throughput benchmark. It is a
   latency benchmark with a throughput coordinate; do not lead with the
   TP/s column from those runs.
 - That sustained throughput on Spigot 1.20.1 is decoupled from the cross-
-  phase chunk-residency question raised in §5c. The reorder test is
+  phase chunk-residency question raised in section 5c. The reorder test is
   in-flight at time of writing this section; until those results are in,
-  §5c's residency hypothesis remains a candidate effect on the order of
+  section 5c's residency hypothesis remains a candidate effect on the order of
   ≤3 TPS rather than a settled cause, and any throughput run that mixes
   plugins in the same JVM inherits that uncertainty.
 
@@ -1819,7 +1819,7 @@ the wall-clock cost.
 10. **No GC tuning beyond default Paper flags.** Default G1GC. Allocation rate per teleport not measured (planned future addition; would mirror `CpuSampler`).
 11. **No spark cross-correlation in the harness CSV**; spark profiles are captured manually per phase via `sparkHook`'s `start/stop` calls. The CSV's `target_label` column maps 1:1 to spark's `--comment` tag.
 12. **No Folia run yet.** Folia is in scope but tested on Paper 1.21.11 here. Folia results will likely be more flattering for RTP (region scheduler matches RTP's design) and less so for AsyRTP (it'll throw `ThreadAccessException`).
-13. **EssentialsX `/tpr` excluded from Spigot rosters.** Calling EssentialsX `/tpr` on Spigot causes a reproducible timeout storm in that target's slice (see §6 *EssentialsX*); EssentialsX's mere presence in `plugins/` is not the trigger — dispatching `/tpr` is. The default Spigot benchmark posture is therefore `/tpr` excluded from the roster (EssentialsX itself may remain installed); any Spigot run that keeps `/tpr` in the roster must be flagged explicitly in the CSV header / footnote and must not be compared head-to-head against rosters that excluded it. Paper/Folia have not been observed to reproduce this.
+13. **EssentialsX `/tpr` excluded from Spigot rosters.** Calling EssentialsX `/tpr` on Spigot causes a reproducible timeout storm in that target's slice (see section 6 *EssentialsX*); EssentialsX's mere presence in `plugins/` is not the trigger — dispatching `/tpr` is. The default Spigot benchmark posture is therefore `/tpr` excluded from the roster (EssentialsX itself may remain installed); any Spigot run that keeps `/tpr` in the roster must be flagged explicitly in the CSV header / footnote and must not be compared head-to-head against rosters that excluded it. Paper/Folia have not been observed to reproduce this.
 15. **Two-version Paper matrix: Paper 1.20.1 and Paper 1.21.11.** The benchmark holds the platform constant (Paper) and varies the Minecraft version, rather than varying the platform. Paper was chosen because it gives the largest set of *functioning* competitor `/rtp` plugins; the two-version split is necessary because **several rostered competitors are rated only up to MC 1.20** (or stopped receiving updates around the 1.20.x line) and either fail to load or misbehave on 1.21.11. Running the 1.20.1 pass is what makes a plugin-vs-plugin comparison possible at all for that subset of competitors; running the 1.21.11 pass is what exercises the current Paper chunk-system / lighting / biome-storage code path that modern operators actually deploy on. Implications:
     - The benchmark's primary axis is **plugin-vs-plugin within a single MC version**, not version-vs-version. Intra-version rankings are valid; cross-version per-plugin deltas are **not** — the 1.20.1 → 1.21.11 jump changed chunk-system internals, lighting, biome storage, and scheduler behavior, so a 1.20.1-vs-1.21.11 number for the same plugin is confounded by the MC-version delta.
     - **Paper 1.21.11 is the canonical head-to-head dataset** for plugin-vs-plugin performance on current MC. Paper 1.20.1 is reported for compatibility-bounded ranking among plugins rated up to 1.20, and for RTP's own cross-version parity — not as a head-to-head against the 1.21.11 numbers.

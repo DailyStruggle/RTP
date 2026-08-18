@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Pure-string, platform-neutral identifier normalizer (ADR-016 §8.1). Trim,
+ * Pure-string, platform-neutral identifier normalizer (ADR-016 section 8.1). Trim,
  * strip first {@code namespace:} prefix, upper-case under {@link Locale#ROOT}.
  * {@code null} → {@code null}; empty/whitespace-only → {@code ""}. Modded ids
  * pass through with namespace stripped (registry reconciliation is an adapter

@@ -88,7 +88,7 @@ A new top-level note will be added to `docs/dev/RULES.md` ("Authoring docs for t
 
 ### Page-break model
 
-`MarkdownToMenuModel` produces a `MenuModel` whose pages are **logical** breaks — driven by `#` / `##` headings — not renderer-cap pages. The renderer paginates each logical page against its own per-page line cap (book: ~12 lines/page; chat: configurable) using `MenuAction.ChangePage` per [ADR-035 §4](ADR-035-interactive-menus-book-first.md). This keeps the cached `MenuModel` renderer-agnostic: the same cache serves the Adventure book renderer and any future chat / GUI renderer.
+`MarkdownToMenuModel` produces a `MenuModel` whose pages are **logical** breaks — driven by `#` / `##` headings — not renderer-cap pages. The renderer paginates each logical page against its own per-page line cap (book: ~12 lines/page; chat: configurable) using `MenuAction.ChangePage` per [ADR-035 section 4](ADR-035-interactive-menus-book-first.md). This keeps the cached `MenuModel` renderer-agnostic: the same cache serves the Adventure book renderer and any future chat / GUI renderer.
 
 Every page after the first carries a synthetic "↩ back to index" line emitting `MenuAction.RunRtpCommand("docs")` (or `"docs", "<parent>"` when navigated into from an index page).
 
@@ -103,7 +103,7 @@ A directory relpath (`/rtp docs admin/`) opens the synthetic index for that dire
 
 ### Permission and visibility
 
-- `rtp.docs` (default: `op`) gates `/rtp docs` itself. Hidden — not greyed out — for users without it, consistent with [ADR-044](ADR-044-command-tree-menu-reflector.md) §*Applicability semantics*.
+- `rtp.docs` (default: `op`) gates `/rtp docs` itself. Hidden — not greyed out — for users without it, consistent with [ADR-044](ADR-044-command-tree-menu-reflector.md) section *Applicability semantics*.
 - Developer docs (`docs/dev/`, `docs/adr/`, `docs/architecture/`) are excluded from the cache when `docs.exposeDeveloperDocs: false` (the default). Setting it `true` re-includes them on the next `rebuild()`. There is no per-section permission in v1; the boolean is sufficient for the only real cohort split (server admin vs. developer).
 - Path sandboxing: every `<relpath>` is normalized and verified to remain under the configured `docs.root`. Symlinks are not followed. Sandbox violations are recorded as `RTP.log(Level.WARNING, "docs.invalidPath", …)` and surface as `messages.yml → docs.invalid` to the caller (REQ-RTP-S-004 / S-007).
 
@@ -188,6 +188,6 @@ Traceability ([TRACEABILITY.md](../dev/TRACEABILITY.md)): add rows for the three
 - [ADR-041](ADR-041-config-command-and-save-implementation.md) — Config command and save implementation. The reload path that triggers `DocsRegistry#rebuild()`.
 - [ADR-042](ADR-042-yaml-comment-preservation-block-only.md) — Block-comment preservation. Cross-reference only; docs lowering does not touch YAML.
 - [ADR-044](ADR-044-command-tree-menu-reflector.md) — Command-tree menu reflector. Defines `MenuConsumerProfile`; `DocsConsumerProfile` is the second concrete profile after `ConfigMenuConsumerProfile`.
-- [REQUIREMENTS.md §3](../dev/REQUIREMENTS.md) — Prohibitions; this ADR inherits S-004, S-005, S-006, S-007.
+- [REQUIREMENTS.md section 3](../dev/REQUIREMENTS.md) — Prohibitions; this ADR inherits S-004, S-005, S-006, S-007.
 - [`docs/dev/scratch/CHECKLIST-generalized-menu.md`](../dev/scratch/CHECKLIST-generalized-menu.md) — Stage 5.7 entry tracks implementation.
 - [TRACEABILITY.md](../dev/TRACEABILITY.md) — new test rows added as part of beta.3.

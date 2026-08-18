@@ -1,6 +1,6 @@
 # rtp-neoforge — NeoForge platform adapter
 
-In-scope per [ADR-033](../../docs/adr/ADR-033-neoforge-platform-in-scope.md) and the subproject ADR [rtp-neoforge-ADR-001](docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md). This tree is a **sibling** of [`rtp-fabric`](../rtp-fabric) (deliberately not nested under or sharing a tree with it — [`NEOFORGE_NOTES.md`](../../docs/dev/NEOFORGE_NOTES.md) §11) and mirrors the Fabric multiversion submodule layout ([rtp-fabric-ADR-001](../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md)).
+In-scope per [ADR-033](../../docs/adr/ADR-033-neoforge-platform-in-scope.md) and the subproject ADR [rtp-neoforge-ADR-001](docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md). This tree is a **sibling** of [`rtp-fabric`](../rtp-fabric) (deliberately not nested under or sharing a tree with it — [`NEOFORGE_NOTES.md`](../../docs/dev/NEOFORGE_NOTES.md) section 11) and mirrors the Fabric multiversion submodule layout ([rtp-fabric-ADR-001](../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md)).
 
 ### Module layout
 

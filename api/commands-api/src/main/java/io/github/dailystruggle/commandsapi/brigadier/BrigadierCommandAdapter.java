@@ -388,7 +388,7 @@ public final class BrigadierCommandAdapter {
                 // toBrigadier(), the dispatcher rejects the partially-built
                 // literal, and the *base* /rtp loses tab-completion entirely
                 // (the symptom the user reported on Fabric 2026-05-06).
-                // commands-api-ADR-001 addendum 2026-05-06 §"Silent failure
+                // commands-api-ADR-001 addendum 2026-05-06 section "Silent failure
                 // isolation" pins this contract.
                 try {
                     CommandsAPICommand sub = entry.getValue();

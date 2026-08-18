@@ -150,7 +150,7 @@ until annotated).
 
 - [`docs/dev/CONFIG_COMMENT_STYLE.md`](../dev/CONFIG_COMMENT_STYLE.md) — canonical style guide (examples, parsing contract, layout).
 - [ADR-035](ADR-035-interactive-menus-book-first.md) — book-first interactive menus.
-- [ADR-044](ADR-044-command-tree-menu-reflector.md) — command-tree menu reflector and hover-text resolution (§4).
+- [ADR-044](ADR-044-command-tree-menu-reflector.md) — command-tree menu reflector and hover-text resolution (section 4).
 - [ADR-020](ADR-020-language-bootstrap-and-locale-aware-configparser.md) — locale-aware ConfigParser / YAML baseline.
 - `rtp-core/.../commands/menu/ConfigMenuConsumerProfile.java`, `CommandTreeMenuBuilder#resolveParamHover` — hover source.
 - `scripts/locale-files-to-csv.ps1`, `scripts/reconcile-locale-csvs.ps1`, `scripts/locale-files-from-csv.ps1` — locale comment pipeline.

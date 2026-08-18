@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Covers the unified pair-wise {@link RegionAwareSelector} used by lobby
  * (`PeerRegionRegistry.pickMostKept`) and proxy (no-region fallback) call
- * sites alike (rtp-proxy-ADR-004 §Region-Pair Scoring).
+ * sites alike (rtp-proxy-ADR-004 section Region-Pair Scoring).
  */
 class RegionAwareSelectorTest {
 

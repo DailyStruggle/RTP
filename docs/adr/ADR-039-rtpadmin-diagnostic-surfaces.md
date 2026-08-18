@@ -78,7 +78,7 @@ All four surfaces share:
 | `DiagnosticSurface` interface, `SurfaceModel` (POJO snapshot), `BiomeSampleSnapshot`, `FailHeatSnapshot`, `MetricsSnapshot` | `rtp-api` | No platform imports. Stable for addons to read; deliberately not for them to register their own surfaces in beta.4. |
 | Per-region fail-rate ring buffer, snapshot assembly, biome tally over existing region entries | `rtp-core` | New `diagnostics/` subpackage. Reads `MemoryTracker` / `FailTypes` / `keptLocations` / `unkeptLocations` / `backlogLocations`; **no new I/O paths**. |
 | `/rtpadmin diag` subcommand, surface → `MenuModel` rendering | `rtp-plugin` | Composes `commands-api`, ADR-035 renderer, and the snapshots from `rtp-core`. |
-| Adapter-specific concerns (e.g., Folia per-region TPS) | platform adapters | Same pattern as existing `rtp-folia` aggregation in `METRICS_PLAN.md §Folia Aggregation`. |
+| Adapter-specific concerns (e.g., Folia per-region TPS) | platform adapters | Same pattern as existing `rtp-folia` aggregation in `METRICS_PLAN.md section Folia Aggregation`. |
 
 No change to `rtp-api`'s wizard interfaces from ADR-038. Surfaces are a sibling, not a subclass.
 
@@ -100,7 +100,7 @@ No change to `rtp-api`'s wizard interfaces from ADR-038. Surfaces are a sibling,
 ## What this ADR is **not**
 
 - **Not** a metrics-plan rewrite. It consumes `METRICS_PLAN.md`; it does not redefine any metric, bound, or sampler. Metrics phases that haven't shipped render as `—`.
-- **Not** a live dashboard. No websocket, no HTTP endpoint, no auto-refresh, no Prometheus exporter. Those are explicitly out of scope and tracked in `METRICS_PLAN.md §Phased Roadmap` / a future ADR.
+- **Not** a live dashboard. No websocket, no HTTP endpoint, no auto-refresh, no Prometheus exporter. Those are explicitly out of scope and tracked in `METRICS_PLAN.md section Phased Roadmap` / a future ADR.
 - **Not** a write path. No `[apply]` from a diagnostic page. Surfaces hand off to ADR-038 wizards or to ADR-037 config commands; they never bypass either.
 - **Not** the place for the heatmap to gain persistence. The fail-rate ring is in-memory only in beta.4. Persisting samples across restarts (and the schema work that implies) is deferred.
 - **Not** an addon extension point in beta.4. The interface is sealed against third-party surfaces until the API has soaked one release cycle.
@@ -177,7 +177,7 @@ Permission denials emit the configurable `menu.surface.denied` message (REQ-RTP-
 | Add a dedicated scheduler/thread for time-series sampling | `MemoryTracker` already runs a periodic pass; adding a second scheduler duplicates that surface and complicates Folia region-scheduler ownership. Rejected — repurpose the existing pass. |
 | Sample every metric every tick at raw resolution for 24 h | Unbounded heap (`O(metrics × tickrate × 24h)`). Multi-tier in-place condensation keeps heap bounded by tier sizes, not by window length. |
 | Render charts as a Bukkit map item or external image | Reintroduces the inventory-surface / external-dependency classes ADR-035 already rejected. Book-page ASCII sparklines are sufficient for triage and stay inside the menu primitive. |
-| Live websocket-pushed surface | No live updates per ADR-035 §no-live-update; would also require an out-of-game client. |
+| Live websocket-pushed surface | No live updates per ADR-035 section no-live-update; would also require an out-of-game client. |
 | Sample biomes via real chunk loads | S-005 violation; defeats the point of the prefilter. |
 | Trigger a fresh anvil sweep on first open per TTL window | New I/O hotpath; violates contract 2 and duplicates work the prefilter already did when the region's entries were generated. The retained region entries are the authoritative cache. |
 | Make surfaces an addon extension point in beta.4 | Premature; the snapshot POJOs need one release cycle to stabilize before third parties depend on them. |
@@ -248,5 +248,5 @@ Traceability rows to add when implementation lands (not in this ADR per CHANGELO
 - ADR-016 — Anvil Subsystem
 - ADR-028 — L3 Backlog Cache
 - [`docs/dev/METRICS_PLAN.md`](../dev/METRICS_PLAN.md)
-- [`docs/dev/REQUIREMENTS.md §3`](../dev/REQUIREMENTS.md) (S-00x prohibitions)
+- [`docs/dev/REQUIREMENTS.md section 3`](../dev/REQUIREMENTS.md) (S-00x prohibitions)
 - commands-api-ADR-001 — Brigadier Bridge

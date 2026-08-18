@@ -8,7 +8,7 @@ import io.github.dailystruggle.mapsapi.model.Heatmap2D;
  * First concrete {@link ChartRenderer}: maps a {@link Heatmap2D}'s scalar
  * field onto the canvas using the logical heat-ramp slice
  * ({@link PaletteIndex#RAMP_MIN}..{@link PaletteIndex#RAMP_MAX}) from
- * {@code maps-api-ADR-001} §Palette policy.
+ * {@code maps-api-ADR-001} section Palette policy.
  *
  * <p>Renders nearest-neighbour: each canvas pixel samples the model cell at
  * {@code (x * model.width() / canvas.width(), y * model.height() / canvas.height())}.
@@ -36,7 +36,7 @@ public final class HeatmapRenderer implements ChartRenderer<Heatmap2D> {
      * Highest palette ramp index (hot end). Mirrors
      * {@link PaletteIndex#RAMP_MAX}; the heat ramp deliberately stops short
      * of the {@code 28..31} named-color slots reserved for categorical
-     * renderers (see {@code maps-api-ADR-001} §Palette policy).
+     * renderers (see {@code maps-api-ADR-001} section Palette policy).
      */
     public static final byte RAMP_MAX = PaletteIndex.RAMP_MAX;
 

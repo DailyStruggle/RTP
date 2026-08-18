@@ -11,7 +11,7 @@ package io.github.dailystruggle.rtp.proxy.common;
  * module. It exists so the SPI can describe "this is a backend speaker"
  * payloads symmetrically.</p>
  *
- * <p>See rtp-proxy-ADR-002 §Validation Rules and rtp-proxy-ADR-013.</p>
+ * <p>See rtp-proxy-ADR-002 section Validation Rules and rtp-proxy-ADR-013.</p>
  */
 public enum Role {
     /** Velocity proxy adapter. */

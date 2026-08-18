@@ -25,7 +25,7 @@ For design and implementation details that satisfy these requirements, see [`doc
 
 ## 2. Strict Architectural Requirements
 
-### 2.1 Architectural Invariants (rtp-neoforge-ADR-001 §7)
+### 2.1 Architectural Invariants (rtp-neoforge-ADR-001 section 7)
 - **REQ-NEOFORGE-ARCH-001 — No Bukkit/Fabric Imports:** No source file under `platforms/rtp-neoforge/**` shall import from `org.bukkit.*`, `io.papermc.*`, `dev.folia.*`, or `net.fabricmc.*`.
 - **REQ-NEOFORGE-ARCH-002 — No Core Pollution:** NeoForge-specific patterns, types, or imports shall not be introduced into `rtp-core` or `rtp-api`.
 - **REQ-NEOFORGE-ARCH-003 — Mod Plugin Scope:** The NeoForge Gradle plugin (ModDevGradle) shall be applied only within `platforms/rtp-neoforge/**` (and `rtp-plugin` solely if a combined multi-loader artifact is pursued).

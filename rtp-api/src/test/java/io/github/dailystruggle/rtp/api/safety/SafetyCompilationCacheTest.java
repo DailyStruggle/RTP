@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit tests for {@link SafetyCompilationCache} (ADR-017, REQ-RTP-S-004).
  */
-@DisplayName("REQ-RTP-S-001 / ADR-017 § SafetyCompilationCache")
+@DisplayName("REQ-RTP-S-001 / ADR-017 - SafetyCompilationCache")
 class SafetyCompilationCacheTest {
 
   @BeforeEach

@@ -27,7 +27,7 @@ The resource management architecture shall feature a **dual-layer strategy**:
 
 Together, the active tracker catches leaks that persist despite live references (stalled tasks), while weak references handle clean deallocation of truly abandoned objects.
 
-For implementation and code-level details (e.g., `MemoryTracker`, `TeleportPipelineTask`), see [DESIGN.md §6 — Active Task and Resource Tracking](../dev/DESIGN.md#6-active-task-and-resource-tracking-memory-and-chunk-management).
+For implementation and code-level details (e.g., `MemoryTracker`, `TeleportPipelineTask`), see [DESIGN.md section 6 — Active Task and Resource Tracking](../dev/DESIGN.md#6-active-task-and-resource-tracking-memory-and-chunk-management).
 
 ## Consequences
 
@@ -44,6 +44,6 @@ For implementation and code-level details (e.g., `MemoryTracker`, `TeleportPipel
 ## References
 
 - Implementing classes: `MemoryTracker`, `TeleportPipelineTask` (`rtp-core`); chunk ticket management in platform adapters (`rtp-bukkit`, `rtp-paper`, `rtp-folia`)
-- Design reference: [`DESIGN.md` §6 — Active Task and Resource Tracking](../dev/DESIGN.md)
+- Design reference: [`DESIGN.md` section 6 — Active Task and Resource Tracking](../dev/DESIGN.md)
 - Related: [ADR-006](ADR-006-async-queue-pre-generation.md) (pre-generation pipeline), [ADR-007](ADR-007-per-user-isolated-queues.md) (orphaned per-user queue cleanup on disconnect)
 - Requirements: `REQ-RTP-NF-003` (memory stability), `REQ-RTP-NF-004` (chunk allocation management)

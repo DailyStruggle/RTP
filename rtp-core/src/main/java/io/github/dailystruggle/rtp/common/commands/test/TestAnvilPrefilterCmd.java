@@ -97,8 +97,8 @@ public class TestAnvilPrefilterCmd extends BaseRTPCmdImpl {
       String note =
           "[RTP test/anvil-prefilter] no probes observed yet — either the pre-filter is "
               + "disabled (SafetyKeys.anvilPrefilterEnabled) or no teleport has triggered "
-              + "a candidate chunk load since startup. Spigot, Paper (§13.2), and Folia "
-              + "all enter the prefilter; Fabric is out of scope (§13.2).";
+              + "a candidate chunk load since startup. Spigot, Paper (section 13.2), and Folia "
+              + "all enter the prefilter; Fabric is out of scope (section 13.2).";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
         RTP.serverAccessor.sendMessage(callerId, note);
       }

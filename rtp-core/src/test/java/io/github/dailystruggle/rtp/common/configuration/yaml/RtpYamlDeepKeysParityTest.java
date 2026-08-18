@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Locks in the dotted-path semantics of {@link RtpYamlSection#getKeys(boolean)}
- * (ADR-025 §Migration step 6). The shape of the output must match what
+ * (ADR-025 section Migration step 6). The shape of the output must match what
  * the prior simpleyaml-backed implementation produced so that no
  * call-site behaviour shifts when the substrate is swapped.
  */

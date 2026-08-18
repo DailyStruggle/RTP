@@ -15,7 +15,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Configuration write / `/rtp config` save path (atomic rename, audit, rollback) | [`../architecture/11-configuration-write-and-persist.md`](../architecture/11-configuration-write-and-persist.md) |
 | Network model diagrams (multi-server / multi-proxy topology, `/rtp` sequence, reservation-token state machine) | [`../architecture/12-network-model.md`](../architecture/12-network-model.md) |
 | `/rtp config` command semantics + save mechanics (target spec) | [`CONFIG_COMMAND_SPEC.md`](CONFIG_COMMAND_SPEC.md) ([ADR-037](../adr/ADR-037-harden-rtp-config-commands.md) decision, [ADR-041](../adr/ADR-041-config-command-and-save-implementation.md) implementation) |
-| What absolute rules apply? | [`REQUIREMENTS.md §3`](REQUIREMENTS.md#3-prohibition-requirements) (S-001 … S-007) |
+| What absolute rules apply? | [`REQUIREMENTS.md section 3`](REQUIREMENTS.md#3-prohibition-requirements) (S-001 … S-007) |
 | Where does my code go? | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Threading / Folia / chunk I/O | [`DESIGN.md#threading`](DESIGN.md#threading) |
 | Memory lifecycle | [`DESIGN.md#memorytracker`](DESIGN.md#memorytracker) |

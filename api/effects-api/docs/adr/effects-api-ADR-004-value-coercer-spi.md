@@ -130,11 +130,11 @@ Net delta inside `Effect.java`:
 
 ADR-002 is amended in two places only:
 
-1. §"Type acceptance (`canParse`)" — replace the four `org.bukkit.*` FQNs
+1. section "Type acceptance (`canParse`)" — replace the four `org.bukkit.*` FQNs
    with the equivalent `TypeKey` constants (`SOUND`, `PARTICLE`, `COLOR`,
    `POTION_EFFECT`). The semantic descriptions ("non-null lookup",
    "registry hit", etc.) carry over verbatim.
-2. New one-paragraph §"Platform binding": *"On any platform, the concrete
+2. New one-paragraph section "Platform binding": *"On any platform, the concrete
    object returned by `ValueCoercer.parse` is the type the platform's
    `Effect` subclasses consume. ADR-002 governs the **order** and the
    **cache-promotion** rule; the **binding** of `TypeKey` to a runtime
