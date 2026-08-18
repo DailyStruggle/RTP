@@ -25,7 +25,8 @@ public class ConfigsReloadTest {
         tempDir = new File("target/test-configs-reload");
         if (!tempDir.exists()) tempDir.mkdirs();
         MockRTPServerAccessor accessor = RTPTestSetup.install(tempDir);
-        accessor.clearWorlds(); // this test requires an empty world list, matching the original behaviour
+        // Requires empty world list.
+        accessor.clearWorlds();
         RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
         rtp = new RTP();
     }
@@ -75,14 +76,10 @@ public class ConfigsReloadTest {
                     for (int j = 0; j < numIterations * 10; j++) {
                         totalReadCount.incrementAndGet();
                         try {
-                            // getWorldParserValue is the one mentioned in the issue
-                            // It returns ConfigParser<WorldKeys> which is then cast to Object in the signature
-                            // but actually returns the parser itself (see Configs.java:176)
                             configs.getWorldParserValue("world", WorldKeys.region);
                         } catch (NullPointerException e) {
                             npeCount.incrementAndGet();
-                        } catch (Exception e) {
-                            // other exceptions are fine for this test, we care about NPE due to cleared maps
+                        } catch (Exception ignored) {
                         }
                     }
                 } catch (Exception e) {
@@ -96,10 +93,6 @@ public class ConfigsReloadTest {
         startLatch.countDown();
         doneLatch.await(30, TimeUnit.SECONDS);
         executor.shutdownNow();
-
-        // 3. Assert that configParserMap and multiConfigParserMap do not retain stale references
-        // Actually the issue is about NPEs during rapid reload and preventing memory leaks.
-        // If it's atomic, NPEs should be minimized/eliminated.
 
         assertEquals(0, npeCount.get(), "Expected zero NPEs during rapid reload with atomic swapping");
     }

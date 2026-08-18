@@ -18,12 +18,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Lifecycle + behaviour tests for {@link BukkitMapBinding}. Covers
- * {@code CHECKLIST-maps-api.md} Stage 2.1 + 2.9: allocation idempotency,
+ * Lifecycle and behaviour tests for {@link BukkitMapBinding}: allocation idempotency,
  * one-shot {@code renderEphemeral} dispatch, palette translation surface,
  * {@code bindLive} explicit deferral, and the no-world failure path.
  */
-@DisplayName("BukkitMapBinding - Stage 2.1 lifecycle / behaviour")
+@DisplayName("BukkitMapBinding - lifecycle and behaviour")
 class BukkitMapBindingTest {
 
     private ServerMock server;

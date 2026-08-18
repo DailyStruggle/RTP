@@ -6,29 +6,10 @@ import io.github.dailystruggle.rtp.common.RTP;
 import java.util.logging.Level;
 
 /**
- * ADR-023 — Login Reserve Cache promotion task.
+ * Promotes unkept coordinates into {@link RegionQueueManager#loginLocations} (ADR-023).
  *
- * <p>Mirrors the unkept→kept promotion block in {@link Region#execute(long)},
- * but writes into {@link RegionQueueManager#loginLocations} instead of
- * {@link RegionQueueManager#keptLocations}. This task runs on its own
- * behavioral loop (startup burst + {@code PlayerQuitEvent} refill) and shares
- * no budget or state with {@code Region.execute()} beyond the source
- * {@code unkeptLocations} buffer.
- *
- * <p>Safety invariants (parallel to existing kept promotion, S-005 compliant):
- * <ul>
- *   <li>{@link LockFreeLocationBuffer#pollSilently()} on the source — the same
- *       composite DB key is re-offered to a kept-style buffer; firing the
- *       delete callback here would race with the destination's save callback
- *       and net out to a row loss across restarts.</li>
- *   <li>Async chunk load via {@code RTPWorld.getChunkAtAsync}.</li>
- *   <li>Second-pass {@code isSafe} verification on the chunk's owning region
- *       thread (Folia) or inline (Spigot/Paper). Fail-closed on any verify
- *       exception.</li>
- *   <li>Reservation lifecycle: created on success, closed on rejection or
- *       unsafe verdict. {@link Region#inFlightCalculations} accounts for the
- *       work in-flight.</li>
- * </ul>
+ * <p>S-005 compliant: asynchronous chunk load with regional safety verification (S-001).
+ * Uses {@link LockFreeLocationBuffer#pollSilently()} to prevent DB deletion races on promotion.
  */
 public final class LoginCacheTask implements Runnable {
     private final Region region;
@@ -102,7 +83,7 @@ public final class LoginCacheTask implements Runnable {
                 Runnable verify = () -> {
                     try {
                         // Re-resolve Y via the region's vertical adjustor against the
-                        // loaded chunk. Mirrors Region.execute() unkept→kept promotion:
+                        // loaded chunk. Mirrors Region.execute() unkept->kept promotion:
                         // the stored coords.y may be an L3 placeholder (ADR-028), and a
                         // single-block isSafe at a mid-air placeholder Y passes trivially
                         // (S-001 mid-air placement bug). vert.adjust(chunk) performs the
@@ -121,7 +102,7 @@ public final class LoginCacheTask implements Runnable {
                         } catch (Throwable verifyEx) {
                             resolved = null;
                             RTP.log(Level.FINE,
-                                    "[LoginCacheTask] unkept→login safety re-verification failed: "
+                                    "[LoginCacheTask] unkept->login safety re-verification failed: "
                                             + verifyEx.getClass().getSimpleName() + ": " + verifyEx.getMessage());
                         }
 

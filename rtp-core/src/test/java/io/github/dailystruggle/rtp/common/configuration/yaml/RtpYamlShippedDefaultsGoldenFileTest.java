@@ -15,16 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 /**
- * Golden-file regression: every shipped {@code .yml} under
- * {@code rtp-plugin/src/main/resources/} must parse without error and
- * must re-emit to a byte-stable form (subsequent re-parse + re-emit
- * yields identical bytes). This guards both the no-inline-comments
- * contract (ADR-042) and the parser's coverage of the actual content
- * surface RTP ships.
- *
- * <p>If a shipped file uses a YAML feature outside the in-house subset,
- * this test fails loudly with the offending file path and line/column,
- * which is exactly what we want during Phase 1 (ADR-025 §Migration).</p>
+ * Golden-file regression: verifies shipped YAML defaults parse and re-emit idempotently (ADR-042).
  */
 class RtpYamlShippedDefaultsGoldenFileTest {
 
@@ -70,7 +61,7 @@ class RtpYamlShippedDefaultsGoldenFileTest {
         try {
             once = RtpYamlReader.parse(src);
         } catch (RtpYamlParseException e) {
-            fail("Parse failed for " + file + " — " + e.getMessage()
+            fail("Parse failed for " + file + " - " + e.getMessage()
                     + " (messageKey=" + e.messageKey() + ")");
             return;
         }

@@ -56,33 +56,14 @@ public class ScanTask extends RTPRunnable {
   private long currentOffset = 0L;
 
   /**
-   * Three-pass scan phase:
-   *   2 = GENSCAN (generation-pass; for every candidate ask
-   *       {@link RTPWorld#isChunkGenerated(int,int)}. Already-generated chunks
-   *       are skipped (PRESCAN will visit them via the anvil probe). Not-yet-
-   *       generated chunks are routed directly to {@code runFullLoadPath},
-   *       which loads/generates the chunk and authoritatively validates it in
-   *       a single I/O so we never load the same chunk twice. Short-lived:
-   *       not persisted to the .scan file — a resumed scan begins at the
-   *       persisted PRESCAN/FULLSCAN phase and skips GENSCAN entirely, since
-   *       chunks generated in the prior run are still generated on disk.
-   *   0 = PRESCAN (anvil probe sweep; cheap rejects only, probe-accept
-   *       trusted without full-load verification).
-   *   1 = FULLSCAN (classic full chunk-load sweep over positions not already
-   *       marked bad by GENSCAN/PRESCAN, authoritative (2r+1)^3 safety scan).
-   * The PRESCAN/FULLSCAN byte is persisted in the .scan progress file so a
-   * killed/resumed scan continues in the correct phase. GENSCAN is never
-   * persisted (collapsed to PRESCAN on save).
+   * Scan phase constants:
+   *   0 = PRESCAN (anvil probe sweep; fast pre-filtering).
+   *   1 = FULLSCAN (full chunk-load sweep over non-bad positions).
+   *   2 = GENSCAN (generation pre-pass).
    */
   public static final int PHASE_PRESCAN = 0;
   public static final int PHASE_FULLSCAN = 1;
   public static final int PHASE_GENSCAN = 2;
-  // GENSCAN disabled (2026-05-25): the dedicated chunk-generation pre-pass was
-  // observed to run very slowly in practice (sustained cps in the low tens on
-  // backend-b devstack). Start directly in PRESCAN; if PRESCAN encounters an
-  // ungenerated chunk it flips the whole scan to FULLSCAN (which loads/
-  // generates and authoritatively validates in a single I/O). GENSCAN code
-  // paths are retained but unreachable from the initial phase.
   private final AtomicInteger scanPhase = new AtomicInteger(PHASE_PRESCAN);
 
   /** Whether the task is currently paused */
@@ -101,28 +82,28 @@ public class ScanTask extends RTPRunnable {
 
   // In-flight chunk-load futures dispatched by runFullLoadPath. Tracked so a
   // cancel/pause can actively cancel them instead of waiting out the per-future
-  // 30s orTimeout one by one — cancelling completes our future chain promptly,
+  // 30s orTimeout one by one - cancelling completes our future chain promptly,
   // releases the inFlightGate, and stops the timeout-exception log spam.
   private final Set<CompletableFuture<?>> inFlightChunkFutures = ConcurrentHashMap.newKeySet();
 
   /*
-   * [TRACE] PR-8 diagnostics: concurrency gauge for the scan driver. Incremented at dispatch,
+   * Concurrency gauge for the scan driver. Incremented at dispatch,
    * decremented on future completion. `peakInFlight` tracks the max observed in a batch; both are
-   * logged + reset in wrapUpBatch. If peak stays ≪ MAX_PENDING_CHUNKS, the driver is the bottleneck,
+   * logged + reset in wrapUpBatch. If peak stays well below MAX_PENDING_CHUNKS, the driver is the bottleneck,
    * not the I/O pool.
    */
   private final AtomicInteger inFlight = new AtomicInteger(0);
   private final AtomicInteger peakInFlight = new AtomicInteger(0);
 
   /*
-   * PR-16 diagnostic: cumulative GC time (ms) observed at the start of the previous gauge
+   * Cumulative GC time (ms) observed at the start of the previous gauge
    * log. Delta = current - last, reported as gcDeltaMs in the log line. If this climbs with
    * scan progress it confirms the 4MB-per-region byte[] churn is pressuring the collector.
    */
   private long lastGcTotalMs = -1L;
 
   /*
-   * PR-17 diagnostic: stage-2 (full chunk load + safety scan) cost. Count and total wall-clock
+   * Stage-2 (full chunk load + safety scan) cost. Count and total wall-clock
    * nanos accumulated per gauge window. Reported as fullLoads / fullLoadAvgMs. If fullLoadAvgMs
    * grows with scan progress while probe I/O (avgColdMissMs) stays flat, the degradation is in
    * stage-2 (loaded-chunk path), not the probe prefilter.
@@ -131,17 +112,16 @@ public class ScanTask extends RTPRunnable {
   private final java.util.concurrent.atomic.AtomicLong fullLoadNanos = new java.util.concurrent.atomic.AtomicLong(0L);
 
   /*
-   * PR-19: per-outcome counters for the probe-first fast path. Diagnostic only; emitted on the
+   * Per-outcome counters for the probe-first fast path. Diagnostic only; emitted on the
    * concurrency gauge log. Tells us which branch of evaluateScanProbe / tryProbeFirstScan is
-   * consuming each candidate. After PR-18 fullLoads stayed ~= activeChecks despite the minY-1
-   * fix, meaning something else is routing every candidate to runFullLoadPath. These counters
-   * split that bucket so we can target the real cause.
+   * consuming each candidate. These counters split the full-load bucket so the dominant
+   * routing cause can be identified.
    */
   private final AtomicLong probeOutcomeProbeNull = new AtomicLong(0L);
   private final AtomicLong probeOutcomeAdjustNull = new AtomicLong(0L);
   /*
-   * PR-20: sub-attribution of probeOutcomeAdjustNull. The single adjustNull
-   * counter was ambiguous across platforms (Paper-vs-Folia asymmetry couldn't
+   * Sub-attribution of probeOutcomeAdjustNull. The single adjustNull
+   * counter is ambiguous across platforms (Paper-vs-Folia asymmetry cannot
    * be diagnosed without a debugger). These four buckets are mutually
    * exclusive and sum to adjustNull. Reasons map to VerticalAdjustor.
    * ProbeRejectReason: LIGHT_GATE / WINDOW / SCAN_MISS / THREW.
@@ -151,15 +131,8 @@ public class ScanTask extends RTPRunnable {
   private final AtomicLong probeOutcomeAdjustNullScan = new AtomicLong(0L);
   private final AtomicLong probeOutcomeAdjustNullThrew = new AtomicLong(0L);
   /*
-   * Counts SCAN_MISS verdicts that were short-circuited to addBadLocation
-   * without dispatching runFullLoadPath. After the multi-column probe sweep
-   * (JumpAdjustor / LinearAdjustor), probe SCAN_MISS is authoritative across
-   * the same testCoords columns the live path would scan, so the chunk has
-   * no acceptable Y and a full chunk load would only confirm the verdict.
-   * Subset of probeOutcomeAdjustNullScan: every increment here also
-   * increments probeOutcomeAdjustNullScan. Reported as
-   * {@code adjustNull=...(scan=S scanShortCircuit=K)} so K/S = fraction of
-   * SCAN_MISS cases that bypassed the full-load path.
+   * Counts SCAN_MISS verdicts short-circuited to addBadLocation without full chunk load.
+   * Subset of probeOutcomeAdjustNullScan.
    */
   private final AtomicLong probeOutcomeAdjustNullScanShortCircuit = new AtomicLong(0L);
   private final AtomicLong probeOutcomeBiomeReject = new AtomicLong(0L);
@@ -168,44 +141,22 @@ public class ScanTask extends RTPRunnable {
   private final AtomicLong probeOutcomeCacheHitLoad = new AtomicLong(0L);
 
   /*
-   * GENSCAN attribution (2026-05-19): per-batch counts of the isChunkGenerated
-   * verdict during the GENSCAN phase. Reported on the same concurrency gauge
-   * line as the probe outcome stats. Interpretation:
-   *   genscanGenerated   = chunk already generated on disk (PRESCAN handles it)
-   *   genscanUngenerated = chunk missing on disk (GENSCAN routes through full load)
-   *   genscanThrew       = isChunkGenerated raised; treated conservatively as generated
-   * If genscanUngenerated == 0 across an entire GENSCAN sweep on a freshly-spawned
-   * world, the platform RTPWorld.isChunkGenerated implementation is reporting
-   * everything as already-generated (wrong data path) and PRESCAN will then fall
-   * back to runFullLoadPath because the anvil probe has nothing to read.
+   * GENSCAN attribution: per-batch counts of isChunkGenerated verdicts.
+   * Tracks generated, ungenerated, and threw states for disk presence.
    */
   private final AtomicLong genscanGenerated = new AtomicLong(0L);
   private final AtomicLong genscanUngenerated = new AtomicLong(0L);
   private final AtomicLong genscanThrew = new AtomicLong(0L);
 
   /*
-   * Cumulative (not reset per batch) count of ungenerated chunks observed during
-   * the GENSCAN sweep. When > 0 at the GENSCAN -> next-phase transition, the
-   * region's chunks are not all on disk and the cheap anvil-probe PRESCAN sweep
-   * cannot produce useful verdicts (probe returns null -> falls back to
-   * runFullLoadPath one-by-one, tripping the 2s chunk-ticket budget). In that
-   * case we skip PRESCAN entirely and go straight to FULLSCAN, which authoritatively
-   * loads + verifies every remaining candidate via the live chunk-load path
-   * (and generates the chunk in the same I/O). See genscan->fullscan flip in run().
+   * Cumulative count of ungenerated chunks observed during GENSCAN.
+   * If > 0, triggers fallback to FULLSCAN when ungenerated chunks are present.
    */
   private final AtomicLong genscanUngeneratedTotal = new AtomicLong(0L);
 
   /*
-   * runFullLoadPath reject sub-attribution (2026-05-19). The single fullLoads
-   * counter rolls up every call to the legacy load path but says nothing
-   * about *why* candidates land in goodCount=0. These buckets split the
-   * reject reasons of runFullLoadPath (mutually exclusive; one per call that
-   * completed res=false). fullLoadAccept counts res=true completions and
-   * should equal accepts-via-full-load. Reported on the diag line as
-   *   fullLoadOutcome=accept=A timeoutOrNull=T midBiome=B vertAdjust=V
-   *                   physBiome=P yOverflow=Y safetyScan=S crashed=X
-   * If accept=0 across an entire PRESCAN/FULLSCAN sweep with land%=0, the
-   * dominant non-zero bucket pinpoints the rejection cause.
+   * Rejection sub-attribution counters for runFullLoadPath.
+   * Splits failure causes: timeout/null, biomes, vert adjustment, overflow, safety, or exceptions.
    */
   private final AtomicLong fullLoadOutcomeAccept = new AtomicLong(0L);
   private final AtomicLong fullLoadOutcomeTimeoutOrNull = new AtomicLong(0L);
@@ -216,7 +167,7 @@ public class ScanTask extends RTPRunnable {
   private final AtomicLong fullLoadOutcomeSafetyScan = new AtomicLong(0L);
   private final AtomicLong fullLoadOutcomeCrashed = new AtomicLong(0L);
 
-  // Land-percentage accounting (2026-05-19). Reverted to deriving land% from
+  // Land-percentage accounting. Derives land% from
   // MemoryShape.getEffectiveBadCount() against the per-batch finalPos1 instead
   // of carrying parallel scanGoodCount/scanBadCount atomics. The shape's
   // totalBadCount is already incremented by `addBadChunk` at every reject
@@ -281,14 +232,7 @@ public class ScanTask extends RTPRunnable {
   }
 
   /**
-   * Constructor for ScanTask with additional parameters for performance tracking
-   *
-   * @param region the region to scan
-   * @param start the starting location index
-   * @param cps_all total completions per second
-   * @param divisor divisor for performance tracking
-   * @param scanIncrementVal current scanIncrement value to carry over
-   * @param cpsVal current cps value to carry over
+   * Performance-tracking constructor for {@link ScanTask}.
    */
   public ScanTask(Region region, long start, BigInteger cps_all, BigInteger divisor, long scanIncrementVal, long cpsVal) {
     this.region = region;
@@ -458,17 +402,8 @@ public class ScanTask extends RTPRunnable {
 
     // 1. Initialize the sliding window gate (field, shared with setCancelled for drain-on-shutdown)
 
-    // PR-14: region-file bin-and-batch. PR-13's 200-entry sliding sort window left hit rate at
-    // 0.31-0.57 because the scan frontier spans 6-10 r.X.Z.mca files and 50 concurrent probes
-    // routinely draw from multiple files at once. Instead, gather the entire run's [currentStart,
-    // limitEnd) window into per-region-file bins (HashMap keyed by (rx, rz)), then dispatch one
-    // bin to completion before starting the next. Within-bin dispatch keeps all 50 in-flight
-    // probes on a single .mca, so the 16-entry AnvilRegionByteCache sees a single hot file and
-    // hit rate approaches 1.0 across the bin.
-    //
-    // Trade-off: observable scan order per run() call reshuffles chunks by region-file grouping
-    // instead of strict shape iteration. addBadLocation still applies per-position; scan progress
-    // `scanIter` still advances by the highest `pos` reached. Cosmetic change only.
+    // Group candidate positions by region file (rx, rz) into bins.
+    // Dispatched bin-by-bin to maximize anvil cache locality.
     java.util.LinkedHashMap<Long, long[]> binHeaders = new java.util.LinkedHashMap<>();
     java.util.HashMap<Long, long[]> binPositions = new java.util.HashMap<>();
     java.util.HashMap<Long, int[]> binCx = new java.util.HashMap<>();
@@ -581,7 +516,7 @@ public class ScanTask extends RTPRunnable {
           // Failsafe: Release the permit instantly if a synchronous error occurs
           inFlight.decrementAndGet();
           inFlightGate.release();
-          // addBadChunk: chunk-uniform — within a chunk the per-column selection order is
+          // addBadChunk: chunk-uniform - within a chunk the per-column selection order is
           // deterministic, so re-rolling onto the same chunk produces the same placement and
           // the same failure. Mark the twin spiral index too.
           shape.addBadChunk(currentPos);
@@ -589,12 +524,11 @@ public class ScanTask extends RTPRunnable {
         }
       }
 
-      // PR-17: per-bin drain removed. PR-14 originally drained here (acquire(50)/release(50))
-      // to let AnvilRegionByteCache settle on one region file at a time. PR-15 coalescing made
+      // No per-bin drain. An earlier design drained here (acquire(50)/release(50))
+      // to let AnvilRegionByteCache settle on one region file at a time. Read coalescing made
       // cross-bin cache interference cheap (~49x dedup on concurrent misses), so the barrier
-      // was costing pipeline bubbles without earning correctness. Runtime measurement post-PR-16
-      // showed peakInFlight degrading 50 -> ~25 as scan progressed; removing this drain lets
-      // the driver keep dispatching across bin boundaries and should hold peakInFlight at cap.
+      // was costing pipeline bubbles without earning correctness. Removing this drain lets
+      // the driver keep dispatching across bin boundaries and holds peakInFlight at cap.
     }
 
     final long finalPos1 = pos;
@@ -670,8 +604,8 @@ public class ScanTask extends RTPRunnable {
                 + " land%=" + String.format("%.2f", landPercentage));
         lastSaveTime = now;
 
-        // [TRACE] PR-8 concurrency gauge: observed peak in-flight probes this window vs the
-        // MAX_PENDING_CHUNKS cap. peak ≪ cap => driver-loop serialization (root-cause fix is driver
+        // Concurrency gauge: observed peak in-flight probes this window vs the
+        // MAX_PENDING_CHUNKS cap. peak well below cap => driver-loop serialization (root-cause fix is driver
         // prefetch or region-file batching, not adapter-side tuning).
         int peak = peakInFlight.getAndSet(inFlight.get());
         String cacheSuffix = readAnvilCacheStatsAndReset();
@@ -679,15 +613,7 @@ public class ScanTask extends RTPRunnable {
         String fullLoadSuffix = readFullLoadStatsAndReset();
         String probeOutcomeSuffix = readProbeOutcomeStatsAndReset();
         String phaseLabelStr = phaseLabel(scanPhase.get());
-        // Per-batch scan diagnostic split (probeNull / adjustNull /
-        // cacheHitLoad / genscan*). Logged at FINE so it is available when a
-        // server raises the log level to debug a scan but does not spam the
-        // default INFO console. This is the single line that explains *why*
-        // PRESCAN falls back to runFullLoadPath: e.g. genscanGenerated >>
-        // genscanUngenerated on a freshly-spawned world means the platform
-        // isChunkGenerated is disagreeing with the on-disk .mca data, and
-        // probeNull dominating PRESCAN means the anvil probe found no region
-        // file to read.
+        // Per-batch diagnostic split logged at Level.FINE to aid troubleshooting without INFO spam.
         RTP.log(Level.FINE, "[TRACE] ScanTask diag region=" + region.name
             + " phase=" + phaseLabelStr
             + " cps=" + cps_local + " activeChecks=" + activeChecks + " peakInFlight=" + peak
@@ -711,7 +637,7 @@ public class ScanTask extends RTPRunnable {
         // delegates to org.bukkit.World#save() because Bukkit's autosave
         // does not reliably flush chunks produced by external generators
         // (see docs/dev/LESSONS_LEARNED.md → "Pre-Generation & Shutdown").
-        // On Paper / Folia / Fabric this is a no-op — those platforms'
+        // On Paper / Folia / Fabric this is a no-op - those platforms'
         // chunk systems persist via their own paths.
         try {
           region.getWorld().save();
@@ -740,17 +666,7 @@ public class ScanTask extends RTPRunnable {
         return;
       }
 
-      // GENSCAN complete -> flip to PRESCAN, or skip straight to FULLSCAN when
-      // any chunk in the region was found ungenerated on disk. Rationale: PRESCAN
-      // is an anvil-probe sweep that reads .mca region files; if even one chunk
-      // is missing on disk, the rest of the region is likely sparsely-generated
-      // too, and the cheap probe will return null for those tiles -> fall back to
-      // runFullLoadPath one chunk at a time (2s chunk-ticket-budget warnings,
-      // server stalls). FULLSCAN is authoritative for the same cost and generates
-      // missing chunks in the same I/O, so it strictly dominates PRESCAN when
-      // ungenerated chunks are present. Per the user's clarification (2026-05-19):
-      // "the entire prescan stage is supposed to be skipped if any chunks are not
-      // generated".
+      // GENSCAN complete: transition to PRESCAN, or directly to FULLSCAN if ungenerated chunks were found.
       if (scanPhase.get() == PHASE_GENSCAN) {
         long ungen = genscanUngeneratedTotal.get();
         int nextPhase = (ungen > 0L) ? PHASE_FULLSCAN : PHASE_PRESCAN;
@@ -817,21 +733,8 @@ public class ScanTask extends RTPRunnable {
                 + " nextScanIter=" + finalPos1);
         shape.flushAndRebuild(shape.spatialResolution);
         isRunning.set(false);
-        // Yield to the main thread between batches. Without this, back-to-back
-        // async reschedules can starve the server tick on Fabric (chunk ticket
-        // applications are processed on the main thread; a continuously busy
-        // scan flood saturates the queue and the server stalls with
-        // "Can't keep up!" warnings). Hop through the main thread before
-        // dispatching the next async batch -- this guarantees the server has
-        // ticked at least once between batches and drained pending chunk work,
-        // without hard-coding a wall-clock delay.
-        //
-        // 2026-05-19 fix: if the main thread is severely backlogged (Fabric
-        // "Can't keep up! Running 60s behind"), the queued `runTask` lambda
-        // may never fire and the scan task sits dormant forever -- never
-        // declaring completion. Race the main-thread hop against a delayed
-        // async fallback; whichever fires first wins via CAS, the loser is
-        // a no-op. Bounds the dormancy window at ~2 seconds.
+        // Yield to the main thread between batches to allow pending chunk tickets to drain.
+        // If main thread is backlogged, a delayed async fallback ensures progress continues.
         final ScanTask self = this;
         final java.util.concurrent.atomic.AtomicBoolean dispatched =
                 new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -880,7 +783,7 @@ public class ScanTask extends RTPRunnable {
     }
   }
 
-  // PR-11: reflectively read AnvilRegionByteCache.stats() + resetStats() so rtp-core doesn't
+  // Reflectively read AnvilRegionByteCache.stats() + resetStats() so rtp-core doesn't
   // need a compile-time dep on rtp-anvil for a diagnostic. Returns "" when rtp-anvil isn't on
   // the classpath (Fabric builds, unit tests) or when no probes have run yet.
   private static volatile java.lang.reflect.Method cacheStatsMethod;
@@ -912,16 +815,16 @@ public class ScanTask extends RTPRunnable {
       try {
         coalesced = (long) stats.getClass().getMethod("coalesced").invoke(stats);
       } catch (NoSuchMethodException ignored) {
-        // older rtp-anvil without PR-15 coalesced counter
+        // older rtp-anvil without the coalesced counter
       }
-      // PR-16: avgColdMissMs — average Files.readAllBytes wall time on misses. If this
+      // avgColdMissMs - average Files.readAllBytes wall time on misses. If this
       // climbs from ~1ms (warm) to >20ms (cold disk) the scan frontier is paying real I/O
       // and OS page-cache pressure is the primary bottleneck.
       double avgColdMissMs = 0.0;
       try {
         avgColdMissMs = (double) stats.getClass().getMethod("avgColdMissMs").invoke(stats);
       } catch (NoSuchMethodException ignored) {
-        // older rtp-anvil without PR-16 cold-read timing
+        // older rtp-anvil without cold-read timing
       }
       long total = hits + misses + coalesced;
       if (total == 0) return " anvilCache=idle";
@@ -937,10 +840,10 @@ public class ScanTask extends RTPRunnable {
   }
 
   /**
-   * PR-16 diagnostic: cumulative GC-time delta since the previous gauge log. Reported as
+   * Cumulative GC-time delta since the previous gauge log. Reported as
    * {@code gcDeltaMs=…} on the concurrency gauge line. If this grows from ~50ms/window
    * (warm) to ~500ms/window (degraded) the 4MB-per-region byte[] churn is pressuring the
-   * collector — fix direction is to avoid per-file allocation (mmap / FileChannel).
+   * collector - fix direction is to avoid per-file allocation (mmap / FileChannel).
    *
    * <p>Returns {@code ""} if the management bean isn't available (headless environments).</p>
    */
@@ -961,7 +864,7 @@ public class ScanTask extends RTPRunnable {
   }
 
   /**
-   * PR-17 diagnostic: stage-2 (full chunk load + safety scan) count and per-invocation
+   * Stage-2 (full chunk load + safety scan) count and per-invocation
    * average wall-clock cost since the previous gauge log. Reported as
    * {@code fullLoads=N fullLoadAvgMs=X.XX}. If {@code fullLoadAvgMs} grows with scan
    * progress while {@code avgColdMissMs} stays flat, the degradation is in the loaded-chunk
@@ -976,21 +879,12 @@ public class ScanTask extends RTPRunnable {
   }
 
   /**
-   * PR-19 diagnostic: per-outcome counters for the probe-first fast path.
-   * Reported as {@code probeNull=A adjustNull=B biomeReject=C blockReject=D
-   * cacheMissAccept=E cacheHitLoad=F}. After PR-18, {@code fullLoads} stayed
-   * ~= activeChecks despite the minY-1 fix; these counters split the bucket so
-   * we can see which branch is actually routing candidates. Interpretation:
-   * large {@code probeNull} = probe I/O or UNKNOWN (missing heightmap, etc.);
-   * large {@code adjustNull} = adjustor reject (wrong window / skylight / mode);
-   * large {@code cacheHitLoad} = probe accepts but chunks are in live cache
-   * (still paying full load, but radius scan is genuine work);
-   * large {@code cacheMissAccept} = fast path is working as intended.
+   * Diagnostic summary of probe-first fast path outcomes since last gauge log.
    */
   private String readProbeOutcomeStatsAndReset() {
     long pn = probeOutcomeProbeNull.getAndSet(0L);
     long an = probeOutcomeAdjustNull.getAndSet(0L);
-    // PR-20 sub-attribution. Buckets are mutually exclusive and sum to {@code an}.
+    // Sub-attribution. Buckets are mutually exclusive and sum to {@code an}.
     long anL = probeOutcomeAdjustNullLight.getAndSet(0L);
     long anW = probeOutcomeAdjustNullWindow.getAndSet(0L);
     long anS = probeOutcomeAdjustNullScan.getAndSet(0L);
@@ -1077,7 +971,7 @@ public class ScanTask extends RTPRunnable {
       if (shape instanceof MemoryShape<?> memoryShape) {buf.putLong(memoryShape.spatialResolution);}
       buf.putLong(currentOffset);
       buf.put((byte) 0);
-      // GENSCAN is transient — collapse to PRESCAN on disk so a resumed scan
+      // GENSCAN is transient - collapse to PRESCAN on disk so a resumed scan
       // does not re-run the chunk-generation pre-pass (chunks generated in
       // the previous run are still generated). See PHASE_GENSCAN docs.
       int persistedPhase = scanPhase.get();
@@ -1156,18 +1050,9 @@ public class ScanTask extends RTPRunnable {
   }
 
   /**
-   * Test if a location within a region is valid for teleportation
+   * Tests whether candidate location {@code pos} within {@code region} is valid for teleportation.
    *
-   * @param region the region
-   * @param pos the location index
-   * @param blockX block x coordinate
-   * @param blockZ block z coordinate
-   * @param safetyRadius safety radius for chunk verification
-   * @param unsafeBlocks set of unsafe block names
-   * @param defaultBiomes set of allowed biomes
-   * @param biomeRecall whether to record bad locations for biomes
-   * @param border world border for the current world
-   * @return a future that completes with true if the location is valid
+   * @return future completing with true if valid
    */
   public CompletableFuture<Boolean> testPos(
           Region region,
@@ -1199,12 +1084,12 @@ public class ScanTask extends RTPRunnable {
       // Fast mathematical rejection ONLY for World Border.
       // Mathematical biome check is completely removed to force chunk generation.
       // Null-guard: an absent border (e.g. platform adapter returned null for
-      // this world) means "no border in effect" — accept the candidate here
+      // this world) means "no border in effect" - accept the candidate here
       // and let downstream shape/region constraints bound the selection.
       if (border != null && !border.isInside().apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
         RTP.log(Level.FINER, "[ScanTask] border-reject region=" + region.name
                 + " pos=" + pos + " block=(" + blockX + "," + blockZ + ")");
-        // addBadChunk: chunk-uniform — within a chunk the per-column selection order is
+        // addBadChunk: chunk-uniform - within a chunk the per-column selection order is
         // deterministic, so re-rolling onto the same chunk yields the same picked column,
         // which the border will reject again. Mark the twin spiral index too.
         shape.addBadChunk(pos);
@@ -1219,20 +1104,7 @@ public class ScanTask extends RTPRunnable {
       int finalSafetyRadius = safetyRadius;
       final int midY = (vert.maxY() + vert.minY()) / 2;
 
-      // Two-pass scan model (2026-04-23):
-      //   Pass 1 / PRESCAN  - run the anvil probe sweep; on probe-accept we
-      //                       trust the probe and complete true WITHOUT a
-      //                       full chunk-load safety scan. Only cheap rejects
-      //                       (biome / adjust-null / center-column unsafe)
-      //                       mark bad locations.
-      //   Pass 2 / FULLSCAN - skip the probe entirely and route every
-      //                       non-isKnownBad position through the classic
-      //                       full chunk-load (2r+1)^3 safety scan for
-      //                       authoritative verification. This catches the
-      //                       probe's false-accepts (waterlogged blocks,
-      //                       stale-chunk body cells, etc.) and upgrades all
-      //                       remaining candidates to the full safety
-      //                       contract.
+      // Multi-pass scan: PRESCAN uses fast anvil probing; FULLSCAN runs full chunk-load safety verification.
       if (scanPhase.get() == PHASE_FULLSCAN) {
         runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
                 finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
@@ -1240,7 +1112,7 @@ public class ScanTask extends RTPRunnable {
       }
 
       // GENSCAN: ensure the chunk is generated on disk before the anvil
-      // prefilter sees it. If the chunk is already generated, skip — PRESCAN
+      // prefilter sees it. If the chunk is already generated, skip - PRESCAN
       // will handle it via the cheap anvil probe. If NOT generated, bypass
       // the anvil prefilter entirely and run the full load path: chunk
       // loading will generate the chunk and we authoritatively validate it
@@ -1267,7 +1139,7 @@ public class ScanTask extends RTPRunnable {
                   finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
           return res;
         }
-        // Already generated — defer to PRESCAN. Complete with `false` so the
+        // Already generated - defer to PRESCAN. Complete with `false` so the
         // caller's gate is released and the position is not counted as good;
         // crucially, do NOT mark the position bad on the shape so PRESCAN
         // re-evaluates it via the anvil probe.
@@ -1275,17 +1147,7 @@ public class ScanTask extends RTPRunnable {
         return res;
       }
 
-      // GENSCAN replacement (2026-05-25): with GENSCAN disabled as the initial
-      // phase, PRESCAN carries the ungenerated-chunk detection. The inline
-      // `isChunkGenerated` precheck is now universal across Bukkit/Paper/Folia/Fabric:
-      // every platform's RTPWorld.isChunkGenerated routes through the
-      // AnvilRegionOccupancyCache (an mtime-validated, 1024-bit per-region-file
-      // occupancy bitmap built once and reused across all ~1024 sibling-chunk
-      // queries in that 32x32 tile). PRESCAN sweeps adjacent chunks in spiral
-      // order, so first-touch cost is amortised over the whole region file —
-      // the previous Paper/Folia regression (synchronous Bukkit chunk-system
-      // call collapsing peakInFlight from cap=50 to ~2-3) no longer applies.
-      // Conservative on error: treat as generated and let the probe path take it.
+      // PRESCAN detects ungenerated chunks and switches the scan to FULLSCAN if found.
       if (scanPhase.get() == PHASE_PRESCAN) {
         boolean generated = true;
         try {
@@ -1305,17 +1167,7 @@ public class ScanTask extends RTPRunnable {
         }
       }
 
-      // BIOME_LOOKUP_PERF_PLAN.md PR-5: probe-first with cache-aware gating.
-      //
-      // Try to decide the candidate from a lean column probe before paying for
-      // a full chunk load. On probe-accept we key on cache residency:
-      //   - cache miss: trust the probe (center column at picked Y is the
-      //     authoritative safety check for safetyRadius==0; for radius>0 we
-      //     silently widen to center-column-only to avoid loading the chunk).
-      //   - cache hit : run a full (2r+1)^3 safety scan with an upgraded
-      //     radius max(configured, 2), since the load is already paid.
-      // On probe UNKNOWN/null we fall through to the legacy getOrLoadChunk
-      // path with zero behavior change.
+      // Probe-first fast path: evaluate via column probe before loading full chunk.
       if (tryProbeFirstScan(region, world, vert, shape, pos, blockX, blockZ,
               finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res)) {
         return res;
@@ -1331,14 +1183,9 @@ public class ScanTask extends RTPRunnable {
   }
 
   /**
-   * PR-5 probe-first fast path. Returns {@code true} iff a verdict was
-   * committed to {@code res} (reject or accept) and the caller must not run
-   * the full load path. Returns {@code false} on UNKNOWN — caller falls
-   * through to {@link #runFullLoadPath}.
+   * Probe-first fast path attempting validation before full chunk load.
    *
-   * <p>S-005: dispatched on the scheduler's async callback chain. Safety
-   * scans on cache-hit run via {@code scheduler.runTask(targetLoc, …)} so
-   * we never touch a live chunk off-thread.</p>
+   * @return true if verdict was committed; false on UNKNOWN to fall back to full load
    */
   private boolean tryProbeFirstScan(
           Region region,
@@ -1361,11 +1208,11 @@ public class ScanTask extends RTPRunnable {
 
     CompletableFuture<ChunkColumnProbe> fut;
     try {
-      // PR-18: widen probe window by one block below minY so that
+      // Widen the probe window by one block below minY so that
       // LinearAdjustor/JumpAdjustor.adjustFromProbe (which consults the block
       // at y-1 for standing-surface safety) doesn't trivially reject with
-      // probe.minY() > minY - 1. Without this the fast path was inert on
-      // every candidate and every probe-accept degraded to a full load.
+      // probe.minY() > minY - 1. Without this the fast path would be inert on
+      // every candidate and every probe-accept would degrade to a full load.
       fut = world.probeChunkColumn(cx, cz, minY - 1, maxY);
     } catch (Throwable t) {
       RTP.log(Level.FINE,
@@ -1391,7 +1238,7 @@ public class ScanTask extends RTPRunnable {
               probe, res);
     }
 
-    // Async completion — schedule evaluation, return true so the caller does
+    // Async completion - schedule evaluation, return true so the caller does
     // not also run the legacy path. On UNKNOWN we continue to the legacy path
     // from within the callback.
     fut.whenComplete((probe, ex) -> {
@@ -1418,7 +1265,7 @@ public class ScanTask extends RTPRunnable {
               probe, res)) {
         return;
       }
-      // UNKNOWN from adjustFromProbe — fall through to full load.
+      // UNKNOWN from adjustFromProbe - fall through to full load.
       runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ,
               (maxY + minY) / 2, configuredSafetyRadius, unsafeBlocks,
               defaultBiomes, biomeRecall, res);
@@ -1465,17 +1312,8 @@ public class ScanTask extends RTPRunnable {
             return false; // UNKNOWN: adjustor threw, defer to full load.
           }
           case SCAN_MISS, NONE -> {
-            // Authoritative bad: the multi-column probe sweep (JumpAdjustor /
-            // LinearAdjustor) iterated the same testCoords columns the live
-            // adjust(RTPChunk,...) path would and found no acceptable Y on any
-            // column. The probe-side predicate is at least as permissive as
-            // the live predicate (state-predicated unsafe tokens are dropped
-            // from the probe fast set; sky-light cold path returns
-            // LIGHT_GATE_REJECT not SCAN_MISS), so a SCAN_MISS verdict
-            // implies the full chunk load would also reject. Short-circuit
-            // here instead of paying for a chunk load that confirms the
-            // verdict — turns the historical air-column / void / no-foothold
-            // adjustNull tail into a zero-cost reject.
+            // Authoritative bad: multi-column probe sweep found no acceptable Y.
+            // Short-circuit to avoid redundant chunk load.
             probeOutcomeAdjustNullScan.incrementAndGet();
             probeOutcomeAdjustNullScanShortCircuit.incrementAndGet();
             // Always record the biome for this position even though no
@@ -1491,7 +1329,7 @@ public class ScanTask extends RTPRunnable {
             } catch (Throwable ignored) {
               // Biome read is best-effort; a failure must not change the verdict.
             }
-            // addBadChunk: chunk-uniform — SCAN_MISS means the multi-column probe sweep
+            // addBadChunk: chunk-uniform - SCAN_MISS means the multi-column probe sweep
             // iterated every testCoords column in this chunk and found no acceptable Y on
             // any of them; the twin spiral index targets a column already covered by the
             // sweep, so it is guaranteed to also reject.
@@ -1503,7 +1341,7 @@ public class ScanTask extends RTPRunnable {
         return false;
       }
     } catch (Throwable t) {
-      // Adjustor threw — UNKNOWN, fall through. Attribute to THREW sub-bucket.
+      // Adjustor threw - UNKNOWN, fall through. Attribute to THREW sub-bucket.
       probeOutcomeAdjustNull.incrementAndGet();
       probeOutcomeAdjustNullThrew.incrementAndGet();
       return false;
@@ -1522,7 +1360,7 @@ public class ScanTask extends RTPRunnable {
       shape.addBiomeLocation(pos, 1, ub);
       if (!BiomeNames.matches(defaultBiomes, ub)) {
         probeOutcomeBiomeReject.incrementAndGet();
-        // addBadChunk: chunk-uniform — biome is a per-chunk property in the anvil probe;
+        // addBadChunk: chunk-uniform - biome is a per-chunk property in the anvil probe;
         // the twin spiral index decodes to the same chunk and is guaranteed to fail.
         shape.addBadChunk(pos);
         res.complete(false);
@@ -1534,7 +1372,7 @@ public class ScanTask extends RTPRunnable {
     String probeBlock = probe.blockAt(py);
     if (probeBlock != null && MaterialNames.matches(unsafeBlocks, probeBlock.toUpperCase())) {
       probeOutcomeBlockReject.incrementAndGet();
-      // addBadChunk: chunk-uniform — within a chunk the per-column selection order is
+      // addBadChunk: chunk-uniform - within a chunk the per-column selection order is
       // deterministic, so the twin spiral index resolves to the same picked column and the
       // same unsafe block.
       shape.addBadChunk(pos);
@@ -1563,10 +1401,9 @@ public class ScanTask extends RTPRunnable {
   }
 
   /**
-   * Legacy full-load path, extracted verbatim from the pre-PR-5 testPos body.
-   * Invoked when the probe is unavailable (UNKNOWN) or fails.
+   * Legacy full-load path, invoked when the probe is unavailable (UNKNOWN) or fails.
    *
-   * <p>PR-17: times each invocation from entry to {@code res} completion and accumulates into
+   * <p>Times each invocation from entry to {@code res} completion and accumulates into
    * {@link #fullLoadCount}/{@link #fullLoadNanos}. Diagnostic only; emitted by
    * {@link #readFullLoadStatsAndReset()}.</p>
    */
@@ -1638,7 +1475,7 @@ public class ScanTask extends RTPRunnable {
                     return;
                   }
 
-                  // Mid-Y biome pre-filter on the resolved chunk — safe to run
+                  // Mid-Y biome pre-filter on the resolved chunk - safe to run
                   // inline only for self-contained (anvil-backed) chunks. For
                   // live-backed chunks the biome read routes through
                   // CraftBlock#getBiome which enforces TickThread and would
@@ -1653,7 +1490,7 @@ public class ScanTask extends RTPRunnable {
                     // re-recording is idempotent ("if it doesn't already").
                     shape.addBiomeLocation(pos, 1, midBiome);
                     if (!BiomeNames.matches(defaultBiomes, midBiome)) {
-                      // addBadChunk: chunk-uniform — mid-Y biome read from the resolved
+                      // addBadChunk: chunk-uniform - mid-Y biome read from the resolved
                       // (anvil-backed self-contained) chunk; biome is per-chunk so the twin
                       // spiral index in the same chunk is guaranteed to fail.
                       shape.addBadChunk(pos);
@@ -1691,7 +1528,7 @@ public class ScanTask extends RTPRunnable {
                       }
 
                       if (!vert.adjust(chunk, localCursor)) {
-                        // addBadChunk: chunk-uniform — within a chunk the per-column
+                        // addBadChunk: chunk-uniform - within a chunk the per-column
                         // selection order is deterministic, so the twin spiral index picks
                         // the same column and vert.adjust fails identically.
                         shape.addBadChunk(pos);
@@ -1711,7 +1548,7 @@ public class ScanTask extends RTPRunnable {
                       shape.addBiomeLocation(pos, 1, actualBiome.toUpperCase());
 
                       if (!BiomeNames.matches(defaultBiomes, actualBiome.toUpperCase())) {
-                        // addBadChunk: chunk-uniform — authoritative biome read from the
+                        // addBadChunk: chunk-uniform - authoritative biome read from the
                         // loaded chunk; biome is per-chunk so the twin spiral index in the
                         // same chunk is guaranteed to fail.
                         shape.addBadChunk(pos);
@@ -1722,7 +1559,7 @@ public class ScanTask extends RTPRunnable {
 
                       boolean pass = localCursor.y < vert.maxY();
                       if (!pass) {
-                        // addBadChunk: chunk-uniform — within a chunk the per-column
+                        // addBadChunk: chunk-uniform - within a chunk the per-column
                         // selection order is deterministic, so the twin spiral index picks
                         // the same column and the same picked Y > maxY.
                         shape.addBadChunk(pos);
@@ -1760,7 +1597,7 @@ public class ScanTask extends RTPRunnable {
                         fullLoadOutcomeAccept.incrementAndGet();
                         res.complete(true);
                       } else {
-                        // addBadChunk: chunk-uniform — within a chunk the per-column
+                        // addBadChunk: chunk-uniform - within a chunk the per-column
                         // selection order is deterministic, so the twin spiral index picks
                         // the same column and the same (2r+1)^3 safety scan rejects again.
                         shape.addBadChunk(pos);
@@ -1769,7 +1606,7 @@ public class ScanTask extends RTPRunnable {
                       }
                     } catch (Throwable t) {
                       RTP.log(Level.SEVERE, "[ScanTask] Validation crashed on Region Thread at location " + pos, t);
-                      // addBadChunk: chunk-uniform — within a chunk the per-column
+                      // addBadChunk: chunk-uniform - within a chunk the per-column
                       // selection order is deterministic, so re-rolling the same chunk
                       // would crash the same way.
                       shape.addBadChunk(pos);
@@ -1779,7 +1616,7 @@ public class ScanTask extends RTPRunnable {
                   });
                 } catch (Throwable t) {
                   RTP.log(Level.SEVERE, "[ScanTask] Async callback crashed at location " + pos, t);
-                  // addBadChunk: chunk-uniform — within a chunk the per-column selection
+                  // addBadChunk: chunk-uniform - within a chunk the per-column selection
                   // order is deterministic, so re-rolling the same chunk would crash the
                   // async callback identically.
                   shape.addBadChunk(pos);
@@ -1799,17 +1636,8 @@ public class ScanTask extends RTPRunnable {
   }
 
   /**
-   * Bounded drain of the in-flight chunk-load futures. Waits up to {@code timeoutMs}
-   * for outstanding chunk callbacks to settle so no ghost callback mutates the shape
-   * after {@code flushAndRebuild}/{@code save}, but never blocks the caller (command /
-   * main thread) indefinitely — a hung or timing-out chunk load must not freeze the
-   * server. The cancelled/pause flag already guards late callbacks (they complete
-   * false without mutating shape state), so proceeding after a timeout is safe.
-   *
-   * <p>Any still-tracked chunk futures are cancelled first so the drain does not have
-   * to wait out their per-future 30s {@code orTimeout} one at a time; cancellation
-   * completes the chain promptly, releases the gate, and suppresses the
-   * timeout-exception log spam (the completion guards check the cancelled flag).</p>
+   * Bounded drain of in-flight chunk-load futures. Waits up to {@code timeoutMs}
+   * for outstanding chunk callbacks to settle without blocking indefinitely.
    */
   private void drainInFlight(String reason, long timeoutMs) {
     // Actively abort outstanding chunk loads so the gate frees up promptly.
@@ -1834,7 +1662,7 @@ public class ScanTask extends RTPRunnable {
     } else {
       RTP.log(Level.FINE, "[ScanTask] " + reason + " drain timed out region=" + region.name
               + " after " + drainMs + "ms inFlight=" + inFlight.get()
-              + " — proceeding (cancelled/pause flag guards late callbacks)");
+              + " - proceeding (cancelled/pause flag guards late callbacks)");
     }
   }
 
@@ -1855,20 +1683,12 @@ public class ScanTask extends RTPRunnable {
     if (cancelled) {
       RTP.log(Level.FINE, "[ScanTask] cancellation requested region=" + region.name
               + " inFlight=" + inFlight.get());
-      // Mark cancelled BEFORE draining: drainInFlight actively cancels the
-      // tracked chunk futures, which fires their whenComplete handlers
-      // synchronously on this thread. Those handlers suppress the
-      // timeout/cancellation WARNING only when isCancelled() is already true,
-      // so the flag must be set first or the cancel spams the very exceptions
-      // we are trying to silence.
+      // Mark cancelled BEFORE draining: prevents late callback exception spam during cancel.
       super.setCancelled(true);
       try {
         done.cancel(true);
       } catch (CancellationException | CompletionException ignored) { }
-      // Drain all in-flight chunk futures before saving, so no ghost callbacks
-      // can call addBadLocation() after flushAndRebuild/save. Bounded so a hung
-      // chunk load cannot freeze the server, and outstanding loads are cancelled
-      // up front to stop the per-future 30s timeout-exception spam.
+      // Drain in-flight chunk futures before saving to prevent ghost callbacks.
       drainInFlight("cancel", DRAIN_TIMEOUT_MS);
       MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
       if (shape != null) {

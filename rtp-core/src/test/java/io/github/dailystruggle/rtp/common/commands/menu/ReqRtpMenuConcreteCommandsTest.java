@@ -33,29 +33,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * ADR-050 Stage 1a (Proposed 2026-05-24) - concrete-command leaves coexist
- * with the token-redeem path. This suite asserts:
- *
- * <ol>
- *   <li><b>Registration</b>: {@code /rtp menu open/admin/front/visualizations}
- *       and {@code /rtp visualization} are registered as expected after the
- *       {@link MenuRedeemSubcommand} constructor runs.</li>
- *   <li><b>Routing</b>: each leaf's {@code onCommand} invocation drives the
- *       matching {@code dispatch*} helper end-to-end through the renderer
- *       (no token mint / consume involved).</li>
- *   <li><b>Path-parameter parsing</b>: the {@code open} leaf splits dotted
- *       paths on {@code '.'} and forwards the array to
- *       {@link MenuAction.OpenMenu}.</li>
- *   <li><b>Permission gating</b>: the {@code admin} and {@code visualizations}
- *       leaves still respect the {@code rtp.menu.admin} gate inside their
- *       shared {@code dispatchOpen*} helpers (S-004 reject path).</li>
- * </ol>
- *
- * <p>This test is the REQ-RTP-F-013 regression guard for the new
- * concrete-command surface (configurable rejection messages still apply on
- * the new leaves because the underlying helpers are unchanged).
+ * Concrete-command leaves regression suite (ADR-050 / REQ-RTP-F-013).
+ * Asserts registration, routing, path parsing, and permission gating.
  */
-@DisplayName("ADR-050 Stage 1a: concrete `/rtp menu ...` and `/rtp visualization` leaves")
+@DisplayName("ADR-050: concrete `/rtp menu ...` and `/rtp visualization` leaves")
 class ReqRtpMenuConcreteCommandsTest {
 
     @TempDir
@@ -534,14 +515,7 @@ class ReqRtpMenuConcreteCommandsTest {
     }
 
     /**
-     * Minimal /rtp root stub - same shape as the existing
-     * MenuConfigSubtreeDispatchTest fixture but only carries enough state
-     * for the new concrete-command leaves to register and route. A single
-     * {@code config} child stub is installed so the
-     * {@code OpenMenuConcreteCmd}'s dotted-path splitter resolves the
-     * "config" segment into a {@link TreeCommand} under {@code dispatchOpen}.
-     * The dotted-path splitter itself is package-private inside
-     * {@link MenuConcreteCommandLeaves} and not part of the public surface.
+     * Minimal /rtp root stub with config subcommand for testing concrete-command leaves.
      */
     static final class TestableRoot extends BaseRTPCmdImpl {
         TestableRoot() {
