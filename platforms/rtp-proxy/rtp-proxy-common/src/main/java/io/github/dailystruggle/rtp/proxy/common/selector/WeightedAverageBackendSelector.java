@@ -34,7 +34,7 @@ import java.util.logging.Logger;
  * external state beyond its arguments and the {@link LoadBalancerConfig}
  * supplied at construction (REQ-RTP-PROXY-COMMON-002).</p>
  *
- * <p>Candidate filtering (rtp-proxy-ADR-004 §Candidate Filtering): staleness,
+ * <p>Candidate filtering (rtp-proxy-ADR-004 section Candidate Filtering): staleness,
  * {@link BackendHeartbeat.PluginState} = {@code READY},
  * {@link BackendHeartbeat#acceptingRequests()}, region constraint, world
  * constraint. {@code schemaVersion} negotiation and cooldown maps are left

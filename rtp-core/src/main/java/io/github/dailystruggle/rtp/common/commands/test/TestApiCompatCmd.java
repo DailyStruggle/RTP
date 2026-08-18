@@ -15,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * {@code rtp test api-compat} - read-only reflective probe of every
  * Bukkit/Paper/Folia API method RTP relies on; surfaces {@link NoSuchMethodError}
- * risk at test time (RUNTIME_TEST_SUITE_PLAN §3.7). Curated list (not bytecode-scanned)
+ * risk at test time (RUNTIME_TEST_SUITE_PLAN section 3.7). Curated list (not bytecode-scanned)
  * to stay in lock-step with adapter notes. Missing classes report as {@code skipped}
  * (expected for platform-conditional APIs); missing methods report as failures.
  * S-004 (warn + send on miss), S-005 (pure reflection), no method is invoked.

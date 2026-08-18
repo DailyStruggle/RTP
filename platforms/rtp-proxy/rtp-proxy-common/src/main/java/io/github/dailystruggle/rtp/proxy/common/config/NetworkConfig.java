@@ -124,7 +124,7 @@ public final class NetworkConfig {
     /**
      * Parse a raw {@code network.yml} document into a {@code NetworkConfig}.
      *
-     * <p>Fail-fast rules enforced here (ADR-002 §Validation Rules):
+     * <p>Fail-fast rules enforced here (ADR-002 section Validation Rules):
      * <ul>
      *   <li>{@code role: auto} resolves via {@code accessor.role()}.</li>
      *   <li>If the resolved role is a proxy, {@code network.proxyId} must be

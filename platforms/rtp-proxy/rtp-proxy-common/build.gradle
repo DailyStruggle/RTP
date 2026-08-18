@@ -1,6 +1,6 @@
 // rtp-proxy-common — host-independent proxy SPI + reference selector + in-memory binding.
 //
-// Architecture (rtp-proxy-ADR-001 §Package Boundary Rules):
+// Architecture (rtp-proxy-ADR-001 section Package Boundary Rules):
 //   - May depend on: rtp-api, JDK.
 //   - Must NOT import: com.velocitypowered.*, net.md_5.bungee.*, org.bukkit.*,
 //     net.minecraft.*, net.fabricmc.*.

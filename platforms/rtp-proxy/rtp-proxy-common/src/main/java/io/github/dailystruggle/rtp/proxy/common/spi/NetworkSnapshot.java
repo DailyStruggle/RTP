@@ -13,7 +13,7 @@ import java.util.Optional;
  * {@link BackendSelector#choose(RtpRequest, NetworkSnapshot)} so the selector
  * stays a pure function (REQ-RTP-PROXY-COMMON-002).
  *
- * <p>Pinned by rtp-proxy-ADR-001 §2.</p>
+ * <p>Pinned by rtp-proxy-ADR-001 section 2.</p>
  *
  * @param timestampEpochMs when this snapshot was assembled, used by the
  *                         staleness filter (REQ-RTP-PROXY-COMMON-003)

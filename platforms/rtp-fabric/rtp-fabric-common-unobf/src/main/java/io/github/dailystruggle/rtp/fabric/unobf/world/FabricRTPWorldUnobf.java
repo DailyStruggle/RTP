@@ -207,7 +207,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         // Only when the probe returns no view at all (UNKNOWN: no region file /
         // unsupported DataVersion / decode error / no emitted sections) do we
         // fall through to the live-load path below. The live re-check at
-        // teleport commit (ADR-016 §4) remains the authoritative arbiter.
+        // teleport commit (ADR-016 section 4) remains the authoritative arbiter.
         if (shouldPrefilter(chunkX, chunkZ)) {
             ServerLevel probeLevel = world;
             MinecraftServer probeServer = (probeLevel != null) ? probeLevel.getServer() : null;
@@ -1130,7 +1130,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * Non-blocking check for whether the chunk has been generated and persisted
      * to disk. Implements the {@link RTPWorld#isChunkGenerated(int, int)}
      * contract using region-file probes - same primitive Bukkit's
-     * {@code World#isChunkGenerated} reduces to. Used by ADR-016 §13.3 to gate
+     * {@code World#isChunkGenerated} reduces to. Used by ADR-016 section 13.3 to gate
      * the vanilla seed-biome pre-check fast path.
      *
      * <p>Resolution order:</p>
@@ -1145,7 +1145,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      *   <li>If reflection is unavailable or throws, fall back to {@code true}
      *       per the conservative default - false-positives are harmless
      *       (only skip the perf fast path); false-negatives would risk the
-     *       ADR-016 §13.3 palette-drift bug.</li>
+     *       ADR-016 section 13.3 palette-drift bug.</li>
      * </ol>
      */
     @Override
@@ -1186,7 +1186,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         } catch (Throwable t) {
             // Conservative default per RTPWorld javadoc: a false-positive only
             // forfeits a perf fast path; a false-negative could re-introduce
-            // the ADR-016 §13.3 palette-drift bug.
+            // the ADR-016 section 13.3 palette-drift bug.
             return true;
         }
     }

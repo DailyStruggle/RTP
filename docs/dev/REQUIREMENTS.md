@@ -68,7 +68,7 @@ These requirements establish the overarching contract for operating RTP across m
 
 - **REQ-RTP-NET-003 — Single Distribution Artifact:** The system shall ship a single distribution artifact that activates the appropriate role — backend or proxy coordinator — based on the host runtime, without requiring operators to select between separate proxy and backend builds.
 
-- **REQ-RTP-NET-004 — Safety Preservation Across the Network:** A network-mediated teleport shall preserve every prohibition in §3 end-to-end. No prohibition shall be weakened, deferred, or transferred to the proxy.
+- **REQ-RTP-NET-004 — Safety Preservation Across the Network:** A network-mediated teleport shall preserve every prohibition in section 3 end-to-end. No prohibition shall be weakened, deferred, or transferred to the proxy.
 
 - **REQ-RTP-NET-005 — Authoritative World State on Backends:** The proxy shall not own world state, region definitions, or chunk data. Location validation, chunk handling, and safety checks shall execute on a backend server.
 

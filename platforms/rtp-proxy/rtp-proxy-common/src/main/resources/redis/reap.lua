@@ -1,5 +1,5 @@
 -- rtp-proxy-common reservation-token TTL reap.
--- Refines rtp-proxy-ADR-005 §Reservation Tokens and REQ-RTP-NET-011.
+-- Refines rtp-proxy-ADR-005 section Reservation Tokens and REQ-RTP-NET-011.
 --
 -- Scans every rtp:net:tok:<id> HASH, transitions any row whose
 -- expiresAtMs <= now AND state IN (PENDING, CLAIMED) to RELEASED, removes

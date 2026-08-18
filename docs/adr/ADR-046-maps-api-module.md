@@ -29,7 +29,7 @@ Three structural facts shape the decision:
    `rtp-core` and `rtp-anvil`.
 
 Folding this into `rtp-core` would force a platform import there (forbidden by
-*Architecture Boundaries §2*). Folding it into `effects-api` or `commands-api`
+*Architecture Boundaries section 2*). Folding it into `effects-api` or `commands-api`
 would conflate concerns: `effects-api` dispatches discrete sensory effects
 (sounds, particles), `commands-api` dispatches Brigadier nodes, neither owns a
 persistent 2D pixel surface or a per-viewer refresh cadence.
@@ -161,11 +161,11 @@ during Stage 2.
 
 | Alternative | Why Rejected |
 |-------------|--------------|
-| Fold the SPI into `rtp-core` directly | Forces a platform import (`org.bukkit.map.MapView`) into `rtp-core`, breaking *Architecture Boundaries §2*. |
+| Fold the SPI into `rtp-core` directly | Forces a platform import (`org.bukkit.map.MapView`) into `rtp-core`, breaking *Architecture Boundaries section 2*. |
 | Fold into `effects-api` | `effects-api` dispatches discrete sensory events with no persistent surface, no per-viewer cadence, and no pixel buffer. The two concerns share neither a model nor a delivery path. |
 | Fold into `commands-api` | `commands-api` is a Brigadier bridge; pixel rendering is not a command concern. The `/rtp map` command is one consumer, not the subsystem. |
 | Fold the `MapCanvas` SPI into `rtp-api` (public addon surface) only | `rtp-api` is the addon-facing contract; binding implementations carry platform imports and a non-trivial lifecycle that addons should consume, not author. Re-evaluate after Phase 3 if addons ask for it. |
-| Per-platform fork (separate map renderer in each adapter) | Already proven anti-pattern by `effects-api` and `commands-api`; *Architecture Boundaries §3* explicitly says "extend these, don't fork per-platform." |
+| Per-platform fork (separate map renderer in each adapter) | Already proven anti-pattern by `effects-api` and `commands-api`; *Architecture Boundaries section 3* explicitly says "extend these, don't fork per-platform." |
 | Skip the Fabric obf/unobf split and use reflection in a single common module | Loom's intermediary remap fundamentally requires the split for 1.20.x / 1.21.x runtimes; reflection from deobf MC 26.x is unsafe ([rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)). |
 | Render to a custom client-side surface (resource pack / mod overlay) | Requires a client mod, breaking vanilla-compatibility. Cartography maps work for every connecting client out of the box. |
 | Defer to bStats only | bStats charts are off-server analytics, anonymized and aggregated. They cannot answer "what does the spiral look like on *my* server right now" or be inspected in-world by operators. The two pipelines stay independent. |
@@ -257,5 +257,5 @@ Revised contract:
   (rather than excluding the concrete bindings as originally planned).
 
 This amendment is documentation-only at the ADR level; the code already
-behaves as described. `maps-api-ADR-001` §3 (Lite-assembly inclusion /
+behaves as described. `maps-api-ADR-001` section 3 (Lite-assembly inclusion /
 exclusion) is amended in lockstep.

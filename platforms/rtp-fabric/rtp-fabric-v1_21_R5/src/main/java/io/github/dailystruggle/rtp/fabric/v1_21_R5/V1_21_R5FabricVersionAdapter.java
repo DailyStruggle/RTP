@@ -445,7 +445,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     /**
-     * Typed written-book modal for MC 1.21.5+ (rtp-fabric-ADR-012 §4
+     * Typed written-book modal for MC 1.21.5+ (rtp-fabric-ADR-012 section 4
      * un-defer). Mirrors the v1_21_R1 implementation; see that class for the
      * transient-slot rationale.
      */

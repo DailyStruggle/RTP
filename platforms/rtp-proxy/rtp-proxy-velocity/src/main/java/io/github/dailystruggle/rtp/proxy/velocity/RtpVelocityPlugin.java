@@ -670,7 +670,7 @@ public final class RtpVelocityPlugin {
     private static final long RESERVATION_LOOKUP_TIMEOUT_MS = 250L;
 
     /**
-     * Reverse-order teardown per rtp-proxy-ADR-006 §Lifecycle.
+     * Reverse-order teardown per rtp-proxy-ADR-006 section Lifecycle.
      * Checklist rows 7b-7f:
      * <ul>
      *   <li>7b: unregister command, stop trigger source, stop publisher,
@@ -837,7 +837,7 @@ public final class RtpVelocityPlugin {
         }
     }
 
-    /** Bounded transport close per ADR-006 §Lifecycle. Returns {@code true} on clean close. */
+    /** Bounded transport close per ADR-006 section Lifecycle. Returns {@code true} on clean close. */
     private boolean closeTransportBounded(NetworkTransport t, long timeoutMs) {
         Thread closer = new Thread(() -> {
             try { t.close(); }

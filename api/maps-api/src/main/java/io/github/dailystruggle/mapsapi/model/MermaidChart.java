@@ -9,7 +9,7 @@ import java.util.Objects;
  * no external runtime or scripting engine).
  *
  * @param source the raw Mermaid source text (subset locked in ADR-046
- *               §Mermaid output). Out-of-subset constructs surface as
+ *               section Mermaid output). Out-of-subset constructs surface as
  *               {@code MermaidParseException} at render time.
  * @param title  human-readable title shown above the diagram, or {@code ""}
  *               for an untitled chart. Never {@code null}.

@@ -45,7 +45,7 @@ import java.util.logging.Level;
  * <p>S-005: all effect dispatch is funneled through {@link FabricEffectRuntimeUnobf#schedule}
  * (→ {@code MinecraftServer#execute}). Effect <em>resolution</em> (the
  * {@code EffectFactory.buildEffects} call) runs on the calling thread (which
- * is the pipeline thread on Fabric per ADR-022 §4) and is pure in-memory
+ * is the pipeline thread on Fabric per ADR-022 section 4) and is pure in-memory
  * lookup against {@code BuiltInRegistries} - no chunk I/O.
  */
 public final class FabricEffectsHandlerUnobf {

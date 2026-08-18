@@ -1,13 +1,13 @@
 # effects-api-ADR-006 — Fabric obf/unobf split: relocate `effectsapi/fabric/*` to a Mojmap-unobfuscated common layer
 
-- **Status:** Accepted (2026-05-09); §*`effects-api/build.gradle` change* and §*Implementation checklist* step 2–4 amended in-place 2026-05-09 to reflect the **nested sibling Gradle module** mechanism (`effects-api/effects-api-fabric-unobf/`) instead of a second source set inside `effects-api`. See *Amendment 2026-05-09 — sibling module, not source set* below for rationale.
+- **Status:** Accepted (2026-05-09); section *`effects-api/build.gradle` change* and section *Implementation checklist* step 2–4 amended in-place 2026-05-09 to reflect the **nested sibling Gradle module** mechanism (`effects-api/effects-api-fabric-unobf/`) instead of a second source set inside `effects-api`. See *Amendment 2026-05-09 — sibling module, not source set* below for rationale.
 - **Supersedes:** —
 - **Superseded by:** —
 - **Related:**
   - `effects-api-ADR-003-platform-split-bukkit-fabric.md` — established the in-module `common/ + bukkit/ + fabric/` split. This ADR refines the `fabric/` half **without** touching `common/` or `bukkit/`.
   - `effects-api-ADR-004-value-coercer-spi.md` — `FabricValueCoercer` is one of the leak sites this ADR moves.
   - `rtp-fabric-ADR-001-multiversion-submodule-layout.md` — multi-MC submodule pattern; this ADR adds an obf/unobf axis orthogonal to the per-MC axis.
-  - `rtp-fabric-ADR-002-platform-in-scope.md §4 Build Discipline` — the Loom allow-list. This ADR keeps `effects-api`'s existing Loom plugin (granted by ADR-003) but narrows what `effectsapi/fabric/*` is responsible for.
+  - `rtp-fabric-ADR-002-platform-in-scope.md section 4 Build Discipline` — the Loom allow-list. This ADR keeps `effects-api`'s existing Loom plugin (granted by ADR-003) but narrows what `effectsapi/fabric/*` is responsible for.
   - `rtp-fabric-ADR-007-mojmap-name-decoupling.md` — rationale for keeping `net.minecraft.*` calls behind a thin SPI; this ADR is the concrete consequence on the deobf MC 26.x runtime family.
   - **Companion (mandatory pair):** `platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md` — the corresponding Gradle/module decision in `platforms/rtp-fabric/`. Both ADRs must be accepted together.
   - `docs/dev/scratch/CHECKLIST-fabric-26-1-2-bringup.md` Phase 5 / Phase 5C — the bring-up work this ADR unblocks.
@@ -69,7 +69,7 @@ effects-api/                                       (existing module — KEPT, in
   effects-api-fabric-unobf/                        ← NEW — nested sibling Gradle module, unobfuscated 1.15 Loom
     build.gradle                                   (mirrors rtp-fabric-v26_1_R1 / rtp-fabric-common-unobf:
                                                     `id 'net.fabricmc.fabric-loom'`, MC 26.1.2, no `mappings`
-                                                    line, Java 25 toolchain. See § build wiring below.)
+                                                    line, Java 25 toolchain. See section build wiring below.)
     src/main/java/io/github/dailystruggle/effectsapi/fabric_unobf/
       FabricEffectRuntimeUnobf.java                (mirror of fabric/FabricEffectRuntime — same source
                                                     body, compiled under unobfuscated Loom so the NM
@@ -201,7 +201,7 @@ include ':effects-api:effects-api-fabric-unobf'
 
 - One-time relocation: ~12 files move from `effectsapi/fabric/` to `effectsapi/fabric_unobf/`, plus one new file (`FabricEffectRuntimeUnobf` — the mojmap-bytecode mirror of `FabricEffectRuntime`). The source bodies are identical at relocation time; subsequent edits must be made in lockstep until/unless a future ADR collapses the two carriers behind a shared common ancestor. CHANGELOG-flagged.
 - One new nested Gradle module (`effects-api/effects-api-fabric-unobf`) and the corresponding `settings.gradle` include. Build-graph leaf-count grows by one. The new module uses the same Java 25 + Loom 1.15 toolchain as `rtp-fabric-v26_1_R1` and `rtp-fabric-common-unobf`; contributors without JDK 25 will see this module fail toolchain provisioning (the rest of `effects-api` remains on Java 21). Loom config drift between this module and the two existing unobf modules is a maintenance hazard; mitigation is the shared `gradle.properties`/`versions.gradle` follow-up already recorded in `rtp-fabric-ADR-009` *Negative / costs*.
-- The `effects-api` jar now contains two carriers for the fabric platform. This is an allowed jar-content change under `rtp-fabric-ADR-002 §4 Build Discipline`'s existing exception for `rtp-plugin` and (post-ADR-003) `effects-api`. No third-party addon's classpath grows by more than the difference between one and two compiled subpackages; addons that did `import io.github.dailystruggle.effectsapi.fabric.*` continue to work — the public-ish symbols (concrete effect names) move under `fabric_unobf/`, but no in-tree addon imports them today (verified for ADR-003) and a CHANGELOG migration note covers out-of-tree consumers.
+- The `effects-api` jar now contains two carriers for the fabric platform. This is an allowed jar-content change under `rtp-fabric-ADR-002 section 4 Build Discipline`'s existing exception for `rtp-plugin` and (post-ADR-003) `effects-api`. No third-party addon's classpath grows by more than the difference between one and two compiled subpackages; addons that did `import io.github.dailystruggle.effectsapi.fabric.*` continue to work — the public-ish symbols (concrete effect names) move under `fabric_unobf/`, but no in-tree addon imports them today (verified for ADR-003) and a CHANGELOG migration note covers out-of-tree consumers.
 - The dispatch policy relies on the runtime never naming the wrong carrier. A regression test (bytecode/import scan, mirror of the `EffectsApiCommonNoPlatformImportsTest` proposed in ADR-003) is required to assert that no class under `effectsapi/common/*` or `effectsapi/bukkit/*` references either fabric carrier, and that nothing under `effectsapi/fabric/` references `effectsapi/fabric_unobf/*` or vice versa.
 
 ### Out of scope (separate follow-ups)

@@ -11,7 +11,7 @@ import java.util.Set;
  * authoritative health and capability snapshot the {@link BackendSelector}
  * scores against.
  *
- * <p>Pinned by rtp-proxy-ADR-001 §3 and rtp-proxy-ADR-004 §Candidate
+ * <p>Pinned by rtp-proxy-ADR-001 section 3 and rtp-proxy-ADR-004 section Candidate
  * Filtering. Fields map 1:1 to {@code backend_state} schema in
  * rtp-proxy-ADR-002.</p>
  *
@@ -29,7 +29,7 @@ import java.util.Set;
  * @param playerCount        online player count (lagging indicator; ships with weight 0 in v1)
  * @param regionsAvailable   region keys this backend can satisfy (may be empty for "any")
  * @param worldsLoaded       world keys currently loaded on this backend
- * @param killSwitch         operator-asserted kill switch (rtp-proxy-ADR-010 §Kill
+ * @param killSwitch         operator-asserted kill switch (rtp-proxy-ADR-010 section Kill
  *                           Switch); when {@code true}, the {@link BackendSelector}
  *                           must exclude this backend from candidate scoring.
  *                           Default {@code false}.

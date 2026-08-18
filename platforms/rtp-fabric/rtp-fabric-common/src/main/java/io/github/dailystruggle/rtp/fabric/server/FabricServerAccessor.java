@@ -808,7 +808,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     // hydration banner) renders with the prefix resolved.
     String formatted = (msg == null) ? "" : formatForLog(msg);
     // Route through Log4j2 (Minecraft's own logger framework) so the dedicated
-    // server's TerminalConsoleAppender translates §-codes to ANSI on the
+    // server's TerminalConsoleAppender translates section -codes to ANSI on the
     // console. Apply a level-coloured prefix that mirrors Spigot's
     // SendMessage.log so SEVERE/WARNING are visually distinct.
     String ansi = FabricAnsiText.toAnsiString(prefixForLevel(level) + formatted);
@@ -942,7 +942,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
         p.sendMessage(format(p.uuid(), msg));
       }
     }
-    // Console branch: route via Log4j2 with §-form so colour is preserved
+    // Console branch: route via Log4j2 with section -form so colour is preserved
     // (sendSystemMessage(Component) logs plain text on the dedicated server).
     String consoleMsg = format(null, msg);
     org.apache.logging.log4j.LogManager.getLogger("RTP")
@@ -2218,7 +2218,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    *
    * <p>Always reports op-level permissions (Fabric console is unconditionally
    * privileged), routes {@link #sendMessage(String)} through Log4j2 in
-   * legacy {@code §}-form so MC's TerminalConsoleAppender renders ANSI
+   * legacy {@code section }-form so MC's TerminalConsoleAppender renders ANSI
    * colour on the dedicated server.
    */
   private static final class FabricConsoleSender implements RTPCommandSender {
@@ -2288,8 +2288,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       // logs `component.getString()` (plain text) on the dedicated server,
       // which strips styling. To keep colour on the console we route the
       // ANSI form straight through Log4j2. Translating to ANSI here (rather
-      // than relying on TerminalConsoleAppender to convert §-codes) avoids
-      // mojibake on Windows consoles whose codepage isn't UTF-8: the raw §
+      // than relying on TerminalConsoleAppender to convert section -codes) avoids
+      // mojibake on Windows consoles whose codepage isn't UTF-8: the raw section 
       // (UTF-8 0xC2 0xA7) would otherwise render as "┬º".
       String ansi = FabricAnsiText.toAnsiString(message);
       org.apache.logging.log4j.LogManager.getLogger("RTP").info(ansi);

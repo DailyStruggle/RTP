@@ -42,4 +42,4 @@ src/main/java/io/github/dailystruggle/rtp/proxy/common/
 ## Cross-references
 
 - [`../README.md`](../README.md) — umbrella overview.
-- [`../../docs/dev/MULTI_SERVER_PLAN.md`](../../../docs/dev/MULTI_SERVER_PLAN.md) §*Load Balancer*, §*Trigger Abstraction*, §*Reservation Tokens*.
+- [`../../docs/dev/MULTI_SERVER_PLAN.md`](../../../docs/dev/MULTI_SERVER_PLAN.md) section *Load Balancer*, section *Trigger Abstraction*, section *Reservation Tokens*.

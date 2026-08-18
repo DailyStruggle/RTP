@@ -27,6 +27,6 @@ dependencies {
     testImplementation 'net.kyori:adventure-text-serializer-gson:4.17.0'
     // ArchUnit â€” bytecode-level architecture rule enforcement. Hosts the three
     // boundary rules that lock the Spigot-exclusive Anvil read-only pre-filter
-    // package in place (see ADR-016 / ADR-016 Â§6).
+    // package in place (see ADR-016 / ADR-016 section 6).
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 }

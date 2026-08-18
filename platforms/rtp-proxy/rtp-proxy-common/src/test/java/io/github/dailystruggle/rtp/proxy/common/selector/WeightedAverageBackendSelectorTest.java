@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Exercises rtp-proxy-ADR-004 §Scoring Formula and §Candidate Filtering on the
+ * Exercises rtp-proxy-ADR-004 section Scoring Formula and section Candidate Filtering on the
  * reference {@link WeightedAverageBackendSelector}. Covers
  * REQ-RTP-PROXY-COMMON-002 (pure-function selector) and
  * REQ-RTP-PROXY-COMMON-003 (snapshot freshness filter).

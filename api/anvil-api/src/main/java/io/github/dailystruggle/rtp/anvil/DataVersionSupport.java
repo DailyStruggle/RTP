@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.anvil;
 
 /**
- * DataVersion gate for the Anvil read-only pre-filter (ADR-016 §8.2). Currently
+ * DataVersion gate for the Anvil read-only pre-filter (ADR-016 section 8.2). Currently
  * admits every chunk and lets the decoder be the correctness boundary; failures
  * surface as {@link Verdict#UNKNOWN} and fall through to live-load. Constants
  * below are fixture-parity anchors retained for {@code AnvilFixtureParityTest}.
@@ -30,7 +30,7 @@ public final class DataVersionSupport {
   /** Lower bound of the historic supported range (1.20 RC; retained for parity tests). */
   public static final int MIN_SUPPORTED_DATA_VERSION = 3454;
 
-  /** Upper bound of the historic supported range; tighten when chunk NBT layout breaks (ADR-016 §8.2). */
+  /** Upper bound of the historic supported range; tighten when chunk NBT layout breaks (ADR-016 section 8.2). */
   public static final int MAX_SUPPORTED_DATA_VERSION = 5000;
 
   private DataVersionSupport() {
@@ -38,7 +38,7 @@ public final class DataVersionSupport {
   }
 
   /**
-   * Always {@code true}: the gate is retired (ADR-016 §13.1, 2026-04-20). The decoder
+   * Always {@code true}: the gate is retired (ADR-016 section 13.1, 2026-04-20). The decoder
    * ({@code AnvilReader} → {@code AnvilChunkView}) is the correctness boundary; layout
    * drift surfaces as {@link Verdict#UNKNOWN} via the {@code try/catch} in
    * {@link AnvilPrefilter#probeSyncDetailed}.

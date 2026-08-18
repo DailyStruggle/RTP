@@ -73,7 +73,7 @@ class SqlNetworkStateBindingH2Test {
     }
 
     @Test
-    @DisplayName("Snapshot reflects rows published by a peer binding (ADR-011 §DB-as-bus)")
+    @DisplayName("Snapshot reflects rows published by a peer binding (ADR-011 section DB-as-bus)")
     void snapshotCrossesInstances() throws Exception {
         a.publishBackendHeartbeat(sampleBackend("server-a", 42L)).get(2, TimeUnit.SECONDS);
         NetworkSnapshot snap = b.readSnapshot().get(2, TimeUnit.SECONDS);

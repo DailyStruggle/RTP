@@ -84,7 +84,7 @@ public final class AnvilProbeSupport {
             logProbeOutcome("PUBLISH", worldFolder, dimSubpath, cx, cz,
                 result.verdict());
           } else {
-            // ADR-016 §13.1 follow-up (2026-04-20): emit a rate-limited line on
+            // ADR-016 section 13.1 follow-up (2026-04-20): emit a rate-limited line on
             // every UNKNOWN so operators can see the probe ran (applicability
             // gate passed, probe executed) and still produced no view - i.e.
             // the `rtp-anvil` decoder fell through at one of the attribution
@@ -179,7 +179,7 @@ public final class AnvilProbeSupport {
   private static final int PROBE_OUTCOME_BUDGET_PER_REASON = 200;
 
   /**
-   * ADR-016 §13.1 follow-up (2026-04-20): emit a rate-limited one-liner for
+   * ADR-016 section 13.1 follow-up (2026-04-20): emit a rate-limited one-liner for
    * every probe outcome (view published or no view available). Makes the
    * "gate accepted → probe ran → outcome" chain observable end-to-end from
    * the server console so an operator triaging a sustained {@code

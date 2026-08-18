@@ -70,7 +70,7 @@ final class AnvilTestFixtures {
 
     /**
      * Builds a section compound carrying <em>both</em> a {@code block_states} and a
-     * {@code biomes} container. Phase-2 (ADR-016 (biome) §3) fixture helper: the
+     * {@code biomes} container. Phase-2 (ADR-016 (biome) section 3) fixture helper: the
      * biome palette is a bare-string {@code TAG_List} (element type {@code TAG_STRING}),
      * not the compound list the block palette uses, and the packed {@code data}
      * array is 64 cells (4×4×4) rather than 4096 blocks. {@code biomeData} may be

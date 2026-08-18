@@ -47,4 +47,4 @@ Additional ADRs may be inserted at the tail of the series (`-ADR-017`, `-018`, �
 - Umbrella: [`docs/adr/ADR-036`](../../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
 - Plan: [`docs/dev/MULTI_SERVER_PLAN.md`](../../../../docs/dev/MULTI_SERVER_PLAN.md)
 - Requirements: [`rtp-proxy/REQUIREMENTS.md`](../../REQUIREMENTS.md), [`rtp-proxy-common/REQUIREMENTS.md`](../../rtp-proxy-common/REQUIREMENTS.md), [`rtp-proxy-velocity/REQUIREMENTS.md`](../../rtp-proxy-velocity/REQUIREMENTS.md), [`rtp-proxy-bungee/REQUIREMENTS.md`](../../rtp-proxy-bungee/REQUIREMENTS.md)
-- Network REQs: [`docs/dev/REQUIREMENTS.md §1.6`](../../../../docs/dev/REQUIREMENTS.md) (`REQ-RTP-NET-001…014`)
+- Network REQs: [`docs/dev/REQUIREMENTS.md section 1.6`](../../../../docs/dev/REQUIREMENTS.md) (`REQ-RTP-NET-001…014`)

@@ -13,7 +13,7 @@ For design and implementation details that satisfy these requirements, see [`doc
 - **REQ-FABRIC-F-004 — Scheduler Implementation:** The adapter shall provide an `RTPScheduler` implementation honoring the contract for synchronous, asynchronous, delayed, and repeating task dispatch.
 
 ### 1.2 Single-JAR Multi-Loader Distribution
-- **REQ-FABRIC-F-005 — Co-located Metadata:** The single distribution JAR shall contain both `plugin.yml` (Bukkit-family) and `fabric.mod.json` (Fabric) at its root, each referencing a runtime-specific entry point in a disjoint package (per ADR-022 §2).
+- **REQ-FABRIC-F-005 — Co-located Metadata:** The single distribution JAR shall contain both `plugin.yml` (Bukkit-family) and `fabric.mod.json` (Fabric) at its root, each referencing a runtime-specific entry point in a disjoint package (per ADR-022 section 2).
 - **REQ-FABRIC-F-006 — Disjoint Entry Points:** The Bukkit entry point shall not transitively reach Fabric platform classes, and the Fabric entry point shall not transitively reach Bukkit platform classes. Shared state shall pass exclusively through `rtp-core` / `rtp-api` / `commands-api` / `effects-api`.
 
 ### 1.3 Lifecycle Integration
@@ -25,7 +25,7 @@ For design and implementation details that satisfy these requirements, see [`doc
 
 ## 2. Strict Architectural Requirements
 
-### 2.1 Architectural Invariants (ADR-022 §4)
+### 2.1 Architectural Invariants (ADR-022 section 4)
 - **REQ-FABRIC-ARCH-001 — No Bukkit Imports:** No source file under `platforms/rtp-fabric/**` shall import from `org.bukkit.*`, `io.papermc.*`, or `dev.folia.*`.
 - **REQ-FABRIC-ARCH-002 — No Core Pollution:** Fabric-specific patterns, types, or imports shall not be introduced into `rtp-core` or `rtp-api`.
 - **REQ-FABRIC-ARCH-003 — Loom Plugin Scope:** The `fabric-loom` Gradle plugin shall be applied only within `platforms/rtp-fabric/**`, `rtp-plugin` (the latter solely for single-JAR remap), and `effects-api` (per `effects-api-ADR-003`, to support the in-module `effectsapi/fabric` subpackage), and shall remap only classes under `io/github/dailystruggle/rtp/fabric/**` and `io/github/dailystruggle/effectsapi/fabric/**`.

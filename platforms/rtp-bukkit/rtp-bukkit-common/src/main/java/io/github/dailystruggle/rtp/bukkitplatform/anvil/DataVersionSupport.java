@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.bukkitplatform.anvil;
 
 /**
- * Spigot mirror of {@code rtp-anvil}'s DataVersionSupport (ADR-016 §8.2). Gate
+ * Spigot mirror of {@code rtp-anvil}'s DataVersionSupport (ADR-016 section 8.2). Gate
  * is retired; constants below are fixture-parity anchors for
  * {@code AnvilFixtureParityTest}. Immutable, thread-safe; static helpers only.
  */
@@ -29,7 +29,7 @@ public final class DataVersionSupport {
     // Utility class.
   }
 
-  /** Always {@code true}: gate retired (ADR-016 §13.1). Decoder failures surface as {@link Verdict#UNKNOWN}. */
+  /** Always {@code true}: gate retired (ADR-016 section 13.1). Decoder failures surface as {@link Verdict#UNKNOWN}. */
   public static boolean isSupported(int dataVersion) {
     return true;
   }

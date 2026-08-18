@@ -80,7 +80,7 @@ public class BukkitServerProvider {
      * Backwards-compatible overload. The full bootstrap ({@code RTPBukkitPlugin})
      * passes its plugin instance for parameter-symmetry with prior versions; the
      * lite bootstrap ({@code RTPBukkitLitePlugin}) calls the {@link JavaPlugin}
-     * variant. Both delegate to the same probe-based resolution -- ADR-024 §"three
+     * variant. Both delegate to the same probe-based resolution -- ADR-024 section "three
      * layers": the plugin instance carries no detection state.
      */
     public static ServerModel resolveServerModel(JavaPlugin plugin) {

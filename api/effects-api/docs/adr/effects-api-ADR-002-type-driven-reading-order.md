@@ -5,7 +5,7 @@
 **Status:** Accepted
 **Date:** 2026-05-05
 **Implemented:** 2026-05-05 (`Effect.applyByType` + per-effect `KEY_ORDER` constants in all six bundled effects; tests in `EffectsApiAdaptiveReadingOrderTest`)
-**Amended by:** [`effects-api-ADR-004`](effects-api-ADR-004-value-coercer-spi.md) (Accepted, 2026-05-07) — replaces the four `org.bukkit.*` FQNs in §"Type acceptance (`canParse`)" with platform-neutral `TypeKey` constants and adds a "Platform binding" paragraph; the ordering and cache-promotion semantics in this ADR are unchanged. The leaf operations of `canParse` / `parse` / reflective fallback are now per-platform, supplied by a `ValueCoercer` implementation bound at platform-init time (`BukkitValueCoercer` on Bukkit-family, `FabricValueCoercer` on Fabric).
+**Amended by:** [`effects-api-ADR-004`](effects-api-ADR-004-value-coercer-spi.md) (Accepted, 2026-05-07) — replaces the four `org.bukkit.*` FQNs in section "Type acceptance (`canParse`)" with platform-neutral `TypeKey` constants and adds a "Platform binding" paragraph; the ordering and cache-promotion semantics in this ADR are unchanged. The leaf operations of `canParse` / `parse` / reflective fallback are now per-platform, supplied by a `ValueCoercer` implementation bound at platform-init time (`BukkitValueCoercer` on Bukkit-family, `FabricValueCoercer` on Fabric).
 
 ### Implementation note (post-acceptance)
 

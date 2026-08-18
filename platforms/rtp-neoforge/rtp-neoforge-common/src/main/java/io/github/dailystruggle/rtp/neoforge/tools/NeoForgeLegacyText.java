@@ -23,7 +23,7 @@ import io.github.dailystruggle.rtp.common.RTP;
  * <p>Parses legacy text containing {@code &}-prefixed colour/format codes
  * (e.g. {@code &a}, {@code &l}) and 6-digit hex codes ({@code #RRGGBB} or
  * {@code &#RRGGBB}) into a styled {@link Component} tree that Minecraft renders
- * correctly. Bukkit's hex form {@code §x§r§r§g§g§b§b} is also accepted.
+ * correctly. Bukkit's hex form {@code section xsection rsection rsection gsection gsection bsection b} is also accepted.
  *
  * <p>NeoForge ships Mojang-mapped names at runtime, so this class compiles
  * directly against {@code net.minecraft.network.chat}. The HoverEvent /

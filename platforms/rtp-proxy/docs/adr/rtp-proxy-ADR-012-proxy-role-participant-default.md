@@ -85,4 +85,4 @@ The two interaction points worth pinning:
 - ADR-036 (umbrella); `MULTI_SERVER_PLAN.md` Phase 2 and *Proxy roles* subsection (added 2026-05-18).
 - ADR-006 (`rtp-proxy-velocity` bootstrap; Accepted 2026-05-18).
 - ADR-013 (proxy-accessor registration).
-- `docs/dev/scratch/PROPOSAL-sql-binding-first.md` rev 2 §1 Axis B.
+- `docs/dev/scratch/PROPOSAL-sql-binding-first.md` rev 2 section 1 Axis B.

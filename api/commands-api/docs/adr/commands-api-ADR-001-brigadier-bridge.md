@@ -34,7 +34,7 @@ For implementation and code-level details, see [DESIGN.md — Brigadier Bridge](
 
 - `commands-api/src/main/` — command tree definition
 - `platforms/rtp-fabric/src/main/java/.../fabric/commands/RTPCmdFabric.java` — registration shim
-- [MULTI_PLATFORM_PLAN.md §Phase 3](../../../docs/dev/MULTI_PLATFORM_PLAN.md#phase-3-command-system-refinement)
+- [MULTI_PLATFORM_PLAN.md section Phase 3](../../../docs/dev/MULTI_PLATFORM_PLAN.md#phase-3-command-system-refinement)
 - [ARCHITECTURE.md](../../../docs/dev/ARCHITECTURE.md) — dependency rule: `rtp-core` and `rtp-api` do not import platform-specific classes (ArchUnit-enforced)
 
 ---

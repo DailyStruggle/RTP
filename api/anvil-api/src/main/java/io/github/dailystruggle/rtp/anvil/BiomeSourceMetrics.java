@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Process-global telemetry for ADR-016 §13.1 biome-source attribution.
+ * Process-global telemetry for ADR-016 section 13.1 biome-source attribution.
  * Each {@code getBiome(x,y,z)} increments exactly one reason bucket; the
  * legacy {@link #anvilHits} / {@link #liveHits} totals are updated in lock-step
  * so the two views cannot drift. See {@link Reasons} for the canonical keys.

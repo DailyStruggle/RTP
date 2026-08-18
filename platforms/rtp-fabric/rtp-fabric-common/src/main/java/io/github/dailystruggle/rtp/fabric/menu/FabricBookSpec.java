@@ -9,11 +9,11 @@ import java.util.List;
  * {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#openBookMenu
  * openBookMenu} carrier method, which binds the spec to that MC version's
  * {@code WrittenBookContent} / {@code ClientboundOpenBookPacket} types
- * (rtp-fabric-ADR-012 §4).
+ * (rtp-fabric-ADR-012 section 4).
  *
  * <p>All text is already run through
  * {@code RTPServerAccessor.format(uuid, raw)} (placeholders + legacy
- * {@code &}/{@code §} colour codes); the carrier feeds each fragment straight
+ * {@code &}/{@code section } colour codes); the carrier feeds each fragment straight
  * into {@code FabricLegacyText.parseInteractive(text, hover, runCommand, RUN)}
  * so the {@code MenuModel} → {@code Component} colour/hover/click translation
  * is not re-implemented per version.

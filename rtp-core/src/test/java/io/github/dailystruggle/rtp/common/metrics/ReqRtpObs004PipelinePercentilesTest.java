@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * REQ-RTP-OBS-004 (ADR-053 §1): the pipeline-latency histogram exposes percentiles
+ * REQ-RTP-OBS-004 (ADR-053 section 1): the pipeline-latency histogram exposes percentiles
  * computed on demand from the bounded sample window without mutating it or blocking
  * the wait-free write path.
  */

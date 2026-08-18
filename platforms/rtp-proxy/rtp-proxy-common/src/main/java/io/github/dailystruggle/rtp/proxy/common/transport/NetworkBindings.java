@@ -34,7 +34,7 @@ import java.util.logging.Logger;
  * so the choice of binding ("in-memory" vs "sql" vs "redis") is one config
  * key, not a wiring decision baked into each adapter.
  *
- * <p>Pinned by rtp-proxy-ADR-011 (Proposed) §Factory Placement. The factory
+ * <p>Pinned by rtp-proxy-ADR-011 (Proposed) section Factory Placement. The factory
  * lives in {@code rtp-proxy-common} so vendor-free callers can consume it;
  * SQL drivers are supplied by the host's database accessor pool, not bundled
  * here.</p>
@@ -151,7 +151,7 @@ public final class NetworkBindings {
      * The {@code sql} kind constructs {@link SqlNetworkRequestQueue} against
      * the supplied {@link DataSource} (typically the host's shared
      * {@code AbstractSQLDatabaseAccessor} pool per rtp-proxy-ADR-011
-     * §HikariCP Pool Sharing); a null DataSource throws
+     * section HikariCP Pool Sharing); a null DataSource throws
      * {@link IllegalArgumentException}. The {@code redis} kind constructs
      * {@link RedisNetworkRequestQueue}; open-time failures degrade to
      * in-memory per the network-mode failure-mode policy.</p>

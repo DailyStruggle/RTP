@@ -76,7 +76,7 @@ Triggered by user report that chunk loading is still slow on Fabric: the column-
 ### Out of scope (still deferred)
 
 - Hoisting `AnvilColumnProbeAdapter` into `rtp-anvil` for cross-platform reuse — same rationale as the original ADR.
-- Sky-light decoding from anvil snapshots — anvil-backed `getSkyLight` returns the vanilla "fully lit" default (15); the live re-check at teleport commit (ADR-016 §4) remains authoritative if any caller gates on sky light.
+- Sky-light decoding from anvil snapshots — anvil-backed `getSkyLight` returns the vanilla "fully lit" default (15); the live re-check at teleport commit (ADR-016 section 4) remains authoritative if any caller gates on sky light.
 - State-predicate parity in the `CompiledUnsafeSet` overload — anvil-mode delegates to the plain-material bucket only, mirroring Spigot's Slice-2 behaviour.
 
 ### Verification

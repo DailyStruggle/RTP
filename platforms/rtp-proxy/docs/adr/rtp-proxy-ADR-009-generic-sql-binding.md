@@ -5,7 +5,7 @@
 **Refines:** [ADR-036](../../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
 **Depends on:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md), [rtp-proxy-ADR-002](rtp-proxy-ADR-002-network-yml-schema.md), [rtp-proxy-ADR-007](rtp-proxy-ADR-007-postgres-binding.md)
 
-> **Superseded:** ADR-011 (`SqlNetworkStateBinding`) collapses the per-dialect class layout proposed here into a single binding with a `Dialect` enum (`H2`, `MYSQL` (aliases MariaDB), `POSTGRES`, `SQLITE`). The MySQL/MariaDB coverage envisioned by this ADR is delivered as `Dialect.MYSQL` inside `SqlNetworkStateBinding`; see `MULTI_SERVER_PLAN.md` Phase 4 §Generic-SQL row for the tick. This ADR is retained for historical context and for the SQLite-dev-only and sweep-lock surrogate sections, which informed the portable polling path in ADR-011.
+> **Superseded:** ADR-011 (`SqlNetworkStateBinding`) collapses the per-dialect class layout proposed here into a single binding with a `Dialect` enum (`H2`, `MYSQL` (aliases MariaDB), `POSTGRES`, `SQLITE`). The MySQL/MariaDB coverage envisioned by this ADR is delivered as `Dialect.MYSQL` inside `SqlNetworkStateBinding`; see `MULTI_SERVER_PLAN.md` Phase 4 section Generic-SQL row for the tick. This ADR is retained for historical context and for the SQLite-dev-only and sweep-lock surrogate sections, which informed the portable polling path in ADR-011.
 
 ## Context
 

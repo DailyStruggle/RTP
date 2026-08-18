@@ -140,6 +140,6 @@ Harden the config command surface against the requirements a wizard (and ADR-035
 - [ADR-034](ADR-034-memory-shape-catalog.md) — Memory shape catalog. Shape-specific schema invariants plug into the new validator chain.
 - [ADR-035](ADR-035-interactive-menus-book-first.md) — Interactive menus (book-first). Menu redeems that target config commands inherit all eight contracts; the eventual `/rtpadmin` wizard composes this ADR's primitives with ADR-035's menu primitive.
 - [commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) — Brigadier bridge. Carries the unchanged subcommand grammar; the `--dry-run` flag is a normal trailing argument from its perspective.
-- [REQUIREMENTS.md §3](../dev/REQUIREMENTS.md) — Prohibitions. S-004, S-005, S-006, S-007 all referenced above.
+- [REQUIREMENTS.md section 3](../dev/REQUIREMENTS.md) — Prohibitions. S-004, S-005, S-006, S-007 all referenced above.
 - [TRACEABILITY.md](../dev/TRACEABILITY.md) — REQ-* → class → test mapping; new rows enumerated in *Migration / Rollout*.
 - Code surveyed: `rtp-core/.../commands/config/{ConfigCmd,SubConfigCmd,ViewSubConfigCmd}.java`, `rtp-core/.../commands/reload/{ReloadCmd,SubReloadCmd}.java`, `rtp-plugin/.../commands/BukkitBaseRTPCmd.java`.

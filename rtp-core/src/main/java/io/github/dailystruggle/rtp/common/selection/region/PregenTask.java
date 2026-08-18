@@ -432,12 +432,12 @@ final class PregenTask implements Runnable {
             return;
         }
 
-        // --- full path via ADR-016 §13.1 precedence chain (cached → anvil → live) ---
+        // --- full path via ADR-016 section 13.1 precedence chain (cached → anvil → live) ---
         requestChunk(cx, cz, finalL, /*staleRetries*/ 0);
     }
 
     /**
-     * Probe-first gate (ADR-016 §13). Attempts early reject using a lean
+     * Probe-first gate (ADR-016 section 13). Attempts early reject using a lean
      * {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe}.
      *
      * @return {@code true} if candidate was rejected and reschedule was queued;
@@ -524,7 +524,7 @@ final class PregenTask implements Runnable {
         }
         int py = picked.y();
 
-        // Center-column biome check (ADR-016 §13.1 - probe is equivalent to
+        // Center-column biome check (ADR-016 section 13.1 - probe is equivalent to
         // post-chunk-load biomeAt at center column).
         String probeBiome = probe.biomeAt(py);
         if (probeBiome != null) {
@@ -752,7 +752,7 @@ final class PregenTask implements Runnable {
         final int finalY = res.y();
         final int finalZ = res.z();
 
-        // --- biome filter (ADR-016 §13.1 - read from the resolved chunk) ---
+        // --- biome filter (ADR-016 section 13.1 - read from the resolved chunk) ---
         String currBiome = chunk.getBiome(finalX, finalY, finalZ).toUpperCase();
         if (BiomeNames.matches(state.biomeNames, currBiome) != state.biomeWhitelist) {
             if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;

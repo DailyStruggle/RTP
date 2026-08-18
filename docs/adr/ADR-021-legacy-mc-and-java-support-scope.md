@@ -51,7 +51,7 @@ If revisited, the minimum plan is:
 
 ## References
 
-- REQ-RTP-SYS-001 (Java 21+), `docs/dev/REQUIREMENTS.md §0` (scope)
+- REQ-RTP-SYS-001 (Java 21+), `docs/dev/REQUIREMENTS.md section 0` (scope)
 - ADR-005 — PaperLib removal
 - ADR-010 — Versioned platform adapter submodules
 - ADR-012 — `ChunkReservation` chunk ticket abstraction

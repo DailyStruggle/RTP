@@ -191,7 +191,7 @@ class BrigadierTreeShapeTest {
     }
 
     // ------------------------------------------------------------------
-    // Silent-failure isolation (commands-api-ADR-001 addendum 2026-05-06 §"Silent failure isolation")
+    // Silent-failure isolation (commands-api-ADR-001 addendum 2026-05-06 section "Silent failure isolation")
     // ------------------------------------------------------------------
 
     @Test

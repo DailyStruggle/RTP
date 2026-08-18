@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.bukkitplatform.anvil;
 
 /**
- * Outcome of an Anvil region-file pre-filter probe. See ADR-016 Decision §3 for the
+ * Outcome of an Anvil region-file pre-filter probe. See ADR-016 Decision section 3 for the
  * authoritative contract; a short summary is given here to keep the enum self-documenting.
  *
  * <p>The pre-filter is <strong>advisory only</strong>. A {@link #REJECT} verdict is trusted

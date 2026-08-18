@@ -43,7 +43,7 @@ The exact DDL is finalised when the binding lands in code; the shape below is a 
 
 ### Orphan reanimation
 
-Equivalent to ADR-005 §Orphan Reanimation. A periodic sweeper on the proxy runs every `claimReanimateMs`:
+Equivalent to ADR-005 section Orphan Reanimation. A periodic sweeper on the proxy runs every `claimReanimateMs`:
 
 ```sql
 UPDATE rtp_network_tokens
@@ -111,6 +111,6 @@ ADR-010's HMAC envelope is a wire-layer concern for Redis. The SQL binding leans
 
 - ADR-036 (umbrella); `MULTI_SERVER_PLAN.md` Phase 2.
 - ADR-005 (`RedisNetworkStateBinding`); ADR-007 (Postgres binding, superseded by this); ADR-009 (generic SQL binding, superseded by this).
-- ADR-010 (security hardening; HMAC is N/A for SQL binding per §Replay resistance).
+- ADR-010 (security hardening; HMAC is N/A for SQL binding per section Replay resistance).
 - REQ-RTP-NET-007, -008, -009, -011, -012, -014.
 - `docs/dev/scratch/PROPOSAL-sql-binding-first.md` rev 2.

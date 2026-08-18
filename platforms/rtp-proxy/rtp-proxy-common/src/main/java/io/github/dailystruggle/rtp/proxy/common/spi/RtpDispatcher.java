@@ -5,7 +5,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Single entry point invoked by trigger sources (command, join, event).
  * Owns the end-to-end "route → reserve → transfer" lifecycle.
- * rtp-proxy-ADR-001 §1.
+ * rtp-proxy-ADR-001 section 1.
  *
  * <p>Pure async: implementations must not block any caller thread; the
  * returned future completes on a transport-owned executor.</p>

@@ -140,7 +140,7 @@ class NetworkSimulationTestJobTest {
     @Test
     @DisplayName("probe-mode subcommands registered: heartbeat, tokens, all")
     void probeModeSubcommandsRegistered() {
-        // After the grammar-fix refactor (commands-api §2.2: bare tokens are
+        // After the grammar-fix refactor (commands-api section 2.2: bare tokens are
         // always subcommands, never default parameter values), the probe-mode
         // selector is a real subcommand tree under `network`, not a hand-parsed
         // positional arg.

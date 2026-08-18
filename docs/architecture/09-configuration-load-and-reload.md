@@ -3,11 +3,11 @@
 **Scope of this diagram.** This chart covers the **configuration data flow** — how the YAML files under `plugins/RTP/` become the in-memory `ConfigParser` / `MultiConfigParser` objects that every runtime path reads from, and what happens during `/rtp reload`. This is the single most error-prone surface (most "bug reports" are misread config), so this diagram is the one to open first when a key appears to have no effect. Related-but-separate behavior paths are intentionally **out of scope**:
 
 - **Plugin enable ordering** (when `reloadAction` is first called) — see diagram 06.
-- **How a runtime task reads a value** (`getWorldParserValue` vs. direct `ConfigParser.getConfigValue`) — see diagrams 01 / 08 / 09 and `CODE_TOUR.md` §11.
-- **Message routing** (`messages.yml` keys → player feedback) — see `CODE_TOUR.md` §7 and ADR-020 (locale resolution lives in `LanguageBootstrap` + locale-aware `ConfigParser`).
+- **How a runtime task reads a value** (`getWorldParserValue` vs. direct `ConfigParser.getConfigValue`) — see diagrams 01 / 08 / 09 and `CODE_TOUR.md` section 11.
+- **Message routing** (`messages.yml` keys → player feedback) — see `CODE_TOUR.md` section 7 and ADR-020 (locale resolution lives in `LanguageBootstrap` + locale-aware `ConfigParser`).
 - **Persistent storage of player/teleport state** (`YamlFileDatabase`) — see `LESSONS_LEARNED.md` and diagram 02.
 
-> Companion walkthrough: [`CODE_TOUR.md` §13 — Configuration load and reload](../dev/CODE_TOUR.md).
+> Companion walkthrough: [`CODE_TOUR.md` section 13 — Configuration load and reload](../dev/CODE_TOUR.md).
 
 ```mermaid
 flowchart TD

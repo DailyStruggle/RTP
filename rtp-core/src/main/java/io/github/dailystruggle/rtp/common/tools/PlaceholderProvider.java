@@ -103,7 +103,7 @@ public class PlaceholderProvider {
     }
 
     /**
-     * Point-in-time pipeline-latency percentiles (ADR-053 §1). Reads the
+     * Point-in-time pipeline-latency percentiles (ADR-053 section 1). Reads the
      * {@code CoreMetrics}-owned {@link io.github.dailystruggle.rtp.common.metrics.PipelineHistogram}
      * when the live {@code Metrics} is the core implementation; otherwise returns an all-{@code NaN}
      * (zero-sample) snapshot. Never returns {@code null}.
@@ -405,7 +405,7 @@ public class PlaceholderProvider {
                     double v = currentRtpExt().avgPipelineMs;
                     return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
                 });
-        // ADR-053 §1 / REQ-RTP-OBS-004: pipeline-latency percentiles, computed on demand by
+        // ADR-053 section 1 / REQ-RTP-OBS-004: pipeline-latency percentiles, computed on demand by
         // sorting a point-in-time copy of the bounded histogram ring. Read directly off the
         // CoreMetrics-owned PipelineHistogram (not the snapshot extension) since percentiles are
         // a read-path over the same data; render "n/a" until the first sample lands.
@@ -416,7 +416,7 @@ public class PlaceholderProvider {
         placeholders.put("pipelineMsP99", uuid -> formatPercentile(currentPercentiles().p99));
         placeholders.put("pipelineSampleCount",
                 uuid -> String.valueOf(currentPercentiles().sampleCount));
-        // ADR-053 §2a / REQ-RTP-OBS-005: slow-teleport audit (immediate/unqueued only).
+        // ADR-053 section 2a / REQ-RTP-OBS-005: slow-teleport audit (immediate/unqueued only).
         placeholders.put("slowPipelineCount",
                 uuid -> String.valueOf(currentRtpExt().slowPipelineCount));
         placeholders.put("slowPipelineThresholdMs",
@@ -424,7 +424,7 @@ public class PlaceholderProvider {
                     long t = currentRtpExt().slowPipelineThresholdMs;
                     return (t <= 0L) ? "disabled" : String.valueOf(t);
                 });
-        // ADR-053 §2b / REQ-RTP-OBS-006: queue-growth audit.
+        // ADR-053 section 2b / REQ-RTP-OBS-006: queue-growth audit.
         placeholders.put("queueGrowthWarnCount",
                 uuid -> String.valueOf(currentRtpExt().queueGrowthWarnCount));
         placeholders.put("queueGrowthWarnThreshold",
@@ -807,7 +807,7 @@ public class PlaceholderProvider {
                     RTPWorld<?> world =
                             RTP.serverAccessor.getRTPWorld(data.selectedCoords.worldName());
                     if (world == null) return "";
-                    // ADR-016 §13.1 follow-up (2026-04-20): route the biome read
+                    // ADR-016 section 13.1 follow-up (2026-04-20): route the biome read
                     // through the resolved chunk so anvil-cached data is used
                     // transparently and an ungenerated chunk is probed/loaded on
                     // demand rather than falling to the seed-synth getter.

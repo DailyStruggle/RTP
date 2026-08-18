@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * {@code import} declarations from {@code .java} files and asserts the
  * disjointness contract.</p>
  *
- * <p>Trace: effects-api-ADR-006 §6 (regression tests).</p>
+ * <p>Trace: effects-api-ADR-006 section 6 (regression tests).</p>
  */
 @DisplayName("effects-api-ADR-006 — fabric/fabric_unobf carriers are mutually disjoint")
 class EffectsApiFabricCarriersDisjointTest {

@@ -99,7 +99,7 @@ class SchematicPasterSurfaceTest {
                 paster.paste(loaded, at, PasteOptions.defaults()));
     }
 
-    /** Deterministic, file-free test paster (ADR-058 §6 {@code MockSchematicPaster}). */
+    /** Deterministic, file-free test paster (ADR-058 section 6 {@code MockSchematicPaster}). */
     private static final class MockSchematicPaster implements SchematicPaster {
         @Override
         public CompletableFuture<LoadedSchematic> load(SchematicSource source) {

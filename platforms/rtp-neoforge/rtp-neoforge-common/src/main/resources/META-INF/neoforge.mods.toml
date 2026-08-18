@@ -1,4 +1,4 @@
-# NeoForge mod metadata (NEOFORGE_NOTES.md §2: neoforge.mods.toml vs fabric.mod.json).
+# NeoForge mod metadata (NEOFORGE_NOTES.md section 2: neoforge.mods.toml vs fabric.mod.json).
 # The entry point is the @Mod-annotated RTPNeoForgeMod.
 #
 # NOTE: the carrier submodules (rtp-neoforge-vXX_YY_R1) supply the runtime jar

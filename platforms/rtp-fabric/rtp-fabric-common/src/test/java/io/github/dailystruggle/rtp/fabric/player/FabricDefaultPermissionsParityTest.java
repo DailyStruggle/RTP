@@ -59,7 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  *
  * <p><b>Traceability.</b> Candidate {@code REQ-RTP-F-???} - permission semantics
  * parity across Bukkit and Fabric adapters. No existing REQ-* row covers this
- * surface; row to be added in {@code REQUIREMENTS.md §F}.
+ * surface; row to be added in {@code REQUIREMENTS.md section F}.
  */
 class FabricDefaultPermissionsParityTest {
 

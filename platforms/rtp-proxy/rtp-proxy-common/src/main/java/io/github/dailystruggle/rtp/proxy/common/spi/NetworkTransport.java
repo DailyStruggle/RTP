@@ -10,7 +10,7 @@ import java.util.function.Consumer;
 
 /**
  * Pluggable shared-store binding (Redis / Postgres / generic-SQL / in-memory /
- * dev-only plugin-message). Async-only; rtp-proxy-ADR-001 §3.
+ * dev-only plugin-message). Async-only; rtp-proxy-ADR-001 section 3.
  *
  * <p><strong>Threading contract:</strong> all returned futures complete on a
  * transport-owned executor; consumers must {@code thenAcceptAsync(...,
@@ -19,7 +19,7 @@ import java.util.function.Consumer;
  *
  * <p><strong>Atomicity contract:</strong> {@link #claim} must guarantee
  * row-count atomicity for the PENDING→CLAIMED transition (REQ-RTP-PROXY-004,
- * ADR-036 §5 Multi-Proxy Idempotency).</p>
+ * ADR-036 section 5 Multi-Proxy Idempotency).</p>
  */
 public interface NetworkTransport extends AutoCloseable {
 

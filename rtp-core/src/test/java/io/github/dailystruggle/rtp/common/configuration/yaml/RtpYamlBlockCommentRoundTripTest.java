@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Locks in the comment-preservation contract for the in-house YAML
- * substrate (ADR-025 §Migration step 4, ADR-042 block-only scope).
+ * substrate (ADR-025 section Migration step 4, ADR-042 block-only scope).
  */
 class RtpYamlBlockCommentRoundTripTest {
 

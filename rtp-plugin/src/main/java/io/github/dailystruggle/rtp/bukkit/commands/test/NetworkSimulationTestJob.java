@@ -100,7 +100,7 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
 
   public NetworkSimulationTestJob(@Nullable CommandsAPICommand parent) {
     super(parent);
-    // Per commands-api/README.md §2.2 + §4: bare tokens are always
+    // Per commands-api/README.md section 2.2 + section 4: bare tokens are always
     // subcommands, never parameter values. Expose probe modes as real
     // subcommands so `/rtp test network heartbeat`, `tokens`, and `all`
     // dispatch correctly instead of triggering `invalid command - <mode>`.

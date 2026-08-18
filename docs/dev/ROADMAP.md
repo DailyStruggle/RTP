@@ -85,7 +85,7 @@ to the authoritative live load.
 ### 1.D — Fabric: supported (stable as of 2026-05-26)
 
 Fabric (`rtp-fabric`) is a first-class, in-scope, stable platform. The three standing blockers
-documented in prior revisions of this section are resolved; the front page and `REQUIREMENTS.md §0`
+documented in prior revisions of this section are resolved; the front page and `REQUIREMENTS.md section 0`
 should be updated to reflect that Fabric is supported, not out of scope.
 
 - [x] ~~**Resolve the three standing blockers in `MULTI_PLATFORM_PLAN.md`:**~~
@@ -96,7 +96,7 @@ should be updated to reflect that Fabric is supported, not out of scope.
   - [x] ~~**Unresolved Loom dependency.**~~ — resolved via the obf/unobf carrier split
     ([rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)).
 - [x] ~~**Update front-page / requirements wording.** `docs/FRONT_PAGE.bbcode` and `REQUIREMENTS.md
-  §0 Out of Scope` still describe Fabric as unsupported; reframe to first-class supported
+  section 0 Out of Scope` still describe Fabric as unsupported; reframe to first-class supported
   platform.~~
 - [x] ~~**Re-run the `rtp-api` interface-sufficiency analysis** and record the result as an ADR
   (April 2026 gap analysis concluded interfaces are sufficient; promote the finding from

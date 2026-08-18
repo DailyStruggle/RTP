@@ -2,7 +2,7 @@
 
 This document captures the contract that the `commands-api` module shall satisfy across all platform bridges (Bukkit/Spigot/Paper/Folia dispatcher and the Brigadier bridge used by Fabric and any future Velocity/Brigadier client). The contract is derived from the long-standing, working Bukkit dispatcher behavior (`TreeCommand.onCommand`) and is written here so that any alternate bridge — present or future — has a single, testable specification of "what already works on Bukkit".
 
-For design, code-level details, and the Brigadier mapping see [`docs/dev/DESIGN.md`](../docs/dev/DESIGN.md) and [`commands-api-ADR-001`](docs/adr/commands-api-ADR-001-brigadier-bridge.md). For the project-wide safety prohibitions referenced below see [`docs/dev/REQUIREMENTS.md §3`](../docs/dev/REQUIREMENTS.md).
+For design, code-level details, and the Brigadier mapping see [`docs/dev/DESIGN.md`](../docs/dev/DESIGN.md) and [`commands-api-ADR-001`](docs/adr/commands-api-ADR-001-brigadier-bridge.md). For the project-wide safety prohibitions referenced below see [`docs/dev/REQUIREMENTS.md section 3`](../docs/dev/REQUIREMENTS.md).
 
 Requirement style follows project rules: requirements state *what*, not *how*; obligations use `shall`; prohibitions use `shall not`. Where a requirement codifies behavior already exhibited by the Bukkit dispatcher, that fact is noted as the **source of truth**, not as implementation guidance.
 

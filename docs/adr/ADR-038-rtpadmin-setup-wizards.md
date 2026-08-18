@@ -162,5 +162,5 @@ The `<internal-token>` form is what `ClickEvent.runCommand` issues; it is opaque
 - [ADR-036](ADR-036-network-mode-multi-server-multi-proxy.md) — defines the network-mode posture contract 7 references.
 - [ADR-037](ADR-037-harden-rtp-config-commands.md) — sole config-mutation primitive; this ADR is its named follow-up consumer.
 - [commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) — Brigadier bridge. `/rtpadmin wizard` is an ordinary subcommand from its perspective.
-- [REQUIREMENTS.md §3](../dev/REQUIREMENTS.md) — Prohibitions. S-004, S-005, S-006, S-007 referenced above.
+- [REQUIREMENTS.md section 3](../dev/REQUIREMENTS.md) — Prohibitions. S-004, S-005, S-006, S-007 referenced above.
 - [TRACEABILITY.md](../dev/TRACEABILITY.md) — REQ-* → class → test mapping; new rows enumerated in *Migration / Rollout*.

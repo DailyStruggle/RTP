@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * C6 §1.6.1 of {@code CHECKLIST-metrics-and-multiserver.md} - verifies the
+ * C6 section 1.6.1 of {@code CHECKLIST-metrics-and-multiserver.md} - verifies the
  * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#getTPS(int)
  * RTPServerAccessor#getTPS} contract that a non-NOOP {@link MetricsBinding}
  * overrides the per-platform fallback constant on every adapter, and that
@@ -87,9 +87,9 @@ class RTPServerAccessorTpsParityTest {
         coreMetrics().setBinding(new StubBinding(17.5));
 
         AbstractServerAccessor a = newAccessor();
-        // ticks=1 -> tps1m branch per §1.6.1 (ticks<100).
+        // ticks=1 -> tps1m branch per section 1.6.1 (ticks<100).
         assertEquals(17.5, a.getTPS(1), 1e-9,
-                "non-NOOP binding TPS must be returned verbatim — §1.6.1 routing failed");
+                "non-NOOP binding TPS must be returned verbatim — section 1.6.1 routing failed");
 
         // ticks=100..599 -> tps5m, ticks>=600 -> tps15m. The stub returns
         // the same value for all three windows, so they must all equal the

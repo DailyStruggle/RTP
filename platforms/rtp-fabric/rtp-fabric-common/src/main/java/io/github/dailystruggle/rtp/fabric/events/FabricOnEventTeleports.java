@@ -53,7 +53,7 @@ import java.util.logging.Level;
  * once per first-ever join (parity with Bukkit's
  * {@code Player#hasPlayedBefore()} which reads the same file).
  *
- * <p>No {@code org.bukkit.*} imports - ADR-022 §4 invariant.
+ * <p>No {@code org.bukkit.*} imports - ADR-022 section 4 invariant.
  */
 public final class FabricOnEventTeleports {
 

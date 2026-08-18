@@ -13,7 +13,7 @@
 // :rtp-plugin (see rtp-plugin/build.gradle Phase-1 comment block).
 //
 // Loom allow-list amendment landed in lockstep with effects-api-ADR-003:
-//   - rtp-fabric-ADR-002 §4 Build Discipline (now lists effects-api).
+//   - rtp-fabric-ADR-002 section 4 Build Discipline (now lists effects-api).
 //   - rtp-fabric/REQUIREMENTS.md REQ-FABRIC-ARCH-003 (now lists
 //     effects-api and remap scope io/github/dailystruggle/effectsapi/fabric/**).
 plugins {

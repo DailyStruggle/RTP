@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Exercises: short-query guard, case-insensitive substring matching,
  * key-vs-value match attribution, color-stripped haystack across legacy
- * {@code &x}, {@code §x} and {@code &#rrggbb} hex syntaxes, and raw-offset
+ * {@code &x}, {@code section x} and {@code &#rrggbb} hex syntaxes, and raw-offset
  * projection of match ranges so renderer highlight lands on the literal
  * letters.
  */

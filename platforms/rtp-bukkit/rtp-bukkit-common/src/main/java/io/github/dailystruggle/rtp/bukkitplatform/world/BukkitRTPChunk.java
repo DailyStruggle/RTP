@@ -34,7 +34,7 @@ import org.bukkit.block.data.BlockData;
  * the detailed probe path. They carry the decoded snapshot plus
  * the world identity + chunk coordinates needed to answer RTPChunk queries without
  * touching any tick-thread state. The authoritative live
- * {@code chunk.isSafe(...)} re-check at teleport-commit time (ADR-016 §4) is
+ * {@code chunk.isSafe(...)} re-check at teleport-commit time (ADR-016 section 4) is
  * preserved - the Anvil-backed instance is never promoted to a live chunk
  * in-place; it is replaced by the live-loaded {@code BukkitRTPChunk} once the
  * teleport pipeline commits.
@@ -250,7 +250,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
   }
 
   /**
-   * ADR-016 §13.1 post-load biome read, chunk-local. Anvil-backed: consult the
+   * ADR-016 section 13.1 post-load biome read, chunk-local. Anvil-backed: consult the
    * decoded {@link AnvilChunkView#getBiomeAt(int,int,int)} (chunk-local x/z,
    * absolute Y). Live-backed: delegate to the loaded block's biome. Neither
    * path consults {@code anvilProbeSupport}, so an evicted cache entry cannot
@@ -344,7 +344,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
       // Anvil-backed snapshots evaluate only the plain-material bucket of the
       // compiled set. State and tag predicates against Anvil palette data are not
       // yet supported. The live re-check at teleport-commit time remains
-      // authoritative (ADR-016 §4), so any predicate this path misses is
+      // authoritative (ADR-016 section 4), so any predicate this path misses is
       // re-evaluated by the live BukkitRTPChunk before teleport.
       Set<String> plain = (reconciledUnsafe != null) ? reconciledUnsafe : unsafeBlocks.plainMaterials();
       return anvilView.isSafe(x & 0xF, y, z & 0xF, plain);

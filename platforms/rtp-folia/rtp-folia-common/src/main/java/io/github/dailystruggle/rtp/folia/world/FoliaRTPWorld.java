@@ -61,7 +61,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   private final ConcurrentHashMap<Long, WeakReference<Chunk>> chunkCache = new ConcurrentHashMap<>();
 
   /**
-   * ADR-016 §11 - per-world cache of Anvil-backed chunk views. Populated by
+   * ADR-016 section 11 - per-world cache of Anvil-backed chunk views. Populated by
    * {@link #getChunkAt(int, int)} whenever the shared
    * {@link io.github.dailystruggle.rtp.anvil.AnvilProbeSupport#probeAndPublish} yields a
    * decoded view, and consumed by {@link #getCachedChunk(long)} when no live
@@ -184,12 +184,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     // on RTPWorld.totalChunkLoads.
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
-    // ADR-016 §11 - Anvil read-only data source, same probe-then-fall-through
+    // ADR-016 section 11 - Anvil read-only data source, same probe-then-fall-through
     // semantics as BukkitRTPWorld. When the applicability gate passes and the
     // pre-filter returns a decoded view, publish it into the per-world cache
     // and resolve the future with the key directly - no region-thread hop,
     // no chunk ticket acquired. The live chunk.isSafe(...) re-check at
-    // teleport-commit time (ADR-016 §4) remains the authoritative arbiter.
+    // teleport-commit time (ADR-016 section 4) remains the authoritative arbiter.
     // On UNKNOWN (no view) we fall through to Folia's native async load.
     if (shouldPrefilter(cx, cz)) {
       java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
@@ -403,7 +403,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-016 §11 applicability gate - mirrors
+   * ADR-016 section 11 applicability gate - mirrors
    * {@code BukkitRTPWorld#shouldPrefilter}. Returns {@code true} when:
    * <ul>
    *   <li>{@code SafetyKeys.anvilPrefilterEnabled} is truthy (default true),</li>
@@ -411,7 +411,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    * </ul>
    *
    * <p>The custom-{@link org.bukkit.generator.ChunkGenerator} short-circuit that previously
-   * appeared here has been intentionally removed (ADR-016 §1 trust-model revision). For
+   * appeared here has been intentionally removed (ADR-016 section 1 trust-model revision). For
    * populated chunks the {@code .mca} palette is a strictly more accurate source than the
    * Bukkit enum view (modded/Iris-native IDs collapse to vanilla on {@code Material}/{@code
    * Biome} lookups but survive verbatim in the on-disk palette). For chunks the custom
@@ -472,7 +472,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
 
   private void logGateSkip(String reason, int cx, int cz) {
     // "chunk-already-loaded" is the steady-state outcome on Folia's region
-    // scheduler (ADR-016 §1.1): the call-site probe in LocationGenerator runs
+    // scheduler (ADR-016 section 1.1): the call-site probe in LocationGenerator runs
     // after candidate selection, by which time the region's tick loop has
     // typically already ticket-pinned the candidate chunk. The message carries
     // no diagnostic signal in that regime and would otherwise spam the log.
@@ -690,7 +690,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       chunkCache.remove(key); // Cleanup stale reference
     }
 
-    // ADR-016 §11 fallback: no live chunk cached, but the pre-filter may have
+    // ADR-016 section 11 fallback: no live chunk cached, but the pre-filter may have
     // produced an Anvil-backed view earlier in this candidate's evaluation.
     io.github.dailystruggle.rtp.anvil.AnvilChunkView view = anvilProbeSupport.takeCached(key);
     if (view != null) {
@@ -741,14 +741,14 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public String getBiome(int x, int y, int z) {
-    // ADR-016 / ADR-016 (biome) §6 - Anvil-first in-place amendment (parity
+    // ADR-016 / ADR-016 (biome) section 6 - Anvil-first in-place amendment (parity
     // with BukkitRTPWorld). Zero-I/O cache read; on miss or outside-window the
     // call falls through to the pre-existing static getter (vanilla enum or
     // Iris-addon override, depending on last-registered setter). Biome reads
-    // never gate safety (plan §5), so a null from the Anvil branch is a quiet
+    // never gate safety (plan section 5), so a null from the Anvil branch is a quiet
     // fall-through. Catch-all guards the advisory path per ADR-016's
     // "malformed → UNKNOWN, never crash" posture.
-    // Reason-keyed metric + rate-limited log (ADR-016 §13.1 observability,
+    // Reason-keyed metric + rate-limited log (ADR-016 section 13.1 observability,
     // audit options A+C). Mirrors BukkitRTPWorld#getBiome.
     String reason;
     Throwable thrown = null;
@@ -815,7 +815,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-016 §13.3 vanilla-generator detection (parity with BukkitRTPWorld).
+   * ADR-016 section 13.3 vanilla-generator detection (parity with BukkitRTPWorld).
    *
    * <p>Folia inherits Bukkit's {@code World#getGenerator()} /
    * {@code World#getBiomeProvider()} API, so the same reflective-safe detection
@@ -834,7 +834,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-016 §13.3 upgrade-drift gate - region-file backed probe (parity with
+   * ADR-016 section 13.3 upgrade-drift gate - region-file backed probe (parity with
    * {@code BukkitRTPWorld#isChunkGenerated} and {@code FabricRTPWorld#isChunkGenerated}).
    *
    * <p>Resolution order:</p>
@@ -849,7 +849,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    *       all ~1024 sibling-chunk queries - crucial for {@code ScanTask}
    *       PRESCAN which sweeps adjacent chunks in spiral order.</li>
    *   <li>Any {@link Throwable} collapses to {@code true} - "assume
-   *       generated, skip the perf fast path" preserves the ADR-016 §13.3
+   *       generated, skip the perf fast path" preserves the ADR-016 section 13.3
    *       palette-drift correctness (false-positives only forfeit a fast
    *       path; false-negatives would risk the bug).</li>
    * </ol>

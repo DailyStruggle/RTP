@@ -257,7 +257,7 @@ final class QueueTask {
 
     private void runFullLoadAndResolve(
             RTPLocation pair, RTPCoords left, RTPWorld<?> world, int cx, int cz) {
-        // ADR-016 §13.1 probe-first via getOrLoadChunk traffic-cop.
+        // ADR-016 section 13.1 probe-first via getOrLoadChunk traffic-cop.
         // Anvil-backed candidates run inline with no reservation; live-backed
         // candidates allocate a reservation and dispatch to the region thread.
         // Per-attempt chunk-load: per-chunk deadline lives in the world adapter,

@@ -19,7 +19,7 @@ import java.util.Objects;
  * <p>This record intentionally carries raw identifier strings, not normalized forms, so the
  * verdict layer can apply the
  * {@code rtp-api} normalizer symmetrically against the user-supplied unsafe set. See
- * ADR-016 Decision §3.
+ * ADR-016 Decision section 3.
  */
 public record PaletteSection(int sectionY, List<String> palette, long[] data) {
 

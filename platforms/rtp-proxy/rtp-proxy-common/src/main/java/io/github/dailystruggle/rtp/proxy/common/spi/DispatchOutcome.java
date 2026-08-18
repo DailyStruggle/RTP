@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * Result of an {@link RtpDispatcher#dispatch(RtpRequest)} attempt. Sealed so
  * adapter code switch-exhaustively handles the three terminal cases pinned
- * by rtp-proxy-ADR-001 §1.
+ * by rtp-proxy-ADR-001 section 1.
  *
  * <p>Implementations must <strong>never</strong> swallow a failure
  * silently (REQ-RTP-S-004); always surface a {@link Failed} carrying a

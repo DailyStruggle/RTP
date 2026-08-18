@@ -17,7 +17,7 @@ import java.util.Objects;
  * Loader, SHA1-verifier, and EVALSHA dispatcher for the
  * atomic-claim/release Lua scripts.
  *
- * <p>Refines rtp-proxy-ADR-005 §"Lua script SHA1 verify-on-load" (Amendment
+ * <p>Refines rtp-proxy-ADR-005 section "Lua script SHA1 verify-on-load" (Amendment
  * 2026-05-18): each script under {@code /redis/<name>.lua} ships with a
  * checked-in {@code .sha1} sidecar; the loader computes the SHA1 of the
  * LF-normalized script bytes and compares against the sidecar. Mismatch is a

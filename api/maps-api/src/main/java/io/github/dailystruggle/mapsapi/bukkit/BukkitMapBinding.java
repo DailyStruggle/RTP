@@ -26,7 +26,7 @@ import java.util.function.Supplier;
 /**
  * Bukkit-family concrete {@link MapBinding}. This is the only file in the
  * {@code maps-api} module permitted to {@code import org.bukkit.*} per
- * {@code maps-api-ADR-001} §Package layout.
+ * {@code maps-api-ADR-001} section Package layout.
  *
  * <p>Scope (this class):
  * <ul>
@@ -261,7 +261,7 @@ public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
     /**
      * Build the 32-step logical-to-vanilla palette translation table once.
      * Layout per {@link io.github.dailystruggle.mapsapi.PaletteIndex} /
-     * {@code maps-api-ADR-001} §Palette policy:
+     * {@code maps-api-ADR-001} section Palette policy:
      * <ul>
      *   <li>index 0 ({@code TRANSPARENT}) -> {@link MapPalette#TRANSPARENT};</li>
      *   <li>indices 1..27 ({@code RAMP_MIN..RAMP_MAX}) walk a black -> red ->
@@ -478,8 +478,8 @@ public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
         public void drawText(int x, int y, String text, byte paletteIndex) {
             // Bukkit's MapCanvas#drawText takes a MapFont; the default
             // MinecraftFont renders 6-pixel glyphs which matches the
-            // maps-api-ADR-001 §Mermaid output minimum legible width. We
-            // pre-translate the palette byte to a "§<hex>" prefix so font
+            // maps-api-ADR-001 section Mermaid output minimum legible width. We
+            // pre-translate the palette byte to a "section <hex>" prefix so font
             // colour matches the rest of the chart palette.
             byte vb = toVanillaPalette(paletteIndex);
             delegate.drawText(x, y,

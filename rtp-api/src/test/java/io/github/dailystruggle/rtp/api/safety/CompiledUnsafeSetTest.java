@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
  * including the wildcard fast-path flag and the fail-open behaviour when property maps
  * are missing or incomplete.</p>
  */
-@DisplayName("REQ-RTP-S-001 / ADR-017 § CompiledUnsafeSet")
+@DisplayName("REQ-RTP-S-001 / ADR-017 - CompiledUnsafeSet")
 class CompiledUnsafeSetTest {
 
   // Matches what the platform adapter would hand us: lowercase key, lowercase value.

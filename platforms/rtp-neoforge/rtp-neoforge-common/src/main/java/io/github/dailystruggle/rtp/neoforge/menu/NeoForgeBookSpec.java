@@ -12,7 +12,7 @@ import java.util.List;
  * analogue of {@code FabricBookSpec}).
  *
  * <p>All text is already run through {@code RTPServerAccessor.format(uuid, raw)}
- * (placeholders + legacy {@code &}/{@code §} colour codes); the carrier feeds
+ * (placeholders + legacy {@code &}/{@code section } colour codes); the carrier feeds
  * each fragment straight into
  * {@code NeoForgeLegacyText.parseInteractive(text, hover, runCommand, RUN)} so
  * the {@code MenuModel} -&gt; {@code Component} colour/hover/click translation is

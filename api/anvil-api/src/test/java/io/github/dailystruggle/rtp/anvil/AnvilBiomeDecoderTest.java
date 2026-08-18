@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * (namespaced strings like {@code iris:volcanic_ash_plains} round-trip without
  * being collapsed).
  */
-@DisplayName("ADR-016 (biome) §3–§4: biome palette decoder + AnvilChunkView biome API")
+@DisplayName("ADR-016 (biome) sections 3-4: biome palette decoder + AnvilChunkView biome API")
 class AnvilBiomeDecoderTest {
 
     // ----------------------------------------------------------- BiomePaletteSection unit-level
@@ -142,7 +142,7 @@ class AnvilBiomeDecoderTest {
     @Test
     @DisplayName("Reader round-trips a multi-entry biomes container and preserves namespaced identifiers verbatim")
     void readerDecodesMultiEntryBiomesAndPreservesNamespaces() throws IOException {
-        // Mixed vanilla + Iris-style identifier: the §5 trust-model promise is that
+        // Mixed vanilla + Iris-style identifier: the section 5 trust-model promise is that
         // the on-disk string is returned verbatim, not collapsed through any Bukkit
         // enum. If this test ever starts returning PLAINS/BADLANDS, the pre-filter
         // has regressed into the live-Bukkit path.
@@ -200,7 +200,7 @@ class AnvilBiomeDecoderTest {
                 () -> assertTrue(view.biomeSections().isEmpty(),
                         "a section without a biomes container must not emit a BiomePaletteSection"),
                 () -> assertNull(view.getBiomeAt(0, 0, 0),
-                        "no biome container → caller must fall through to live world.getBiome (§5)"),
+                        "no biome container → caller must fall through to live world.getBiome (section 5)"),
                 () -> assertTrue(view.getBiomesPresent().isEmpty()));
         // Paranoia: the block side must still decode - this guards against an edit that
         // accidentally conflates the two containers.

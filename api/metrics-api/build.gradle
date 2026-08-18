@@ -11,7 +11,7 @@
 //
 // Shape mirrors maps-api / rtp-api: java-library, JUnit Jupiter + Mockito
 // inherited from the root subprojects {} block, ArchUnit added locally for
-// the cross-module drift guard re-authored from C6 §1.6.5
+// the cross-module drift guard re-authored from C6 section 1.6.5
 // (MetricsConsolidationArchTest).
 plugins {
     id 'java-library'

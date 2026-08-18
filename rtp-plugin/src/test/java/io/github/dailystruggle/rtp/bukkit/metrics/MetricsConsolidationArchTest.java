@@ -14,23 +14,23 @@ import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.Wi
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * C6 / §1.6.5 of {@code CHECKLIST-metrics-and-multiserver.md} - ArchUnit
+ * C6 / section 1.6.5 of {@code CHECKLIST-metrics-and-multiserver.md} - ArchUnit
  * drift guard for the cross-platform metrics consolidation.
  *
- * <p>After §1.6.1-§1.6.4 the canonical sources of TPS / player-count /
+ * <p>After section 1.6.1-section 1.6.4 the canonical sources of TPS / player-count /
  * soft-cap are the {@code Metrics.snapshot()} fields and the platform
  * {@code *MetricsBinding} samplers. This guard pins raw reads of the
  * underlying server APIs to those binding/sampler classes so future drift
  * can't silently reintroduce the divergence the proposal closed.
  *
- * <p>Allow-list (per proposal §1.6.5):
+ * <p>Allow-list (per proposal section 1.6.5):
  * <ul>
  *     <li>{@code Bukkit.getOnlinePlayers().size()} - {@code *MetricsBinding},
  *         {@code *TpsSampler}.</li>
  *     <li>{@code Server#getMaxPlayers()} / {@code Bukkit.getMaxPlayers()} -
  *         {@code *MetricsBinding}, {@code *TpsSampler}.</li>
  *     <li>{@code Server#getTPS()} - {@code *MetricsBinding} only
- *         ({@code RTPCostMetricsCharts} dropped from the list once §1.6.4
+ *         ({@code RTPCostMetricsCharts} dropped from the list once section 1.6.4
  *         landed).</li>
  * </ul>
  *
@@ -39,7 +39,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * {@code helpers/}, {@code commands-api/}, and {@code addons/} trees; and
  * reflective {@code MinecraftServer.getMaxPlayers()} probes inside
  * {@code FabricMetricsBinding} (the binding-boundary entry point per
- * §1.6.3).
+ * section 1.6.3).
  *
  * <p>Scope rationale: the guard runs from {@code rtp-plugin}'s test
  * suite because that module is the only one that aggregates every
@@ -96,10 +96,10 @@ class MetricsConsolidationArchTest {
     void server_getTPS_reflective_read_is_restricted_to_metrics_bindings() {
         // Catches both `Server#getTPS` (Paper/Spigot) and `Server#getTPS()`
         // invoked reflectively via Method#invoke - the latter is the
-        // RTPCostMetricsCharts pattern §1.6.4 removed; the former is the
+        // RTPCostMetricsCharts pattern section 1.6.4 removed; the former is the
         // legitimate PaperMetricsBinding sampler call. Sampler classes are
         // NOT allowed here (proposal: only *MetricsBinding may call getTPS),
-        // mirroring the audit decision in §1.6.5.
+        // mirroring the audit decision in section 1.6.5.
         ArchRule rule = noClasses()
                 .that(new com.tngtech.archunit.base.DescribedPredicate<>("are not *MetricsBinding") {
                     @Override
@@ -111,7 +111,7 @@ class MetricsConsolidationArchTest {
                         target(nameMatching("getTPS"))
                                 .and(target(owner(assignableTo("org.bukkit.Server"))))
                 )
-                .because("§1.6.4/§1.6.5 — Server#getTPS may only be called from a *MetricsBinding."
+                .because("sections 1.6.4/1.6.5 — Server#getTPS may only be called from a *MetricsBinding."
                         + " All other call sites must read Metrics.snapshot().tps1m.");
         rule.check(importRtpClasses());
     }
@@ -217,9 +217,9 @@ class MetricsConsolidationArchTest {
 
     @Test
     void server_getMaxPlayers_is_restricted_to_metrics_bindings_or_samplers() {
-        // §1.6.5 - Bukkit.getMaxPlayers() / Server#getMaxPlayers() is
+        // section 1.6.5 - Bukkit.getMaxPlayers() / Server#getMaxPlayers() is
         // allow-listed inside *MetricsBinding and *TpsSampler; everything
-        // else (notably RTPBukkitPlugin's login-cache bootstrap as of §1.6.3)
+        // else (notably RTPBukkitPlugin's login-cache bootstrap as of section 1.6.3)
         // must read snapshot().softCap. Bukkit/Folia iterator-style reads on
         // OnlinePlayers are NOT covered by this rule.
         ArchRule rule = noClasses()
@@ -233,7 +233,7 @@ class MetricsConsolidationArchTest {
                         target(nameMatching("getMaxPlayers"))
                                 .and(target(owner(assignableTo("org.bukkit.Server"))))
                 )
-                .because("§1.6.3/§1.6.5 — Server#getMaxPlayers may only be called from"
+                .because("sections 1.6.3/1.6.5 — Server#getMaxPlayers may only be called from"
                         + " a *MetricsBinding or *TpsSampler. All other call sites must read"
                         + " Metrics.snapshot().softCap.");
         rule.check(importRtpClasses());

@@ -34,7 +34,7 @@ public class BukkitTestCmd extends TestCmd {
     addSubCommand(new TestChunkProbePerfCmd(this));
     addSubCommand(new AsyncReplyTestJob(this));
 
-    // `full` is the umbrella entry point (see RUNTIME_TEST_SUITE_PLAN.md §3.2).
+    // `full` is the umbrella entry point (see RUNTIME_TEST_SUITE_PLAN.md section 3.2).
     // It is wired in last so `findChild` in TestFullCmd can resolve every
     // sibling. `all` is registered as an alias by pointing the same instance
     // at an additional key; TreeCommand uses upper-case keys (see

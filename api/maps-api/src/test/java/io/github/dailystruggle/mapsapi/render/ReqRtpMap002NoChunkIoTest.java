@@ -86,7 +86,7 @@ class ReqRtpMap002NoChunkIoTest {
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "org.bukkit..",
                         "net.minecraft..")
-                .because("maps-api-ADR-001 §Package layout: only mapsapi.bukkit "
+                .because("maps-api-ADR-001 section Package layout: only mapsapi.bukkit "
                         + "(Stage 2) and mapsapi.fabric (Stage 3) may import "
                         + "platform packages.");
         rule.check(PRODUCTION_CLASSES);

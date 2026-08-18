@@ -38,6 +38,6 @@ Pre-filling the queue via `/rtp scan` further guards against runtime chunk-loadi
 ## References
 
 - Implementing classes: `RegionQueueManager`, `TeleportPipelineTask` (`rtp-core`)
-- Design reference: [`DESIGN.md` §1 — Asynchronous Queue-Based Pre-Generation](../dev/DESIGN.md)
+- Design reference: [`DESIGN.md` section 1 — Asynchronous Queue-Based Pre-Generation](../dev/DESIGN.md)
 - Related: [ADR-001](ADR-001-archimedean-spiral-1d-mapping.md) (bounded spatial selection), [ADR-008](ADR-008-memory-tracker-active-gc.md) (chunk allocation management)
 - Requirements: `REQ-RTP-F-001` (instant execution), `REQ-RTP-NF-001` (bounded computation overhead)

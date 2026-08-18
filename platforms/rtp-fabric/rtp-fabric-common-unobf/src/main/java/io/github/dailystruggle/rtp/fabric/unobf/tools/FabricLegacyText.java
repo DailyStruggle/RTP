@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * <p>Parses legacy text containing {@code &}-prefixed colour/format codes
  * (e.g. {@code &a}, {@code &l}) and 6-digit hex codes ({@code #RRGGBB} or
  * {@code &#RRGGBB}) into a styled {@link Component} tree that Minecraft
- * renders correctly. Bukkit's hex form {@code §x§r§r§g§g§b§b} is also
+ * renders correctly. Bukkit's hex form {@code section xsection rsection rsection gsection gsection bsection b} is also
  * accepted, allowing plugin output that has already been pre-converted to
  * Bukkit legacy hex to be displayed without losing colour.
  *
@@ -32,7 +32,7 @@ public final class FabricLegacyText {
     private static final char SECTION = '\u00A7';
     // Matches "&#RRGGBB" or "#RRGGBB"
     private static final Pattern HEX_PATTERN = Pattern.compile("&?#([0-9a-fA-F]{6})");
-    // Bukkit-style "§x§r§r§g§g§b§b" hex run
+    // Bukkit-style "section xsection rsection rsection gsection gsection bsection b" hex run
     private static final Pattern BUKKIT_HEX_PATTERN =
             Pattern.compile(SECTION + "[xX](?:" + SECTION + "[0-9a-fA-F]){6}");
 
@@ -52,7 +52,7 @@ public final class FabricLegacyText {
      * <p>If both {@code hover} and {@code click} are {@code null} or empty, this
      * returns the result of {@link #parse(String)} unchanged.
      *
-     * @param raw   primary message; legacy {@code &}/{@code §} codes accepted
+     * @param raw   primary message; legacy {@code &}/{@code section } codes accepted
      * @param hover hover-tooltip text; legacy codes accepted; {@code null}/empty disables hover
      * @param click suggest-command target; colour codes are stripped before insertion
      *              into the chat input; {@code null}/empty disables click
@@ -91,7 +91,7 @@ public final class FabricLegacyText {
                 }
             }
             if (hasClick) {
-                // Strip colour from the suggest-command target so § codes never leak
+                // Strip colour from the suggest-command target so section codes never leak
                 // into the player's chat input - mirrors the Spigot path which feeds
                 // the raw command string straight into ClickEvent.SUGGEST_COMMAND.
                 String suggestion = stripColor(click);
@@ -138,7 +138,7 @@ public final class FabricLegacyText {
             char c = text.charAt(i);
             if (c == SECTION && i + 1 < n) {
                 char code = text.charAt(i + 1);
-                // Bukkit hex: §x§R§R§G§G§B§B (7 codes total after §x)
+                // Bukkit hex: section xsection Rsection Rsection Gsection Gsection Bsection B (7 codes total after section x)
                 if ((code == 'x' || code == 'X') && i + 13 < n) {
                     StringBuilder hex = new StringBuilder(6);
                     boolean ok = true;
@@ -179,10 +179,10 @@ public final class FabricLegacyText {
 
     /**
      * Normalise the input to Minecraft's section-sign legacy form
-     * ({@code §a}, {@code §x§r§r§g§g§b§b}, …).
+     * ({@code section a}, {@code section xsection rsection rsection gsection gsection bsection b}, …).
      *
      * <p>This is what Minecraft's TerminalConsoleAppender expects on the
-     * dedicated-server console: {@code §}+code sequences are translated to
+     * dedicated-server console: {@code section }+code sequences are translated to
      * ANSI escapes so coloured output renders, while {@link Component}-based
      * dispatch via {@link net.minecraft.server.MinecraftServer#sendSystemMessage}
      * loses styling because it logs {@code component.getString()} (plain text).
@@ -197,13 +197,13 @@ public final class FabricLegacyText {
     /**
      * Convert a legacy/{@code &}/{@code #RRGGBB} string into ANSI escape sequences for
      * direct console output. Used by the Fabric log path because Minecraft's
-     * TerminalConsoleAppender does not translate {@code §}-codes when our
-     * Log4j2 logger writes them - and on Windows consoles the raw {@code §}
+     * TerminalConsoleAppender does not translate {@code section }-codes when our
+     * Log4j2 logger writes them - and on Windows consoles the raw {@code section }
      * (UTF-8 0xC2 0xA7) renders as {@code ┬º} mojibake.
      *
      * <p>The basic 16 colours map to ANSI 30-37 / 90-97; bold/italic/underline
      * map to their SGR codes; reset is {@code \u001b[0m}; truecolor (hex /
-     * {@code §x}) maps to {@code \u001b[38;2;R;G;Bm}. A trailing reset is always
+     * {@code section x}) maps to {@code \u001b[38;2;R;G;Bm}. A trailing reset is always
      * appended so subsequent unstyled console output isn't tinted.
      *
      * <p>Empty/null input returns the empty string.
@@ -219,7 +219,7 @@ public final class FabricLegacyText {
             if (c == SECTION && i + 1 < n) {
                 char code = text.charAt(i + 1);
                 if ((code == 'x' || code == 'X') && i + 13 < n) {
-                    // §x§R§R§G§G§B§B - 6 hex digits each preceded by §
+                    // section xsection Rsection Rsection Gsection Gsection Bsection B - 6 hex digits each preceded by section 
                     int r = (hexVal(text.charAt(i + 3)) << 4) | hexVal(text.charAt(i + 5));
                     int g = (hexVal(text.charAt(i + 7)) << 4) | hexVal(text.charAt(i + 9));
                     int b = (hexVal(text.charAt(i + 11)) << 4) | hexVal(text.charAt(i + 13));
@@ -289,7 +289,7 @@ public final class FabricLegacyText {
             if (c == SECTION && i + 1 < n) {
                 char code = text.charAt(i + 1);
                 if ((code == 'x' || code == 'X') && i + 13 < n) {
-                    // skip §x and 6 §r pairs
+                    // skip section x and 6 section r pairs
                     i += 14;
                     continue;
                 }
@@ -310,7 +310,7 @@ public final class FabricLegacyText {
         // 0) Expand MiniMessage <tag> color/format markup into legacy &-codes
         //    so Adventure-less Fabric still honors MiniMessage colors.
         raw = io.github.dailystruggle.rtp.common.tools.MiniMessageColorExpander.expand(raw);
-        // 1) Convert "#RRGGBB" / "&#RRGGBB" to "§x§R§R§G§G§B§B" so the main
+        // 1) Convert "#RRGGBB" / "&#RRGGBB" to "section xsection Rsection Rsection Gsection Gsection Bsection B" so the main
         //    scanner can treat hex uniformly with formatting codes.
         Matcher m = HEX_PATTERN.matcher(raw);
         StringBuilder sb = new StringBuilder(raw.length());
@@ -324,7 +324,7 @@ public final class FabricLegacyText {
         }
         sb.append(raw, last, raw.length());
 
-        // 2) Convert remaining "&x" formatting codes to "§x".
+        // 2) Convert remaining "&x" formatting codes to "section x".
         String s = sb.toString();
         StringBuilder out = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {

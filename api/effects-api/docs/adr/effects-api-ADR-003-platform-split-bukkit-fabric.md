@@ -124,7 +124,7 @@ public interface EffectRuntime {
 
 ### Negative / costs
 - One-time refactor: 8 effect classes + `EffectFactory` to thread `EffectRuntime`, plus mechanical package moves under `bukkit/`.
-- `effects-api/build.gradle` gains the `fabric-loom` plugin and Loom config block. `rtp-fabric-ADR-002 §4 Build Discipline` (and `platforms/rtp-fabric/REQUIREMENTS.md` REQ-FABRIC-ARCH-003) currently restrict Loom to `platforms/rtp-fabric/**` and `rtp-plugin`; **this ADR widens that allow-list to also include `effects-api`** (rationale: same single-jar mixed-platform precedent as `rtp-plugin`). REQ-FABRIC-ARCH-003 and ADR-002 §4 are amended in lockstep with this ADR's acceptance.
+- `effects-api/build.gradle` gains the `fabric-loom` plugin and Loom config block. `rtp-fabric-ADR-002 section 4 Build Discipline` (and `platforms/rtp-fabric/REQUIREMENTS.md` REQ-FABRIC-ARCH-003) currently restrict Loom to `platforms/rtp-fabric/**` and `rtp-plugin`; **this ADR widens that allow-list to also include `effects-api`** (rationale: same single-jar mixed-platform precedent as `rtp-plugin`). REQ-FABRIC-ARCH-003 and ADR-002 section 4 are amended in lockstep with this ADR's acceptance.
 - `effectsapi/bukkit` package move = ~15 file paths change. All consumers are in-tree; one `BukkitEffectsHandler` import-block edit covers them.
 - Public-ish change: any out-of-tree addon that does `effect.runTask(plugin)` directly migrates to `runtime.schedule(effect, 0)` — CHANGELOG-flagged.
 

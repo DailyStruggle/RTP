@@ -8,7 +8,7 @@ import java.util.Objects;
  * on-disk path is owned by {@code rtp-core} (so the path policy and claim/footprint
  * logic stay platform-neutral); the paster only consumes this descriptor.
  *
- * <p>See ADR-058 §3.
+ * <p>See ADR-058 section 3.
  */
 public final class SchematicSource {
   private final String name;

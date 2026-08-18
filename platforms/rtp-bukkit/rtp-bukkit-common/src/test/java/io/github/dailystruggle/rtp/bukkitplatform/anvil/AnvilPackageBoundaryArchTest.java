@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Bytecode-level boundary rules for the Spigot-exclusive Anvil read-only pre-filter package.
  *
- * <p>Per ADR-016 and {@code ADR-016} §2, the pre-filter is confined
+ * <p>Per ADR-016 and {@code ADR-016} section 2, the pre-filter is confined
  * to {@code io.github.dailystruggle.rtp.bukkitplatform.anvil}. Paper overrides {@code getChunkAt}
  * with its native async API, and Folia extends {@link io.github.dailystruggle.rtp.api.world.RTPWorld}
  * directly - so structural exclusivity is guaranteed by the class hierarchy. These rules
@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
  * "core/api do not depend on anvil" direction is enforced by a separate rule in
  * {@code RTPArchitectureTest} (rtp-core).</p>
  */
-@DisplayName("ADR-016 § Anvil package boundary")
+@DisplayName("ADR-016 - Anvil package boundary")
 class AnvilPackageBoundaryArchTest {
 
   /**
@@ -71,7 +71,7 @@ class AnvilPackageBoundaryArchTest {
                 "The Anvil pre-filter deliberately operates on region-file bytes for "
                     + "*unloaded* chunks. A direct dependency on org.bukkit.Chunk would "
                     + "indicate a regression to the live-load path and defeat the whole "
-                    + "off-thread design (ADR-016 §3 Verdict contract).");
+                    + "off-thread design (ADR-016 section 3 Verdict contract).");
 
     rule.check(PRODUCTION_CLASSES);
   }

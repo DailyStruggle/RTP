@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
  * never-silent rejection contract required by REQ-RTP-S-004: every malformed
  * token must surface as a {@link Rejection} with a human-readable reason.</p>
  */
-@DisplayName("REQ-RTP-S-001 / ADR-017 § SafetyTokenParser")
+@DisplayName("REQ-RTP-S-001 / ADR-017 - SafetyTokenParser")
 class SafetyTokenParserTest {
 
   private static SafetyToken soleAccepted(ParseResult r) {

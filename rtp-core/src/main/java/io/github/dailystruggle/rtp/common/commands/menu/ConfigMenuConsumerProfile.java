@@ -100,7 +100,7 @@ public final class ConfigMenuConsumerProfile implements MenuConsumerProfile {
         }
         // Comments routinely document color codes (e.g. "use &e/&6") as
         // examples. The menu renderers run hover text through the standard
-        // &-to-§ color translation, which would otherwise paint the description
+        // &-to-section color translation, which would otherwise paint the description
         // or swallow the example codes. Escape them so they render literally.
         return io.github.dailystruggle.rtp.common.text.LegacyColorStrip.escape(sb.toString());
     }

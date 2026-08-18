@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-05-11
-**Activated:** 2026-06-01 (Fabric stabilization gate per §2 confirmed clear; bring-up sequence §3 started — D-005 proposal `docs/dev/scratch/PROPOSAL-neoforge-bringup.md` and subproject `rtp-neoforge-ADR-001` on file)
+**Activated:** 2026-06-01 (Fabric stabilization gate per section 2 confirmed clear; bring-up sequence section 3 started — D-005 proposal `docs/dev/scratch/PROPOSAL-neoforge-bringup.md` and subproject `rtp-neoforge-ADR-001` on file)
 
 ## Context
 
@@ -27,7 +27,7 @@ What this ADR is **not**:
 1. **NeoForge becomes a first-class, in-scope target platform**, joining Spigot, Paper, Folia, and Fabric. The requirements documents are amended accordingly:
    - `REQ-RTP-NF-002` (Cross-Platform Thread Safety) extended to enumerate NeoForge.
    - `REQ-RTP-SYS-002` (Server Software) extended to include NeoForge.
-   - The §0 *In Scope* and *Out of Scope* lists updated to reflect NeoForge as supported and to enumerate the platforms that remain unsupported.
+   - The section 0 *In Scope* and *Out of Scope* lists updated to reflect NeoForge as supported and to enumerate the platforms that remain unsupported.
 2. **Activation of NeoForge work is gated** on Fabric stabilization, per the criteria above. Until that gate clears, NeoForge remains a documented in-scope target with **no committed delivery date** and **no module skeleton** under version control.
 3. **When the gate clears**, the bring-up sequence shall be:
    1. A D-005 proposal referencing this ADR and `NEOFORGE_NOTES.md`.
@@ -58,7 +58,7 @@ What this ADR is **not**:
 - **Negative / Trade-offs:**
   - The supported platform matrix grows from four to five families, expanding the release-test surface and the lite-jar assembly matrix ([ADR-024](ADR-024-rtp-lite-assembly-variant.md)) once NeoForge ships. The matrix expansion is bounded by per-version carriers ([ADR-010](ADR-010-versioned-platform-adapter-submodules.md)).
   - Documentation surface increases (a `rtp-neoforge/REQUIREMENTS.md`, subproject ADRs, plan-doc rows, TRACEABILITY entries) before any code lands. Mitigated by the scratch notes already covering most of the design ground.
-  - Risk of premature implementation work if the Fabric gate is not strictly enforced. Mitigated by the explicit gating clause in §2 of the *Decision*.
+  - Risk of premature implementation work if the Fabric gate is not strictly enforced. Mitigated by the explicit gating clause in section 2 of the *Decision*.
   - Future requirement and ADR drift: every cross-platform requirement now must mentally include NeoForge even before the module exists. Mitigated by listing NeoForge alongside the other platforms in the amended requirement text.
 
 ## References

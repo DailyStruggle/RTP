@@ -98,7 +98,7 @@ RTP uses a structured requirements workflow enforced by CI. If you add or modify
 
    | Req ID | Description | Design Ref | Implementing Class(es) | Test(s) |
    |---|---|---|---|---|
-   | REQ-CORE-F-008 | Short title | docs/DESIGN.md §X | `ClassName.java` | `TestClass#method` |
+   | REQ-CORE-F-008 | Short title | docs/DESIGN.md section X | `ClassName.java` | `TestClass#method` |
 
    Use `— (pending)` for columns that don't exist yet.
 

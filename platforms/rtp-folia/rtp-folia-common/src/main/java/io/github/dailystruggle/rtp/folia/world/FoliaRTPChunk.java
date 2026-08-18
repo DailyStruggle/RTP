@@ -26,7 +26,7 @@ import org.bukkit.block.data.BlockData;
 
 /**
  * Folia-side {@link RTPChunk} implementation. Carries an internal source union
- * (ADR-016 §11) of either a live {@link Chunk} or an {@link AnvilChunkView} read
+ * (ADR-016 section 11) of either a live {@link Chunk} or an {@link AnvilChunkView} read
  * from a persisted region file off the tick thread. Dispatch on every query is
  * a single branch on the populated source field.
  *
@@ -35,7 +35,7 @@ import org.bukkit.block.data.BlockData;
  * produced a decoded view for this chunk key. They carry the decoded snapshot
  * plus the world identity + chunk coordinates needed to answer RTPChunk queries
  * without ever hopping to the Region Thread. The authoritative live
- * {@code chunk.isSafe(...)} re-check at teleport-commit time (ADR-016 §4)
+ * {@code chunk.isSafe(...)} re-check at teleport-commit time (ADR-016 section 4)
  * remains the final arbiter - the Anvil-backed instance is replaced by a
  * live-loaded {@code FoliaRTPChunk} once the teleport pipeline commits.</p>
  *
@@ -47,7 +47,7 @@ import org.bukkit.block.data.BlockData;
  */
 public final class FoliaRTPChunk extends RTPChunk<Chunk> {
 
-  /** Non-null iff this chunk is Anvil-backed (ADR-016 §11). */
+  /** Non-null iff this chunk is Anvil-backed (ADR-016 section 11). */
   private final AnvilChunkView anvilView;
 
   /** Anvil-backed path only: chunk X, because {@link #anvilView} carries no coords. */
@@ -74,7 +74,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   }
 
   /**
-   * Anvil-backed constructor (ADR-016 §11). {@code chunk} is {@code null} because no live
+   * Anvil-backed constructor (ADR-016 section 11). {@code chunk} is {@code null} because no live
    * chunk was loaded - this instance answers every query from {@code view}. The
    * {@code reconciledUnsafe} set, when non-null, short-circuits
    * {@link #isSafe(int, int, int, Set)} to skip per-call reconciliation; pass
@@ -241,7 +241,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   }
 
   /**
-   * ADR-016 §13.1 post-load biome read, chunk-local. Anvil-backed: consult the
+   * ADR-016 section 13.1 post-load biome read, chunk-local. Anvil-backed: consult the
    * decoded {@link AnvilChunkView#getBiomeAt(int,int,int)} (chunk-local x/z,
    * absolute Y). Live-backed: delegate to the loaded block's biome. Neither
    * path consults {@code anvilProbeSupport}, so an evicted cache entry cannot
@@ -263,7 +263,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
         return (normalized != null && !normalized.isEmpty()) ? normalized : id;
       }
       // Anvil view had no biome container at this Y; fall back to the world
-      // getter as a last resort (matches the §13.1 precedence chain tail).
+      // getter as a last resort (matches the section 13.1 precedence chain tail).
       return super.getBiome(x, y, z);
     }
     if (chunk != null) {
@@ -329,7 +329,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
    *
    * <p>Runs under {@link RegionThread} because the live-backed path reads from the
    * chunk and the caller already holds region-thread context in {@code LocationGenerator};
-   * the Anvil-backed branch is thread-agnostic (self-contained snapshot, ADR-015 §interop).</p>
+   * the Anvil-backed branch is thread-agnostic (self-contained snapshot, ADR-015 section interop).</p>
    */
   @Override
   @RegionThread
@@ -360,7 +360,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
    * equivalent helper in {@code BukkitRTPChunk} for the format contract; the
    * implementation is duplicated deliberately so the Folia adapter retains zero
    * compile-time coupling to {@code rtp-spigot-common}'s internal helpers (keeps the
-   * platform boundary clean per Architecture Boundaries rule §4).
+   * platform boundary clean per Architecture Boundaries rule section 4).
    */
   private static Map<String, String> extractProperties(BlockData data) {
     if (data == null) return Collections.emptyMap();

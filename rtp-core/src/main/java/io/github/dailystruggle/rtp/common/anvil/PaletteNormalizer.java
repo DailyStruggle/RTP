@@ -7,7 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Platform-neutral palette-identifier reconciler for anvil pre-filtering (ADR-016 §8.1).
+ * Platform-neutral palette-identifier reconciler for anvil pre-filtering (ADR-016 section 8.1).
  * Normalizes palette IDs to uppercase namespace-stripped strings for lookup matching.
  * Stateless and thread-safe.
  */

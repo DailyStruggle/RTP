@@ -211,9 +211,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // Only when the probe returns no view at all (UNKNOWN: no region file /
     // unsupported DataVersion / decode error / no emitted sections) do we
     // fall through to the live-load path. The live chunk.isSafe(...) re-check
-    // at teleport commit (ADR-016 §4) remains the authoritative arbiter.
+    // at teleport commit (ADR-016 section 4) remains the authoritative arbiter.
     //
-    // ADR-016 §13.2 - every Bukkit-family adapter in scope (Spigot, Paper,
+    // ADR-016 section 13.2 - every Bukkit-family adapter in scope (Spigot, Paper,
     // Folia) goes through this pre-filter. Paper inherits it verbatim via
     // this class (its `PaperRTPWorld` subclass deliberately adds no
     // `getChunkAt` override). Folia re-implements the same probe-and-publish
@@ -407,7 +407,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * </ul>
    *
    * <p>The custom-{@link org.bukkit.generator.ChunkGenerator} short-circuit that previously
-   * appeared here has been intentionally removed (ADR-016 §1 trust-model revision): for
+   * appeared here has been intentionally removed (ADR-016 section 1 trust-model revision): for
    * chunks that are already populated on disk, the {@code .mca} palette is a strictly
    * more accurate data source than the Bukkit {@link org.bukkit.Material} / {@link
    * org.bukkit.block.Biome} enum views (which silently collapse modded and Iris-native
@@ -460,7 +460,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   private void logGateSkip(String reason, int cx, int cz) {
     // "chunk-already-loaded" is the steady-state outcome on Paper chunk-system-v2
-    // and Folia (ADR-016 §1.1): the call-site probe in LocationGenerator runs after
+    // and Folia (ADR-016 section 1.1): the call-site probe in LocationGenerator runs after
     // candidate selection, by which time ambient server load or prior-attempt residue
     // has typically already ticket-pinned the candidate chunk. The message carries no
     // diagnostic signal in that regime and would otherwise spam the log. Suppressed
@@ -850,7 +850,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public String getBiome(int x, int y, int z) {
-    // ADR-016 (biome) §6. Anvil-first:
+    // ADR-016 (biome) section 6. Anvil-first:
     // if the anvil pre-filter already decoded this chunk and its view
     // is still cached (no I/O on this path - O(1) ConcurrentHashMap read),
     // return the raw namespaced biome identifier from the on-disk palette.
@@ -865,7 +865,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // never gate safety, so a null from the Anvil branch is always a quiet
     // fall-through.
     // Reason-keyed metric + rate-limited log so operators can tell *why* a
-    // live-tier read happened (ADR-016 §13.1 observability, audit option A+C).
+    // live-tier read happened (ADR-016 section 13.1 observability, audit option A+C).
     String reason;
     Throwable thrown = null;
     int cx = x >> 4;
@@ -896,7 +896,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   /**
    * Rate-limited diagnostic (first {@link #BIOME_LOG_BUDGET_PER_REASON} per
    * reason at INFO, then FINE) for each live-tier fallthrough path in
-   * {@link #getBiome(int,int,int)}. Closes the ADR-016 §13.1 observability
+   * {@link #getBiome(int,int,int)}. Closes the ADR-016 section 13.1 observability
    * gap alongside the {@code BiomeSourceMetrics} reason breakdown.
    */
   private static final java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>
@@ -932,7 +932,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-016 §13.3 vanilla-generator detection.
+   * ADR-016 section 13.3 vanilla-generator detection.
    *
    * <p>Treats a world as vanilla iff the running server reports no custom
    * {@link org.bukkit.generator.ChunkGenerator} and no custom
@@ -941,7 +941,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * bootstrapper use to install a non-vanilla generator. It cannot positively
    * detect mods that replace generation via NMS mixins, so any {@link Throwable}
    * collapses to {@code false} - "assume non-vanilla" is the safe default that
-   * keeps the §13.3 exemption from over-firing.</p>
+   * keeps the section 13.3 exemption from over-firing.</p>
    */
   @Override
   public boolean isVanilla() {
@@ -954,7 +954,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-016 §13.3 upgrade-drift gate - region-file backed probe.
+   * ADR-016 section 13.3 upgrade-drift gate - region-file backed probe.
    *
    * <p>Resolution order:</p>
    * <ol>
@@ -968,7 +968,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    *       all ~1024 sibling-chunk queries - crucial for {@code ScanTask}
    *       PRESCAN which sweeps adjacent chunks in spiral order.</li>
    *   <li>Any {@link Throwable} collapses to {@code true} - "assume
-   *       generated, skip the perf fast path" preserves the ADR-016 §13.3
+   *       generated, skip the perf fast path" preserves the ADR-016 section 13.3
    *       palette-drift correctness (false-positives only forfeit a fast
    *       path; false-negatives would risk the bug).</li>
    * </ol>

@@ -7,7 +7,7 @@
 
 ## Context
 
-[ADR-033](../../../../docs/adr/ADR-033-neoforge-platform-in-scope.md) made NeoForge an in-scope target platform but **hard-gated** activation behind Fabric stabilization (ADR-033 §2) and required a bring-up sequence (ADR-033 §3): a D-005 proposal, this subproject ADR, `MULTI_PLATFORM_PLAN.md` phase rows, and TRACEABILITY rows for the S-005 / S-006 guards before any code lands.
+[ADR-033](../../../../docs/adr/ADR-033-neoforge-platform-in-scope.md) made NeoForge an in-scope target platform but **hard-gated** activation behind Fabric stabilization (ADR-033 section 2) and required a bring-up sequence (ADR-033 section 3): a D-005 proposal, this subproject ADR, `MULTI_PLATFORM_PLAN.md` phase rows, and TRACEABILITY rows for the S-005 / S-006 guards before any code lands.
 
 As of 2026-06-01 the Fabric platform is **confirmed stable**: the Phase 2 Step H dual-runtime smoke test passed, the historical S-005 / null-stub / Loom blockers are resolved, and the Fabric beta shipped (Phase 3, 2026-05-31). The activation gate is therefore clear, and the D-005 proposal ([`docs/dev/scratch/PROPOSAL-neoforge-bringup.md`](../../../../docs/dev/scratch/PROPOSAL-neoforge-bringup.md)) is on file. This ADR ratifies the NeoForge adapter's structural decisions so Phase N1 code can begin once a maintainer is assigned and the proposal is approved.
 
@@ -21,7 +21,7 @@ NeoForge is a **first-class, in-scope target platform** for RTP, alongside Spigo
 
 ### 2. Module layout — per-MC-version submodules, sibling to `rtp-fabric`
 
-The `platforms/rtp-neoforge/` module group mirrors the Bukkit-family and Fabric per-version adapter pattern ([rtp-fabric-ADR-001](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md), [ADR-010](../../../../docs/adr/ADR-010-versioned-platform-adapter-submodules.md)). It is a **sibling** of `rtp-fabric`; it is **not** nested under or sharing a source tree with it (ADR-033 alternatives; `NEOFORGE_NOTES.md` §11 — divergent build systems and event models make a shared tree a trap).
+The `platforms/rtp-neoforge/` module group mirrors the Bukkit-family and Fabric per-version adapter pattern ([rtp-fabric-ADR-001](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md), [ADR-010](../../../../docs/adr/ADR-010-versioned-platform-adapter-submodules.md)). It is a **sibling** of `rtp-fabric`; it is **not** nested under or sharing a source tree with it (ADR-033 alternatives; `NEOFORGE_NOTES.md` section 11 — divergent build systems and event models make a shared tree a trap).
 
 ```
 platforms/rtp-neoforge/
@@ -40,7 +40,7 @@ NeoForge runs against Mojang mappings at runtime on 1.20.4+. Unlike Fabric (whic
 
 ### 4. Build toolchain — ModDevGradle
 
-The NeoForge Gradle plugin is **ModDevGradle** (the newer official path, closer to Loom in spirit) rather than NeoGradle, pending a confirmation spike (`NEOFORGE_NOTES.md` §8). It is applied **only** under `platforms/rtp-neoforge/**` (and `rtp-plugin` only if a combined multi-loader artifact is pursued). Java 21+ toolchain per REQ-RTP-SYS-001. Platform-neutral modules (`rtp-core`, `rtp-api`, `rtp-anvil`, `commands-api`, `effects-api`, `metrics-api`, `maps-api`) are reused 1:1 with no NeoForge coupling.
+The NeoForge Gradle plugin is **ModDevGradle** (the newer official path, closer to Loom in spirit) rather than NeoGradle, pending a confirmation spike (`NEOFORGE_NOTES.md` section 8). It is applied **only** under `platforms/rtp-neoforge/**` (and `rtp-plugin` only if a combined multi-loader artifact is pursued). Java 21+ toolchain per REQ-RTP-SYS-001. Platform-neutral modules (`rtp-core`, `rtp-api`, `rtp-anvil`, `commands-api`, `effects-api`, `metrics-api`, `maps-api`) are reused 1:1 with no NeoForge coupling.
 
 ### 5. Entry point, event bus, and command registration
 
@@ -50,7 +50,7 @@ The NeoForge Gradle plugin is **ModDevGradle** (the newer official path, closer 
 
 ### 6. Threading & S-00x invariants preserved
 
-NeoForge servers are single-main-thread vanilla — **no Folia region-ownership analog; do not invent one.** All S-00x prohibitions apply on the same terms as every other platform (ADR-033 §5, no grandfathering):
+NeoForge servers are single-main-thread vanilla — **no Folia region-ownership analog; do not invent one.** All S-00x prohibitions apply on the same terms as every other platform (ADR-033 section 5, no grandfathering):
 
 - **S-005 (critical):** `NeoForgeRTPWorld.getChunkAt` returns `CompletableFuture` and routes through `MinecraftServer#submit` / the server-tick executor; never a synchronous `ServerLevel#getChunk(..., load=true)` on the tick thread. The Fabric `getChunkAt` S-005 regression must **not** be re-introduced.
 - **S-006:** API entry points throw `IllegalStateException` pre-init, never null / no-op. NeoForge mod-loading phases make this fail-loud contract a natural fit.
@@ -77,7 +77,7 @@ A **named maintainer** shall own the NeoForge adapter end-to-end (build, mapping
 | Cover NeoForge via a hybrid server (Mohist / Arclight) instead of a native adapter. | Hybrid servers are unstable, lag MC versions, and violate both ecosystems' assumptions. Acceptable transitively via `rtp-paper`, not a substitute for a native adapter. |
 | Cover the audience via legacy Forge. | Forge ≤1.20.1 is sunsetting; the active ecosystem has moved to NeoForge. |
 | Adopt an obf/intermediary carrier like Fabric's. | NeoForge is Mojmap-at-runtime on 1.20.4+; only the structural per-version split is needed, not an intermediary-namespace carrier. Revisit only if NeoForge ships an SRG-mapped runtime. |
-| Adopt Architectury for cross-loader sharing. | Produces N binaries from one source tree, not one adapter covering N runtimes; re-evaluate only if maintaining parallel Fabric + NeoForge carrier trees proves costly (`NEOFORGE_NOTES.md` §11). |
+| Adopt Architectury for cross-loader sharing. | Produces N binaries from one source tree, not one adapter covering N runtimes; re-evaluate only if maintaining parallel Fabric + NeoForge carrier trees proves costly (`NEOFORGE_NOTES.md` section 11). |
 
 ## Consequences
 
@@ -100,4 +100,4 @@ A **named maintainer** shall own the NeoForge adapter end-to-end (build, mapping
 - [rtp-fabric-ADR-001](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md), [rtp-fabric-ADR-003](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md), [rtp-fabric-ADR-007](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md), [rtp-fabric-ADR-009](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md) — reused patterns and contrasts.
 - [ADR-010](../../../../docs/adr/ADR-010-versioned-platform-adapter-submodules.md), [ADR-024](../../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md), [ADR-026](../../../../docs/adr/ADR-026-external-hook-api-surface.md), [commands-api-ADR-001](../../../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md).
 - [`MULTI_PLATFORM_PLAN.md`](../../../../docs/dev/MULTI_PLATFORM_PLAN.md) — Phase 4 (`rtp-neoforge`) phase rows.
-- REQ-RTP-S-005 / REQ-RTP-S-006 — S-005/S-006 guards (`ReqRtpNeoforgeS005ChunkLoadingTest`, `ReqRtpNeoforgeS006EarlyApiTest`) per ADR-033 §3.4.
+- REQ-RTP-S-005 / REQ-RTP-S-006 — S-005/S-006 guards (`ReqRtpNeoforgeS005ChunkLoadingTest`, `ReqRtpNeoforgeS006EarlyApiTest`) per ADR-033 section 3.4.

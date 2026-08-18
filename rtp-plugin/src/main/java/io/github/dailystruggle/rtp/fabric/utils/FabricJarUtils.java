@@ -26,7 +26,7 @@ import java.util.logging.Level;
  *       {@link RTP#log(Level, String, Throwable)} instead of the Bukkit
  *       {@code SendMessage.log} sink. {@code SendMessage} lives in
  *       {@code rtp-bukkit-common}'s {@code bukkitplatform} package and is not
- *       reachable from the Fabric entrypoint (rtp-fabric-ADR-002 §4 forbids
+ *       reachable from the Fabric entrypoint (rtp-fabric-ADR-002 section 4 forbids
  *       {@code org.bukkit.*} reach-through).</li>
  *   <li>Has no {@code JavaPlugin} dependency - the jar is discovered via
  *       {@code getProtectionDomain().getCodeSource().getLocation()} exactly as

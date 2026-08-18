@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.proxy.common.spi;
 
 /**
- * Origin of an {@link RtpRequest}. Pinned by rtp-proxy-ADR-001 §1 and
+ * Origin of an {@link RtpRequest}. Pinned by rtp-proxy-ADR-001 section 1 and
  * REQ-RTP-PROXY-COMMON-005 (trigger source plurality).
  */
 public enum TriggerType {

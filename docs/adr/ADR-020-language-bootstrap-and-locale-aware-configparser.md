@@ -56,7 +56,7 @@ Hot reload (`/rtp reload`) re-reads `language.yml` and reconstructs every parser
 ## References
 
 - REQ-RTP-F-013 in [`docs/dev/REQUIREMENTS.md`](../dev/REQUIREMENTS.md) — Configurable User Messages.
-- S-007 in [`docs/dev/REQUIREMENTS.md §3`](../dev/REQUIREMENTS.md) — Configurable "busy" / "invalid command" messages.
+- S-007 in [`docs/dev/REQUIREMENTS.md section 3`](../dev/REQUIREMENTS.md) — Configurable "busy" / "invalid command" messages.
 - [`docs/dev/TRACEABILITY.md`](../dev/TRACEABILITY.md) row `REQ-RTP-F-013`.
 - [`rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/LanguageBootstrap.java`](../../rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/LanguageBootstrap.java) — bootstrap reader.
 - [`rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/ConfigParser.java`](../../rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/ConfigParser.java) — locale-aware loader.

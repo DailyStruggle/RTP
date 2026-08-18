@@ -259,7 +259,7 @@ public class LocaleParityTest {
         /**
          * Catches user-facing message values that were never translated: a
          * non-English locale's {@code messages.yml} value that, after stripping
-         * color codes ({@code &a}, {@code #RRGGBB}, {@code §x}) and
+         * color codes ({@code &a}, {@code #RRGGBB}, {@code section x}) and
          * {@code [placeholder]} tokens, is byte-for-byte identical to the
          * English baseline value for the same key and still contains real words.
          *

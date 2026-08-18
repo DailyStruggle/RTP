@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Enforces rtp-proxy-ADR-001 §Package Boundary Rules / REQ-RTP-PROXY-COMMON-001.
+ * Enforces rtp-proxy-ADR-001 section Package Boundary Rules / REQ-RTP-PROXY-COMMON-001.
  * The {@code rtp-proxy-common} module shall not import any proxy-vendor or
  * backend-platform class. This test walks the production source tree and
  * fails the build if any forbidden FQN prefix appears in an {@code import}

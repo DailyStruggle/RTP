@@ -176,9 +176,9 @@ Count-Bound-scheduled callback:
 
 ## References
 
-- REQ-RTP-S-002 (chunk reservation lifecycle) — `docs/dev/REQUIREMENTS.md §3`.
-- REQ-RTP-S-004 (no silent teleport failures) — `docs/dev/REQUIREMENTS.md §3`.
-- REQ-RTP-S-005 (no main-thread chunk loading) — `docs/dev/REQUIREMENTS.md §3`.
+- REQ-RTP-S-002 (chunk reservation lifecycle) — `docs/dev/REQUIREMENTS.md section 3`.
+- REQ-RTP-S-004 (no silent teleport failures) — `docs/dev/REQUIREMENTS.md section 3`.
+- REQ-RTP-S-005 (no main-thread chunk loading) — `docs/dev/REQUIREMENTS.md section 3`.
 - ADR-004 "Count-Bound Task Pipe on Folia".
 - ADR-012 "Chunk Reservation Abstraction".
 - Implementation:

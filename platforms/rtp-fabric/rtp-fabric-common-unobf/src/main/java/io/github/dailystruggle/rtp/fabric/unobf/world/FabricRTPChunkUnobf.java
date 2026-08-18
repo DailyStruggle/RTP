@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *       thread. Mirrors {@code BukkitRTPChunk}'s anvil-backed constructor.</li>
  * </ol>
  *
- * <p>ADR-022 §4: no {@code org.bukkit.*}; queries do not trigger loads (S-005);
+ * <p>ADR-022 section 4: no {@code org.bukkit.*}; queries do not trigger loads (S-005);
  * stale-chunk guard is caller-side (ADR-015) for live mode and moot for anvil
  * mode (the snapshot is self-contained - see {@link #isSelfContained()}).
  * Material IDs are upper-cased {@code NAMESPACE:PATH} on the live path; the
@@ -301,7 +301,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
     }
 
     /**
-     * ADR-016 §13.1 post-load biome read, chunk-local. Anvil-backed: consult
+     * ADR-016 section 13.1 post-load biome read, chunk-local. Anvil-backed: consult
      * the decoded {@link AnvilChunkView#getBiomeAt(int, int, int)} (chunk-local
      * x/z, absolute Y). Live-backed: delegate to the parent's world-level
      * getter (the live block-biome accessor is too version-volatile across

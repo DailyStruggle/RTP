@@ -7,7 +7,7 @@ package io.github.dailystruggle.mapsapi;
  * logical byte to a concrete vanilla map-colour byte (or the equivalent for
  * non-Bukkit platforms) at commit time.
  *
- * <p>Layout (REQ-RTP-MAP-001, {@code maps-api-ADR-001} §Palette policy):
+ * <p>Layout (REQ-RTP-MAP-001, {@code maps-api-ADR-001} section Palette policy):
  * <ul>
  *   <li>{@link #TRANSPARENT} (logical 0): unfilled canvas pixel. Renders as
  *       the host's map-transparent byte ({@code MapPalette.TRANSPARENT} on
@@ -29,7 +29,7 @@ package io.github.dailystruggle.mapsapi;
  * <p>The total contract size is 32 bytes (logical {@code 0..31}), matching
  * the {@code PALETTE} table in every {@link MapBinding} implementation. Any
  * change to slot count or layout shall be accompanied by an amendment to
- * {@code maps-api-ADR-001} §Palette policy and a synchronised update to
+ * {@code maps-api-ADR-001} section Palette policy and a synchronised update to
  * every binding's {@code buildPalette} method (Bukkit, Folia, Fabric,
  * Noop, InMemory).
  *

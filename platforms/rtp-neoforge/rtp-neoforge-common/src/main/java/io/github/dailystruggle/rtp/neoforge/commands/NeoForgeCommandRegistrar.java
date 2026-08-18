@@ -18,7 +18,7 @@ import java.util.logging.Level;
  *
  * <p>NeoForge fires {@code RegisterCommandsEvent} on the game bus, exposing the
  * vanilla {@link CommandDispatcher} of {@link CommandSourceStack}
- * ({@code NEOFORGE_NOTES.md} §2). Both NeoForge and Fabric terminate in vanilla
+ * ({@code NEOFORGE_NOTES.md} section 2). Both NeoForge and Fabric terminate in vanilla
  * Brigadier, so the {@code commands-api} Brigadier bridge
  * ({@code commands-api-ADR-001}) is reused verbatim - this class is the
  * platform-specific trampoline that builds the shared {@code /rtp} tree, wraps

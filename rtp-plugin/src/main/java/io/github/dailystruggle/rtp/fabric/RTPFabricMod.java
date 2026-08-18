@@ -17,10 +17,10 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Fabric entry point - single-JAR multi-loader bootstrap (rtp-fabric-ADR-002 §2).
+ * Fabric entry point - single-JAR multi-loader bootstrap (rtp-fabric-ADR-002 section 2).
  *
  * <p>Counterpart to {@code io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin}. Referenced from
- * {@code fabric.mod.json} as the {@code main} entrypoint. Per rtp-fabric-ADR-002 §4 (Architectural
+ * {@code fabric.mod.json} as the {@code main} entrypoint. Per rtp-fabric-ADR-002 section 4 (Architectural
  * Invariants) this class:
  *
  * <ul>
@@ -50,7 +50,7 @@ public final class RTPFabricMod implements ModInitializer {
     @Override
     public void onInitialize() {
         // Event bridge + command wiring. Body kept minimal per
-        // REQ-RTP-NF-003 (applied per-entry-point under rtp-fabric-ADR-002 §2). Heavy
+        // REQ-RTP-NF-003 (applied per-entry-point under rtp-fabric-ADR-002 section 2). Heavy
         // lifting is in FabricServerAccessor / FabricEventBridge / the
         // commands-api Brigadier adapter.
         try {
@@ -677,7 +677,7 @@ public final class RTPFabricMod implements ModInitializer {
             // Fabric has no Folia-style region threading, so the non-Folia
             // branch always applies. Without this, chunks loaded by the
             // teleport pipeline with keep(true) are never released and
-            // MemoryTracker tickets accumulate (see ADR-022 §4 / S-002).
+            // MemoryTracker tickets accumulate (see ADR-022 section 4 / S-002).
             // ----------------------------------------------------------------
             RTP.scheduler.runTaskTimer(
                     new io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor(),

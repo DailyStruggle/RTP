@@ -182,9 +182,9 @@ Every number below comes from a public harness you can rerun yourself: [`helpers
 | AdvancedRTP           | 2.16     | 2 100         | 19.95     | 92.1          | 96.3 %    |
 | EzRTP                 | 1.76     | 2 903         | 19.95     | 139.6         | 100 %     |
 | AsyRTP                | 1.67     | 4 534         | 19.95     | 38.8          | 100 %     |
-| EssentialsX `/tpr`    | 0.96     | 4 504         | 19.95     | 88.9          | 75.9 % §  |
+| EssentialsX `/tpr`    | 0.96     | 4 504         | 19.95     | 88.9          | 75.9 % *  |
 
-§ EssentialsX `/tpr` is a teleport-*request* command (handshake + accept), not a teleport-*do* command; the harness's 5 s per-attempt deadline times out a fraction of the request-accept latencies. Numbers are dispatch-shaped, not plugin-broken.
+* EssentialsX `/tpr` is a teleport-*request* command (handshake + accept), not a teleport-*do* command; the harness's 5 s per-attempt deadline times out a fraction of the request-accept latencies. Numbers are dispatch-shaped, not plugin-broken.
 
 **Spigot 1.20.1** - Spigot's platform-wide chunk-gen ceiling caps everyone in the 1-1.5 TP/s range during the burst; the latency tail is what matters.
 

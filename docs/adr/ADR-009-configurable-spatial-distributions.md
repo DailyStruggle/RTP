@@ -40,7 +40,7 @@ The `Normal` distribution achieves parity with legacy plugins (e.g., JakesRTP) a
 ## References
 
 - `REQUIREMENTS.md` — REQ-RTP-F-003 (Configurable Geometry / Statistical Distributions)
-- `DESIGN.md` §3 — Deterministic Spatial Algorithms (shape and distribution pipeline)
+- `DESIGN.md` section 3 — Deterministic Spatial Algorithms (shape and distribution pipeline)
 - `ARCHITECTURE.md` — MemoryShape / Shape layer description
 - ADR-001 — Archimedean Spiral 1D Mapping (the 1D curve over which distributions are applied)
 - JakesRTP plugin — prior art for the Normal distribution option

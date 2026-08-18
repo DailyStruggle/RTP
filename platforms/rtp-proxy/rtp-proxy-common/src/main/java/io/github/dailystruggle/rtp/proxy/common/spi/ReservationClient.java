@@ -10,7 +10,7 @@ import java.util.concurrent.CompletableFuture;
  * (REQ-RTP-PROXY-COMMON-004). Reference implementation lives under
  * {@code …proxy.common.reservation}; adapters may swap it out.
  *
- * <p>rtp-proxy-ADR-001 §5; rtp-proxy-ADR-004 §Fallback Chain.</p>
+ * <p>rtp-proxy-ADR-001 section 5; rtp-proxy-ADR-004 section Fallback Chain.</p>
  */
 public interface ReservationClient {
 

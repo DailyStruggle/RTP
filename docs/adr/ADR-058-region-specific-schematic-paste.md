@@ -5,22 +5,22 @@
 
 ## Amendment 2 (2026-05-30): file presence is the knob (no per-region config key); core wiring landed
 
-The per-region `schematic` config key proposed in §3 is withdrawn. **The presence of a file is the entire knob.** Core resolves `<pluginDir>/schematics/<region>.schem` (with a `.schematic` fallback) by file name == region name: drop a file in and that region's teleports paste it; remove the file and behavior reverts to the default emergency platform. This removes a config key from locale-parity upkeep and makes the feature self-documenting (the directory listing *is* the configuration).
+The per-region `schematic` config key proposed in section 3 is withdrawn. **The presence of a file is the entire knob.** Core resolves `<pluginDir>/schematics/<region>.schem` (with a `.schematic` fallback) by file name == region name: drop a file in and that region's teleports paste it; remove the file and behavior reverts to the default emergency platform. This removes a config key from locale-parity upkeep and makes the feature self-documenting (the directory listing *is* the configuration).
 
 Landed in this amendment:
 
 - `io.github.dailystruggle.rtp.common.tasks.teleport.RegionSchematicService#resolveSource(regionName)` performs the file-presence resolution in `rtp-core` (path policy stays platform-neutral; the paster only consumes the resolved `SchematicSource`).
-- Core reaches the active paster through a new **instance** accessor `RTPWorld#schematicPaster()` (default `NoOpSchematicPaster`, S-006), overridden on `BukkitRTPWorld` / `FoliaRTPWorld` / `FabricRTPWorld` to return their existing swappable static holder (§2). This lets `rtp-core` invoke the paster polymorphically without a platform import.
-- `TeleportPipelineTask` implements the §4 split: `runLoad` (off the region thread) resolves + decodes via `paster.load(...)`; `runTeleport` (on the region thread) pastes at `PasteAnchor.BOTTOM_CENTER` (player stands on top-center) **in place of** the emergency `RTPWorld#platform(...)`, falling back to the platform whenever nothing is pasted. Every non-`PASTED` outcome is audited and never aborts the teleport (S-004).
+- Core reaches the active paster through a new **instance** accessor `RTPWorld#schematicPaster()` (default `NoOpSchematicPaster`, S-006), overridden on `BukkitRTPWorld` / `FoliaRTPWorld` / `FabricRTPWorld` to return their existing swappable static holder (section 2). This lets `rtp-core` invoke the paster polymorphically without a platform import.
+- `TeleportPipelineTask` implements the section 4 split: `runLoad` (off the region thread) resolves + decodes via `paster.load(...)`; `runTeleport` (on the region thread) pastes at `PasteAnchor.BOTTOM_CENTER` (player stands on top-center) **in place of** the emergency `RTPWorld#platform(...)`, falling back to the platform whenever nothing is pasted. Every non-`PASTED` outcome is audited and never aborts the teleport (S-004).
 - Verified end-to-end against the committed `skyblock_island.schem` by `RegionSchematicServiceTest` (`rtp-core`).
 - **Footprint claim check (S-003) landed.** Before `runTeleport` invokes `paster.paste(...)`, `TeleportPipelineTask#schematicFootprintClear` walks the schematic's horizontal footprint (the same `BOTTOM_CENTER`/`CENTER`/`ORIGIN` anchor math as `SchematicPlacementPlanner`) and runs every cell through `GlobalRegionVerifiers` (the sanctioned claim/protection registry the bundled claim integrations register into per [ADR-019](ADR-019-claim-plugin-integrations-folded-into-plugin.md) - never an inline claim-plugin call). If any cell intersects a claim the paste is suppressed (audited, S-004) and the default emergency platform path runs, so the paste never overwrites protected land. A failure of the check itself fails safe (treated as protected). Pinned by `ReqRtpS003SchematicFootprintClaimTest` (`rtp-core`).
 - **Bundled-schematic prefab plumbing.** The `Skyblock` prefab ships an island baked into the jar at `/schematics/skyblock.schem` (`rtp-plugin` resources). On `/rtp admin prefab` confirm, `PrefabSchematicInstaller` extracts it once, copying the bundled resource named by the overlay's `schematic` value to `<pluginDir>/schematics/<regionId>.schem` keyed by the **region the overlay targets** (so the Skyblock prefab, which overlays `default`, writes `schematics/default.schem`). This matches `RegionSchematicService.resolveSource` (which keys off region name, not the `schematic` value), so the paste actually fires after applying the prefab. Existing files are never overwritten; a missing bundled resource is audited (S-004), never fatal. The round-trip (install Skyblock prefab -> `resolveSource("default")` resolves the island) is pinned by `RegionSchematicServiceTest`.
 
-Still open from §4-§6: the footprint claim check (S-003) ahead of the paste; the Folia and Fabric native pasters (only `BukkitSchematicPaster` ships, so Folia/Fabric currently fall back to the platform); block-entity NBT reconstruction; and the `docs/admin/` page + traceability rows. Where §3 below says "per-region config knob", read it as superseded by this amendment.
+Still open from sections 4-6: the footprint claim check (S-003) ahead of the paste; the Folia and Fabric native pasters (only `BukkitSchematicPaster` ships, so Folia/Fabric currently fall back to the platform); block-entity NBT reconstruction; and the `docs/admin/` page + traceability rows. Where section 3 below says "per-region config knob", read it as superseded by this amendment.
 
 ## Amendment 1 (2026-05-30): single cross-platform `.schem` format, decoded in-house
 
-The original decision (below) used WorldEdit/FAWE to decode and paste `.schem` on Bukkit-family and **vanilla structure `.nbt`** on Fabric (§3, §5, §6). That divergence is withdrawn. The format is now **`.schem` (Sponge schematic v2/v3) on every platform, decoded by an in-repo, dependency-free Sponge reader** (`io.github.dailystruggle.rtp.api.schematic.SpongeSchematicDecoder`), with each adapter pasting via its **native block-state-from-string API**. Rationale:
+The original decision (below) used WorldEdit/FAWE to decode and paste `.schem` on Bukkit-family and **vanilla structure `.nbt`** on Fabric (section 3, section 5, section 6). That divergence is withdrawn. The format is now **`.schem` (Sponge schematic v2/v3) on every platform, decoded by an in-repo, dependency-free Sponge reader** (`io.github.dailystruggle.rtp.api.schematic.SpongeSchematicDecoder`), with each adapter pasting via its **native block-state-from-string API**. Rationale:
 
 - **One format everywhere.** Operators reuse the same `plugins/RTP/schematics/<name>.schem` / `config/rtp/schematics/<name>.schem` file on Bukkit, Paper, Folia, and Fabric. No `.schem`->`.nbt` conversion, no divergent docs.
 - **No WorldEdit hard-dependency on Fabric.** WorldEdit's Fabric mod has no build for the deobf MC 26.x runtime family (Mojmap / Java 25) that `rtp-fabric` targets via the obf/unobf carrier split ([rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)); a WorldEdit-only Fabric path would silently `SKIPPED_UNSUPPORTED` on a supported runtime. Decoding in-house removes that gap and the operator burden of installing a second mod.
@@ -28,7 +28,7 @@ The original decision (below) used WorldEdit/FAWE to decode and paste `.schem` o
 - **Native paste is the only platform-specific step.** The palette entries are full block-state strings (`minecraft:oak_log[axis=y]`). Each adapter parses them with the platform's own parser (`Bukkit.createBlockData(String)` on Bukkit-family; `BlockArgumentParser` through the carrier on Fabric) and writes blocks on the region thread. WorldEdit/FAWE remains an **optional accelerator** on Bukkit-family for very large schematics, never a requirement.
 - **Shared block-state grammar (extracted).** The `namespace:id[k=v,...]` palette grammar is the same one `SafetyTokenParser` (ADR-017) already tokenizes for `safety.yml`. The structural split (head + bracketed `key=value` body) is extracted into a shared `io.github.dailystruggle.rtp.api.block.BlockStateString` so both the safety parser and the schematic decoder share one tested tokenizer rather than maintaining two.
 
-Where the prose below says "Fabric: vanilla structure NBT" or "WorldEdit clipboard API", read it as superseded by this amendment. The SPI shape (§1, §2), the config knob (§3 minus the per-platform file extension), the load-async/paste-on-region-thread split (§4), the claim/S-004 contracts, and the test plan (§6) are unchanged.
+Where the prose below says "Fabric: vanilla structure NBT" or "WorldEdit clipboard API", read it as superseded by this amendment. The SPI shape (section 1, section 2), the config knob (section 3 minus the per-platform file extension), the load-async/paste-on-region-thread split (section 4), the claim/S-004 contracts, and the test plan (section 6) are unchanged.
 
 ## Context
 
@@ -76,7 +76,7 @@ public interface SchematicPaster {
 
 Supporting types (all in `rtp-api`):
 
-- `SchematicSource` — value object: file path (resolved by core, see §3), a format hint, and an anchor/offset policy.
+- `SchematicSource` — value object: file path (resolved by core, see section 3), a format hint, and an anchor/offset policy.
 - `LoadedSchematic` — opaque handle to the decoded payload plus its bounding-box dimensions (so core can compute the footprint for the claim check **before** pasting). Carries no live world references.
 - `PasteOptions` — anchor (center-on / bottom-on the arrival block), air-handling (paste air vs. skip air), and a `claimAware` flag.
 - `PasteResult` — `PASTED` / `SKIPPED_CLAIM` / `SKIPPED_UNSUPPORTED` / `MISSING_SOURCE` / `DECODE_ERROR` / `PASTE_ERROR`, plus an optional message for the S-004 audit line.
@@ -161,7 +161,7 @@ This split keeps file I/O off tick threads (S-005) and block writes on the corre
 - Roadmap entry: [`docs/dev/ROADMAP.md`](../dev/ROADMAP.md) Tier 2, *Region-specific schematic (`.schem`) support*.
 - Biome-getter hook prior art: `BukkitRTPWorld#setBiomeGetter` / `FoliaRTPWorld#setBiomeGetter`.
 - Scheduling contract: [`.junie/AGENTS.md`](../../.junie/AGENTS.md) *Scheduler Usage*; `RTPScheduler` (`runTask(RTPLocation, ...)`).
-- S-003 / S-004 / S-005 / S-006: [`REQUIREMENTS.md §3`](../dev/REQUIREMENTS.md); claim integration: [ADR-019](ADR-019-claim-plugin-integrations-folded-into-plugin.md).
+- S-003 / S-004 / S-005 / S-006: [`REQUIREMENTS.md section 3`](../dev/REQUIREMENTS.md); claim integration: [ADR-019](ADR-019-claim-plugin-integrations-folded-into-plugin.md).
 - External hook catalog: [ADR-026](ADR-026-external-hook-api-surface.md), [`EXTERNAL_HOOKS.md`](../dev/EXTERNAL_HOOKS.md).
 - Extension-tier model: [ADR-051](ADR-051-two-tier-api-extension-model.md).
 - Fabric carrier dispatch: [rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md).

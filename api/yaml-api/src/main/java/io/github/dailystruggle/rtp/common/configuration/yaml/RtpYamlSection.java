@@ -11,7 +11,7 @@ import java.util.Set;
  * Read-side / mutate-side handle on a YAML mapping (the root document or
  * a nested section). Mirrors the small surface of {@code simpleyaml}'s
  * {@code ConfigurationSection} that the RTP codebase actually uses, per
- * the ADR-025 §Context enumeration.
+ * the ADR-025 section Context enumeration.
  *
  * <p>The handle holds a back-reference to the underlying {@link RtpYamlMapping}
  * - mutations performed through {@link #set(String, Object)} go directly

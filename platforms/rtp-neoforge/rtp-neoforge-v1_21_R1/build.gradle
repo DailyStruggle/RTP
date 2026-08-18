@@ -7,7 +7,7 @@
 // same 1.21.1 Mojmap line purely to typecheck.
 //
 // NeoForge is Mojmap-at-runtime on 1.20.4+, so unlike the Fabric v26_*_R1
-// carriers there is no obf/unobf split here (NEOFORGE_NOTES.md §5); the
+// carriers there is no obf/unobf split here (NEOFORGE_NOTES.md section 5); the
 // per-version isolation is purely about absorbing Mojmap name drift, never
 // leaking it into rtp-core / rtp-api.
 //
@@ -32,7 +32,7 @@ ext {
 neoForge {
     version = neoforgeVersion
 
-    // Dev-launch run config (NEOFORGE_NOTES.md §8). The Phase N1 exit gate is a
+    // Dev-launch run config (NEOFORGE_NOTES.md section 8). The Phase N1 exit gate is a
     // single /rtp round-trip on a dev server launched via `:rtp-neoforge:rtp-neoforge-v1_21_R1:runServer`.
     runs {
         server {

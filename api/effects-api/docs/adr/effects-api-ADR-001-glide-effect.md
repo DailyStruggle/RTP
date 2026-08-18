@@ -57,7 +57,7 @@ We will introduce a `GlideEffect` as a first-class entry in
   `effects-api` (or kept as thin re-exports during a transition window).
 
 No `rtp-core` or `rtp-api` changes are required — `effects-api` is the correct
-home (see Architecture Boundaries §3 in `.junie/AGENTS.md`).
+home (see Architecture Boundaries section 3 in `.junie/AGENTS.md`).
 
 ### Configuration surface (per-effect block)
 
@@ -204,7 +204,7 @@ Configuration:
 | Alternative | Why Rejected |
 |-------------|--------------|
 | Keep `RTP_Glide` as an external addon indefinitely | Forces every operator who wants glide to install a separate jar; firework-vs-glide safety logic stays out of `effects-api` and is duplicated by anyone re-implementing it; addon currently misses Folia entity-scheduler nuance. |
-| Put glide directly in `rtp-core` | Violates Architecture Boundaries §2 (no per-effect logic in core). Glide is an effect, not part of region/queue/spiral concerns. |
+| Put glide directly in `rtp-core` | Violates Architecture Boundaries section 2 (no per-effect logic in core). Glide is an effect, not part of region/queue/spiral concerns. |
 | No timeout (rely on natural landing only) | Reproduces a real bug from the addon: in void worlds, misconfigured `startHeight`, or creative-flight players, glide never ends and the watchdog leaks. `Integer.MAX_VALUE` default preserves "effectively unlimited" while giving operators a clamp. |
 | Default `allowFireworks = true` (vanilla) | Trivially exploitable: a player who carries rockets gets a free, fast, configurable glide jump from anywhere `/rtp` lands them. Default-deny is safer; operators can opt in per world / per permission. |
 | Implement firework suppression by clearing the rocket from inventory | Destructive and surprising; players lose items. Cancelling the interact event is reversible and observable. |

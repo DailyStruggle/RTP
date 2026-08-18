@@ -33,7 +33,7 @@ Confirmed via `javap` on the user's
 `~/.gradle/caches/fabric-loom/minecraftMaven/.../minecraft-merged-1.21.11-...-v2.jar`
 and yarn 1.21.11+build.4 docs (cross-checked with intermediary jar
 disassembly). Full symbol-by-symbol evidence is in the working note
-`docs/dev/scratch/CHECKLIST-fabric-1.21.11-multiversion.md` §1–§2.
+`docs/dev/scratch/CHECKLIST-fabric-1.21.11-multiversion.md` sections 1-2.
 
 Why the rename hits us, mechanically:
 

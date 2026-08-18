@@ -26,7 +26,7 @@ import java.util.concurrent.CompletableFuture;
  * from the accessor map on disconnect (REQ-RTP-S-004 - MemoryTracker release
  * on all exit paths), so the strong-ref window is bounded by player session.
  *
- * <p>No {@code org.bukkit.*} imports - ADR-022 §4 invariant.
+ * <p>No {@code org.bukkit.*} imports - ADR-022 section 4 invariant.
  */
 public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
