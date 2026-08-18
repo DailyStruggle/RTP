@@ -6,12 +6,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit coverage for {@link ColourBands} (B12, METRICS_PLAN.md > Health colour coding).
- * The class is intentionally exercised with no live {@code RTP} instance so the
- * {@link ColourBands#resolveDouble} fallback path is forced - this is exactly
- * the scenario the row's hard-coded-default guarantee is meant to cover.
+ * Unit coverage for {@link ColourBands} health colour coding thresholds.
+ * Exercises {@link ColourBands#resolveDouble} fallback path without active config.
  */
-@DisplayName("B12 - /rtp info colour-band thresholds resolve safely with no config loaded")
+@DisplayName("/rtp info colour-band thresholds resolve safely with no config loaded")
 class ColourBandsTest {
 
     @Test

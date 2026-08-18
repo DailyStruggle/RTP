@@ -24,20 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Step 4 (PROPOSAL-config-view-as-book.md v3.7.5 / CHECKLIST step 4) — surface
- * tests for {@code CommandTreeMenuBuilder.buildShapeVertTypePicker} (page 3a)
+ * Surface tests for {@code CommandTreeMenuBuilder.buildShapeVertTypePicker} (page 3a)
  * and {@code buildShapeVertSubParamPage} (page 3b).
- *
- * <p>The builders are tested in isolation: caller supplies the type-name list
- * and sub-parameter map (in production these come from
- * {@code ShapeParameter.values()} / {@code ShapeParameter.subParams(type)} and
- * {@code factory.get(type).getData()}, but the builder does not reach
- * {@code RTP.factoryMap} directly — that wiring lands in the step-6
- * {@code MenuConfigSubtreeBuilder} impl). Q13 stateless-write contract: every
- * sub-parameter row emits {@code OpenParamPicker} with the same write-command
- * path; the parser's stored {@code name} discriminates which type is active.
  */
-@DisplayName("PROPOSAL-config-view-as-book v3.7.5 § shape/vert two-step expansion (step 4)")
+@DisplayName("shape/vert two-step expansion")
 class MenuShapeVertExpansionTest {
 
     @TempDir

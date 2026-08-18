@@ -12,8 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Lightweight, MockBukkit-free coverage for {@link FoliaMapBinding} per
- * {@code CHECKLIST-maps-api.md} Stage 2.3. The Bukkit-side allocate / render
+ * Lightweight, MockBukkit-free coverage for {@link FoliaMapBinding}. The Bukkit-side allocate / render
  * paths are exhaustively covered by {@code BukkitMapBindingTest}; this suite
  * focuses on the Folia-specific narrow surface:
  *
@@ -33,7 +32,7 @@ class FoliaMapBindingTest {
     void typeHierarchy() {
         FoliaMapBinding binding = new FoliaMapBinding();
         assertTrue(binding instanceof BukkitMapBinding,
-                "FoliaMapBinding must extend BukkitMapBinding (Stage 2.3)");
+                "FoliaMapBinding must extend BukkitMapBinding");
         assertTrue(binding instanceof MapBinding,
                 "FoliaMapBinding must implement MapBinding via inheritance");
         assertTrue(binding instanceof MapBindingLifecycle,

@@ -26,16 +26,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Step 3 (PROPOSAL-config-view-as-book.md v3.7 / CHECKLIST step 3) — surface
- * tests for {@code CommandTreeMenuBuilder.buildConfigSelector} and
+ * Surface tests for {@code CommandTreeMenuBuilder.buildConfigSelector} and
  * {@code buildConfigFile}.
  *
- * <p>These are the curated 3-page config subtree's first two pages
+ * <p>These are the curated config subtree's first two pages
  * (selector → per-file). The per-key page (page 3) reuses
- * {@code buildParamPicker} verbatim and is exercised by
- * {@code MenuParamPickerStageA2Test}.
+ * {@code buildParamPicker} verbatim.
  */
-@DisplayName("PROPOSAL-config-view-as-book v3.7 § config subtree builders (step 3)")
+@DisplayName("Config subtree builders test")
 class MenuConfigSubtreeBuildersTest {
 
     @TempDir
@@ -71,8 +69,7 @@ class MenuConfigSubtreeBuildersTest {
         assertEquals(0, ((MenuAction.OpenMenu) back.action()).path().length,
                 "Back must target the root menu page (empty path)");
 
-        // Row 1 → Search via OpenConfigSearchPrompt (per
-        // PROPOSAL-rtp-menu-config-search.md §10 item 6).
+        // Row 1 → Search via OpenConfigSearchPrompt.
         assertInstanceOf(MenuAction.OpenConfigSearchPrompt.class,
                 lines.get(1).fragments().get(0).action(),
                 "second row must be the search-configs entry point");
@@ -81,9 +78,7 @@ class MenuConfigSubtreeBuildersTest {
         assertEquals(null, lines.get(2).fragments().get(0).action(),
                 "header row must be non-clickable");
 
-        // Rows 3..4 → Regions / Worlds multiconfig submenu entry points
-        // (CHECKLIST-multiconfig-menu: these live on the config selector,
-        // not the admin panel).
+        // Rows 3..5 → Regions / Worlds / Effects multiconfig submenu entry points.
         MenuAction regionsAction = lines.get(3).fragments().get(0).action();
         assertInstanceOf(MenuAction.OpenMultiConfigSelector.class, regionsAction,
                 "row 3 must be the Regions multiconfig submenu entry");
@@ -163,7 +158,7 @@ class MenuConfigSubtreeBuildersTest {
     }
 
     // ------------------------------------------------------------------------
-    // buildConfigSelector — recursive directory walk (ADR-071 rule 7)
+    // buildConfigSelector - recursive directory walk (ADR-071 rule 7)
     // ------------------------------------------------------------------------
 
     @Test
@@ -426,13 +421,13 @@ class MenuConfigSubtreeBuildersTest {
         // Simulate a packaging variant (lite jar / hand-trimmed admin YAML)
         // that deliberately omits a single key from the on-disk file. The
         // in-memory parser state is the ground truth that the menu must
-        // mirror — iterating the raw `PerformanceKeys` enum constants would
+        // mirror - iterating the raw `PerformanceKeys` enum constants would
         // re-expose the omitted key purely because it exists in Java.
         PerformanceKeys[] all = PerformanceKeys.values();
         // Need at least two keys so that "omit one" is meaningful.
         org.junit.jupiter.api.Assumptions.assumeTrue(all.length >= 2,
                 "PerformanceKeys must have >= 2 constants for this test");
-        // Pick an omitted key that is *not* the schema-marker `version` —
+        // Pick an omitted key that is *not* the schema-marker `version` -
         // the builder filters `version` unconditionally (2026-05-22 polish),
         // so omitting it from the file makes "only version is missing" a
         // no-op from the menu's perspective.

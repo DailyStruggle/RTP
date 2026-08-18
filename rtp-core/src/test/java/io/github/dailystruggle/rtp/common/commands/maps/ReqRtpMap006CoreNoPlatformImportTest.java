@@ -16,14 +16,8 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-MAP-006 (extends REQ-RTP-F-008 / REQ-RTP-S-005): no class under
- * {@code rtp.common.commands.maps..} (the ADR-047 declarative chart bridge
- * orchestrator + resolvers) imports {@code org.bukkit.*} /
- * {@code net.minecraft.*} / Paper / Fabric, and no method blocks on
- * {@link java.util.concurrent.CompletableFuture#get} or
- * {@link java.util.concurrent.CompletableFuture#join}. Mirrors the
- * {@code maps-api}-side {@code ReqRtpMap002NoChunkIoTest} but on the
- * rtp-core resolver tier.
+ * REQ-RTP-MAP-006: verifies {@code rtp.common.commands.maps} contains no platform imports
+ * (Bukkit, Paper, Minecraft, Fabric) and no blocking {@link java.util.concurrent.CompletableFuture} calls.
  */
 @DisplayName("REQ-RTP-MAP-006 - rtp-core commands.maps is platform-neutral and non-blocking")
 class ReqRtpMap006CoreNoPlatformImportTest {
@@ -45,7 +39,7 @@ class ReqRtpMap006CoreNoPlatformImportTest {
             "net.fabricmc..")
         .because("REQ-RTP-MAP-006 / ADR-047: the rtp-core chart bridge is "
             + "platform-neutral; concrete platform MapBinding lives in "
-            + "rtp-bukkit / rtp-fabric (Stage 2+).");
+            + "platform adapters.");
     rule.check(PRODUCTION_CLASSES);
   }
 

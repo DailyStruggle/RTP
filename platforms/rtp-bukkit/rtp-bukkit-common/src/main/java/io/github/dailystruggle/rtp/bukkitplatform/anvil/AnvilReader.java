@@ -19,14 +19,14 @@ import java.util.zip.InflaterInputStream;
  * it, and hands the decoded root {@code TAG_Compound} back to the caller. It never imports
  * {@link org.bukkit.Chunk} (the whole point of the pre-filter is operating on unloaded chunks)
  * and it performs no block-state or biome interpretation beyond what the structural NBT walk
- * provides — those higher-level views are the job of later phases.
+ * provides - those higher-level views are the job of later phases.
  *
  * <p><b>Compression support.</b> Per observed fixtures across 1.20.4 / 1.21.5 / 26.1 (data
  * versions 3465 / 4671 / 4788), vanilla servers ship Anvil chunks as Minecraft compression
  * mode {@code 2} (zlib-wrapped Deflate). Mode {@code 1} (gzip) is supported for forward
  * compatibility. Mode {@code 3} (uncompressed) is supported. Mode {@code 4} (LZ4) and the
  * {@code 0x80}-or'd "external" variants are rejected with {@link UnsupportedAnvilFormatException}
- * so the pre-filter returns {@link Verdict#UNKNOWN} and the live load path takes over — this
+ * so the pre-filter returns {@link Verdict#UNKNOWN} and the live load path takes over - this
  * is the deliberate safe fallback for formats we have not yet validated against real data.
  *
  * <p>All methods are thread-safe: the class is stateless and operates on caller-owned buffers.
@@ -125,7 +125,7 @@ public final class AnvilReader {
                 System.arraycopy(src, off, copy, 0, len);
                 return copy;
             case 4:
-                throw new UnsupportedAnvilFormatException("LZ4 (compression mode 4) not supported by the Phase 1 pre-filter reader");
+                throw new UnsupportedAnvilFormatException("LZ4 (compression mode 4) not supported by the pre-filter reader");
             default:
                 throw new UnsupportedAnvilFormatException("Unknown Anvil compression mode " + mode);
         }
@@ -167,14 +167,14 @@ public final class AnvilReader {
         return (v instanceof Nbt.NbtList) ? (Nbt.NbtList) v : null;
     }
 
-    // -------------------------------------------------------------------- typed view (Phase 2)
+    // -------------------------------------------------------------------- typed view
 
     /**
      * Reads the chunk at region-local coordinates {@code (cx, cz)} and lifts the raw
      * NBT root into an {@link AnvilChunkView} typed view. Returns {@code null} if the
      * chunk is not present in the region (same semantics as {@link #readChunk}).
      *
-     * <p>This overload is the preferred entry point for the Phase 3 verdict layer — it
+     * <p>This overload is the preferred entry point for the verdict layer - it
      * exposes only the fields the pre-filter actually consults, and shields callers from
      * the {@link Nbt.NbtList} / {@link LinkedHashMap} wire shape.
      */

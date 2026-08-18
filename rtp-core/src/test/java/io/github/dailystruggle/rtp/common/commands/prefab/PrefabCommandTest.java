@@ -23,13 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Session 4a smoke tests for {@code /rtp admin} and the {@code prefab}
- * subtree. Focuses on the security/state shape that survives Session 4b's
- * disk-write wiring: command metadata + permissions, nonce mint on apply,
- * nonce single-use consume, TTL expiry, caller binding, prefab binding.
- *
- * <p>Session 4b will add a sibling {@code PrefabOnDiskWriteTest} that
- * exercises the atomic-rename + {@code .bak.&lt;ts&gt;} retention path.
+ * Smoke tests for {@code /rtp admin} and the {@code prefab}
+ * subtree. Focuses on the security/state shape: command metadata + permissions,
+ * nonce mint on apply, nonce single-use consume, TTL expiry, caller binding, prefab binding.
  */
 class PrefabCommandTest {
 
@@ -156,17 +152,8 @@ class PrefabCommandTest {
 
     @Test
     void multiWorldApply_repairsNetherVertInDiffAndTrees() throws Exception {
-        // The multi-world prefab clones the overworld regions/default template
-        // into each world. In a nether world that cloned vert (sky-light
-        // required, maxY at the build limit) makes every teleport attempt fail
-        // vert/no-stand-y. The apply step must repair it via the canonical
-        // NetherEndConfigAmender so the preview diff already shows the fix
-        // (option B: diff-consistent).
-        //
-        // Use a dedicated plugin dir (not the shared @TempDir) because this
-        // test writes worlds/*.yml whose open config-file handles trip the
-        // @TempDir auto-delete on Windows; a manually-created dir is left for
-        // the OS to reap, matching MultiConfigRemovalGuardsTest.
+        // Multi-world prefab clones overworld regions/default; verify NetherEndConfigAmender
+        // repairs nether vert settings (requireSkyLight=false, maxY <= 128) in diff and trees.
         java.io.File pluginDir =
                 java.nio.file.Files.createTempDirectory("rtp-prefab-nether-test").toFile();
         accessor = RTPTestSetup.install(pluginDir);
@@ -231,7 +218,7 @@ class PrefabCommandTest {
 
     // Post-token-removal (2026-05-24, mirrors ADR-050): the pending diff is
     // keyed solely on (callerId, prefabId). No opaque token, no TTL, no
-    // wrong-caller / wrong-prefab / expired arms — those concerns are
+    // wrong-caller / wrong-prefab / expired arms - those concerns are
     // collapsed into the trust boundary of the command sender.
 
     @Test
@@ -321,7 +308,7 @@ class PrefabCommandTest {
         PrefabNonceStore store = new PrefabNonceStore();
         UUID caller = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
-        // No mint — caller has no pending diff.
+        // No mint - caller has no pending diff.
         PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
         Map<String, List<String>> params = new HashMap<>();
         params.put("id", List.of("low-performance"));
@@ -364,7 +351,7 @@ class PrefabCommandTest {
     // --- PrefabRollbackCmd ---------------------------------------------------
 
     @Test
-    void rollback_isStubInSession4a() {
+    void rollback_missingBackupsReportsNoOp() {
         PrefabRollbackCmd rb = new PrefabRollbackCmd(null);
         UUID caller = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));

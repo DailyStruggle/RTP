@@ -69,7 +69,7 @@ public class InfoCmdTest {
         verify(next).onCommand(any(), any(), isNull());
     }
 
-    // ── onCommand empty params — player sender ────────────────────────────────
+    // ── onCommand empty params - player sender ────────────────────────────────
 
     @Test
     void onCommand_emptyParams_playerSender_returnsTrue() {
@@ -81,11 +81,11 @@ public class InfoCmdTest {
         assertTrue(result);
     }
 
-    // ── onCommand empty params — console sender ───────────────────────────────
+    // ── onCommand empty params - console sender ───────────────────────────────
 
     @Test
     void onCommand_emptyParams_consoleSender_returnsTrue() {
-        // RTPAPI.serverId is UUID(0,0) — the console
+        // RTPAPI.serverId is UUID(0,0) - the console
         boolean result = infoCmd.onCommand(RTPAPI.serverId, new HashMap<>(), null);
 
         assertTrue(result);
@@ -197,7 +197,7 @@ public class InfoCmdTest {
         assertTrue(result);
     }
 
-    // ── metrics snapshot caching (B11 cleanup, METRICS_PLAN.md) ───────────────
+    // ── metrics snapshot caching ──────────────────────────────────────────────
 
     /**
      * One {@code /rtp info} invocation shall trigger exactly one
@@ -232,7 +232,7 @@ public class InfoCmdTest {
                     1,
                     tpsReads.get(),
                     "InfoCmd must capture exactly one MetricsSnapshot per /rtp info "
-                            + "invocation (B11 cleanup); placeholders read the cached snapshot "
+                            + "invocation; placeholders read the cached snapshot "
                             + "via PlaceholderProvider.currentSnapshot().");
         } finally {
             RTP.metrics.setBinding(null);
@@ -277,7 +277,7 @@ public class InfoCmdTest {
                 };
         RTP.metrics.setBinding(folia);
         @SuppressWarnings("unchecked")
-        // Inject explicit templates — the test ConfigParser stub returns the
+        // Inject explicit templates - the test ConfigParser stub returns the
         // enum name as default text, which would not exercise the row-token
         // substitution. Setting the values directly is the minimal surface
         // for verifying the rendering path.

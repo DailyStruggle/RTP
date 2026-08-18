@@ -25,25 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Step 6 coverage for {@link ViewSubConfigCmd} — the rewritten
- * {@code /rtp config <file> view} command that opens the interactive book
- * menu via the {@link ViewSubConfigCmd.BookViewOpener} hook, and falls
- * through to the legacy raw-dump path provided by
- * {@link ViewRawSubConfigCmd} when no opener is wired.
- *
- * <p>The legacy raw-dump verb has been moved to its own subcommand
- * ({@code /rtp config <file> viewraw}); these tests assert the new entry
- * point's contract:
- * <ul>
- *   <li>When an opener is installed and returns {@code true}, the command
- *       does not fall through to the raw-dump path.</li>
- *   <li>When no opener is installed, the command falls through.</li>
- *   <li>When an opener is installed but returns {@code false}, the command
- *       falls through.</li>
- *   <li>When the opener throws, the failure is logged and the command
- *       falls through (rather than propagating the exception to the
- *       command pipeline).</li>
- * </ul>
+ * Unit tests for {@link ViewSubConfigCmd} ({@code /rtp config <file> view}).
+ * Verifies book menu opener hook dispatch and fallback to {@link ViewRawSubConfigCmd}.
  */
 final class ViewSubConfigCmdTest {
 
@@ -159,7 +142,7 @@ final class ViewSubConfigCmdTest {
         ConfigParser<PerformanceKeys> parser = lookupPerformanceParser();
         ViewRawSubConfigCmd raw = new ViewRawSubConfigCmd(null, parser);
         assertEquals("viewraw", raw.name(),
-                "raw chat-dump must be registered under 'viewraw' (step 6 extraction)");
+                "raw chat-dump must be registered under 'viewraw'");
         assertEquals("rtp.config", raw.permission());
     }
 

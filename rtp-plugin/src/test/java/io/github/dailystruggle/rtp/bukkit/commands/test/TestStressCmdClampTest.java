@@ -10,12 +10,12 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit tests for the argument parsing and clamping helpers in
  * {@link TestStressCmd}. These helpers are safety-relevant: they enforce
- * the hard caps documented in {@code RUNTIME_TEST_SUITE_PLAN.md §3} that
+ * the hard caps that
  * prevent an operator typo (e.g. {@code iterations:1000000}) from
  * saturating the scheduler.
  *
  * <p>Traces REQ-RTP-S-004 (no silent failure modes) and the hard-cap
- * contract from the plan document. See {@code docs/dev/TRACEABILITY.md}.
+ * contract. See {@code docs/dev/TRACEABILITY.md}.
  */
 class TestStressCmdClampTest {
 
@@ -38,10 +38,10 @@ class TestStressCmdClampTest {
   }
 
   @Test
-  @DisplayName("documented defaults match the plan's safe-runtime expectations")
+  @DisplayName("documented defaults match safe-runtime expectations")
   void defaultsMatchPlanDocument() {
-    // These values are the contract the plan document promises; if they
-    // change, RUNTIME_TEST_SUITE_PLAN.md §2 must change in the same commit.
+    // These values are the contract promised; if they
+    // change, the corresponding tests and documentation must change in the same commit.
     assertEquals(10, TestStressCmd.DEFAULT_ITERATIONS);
     assertEquals(40, TestStressCmd.DEFAULT_INTERVAL_TICKS);
     assertEquals(1, TestStressCmd.MIN_ITERATIONS);

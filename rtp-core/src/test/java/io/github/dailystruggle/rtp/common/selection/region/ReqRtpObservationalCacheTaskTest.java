@@ -19,24 +19,8 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Verifies the Phase 8.2 pivot (2026-04-20c) observational-mode contract on
- * {@link RegionCacheTask}:
- *
- * <ol>
- *   <li>The default-mode task early-returns when the pregen cache is at or
- *       above {@code cacheCap} (unchanged behaviour — regression guard).</li>
- *   <li>The observational-mode task early-returns when the cache has
- *       headroom (the strict inversion).</li>
- *   <li>When an observational task runs to completion with a safe-candidate
- *       result, the candidate is not enqueued on {@code unkeptLocations} —
- *       the queue size does not grow past {@code cacheCap}.</li>
- * </ol>
- *
- * <p>Traces to {@code docs/dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md} §2 /
- * §4.2 / §4.4. Uses only mock server components
- * ({@link MockRTPWorld}, {@link MockRTPServerAccessor}) + the real
- * {@link LocationGenerator} to exercise the full public surface the pivot
- * touches.
+ * Verifies the observational-mode contract on {@link RegionCacheTask}.
+ * Checks early returns on capacity/headroom and ensures queue sizes respect cacheCap.
  */
 public class ReqRtpObservationalCacheTaskTest {
 
@@ -79,7 +63,7 @@ public class ReqRtpObservationalCacheTaskTest {
 
     /**
      * Default-mode task must return immediately when the cache is already
-     * at capacity — this is the behaviour the observational mode inverts,
+     * at capacity - this is the behaviour the observational mode inverts,
      * so it's guarded here as the prerequisite invariant.
      */
     @Test
@@ -105,8 +89,8 @@ public class ReqRtpObservationalCacheTaskTest {
 
     /**
      * Observational-mode task must early-return when the cache has
-     * headroom — the default-mode task retains priority while it still
-     * has work to do. Plan §2.
+     * headroom - the default-mode task retains priority while it still
+     * has work to do.
      */
     @Test
     @Timeout(value = 2, unit = TimeUnit.SECONDS)
@@ -129,7 +113,7 @@ public class ReqRtpObservationalCacheTaskTest {
 
     /**
      * observe() factory must produce a task whose gate is inverted from
-     * the default constructor's gate — i.e. the two constructions are
+     * the default constructor's gate - i.e. the two constructions are
      * complementary, never both runnable at the same cache state.
      */
     @Test
@@ -143,24 +127,8 @@ public class ReqRtpObservationalCacheTaskTest {
     }
 
     /**
-     * Regression guard for the perpetual {@code [cached] = totalCap - 1}
-     * symptom (e.g. "cached: 59" against a 60-slot total). Root cause:
-     * {@code Region.execute()} added the observational task to
-     * {@code cachePipeline} BEFORE computing the cache-fill deficit, so
-     * {@code cachePipeline.size()} was already inflated by 1 at deficit
-     * time. The deficit equation
-     * {@code totalCap - (cachePipeline.size() + kept + unkept + inFlight)}
-     * therefore swallowed exactly one default-mode cache slot per pulse.
-     * The observational task self-gates closed when the cache has headroom
-     * (RegionCacheTask.run() — {@code if (!cacheFull) return;}), so the
-     * stolen slot was never filled by the observational task either. Net:
-     * cache pinned one slot below {@code cacheCap + activeChunkCap}
-     * indefinitely.
-     *
-     * <p>Setup mirrors the user-visible scenario: cacheCap=3, activeCap=5
-     * (totalCap=8), observational mode enabled by default. We pump
-     * execute() until the public queue length stops growing and assert it
-     * reaches the full totalCap.
+     * Regression guard for perpetual {@code [cached] = totalCap - 1} symptom,
+     * ensuring cache deficit computation reaches full totalCap with observational mode enabled.
      */
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
@@ -186,6 +154,6 @@ public class ReqRtpObservationalCacheTaskTest {
         assertEquals(totalCap, current,
                 "with observational mode enabled, [cached] must reach "
                         + "cacheCap + activeChunkCap (regression guard for the "
-                        + "off-by-one cache-deficit bug — \"cached: 59\" symptom).");
+                        + "off-by-one cache-deficit bug - \"cached: 59\" symptom).");
     }
 }

@@ -14,27 +14,8 @@ import java.util.ArrayList;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Exercises the core logic paths of {@link JumpAdjustor}.
- *
- * <p>The {@link JumpAdjustor} finds a valid landing Y via three phases:
- * <ol>
- *   <li><b>Phase 1</b> – scans bottom-up to find the first non-air unsafe block and
- *       advances {@code minY} to it.</li>
- *   <li><b>Phase 2</b> – binary-search-like jumps (only active when {@code step > 2}),
- *       halving {@code step} each iteration to narrow the search window.</li>
- *   <li><b>Phase 3</b> – linear scan from {@code minY} to {@code maxY} looking for the
- *       pattern: solid floor at {@code i-1}, two clear air blocks at {@code i} and
- *       {@code i+1}, all three positions safe.</li>
- * </ol>
- *
- * <p>Each test uses a {@link ConfigurableMockChunk} with blocks placed at specific
- * Y-coordinates:
- * <ul>
- *   <li>{@link ConfigurableMockChunk#setSolid(int)} – non-air <em>and</em> unsafe
- *       (e.g. lava, fire). Phase 1 advances {@code minY} past these.</li>
- *   <li>{@link ConfigurableMockChunk#setSolidSafe(int)} – non-air <em>but</em> safe
- *       (e.g. stone, dirt). Used for floor blocks that Phase 3 can stand on.</li>
- * </ul>
+ * Exercises {@link JumpAdjustor} logic paths: floor advance, binary narrowing,
+ * and linear landing scan. Uses {@link ConfigurableMockChunk} fixtures.
  */
 public class JumpAdjustorTest {
 
@@ -69,14 +50,14 @@ public class JumpAdjustorTest {
     /**
      * Direct Hit: solid-safe floor at Y=64, two air blocks above (Y=65, 66).
      *
-     * <p>Phase 1 finds no unsafe blocks, so {@code minY} stays at 60.
-     * Phase 2 is skipped (step clamped to 1 for a small range).
-     * Phase 3 linear scan: {@code i=65} → {@code !isAir(64)} ✓, {@code isAir(65,66)} ✓,
+     * <p>Floor advance finds no unsafe blocks, so {@code minY} stays at 60.
+     * Binary narrowing is skipped (step clamped to 1 for a small range).
+     * Landing scan: {@code i=65} → {@code !isAir(64)} ✓, {@code isAir(65,66)} ✓,
      * {@code isSafe(64,65,66)} ✓ → <b>Y=65</b>.
      */
     @Test
     void directHit_solidFloorAtY64_returnsY65() {
-        // range 60–80, solid-safe floor only at Y=64; Y=65 and Y=66 are air
+        // range 60-80, solid-safe floor only at Y=64; Y=65 and Y=66 are air
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
         chunk.setSolidSafe(64);
 
@@ -92,13 +73,8 @@ public class JumpAdjustorTest {
     // -----------------------------------------------------------------------
 
     /**
-     * Step Expansion: unsafe solid band from Y=60 to Y=83, with a safe floor at Y=84
-     * and an open air gap at Y=85–86.
-     *
-     * <p>Range 60–100, step=1 (Phase 2 skipped).
-     * Phase 1 advances {@code minY} to the first unsafe block (Y=60).
-     * Phase 3 linear scan skips all solid positions and finds {@code i=85}:
-     * {@code !isAir(84)} ✓, {@code isAir(85,86)} ✓, {@code isSafe(84,85,86)} ✓ → <b>Y=85</b>.
+     * Step Expansion: unsafe band Y=60..83, safe floor at Y=84, air at Y=85-86.
+     * Landing scan skips solid band and finds Y=85.
      */
     @Test
     void stepExpansion_solidBaseline_jumpsToGapOneStepAway() {
@@ -119,19 +95,15 @@ public class JumpAdjustorTest {
     // -----------------------------------------------------------------------
 
     /**
-     * Ceiling Clearance: a 1-block-high tunnel at Y=65 (solid-safe floor at Y=64,
-     * solid-safe ceiling at Y=66). The adjustor must reject Y=65 because
-     * {@code isAir(i+1)=isAir(66)} is {@code false}, and instead find the next open
-     * space above the ceiling.
-     *
-     * <p>Layout: solid-safe at Y=64 (floor) and Y=66 (ceiling), air only at Y=65.
-     * Next valid gap: floor at Y=66 (solid-safe), air at Y=67 and Y=68 → <b>Y=67</b>.
+     * Ceiling Clearance: 1-block tunnel at Y=65 (floor at Y=64, ceiling at Y=66).
+     * Adjustor rejects Y=65 (no headroom) and finds Y=67 above ceiling.
      */
     @Test
     void ceilingClearance_oneBlockHighTunnel_skipsAndFindsOpenSpace() {
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
         chunk.setSolidSafe(64); // floor of tunnel
-        chunk.setSolidSafe(66); // ceiling of tunnel (only 1 air block at Y=65 — not enough headroom)
+        // ceiling of tunnel (insufficient headroom at Y=65)
+        chunk.setSolidSafe(66);
 
         JumpAdjustor adj = buildAdjustor(60, 80, 1);
         RTPCoords result = adj.adjust(chunk);
@@ -148,8 +120,8 @@ public class JumpAdjustorTest {
     /**
      * No Valid Landing: the entire range is filled with unsafe solid blocks.
      *
-     * <p>Phase 1 advances {@code minY} to Y=60 (first unsafe block).
-     * Phase 3 finds no position where {@code isAir(i) && isAir(i+1)} → returns {@code null}.
+     * <p>Floor advance moves {@code minY} to Y=60 (first unsafe block).
+     * The landing scan finds no position where {@code isAir(i) && isAir(i+1)} → returns {@code null}.
      */
     @Test
     void noValidLanding_entireRangeSolid_returnsNull() {
@@ -167,12 +139,12 @@ public class JumpAdjustorTest {
     // -----------------------------------------------------------------------
 
     /**
-     * All Air: the entire range is air — there is no solid floor block, so Phase 3
-     * never satisfies {@code !isAir(i-1)} and returns {@code null}.
+     * All Air: the entire range is air - there is no solid floor block, so the landing
+     * scan never satisfies {@code !isAir(i-1)} and returns {@code null}.
      */
     @Test
     void allAir_noFloor_returnsNull() {
-        // chunk has no solid blocks at all — every block is air
+        // chunk has no solid blocks at all - every block is air
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
 
         JumpAdjustor adj = buildAdjustor(60, 80, 1);
@@ -182,7 +154,7 @@ public class JumpAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // adjust(chunk, output) overload — direct boolean form
+    // adjust(chunk, output) overload - direct boolean form
     // -----------------------------------------------------------------------
 
     /**
@@ -220,15 +192,15 @@ public class JumpAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // Phase 2 — step > 2 (binary-search phase)
+    // Binary narrowing - step > 2
     // -----------------------------------------------------------------------
 
     /**
-     * Phase 2 active (step=16): a solid-safe floor at Y=64 with air above.
-     * Phase 2 narrows the window; Phase 3 then finds Y=65.
+     * Binary narrowing active (step=16): a solid-safe floor at Y=64 with air above.
+     * The narrowing pass shrinks the window; the landing scan then finds Y=65.
      */
     @Test
-    void phase2_largeStep_narrowsWindowAndFindsLanding() {
+    void largeStep_narrowsWindowAndFindsLanding() {
         // With step=16 the binary-search phase narrows the window; place the
         // solid-safe block at the very bottom so it is always found.
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
@@ -237,38 +209,31 @@ public class JumpAdjustorTest {
         JumpAdjustor adj = buildAdjustor(60, 100, 16);
         RTPCoords result = adj.adjust(chunk);
 
-        assertNotNull(result, "Phase-2 adjustor should find a valid landing");
+        assertNotNull(result, "binary-narrowing adjustor should find a valid landing");
         assertEquals(61, result.y(), "Landing should be Y=61 above the solid-safe floor at Y=60");
     }
 
     /**
-     * Phase 2 active (step=8): entire range is solid — Phase 2 should exhaust the window
-     * and return false (null from the nullable overload).
+     * Binary narrowing active (step=8): entire range is solid - the narrowing pass
+     * should exhaust the window and return false (null from the nullable overload).
      */
     @Test
-    void phase2_largeStep_entireRangeSolid_returnsNull() {
+    void largeStep_entireRangeSolid_returnsNull() {
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
         for (int y = 60; y <= 100; y++) chunk.setSolid(y);
 
         JumpAdjustor adj = buildAdjustor(60, 100, 8);
         RTPCoords result = adj.adjust(chunk);
 
-        assertNull(result, "Phase-2 adjustor should return null when entire range is solid");
+        assertNull(result, "binary-narrowing adjustor should return null when entire range is solid");
     }
 
     /**
-     * Regression for the cold->hot promotion drop ([PROMOTE_DIAG] vert.adjust=null).
-     *
-     * <p>With the default region's parameters (minY=32, maxY=255, step=16) over
-     * terrain whose surface sits at Y=67 (solid 32..67, air 68+), Phase 2 narrows
-     * the window down to exactly {@code maxY=68} — which is the one valid standing
-     * Y (feet at 68, ground at 67, head at 69). The Phase-3 final scan must include
-     * that converged {@code maxY}; previously it used an exclusive {@code i < maxY}
-     * bound, never re-tested Y=68, and returned {@code null}, dropping a perfectly
-     * good live, generated land chunk at promotion.
+     * Regression: verify that when binary narrowing converges maxY onto the only
+     * valid standing Y, the inclusive upper bound preserves that candidate.
      */
     @Test
-    void phase2_convergedMaxYIsTheOnlyLanding_isNotDropped() {
+    void convergedMaxYIsTheOnlyLanding_isNotDropped() {
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
         for (int y = 32; y <= 67; y++) chunk.setSolidSafe(y); // solid ground up to 67, air 68+
 
@@ -276,20 +241,20 @@ public class JumpAdjustorTest {
         RTPCoords result = adj.adjust(chunk);
 
         assertNotNull(result,
-                "JumpAdjustor must not drop a valid landing when Phase 2 converges maxY onto it");
+                "JumpAdjustor must not drop a valid landing when binary narrowing converges maxY onto it");
         assertEquals(68, result.y(), "Landing should be Y=68 (one above the solid ground at Y=67)");
     }
 
     // -----------------------------------------------------------------------
-    // adjustColumn — per-column re-validation (cold->hot promotion path)
+    // adjustColumn - per-column re-validation (cold->hot promotion path)
     // -----------------------------------------------------------------------
 
     /**
      * {@code adjustColumn} re-validates exactly the requested column and returns
-     * the landing Y derived with the same Phase-3 predicate as {@code adjust},
+     * the landing Y derived with the same landing-scan predicate as {@code adjust},
      * with the global X/Z resolved from the requested in-chunk local column.
      * This is the entry point the promotion verify uses to avoid re-sampling
-     * the fixed sub-columns ([PROMOTE_DIAG] vert.adjust=null regression).
+     * the fixed sub-columns (vertical adjust returned null regression).
      */
     @Test
     void adjustColumn_findsLandingOnRequestedColumn() {
@@ -338,7 +303,7 @@ public class JumpAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // testPlacement — verifier integration
+    // testPlacement - verifier integration
     // -----------------------------------------------------------------------
 
     /**
@@ -406,7 +371,7 @@ public class JumpAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // safetyRadius — live full-load path sweeps [1..safetyRadius] below feet
+    // safetyRadius - live full-load path sweeps [1..safetyRadius] below feet
     // -----------------------------------------------------------------------
 
     /**
@@ -414,7 +379,7 @@ public class JumpAdjustorTest {
      * with {@code safetyRadius=2}, a safe crust at {@code y-1} over an unsafe block
      * at {@code y-2} must reject the candidate. Before aligning the live path with
      * the probe-path sweep, only {@code y-1} was checked and the crust alone would
-     * pass — players would drop through into the fluid.
+     * pass - players would drop through into the fluid.
      */
     @Test
     void safetyRadius_liveFullLoad_rejectsUnsafeUnderSafeCrust() throws Exception {
@@ -438,7 +403,7 @@ public class JumpAdjustorTest {
         safetyData.put(
                 io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.safetyRadius, 2);
 
-        // No static cache to reset — JumpAdjustor reads safety config directly
+        // No static cache to reset - JumpAdjustor reads safety config directly
         // from RTP.configs at the top of each adjust(...) call now.
 
         try {

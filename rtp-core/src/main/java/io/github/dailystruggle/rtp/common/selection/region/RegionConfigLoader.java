@@ -62,11 +62,9 @@ public class RegionConfigLoader {
         }
 
         // 2. Deserializing the Shape
-        // ADR-073: record an @<file> reference so the menu can show the inherit state; the
-        // getConfigValue call below resolves the token to the inherited default block.
+        // ADR-073: record @<file> reference so the menu can show inherit state.
         recordReferenceIfAny(regionParser, RegionKeys.shape);
         Object rawShape = regionParser.getConfigValue(RegionKeys.shape, null);
-//        System.out.println("[RTP-DEBUG] RegionLoader: Raw Shape Object Type: " + (rawShape == null ? "null" : rawShape.getClass().getSimpleName()));
 
         Shape<?> shape = null;
         if (rawShape instanceof Shape<?>) {
@@ -99,7 +97,6 @@ public class RegionConfigLoader {
         // 3. Deserializing the Vertical Adjustor
         recordReferenceIfAny(regionParser, RegionKeys.vert);
         Object rawVert = regionParser.getConfigValue(RegionKeys.vert, null);
-//        System.out.println("[RTP-DEBUG] RegionLoader: Raw Vert Object Type: " + (rawVert == null ? "null" : rawVert.getClass().getSimpleName()));
 
         VerticalAdjustor<?> vert = null;
         if (rawVert instanceof VerticalAdjustor<?>) {
@@ -142,10 +139,6 @@ public class RegionConfigLoader {
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
 
         if (shape instanceof MemoryShape<?> && world != null) {
-            if (detailedRegionInit) {
-                // Here we CAN use RTP.log if we want, but since we are debugging early init, sysout is safer
-//                System.out.println("[RTP-DEBUG] RegionLoader: [" + name + "] memory shape detected, reading location data from file...");
-            }
             // Filename keyed by RegionCacheKey: any change to seed/shape/vert invalidates the cache.
             ((MemoryShape<?>) shape).load(
                 name + "_" + RegionCacheKey.cacheKey(world, shape, vert) + ".bin", world.name());
@@ -203,50 +196,33 @@ public class RegionConfigLoader {
 
     private static Shape<?> deserializeShape(Map<String, Object> map) {
         String shapeName = String.valueOf(map.getOrDefault("name", "CIRCLE")).toUpperCase();
-//        System.out.println("[RTP-DEBUG] RegionLoader: Deserializing Shape... Extracted Name = '" + shapeName + "'");
-
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
         Shape<?> prototype = (Shape<?>) factory.get(shapeName);
 
         if (prototype != null) {
             Shape<?> clone = prototype.clone();
             clone.setData(map);
-//            System.out.println("[RTP-DEBUG] RegionLoader: Successfully mapped to prototype '" + prototype.name + "' and applied config data.");
             return clone;
-        } else {
-//            System.out.println("[RTP-DEBUG] RegionLoader: FAILURE - No shape prototype found in factory for '" + shapeName + "'. Available: " + factory.list());
         }
         return null;
     }
 
     private static VerticalAdjustor<?> deserializeVert(Map<String, Object> map) {
         String vertName = String.valueOf(map.getOrDefault("name", "JUMP")).toUpperCase();
-//        System.out.println("[RTP-DEBUG] RegionLoader: Deserializing Vert... Extracted Name = '" + vertName + "'");
-
         Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
         VerticalAdjustor<?> prototype = (VerticalAdjustor<?>) factory.get(vertName);
 
         if (prototype != null) {
             VerticalAdjustor<?> clone = (VerticalAdjustor<?>) prototype.clone();
             clone.setData(map);
-//            System.out.println("[RTP-DEBUG] RegionLoader: Successfully mapped to prototype '" + prototype.name + "' and applied config data.");
             return clone;
-        } else {
-//            System.out.println("[RTP-DEBUG] RegionLoader: FAILURE - No vert prototype found in factory for '" + vertName + "'. Available: " + factory.list());
         }
         return null;
     }
 
     /**
-     * Detects whether the configured world in {@code regionParser} was unavailable at the time
-     * {@link #load} ran, causing the "RTP-2 master fallback" to substitute the server's primary
-     * world. Returns the raw configured world name when a fallback occurred; returns {@code null}
-     * when the resolved world matches the configured name (or the configured value uses the
-     * {@code [index]} syntax, where no meaningful rebind target exists).
-     *
-     * <p>Callers use the returned name to re-resolve and rebind the region via
-     * {@code Region.rebindWorld} once the real world becomes available (e.g. after
-     * {@code WorldLoadEvent}).
+     * Detects if configured world was unavailable at load time (dormant region).
+     * Returns the raw world name to rebind on WorldLoadEvent, or null if matched.
      */
     public static String detectFallbackConfiguredWorld(ConfigParser<RegionKeys> regionParser, RegionSettings settings) {
         if (settings == null) return null;

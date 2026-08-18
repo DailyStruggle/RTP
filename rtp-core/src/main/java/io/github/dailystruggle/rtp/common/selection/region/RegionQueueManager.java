@@ -8,18 +8,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * Manages the generation and distribution of pre-calculated teleport locations for a specific region.
- *
- * <p>This class is the core of the plugin's "instant teleport" feature. Instead of finding a location
- * when a player executes a command, this manager maintains queues of valid locations.
- *
+ * Manages pre-calculated teleport location queues for a region:
  * <ul>
- *   <li><b>Hot Queue (keptLocations):</b> Chunks are currently loaded in server memory and ready for immediate use.</li>
- *   <li><b>Cold Queue (unkeptLocations):</b> Locations have been verified as safe, but their chunks have been released to save RAM.</li>
- *   <li><b>Per-Player Queue:</b> Specific locations reserved or recycled for individual players.</li>
+ *   <li><b>Hot Queue (keptLocations):</b> Active chunk tickets held for immediate use.</li>
+ *   <li><b>Cold Queue (unkeptLocations):</b> Safe coordinates with released chunk tickets.</li>
+ *   <li><b>Per-Player Queue:</b> Dedicated coordinates reserved for individual players.</li>
  * </ul>
- *
- * <p>By asynchronously replenishing these queues, the plugin guarantees zero-latency teleports.
  */
 public class RegionQueueManager {
     private final Region region;
@@ -31,53 +25,28 @@ public class RegionQueueManager {
     public final LockFreeLocationBuffer unkeptLocations;
 
     /**
-     * Cross-server sibling of {@link #keptLocations} (PROPOSAL
-     * §12.2). Identical lifecycle (kept-with-ticket
-     * semantics, fed by the scan/verify pipeline, drained by the network
-     * reservation pulse) but isolated from local {@code /rtp} consumption so
-     * local players draining {@code keptLocations} cannot starve cross-server
-     * requests and vice versa.
+     * Cross-server sibling of {@link #keptLocations} for network reservations.
      *
      * <p>Allocated only when {@code settings.networkReserveSize() > 0};
-     * {@code null} otherwise (local routing means most
-     * deployments will leave this off until they opt in). Capacity is
      * clamped to {@code min(networkReserveSize, cacheCap)}.
      */
-    @org.jetbrains.annotations.Nullable
     public final LockFreeLocationBuffer networkKeptLocations;
 
     /**
-     * In-flight pinned reservations for cross-server transfers
-     * (PROPOSAL §12). Keyed by the proxy-issued
-     * {@code networkTokenId} (see {@code ReservationToken} in
-     * {@code rtp-proxy-common}). An entry exists between
-     * {@link #reserveFromNetworkKept(UUID, String)} (called by the backend
-     * reservation pulse) and
-     * {@link #redeemReserved(UUID)} (called by {@code JoinTriggerSource}
-     * post-transfer) or {@link #releaseToNetworkKept(UUID)}
-     * (TTL reaper / disconnect).
+     * In-flight cross-server reservations keyed by proxy-issued {@code networkTokenId}.
      *
-     * <p>Never {@code null}; empty when no reservations are outstanding.
+     * <p>Pinned between {@link #reserveFromNetworkKept(UUID, String)} and
+     * {@link #redeemReserved(UUID)} or {@link #releaseToNetworkKept(UUID)}.
      */
     public final ConcurrentHashMap<UUID, RTPLocation> networkReservedLocations =
             new ConcurrentHashMap<>();
 
     /**
-     * L3 backlog cache (ADR-028). Order-preserving FIFO of unverified candidate
-     * locations produced by shape-only picks (no chunk I/O — S-005 safe). Each
-     * entry carries a tri-state validity flag
-     * ({@code UNVERIFIED}/{@code VALIDATED}/{@code INVALIDATED}); per
-     * {@link Region#execute(long)} pulse, exactly one Anvil-region-file bin is
-     * verified via the bound {@link io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry}
-     * provider, and the contiguous-{@code VALIDATED} head is drained into
-     * {@link #unkeptLocations}.
+     * L3 backlog cache (ADR-028): shape-only candidate FIFO prior to chunk I/O (S-005).
      *
-     * <p>Allocated only when {@code backlogCacheCap > 0}; {@code null} otherwise
-     * (lite default per ADR-028 / lite YAML overlay). Storage of truth lives
-     * here; the world-level {@link WorldBacklogBinIndex} only holds weak
-     * references for cross-RTP-region Anvil amortization.
+     * <p>Anvil bins are verified per {@link Region#execute(long)} pulse, and validated
+     * entries are promoted to {@link #unkeptLocations}. Null when {@code backlogCacheCap <= 0}.
      */
-    @org.jetbrains.annotations.Nullable
     public final BacklogLocationBuffer backlogLocations;
 
     /**
@@ -98,21 +67,11 @@ public class RegionQueueManager {
     }
 
     /**
-     * Login Reserve Queue (ADR-023): a reserved kept-cache of safe locations
-     * promoted from {@link #unkeptLocations} solely for join-time teleports
-     * routed through {@code rtp.onevent.firstjoin}/{@code rtp.onevent.join}.
+     * Login Reserve Queue (ADR-023): kept-cache for join-time teleports.
      *
-     * <p>Allocated only on the default-world region (the first world configured
-     * for RTP) and only when {@code PerformanceKeys.loginCacheEnabled=true}.
-     * On all other regions and when the toggle is off, this field is
-     * {@code null}.
-     *
-     * <p>Fill loop is event-driven and decoupled from {@code Region.execute()}:
-     * a startup burst tops it up to {@code loginCacheCap}, then
-     * {@code PlayerQuitEvent} triggers a single-slot lazy refill. This avoids
-     * sharing budget with the regular hot/cold deficit loop.
+     * <p>Allocated only on default-world region when {@code PerformanceKeys.loginCacheEnabled=true}.
+     * Decoupled from {@code Region.execute()} refill loops.
      */
-    @org.jetbrains.annotations.Nullable
     public LockFreeLocationBuffer loginLocations;
 
     /** When reserving/recycling locations for specific players, I want to guard against */
@@ -153,8 +112,8 @@ public class RegionQueueManager {
             this.backlogLocations = (backlogCap > 0)
                     ? new BacklogLocationBuffer((int) Math.min(backlogCap, Integer.MAX_VALUE))
                     : null;
-            // PROPOSAL §12.2: networkKeptLocations is a sibling pool capped
-            // by min(networkReserveSize, cacheCap). 0 disables the network split
+            // networkKeptLocations is a sibling pool capped by
+            // min(networkReserveSize, cacheCap). 0 disables the network split
             // for this region (no allocation; regionKeptCounts heartbeat field omitted).
             long networkReserve = settings.networkReserveSize();
             if (networkReserve > 0) {
@@ -175,18 +134,10 @@ public class RegionQueueManager {
     }
 
     /**
-     * (Re)install the database save/delete callbacks on both location buffers.
+     * (Re)installs database save/delete callbacks on all active location buffers.
      *
-     * <p>Persist both queues. On startup nothing is loaded as "kept" (kept requires a live
-     * chunk reservation, which only the async deficit loop in Region.execute() can produce
-     * safely per REQ-RTP-S-005). The distinction between kept and unkept is therefore
-     * irrelevant to persistence: every cached location is restored as an unkept stub
-     * regardless of which queue it was saved from. Order does not matter — hydration
-     * shuffles the list on load.
-     *
-     * <p>Exposed publicly so that {@link Region#hydrateCacheFromDatabase} can temporarily
-     * disable the save callback during hydration (the rows are already in the DB and are
-     * deleted-after-consumption) and restore the normal persistence behaviour afterwards.
+     * <p>S-005: all hydrated locations restore as unkept stubs regardless of original queue.
+     * Order is shuffled on hydration.
      */
     public void installDatabaseCallbacks() {
         java.util.function.Consumer<RTPLocation> saveCallback = location -> {
@@ -210,22 +161,8 @@ public class RegionQueueManager {
     }
 
     // -------------------------------------------------------------------------
-    // Network reservation API.
-    //
-    // Reserve a coordinate from networkKeptLocations under a proxy-issued
-    // networkTokenId. Returns the reserved RTPLocation on success, null when
-    // the network sibling pool is absent or empty. On success the location is
-    // removed from networkKeptLocations and pinned in networkReservedLocations
-    // until redeemReserved/releaseToNetworkKept is called.
-    //
-    // regionKey is accepted for API symmetry with the cross-server selector
-    // predicate; current single-region scope ignores it but
-    // implementers MUST keep the parameter so future per-region routing does
-    // not require an API churn.
-    //
-    // S-005 note: this method does no chunk I/O. The chunk reservation is
-    // already pinned on the candidate location at the moment it landed in
-    // networkKeptLocations (same lifecycle as keptLocations).
+    // Network reservation API: coordinate allocation under proxy-issued tokens.
+    // S-005: no chunk I/O here; reservations are pre-acquired in networkKeptLocations.
     // -------------------------------------------------------------------------
 
     /**
@@ -257,13 +194,10 @@ public class RegionQueueManager {
     }
 
     /**
-     * Redeem a previously reserved coordinate. Removes the entry from
-     * {@link #networkReservedLocations} and returns the bound location.
-     * The caller is expected to consume it (e.g. teleport on join).
-     * Subsequent calls with the same token return {@code null}.
+     * Redeem a reserved coordinate, removing it from {@link #networkReservedLocations}.
      *
      * @param networkTokenId proxy-issued token id
-     * @return the reserved location, or {@code null} if no reservation is bound
+     * @return reserved location or {@code null} if absent
      */
     public RTPLocation redeemReserved(UUID networkTokenId) {
         if (networkTokenId == null) return null;
@@ -271,10 +205,7 @@ public class RegionQueueManager {
     }
 
     /**
-     * Release a previously reserved coordinate back to {@link #networkKeptLocations}.
-     * Used by the TTL reaper, disconnect listener, and any failed-transfer
-     * cleanup path. Idempotent: a second call
-     * with the same token id is a no-op.
+     * Release a reserved coordinate back to {@link #networkKeptLocations} or {@link #unkeptLocations}.
      *
      * @param networkTokenId proxy-issued token id
      * @return {@code true} if a reservation was released, {@code false} otherwise
@@ -297,24 +228,12 @@ public class RegionQueueManager {
     }
 
     /**
-     * Pin a previously-redeemed cross-server reservation coordinate into
-     * {@code playerId}'s personal queue so the immediately-following local
-     * {@code /rtp} dispatch preferentially polls that coord. Used by the
-     * backend-side {@code JoinTriggerSource} on REDEEMED hit:
-     * the proxy already chose this backend at /rtp time and the coord was
-     * earmarked via {@link #reserveFromNetworkKept(UUID, String)}; on join
-     * the redeemed coord must reach the player without re-running the
-     * region selection that produced it.
+     * Pins a redeemed reservation coordinate into {@code playerId}'s personal queue.
+     * S-004: returns {@code true} on successful enqueuing, {@code false} if inputs are null.
      *
-     * <p>S-004 contract: returns {@code true} when the coord was accepted
-     * into the personal queue (the player's /rtp will see it first);
-     * {@code false} when {@code playerId} or {@code loc} is null. Internal
-     * delegation to {@link #enqueuePlayerLocation(UUID, RTPLocation)}
-     * preserves the per-player single-slot invariant.</p>
-     *
-     * @param playerId joining player's UUID; must be non-null
-     * @param loc      redeemed reservation coordinate; must be non-null
-     * @return {@code true} if the coord was pinned to the personal queue
+     * @param playerId joining player's UUID
+     * @param loc      redeemed reservation coordinate
+     * @return {@code true} if pinned to personal queue
      */
     public boolean acceptRedeemedReservation(UUID playerId, RTPLocation loc) {
         if (playerId == null || loc == null) return false;
@@ -343,16 +262,9 @@ public class RegionQueueManager {
     }
 
     /**
-     * Allocate the {@link #loginLocations} buffer for ADR-023 (Login Reserve Cache).
-     * Idempotent: a second call with the same capacity is a no-op; a call with a
-     * different non-zero capacity reallocates and drains the prior contents back
-     * to {@link #unkeptLocations} (closing reservations).
+     * Allocates {@link #loginLocations} for ADR-023 (Login Reserve Cache).
      *
-     * <p>Should only be invoked on the default-world region when
-     * {@code PerformanceKeys.loginCacheEnabled=true}. Capacity is the snapshotted
-     * {@code loginCacheCap} (or server max-players if {@code loginCacheCap=0}).
-     *
-     * @param capacity buffer capacity; values &lt;= 0 disable the buffer.
+     * @param capacity buffer capacity; &lt;= 0 disables the buffer
      */
     public void enableLoginCache(int capacity) {
         if (capacity <= 0) {
@@ -360,7 +272,8 @@ public class RegionQueueManager {
             return;
         }
         if (this.loginLocations != null) {
-            return; // already enabled; reload-time changes go through disable+enable.
+            // Already enabled; reload changes use disable+enable.
+            return;
         }
         this.loginLocations = new LockFreeLocationBuffer(capacity);
         installDatabaseCallbacks();
@@ -398,19 +311,10 @@ public class RegionQueueManager {
     }
 
     /**
-     * Open a personal coordinate bucket for {@code uuid} in this region (ADR-043).
+     * Opens a personal coordinate bucket for {@code uuid} in this region (ADR-043).
      *
-     * <p>Idempotent. This is the {@code rtp.personalqueue} opt-in proper: it
-     * declares "subsequent pregen output for this region MAY earmark a
-     * coordinate into a bucket dedicated to {@code uuid}, instead of (or in
-     * addition to) the shared {@code keptLocations} pool." It does
-     * <strong>NOT</strong> request a teleport, does NOT enroll {@code uuid} in
-     * {@link #playerQueue}, and does NOT add {@code uuid} to
-     * {@link RTP#queuedPlayers}.
-     *
-     * <p>Schedules a single push-on-open {@link RegionCacheTask} to fill the
-     * bucket when no fill is already in flight for {@code uuid} (per-uuid
-     * in-flight guard via {@link #perPlayerInFlight}).
+     * <p>Opt-in only: does not request teleport or enroll in {@link #playerQueue}.
+     * Triggers a single push-on-open {@link RegionCacheTask} fill if needed.
      *
      * @param uuid player uuid
      */
@@ -441,11 +345,7 @@ public class RegionQueueManager {
     }
 
     /**
-     * Close the personal coordinate bucket for {@code uuid} in this region
-     * (ADR-043). Returns any banked coordinates to {@link #unkeptLocations}
-     * (closing their reservations first), so the pregen budget is not stranded
-     * by player churn. Called on disconnect / world change away from this
-     * region's world. Idempotent.
+     * Closes personal coordinate bucket for {@code uuid}, returning banked locations to unkept.
      *
      * @param uuid player uuid
      */
@@ -467,16 +367,12 @@ public class RegionQueueManager {
         }
         perPlayerInFlight.remove(uuid);
         // A close call does NOT remove uuid from playerQueue or
-        // RTP.queuedPlayers — those are the teleport-intent state and have
+        // RTP.queuedPlayers - those are the teleport-intent state and have
         // their own lifecycle in Region.execute / RTPTeleportCancel.
     }
 
     /**
-     * Enroll {@code uuid} at the tail of {@link #playerQueue} so
-     * {@link Region#execute(long)} pairs them with the next available
-     * coordinate (ADR-043 concern (2)+(3)). The caller must already have
-     * populated {@code latestTeleportData} for {@code uuid}; stale entries are
-     * purged defensively by {@code Region.execute}.
+     * Enrolls {@code uuid} at the tail of {@link #playerQueue} for teleport pairing (ADR-043).
      *
      * @param uuid player uuid
      */
@@ -487,9 +383,10 @@ public class RegionQueueManager {
     }
 
     /**
-     * poll - get a location for a player from the queue, prioritizing fastLocations, then perPlayerLocationQueue, then locationQueue
+     * Polls a location for a player: fastLocations -> personalQueue -> kept/unkept.
+     *
      * @param uuid player uuid
-     * @return location or null if none available
+     * @return future location or null if unavailable
      */
     public CompletableFuture<RTPLocation> poll(UUID uuid) {
         if (fastLocations.containsKey(uuid)) {
@@ -584,7 +481,7 @@ public class RegionQueueManager {
         unkeptLocations.setCallbacks(null, null);
         keptLocations.clear();
         unkeptLocations.clear();
-        // ADR-028 Phase 4.1: drop L3 backlog on shutdown. Entries are unverified candidate
+        // ADR-028: drop L3 backlog on shutdown. Entries are unverified candidate
         // locations with no chunk tickets and no DB rows, so a clear() is sufficient.
         // The world-level WorldBacklogBinIndex holds only weak references to per-bin lists
         // and becomes GC-eligible automatically once the BacklogEntry strong-pins are gone.

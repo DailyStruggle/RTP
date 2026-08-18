@@ -30,21 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Step 6 (CHECKLIST-multiconfig-menu.md) — surface tests for
- * {@link MultiConfigMenuBuilder}.
- *
- * <p>Covers the three public methods (selector / entry / confirm-remove),
- * the {@link MultiConfigRemovalGuards} integration (locked rows render
- * gray + non-clickable with the registered hover reason), the
- * remove-mode toggle row flipping entry-row actions, and the
- * {@link MultiConfigMenuBuilder#nextDefaultName} synthesiser.
- *
- * <p>Tests exercise the real {@code RTP.configs.multiConfigParserMap}'s
- * regions parser (provisioned by {@link RTPTestSetup}); the bundled
- * {@code default.yml} resource ensures the parser has at least the
- * {@code "default"} entry.
+ * Tests for {@link MultiConfigMenuBuilder}: selector, entry, confirm-remove views,
+ * {@link MultiConfigRemovalGuards} integration, and remove-mode toggle logic.
  */
-@DisplayName("CHECKLIST-multiconfig-menu step 6: MultiConfigMenuBuilder")
+@DisplayName("MultiConfigMenuBuilder surface tests")
 final class MultiConfigMenuBuilderTest {
 
     private Path tempDir;

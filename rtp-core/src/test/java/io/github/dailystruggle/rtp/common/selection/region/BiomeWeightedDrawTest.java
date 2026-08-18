@@ -9,16 +9,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Regression coverage for the ADR-062 biome-probability weighted draw
- * ({@link PregenTask#drawWeightedBiome(List)}).
- *
- * <p>The legacy biome-recall draw flattens every recorded run across the requested
- * biomes and picks one uniformly, so a common biome occupying many runs drowns out
- * a rare biome occupying few. ADR-062's weighted draw instead picks the target
- * biome with equal probability among those present in memory, then a run within it
- * weighted by width. These tests pin that equal-per-biome behaviour and the
- * within-biome width weighting, while staying bounded (a finite weighted pick, no
- * reroll).
+ * Tests for ADR-062 biome-probability weighted draw ({@link PregenTask#drawWeightedBiome(List)}).
+ * Verifies equal-per-biome baseline, width-weighting within biomes, and custom weights.
  */
 class BiomeWeightedDrawTest {
 
@@ -88,7 +80,7 @@ class BiomeWeightedDrawTest {
   }
 
   @Test
-  @DisplayName("ADR-062 Phase 2: configured per-biome weights bias the biome pick proportionally")
+  @DisplayName("ADR-062: configured per-biome weights bias the biome pick proportionally")
   void configuredWeightsBiasBiomePick() {
     // Two biomes, each a single width-1 run. Biome A at 0, biome B at 1_000_000.
     long[] aKeys = {0L};
@@ -115,7 +107,7 @@ class BiomeWeightedDrawTest {
   }
 
   @Test
-  @DisplayName("ADR-062 Phase 2: a zero weight suppresses a biome entirely")
+  @DisplayName("ADR-062: a zero weight suppresses a biome entirely")
   void zeroWeightSuppressesBiome() {
     long[] aKeys = {0L};
     long[] aWidths = {1L};
@@ -134,7 +126,7 @@ class BiomeWeightedDrawTest {
   }
 
   @Test
-  @DisplayName("ADR-062 Phase 2: all-zero weights fall back to an equal-probability pick")
+  @DisplayName("ADR-062: all-zero weights fall back to an equal-probability pick")
   void allZeroWeightsFallBackToEqual() {
     long[] aKeys = {0L};
     long[] aWidths = {1L};
@@ -168,10 +160,10 @@ class BiomeWeightedDrawTest {
     assertEquals(4242L, PregenTask.drawWeightedBiome(perBiome));
   }
 
-  // --- ADR-062 Phase 3: gray-space deferral / exploration probability ---
+  // --- ADR-062: gray-space deferral / exploration probability ---
 
   @Test
-  @DisplayName("Phase 3: grayFraction ramps from 1.0 (unrecorded) to 0.0 (well-recorded)")
+  @DisplayName("grayFraction ramps from 1.0 (unrecorded) to 0.0 (well-recorded)")
   void grayFractionRamp() {
     long min = PregenTask.GRAY_SPACE_MIN_RUNS;
     assertEquals(0.0d, PregenTask.grayFraction(min, min), 1e-9, "at threshold -> fully recall");
@@ -184,7 +176,7 @@ class BiomeWeightedDrawTest {
   }
 
   @Test
-  @DisplayName("Phase 3: graySpaceProbability is the gray share of total weight")
+  @DisplayName("graySpaceProbability is the gray share of total weight")
   void graySpaceProbabilityShares() {
     assertEquals(0.0d, PregenTask.graySpaceProbability(10.0d, 0.0d), 1e-9, "no gray -> never explore");
     assertEquals(0.5d, PregenTask.graySpaceProbability(1.0d, 1.0d), 1e-9, "equal -> 50/50");

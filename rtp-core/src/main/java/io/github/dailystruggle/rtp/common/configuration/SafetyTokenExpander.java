@@ -14,44 +14,18 @@ import java.util.Set;
 import java.util.logging.Level;
 
 /**
- * Eager, one-shot expansion of {@link BlocksKeys#airBlocks} and
- * {@link BlocksKeys#unsafeBlocks} at config-load time.
+ * Eager expansion of {@link BlocksKeys#airBlocks} and {@link BlocksKeys#unsafeBlocks} at config-load time.
  *
- * <p>Historically, tag expansion ({@code #minecraft:leaves} → {@code OAK_LEAVES,
- * BIRCH_LEAVES, ACACIA_LEAVES, ...}) was performed lazily on the first
- * {@code JumpAdjustor.refreshSafetySets()} invocation, throttled to every 5
- * seconds. That left a window where the very first scan / probe / live
- * {@code BukkitRTPChunk.isAir} call after plugin enable saw the raw
- * {@code "#minecraft:leaves"} string, which never matches a palette /
- * {@code Material.name()} id — producing the user-visible "placed on top of
- * birch and acacia leaves" symptom.
- *
- * <p>This utility resolves all {@code #namespace:tag} tokens in the safety
- * lists immediately after the safety parser is built (in
- * {@code Configs.reloadConfigs}), and writes the
- * flattened set back to the in-memory parser value via
- * {@link ConfigParser#setConfigValue(String, Object)}. The on-disk
- * {@code safety.yml} is not touched — operator-authored tag tokens survive a
- * round-trip through the live config object only.
- *
- * <p>The resolved lists are logged at {@link Level#INFO} so operators can
- * verify which materials each tag expanded to (e.g.,
- * {@code [RTP] safety.airBlocks resolved to: AIR, CAVE_AIR, ..., OAK_LEAVES,
- * BIRCH_LEAVES, ACACIA_LEAVES, ...}). State-predicated tokens
- * ({@code MATERIAL[prop=val]}) are preserved verbatim because the compiled-form
- * consumer ({@code SafetyCompilationCache}) needs them.
+ * <p>Resolves {@code #namespace:tag} tokens immediately after safety config loading
+ * and writes flattened sets back to parser memory.
  */
 public final class SafetyTokenExpander {
     private SafetyTokenExpander() {}
 
     /**
-     * Expand tag tokens in {@code airBlocks} and {@code unsafeBlocks}, write the
-     * flattened lists back to the parser, and log the resolved sets.
+     * Expands tag tokens in {@code airBlocks} and {@code unsafeBlocks} into flattened material lists.
      *
-     * <p>If {@code RTP.serverAccessor} is null or returns an empty/null tag
-     * snapshot, tag tokens are preserved as-is so that a later refresh (e.g.,
-     * {@code JumpAdjustor.refreshSafetySets}) can resolve them once the server
-     * tag registry is populated. This keeps the early-bootstrap path safe.
+     * @param safety safety blocks config parser
      */
     public static void expandAndApply(ConfigParser<BlocksKeys> safety) {
         expandAndApply(safety, 0);
@@ -59,7 +33,7 @@ public final class SafetyTokenExpander {
 
     /**
      * Maximum number of deferred retries scheduled when {@link #expandAndApply}
-     * detects unresolved {@code #namespace:tag} tokens — symptomatic of the
+     * detects unresolved {@code #namespace:tag} tokens - symptomatic of the
      * Bukkit tag registry not yet being populated when {@code reloadConfigs}
      * runs (early plugin enable). Each retry forces a
      * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#rebuildBlockTagSnapshot()}
@@ -79,7 +53,7 @@ public final class SafetyTokenExpander {
         Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
         if (RTP.serverAccessor == null) {
             RTP.log(Level.WARNING,
-                    "[RTP] SafetyTokenExpander: RTP.serverAccessor is null — tag tokens cannot be resolved");
+                    "[RTP] SafetyTokenExpander: RTP.serverAccessor is null - tag tokens cannot be resolved");
         } else {
             try {
                 RTP.serverAccessor.rebuildBlockTagSnapshot();
@@ -163,7 +137,7 @@ public final class SafetyTokenExpander {
                         if (seen.add(canonical)) reapply.add(canonical);
                     }
                 } else {
-                    // Snapshot doesn't have it yet — preserve original token so
+                    // Snapshot doesn't have it yet - preserve original token so
                     // a later refresh can resolve it. Log at FINE so operators
                     // configuring custom tags get a hint.
                     tagsUnresolved++;
@@ -209,7 +183,7 @@ public final class SafetyTokenExpander {
     }
 
     /**
-     * Canonicalise to upper-case, namespace-stripped — matches
+     * Canonicalise to upper-case, namespace-stripped - matches
      * {@code Material.name()} / {@code PaletteIdentifierNormalizer.normalize}.
      */
     private static String canonicalise(String raw) {
