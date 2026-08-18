@@ -7,25 +7,8 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Platform-neutral parse of a Minecraft block-state string of the form
- * {@code namespace:id[key=value,...]} (e.g. {@code minecraft:oak_log[axis=y]}).
- *
- * <p>This is the structural tokenizer shared by two consumers that speak the same
- * grammar (ADR-058 Amendment 1):
- *
- * <ul>
- *   <li>{@code SafetyTokenParser} (ADR-017), which tokenizes {@code safety.yml} entries
- *       (it uses {@link #split} for the head/bracketed-body split, then applies its own
- *       predicate / comparator semantics to the body);
- *   <li>the in-house Sponge schematic decoder, whose palette entries are full block-state
- *       strings handed verbatim to each platform's native block parser
- *       ({@code Bukkit.createBlockData(String)} / Fabric {@code BlockArgumentParser}).
- * </ul>
- *
- * <p>Instances are immutable. The parse is intentionally permissive about the head
- * (it does not require a {@code namespace:}); {@link #namespace()} returns
- * {@code "minecraft"} by default when no explicit namespace is present, matching the
- * vanilla resolution rule.
+ * Platform-neutral parser for Minecraft block-state strings of the form
+ * {@code namespace:id[key=value,...]} (ADR-058). Immutable.
  */
 public final class BlockStateString {
   private final String head;
@@ -42,14 +25,10 @@ public final class BlockStateString {
   }
 
   /**
-   * Splits a token into its head (the text before {@code [}) and its bracketed body
-   * (the text between {@code [} and the trailing {@code ]}), without interpreting the
-   * body. This is the exact structural rule shared with {@code SafetyTokenParser}.
+   * Splits a token into its head (before {@code [}) and bracketed body (between {@code [} and {@code ]}).
    *
-   * @param token the raw token; never {@code null}
-   * @return the split; {@link Split#body()} is {@code null} when no bracket is present
-   * @throws IllegalArgumentException when the brackets are unbalanced or misplaced, or
-   *     when the head is empty
+   * @param token raw token; never {@code null}
+   * @return split token; {@link Split#body()} is {@code null} when no bracket is present
    */
   public static Split split(String token) {
     Objects.requireNonNull(token, "token");
@@ -74,14 +53,10 @@ public final class BlockStateString {
   }
 
   /**
-   * Parses a full block-state string into its namespace, path, and ordered properties.
-   * Property values are preserved verbatim (not lower-cased) so the canonical form can be
-   * round-tripped to a platform parser.
+   * Parses a full block-state string into namespace, path, and ordered properties.
    *
-   * @param token the raw block-state string; never {@code null}
-   * @return the parsed block state
-   * @throws IllegalArgumentException on malformed brackets or a malformed {@code key=value}
-   *     predicate
+   * @param token raw block-state string; never {@code null}
+   * @return parsed block state
    */
   public static BlockStateString parse(String token) {
     Split s = split(token);

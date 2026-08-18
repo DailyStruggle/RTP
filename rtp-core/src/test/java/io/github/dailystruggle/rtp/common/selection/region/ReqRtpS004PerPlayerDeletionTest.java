@@ -138,7 +138,7 @@ public class ReqRtpS004PerPlayerDeletionTest {
 
         // ADR-043: enroll on the teleport waitlist explicitly via the named
         // entry point (the old bundled queue(UUID) is retired). No personal
-        // bucket is needed for the public-queue path — Region.execute will
+        // bucket is needed for the public-queue path - Region.execute will
         // drain from keptLocations directly.
         region.queueManager.requestTeleport(playerId);
 

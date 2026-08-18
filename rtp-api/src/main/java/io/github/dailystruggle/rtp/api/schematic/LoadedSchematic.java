@@ -1,13 +1,7 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
 /**
- * Opaque, platform-neutral handle to a decoded schematic payload plus its
- * bounding-box dimensions. The dimensions let {@code rtp-core} compute the paste
- * footprint for the claim check (S-003) <em>before</em> any block is written, without
- * the core ever touching a platform schematic type.
- *
- * <p>A {@code LoadedSchematic} holds no live world references and is safe to cache and
- * to hand back to {@link SchematicPaster#paste}. See ADR-058 §1.
+ * Platform-neutral handle to a decoded schematic payload and dimensions (ADR-058 §1, S-003).
  */
 public interface LoadedSchematic {
   /** @return the source this schematic was decoded from. */

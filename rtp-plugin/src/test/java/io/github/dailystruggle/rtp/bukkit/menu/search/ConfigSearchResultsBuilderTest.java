@@ -24,14 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Unit tests for {@link ConfigSearchResultsBuilder} (proposal §8, v1 lands
- * in {@code rtp-plugin}).
+ * Unit tests for {@link ConfigSearchResultsBuilder}.
  *
  * <p>Exercises: short-query guard, case-insensitive substring matching,
  * key-vs-value match attribution, color-stripped haystack across legacy
  * {@code &x}, {@code §x} and {@code &#rrggbb} hex syntaxes, and raw-offset
  * projection of match ranges so renderer highlight lands on the literal
- * letters (proposal §2.7 / §2.8).
+ * letters.
  */
 public class ConfigSearchResultsBuilderTest {
 

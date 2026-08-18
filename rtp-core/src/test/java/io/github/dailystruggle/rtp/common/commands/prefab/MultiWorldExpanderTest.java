@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Session 3 unit coverage for {@link MultiWorldExpander}: per-world cloning
+ * Unit coverage for {@link MultiWorldExpander}: per-world cloning
  * of the {@code regions/default} template, idempotent re-apply behaviour,
  * existing-world preservation, defensive deep-copy, and error paths
  * (missing default, null/empty inputs).

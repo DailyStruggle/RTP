@@ -19,27 +19,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * ADR-043 — Personal-Queue Permission Semantics: Bucket-Only Opt-In.
- *
- * <p>Regression guard for the API decomposition that replaced the bundled
- * {@code RegionQueueManager.queue(UUID)} with three named entry points:
- *
- * <ul>
- *   <li>{@link RegionQueueManager#openPersonalQueue(UUID)} — bucket-only opt-in.
- *       Must create the personal bucket and MUST NOT enroll the uuid on the
- *       teleport waitlist or set the global awaiting-teleport flag.</li>
- *   <li>{@link RegionQueueManager#requestTeleport(UUID)} — teleport intent.
- *       Must enroll the uuid on {@code playerQueue} + {@code queuedPlayers}
- *       and MUST NOT create a personal bucket.</li>
- *   <li>{@link RegionQueueManager#closePersonalQueue(UUID)} — bucket teardown.
- *       Must drain the bucket back to {@code unkeptLocations}, clear the
- *       per-uuid push-on-open guard, and leave the waitlist state untouched.</li>
- * </ul>
- *
- * <p>The previous bundled {@code queue(UUID)} did all three jobs from one
- * call; under the {@code rtp.personalqueue} opt-in path (granted by op
- * default on Paper+LuckPerms) that conflation silently enrolled every op on
- * the teleport waitlist on every join, respawn, and world change.
+ * ADR-043 - Personal-Queue Permission Semantics: Bucket-Only Opt-In tests.
  */
 class ReqRtpAdr043PersonalQueueSeparationTest {
 
@@ -53,7 +33,7 @@ class ReqRtpAdr043PersonalQueueSeparationTest {
         RTPTestSetup.install(tempDir);
         mockRegion = buildMockRegion();
         // RegionQueueManager construction may inherit state from previous
-        // tests via the shared RTP singleton — be defensive.
+        // tests via the shared RTP singleton - be defensive.
         RTP.getInstance().queuedPlayers.clear();
     }
 

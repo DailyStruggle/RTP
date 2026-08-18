@@ -11,32 +11,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Helper that applies the nether/end seed amendment to a region's parameter
- * map prior to a region-config update.
- *
- * <p>Lifted verbatim from {@code SubConfigCmd.onCommand} (the
- * {@code vertFixBlock} at lines 82-140 of the pre-refactor file) so that the
- * same amendment can be applied from both the {@code /rtp config region ...}
- * command path and the upcoming MultiConfig submenu's ADD path. Behavior is
- * intentionally identical to the original block; any change here must be
- * mirrored in both call sites (or, preferably, made here only).
- *
- * <p>Rules (matching the previous inline block):
- * <ul>
- *   <li>If the target world ends with {@code _nether} or {@code _the_end},
- *       seed the vert name to {@code LINEAR}. (The middle-out search
- *       direction is now the global default, so it is no longer seeded
- *       here.)</li>
- *   <li>Resolve {@code vert.name}, {@code vert.maxY}, {@code vert.minY}
- *       from {@code parameterValues} first, then from the region parser's
- *       existing {@code vert} section / {@link VerticalAdjustor}.</li>
- *   <li>Clamp {@code maxY <= 128} for {@code _nether}; force
- *       {@code requireskylight=false} for both nether and end.</li>
- *   <li>Clamp {@code maxY} to {@code rtpWorld.getMaxHeight()} and
- *       {@code minY} to {@code rtpWorld.getMinHeight()}.</li>
- *   <li>{@code parameterValues.putIfAbsent} is used for every write so an
- *       explicit user-supplied value wins over the seed.</li>
- * </ul>
+ * Applies dimension-specific defaults (Nether/End) to region parameter maps.
+ * Handles LINEAR vert, height bounds, and disabled skylight requirements.
  *
  * @see io.github.dailystruggle.rtp.common.commands.config.SubConfigCmd
  */

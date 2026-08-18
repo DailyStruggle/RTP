@@ -12,22 +12,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Backend-side {@link NetworkRequestQueue} for the {@code proxy-direct} tier
- * (PROPOSAL-proxy-direct-as-remote-store). A thin RPC client of the proxy's
- * in-memory {@code NetworkRequestQueue}: {@code enrol}/{@code flushPending}/
- * {@code pollStatus}/{@code cancel} ride the same outbound socket the
- * {@link ProxyDirectNetworkBinding} uses, so a player-empty backend can enrol a
- * cross-server {@code /rtp} into the proxy's queue with no shared DB.
- *
- * <p>The proxy's own {@code TransportRequestTriggerSource} drains the queue and
- * the dispatcher relocates the player, exactly as on the Redis/SQL tier - this
- * class only carries the producer-side calls across the process boundary.
- * {@code dequeueReady} and {@code transition} are proxy-local (the backend never
- * drains its own queue), so they resolve empty here.</p>
- *
- * <p>Each method hops onto a {@code CompletableFuture} async task because the
- * underlying RPC performs blocking socket I/O; callers already treat this SPI as
- * async (S-005 / the {@code NetworkRequestQueue} threading contract).</p>
+ * Backend-side {@link NetworkRequestQueue} for the {@code proxy-direct} tier.
+ * Acts as an RPC client forwarding queue operations over {@link ProxyDirectNetworkBinding}.
  */
 public final class ProxyDirectNetworkRequestQueue implements NetworkRequestQueue {
 

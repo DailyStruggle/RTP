@@ -8,25 +8,7 @@ import java.util.function.BiConsumer;
 
 /**
  * Platform-neutral fan-out registry for {@code /rtp} command outcome events.
- *
- * <p>This mirrors RTP's existing in-house "collection of callbacks" pattern
- * (see {@link io.github.dailystruggle.rtp.api.server.DispatchingPlayerLifecycleHook}):
- * platforms register their interest once at plugin / mod startup, and the
- * platform-neutral {@link CoreRtpRoot} fires the registered callbacks from
- * {@link CoreRtpRoot#successEvent(RTPCommandSender, RTPPlayer)} /
- * {@link CoreRtpRoot#failEvent(RTPCommandSender, String)} without knowing what
- * (if anything) is listening.</p>
- *
- * <p>This is the seam that lets the Bukkit family share the single neutral
- * {@code CoreRtpRoot} instead of subclassing a platform command type purely to
- * fire its {@code TeleportCommandSuccessEvent} / {@code TeleportCommandFailEvent}
- * onto the Bukkit plugin event bus: the Bukkit bootstrap subscribes a callback
- * here at startup that publishes those events, and platforms with no
- * plugin-event analogue (Fabric / NeoForge) simply register nothing.</p>
- *
- * <p><b>Threading:</b> callbacks may be invoked from any thread the command
- * pipeline runs on. Each subscriber is invoked under a try / catch so a single
- * misbehaving listener cannot abort fan-out to the others.</p>
+ * Platforms register success/fail callbacks to bridge into platform-specific event buses.
  */
 public final class RTPCommandEvents {
 

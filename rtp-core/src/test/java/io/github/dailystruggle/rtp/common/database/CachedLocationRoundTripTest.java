@@ -17,29 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression test for the kept/unkept cache persistence contract described in the
- * 2026-04-18 issue. Exercises the <b>full</b> save chain:
- *
- * <pre>
- *   saveCachedLocation(...) -&gt; cacheValue(...) -&gt; flushDirtyCache()
- *      -&gt; processQueries(...) -&gt; write(...)  (real SQL)
- *   loadCachedLocations(regionName)            (real SQL)
- * </pre>
- *
- * <p>Prior to the 2026-04-18 fix, {@link DatabaseAccessor#saveCachedLocation} wrapped its
- * column map in an outer <code>{compositeKey -&gt; columns}</code> map. That defeated the
- * primary-key inference in {@link DatabaseAccessor#cacheValue} (which fell through to
- * {@code data.hashCode()}) and caused the downstream SQL {@code write()} to emit a
- * malformed INSERT whose only column name was the composite key string and whose value
- * was the entire columns map serialized as an object. The per-backend write() catch
- * blocks silently logged the resulting {@code SQLException} as a WARNING, so to the
- * caller, saves appeared to succeed but nothing was ever persisted — on reboot the
- * kept cache always came back empty.
- *
- * <p>The existing {@code H2DatabaseAccessorTest} cases bypass this entire chain by
- * calling {@link io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor#write}
- * directly with a pre-built column map, which is why the bug slipped through. This test
- * deliberately exercises only the public API surface.
+ * Regression test for kept/unkept location cache persistence through public API.
+ * Exercises: {@code saveCachedLocation -> cacheValue -> flushDirtyCache -> processQueries -> write}.
+ * Verifies recovery via {@code loadCachedLocations}.
  */
 class CachedLocationRoundTripTest {
 
@@ -93,7 +73,7 @@ class CachedLocationRoundTripTest {
     @DisplayName("multiple saveCachedLocation calls all round-trip (unkept+kept unified persistence)")
     void multipleSaves_allRoundTrip() {
         // Simulates the post-fix behaviour where BOTH the kept and unkept queues
-        // persist via the same save callback. Order does not matter — hydrate shuffles.
+        // persist via the same save callback. Order does not matter - hydrate shuffles.
         db.saveCachedLocation("default", new RTPLocation(new RTPCoords("world", 10, 64, 10), 1L, null), null);
         db.saveCachedLocation("default", new RTPLocation(new RTPCoords("world", 20, 64, 20), 1L, null), null);
         db.saveCachedLocation("default", new RTPLocation(new RTPCoords("world", 30, 64, 30), 1L, null), null);

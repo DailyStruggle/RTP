@@ -7,8 +7,7 @@ import java.lang.management.MemoryUsage;
  * Thin platform-portable wrapper over {@link ManagementFactory#getMemoryMXBean()}'s
  * heap usage. All methods are O(1) and safe to call from any thread.
  *
- * <p>Per {@code METRICS_PLAN.md > Metric Catalogue}, heap usage is the same on every
- * platform RTP runs on, so this lives in {@code rtp-core} rather than a per-platform
+ * <p>Heap usage is platform-agnostic, so this lives in {@code rtp-core} rather than a per-platform
  * binding. No {@code org.bukkit.*} or platform imports.
  */
 public final class HeapSampler {

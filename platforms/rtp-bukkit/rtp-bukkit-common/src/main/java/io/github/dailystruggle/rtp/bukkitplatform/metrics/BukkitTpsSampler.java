@@ -36,7 +36,7 @@ public final class BukkitTpsSampler implements MetricsBinding {
     private volatile double ema5m = Double.NaN;
     private volatile double ema15m = Double.NaN;
 
-    /** Production constructor — uses {@link System#nanoTime()}. */
+    /** Production constructor - uses {@link System#nanoTime()}. */
     public BukkitTpsSampler() {
         this(System::nanoTime);
     }
@@ -49,7 +49,7 @@ public final class BukkitTpsSampler implements MetricsBinding {
     /**
      * Record one tick. Must be called from a single tick-thread (the
      * platform's main scheduler). The first call only seeds the timestamp
-     * — no EMA is produced until the second call.
+     * - no EMA is produced until the second call.
      */
     public void tick() {
         long now = nanoClock.getAsLong();

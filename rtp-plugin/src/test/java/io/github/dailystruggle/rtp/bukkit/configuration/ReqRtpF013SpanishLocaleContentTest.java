@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
- * REQ-RTP-F-013 / ADR-020 — content-parity regression tests for the shipped
+ * REQ-RTP-F-013 / ADR-020 - content-parity regression tests for the shipped
  * Spanish {@code messages.yml}. Per-locale {@code messages.lang.yml} maps enum
  * key → translated key name; baseline + identity fallback. Catches: missing
  * keys, unresolvable keys, wrong YAML type for typed keys (list/int/bool),
@@ -170,7 +170,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
         Map<Enum<?>, String> resolved = effectiveKeyMap(esLangMap, enLangMap);
 
         // For every key the English baseline ships, the Spanish locale must
-        // ship it too — under whatever name messages.lang.yml declares for it.
+        // ship it too - under whatever name messages.lang.yml declares for it.
         // (Per the issue update: locale files must NOT have fewer entries
         // than the default config; partial overlays are not acceptable here.)
         List<String> missing = new ArrayList<>();
@@ -305,7 +305,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
             Object enVal = en.get(key.name());
             Object esVal = es.get(resolved.get(key));
             if (enVal == null || esVal == null) continue;
-            // Only strings are at risk — INT_KEYS / BOOLEAN_KEYS / LIST_KEYS are handled.
+            // Only strings are at risk - INT_KEYS / BOOLEAN_KEYS / LIST_KEYS are handled.
             if (LIST_KEYS.contains(key) || INT_KEYS.contains(key) || BOOLEAN_KEYS.contains(key)) {
                 continue;
             }

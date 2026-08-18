@@ -121,7 +121,7 @@ public class ReloadCmdTest {
         accessor.addPlayer(new MockRTPPlayer(senderId, "admin3", null));
 
         // The real Enum<?> parser is registered; reloading/reloaded messages
-        // may contain [filename] — the command should replace it with "configs"
+        // may contain [filename] - the command should replace it with "configs"
         assertDoesNotThrow(() -> reloadCmd.onCommand(senderId, new HashMap<>(), null));
     }
 

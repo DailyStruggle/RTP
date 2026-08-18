@@ -4,19 +4,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Per-player rolling usage-cap tracker backing the BetterRTP {@code LockAfter}
- * parity feature (the {@code lockAfterUses} / {@code lockAfterResetSeconds}
- * config knobs).
- *
- * <p>Each player accrues a count of successful {@code /rtp} uses within a rolling
- * window. Once the count reaches the configured cap the player is "locked" until
- * the window elapses (or forever, when the reset window is {@code 0}). The whole
- * feature is inert when the cap is {@code <= 0}, so a server that leaves the
- * default {@code lockAfterUses: 0} pays nothing.
- *
- * <p><b>Thread safety:</b> all public methods are {@code synchronized}; the
- * feature is exercised at most once per {@code /rtp}, so contention is a
- * non-issue.
+ * Tracks per-player rolling usage caps for BetterRTP LockAfter parity.
+ * Inert when {@code lockAfterUses <= 0}. All public methods are synchronized.
  */
 public final class UsageCapTracker {
   private static final class Window {

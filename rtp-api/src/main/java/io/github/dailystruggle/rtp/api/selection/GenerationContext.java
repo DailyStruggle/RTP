@@ -7,13 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Set;
 
 /**
- * Immutable snapshot of the context in which a teleport location is being generated.
- *
- * <p>Passed to {@link ILocationGenerator} at the point of request and threaded
- * through the async generation pipeline. Because generation runs off the main
- * server thread (REQ-API-ARCH-001), all fields must be safe to read from any
- * thread without synchronization — hence this class is {@code final} with only
- * final fields.
+ * Immutable context for async teleport location generation (REQ-API-ARCH-001).
  *
  * @see ILocationGenerator#getLocation(Object, GenerationContext)
  * @see ILocationGenerator#generateLocation(Object, GenerationContext)
@@ -26,12 +20,9 @@ public final class GenerationContext {
   /**
    * Creates a generation context.
    *
-   * @param sender     the command sender who initiated the teleport request
-   *                   (may be the player themselves, a console, or an admin);
-   *                   must not be {@code null}
-   * @param player     the player who will be teleported; must not be {@code null}
-   * @param biomeNames optional set of biome names to restrict candidate selection;
-   *                   {@code null} or empty means no biome filter is applied
+   * @param sender     initiating command sender; non-null
+   * @param player     target player; non-null
+   * @param biomeNames optional biome filter, or null/empty for none
    */
     public GenerationContext(RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
         this.sender = sender;
@@ -58,13 +49,9 @@ public final class GenerationContext {
     }
 
   /**
-   * Returns the optional biome filter applied during candidate selection.
+   * Returns optional biome filter applied during candidate selection.
    *
-   * <p>When non-null and non-empty, only locations whose biome name is contained
-   * in this set will be returned. Biome names use the platform's canonical format
-   * (e.g. {@code "minecraft:forest"}).
-   *
-   * @return the biome name filter, or {@code null} if no filter is applied
+   * @return canonical biome names, or null if unfiltered
    */
     public @Nullable Set<String> biomeNames() {
         return biomeNames;

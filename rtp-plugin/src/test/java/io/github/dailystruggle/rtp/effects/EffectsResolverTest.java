@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * </ul>
  *
  * <p>S-005-clean: no chunk I/O. S-006-clean: missing {@code effects/} parser
- * yields an empty list (no NPE) — verified by the no-parser test.
+ * yields an empty list (no NPE) - verified by the no-parser test.
  */
 public class EffectsResolverTest {
 
@@ -275,7 +275,7 @@ public class EffectsResolverTest {
         perms.add("rtp.a");
         RTPPlayer p = player("grace", UUID.randomUUID(), perms);
 
-        // Must not StackOverflow — resolver's visited-set guards the cycle.
+        // Must not StackOverflow - resolver's visited-set guards the cycle.
         List<String> tokens = EffectsResolver.resolveTokens(
                 "postteleport", p, "rtp.effect.postteleport");
         assertNotNull(tokens, "cycle must not crash the resolver");

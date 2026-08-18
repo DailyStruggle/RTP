@@ -10,14 +10,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Contract tests for {@link BiomeNames#matches(Set, String)}.
- *
- * <p>The helper exists because Bukkit-family platforms expose biome ids in two shapes:
- * older releases (enum {@code Biome}) yield bare uppercase names like {@code "PLAINS"};
- * newer releases (Keyed registry {@code Biome}, 1.21.5+) yield namespaced uppercase names
- * like {@code "MINECRAFT:PLAINS"}. The same input typed at a command argument or written
- * into {@code safety.yml} may follow either convention; the comparator treats the vanilla
- * {@code MINECRAFT:} prefix as optional on either side while preserving modded namespaces
- * (e.g. {@code IRIS:OVERWORLD:PLAINS}) verbatim.
+ * Tests optional vanilla {@code MINECRAFT:} prefix matching and modded namespace preservation.
  */
 class BiomeNamesTest {
 

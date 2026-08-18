@@ -14,15 +14,15 @@ import java.util.zip.DeflaterOutputStream;
  * the production {@link AnvilReader} can parse cleanly. The structure mirrors the
  * subset of the vanilla chunk layout that the pre-filter actually reads:
  * <ul>
- *   <li>{@code DataVersion} — an Int tag,</li>
- *   <li>{@code Heightmaps.MOTION_BLOCKING_NO_LEAVES} — a packed long array,</li>
- *   <li>{@code sections} — a List of section compounds, each with a
+ *   <li>{@code DataVersion} - an Int tag,</li>
+ *   <li>{@code Heightmaps.MOTION_BLOCKING_NO_LEAVES} - a packed long array,</li>
+ *   <li>{@code sections} - a List of section compounds, each with a
  *       {@code block_states.palette} List containing resource-ID strings.</li>
  * </ul>
  *
  * <p>Compression is always zlib (Minecraft mode {@code 2}), matching 100% of the real
  * fixtures committed under {@code src/test/resources/anvil/real/}. The writer is
- * deliberately separate from any production class — it lives only in the test tree so
+ * deliberately separate from any production class - it lives only in the test tree so
  * it cannot be reached from runtime code paths.
  */
 final class AnvilTestFixtures {
@@ -38,7 +38,7 @@ final class AnvilTestFixtures {
 
     /**
      * Builds a single chunk-section compound with the given palette. The surrounding
-     * {@code data} long-array is intentionally omitted — the pre-filter's palette
+     * {@code data} long-array is intentionally omitted - the pre-filter's palette
      * probe can {@code REJECT} on palette contents alone when every entry is unsafe,
      * without decoding block indices.
      */

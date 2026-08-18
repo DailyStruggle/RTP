@@ -8,30 +8,11 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Backend-side heartbeat loop: ticks at the configured interval, asks the
- * registered {@link BackendStateSampler} for a fresh
- * {@link BackendHeartbeat}, and hands it to
- * {@link NetworkTransport#publishBackendHeartbeat(BackendHeartbeat)}.
+ * Backend heartbeat loop: periodically samples {@link BackendHeartbeat} state
+ * and publishes it via {@link NetworkTransport#publishBackendHeartbeat}.
  *
- * <p>Pinned by rtp-proxy-ADR-011 §Backend Wiring. Mirrors the proxy-side
- * {@code ProxyStatePublisher} in {@code rtp-proxy-common} but ships in
- * {@code rtp-core} because every backend platform inherits the same loop.</p>
- *
- * <p>Lifecycle is owned by the host adapter: it constructs an instance
- * during {@code onEnable} (after {@code RTP.serverAccessor.start} and the
- * network transport is open), calls {@link #start()} once, and calls
- * {@link #stop()} during {@code onDisable} BEFORE the transport is closed.
- * Re-entrant {@code start} is a no-op; {@code stop} is idempotent.</p>
- *
- * <p>Scheduling is delegated to {@link RTP#scheduler} via
- * {@code runTaskTimerAsynchronously}. This is the only Folia-safe
- * scheduling path; do NOT replace it with a raw
- * {@link java.util.concurrent.ScheduledExecutorService} or
- * {@code new Thread(...)} - see {@code .junie/AGENTS.md} "Scheduler Usage".</p>
- *
- * <p>Failure isolation: a thrown exception from the sampler or transport is
- * logged once via {@link io.github.dailystruggle.rtp.common.RTP#log} and the
- * loop continues; one bad tick must not kill heartbeat publication.</p>
+ * <p>Uses {@link RTP#scheduler} async timers for Folia safety. Exceptions during
+ * sampling or publishing are logged and isolated so ticks continue.
  */
 public final class BackendStatePublisher {
 
@@ -98,13 +79,7 @@ public final class BackendStatePublisher {
     }
 
     /**
-     * Force an immediate, off-cadence heartbeat publish. Used by the
-     * lobby-mode no-arg {@code /rtp} hook after a cross-server dispatch so
-     * the transport's snapshot reflects the local optimistic decrement (a
-     * lower {@code keptCount} for the chosen peer) without waiting for the
-     * next scheduled {@link #tick()}. Safe to call from any thread; the
-     * transport binding handles its own thread affinity. Failure-isolated
-     * the same way {@link #tick()} is.
+     * Forces an immediate off-cadence heartbeat publish to sync optimistic state updates.
      */
     public void publishNow() {
         tick();

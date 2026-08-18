@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>Stub {@link ScanTask} instances are created via {@link ReflectionFactory} so
  * that no constructor body runs (avoiding the NPE from {@code region.name}).
- * All execution is synchronous — no real threads are spawned.
+ * All execution is synchronous - no real threads are spawned.
  */
 class ScanTaskProcessingTest {
 
@@ -42,7 +42,7 @@ class ScanTaskProcessingTest {
     }
 
     // -----------------------------------------------------------------------
-    // Named stub class — can be instantiated via ReflectionFactory
+    // Named stub class - can be instantiated via ReflectionFactory
     // -----------------------------------------------------------------------
 
     /**
@@ -51,11 +51,11 @@ class ScanTaskProcessingTest {
      * Instantiated without calling any constructor via {@link ReflectionFactory}.
      */
     static class StubScanTask extends ScanTask {
-        // These fields are set after allocation via ReflectionFactory — never via constructor.
+        // These fields are set after allocation via ReflectionFactory - never via constructor.
         volatile boolean simulateRunning;
         volatile Runnable onRun;
 
-        /** Never called — exists only to satisfy the compiler. */
+        /** Never called - exists only to satisfy the compiler. */
         @SuppressWarnings("unused")
         private StubScanTask(Void ignored) {
             super(null, 0L); // unreachable at runtime; ReflectionFactory bypasses this

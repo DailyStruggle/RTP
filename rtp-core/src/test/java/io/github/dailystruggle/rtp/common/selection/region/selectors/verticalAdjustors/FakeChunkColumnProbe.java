@@ -6,19 +6,7 @@ import java.util.Map;
 import java.util.OptionalInt;
 
 /**
- * <b>Test-only</b> in-memory {@link ChunkColumnProbe} used to exercise
- * {@code adjustFromProbe} without a real Anvil fixture. Defaults every Y to
- * solid-safe {@code minecraft:stone}; tests opt specific Ys into air or into a
- * named unsafe block via the fluent {@code withBlock(...)} / {@code setAir(...)}
- * / {@code setSolid(...)} helpers.
- *
- * <p><b>Not a production probe.</b> The production {@link ChunkColumnProbe} and
- * its concrete implementation ({@code io.github.dailystruggle.rtp.anvil.ColumnProbe})
- * are read-only views over decoded NBT / live-chunk data and expose no mutation
- * surface. The {@code with*} methods on this class are test-fixture staging only
- * — they populate an in-memory map that backs {@link #blockAt(int)} / etc. They
- * do <b>not</b>, and cannot, write blocks into any world. Do not copy this class
- * (or its API shape) into {@code src/main}.
+ * Test-only in-memory {@link ChunkColumnProbe} for testing {@code adjustFromProbe}.
  */
 public final class FakeChunkColumnProbe implements ChunkColumnProbe {
   private final int chunkX;
@@ -30,7 +18,7 @@ public final class FakeChunkColumnProbe implements ChunkColumnProbe {
   // Per-column overrides keyed by ((localX << 8) | localZ) → (Y → block id).
   // Allows tests covering the multi-column probe sweep (testCoords) to make a
   // chunk where the center column has no foothold but an off-center column
-  // does — exercising the {@link ChunkColumnProbe#blockAt(int, int, int)}
+  // does - exercising the {@link ChunkColumnProbe#blockAt(int, int, int)}
   // entry-point that the production AnvilColumnProbeAdapter overrides.
   // Lookup falls back to the Y-only blockOverrides map (uniform-column
   // behaviour) when no per-column entry exists, preserving back-compat for

@@ -5,20 +5,8 @@ import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 
 /**
- * Single-binding registry for the platform-agnostic {@link RTPEconomy} that RTP uses
- * to charge and refund teleport requests.
- *
- * <p>Today, the bundled Vault adapter ({@code VaultChecker} in {@code rtp-plugin})
- * is the only producer; this interface is the API surface for any third-party
- * economy provider that wishes to register without depending on Vault or on
- * {@code rtp-core} internals (ADR-026).
- *
- * <p><b>Lifecycle.</b> Bind once during the integration plugin's {@code onEnable}.
- * Re-binding replaces the previous provider. {@link #clear()} restores the no-op
- * implementation supplied by the platform server accessor.
- *
- * <p><b>Threading.</b> Implementations may be invoked from the async generation
- * pipeline; see {@link RTPEconomy} for thread-safety contracts.
+ * Single-binding registry for platform-agnostic {@link RTPEconomy} (ADR-026).
+ * Manages active economy provider used to charge/refund teleport requests.
  */
 @PublicApi
 public interface EconomyProviderRegistry {

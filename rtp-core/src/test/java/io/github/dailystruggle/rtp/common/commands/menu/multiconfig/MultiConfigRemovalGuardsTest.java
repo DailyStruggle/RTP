@@ -22,15 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * CHECKLIST-multiconfig-menu step 9.
- *
- * <p>Behavioral coverage for {@link MultiConfigRemovalGuard} +
+ * Behavioral coverage for {@link MultiConfigRemovalGuard} +
  * {@link MultiConfigRemovalGuards}, plus the two default guards
- * documented in {@code PROPOSAL-multiconfig-menu.md} §3.2 (the regions
- * "default" lock and the worlds "server has world loaded" lock). The
- * production default-guard wiring lands in step 12; this test authors
- * the two guards inline so the behavior is locked in regardless of
- * where the wiring eventually lives.
+ * (the regions "default" lock and the worlds "server has world loaded" lock).
  */
 class MultiConfigRemovalGuardsTest {
 
@@ -132,7 +126,7 @@ class MultiConfigRemovalGuardsTest {
     }
 
     // -----------------------------------------------------------------------
-    // Default-region guard (PROPOSAL §3.2): "default" entry is locked.
+    // Default-region guard: "default" entry is locked.
     // -----------------------------------------------------------------------
 
     @Nested
@@ -188,7 +182,7 @@ class MultiConfigRemovalGuardsTest {
     }
 
     // -----------------------------------------------------------------------
-    // Default-world guard (PROPOSAL §3.2): worlds the server has loaded
+    // Default-world guard: worlds the server has loaded
     // (RTPServerAccessor.getRTPWorld(name) != null) are locked; orphan
     // YAML entries for worlds the server does NOT have are removable.
     // -----------------------------------------------------------------------

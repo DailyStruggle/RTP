@@ -13,14 +13,8 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Production-safe synthetic {@link RTPPlayer} used to exercise the queue and
- * teleport pipeline on a live server without a real account.
- *
- * <p>Unlike the test-fixture {@code MockRTPPlayer}, this implementation ships in
- * the main artifact and is intended to be installed into {@link MockPlayerRegistry}
- * by an operator command. A mock cannot receive packets, so {@link #setLocation}
- * is a logged no-op that records the destination and completes successfully, and
- * all feedback messages are routed to the server log rather than dropped.
+ * Synthetic {@link RTPPlayer} used to exercise queues and pipelines without real accounts.
+ * Logs teleports and messages to server logs.
  */
 public final class RuntimeMockRTPPlayer implements RTPPlayer {
 

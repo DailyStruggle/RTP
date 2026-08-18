@@ -21,8 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Contract test for {@link PrefabApplier}.
  *
- * <p>Guards the pure merge contract from {@code PROPOSAL-admin-panel-prefabs.md}
- * §3.1: sparse merge, nested-map recursion, list-wholesale replacement,
+ * <p>Guards the pure merge contract:
+ * sparse merge, nested-map recursion, list-wholesale replacement,
  * idempotency, and the locked invariant that no prefab merge ever introduces
  * a {@code backlogCacheCap} key.
  */

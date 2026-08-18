@@ -18,14 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Decode-and-verify test for the committed {@code skyblock_island.schem} fixture
- * (ADR-058). Parses the Sponge Schematic v3 GZIP-NBT container with a minimal,
- * dependency-free reader (the same tag layout WorldEdit's SpongeSchematicV3Reader
- * expects) and asserts the bounding box, block counts, and chest contents match
- * the authored spec. This is the file-backed counterpart to the surface-only
- * {@code SchematicPasterSurfaceTest}: it proves the fixture {@code rtp-core}'s
- * S-003 footprint check will read is well-formed and reports the dimensions a
- * {@link LoadedSchematic} would expose.
+ * Decode-and-verify test for committed {@code skyblock_island.schem} fixture (ADR-058).
+ *
+ * <p>Parses Sponge Schematic v3 GZIP-NBT container and asserts bounding box, block counts, and chest items.
  */
 class SkyblockIslandFixtureTest {
 

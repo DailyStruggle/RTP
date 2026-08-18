@@ -43,7 +43,7 @@ class BukkitTpsSamplerTest {
         BukkitTpsSampler s = samplerWithClock(clock);
 
         s.tick(); // seed
-        // Bootstrap on first delta — exact 50ms — and then keep stable.
+        // Bootstrap on first delta - exact 50ms - and then keep stable.
         for (int i = 0; i < 50; i++) {
             clock.addAndGet(50_000_000L); // +50ms
             s.tick();
@@ -92,7 +92,7 @@ class BukkitTpsSamplerTest {
         BukkitTpsSampler s = samplerWithClock(clock);
 
         s.tick(); // seed
-        // Clock did not advance — must not produce NaN/Infinity in the EMA.
+        // Clock did not advance - must not produce NaN/Infinity in the EMA.
         s.tick();
         s.tick();
 

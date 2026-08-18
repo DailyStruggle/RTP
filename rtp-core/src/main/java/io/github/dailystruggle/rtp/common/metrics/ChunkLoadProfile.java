@@ -4,39 +4,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
- * Process-global, always-on accumulator of the wall-clock cost of loading a
- * single chunk through the server's chunk API, split by whether the chunk was
- * already <em>generated</em> on disk (loaded from the region file) or had to be
- * <em>generated</em> by the server (the expensive path).
- *
- * <p>Loading a chunk is not free, but the plugin never observes the exact
- * instant the platform <em>begins</em> the load after the request is issued -
- * only the moment the returned future completes. Any single observed duration
- * is therefore {@code dispatch_wait + actual_load}. The smallest duration ever
- * observed is the sample least polluted by queue contention, so it is taken as
- * the assumed shortest time to start and complete loading a chunk on this
- * server (the "floor"). The running minimum is the headline figure; the total
- * and count are retained so a mean (per-RTP cost) can be derived.
- *
- * <p>The generated / ungenerated split matters because RTP-ing into ungenerated
- * terrain forces the server to generate the chunk - far more expensive than
- * reading one that already exists. Tracking the two separately lets operators
- * see how much of the plugin's cost comes from generation (which pre-generating
- * the world removes) versus loading.
- *
- * <p>Only genuine live chunk loads feed this profile: the platform adapters
- * record into it from their live-load path ({@code loadChunkFuture} /
- * {@code loadLiveChunk}), <em>not</em> from the ADR-016 anvil pre-filter
- * short-circuit (which republishes a cached view without a real load) nor from
- * an already-resident chunk. Counting those near-zero non-loads would peg the
- * floor at ~0 and destroy its meaning.
- *
- * <p>Wait-free: the totals are {@link LongAdder} and the minimum is an
- * {@link AtomicLong} updated by CAS. No locking, no tick-thread blocking. Reads
- * are eventually-consistent snapshots.
- *
- * <p>Lifecycle: a single {@link #GLOBAL} instance lives for the process.
- * {@link #reset()} exists for tests; it is not called on {@code /reload}.
+ * Process-global accumulator for chunk load wall-clock duration, tracking
+ * generated vs ungenerated chunk load costs and running minimums.
  */
 public final class ChunkLoadProfile {
 
@@ -88,15 +57,10 @@ public final class ChunkLoadProfile {
   private final Bucket ungenerated = new Bucket();
 
   /**
-   * Records one successful single-chunk live-load of {@code nanos} wall-clock
-   * duration, updating the matching ({@code generated}) running minimum.
-   * Non-positive input is ignored (a zero/negative reading is a clock artefact,
-   * not a meaningful load floor).
+   * Records a chunk load duration in nanoseconds.
    *
-   * @param generated {@code true} when the chunk was already generated on disk
-   *                  (loaded from the region file); {@code false} when the load
-   *                  triggered generation of a previously-ungenerated chunk.
-   * @param nanos     wall-clock duration of the load in nanoseconds; non-positive values are ignored
+   * @param generated true if chunk was already on disk, false if generated on demand
+   * @param nanos wall-clock load duration in nanoseconds (non-positive values ignored)
    */
   public void record(boolean generated, long nanos) {
     if (nanos <= 0L) return;

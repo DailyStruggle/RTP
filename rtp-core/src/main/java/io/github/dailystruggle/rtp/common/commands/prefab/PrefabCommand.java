@@ -11,19 +11,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The {@code prefab} subtree under {@code /rtp admin}. Per the locked design
- * decision (2026-05-20, {@code PROPOSAL-admin-panel-prefabs.md} v3.1) it
- * exposes four verbs: {@code list}, {@code apply &lt;id&gt;},
+ * The {@code prefab} subtree under {@code /rtp admin}. Exposes four verbs: {@code list}, {@code apply &lt;id&gt;},
  * {@code confirm &lt;id&gt; &lt;token&gt;}, {@code rollback &lt;id&gt;}.
- *
- * <p><strong>Session 4a scope:</strong> {@code list} and {@code apply} are
- * fully wired - {@code apply} computes the diff via {@link PrefabApplier},
- * mints a nonce via {@link PrefabNonceStore}, and surfaces the diff + token
- * over chat. {@code confirm} and {@code rollback} are stubs that audit-log
- * and reject with an explicit "on-disk write lands in Session 4b" notice;
- * they validate / consume the nonce so the security shape is testable today,
- * but they do not yet touch disk or invoke reload. See
- * {@code CHECKLIST-admin-panel-prefabs.md} step 4 for the full split.
  *
  * <p>Permission: every verb gates on {@code rtp.admin.prefab}. The parent
  * {@code /rtp admin} verb additionally gates on {@code rtp.menu.admin} for

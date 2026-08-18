@@ -18,7 +18,7 @@ public final class OnPlayerJoin implements Listener {
       if (region == null) return;
       // ADR-043: bucket-only opt-in. Open the personal coordinate bucket
       // and schedule the push-on-open pregen fill. Does NOT enroll the
-      // player on the teleport waitlist — they will only ever be enrolled
+      // player on the teleport waitlist - they will only ever be enrolled
       // when they actually invoke /rtp via QueueTask.fallback.
       region.openPersonalQueue(player.getUniqueId());
     }

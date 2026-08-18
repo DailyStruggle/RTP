@@ -4,18 +4,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * A {@link MockRTPWorld} that counts the number of currently active
- * force-loaded chunk tickets so that tests can assert the ticket lifecycle.
+ * A {@link MockRTPWorld} tracking active force-loaded chunk tickets for lifecycle assertions.
  *
- * <p>Every call to {@link #setForceLoadedImpl(int, int, boolean)} with
- * {@code forceLoad=true} increments {@link #activeTicketCount}; every call
- * with {@code forceLoad=false} decrements it.  The counter therefore reflects
- * the number of outstanding {@code addPluginChunkTicket} calls that have not
- * yet been matched by a corresponding {@code removePluginChunkTicket} call,
- * mirroring the real Spigot/Paper chunk-ticket API.
- *
- * <p>Requirements covered: REQ-SPIGOT-ARCH-001, REQ-SPIGOT-ARCH-005,
- * REQ-PAPER-ARCH-001, REQ-PAPER-ARCH-005.
+ * <p>Requirements: REQ-SPIGOT-ARCH-001, REQ-SPIGOT-ARCH-005, REQ-PAPER-ARCH-001, REQ-PAPER-ARCH-005.
  */
 public class TrackedMockWorld extends MockRTPWorld {
 
@@ -67,16 +58,7 @@ public class TrackedMockWorld extends MockRTPWorld {
     }
 
     /**
-     * Bumps the ticket counter on behalf of a subclass that simulates a deferred
-     * (main-thread-scheduled) apply — e.g. the {@code DeferredApplyWorld} used by
-     * {@code ReqRtpS005PaperTicketApplicationRaceTest} to reproduce Paper's
-     * {@code Bukkit.getScheduler().runTask(...)} ticket-application pattern.
-     *
-     * <p>Plain subclasses that want the default synchronous counter behaviour
-     * should not call this — {@code super.setForceLoadedImpl(cx, cz, forceLoad)}
-     * handles it. This hook exists only so a subclass that overrides
-     * {@code setForceLoadedImpl} (and therefore skips the superclass counter
-     * update) can still drive the counter from its own deferred callback.
+     * Updates ticket counter for subclasses simulating deferred ticket application.
      *
      * @param forceLoad {@code true} to increment, {@code false} to decrement
      */

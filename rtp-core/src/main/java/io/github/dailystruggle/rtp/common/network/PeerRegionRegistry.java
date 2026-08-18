@@ -20,43 +20,10 @@ import java.util.function.Supplier;
 
 /**
  * Snapshot-adapter exposing peer-advertised {@code server:region} entries
- * to the local command pipeline (rtp-proxy-ADR-014).
+ * to the local command pipeline (ADR-036).
  *
- * <p>"Snapshot-adapter, not a timer" - this class reads from the already-
- * cached {@link NetworkSnapshot} that the heartbeat subscriber updates as
- * a side effect of the existing redis dirty-cache traffic. There is no new
- * thread, no new redis op, no new TTL: the registry is a view over data
- * the system already maintains for {@link NetworkRouter} gating.</p>
- *
- * <p>Used by:</p>
- * <ul>
- *   <li>{@link io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter}
- *       (via the extras supplier) to surface {@code backend-a:default} in
- *       tab-completion alongside the local region set.</li>
- *   <li>{@code RTPCmdBukkit}'s
- *       validator to accept a peer-qualified region name that the local
- *       {@code RTP.selectionAPI.regionNames()} set does not contain.</li>
- *   <li>{@code BukkitNetworkCommandHook} (indirectly via the router) to
- *       hard-pin to the named server.</li>
- * </ul>
- *
- * <p>Exclusions on read (S-004 spirit - never silently advertise a peer
- * the request could not actually land on):</p>
- * <ul>
- *   <li>{@code killSwitch} peers: operator-asserted unavailable.</li>
- *   <li>Peers with a {@code null}/empty {@code regions} set AND empty
- *       legacy {@code regionsAvailable}: nothing to advertise.</li>
- * </ul>
- *
- * <p>Self ({@code serverId == localServerId}) is intentionally INCLUDED so
- * that on a backend, {@code /rtp region=} tab-complete distinguishes the
- * load-balanced unqualified {@code default} (network dispatcher chooses a
- * peer) from the self-qualified {@code backend-a:default} (hard-pin to
- * this backend, skip load balancing). The {@code pickMostKept} lobby
- * picker still excludes self by design.</p>
- *
- * <p>Falls back to legacy {@code regionsAvailable} for older peers that
- * predate the {@code BackendHeartbeat.regions} field.</p>
+ * <p>Reads from the cached {@link NetworkSnapshot} updated by the heartbeat subscriber.
+ * Surfaces remote regions in parameter completion and routing without extra I/O.</p>
  */
 public final class PeerRegionRegistry {
 
@@ -65,35 +32,15 @@ public final class PeerRegionRegistry {
     private final RegionAwareSelector selector;
 
     /**
-     * Optimistic local decrements applied to peer {@code keptCount} between
-     * heartbeat refreshes. When the local hook dispatches a cross-server
-     * {@code /rtp} to {@code (serverId, regionKey)}, we immediately bump the
-     * decrement so the very next {@code pickMostKept()} call on this JVM
-     * scores that target lower and the burst spreads across peers. Each
-     * entry remembers the {@code lastSeenEpochMs} of the heartbeat that was
-     * authoritative at dispatch time; when a strictly newer heartbeat from
-     * that peer arrives, the decrement is cleared (the new ground truth
-     * already reflects whatever drain we anticipated).
+     * Optimistic local decrements applied to peer {@code keptCount} between heartbeat
+     * refreshes. Dispatches temporarily lower target scores until a newer heartbeat arrives.
      */
     private final ConcurrentHashMap<ServerRegion, Decrement> localDecrements =
             new ConcurrentHashMap<>();
 
     /**
-     * Topology-seeded peer source (Option 1, plugin-message tier). On the
-     * DB-free plugin-message transport a single test player cannot carry
-     * heartbeat gossip from a player-empty backend, so the heartbeat-fed
-     * {@link NetworkSnapshot} is frequently empty even though the proxy
-     * knows every backend. The {@code auto} resolver learns the full server
-     * list from the proxy's {@code GetServers} reply (which only needs the
-     * local server's own player connection), and that list is supplied here
-     * so {@link #peerEntries()} can surface, and {@link #isReachableHardPin}
-     * can accept, {@code server:region} destinations the snapshot has not
-     * yet observed. Availability for these is UNKNOWN, and the "unknown ->
-     * accept" rule lets the destination backend decide on arrival.
-     *
-     * <p>Defaults to an empty supplier (durable Redis/SQL tiers leave it
-     * unset and rely purely on heartbeats, which they can publish even when
-     * a backend is player-empty).</p>
+     * Topology-seeded peer source for DB-free plugin-message transport.
+     * Surfaces proxy-advertised servers when heartbeat gossip is unavailable.
      */
     private volatile Supplier<Set<String>> topologyPeerSupplier = Set::of;
 
@@ -131,11 +78,7 @@ public final class PeerRegionRegistry {
     }
 
     /**
-     * This backend's own network id (the {@code serverId} a peer would use to
-     * hard-pin to this backend), or {@code null} when not running as a network
-     * backend. Used by callers (e.g. the addon-facing allowed-targets list) to
-     * deduplicate a self-qualified {@code <self>:<region>} peer entry against the
-     * unqualified local region of the same name.
+     * Local backend network id, or {@code null} if not running as a network backend.
      *
      * @return the local server id, or {@code null}
      */
@@ -144,17 +87,10 @@ public final class PeerRegionRegistry {
     }
 
     /**
-     * Read a single descriptive attribute a peer backend advertised for one of
-     * its regions (e.g. {@code "env"} -&gt; {@code "NETHER"}, {@code "block"} -&gt;
-     * {@code "NETHERRACK"}). Backed by the heartbeat's open-ended
-     * {@code regionMetadata} map, keyed {@code "<region>.<attribute>"}.
-     *
-     * <p>Purely informational (icon / display hints for menus and addons);
-     * never affects routing. Defensive: a null/flaky snapshot, an unknown
-     * peer, or a missing attribute all yield {@code null}.</p>
+     * Read a single descriptive attribute a peer backend advertised for a region.
      *
      * @param serverId  the peer backend's network id
-     * @param regionKey the (unqualified) region name on that backend
+     * @param regionKey the region name on that backend
      * @param attribute the attribute name (e.g. {@code "env"}, {@code "block"})
      * @return the advertised attribute value, or {@code null} when absent
      */
@@ -169,35 +105,29 @@ public final class PeerRegionRegistry {
             if (hb == null) return null;
             return hb.regionMetadata().get(regionKey + "." + attribute);
         } catch (Throwable ignored) {
-            // Defensive: a flaky transport must not crash a menu render.
+            // Defensive: flaky transport must not crash callers.
             return null;
         }
     }
 
     /**
-     * Install the topology-peer supplier (Option 1, plugin-message tier).
-     * The supplier returns the set of backend server IDs the proxy has
-     * advertised via {@code GetServers} (typically
-     * {@code ProxyAutoDetector#peerServerIds()}). A {@code null} argument
-     * resets to the empty default. The supplier is read on every
-     * {@link #peerEntries()} / {@link #isReachableHardPin} call so it always
-     * reflects the latest handshake result.
+     * Install the topology-peer supplier for plugin-message tier discovery.
+     *
+     * @param supplier supplier returning peer server IDs
      */
     public void setTopologyPeerSupplier(Supplier<Set<String>> supplier) {
         this.topologyPeerSupplier = supplier == null ? Set::of : supplier;
     }
 
     /**
-     * Override the region names assumed for topology-seeded peers (defaults
-     * to {@code {"default"}}). A {@code null} argument resets to the default.
+     * Override the region names assumed for topology-seeded peers (defaults to {@code {"default"}}).
      */
     public void setAssumedRegionSupplier(Supplier<Set<String>> supplier) {
         this.assumedRegionSupplier = supplier == null ? () -> Set.of("default") : supplier;
     }
 
     /**
-     * Defensive read of the topology-peer set: never {@code null}, never
-     * throws (a flaky supplier yields the empty set).
+     * Defensive read of the topology-peer set: never throws or returns null.
      */
     private Set<String> topologyPeers() {
         try {
@@ -209,19 +139,8 @@ public final class PeerRegionRegistry {
     }
 
     /**
-     * Record that this lobby has just dispatched a cross-server
-     * {@code /rtp} to {@code (serverId, regionKey)}. Bumps the local
-     * decrement applied to that peer's {@code keptCount} in subsequent
-     * {@link #pickMostKept()} calls until the peer publishes a fresh
-     * heartbeat. Idempotent only in the sense that repeated calls before a
-     * fresh heartbeat keep accumulating - that is intentional (a 5-burst
-     * deserves a 5-decrement).
-     *
-     * <p>Anchored to the peer's currently-observed {@code lastSeenEpochMs}
-     * so the next strictly newer heartbeat clears the decrement
-     * automatically. If no heartbeat is observable for that peer (snapshot
-     * empty or peer unknown), the decrement still records with anchor
-     * {@code 0L}; any subsequent heartbeat with epoch &gt; 0 clears it.</p>
+     * Record a cross-server dispatch to {@code (serverId, regionKey)}, temporarily
+     * decrementing its score until the next newer heartbeat is received.
      */
     public void recordDispatch(String serverId, String regionKey) {
         if (serverId == null || serverId.isEmpty()) return;
@@ -280,13 +199,8 @@ public final class PeerRegionRegistry {
 
     /**
      * Build the current set of peer-qualified {@code server:region} entries.
-     * Returns an empty set if the snapshot is null, has no peers, or all
-     * peers are excluded by the rules above. Never returns {@code null}.
      *
-     * <p>Allocates a fresh set per call. The caller (typically commands-api's
-     * tab-completion path) iterates once and discards; no long-lived view
-     * cache is needed because the underlying {@code NetworkSnapshot} is
-     * already maintained by the transport layer.</p>
+     * @return non-null set of available peer entries
      */
     public Set<String> peerEntries() {
         NetworkSnapshot snap;
@@ -366,26 +280,9 @@ public final class PeerRegionRegistry {
     }
 
     /**
-     * Lobby-mode target picker. Delegates to the unified
-     * {@link RegionAwareSelector}, which scores every qualifying
-     * {@code (serverId, regionKey)} candidate with the same weighted-curve
-     * formula the proxy uses for its own {@code BackendSelector} (one
-     * scoring table, two call sites - rtp-proxy-ADR-004).
+     * Lobby-mode target picker delegating to {@link RegionAwareSelector} (ADR-036).
      *
-     * <p>The synthesized {@link
-     * io.github.dailystruggle.rtp.proxy.common.selector.MetricInput#KEPT_REGION}
-     * scarcity term with {@code exponential(k=5)} reproduces the legacy
-     * "most-kept wins" behaviour byte-identically when no other scoring
-     * terms are configured: a region 90% empty contributes ~0.85, a region
-     * 50% empty only ~0.07. Operators wanting MSPT/heap/queue to also
-     * influence the lobby pick add explicit terms to {@code network.yml}'s
-     * {@code loadBalancer.terms} block - same place the proxy reads.</p>
-     *
-     * <p>Filtering: self ({@code localServerId}) excluded; non-{@code READY},
-     * non-{@code acceptingRequests}, and {@code killSwitch} peers excluded;
-     * stale heartbeats excluded. Optimistic {@link #recordDispatch}
-     * decrements applied per-pair as a post-score adjustment so a recent
-     * burst spreads across peers before the next heartbeat tick.</p>
+     * @return chosen peer candidate, or empty if none available
      */
     public Optional<ServerRegion> pickMostKept() {
         NetworkSnapshot snap;
@@ -435,27 +332,11 @@ public final class PeerRegionRegistry {
     }
 
     /**
-     * Hard-pin reachability check: may a player hard-pin
-     * {@code serverId:regionKey}?
+     * Hard-pin reachability check for {@code serverId:regionKey}.
      *
-     * <p>Resolution order (KNOWN beats topology; "unknown -> accept"):</p>
-     * <ul>
-     *   <li>A {@code killSwitch} heartbeat from {@code serverId} -> reject
-     *       (operator-asserted unavailable).</li>
-     *   <li>A heartbeat that lists {@code regionKey} -> accept.</li>
-     *   <li>A heartbeat whose concrete region set does NOT contain
-     *       {@code regionKey} -> reject (KNOWN region set, region absent).</li>
-     *   <li>No heartbeat observed but the proxy advertised {@code serverId}
-     *       via {@code GetServers} (topology) -> accept. Availability is
-     *       UNKNOWN on the plugin-message tier (a player-empty backend cannot
-     *       gossip), so we let the destination backend decide on arrival
-     *       rather than falsely rejecting a valid destination.</li>
-     *   <li>Otherwise -> reject.</li>
-     * </ul>
-     *
-     * <p>Self is intentionally reachable as a hard-pin: typing
-     * {@code /rtp region=<self>:default} on a backend pins the request to
-     * this backend and bypasses the lobby/network load balancer.</p>
+     * @param serverId  target server id
+     * @param regionKey target region key
+     * @return true if destination can be targeted directly
      */
     public boolean isReachableHardPin(String serverId, String regionKey) {
         if (serverId == null || serverId.isEmpty()) return false;

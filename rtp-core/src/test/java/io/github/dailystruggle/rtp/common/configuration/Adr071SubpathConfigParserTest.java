@@ -15,14 +15,8 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * ADR-071 (Config Organization and Discoverability), rule 3 sub-bullet: a {@code ConfigParser}
- * {@code name} may carry a relative subdirectory (e.g. {@code "advanced/blocks.yml"},
- * {@code "messages/player.yml"}). The on-disk file, the JAR-resource extraction path, and the
- * {@code lang/<locale>/<name>} mirror path must all tolerate the subdirectory while the
- * file-database key and the {@code /rtp config} sub-command stay unqualified (bare leaf name).
- *
- * <p>Driven by a bundled test resource at {@code advanced/logging.yml} (+ no
- * {@code lang/advanced/logging.lang.yml}, so an identity lang map is seeded).
+ * Tests for subpath support in {@link ConfigParser} (ADR-071).
+ * Verifies relative subdirectories for extraction, on-disk paths, and lang mirrors.
  */
 public class Adr071SubpathConfigParserTest {
 

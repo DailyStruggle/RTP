@@ -20,10 +20,10 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * Exercises {@link Nbt#skipPayload} and {@link Nbt#readRootCompoundSelective}.
  *
- * <p>Guards PR-1 of {@code docs/dev/BIOME_LOOKUP_PERF_PLAN.md}: the selective parser is
+ * <p>The selective parser is
  * only safe when {@code skipPayload} consumes <i>exactly</i> the same byte range that
- * {@link Nbt#readRootCompound}'s recursive reader would. Any drift — e.g. a
- * {@code TAG_LIST} of strings whose length is miscomputed — desynchronises the stream
+ * {@link Nbt#readRootCompound}'s recursive reader would. Any drift - e.g. a
+ * {@code TAG_LIST} of strings whose length is miscomputed - desynchronises the stream
  * and produces garbage on downstream tags.
  *
  * <p>Tests cover (a) skip fidelity across every tag type via byte-range comparison,

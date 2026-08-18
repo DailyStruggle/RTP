@@ -63,7 +63,7 @@ final class FabricMetricsBindingTest {
 
     /**
      * Sustained 100 ms tick deltas (10 TPS) converge the 1-minute EMA
-     * downward over many ticks. We don't require full convergence — just
+     * downward over many ticks. We don't require full convergence - just
      * monotonic movement away from the nominal seed.
      */
     @Test
@@ -93,7 +93,7 @@ final class FabricMetricsBindingTest {
         AtomicLong clock = new AtomicLong(1_000L);
         FabricMetricsBinding b = new FabricMetricsBinding(clock::get, () -> 0, () -> 0);
         b.tick();
-        // Same clock value — delta=0, must be a no-op (no EMA emitted).
+        // Same clock value - delta=0, must be a no-op (no EMA emitted).
         b.tick();
         assertEquals(MetricsSnapshot.UNSAMPLED, b.tps1m(), 1e-9);
     }

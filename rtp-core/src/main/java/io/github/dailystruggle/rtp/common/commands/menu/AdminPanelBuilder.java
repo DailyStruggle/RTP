@@ -18,44 +18,10 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
 /**
- * Curated admin-panel page builder for {@code /rtp menu} (PROPOSAL-admin-panel.md v2).
+ * Curated admin-panel page builder for {@code /rtp menu}.
  *
- * <p>Sibling to {@link FrontPageBuilder}: produces a curated {@link MenuModel}
- * dedicated to operator tooling, reached from the front page's single
- * {@code Admin panel} entry row (which emits a {@link MenuAction.OpenAdminPanel}
- * token). The panel collects every row that previously lived inline on the
- * front-page admin block plus a {@code Browse all commands} reflected-tree
- * fallback, organised into named sections so the page can grow without
- * pushing player-facing chrome off page 1 of the book.
- *
- * <p>Sections (top-to-bottom):
- * <ul>
- *   <li><b>Configuration</b> &mdash; {@link MenuAction.OpenConfigSelector}, gated on
- *       {@code rtp.config.view}.</li>
- *   <li><b>Diagnostics</b> &mdash; {@code /rtp info}, {@code /rtp test full},
- *       {@code /rtp test memory} (if registered), and the scan sub-menu.</li>
- *   <li><b>Lifecycle</b> &mdash; {@code /rtp reload}, gated on {@code rtp.reload}.</li>
- *   <li><b>Browse</b> &mdash; reflected-tree fallback via {@link MenuAction.OpenMenu}
- *       with an empty path, equivalent to today's {@code /rtp menu} pre-Stage-B
- *       behaviour.</li>
- * </ul>
- *
- * <p>Per-row self-hide rules:
- * <ul>
- *   <li>A row is suppressed when its underlying subcommand is not registered on
- *       the live {@code /rtp} tree (matches {@link FrontPageBuilder}'s defensive
- *       contract).</li>
- *   <li>A row is suppressed when the viewer lacks the row's permission.</li>
- *   <li>A section divider whose entire body is hidden is also suppressed, so a
- *       partial admin never sees a {@code Lifecycle} header with nothing under
- *       it.</li>
- * </ul>
- *
- * <p>The admin gate ({@link FrontPageBuilder#ADMIN_PERMISSION}) is enforced
- * upstream at the dispatch arm ({@code MenuRedeemSubcommand#dispatchOpenAdminPanel});
- * this builder trusts that contract and does not re-probe it. Each clickable
- * fragment mints one token, mirroring {@link FrontPageBuilder} for ADR-035 §3
- * book-renderer compatibility.
+ * <p>Produces a curated {@link MenuModel} dedicated to operator tooling (config, diagnostics,
+ * lifecycle, and reflected-tree fallback), reached from the front page's admin panel entry row.
  */
 public final class AdminPanelBuilder {
 
@@ -68,8 +34,8 @@ public final class AdminPanelBuilder {
     /**
      * Permission required for the {@code Setup (quick start)} section. Mirrors
      * the {@code rtp.admin.prefab} gate enforced by the {@code prefab}
-     * {@link TreeCommand} subtree (Session 4a). When the viewer lacks it,
-     * every prefab row (and the section divider) is suppressed.
+     * {@link TreeCommand} subtree. When the viewer lacks it, every prefab row
+     * (and the section divider) is suppressed.
      */
     public static final String PREFAB_PERMISSION = "rtp.admin.prefab";
 
@@ -82,27 +48,19 @@ public final class AdminPanelBuilder {
             FrontPageBuilder.CONFIG_VIEW_PERMISSION;
 
     /**
-     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
-     * emits concrete {@code /rtp menu ...} commands, so no token registry or
-     * TTL is consulted any more.
+     * No-arg constructor. The renderer emits concrete {@code /rtp menu ...}
+     * commands, so no token registry or TTL is consulted.
      */
     public AdminPanelBuilder() {
     }
 
     /**
-     * Build the curated admin-panel {@link MenuModel} for {@code viewer}. The
-     * caller is responsible for enforcing the
-     * {@link FrontPageBuilder#ADMIN_PERMISSION} gate before invocation; this
-     * builder will happily produce a (possibly empty-body) model if invoked
-     * without admin rights.
+     * Builds curated admin-panel {@link MenuModel} for {@code viewer}.
      *
-     * @param rtpRoot    the {@code /rtp} root {@link TreeCommand}; used to
-     *                   probe for subcommand availability.
-     * @param viewer     the calling player UUID.
-     * @param permission permission probe for {@code viewer}; consulted per
-     *                   row, never for the admin gate (that is the dispatch
-     *                   arm's responsibility).
-     * @return the assembled {@link MenuModel} ready for rendering
+     * @param rtpRoot    {@code /rtp} root command to probe subcommand availability
+     * @param viewer     calling player UUID
+     * @param permission per-row permission probe
+     * @return assembled {@link MenuModel}
      */
     public MenuModel build(TreeCommand rtpRoot, UUID viewer, Predicate<String> permission) {
         Objects.requireNonNull(rtpRoot, "rtpRoot");
@@ -126,18 +84,7 @@ public final class AdminPanelBuilder {
         lines.add(new MenuLine(List.of()));
 
         // --- Setup (quick start) section ---
-        // Single entry-point row that opens the curated prefab selection
-        // menu (`/rtp menu prefab`), skipping the apply/confirm/rollback/list
-        // subcommand-list page that an OpenMenu({admin,prefab}) would
-        // produce. The PrefabCmd leaf renders one clickable row per bundled
-        // prefab id (the live PrefabRegistry, via the apply node's `id`
-        // parameter relevantValues); clicking a row stages
-        // `id=<id>` onto `admin prefab apply` so the subsequent Execute row
-        // dispatches `/rtp admin prefab apply id=<id>`. This gives the
-        // operator the clickable prefab-selection book menu without flooding
-        // the admin panel page itself with per-prefab rows. Suppressed
-        // wholesale when the viewer lacks `rtp.admin.prefab` so a partial
-        // admin never sees the Setup divider with no row under it.
+        // Single entry row opening curated prefab menu (`/rtp menu prefab`), gated on rtp.admin.prefab.
         List<MenuLine> setupRows = new ArrayList<>();
         if (safeTest(permission, PREFAB_PERMISSION)) {
             addRow(
@@ -159,9 +106,8 @@ public final class AdminPanelBuilder {
                             "Open the curated config selector."),
                     new MenuAction.OpenConfigSelector());
         }
-        // CHECKLIST-multiconfig-menu: Regions / Worlds rows live in the
-        // config selector page (CommandTreeMenuBuilder.buildConfigSelector),
-        // not the admin panel. See PROPOSAL-multiconfig-menu.md.
+        // Regions / Worlds rows live in the config selector page
+        // (CommandTreeMenuBuilder.buildConfigSelector), not the admin panel.
         appendSection(
                 lines,
                 CommandMessages.menuAdminPanelSectionConfig,
@@ -171,10 +117,9 @@ public final class AdminPanelBuilder {
         // --- Diagnostics section ---
         List<MenuLine> diagRows = new ArrayList<>();
         if (hasSubcommand(rtpRoot, "info")) {
-            // PROPOSAL-info-as-book.md section 4.6: the admin-panel "server
-            // info" row now opens the curated info book (mirrors the chat
-            // output of /rtp info page-by-page) instead of dumping the same
-            // lines into chat. Falls back transparently when the dispatch
+            // The admin-panel "server info" row opens the curated info book
+            // (mirrors the chat output of /rtp info page-by-page) instead of
+            // dumping the same lines into chat. Falls back transparently when the dispatch
             // arm's MenuInfoBookBuilder is unwired: the dispatch arm logs WARN
             // + reject with menuInvalid (S-004), which is the same shape every
             // other curated builder uses when its SAM is missing.
@@ -303,13 +248,7 @@ public final class AdminPanelBuilder {
     static final int LINES_PER_PAGE = 13;
 
     /**
-     * Split the accumulated body lines into pages of at most
-     * {@link #LINES_PER_PAGE} lines and append {@code backRow} to the last
-     * page (allocating an extra page if the last body page is already
-     * full). Section dividers are nudged onto the next page when they
-     * would otherwise be the bottom line of a page (orphaned-divider
-     * guard) so the divider always sits directly above the rows it
-     * introduces.
+     * Splits body lines into pages of at most {@link #LINES_PER_PAGE} lines and appends {@code backRow}.
      */
     private static List<MenuPage> paginate(List<MenuLine> lines, MenuLine backRow) {
         List<MenuPage> pages = new ArrayList<>();
@@ -370,13 +309,7 @@ public final class AdminPanelBuilder {
     // ---- helpers ----------------------------------------------------------
 
     /**
-     * Setup-section variant of {@link #appendSection} that uses a hardcoded
-     * English divider literal until the
-     * {@code menuAdminPanelSectionSetup} {@link MessagesKeys} entry is added
-     * through the locale TSV pipeline. Once that key exists, this method should be
-     * collapsed back into the standard {@code appendSection} call.
-     * Behavior is otherwise identical (empty body suppresses the
-     * divider; spacer line inserted between sections).
+     * Setup-section variant of {@link #appendSection}.
      */
     private static void appendSetupSection(List<MenuLine> dest, List<MenuLine> body) {
         if (body == null || body.isEmpty()) return;

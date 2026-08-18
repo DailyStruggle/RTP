@@ -66,7 +66,7 @@ public final class PeriodicWorldSaverPlugin extends JavaPlugin {
     /**
      * Save every loaded world, then walk every loaded chunk and request
      * an unload (with {@code save = true}). The server preserves chunks
-     * held by force-tickets automatically — {@link World#unloadChunk(int, int, boolean)}
+     * held by force-tickets automatically - {@link World#unloadChunk(int, int, boolean)}
      * is a no-op in that case.
      *
      * @param finalSweep true when invoked from {@link #onDisable()};
@@ -87,7 +87,7 @@ public final class PeriodicWorldSaverPlugin extends JavaPlugin {
                 continue;
             }
 
-            // Snapshot — Bukkit's getLoadedChunks() returns a fresh array
+            // Snapshot - Bukkit's getLoadedChunks() returns a fresh array
             // each call, so iteration is safe even though we're mutating
             // the loaded set below.
             for (Chunk chunk : world.getLoadedChunks()) {

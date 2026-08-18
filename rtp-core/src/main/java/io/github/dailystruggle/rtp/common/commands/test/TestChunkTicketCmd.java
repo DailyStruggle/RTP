@@ -15,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
  * {@link MemoryTracker} release paths (REQ-RTP-S-002): {@code untrack(UUID)},
  * {@code untrack(Object)}, and drop-and-diagnose. Uses sentinel {@code Object}s
  * (no real ticket) tagged with {@link #SENTINEL_LABEL} so it never collides
- * with live teleport activity. See {@code RUNTIME_TEST_SUITE_PLAN.md &sect;3.8}.
+ * with live teleport activity.
  */
 public class TestChunkTicketCmd extends BaseRTPCmdImpl {
 
@@ -105,7 +105,7 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
     return r;
   }
 
-  /** Emits the result per the RUNTIME_TEST_SUITE_PLAN output contract. */
+  /** Emits the result per the test output contract. */
   private void emit(UUID callerId, Result r) {
     String summary =
         "[RTP test/chunk-ticket] "

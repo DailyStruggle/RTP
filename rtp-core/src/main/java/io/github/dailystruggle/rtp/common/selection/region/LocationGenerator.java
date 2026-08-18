@@ -17,23 +17,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 /**
- * Non-blocking {@link ILocationGenerator} implementation (ADR-015 Option B refactor,
- * 2026-04-21). The outer attempt loop is a state machine ({@link PregenTask} /
- * {@link QueueTask}) whose I/O-bearing stages chain through {@link CompletableFuture}
- * rather than blocking the async worker with {@code .get()} / {@code .join()} /
- * {@code awaitReady()}. The deprecated static {@code getLocation(Region, ...)} helpers
- * remain as synchronous shims that await the async version for backward compatibility
- * with the existing test suite.
- *
- * <p>Semantics preserved from the previous blocking implementation: every {@link FailTypes}
- * attribution bucket (including {@code ticketFailed}, {@code chunkLoadTimeout},
- * {@code asyncLoadNull}, {@code staleChunkBeforeVert}, {@code ticketApplyTimeout},
- * {@code neighborNull}); probe-first ADR-016 §11 ordering (platform {@code getChunkAt}
- * before {@code getChunkAtAsync}); {@code localChunks} neighbour cache inside the
- * safety-check loop; {@code biomeRecall} / {@code biomeRecallForced} behaviour;
- * {@code worldBorder} bookkeeping with {@code worldBorderFails > 1000} cap;
- * verbose selections log; {@code PRE_CHUNK_BIOME_PRECHECK_ENABLED} dead-code branch
- * (gated off at a compile-time constant per ADR-016 §13.3).
+ * Non-blocking {@link ILocationGenerator} implementation (ADR-015).
+ * Outer attempt loop is an async state machine ({@link PregenTask} / {@link QueueTask})
+ * chaining via {@link CompletableFuture} to prevent blocking worker threads.
  */
 public class LocationGenerator implements ILocationGenerator {
 
@@ -58,13 +44,8 @@ public class LocationGenerator implements ILocationGenerator {
     static final AtomicLong lastUpdate = new AtomicLong(0);
     static final AtomicInteger safetyRadiusCache = new AtomicInteger(0);
     /**
-     * Mirrors {@code SafetyKeys.platformDepth} so {@code QueueTask.runSafetyScan} can
-     * always re-validate the ground column on the live (commit-time) chunk regardless
-     * of {@code safetyRadius}. Closes the probe-vs-live drift window where a candidate
-     * Y was approved by the off-thread probe (e.g. ice over water) but the live block
-     * has changed by commit time (ice melted, water source flowed). Refreshed in the
-     * same throttled block as {@link #safetyRadiusCache} inside
-     * {@code QueueTask.afterChunkResolved}.
+     * Mirrors {@code SafetyKeys.platformDepth} for {@code QueueTask.runSafetyScan} ground
+     * re-validation on live chunks, preventing drift between probe and live block state.
      */
     static final AtomicInteger platformDepthCache = new AtomicInteger(1);
 
@@ -114,7 +95,7 @@ public class LocationGenerator implements ILocationGenerator {
     }
 
     // ==========================================================================
-    // ILocationGenerator async interface — primary entry points
+    // ILocationGenerator async interface - primary entry points
     // ==========================================================================
 
     @Override
@@ -143,7 +124,7 @@ public class LocationGenerator implements ILocationGenerator {
     }
 
     // ==========================================================================
-    // Deprecated static sync shims — retained for test + internal back-compat
+    // Deprecated static sync shims - retained for test + internal back-compat
     // ==========================================================================
 
     @Deprecated
@@ -216,20 +197,8 @@ public class LocationGenerator implements ILocationGenerator {
     }
 
     /**
-     * Queue path: consumes a pre-generated result from {@code region.queueManager.poll}
-     * when available, otherwise dispatches the pregen path (if the sender has
-     * {@code rtp.unqueued} permission) or enqueues the player (normal flow).
-     *
-     * <p>Runs {@link QueueTask#start()} on the caller thread. This is intentional —
-     * the architecture spec (docs/architecture/01-teleport-execution-pipeline.md)
-     * routes the cache-hot path directly from {@code QueryCache} to {@code ReqTicket}
-     * without a scheduler hop, so a kept-queue hit with a pre-acquired reservation
-     * completes {@code result} synchronously on the caller and {@code
-     * TeleportPipelineTask.runSetup} takes its {@code locationFuture.isDone()} inline
-     * branch. Cold paths inside {@code QueueTask} (probe {@code world.getChunkAt},
-     * live {@code world.getChunkAtAsync}, neighbour {@code allOf}) remain
-     * non-blocking {@link CompletableFuture} chains, so REQ-RTP-S-005 is preserved:
-     * the caller thread never blocks on chunk I/O.
+     * Queue path: consumes pre-generated result from {@code region.queueManager.poll}
+     * or dispatches generation/enqueuing via {@link QueueTask}.
      */
     public static CompletableFuture<GenerationResult> getLocationFuture(
             Region region, RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {

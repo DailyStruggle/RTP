@@ -286,7 +286,7 @@ public abstract class DatabaseAccessor<D> {
       // The "seed" column is overwritten by saveCachedLocation(...) with the region's
       // RegionCacheKey.cacheKeyLong (which folds the seed plus the shape/vert config hash).
       // Falling back to the raw world seed here is safe for the rare path where toColumns
-      // is invoked outside of the saveCachedLocation entry point — the value will still
+      // is invoked outside of the saveCachedLocation entry point - the value will still
       // mismatch on a world re-roll, only it will not pick up shape/vert edits.
       RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(location.coords().worldName());
       if (world != null) res.put("seed", world.getSeed());
@@ -432,19 +432,7 @@ public abstract class DatabaseAccessor<D> {
   }
 
   /**
-   * Cache a row's data without writing to the database. The row is stored using a
-   * composite key of the form {@code tableName + ":" + primaryKey}.
-   *
-   * The primary key is inferred from common identifiers, in order of preference:
-   * "id", "UUID", "key", "primaryKey", "senderId", "name". If none are present,
-   * a deterministic fallback based on {@code data.hashCode()} is used.
-   *
-   * <p>Note: "UUID" here is the in-project column-name convention (uppercase). It does
-   * not necessarily hold a {@link java.util.UUID} — depending on the table it may be a
-   * player UUID string ({@code teleportData}), a sentinel zero-UUID ({@code referenceData}),
-   * or a synthetic composite row key such as {@code region:world:x:y:z}
-   * ({@code rtp_cached_locations}). All SQL schemas and lookups in this project spell the
-   * column {@code UUID}; no caller uses lowercase {@code "uuid"}.
+   * Cache row data in memory without writing to database. Stored under {@code tableName:primaryKey}.
    *
    * @param tableName the table name
    * @param data the row data to cache
@@ -475,12 +463,7 @@ public abstract class DatabaseAccessor<D> {
   }
 
   /**
-   * Cache a row's data without writing to the database. The row is stored using a
-   * composite key of the form {@code tableName + ":" + primaryKey}.
-   *
-   * The primary key is inferred from common identifiers, in order of preference:
-   * "id", "UUID", "key", "primaryKey", "senderId", "name". If none are present,
-   * a deterministic fallback based on {@code data.hashCode()} is used.
+   * Cache a row's data without writing to the database.
    *
    * @param data the row data to cache
    */
@@ -499,7 +482,7 @@ public abstract class DatabaseAccessor<D> {
     Map<String, Object> columns = toColumns(location);
     columns.put("region", regionName);
     columns.put("player_uuid", (playerUuid != null) ? playerUuid.toString() : "shared");
-    // Repurpose the legacy "seed" column to carry RegionCacheKey.cacheKeyLong — a 64-bit
+    // Repurpose the legacy "seed" column to carry RegionCacheKey.cacheKeyLong - a 64-bit
     // hash of (world seed + shape class/params + vert class/params + SCHEMA_VERSION).
     // Region.hydrateCacheFromDatabase compares this on load and drops mismatches, so any
     // edit to validity-affecting region config invalidates the persisted rows automatically
@@ -594,7 +577,7 @@ public abstract class DatabaseAccessor<D> {
    * </ol>
    *
    * <p>After this call, a subsequent {@link #flushDirtyCache()} +
-   * {@link #processQueries(long)} cycle repopulates the table from scratch —
+   * {@link #processQueries(long)} cycle repopulates the table from scratch -
    * "fresh table on every save". This prevents stale rows for already-consumed
    * locations from surviving a restart (the per-poll delete callback alone is
    * subject to a save-vs-delete race in {@link #processQueries(long)} and to
@@ -615,7 +598,7 @@ public abstract class DatabaseAccessor<D> {
 
     if (!anyDumped) return;
 
-    // Any prior-cycle ops targeting rtp_cached_locations are now stale — the
+    // Any prior-cycle ops targeting rtp_cached_locations are now stale - the
     // in-memory dump above is the authoritative state.
     writeQueue.removeIf(e ->
         e != null && e.getKey() != null
@@ -724,7 +707,7 @@ public abstract class DatabaseAccessor<D> {
    * @param availableTime the time available for processing in nanoseconds
    */
   public void processQueries(long availableTime) {
-    // Process file I/O tasks first — they don't require a database connection
+    // Process file I/O tasks first - they don't require a database connection
     if (!fileWriteQueue.isEmpty() || !fileReadQueue.isEmpty()) {
       long start = System.nanoTime();
       long dt;
@@ -769,7 +752,7 @@ public abstract class DatabaseAccessor<D> {
       }
     }
 
-    // Include deleteQueue in the early-exit check — otherwise pending deletes are stranded
+    // Include deleteQueue in the early-exit check - otherwise pending deletes are stranded
     // whenever no reads/writes are queued. Symptom: deleteCachedLocation enqueues a row
     // for removal, processQueries returns before the delete loop runs, and the row
     // remains in the DB until the next write happens to land in the same tick.

@@ -76,7 +76,7 @@ class YamlFileDatabaseTest {
     @Test
     void connect_skipsMalformedYamlFile() throws IOException {
         Files.writeString(tempDir.resolve("bad.yml"), "key: [\nunclosed bracket\n\t\t{{{{");
-        // connect() catches parse exceptions and skips the file — must not throw
+        // connect() catches parse exceptions and skips the file - must not throw
         assertDoesNotThrow(() -> db.connect());
     }
 
@@ -310,13 +310,7 @@ class YamlFileDatabaseTest {
 
     /**
      * Regression: multiple sequential {@code write()} calls must all persist to disk.
-     *
-     * <p>Prior to the fix, {@code YamlFileDatabase.write()} reloaded the file from
-     * disk on every call but only saved on {@code disconnect()}, so each write
-     * blew away the prior in-memory edits and only the most recent row survived.
-     * Symptom: {@code rtp_cached_locations.yml} only ever contained a single row
-     * regardless of how many were queued. See
-     * {@link io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase#write}.
+     * Prevents prior rows from being overwritten in {@link YamlFileDatabase#write}.
      */
     @Test
     void write_multipleRows_allPersisted() throws IOException {
@@ -344,16 +338,8 @@ class YamlFileDatabaseTest {
     }
 
     /**
-     * Regression: {@link YamlFileDatabase#setValue(String, Map)} must re-nest a
-     * flat {@code {column -> value}} row under its primary-key column before
-     * enqueueing the write. Otherwise the row is laid out as top-level keys
-     * (matching the user-attached {@code rtp_cached_locations.yml} sample showing
-     * a single flat row with `x:`, `y:`, `z:`, `UUID:` at document root), every
-     * subsequent row collides on those top-level keys, and {@code loadCachedLocations}
-     * skips the file because there are no per-row configuration sections to descend
-     * into. End-to-end shape: {@code DatabaseAccessor.saveCachedLocation} -> flat
-     * columns -> {@code flushDirtyCache} -> {@code setValue(String, Map)} ->
-     * {@code processQueries} -> {@code write} -> {@code loadCachedLocations}.
+     * Regression: {@link YamlFileDatabase#setValue(String, Map)} must nest a flat
+     * {@code {column -> value}} row under its primary key to prevent key collisions.
      */
     @Test
     void setValue_flatRow_isNestedUnderPrimaryKey() throws IOException {

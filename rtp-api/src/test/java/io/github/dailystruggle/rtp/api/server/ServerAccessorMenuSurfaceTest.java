@@ -21,15 +21,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the four {@code menu*} default methods added to {@link RTPServerAccessor}
- * by ADR-048, and the {@link MenuPlatformView#of} snapshot factory.
- *
- * <p>Uses a {@link Proxy}-backed stub so the test does not have to implement
- * the ~50 abstract methods on {@link RTPServerAccessor}. Only
- * {@code getSender(UUID)} is routed to a configurable {@link Function};
- * everything else falls through to {@link InvocationHandler#invokeDefault}
- * (default methods) or throws (other abstracts; the menu surface does not
- * touch them).
+ * Tests the {@code menu*} default methods on {@link RTPServerAccessor} (ADR-048)
+ * and the {@link MenuPlatformView#of} snapshot factory using a dynamic proxy stub.
  */
 class ServerAccessorMenuSurfaceTest {
 

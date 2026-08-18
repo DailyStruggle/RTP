@@ -5,20 +5,11 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Objects;
 
 /**
- * One styled-text run within a {@link MenuLine}.
+ * Plain-text styled run within a {@link MenuLine} (ADR-035).
  *
- * <p>The surface is intentionally plain-text: no Adventure {@code Component},
- * no Bukkit {@code BaseComponent}, no platform color objects. Renderers
- * translate {@code text} and {@code hover} to their native representation
- * (ADR-035 §Menu model).
- *
- * @param text   the visible text. Never {@code null}; may be empty.
- * @param hover  optional tooltip shown on cursor hover. {@code null} means no
- *               tooltip. Hover text is populated at mint time by the reflector
- *               (ADR-044) — a config edit between mint and redeem cannot
- *               desync the displayed hover.
- * @param action optional click action. {@code null} means the fragment is
- *               purely decorative.
+ * @param text   visible text; never {@code null}
+ * @param hover  optional tooltip shown on cursor hover (ADR-044), or {@code null}
+ * @param action optional click action, or {@code null} if purely decorative
  */
 public record MenuFragment(String text, @Nullable String hover, @Nullable MenuAction action) {
 

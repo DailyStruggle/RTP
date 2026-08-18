@@ -111,7 +111,7 @@ public class RegionQueueManagerTest {
     }
 
     // -----------------------------------------------------------------------
-    // poll — empty queue returns null
+    // poll - empty queue returns null
     // -----------------------------------------------------------------------
 
     @Test
@@ -122,7 +122,7 @@ public class RegionQueueManagerTest {
     }
 
     // -----------------------------------------------------------------------
-    // poll — keptLocations path
+    // poll - keptLocations path
     // -----------------------------------------------------------------------
 
     @Test
@@ -140,7 +140,7 @@ public class RegionQueueManagerTest {
     }
 
     // -----------------------------------------------------------------------
-    // poll — perPlayerLocationQueue path
+    // poll - perPlayerLocationQueue path
     // -----------------------------------------------------------------------
 
     @Test
@@ -164,7 +164,7 @@ public class RegionQueueManagerTest {
     }
 
     // -----------------------------------------------------------------------
-    // fastQueue / poll — fastLocations path
+    // fastQueue / poll - fastLocations path
     // -----------------------------------------------------------------------
 
     @Test

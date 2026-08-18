@@ -16,31 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 /**
- * Shared, tick-sampled producer for the ADR-075 platform-neutral
- * {@link PlayerMoveEvent}. Platforms that have no native per-move event
- * (Fabric, NeoForge) observe movement by reading each watched player's block
- * position once per server tick and diffing it against the last observed
- * position; when the block coordinate changes within the same world, a
- * {@link PlayerMoveEvent} is fired through {@link RTPAPI#playerMoveEvents}.
- *
- * <p>This class holds the per-player baseline state and the diff logic so each
- * adapter's producer is a thin wrapper that just calls {@link #sample()} from
- * its own tick loop. It is deliberately cheap: work is bounded to the
- * {@linkplain PlayerMoveDispatcher#watchedPlayers() watched set}, not the total
- * online count, so an idle server with no watchers costs a single
- * {@link PlayerMoveDispatcher#hasWatchers()} check per tick.
- *
- * <p><b>World changes.</b> When a watched player's world changes between
- * samples (e.g. a cross-dimension teleport), the baseline is silently reset
- * without firing: {@link PlayerMoveEvent} carries a single world and a
- * same-world from/to pair, so a cross-world jump is not a meaningful "move"
- * for this signal. Consumers that care about world changes observe the teleport
- * events instead.
- *
- * <p><b>Threading.</b> {@link #sample()} runs on the caller's tick thread. It
- * reads live player positions through {@link RTPPlayer#getLocation()} (no chunk
- * I/O) and fires synchronously on that thread, matching the ADR-075 contract
- * that the event is delivered on the platform's natural thread for that player.
+ * Tick-sampled producer for platform-neutral {@link PlayerMoveEvent} (ADR-075).
+ * Diffs block positions per tick for watched players on platforms lacking native move events.
  *
  * @since 3.1.4
  */

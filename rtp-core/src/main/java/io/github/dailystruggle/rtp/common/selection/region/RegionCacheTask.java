@@ -19,17 +19,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 /**
- * A task that asynchronously generates and caches a safe teleportation location
- * for a specific region. This task is used to proactively fill the region's
- * location queue, ensuring that teleports can be processed quickly.
- *
- * <p>On the private-queue path (a specific {@code playerId} is set), the task
- * also pre-warms the landing neighborhood's chunks before enqueueing the
- * {@link RTPLocation}, so the consumer (which can run on any scheduler lane —
- * including Folia region threads under the ADR-015 stale-chunk guard) does not
- * drive chunk I/O itself. See ADR-016 §6 for why this wait is intentionally
- * kept on the cache path even though the Anvil pre-filter means the safety
- * evaluation itself is already off-tick.
+ * Asynchronously generates and caches safe teleport locations for a region.
+ * Pre-warms landing chunks on private queues to prevent main-thread chunk I/O (ADR-016).
  */
 public class RegionCacheTask extends RTPRunnable {
     private final Region region;
@@ -37,26 +28,13 @@ public class RegionCacheTask extends RTPRunnable {
     private final long selectRadius;
     private final long maxNanos;
     /**
-     * Observational mode flag (Phase 8.2 pivot, 2026-04-20c). When
-     * {@code true}, this task runs only when the pregen cache is at or above
-     * {@code cacheCap} (the strict inversion of the default gate) and drops
-     * any safe candidate instead of enqueuing it. All side effects that
-     * matter — {@code MemoryShape#addBadLocation} for rejected cells and
-     * {@code biomePrefixSumsCache} updates for every evaluated candidate —
-     * already occur inside {@code LocationGenerator} and are inherited for
-     * free. See {@code docs/dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §§2, 4.2}.
+     * Observational mode flag. When true, runs only when pregen cache is at/above
+     * cacheCap and drops safe candidates, retaining generator side effects.
      */
     private final boolean observationalOnly;
 
     /**
-     * Idempotency latch for {@link #releaseInFlight()}. The lifecycle of this
-     * task has multiple terminal branches (normal-null result, exception,
-     * playerId-success after chunk-load, playerId-coords-null, public-cache
-     * offer); each must release the {@code inFlightCalculations} counter and
-     * the {@link MemoryTracker} registration exactly once. A single CAS gate
-     * collapses "who decrements?" into a single answer regardless of which
-     * branch fires first or whether {@code exceptionally} chains into
-     * {@code thenAccept(null)}.
+     * Idempotency latch for {@link #releaseInFlight()} across multiple terminal branches.
      */
     private final AtomicBoolean released = new AtomicBoolean(false);
 
@@ -101,15 +79,8 @@ public class RegionCacheTask extends RTPRunnable {
     }
 
     /**
-     * Observational-mode factory (Phase 8.2 pivot, 2026-04-20c). Constructs a
-     * task that runs only when the cache is at/above {@code cacheCap} and
-     * discards the resulting safe candidate (if any). Side effects on
-     * {@code pendingBadLocations} / {@code biomePrefixSumsCache} are inherited
-     * from the existing {@code LocationGenerator} walk.
-     *
-     * @param region   the region to sample against
-     * @param maxNanos the time budget for the backing task
-     * @return a cache task configured for observational mode
+     * Observational-mode factory. Constructs task running only when cache is at/above
+     * cacheCap, discarding safe candidates while retaining bad-location/biome side effects.
      */
     public static RegionCacheTask observe(Region region, long maxNanos) {
         return new RegionCacheTask(region, maxNanos, true);
@@ -130,9 +101,9 @@ public class RegionCacheTask extends RTPRunnable {
             long cacheCap = region.getSettings().cacheCap();
             boolean cacheFull = region.queueManager.unkeptLocations.size() >= cacheCap;
             if (observationalOnly) {
-                // Phase 8.2 pivot (2026-04-20c): observational mode runs
-                // only when L2 is full — i.e. when the default-mode deficit
-                // loop has nothing to do, the visitor walks LocationGenerator
+                // Observational mode runs only when L2 is full - i.e. when the
+                // default-mode deficit loop has nothing to do, the visitor walks
+                // LocationGenerator
                 // for its bad-location/biome side-effects and discards the
                 // candidate. Skip when L2 has headroom; the default-mode
                 // deficit loop will fill that headroom on this pulse.
@@ -145,24 +116,9 @@ public class RegionCacheTask extends RTPRunnable {
                 return;
             }
 
-            // THROTTLE: At most ONE in-flight public-cache generation per region.
-            // Tightened 2026-05-08 from `> 2` (up to 3 concurrent) to single-flight
-            // after the Fabric heap dump showed `RegionCacheTask` was the rate-
-            // multiplier behind the CompletableFuture graph leak: every concurrent
-            // PregenTask under it allocated its own neighbour-grid `allOf` fan-out
-            // (~48 BiApply / ~48 BiRelay per safetyRadius=3 attempt, retained for
-            // up to 5 s under the new orTimeout). With the cap at 3 and a sub-
-            // second per-attempt cadence, three independent retry trains stacked
-            // their CF graphs continuously; a single-flight cap collapses that to
-            // one train and lets the per-task `maxAttempts` ceiling actually bound
-            // the working set.
-            //
-            // The TaskPipe's per-pulse loop still calls run() repeatedly; the
-            // surplus calls cleanly abort here, naturally pacing generation to
-            // one chunk at a time. Per-player tasks (playerId != null) bypass
-            // this gate intentionally — they are bounded by the number of
-            // waiting players, which is upstream-rate-limited by the per-player
-            // single-flight enforced in QueueTask/RegionQueueManager.
+            // Throttle: single-flight in-flight public-cache generation per region.
+            // Collapses concurrent retry fan-out into one active train.
+            // Per-player tasks (playerId != null) bypass this gate and are rate-limited upstream.
             if (region.inFlightCalculations.get() >= 1) {
                 MemoryTracker.untrack(this);
                 return;
@@ -184,7 +140,7 @@ public class RegionCacheTask extends RTPRunnable {
             } else {
                 RTP.log(Level.SEVERE, "Failed to generate location", e);
             }
-            // Cleanup is owned by processResult(null) below — keeping the
+            // Cleanup is owned by processResult(null) below - keeping the
             // decrement here as well would race with processResult on a future
             // that completes after recovery, leaking or double-counting the
             // counter depending on dispatch order. The releaseInFlight() CAS
@@ -269,11 +225,10 @@ public class RegionCacheTask extends RTPRunnable {
             } else {
                 if (res.coords() != null) {
                     if (res.reservation() != null) res.reservation().close();
-                    // Observational mode (Phase 8.2 pivot): drop the safe
-                    // candidate instead of enqueuing it. All biome /
-                    // bad-location side effects already fired inside
-                    // LocationGenerator; the winning candidate itself is
-                    // eligible for immediate GC. See plan §2.
+                    // Observational mode: drop the safe candidate instead of
+                    // enqueuing it. All biome / bad-location side effects already
+                    // fired inside LocationGenerator; the winning candidate
+                    // itself is eligible for immediate GC.
                     if (!observationalOnly) {
                         RTPLocation coldLoc = new RTPLocation(res.coords(), res.attempts(), null);
                         region.queueManager.unkeptLocations.offer(coldLoc);
@@ -292,12 +247,7 @@ public class RegionCacheTask extends RTPRunnable {
 
     /**
      * Decrements {@code region.inFlightCalculations} and untracks this task in
-     * {@link MemoryTracker} exactly once across the task's lifetime, regardless
-     * of how many terminal branches fire. The CAS on {@link #released}
-     * guarantees idempotency, which is required because the chain
-     * {@code exceptionally -> thenAccept(null)} can deliver the null result to
-     * {@code processResult} after recovery, and the playerId-success branch
-     * finalises asynchronously inside the {@code chunkSet.complete()} callback.
+     * {@link MemoryTracker} exactly once across all terminal branches via CAS.
      */
     private void releaseInFlight() {
         if (released.compareAndSet(false, true)) {

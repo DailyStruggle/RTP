@@ -194,7 +194,7 @@ public class ConfigParserLanguageTest {
     @Test
     void testGetMapReturnsEmptyForScalarValue() throws IOException {
         ConfigParser<TestKeys> parser = buildParser("alpha: 42\nversion: 1.0\n");
-        // alpha holds a scalar — getMap should return an empty map
+        // alpha holds a scalar - getMap should return an empty map
         java.util.Map<String, Object> map = parser.getMap(TestKeys.alpha);
         assertNotNull(map);
         assertTrue(map.isEmpty(), "getMap on a scalar value should return an empty map");
@@ -225,7 +225,7 @@ public class ConfigParserLanguageTest {
 
     @Test
     void testVersionMismatchTriggersRename() throws IOException {
-        // Write a config with version 0.9 but request version 1.0 — should trigger update/rename
+        // Write a config with version 0.9 but request version 1.0 - should trigger update/rename
         File configFile = tempDir.resolve("test.yml").toFile();
         Files.writeString(configFile.toPath(), "alpha: 7\nversion: 0.9\n");
         YamlFileDatabase fileDatabase = new YamlFileDatabase(tempDir.toFile());
@@ -264,7 +264,7 @@ public class ConfigParserLanguageTest {
     }
 
     // -----------------------------------------------------------------------
-    // getMap() — nested map value stored in YAML
+    // getMap() - nested map value stored in YAML
     // -----------------------------------------------------------------------
 
     @Test
@@ -280,7 +280,7 @@ public class ConfigParserLanguageTest {
     }
 
     // -----------------------------------------------------------------------
-    // set(String, Object) — valid and invalid key
+    // set(String, Object) - valid and invalid key
     // -----------------------------------------------------------------------
 
     @Test
@@ -300,7 +300,7 @@ public class ConfigParserLanguageTest {
     }
 
     // -----------------------------------------------------------------------
-    // saveResource() — overwrite=false does not replace existing file
+    // saveResource() - overwrite=false does not replace existing file
     // -----------------------------------------------------------------------
 
     @Test
@@ -308,7 +308,7 @@ public class ConfigParserLanguageTest {
         // Build parser first (writes test.yml), then overwrite with sentinel content
         ConfigParser<TestKeys> parser = buildParser("alpha: 1\nversion: 1.0\n");
 
-        // Now stamp the sentinel — saveResource(overwrite=false) must not touch it
+        // Now stamp the sentinel - saveResource(overwrite=false) must not touch it
         java.nio.file.Path target = tempDir.resolve("test.yml");
         Files.writeString(target, "alpha: SENTINEL\nversion: 1.0\n");
 
@@ -320,7 +320,7 @@ public class ConfigParserLanguageTest {
     }
 
     // -----------------------------------------------------------------------
-    // getConfigValue() — null stored value returns default
+    // getConfigValue() - null stored value returns default
     // -----------------------------------------------------------------------
 
     @Test
@@ -332,7 +332,7 @@ public class ConfigParserLanguageTest {
     }
 
     // -----------------------------------------------------------------------
-    // keys() — all enum names present
+    // keys() - all enum names present
     // -----------------------------------------------------------------------
 
     @Test

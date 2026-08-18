@@ -13,19 +13,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for {@link FoliaRegionSample} and the {@link MetricsSnapshot#foliaRegions}
- * per-region detail. Verifies:
- * <ul>
- *   <li>The host-runtime {@link MetricsSnapshot} constructor with an omitted list
- *       leaves {@code foliaRegions} empty (non-null).</li>
- *   <li>The list-bearing constructor accepts a list and exposes it as an immutable copy.</li>
- *   <li>The {@link MetricsBinding#foliaRegions()} default returns an empty list, so
- *       non-Folia bindings inherit the correct single-region answer.</li>
- *   <li>{@link FoliaRegionSample#tickBudgetUtilisation()} mirrors the snapshot-level
- *       {@code mspt/50.0} semantics including {@code NaN} propagation.</li>
- * </ul>
+ * Tests for {@link FoliaRegionSample} and {@link MetricsSnapshot#foliaRegions}.
  *
- * <p>Traceability: REQ-RTP-OBS-001 (non-blocking snapshot surface).
+ * <p>Verifies immutability, empty defaults, and tick budget calculation (REQ-RTP-OBS-001).
  */
 class FoliaRegionSampleTest {
 

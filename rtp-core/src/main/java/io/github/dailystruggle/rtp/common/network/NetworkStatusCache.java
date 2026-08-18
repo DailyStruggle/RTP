@@ -14,16 +14,8 @@ import java.util.logging.Level;
 /**
  * Read-side cache for per-player cross-server queue status.
  *
- * <p>A single async timer polls the injected {@code statusSupplier} on a
- * fixed interval (default {@code network.queuePollIntervalMs = 1000ms}) and
- * replaces this cache's contents wholesale. The {@code /rtp} command path
- * and any UI / status emitter reads {@link #get(UUID)} and never blocks on
- * the transport. Message emission per {@code REQ-RTP-F-013} is the caller's
- * responsibility - this cache is data only.</p>
- *
- * <p>The {@link QueueStatus} record is the local shape; the
- * {@code NetworkRequestQueue.pollStatus} returns the same fields and a
- * thin adapter feeds them in here.</p>
+ * <p>Polled asynchronously at {@code network.queuePollIntervalMs} intervals.
+ * Provides lock-free status lookups for commands and UI without blocking on transport.
  */
 public final class NetworkStatusCache {
 
@@ -32,10 +24,10 @@ public final class NetworkStatusCache {
      *
      * @param playerId        UUID of the player
      * @param state           current queue state
-     * @param positionInQueue zero-based position in the queue; 0 when not queued
-     * @param serverId        optional backend server id the player is being routed to
-     * @param regionKey       optional region key associated with this enrolment
-     * @param updatedAtMs     wall-clock time of the last status update in milliseconds
+     * @param positionInQueue zero-based position in the queue
+     * @param serverId        optional target backend server id
+     * @param regionKey       optional region key for this enrolment
+     * @param updatedAtMs     wall-clock timestamp of the update in milliseconds
      */
     public record QueueStatus(
             UUID playerId,
@@ -57,12 +49,7 @@ public final class NetworkStatusCache {
         public enum State {
             QUEUED,
             /**
-             * ADR-015 / REQ-RTP-NET-015: the request
-             * is parked on the shared cross-proxy {@code NetworkWaitlist}
-             * because no backend qualified at enrolment time. The player has
-             * not been routed; they are awaiting the {@code NetworkWaitlistDrainer}.
-             * Non-terminal: command-lock applies, periodic notify applies,
-             * quit-event removal applies.
+             * ADR-015 / REQ-RTP-NET-015: parked on shared waitlist awaiting backend qualification.
              */
             WAITLISTED,
             ROUTING, RESERVED, TRANSFERRING, COMPLETED, FAILED, CANCELLED, UNKNOWN
@@ -87,28 +74,12 @@ public final class NetworkStatusCache {
     private final ConcurrentHashMap<UUID, QueueStatus> byPlayer = new ConcurrentHashMap<>();
     private volatile Object timerTaskHandle;
     /**
-     * Terminal-transition observer. Fires when a player's queue entry
-     * moves non-terminal -> (terminal state OR eviction). Used by the
-     * lobby to release the local {@code processingPlayers} lock once
-     * the proxy reports COMPLETED / FAILED / CANCELLED, or once the
-     * proxy stops reporting them entirely (eviction = the proxy
-     * dropped the row, which is itself terminal from our POV).
-     * Default no-op; bootstrap installs the real listener.
+     * Terminal-transition observer for non-terminal to terminal/evicted transitions.
      */
     private volatile java.util.function.BiConsumer<UUID, QueueStatus.State> terminalListener = (u, s) -> {};
 
     /**
-     * Locally-seeded enrolments that the supplier has not yet confirmed.
-     * A lobby cross-server enrolment is recorded here at the moment we
-     * hand the envelope to the enrolment buffer (well before the proxy
-     * acks the row into the status supplier's view). Entries are sticky:
-     * pollOnce will NOT evict them while they remain in this set, even
-     * if the supplier returns an empty snapshot. Once the supplier
-     * starts reporting the row, pollOnce removes it from here. If a
-     * locally-seeded entry exceeds {@link #seededTimeoutMs} without
-     * being confirmed by the supplier, pollOnce drops it AND fires the
-     * terminal listener with {@code FAILED} so the lobby releases the
-     * processingPlayers lock and the player can retry.
+     * Locally-seeded enrolments pending supplier confirmation, with expiry timeout.
      */
     private final ConcurrentHashMap<UUID, Long> seededAtMs = new ConcurrentHashMap<>();
     /** TTL for {@link #seededAtMs}; default 20s. Settable for tests. */
@@ -169,20 +140,9 @@ public final class NetworkStatusCache {
     }
 
     /**
-     * Locally evict any cached row for {@code playerId} (and clear any
-     * sticky local seed). Used by {@code JoinTriggerSource} on a successful
-     * cross-server redeem: once the proxy token has transitioned to
-     * {@code CONSUMED}, the lobby-seeded / proxy-poller-seeded non-terminal
-     * row on this backend is stale and would cause
-     * {@link NetworkWaitlistGuard} to short-circuit the post-arrival
-     * {@code /rtp} dispatch with {@code msgAlreadyQueued}, leaving the
-     * arrival without a teleport (REQ-RTP-S-004, REQ-RTP-NET-008/-015).
+     * Evicts local cached row and pending seed for {@code playerId}.
      *
-     * <p>This is a deliberate local-state correction, not a proxy state
-     * change, so the terminal listener is intentionally NOT fired: the
-     * authoritative terminal transition will be observed (and fired) by
-     * {@link #pollOnce} on the next supplier roundtrip. Idempotent; null
-     * tolerant.</p>
+     * <p>Used after successful cross-server token redemption to prevent stale waitlist guards.
      */
     public void evictLocal(UUID playerId) {
         if (playerId == null) return;

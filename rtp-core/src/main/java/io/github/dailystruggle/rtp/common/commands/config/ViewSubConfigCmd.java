@@ -16,31 +16,15 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /rtp config <file> view} &mdash; opens the interactive book menu for
- * the targeted configuration file (proposal v3.6.1, checklist step 6).
+ * {@code /rtp config <file> view} - opens interactive book menu for configuration file.
  *
- * <p>When a {@link BookViewOpener} has been wired (e.g. by the Bukkit family
- * via {@code RTPCmdBukkit}), invoking this command mints an
- * {@code OpenConfigFile(name)} action through the menu pipeline and delegates
- * rendering to the active {@code MenuRenderer}. On platforms where no opener
- * has been wired (or where the wiring deliberately returns {@code false}),
- * the command falls through to the legacy raw-dump path provided by
- * {@link ViewRawSubConfigCmd} so {@code /rtp config <file> view} never feels
- * broken on Spigot / Fabric (REQ-RTP-S-007 spirit).
- *
- * <p>Read-only by design: this command never mutates state.
+ * <p>Delegates to wired {@link BookViewOpener}, falling back to {@link ViewRawSubConfigCmd}.
  */
 public class ViewSubConfigCmd extends BaseRTPCmdImpl {
 
   /**
-   * Service hook for opening the book-form config view for a given file name
-   * and caller. Implementations live in platform wiring (e.g. {@code rtp-plugin}'s
-   * {@code RTPCmdBukkit}) where the {@code MenuRenderer},
-   * {@code MenuConfigSubtreeBuilder} and {@code MenuTokenRegistry} are wired.
-   *
-   * <p>Implementations should return {@code true} when the book was opened
-   * (or a configurable rejection was sent), and {@code false} when this
-   * command should fall through to the legacy raw-dump path.
+   * Service hook for opening the book-form config view for a file.
+   * Returns {@code true} if opened, or {@code false} to fall back to raw dump.
    */
   @FunctionalInterface
   public interface BookViewOpener {

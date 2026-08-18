@@ -11,33 +11,8 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test anvil-prefilter} &mdash; read-only diagnostic that reports
- * the current {@code AnvilPrefilterMetrics} counters (ACCEPT / REJECT /
- * UNKNOWN) plus the derived hit rate.
- *
- * <p>Surfaces the Phase&nbsp;4 telemetry introduced in ADR-016 so operators
- * can verify the pre-filter is doing useful work across every in-scope
- * Bukkit-family adapter: Spigot runs the probe in {@code
- * BukkitRTPWorld#getChunkAt}; Paper inherits the same path verbatim per
- * §13.2 (landed 2026-04-20); Folia re-implements the same orchestration in
- * {@code FoliaRTPWorld#getChunkAt} per §11. Counters staying at zero now
- * means either the pre-filter is disabled
- * ({@code SafetyKeys.anvilPrefilterEnabled}) or no teleport has triggered a
- * candidate chunk load since startup. Fabric is out of scope (§13.2).
- *
- * <p>See {@code ADR-016 §10} (Phase&nbsp;4)
- * and {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md} for the runtime-test
- * suite contract.
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>S-004:</b> emits a single {@code INFO}-level summary plus, when
- *       relevant, per-bucket detail. No failure mode to hide.</li>
- *   <li><b>S-005:</b> reads three {@code AtomicLong}s; no chunk I/O, no
- *       main-thread wait. Safe on any scheduler.</li>
- *   <li><b>Read-only:</b> does not reset the counters. A future
- *       {@code reset} leaf would need its own permission gate.</li>
- * </ul>
+ * {@code rtp test anvil-prefilter} - diagnostic reporting {@code AnvilPrefilterMetrics}
+ * counters (ACCEPT / REJECT / UNKNOWN) and derived hit rate (ADR-016).
  */
 public class TestAnvilPrefilterCmd extends BaseRTPCmdImpl {
 

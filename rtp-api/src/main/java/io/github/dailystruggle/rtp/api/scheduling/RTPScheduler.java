@@ -7,15 +7,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 /**
- * Platform-agnostic abstraction for scheduling tasks on the server.
- *
- * <p>This interface provides methods for running tasks synchronously and asynchronously,
- * with support for delays and repeating timers. It also includes methods for
- * scheduling tasks on specific regions or chunks, which is essential for Folia
- * compatibility.
- *
- * <p>Implementations are provided by the platform adapter (e.g., {@code rtp-bukkit},
- * {@code rtp-folia}).
+ * Platform-agnostic scheduler SPI for synchronous, asynchronous, and region-bound tasks.
  */
 @PublicApi
 public interface RTPScheduler {
@@ -90,38 +82,35 @@ public interface RTPScheduler {
 
   /**
    * Executes a task on the thread associated with the specified chunk.
-   * On non-Folia platforms, this is the main server thread.
    *
-   * @param world the world of the chunk
-   * @param cx the chunk's X coordinate
-   * @param cz the chunk's Z coordinate
-   * @param task the task to run
+   * @param world world of chunk
+   * @param cx chunk X
+   * @param cz chunk Z
+   * @param task task to run
    */
   void runTask(RTPWorld<?> world, int cx, int cz, Runnable task);
 
   /**
    * Executes a repeating task on the thread associated with the specified chunk.
-   * On non-Folia platforms, this is the main server thread.
    *
-   * @param world the world of the chunk
-   * @param cx the chunk's X coordinate
-   * @param cz the chunk's Z coordinate
-   * @param task the task to run
-   * @param delay the delay before the first execution, in server ticks
-   * @param period the interval between subsequent executions, in server ticks
-   * @return a platform-specific task object that can be used to cancel it
+   * @param world world of chunk
+   * @param cx chunk X
+   * @param cz chunk Z
+   * @param task task to run
+   * @param delay initial delay in ticks
+   * @param period interval in ticks
+   * @return cancellable task handle
    */
   Object runTaskTimer(RTPWorld<?> world, int cx, int cz, Runnable task, long delay, long period);
 
   /**
-   * Executes a task on the thread associated with the specified chunk after a delay.
-   * On non-Folia platforms, this is the main server thread.
+   * Executes a delayed task on the thread associated with the specified chunk.
    *
-   * @param world the world of the chunk
-   * @param cx the chunk's X coordinate
-   * @param cz the chunk's Z coordinate
-   * @param task the task to run
-   * @param delay the delay in server ticks
+   * @param world world of chunk
+   * @param cx chunk X
+   * @param cz chunk Z
+   * @param task task to run
+   * @param delay delay in ticks
    */
   void runTaskLater(RTPWorld<?> world, int cx, int cz, Runnable task, long delay);
 }

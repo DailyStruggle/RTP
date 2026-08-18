@@ -30,14 +30,8 @@ public class BiomeParameter extends CommandParameter {
   }
 
   /**
-   * Biome-first menu / tab-completion source (ADR-063). Rather than offering
-   * the whole-server biome set, surface only biomes actually observed within a
-   * region the sender can reach, so a selection resolves to a region that
-   * contains the biome and the teleport stays bounded. The list is the union
-   * of {@code MemoryShape.getObservedBiomes()} over accessible regions, sourced
-   * from chunk-I/O-free spatial memory. Falls back to {@link #values()} only
-   * when no observed-biome data exists yet (cold-data state) so suggestions are
-   * never worse than before the background sampler has run.
+   * Biome-first menu / tab-completion source (ADR-063).
+   * Surfaces biomes observed within accessible regions before falling back to full server biome set.
    */
   @Override
   public Set<String> relevantValues(UUID senderId) {

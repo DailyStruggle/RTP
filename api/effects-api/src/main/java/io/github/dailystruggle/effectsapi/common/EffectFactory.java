@@ -29,7 +29,7 @@ public class EffectFactory {
 
     /**
      * Per-platform leaf operations of the ADR-002 adaptive reading order.
-     * Bound at platform-init time via {@link #setCoercer(ValueCoercer)} —
+     * Bound at platform-init time via {@link #setCoercer(ValueCoercer)} -
      * {@code BukkitEffectsInitializer.registerAll()} on the Bukkit family,
      * {@code FabricEffectsInitializer.registerAll()} on Fabric. See
      * effects-api-ADR-004.
@@ -49,7 +49,7 @@ public class EffectFactory {
     /**
      * Retrieve the bound {@link ValueCoercer}.
      *
-     * @throws IllegalStateException if no coercer has been bound yet — addons
+     * @throws IllegalStateException if no coercer has been bound yet - addons
      *         calling effect coercion before the platform initializer ran
      *         (S-006: never null, never silent).
      */

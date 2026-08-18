@@ -6,50 +6,27 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Platform-neutral SPI for loading and pasting a region-specific schematic at the
- * confirmed arrival {@link RTPLocation}. See ADR-058.
+ * SPI for loading and pasting region-specific schematics at arrival locations (ADR-058).
  *
- * <p>The contract enforces a strict two-phase split:
- *
- * <ul>
- *   <li>{@link #load} performs the blocking file read + decode and MUST run off any
- *       tick / region thread (S-005). It returns a {@link CompletableFuture} so the
- *       caller never blocks the pipeline on a {@code .get()}.
- *   <li>{@link #paste} performs only the block writes and MUST be invoked by the caller
- *       on the thread that owns the target region (Folia region thread; Bukkit/Paper main
- *       thread). It performs no file I/O.
- * </ul>
- *
- * <p>Implementations never throw to abort a teleport: every non-success condition is
- * reported as a {@link PasteResult} so the core invocation point can audit it (S-004)
- * and proceed with the teleport unmodified.
- *
- * <p>A {@code SchematicPaster} is the bundled, file-backed specialisation of the general
- * {@link PlatformCreator} extension point: it creates the arrival platform by decoding and
- * pasting a {@code .schem} structure. Addons may instead implement {@code PlatformCreator}
- * directly for a non-schematic platform (e.g. a procedural pad) and bind it through
- * {@code RTPHooks#platformCreator()}.
+ * <p>Enforces a two-phase split: asynchronous off-thread file decode ({@link #load}),
+ * followed by region-thread block placement ({@link #paste}).
  */
 public interface SchematicPaster extends PlatformCreator {
   /**
-   * Loads and decodes a schematic source off-thread. Implementations MUST NOT touch the
-   * world or load chunks here (S-005).
+   * Loads and decodes a schematic source asynchronously off-thread without loading chunks (S-005).
    *
-   * @param source the resolved source descriptor; never {@code null}
-   * @return a future completing with the decoded handle, or completing with {@code null}
-   *     when the source is missing / undecodable (the caller maps {@code null} to a
-   *     {@link PasteResult#MISSING_SOURCE} / {@link PasteResult#DECODE_ERROR} audit)
+   * @param source resolved source descriptor; never {@code null}
+   * @return future completing with decoded handle, or {@code null} on failure
    */
   CompletableFuture<LoadedSchematic> load(SchematicSource source);
 
   /**
-   * Pastes a previously-loaded schematic at the arrival location. MUST be invoked on the
-   * region-owning thread (caller's contract). Performs block writes only; no file I/O.
+   * Pastes a decoded schematic at the arrival location on the region-owning thread.
    *
-   * @param schematic the decoded handle from {@link #load}; never {@code null}
-   * @param at        the confirmed arrival location; never {@code null}
-   * @param options   paste tuning; never {@code null}
-   * @return the outcome, for the caller to audit; never {@code null}
+   * @param schematic decoded handle from {@link #load}; never {@code null}
+   * @param at        arrival location; never {@code null}
+   * @param options   paste options; never {@code null}
+   * @return paste outcome for caller auditing; never {@code null}
    */
   PasteResult paste(LoadedSchematic schematic, RTPLocation at, PasteOptions options);
 

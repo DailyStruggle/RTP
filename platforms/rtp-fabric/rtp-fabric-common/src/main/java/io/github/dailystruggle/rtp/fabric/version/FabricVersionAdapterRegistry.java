@@ -15,7 +15,7 @@ import java.util.logging.Level;
  * {@link IllegalStateException} per S-006 (no silent no-op on early-API calls).</p>
  *
  * <p>This class is intentionally not part of the public {@code rtp-api}
- * surface — it is internal Fabric platform glue, callable only by code under
+ * surface - it is internal Fabric platform glue, callable only by code under
  * {@code io.github.dailystruggle.rtp.fabric.**}.</p>
  *
  * <p><b>See also:</b> rtp-fabric-ADR-001 §"Runtime selection".</p>
@@ -55,7 +55,7 @@ public final class FabricVersionAdapterRegistry {
 
     /**
      * Returns the active adapter, or throws {@link IllegalStateException} if
-     * the bootstrap has not yet installed one (REQ-RTP-S-006 — fail loud, do
+     * the bootstrap has not yet installed one (REQ-RTP-S-006 - fail loud, do
      * not silently no-op).
      */
     public static FabricVersionAdapter require() {
@@ -70,7 +70,7 @@ public final class FabricVersionAdapterRegistry {
 
     /**
      * Returns the active adapter, or {@code null} if not yet installed.
-     * Prefer {@link #require()} on hot paths — null returns are reserved for
+     * Prefer {@link #require()} on hot paths - null returns are reserved for
      * defensive shutdown and test plumbing.
      */
     public static FabricVersionAdapter peek() {
@@ -83,7 +83,7 @@ public final class FabricVersionAdapterRegistry {
     }
 
     /**
-     * Tests-only — clears the active adapter. Production code shall not call
+     * Tests-only - clears the active adapter. Production code shall not call
      * this; it exists so tests can simulate cold bootstrap.
      */
     public static void clearForTesting() {

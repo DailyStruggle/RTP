@@ -4,41 +4,19 @@ import java.util.Deque;
 import java.util.Objects;
 
 /**
- * Per-consumer parameterization seam for the command-tree menu reflector
- * (ADR-044).
+ * Per-consumer parameterization seam for command-tree menu reflector (ADR-044).
  *
- * <p>The reflector itself is consumer-agnostic — it walks
- * {@code commands-api}'s node graph filtered by permission. Each concrete
- * consumer (the {@code /rtp config} browser first, region picker and
- * {@code /rtpadmin} wizards later) supplies a {@code MenuConsumerProfile}
- * to control:
- *
- * <ul>
- *   <li>How a leaf parameter maps to a chat suggestion prefix
- *       ({@link #suggestPrefix}); e.g. for {@code /rtp config} the prefix is
- *       {@code "/rtp config <file> <key>="} matching CONFIG_COMMAND_SPEC §2.4.
- *   <li>Which {@link YamlCommentLookup} feeds the hover-text resolver
- *       ({@link #commentLookup}); consumers without YAML backing return
- *       {@link YamlCommentLookup#EMPTY} and the reflector falls back to
- *       declared type + bounds.</li>
- * </ul>
- *
- * <p>Hover text for <i>command</i> fragments always comes from
- * {@code CommandsAPICommand#description()} (resolved from {@code messages.yml})
- * — the profile is consulted only for <i>parameter</i> fragments.
+ * <p>Controls chat suggestion prefix building ({@link #suggestPrefix}) and
+ * YAML comment hover resolution ({@link #commentLookup}).
  */
 public interface MenuConsumerProfile {
 
     /**
-     * Build the chat-suggestion prefix for a leaf parameter.
+     * Builds the chat-suggestion prefix for a leaf parameter.
      *
-     * @param commandPath   path of command-node names from root to the parent
-     *                      command of {@code parameterName}, in order (root at
-     *                      head). The deque is not modified by the callee.
-     * @param parameterName the leaf parameter name as declared in
-     *                      {@code commands-api}.
-     * @return the prefix the renderer should emit as
-     *         {@link MenuAction.SuggestInput}. Never {@code null}.
+     * @param commandPath   root-to-parent command path (unmodified)
+     * @param parameterName leaf parameter name
+     * @return prefix for {@link MenuAction.SuggestInput}; never {@code null}
      */
     String suggestPrefix(Deque<String> commandPath, String parameterName);
 

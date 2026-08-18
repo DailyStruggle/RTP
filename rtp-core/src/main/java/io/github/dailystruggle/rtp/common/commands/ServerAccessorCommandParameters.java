@@ -9,21 +9,8 @@ import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import java.util.Set;
 
 /**
- * Platform-neutral {@link PlatformCommandParameters} source backed entirely by
- * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor}.
- *
- * <p>The {@code player} and {@code world} parameters are nominally
- * "platform-bound" only because their validators historically reached for
- * platform-native lookups. On every platform whose accessor exposes
- * online-player / world enumeration ({@code getPlayer}, {@code getRTPWorld},
- * {@code getSender}, {@code getOnlinePlayerNames}) the logic is identical, so a
- * single accessor-backed source serves them all. This is what lets the Fabric
- * and NeoForge roots share one neutral {@link CoreRtpRoot} instead of
- * hand-rolling byte-for-byte identical parameter classes.</p>
- *
- * <p>The Bukkit family still supplies its own implementation (it gates on
- * {@code CommandSender}-typed Bukkit permission checks and {@code Bukkit.getPlayer}
- * / {@code Bukkit.getWorld}); it does not use this source.</p>
+ * Platform-neutral {@link PlatformCommandParameters} implementation backed by
+ * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor} for Fabric and NeoForge.
  */
 public final class ServerAccessorCommandParameters implements PlatformCommandParameters {
 

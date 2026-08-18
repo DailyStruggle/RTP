@@ -99,13 +99,13 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public @NotNull String getPlatform() { // @AnyThread — returns constant String
+  public @NotNull String getPlatform() { // @AnyThread - returns constant String
     return "Folia";
   }
 
   protected Integer intVersion = null;
   @Override
-  public Integer getServerIntVersion() { // @AnyThread — pure parse/cache of version string
+  public Integer getServerIntVersion() { // @AnyThread - pure parse/cache of version string
     if (intVersion == null) {
       // TODO: THREAD-VIOLATION - Requires async bridge; calls @GlobalRegionThread getServerVersion() from unannotated context
       String v = getServerVersion();
@@ -142,12 +142,12 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public @Nullable Object getShape(String name) { // @AnyThread — delegates to pure function
+  public @Nullable Object getShape(String name) { // @AnyThread - delegates to pure function
     return shapeFunction.apply(name);
   }
 
   @Override
-  public boolean isPrimaryThread() { // @AnyThread — pure boolean check
+  public boolean isPrimaryThread() { // @AnyThread - pure boolean check
     return false;
   }
 
@@ -204,7 +204,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public long overTime() { // @AnyThread — returns constant
+  public long overTime() { // @AnyThread - returns constant
     return 0;
   }
 
@@ -302,19 +302,19 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public String format(@Nullable UUID player, String text) { // @AnyThread — pure text formatting
+  public String format(@Nullable UUID player, String text) { // @AnyThread - pure text formatting
     org.bukkit.OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
     return io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.format(bukkitPlayer, text);
   }
 
   @Override
-  public String formatNoColor(@Nullable UUID player, String text) { // @AnyThread — pure text formatting
+  public String formatNoColor(@Nullable UUID player, String text) { // @AnyThread - pure text formatting
     org.bukkit.OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
     return io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.formatNoColor(bukkitPlayer, text);
   }
 
   @Override
-  public void log(Level level, String msg) { // @AnyThread — thread-safe logger
+  public void log(Level level, String msg) { // @AnyThread - thread-safe logger
     // Route through SendMessage.log so that '&' color codes in messages.yml
     // (e.g. the locationLoaded hydration banner) are translated before being
     // printed to the console. Previously this delegated directly to
@@ -324,7 +324,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void log(Level level, String msg, Throwable throwable) { // @AnyThread — thread-safe logger
+  public void log(Level level, String msg, Throwable throwable) { // @AnyThread - thread-safe logger
     io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.log(level, msg, throwable);
   }
 
@@ -346,17 +346,17 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public @NotNull Set<String> getBiomes(RTPWorld<?> rtpWorld) { // @AnyThread — delegates to pure function
+  public @NotNull Set<String> getBiomes(RTPWorld<?> rtpWorld) { // @AnyThread - delegates to pure function
     return biomes.apply(rtpWorld);
   }
 
   @Override
-  public @NotNull Set<String> getBiomes() { // @AnyThread — delegates to pure function
+  public @NotNull Set<String> getBiomes() { // @AnyThread - delegates to pure function
     return biomes.apply(null);
   }
 
   @Override
-  public @NotNull Set<String> materials() { // @AnyThread — pure enum enumeration
+  public @NotNull Set<String> materials() { // @AnyThread - pure enum enumeration
     return Arrays.stream(Material.values())
         .map(material -> material.name().toUpperCase())
         .collect(Collectors.toSet());
@@ -494,62 +494,60 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public boolean setShapeFunction(Function<String, ?> shapeFunction) { // @AnyThread — sets a pure function field
+  public boolean setShapeFunction(Function<String, ?> shapeFunction) { // @AnyThread - sets a pure function field
     this.shapeFunction = shapeFunction;
     return true;
   }
 
   @Override
-  public boolean setWorldBorderFunction(Function<String, ?> function) { // @AnyThread — sets a pure function field
+  public boolean setWorldBorderFunction(Function<String, ?> function) { // @AnyThread - sets a pure function field
     this.worldBorderFunction = function;
     return true;
   }
 
   @Override
-  public RTPTaskPipe createTaskPipe() { // @AnyThread — factory method, no Bukkit state
+  public RTPTaskPipe createTaskPipe() { // @AnyThread - factory method, no Bukkit state
     return new CountBoundTaskPipe((Plugin) plugin, 10);
   }
 
   @Override
-  public Object createCachePipe() { // @AnyThread — factory method, no Bukkit state
+  public Object createCachePipe() { // @AnyThread - factory method, no Bukkit state
     return new CountBoundTaskPipe((Plugin) plugin, 2);
   }
 
   @Override
-  public Object getPlugin() { // @AnyThread — returns stored field
+  public Object getPlugin() { // @AnyThread - returns stored field
     return plugin;
   }
 
   @Override
-  public ILocationGenerator getLocationGenerator() { // @AnyThread — factory method
+  public ILocationGenerator getLocationGenerator() { // @AnyThread - factory method
     return new FoliaLocationGenerator();
   }
 
   @Override
-  public io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler() { // @AnyThread — returns stored field
+  public io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler() { // @AnyThread - returns stored field
     return io.github.dailystruggle.rtp.common.RTP.scheduler;
   }
 
   @Override
-  public double getTPS(int ticks) { // @AnyThread — reads M2 snapshot, falls back to nominal
-    // C6 (Section C of CHECKLIST-metrics-and-multiserver) — Folia exposes no
-    // first-class TPS field on its server object (regions tick independently)
-    // so the pre-M2 implementation simply returned the nominal 20. Once a
-    // FoliaMetricsBinding is installed the snapshot carries the EMA-blended
-    // global TPS; fall back to the nominal constant only on the M0 NOOP path.
+  public double getTPS(int ticks) { // @AnyThread - reads snapshot, falls back to nominal
+    // Folia exposes no first-class TPS field on its server object (regions tick independently).
+    // When a FoliaMetricsBinding is installed the snapshot carries the EMA-blended
+    // global TPS; fall back to the nominal constant only on the NOOP path.
     try {
       io.github.dailystruggle.metrics.api.MetricsSnapshot s =
           io.github.dailystruggle.rtp.common.RTP.metrics.snapshot();
       double v = (ticks >= 600) ? s.tps15m : (ticks >= 100 ? s.tps5m : s.tps1m);
       if (!Double.isNaN(v)) return v;
     } catch (Throwable ignored) {
-      // Defensive — snapshot() is non-throwing by contract.
+      // Defensive - snapshot() is non-throwing by contract.
     }
     return 20.0;
   }
 
   @Override
-  public void setBiomeGetter(Function<RTPLocation, String> getter) { // @AnyThread — sets a pure function field
+  public void setBiomeGetter(Function<RTPLocation, String> getter) { // @AnyThread - sets a pure function field
     FoliaRTPWorld.setBiomeGetter(
         location ->
             getter.apply(

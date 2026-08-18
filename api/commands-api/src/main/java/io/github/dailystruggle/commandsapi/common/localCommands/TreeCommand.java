@@ -258,7 +258,7 @@ public interface TreeCommand extends CommandsAPICommand {
                 CompletableFuture<Boolean> res = new CompletableFuture<>();
                 // Use `whenComplete` (not `whenCompleteAsync`) so the
                 // sub-command continuation runs on the thread that
-                // completes `cont` — i.e. the platform-driven
+                // completes `cont` - i.e. the platform-driven
                 // `CommandsAPI.execute()` drain thread (REQ-API-ARCH-006).
                 // The async variant would dispatch onto
                 // `ForkJoinPool.commonPool`, adding an extra thread hop

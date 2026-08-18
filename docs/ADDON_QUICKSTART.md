@@ -16,21 +16,52 @@ typed `RTP.addShape(Shape<?>)` call.
 
 ---
 
-## 1. Depend on RTP (`build.gradle`)
+## 1. Depend on RTP
 
 Compile against `rtp-api` (the `RTPAddon` SPI) and `rtp-core` (the `Shape` hierarchy and
-the `RTP` facade). Both are `compileOnly` - RTP provides them at runtime.
+the `RTP` facade). Both are compile-only - RTP provides them at runtime (Gradle `compileOnly`,
+Maven `<scope>provided</scope>`).
 
-In-repo addon (a sub-project of this build):
+Your addon is its own project, so pull the published artifacts from **Maven Central** - it is
+in the default repository set of both Gradle and Maven, so no repository block or credentials
+are needed.
+
+Gradle (`build.gradle`):
 
 ```gradle
+repositories {
+    mavenCentral()
+}
+
 dependencies {
-    compileOnly project(':rtp-api')   // RTPAddon SPI
-    compileOnly project(':rtp-core')  // RTP.addShape, Shape, built-in shapes
+    compileOnly 'io.github.dailystruggle:rtp-api:3.2.1'   // RTPAddon SPI
+    compileOnly 'io.github.dailystruggle:rtp-core:3.2.1'  // RTP.addShape, Shape, built-in shapes
 }
 ```
 
-Building **outside** this repository? Pull the published artifacts from JitPack instead:
+Maven (`pom.xml`):
+
+```xml
+<dependencies>
+    <dependency>                                  <!-- RTPAddon SPI -->
+        <groupId>io.github.dailystruggle</groupId>
+        <artifactId>rtp-api</artifactId>
+        <version>3.2.1</version>
+        <scope>provided</scope>
+    </dependency>
+    <dependency>                                  <!-- RTP.addShape, Shape, built-in shapes -->
+        <groupId>io.github.dailystruggle</groupId>
+        <artifactId>rtp-core</artifactId>
+        <version>3.2.1</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+```
+
+Prefer to track a git tag / branch / commit instead of a released version? **JitPack** serves
+the same modules on demand.
+
+Gradle:
 
 ```gradle
 repositories {
@@ -39,13 +70,50 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'com.github.DailyStruggle.RTP:rtp-api:3.0.1'   // RTPAddon SPI
-    compileOnly 'com.github.DailyStruggle.RTP:rtp-core:3.0.1'  // RTP.addShape, Shape, built-in shapes
+    compileOnly 'com.github.DailyStruggle.RTP:rtp-api:3.2.1'   // RTPAddon SPI
+    compileOnly 'com.github.DailyStruggle.RTP:rtp-core:3.2.1'  // RTP.addShape, Shape, built-in shapes
 }
 ```
 
-(`3.0.1` is a git tag; a branch like `master-SNAPSHOT` or a commit SHA also works. See
-[`dev/PUBLISHING.md`](dev/PUBLISHING.md) for the publishing setup and the Maven Central path.)
+Maven:
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>com.github.DailyStruggle.RTP</groupId>
+        <artifactId>rtp-api</artifactId>
+        <version>3.2.1</version>
+        <scope>provided</scope>
+    </dependency>
+    <dependency>
+        <groupId>com.github.DailyStruggle.RTP</groupId>
+        <artifactId>rtp-core</artifactId>
+        <version>3.2.1</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+```
+
+(On JitPack the version is a git tag; a branch like `master-SNAPSHOT` or a commit SHA also
+works. See [`dev/PUBLISHING.md`](dev/PUBLISHING.md) for all publishing channels, including the
+credentialed GitHub Packages registry.)
+
+Building your addon **as a sub-project of this repository** instead? Skip the coordinates and
+depend on the modules directly:
+
+```gradle
+dependencies {
+    compileOnly project(':rtp-api')   // RTPAddon SPI
+    compileOnly project(':rtp-core')  // RTP.addShape, Shape, built-in shapes
+}
+```
 
 ---
 

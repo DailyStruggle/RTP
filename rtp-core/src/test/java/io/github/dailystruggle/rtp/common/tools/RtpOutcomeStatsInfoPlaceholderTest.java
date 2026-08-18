@@ -11,14 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Covers the {@code /rtp info} generation-outcome placeholders (ADR-052) rendered by
- * {@link PlaceholderProvider}: {@code [genSuccessRate]}, {@code [genFailureRate]},
- * {@code [genOutcomeTotal]}, {@code [genFailureBreakdown]}, {@code [genTopRejectionCause]},
- * and {@code [genTopRejectionShare]}. These read the process-global
- * {@link RtpOutcomeStats#GLOBAL} accumulator directly (same read-path pattern the ADR-053
- * percentile placeholders use for the CoreMetrics histogram), so they are exercised without
- * a full metrics-binding round-trip. The accumulator is process-global, so the test resets
- * it around each case.
+ * Tests generation-outcome placeholders (ADR-052) rendered by {@link PlaceholderProvider}.
  */
 class RtpOutcomeStatsInfoPlaceholderTest {
 

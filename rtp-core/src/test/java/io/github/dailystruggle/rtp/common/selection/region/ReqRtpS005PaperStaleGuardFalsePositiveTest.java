@@ -26,31 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-S-005 / ADR-015 (Paper chunk-system-v2 follow-up).
- *
- * <p>On Paper chunk-system-v2, {@code World#getChunkAtAsync(cx, cz)} returns a
- * {@code Chunk} reference without a plugin ticket; a just-loaded chunk is
- * eligible for immediate native GC on the scheduler thread that resolved the
- * future. A stale-chunk guard that queries {@code world.isChunkLoaded(cx, cz)}
- * on the server's default TTL therefore reports {@code false} on every
- * candidate and rejects loads that RTP itself just performed — the user-reported
- * symptom was {@code cause=nullChunk reason=staleChunkBeforeVert fails=10} with
- * zero successful generations.
- *
- * <p>This test simulates that mechanic by installing a {@code TrackedMockWorld}
- * whose {@code isChunkLoaded} returns {@code true} only while the
- * force-loaded ticket counter is non-zero — i.e. only while a
- * {@code ChunkReservation} is held. It then runs
- * {@link LocationGenerator#getLocation(Region, Set)} and asserts:
- *
- * <ol>
- *   <li>{@code MockRTPChunk.isSafe} is invoked at least once — proving the
- *       guard did <b>not</b> false-positive the candidate (because the
- *       reservation pinned the chunk across the guard check).</li>
- *   <li>All reservations are released on exit — the active ticket count
- *       returns to zero, confirming {@code finally { reservation.close(); }}
- *       runs on every loop-exit path.</li>
- * </ol>
+ * Tests that Paper chunk-system-v2 ChunkReservation prevents stale guard false-positives (REQ-RTP-S-005 / ADR-015).
+ * Confirms safetyCheck executes and all ticket reservations drain on exit (REQ-RTP-S-002).
  */
 @DisplayName("REQ-RTP-S-005 / ADR-015: Paper chunk-system-v2 reservation prevents guard false-positive")
 public class ReqRtpS005PaperStaleGuardFalsePositiveTest {

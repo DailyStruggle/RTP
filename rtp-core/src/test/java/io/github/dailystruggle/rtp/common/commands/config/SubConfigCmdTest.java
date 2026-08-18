@@ -141,7 +141,7 @@ public class SubConfigCmdTest {
         verify(next, never()).onCommand(any(), any(), any());
     }
 
-    // ── addParameters — integer type registers IntegerParameter ──────────────
+    // ── addParameters - integer type registers IntegerParameter ──────────────
 
     @Test
     void subConfigCmd_addParameters_registersIntegerParameterForLongValue() {
@@ -154,7 +154,7 @@ public class SubConfigCmdTest {
         assertInstanceOf(IntegerParameter.class, params.get("viewdistanceselect"));
     }
 
-    // ── addParameters — boolean type registers BooleanParameter ──────────────
+    // ── addParameters - boolean type registers BooleanParameter ──────────────
 
     @Test
     void subConfigCmd_addParameters_registersBooleanParameterForBooleanValue() {
@@ -169,7 +169,7 @@ public class SubConfigCmdTest {
         assertInstanceOf(BooleanParameter.class, params.get("viewdistanceselect"));
     }
 
-    // ── addParameters — float type registers FloatParameter ──────────────────
+    // ── addParameters - float type registers FloatParameter ──────────────────
 
     @Test
     void subConfigCmd_addParameters_registersFloatParameterForDoubleValue() {
@@ -184,7 +184,7 @@ public class SubConfigCmdTest {
         assertInstanceOf(FloatParameter.class, params.get("viewdistanceselect"));
     }
 
-    // ── addParameters — string type registers generic CommandParameter ────────
+    // ── addParameters - string type registers generic CommandParameter ────────
 
     @Test
     void subConfigCmd_addParameters_registersCommandParameterForStringValue() {
@@ -200,18 +200,18 @@ public class SubConfigCmdTest {
         assertNotNull(params.get("viewdistanceselect"));
     }
 
-    // ── addParameters — version key is skipped ────────────────────────────────
+    // ── addParameters - version key is skipped ────────────────────────────────
 
     @Test
     void subConfigCmd_addParameters_skipsVersionKey() {
-        // Use a config whose enum has a VERSION key — check it's not registered
+        // Use a config whose enum has a VERSION key - check it's not registered
         // PerformanceKeys doesn't have VERSION, so we verify no "version" key appears
         SubConfigCmd cmd = new SubConfigCmd(null, "performance", performanceConfig);
         Map<String, CommandParameter> params = cmd.getParameterLookup();
         assertFalse(params.containsKey("version"), "'version' key must be skipped");
     }
 
-    // ── addParameters — RtpYamlSection flattened into dotted-path parameters ──
+    // ── addParameters - RtpYamlSection flattened into dotted-path parameters ──
 
     @Test
     void subConfigCmd_addParameters_flattensMemorySectionIntoDottedParameters() {
@@ -239,7 +239,7 @@ public class SubConfigCmdTest {
         assertInstanceOf(BooleanParameter.class, params.get("viewdistanceselect.enabled"));
     }
 
-    // ── addParameters — nested RtpYamlSection flattened recursively ────────────
+    // ── addParameters - nested RtpYamlSection flattened recursively ────────────
 
     @Test
     void subConfigCmd_addParameters_flattensNestedMemorySectionRecursively() {
@@ -268,14 +268,14 @@ public class SubConfigCmdTest {
         assertInstanceOf(IntegerParameter.class, params.get("viewdistanceselect.redis.port"));
     }
 
-    // ── addParameters — null factoryValue is safe ─────────────────────────────
+    // ── addParameters - null factoryValue is safe ─────────────────────────────
 
     @Test
     void subConfigCmd_addParameters_nullFactoryValueDoesNotThrow() {
         assertDoesNotThrow(() -> new SubConfigCmd(null, "empty", null));
     }
 
-    // ── onCommand — returns true when nextCommand is null ─────────────────────
+    // ── onCommand - returns true when nextCommand is null ─────────────────────
 
     @Test
     void subConfigCmd_onCommand_returnsTrueWhenNextCommandNull() {
@@ -285,7 +285,7 @@ public class SubConfigCmdTest {
         assertTrue(result);
     }
 
-    // ── onCommand — updates config value via set(String, Object) ─────────────
+    // ── onCommand - updates config value via set(String, Object) ─────────────
 
     @Test
     void subConfigCmd_onCommand_updatesConfigValueAndSaves() throws IOException, InterruptedException {
@@ -303,7 +303,7 @@ public class SubConfigCmdTest {
         verify(performanceConfig, atLeastOnce()).save();
     }
 
-    // ── onCommand — reload fires exactly once per real update ─────────────────
+    // ── onCommand - reload fires exactly once per real update ─────────────────
 
     @Test
     void subConfigCmd_onCommand_reloadFiredExactlyOnceOnUpdate() throws InterruptedException {
@@ -322,7 +322,7 @@ public class SubConfigCmdTest {
         verify(mockReload, times(1)).onCommand(any(), any(), isNull());
     }
 
-    // ── onCommand — reload NOT fired when acting as an intermediate node ──────
+    // ── onCommand - reload NOT fired when acting as an intermediate node ──────
 
     @Test
     void subConfigCmd_onCommand_reloadNotFiredWhenNextCommandNonNull() throws InterruptedException {
@@ -342,7 +342,7 @@ public class SubConfigCmdTest {
         verify(mockChild, never()).onCommand(any(), any(), any());
     }
 
-    // ── ConfigCmd — name / permission / description ───────────────────────────
+    // ── ConfigCmd - name / permission / description ───────────────────────────
 
     @Test
     void configCmd_name_isConfig() {
@@ -362,7 +362,7 @@ public class SubConfigCmdTest {
         assertNotNull(cmd.description());
     }
 
-    // ── ConfigCmd.onCommand — always returns true, library handles sub-command dispatch ──
+    // ── ConfigCmd.onCommand - always returns true, library handles sub-command dispatch ──
 
     @Test
     void configCmd_onCommand_returnsTrueAndDoesNotManuallyDelegateToNextCommand() {
@@ -382,7 +382,7 @@ public class SubConfigCmdTest {
         assertTrue(result);
     }
 
-    // ── ConfigCmd.addCommands — registers SubConfigCmd for each parser ────────
+    // ── ConfigCmd.addCommands - registers SubConfigCmd for each parser ────────
 
     @Test
     void configCmd_addCommands_doesNotThrowWithMockParser() {

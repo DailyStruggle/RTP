@@ -7,7 +7,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Vendor-neutral wrapper over the host proxy's "send player to backend"
  * capability. Implemented by each proxy adapter (Velocity, Bungee) to bridge
- * into its native event surface — {@code ServerPreConnectEvent} on Velocity,
+ * into its native event surface - {@code ServerPreConnectEvent} on Velocity,
  * {@code ServerConnectEvent} on Bungee.
  *
  * <p>rtp-proxy-ADR-001 §4.</p>

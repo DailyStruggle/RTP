@@ -11,14 +11,7 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for MemoryShape cache hit/miss/invalidation behavior.
- *
- * Covers:
- * - Cache hit: flushAndRebuild not re-run when dirty flag is false
- * - Cache miss: flushAndRebuild runs when badLocationsDirty is true
- * - Cache invalidation: clear() resets all caches and sets dirty flag
- * - Config change invalidation: adding a bad location marks cache dirty
- * - Biome cache invalidation: adding a biome location marks cache dirty
+ * Tests for {@link MemoryShape} cache hit, miss, and invalidation semantics.
  */
 public class MemoryShapeCacheTest {
 
@@ -77,7 +70,7 @@ public class MemoryShapeCacheTest {
         long countAfterFirstBuild = shape.getEffectiveBadCount();
         assertFalse(shape.badLocationsDirty);
 
-        // Call again without adding anything — should be a no-op
+        // Call again without adding anything - should be a no-op
         shape.flushAndRebuild(shape.spatialResolution);
 
         assertEquals(countAfterFirstBuild, shape.getEffectiveBadCount(),
@@ -113,7 +106,7 @@ public class MemoryShapeCacheTest {
         shape.flushAndRebuild(shape.spatialResolution);
         shape.clear();
 
-        // Rebuild after clear — should be empty
+        // Rebuild after clear - should be empty
         shape.flushAndRebuild(shape.spatialResolution);
         assertEquals(0, shape.getEffectiveBadCount(),
                 "After clear+rebuild, bad count must be 0");
@@ -204,7 +197,7 @@ public class MemoryShapeCacheTest {
         shape.flushAndRebuild(1);
         long countRes1 = shape.getEffectiveBadCount();
 
-        // Resolution 10: intervals of width 10 — all three may merge
+        // Resolution 10: intervals of width 10 - all three may merge
         shape.badLocationsDirty = true;
         shape.flushAndRebuild(10);
         long countRes10 = shape.getEffectiveBadCount();

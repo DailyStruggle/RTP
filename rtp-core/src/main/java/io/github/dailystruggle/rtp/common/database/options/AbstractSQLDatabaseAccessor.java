@@ -29,26 +29,15 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
   protected final ConcurrentLinkedQueue<TeleportData> writeQueue = new ConcurrentLinkedQueue<>();
 
   /**
-   * Network-state member per decision D3 of {@code MULTI_SERVER_PLAN.md}.
-   *
-   * <p>{@code null} (the default) means network mode is disabled. When non-{@code
-   * null}, a proxy-side binding (in-memory, Redis, Postgres, generic SQL) is
-   * attached and the accessor may be consulted as the durable home for
-   * network-state rows. The accessor itself is intentionally agnostic about
-   * what the binding does; this is a plumbing slot only.
-   *
-   * <p>Read with {@link #getNetworkStateBinding()}; install with {@link
-   * #setNetworkStateBinding(NetworkStateBinding)}. The byte-identical no-op
-   * contract (REQ-RTP-NET-005) is exercised by {@code
-   * ReqRtpNet005NetworkDisabledNoOpTest}.
+   * Network-state member for multi-server transport (REQ-RTP-NET-005).
+   * {@code null} means network mode is disabled.
    */
   private volatile NetworkStateBinding networkStateBinding;
 
   /**
    * Returns the installed network-state binding.
    *
-   * @return the installed network-state binding, or {@code null} if network
-   *     mode is disabled (the shipping default).
+   * @return the installed network-state binding, or {@code null} if network mode is disabled.
    */
   public NetworkStateBinding getNetworkStateBinding() {
     return networkStateBinding;
@@ -56,11 +45,6 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
 
   /**
    * Install (or clear, with {@code null}) the network-state binding.
-   *
-   * <p>This is a plumbing setter only: changing the binding does not retroactively
-   * publish anything or alter previously-flushed rows. Intended to be called
-   * once during boot, after the proxy-side wiring has chosen a binding
-   * implementation per the configured {@code network.transport.type}.
    *
    * @param binding the binding to install, or {@code null} to disable network mode
    */
@@ -79,20 +63,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
   /**
    * Adapter view of this accessor as a JDBC {@link javax.sql.DataSource}.
    *
-   * <p>rtp-proxy-ADR-011 §Backend Wiring: the
-   * {@code SqlNetworkStateBinding} consumes a {@code DataSource}, but
-   * {@link #getConnection()} is the only contract this accessor publishes.
-   * Wrap each call into a fresh {@code DataSource.getConnection()} so callers
-   * (heartbeat publisher, network-state binding) participate in the existing
-   * connection pool (HikariCP for MySQL/Postgres; single-connection for
-   * SQLite/H2) without having to learn pool-specific APIs.</p>
-   *
-   * <p>The returned {@code DataSource} is a thin facade - it owns no state
-   * and delegates every {@code getConnection()} call to this accessor's
-   * abstract {@link #getConnection()}. Callers that need to share the pool
-   * (proxy + binding + addons) should all use this single facade.</p>
-   *
-   * @return a {@link javax.sql.DataSource} facade backed by this accessor's connection pool
+   * @return a {@link javax.sql.DataSource} facade delegating to {@link #getConnection()}
    */
   public javax.sql.DataSource asDataSource() {
     return new AccessorDataSource(this);
@@ -347,7 +318,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         statement.executeUpdate();
       }
     } catch (SQLException e) {
-      // Table may not exist yet on first save — that's a successful no-op.
+      // Table may not exist yet on first save - that's a successful no-op.
     } finally {
       disconnect(connection);
     }

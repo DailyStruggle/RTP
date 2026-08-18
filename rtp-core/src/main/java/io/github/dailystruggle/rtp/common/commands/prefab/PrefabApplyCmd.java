@@ -21,22 +21,8 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /rtp admin prefab apply <id>} - preview a prefab and stash a
- * confirmation nonce. Per the locked design decision (2026-05-20, no
- * {@code --commit} flag), this verb is preview-only; the caller must follow
- * up with {@code /rtp admin prefab confirm <id> <token>} to write to disk
- * (the disk-write itself lands in Session 4b - see
- * {@code CHECKLIST-admin-panel-prefabs.md} step 4).
- *
- * <p>Session 4a scope: the diff displayed is "every key the overlay would
- * write", computed against an empty baseline. Session 4b will swap in the
- * live config trees so the diff shows the true delta from the current
- * on-disk state. Either way the nonce stashes the diff that the confirm
- * verb will replay - the security shape (nonce TTL, single-use, caller
- * binding) is testable today.
- *
- * <p>Audit-logs at INFO on every successful apply per REQ-RTP-S-004:
- * &lt;callerId&gt;, prefab id, token, and the number of changes per file.
+ * {@code /rtp admin prefab apply id=<id>} - preview prefab and stash confirmation nonce.
+ * Must confirm with {@code /rtp admin prefab confirm id=<id>} to apply changes (REQ-RTP-S-004).
  */
 public class PrefabApplyCmd extends BaseRTPCmdImpl {
 
@@ -92,10 +78,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
             return false;
         }
         Prefab prefab = opt.get();
-        // Session 4b: snapshot the live trees so the diff describes the true
-        // delta from the on-disk state. Falls back to an empty baseline when
-        // RTP.serverAccessor is null (test scaffolds that exercise the
-        // command surface without a plugin directory).
+        // Snapshot the live trees so the diff describes the true delta from the on-disk state.
         Map<String, Map<String, Object>> baseline;
         try {
             java.io.File pluginDir = (RTP.serverAccessor == null) ? null
@@ -221,13 +204,8 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
     }
 
     /**
-     * Build the per-world dimension vert repair hook for an
-     * {@code expandPerWorld} prefab, or {@code null} when the repair cannot be
-     * applied (non-expanding prefab, no live config system, or no
-     * {@code regions/default} parser to read the template vert from). The hook
-     * delegates the dimension rules to the canonical {@code NetherEndConfigAmender}
-     * so they have exactly one definition shared with {@code /rtp config region}
-     * and the MultiConfig menu.
+     * Builds dimension vert amender for {@code expandPerWorld} prefab, or null if unavailable.
+     * Delegates rules to canonical {@code NetherEndConfigAmender}.
      */
     @SuppressWarnings("unchecked")
     private static MultiWorldExpander.RegionOverlayAmender buildDimensionVertAmender(Prefab prefab) {

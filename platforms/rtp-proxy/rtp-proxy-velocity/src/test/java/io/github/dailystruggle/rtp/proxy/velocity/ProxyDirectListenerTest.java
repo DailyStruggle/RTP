@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Coverage for {@link ProxyDirectListener}, the RPC server half of the
- * {@code proxy-direct} transport (PROPOSAL-proxy-direct-as-remote-store). A raw
+ * {@code proxy-direct} transport. A raw
  * socket client stands in for a backend's {@code ProxyDirectNetworkBinding}: it
  * issues {@link ProxyDirectWire} opcodes and the listener dispatches them onto
  * the proxy's own in-memory {@code NetworkTransport} + {@code NetworkRequestQueue},

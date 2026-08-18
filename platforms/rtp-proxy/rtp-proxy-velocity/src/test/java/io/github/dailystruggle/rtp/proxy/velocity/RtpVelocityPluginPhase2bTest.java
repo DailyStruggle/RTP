@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Phase 2b participant-skeleton coverage for {@link RtpVelocityPlugin}:
+ * Participant-skeleton coverage for {@link RtpVelocityPlugin}:
  * accessor registration, no-op behaviour when {@code network.yml} is absent
  * or {@code enabled:false}, transport + publisher wiring when enabled, and
  * clean teardown on shutdown.

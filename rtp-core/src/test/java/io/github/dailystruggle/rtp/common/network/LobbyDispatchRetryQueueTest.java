@@ -16,15 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Lobby auto-retry queue: verifies the four advance paths
- * (transient -> stay parked, transient cleared -> enrol + drop,
- * REGION_UNAVAILABLE -> terminate, TTL exhausted -> terminate).
- *
- * <p>Design choice: the test drives {@link LobbyDispatchRetryQueue#pulse()}
- * directly so it never touches {@code RTP.scheduler}. The router is built
- * with a mutable snapshot reference so a single test can simulate the
- * "first attempt transient, second attempt CrossServer" sequence that
- * is the whole point of the queue.</p>
+ * Lobby auto-retry queue tests.
+ * Drives {@link LobbyDispatchRetryQueue#pulse()} directly to test state transitions:
+ * transient retry, resolution to CrossServer enrolment, region unavailability, and TTL expiration.
  */
 class LobbyDispatchRetryQueueTest {
 

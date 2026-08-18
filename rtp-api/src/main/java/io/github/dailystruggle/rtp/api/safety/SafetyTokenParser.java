@@ -14,18 +14,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Pure-string grammar parser for safety-list tokens (ADR-017 §1). Accepts
- * {@code LAVA}, {@code #minecraft:leaves}, {@code OAK_SLAB[waterlogged=true]},
- * {@code #minecraft:slabs[waterlogged=true]}, {@code *[waterlogged=true]}.
- * Predicate bodies accept string equalities ({@code key=value}) and numeric range
- * comparisons ({@code key>=n}, {@code key<=n}, {@code key>n}, {@code key<n}) such as
- * {@code LAVA[level<=3]} or {@code FIRE[age>=10]}; range bounds must be integers.
- * Every reject (empty, bare {@code *}, unbalanced brackets, malformed body,
- * empty tag ns/path, bad identifier) is reported via {@link ParseResult#rejected()}
- * with a reason — never silent (REQ-RTP-S-004). No registry reconciliation here;
- * callers expand tags and reconcile unknowns. Material ids upper-cased under
- * {@link Locale#ROOT}; tag ns/path and property keys/values lower-cased.
- * Stateless and thread-safe.
+ * Pure-string grammar parser for safety-list tokens (ADR-017 §1).
+ * Rejections are reported via {@link ParseResult#rejected()} (REQ-RTP-S-004). Stateless and thread-safe.
  */
 public final class SafetyTokenParser {
 
@@ -44,14 +34,10 @@ public final class SafetyTokenParser {
   }
 
   /**
-   * Parse a single raw token.
+   * Parse a single raw token into a {@link ParseResult}.
    *
-   * <p>Prefer {@link #parseAll(Collection)} for batch parsing at config load; this
-   * single-token form is exposed for targeted unit testing and for the command-surface
-   * round-trip test required by ADR-017 &sect;6.</p>
-   *
-   * @param raw the raw token; may be {@code null} or whitespace.
-   * @return a populated {@link ParseResult} with either one accepted token or one rejection.
+   * @param raw raw token; may be null or whitespace
+   * @return populated {@link ParseResult}
    */
   public static ParseResult parse(String raw) {
     List<SafetyToken> accepted = new ArrayList<>(1);
@@ -194,7 +180,7 @@ public final class SafetyTokenParser {
     // Track (key|operator) signatures so a range like 'level>=2,level<=5' is allowed while
     // a genuine duplicate ('waterlogged=true,waterlogged=false', 'level>=2,level>=3') is not.
     Set<String> seen = new HashSet<>();
-    // Simple split on ',' — values that contain commas are out of scope (ADR-017 &sect;1).
+    // Simple split on ',' - values that contain commas are out of scope (ADR-017 &sect;1).
     String[] parts = trimmed.split(",", -1);
     for (String rawPart : parts) {
       String part = rawPart.trim();
@@ -285,7 +271,7 @@ public final class SafetyTokenParser {
 
   /**
    * Outcome of a parse operation. Carries both accepted tokens and a per-token rejection
-   * record (so callers can emit a single startup WARN per rejection — see ADR-017 &sect;3).
+   * record (so callers can emit a single startup WARN per rejection - see ADR-017 &sect;3).
    */
   public static final class ParseResult {
     private static final ParseResult EMPTY = new ParseResult(Collections.emptyList(),

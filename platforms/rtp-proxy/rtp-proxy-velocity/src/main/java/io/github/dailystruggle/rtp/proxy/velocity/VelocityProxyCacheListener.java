@@ -16,8 +16,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Velocity companion for the {@code proxy-cache} transport tier
- * (PROPOSAL-proxy-as-availability-store, build-order step 3). Registers the
+ * Velocity companion for the {@code proxy-cache} transport tier. Registers the
  * dedicated backend&lt;-&gt;proxy {@code rtp:net} channel and answers the two
  * companion verbs backends speak over it:
  *

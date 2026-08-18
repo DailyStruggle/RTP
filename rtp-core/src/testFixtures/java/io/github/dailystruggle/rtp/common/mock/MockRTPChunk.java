@@ -6,14 +6,8 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.util.Set;
 
 /**
- * Minimal in-memory implementation of {@link RTPChunk} for use in unit tests.
- *
- * <p>Blocks at Y &le; 31 are solid (non-air, safe) to simulate a ground layer; all
- * blocks at Y &ge; 32 are air and safe.  Sky-light is always 15 and
- * {@link #getSurfaceHeight} always returns 64.  This lets
- * {@link io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor}
- * satisfy the solid-floor requirement ({@code !isAir(i-1)}) and find a valid
- * landing at Y=32 without requiring a real platform chunk.
+ * In-memory {@link RTPChunk} for unit tests.
+ * Blocks at Y <= 31 are solid; blocks at Y >= 32 are air (valid landing at Y=32 for LinearAdjustor).
  */
 public class MockRTPChunk extends RTPChunk<Object> {
 
@@ -54,7 +48,7 @@ public class MockRTPChunk extends RTPChunk<Object> {
         return y > 31;
     }
 
-    /** Full sky-light everywhere — satisfies requireSkyLight checks. */
+    /** Full sky-light everywhere - satisfies requireSkyLight checks. */
     @Override
     public int getSkyLight(int x, int y, int z) {
         return 15;
@@ -66,7 +60,7 @@ public class MockRTPChunk extends RTPChunk<Object> {
         return 64;
     }
 
-    /** All positions are safe — no unsafe-block filtering needed in tests. */
+    /** All positions are safe - no unsafe-block filtering needed in tests. */
     @Override
     public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
         if (world instanceof MockRTPWorld m) {

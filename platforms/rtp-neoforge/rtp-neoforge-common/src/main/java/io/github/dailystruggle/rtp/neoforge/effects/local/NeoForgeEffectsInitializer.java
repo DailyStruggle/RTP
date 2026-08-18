@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>Unlike the Fabric initializer, these prototypes are compiled Mojmap (no
  * Loom remap) in {@code rtp-neoforge-common}, so their static initializers do
  * not reference Fabric-intermediary {@code class_NNNN} types and they never
- * type {@code ResourceLocation} (renamed to {@code Identifier} in 1.21.11) —
+ * type {@code ResourceLocation} (renamed to {@code Identifier} in 1.21.11) -
  * the two linkage failures that made the {@code effectsapi.fabric.*}
  * prototypes unusable on NeoForge.</p>
  *

@@ -21,21 +21,8 @@ import java.util.function.ToIntFunction;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Developer-UX surface test for the first-class teleport entry point added to
- * {@link RTPAPI} ({@code teleport} / {@code cancel} / {@code queueDepth} /
- * {@code isWarmingUp}).
- *
- * <p>Two guarantees are asserted, both expressed using only {@code rtp-api}
- * imports (this test deliberately touches no {@code io...common.RTP} type beyond
- * the class-init nudge), proving an addon can drive an RTP through the public
- * API alone:
- * <ul>
- *   <li>Pre-init calls throw {@link IllegalStateException} (REQ-RTP-S-006), and
- *       null arguments throw {@link IllegalArgumentException}.</li>
- *   <li>When core delegates are registered, each method routes to its delegate
- *       and a teleport always yields a completed {@link RTPResult} (never a
- *       silent no-op, REQ-RTP-S-004).</li>
- * </ul>
+ * Tests for {@link RTPAPI} teleport surface (teleport, cancel, queueDepth, isWarmingUp).
+ * Covers pre-init exceptions (REQ-RTP-S-006) and delegation guarantees (REQ-RTP-S-004).
  */
 class RtpApiTeleportSurfaceTest {
 

@@ -15,8 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pure-function tests for {@link InfoBookBuilder} (PROPOSAL-info-as-book.md
- * section 4.6). Exercises pagination and scope-to-parameters mapping in
+ * Pure-function tests for {@link InfoBookBuilder}. Exercises pagination and scope-to-parameters mapping in
  * isolation; the full {@code build()} happy-path requires a wired
  * {@code RTP.configs} + {@code serverAccessor} and is covered by an
  * integration-style test elsewhere.

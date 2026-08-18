@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * regex-scanned for patterns that would identify an individual server:
  * UUIDs, IPv4 addresses, hostnames containing dots, and bare integers that
  * look like ports or numeric server IDs. Any hit is a defect because RTP
- * publishes only aggregate, low-cardinality configuration adoption — never a
+ * publishes only aggregate, low-cardinality configuration adoption - never a
  * {@code serverId}-equivalent string.
  *
  * <p>This test deliberately drives the package-private detector methods
@@ -340,7 +340,7 @@ class BStatsChartIdsAntiFingerprintingTest {
         assertNotNull(RTPCostMetricsCharts.KNOWN_ADDON_PLUGINS);
         assertFalse(RTPCostMetricsCharts.KNOWN_ADDON_PLUGINS.isEmpty(),
                 "whitelist must mirror plugin.yml softdepend; empty would defeat the chart");
-        // Mutation must throw — caller can't expand the whitelist at runtime.
+        // Mutation must throw - caller can't expand the whitelist at runtime.
         try {
             RTPCostMetricsCharts.KNOWN_ADDON_PLUGINS.add("BackdoorPlugin");
             org.junit.jupiter.api.Assertions.fail(

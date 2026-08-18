@@ -512,7 +512,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
    * produce an immutable {@code namespace:path → upper-case material name}
    * snapshot. Any failure (e.g. a server that hasn't loaded the tag registry
    * yet, or a pre-1.13 fork that doesn't implement the Tag API) is logged at
-   * WARNING and falls through to an empty snapshot — never a null reference.
+   * WARNING and falls through to an empty snapshot - never a null reference.
    */
   private Map<String, Set<String>> buildBlockTagSnapshot() {
     Map<String, Set<String>> out = new HashMap<>();
@@ -551,7 +551,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
             Collections.unmodifiableSet(members));
       }
     } catch (Throwable e) {
-      // Catch Throwable (not just RuntimeException) — Bukkit.getTags can throw
+      // Catch Throwable (not just RuntimeException) - Bukkit.getTags can throw
       // NoSuchMethodError / NoClassDefFoundError on forks where the Tag API
       // signature differs, and those would otherwise silently escape our handler
       // with no operator-visible log line.
@@ -572,7 +572,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   private Object plugin;
 
-  // ADR-049 — platform-agnostic player join/quit dispatcher. Constructed lazily
+  // ADR-049 - platform-agnostic player join/quit dispatcher. Constructed lazily
   // and exposed via getPlayerLifecycleHook(); the Bukkit Listener registration
   // happens in start(Object) once the owning Plugin is known.
   private final BukkitPlayerLifecycleHook playerLifecycleHook = new BukkitPlayerLifecycleHook();
@@ -663,9 +663,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public double getTPS(int ticks) {
-    // C6 (Section C of CHECKLIST-metrics-and-multiserver) — when a non-NOOP
-    // MetricsBinding is installed the canonical TPS source is the M2 metrics
-    // facade. Read the snapshot first; if the binding is the M0 NOOP (all
+    // When a non-NOOP MetricsBinding is installed the canonical TPS source is the
+    // metrics facade. Read the snapshot first; if the binding is the M0 NOOP (all
     // scalars NaN) fall back to the reflective recentTps lookup that has
     // shipped on Bukkit since pre-Metrics days.
     try {

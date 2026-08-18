@@ -18,13 +18,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests for PostgreSQL-specific read/write logic using Mockito mocks.
- *
- * A testable subclass of {@link AbstractSQLDatabaseAccessor} is used to avoid
- * any real HikariCP / PostgreSQL driver initialisation.  The PostgreSQL-specific
- * {@code read} and {@code write} implementations are copied verbatim from
- * {@link PostgreSQLDatabaseAccessor} so that every {@code catch (SQLException)}
- * block is exercised.
+ * Unit tests for PostgreSQL read/write operations using Mockito connection mocks.
  */
 class PostgreSQLDatabaseAccessorTest {
 
@@ -32,7 +26,7 @@ class PostgreSQLDatabaseAccessorTest {
     Path tempDir;
 
     // -------------------------------------------------------------------------
-    // Testable subclass — mirrors PostgreSQLDatabaseAccessor read/write exactly
+    // Testable subclass - mirrors PostgreSQLDatabaseAccessor read/write exactly
     // -------------------------------------------------------------------------
 
     static class TestablePostgreSQLAccessor extends AbstractSQLDatabaseAccessor {
@@ -126,7 +120,7 @@ class PostgreSQLDatabaseAccessorTest {
                 }
                 statement.executeUpdate();
             } catch (SQLException e) {
-                // logged — swallowed
+                // logged - swallowed
             }
         }
     }
@@ -158,7 +152,7 @@ class PostgreSQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // read() — happy path
+    // read() - happy path
     // -------------------------------------------------------------------------
 
     @Test
@@ -225,7 +219,7 @@ class PostgreSQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // read() — SQLException coverage
+    // read() - SQLException coverage
     // -------------------------------------------------------------------------
 
     @Test
@@ -253,7 +247,7 @@ class PostgreSQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // write() — happy path (rtp_teleport_data uses ON CONFLICT DO UPDATE)
+    // write() - happy path (rtp_teleport_data uses ON CONFLICT DO UPDATE)
     // -------------------------------------------------------------------------
 
     @Test
@@ -301,7 +295,7 @@ class PostgreSQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // write() — SQLException coverage
+    // write() - SQLException coverage
     // -------------------------------------------------------------------------
 
     @Test
@@ -327,7 +321,7 @@ class PostgreSQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // delete() — inherited from AbstractSQLDatabaseAccessor
+    // delete() - inherited from AbstractSQLDatabaseAccessor
     // -------------------------------------------------------------------------
 
     @Test
@@ -351,7 +345,7 @@ class PostgreSQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // connect() / disconnect() — inherited
+    // connect() / disconnect() - inherited
     // -------------------------------------------------------------------------
 
     @Test
@@ -406,7 +400,7 @@ class PostgreSQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // flush() — inherited, uses getConnection()
+    // flush() - inherited, uses getConnection()
     // -------------------------------------------------------------------------
 
     @Test
@@ -470,7 +464,7 @@ class PostgreSQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // loadCachedLocations() — inherited, uses getConnection()
+    // loadCachedLocations() - inherited, uses getConnection()
     // -------------------------------------------------------------------------
 
     @Test

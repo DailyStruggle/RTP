@@ -23,12 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit coverage for {@code /rtp clear cooldown} ({@link ClearCooldownCmd}).
- *
- * <p>The teleport cooldown is derived from the player's latest
- * {@link TeleportData#time}; clearing it means dropping the player's entry from
- * {@link RTP#latestTeleportData} / {@link RTP#priorTeleportData}. These tests
- * exercise the three targeting modes: self (player caller), all (console
- * caller), and an explicit {@code player=} list.
+ * Exercises self, global (console), and named player targeting modes.
  */
 class ClearCooldownCmdTest {
 

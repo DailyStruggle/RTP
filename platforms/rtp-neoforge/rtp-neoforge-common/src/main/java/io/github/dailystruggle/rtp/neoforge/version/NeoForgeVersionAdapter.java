@@ -52,7 +52,7 @@ public interface NeoForgeVersionAdapter {
      * shape documented on
      * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#blockTagSnapshot()}.
      *
-     * <p>Return {@code null} to signal "carrier cannot resolve — fall back" so
+     * <p>Return {@code null} to signal "carrier cannot resolve - fall back" so
      * {@code NeoForgeServerAccessor} can attempt its reflective walk. An empty
      * map is a valid "walked but no tags yet" result. Default returns
      * {@code null}.</p>
@@ -62,7 +62,7 @@ public interface NeoForgeVersionAdapter {
     }
 
     // -------------------------------------------------------------------------
-    // Chunk access — S-005 async path (no synchronous chunk load on the
+    // Chunk access - S-005 async path (no synchronous chunk load on the
     // server tick thread).
     // -------------------------------------------------------------------------
 
@@ -70,7 +70,7 @@ public interface NeoForgeVersionAdapter {
      * Loads (synchronously, on the server thread) the chunk at {@code (cx, cz)}
      * at full status, generating if absent. Callers are responsible for
      * dispatching to the server thread. Returns a future for
-     * forward-compatibility — implementations complete it inline.
+     * forward-compatibility - implementations complete it inline.
      */
     CompletableFuture<ChunkAccess> getChunkFull(ServerLevel level, int cx, int cz);
 
@@ -84,7 +84,7 @@ public interface NeoForgeVersionAdapter {
      *
      * <p>The returned future completes with {@code null} on a chunk-loading
      * failure so callers attribute it through {@code FailTypes.nullChunk}
-     * (REQ-RTP-S-004 — no silent discards). Default falls back to the blocking
+     * (REQ-RTP-S-004 - no silent discards). Default falls back to the blocking
      * {@link #getChunkFull}; RTP-shipped carriers all override.</p>
      */
     default CompletableFuture<ChunkAccess> requestFullChunkAsync(ServerLevel level, int cx, int cz) {
@@ -94,7 +94,7 @@ public interface NeoForgeVersionAdapter {
     // -------------------------------------------------------------------------
     // Non-persistent chunk tickets (S-002). NeoForge's ForgeChunkManager /
     // ticket API keeps the chunk loaded for the JVM lifetime only, never
-    // written to level.dat — the analogue of Bukkit's addPluginChunkTicket.
+    // written to level.dat - the analogue of Bukkit's addPluginChunkTicket.
     //
     // Threading: callers MUST dispatch to the server tick thread. On failure
     // the future completes exceptionally so callers surface it (REQ-RTP-S-004).
@@ -102,7 +102,7 @@ public interface NeoForgeVersionAdapter {
 
     /**
      * Apply a non-persistent RTP-owned chunk ticket at {@code (cx, cz)}.
-     * Default is a defensive failure — every carrier overrides. Failing rather
+     * Default is a defensive failure - every carrier overrides. Failing rather
      * than silently no-op'ing is required by S-006.
      */
     default CompletableFuture<Void> applyTicket(ServerLevel level, int cx, int cz) {
@@ -121,11 +121,11 @@ public interface NeoForgeVersionAdapter {
 
     /**
      * Periodic refresh hook, called by {@code RTPNeoForgeMod} on a fixed-rate
-     * scheduler. Default is a no-op — only carriers that use auto-expiring
+     * scheduler. Default is a no-op - only carriers that use auto-expiring
      * tickets need to override and re-issue tickets for chunks still held.
      */
     default void tickRefresh() {
-        // no-op — carriers with auto-expiring tickets override this.
+        // no-op - carriers with auto-expiring tickets override this.
     }
 
     // -------------------------------------------------------------------------
@@ -146,7 +146,7 @@ public interface NeoForgeVersionAdapter {
      * Default no-op.
      */
     default void rebindPlayer(RTPPlayer existing, Object serverPlayer) {
-        // no-op — carriers that own a custom RTPPlayer impl override this.
+        // no-op - carriers that own a custom RTPPlayer impl override this.
     }
 
     /**
@@ -268,7 +268,7 @@ public interface NeoForgeVersionAdapter {
     }
 
     // -------------------------------------------------------------------------
-    // Menu parity — written-book modal (carriers opt in by overriding).
+    // Menu parity - written-book modal (carriers opt in by overriding).
     // -------------------------------------------------------------------------
 
     /**

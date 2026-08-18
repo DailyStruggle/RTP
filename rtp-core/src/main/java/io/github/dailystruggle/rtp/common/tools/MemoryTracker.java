@@ -74,7 +74,7 @@ public class MemoryTracker {
     UUID uuid = UUID.randomUUID();
     TrackedObject trackedObject = new TrackedObject(target, label, maxLifespan);
     trackedObjects.put(uuid, trackedObject);
-    // Diagram 03: TrackRes node — MemoryTracker.track() registers a freshly opened
+    // Diagram 03: TrackRes node - MemoryTracker.track() registers a freshly opened
     // ChunkReservation (or pipeline task) for the active GC safety net.
     log(Level.FINE,
             "[RTP][Track] Registered: id={0}, label={1}, maxLifespanMs={2}, totalTracked={3}",
@@ -88,7 +88,7 @@ public class MemoryTracker {
     trackedObjects.entrySet().removeIf(entry -> {
       TrackedObject tracked = entry.getValue();
       boolean remove = tracked.isCollected() || tracked.matches(target);
-      // Diagram 03: UntrackRes node — normal teardown path after CloseRes/DropTicket.
+      // Diagram 03: UntrackRes node - normal teardown path after CloseRes/DropTicket.
       if (remove) {
         log(Level.FINER,
                 "[RTP][Track] Untracked: id={0}, label={1}, collected={2}",
@@ -101,7 +101,7 @@ public class MemoryTracker {
   /**
    * Returns the current number of live entries in the tracker. Intended for
    * diagnostics and the {@code rtp test chunk-ticket} runtime probe
-   * ({@code RUNTIME_TEST_SUITE_PLAN.md} &sect;3.8) &mdash; not for production
+   * &mdash; not for production
    * decision-making, since the count can change concurrently. Visible in the
    * public API so that {@code rtp-plugin}'s test commands can assert lifecycle
    * correctness without reflection (REQ-RTP-S-002 positive-path coverage).
@@ -235,7 +235,7 @@ public class MemoryTracker {
         RegionSettings settings = region.getSettings();
         totalCacheCap += settings.cacheCap();
         totalCacheCap += settings.activeChunkCap();
-        // ADR-028 Phase 4.3: account for L3 backlog capacity in the global cache budget.
+        // Account for L3 backlog capacity in the global cache budget (ADR-028).
         totalCacheCap += settings.backlogCacheCap();
         totalActiveChunkCap += settings.activeChunkCap();
 
@@ -375,7 +375,7 @@ public class MemoryTracker {
   public static void untrack(UUID trackingId) {
     if (trackingId != null) {
       TrackedObject removed = trackedObjects.remove(trackingId);
-      // Diagram 03: UntrackRes node — RAM Freed transition (id-keyed fast path).
+      // Diagram 03: UntrackRes node - RAM Freed transition (id-keyed fast path).
       if (removed != null) {
         log(Level.FINER,
                 "[RTP][Track] Untracked by id: id={0}, label={1}, remaining={2}",

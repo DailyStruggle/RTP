@@ -22,20 +22,10 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Regression test for the ADR-065 world-override "teleport trap".
+ * Regression test for ADR-065 synthetic world-override region queueing.
  *
- * <p>{@code /rtp region=default world=world_nether} resolves to a synthetic
- * world-override region (named {@code "<base>_<world>"}) that is stored in
- * {@code SelectionAPI.tempRegions}, not {@code permRegionLookup}. Only regions
- * in {@code permRegionLookup} are ticked by {@code AsyncTaskProcessing}, so
- * {@code Region.execute()} is never invoked for the synthetic region and its
- * teleport waitlist ({@code RegionQueueManager.playerQueue}) is never drained.
- *
- * <p>Before the fix, the queue path enqueued the player on that un-drained
- * waitlist, trapping them in the teleporting state forever. The fix makes
- * {@code QueueTask.fallback()} serve any region that is not pumped (i.e. not
- * identity-present in {@code permRegionLookup}) through the pregen path
- * instead, so the teleport completes on first use rather than hanging.
+ * <p>Verifies unpumped synthetic regions (in {@code tempRegions}) serve via pregen
+ * rather than enqueueing players on un-drained waitlists.
  */
 public class ReqRtpAdr065WorldRegionTeleportTrapTest {
 
@@ -75,7 +65,7 @@ public class ReqRtpAdr065WorldRegionTeleportTrapTest {
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void unpumpedWorldRegion_doesNotTrapPlayerInQueue() {
         Region synthetic = buildRegion("default_trap_world");
-        // Deliberately NOT added to permRegionLookup — mirrors SelectionAPI.worldRegion's tempRegions placement.
+        // Deliberately NOT added to permRegionLookup - mirrors SelectionAPI.worldRegion's tempRegions placement.
 
         UUID playerId = UUID.randomUUID();
         MockRTPPlayer player =

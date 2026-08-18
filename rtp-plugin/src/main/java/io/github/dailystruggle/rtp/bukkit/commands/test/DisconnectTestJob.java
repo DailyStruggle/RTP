@@ -106,20 +106,20 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
    * <p>Pipeline shape (all async, never blocking):
    *
    * <ol>
-   *   <li><b>Setup stage</b> — stage the synthetic player into
+   *   <li><b>Setup stage</b> - stage the synthetic player into
    *       {@code processingPlayers} and {@code latestTeleportData}, and
    *       acquire one synthetic chunk ticket.</li>
-   *   <li><b>Generation stage</b> — kick off a delayed
+   *   <li><b>Generation stage</b> - kick off a delayed
    *       {@link CompletableFuture} that represents the async
    *       chunk-generation chain; it completes <i>after</i> the
    *       disconnect fires, proving the cleanup is disconnect-driven,
    *       not completion-driven.</li>
-   *   <li><b>Disconnect stage</b> — a second async stage fires the
+   *   <li><b>Disconnect stage</b> - a second async stage fires the
    *       disconnect cleanup while stage 2 is still pending. The
    *       cleanup runs inside a {@code try-finally} that <i>must</i>
    *       release the ticket and remove the UUID even if the pending
    *       future throws.</li>
-   *   <li><b>Assertion stage</b> — after the generation future
+   *   <li><b>Assertion stage</b> - after the generation future
    *       resolves, assert the ticket counter is zero, the reservation
    *       was closed exactly once, the UUID is absent from
    *       {@code processingPlayers} and {@code latestTeleportData},

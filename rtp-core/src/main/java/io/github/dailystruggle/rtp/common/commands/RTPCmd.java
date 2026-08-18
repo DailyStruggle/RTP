@@ -54,17 +54,8 @@ public interface RTPCmd extends BaseRTPCmd {
   }
 
   /**
-   * Decides whether the world-override region mechanism applies for a given
-   * {@code /rtp} argument map.
-   *
-   * <p>The override (duplicate the base region and rebind it to the requested
-   * world) applies ONLY to the region sub-parameter grammar
-   * {@code rtp region:<r> world:<w>} - i.e. when BOTH a {@code region} and a
-   * {@code world} argument are present. Top-level {@code rtp world:<w>} resolves
-   * its region from world {@code w}'s own configuration ({@code WorldKeys.region})
-   * and is intentionally left unmodified, so a world configured to redirect to
-   * region {@code default} teleports to region {@code default} as configured
-   * rather than being forced to land inside world {@code w}.
+   * Checks if world-override applies (`rtp region:<r> world:<w>` with both args present).
+   * Top-level `rtp world:<w>` resolves its region from the world configuration instead.
    *
    * @param rtpArgs the flattened {@code /rtp} argument map
    * @return {@code true} when the world-override region should be applied
@@ -76,17 +67,10 @@ public interface RTPCmd extends BaseRTPCmd {
   }
 
   /**
-   * Resolves a vanilla {@code /spreadplayers}-style relative coordinate token against a base
-   * coordinate. The Bukkit {@code CoordinateParameter} advertises {@code ~} / {@code -~} in its
-   * tab-completion, so these tokens must resolve to an actual coordinate rather than fall through
-   * to {@code Boolean.valueOf("~") == false} (which silently produced a {@code 0}/garbage center).
+   * Resolves relative coordinate tokens (~, ~n, -~, -~n) against a base coordinate.
+   * Tokens without ~ are parsed as absolute numbers.
    *
-   * <p>Supported forms (whitespace-trimmed): {@code ~} ({@code base}), {@code ~<n>}
-   * ({@code base + n}, where {@code n} may be negative e.g. {@code ~-5}), {@code -~}
-   * ({@code -base}), and {@code -~<n>} ({@code -base + n}). A token containing no {@code ~} is
-   * parsed as an absolute value.
-   *
-   * @param token the raw override token (must be non-null)
+   * @param token raw override token (must be non-null)
    * @param base  the player's current coordinate on this axis
    * @return the resolved absolute coordinate
    * @throws NumberFormatException if the numeric offset is malformed
@@ -107,24 +91,12 @@ public interface RTPCmd extends BaseRTPCmd {
   }
 
   /**
-   * Consults the pluggable bare-{@code /rtp} root action (ADR-056). A third-party
-   * addon may bind an action (e.g. {@code LeafRTPGuiAddon} opening a GUI) that
-   * replaces the classic teleport for a bare {@code /rtp}. Shared by the Bukkit
-   * {@code String[]}-args {@code onCommand} path and the {@code compute(...)} path
-   * that Fabric / NeoForge / the proxy backend dispatch through, so the bound GUI
-   * opens uniformly on every platform (single source of truth, no duplicated block).
+   * Consults pluggable bare-{@code /rtp} root action (ADR-056).
+   * Falls back to classic teleport if unbound, unhandled, or on error (REQ-RTP-S-004).
    *
-   * <p>A bound action that returns {@code false} (no renderer / offline) or throws
-   * (logged per REQ-RTP-S-004) is treated as not-handled, so the classic teleport
-   * still runs. The console sender (zero UUID) is never routed through the action.
-   *
-   * @param senderId              the command sender
-   * @param messageMethod         feedback sink; when {@code null} feedback is routed
-   *                              through {@link RTP#serverAccessor}
-   * @param releaseProcessingLock release the {@code processingPlayers} lock when the
-   *                              action handles the command (the {@code compute(...)}
-   *                              path enters with the lock already acquired; the
-   *                              {@code String[]} path has not acquired it yet)
+   * @param senderId              command sender UUID
+   * @param messageMethod         feedback sink or null for serverAccessor default
+   * @param releaseProcessingLock whether to release processingPlayers lock when handled
    * @return {@code true} when the bound action handled the command
    */
   private boolean tryRootAction(
@@ -171,15 +143,8 @@ public interface RTPCmd extends BaseRTPCmd {
   }
 
   /**
-   * Unbinds the currently bound bare-{@code /rtp} root action after it has failed,
-   * resetting the command to its default (classic teleport) behaviour. A bound action
-   * that throws is almost always permanently broken on this runtime (e.g. a GUI menu
-   * whose backend cannot load on a too-old modded server), so leaving it bound would
-   * make every subsequent bare {@code /rtp} pay the same exception and log spam. By
-   * clearing it the first failure both falls back (the caller treats the throw as
-   * not-handled) and self-heals: later invocations skip the broken action entirely and
-   * run the classic teleport directly. The clear itself is guarded so a failure to
-   * reach the hooks facade can never escalate.
+   * Unbinds failing bare-{@code /rtp} root action, resetting to classic teleport.
+   * Prevents repeated exceptions and log spam on permanently broken hook bindings.
    */
   private static void clearFailedRootAction() {
     try {
@@ -344,7 +309,7 @@ public interface RTPCmd extends BaseRTPCmd {
     return res;
   }
 
-  // CommandsAPI puts the responsibility on the plugin to decide when and how to run compute() - called via CommandsAPI.execute() in SyncTaskProcessing
+  // CommandsAPI compute delegate; invoked via CommandsAPI.execute() in SyncTaskProcessing.
   default boolean compute(
           UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
     return compute(senderId, rtpArgs, nextCommand, null);
@@ -356,17 +321,8 @@ public interface RTPCmd extends BaseRTPCmd {
       return true;
     }
 
-    // --------------------------------------------------------------------------------------------------------------
-    // Pluggable bare-/rtp root action (ADR-056); shared with the Bukkit String[]-args
-    // onCommand path via tryRootAction() so the logic lives in exactly one place.
-    // Reached by the platforms that dispatch straight through compute() (Fabric,
-    // NeoForge, the proxy backend path) rather than the Bukkit String[] overload, so
-    // without it the bound GUI never opens on those platforms. Fires only for a
-    // *bare* `/rtp` (empty args); explicit teleport parameters skip the GUI override.
-    // The Bukkit String[] path consults the same hook and short-circuits before
-    // reaching compute() when it handles the command, so this never double-fires.
-    // This path enters with the processingPlayers lock acquired, so release it on a
-    // handled action.
+    // Bare /rtp root action (ADR-056) for platforms dispatching directly to compute().
+    // Releases processingPlayers lock if handled.
     boolean bareInvocation = (rtpArgs == null || rtpArgs.isEmpty());
     if (bareInvocation && tryRootAction(senderId, messageMethod, true)) {
       return true;
@@ -416,17 +372,8 @@ public interface RTPCmd extends BaseRTPCmd {
                   .replace("[server]", cross.serverHint().orElse(""));
           if (messageMethod != null) messageMethod.accept(msg);
           else RTP.serverAccessor.sendMessage(senderId, msg);
-          // KEEP the processingPlayers lock for the cross-server branch.
-          // Prior behaviour released it immediately so that the
-          // destination backend's eventual transfer wouldn't be blocked
-          // by this JVM's "busy" set - but the side effect was that the
-          // player could re-run /rtp on the same lobby and re-enrol
-          // duplicates (REJECTED_DUPLICATE on the proxy, no feedback
-          // to the player, looks like nothing happens). The
-          // NetworkWaitlistGuard + lobby-side quit/terminal-status
-          // listeners are the correct authoritative releases; until
-          // they fire, this local lock is the anti-spam primitive.
-          // Disconnect / shutdown clears the set via RTP.shutdown().
+          // Retain processingPlayers lock for cross-server queue as anti-spam guard.
+          // Released on disconnect, shutdown, or via terminal status listeners.
           return true;
         }
         if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.Reject reject) {
@@ -704,16 +651,8 @@ public interface RTPCmd extends BaseRTPCmd {
         return true;
       }
 
-      // World-override region. This applies ONLY to the region sub-parameter
-      // grammar `rtp region:<r> world:<w>`: duplicate base region <r> and rebind
-      // it to world <w> (re-resolving the shape for <w>), so the teleport uses
-      // region <r>'s settings adjusted for world <w>.
-      //
-      // Top-level `rtp world:<w>` is intentionally NOT overridden here: it
-      // resolves its region from world <w>'s own configuration (WorldKeys.region,
-      // see above), honoring that redirect. If world <w> is configured to use
-      // region `default`, `rtp world:<w>` teleports to region `default` as
-      // configured - it does not force a landing inside world <w>.
+      // World-override: duplicates base region <r> rebound to world <w> for `rtp region:<r> world:<w>`.
+      // Top-level `rtp world:<w>` resolves its configured region above without override.
       if (shouldApplyWorldOverride(rtpArgs)) {
         String worldOverride = pickOne(rtpArgs.get("world"), null);
         if (worldOverride != null && !worldOverride.isEmpty()) {

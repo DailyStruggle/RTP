@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Verifies the requested → H2 → YAML fallback chain in
  * {@link DatabaseAccessorFactory}. The factory is the central guard against
- * "we cannot shade in every database dependency" — if a JDBC driver class is
+ * "we cannot shade in every database dependency" - if a JDBC driver class is
  * not on the classpath, the corresponding accessor must not be instantiated;
  * instead the chain falls back to H2 (bundled) and finally to flat-file YAML.
  */
@@ -56,7 +56,7 @@ class DatabaseAccessorFactoryTest {
         try {
             assertNotNull(r);
             assertNotNull(r.accessor);
-            // Either the default sqlite branch succeeded, or we fell back to H2 / yaml — all are
+            // Either the default sqlite branch succeeded, or we fell back to H2 / yaml - all are
             // acceptable; the contract is "never crash and never return null".
             assertTrue(
                     "definitely-not-a-real-backend".equals(r.effectiveType)

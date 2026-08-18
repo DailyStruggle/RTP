@@ -25,7 +25,7 @@ import net.minecraft.server.MinecraftServer;
  * <p>Structurally identical to {@code FabricScheduler}: NeoForge servers are
  * single-main-thread (no Folia regions), so the threading model is the same as
  * vanilla / Fabric (NEOFORGE_NOTES.md §2 "Threading"). Only the wiring point
- * differs — the {@code @Mod} entry point ({@code RTPNeoForgeMod}) drives
+ * differs - the {@code @Mod} entry point ({@code RTPNeoForgeMod}) drives
  * {@link #tick(MinecraftServer)} from the NeoForge {@code ServerTickEvent.Post}
  * game-bus event and sets/clears the server reference from
  * {@code ServerStartedEvent} / {@code ServerStoppingEvent}.</p>

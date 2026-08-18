@@ -23,18 +23,8 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Verifies that {@code addPluginChunkTicket} and {@code removePluginChunkTicket}
- * are perfectly paired throughout the teleport pipeline, leaving zero orphaned
- * tickets after each operation.
- *
- * <p>A {@link TrackedMockWorld} intercepts every {@code setForceLoadedImpl} call
- * and maintains a live counter of outstanding tickets.  Tests assert that the
- * counter is {@code > 0} while a reservation is held and exactly {@code 0} after
- * it is released — both in the happy path and when an exception is thrown
- * mid-validation.
- *
- * <p>Requirements covered: REQ-SPIGOT-ARCH-001, REQ-SPIGOT-ARCH-005,
- * REQ-PAPER-ARCH-001, REQ-PAPER-ARCH-005.
+ * Verifies pairing of {@code addPluginChunkTicket} and {@code removePluginChunkTicket}.
+ * Proves zero orphaned tickets across normal completion and error paths (REQ-PAPER-ARCH-001/005).
  */
 public class ChunkTicketLifecycleTest {
 
@@ -77,21 +67,11 @@ public class ChunkTicketLifecycleTest {
     }
 
     // -----------------------------------------------------------------------
-    // Test 1 – happy path: ticket is held during reservation, released on close
+    // Test 1 - happy path: ticket is held during reservation, released on close
     // -----------------------------------------------------------------------
 
     /**
-     * Asserts that:
-     * <ol>
-     *   <li>While a {@link ChunkReservation} is open the active ticket count is {@code > 0},
-     *       proving the ticket was actually requested from the world.</li>
-     *   <li>After {@link ChunkReservation#close()} the active ticket count drops back to
-     *       exactly {@code 0}, proving no orphaned tickets remain.</li>
-     * </ol>
-     *
-     * <p>The pipeline is exercised end-to-end: {@link LocationGenerator#getLocation} finds a
-     * valid location, then a {@link ChunkReservation} is opened for that chunk to simulate
-     * the force-load ticket that the real teleport pipeline holds during validation.
+     * Asserts that active tickets are held during reservation and cleared on close.
      */
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
@@ -119,7 +99,7 @@ public class ChunkTicketLifecycleTest {
         assertTrue(world.getActiveTicketCount() > 0,
                 "Active ticket count must be > 0 while ChunkReservation is held");
 
-        // Release the reservation — ticket must be freed
+        // Release the reservation - ticket must be freed
         reservation.close();
 
         assertEquals(0, world.getActiveTicketCount(),
@@ -127,7 +107,7 @@ public class ChunkTicketLifecycleTest {
     }
 
     // -----------------------------------------------------------------------
-    // Test 2 – try-with-resources: ticket is released even when exception thrown
+    // Test 2 - try-with-resources: ticket is released even when exception thrown
     // -----------------------------------------------------------------------
 
     /**

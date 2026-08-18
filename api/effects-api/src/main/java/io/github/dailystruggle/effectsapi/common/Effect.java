@@ -95,7 +95,7 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
      * {@code token}, advances the cursor to the first remaining key whose
      * default-type can parse the token ({@link #canParse(Object, String)}),
      * assigns it, and advances past that key. Tokens that no remaining key
-     * accepts are reported once via {@code warn} (S-004 — never silently
+     * accepts are reported once via {@code warn} (S-004 - never silently
      * dropped) and the cursor is not advanced. Keys that are never assigned
      * keep their constructor-set defaults.
      *
@@ -112,7 +112,7 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
      * @param warn     consumer invoked with a single human-readable diagnostic
      *                 line per unparsed token; may be {@code null} for a
      *                 no-op (caller is then responsible for surfacing
-     *                 misconfiguration in some other way — discouraged)
+     *                 misconfiguration in some other way - discouraged)
      */
     protected final void applyByType(T[] keyOrder, String[] tokens, Consumer<String> warn) {
         if (keyOrder == null || keyOrder.length == 0) return;
@@ -140,7 +140,7 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
             this.data.put(keyOrder[chosen], token);
             cursor = chosen + 1;
             if (cursor >= keyOrder.length) {
-                // remaining tokens cannot land anywhere — record them
+                // remaining tokens cannot land anywhere - record them
                 // as unparsed rather than silently dropping (S-004).
                 continue;
             }
@@ -179,7 +179,7 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
         // Class-name match keeps effectsapi.common free of org.bukkit.* imports
         // while still validating that callers hand us one of the two legitimate
         // shapes. A Fabric-side effect would pass the equivalent Fabric types
-        // (or a wrapper) — concrete subclasses do the platform-typed cast.
+        // (or a wrapper) - concrete subclasses do the platform-typed cast.
         String fqn = target.getClass().getName();
         if (!isAcceptedTargetClass(target.getClass())) {
             throw new IllegalArgumentException(
@@ -244,7 +244,7 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
                                 + "] fixData: " + exception.getMessage());
                     }
                 } else {
-                    // Not a String — try the platform's reflective fallback
+                    // Not a String - try the platform's reflective fallback
                     // (valueOf / getByName / Registry on the default's class).
                     Object reflective = coercer.resolveReflective(type, val.toString());
                     if (reflective != null) {

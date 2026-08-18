@@ -22,20 +22,8 @@ import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Developer-UX surface test for the GUI-author read SPI added to {@link RTPAPI}
- * ({@code getAllowedTargets} / {@code getTargetStatus} / {@code getMetricsSnapshot}
- * / {@code getRegionSamples}) per {@code PROPOSAL-gui-author-spi.md}.
- *
- * <p>All assertions use only {@code rtp-api} / {@code metrics-api} imports
- * (beyond the class-init nudge), proving a third-party GUI plugin can populate
- * menu items through the public API alone:
- * <ul>
- *   <li>Pre-init calls throw {@link IllegalStateException} (REQ-RTP-S-006) and
- *       null arguments throw {@link IllegalArgumentException}.</li>
- *   <li>When core delegates are registered, each method routes to its delegate;
- *       a null delegate result degrades to a safe non-null value, never a silent
- *       no-op.</li>
- * </ul>
+ * Surface test for GUI menu data SPI on {@link RTPAPI}.
+ * Validates pre-init guards (REQ-RTP-S-006) and delegate routing.
  */
 class RtpApiMenuDataSurfaceTest {
 

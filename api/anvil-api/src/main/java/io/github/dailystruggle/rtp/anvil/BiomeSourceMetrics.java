@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * legacy {@link #anvilHits} / {@link #liveHits} totals are updated in lock-step
  * so the two views cannot drift. See {@link Reasons} for the canonical keys.
  * Surfaced via {@code rtp test biome-source}. Atomics + ConcurrentHashMap
- * only — no chunk I/O (S-005).
+ * only - no chunk I/O (S-005).
  */
 public final class BiomeSourceMetrics {
 

@@ -28,17 +28,8 @@ import org.jetbrains.annotations.Nullable;
  * nonce. Per the locked design decision (no {@code --commit} flag), this is
  * the only path that actually applies a prefab.
  *
- * <p><strong>Session 4a scope:</strong> this verb fully validates the nonce
- * (single-use, ~60 s TTL, caller-bound, prefab-id-bound), audit-logs every
- * outcome, and rejects with an explicit "on-disk write lands in Session 4b"
- * notice on success. The on-disk write itself - atomic temp+rename to the
- * actual {@code performance.yml} / {@code regions/&lt;id&gt;.yml}, sibling
- * {@code .bak.&lt;ts&gt;} retention, and the reload pipeline invocation -
- * is wired in Session 4b. See {@code CHECKLIST-admin-panel-prefabs.md} §4.
- *
- * <p>Nonce consumption happens regardless of the 4b stub: the nonce is
- * removed from the store on success, so an admin cannot replay it. This is
- * the security shape we want to validate in 4a tests.
+ * <p>Nonce consumption happens on confirm: the nonce is
+ * removed from the store on success, so an admin cannot replay it.
  */
 public class PrefabConfirmCmd extends BaseRTPCmdImpl {
 
@@ -88,7 +79,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         }
         // Token-removal (2026-05-24, mirrors ADR-050): the pending diff is
         // keyed solely on (callerId, prefabId). No opaque nonce, no TTL,
-        // no replay surface — the command sender is the trust boundary.
+        // no replay surface - the command sender is the trust boundary.
         PrefabNonceStore.ConsumeResult cr = nonceStore.consumeByCaller(callerId, prefabId);
         switch (cr.kind()) {
             case NOT_FOUND:
@@ -271,19 +262,8 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
     }
 
     /**
-     * Write one prefab file's changes to disk. Preferred path: route the write
-     * through the live config system ({@code rtp.configs}) so the prefab uses
-     * the exact same set+save-with-comments+backup machinery as
-     * {@code /rtp config ... set}. Brand-new per-world region files are created
-     * via the region-creation method {@link MultiConfigParser#addParser(String)}
-     * (which clones {@code regions/default.yml}).
-     *
-     * <p>Falls back to the tree-level {@link PrefabDiskIO#writeWithBackup} only
-     * when {@code RTP.configs} is unavailable (test scaffolds / pre-core) or the
-     * target file's live config cannot be resolved.
-     *
-     * @return the freshly-written {@code .bak.<ts>} backup path, or {@code null}
-     *         when no prior revision existed to back up.
+     * Writes one prefab file's changes to disk via live config system, or fallback writer.
+     * Returns the backup path, or null if no prior file existed.
      */
     @Nullable
     private static Path writeFile(File pluginDir,
@@ -367,15 +347,8 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
     }
 
     /**
-     * Read the {@code prefab.bakRetention} knob off {@code performance.yml}.
-     * Reads the YAML file directly (rather than going through the typed
-     * {@code ConfigParser&lt;PerformanceKeys&gt;}) because the knob is
-     * namespaced under a {@code prefab:} sub-map that does not yet appear in
-     * {@code PerformanceKeys}; introducing the enum constant requires a
-     * locale TSV pipeline pass.
-     *
-     * <p>Falls back to {@link PrefabDiskIO#DEFAULT_BAK_RETENTION} on any
-     * failure (no server accessor, file absent, key absent, non-numeric).
+     * Reads the {@code prefab.bakRetention} knob from {@code performance.yml} directly.
+     * Falls back to {@link PrefabDiskIO#DEFAULT_BAK_RETENTION} on missing/invalid value.
      */
     @SuppressWarnings("unchecked")
     private static int resolveBakRetention() {

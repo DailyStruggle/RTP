@@ -13,17 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Surface guard for the ADR-075 opt-in, per-player {@link PlayerMoveDispatcher}.
+ * Surface guard for ADR-075 per-player {@link PlayerMoveDispatcher}.
  *
- * <p>Contract:
- * <ul>
- *   <li>a player is watched only after {@link PlayerMoveDispatcher#watch} and
- *       only until its last handle is closed;</li>
- *   <li>{@link PlayerMoveDispatcher#fire} delivers only to handlers watching the
- *       moved player, and never to unwatched players;</li>
- *   <li>a throwing handler does not abort fan-out to the others;</li>
- *   <li>null player / handler are rejected.</li>
- * </ul>
+ * <p>Verifies watch lifecycle, targeted event fan-out, error isolation, and null safety.
  */
 class PlayerMoveDispatcherTest {
 

@@ -8,18 +8,8 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * {@link RegionAvailabilityProvider} backed by the live {@link NetworkSnapshot}
- * the transport layer maintains (the same cached snapshot {@link PeerRegionRegistry}
- * reads). This single implementation serves all three tiers transparently: the
- * snapshot is filled by the plugin-message gossip (lite + Pro) or by the SQL /
- * Redis bindings (Pro), and this class does not care which.
- *
- * <p>A server is "known" iff it currently appears in the snapshot with a
- * non-{@code killSwitch} heartbeat. Region availability for a known server is
- * the union of its typed {@link BackendHeartbeat#regions()} set (preferred) and
- * the legacy {@link BackendHeartbeat#regionsAvailable()} list. An absent /
- * stale server yields {@link Availability#UNKNOWN}, which the parameter accepts
- * (the load-bearing rule).</p>
+ * {@link RegionAvailabilityProvider} backed by live {@link NetworkSnapshot}.
+ * Evaluates server presence and advertised region sets across transport tiers.
  */
 public final class SnapshotRegionAvailabilityProvider implements RegionAvailabilityProvider {
 

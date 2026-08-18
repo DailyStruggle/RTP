@@ -14,61 +14,29 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 /**
- * Curated confirmation-menu page builder rendered after a viewer clicks a
- * Setup-section prefab row in the admin panel (PROPOSAL-admin-panel-prefabs.md
- * v3.1).
- *
- * <p>The bare command surface is independent: {@code /rtp admin prefab apply
- * <id>} mints a per-caller nonce, stashes the precomputed
- * {@link PrefabApplier.Result#perFileDiff()} in the {@code PrefabNonceStore},
- * and surfaces the diff as paginated chat. The Bukkit-family entry point
- * ({@code RTPCmdBukkit}) additionally renders this
- * confirmation page so the viewer can click {@code Confirm} or {@code Cancel}
- * instead of typing the nonce by hand. Both surfaces dispatch the same
- * underlying {@code prefab confirm <id> <token>} verb.
- *
- * <p>Each clickable fragment mints one token (ADR-035 §3) so the book
- * renderer can emit {@code menu:<token>} click payloads.
- *
- * <p>All user-facing strings on this page are currently hardcoded English
- * fallbacks; a future change should mirror them through the locale TSV pipeline (new
- * {@code MessagesKeys} entries {@code menuPrefabConfirmTitle},
- * {@code menuPrefabConfirmHint}, {@code menuPrefabConfirmRow},
- * {@code menuPrefabCancelRow}, plus the 14 per-prefab row/hover keys
- * referenced by {@link Prefab#displayKey()} / {@link Prefab#hoverKey()}).
+ * Curated confirmation-menu page builder for Setup-section prefab applications in the admin panel.
+ * Renders diff preview with {@code Confirm} and {@code Cancel} actions (ADR-050).
  */
 public final class PrefabConfirmationMenuBuilder {
 
     /**
      * Hard cap on the number of diff lines surfaced per file in the
-     * confirmation menu body. A noisy multi-world prefab with hundreds of
-     * synthesised region keys would otherwise push the {@code Confirm} /
-     * {@code Cancel} footer off page 1 of the book. Overflow lines are
-     * collapsed into a single "{@code ... (+N more)}" tail row.
+     * confirmation menu body. Overflow lines are collapsed into a single tail row.
      */
     public static final int MAX_LINES_PER_FILE = 8;
 
     /**
-     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
-     * emits concrete {@code /rtp menu ...} commands, so no token registry or
-     * TTL is consulted any more.
+     * ADR-050: no-arg constructor. Concrete commands emitted without token registry.
      */
     public PrefabConfirmationMenuBuilder() {
     }
 
     /**
-     * Build the confirmation page for {@code prefab}. The {@code Confirm}
-     * row dispatches {@code /rtp admin prefab confirm id=<prefabId>}; the
-     * {@code Cancel} row dispatches {@link MenuAction.OpenAdminPanel}. The
-     * apply-side pending diff is keyed by {@code (callerId, prefabId)} in
-     * {@link io.github.dailystruggle.rtp.common.commands.prefab.PrefabNonceStore};
-     * no opaque token is surfaced to the click.
+     * Builds the confirmation page displaying the pending diff for {@code prefab}.
      *
-     * @param prefab the prefab whose diff is being confirmed.
-     * @param diff   the per-file diff produced by {@link PrefabApplier#apply}.
-     *               Keys are file ids ({@code "performance"},
-     *               {@code "regions/<id>"}); values are ordered changes.
-     * @param viewer the calling player UUID.
+     * @param prefab prefab being applied
+     * @param diff   per-file diff produced by {@link PrefabApplier#apply}
+     * @param viewer calling player UUID
      */
     public MenuModel build(Prefab prefab,
                            Map<String, List<PrefabApplier.Change>> diff,
@@ -145,9 +113,7 @@ public final class PrefabConfirmationMenuBuilder {
 
         MenuPage page = new MenuPage(lines);
         List<MenuPage> pages = List.of(page);
-        // ADR-050 Stage 3β.D.2b (2026-05-24): the per-fragment mint loop is
-        // gone (the renderer emits concrete `/rtp menu ...` commands; no
-        // token is consulted).
+        // ADR-050: concrete command actions emitted without tokens.
         return new MenuModel(title, pages);
     }
 

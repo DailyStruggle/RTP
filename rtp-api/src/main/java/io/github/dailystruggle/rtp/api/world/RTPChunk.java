@@ -7,11 +7,7 @@ import java.util.Set;
 /**
  * Platform-agnostic representation of a world chunk.
  *
- * <p>This abstract class provides a common interface for interacting with chunks
- * across different server implementations (e.g., Bukkit, Folia). It encapsulates
- * a platform-specific chunk object and delegates method calls to it.
- *
- * @param <T> the type of the underlying platform-specific chunk object
+ * @param <T> underlying platform-specific chunk object type
  */
 public abstract class RTPChunk<T> {
   protected final T chunk;
@@ -74,14 +70,13 @@ public abstract class RTPChunk<T> {
   public abstract int getSurfaceHeight(int x, int z);
 
   /**
-   * Checks if the block at the specified coordinates within this chunk is safe
-   * for teleportation.
+   * Checks whether block at chunk-relative (x, y, z) is safe for teleportation.
    *
-   * @param x            the block's X coordinate relative to the chunk (0-15)
-   * @param y            the block's Y coordinate
-   * @param z            the block's Z coordinate relative to the chunk (0-15)
-   * @param unsafeBlocks a set of material names considered unsafe
-   * @return {@code true} if the block is safe, {@code false} otherwise
+   * @param x            chunk-local X (0-15)
+   * @param y            world Y
+   * @param z            chunk-local Z (0-15)
+   * @param unsafeBlocks set of unsafe material names
+   * @return true if safe for teleportation
    */
   public abstract boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks);
 
@@ -89,7 +84,7 @@ public abstract class RTPChunk<T> {
    * Compiled-form overload (ADR-017). Adapters with native tag/property access
    * should override and evaluate against the {@link CompiledUnsafeSet} directly;
    * the default delegates to {@link #isSafe(int, int, int, Set)} using the plain
-   * materials bucket only — tag/state predicates are inert until overridden.
+   * materials bucket only - tag/state predicates are inert until overridden.
    * Pass {@link CompiledUnsafeSet#EMPTY} for "nothing unsafe".
    */
   public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
@@ -131,33 +126,12 @@ public abstract class RTPChunk<T> {
   public abstract void unload();
 
   /**
-   * Returns the biome identifier at the specified world coordinates, sourced from
-   * this chunk instance's own backing (ADR-016 §13.1 precedence chain, chunk-local
-   * view). Anvil-backed adapters consult the decoded {@code AnvilChunkView}; live
-   * chunk adapters consult the loaded {@code Chunk}. Either way, the answer is
-   * derived from the same chunk instance the caller already holds — no separate
-   * cache lookup, no fallthrough to the seed-synthesised
-   * {@code world.getBiome(x,y,z)} getter.
-   *
-   * <p>This is the right entry point for post-load biome checks that already have
-   * a resolved {@link RTPChunk} in hand (e.g. inside
-   * {@code LocationGenerator}'s candidate loop). Callers that do not yet have a
-   * chunk handle should continue to use {@link RTPWorld#getBiome(int, int, int)},
-   * which runs the adapter's three-tier precedence chain starting from
-   * {@code anvilProbeSupport.takeCached}.
-   *
-   * <p>The default implementation delegates to
-   * {@link RTPWorld#getBiome(int, int, int)} on {@link #getWorld()} for
-   * back-compat with adapters / mocks that have not yet migrated. New platform
-   * implementations should override this method.
+   * Returns biome identifier at world (x, y, z) from this chunk's backing (ADR-016).
    *
    * @param x absolute world X
    * @param y absolute world Y
    * @param z absolute world Z
-   * @return the biome identifier at the requested coordinates, sourced from this
-   *     chunk's backing; never {@code null} on production adapters — a backing
-   *     that has no answer for the requested Y is expected to fall back to its
-   *     platform getter at override time.
+   * @return biome identifier, or null if unresolvable
    */
   public String getBiome(int x, int y, int z) {
     RTPWorld<?> w = getWorld();
@@ -165,19 +139,9 @@ public abstract class RTPChunk<T> {
   }
 
   /**
-   * Whether this chunk instance can answer block-data queries
-   * ({@link #isAir}, {@link #isSafe}, {@link #getSkyLight}, {@link #getSurfaceHeight})
-   * without requiring the world's live chunk to be loaded.
+   * Returns whether block queries run without requiring a loaded live chunk (ADR-015, ADR-016).
    *
-   * <p>Adapters that carry an out-of-band data source (e.g. the Spigot Anvil-backed
-   * {@code BukkitRTPChunk} per ADR-016) override this to {@code true} so
-   * that callers performing a stale-chunk guard (ADR-015) can skip the guard
-   * safely — the queries will not force a synchronous live-chunk load.</p>
-   *
-   * <p>Default: {@code false}, meaning the chunk relies on the live world state
-   * and is subject to the stale-chunk guard.</p>
-   *
-   * @return true iff queries on this instance never trigger a live chunk load.
+   * @return true if queries never trigger live chunk I/O
    */
   public boolean isSelfContained() {
     return false;

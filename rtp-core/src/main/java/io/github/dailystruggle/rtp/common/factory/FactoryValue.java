@@ -47,7 +47,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   public Map<String, String> reverse_language_mapping = new ConcurrentHashMap<>();
   // Volatile so {@link #setData(EnumMap)} can publish a fresh map by reference
   // assignment and concurrent readers always observe either the old map intact
-  // or the new map intact — never a clear()+putAll() torn state. Reads that
+  // or the new map intact - never a clear()+putAll() torn state. Reads that
   // need a coherent snapshot (getData, toString, toYAML, getNumber cache-back)
   // synchronize on the current map instance, which is correct as long as no
   // mutator ever modifies the map after publishing it via setData.
@@ -73,14 +73,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   }
 
   /**
-   * generic getter
+   * Returns a cloned snapshot of data under synchronization to prevent concurrent modification.
    *
-   * @return copy of data, to prevent editing
-   *
-   * <p>The clone is taken under {@code synchronized (data)} so concurrent
-   * {@code put}s from {@link #getNumber} (cache-back on first parse) cannot
-   * interleave with the snapshot. The returned {@code EnumMap} is owned by
-   * the caller and may be iterated freely without CME risk.</p>
+   * @return cloned copy of data
    */
   @NotNull
   public EnumMap<E, Object> getData() {
@@ -136,7 +131,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     // either the old map intact or the new map intact, never an
     // intermediate state. Pre-existing entries in {@code this.data} are
     // preserved by seeding {@code rebuilt} with the current snapshot
-    // (this overload is "merge", not "replace" — matches the prior
+    // (this overload is "merge", not "replace" - matches the prior
     // {@code this.data.put(...)} semantics).
     EnumMap<E, Object> rebuilt = new EnumMap<>(getData());
     data.forEach(
@@ -237,7 +232,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     synchronized (snapshot) {
       resObj = snapshot.getOrDefault(key, def);
     }
-    // Hot path: already a Number — return without writing back. Pre-fix this
+    // Hot path: already a Number - return without writing back. Pre-fix this
     // method called {@code data.put(key, res)} unconditionally on every read,
     // which (a) wasted a write per call after the first parse and (b) raced
     // with concurrent EnumMap iterators (toString / toYAML / setData.forEach)
@@ -275,7 +270,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     }
     // Idempotent transition cache: any racing thread parses the same String
     // to the same Number, so last-writer-wins is harmless. Cache back into
-    // the same map instance we read from (the snapshot) — if a concurrent
+    // the same map instance we read from (the snapshot) - if a concurrent
     // {@link #setData(EnumMap)} has since swapped {@code data}, the put
     // lands harmlessly in the now-orphaned old map; the next reader will
     // load the new map via the volatile {@code data} field and parse again.

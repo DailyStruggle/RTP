@@ -33,39 +33,21 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public File pluginDirectory;
 
   /**
-   * ADR-076: the rename-map file this parser reads/writes. For a {@link MultiConfigParser}
-   * child this is the shared, folder-similar sibling map (e.g. {@code definitions/.worlds.lang.yml})
-   * passed in at construction; for a standalone parser it is the co-located per-file sibling
-   * {@code .<name>.lang.yml} auto-resolved by {@link #loadLangFile(File)}. It is retained here so
-   * {@link #clone()} and the {@code Factory} construct/clone paths can pass the same map back into
-   * {@link #check(String, File, File)} instead of {@code null}; passing {@code null} would make a
-   * cloned {@link MultiConfigParser} child re-auto-resolve to a stray per-file map inside the folder,
-   * duplicating the shared one.
+   * ADR-076: rename-map file this parser reads/writes. For a {@link MultiConfigParser}
+   * child, shared folder sibling map; for standalone, co-located {@code .<name>.lang.yml}.
+   * Retained to preserve the map on clone/construct paths.
    */
   public File langFile;
 
   /**
-   * ADR-071: relative sub-directory (below {@link #pluginDirectory}, '/'-normalized,
-   * no leading/trailing separator) carried by a subpathed parser {@code name} such as
-   * {@code "advanced/blocks.yml"} or {@code "messages/player.yml"}. Empty for a plain
-   * root-level config. Drives {@link #configDir()} (the on-disk directory and the
-   * sub-rooted file database) and {@link #jarPrefix()} (the JAR-resource and
-   * {@code lang/<locale>/} mirror prefix). {@link #name} always holds the bare leaf
-   * file name, so the file-database key and the {@code /rtp config} sub-command name
-   * stay unqualified.
+   * ADR-071: normalized relative sub-directory below {@link #pluginDirectory}. Empty for
+   * root-level configs. Drives {@link #configDir()} and {@link #jarPrefix()}.
    */
   public String subDir = "";
 
   /**
-   * JAR-resource sub-directory override ('/'-normalized, no leading/trailing separator),
-   * decoupled from {@link #subDir}. A {@link MultiConfigParser} builds each per-file child
-   * with {@code pluginDirectory} pointing at the already-nested definitions folder and a bare
-   * leaf {@code name}, so the child's {@link #subDir} is empty and its on-disk paths are
-   * correct - but its bundled JAR resources still live under the definitions sub-directory
-   * (e.g. {@code definitions/regions/default.yml}, {@code lang/<locale>/definitions/regions/}).
-   * When non-empty this value supplies that JAR/{@code lang/} prefix via {@link #jarPrefix()}
-   * so locale detection, extraction, and migration read the right resource. Empty for a plain
-   * parser, where {@link #subDir} already drives both disk and JAR paths.
+   * JAR-resource sub-directory override decoupled from {@link #subDir}. Used by
+   * {@link MultiConfigParser} children whose bundled resources live under a definitions sub-directory.
    */
   public String jarSubDir = "";
 
@@ -103,17 +85,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    */
   public static int bakRetention = ConfigBackups.DEFAULT_BAK_RETENTION;
 
-  /**
-   * Constructor for ConfigParser
-   *
-   * @param eClass the enum class for configuration keys
-   * @param name the name of the configuration
-   * @param version the version of the configuration
-   * @param pluginDirectory the plugin directory
-   * @param langFile the language file
-   * @param fileDatabase the file database
-   * @param classLoader the class loader
-   */
+  /** Constructor with default English locale. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -126,18 +98,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         LanguageBootstrap.DEFAULT_LOCALE);
   }
 
-  /**
-   * Locale-aware constructor.
-   *
-   * @param eClass the enum class for configuration keys
-   * @param name the name of the configuration
-   * @param version the version of the configuration
-   * @param pluginDirectory the plugin directory
-   * @param langFile the language file (or null to derive from name)
-   * @param fileDatabase the file database
-   * @param classLoader the class loader
-   * @param locale active locale (e.g. {@code "en"}); see {@link LanguageBootstrap}
-   */
+  /** Locale-aware constructor. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -160,16 +121,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     check(version, pluginDirectory, langFile);
   }
 
-  /**
-   * Constructor for ConfigParser without a custom class loader
-   *
-   * @param eClass the enum class for configuration keys
-   * @param name the name of the configuration
-   * @param version the version of the configuration
-   * @param pluginDirectory the plugin directory
-   * @param langFile the language file
-   * @param fileDatabase the file database
-   */
+  /** Constructor without custom class loader, default English locale. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -181,17 +133,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         LanguageBootstrap.DEFAULT_LOCALE);
   }
 
-  /**
-   * Locale-aware constructor (no custom class loader).
-   *
-   * @param eClass          the enum class for configuration keys
-   * @param name            the name of the configuration file (without {@code .yml} if desired)
-   * @param version         the version string stamped into the file
-   * @param pluginDirectory the plugin data directory
-   * @param langFile        the language file, or {@code null} to use the default
-   * @param fileDatabase    the file database used for async I/O
-   * @param locale          the locale code, e.g. {@code "en"}
-   */
+  /** Locale-aware constructor without custom class loader. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -204,17 +146,9 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
-   * Locale-aware constructor with an explicit JAR-resource sub-directory override.
+   * Locale-aware constructor with explicit JAR resource sub-directory override.
    *
-   * <p>Used by {@link MultiConfigParser} for its per-file children: the child's
-   * {@code pluginDirectory} already points at the nested definitions folder (so its
-   * {@link #subDir} is empty and disk paths are correct), while {@code jarSubDir} carries the
-   * definitions sub-directory the bundled JAR resources actually live under (e.g.
-   * {@code definitions/regions}). Without it a child's locale detection/extraction/migration
-   * would probe the JAR root instead of the definitions sub-directory and silently no-op on a
-   * language switch.
-   *
-   * @param jarSubDir the JAR/{@code lang/} resource sub-directory, or {@code null}/empty for none
+   * @param jarSubDir JAR/{@code lang/} resource sub-directory, or null/empty for none
    */
   public ConfigParser(
       Class<E> eClass,
@@ -235,15 +169,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     check(version, pluginDirectory, langFile);
   }
 
-  /**
-   * Constructor for ConfigParser with default language file and class loader
-   *
-   * @param eClass the enum class for configuration keys
-   * @param name the name of the configuration
-   * @param version the version of the configuration
-   * @param pluginDirectory the plugin directory
-   * @param fileDatabase the file database
-   */
+  /** Constructor with default language file, class loader, and English locale. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -253,16 +179,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     this(eClass, name, version, pluginDirectory, fileDatabase, LanguageBootstrap.DEFAULT_LOCALE);
   }
 
-  /**
-   * Locale-aware constructor (default lang file, no class loader).
-   *
-   * @param eClass          the enum class for configuration keys
-   * @param name            the name of the configuration file
-   * @param version         the version string stamped into the file
-   * @param pluginDirectory the plugin data directory
-   * @param fileDatabase    the file database used for async I/O
-   * @param locale          the locale code, e.g. {@code "en"}
-   */
+  /** Locale-aware constructor with default language file and class loader. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -532,24 +449,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
-   * Detect a locale-mismatched on-disk YAML (e.g. an English {@code messages.yml} left over
-   * from a previous run, while {@code language.yml} now selects {@code es}). When detected,
-   * preserve user-customized scalar values keyed by their enum constant, back up the foreign
-   * file via {@link #renameFiles()}, and extract the locale-specific resource from the JAR.
+   * Detects locale mismatch on disk (e.g. English file with Spanish selected). Preserves
+   * user-customized scalar values, backs up the old file, and extracts locale defaults.
    *
-   * <p>Heuristic: if zero on-disk top-level keys round-trip through the active locale's
-   * {@code reverse_language_mapping}, but at least one round-trips through the canonical
-   * English enum names, the file is foreign-locale. Files where some active-locale keys are
-   * already present are left untouched (assumed valid for this locale).
-   *
-   * <p>Customized values are recovered by mapping each foreign key to its enum constant via
-   * the lowercased {@code enumLookup}; container/section values are skipped (keeping the
-   * fresh defaults). Recovery is best-effort: keys that cannot be resolved to an enum are
-   * dropped, with the original on-disk file retained as {@code <name>.old1}.
-   *
-   * @param pluginDirectory the plugin data directory
-   * @return enum→value map of customizations to re-apply after extraction; empty when no
-   *     migration was performed
+   * @param pluginDirectory plugin data directory
+   * @return enum-to-value map of customizations to re-apply after extraction
    */
   private Map<E, Object> detectAndPreserveLocaleMismatch(File pluginDirectory) {
     Map<E, Object> preserved = new EnumMap<>(myClass);
@@ -603,16 +507,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       }
     }
     if (!anyRename) {
-      // No key renames for this locale. Two sub-cases:
-      //   (a) the file has no localized JAR resource at all (loadLangFile seeded an
-      //       identity map as a fallback, e.g. integrations.yml) - nothing to migrate,
-      //       and migrating would re-backup an unchanged file on every reload.
-      //   (b) the file's translation lives in its VALUES, not its keys (every message
-      //       file: the *.lang.yml map is identity, only the shipped text is localized).
-      //       These MUST still migrate on a locale switch, otherwise the on-disk file
-      //       keeps its English text forever. Guarded to only fire while the on-disk
-      //       file still carries the English baseline text, so an already-localized
-      //       file is not re-extracted and backed up on every reload.
+      // No key renames for this locale: either no localized JAR resource exists (identity map),
+      // or translations are value-only (messages). Value-only files migrate on locale switch.
       if (!valueOnlyLocaleMigrationNeeded(f)) return preserved;
     }
 
@@ -643,7 +539,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       // A reverse-mapping hit only signals "active locale" when the active
       // locale renames the key. Identity mappings (e.g. es/messages.lang.yml
       // contains `infoTickets: infoTickets`) appear in BOTH the English and
-      // Spanish files and therefore carry no locale signal — counting them
+      // Spanish files and therefore carry no locale signal - counting them
       // here would short-circuit the migration of any English-keyed file that
       // happens to share an identity-mapped key with the active locale (the
       // exact symptom seen with messages.yml: `infoTickets`/`infoMSPT` kept
@@ -668,7 +564,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     // but ONLY for entries that genuinely differ from the English baseline default
     // shipped in the JAR. Otherwise an unmodified English `messages.yml` would be
     // preserved verbatim and re-applied over the freshly-extracted localized
-    // defaults — defeating the locale switch (the values would stay English even
+    // defaults - defeating the locale switch (the values would stay English even
     // though the keys are now Spanish).
     Map<E, Object> englishDefaults = loadEnglishBaselineDefaults();
     for (Map.Entry<String, E> e : recovered.entrySet()) {
@@ -701,17 +597,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
-   * Load the English baseline defaults for {@link #name} from the JAR root resource (e.g.
-   * {@code messages.yml} at the JAR root, not {@code lang/<locale>/messages.yml}). Top-level
-   * keys in the English baseline are canonical enum names (the English {@code *.lang.yml}
-   * file ships identity mappings), so they map 1:1 to {@link E} via {@link #enumLookup}.
-   *
-   * <p>Used to decide, on locale switch, whether an on-disk value equals the shipped English
-   * default (drop it, let the localized default win) or has been customized by the operator
-   * (preserve it across the migration).
-   *
-   * <p>Best-effort: if the resource is missing or fails to parse, returns an empty map and
-   * every on-disk value is treated as customized.
+   * Loads English baseline scalar defaults from the JAR root resource.
+   * Used during locale switch to separate defaults from user customizations.
    */
   private Map<E, Object> loadEnglishBaselineDefaults() {
     Map<E, Object> defaults = new EnumMap<>(myClass);
@@ -747,20 +634,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
-   * Text-based, format-agnostic locale-migration gate. Returns {@code true} when the on-disk
-   * file is an <em>unmodified</em> pristine copy of a <em>different</em> bundled locale than the
-   * active one (the English baseline or any {@code lang/<loc>/} member), in which case it should
-   * be backed up once and replaced with the active locale's resource. Covers key-renamed,
-   * value-translated, and comment-only-translated files (e.g. {@code advanced/biomes.yml})
-   * uniformly, and both switch directions (English &lt;-&gt; locale).
-   *
-   * <p>Reads bundled resources via the real classloader (not the overridable
-   * {@link #getResourceFromJar}), so it is inert under unit fixtures that stub that method with
-   * synthetic resources and only engages when the genuine {@code lang/} tree is on the classpath.
-   *
-   * <p>Idempotent: a file already equal to the active locale resource returns {@code false}, and
-   * an operator-customized file (matching no shipped locale verbatim) also returns {@code false}
-   * so it is left to the value-preserving migration path.
+   * Format-agnostic gate. Returns true when the on-disk file is an unmodified copy of
+   * a different bundled locale than the active one, needing backup and replacement.
    */
   private boolean onDiskIsPristineForeignLocale(File f) {
     String activeText = normalizeYamlText(readActiveLocaleResourceText());
@@ -977,15 +852,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
-   * Load the active locale's shipped default scalar values from the localized JAR resource
-   * ({@code lang/<locale>/<subDir>/<name>}), keyed by enum constant. Mirrors
-   * {@link #loadEnglishBaselineDefaults()} but reads the localized member. On-disk key names in
-   * the localized file use the active locale's key names, so they are mapped back to the
-   * canonical enum via {@link #reverse_language_mapping} first (identity for value-translated
-   * files), then via {@link #enumLookup}.
-   *
-   * <p>Used to distinguish an on-disk file that still carries the English baseline text (needs
-   * migration) from one already in the active locale (must not be re-extracted / re-backed-up).
+   * Loads active locale default scalar values from {@code lang/<locale>/<subDir>/<name>}.
+   * Used to distinguish on-disk English baselines from already-localized files.
    */
   private Map<E, Object> loadLocalizedDefaults() {
     Map<E, Object> defaults = new EnumMap<>(myClass);
@@ -1023,27 +891,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
-   * Decide whether a value-translated file (identity key map, so the {@code anyRename} test in
-   * {@link #detectAndPreserveLocaleMismatch} is false) still needs to be migrated to the active
-   * locale. This is the case when the file ships a localized JAR resource AND the on-disk file is
-   * not already in the active locale.
+   * Decides whether a value-translated file needs active-locale migration by comparing
+   * on-disk values against localized defaults for translated keys.
    *
-   * <p>The decision is made against the <em>target locale</em>, not the current English baseline:
-   * over the keys the active locale actually translates ({@code English text != localized text}),
-   * count how many already hold the localized text on disk. If a majority already match the
-   * localized default, the file is treated as already in the active locale (no migration, so a
-   * few operator customizations never trigger a re-extract / re-backup loop). Otherwise the file
-   * still carries foreign text - English, an older build's English, or another locale - and is
-   * migrated. Anchoring on the target locale (rather than requiring an exact match to the
-   * <em>current</em> English baseline) is what lets a file extracted by an older build - whose
-   * English wording has since drifted - still switch on a locale change.
-   *
-   * <p>Returns {@code false} for files without any localized resource (e.g. {@code integrations.yml})
-   * and for files already in the active locale, so a locale switch never re-extracts and
-   * re-backs-up an already-localized file on every reload.
-   *
-   * @param f the on-disk value file for this parser
-   * @return {@code true} when the on-disk file should be migrated to the active locale
+   * @param f on-disk value file
+   * @return true when on-disk file should be migrated
    */
   private boolean valueOnlyLocaleMigrationNeeded(File f) {
     if (!localizedResourceExists()) return false;
@@ -1095,13 +947,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
-   * Move a corrupt on-disk YAML aside (to {@code <name>.corrupt-<timestamp>}) and re-extract a
-   * clean default copy from the JAR (locale-specific when applicable, English baseline
-   * otherwise). The file-database cache entry for {@link #name} is evicted so the next
-   * {@code fileDatabase.connect()} call re-reads the freshly extracted file.
-   *
-   * <p>Best-effort: any IO failure here is logged but does not propagate, because callers are
-   * already operating in degraded-recovery paths and must continue.
+   * Moves corrupt YAML to {@code <name>.corrupt-<ts>} and re-extracts clean defaults.
+   * Evicts the file-database cache entry on completion.
    */
   private void quarantineCorruptFile(File pluginDirectory, File corrupt) {
     try {
@@ -1399,14 +1246,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
-   * Returns the loaded YAML document root for this parser, or {@code null}
-   * when the file has not been cached yet. The root is a
-   * {@link RtpYamlSection} (concretely an {@code RtpYamlConfig}) that
-   * preserves block comments, so callers can resolve a key's documentation
-   * comment via {@link RtpYamlSection#getComment(String)} (dotted paths
-   * accepted). Used by the menu config-search hover resolver.
+   * Returns the loaded YAML document root, or null if uncached.
+   * Preserves block comments for {@link RtpYamlSection#getComment(String)}.
    *
-   * @return the YAML root section, or {@code null} when unavailable
+   * @return YAML root section, or null when unavailable
    */
   @Nullable
   public RtpYamlSection getYamlRoot() {

@@ -10,22 +10,7 @@ import java.util.Objects;
 /**
  * Platform-neutral planner that turns a decoded {@link LoadedSchematic} plus an arrival
  * {@link RTPLocation} and {@link PasteOptions} into a flat list of absolute
- * {@link BlockPlacement}s. This holds all the anchor math and air-skip logic so each
- * platform paster only has to apply the resulting placements through its native block
- * parser, and so the logic is fully unit-testable without a live world (ADR-058
- * Amendment 1).
- *
- * <p>Anchor semantics (footprint center is {@code (width-1)/2}, {@code (length-1)/2}):
- *
- * <ul>
- *   <li>{@link PasteAnchor#BOTTOM_CENTER}: arrival is the horizontal center and the
- *       vertical bottom (cell {@code y=0} lands at the arrival Y, structure rises upward).
- *   <li>{@link PasteAnchor#CENTER}: arrival is the geometric center on all three axes.
- *   <li>{@link PasteAnchor#ORIGIN}: the schematic's own origin lands at the arrival block.
- * </ul>
- *
- * <p>When {@link PasteOptions#pasteAir()} is {@code false}, air cells are omitted so the
- * surrounding terrain is preserved (the configured behavior for arrival pads).
+ * {@link BlockPlacement}s (ADR-058 Amendment 1).
  */
 public final class SchematicPlacementPlanner {
 
@@ -79,15 +64,12 @@ public final class SchematicPlacementPlanner {
   }
 
   /**
-   * Computes the absolute world position of each decoded {@link BlockEntityData}, applying the
-   * same anchor math {@link #plan} uses for block placements. This lets a platform paster restore
-   * block-entity payloads (chest contents, sign text, ...) at the correct world coordinates after
-   * the blocks are written.
+   * Computes absolute world positions for decoded {@link BlockEntityData} using anchor math.
    *
-   * @param schematic the decoded schematic; never {@code null}
-   * @param at        the arrival location; never {@code null}
-   * @param options   the paste tuning; never {@code null}
-   * @return an ordered, immutable list of placed block entities (empty when none decoded)
+   * @param schematic decoded schematic; never null
+   * @param at arrival location; never null
+   * @param options paste tuning; never null
+   * @return placed block entities list (empty when none)
    */
   public static List<PlacedBlockEntity> planBlockEntities(LoadedSchematic schematic,
                                                           RTPLocation at, PasteOptions options) {
@@ -144,13 +126,9 @@ public final class SchematicPlacementPlanner {
   }
 
   /**
-   * Finds the lowest standable floor in the given column ({@code x},{@code z}): the lowest
-   * relative Y holding a solid cell that has at least two non-solid (air/empty/out-of-bounds)
-   * cells directly above it, i.e. feet + head clearance. This is the surface a teleport safety
-   * check would accept, and choosing the lowest such floor places the player inside a roofed
-   * structure rather than on top of its roof.
+   * Finds lowest standable floor in column ({@code x},{@code z}) with 2 non-solid clearance blocks above.
    *
-   * @return the floor's relative Y, or {@code -1} when the column has no standable floor.
+   * @return relative Y of floor, or -1 if none found
    */
   private static int standableFloorYInColumn(LoadedSchematic schematic, int x, int z) {
     int height = schematic.height();

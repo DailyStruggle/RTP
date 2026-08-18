@@ -15,7 +15,7 @@ public interface TagSource {
   /**
    * Returns all tag files this source can enumerate for the block tag
    * registry. Tag files for other registries (items, fluids, entity-types,
-   * game-events) shall be ignored by this call — a caller interested in those
+   * game-events) shall be ignored by this call - a caller interested in those
    * would use a different {@link TagSource} instance or, in a future slice, a
    * registry-parameterised variant.
    *

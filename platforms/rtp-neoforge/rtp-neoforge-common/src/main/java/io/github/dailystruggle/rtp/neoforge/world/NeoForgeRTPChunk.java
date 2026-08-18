@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * NeoForge {@link RTPChunk} (the NeoForge analogue of {@code FabricRTPChunk}).
  * Dual-mode: a live {@link ChunkAccess} wrapper (callers performed an off-tick
- * load — S-005-safe) or an {@link AnvilChunkView} snapshot read from a
+ * load - S-005-safe) or an {@link AnvilChunkView} snapshot read from a
  * persisted {@code r.X.Z.mca} (ADR-016).
  *
  * <p>Mojmap-at-runtime: compiles directly against {@code net.minecraft} block

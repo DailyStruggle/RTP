@@ -13,7 +13,7 @@ import org.checkerframework.framework.qual.SubtypeOf;
  *
  * <p>Represents an unknown or unconstrained thread context. All concrete thread qualifiers
  * ({@link RegionThread}, {@link AsyncThread}, {@link GlobalRegionThread}) are subtypes of this
- * annotation. Unannotated methods are implicitly {@code @AnyThread} — they make no thread-affinity
+ * annotation. Unannotated methods are implicitly {@code @AnyThread} - they make no thread-affinity
  * promise and may be called from any context.
  *
  * <p>Think of this as the "unmapped memory" region in a hardware memory-protection model: access

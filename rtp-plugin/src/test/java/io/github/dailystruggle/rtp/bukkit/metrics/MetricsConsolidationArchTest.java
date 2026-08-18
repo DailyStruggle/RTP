@@ -14,10 +14,10 @@ import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.Wi
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * C6 / §1.6.5 of {@code CHECKLIST-metrics-and-multiserver.md} — ArchUnit
+ * C6 / §1.6.5 of {@code CHECKLIST-metrics-and-multiserver.md} - ArchUnit
  * drift guard for the cross-platform metrics consolidation.
  *
- * <p>After §1.6.1–§1.6.4 the canonical sources of TPS / player-count /
+ * <p>After §1.6.1-§1.6.4 the canonical sources of TPS / player-count /
  * soft-cap are the {@code Metrics.snapshot()} fields and the platform
  * {@code *MetricsBinding} samplers. This guard pins raw reads of the
  * underlying server APIs to those binding/sampler classes so future drift
@@ -25,11 +25,11 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  *
  * <p>Allow-list (per proposal §1.6.5):
  * <ul>
- *     <li>{@code Bukkit.getOnlinePlayers().size()} — {@code *MetricsBinding},
+ *     <li>{@code Bukkit.getOnlinePlayers().size()} - {@code *MetricsBinding},
  *         {@code *TpsSampler}.</li>
- *     <li>{@code Server#getMaxPlayers()} / {@code Bukkit.getMaxPlayers()} —
+ *     <li>{@code Server#getMaxPlayers()} / {@code Bukkit.getMaxPlayers()} -
  *         {@code *MetricsBinding}, {@code *TpsSampler}.</li>
- *     <li>{@code Server#getTPS()} — {@code *MetricsBinding} only
+ *     <li>{@code Server#getTPS()} - {@code *MetricsBinding} only
  *         ({@code RTPCostMetricsCharts} dropped from the list once §1.6.4
  *         landed).</li>
  * </ul>
@@ -52,7 +52,7 @@ class MetricsConsolidationArchTest {
 
     /**
      * Skip ArchUnit-internal types and any class outside the RTP root
-     * package — we don't care about transitive deps like Bukkit / Folia /
+     * package - we don't care about transitive deps like Bukkit / Folia /
      * MockBukkit themselves; the guard targets RTP-authored code only.
      */
     private static final ImportOption RTP_ONLY = location -> {
@@ -62,7 +62,7 @@ class MetricsConsolidationArchTest {
     };
 
     /**
-     * Helper — import every RTP class on the test classpath. We deliberately
+     * Helper - import every RTP class on the test classpath. We deliberately
      * scan the entire {@code io.github.dailystruggle.rtp} root rather than
      * sub-packages so the guard catches future module additions automatically.
      */
@@ -95,7 +95,7 @@ class MetricsConsolidationArchTest {
     @Test
     void server_getTPS_reflective_read_is_restricted_to_metrics_bindings() {
         // Catches both `Server#getTPS` (Paper/Spigot) and `Server#getTPS()`
-        // invoked reflectively via Method#invoke — the latter is the
+        // invoked reflectively via Method#invoke - the latter is the
         // RTPCostMetricsCharts pattern §1.6.4 removed; the former is the
         // legitimate PaperMetricsBinding sampler call. Sampler classes are
         // NOT allowed here (proposal: only *MetricsBinding may call getTPS),
@@ -117,7 +117,7 @@ class MetricsConsolidationArchTest {
     }
 
     /**
-     * Phase F of the metrics-api extraction — module-boundary guard.
+     * Phase F of the metrics-api extraction - module-boundary guard.
      *
      * <p>The canonical SPI types now live in the {@code metrics-api} module under
      * {@code io.github.dailystruggle.metrics.api.*}. A deprecated shim interface
@@ -134,15 +134,15 @@ class MetricsConsolidationArchTest {
      *     <li>The four platform binding implementations
      *         ({@code BukkitTpsSampler}, {@code PaperMetricsBinding},
      *         {@code FoliaMetricsBinding}, {@code FabricMetricsBinding}) and the
-     *         in-plugin {@code MetricsBindingDispatcher} — these still
+     *         in-plugin {@code MetricsBindingDispatcher} - these still
      *         {@code implements MetricsBinding} via the shim and are migrated
      *         in lockstep when the shim is removed.</li>
      *     <li>Test scaffolding under {@code rtp-plugin} that exercises the shim
      *         path ({@code MetricsBindingDispatcherTest},
-     *         {@code RTPServerAccessorTpsParityTest}) — kept as regression
+     *         {@code RTPServerAccessorTpsParityTest}) - kept as regression
      *         coverage for the compat layer.</li>
      *     <li>Doc references in {@code rtp-core.RTP} javadoc and
-     *         {@code InfoCmdTest} — non-bytecode (javadoc / fully-qualified
+     *         {@code InfoCmdTest} - non-bytecode (javadoc / fully-qualified
      *         literal in test source) hits that ArchUnit does not see as
      *         dependencies; harmless to leave but listed for clarity.</li>
      * </ul>
@@ -184,7 +184,7 @@ class MetricsConsolidationArchTest {
     }
 
     /**
-     * Phase F module-boundary guard — implementations of the canonical
+     * Phase F module-boundary guard - implementations of the canonical
      * {@code io.github.dailystruggle.metrics.api.MetricsBinding} must live in
      * a platform adapter module, not in {@code rtp-core} or {@code rtp-api}.
      *
@@ -217,7 +217,7 @@ class MetricsConsolidationArchTest {
 
     @Test
     void server_getMaxPlayers_is_restricted_to_metrics_bindings_or_samplers() {
-        // §1.6.5 — Bukkit.getMaxPlayers() / Server#getMaxPlayers() is
+        // §1.6.5 - Bukkit.getMaxPlayers() / Server#getMaxPlayers() is
         // allow-listed inside *MetricsBinding and *TpsSampler; everything
         // else (notably RTPBukkitPlugin's login-cache bootstrap as of §1.6.3)
         // must read snapshot().softCap. Bukkit/Folia iterator-style reads on

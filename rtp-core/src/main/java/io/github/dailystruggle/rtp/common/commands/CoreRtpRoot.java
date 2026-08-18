@@ -22,48 +22,10 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Platform-neutral {@code /rtp} root command, shared by <em>every</em> platform.
+ * Platform-neutral {@code /rtp} root command shared across all server platforms.
  *
- * <p>This is the single shared root: it assembles the entire command tree out
- * of {@code rtp-core} and owns the teleport-dispatch entry points, so adding a
- * verb or parameter is a one-file change. It is consumed both by the platforms
- * dispatched through the Brigadier bridge (commands-api-ADR-001: Fabric /
- * NeoForge) and by the Bukkit family, whose legacy command-map registration is
- * handled by commands-api's {@code BukkitCommandRegistrar} (commands-api-ADR-003)
- * wrapping this neutral root rather than the root subclassing a Bukkit command
- * type.</p>
- *
- * <p>The tree is built from:</p>
- *
- * <ul>
- *   <li>the platform-neutral parameters and subcommands, via
- *       {@link CoreCommandTreeBuilder} (region / biome / toggletargetperms +
- *       reload / gui / config / scan / info / version / clear);</li>
- *   <li>the {@code player} / {@code world} parameters, sourced from
- *       {@link ServerAccessorCommandParameters} (backed entirely by
- *       {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor}); and</li>
- *   <li>optionally the {@code /rtp menu} surface (ADR-035 / ADR-044 / ADR-050),
- *       wired through {@link MenuWiringSupport} with a platform-supplied
- *       {@link MenuRenderer} and {@link MenuRedeemSubcommand.AnvilInputOpener}.</li>
- * </ul>
- *
- * <p>The remaining genuinely platform-bound behaviours are supplied through
- * small seams rather than per-platform subclasses:</p>
- *
- * <ul>
- *   <li><b>Outcome events</b> ({@link #successEvent}/{@link #failEvent}) fan out
- *       through the static {@link RTPCommandEvents} registry; the Bukkit
- *       bootstrap subscribes a callback that fires its plugin-event-bus
- *       {@code TeleportCommandSuccessEvent} / {@code TeleportCommandFailEvent},
- *       while Fabric / NeoForge register nothing.</li>
- *   <li><b>Reply rendering</b> — an optional {@code Function<UUID, Consumer<String>>}
- *       reply-renderer lets a platform wrap the message sink (the Bukkit family
- *       renders {@code /rtp help} rows as clickable chat). When absent the
- *       neutral message path is used.</li>
- *   <li><b>Teleport-path sender checks</b> ({@link #addSenderCheck}) gate the
- *       <em>teleport</em> invocation (e.g. the cross-server network waitlist);
- *       subcommands bypass them.</li>
- * </ul>
+ * <p>Assembles parameters and subcommands via {@link CoreCommandTreeBuilder} and
+ * wires optional menu surfaces via {@link MenuWiringSupport}.</p>
  */
 public class CoreRtpRoot extends BaseRTPCmdImpl implements RTPCmd {
 
@@ -92,13 +54,9 @@ public class CoreRtpRoot extends BaseRTPCmdImpl implements RTPCmd {
   }
 
   /**
-   * Self-discovering constructor for a platform that supplies a custom reply
-   * renderer (e.g. the Bukkit family's {@code /rtp help} clickable-chat sink).
-   * The menu bindings are resolved through {@link MenuBindingSupport} exactly as
-   * for {@link #CoreRtpRoot()}.
+   * Self-discovering constructor with custom reply renderer.
    *
-   * @param replyRenderer optional per-caller reply-renderer, or {@code null} to
-   *                      use the neutral message path
+   * @param replyRenderer optional per-caller reply-renderer, or {@code null}
    */
   public CoreRtpRoot(@Nullable Function<UUID, Consumer<String>> replyRenderer) {
     this(MenuBindingSupport.discoverRenderer(),
@@ -107,13 +65,7 @@ public class CoreRtpRoot extends BaseRTPCmdImpl implements RTPCmd {
   }
 
   /**
-   * Explicit-injection constructor for platforms / tests that supply the menu
-   * seam directly rather than through {@link MenuBindingSupport} discovery.
-   *
-   * @param menuRenderer the platform menu renderer, or {@code null} to disable
-   *                     the menu open-page path
-   * @param anvilOpener  the platform anvil / chat-prompt input opener, or
-   *                     {@code null} when unavailable
+   * Explicit-injection constructor without custom reply renderer.
    */
   public CoreRtpRoot(@Nullable MenuRenderer menuRenderer,
                      @Nullable MenuRedeemSubcommand.AnvilInputOpener anvilOpener) {
@@ -121,17 +73,7 @@ public class CoreRtpRoot extends BaseRTPCmdImpl implements RTPCmd {
   }
 
   /**
-   * Assembles the shared {@code /rtp} tree and (when a renderer is supplied) the
-   * {@code /rtp menu} surface.
-   *
-   * @param menuRenderer  the platform menu renderer, or {@code null} to disable
-   *                      the menu open-page path (the redeem path then degrades
-   *                      to the configurable {@code menuInvalid} message)
-   * @param anvilOpener   the platform anvil / chat-prompt input opener, or
-   *                      {@code null} when unavailable
-   * @param replyRenderer optional per-caller reply-renderer (e.g. the Bukkit
-   *                      help-row clickable chat sink), or {@code null} to use
-   *                      the neutral message path
+   * Primary constructor assembling the command tree and optional menu surfaces.
    */
   public CoreRtpRoot(@Nullable MenuRenderer menuRenderer,
                      @Nullable MenuRedeemSubcommand.AnvilInputOpener anvilOpener,

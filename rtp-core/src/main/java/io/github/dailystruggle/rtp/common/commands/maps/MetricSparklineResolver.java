@@ -10,35 +10,7 @@ import java.util.logging.Level;
 
 /**
  * Resolver for {@link ChartSpec.Kind#METRIC_SPARKLINE}.
- *
- * <p>Produces a {@link DualSparkline} carrying two index-aligned series
- * sampled at 1 Hz by the {@code MetricsSnapshotRing} sampler installed in
- * {@code RTP.start}:
- *
- * <ul>
- *   <li><strong>Series A: MSPT (ms).</strong> On Folia, aggregated across
- *       regions by the platform binding per the configurable
- *       {@code foliaAggregationMspt} mode ({@code max} default, or
- *       {@code mean}); the ring records that host scalar directly. Y-scale
- *       autoscales to {@code [0, max(observed, 50 ms)]} so an idle server
- *       doesn't zoom into noise but a spike clearly stands above the 50 ms
- *       budget line.</li>
- *   <li><strong>Series B: heap used (MB).</strong> Per-JVM scalar; no
- *       Folia aggregation. Y-scale autoscales to
- *       {@code [0, max(observed, heapMax)]}.</li>
- * </ul>
- *
- * <p>Both series share the same x-axis (sample index, oldest left, newest
- * right) and the same 128-slot history depth. With the default 1 Hz
- * sampler this is ~2 minutes of rolling history.
- *
- * <p>Global by design: {@code ChartSpec#regionName} is ignored. The
- * sampler reads from {@code RTP.metrics.snapshot()} which is already
- * platform-aware (Folia regions are aggregated upstream by the
- * {@code MetricsSnapshotRing#recordFromSnapshot} call).
- *
- * <p>S-005 clean (no chunk I/O), no blocking futures, no platform
- * imports.
+ * Produces a {@link DualSparkline} with MSPT and heap series sampled at 1 Hz (S-005).
  */
 public final class MetricSparklineResolver implements ChartSpecResolver {
 

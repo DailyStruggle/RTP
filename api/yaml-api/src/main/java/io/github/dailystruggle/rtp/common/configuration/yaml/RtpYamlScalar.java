@@ -5,15 +5,15 @@ package io.github.dailystruggle.rtp.common.configuration.yaml;
  *
  * <p>Supported quoting styles per ADR-025 §Migration:</p>
  * <ul>
- *   <li>{@link Style#PLAIN} — unquoted (e.g. {@code true}, {@code 42}, {@code sqlite}).</li>
- *   <li>{@link Style#SINGLE} — single-quoted (e.g. {@code 'foo'}). Escape is {@code ''}.</li>
- *   <li>{@link Style#DOUBLE} — double-quoted (e.g. {@code "foo"}). Backslash escapes honoured.</li>
+ *   <li>{@link Style#PLAIN} - unquoted (e.g. {@code true}, {@code 42}, {@code sqlite}).</li>
+ *   <li>{@link Style#SINGLE} - single-quoted (e.g. {@code 'foo'}). Escape is {@code ''}.</li>
+ *   <li>{@link Style#DOUBLE} - double-quoted (e.g. {@code "foo"}). Backslash escapes honoured.</li>
  * </ul>
  *
  * <p>The {@link #rawValue} field preserves the lexical form the scalar was
  * read with (without surrounding quotes for SINGLE/DOUBLE). The
  * {@link #style} field lets the writer re-emit the scalar using its
- * original quoting style — important for idempotent round-trip.</p>
+ * original quoting style - important for idempotent round-trip.</p>
  */
 public final class RtpYamlScalar extends RtpYamlNode {
 

@@ -20,22 +20,12 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 
 /**
- * Primary bridge between the platform-agnostic RTP core and the concrete server
- * implementation (Spigot, Paper, Folia).
+ * Primary bridge between platform-neutral RTP core and concrete server runtimes.
  *
- * <p>A single instance is stored in {@link io.github.dailystruggle.rtp.api.RTPAPI#serverAccessor}
- * and is set during plugin startup. The interface is the only point at which
- * platform-specific APIs (Bukkit scheduler, Paper async chunk loading, Folia region
- * threading) are touched, keeping all other modules platform-agnostic
- * (REQ-API-F-004, REQ-API-NF-002).
+ * <p>Single instance stored in {@link io.github.dailystruggle.rtp.api.RTPAPI#serverAccessor}.
+ * Only layer allowed to touch platform-specific APIs (REQ-API-F-004, REQ-API-NF-002).
  *
- * <p><b>Active-task registry:</b> {@link #activeTasks} is a shared, thread-safe map
- * of currently in-flight {@link TrackedRTPTask}s. Use {@link #registerAction(TrackedRTPTask)}
- * and {@link #removeAction(String)} to manage entries; use {@link #getTaskSnapshot()}
- * to read a consistent snapshot for display (e.g. {@code /rtp info}).
- *
- * <p><b>Thread safety:</b> All methods are safe to call from any thread unless
- * otherwise noted in the method Javadoc.
+ * <p>{@link #activeTasks} tracks active {@link TrackedRTPTask} instances thread-safely.
  */
 @PublicApi
 public interface RTPServerAccessor {
@@ -61,13 +51,9 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Returns a consistent snapshot of all currently active tasks, mapping each
-   * tracking ID to the number of milliseconds elapsed since the task was queued.
+   * Returns a snapshot of active tasks mapping tracking ID to elapsed queue age in ms.
    *
-   * <p>Intended for display only (e.g. {@code /rtp info}). The snapshot is taken
-   * atomically over the map but individual age values may be slightly stale.
-   *
-   * @return a new map of {@code trackingId -> ageMillis}; never {@code null}
+   * @return snapshot map of {@code trackingId -> ageMillis}; never {@code null}
    */
   default Map<String, Long> getTaskSnapshot() {
     ConcurrentHashMap<String, Long> snapshot = new ConcurrentHashMap<>();
@@ -101,15 +87,8 @@ public interface RTPServerAccessor {
   /**
    * Returns the coarse {@link PlatformFamily} this server belongs to.
    *
-   * <p>Prefer this over string-matching {@link #getPlatform()} when gating behaviour on the
-   * runtime: a family is derived from authoritative runtime detection rather than the
-   * self-reported brand, so renamed forks (Purpur, Pufferfish, Leaf, Folia forks, ...) resolve
-   * to their base family without a string allowlist.
-   *
-   * <p>The default implementation maps the canonical {@link #getPlatform()} vocabulary; platform
-   * adapters that already perform authoritative detection should override it. When the runtime
-   * cannot be classified the default returns {@link PlatformFamily#UNKNOWN} and logs it at
-   * {@link Level#WARNING} so the unrecognised platform is reportable.
+   * <p>Prefer over string-matching {@link #getPlatform()} for runtime gating.
+   * Default maps canonical platform strings; unrecognised platforms return UNKNOWN.
    *
    * @return the platform family; never {@code null}
    */
@@ -133,52 +112,31 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Returns the server's headline Minecraft version as a single integer - the second
-   * component of the version string.
+   * Returns the headline Minecraft version integer (e.g. 21 for 1.21.x, 26 for 26.x).
    *
-   * <p>Historically Minecraft used a {@code 1.MINOR.PATCH} scheme, so this value was the
-   * <em>minor</em> version (e.g. {@code 21} for MC 1.21.x). Under the newer year-based
-   * scheme (e.g. MC 26.x) the same component is effectively a <em>major</em> version
-   * ({@code 26} == year 26). Treat this number as an opaque, monotonically increasing
-   * comparator rather than assuming it is a "minor" version; the year-based values
-   * (>= 26) sort above the legacy {@code 1.x} values, so range comparisons stay correct
-   * across the scheme change.
+   * <p>Opaque monotonically increasing integer used for version range comparisons.
    *
-   * @return the integer server version; {@code null} if it cannot be determined
+   * @return the integer server version; {@code null} if undetermined
    */
   Integer getServerIntVersion();
 
   /**
    * Tests whether this server belongs to the given {@link PlatformFamily}.
    *
-   * <p>Convenience over comparing {@link #getPlatformFamily()} by hand. Addons should
-   * prefer this (and {@link #isCompatible(PlatformFamily, int, int)}) for gating
-   * platform-specific behaviour - including self-registration of platform-specific
-   * components - rather than string-matching {@link #getPlatform()} or introducing
-   * their own platform/version probes.
-   *
-   * @param family the family to test against; {@code null} always returns {@code false}
-   * @return {@code true} if this server's family equals {@code family}
+   * @param family the family to test against; {@code null} returns {@code false}
+   * @return {@code true} if server matches {@code family}
    */
   default boolean isPlatformFamily(PlatformFamily family) {
     return family != null && getPlatformFamily() == family;
   }
 
   /**
-   * Tests whether the server's integer Minecraft version (see {@link #getServerIntVersion()})
-   * is at least {@code minServerVersion}.
+   * Tests whether the integer Minecraft version is at least {@code minServerVersion}.
    *
-   * <p>{@code minServerVersion} is the same opaque integer scale as
-   * {@link #getServerIntVersion()}: {@code 21} for MC 1.21.x, {@code 26} for the year-based
-   * MC 26.x, and so on. It is deliberately not called a "minor" version because under the
-   * year-based scheme the value is effectively a major version.
+   * <p>Returns {@code false} if version is unknown (fails closed).
    *
-   * <p>When the version cannot be determined ({@link #getServerIntVersion()} returns
-   * {@code null}) this conservatively returns {@code false}: an unverifiable version is
-   * treated as "not known to satisfy the floor".
-   *
-   * @param minServerVersion the inclusive minimum server version
-   * @return {@code true} if the server version is known and {@code >= minServerVersion}
+   * @param minServerVersion inclusive minimum version
+   * @return {@code true} if server version is known and {@code >= minServerVersion}
    */
   default boolean isServerVersionAtLeast(int minServerVersion) {
     Integer v = getServerIntVersion();
@@ -186,17 +144,12 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Tests whether the server's integer Minecraft version (see {@link #getServerIntVersion()})
-   * is at most {@code maxServerVersion}.
+   * Tests whether the integer Minecraft version is at most {@code maxServerVersion}.
    *
-   * <p>{@code maxServerVersion} is on the same opaque integer scale as
-   * {@link #getServerIntVersion()} ({@code 21} for MC 1.21.x, {@code 26} for year-based
-   * MC 26.x); it is not a "minor" version under the year-based scheme.
+   * <p>Returns {@code false} if version is unknown (fails closed).
    *
-   * <p>When the version cannot be determined this conservatively returns {@code false}.
-   *
-   * @param maxServerVersion the inclusive maximum server version
-   * @return {@code true} if the server version is known and {@code <= maxServerVersion}
+   * @param maxServerVersion inclusive maximum version
+   * @return {@code true} if server version is known and {@code <= maxServerVersion}
    */
   default boolean isServerVersionAtMost(int maxServerVersion) {
     Integer v = getServerIntVersion();
@@ -204,34 +157,14 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Single-call platform-and-version compatibility gate, intended for addons that must
-   * decide whether to register a platform-specific component (e.g. a menu renderer, an
-   * effect, a claim verifier) on the current runtime.
+   * Platform-and-version compatibility gate for addons.
    *
-   * <p>The check passes only when both hold:
+   * <p>Returns {@code true} if family matches and version falls in bounds.
    *
-   * <ul>
-   *   <li>the runtime is the {@code requiredFamily} (skipped when {@code requiredFamily}
-   *       is {@code null} - i.e. "any platform"), and</li>
-   *   <li>the server's integer version (see {@link #getServerIntVersion()}) is within the
-   *       inclusive {@code [minServerVersion, maxServerVersion]} range. A version bound is
-   *       only enforced when it is meaningful ({@code minServerVersion > 0} or
-   *       {@code maxServerVersion < Integer.MAX_VALUE}); a meaningful version bound against
-   *       an undeterminable version ({@link #getServerIntVersion()} {@code == null}) fails
-   *       closed.</li>
-   * </ul>
-   *
-   * <p>{@code minServerVersion} / {@code maxServerVersion} are on the same opaque integer
-   * scale as {@link #getServerIntVersion()} ({@code 21} == MC 1.21.x, {@code 26} == the
-   * year-based MC 26.x); they are not "minor" versions under the year-based scheme.
-   *
-   * <p>Pass {@code 0} for {@code minServerVersion} and {@link Integer#MAX_VALUE} for
-   * {@code maxServerVersion} to gate on platform alone.
-   *
-   * @param requiredFamily the required family, or {@code null} for any platform
-   * @param minServerVersion inclusive minimum server version ({@code 0} for no floor)
-   * @param maxServerVersion inclusive maximum server version ({@link Integer#MAX_VALUE} for no ceiling)
-   * @return {@code true} if the runtime satisfies both the platform and version constraints
+   * @param requiredFamily   required family, or {@code null} for any
+   * @param minServerVersion inclusive minimum ({@code 0} for no floor)
+   * @param maxServerVersion inclusive maximum ({@link Integer#MAX_VALUE} for no ceiling)
+   * @return {@code true} if runtime satisfies constraints
    */
   default boolean isCompatible(PlatformFamily requiredFamily, int minServerVersion, int maxServerVersion) {
     if (requiredFamily != null && getPlatformFamily() != requiredFamily) {
@@ -289,18 +222,9 @@ public interface RTPServerAccessor {
   RTPPlayer getPlayer(String name);
 
   /**
-   * Returns the names of all currently online players, used by the {@code /rtp}
-   * {@code player} (target-player) parameter to surface tab-completion without
-   * leaking platform-specific online-player enumeration into {@code rtp-core}.
+   * Returns names of online players for tab completion without platform coupling.
    *
-   * <p>The default returns an empty set; platforms that drive the
-   * platform-neutral command root ({@code CoreRtpRoot} on Fabric / NeoForge)
-   * shall override to surface their live online-player snapshot. Platforms that
-   * author their own root with platform-native enumeration (e.g. the Bukkit
-   * family) need not override.</p>
-   *
-   * @return an immutable snapshot of online player names; never {@code null},
-   *     may be empty
+   * @return immutable snapshot of online player names; never {@code null}
    */
   default Set<String> getOnlinePlayerNames() {
     return java.util.Collections.emptySet();
@@ -326,30 +250,18 @@ public interface RTPServerAccessor {
   RTPCommandSender getSender(UUID uuid);
 
   /**
-   * Returns the platform's {@link PlayerLifecycleHook}, used by platform-agnostic
-   * subsystems (e.g. network-mode bootstrap) to subscribe to player join / quit
-   * without importing platform-specific event types.
+   * Returns the platform {@link PlayerLifecycleHook} (ADR-049).
    *
-   * <p>The default returns {@link NoopPlayerLifecycleHook#INSTANCE}; platforms
-   * that deliver join / quit events (Bukkit, Fabric) shall override.
-   *
-   * <p>Introduced by ADR-049.
-   *
-   * @return the platform's lifecycle hook; never {@code null}
-   * @since 3.0.0-beta.4
+   * @return the platform lifecycle hook; never {@code null}
    */
   default PlayerLifecycleHook getPlayerLifecycleHook() {
     return NoopPlayerLifecycleHook.INSTANCE;
   }
 
   /**
-   * Returns the number of milliseconds the current server tick has exceeded its
-   * 50 ms budget (i.e. how late the tick is).
+   * Returns milliseconds current tick has exceeded its 50ms budget.
    *
-   * <p>Used by the scheduling subsystem to defer expensive work when the server
-   * is already overloaded, preventing additional tick stalls.
-   *
-   * @return over-time in milliseconds; {@code 0} if the tick is on time
+   * @return over-time in ms; 0 if on time
    */
   long overTime();
 
@@ -361,14 +273,11 @@ public interface RTPServerAccessor {
   File getPluginDirectory();
 
   /**
-   * Sends the configured message for {@code msgType} to the player identified by
-   * {@code target}, optionally tagging the message with {@code tag} for
-   * placeholder resolution.
+   * Sends configured message to a player with optional context tag.
    *
-   * @param target  UUID of the recipient player; must not be {@code null}
-   * @param msgType the message key; must not be {@code null}
-   * @param tag     an optional context tag passed to placeholder handlers;
-   *                {@code null} means no tag
+   * @param target  UUID of recipient player; must not be {@code null}
+   * @param msgType message key; must not be {@code null}
+   * @param tag     optional placeholder context tag
    */
   void sendMessage(UUID target, Enum<?> msgType, String tag);
 
@@ -377,13 +286,12 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Sends the configured message for {@code msgType} to two recipients, typically
-   * the teleport initiator and the teleported player when they differ.
+   * Sends configured message to two recipients (e.g. sender and target).
    *
-   * @param target1 UUID of the first recipient; must not be {@code null}
-   * @param target2 UUID of the second recipient; must not be {@code null}
-   * @param msgType the message key; must not be {@code null}
-   * @param tag     optional context tag; {@code null} means no tag
+   * @param target1 UUID of first recipient; must not be {@code null}
+   * @param target2 UUID of second recipient; must not be {@code null}
+   * @param msgType message key; must not be {@code null}
+   * @param tag     optional placeholder context tag
    */
   void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag);
 
@@ -415,13 +323,12 @@ public interface RTPServerAccessor {
   void sendMessageAndSuggest(UUID target, String message, String suggestion);
 
   /**
-   * Sends a message from one player's perspective to another, allowing
-   * placeholder resolution relative to both the sender and the target.
+   * Sends message from sender perspective to target for relative placeholder context.
    *
-   * @param sender  UUID of the sender (used for placeholder context); must not be {@code null}
-   * @param target  UUID of the display recipient; must not be {@code null}
-   * @param message the fully-resolved message text; must not be {@code null}
-   * @param tag     optional context tag; {@code null} means no tag
+   * @param sender  UUID of sender for placeholder context; must not be {@code null}
+   * @param target  UUID of display recipient; must not be {@code null}
+   * @param message resolved message text; must not be {@code null}
+   * @param tag     optional context tag
    */
   void sendMessage(UUID sender, UUID target, String message, String tag);
 
@@ -430,8 +337,7 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Sends a rich-text message to a command sender with optional hover and click
-   * components (e.g. for the {@code /rtp info} region list).
+   * Sends rich-text message with optional hover and click actions.
    *
    * @param target  the recipient; must not be {@code null}
    * @param message the display text; must not be {@code null}
@@ -446,21 +352,7 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Sends a rich-text message to a command sender whose click action
-   * <strong>auto-dispatches</strong> the supplied command (Adventure
-   * {@code ClickEvent.RUN_COMMAND} on Bukkit-family platforms, the
-   * intermediary / mojmap {@code runCommand} click action on Fabric).
-   *
-   * <p>Distinct from {@link #sendMessage(RTPCommandSender, String, String,
-   * String, String)}, which uses {@code SUGGEST_COMMAND} (pre-fills the
-   * chat input box). Use this overload for menu fragment clicks (per
-   * ADR-050: every menu click carries a literal {@code /rtp menu ...}
-   * command and must auto-dispatch on click).
-   *
-   * <p>Default implementation falls back to {@link #sendMessage(RTPCommandSender,
-   * String, String, String, String)} so out-of-tree {@link RTPServerAccessor}
-   * subclasses keep compiling; production platforms (Bukkit, Folia, Fabric)
-   * override this method to emit a {@code RUN_COMMAND} click.
+   * Sends rich-text message with auto-dispatching click action (ADR-050).
    *
    * @param target     the recipient; must not be {@code null}
    * @param message    the display text; must not be {@code null}
@@ -479,11 +371,9 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Applies colour codes and registered placeholder replacements to {@code text}
-   * in the context of the given player.
+   * Applies colour codes and placeholders in player context.
    *
-   * @param player the player whose context is used for placeholder resolution;
-   *               {@code null} for console/server context
+   * @param player player UUID for placeholders or {@code null} for console
    * @param text   the raw text to format; must not be {@code null}
    * @return the formatted string; never {@code null}
    */
@@ -545,45 +435,27 @@ public interface RTPServerAccessor {
   Set<String> getBiomes();
 
   /**
-   * ADR-062 Phase 3 - classifies how cheaply the platform can answer "what
-   * biome is at (x, z)?" for an arbitrary, not-yet-recorded coordinate in the
-   * given world. See {@link BiomeSampleCapability}.
+   * Classifies coordinate biome sampling cost for the world (ADR-062).
    *
-   * <p>The default implementation returns {@link BiomeSampleCapability#GENERATE_REQUIRED},
-   * the conservative worst case: it assumes nothing about the world's biome
-   * source, so {@code rtp-core} treats unrecorded area as reachable only via
-   * bounded chunk-generating exploration. Platform adapters that can detect a
-   * deterministic noise biome source (vanilla and equivalents) override this to
-   * return {@link BiomeSampleCapability#NOISE_SAMPLABLE}, and adapters that can
-   * read already-generated chunks but not noise-sample return
-   * {@link BiomeSampleCapability#ANVIL_ONLY}.
+   * <p>Default returns GENERATE_REQUIRED.
    *
-   * @param rtpWorld the world to classify; must not be {@code null}
-   * @return the sampling capability for {@code rtpWorld}; never {@code null}
+   * @param rtpWorld world to classify; never {@code null}
+   * @return sampling capability; never {@code null}
    */
   default BiomeSampleCapability biomeSampleCapability(RTPWorld<?> rtpWorld) {
     return BiomeSampleCapability.GENERATE_REQUIRED;
   }
 
   /**
-   * ADR-062 Phase 3 - best-effort biome name at a coordinate, used by
-   * registry-aware gray-space steering to confirm an exploratory candidate's
-   * biome without committing a teleport. Only the cheap, non-blocking tiers are
-   * expected to answer here: an adapter that classifies the world as
-   * {@link BiomeSampleCapability#NOISE_SAMPLABLE} may return a deterministic
-   * noise-source sample; all other capabilities, and any case that would
-   * require a synchronous chunk load (S-005), shall return {@code null} so the
-   * caller falls back to the downstream pipeline biome verification.
+   * Best-effort non-blocking biome sampling at coordinates (ADR-062).
    *
-   * <p>The default implementation returns {@code null} (no cheap sample
-   * available).
+   * <p>Returns null if cheap sampling is unavailable without chunk I/O (S-005).
    *
-   * @param rtpWorld the world to sample; must not be {@code null}
+   * @param rtpWorld world to sample; never {@code null}
    * @param x block x
    * @param y block y
    * @param z block z
-   * @return the upper-cased biome name at the coordinate, or {@code null} if no
-   *     cheap, non-blocking sample is available
+   * @return uppercase biome name or {@code null}
    */
   default @Nullable String sampleBiome(RTPWorld<?> rtpWorld, int x, int y, int z) {
     return null;
@@ -609,31 +481,12 @@ public interface RTPServerAccessor {
   Set<String> materials();
 
   /**
-   * Returns an immutable snapshot of the platform's live block-tag registry,
-   * keyed by the lowercase {@code namespace:path} tag identifier (no leading
-   * {@code #}), matching the parsed form of a {@code SafetyToken} with
-   * {@code Kind.TAG}. Values are immutable {@link Set}s of upper-case material
-   * names in the platform's canonical format (e.g. {@code "OAK_LEAVES"}).
+   * Returns immutable snapshot of live block tags for safety parsing (ADR-017).
    *
-   * <p>The snapshot is consumed by the ADR-017 safety-token compiler
-   * ({@code SafetyCompilationCache}) to expand tag tokens into their constituent
-   * material names at compile time. Implementations shall return a <b>stable
-   * reference</b> between reloads — i.e. the map is rebuilt only when
-   * {@link #rebuildBlockTagSnapshot()} is invoked — so that downstream caches
-   * may key on {@link System#identityHashCode(Object)} to detect invalidation.
+   * <p>Keyed by lowercase namespace:path. Values are sets of uppercase material names.
+   * Reference remains stable between reloads.
    *
-   * <p>The default implementation returns {@link java.util.Collections#emptyMap()},
-   * which is the correct behaviour for platforms without a tag registry and for
-   * test accessors that do not need to exercise the tag path. Bukkit-family
-   * platforms override this to expose {@code Bukkit.getTags(Tag.REGISTRY_BLOCKS, …)}.
-   * Fabric and other non-Bukkit platforms may delegate to the standalone
-   * {@code rtp-tags} disk resolver.
-   *
-   * <p><b>Thread safety:</b> the returned map and all value sets shall be
-   * immutable. Callers shall treat them as read-only and shall not rely on
-   * reference equality across rebuilds.
-   *
-   * @return immutable {@code tagToken -> materialNames} map; never {@code null}.
+   * @return immutable tag map; never {@code null}
    */
   default Map<String, Set<String>> blockTagSnapshot() {
     return java.util.Collections.emptyMap();
@@ -794,29 +647,12 @@ public interface RTPServerAccessor {
 
   // ---------------------------------------------------------------------------
   // Progress-bar surface (platform-neutral on-screen progress feedback)
-  //
-  // Used by long-running operations (e.g. world scans) to surface progress to
-  // players without coupling the core / neutral adapters to any platform UI
-  // type (Bukkit {@code BossBar}, action bar, etc.). The default
-  // implementations are no-ops so platforms with no progress-bar surface
-  // (or pre-init callers) degrade gracefully.
   // ---------------------------------------------------------------------------
 
   /**
-   * Shows or updates a set of progress bars, keyed by a stable, caller-chosen id.
+   * Shows or reconciles progress bars keyed by stable id.
    *
-   * <p>Each call reconciles the displayed bars against {@code bars}: ids present in the map
-   * are created or updated, and any bar previously shown via this method whose id is absent
-   * from {@code bars} is hidden and discarded. Passing an empty map hides every bar (the same
-   * effect as {@link #clearProgressBars()}).
-   *
-   * <p>Each {@link ProgressBar} carries its title (which may contain legacy/hex color codes),
-   * its fill fraction, and the permission a viewer must hold. The platform implementation owns
-   * all rendering decisions (color extraction, title sanitising, per-viewer visibility).
-   *
-   * <p><b>Threading:</b> implementations may require this to be called on the primary thread.
-   *
-   * @param bars desired bar state keyed by stable id; must not be {@code null}
+   * @param bars bar states by id; never {@code null}
    */
   default void updateProgressBars(Map<String, ProgressBar> bars) {}
 
@@ -836,17 +672,10 @@ public interface RTPServerAccessor {
   // ---------------------------------------------------------------------------
 
   /**
-   * Returns a permission probe scoped to the given player. The probe answers
-   * {@code hasPermission(node)} for menu-visibility filtering. Implementations
-   * should respect the same resolution as {@link RTPCommandSender#hasPermission(String)}.
+   * Returns permission probe for menu visibility filtering (ADR-048).
    *
-   * <p>The default delegates to {@code getSender(player).hasPermission(node)};
-   * if the sender is unresolved (offline / unknown), the returned probe
-   * returns {@code false} for every node.
-   *
-   * @param player the player UUID; the probe is bound to this player's view
-   * @return a non-null predicate; never throws
-   * @see <a href="../../../../../../../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md">ADR-048</a>
+   * @param player player UUID
+   * @return non-null permission predicate
    */
   default Predicate<String> menuPermissionProbe(UUID player) {
     return node -> {
@@ -863,14 +692,10 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Returns the set of effective permissions granted to {@code player} for
-   * the menu-relevant {@code rtp.*} namespaces (effects, on-event, numeric
-   * tails where enumerable). Default delegates to
-   * {@link RTPCommandSender#getEffectivePermissions()}.
+   * Returns effective permissions snapshot for menu namespaces (ADR-048).
    *
-   * @param player the player UUID
-   * @return an immutable-style snapshot; empty if unresolved
-   * @see <a href="../../../../../../../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md">ADR-048</a>
+   * @param player player UUID
+   * @return permission set; empty if unresolved
    */
   default Set<String> menuEffectivePermissions(UUID player) {
     if (player == null) {
@@ -889,31 +714,20 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Returns the BCP-47-like locale tag the menu should render in for the
-   * given player (e.g. {@code "en_us"}, {@code "es_es"}). Default returns
-   * the server's configured default locale, currently {@code "en_us"}.
+   * Returns BCP-47 locale tag for menu rendering (ADR-048).
    *
-   * @param player the player UUID
-   * @return a non-null locale tag
-   * @see <a href="../../../../../../../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md">ADR-048</a>
+   * @param player player UUID
+   * @return locale tag; defaults to "en_us"
    */
   default String menuLocale(UUID player) {
     return "en_us";
   }
 
   /**
-   * Returns a short descriptor for the player's current region / world,
-   * suitable for the "you are here" line in {@code FrontPageBuilder}.
+   * Returns descriptor for player's current region/world (ADR-048).
    *
-   * <p>On a single-server backend this is typically the world name; on a
-   * network-mode backend (ADR-036) where the player is routed to a different
-   * backend, the implementation may return an empty string. Default returns
-   * an empty string so that builders gracefully omit the descriptor when no
-   * platform override is installed.
-   *
-   * @param player the player UUID
-   * @return a non-null descriptor; empty string if unknown
-   * @see <a href="../../../../../../../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md">ADR-048</a>
+   * @param player player UUID
+   * @return region descriptor; empty string if unknown
    */
   default String menuRegionDescriptor(UUID player) {
     return "";

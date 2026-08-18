@@ -12,8 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * the binding's plumbing (sentinel propagation, supplier delegation) without
  * standing up MockBukkit. The Bukkit-bound production constructor is exercised
  * indirectly by the platform smoke tests and at runtime.
- *
- * <p>Phase M1 traceability: {@code METRICS_PLAN.md} → "PaperMetricsBinding".
  */
 class PaperMetricsBindingTest {
 

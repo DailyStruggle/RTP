@@ -18,15 +18,8 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /**
- * Ellipse shape for region selection.
- *
- * <p>Carries a second axis radius ({@link EllipseMemoryShapeParams#radius2});
- * the bounding circle and selection math use the wider of {@code radius} and
- * {@code radius2}. Other selection mechanics mirror {@link Circle}'s
- * Archimedean-spiral 1D mapping, but the type is parameterised over
- * {@link EllipseMemoryShapeParams} rather than {@code GenericMemoryShapeParams}
- * so single-radius shapes (Circle, Square) are not burdened with a meaningless
- * {@code radius2} default.
+ * Ellipse shape for region selection using two-axis radii and Archimedean-spiral 1D mapping (ADR-001).
+ * Parameterised over {@link EllipseMemoryShapeParams} with effective radius as {@code max(radius, radius2)}.
  */
 public class Ellipse extends MemoryShape<EllipseMemoryShapeParams> {
   /** Default parameters for Ellipse. */

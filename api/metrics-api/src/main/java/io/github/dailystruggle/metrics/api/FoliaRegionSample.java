@@ -9,8 +9,7 @@ package io.github.dailystruggle.metrics.api;
  * the underlying per-region detail for verbose surfaces and operator diagnostics.
  *
  * <p>The {@link #regionId} is an opaque, stable-per-server-lifetime identifier
- * (e.g. {@code region-0}, {@code region-1}). Per
- * {@code METRICS_PLAN.md > regionQueueStatus redaction in network mode} this id does not
+ * (e.g. {@code region-0}, {@code region-1}). Under network mode redaction this id does not
  * leak human-readable region names across the wire.
  *
  * <p>Non-Folia bindings populate {@link MetricsSnapshot#foliaRegions} with an empty list

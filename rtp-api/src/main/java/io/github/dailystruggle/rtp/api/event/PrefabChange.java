@@ -5,16 +5,9 @@ import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 /**
  * A single config-key change carried by a {@link PrefabAppliedEvent}.
  *
- * <p>This is the stable, {@code rtp-api}-side view of an internal core change
- * record; it intentionally exposes only the dot-delimited key path and the
- * before/after values so that addons can react to a prefab apply without
- * depending on {@code rtp-core} internals.
- *
- * @param keyPath  dot-delimited key path from the file root (e.g.
- *                 {@code "queue.maxSize"}); never {@code null}.
- * @param oldValue the previous value, or {@code null} if the key was absent.
- * @param newValue the new value after the overlay was merged in.
- *
+ * @param keyPath  dot-delimited key path from file root (e.g. {@code "queue.maxSize"}); non-null
+ * @param oldValue previous value, or {@code null} if absent
+ * @param newValue new value after overlay merge
  * @since 3.1.4
  */
 @PublicApi

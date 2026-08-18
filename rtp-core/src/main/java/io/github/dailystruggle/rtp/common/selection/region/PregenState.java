@@ -47,42 +47,21 @@ final class PregenState {
     final boolean biomeRecall;
     final boolean biomeRecallForced;
     /**
-     * ADR-062 biome-probability weighting. When {@code true} and biome steering is
-     * active (biomeRecall, non-default biomes), the recall draw selects a target
-     * biome with equal probability among those present in spatial memory rather
-     * than uniformly over all recorded runs. This counteracts the run-count
-     * dominance of common biomes so rare requested biomes are steered toward
-     * instead of being drowned out. The draw stays bounded (a weighted pick over
-     * a finite, pre-mapped, Anvil-sourced set; no unbounded reroll).
+     * ADR-062 biome-probability weighting. When {@code true} and biome steering is active,
+     * selects target biomes proportionally or with equal probability across spatial memory.
      */
     final boolean biomeWeighted;
     /**
-     * ADR-062 Phase 2 per-biome selection weights. Maps an upper-cased biome
-     * name to a non-negative relative weight; biomes absent from the map use a
-     * weight of {@code 1.0}. Consulted only when {@link #biomeWeighted} is
-     * {@code true} and at least one entry is present: the weighted recall draw
-     * then picks a target biome in proportion to these weights rather than with
-     * equal probability (the all-equal degenerate case is Phase 1). Empty when
-     * unconfigured, which reproduces the Phase 1 equal-probability draw.
+     * ADR-062 per-biome relative weights. Maps upper-cased biome name to non-negative weight (default 1.0).
      */
     final Map<String, Double> biomeWeights;
     /**
-     * ADR-062 Phase 3 - the world's full biome registry (upper-cased names plus
-     * their {@code minecraft:<lower>} namespaced forms), resolved once per
-     * invocation via {@link RTPServerAccessor#getBiomes(RTPWorld)}. A requested
-     * biome present in this registry but absent from recall memory is treated as
-     * reachable "gray space" (steerable via bounded spiral exploration) rather
-     * than implicitly weight {@code 0}; a requested biome absent from the
-     * registry is a true {@code 0} (the world genuinely cannot produce it).
-     * Empty when the platform reports no registry, in which case gray-space
-     * gating treats every requested biome as registered (no pruning).
+     * ADR-062: full biome registry (upper-cased and namespaced names) from {@link RTPServerAccessor#getBiomes(RTPWorld)}.
+     * Distinguishes reachable gray-space biomes from impossible biomes.
      */
     final Set<String> worldBiomeRegistry;
     /**
-     * ADR-062 Phase 3 - per-world classification of how cheaply the platform can
-     * sample the biome at an arbitrary coordinate. Resolved once per invocation;
-     * consulted by the gray-space steering decision and reserved for the future
-     * noise-sample pre-filter (Future Work in ADR-062).
+     * ADR-062: per-world biome sampling capability for coordinate-level biome probes.
      */
     final io.github.dailystruggle.rtp.api.world.BiomeSampleCapability biomeSampleCapability;
     final long resolution;
@@ -93,32 +72,14 @@ final class PregenState {
     long maxAttempts;
     long worldBorderFails = 0L;
     /**
-     * Absolute ceiling on how large {@link #maxAttempts} may grow via
-     * "free-retry" bumps (biome reject, worldborder miss, prefilter reject,
-     * stale-chunk retry, etc.). Without this ceiling, a configuration that can
-     * never satisfy the biome filter (e.g. MockRTPWorld + an impossible biome)
-     * would bump {@code maxAttempts} on every attempt and never exhaust.
-     * <p>Set to {@code maxAttemptsBase * 100} — the historical multiplier that
-     * was previously expressed as {@code Region.maxBiomeChecksPerGen}; that
-     * knob was retired in PR-3a of the biome-lookup performance plan but the
-     * bound it enforced is still structurally required.</p>
+     * Ceiling on {@link #maxAttempts} growth from free retries (bounded at {@code maxAttemptsBase * 100}).
      */
     final long maxAttemptsCeiling;
 
     final Map<LocationGenerator.FailTypes, Map<String, Long>> failMap;
     final List<Map.Entry<Long, Long>> selections = new ArrayList<>();
     /**
-     * Per-attempt outcome breadcrumb trail. One entry per call to
-     * {@code runAttempt()} that produced any outcome — rejection, success, or
-     * exhausted-guard trip. Added opportunistically from every {@code reschedule}
-     * and {@code completeSuccess} site in {@code PregenTask} so a failing log
-     * always reveals which code path fired, even if the {@link #failMap}
-     * bucketing is ambiguous (or, historically, corrupted by concurrent
-     * non-synchronised {@link HashMap#compute} calls).
-     * <p>Not thread-safe — relies on the {@code PregenTask} serialisation
-     * contract (one attempt resolves before the next enters {@code runAttempt}).
-     * If that contract is violated, {@link java.util.ConcurrentModificationException}
-     * is preferable to silent bucket loss.</p>
+     * Per-attempt outcome breadcrumb trail recorded across {@code PregenTask} attempt lifecycle.
      */
     final List<String> attemptOutcomes = new ArrayList<>();
 
@@ -268,8 +229,8 @@ final class PregenState {
                 RTP.configs.getConfigValue(BiomesKeys.biomeWeighted, false).toString());
         Map<String, Double> biomeWeights = parseBiomeWeights(biomes);
 
-        // ADR-062 Phase 3: resolve the world's biome registry and sampling
-        // capability once per invocation (like the weights above). Both feed the
+        // ADR-062: resolve the world's biome registry and sampling capability
+        // once per invocation (like the weights above). Both feed the
         // gray-space steering decision in PregenTask; the registry lets a
         // registered-but-unrecorded requested biome stay reachable instead of
         // being implicitly weight 0.
@@ -323,10 +284,10 @@ final class PregenState {
 
     /**
      * Parse the {@code biomes.yml#biomeWeights} map into an upper-cased,
-     * non-negative weight table (ADR-062 Phase 2). Non-numeric or negative
-     * values are dropped (negative weights are meaningless for a probability
-     * draw); a malformed or absent map yields an empty table, which the draw
-     * treats as "all biomes equal" (Phase 1 behavior).
+     * non-negative weight table (ADR-062). Non-numeric or negative values are
+     * dropped (negative weights are meaningless for a probability draw); a
+     * malformed or absent map yields an empty table, which the draw treats as
+     * "all biomes equal".
      */
     private static Map<String, Double> parseBiomeWeights(ConfigParser<BiomesKeys> biomes) {
         Map<String, Double> result = new HashMap<>();

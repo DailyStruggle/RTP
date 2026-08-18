@@ -14,45 +14,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Platform-neutral chat renderer for {@link MenuModel} (ADR-035, ADR-050,
- * rtp-fabric-ADR-012). Walks the model and emits one chat line per
- * {@link MenuLine}, dispatching clickable fragments via
- * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#sendMessageWithRunCommand
- * sendMessageWithRunCommand} so each click auto-fires its literal
- * {@code /rtp menu ...} command.
- *
- * <p><b>Page handling.</b> Unlike the Adventure book renderer (which opens an
- * interactive multi-page widget), chat has no native paging surface; the
- * renderer therefore emits every page sequentially with a thin page-header
- * line between pages. Players use the chat scrollback to review earlier
- * pages, and the {@code [prev]}/{@code [next]} pagination fragments (when
- * present in the model) still emit concrete {@code /rtp menu page n=<n>}
- * clicks for operators who prefer re-rendering at a specific page.
- *
- * <p><b>Renderer-only variants.</b>
- * <ul>
- *   <li>{@link MenuAction.ChangePage} - emitted as a literal
- *       {@code /rtp menu page n=<1-indexed>} click via
- *       {@link MenuActionToCommand#changePageCommand}.</li>
- *   <li>{@link MenuAction.SuggestInput} - chat has no SUGGEST-without-RUN
- *       click in the {@code sendMessageWithRunCommand} surface, so the
- *       fragment degrades to plain text. Listed under ADR-012 §"Negative"
- *       trade-offs.</li>
- *   <li>{@link MenuAction.OpenExternalUrl} - same degradation; chat-channel
- *       URL clicks are out of scope for this phase.</li>
- * </ul>
- *
- * <p><b>Permission-filtered visibility.</b> The renderer does not duplicate
- * the {@code MenuRedeemSubcommand} permission probe. The producers already
- * call the probe at model-build time (via {@code MenuPlatformBindings.permissionProbe})
- * and omit rows the viewer cannot access. Clicking a stale row a producer
- * <em>did</em> emit still hits the leaf's permission gate server-side - the
- * concrete-command security boundary per ADR-050.
- *
- * <p><b>Color contrast.</b> Chat renders against the chat-channel background
- * (terminal-styled, dark on most clients), so the AGENTS.md "Book Menu Color
- * Contrast" rule does NOT apply here - the chat renderer may use the full
- * color palette including {@code &e}/{@code &f}/{@code &6}.
+ * Platform-neutral chat renderer for {@link MenuModel} (ADR-035, ADR-050).
+ * Emits chat lines for {@link MenuLine}s and sends clickable run-commands for interactive fragments.
  */
 public final class ChatMenuRenderer implements MenuRenderer {
 

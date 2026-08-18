@@ -11,30 +11,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Central, platform-agnostic decision point for the optional PvP / combat-tag
- * pre-flight gate (ROADMAP Tier 2).
- *
- * <p>Two consumers call into this class:
- * <ul>
- *   <li>the {@code /rtp} pre-dispatch surface (command handlers), <i>before</i>
- *       enrolling the player in any queue;</li>
- *   <li>the teleport pipeline, immediately <i>before</i> applying the chosen
- *       destination (the "prefilter the rtp execution too" requirement).</li>
- * </ul>
- *
- * <p>The "in combat?" question is answered by the active authority, mirroring the
- * biome/anvil pre-filter replacement pattern:
- * <ul>
- *   <li>an external {@link PvPCombatStateRegistry.Provider} bound via
- *       {@code RTPAPI.hooks().pvpCombatState().bind(...)} (a combat-tag plugin), or</li>
- *   <li>RTP's {@link NativePvPCombatTracker} fallback, fed by per-platform damage
- *       listeners.</li>
- * </ul>
- * The {@code safety.yml#pvpSource} knob selects {@code AUTO} / {@code NATIVE} /
- * {@code EXTERNAL}.
- *
- * <p>This class holds the singleton native tracker so platform damage listeners
- * can stamp combat state through {@link #nativeTracker()}.
+ * Platform-agnostic decision point for the PvP / combat-tag pre-flight gate.
  */
 public final class PvPGate {
 

@@ -34,15 +34,7 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 
 /**
- * Package-private worker that holds the lifted L210-731 menu-wiring
- * block from the pre-2026-05-24 {@code RTPCmdBukkit} constructor.
- * Split out of {@link MenuWiringSupport} so the public facade stays small
- * and the implementation can carry per-call mutable locals (token
- * registry, builders, etc.) as instance state.
- *
- * <p>Behaviour is intended to be byte-identical to the pre-lift code.
- * Any deliberate behavioural change must update both this class and the
- * relevant tests.
+ * Worker class that instantiates and wires menu subcommands and page builders.
  */
 final class MenuWiringSupportInstaller {
 
@@ -59,25 +51,14 @@ final class MenuWiringSupportInstaller {
     }
 
     void install() {
-        // /rtp menu — generalized menu subcommand (ADR-035 / ADR-044).
-        // The page builder reflects the live /rtp tree via CommandTreeMenuBuilder
-        // (filtered by the viewer's permissions, so inaccessible rows are hidden,
-        // not greyed). If no renderer can be constructed the subcommand stays
-        // registered and rejects with the configurable `menuInvalid` message so
-        // /rtp menu is at least *recognised* on every platform
-        // (REQ-RTP-S-007 / F-013).
-        //
-        // ADR-050 Stage 3β.D.2b (2026-05-24): builders are no-arg now; the
-        // renderer emits concrete /rtp menu ... commands directly.
+        // Generalized /rtp menu subcommand (ADR-035 / ADR-044, REQ-RTP-S-007 / REQ-RTP-F-013).
+        // Reflects live /rtp tree via CommandTreeMenuBuilder, filtered by viewer permissions.
         final FrontPageBuilder frontPageBuilder = new FrontPageBuilder();
         final AdminPanelBuilder adminPanelBuilder = new AdminPanelBuilder();
 
         final MenuRedeemSubcommand.MenuPageBuilder menuPageBuilder =
                 (node, open, assembledPath) -> {
-                    // Stage B: the root /rtp menu page is the curated front page, not
-                    // the flat reflector. Any descended node (assembledPath non-empty)
-                    // or any node that isn't this command root falls through to the
-                    // existing CommandTreeMenuBuilder reflector.
+                    // Root /rtp menu page uses FrontPageBuilder; sub-paths reflect via CommandTreeMenuBuilder.
                     if (node == rtpRoot && assembledPath.isEmpty()) {
                         return frontPageBuilder.build(
                                 node, open.viewer(), menuPermissionProbe.apply(open.viewer()));
@@ -91,14 +72,7 @@ final class MenuWiringSupportInstaller {
                                     assembledPath);
                 };
 
-        // Stage A.2: wire the param-picker builder so OpenParamPicker redeems
-        // resolve to a value-picker sub-page (see dispatchOpenParamPicker).
-        // The curated destination selectors (region / world / biome / prefab)
-        // no longer flow through here - they are dedicated /rtp menu
-        // world|region|biome|prefab leaves that render via SelectionMenuBuilder
-        // (see MenuConcreteCommandLeavesB + MenuRedeemSubcommand#dispatchSelectionMenu).
-        // This generic picker remains for command-navigation, config-key, and
-        // shape/vert sub-parameter pages.
+        // Generic parameter picker for command navigation, config keys, and shape/vert sub-parameters.
         final MenuRedeemSubcommand.MenuParamPickerBuilder menuParamPickerBuilder =
                 (parent, viewer, parentPath, paramName) ->
                         new CommandTreeMenuBuilder()
@@ -119,7 +93,7 @@ final class MenuWiringSupportInstaller {
         final MenuRedeemSubcommand.MenuConfigSearchBuilder configSearchBuilder =
                 buildConfigSearchBuilder();
 
-        // PROPOSAL-info-as-book.md section 4.6 — curated /rtp info book builder.
+        // Curated /rtp info book builder.
         final InfoBookBuilder infoBookBuilderImpl = new InfoBookBuilder();
         final MenuRedeemSubcommand.MenuInfoBookBuilder infoBookBuilder =
                 (UUID viewer, MenuAction.InfoScopeToken scope) ->
@@ -140,12 +114,11 @@ final class MenuWiringSupportInstaller {
 
         // Staging-cart wiring: bind the anvil opener's cart sink to this redeem
         // instance so STAGE-mode anvil confirms push into the per-player cart
-        // on this backend (CHECKLIST-config-staging-cart.md).
+        // on this backend.
         if (anvilOpener != null) {
             anvilOpener.setCartSink(menuRedeem.cartSink());
         }
-        // CHECKLIST-multiconfig-menu step 12: wire the MultiConfigMenuBuilder
-        // and register the two default removal guards.
+        // Wire the MultiConfigMenuBuilder and register the two default removal guards.
         final MultiConfigMenuBuilder multiConfigBuilder =
                 new MultiConfigMenuBuilder();
         multiConfigBuilder.setCommandTreeMenuBuilder(
@@ -161,9 +134,8 @@ final class MenuWiringSupportInstaller {
     // ---- Builder factories (extracted purely for readability) -------------
 
     private MenuRedeemSubcommand.MenuConfigSubtreeBuilder buildConfigSubtreeBuilder() {
-        // PROPOSAL-config-view-as-book v3.7 — wire the production config-subtree
-        // builder so OpenConfigSelector / OpenConfigFile tokens redeem to the
-        // curated book pages.
+        // Production config-subtree builder: OpenConfigSelector / OpenConfigFile
+        // tokens redeem to the curated book pages.
         return new MenuRedeemSubcommand.MenuConfigSubtreeBuilder() {
             @Override
             public MenuModel buildSelector(UUID viewer) {
@@ -225,9 +197,8 @@ final class MenuWiringSupportInstaller {
             @Override
             public MenuModel buildFile(UUID viewer, String fileName,
                                        LinkedHashMap<String, String> cartSnapshot) {
-                // Item 6 of the staging-cart redesign: cart-aware rendering of
-                // /rtp config <file>. cartSnapshot is the viewer's currently
-                // staged (paramName -> typed value) pairs.
+                // Cart-aware rendering of /rtp config <file>. cartSnapshot is the
+                // viewer's currently staged (paramName -> typed value) pairs.
                 ConfigParser<?> parser = resolveParserByFileName(fileName);
                 if (parser == null) return null;
                 return new CommandTreeMenuBuilder()
@@ -240,9 +211,9 @@ final class MenuWiringSupportInstaller {
 
             @Override
             public MenuModel buildKey(UUID viewer, String fileName, String paramName) {
-                // PROPOSAL v3.7 §3.3 — resolve the live SubConfigCmd node for
-                // <fileName> and reuse buildParamPicker so suggested values
-                // write back via /rtp config <fileName>.yml <paramName>:<value>.
+                // Resolve the live SubConfigCmd node for <fileName> and reuse
+                // buildParamPicker so suggested values write back via
+                // /rtp config <fileName>.yml <paramName>:<value>.
                 CommandsAPICommand configCmd = rtpRoot.getCommandLookup().get("CONFIG");
                 if (!(configCmd instanceof TreeCommand configTree)) {
                     return null;
@@ -280,9 +251,9 @@ final class MenuWiringSupportInstaller {
     private MenuRedeemSubcommand.MenuCuratedPageBuilder buildCuratedPageBuilder(
             FrontPageBuilder frontPageBuilder,
             AdminPanelBuilder adminPanelBuilder) {
-        // PROPOSAL-admin-panel.md v2 — curated admin-panel and front-page
-        // builders so OpenAdminPanel / OpenFrontPage tokens redeem to the
-        // curated book pages. The rtp.menu.admin gate is enforced in
+        // Curated admin-panel and front-page builders: OpenAdminPanel /
+        // OpenFrontPage tokens redeem to the curated book pages. The
+        // rtp.menu.admin gate is enforced in
         // MenuRedeemSubcommand.dispatchOpenAdminPanel, not here.
         return new MenuRedeemSubcommand.MenuCuratedPageBuilder() {
             @Override
@@ -299,7 +270,7 @@ final class MenuWiringSupportInstaller {
 
             @Override
             public MenuModel buildVisualizations(UUID viewer) {
-                // PR2b: curated admin Visualizations submenu. rtp.menu.admin is
+                // Curated admin Visualizations submenu. rtp.menu.admin is
                 // enforced by MenuRedeemSubcommand.dispatchOpenVisualizations.
                 // Top-level page is the chart-kind picker; per-kind region
                 // pickers land here via buildVisualizationRegions below.
@@ -319,17 +290,7 @@ final class MenuWiringSupportInstaller {
     }
 
     private MenuRedeemSubcommand.MenuConfigSearchBuilder buildConfigSearchBuilder() {
-        // PROPOSAL-rtp-menu-config-search.md slice 5b — production
-        // MenuConfigSearchBuilder. Walks RTP.configs via
-        // ConfigSearchResultsBuilder, renders a paginated MenuModel where each
-        // hit row is a gray-base line with an off-blue highlight overlay at the
-        // raw-offset match ranges. Each row click resolves to OpenConfigKey.
-        // Hover text for each result row resolves through the same YAML
-        // block-comment lookup the curated config menu uses
-        // (ConfigMenuConsumerProfile), so a row's tooltip shows the operator
-        // the configured comment for that key (dotted sub-paths like
-        // "shape.radius" included). The section resolver maps a hit's file
-        // name back to its loaded YAML root via ConfigParser#getYamlRoot.
+        // Config search builder: paginated MenuModel highlighting matched ranges and tooltips from YAML comments.
         final ConfigMenuConsumerProfile searchProfile =
                 new ConfigMenuConsumerProfile(MenuWiringSupportInstaller::resolveYamlRoot);
         return (UUID viewer, String query, int page) -> {
@@ -406,8 +367,7 @@ final class MenuWiringSupportInstaller {
                 }
             }
 
-            // ADR-050 Stage 3α: pre-mint loop removed. Renderer emits
-            // concrete /rtp menu ... commands per fragment action.
+            // Renderer emits concrete /rtp menu commands per fragment action.
 
             if (pages.isEmpty()) return null;
             return new MenuModel("config:search:" + safeQuery, pages);
@@ -474,10 +434,9 @@ final class MenuWiringSupportInstaller {
     // ---- Admin verb + deferred /rtp config search handler ----------------
 
     private void installAdminCmd(AdminPanelBuilder adminPanelBuilder) {
-        // PROPOSAL-admin-panel-prefabs.md v3.1 (Session 4b D1) — register the
-        // top-level `/rtp admin` verb whose bare form opens the curated admin
-        // panel. When the renderer is null (no menu renderer available on this
-        // platform) the opener is null and the bare form rejects with the
+        // Register the top-level `/rtp admin` verb whose bare form opens the
+        // curated admin panel. When the renderer is null (no menu renderer on
+        // this platform) the opener is null and the bare form rejects with the
         // configurable menuInvalid message per S-004 / S-007.
         final Consumer<UUID> openAdminPanel;
         if (menuRenderer == null) {
@@ -528,11 +487,10 @@ final class MenuWiringSupportInstaller {
 
     private void installConfigSearchHandler(
             MenuRedeemSubcommand.MenuConfigSearchBuilder configSearchBuilder) {
-        // PROPOSAL-rtp-menu-config-search.md slice 5b — wire the search-leaf
-        // handler now that the renderer + builder are constructed. ConfigCmd
-        // registers ConfigSearchSubCmd via its own 5-tick deferred addCommands;
-        // schedule our handler attachment at 8 ticks so it lands after ConfigCmd
-        // but before the menu mirror seeds at 10 ticks.
+        // Wire the search-leaf handler now that the renderer + builder are
+        // constructed. ConfigCmd registers ConfigSearchSubCmd via its own 5-tick
+        // deferred addCommands; schedule our attachment at 8 ticks so it lands
+        // after ConfigCmd but before the menu mirror seeds at 10 ticks.
         final MenuRedeemSubcommand.MenuConfigSearchBuilder finalSearchBuilder = configSearchBuilder;
         final MenuRenderer finalRenderer = menuRenderer;
         RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(() -> {

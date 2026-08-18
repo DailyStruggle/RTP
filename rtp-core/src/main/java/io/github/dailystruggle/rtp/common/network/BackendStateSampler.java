@@ -3,33 +3,16 @@ package io.github.dailystruggle.rtp.common.network;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 
 /**
- * Producer-side abstraction: each platform adapter (Bukkit/Paper/Folia/
- * Fabric/...) supplies a sampler that knows how to read live host state
- * (TPS / MSPT / heap / player count / loaded worlds / etc.) and assemble a
- * {@link BackendHeartbeat} row for {@link BackendStatePublisher} to ship.
- *
- * <p>Pinned by rtp-proxy-ADR-011 §Backend Wiring. Lives in {@code rtp-core}
- * (not {@code rtp-proxy-common}) so the publisher composes with the host's
- * scheduler and {@code AbstractSQLDatabaseAccessor}, but it consumes the
- * vendor-neutral {@link BackendHeartbeat} record so the network state
- * surface stays in {@code rtp-proxy-common}.</p>
- *
- * <p>Implementations must be safe to call from a scheduler thread (the
- * publisher tick). Sampling should be cheap (less than ~1 ms typical); if a
- * value is genuinely expensive to compute (loaded worlds enumeration with
- * thousands of entries), implementations should cache it between samples.</p>
+ * Platform adapter sampler producing {@link BackendHeartbeat} state snapshots (rtp-proxy-ADR-011).
+ * Implementations must be safe and non-blocking when called from scheduler threads.
  */
 public interface BackendStateSampler {
 
     /**
-     * Sample the current backend state and produce a heartbeat row stamped
-     * with {@code lastSeenEpochMs == System.currentTimeMillis()}. The
-     * {@code serverId} parameter is the operator-configured identity from
-     * {@code network.yml}; samplers must echo it back so heartbeats are
-     * trivially routable to the right backend row.
+     * Samples host state and produces a fresh heartbeat row stamped with the current timestamp.
      *
-     * @param serverId the operator-configured backend server id from {@code network.yml}
-     * @return a fresh {@link BackendHeartbeat} reflecting current host state; never {@code null}
+     * @param serverId configured backend server ID from {@code network.yml}
+     * @return current {@link BackendHeartbeat} snapshot; never {@code null}
      */
     BackendHeartbeat sample(String serverId);
 }

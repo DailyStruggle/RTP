@@ -55,7 +55,7 @@ public class MockAsyncScheduler implements AsyncScheduler {
     @Override
     public ScheduledTask runDelayed(Plugin plugin, Consumer<ScheduledTask> task,
                                     long delay, TimeUnit unit) {
-        // Delay is ignored in the mock — task is queued immediately.
+        // Delay is ignored in the mock - task is queued immediately.
         return runNow(plugin, task);
     }
 

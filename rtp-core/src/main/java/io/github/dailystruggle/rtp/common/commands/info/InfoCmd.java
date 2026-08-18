@@ -41,7 +41,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
   }
 
   /**
-   * Formats a double for the per-region table — two decimal places when finite,
+   * Formats a double for the per-region table - two decimal places when finite,
    * literal {@code NaN} when not sampled yet. Keeps the row layout stable across
    * locales without dragging a {@code Locale}-sensitive formatter into core.
    */
@@ -52,9 +52,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
   /**
    * Routes a raw line to {@link RTP#messageTap} if one is installed for this
-   * thread (book-mirroring path; see PROPOSAL-info-as-book.md section 4.6),
-   * or otherwise to {@link RTP#serverAccessor} for the normal chat path. When
-   * the tap is installed the line is run through
+   * thread (book-mirroring path), or otherwise to {@link RTP#serverAccessor}
+   * for the normal chat path. When the tap is installed the line is run through
    * {@link PlaceholderProvider#fillPlaceholders(String, UUID)} first so it
    * arrives at the sink in the same fully-substituted form the chat path
    * would have produced.
@@ -134,8 +133,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     // Capture exactly one MetricsSnapshot for the entire /rtp info invocation so
     // every metrics-backed placeholder ([tps1m], [mspt], [queueDepth], …) reads
-    // from the same atomic view. See PlaceholderProvider.withSnapshot and
-    // METRICS_PLAN.md > /rtp info Surface (B11 cleanup).
+    // from the same atomic view. See PlaceholderProvider.withSnapshot.
     final boolean[] result = {true};
     PlaceholderProvider.withSnapshot(() -> result[0] = onCommandInner(callerId, parameterValues));
     return result[0];
@@ -200,11 +198,10 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String infoTotalLoads = RTP.configs.getConfigValue(CommandMessages.infoTotalLoads, "").toString();
       String infoLoadsByOrigin = RTP.configs.getConfigValue(CommandMessages.infoLoadsByOrigin, "").toString();
       String infoLeakRate = RTP.configs.getConfigValue(CommandMessages.infoLeakRate, "").toString();
-      // Metrics SPI health block — surfaces the same MetricsSnapshot data that the
-      // bStats integration and (planned) multi-server publisher consume. Per
-      // METRICS_PLAN.md > /rtp info Surface, these are operator-facing live signals
-      // for triage. Empty templates skip silently so existing locale files without
-      // the new keys keep working unchanged.
+      // Metrics SPI health block - surfaces the same MetricsSnapshot data that the
+      // bStats integration and (planned) multi-server publisher consume. These are
+      // operator-facing live signals for triage. Empty templates skip silently so
+      // existing locale files without the new keys keep working unchanged.
       String infoQueueDepth = RTP.configs.getConfigValue(CommandMessages.infoQueueDepth, "").toString();
       String infoPendingTeleports = RTP.configs.getConfigValue(CommandMessages.infoPendingTeleports, "").toString();
       String infoAvgPipelineMs = RTP.configs.getConfigValue(CommandMessages.infoAvgPipelineMs, "").toString();
@@ -238,8 +235,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
       if (!infoTotalLoads.isEmpty()) emit(callerId, infoTotalLoads);
       if (!infoLoadsByOrigin.isEmpty()) emit(callerId, infoLoadsByOrigin);
       if (!infoLeakRate.isEmpty()) emit(callerId, infoLeakRate);
-      // Health — pipeline group (METRICS_PLAN.md > /rtp info Surface). Header line
-      // is rendered ahead of the metrics group so operators can visually anchor it.
+      // Health - pipeline group. Header line is rendered ahead of the metrics
+      // group so operators can visually anchor it.
       if (!infoHealthPipelineHeader.isEmpty())
         emit(callerId, infoHealthPipelineHeader);
       if (!infoTps.isEmpty() && hasLiveTps) emit(callerId, infoTps);
@@ -260,8 +257,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
       if (!infoTopRejectionCause.isEmpty()) emit(callerId, infoTopRejectionCause);
       if (!infoFailureBreakdown.isEmpty()) emit(callerId, infoFailureBreakdown);
 
-      // Section C / METRICS_PLAN.md > Folia Aggregation — render the per-region
-      // table when the active MetricsBinding publishes per-region detail (Folia).
+      // Folia aggregation - render the per-region table when the active
+      // MetricsBinding publishes per-region detail (Folia).
       // foliaRegions() is structurally empty on Paper / Bukkit / Fabric (single
       // region runtimes), so this whole block is a no-op there. Empty templates
       // skip silently for locales that haven't merged the new keys.

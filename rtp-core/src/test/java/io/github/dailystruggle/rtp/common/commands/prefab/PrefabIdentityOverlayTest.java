@@ -11,20 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Drift guard: {@code SurvivalDefault} is documented as the
- * identity overlay ("reset to shipped defaults"). If a future commit adds
- * a key to {@link SurvivalDefault#INSTANCE}'s overlay maps - whether by
- * mistake or to "document" a default - the prefab stops being an identity
- * and this test fails loudly.
- *
- * <p>Identity is verified two ways:
- * <ol>
- *   <li>Structurally: both overlay maps on the {@link Prefab} are empty.</li>
- *   <li>Behaviourally: applying the prefab to a representative trees map
- *       (covering {@code performance} and {@code regions/default}) produces
- *       an empty per-file diff and leaves the input trees structurally
- *       equal to the output trees.</li>
- * </ol>
+ * Drift guard: verifies that {@link SurvivalDefault#INSTANCE} remains an empty identity overlay.
  */
 class PrefabIdentityOverlayTest {
 

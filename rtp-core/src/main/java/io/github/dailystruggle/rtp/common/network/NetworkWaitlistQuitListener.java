@@ -9,23 +9,9 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * ADR-015 / REQ-RTP-NET-015: on player quit, cancel
- * any in-flight cross-server enrolment for the disconnecting player so
- * their slot does not occupy the shared waitlist / pending queue.
+ * Cancels in-flight cross-server waitlist entries and local lobby retries on player quit (REQ-RTP-NET-015).
  *
- * <p>Routes through {@link NetworkRequestQueue#cancel(UUID,
- * NetworkRequestQueue.CancelReason)} with reason
- * {@link NetworkRequestQueue.CancelReason#PLAYER_DISCONNECT}. The SPI
- * contract makes this idempotent and safe to call even when there is no
- * live entry (no-op fast-path).</p>
- *
- * <p>S-004: any transport-level failure is logged via {@link RTP#log} but
- * never propagated - a player quit must not throw out of the platform event
- * dispatch, and the transport-side TTL reaper will eventually clean up
- * even if this single call fails.</p>
- *
- * <p>ADR-049: platform-neutral. Subscribes to player quit via the
- * {@link PlayerLifecycleHook} SPI rather than a Bukkit {@code Listener}.</p>
+ * <p>Uses {@link PlayerLifecycleHook} for platform neutrality. S-004 compliant error logging.
  */
 public final class NetworkWaitlistQuitListener {
 

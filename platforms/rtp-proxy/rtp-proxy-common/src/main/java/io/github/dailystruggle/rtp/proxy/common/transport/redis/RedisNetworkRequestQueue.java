@@ -281,7 +281,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
                     // Short sleep before re-polling. Java-level BLPOP would
                     // tie up a Jedis connection for the full block window; a
                     // 25ms poll trades a small wake-cost for connection
-                    // availability. See PROPOSAL §4.4.
+                    // availability.
                     try { Thread.sleep(25L); } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         return Optional.<QueueEnvelope>empty();

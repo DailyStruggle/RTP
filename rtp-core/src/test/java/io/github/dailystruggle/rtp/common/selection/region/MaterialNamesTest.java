@@ -10,15 +10,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Contract tests for {@link MaterialNames#matches(Set, String)}.
- *
- * <p>Direct analog of {@link BiomeNamesTest}. The helper exists because
- * Bukkit-family platforms may expose block ids in two shapes: enum-based
- * releases yield bare uppercase names like {@code "LAVA"}; Keyed-registry
- * releases yield the namespaced form {@code "MINECRAFT:LAVA"}. The same
- * input written into {@code safety.yml::unsafeBlocks} may follow either
- * convention; the comparator treats the vanilla {@code MINECRAFT:} prefix
- * as optional on either side while preserving modded namespaces
- * (e.g. {@code CREATEDECO:LIMESTONE}) verbatim.
+ * Verifies optional vanilla {@code MINECRAFT:} prefixes and preservation of modded namespaces.
  */
 class MaterialNamesTest {
 

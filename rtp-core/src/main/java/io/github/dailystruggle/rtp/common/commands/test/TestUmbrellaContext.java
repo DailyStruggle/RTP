@@ -4,24 +4,8 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * Carrier for the platform-supplied {@code /rtp test ...} umbrella SPI
- * implementations. Holds the {@link TestUmbrellaSender}, the
- * {@link TestUmbrellaScheduler}, and an optional audit-log consumer that
- * receives every audit line the umbrella emits (mirrors REQ-RTP-S-004
- * fidelity used by {@code rtp test full}).
- *
- * <p>Wired statically on {@code RTP.testUmbrellaContext} by each platform
- * plugin at startup (Phase 1.4 / 1.5 / 3.3 of
- * {@code docs/dev/scratch/CHECKLIST-fabric-rtp-test-full.md}). Callers
- * inside {@code rtp-core} obtain the active context via
- * {@link #require()} which enforces S-006 by throwing
- * {@link IllegalStateException} when the umbrella is invoked before core
- * load completes &mdash; never a silent null-return.
- *
- * <p>This class is intentionally immutable and trivially constructible so
- * that test harnesses can install a stub via
- * {@code RTP.testUmbrellaContext = new TestUmbrellaContext(stubSender,
- * stubScheduler, line -> {})} without reflection.
+ * Carrier for platform-supplied {@code /rtp test ...} umbrella SPI implementations.
+ * Holds {@link TestUmbrellaSender}, {@link TestUmbrellaScheduler}, and an optional audit sink.
  */
 public final class TestUmbrellaContext {
 
@@ -65,8 +49,7 @@ public final class TestUmbrellaContext {
   /**
    * Returns the active context from {@code RTP.testUmbrellaContext},
    * throwing {@link IllegalStateException} when no platform adapter has
-   * wired one yet. Used by leaves moved into {@code rtp-core} during
-   * Phase 2 to honor S-006 (no silent no-op).
+   * wired one yet (S-006: no silent no-op).
    *
    * @return the non-{@code null} active context.
    * @throws IllegalStateException if no context has been installed.

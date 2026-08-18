@@ -54,7 +54,7 @@ class AnvilRegionByteCacheTest {
 
   @Test
   void lru_evictsBeyondCapacity(@TempDir Path tmp) throws Exception {
-    // Write 20 region files; cache capacity is 16 (PR-12).
+    // Write 20 region files; cache capacity is 16.
     Path[] files = new Path[20];
     for (int i = 0; i < files.length; i++) {
       files[i] = tmp.resolve("r." + i + ".0.mca");

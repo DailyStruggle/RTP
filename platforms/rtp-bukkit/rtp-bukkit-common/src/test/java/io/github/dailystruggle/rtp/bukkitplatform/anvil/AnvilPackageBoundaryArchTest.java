@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
  * <p>Per ADR-016 and {@code ADR-016} §2, the pre-filter is confined
  * to {@code io.github.dailystruggle.rtp.bukkitplatform.anvil}. Paper overrides {@code getChunkAt}
  * with its native async API, and Folia extends {@link io.github.dailystruggle.rtp.api.world.RTPWorld}
- * directly — so structural exclusivity is guaranteed by the class hierarchy. These rules
+ * directly - so structural exclusivity is guaranteed by the class hierarchy. These rules
  * lock the invariants in at the bytecode level so a future contributor cannot accidentally
  * reintroduce a coupling that would defeat the hierarchy-based design.</p>
  *

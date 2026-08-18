@@ -61,7 +61,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   private final ConcurrentHashMap<Long, WeakReference<Chunk>> chunkCache = new ConcurrentHashMap<>();
 
   /**
-   * ADR-016 §11 — per-world cache of Anvil-backed chunk views. Populated by
+   * ADR-016 §11 - per-world cache of Anvil-backed chunk views. Populated by
    * {@link #getChunkAt(int, int)} whenever the shared
    * {@link io.github.dailystruggle.rtp.anvil.AnvilProbeSupport#probeAndPublish} yields a
    * decoded view, and consumed by {@link #getCachedChunk(long)} when no live
@@ -90,7 +90,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-058 — swappable region-schematic paster, mirroring {@link #setBiomeGetter}.
+   * ADR-058 - swappable region-schematic paster, mirroring {@link #setBiomeGetter}.
    * Defaults to {@link io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster}
    * (never {@code null}, S-006).
    */
@@ -150,9 +150,9 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   public static Set<String> getBiomes(RTPWorld<?> world) {
-    // BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §4 step 6 — the `AnvilRegionScanner.scanBiomes`
-    // union has been retired from the runtime getter (parity with BukkitRTPWorld). The
-    // biome filter in `LocationGenerator` now evaluates the whitelist/blacklist directly
+    // The `AnvilRegionScanner.scanBiomes` union is not used by the runtime
+    // getter (parity with BukkitRTPWorld). The biome filter in
+    // `LocationGenerator` now evaluates the whitelist/blacklist directly
     // without materialising a world-level biome enumeration, so this path is only used
     // by tab completion and diagnostics. The scanner remains available in `rtp-anvil`.
     Set<String> pre = getBiomes.apply(world);
@@ -184,10 +184,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     // on RTPWorld.totalChunkLoads.
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
-    // ADR-016 §11 — Anvil read-only data source, same probe-then-fall-through
+    // ADR-016 §11 - Anvil read-only data source, same probe-then-fall-through
     // semantics as BukkitRTPWorld. When the applicability gate passes and the
     // pre-filter returns a decoded view, publish it into the per-world cache
-    // and resolve the future with the key directly — no region-thread hop,
+    // and resolve the future with the key directly - no region-thread hop,
     // no chunk ticket acquired. The live chunk.isSafe(...) re-check at
     // teleport-commit time (ADR-016 §4) remains the authoritative arbiter.
     // On UNKNOWN (no view) we fall through to Folia's native async load.
@@ -230,8 +230,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * BIOME_LOOKUP_PERF_PLAN.md PR-3b — fast-path center-column probe for Folia.
-   * See {@code BukkitRTPWorld#probeChunkColumn} for the shared contract.
+   * Fast-path center-column probe for Folia. See
+   * {@code BukkitRTPWorld#probeChunkColumn} for the shared contract.
    *
    * <p>S-005 / Folia threading: all file I/O is dispatched to
    * {@link java.util.concurrent.ForkJoinPool#commonPool()}, never to a region
@@ -251,19 +251,18 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     final String dim = dimensionRegionSubpath(world);
     final int finalMinY = minY;
     final int finalMaxY = maxY;
-    // BIOME_LOOKUP_PERF_PLAN.md PR-9: revert PR-8's inline dispatch. The ScanTask
-    // concurrency gauge showed peak in-flight 11–12 vs cap 50 — the driver loop
-    // was serializing ~7ms of probe I/O onto its single thread, capping throughput
-    // at 1/7ms ≈ 140 cps instead of saturating the semaphore. Dispatch back onto
-    // AnvilIoPool (dedicated blocking-I/O executor) so the driver hands off in
-    // µs and AnvilIoPool runs probes in parallel. S-005 preserved: AnvilIoPool
-    // threads are daemons with no region-thread affinity.
+    // Dispatch onto AnvilIoPool rather than inline: inline dispatch serialized
+    // ~7ms of probe I/O onto the driver's single thread, capping throughput at
+    // ~140 cps (peak in-flight 11-12 vs cap 50). AnvilIoPool (dedicated
+    // blocking-I/O executor) lets the driver hand off in microseconds and run
+    // probes in parallel. S-005 preserved: AnvilIoPool threads are daemons with
+    // no region-thread affinity.
     return CompletableFuture.supplyAsync(() -> {
       try {
         java.nio.file.Path regionFile =
             io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(worldFolder, dim, cx, cz);
-        // BIOME_LOOKUP_PERF_PLAN.md PR-10: share raw region bytes across sibling-chunk
-        // probes in the same r.X.Z.mca via a 4-entry LRU, with mtime invalidation.
+        // Share raw region bytes across sibling-chunk probes in the same
+        // r.X.Z.mca via a 4-entry LRU, with mtime invalidation.
         byte[] regionBytes = io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
         if (regionBytes == null) return null;
         int rx = Math.floorMod(cx, 32);
@@ -376,7 +375,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
               if (chunk == null) {
                 // Symmetrical with BukkitRTPWorld.loadChunkSync's null-guard log.
                 // A null live chunk after a prefilter UNKNOWN is an attributable
-                // load failure — surface it so operators can tell "Folia caching
+                // load failure - surface it so operators can tell "Folia caching
                 // feels slow" apart from genuine async-load failures.
                 RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] Folia world.getChunkAtAsync returned null for world=" + name
@@ -404,7 +403,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-016 §11 applicability gate — mirrors
+   * ADR-016 §11 applicability gate - mirrors
    * {@code BukkitRTPWorld#shouldPrefilter}. Returns {@code true} when:
    * <ul>
    *   <li>{@code SafetyKeys.anvilPrefilterEnabled} is truthy (default true),</li>
@@ -417,7 +416,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    * Bukkit enum view (modded/Iris-native IDs collapse to vanilla on {@code Material}/{@code
    * Biome} lookups but survive verbatim in the on-disk palette). For chunks the custom
    * generator has not yet populated, {@code AnvilPrefilter.probeDetailed} returns {@code
-   * UNKNOWN} and we fall through to Folia's native async load — which is exactly when we
+   * UNKNOWN} and we fall through to Folia's native async load - which is exactly when we
    * want the generator to run. {@code REJECT} remains advisory: downstream
    * {@code chunk.isSafe(...)} corroborates every rejection, so disk-vs-live divergence
    * under a custom generator is bounded to "extra retries", never "unsafe teleport".
@@ -427,7 +426,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     // Folia note: world.isChunkLoaded(cx,cz) is region-thread-restricted. The
     // ADR-016 call-site probe runs on the async scheduler thread (no owning
     // region), so a ThreadAccessException here is expected and non-diagnostic.
-    // We must not fall through to loadLiveChunk on that exception — the whole
+    // We must not fall through to loadLiveChunk on that exception - the whole
     // point of ADR-016 is that when the chunk is *not* loaded we read .mca
     // instead of forcing a live load. Treat "can't determine" as "not loaded"
     // and continue into the anvil probe; the worst case is one extra probe
@@ -438,7 +437,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
         return false;
       }
     } catch (Throwable ignored) {
-      // Fall through to the anvil path — do NOT short-circuit, do NOT log
+      // Fall through to the anvil path - do NOT short-circuit, do NOT log
       // at INFO (would spam every candidate on Folia).
     }
     try {
@@ -551,7 +550,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @RegionThread
   public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
     totalChunkLoads.incrementAndGet();
-    // Must pass gen=true to force generation of unexplored chunks — RTP's primary
+    // Must pass gen=true to force generation of unexplored chunks - RTP's primary
     // use case. Without the generate flag Folia returns a null Chunk for coordinates
     // with no prior .mca data, causing PregenTask to attribute every candidate to
     // nullChunk/asyncLoadNull (parity with BukkitRTPWorld.loadChunkSync / loadLiveChunk).
@@ -581,14 +580,14 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    * block-evaluation task executing on a backlogged Count-Bound pipe, during
    * which Folia's native chunk GC may have unloaded the chunk.
    *
-   * <p>Never call this from a hot inner loop that expects pin semantics — this
+   * <p>Never call this from a hot inner loop that expects pin semantics - this
    * is a best-effort status read, not a guarantee the chunk will remain loaded
    * on the following line.</p>
    */
   @Override
   public boolean isChunkLoaded(int cx, int cz) {
     // Folia ADR-015 follow-up: World#isChunkLoaded(int,int) is region-thread-
-    // restricted on Folia — calling it from an async scheduler thread (which
+    // restricted on Folia - calling it from an async scheduler thread (which
     // owns no region) throws ThreadAccessException, which previously caused
     // the stale-chunk guard in PregenTask to reject every candidate with
     // reason=staleChunkBeforeVert fails=10. Trust our own liveness signal
@@ -679,7 +678,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public RTPChunk<?> getCachedChunk(long key) {
-    // Live chunk takes precedence over any Anvil snapshot — the live path is
+    // Live chunk takes precedence over any Anvil snapshot - the live path is
     // authoritative once a real chunk has been loaded.
     WeakReference<Chunk> ref = chunkCache.get(key);
     if (ref != null) {
@@ -742,7 +741,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public String getBiome(int x, int y, int z) {
-    // ADR-016 / ADR-016 (biome) §6 — Anvil-first in-place amendment (parity
+    // ADR-016 / ADR-016 (biome) §6 - Anvil-first in-place amendment (parity
     // with BukkitRTPWorld). Zero-I/O cache read; on miss or outside-window the
     // call falls through to the pre-existing static getter (vanilla enum or
     // Iris-addon override, depending on last-registered setter). Biome reads
@@ -781,7 +780,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   /**
    * Rate-limited diagnostic (first {@link #BIOME_LOG_BUDGET_PER_REASON} per
    * reason at INFO, then FINE) for each live-tier fallthrough path in
-   * {@link #getBiome(int,int,int)} — parity with {@code BukkitRTPWorld}.
+   * {@link #getBiome(int,int,int)} - parity with {@code BukkitRTPWorld}.
    */
   private static final java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>
       BIOME_FALLTHROUGH_COUNTERS = new java.util.concurrent.ConcurrentHashMap<>();
@@ -835,21 +834,21 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-016 §13.3 upgrade-drift gate — region-file backed probe (parity with
+   * ADR-016 §13.3 upgrade-drift gate - region-file backed probe (parity with
    * {@code BukkitRTPWorld#isChunkGenerated} and {@code FabricRTPWorld#isChunkGenerated}).
    *
    * <p>Resolution order:</p>
    * <ol>
-   *   <li>{@link World#isChunkLoaded(int, int)} — a loaded chunk is by
+   *   <li>{@link World#isChunkLoaded(int, int)} - a loaded chunk is by
    *       definition generated; cheapest answer, safe to call off-region on
    *       Folia (concurrent map lookup, no region affinity required).</li>
    *   <li>{@link io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache#isOccupied}
    *       against the {@code r.X.Z.mca} file resolved via
    *       {@link io.github.dailystruggle.rtp.anvil.AnvilPrefilter#regionFileFor}.
    *       The cache amortises the 32x32 region-tile occupancy bitmap across
-   *       all ~1024 sibling-chunk queries — crucial for {@code ScanTask}
+   *       all ~1024 sibling-chunk queries - crucial for {@code ScanTask}
    *       PRESCAN which sweeps adjacent chunks in spiral order.</li>
-   *   <li>Any {@link Throwable} collapses to {@code true} — "assume
+   *   <li>Any {@link Throwable} collapses to {@code true} - "assume
    *       generated, skip the perf fast path" preserves the ADR-016 §13.3
    *       palette-drift correctness (false-positives only forfeit a fast
    *       path; false-negatives would risk the bug).</li>
@@ -1001,7 +1000,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     // ThreadAccessException, and Folia/Paper chunk-system-v2 already
     // persists generated chunks via its own dirty-tracking + autosave
     // path (unlike Spigot, where Chunky-style pre-generated chunks may
-    // never reach disk without a forced World.save() — see
+    // never reach disk without a forced World.save() - see
     // helpers/PeriodicWorldSaver and docs/dev/LESSONS_LEARNED.md
     // "Pre-Generation & Shutdown"). The BukkitRTPWorld override remains
     // the only platform that actually flushes here.

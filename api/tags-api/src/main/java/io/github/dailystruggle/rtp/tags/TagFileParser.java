@@ -61,7 +61,7 @@ public final class TagFileParser {
   /**
    * Extract a single values-array entry to its raw-string form, returning
    * {@code null} if the entry should be silently dropped (e.g. object-form
-   * entry without an {@code id} field — malformed but not fatal, matching
+   * entry without an {@code id} field - malformed but not fatal, matching
    * vanilla's permissive loader).
    */
   private static String extractEntry(Object entry, String namespacedId) {

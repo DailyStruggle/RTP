@@ -16,9 +16,9 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Regression guard for effects-api-ADR-006 (Fabric obf/unobf split):
- * the two carrier source trees — {@code effectsapi.fabric.*} (intermediary,
+ * the two carrier source trees - {@code effectsapi.fabric.*} (intermediary,
  * lives in {@code effects-api/src/main}) and {@code effectsapi.fabric_unobf.*}
- * (Mojmap, lives in the sibling module {@code effects-api-fabric-unobf}) —
+ * (Mojmap, lives in the sibling module {@code effects-api-fabric-unobf}) -
  * must remain mutually independent at the source level. Neither side may
  * reference the other; if it did, the cross-mappings link would explode at
  * runtime when the wrong carrier is loaded.

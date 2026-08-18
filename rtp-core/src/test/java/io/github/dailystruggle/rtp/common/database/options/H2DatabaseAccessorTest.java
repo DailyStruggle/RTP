@@ -168,7 +168,7 @@ class H2DatabaseAccessorTest {
     @AfterEach
     void tearDown() throws SQLException {
         // Drop tables and close our own connection; accessor's internal connection
-        // may already be closed by individual tests — that is fine.
+        // may already be closed by individual tests - that is fine.
         if (connection != null && !connection.isClosed()) {
             try (Statement st = connection.createStatement()) {
                 st.execute("DROP TABLE IF EXISTS rtp_teleport_data");
@@ -237,7 +237,7 @@ class H2DatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // write() — basic CRUD
+    // write() - basic CRUD
     // -------------------------------------------------------------------------
 
     @Test

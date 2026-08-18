@@ -11,19 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression test for the corrected {@code /rtp} world-argument semantics.
- *
- * <p>The world-override region (duplicate the base region and rebind it to the
- * requested world) must apply ONLY to the region sub-parameter grammar
- * {@code rtp region=<r> world=<w>}. Top-level {@code rtp world=<w>} must resolve
- * its region from world {@code w}'s own configuration ({@code WorldKeys.region})
- * and is left unmodified, so a world configured to redirect to region
- * {@code default} teleports to region {@code default} as configured rather than
- * being forced into world {@code w}.
- *
- * <p>This supersedes the original ADR-065 behavior, which forced both grammars
- * into world {@code w} (and so ignored the per-world {@code region} redirect for
- * the top-level {@code world=} parameter).
+ * Regression test for {@code /rtp} world-argument semantics.
+ * World-override applies only to {@code region=<r> world=<w>}.
+ * Top-level {@code world=<w>} resolves region from {@code WorldKeys.region}.
  */
 @DisplayName("RTPCmd - world-override gate (region sub-parameter only)")
 public class RTPCmdWorldOverrideGateTest {

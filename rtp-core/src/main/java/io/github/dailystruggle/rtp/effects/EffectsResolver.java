@@ -21,65 +21,22 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Resolves the per-player effect-token list for a given pipeline stage by
- * reading the {@code effects/} {@link MultiConfigParser} registered in
- * {@link io.github.dailystruggle.rtp.common.configuration.Configs#reloadConfigs()}.
+ * Resolves the per-player effect-token list for a pipeline stage from {@code effects/} config files.
  *
- * <p>See <em>effects-api-ADR-005</em>. The resolver is stateless; it queries
- * {@link RTP#configs} on every call so a {@code /rtp reload} (which atomically
- * swaps {@code multiConfigParserMap}) is honored without any cache invalidation
- * on this layer. Callers must invoke once per teleport, never cache the result
- * across pipeline stages.
- *
- * <p>Output: a {@link Collection} of synthetic permission-style strings of the
- * form {@code <prefix>.<EFFECT>.<arg1>.<arg2>...} that feeds directly into
- * {@code EffectFactory.buildEffects(prefix, Collection&lt;String&gt;)} —
- * <strong>no factory changes are required</strong>. The handler typically
- * unions these with the player's real {@code getEffectivePermissions()} so
- * permission-driven and config-driven effects co-exist on Bukkit.
- *
- * <p>Resolution algorithm (see ADR-005):
- * <ol>
- *   <li>Iterate every group file (each is a {@link ConfigParser} entry under
- *       the {@code effects/} {@link MultiConfigParser}).</li>
- *   <li>Filter to those whose {@code when:} value matches the requested stage
- *       (case-insensitive).</li>
- *   <li>Skip the {@code default} group during the matching pass — it is the
- *       implicit fallback applied last.</li>
- *   <li>For each remaining group, gate by {@code permission:} (via
- *       {@link RTPPlayer#hasPermission(String)}) or by membership in the
- *       {@code players:} allowlist (UUID or name match).</li>
- *   <li>If <em>no</em> non-default group matched, fall back to the stage's
- *       {@code default} group (or {@code default-<stage>} when present).</li>
- *   <li>For every selected group, depth-first walk {@code inherit:} (cycle-
- *       guarded) and emit each parent's tokens before its own.</li>
- * </ol>
- *
- * <p>S-005: pure in-memory parser-map lookup — no chunk I/O, no file I/O.
- * S-006: never returns {@code null}; an empty list signals "no applicable
- * groups". S-007: parse errors surface via {@link RTP#log} at WARNING.
+ * <p>Queries {@link RTP#configs} dynamically so reloads take effect immediately (effects-api-ADR-005).
+ * Produces synthetic permission-style strings matching {@code <prefix>.<EFFECT>.<args>}.
  */
 public final class EffectsResolver {
 
   private EffectsResolver() {}
 
   /**
-   * Synthesise prefixed effect tokens for {@code (stage, player)} by walking
-   * the loaded {@code effects/} group files. Returns an empty list when the
-   * {@code effects/} parser hasn't been registered yet (e.g. before
-   * {@code Configs.reloadConfigs()} has run for the first time) — caller
-   * still proceeds with permission-derived effects.
+   * Synthesizes prefixed effect tokens for {@code (stage, player)} by walking loaded group files.
    *
-   * @param stage  pipeline stage token (e.g. {@code "postteleport"});
-   *               compared case-insensitively against each group's {@code when:}.
-   * @param player target player; gating reads {@code uuid()}, {@code name()},
-   *               and {@code hasPermission(...)}.
-   * @param prefix effect-prefix to prepend to every token (e.g.
-   *               {@code "rtp.effect.postteleport"}); the trailing dot is
-   *               appended if absent so the result feeds straight into
-   *               {@code EffectFactory.buildEffects}.
-   * @return ordered, de-duplicated list of synthetic permission strings;
-   *         empty when nothing applies. Never {@code null}.
+   * @param stage  pipeline stage token (e.g. {@code "postteleport"})
+   * @param player target player
+   * @param prefix effect-prefix to prepend to every token (e.g. {@code "rtp.effect.postteleport"})
+   * @return ordered, de-duplicated list of synthetic permission strings; never null
    */
   public static List<String> resolveTokens(String stage, RTPPlayer player, String prefix) {
     Objects.requireNonNull(stage, "stage");
@@ -199,7 +156,7 @@ public final class EffectsResolver {
   /**
    * A group is treated as "default for stage S" iff its name is exactly
    * {@code default} and its {@code when:} == S, or its name is
-   * {@code default-<S>} (matches the project's on-disk convention —
+   * {@code default-<S>} (matches the project's on-disk convention -
    * {@code default-pre.yml}, {@code default-cancel.yml}).
    */
   private static String findDefaultForStage(
@@ -295,15 +252,8 @@ public final class EffectsResolver {
   }
 
   /**
-   * Convenience: build the union of permission-derived nodes and config-resolved
-   * tokens for a given stage. Useful for handlers that previously only fed
-   * {@code player.getEffectivePermissions()} into {@code EffectFactory.buildEffects}.
-   *
-   * @param stage  pipeline stage (e.g. {@code "postteleport"})
-   * @param player target player
-   * @param prefix permission prefix (e.g. {@code "rtp.effect.postteleport"})
-   * @param permissionNodes player's effective permissions; may be {@code null} or empty
-   * @return union list ready for {@code EffectFactory.buildEffects(prefix, …)}
+   * Builds union of permission-derived nodes and config-resolved tokens for a given stage.
+   * Returns collection ready for {@code EffectFactory.buildEffects(prefix, ...)}.
    */
   public static Collection<String> resolveUnioned(
       String stage, RTPPlayer player, String prefix, Collection<String> permissionNodes) {

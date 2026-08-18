@@ -200,7 +200,7 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
         if (view == null) return;
 
         // Seed the rename slot with a paper item whose display name carries
-        // the prefill — the anvil rename field initialises from the left
+        // the prefill - the anvil rename field initialises from the left
         // slot item's display name on the client.
         try {
             Inventory inv = view.getTopInventory();

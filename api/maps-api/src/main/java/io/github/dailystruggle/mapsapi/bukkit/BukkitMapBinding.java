@@ -26,23 +26,22 @@ import java.util.function.Supplier;
 /**
  * Bukkit-family concrete {@link MapBinding}. This is the only file in the
  * {@code maps-api} module permitted to {@code import org.bukkit.*} per
- * {@code CHECKLIST-maps-api.md} Stage 2 / {@code maps-api-ADR-001} §Package
- * layout.
+ * {@code maps-api-ADR-001} §Package layout.
  *
- * <p>Stage 2 scope (this class):
+ * <p>Scope (this class):
  * <ul>
- *   <li>{@link #allocate(MapAllocationRequest)} — backs each
+ *   <li>{@link #allocate(MapAllocationRequest)} - backs each
  *       {@link MapHandle} with a freshly-created {@link MapView} on the
  *       viewer's world (or the default world if no viewer).</li>
- *   <li>{@link #renderEphemeral(MapHandle, ChartRenderer, ChartModel)} — installs
+ *   <li>{@link #renderEphemeral(MapHandle, ChartRenderer, ChartModel)} - installs
  *       a one-shot {@link MapRenderer} that paints the supplied
  *       {@link ChartModel} once and then removes itself; the resulting filled
  *       map is delivered to the viewer's main hand by the caller (see
  *       {@code OpenMapActionHandler} in {@code rtp-plugin}).</li>
- *   <li>{@link #bindLive} — <strong>deferred</strong>: throws
- *       {@link UnsupportedOperationException}. Live charts arrive in
- *       Stage 3 of {@code CHECKLIST-metrics-to-maps.md}; the one-shot path
- *       is sufficient for the Stage 2 {@code /rtp info} bad-points heatmap.</li>
+ *   <li>{@link #bindLive} - <strong>deferred</strong>: throws
+ *       {@link UnsupportedOperationException}. Live charts arrive with
+ *       the live map pipeline; the one-shot path
+ *       is sufficient for the {@code /rtp info} bad-points heatmap.</li>
  * </ul>
  *
  * <p>Palette translation: the 32-symbol logical palette
@@ -64,9 +63,8 @@ import java.util.function.Supplier;
  *
  * <p>Folia: this class works on Folia as-is for {@code renderEphemeral}
  * because vanilla {@code MapView} commits are global-region-scheduled by the
- * platform; the dedicated {@code FoliaMapBinding} override planned in
- * {@code CHECKLIST-maps-api.md} Stage 2.3 will replace this when
- * region-affinity matters (live charts and per-viewer pixel commits).
+ * platform; the dedicated {@code FoliaMapBinding} override
+ * will replace this when region-affinity matters (live charts and per-viewer pixel commits).
  */
 public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
 

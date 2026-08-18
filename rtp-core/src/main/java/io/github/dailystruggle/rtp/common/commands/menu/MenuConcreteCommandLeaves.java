@@ -17,25 +17,8 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * ADR-050 Stage 1a (Proposed 2026-05-24): concrete `/rtp menu ...` and
- * `/rtp visualization` subcommand leaves that replace the opaque
- * `MenuTokenRegistry` indirection with self-documenting commands. Each leaf
- * routes into the matching package-private `dispatch*` helper on its owning
- * {@link MenuRedeemSubcommand}; permission gating, builder dispatch, and
- * S-004 reject paths remain inside the helper. No logic is duplicated.
- *
- * <p>This file is the Stage-1a subset (open / admin / front / visualizations
- * under {@code menu}, plus a root-level {@code visualization} sibling).
- * Stage 1b will extend the same pattern to the remaining leaves
- * (picker, page, config subtree, stage/unstage/apply/discard, info, multi).
- *
- * <p>Lifecycle: instances are constructed and registered by
- * {@code MenuRedeemSubcommand}'s constructor. They do not own state of
- * their own beyond the back-reference to the redeem subcommand.
- *
- * <p>Tokens coexist with these leaves throughout Stage 1; the renderer is
- * unchanged. Stage 2 will switch the renderer to emit these concrete
- * commands; Stage 3 deletes the token-redeem branch and registries.
+ * Concrete {@code /rtp menu ...} and {@code /rtp visualization} subcommand leaves (ADR-050).
+ * Replaces token indirection with typed commands that route into {@link MenuRedeemSubcommand}.
  */
 final class MenuConcreteCommandLeaves {
 
@@ -256,16 +239,8 @@ final class MenuConcreteCommandLeaves {
     }
 
     /**
-     * {@code /rtp visualization} - root-level sibling of {@code /rtp menu}
-     * that opens the visualizations selector. Typed per-kind sub-commands
-     * (e.g. {@link VisualizationBadLocationsCmd}) hang off this node; the
-     * bare {@code /rtp visualization} call always opens the selector
-     * through {@link MenuRedeemSubcommand#dispatchOpenVisualizations}.
-     *
-     * <p>This leaf is registered as a child of the {@code /rtp} root
-     * (not as a child of {@code menu}) so the command is reachable as
-     * {@code /rtp visualization} directly. Permission gate is
-     * {@code rtp.menu.admin}, matching {@link OpenVisualizationsConcreteCmd}.
+     * {@code /rtp visualization} root command opening the visualizations selector.
+     * Hosts per-kind sub-commands; bare invocation opens the selector (gates on {@code rtp.menu.admin}).
      */
     static final class VisualizationRootCmd extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
 
@@ -341,27 +316,9 @@ final class MenuConcreteCommandLeaves {
     }
 
     /**
-     * {@code /rtp visualization bad-locations [region=<regionName>]} - draw
-     * the per-region {@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE} chart.
-     * When {@code region=} is absent the command falls through to the
-     * visualizations selector (same behavior as bare
-     * {@code /rtp visualization}); when {@code region=<name>} is present it
-     * dispatches through {@link VisualizationDispatch#paintBadLocations},
-     * which owns the permission gate, {@link ChartSpec} validation, and
-     * {@code MapDispatch.paint} failure surfaces.
-     *
-     * <p>Crucially, this leaf does <strong>not</strong> hold a reference to
-     * {@link MenuRedeemSubcommand}: visualization dispatch lives in its own
-     * class so the legacy redeem/cart subcommand does not keep growing.
-     * Only the no-region selector fallback (a menu-side concern) is passed
-     * in as a {@link java.util.function.BiFunction} callback wired up by
-     * {@link VisualizationRootCmd}.
-     *
-     * <p>Permission gate is {@code rtp.menu.admin}. The {@code region}
-     * parameter's suggestion set is read live from
-     * {@code RTP.selectionAPI.regionNames()} so tab-completion stays in
-     * sync with the running configuration; an empty / missing
-     * {@code selectionAPI} collapses to an empty suggestion set.
+     * {@code /rtp visualization bad-locations [region=<regionName>]} command (ADR-050).
+     * Draws {@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE}; falls back to region picker if omitted.
+     * Gates on {@code rtp.menu.admin}.
      */
     static final class VisualizationBadLocationsCmd
             extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
@@ -459,13 +416,8 @@ final class MenuConcreteCommandLeaves {
     }
 
     /**
-     * {@code /rtp visualization biomes [region=<regionName>]} - draw the
-     * per-region {@link ChartSpec.Kind#REGION_BIOMES} chart. Structural
-     * twin of {@link VisualizationBadLocationsCmd} (same parameter set,
-     * same permission gate, same selector fallback); only the dispatch
-     * method and command name differ. Biome data is read exclusively from
-     * the region's {@code MemoryShape.biomeKeysCache} - no
-     * {@code World#getBiome}, no anvil prefilter, no chunk I/O.
+     * {@code /rtp visualization biomes [region=<regionName>]} command.
+     * Draws {@link ChartSpec.Kind#REGION_BIOMES} using cached biome data without chunk I/O (S-005).
      */
     static final class VisualizationBiomesCmd
             extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {

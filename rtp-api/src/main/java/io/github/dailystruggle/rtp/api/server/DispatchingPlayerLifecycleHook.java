@@ -5,24 +5,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
- * Reusable {@link PlayerLifecycleHook} skeleton that maintains thread-safe
- * lists of join and quit subscribers and provides {@link #fireJoin(UUID)} /
- * {@link #fireQuit(UUID)} for platform adapters to invoke from their native
- * event callbacks.
+ * Thread-safe {@link PlayerLifecycleHook} base that manages join/quit subscriber lists (ADR-049).
  *
- * <p>Intended use: a platform adapter (e.g. {@code BukkitPlayerLifecycleHook},
- * {@code FabricPlayerLifecycleHook}) extends this class (or holds an instance
- * of it) and arranges for {@link #fireJoin(UUID)} / {@link #fireQuit(UUID)} to
- * be called when the platform delivers a player-join / player-quit event. The
- * platform need not implement subscription bookkeeping or exception isolation.
- *
- * <p><b>Threading:</b> handlers may be invoked from any thread that the
- * platform delivers events on. Each subscriber is invoked under a try / catch
- * so a single misbehaving consumer cannot abort fan-out to the others;
- * exceptions are swallowed (callers that need diagnostic visibility should log
- * inside their own consumer).
- *
- * <p>Introduced by <a href="../../../../../../../../../docs/adr/ADR-049-network-mode-platform-neutral-lift.md">ADR-049</a>.
+ * <p>Dispatches via {@link #fireJoin(UUID)} and {@link #fireQuit(UUID)} with per-subscriber exception isolation.
  *
  * @since 3.0.0-beta.4
  */

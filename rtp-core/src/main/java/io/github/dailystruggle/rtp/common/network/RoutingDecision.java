@@ -3,21 +3,7 @@ package io.github.dailystruggle.rtp.common.network;
 import java.util.Optional;
 
 /**
- * Sealed result of {@link NetworkRouter#route}. One of three outcomes:
- *
- * <ul>
- *   <li>{@link Local} - serve the request from local {@code keptLocations}.</li>
- *   <li>{@link CrossServer} - enrol the request on the cross-server queue,
- *       optionally pinned to a {@code serverHint} and / or {@code regionKey}.</li>
- *   <li>{@link LocalFallback} - cross-server was preferred but is not currently
- *       safe (queue full, token bucket exhausted, no live peer, regionKey not
- *       advertised by any backend); fall back to local with {@code reason}
- *       recorded for logging / status emission per S-004.</li>
- * </ul>
- *
- * <p>Pinned by D1 ADR addendum
- * (rtp-proxy-ADR-NNN-backend-owned-rtp-with-network-queue) and PROPOSAL
- * {@code §3 Router Decision Matrix}.</p>
+ * Result of {@link NetworkRouter#route} (Local, CrossServer, or LocalFallback).
  */
 public sealed interface RoutingDecision
         permits RoutingDecision.Local,

@@ -26,10 +26,10 @@ import java.util.concurrent.CompletableFuture;
  *
  * <p><b>Design note.</b> Holds a strong reference to the {@link ServerPlayer}
  * that was current at construction. The event bridge drops the wrapper
- * from the accessor map on disconnect (REQ-RTP-S-004 — MemoryTracker release
+ * from the accessor map on disconnect (REQ-RTP-S-004 - MemoryTracker release
  * on all exit paths), so the strong-ref window is bounded by player session.
  *
- * <p>No {@code org.bukkit.*} imports — ADR-022 §4 invariant.
+ * <p>No {@code org.bukkit.*} imports - ADR-022 §4 invariant.
  */
 public final class FabricRTPPlayer
         implements RTPPlayer, FabricBookOpener, FabricMapSink, FabricInteractiveMessageSink {
@@ -162,7 +162,7 @@ public final class FabricRTPPlayer
         // back to the vanilla op-level check at the supplied level (2 ≈ "op").
         // That matches the previous op-level fallback this method had.
         //
-        // NOTE: We deliberately avoid ServerPlayer#hasPermissions(int) directly —
+        // NOTE: We deliberately avoid ServerPlayer#hasPermissions(int) directly -
         // its intermediary mapping (class_3222.method_5687) drifts across MC
         // patch releases and triggers NoSuchMethodError at runtime (same family
         // as SharedConstants.getCurrentVersion().getName() and
@@ -177,7 +177,7 @@ public final class FabricRTPPlayer
         // Ledger, ...) FIRST so non-op grants and explicit denials win over
         // the on-disk op-level check. We use the UUID-keyed overload
         // (Permissions.getPermissionValue(UUID, String)) which routes through
-        // OfflinePermissionCheckEvent — this avoids the drifted Entity
+        // OfflinePermissionCheckEvent - this avoids the drifted Entity
         // overload (which internally calls entity.method_5671() and silently
         // returns DEFAULT on 1.21.11). LuckPerms-Fabric registers an
         // OfflinePermissionCheckEvent handler that resolves synchronously
@@ -206,18 +206,18 @@ public final class FabricRTPPlayer
         FabricDefaultPermissions.Verdict verdict = FabricDefaultPermissions.resolve(permission);
         if (verdict == FabricDefaultPermissions.Verdict.TRUE) return true;
         if (verdict == FabricDefaultPermissions.Verdict.FALSE) return false;
-        // verdict == OP — fall through to the ops.json scan below.
+        // verdict == OP - fall through to the ops.json scan below.
         // TERTIARY: op-level fallback via stable APIs. ServerLevel#getServer()
         // and PlayerList#isOp(GameProfile) are non-intermediary and stable
         // across MC patch releases (unlike ServerPlayer#hasPermissions(int),
         // ServerPlayer#server (field_13995), or Entity#getServer() (method_5682)
-        // — all of which have drifted on 1.21.11 under Loom).
+        // - all of which have drifted on 1.21.11 under Loom).
         //
         // We try op-level FIRST (rather than perms-api first) because:
         //  1. perms-api's no-handler default path internally calls
         //     entity.method_5671() / server.method_3835(profile), both of
         //     which are intermediaries that can return wrong values or
-        //     fail silently (returning false) on patch-release drift —
+        //     fail silently (returning false) on patch-release drift -
         //     without throwing a LinkageError we can catch.
         //  2. The previous order (perms-api first, op-level only on
         //     LinkageError) silently denied ops on 1.21.11 because the
@@ -303,7 +303,7 @@ public final class FabricRTPPlayer
      * sink in {@code FabricServerAccessor.sendMessage(target, msg, hover, click, tag)}
      * so hover/click annotations survive end-to-end on Fabric.
      *
-     * <p>NOTE: We deliberately avoid {@code ServerPlayer#sendSystemMessage(Component)} —
+     * <p>NOTE: We deliberately avoid {@code ServerPlayer#sendSystemMessage(Component)} -
      * its intermediary mapping ({@code class_3222.method_43496}) drifts across MC
      * patch releases (observed {@code NoSuchMethodError} on 1.21.11), same family
      * as the {@code hasPermission(int)} drift documented above. Sending the system
@@ -357,7 +357,7 @@ public final class FabricRTPPlayer
      * {@code ClientboundSetTitlesAnimationPacket}, {@code ClientboundSetTitleTextPacket},
      * {@code ClientboundSetSubtitleTextPacket}. Sent directly through the player's
      * {@code connection} for the same reason {@link #sendComponent(Component)} avoids
-     * {@code ServerPlayer#sendSystemMessage} — higher-level helpers drift across MC
+     * {@code ServerPlayer#sendSystemMessage} - higher-level helpers drift across MC
      * patch releases (NoSuchMethodError on 1.21.11).
      */
     public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
@@ -390,7 +390,7 @@ public final class FabricRTPPlayer
      * Send an actionbar message (the text that hovers above the hotbar). Mirrors
      * {@code SendMessage.actionbar} on Bukkit. Empty / null is silently dropped.
      *
-     * <p>Uses {@code ClientboundSetActionBarTextPacket} via {@code connection.send} —
+     * <p>Uses {@code ClientboundSetActionBarTextPacket} via {@code connection.send} -
      * same intermediary-stability rationale as {@link #sendTitle}.
      */
     public void sendActionbar(String message) {
@@ -422,10 +422,10 @@ public final class FabricRTPPlayer
     public void performCommand(@Nullable RTPPlayer player, String command) {
         ServerPlayer p = handle;
         if (p == null || command == null) return;
-        // Use Entity#getServer() rather than ServerPlayer#server — see setLocation
+        // Use Entity#getServer() rather than ServerPlayer#server - see setLocation
         // for the IllegalAccessError rationale (intermediary field_13995 is
         // private at bytecode level under Loom).
-        // Reach the MinecraftServer via ServerLevel#getServer() — both p.server
+        // Reach the MinecraftServer via ServerLevel#getServer() - both p.server
         // (field_13995, IllegalAccessError) and p.getServer() (method_5682,
         // NoSuchMethodError) drift on 1.21.11; ServerLevel#getServer() is stable.
         ServerLevel lvl = p.serverLevel();
@@ -542,7 +542,7 @@ public final class FabricRTPPlayer
     @Override
     public RTPCommandSender clone() {
         // Same identity, same handle snapshot. Cloneable contract is loose for
-        // command senders — the clone shares the handle until a rebind/unbind.
+        // command senders - the clone shares the handle until a rebind/unbind.
         ServerPlayer p = handle;
         if (p == null) {
             // No handle to clone from; return a detached placeholder that will
@@ -563,7 +563,7 @@ public final class FabricRTPPlayer
             return CompletableFuture.completedFuture(false);
         }
         ServerLevel target = fw.level();
-        // Hop to the server thread for the teleport — Fabric mutations to
+        // Hop to the server thread for the teleport - Fabric mutations to
         // entity state must run there. server.submit returns a future that
         // resolves on-tick.
         // NOTE: We use Entity#getServer() (public) rather than the inherited
@@ -574,7 +574,7 @@ public final class FabricRTPPlayer
         // under Loom's classloader. Same family as the hasPermission /
         // sendSystemMessage intermediary drift documented above.
         // Reach the MinecraftServer via ServerLevel#getServer() rather than
-        // ServerPlayer#getServer() — the inherited Entity#getServer()
+        // ServerPlayer#getServer() - the inherited Entity#getServer()
         // intermediary (method_5682) is missing on 1.21.11 (NoSuchMethodError).
         // ServerLevel#getServer() is mapping-stable and gives us the same handle.
         net.minecraft.server.MinecraftServer srv = target.getServer();
@@ -598,7 +598,7 @@ public final class FabricRTPPlayer
     /**
      * Teleport implementation that survives Yarn/intermediary drift across MC patch
      * releases. On 1.21.11 the 6-arg {@code ServerPlayer#teleportTo(ServerLevel,double,
-     * double,double,float,float)} intermediary {@code method_14251} is missing — same
+     * double,double,float,float)} intermediary {@code method_14251} is missing - same
      * family as the {@code field_13995} / {@code method_5682} drifts already worked
      * around in this file. We attempt several stable shapes in order and fall back
      * to a packet-level same-dimension teleport (which has been part of the protocol
@@ -608,7 +608,7 @@ public final class FabricRTPPlayer
                                            double x, double y, double z,
                                            float yaw, float pitch) {
         // Attempt 0: per-version typed teleport. This is the only path that can
-        // perform a cross-dimension teleport on a remapped Fabric runtime — the
+        // perform a cross-dimension teleport on a remapped Fabric runtime - the
         // reflective Mojmap-name lookups below never resolve against intermediary
         // runtime names, so without this a cross-dim RTP (e.g. overworld -> End)
         // falls all the way through to the in-place setPos fallback, which moves
@@ -656,7 +656,7 @@ public final class FabricRTPPlayer
                     "[RTP][trace] FabricRTPPlayer same-dim connection.teleport failed: " + t);
         }
 
-        // Attempt 3: cross-dimension fallback — set position then change level.
+        // Attempt 3: cross-dimension fallback - set position then change level.
         // Best-effort; if even this drifts we surface the failure to the pipeline
         // (S-004: never silently discard).
         try {
@@ -790,8 +790,8 @@ public final class FabricRTPPlayer
     // Reads/sends are purely visual: the server's real blocks are never mutated
     // (S-001..S-007), only already-loaded blocks are touched (S-005, isChunkLoaded
     // guard), and a malformed block-data token is logged, never swallowed (S-004).
-    // The block-data string round-trips through the vanilla BlockStateParser — the
-    // same parser FabricRTPWorld#setBlocks uses — so it is platform-internally
+    // The block-data string round-trips through the vanilla BlockStateParser - the
+    // same parser FabricRTPWorld#setBlocks uses - so it is platform-internally
     // compatible with whatever getClientBlock produced.
     //
     // Binning note: the bulk sendClientBlockChanges(Map) inherits the RTPPlayer

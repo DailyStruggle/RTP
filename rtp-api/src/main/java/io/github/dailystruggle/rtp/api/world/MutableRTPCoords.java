@@ -1,15 +1,10 @@
 package io.github.dailystruggle.rtp.api.world;
 
 /**
- * Mutable block-coordinate value used during the location generation pipeline
- * before a candidate position is confirmed and frozen as a {@link RTPCoords}.
+ * Mutable block-coordinate value used during location generation before freezing.
  *
- * <p>Fields are intentionally {@code public} for low-overhead sequential mutation
- * inside the generation loop. Once generation is complete, call {@link #toImmutable()}
- * to obtain a thread-safe snapshot suitable for passing across the API boundary.
- *
- * <p><b>Thread safety:</b> This class is <em>not</em> thread-safe. Instances must
- * be confined to a single thread during the generation phase.
+ * <p>Public fields allow low-overhead mutation in the generator loop.
+ * Thread safety: not thread-safe; confine to generation thread until {@link #toImmutable()}.
  *
  * @see RTPCoords
  */
@@ -20,12 +15,7 @@ public class MutableRTPCoords {
     public int z;
 
   /**
-   * Creates a horizontal-only coordinate with {@code worldName} set to an empty
-   * string and {@code y} set to {@code 0}.
-   *
-   * <p>Use this constructor when only the XZ plane is known at the time of
-   * candidate selection; call {@link #setY(int)} and {@link #setWorldName(String)}
-   * once the surface Y and world are resolved.
+   * Creates a horizontal-only coordinate with empty world name and y=0.
    *
    * @param x block X coordinate
    * @param z block Z coordinate
@@ -83,13 +73,9 @@ public class MutableRTPCoords {
     }
 
   /**
-   * Creates an immutable snapshot of the current state.
+   * Creates an immutable {@link RTPCoords} snapshot of current field values.
    *
-   * <p>This is a cheap field-copy operation and does not validate the coordinate
-   * values. Callers are responsible for ensuring the coordinate represents a
-   * valid, verified location before sharing the result across threads.
-   *
-   * @return a new {@link RTPCoords} with the current field values
+   * @return new immutable coordinate snapshot
    */
     public RTPCoords toImmutable() {
         return new RTPCoords(worldName, x, y, z);

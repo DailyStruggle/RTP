@@ -6,22 +6,8 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 /**
  * Immutable outcome of an {@link RTPAPI#teleport(java.util.UUID, RtpTarget)} request.
  *
- * <p>A result is <em>always</em> delivered for every teleport request - success or
- * failure - so that callers never have to guess whether a teleport silently did
- * nothing (REQ-RTP-S-004). On success {@link #location()} is non-null; on failure
- * {@link #reason()} explains why and {@link #location()} is {@code null}.
- *
- * <p>Idiomatic use:
- * <pre>{@code
- * RTPAPI.teleport(playerId, RtpTarget.defaultRegion())
- *       .thenAccept(result -> {
- *         if (result.isSuccess()) {
- *           getLogger().info("Sent to " + result.location());
- *         } else {
- *           getLogger().warning("RTP failed: " + result.reason() + " - " + result.message());
- *         }
- *       });
- * }</pre>
+ * <p>Delivered for every request (REQ-RTP-S-004). Success yields a non-null {@link #location()};
+ * failure yields a {@link #reason()} and {@code null} location.
  */
 @PublicApi
 public final class RTPResult {
@@ -102,13 +88,10 @@ public final class RTPResult {
   }
 
   /**
-   * Builds a {@link Reason#QUEUED} result: the request was accepted and enrolled
-   * on the cross-server wait queue. The player will be transferred to a peer
-   * backend and teleported there; no local {@link #location()} exists.
+   * Builds a {@link Reason#QUEUED} result for an accepted cross-server request.
    *
-   * @param message a human-readable explanation (e.g. "queued for backend-a");
-   *     may be {@code null}
-   * @return a queued result
+   * @param message human-readable status explanation, or {@code null}
+   * @return queued result with {@code null} location
    */
   public static RTPResult queued(String message) {
     return new RTPResult(Reason.QUEUED, null, message);

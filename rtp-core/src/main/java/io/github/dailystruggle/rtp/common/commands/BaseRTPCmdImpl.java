@@ -53,26 +53,15 @@ public abstract class BaseRTPCmdImpl implements BaseRTPCmd {
   }
 
   /**
-   * Subclass-accessible bridge to {@link BaseRTPCmd}'s default args-form
-   * dispatch (inherited from
-   * {@link io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand}).
+   * Subclass bridge to {@link BaseRTPCmd}'s default {@code onCommand} dispatch.
    *
-   * <p>Java forbids {@code Iface.super.method()} when the interface is
-   * reached transitively through a superclass — a subclass of
-   * {@code BaseRTPCmdImpl} cannot write {@code BaseRTPCmd.super.onCommand(...)}
-   * because {@code BaseRTPCmd} is not its <em>direct</em> superinterface.
-   * This bridge is the only legal way for subclasses (e.g. the runtime
-   * test command tree's {@code TestCmd}) to wrap the default dispatch
-   * with cross-cutting behaviour such as the per-caller test-isolation
-   * semaphore.
-   *
-   * @param callerId             UUID of the command sender
-   * @param permissionCheckMethod predicate that tests a permission node for the sender
-   * @param messageMethod        consumer that sends a message to the sender
-   * @param args                 raw command arguments
-   * @param i                    current argument index
-   * @param tempParameters       per-invocation parameter overrides, or {@code null}
-   * @return a future that resolves to {@code true} on success
+   * @param callerId              command sender UUID
+   * @param permissionCheckMethod permission test predicate
+   * @param messageMethod         message feedback sink
+   * @param args                  command arguments
+   * @param i                     current argument index
+   * @param tempParameters        per-invocation parameter overrides or null
+   * @return future resolving to true on completion
    */
   protected final CompletableFuture<Boolean> defaultOnCommand(
       @NotNull java.util.UUID callerId,

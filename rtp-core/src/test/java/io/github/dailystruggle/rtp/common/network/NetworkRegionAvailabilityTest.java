@@ -17,10 +17,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice E coverage (REQ-RTP-NET cross-server region parameter): the
+ * Behaviour tests for the cross-server region parameter (REQ-RTP-NET): the
  * snapshot-backed {@link RegionAvailabilityProvider} verdicts and the
  * {@link NetworkRegionParameter} suggest-vs-validate split, including the
- * load-bearing "unknown -&gt; accept" execute-time rule (proposal §6.2).
+ * load-bearing "unknown -&gt; accept" execute-time rule.
  */
 class NetworkRegionAvailabilityTest {
 

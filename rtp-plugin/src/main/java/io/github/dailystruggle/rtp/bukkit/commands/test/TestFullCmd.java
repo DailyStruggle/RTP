@@ -27,9 +27,7 @@ import org.jetbrains.annotations.Nullable;
  * currently-shipped {@code rtp test *} subcommand in sequence with
  * conservative defaults, emitting a consolidated start/end log line.
  *
- * <p>This class is the <b>intent-of-continuity anchor</b> documented in
- * {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md &sect;3.2}: every time a new
- * subcommand is promoted from <b>Roadmap</b> to <b>Shipped</b>, it must be
+ * <p>Every time a new subcommand is promoted to <b>Shipped</b>, it must be
  * added to the {@link #SHIPPED_SUBCOMMAND_NAMES} list and dispatched by
  * {@link #runStep(UUID, int, FullAudit)} in the same
  * change. Today the shipped set is {@link TestSchedulerCmd} and
@@ -55,14 +53,13 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
   /**
    * The canonical ordered list of subcommand names this umbrella sweep
-   * invokes. Mirrors the sequence dispatched by {@link #runStep(UUID, int, FullAudit)}
-   * and &sect;4 of {@code RUNTIME_TEST_SUITE_PLAN.md}. Exposed package-private
-   * so unit tests can assert parity with {@link TestCmd}'s registration set
-   * without having to initialise {@link RTP#serverAccessor}.
+   * invokes. Mirrors the sequence dispatched by {@link #runStep(UUID, int, FullAudit)}.
+   * Exposed package-private so unit tests can assert parity with
+   * {@link TestCmd}'s registration set without having to initialise
+   * {@link RTP#serverAccessor}.
    *
    * <p>Deliberately excluded: {@code cancel} (would abort the sweep itself)
-   * and {@code reload-safety} (admin-only, intentionally noisy). See the
-   * javadoc on {@link #runStep(UUID, int, FullAudit)} for the rationale.
+   * and {@code reload-safety} (admin-only, intentionally noisy).
    */
   static final List<String> SHIPPED_SUBCOMMAND_NAMES =
       Collections.unmodifiableList(
@@ -350,7 +347,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
     // Register the listener first. addOnEmptyListener fires inline if the
     // owner is already drained, which is the common case for synchronous
-    // subcommands that did not register an ActiveTestJobs entry — so the
+    // subcommands that did not register an ActiveTestJobs entry - so the
     // chain advances without ever scheduling the watchdog timer.
     ActiveTestJobs.addOnEmptyListener(callerId, listener);
     if (advanced.get()) {
@@ -458,7 +455,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       // emit kept as discrete sendMessage / log calls to preserve the
       // existing audit-interceptor capture semantics.
       // NOTE: This is the plain-text rendering; once the book API
-      // stabilises, the same data will be re-emitted as a book page —
+      // stabilises, the same data will be re-emitted as a book page -
       // see docs/dev/TODO.md section 7 (Interactive Menus) follow-up.
       String[] lines = (summaryHeader + "\n" + rows + metricsLine + "\n" + footer)
           .split("\n");

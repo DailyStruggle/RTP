@@ -57,16 +57,8 @@ public class LockFreeLocationBuffer {
     }
 
     /**
-     * Tries to add a location to the buffer without firing the {@code onAdd}
-     * callback.
-     *
-     * <p>Mirror of {@link #pollSilently()} for the destination side of an
-     * internal buffer-to-buffer move (e.g. shedding {@code keptLocations} back
-     * into {@code unkeptLocations} under heap pressure). The location persists
-     * under an identical DB composite key in both buffers, so firing the
-     * {@code onAdd} save here would be redundant write churn against a row that
-     * already exists. Pairing a {@link #pollSilently()} on the source with this
-     * silent offer keeps the DB row untouched while the chunk ticket is freed.
+     * Tries to add a location to the buffer without firing the {@code onAdd} callback.
+     * Used for buffer-to-buffer transfers to avoid redundant database writes.
      *
      * @param location the location to add.
      * @return {@code true} if the location was added, {@code false} if full.
@@ -142,19 +134,8 @@ public class LockFreeLocationBuffer {
     }
 
     /**
-     * Removes and returns the head location without firing the {@code onRemove}
-     * callback.
-     *
-     * <p>Intended for internal-promotion paths where a location is being moved
-     * from one buffer to another (e.g. {@code unkeptLocations} → {@code keptLocations}
-     * in {@code Region.execute}) and persists under an identical DB composite key
-     * at the destination. Firing the delete callback on the source poll and the
-     * save callback on the destination offer on the same key races inside
-     * {@code DatabaseAccessor}'s {@code writeQueue} / {@code deleteQueue} and can
-     * produce a net delete (silently losing the row across restarts). Using this
-     * silent variant for the source removal keeps the DB row intact — the
-     * destination offer's save callback is a deterministic upsert that refreshes
-     * the existing row.
+     * Removes and returns the head location without firing the {@code onRemove} callback.
+     * Used for buffer-to-buffer promotions to prevent premature database row deletion.
      *
      * @return The removed location, or {@code null} if the buffer is empty.
      */
@@ -173,7 +154,7 @@ public class LockFreeLocationBuffer {
             location = buffer.get((int) (currentHead & mask));
             // offer() advances tail BEFORE publishing the slot, so a concurrent
             // consumer can observe a non-empty tail with a still-null slot. Spin
-            // rather than CAS head forward over the gap — advancing over a null
+            // rather than CAS head forward over the gap - advancing over a null
             // slot would silently drop the producer's in-flight entry.
         } while (location == null || !head.compareAndSet(currentHead, currentHead + 1));
 
@@ -226,8 +207,7 @@ public class LockFreeLocationBuffer {
     /**
      * Returns the buffer's allocated capacity (next power of two ≥ the value passed
      * to the constructor). Exposed for fill-ratio metrics consumed by {@code /rtp info}
-     * health output and bStats {@code cache_pool_health} chart per
-     * {@code docs/dev/METRICS_PLAN.md}.
+     * health output and bStats {@code cache_pool_health} chart.
      *
      * @return Total slot count of the underlying ring buffer.
      */

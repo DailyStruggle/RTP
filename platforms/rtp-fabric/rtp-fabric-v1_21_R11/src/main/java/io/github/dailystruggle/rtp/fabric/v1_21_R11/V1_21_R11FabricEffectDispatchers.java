@@ -18,16 +18,16 @@ import java.util.logging.Level;
  * Loom-compiled effect dispatchers for MC 1.21.11+. Replaces the reflective
  * resolvers in {@code effects-api}'s {@code FabricSoundEffect} /
  * {@code FabricParticleEffect} on this MC version with direct, mapped vanilla
- * calls — no constructor-arity probing, no {@code Holder<SoundEvent>} vs
+ * calls - no constructor-arity probing, no {@code Holder<SoundEvent>} vs
  * {@code SoundEvent} guesswork, no intermediary-name walks.
  *
  * <p>Sound: builds a {@link ClientboundSoundPacket} from a registry-keyed
- * reference {@link Holder} (never {@code Holder.direct} — direct holders
+ * reference {@link Holder} (never {@code Holder.direct} - direct holders
  * are decoded client-side as one-off custom-pack sounds and produce no
  * audio for built-in {@link SoundEvent}s, which is the user-reported
  * 1.21.11 symptom that motivated the per-version dispatcher work). Sent
  * straight to {@link ServerPlayer#connection} so the packet bypasses the
- * chunk tracker — important because right after a long teleport the
+ * chunk tracker - important because right after a long teleport the
  * player is briefly outside the destination chunk's tracking radius and
  * tracker-broadcast packets are dropped client-side.</p>
  *
@@ -38,7 +38,7 @@ import java.util.logging.Level;
  *
  * <p>Called from {@link V1_21_R11FabricVersionAdapter#installEffectsDispatchers()},
  * which the {@code RTPFabricMod} bootstrap invokes once per server start
- * after the version adapter is selected. Idempotent — last-writer-wins on
+ * after the version adapter is selected. Idempotent - last-writer-wins on
  * the {@code FabricEffectRuntime} side.</p>
  */
 final class V1_21_R11FabricEffectDispatchers {
@@ -51,7 +51,7 @@ final class V1_21_R11FabricEffectDispatchers {
     static void install() {
         // Tolerate effects-api being absent at runtime (the rtp-lite assembly
         // strips it). The reference to FabricEffectRuntime below will trigger
-        // class loading; if that fails, log and move on — effects-api's own
+        // class loading; if that fails, log and move on - effects-api's own
         // reflective fallback path won't run either (because effects-api
         // itself isn't loaded), so there's nothing to do.
         try {
@@ -60,7 +60,7 @@ final class V1_21_R11FabricEffectDispatchers {
             FabricEffectRuntime.registerPotion(V1_21_R11FabricEffectDispatchers::applyPotion);
             // One-shot startup confirmation so deployments can prove the
             // per-version dispatcher path is wired (user reported "no
-            // logs at all" symptom on 1.21.11 — without this line there's
+            // logs at all" symptom on 1.21.11 - without this line there's
             // no positive evidence of registration in the server log).
             RTP.log(Level.FINER, "[RTP][Fabric 1.21.11+] effect dispatchers registered "
                     + "(SoundDispatcher + ParticleDispatcher) — "
@@ -102,7 +102,7 @@ final class V1_21_R11FabricEffectDispatchers {
         // Avoid touching player.level() / serverLevel() entirely. The user-
         // reported runtime on 1.21.11 throws NoSuchMethodError for
         // class_3222.method_37908() (Entity#level intermediary), even from
-        // this Loom-compiled module — apparently because the deployed
+        // this Loom-compiled module - apparently because the deployed
         // Fabric Loader's intermediary mapping for that runtime no longer
         // contains the symbol on this concrete subclass. We only used the
         // level for a random seed, which is purely a client-side variation
@@ -133,13 +133,13 @@ final class V1_21_R11FabricEffectDispatchers {
                                      double x, double y, double z,
                                      int count,
                                      double dx, double dy, double dz, double speed) {
-        // Avoid recipient.level() / serverLevel() entirely — both throw
+        // Avoid recipient.level() / serverLevel() entirely - both throw
         // NoSuchMethodError on the deployed 1.21.11 runtime even from
         // this Loom-compiled module (intermediary mismatch on
         // class_3222.method_37908 / method_51469). Build the targeted
         // particle packet ourselves and send it through
         // ServerGamePacketListenerImpl, which only needs the recipient
-        // and the ParticleOptions — no ServerLevel required.
+        // and the ParticleOptions - no ServerLevel required.
         //
         // Both flags forced to true: overrideLimiter bypasses the
         // client's particle.density throttle, and longDistance ("alwaysShow"

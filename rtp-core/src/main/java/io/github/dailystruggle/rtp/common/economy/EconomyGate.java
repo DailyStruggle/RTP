@@ -11,29 +11,9 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.util.UUID;
 
 /**
- * Single shared economy charging gate for one teleport charge.
- *
- * <p>This is the only place in {@code rtp-core} that computes a teleport price,
- * performs the balance-floor affordability check, and issues the withdrawal.
- * Both the {@code /rtp} command path ({@code RTPCmd.compute}) and the
- * addon-facing teleport entry point ({@code RTPAPI.teleport(UUID, RtpTarget)},
- * which every GUI/menu addon drives) route through it, so money leaves an
- * account through exactly one code path over whatever {@link RTPEconomy}
- * provider is bound (Vault by default, addon-replaceable via
- * {@code RTPAPI.hooks().economy().bind(...)}). Callers own only the user-facing
- * messaging and the {@code TeleportData.cost} bookkeeping used for the
- * refund-on-failure path ({@code RTPTeleportCancel}).
- *
- * <p>The charge is {@code EconomyKeys.price} (or {@code EconomyKeys.priceOther}
- * for a target that is not the payer, see {@link PriceKey}) plus the target
- * region's {@code RegionKeys.price}, optionally plus
- * {@code paramsPrice}/{@code biomePrice} when the caller supplied
- * shape/vert/world-border or biome parameters. The charge is skipped entirely
- * (returns {@link Result#ALLOWED} with {@code cost == 0}) when no economy
- * provider is bound, when the payer is the console/server sender, or when the
- * free-check subject has {@code rtp.free}. The balance-floor rejection uses
- * {@code EconomyKeys.balanceFloor}. The actual withdrawal is fire-and-forget via
- * {@link EconomyHop}, so no future is blocked (S-005 preserved).
+ * Shared economy charging gate for teleportation costs.
+ * Computes base price, region price, and param/biome modifiers; checks balance floor;
+ * and applies asynchronous withdrawal via {@link EconomyHop}.
  */
 public final class EconomyGate {
   private EconomyGate() {}
@@ -65,19 +45,15 @@ public final class EconomyGate {
   public record Charge(Result result, double cost) {}
 
   /**
-   * Computes and (when affordable) applies a single teleport charge.
+   * Computes and applies a single teleport charge.
    *
-   * @param payerId      the paying account's UUID; never {@code null}
-   * @param freeSubject  the actor whose {@code rtp.free} permission exempts the
-   *                     charge (the sender for a self/other command charge, the
-   *                     target for a target-pays charge); may be {@code null}
-   * @param region       the target region (for {@code RegionKeys.price}); may be {@code null}
-   * @param which        whether to use the self or other-player base price key
-   * @param hasParams    whether shape/vert/world-border parameters were supplied
-   * @param hasBiome     whether a biome parameter was supplied
-   * @return a {@link Charge} carrying {@link Result#ALLOWED} (charge applied or
-   *     not required) or {@link Result#INSUFFICIENT_FUNDS} (payer cannot afford
-   *     it, nothing withdrawn) and the computed cost
+   * @param payerId paying account UUID; never {@code null}
+   * @param freeSubject actor whose {@code rtp.free} permission exempts charges; may be {@code null}
+   * @param region target region for region price; may be {@code null}
+   * @param which base price key to use (self vs. other)
+   * @param hasParams whether extra params were supplied
+   * @param hasBiome whether a biome was supplied
+   * @return {@link Charge} result and cost
    */
   public static Charge charge(
       UUID payerId,

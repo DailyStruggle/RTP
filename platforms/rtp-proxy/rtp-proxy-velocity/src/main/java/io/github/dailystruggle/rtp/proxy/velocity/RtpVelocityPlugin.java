@@ -112,8 +112,8 @@ public final class RtpVelocityPlugin {
     /** ADR-016 periodic tag-refresh pulse; cancelled on shutdown. */
     private ScheduledFuture<?> ownershipRefreshTask;
     /**
-     * Proxy-cache companion (PROPOSAL-proxy-as-availability-store): caches
-     * backend heartbeats + serves the operator-configured server-&gt;regions
+     * Proxy-cache companion: caches backend heartbeats and serves the
+     * operator-configured server-&gt;regions
      * snapshot to lobbies over the {@code rtp:net} channel. Null when network
      * is disabled.
      */
@@ -125,7 +125,7 @@ public final class RtpVelocityPlugin {
      * {@link VelocityProxyAvailabilityCache} as {@link #proxyCacheListener}.
      */
     private ProxyDirectListener proxyDirectListener;
-    /** Idempotence guard for {@link #onProxyShutdown} (checklist row 7f). */
+    /** Idempotence guard for {@link #onProxyShutdown}. */
     private volatile boolean shutdownStarted;
 
     @Inject
@@ -147,7 +147,7 @@ public final class RtpVelocityPlugin {
             // operator can see why the file wasn't created.
             saveDefaultNetworkYaml();
 
-            // Step 1: register accessor BEFORE any rtp-proxy-common entry point.
+            // Register accessor BEFORE any rtp-proxy-common entry point.
             // proxyId is read from network.yml, but the accessor needs a value at
             // construction. Read just the proxyId first (or fall back to a placeholder
             // when the file is absent; disabled config does not require a real id).
@@ -155,7 +155,7 @@ public final class RtpVelocityPlugin {
             this.accessor = new VelocityProxyAccessor(proxyServer, preliminaryProxyId);
             RtpProxy.setProxyAccessor(accessor);
 
-            // Step 2: parse network.yml (defaults when absent).
+            // Parse network.yml (defaults when absent).
             Map<String, Object> raw = readNetworkYaml();
             try {
                 this.config = NetworkConfig.fromMap(raw, accessor);
@@ -169,7 +169,7 @@ public final class RtpVelocityPlugin {
                 return;
             }
 
-            // Step 3: open transport + start publisher.
+            // Open transport + start publisher.
             // Route through NetworkBindings factory. The proxy currently has no
             // JDBC DataSource (proxies don't own a SQL DB by default);
             // transport.type=sql therefore fails fast on the proxy. Operators
@@ -557,7 +557,7 @@ public final class RtpVelocityPlugin {
                     },
                     // proxy-direct = remote view of the proxy store: dispatch
                     // NetworkTransport + NetworkRequestQueue RPCs onto the
-                    // proxy's own instances (PROPOSAL-proxy-direct-as-remote-store).
+                    // proxy's own instances.
                     // NB: the local `transport` here is the YAML section, so we
                     // pass the plugin fields explicitly.
                     this.transport,

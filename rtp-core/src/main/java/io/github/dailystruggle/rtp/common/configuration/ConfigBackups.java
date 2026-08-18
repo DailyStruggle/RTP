@@ -11,18 +11,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Shared, RTP-free disk-backup helper for YAML configuration files. This is the
- * single implementation of the {@code <file>.bak.<epochMillis>} sibling-backup
- * scheme used by both the live config system ({@link ConfigParser#save()}) and
- * the admin prefab pipeline.
- *
- * <p>Backup naming: {@code <originalFileName>.bak.<epochMillis>} as a sibling of
- * the original file. Rotation is FIFO by epoch (lexicographic on the fixed-width
- * suffix), oldest pruned first once the count exceeds the retention cap.
- *
- * <p>All methods are pure static helpers operating on an absolute {@link File}
- * target so they remain unit-testable against a {@code @TempDir} without an
- * {@link io.github.dailystruggle.rtp.common.RTP} bootstrap.
+ * Shared disk-backup helper for YAML configuration files.
+ * Manages {@code <file>.bak.<epochMillis>} sibling backups and FIFO retention.
  */
 public final class ConfigBackups {
 
@@ -36,14 +26,11 @@ public final class ConfigBackups {
     }
 
     /**
-     * Copy {@code target} sideways as {@code <name>.bak.<epochMillis>} and prune
-     * the sibling backups beyond {@code retention} (oldest first). No-op (returns
-     * {@code null}) when the target does not yet exist.
+     * Copies {@code target} sideways as {@code <name>.bak.<epochMillis>} and prunes
+     * sibling backups beyond {@code retention} (oldest first).
      *
-     * @param retention number of {@code .bak.<ts>} siblings to keep after this
-     *                  backup is written; clamped to {@code >= 1}.
-     * @return the path of the freshly-written backup, or {@code null} when the
-     *         target did not exist.
+     * @param retention number of backups to keep (clamped to >= 1).
+     * @return path of created backup, or {@code null} if target did not exist.
      */
     public static Path backup(File target, int retention) throws IOException {
         Objects.requireNonNull(target, "target");

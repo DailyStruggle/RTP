@@ -8,27 +8,8 @@ import java.io.File;
 import java.lang.reflect.Field;
 
 /**
- * One-call test harness that wires a {@link MockRTPServerAccessor} into all
- * static singletons that rtp-core code reads at runtime.
- *
- * <h3>Typical usage</h3>
- * <pre>{@code
- * @TempDir Path tempDir;
- *
- * @BeforeEach
- * void setUp() {
- *     RTPTestSetup.install(tempDir.toFile());
- * }
- * }</pre>
- *
- * <p>After {@code install} the following are set:
- * <ul>
- *   <li>{@link RTP#serverAccessor} — the mock accessor (RTPAPI.serverAccessor is set
- *       automatically by the {@link RTP} constructor via
- *       {@link RTPAPI#setServerAccessor(io.github.dailystruggle.rtp.api.server.RTPServerAccessor)})</li>
- *   <li>{@link RTP#scheduler} — the mock scheduler (synchronous, no threads)</li>
- *   <li>{@link RTP} instance — an anonymous subclass so {@link RTP#getInstance()} works</li>
- * </ul>
+ * Test harness wiring {@link MockRTPServerAccessor} into static singletons for tests.
+ * Installs mock server accessor, scheduler, configs, and RTP singleton.
  */
 public final class RTPTestSetup {
 
@@ -76,7 +57,7 @@ public final class RTPTestSetup {
         // Guarantee RTPAPI.serverAccessor is always set to the current test's accessor.
         // ensureRTPInstance() reuses an existing RTP instance when one is present, so the
         // RTP constructor (which calls RTPAPI.setServerAccessor) may not run on subsequent
-        // installs — leaving RTPAPI.serverAccessor null after the null-clear above.
+        // installs - leaving RTPAPI.serverAccessor null after the null-clear above.
         RTPAPI.serverAccessor = accessor;
 
         // Always refresh Configs to point at the current test's pluginDir and register all

@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * REQ-RTP-MAP-001 (extends REQ-RTP-S-006): every {@link NoopMapBinding}
  * entry-point shall throw {@link IllegalStateException} with the documented
- * prefix — never return {@code null} and never silently no-op.
+ * prefix - never return {@code null} and never silently no-op.
  */
 @DisplayName("REQ-RTP-MAP-001 — NoopMapBinding require-by-contract")
 class ReqRtpMap001RequireByContractTest {

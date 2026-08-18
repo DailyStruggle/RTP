@@ -29,15 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Unit tests for {@link SubConfigCmd} verifying that user-supplied sub-parameters
- * (e.g. {@code /rtp config region default.yml shape:square radius:128}) update
- * the region config's nested shape/vert sub-map with the supplied values.
- *
- * <p>This pins V2 behaviour: when the user types a top-level enum-typed parameter
- * (shape or vert) plus one of its sub-parameters (radius, centerRadius, mode, ...),
- * {@link SubConfigCmd#onCommand} must rebuild the shape/vert section as a
- * {@code Map<String, Object>} with the user's overrides applied, then hand it
- * to {@link ConfigParser#set(String, Object)}.
+ * Unit tests for {@link SubConfigCmd} sub-parameter overrides.
+ * Verifies shape/vert nested sub-maps are updated and passed to {@link ConfigParser#set}.
  */
 public class RegionSubParameterUpdateTest {
 
@@ -154,7 +147,7 @@ public class RegionSubParameterUpdateTest {
                     return (Map<String, Object>) captured;
                 }
             } catch (AssertionError ignored) {
-                // not yet — keep waiting
+                // not yet - keep waiting
             }
             Thread.sleep(25);
         }
@@ -212,7 +205,7 @@ public class RegionSubParameterUpdateTest {
         Map<String, Object> shapeMap = waitForSet("shape");
         assertEquals("SQUARE", shapeMap.get("name"));
         // Square's default radius is 256 (see Square.defaults). When the user supplies
-        // no override, the sub-map's `radius` must be the default — not removed.
+        // no override, the sub-map's `radius` must be the default - not removed.
         assertEquals(256, shapeMap.get("radius"),
                 "with no radius override the shape sub-map must carry the shape's default");
     }

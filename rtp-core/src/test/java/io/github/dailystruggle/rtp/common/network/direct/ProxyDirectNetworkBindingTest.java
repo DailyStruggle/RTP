@@ -73,7 +73,7 @@ class ProxyDirectNetworkBindingTest {
                     DataInputStream in = new DataInputStream(s.getInputStream());
                     DataOutputStream out = new DataOutputStream(s.getOutputStream());
                     // Every proxy-direct connection is an opcode + signed
-                    // request; branch on it (PROPOSAL-proxy-direct-as-remote-store).
+                    // request; branch on it.
                     byte op = ProxyDirectWire.readOpcode(in);
                     String payload = ProxyDirectWire.readSignedPayload(in, verifier);
                     if (op == ProxyDirectWire.OP_FIND_RESERVATION) {

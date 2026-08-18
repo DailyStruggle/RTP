@@ -96,20 +96,11 @@ public class Factory<T extends FactoryValue<?>> {
   }
 
   /**
-   * Like {@link #construct(String)}, but clones the entry registered under
-   * {@code fromName} as the template instead of always falling back to
-   * {@code DEFAULT.YML}. Used to create a new file (e.g. a new region) seeded
-   * from an arbitrary originating file rather than the bundled default.
+   * Constructs an item cloned from template {@code fromName}, falling back to default.
    *
-   * <p>When {@code fromName} resolves to an already-registered name the new
-   * value reuses that entry as a template; when it does not exist the call
-   * degrades to {@link #construct(String)} (default-seeded), so callers never
-   * need to special-case a missing template.
-   *
-   * @param name     the name of the item to construct
-   * @param fromName the originating template name to clone from
-   * @return mutable copy of the item seeded from {@code fromName}, or
-   *         {@code null} when the map is empty
+   * @param name     item name to construct
+   * @param fromName originating template name to clone from
+   * @return mutable cloned copy, or {@code null} if factory is empty
    */
   @Nullable
   public FactoryValue<?> construct(String name, String fromName) {

@@ -14,18 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Phase B parity test for the {@link MetricsExtension} slot mechanism on
- * {@link MetricsSnapshot}. Verifies:
- * <ol>
- *   <li>{@link Metrics#NOOP} attaches a zero {@link RTPMetricsExtension}.</li>
- *   <li>{@link MetricsSnapshot#withExtension(MetricsExtension)} returns a new
- *       snapshot carrying the payload, leaves the receiver untouched, and
- *       preserves all 15 legacy host-runtime fields.</li>
- *   <li>{@link MetricsSnapshot#extension(Class)} returns {@code null} for
- *       absent payloads and rejects null type without NPE.</li>
- * </ol>
- *
- * <p>See {@code metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md}.
+ * Parity test for the {@link MetricsExtension} slot mechanism on {@link MetricsSnapshot}.
  */
 class MetricsExtensionParityTest {
 

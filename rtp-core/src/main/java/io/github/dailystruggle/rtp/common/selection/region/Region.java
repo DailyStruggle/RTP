@@ -43,7 +43,7 @@ public class Region extends FactoryValue<RegionKeys> {
   // Constructed in the Region(...) constructor body, after this.settings is
   // assigned. A field initializer here would run before this.settings is set,
   // making RegionQueueManager observe settings==null and fall into its
-  // fallback branch — which (per ADR-028) leaves backlogLocations null,
+  // fallback branch - which (per ADR-028) leaves backlogLocations null,
   // permanently disabling the L3 cache regardless of backlogCacheCap.
   public RegionQueueManager queueManager;
   public AtomicInteger inFlightCalculations =
@@ -74,31 +74,12 @@ public class Region extends FactoryValue<RegionKeys> {
 
   /**
    * Set true once this region's {@link ScanTask} has finished its full-load
-   * verification pass (i.e. world pre-generation is sufficient for the
-   * region's footprint). Used to gate the L3 backlog cache pulse
-   * ({@link #processBacklog}) so that backlog refill/verify/drain — which
-   * ultimately drives live chunk loads through the deficit loop — does not
-   * compete with ongoing pre-generation work.
-   *
-   * <p>Default {@code false}; flipped to {@code true} by {@code ScanTask}
-   * at the end of its FULLSCAN pass. Remains {@code true} for the lifetime
-   * of the region (a completed scan does not need to be re-run unless the
-   * scan progress files are deleted, in which case a new {@code Region}
-   * instance is created).
+   * verification pass. Used to gate L3 backlog drain.
    */
   public volatile boolean scanCompleted = false;
 
   /**
-   * Hysteresis latch for the L3 backlog refill loop (see
-   * {@link #processBacklog}). When {@code true}, the refill loop will run on
-   * each pulse until the backlog reaches {@code capacity}; when
-   * {@code false}, the loop is skipped until the backlog drains below
-   * {@code backlogRefillThreshold * capacity}. This deliberate dead-band
-   * groups shape picks (and the eventual Anvil bin verification) into
-   * larger batches that share the same {@code .mca} files, improving CPU
-   * and memory locality versus refilling one-slot-at-a-time on every
-   * pulse. Default starting state is {@code true} so a fresh region fills
-   * the backlog once at startup.
+   * Hysteresis latch for the L3 backlog refill loop.
    */
   private volatile boolean backlogRefillActive = true;
 
@@ -191,15 +172,8 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     }
 
-    // Hydrate locations from database. Skip when this region is fallback-bound to a
-    // stand-in world: the DB rows reference the configured world's seed, and the seed
-    // mismatch check in hydrateCacheFromDatabase would permanently delete every row.
-    // Hydration is performed later by rebindWorld(...) once the real world loads.
-    //
-    // Deferred to an async task: DB I/O on the plugin-init main thread can stall server
-    // startup, and on Folia the calling thread context for synchronous DB reads is not
-    // well-defined. Scheduling onto the async pool means the queues stay empty for the
-    // first few ticks, which is harmless because no player can RTP that early anyway.
+    // Hydrate locations from database asynchronously. Skip for fallback-bound regions
+    // until rebindWorld() is called.
     if (!this.worldFallbackBound) {
       RTP.scheduler.runTaskAsynchronously(this::hydrateFromDatabaseIfAvailable);
     }
@@ -207,10 +181,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
   /**
    * Reads cached locations for this region from the database (if any) and feeds them into the
-   * local queues. Safe to call multiple times; the region simply won't re-queue rows already
-   * consumed. Intended to be invoked at construction for normally-bound regions, and again by
-   * {@link #rebindWorld(RegionSettings)} when a fallback-bound region is switched onto its
-   * configured world.
+   * local queues.
    */
   private void hydrateFromDatabaseIfAvailable() {
     if (RTP.getInstance().databaseAccessor == null) return;
@@ -230,13 +201,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * Replaces this region's {@link RegionSettings} with settings resolved against a now-loaded
    * configured world, then hydrates cached locations from the database.
    *
-   * <p>Used when automatic world generation (e.g. Multiverse) loads the configured world after
-   * the plugin has already instantiated the region against a fallback world. Drops any stale
-   * queue entries that were reserved against the fallback world before swapping, so no location
-   * resolved for the wrong world leaks to a player.
-   *
-   * @param newSettings settings produced by {@link RegionConfigLoader#load} after the
-   *                    configured world was loaded.
+   * @param newSettings settings produced after the configured world was loaded
    */
   public void rebindWorld(RegionSettings newSettings) {
     // Purge any queued locations bound to the fallback world. None should have actually been
@@ -290,7 +255,7 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   public void setSettings(RegionSettings settings) {
-    // Capture the old cache key BEFORE we replace shape/settings — this is what the
+    // Capture the old cache key BEFORE we replace shape/settings - this is what the
     // (about-to-be-orphaned) on-disk .bin and .scan files are keyed by.
     String oldCacheKey = cacheKey();
 
@@ -303,7 +268,7 @@ public class Region extends FactoryValue<RegionKeys> {
     if (!oldCacheKey.equals(newCacheKey)) {
       // The shape or vertical adjustor changed in a way that invalidates the spiral
       // 1D->2D mapping or the validity predicate. The old persisted shape data and scan
-      // progress are stale — drop them so a fresh ScanTask cycle starts on the new geometry.
+      // progress are stale - drop them so a fresh ScanTask cycle starts on the new geometry.
       // ADR-022 calls for safety-first invalidation here; the alternative (silently
       // overwriting the in-memory MemoryShape with stale flags) is the latent bug we
       // are closing.
@@ -337,17 +302,7 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
-   * Compute the on-disk cache key suffix for this region, of the form
-   * {@code "<seed>_<12hex>"} (see {@link RegionCacheKey#cacheKey}).
-   *
-   * <p>Used as the suffix for {@code <regionName>_<cacheKey>.bin} and the matching
-   * {@code .scan} progress file. Folds the world seed and a stable hash of the shape
-   * and vertical-adjustor configuration into one identifier so that any config edit
-   * which would shift the spiral 1D&rarr;2D mapping or the validity predicate produces
-   * a different filename and the stale cache is naturally orphaned.
-   *
-   * <p>Returns {@code "0"} when the world is not yet available (dormant region); the
-   * caller should guard against persisting in that state.
+   * Compute on-disk cache key suffix for this region (format {@code "<seed>_<12hex>"}).
    */
   public String cacheKey() {
     RTPWorld<?> world = getWorld();
@@ -355,8 +310,7 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
-   * Same key folded to a {@code long} for the legacy {@code rtp_cached_locations.seed}
-   * column. See {@link RegionCacheKey#cacheKeyLong}.
+   * Same key folded to a {@code long} for the legacy {@code rtp_cached_locations.seed} column.
    */
   public long cacheKeyLong() {
     RTPWorld<?> world = getWorld();
@@ -364,60 +318,26 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   public void hydrateCacheFromDatabase(List<DatabaseAccessor.StoredLocation> storedLocations) {
-    // The "seed" column historically stored world.getSeed(). It now carries the 64-bit
-    // truncation of the region's full cache-key hash (see RegionCacheKey.cacheKeyLong).
-    // The seed is part of the hash input, so a world re-roll still produces a mismatch
-    // — the predicate semantics are preserved without a schema migration. Any change
-    // to shape geometry, vertical adjustor, or SCHEMA_VERSION also produces a mismatch
-    // and invalidates the rows.
     long currentCacheKey = cacheKeyLong();
-    // The database may return rows in insertion order. That order is meaningless for our
-    // caching strategy — we want players landing in different areas on reboot, not a
-    // deterministic rush to whichever location happened to be saved first. Shuffle in-place.
-    // (A defensive copy-then-shuffle is avoided because the caller does not reuse the list.)
     if (storedLocations.size() > 1) {
       java.util.Collections.shuffle(storedLocations);
     }
 
-    // Flush-after-consumption: while hydrating, suppress the save callback on both location
-    // buffers so that offer(...) does NOT immediately re-queue a write for a row that is
-    // already persisted. Every successfully consumed row is deleted from the DB explicitly
-    // below. The periodic rebuildCachedLocationsFromMemory() cycle (and shutdown) repopulate
-    // the table from the authoritative in-memory state, so runtime persistence is unchanged;
-    // this change only prevents stale / duplicated rows from repeating locations across
-    // unclean shutdowns — previously observed on slow async world generators (e.g. Iris).
     this.queueManager.keptLocations.setCallbacks(null, null);
     this.queueManager.unkeptLocations.setCallbacks(null, null);
     try {
       DatabaseAccessor db = RTP.getInstance().databaseAccessor;
       for (DatabaseAccessor.StoredLocation stored : storedLocations) {
         if (stored.getSeed() != 0L && stored.getSeed() != currentCacheKey) {
-          // Either the world was re-rolled with a different seed, or a config edit
-          // changed the shape/vert in a way that invalidates the spiral mapping or
-          // validity predicate. Either way the cached location is no longer safe.
           if (db != null) db.removeCachedLocation(stored.getId());
           continue;
         }
 
         RTPCoords coords = new RTPCoords(stored.getWorldName(), stored.getX(), stored.getY(), stored.getZ());
-        // Reconstruct as an unkept location stub (null reservation).
-        // Every row in the DB was validated before it was saved, and the seed check above
-        // confirms the world terrain is unchanged, so the deficit loop just needs to re-reserve
-        // the chunk — the consumer path in LocationGenerator already treats any queue-polled
-        // candidate as validated (only freshly generated candidates run the full safety grid).
         RTPLocation recoveredLoc = new RTPLocation(coords, stored.getAttempts(), null);
 
-        // Feed into the queues for the region execution loop to handle
         if (stored.getPlayerId() == null) {
-          // Restore every persisted row. The unkeptLocations buffer is sized to
-          // cacheCap+activeChunkCap precisely so that rows saved from BOTH kept and
-          // unkept queues fit on hydration; steady-state Region.execute() then promotes
-          // surplus into keptLocations (consuming activeChunkCap worth) and drains
-          // unkeptLocations back below its configured cacheCap. Previously this path
-          // gated on cacheCap and silently dropped activeChunkCap-worth of rows per
-          // restart (default 10 lost). See RegionQueueManager constructor.
           this.queueManager.unkeptLocations.offer(recoveredLoc);
-          // The DB row must go regardless — the in-memory state is authoritative.
           if (db != null) db.removeCachedLocation(stored.getId());
         } else {
           this.queueManager.perPlayerLocationQueue.computeIfAbsent(stored.getPlayerId(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).add(recoveredLoc);
@@ -425,33 +345,12 @@ public class Region extends FactoryValue<RegionKeys> {
         }
       }
     } finally {
-      // Restore the normal persistence callbacks for steady-state operation.
       this.queueManager.installDatabaseCallbacks();
     }
   }
 
-
   /**
-   * [PROMOTE_DIAG] Diagnostic for the cold->hot (L2->L1) promotion drop path.
-   * Emitted at INFO when {@code vert.adjust(chunk)} returns {@code null} during a
-   * promotion, which is otherwise a silent drop. Reports whether the cached chunk
-   * is live-backed or anvil-backed, whether it reports as generated/loaded, and a
-   * sample of surface height + air/biome reads at the chunk-centre column. A live,
-   * generated chunk with a sensible {@code surfaceY} but {@code adjust==null}
-   * points at the vertical adjustor; an anvil-backed view (or {@code surfaceY} at
-   * world-min with all-air reads) points at an ungenerated/empty chunk being
-   * verified instead of generated.
-   *
-   * <p>A {@code null} cached chunk (chunk not retained through the verify
-   * window) is a self-healing transient, not a drop: the caller re-queues the
-   * location for a later retry, so this case is logged at {@code FINE} only to
-   * avoid flooding the console under burst promotion. The {@code
-   * vert.adjust==null} drop is also logged at {@code FINE}: it is the routine,
-   * correct rejection of a water/ocean/biome column that the L2 -> L1 load
-   * verification proves unsafe (nothing is broken in normal usage), so it must
-   * not masquerade as a potential error case on the console. Only the genuinely
-   * anomalous sub-cases (the {@code isAir} read threw, or the diagnostic itself
-   * failed) stay at a higher level.
+   * Diagnostic for cold->hot (L2->L1) promotion drop path.
    */
   private void logPromotionDropDiag(
       RTPLocation coldLoc,
@@ -459,16 +358,7 @@ public class Region extends FactoryValue<RegionKeys> {
       int cx, int cz) {
     try {
       if (rtpChunk == null) {
-        // Self-healing TRANSIENT, NOT a drop: the caller has already returned
-        // this location to the unkept queue for a later retry (see the
-        // rtpChunk==null branch in the promotion verify). Under burst cold->hot
-        // promotion the shared anvil-view cache and the WeakReference live-chunk
-        // caches get clobbered by other in-flight candidates before this
-        // candidate's verify reads getCachedChunk(key), so a transient null here
-        // is expected and self-corrects as the queues fill and concurrency
-        // drops. Logging it at INFO produced the recurring console flood on
-        // Fabric backends; FINE keeps it available for opt-in diagnosis without
-        // spamming operators about a condition the retry already handles.
+        // Transient null: returned to unkept queue for retry.
         RTP.log(Level.FINE,
             "[RTP][PROMOTE_DIAG] region=" + name + " cold=(" + coldLoc.coords().x() + ","
                 + coldLoc.coords().y() + "," + coldLoc.coords().z() + ") chunk=(" + cx + "," + cz
@@ -491,14 +381,6 @@ public class Region extends FactoryValue<RegionKeys> {
         airAt = rtpChunk.isAir(8, surfaceY, 8);
         airAbove = rtpChunk.isAir(8, surfaceY + 1, 8);
       } catch (IllegalArgumentException yOutOfRange) {
-        // Routine, NOT a broken platform read: a void / no-surface column (common
-        // in the End and over ocean trenches) makes getSurfaceHeight return a
-        // sentinel at (or below) world-min, so the surfaceY±1 sample Ys fall
-        // outside the chunk's legal block range and the platform's isAir
-        // correctly rejects them with an out-of-range IllegalArgumentException.
-        // This is the same correct rejection as the vert.adjust==null drop, so
-        // keep it at FINE rather than flooding the console at INFO with a
-        // misleading "block reads are broken" claim.
         RTP.log(Level.FINE,
             "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
                 + ") DROPPED vert.adjust=null; surfaceY=" + surfaceY
@@ -533,19 +415,7 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
-   * Releases retained hot-cache chunk tickets while the JVM heap is under
-   * pressure, letting the garbage collector actually reclaim memory.
-   *
-   * <p>The heap gate in {@link #execute(long)} pauses cold-&gt;hot promotion so the
-   * retained set stops growing, but each kept {@link RTPLocation} pins a chunk via
-   * its {@link io.github.dailystruggle.rtp.api.world.ChunkReservation}; without
-   * shedding, usage stays parked above the threshold and the "pausing background
-   * cache generation" warning repeats forever. This drains a bounded number of
-   * kept locations per pulse, closing each reservation (freeing the chunk) and
-   * returning the bare coordinates to the ticketless {@code unkeptLocations}
-   * buffer <em>silently</em> - both buffers key the same DB row, so the move
-   * issues no writes. A small reserve of hot locations is left untouched so
-   * waiting players keep being served while the heap recovers.
+   * Release retained hot-cache chunk tickets under JVM heap pressure.
    */
   private void shedHotCacheUnderPressure() {
     final int reserve = 8;
@@ -560,12 +430,8 @@ public class Region extends FactoryValue<RegionKeys> {
       RTPLocation cold = hot;
       if (hot.reservation() != null) {
         hot.reservation().close();
-        // Strip the now-closed reservation so the cold buffer holds a ticketless
-        // candidate (RTPLocation is an immutable record).
         cold = new RTPLocation(hot.coords(), hot.attempts());
       }
-      // Drop silently if the cold buffer is already full - the candidate is lost,
-      // which is acceptable when shedding to avoid an OutOfMemoryError.
       queueManager.unkeptLocations.offerSilently(cold);
       shed++;
     }
@@ -586,7 +452,7 @@ public class Region extends FactoryValue<RegionKeys> {
     // queues stay empty.
     if (RTP.lobbyMode) return;
     // Dormant regions (configured world not yet loaded) must not attempt chunk I/O,
-    // ticket validation, or cache generation — they activate via rebindWorld once
+    // ticket validation, or cache generation - they activate via rebindWorld once
     // WorldLoadEvent delivers the configured world.
     if (getWorld() == null) return;
 
@@ -601,9 +467,9 @@ public class Region extends FactoryValue<RegionKeys> {
 
 //    System.out.println("[RTP-DEBUG] Region '" + name + "' execute() STARTED. Initial budget: " + availableTime + "ns");
 
-    // ADR-028 — L3 backlog cache pulse. Three inline steps (no producer/consumer
+    // ADR-028 - L3 backlog cache pulse. Three inline steps (no producer/consumer
     // split), in order: refill the per-region buffer with shape-only picks
-    // (S-005 safe — no chunk I/O), verify exactly one Anvil-region-file bin via
+    // (S-005 safe - no chunk I/O), verify exactly one Anvil-region-file bin via
     // the bound AnvilPrefilter provider (cross-RTP-region amortization through
     // the world-shared bin index), and drain the contiguous-VALIDATED head into
     // unkeptLocations subject to its capacity. Skipped when backlogCacheCap=0
@@ -636,17 +502,7 @@ public class Region extends FactoryValue<RegionKeys> {
           "[Region:" + name + "] hot-cache fill paused (heap pressure); deficit=" + deficit);
     }
 
-    // Active shed: pausing the fill above stops the retained set from *growing*,
-    // but it never *shrinks* it - each kept location pins a chunk via its
-    // ChunkReservation, so on a small heap the usage stays parked above the
-    // threshold indefinitely (the symptom: a repeating "pausing background cache
-    // generation" warning that never clears). While under pressure, release a
-    // bounded number of kept chunk tickets per pulse so the JVM can actually
-    // reclaim memory. The coordinates are returned to the ticketless cold buffer
-    // (unkeptLocations) silently - both buffers persist the same DB composite
-    // key, so this moves zero rows and issues zero writes; only the in-memory
-    // chunk ticket is freed. Waiting players keep being served from whatever hot
-    // locations remain.
+    // Active shed: under heap pressure, release kept chunk tickets back to unkeptLocations.
     if (heapUnderPressure) {
       shedHotCacheUnderPressure();
     }
@@ -697,25 +553,8 @@ public class Region extends FactoryValue<RegionKeys> {
             }
             return;
           }
-          // Second-pass safety verification at the unkept→kept transition must
-          // run on the chunk's owning region thread on Folia (live-backed
-          // RTPChunk reads Level.getBlockState, which is thread-local).
-          // On Spigot/Paper, RTP.scheduler.runTask(world,cx,cz,..) hops to the
-          // MAIN thread — which would unreasonably impact tick time per
-          // promotion. Dispatch inline on non-Folia; region-hop on Folia only.
-          //
-          // Re-resolve Y by re-running the region's vertical adjustor against
-          // the loaded chunk (rather than trusting the stored coords.y and
-          // only block-testing that single feet-Y). The stored Y may be a
-          // placeholder from the L3 backlog refill path (ADR-028), which
-          // stamps a vert-window-derived Y *before* any ground check has
-          // run. Trusting that Y caused mid-air placements (S-001) because
-          // a single-block isSafe at mid-air air-feet returns true. The
-          // adjustor's adjust(chunk) sweep does the ground+headroom check
-          // every adjustor already enforces on the live-spiral path, so
-          // routing every L2→L1 promotion through it gives the same
-          // guarantees as a fresh spiral attempt — no separate ground
-          // predicate to keep in sync.
+          // Second-pass safety verification on Folia region thread or inline.
+          // Re-runs vertical adjustor against loaded chunk to ensure valid ground placement.
           Runnable verify = () -> {
             try {
               RTP.log(Level.FINER,
@@ -732,11 +571,6 @@ public class Region extends FactoryValue<RegionKeys> {
                         + ") verify cachedChunk=" + (rtpChunk == null ? "null" : "present")
                         + " vert=" + (v == null ? "null" : v.getClass().getSimpleName()));
                 if (rtpChunk != null && v != null) {
-                  // Re-validate the column where this candidate was originally
-                  // selected (spiral or L3 anvil backlog) before falling back to
-                  // the adjustor's fixed sub-column sweep. The sweep samples only
-                  // a few columns and silently dropped good land locations whose
-                  // safe column was not among them ([PROMOTE_DIAG] vert.adjust=null).
                   RTPCoords storedCoords = coldLoc.coords();
                   resolved = v.adjustColumn(rtpChunk, storedCoords.x() & 15, storedCoords.z() & 15);
                   if (resolved == null) {
@@ -747,9 +581,6 @@ public class Region extends FactoryValue<RegionKeys> {
                     "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
                         + ") verify adjust resolved=" + (resolved == null ? "null" : "present"));
               } catch (Throwable verifyEx) {
-                // Fail CLOSED on verification error — never promote an
-                // unverified location (prior fail-open default caused
-                // lava-placement reports).
                 resolved = null;
                 RTP.log(
                     Level.FINE,
@@ -758,17 +589,7 @@ public class Region extends FactoryValue<RegionKeys> {
               }
 
               if (rtpChunk == null) {
-                // [PROMOTE_DIAG] TRANSIENT failure: the (re)loaded chunk was
-                // not retained by the world's chunk cache by the time this
-                // verification ran. On platforms that do not pin a freshly
-                // loaded chunk (e.g. Fabric, where vanilla can immediately
-                // unload a ticket-less chunk), getCachedChunk returns null even
-                // though the load reported success. This is NOT an unsafe
-                // location, so it MUST NOT be purged: return it to the unkept
-                // queue (pollSilently above skipped the delete callback, so the
-                // persisted row survives) and let a later promotion attempt
-                // retry once the chunk is retained. Purging here permanently
-                // lost known-good cold locations and flooded the log.
+                // Transient verify failure: chunk not retained through window; re-queue cold.
                 logPromotionDropDiag(coldLoc, null, cx, cz);
                 queueManager.unkeptLocations.offer(coldLoc);
                 return;
@@ -930,8 +751,8 @@ public class Region extends FactoryValue<RegionKeys> {
       // 3. Both are ready. Poll them to finalize the pairing.
       if (isPrivate) privateQueue.poll();
       else queueManager.keptLocations.poll();
-      // DatabaseAccessor.deleteCachedLocation keys on (regionName, worldName, x, y, z) only —
-      // there is no per-player UUID column — so the same call serves both branches and a
+      // DatabaseAccessor.deleteCachedLocation keys on (regionName, worldName, x, y, z) only -
+      // there is no per-player UUID column - so the same call serves both branches and a
       // single hoisted invocation cannot over-delete a private row from the public branch.
       // Cache the accessor in a local to avoid a second RTP.getInstance() and the TOCTOU
       // null-window between the null check and the deleteCachedLocation call.
@@ -951,7 +772,7 @@ public class Region extends FactoryValue<RegionKeys> {
       // Synthesize a reservation here so `TeleportPipelineTask.runTeleport` has live chunks to
       // consult for its unsafe-landing check, and so the chunks stay loaded long enough to
       // perform the teleport. Mirrors the synthesis in
-      // TeleportPipelineTask.processGenerationResult() — REQ-RTP-S-002 is preserved because
+      // TeleportPipelineTask.processGenerationResult() - REQ-RTP-S-002 is preserved because
       // runCleanup still closes whichever reservation ends up attached to the task.
       ChunkReservation reservationForTask = pair.reservation();
       if (reservationForTask == null) {
@@ -995,16 +816,7 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     }
 
-    // Broadcast queue-update to every remaining queued player exactly once
-    // per pulse, regardless of whether a pop happened this tick. Previously
-    // this broadcast was nested inside the pop loop above, which meant queued
-    // players received no position update whenever the pop loop broke early
-    // (empty kept queue, or front player's chunks not yet loaded — lines
-    // guarded by the two `break` statements above). Regular players (Type A:
-    // no rtp.unqueued) were left in the queue silently with stale
-    // TeleportData.queueLocation and no visible feedback until a successful
-    // pop eventually occurred — contradicting the "placed on queue / queue
-    // position changed" messaging contract.
+    // Broadcast queue-update to waiting players once per pulse if their position changed.
     {
       Iterator<UUID> iterator = queueManager.playerQueue.iterator();
       int i = 0;
@@ -1025,13 +837,6 @@ public class Region extends FactoryValue<RegionKeys> {
         }
         long previousSpot = data.queueLocation;
         data.queueLocation = i;
-        // Only emit a message if the spot actually changed (player was just
-        // enqueued with queueLocation==size, or the line shifted). The
-        // enqueue-time emission in QueueTask.enqueueAndComplete() already
-        // covers the initial placement; this pulse emission covers
-        // subsequent position changes. Always emitting every pulse would
-        // spam the player with identical spot numbers while the queue is
-        // stalled.
         if (previousSpot != i) {
           RTP.serverAccessor.sendMessage(id, PlayerMessages.queueUpdate);
         }
@@ -1040,53 +845,26 @@ public class Region extends FactoryValue<RegionKeys> {
 
     miscPipeline.execute(availableTime - (System.nanoTime() - start));
 
-//    long totalCap = Math.max(settings.cacheCap(), queueManager.playerQueue.size());
     long cacheCap = settings.cacheCap();
-
     long totalCap = Math.max(cacheCap + activeCap, queueManager.playerQueue.size());
 
     if (!isScanningCache.compareAndSet(false, true)) {
-//      System.out.println("[RTP-DEBUG] Region '" + name + "' ABORT 2: isScanningCache lock is currently held by another thread.");
       return;
     }
 
     try {
-      // Compute the cache-fill deficit BEFORE scheduling any observational
-      // task. The observational task is queued onto the same `cachePipeline`
-      // and would otherwise inflate `cachePipeline.size()` here by 1 every
-      // pulse, swallowing exactly one default-mode cache slot. Because the
-      // observational task self-gates closed when the cache has headroom
-      // (RegionCacheTask.run() line 131: `if (!cacheFull) return;`), it
-      // would early-return without filling — leaving the cache pinned one
-      // slot below `cacheCap + activeChunkCap` indefinitely (visible as
-      // `[cached] = totalCap - 1`, e.g. perpetual 59 against a 60-slot
-      // total). Scheduling observational AFTER this loop preserves the
-      // Phase 8.2 contract (one observational task per pulse, no enqueues
-      // when cache full) without contaminating the deficit math.
+      // Compute cache deficit before scheduling observational task.
       deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + queueManager.unkeptLocations.size() + inFlightCalculations.get());
-//      System.out.println("[RTP-DEBUG] Region '" + name + "' caching phase. Deficit: " + deficit + " | inFlight: " + inFlightCalculations.get() + " | cachePipeSize: " + cachePipeline.size());
 
       for (long i = 0; i < deficit; i++) {
         cachePipeline.add(new RegionCacheTask(this, availableTime - (System.nanoTime() - start)));
       }
 
-      // Phase 8.2 pivot (2026-04-20c), gate inverted (2026-05-08): schedule
-      // at most one observational RegionCacheTask alongside the default-mode
-      // deficit loop. The task self-gates on `unkeptLocations.size() >=
-      // cacheCap` and skips when L2 is full (originally it ran only when
-      // full; the gate was inverted after the visitor walk's chunk-I/O cost
-      // was found to dominate its side-effect benefits on saturated caches —
-      // it was driving up RTPWorld.totalChunkLoads without producing TP
-      // attempts). Reuses LocationGenerator and drops any safe result
-      // instead of enqueuing it. Config surface is a single master switch
-      // (PerformanceKeys.visitorEnabled); cadence is inherited from the
-      // existing cache-fill `period`. See
-      // docs/dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §§2, 4.2–4.3.
+      // Schedule at most one observational RegionCacheTask when visitor mode is enabled.
       if (isObservationalModeEnabled()) {
         cachePipeline.add(RegionCacheTask.observe(this, availableTime - (System.nanoTime() - start)));
       }
 
-//      System.out.println("[RTP-DEBUG] Region '" + name + "' executing cachePipeline with budget: " + currentAvailable + "ns");
       cachePipeline.execute(availableTime - (System.nanoTime() - start));
     } finally {
       isScanningCache.set(false);
@@ -1094,29 +872,8 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
-   * ADR-028 L3 backlog cache pulse. Inline 3-step linear flow:
-   * <ol>
-   *   <li><b>Refill.</b> While the per-region {@link BacklogLocationBuffer}
-   *       has spare capacity and the time slice has not been exhausted,
-   *       perform a shape-only pick (no chunk I/O — S-005 safe), enqueue it
-   *       as {@code UNVERIFIED}, and index it into the world-shared
-   *       {@link WorldBacklogBinIndex} for cross-RTP-region Anvil amortization.</li>
-   *   <li><b>Verify one bin.</b> Take the bin coordinate of this region's
-   *       oldest {@code UNVERIFIED} entry, snapshot the world bin's list
-   *       (entries contributed by every region targeting this world that fall
-   *       in the same {@code .mca}), and run the bound
-   *       {@link io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry}
-   *       provider against each. Set each entry's validity to
-   *       {@code VALIDATED} on {@code ACCEPT}/{@code UNKNOWN}/(no provider) and
-   *       {@code INVALIDATED} on {@code REJECT}. Exactly one bin per pulse.</li>
-   *   <li><b>Drain.</b> Poll the contiguous-{@code VALIDATED} head of this
-   *       region's buffer (skipping {@code INVALIDATED} heads, stopping at
-   *       the first {@code UNVERIFIED}) and offer each location to
-   *       {@code unkeptLocations} until it is full or the head is exhausted.</li>
-   * </ol>
-   *
-   * <p>No-op when {@code queueManager.backlogLocations == null} (i.e.
-   * {@code backlogCacheCap == 0}, lite default).
+   * L3 backlog cache pulse (ADR-028).
+   * Refills unverified buffer, validates one anvil bin, and drains validated head to L2.
    *
    * @param availableTime original pulse budget (ns)
    * @param startNanos    {@code System.nanoTime()} captured at pulse start
@@ -1126,29 +883,13 @@ public class Region extends FactoryValue<RegionKeys> {
     if (backlog == null) return;
     RTPWorld<?> world = getWorld();
     if (world == null) return;
-    // L3 refill + verify run regardless of scan state — both steps are S-005
-    // safe (shape pick has no chunk I/O; Anvil prefilter reads .mca off-thread).
-    // L3 is the highest-volume accumulator and benefits from running
-    // continuously so backlog is warm by the time scan completes. The drain
-    // step (Step 3 below) remains gated on scanCompleted to avoid feeding the
-    // deficit loop's live-load path before pre-generation has settled.
 
-    // Step 1 — refill (shape-only, time-sliced). Cap the refill spend at a
-    // small fraction of the pulse budget so the rest of execute() (deficit
-    // loop, player queue, miscPipeline, cachePipeline) is not starved.
+    // Refill (shape-only, time-sliced).
     final long refillBudget = Math.max(0L, availableTime / 4L);
     Shape<?> currentShape = this.shape;
     int verticalY;
     {
-      // Placeholder Y stored on L3 backlog entries until the L2→L1 promotion
-      // re-runs the vertical adjustor against a loaded chunk and overwrites
-      // it with a ground-verified Y (see deficit-loop verify above). Use the
-      // adjustor's floor (clamped to the world's [min, max-1] bounds) so the
-      // value is at least within the searchable window — never the midpoint,
-      // which previously masqueraded as a "placement" Y and caused mid-air
-      // teleports when a downstream consumer trusted it (S-001). Midpoint
-      // remains the right value for biome/border probes (PregenTask,
-      // ScanTask) which never become a player-facing coord.
+      // Placeholder Y clamped to adjustor min/world bounds until L2->L1 promotion verifies ground.
       VerticalAdjustor<?> v = getVert();
       if (v != null) {
         int wMin = world.getMinHeight();
@@ -1164,14 +905,7 @@ public class Region extends FactoryValue<RegionKeys> {
     String worldName = world.name();
     WorldBacklogBinIndex binIndex = RegionQueueManager.binIndexFor(worldName);
 
-    // Hysteresis gate (PerformanceKeys.backlogRefillThreshold). Refill runs
-    // in bursts: once the backlog reaches capacity, refill is suspended
-    // until the buffer drains below `threshold * capacity`. This groups
-    // multiple shape picks (and their downstream Anvil bin verifications)
-    // into larger batches that share .mca files, improving CPU and memory
-    // efficiency versus a constant per-pulse refill of every drained slot.
-    // threshold == 1.0 reproduces the prior always-refill behaviour;
-    // threshold == 0.0 effectively disables refill after the initial fill.
+    // Hysteresis gate: refill runs in bursts until full, then pauses until below threshold.
     final int currentBacklogSize = backlog.size();
     final int backlogCapacity = backlog.capacity();
     if (backlogRefillActive) {
@@ -1180,29 +914,15 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     } else {
       double threshold = readBacklogRefillThreshold();
-      // Inactive until size strictly drops below threshold * capacity.
-      // Using strict-less so threshold==0.0 never re-arms refill (admin
-      // opt-out) and threshold==1.0 re-arms as soon as one slot drains.
       if (currentBacklogSize < (long) Math.floor(threshold * backlogCapacity)) {
         backlogRefillActive = true;
       }
     }
 
-    // Heap-pressure gate (see deficit loop in execute()): pause L3 backlog
-    // refill while the heap is above PerformanceKeys.maxHeapPercent so the
-    // accumulator stops growing the retained set during a memory crunch.
     boolean heapUnderPressure =
         io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.underPressure();
     if (currentShape != null && backlogRefillActive && !heapUnderPressure) {
-      // Bounded rejection sampling: cap *consecutive* pregenPref rejections per
-      // pulse so a sparsely-pregenerated world with a high pregeneratedPreference
-      // cannot endlessly spin the refill loop. After the cap is hit, we break
-      // out of the refill for this pulse — the next pulse will retry, giving
-      // the rest of execute() (deficit loop, player queue, pipelines) a fair
-      // share of the budget. The time-budget guard above already bounds total
-      // spin time; this additional cap shortens worst-case latency further and
-      // makes the bound explicit. Accepted picks reset the counter so the cap
-      // applies only to a "stuck" tail of consecutive ungenerated draws.
+      // Bounded rejection sampling: cap consecutive pregenPref rejections per pulse.
       final int maxConsecutivePregenRejects = Math.max(16, backlog.capacity());
       int consecutivePregenRejects = 0;
       while (backlog.size() < backlog.capacity()
@@ -1214,19 +934,8 @@ public class Region extends FactoryValue<RegionKeys> {
           break;
         }
         if (sel == null || sel.length < 2) break;
-        // pregeneratedPreference gate at the L3 coordinate-generation site.
-        // Reject ungenerated columns with probability `pref` BEFORE we spend
-        // any validation effort on them (no anvil read, no buffer slot used).
-        // This is rejection sampling: a rejected pick just advances to the
-        // next shape draw; only accepted picks consume an L3 slot. Non-
-        // blocking (S-005 safe); shares the same helper as PregenTask's L1
-        // gate. Matches the user's intent that the weighted preference live
-        // at coordinate selection, not after locations have been validated.
         if (pregenPrefRejects(world, sel[0], sel[1])) {
           if (++consecutivePregenRejects >= maxConsecutivePregenRejects) {
-            // Bounded: give up on this pulse rather than spinning. The next
-            // pulse retries; the deficit loop and other consumers still get
-            // their slice of the budget.
             break;
           }
           continue;
@@ -1242,8 +951,7 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     }
 
-    // Step 2 — verify exactly one bin per pulse, derived from this region's
-    // oldest UNVERIFIED entry.
+    // Verify one bin per pulse from oldest unverified entry.
     BacklogLocationBuffer.BacklogEntry oldest = backlog.peekOldestUnverified();
     if (oldest != null) {
       RegionFileCoord binKey = RegionFileCoord.of(oldest.location().coords());
@@ -1260,9 +968,6 @@ public class Region extends FactoryValue<RegionKeys> {
         if (e.validity() != BacklogLocationBuffer.Validity.UNVERIFIED) continue;
         BacklogLocationBuffer.Validity next;
         if (provider == null) {
-          // Fallback: no Anvil prefilter bound — treat as VALIDATED to avoid
-          // stalling L3 (checklist 3.4). Live-load safety re-verification still
-          // runs at the unkept→kept promotion in the existing deficit loop.
           next = BacklogLocationBuffer.Validity.VALIDATED;
         } else {
           int cx = e.location().coords().x() >> 4;
@@ -1283,17 +988,11 @@ public class Region extends FactoryValue<RegionKeys> {
         }
         e.setValidity(next);
       }
-      // Step 2b — eagerly eject explicit Anvil-pre-filter rejections from
-      // anywhere in this region's buffer, not just at the head. This keeps
-      // the L3 occupancy honest (the `/rtp info` line now reflects only
-      // in-play candidates) and prevents INVALIDATED entries from consuming
-      // capacity until they drift to the head via the natural drain path.
+      // Eagerly remove invalidated entries to free L3 capacity.
       backlog.removeInvalidated();
     }
 
-    // Step 3 — drain the contiguous-VALIDATED head into unkeptLocations,
-    // bounded by L2 capacity. INVALIDATED heads are dropped silently;
-    // pollContiguousValidatedHead stops at the first UNVERIFIED.
+    // Drain validated head into unkeptLocations up to L2 capacity.
     long l2Cap = settings.cacheCap();
     long l2Free = Math.max(0L, l2Cap - queueManager.unkeptLocations.size());
     if (l2Free > 0L) {
@@ -1301,9 +1000,6 @@ public class Region extends FactoryValue<RegionKeys> {
           backlog.pollContiguousValidatedHead((int) Math.min(l2Free, Integer.MAX_VALUE));
       for (BacklogLocationBuffer.BacklogEntry e : drained) {
         if (!queueManager.unkeptLocations.offer(e.location())) {
-          // L2 filled mid-drain; the rest of the drained batch is dropped on
-          // the floor. Acceptable: the L3 entry was already removed from the
-          // backlog, the next pulse will refill.
           break;
         }
       }
@@ -1311,32 +1007,8 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
-   * pregenPrefRejects — shared L2/L3 promotion gate for the
-   * {@code pregeneratedPreference} performance knob. Returns {@code true} when
-   * the candidate chunk's column is not yet generated on disk AND a uniform
-   * {@code [0,1)} draw falls below the configured weight. Always returns
-   * {@code false} when the weight is {@code 0.0} (default) or the column is
-   * already generated, preserving prior behavior.
-   *
-   * <p>The probe uses {@link RTPWorld#isChunkGenerated(int, int)}, which is
-   * non-blocking and never triggers generation (S-005 safe). Adapters that
-   * have not overridden it return {@code true} and the gate is a no-op on
-   * those platforms — by design.</p>
-   *
-   * <p>Mirrors the identical gate in {@code PregenTask.runAttempt()} so all
-   * three insertion paths (live spiral, L2→live, L3→L2) apply the same
-   * probabilistic policy. Fail attribution lives on the L1 path
-   * ({@code LocationGenerator.FailTypes.ungenerated}); L2/L3 rejections here
-   * are silent because the locations were already accounted for at L1 entry.</p>
-   */
-  // (readBacklogRefillThreshold helper defined below)
-  /**
-   * readBacklogRefillThreshold — reads
-   * {@code PerformanceKeys.backlogRefillThreshold} clamped to {@code [0.0, 1.0]}.
-   * Defaults to {@code 0.5} when the parser is missing or the value cannot
-   * be parsed (cold-boot races, malformed admin input). The clamping is
-   * deliberate so out-of-range admin values silently degrade to the
-   * nearest valid behaviour rather than corrupting the hysteresis latch.
+   * Rejection gate for pregeneratedPreference setting (S-005).
+   * Returns true if chunk is ungenerated and rejected by probability draw.
    */
   private double readBacklogRefillThreshold() {
     try {
@@ -1378,7 +1050,6 @@ public class Region extends FactoryValue<RegionKeys> {
     try {
       generated = world.isChunkGenerated(cx, cz);
     } catch (Throwable t) {
-      // Probe failure: do not block promotion — preserves prior behavior.
       return false;
     }
     if (generated) return false;
@@ -1388,13 +1059,7 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
-   * isObservationalModeEnabled - consults {@code PerformanceKeys.visitorEnabled}
-   * as the single master switch for the observational cache-fill mode
-   * (plan §§2, 3). Defaults to {@code false} so the lite assembly (and any
-   * deployment without an explicit opt-in) does not perform background
-   * data-gathering work. Returns {@code false} if the config parser is
-   * unavailable so a cold-boot race cannot produce spurious observational
-   * tasks.
+   * Check if observational cache-fill mode is enabled.
    */
   private boolean isObservationalModeEnabled() {
     io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf;
@@ -1618,17 +1283,9 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
-   * The operator-configured cosmetic display name for this region, read from the
-   * optional {@code displayName} key in the region's config file. This is purely
-   * a label for user-facing surfaces (the {@code /rtp info} command, the GUI menu,
-   * cross-server heartbeat advertisement); it never changes the region's identity,
-   * which remains {@link #name}. Supports RTP's hex/gradient color formatting like
-   * any other config string.
+   * Operator-configured display name for region, falling back to name.
    *
-   * <p>Falls back to the region {@link #name} when the key is absent, blank, or
-   * cannot be read, so existing configs behave exactly as before.
-   *
-   * @return the configured display name, or the region name when none is set
+   * @return configured display name or region name
    */
   public String displayName() {
     try {

@@ -14,16 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression guard for {@link PaletteNormalizer} — the platform-neutral
- * reconciler that produces the canonical lookup form expected by
- * {@code rtp-anvil}'s {@code AnvilChunkView#isAir} / {@code isSafe}. Mirrors
- * the rtp-api {@code PaletteIdentifierNormalizerTest} contract so that a
- * config authored against Bukkit-family Material names continues to match
- * vanilla palette IDs on non-Bukkit platforms (Fabric).
- *
- * <p>Trace: rtp-fabric-ADR-005 follow-up (full anvil-backed {@code RTPChunk}
- * parity); ADR-016 §8.1. Lifted from {@code rtp-fabric-common} into rtp-core
- * alongside {@link PaletteNormalizer}.</p>
+ * Regression guard for {@link PaletteNormalizer} canonical lookup forms (ADR-016 §8.1).
  */
 @DisplayName("ADR-016 §8.1 — PaletteNormalizer reconciler parity")
 class PaletteNormalizerTest {
@@ -68,7 +59,7 @@ class PaletteNormalizerTest {
         Set<String> out = PaletteNormalizer.reconcileAll(raw);
         assertEquals(Set.of("LAVA", "WATER", "CRUSHING_WHEEL"), out);
         // Set.of returns an unmodifiable set; the normalizer's contract also
-        // returns one — ensure that mutation throws.
+        // returns one - ensure that mutation throws.
         assertThrowsUnsupported(out);
     }
 
@@ -104,7 +95,7 @@ class PaletteNormalizerTest {
     private static void assertThrowsUnsupported(Set<String> immutable) {
         try {
             immutable.add("X");
-            // Reached here only if the set was mutable — fail.
+            // Reached here only if the set was mutable - fail.
             org.junit.jupiter.api.Assertions.fail(
                     "reconcileAll must return an unmodifiable set");
         } catch (UnsupportedOperationException expected) {

@@ -48,7 +48,7 @@ public class ChunkyRTPShape extends Rectangle {
 
     int i = 0;
     while (!shape.isBounding(xz[0], xz[1])) {
-      // addBadChunk: chunk-uniform — Chunky's isBounding predicate is evaluated at the
+      // addBadChunk: chunk-uniform - Chunky's isBounding predicate is evaluated at the
       // chunk-unit coords from locationToXZ; membership in the Chunky-defined boundary is
       // a per-chunk property, so the twin spiral index decoding to the same chunk is
       // guaranteed to also be out-of-bounds.

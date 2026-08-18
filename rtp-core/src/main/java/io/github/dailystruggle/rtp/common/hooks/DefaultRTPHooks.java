@@ -22,19 +22,8 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * Default in-process implementation of the {@link RTPHooks} facade for {@code rtp-core}.
- *
- * <p>Purpose: provide a single, API-only registration surface for every third-party
- * "behavior modification" seam (region verifiers, economy, placeholders, world
- * border, anvil pre-filter) so that integrations can depend on {@code rtp-api}
- * alone (ADR-026; see {@code docs/dev/EXTERNAL_HOOKS.md}).
- *
- * <p>Backward compatibility: {@link RegionVerifierRegistry#register(Predicate)}
- * delegates to {@link GlobalRegionVerifiers#addGlobalRegionVerifier(Predicate)}
- * and vice-versa, so addons compiled against either entry point keep working.
- *
- * <p>Thread safety: all registries are backed by simple synchronised collections or
- * volatile single-binding fields; this class itself is stateless.
+ * Default implementation of {@link RTPHooks} facade for {@code rtp-core} (ADR-026).
+ * Provides API registration surface for verifiers, economy, placeholders, world border, and prefilters.
  */
 public final class DefaultRTPHooks implements RTPHooks {
 

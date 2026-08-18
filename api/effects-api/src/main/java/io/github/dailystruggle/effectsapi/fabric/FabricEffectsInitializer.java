@@ -39,11 +39,11 @@ public final class FabricEffectsInitializer {
     /**
      * Bind the {@link FabricValueCoercer} and register the Phase-1 Fabric
      * concrete effects with {@link EffectFactory}. Safe to call multiple
-     * times — second and subsequent invocations are no-ops.
+     * times - second and subsequent invocations are no-ops.
      *
      * <p>Must be called <em>after</em> {@code MinecraftServer} is up
      * (so {@code BuiltInRegistries} is fully populated for default-value
-     * resolution) — typically from a {@code ServerLifecycleEvents.SERVER_STARTED}
+     * resolution) - typically from a {@code ServerLifecycleEvents.SERVER_STARTED}
      * listener in {@code RTPFabricMod}.
      */
     public static void registerAll() {

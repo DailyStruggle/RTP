@@ -44,7 +44,7 @@ public final class BukkitValueCoercer implements ValueCoercer {
         if (def instanceof PotionEffectType) return TypeKey.POTION_EFFECT;
         if (def instanceof Material) return TypeKey.MATERIAL;
         if (def instanceof World) return TypeKey.WORLD;
-        // Sound is registry-backed on 1.21.3+ (interface, not enum) — match by
+        // Sound is registry-backed on 1.21.3+ (interface, not enum) - match by
         // name as well as instanceof to cover both eras.
         if (def instanceof Sound || def.getClass().getName().equals("org.bukkit.Sound")) return TypeKey.SOUND;
         return TypeKey.UNKNOWN;
@@ -188,7 +188,7 @@ public final class BukkitValueCoercer implements ValueCoercer {
         } catch (NoSuchMethodException | IllegalAccessException ignored) {
             // fall through
         } catch (InvocationTargetException ite) {
-            // valueOf threw — not a match
+            // valueOf threw - not a match
         }
         try {
             Object r = targetType.getMethod("getByName", String.class).invoke(null, raw);
@@ -217,7 +217,7 @@ public final class BukkitValueCoercer implements ValueCoercer {
     /**
      * Resolve a Bukkit value from a string by walking the {@link Registry}
      * surface reflectively. Used as a fallback when {@code valueOf} /
-     * {@code getByName} both fail — covers the 1.21.3+ {@link Sound} migration
+     * {@code getByName} both fail - covers the 1.21.3+ {@link Sound} migration
      * and the expected 26.1 migration of {@code Particle}/{@code EntityType}/
      * {@code Biome} from enums to registry-backed interfaces.
      *

@@ -15,8 +15,8 @@ import net.minecraft.world.effect.MobEffectInstance;
 import java.util.logging.Level;
 
 /**
- * Loom-compiled effect dispatchers for MC 1.21.0–1.21.4. Sibling of the
- * R5 / R11 dispatchers; differs only in the {@code sendParticles} arity —
+ * Loom-compiled effect dispatchers for MC 1.21.0-1.21.4. Sibling of the
+ * R5 / R11 dispatchers; differs only in the {@code sendParticles} arity -
  * the {@code overrideLimiter} boolean was added in 1.21.5, so this version
  * uses the single-{@code boolean longDistance} overload.
  */
@@ -68,7 +68,7 @@ final class V1_21_R1FabricEffectDispatchers {
                                      double dx, double dy, double dz, double speed) {
         ServerLevel level = (ServerLevel) recipient.level();
         if (level == null) return;
-        // 1.21.0–1.21.4 targeted overload: single boolean (longDistance).
+        // 1.21.0-1.21.4 targeted overload: single boolean (longDistance).
         level.sendParticles(recipient, options,
                 /* longDistance */ false,
                 x, y, z, count, dx, dy, dz, speed);

@@ -14,16 +14,7 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /rtp info biomes} - renders the biome-occupancy leaderboard accumulated
- * by {@link RTP#biomeActivity}. Reports which biomes online players spend their
- * time in (sampled periodically by the platform adapter), ordered by descending
- * share. Read-only; never triggers a teleport.
- *
- * <p>The three line templates ({@link CommandMessages#infoBiomeActivityHeader},
- * {@link CommandMessages#infoBiomeActivityRow},
- * {@link CommandMessages#infoBiomeActivityEmpty}) carry their own {@code [biome*]}
- * tokens; an empty template skips that line silently so locales missing the keys
- * keep working.
+ * {@code /rtp info biomes} - renders biome-occupancy leaderboard from {@link RTP#biomeActivity}.
  */
 public class BiomeActivityCmd extends BaseRTPCmdImpl {
   /** Number of rows shown by default. */

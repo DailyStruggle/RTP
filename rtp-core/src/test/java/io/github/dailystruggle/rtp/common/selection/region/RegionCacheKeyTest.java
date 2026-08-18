@@ -26,14 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * POTENTIAL_BUGS.md 2026-04-30 follow-up: every key on the cache-hash allowlist
- * must invalidate the {@link RegionCacheKey#cacheKey} when its value changes, and
- * every excluded key must not.
- *
- * <p>ADR-071 split the landing block lists into {@link BlocksKeys} and the biome
- * filter into {@link BiomesKeys}; the cache-hash allowlist now spans all three
- * parsers ({@link SafetyKeys}, {@link BlocksKeys}, {@link BiomesKeys}). This test
- * pins the in/out boundary of {@link RegionCacheKey} against each.
+ * Unit tests for {@link RegionCacheKey} cache key invalidation on safety changes.
+ * Pins allowlist inclusion/exclusion across {@link SafetyKeys}, {@link BlocksKeys}, and {@link BiomesKeys}.
  */
 @DisplayName("RegionCacheKey: safety validity edits invalidate the cache hash")
 public class RegionCacheKeyTest {
@@ -159,7 +153,7 @@ public class RegionCacheKeyTest {
     @DisplayName("excluded: invulnerabilityTime / staleChunkRetryLimit / version edits are STABLE")
     void cosmetic_keys_not_in_hash() {
         // These keys are runtime/cosmetic and must not invalidate persisted
-        // shape data — a server admin tweaking them should not pay a re-scan cost.
+        // shape data - a server admin tweaking them should not pay a re-scan cost.
         assertEquals(currentKey(), mutateAndKey(SafetyKeys.invulnerabilityTime, 5000L),
                 "invulnerabilityTime is post-teleport cosmetic; cache must survive its edits.");
         assertEquals(currentKey(), mutateAndKey(SafetyKeys.staleChunkRetryLimit, 7),

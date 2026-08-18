@@ -34,29 +34,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Backend-side {@link NetworkTransport} for the {@code proxy-direct} tier
- * (rtp-proxy-ADR-017). The backend opens its OWN short-lived outbound TCP
- * connection to each configured proxy companion on every heartbeat tick - it
- * does NOT ride a player's Minecraft plugin-message session - so a
- * player-empty backend can publish its real region list and read the merged
- * network snapshot back. This is the only DB-free channel that converges
- * cross-server region names with zero players AND zero per-server operator
- * config.
- *
- * <p>No long-lived backend thread: all socket work happens inside the
- * scheduler-driven {@link #publishBackendHeartbeat(BackendHeartbeat)} call
- * (pumped by {@code BackendStatePublisher} via {@code RTP.scheduler}), and
- * {@link #readSnapshot()} just returns the last-fetched view. This keeps the
- * binding Folia-safe and inside the {@code RTP.scheduler} contract (no raw
- * executors / threads on a backend JVM).</p>
- *
- * <p>This binding is a thin RPC <em>client</em> of the proxy's in-memory store:
- * heartbeat/snapshot, reservation lookup/redeem, and the request-queue ops all
- * map 1:1 to {@link ProxyDirectWire} opcodes dispatched against the proxy's own
- * {@code NetworkTransport} + {@code NetworkRequestQueue}. {@code claim} is the
- * one method a backend never calls (the proxy dispatcher claims), so it throws;
- * {@code release}/{@code publishProxyHeartbeat}/{@code reapExpired} are proxy-
- * local concerns and stay no-ops here.</p>
+ * Backend-side {@link NetworkTransport} for the {@code proxy-direct} tier (ADR-036).
+ * Opens outbound TCP connections to configured proxies during heartbeat ticks to exchange state.
+ * Folia-safe RPC client without raw background threads.
  */
 public final class ProxyDirectNetworkBinding implements NetworkTransport {
 

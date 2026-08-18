@@ -7,42 +7,19 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * In-memory store of pending prefab-apply confirmations, keyed by
- * {@code (callerId, prefabId)}. Each entry binds together the originating
- * caller, the prefab id, the per-file diff computed by {@link PrefabApplier},
- * and the precomputed new YAML trees that {@code confirm} will write to disk.
- *
- * <p>Post-token-removal (2026-05-24, mirroring ADR-050): there is no opaque
- * token, no TTL, and no expiry. The previous design minted a UUID-shaped
- * string and surfaced it on the chat/book path; the click/chat surfaces are
- * already caller-bound through Bukkit's command sender, so the token only
- * added typing friction and produced "token expired" UX failures. The verb
- * {@code /rtp admin prefab confirm id=&lt;id&gt;} now resolves the pending
- * diff straight from {@code (callerId, prefabId)}. A repeat {@code apply}
- * for the same {@code (caller, prefab)} pair simply overwrites the prior
- * pending entry.
- *
- * <p>The store is process-local and not persisted - a restart drops every
- * outstanding confirmation. Rollback is the recovery path. All methods are
- * thread-safe.
- *
- * <p>The class name {@code PrefabNonceStore} is preserved for now to keep
- * the existing call sites and tests compiling; the "nonce" framing no
- * longer reflects the semantics. Rename is mechanical follow-up work.
+ * In-memory store of pending prefab-apply confirmations keyed by {@code (callerId, prefabId)}.
+ * Holds diffs and precomputed trees ready for disk commit. Thread-safe, in-memory only.
  */
 public final class PrefabNonceStore {
 
     /**
-     * One outstanding confirmation. Immutable once {@link #mint} returns.
-     * The {@code token} field is retained as the empty string for binary
-     * compatibility with tests that still call {@code entry.token()}; new
-     * call sites should ignore it.
+     * One outstanding confirmation descriptor.
      *
-     * @param token       always the empty string; retained for call-site compatibility
-     * @param callerId    UUID of the player or console that initiated the apply
-     * @param prefabId    id of the prefab being confirmed
-     * @param perFileDiff per-file list of changes computed by {@link PrefabApplier}
-     * @param newTrees    precomputed merged YAML trees to write on confirm
+     * @param token       retained empty string for binary compatibility
+     * @param callerId    UUID of player or console initiating the apply
+     * @param prefabId    identifier of the prefab being confirmed
+     * @param perFileDiff per-file list of changes
+     * @param newTrees    precomputed merged trees to write on confirm
      */
     public record Entry(
             String token,

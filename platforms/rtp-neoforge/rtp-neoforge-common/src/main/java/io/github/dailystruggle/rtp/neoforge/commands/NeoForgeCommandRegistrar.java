@@ -20,7 +20,7 @@ import java.util.logging.Level;
  * vanilla {@link CommandDispatcher} of {@link CommandSourceStack}
  * ({@code NEOFORGE_NOTES.md} §2). Both NeoForge and Fabric terminate in vanilla
  * Brigadier, so the {@code commands-api} Brigadier bridge
- * ({@code commands-api-ADR-001}) is reused verbatim — this class is the
+ * ({@code commands-api-ADR-001}) is reused verbatim - this class is the
  * platform-specific trampoline that builds the shared {@code /rtp} tree, wraps
  * the NeoForge {@link CommandSourceStack} via {@link NeoForgeBrigadierSourceBridge},
  * and registers the literal against the dispatcher.</p>
@@ -66,7 +66,7 @@ public final class NeoForgeCommandRegistrar {
                 try {
                   UUID uuid = NeoForgeBrigadierSourceBridge.resolveSenderUuid(src);
                   if (uuid != null && !uuid.equals(RTPAPI.serverId)) {
-                    // Player source — formats placeholders + legacy colour codes
+                    // Player source - formats placeholders + legacy colour codes
                     // and dispatches through the player's RTPCommandSender.
                     RTP.serverAccessor.sendMessage(uuid, msg, null);
                   } else {

@@ -38,18 +38,7 @@ public class ParsePermissions {
 
     permissionPrefix = permissionPrefix.toLowerCase();
     boolean hasPerm = false;
-    // Do NOT call sender.hasPermission(...) here.
-    // Permission managers (notably LuckPerms on Paper) treat any lookup whose
-    // node is registered with `default: op` (or any node not explicitly set
-    // for the player) as resolved against the player's op state — so ops
-    // short-circuit to true regardless of the registered `default: false`
-    // we declared in plugin.yml. That made every `rtp.onevent.*` event
-    // auto-fire for operators.
-    //
-    // Instead, mirror the pattern used by getInt below: enumerate the
-    // sender's *effective* (explicitly granted) permissions and check
-    // whether any of them match an expected child node. This bypasses the
-    // permission manager's op-default short-circuit entirely.
+    // Check sender effective permissions directly to avoid op-default short circuits.
     Set<String> effective = sender.getEffectivePermissions();
     outer:
     for (String perm : permissions) {

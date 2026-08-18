@@ -108,7 +108,7 @@ class ActiveTestJobsTest {
   }
 
   // -----------------------------------------------------------------
-  // addOnEmptyListener / removeOnEmptyListener — these are the hooks
+  // addOnEmptyListener / removeOnEmptyListener - these are the hooks
   // TestFullCmd uses to chain shipped subcommands without parking an
   // async-pool worker between dispatches. Without these tests, a
   // regression in fire-once semantics would silently strand the umbrella
@@ -148,7 +148,7 @@ class ActiveTestJobsTest {
     assertEquals(1, fires.get(), "listener must fire on transition to empty");
 
     // Re-arming jobs and draining again must NOT re-fire the original
-    // listener — it was a one-shot and was removed at fire time.
+    // listener - it was a one-shot and was removed at fire time.
     Runnable unreg3 =
         ActiveTestJobs.register(owner, new ActiveTestJobs.Job("c", () -> {}));
     unreg3.run();

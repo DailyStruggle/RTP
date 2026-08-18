@@ -18,37 +18,19 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Platform-neutral resolution of the {@code /rtp menu} bindings (the
- * {@link MenuRenderer} and the {@link MenuRedeemSubcommand.AnvilInputOpener}),
- * shared by <em>every</em> platform so the menu-binding code path is authored
- * exactly once (ADR-070).
- *
- * <p>Discovery is via {@link java.util.ServiceLoader} against the
- * {@link MenuRendererProvider} (rtp-api) and {@link AnvilInputOpenerProvider}
- * (rtp-core) SPIs: each platform adapter ships an implementation registered
- * through a {@code META-INF/services} entry. On the Bukkit family a single jar
- * must run on plain Spigot <em>and</em> Paper, so the Paper renderer /
- * anvil-opener implementations are only present transitively on the runtime
- * classpath when a Paper adapter is shaded in; {@code ServiceLoader} surfaces
- * their providers exactly in that case (and yields nothing on plain Spigot).
- * Fabric / NeoForge compile-depend on their adapter and register the same way,
- * so the discovery path is identical on every platform rather than each root
- * hand-constructing its renderer. Callers tolerate {@code null} (the picker /
- * open-page paths fall back to the configurable {@code menuInvalid} reject).</p>
+ * Platform-neutral resolution of {@code /rtp menu} bindings (ADR-070).
+ * Discovers {@link MenuRendererProvider} and {@link AnvilInputOpenerProvider} via {@link ServiceLoader}.
+ * Tolerates null when no provider matches the running platform.
  */
 public final class MenuBindingSupport {
 
   private MenuBindingSupport() {}
 
   /**
-   * Resolves the {@link MenuRenderer} from the {@code menu.renderer} config list
-   * (first-wins; unknown / failing ids logged at WARNING and skipped). Returns
-   * {@code null} if the list is empty, missing, or no listed id has a discoverable
-   * provider on the runtime classpath - callers must tolerate {@code null} (the
-   * redeem path degrades to the configurable {@code menuInvalid} message).
+   * Resolves the {@link MenuRenderer} from configured renderer IDs.
+   * Discovers via {@link MenuRendererProvider}; returns {@code null} if unavailable.
    *
-   * <p>Providers are discovered via {@link MenuRendererProvider}; the platform
-   * adapter (when present) registers a {@code "book"} provider.
+   * @return resolved {@link MenuRenderer}, or {@code null}
    */
   public static @Nullable MenuRenderer discoverRenderer() {
     List<String> ids = configuredRendererIds();
@@ -189,19 +171,8 @@ public final class MenuBindingSupport {
   }
 
   /**
-   * Eagerly materialise every loadable provider from a {@link ServiceLoader},
-   * skipping any whose class cannot be linked or instantiated on this runtime.
-   *
-   * <p>A universal jar shades the Paper, Fabric, and NeoForge adapters together,
-   * so a {@code META-INF/services} entry may name a provider class that hard-
-   * references a platform type absent at runtime (e.g. the Bukkit anvil opener
-   * referencing {@code org.bukkit.plugin.Plugin} on a NeoForge server). The lazy
-   * {@code ServiceLoader} iterator surfaces that as a {@link java.util.ServiceConfigurationError}
-   * or a raw {@link LinkageError} (e.g. {@link NoClassDefFoundError}) from
-   * {@code hasNext()}/{@code next()}; left unhandled it would abort the whole
-   * discovery (and the {@code CoreRtpRoot} construction that drives it). We
-   * therefore advance defensively and drop the unloadable provider rather than
-   * failing the platform that does have a valid one.</p>
+   * Materialises providers from {@link ServiceLoader}, catching {@link LinkageError} and
+   * {@link java.util.ServiceConfigurationError} to safely skip mismatched platform classes in universal jars.
    */
   private static <T> List<T> loadProvidersSafely(ServiceLoader<T> loader, String what) {
     List<T> providers = new ArrayList<>();

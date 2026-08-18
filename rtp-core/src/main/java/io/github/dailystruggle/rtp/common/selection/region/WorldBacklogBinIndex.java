@@ -8,36 +8,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * World-scoped cross-RTP-region index of L3 backlog entries, keyed by Anvil
- * region-file coordinate (see {@link RegionFileCoord}). Each bin holds a
- * {@link WeakReference} to a list of {@link BacklogLocationBuffer.BacklogEntry}
- * instances contributed by any number of {@link Region}s that target the same
- * world.
- *
- * <p>This index is the &quot;cross-RTP-region amortization&quot; structure required
- * by <a href="../../../../../../../../../../docs/adr/ADR-028-l3-backlog-cache.md">ADR-028</a>:
- * when one region selects a bin to verify, the Anvil pre-filter pass covers
- * <em>every</em> entry contributed to that bin by any region, paying for the
- * single {@code .mca} read once.
- *
- * <h2>Storage of truth</h2>
- * The per-region {@link BacklogLocationBuffer} owns each entry; this index
- * holds only weak references. If the GC reclaims a bin's list (because every
- * referencing buffer has been cleared or its entries replaced), the next
- * insert simply recreates the bin — there is no correctness impact.
- *
- * <h2>Capacity</h2>
- * The index itself is unbounded. Bound is transitively imposed by
- * {@code Σ backlogCacheCap} across all regions targeting the world, since each
- * referenced entry must also be live in some region's buffer.
- *
- * <h2>Thread-safety</h2>
- * Uses {@link ConcurrentHashMap} for bin lookup. The per-bin {@code List} is
- * itself synchronized externally during mutation (see {@link #insert}); reads
- * (verification iteration) take a snapshot copy to avoid concurrent
- * modification during a multi-entry pass. Validity field on each
- * {@link BacklogLocationBuffer.BacklogEntry} is {@code volatile} so a
- * verification write is observable without locking.
+ * World-scoped index of L3 backlog entries keyed by Anvil region-file coordinate (ADR-028).
+ * Groups candidate locations across regions targeting the same world for single-pass verification.
  */
 public final class WorldBacklogBinIndex {
 
@@ -90,13 +62,10 @@ public final class WorldBacklogBinIndex {
   }
 
   /**
-   * Snapshots the current contents of the bin identified by {@code key}. The
-   * returned list is a copy: subsequent mutations on the underlying bin do
-   * not affect it.
+   * Returns an insertion-ordered copy of entries in bin {@code key}, or an empty list if none exist.
    *
-   * @param key bin coordinate; never {@code null}
-   * @return snapshot of entries currently contributed to the bin, in insertion
-   *         order; empty if the bin has been GC'd or never existed
+   * @param key bin coordinate (never null)
+   * @return snapshot of entries in the bin
    */
   public List<BacklogLocationBuffer.BacklogEntry> snapshot(RegionFileCoord key) {
     WeakReference<List<BacklogLocationBuffer.BacklogEntry>> ref = bins.get(key);
@@ -131,7 +100,7 @@ public final class WorldBacklogBinIndex {
 
   /**
    * Sweeps any bins whose weak-referenced list has been GC'd. Optional housekeeping
-   * — correctness does not depend on it.
+   * - correctness does not depend on it.
    *
    * @return number of stale bin keys removed
    */

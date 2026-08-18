@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>An Anvil-backed {@link FabricRTPChunk} must answer every block-data query
  * from the decoded {@link AnvilChunkView} without touching a {@code ChunkAccess}
- * — i.e. without forcing a synchronous chunk load on the server tick thread.
+ * - i.e. without forcing a synchronous chunk load on the server tick thread.
  * Forcing through any of the Minecraft accessors here would NPE on the
  * {@code super(null)} {@code chunk} field, which is exactly the failure mode
  * we want to surface if a future refactor accidentally drops the dual-mode
@@ -70,7 +70,7 @@ class ReqRtpS005FabricAnvilChunkTest {
         FabricRTPChunk c = new FabricRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
         // Empty sections ⇒ every (x,y,z) is "above the highest emitted section"
         // ⇒ treated as air per AnvilChunkView contract. Live path would NPE on
-        // a null ChunkAccess — that this returns true is the proof of dispatch.
+        // a null ChunkAccess - that this returns true is the proof of dispatch.
         assertTrue(c.isAir(0, 64, 0));
         assertTrue(c.isAir(15, 0, 15));
         // Anvil-backed sky light is the vanilla "fully lit" default.
@@ -102,7 +102,7 @@ class ReqRtpS005FabricAnvilChunkTest {
     void keepAndUnloadAreNoOps() {
         FabricRTPChunk c = new FabricRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
         // No FabricRTPWorld registered against WORLD_ID and RTP.serverAccessor
-        // is unset — if dispatch leaked into the live branch, the world lookup
+        // is unset - if dispatch leaked into the live branch, the world lookup
         // would proceed (or NPE). The anvil branch returns immediately.
         assertDoesNotThrow(() -> c.keep(true));
         assertDoesNotThrow(() -> c.keep(false));

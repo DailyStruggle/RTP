@@ -215,7 +215,7 @@ public final class BukkitHandles implements HandleProvider {
             org.bukkit.Bukkit.getPluginManager().callEvent(
                     new io.github.dailystruggle.effectsapi.bukkit.events.PlayerGlideEvent(player));
 
-            // Arm watchdog. Integer.MAX_VALUE is treated as "no timeout" — skip the
+            // Arm watchdog. Integer.MAX_VALUE is treated as "no timeout" - skip the
             // schedule entirely to avoid a long-lived task that will never fire.
             if (landingTimeoutTicks > 0 && landingTimeoutTicks < Integer.MAX_VALUE) {
                 org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();

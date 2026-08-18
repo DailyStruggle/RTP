@@ -7,27 +7,18 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Platform-agnostic representation of a player who can be teleported.
  *
- * <p>This interface abstracts over the platform's native player object (e.g.
- * {@code org.bukkit.entity.Player}) to decouple the core teleport logic from
- * server-specific APIs. Implementations are provided by the platform adapter
- * (e.g. {@code rtp-bukkit}) and are obtained via
- * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#getPlayer(java.util.UUID)}.
+ * <p>Abstracts over native player handles to decouple core logic from platform APIs.
  *
- * <p><b>Thread safety:</b> With the exception of {@link #isOnline()}, all methods
- * on this interface must be called from the main server thread.
+ * <p><b>Thread safety:</b> Main server thread only, except {@link #isOnline()}.
  */
 public interface RTPPlayer extends RTPCommandSender {
   /**
    * Asynchronously teleports the player to the specified {@link RTPLocation}.
    *
-   * <p>The teleport is not guaranteed to be instantaneous; it may be delayed by
-   * the platform to ensure chunks are loaded. The returned {@link CompletableFuture}
-   * completes on the main server thread after the teleport has been dispatched.
+   * <p>Completes on the main server thread after teleport dispatch.
    *
-   * @param to the target location; must not be {@code null}
-   * @return a {@link CompletableFuture} that completes with {@code true} if the
-   *         teleport was successfully initiated, or {@code false} otherwise (e.g.
-   *         if the teleport was cancelled by another plugin or the player logged off)
+   * @param to target location; must not be {@code null}
+   * @return future completing with {@code true} if initiated, or {@code false} if cancelled/offline
    */
   CompletableFuture<Boolean> setLocation(RTPLocation to);
 
@@ -50,88 +41,47 @@ public interface RTPPlayer extends RTPCommandSender {
   boolean isOnline();
 
   /**
-   * Sets the given location as the player's persistent spawn anchor (the point
-   * they respawn at after death), backing the {@code setRespawnOnTeleport} config
-   * knob (BetterRTP {@code SetAsRespawn} parity).
+   * Sets the given location as the player's persistent spawn anchor (ADR-023).
    *
-   * <p>The default implementation is a no-op so existing {@link RTPPlayer}
-   * implementations (and addon test doubles) remain source- and binary-compatible;
-   * each platform adapter overrides it with the native respawn-point call.
+   * <p>Must be called from the destination owning thread (main or Folia region thread).
    *
-   * <p>Must be called from the thread that owns the destination (the main server
-   * thread, or the owning region thread on Folia).
-   *
-   * @param location the location to anchor the player's respawn to; must not be
-   *                 {@code null}
+   * @param location anchor location; must not be {@code null}
    */
   default void setRespawnLocation(RTPLocation location) {
     // no-op by default; platform adapters override with the native call
   }
 
   /**
-   * Reads the block currently shown to this player at {@code location} and returns its
-   * platform-neutral block-data string (e.g. {@code "minecraft:oak_log[axis=y]"}), in the
-   * same string form a block material is otherwise exchanged across the SPI.
+   * Reads the block-data string currently shown to this player at {@code location}.
    *
-   * <p>This is a purely local, in-memory read of an <b>already-loaded</b> block; it must never
-   * trigger a chunk load (REQ-RTP-S-005). Implementations return {@code null} when the block's
-   * chunk is not currently loaded (or when the platform cannot answer), and callers must treat
-   * {@code null} as "skip this position".
+   * <p>In-memory read of loaded blocks only; never loads chunks (REQ-RTP-S-005).
+   * Returns {@code null} if unloaded or unavailable.
    *
-   * <p>The default implementation returns {@code null}; platform adapters override it.
-   *
-   * <p>Must be called from the thread that owns the player / location (the main server thread,
-   * or the owning region thread on Folia).
-   *
-   * @param location the block position to read; must not be {@code null}
-   * @return the block-data string shown at {@code location}, or {@code null} if unavailable
+   * @param location block position; must not be {@code null}
+   * @return block-data string (e.g. {@code "minecraft:oak_log[axis=y]"}), or {@code null}
    */
   default String getClientBlock(RTPLocation location) {
     return null;
   }
 
   /**
-   * Sends a single client-side ("fake") block change to this player: the block at
-   * {@code location} is shown as {@code blockData} on the client only, without altering the
-   * world, firing physics, or loading chunks. The fake is purely visual and self-corrects on
-   * the client's next real chunk update, so it can never compromise destination safety
-   * (S-001..S-007).
+   * Sends a single client-side visual block change without modifying world state or loading chunks.
    *
-   * <p>Prefer {@link #sendClientBlockChanges(Map)} for more than one block: a bulk send is
-   * binned into one multi-block packet per chunk section, avoiding the packet/CPU spam of many
-   * single-block sends.
+   * <p>For bulk updates, prefer {@link #sendClientBlockChanges(Map)} for chunk-section batching.
    *
-   * <p>The default implementation is a no-op; platform adapters override it.
-   *
-   * <p>Must be called from the thread that owns the player (the main server thread, or the
-   * owning region thread on Folia).
-   *
-   * @param location  the block position to change on the client; must not be {@code null}
-   * @param blockData the platform-neutral block-data string to show (e.g. {@code "minecraft:air"})
+   * @param location  target block position; must not be {@code null}
+   * @param blockData platform-neutral block-data string (e.g. {@code "minecraft:air"})
    */
   default void sendClientBlockChange(RTPLocation location, String blockData) {
     // no-op by default; platform adapters override with the native client-side block change
   }
 
   /**
-   * Binned bulk variant of {@link #sendClientBlockChange(RTPLocation, String)}: sends all of
-   * {@code changes} to this player's client in as few packets as the platform allows (typically
-   * one multi-block-change packet per affected chunk section), so dissolving/restoring a large
-   * region costs a handful of packets instead of one per block.
+   * Sends batched client-side visual block changes to this player in multi-block packets.
    *
-   * <p>Each entry maps a block position to the platform-neutral block-data string to display
-   * there. Entries with a {@code null} value, or whose chunk is not currently loaded, are
-   * skipped (no chunk load is triggered, REQ-RTP-S-005). Nothing about the real world changes.
+   * <p>Unloaded chunks and {@code null} values are skipped without triggering chunk loads (REQ-RTP-S-005).
    *
-   * <p>The default implementation falls back to per-block
-   * {@link #sendClientBlockChange(RTPLocation, String)} calls so existing implementations remain
-   * source- and binary-compatible; platform adapters override it with a single batched send.
-   *
-   * <p>Must be called from the thread that owns the player (the main server thread, or the
-   * owning region thread on Folia).
-   *
-   * @param changes the block positions mapped to the block-data strings to show; must not be
-   *                {@code null}
+   * @param changes map of locations to block-data strings; must not be {@code null}
    */
   default void sendClientBlockChanges(Map<RTPLocation, String> changes) {
     if (changes == null) {
@@ -143,27 +93,12 @@ public interface RTPPlayer extends RTPCommandSender {
   }
 
   /**
-   * Shows or updates a personal, on-screen progress bar (e.g. a boss-bar) for this player only,
-   * keyed by a stable, caller-chosen {@code id}.
+   * Shows or updates a personal progress bar (e.g. boss-bar) for this player only.
    *
-   * <p>Unlike the server-wide, permission-scoped
-   * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#updateProgressBars(Map)}
-   * surface, this targets a single player, so it is suited to per-player feedback such as a
-   * teleport-warmup or queue-position countdown. Calling again with the same {@code id} updates
-   * the existing bar in place; distinct ids show distinct bars.
+   * <p>Supports legacy color codes in {@code title}. {@code progress} is clamped to {@code [0, 1]}.
    *
-   * <p>The {@code title} may contain legacy {@code &x} / {@code #RRGGBB} color codes; the platform
-   * decides how (or whether) to render them. {@code progress} is a fill fraction in {@code [0, 1]}
-   * (clamped by the implementation).
-   *
-   * <p>The default implementation is a no-op so existing {@link RTPPlayer} implementations (and
-   * addon test doubles) remain source- and binary-compatible; platform adapters override it.
-   *
-   * <p>Must be called from the thread that owns the player (the main server thread, or the owning
-   * region thread on Folia).
-   *
-   * @param id       a stable, caller-chosen bar id; must not be {@code null}
-   * @param title    the bar title, possibly containing color codes; {@code null} is treated as empty
+   * @param id       stable bar identifier; must not be {@code null}
+   * @param title    bar title (null treated as empty)
    * @param progress fill fraction in {@code [0, 1]}
    */
   default void showProgressBar(String id, String title, double progress) {
@@ -171,101 +106,53 @@ public interface RTPPlayer extends RTPCommandSender {
   }
 
   /**
-   * Hides and discards a personal progress bar previously shown to this player via
-   * {@link #showProgressBar(String, String, double)} under the same {@code id}. Unknown ids are
-   * ignored.
+   * Clears a personal progress bar previously shown under {@code id}.
    *
-   * <p>The default implementation is a no-op; platform adapters override it.
-   *
-   * <p>Must be called from the thread that owns the player (the main server thread, or the owning
-   * region thread on Folia).
-   *
-   * @param id the bar id to clear; must not be {@code null}
+   * @param id bar identifier to clear; must not be {@code null}
    */
   default void clearProgressBar(String id) {
     // no-op by default; platform adapters override with the native per-player progress bar
   }
 
   /**
-   * Returns this player's current server-side view distance in chunks, or a non-positive value
-   * when the platform exposes no per-player view-distance API.
+   * Returns this player's current server-side chunk delivery radius, or {@code -1} if unsupported.
    *
-   * <p>This is the per-player <i>delivery</i> view distance (the radius of chunks the server
-   * tracks and streams to this client), not the chunk radius RTP itself pre-loads around a
-   * destination. It is purely runtime state and is never persisted; a server restart
-   * re-negotiates it to the world/server default.
+   * <p>Must be called from the player's owning thread (main or Folia region thread).
    *
-   * <p>The default implementation returns {@code -1} to signal "unsupported", so callers can
-   * skip any view-distance behaviour on platforms without a per-player API. Platform adapters
-   * override it with the native getter.
-   *
-   * <p>Must be called from the thread that owns the player (the main server thread, or the
-   * owning region thread on Folia).
-   *
-   * @return the current per-player view distance in chunks, or {@code -1} if unsupported
+   * @return current per-player view distance in chunks, or {@code -1}
    */
   default int getViewDistance() {
     return -1;
   }
 
   /**
-   * Sets this player's server-side view distance in chunks (per-player delivery radius). Used by
-   * the teleport view-distance clamp and steady restore (ADR-072) to shrink the chunk-tracking
-   * ring the engine expands when the player is placed, then ramp it back up over time.
+   * Sets this player's server-side chunk delivery radius (ADR-072).
    *
-   * <p>The value is runtime-only and never persisted. Implementations should clamp it to the
-   * platform's supported range (the minimum renderable view distance is 2 chunks). On a platform
-   * with no per-player view-distance API the default implementation is a no-op, so the clamp
-   * feature silently degrades to "off" rather than failing.
+   * <p>Runtime-only; clamps to platform bounds. No-op on unsupported platforms.
    *
-   * <p>Must be called from the thread that owns the player (the main server thread, or the
-   * owning region thread on Folia).
-   *
-   * @param viewDistance the desired per-player view distance in chunks
+   * @param viewDistance desired per-player view distance in chunks
    */
   default void setViewDistance(int viewDistance) {
     // no-op by default; platform adapters override with the native per-player view-distance call
   }
 
   /**
-   * Returns this player's current per-player <i>send</i> view distance in chunks (the radius of
-   * chunks actually streamed to and rendered by the client), or a non-positive value when the
-   * platform exposes no separate send-view-distance API.
+   * Returns this player's client render distance in chunks, or {@code -1} if unsupported.
    *
-   * <p>This is distinct from {@link #getViewDistance()}: the send distance governs what the client
-   * is told to render, while the (tracking) view distance governs what the server loads and tracks.
-   * On platforms that do not separate the two, this returns {@code -1} ("unsupported").
+   * <p>Distinct from {@link #getViewDistance()}: governs client render radius, not server tracking.
    *
-   * <p>Must be called from the thread that owns the player (the main server thread, or the owning
-   * region thread on Folia).
-   *
-   * @return the current per-player send view distance in chunks, or {@code -1} if unsupported
+   * @return current send view distance in chunks, or {@code -1}
    */
   default int getSendViewDistance() {
     return -1;
   }
 
   /**
-   * Sets this player's per-player <i>send</i> view distance in chunks (the radius of chunks the
-   * client is told to render), independently of the server-side tracking view distance set by
-   * {@link #setViewDistance(int)}.
+   * Sets this player's client render distance independently of server tracking distance (ADR-072).
    *
-   * <p>Pinning the send distance to the player's pre-teleport value lets the teleport view-distance
-   * clamp and steady restore (ADR-072) shrink and ramp the server-side <i>tracking</i> distance to
-   * cap the arrival chunk-load burst, without the client ever receiving a view-distance change. That
-   * removes the visible render-ring "flash" the client would otherwise show when its negotiated view
-   * distance is lowered and raised again.
+   * <p>Negative values reset to platform default. No-op if unsupported.
    *
-   * <p>Passing a negative value resets the send distance to "follow the tracking/world default".
-   * The value is runtime-only and never persisted. On a platform with no separate send-view-distance
-   * API the default implementation is a no-op, so the clamp feature degrades to mutating the tracking
-   * distance alone (the pre-ADR-072 behaviour).
-   *
-   * <p>Must be called from the thread that owns the player (the main server thread, or the owning
-   * region thread on Folia).
-   *
-   * @param viewDistance the desired per-player send view distance in chunks, or a negative value to
-   *                     reset to the platform default
+   * @param viewDistance desired send view distance in chunks, or negative for default
    */
   default void setSendViewDistance(int viewDistance) {
     // no-op by default; platform adapters override with the native per-player send-view-distance call

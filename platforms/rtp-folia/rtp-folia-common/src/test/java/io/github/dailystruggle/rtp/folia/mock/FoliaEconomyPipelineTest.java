@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class FoliaEconomyPipelineTest {
 
     // -----------------------------------------------------------------------
-    // Minimal no-op Plugin stub — only getLogger() is used by the mocks.
+    // Minimal no-op Plugin stub - only getLogger() is used by the mocks.
     // -----------------------------------------------------------------------
     private static final Plugin STUB_PLUGIN = new Plugin() {
         @Override public void onDisable() {}
@@ -98,11 +98,11 @@ class FoliaEconomyPipelineTest {
     }
 
     // -----------------------------------------------------------------------
-    // Test 1 – full context-switching pipeline
+    // Test 1 - full context-switching pipeline
     // -----------------------------------------------------------------------
 
     /**
-     * Verifies the five-step economy → teleport pipeline:
+     * Verifies the economy → teleport pipeline end-to-end:
      * <ol>
      *   <li>Async task is queued (economy check).</li>
      *   <li>{@code asyncScheduler.executeAll()} runs exactly 1 task.</li>
@@ -118,18 +118,18 @@ class FoliaEconomyPipelineTest {
         AtomicInteger asyncTaskCount   = new AtomicInteger(0);
         AtomicInteger regionTaskCount  = new AtomicInteger(0);
 
-        // ── Step 1 (RegionThread): player types /rtp ─────────────────────
-        // Plugin submits an economy check to the async scheduler.
+        // Region thread: player types /rtp; the plugin submits an economy check
+        // to the async scheduler.
         asyncScheduler.runNow(STUB_PLUGIN, scheduledTask -> {
 
-            // ── Step 3 (AsyncThread): Vault withdrawal succeeds ───────────
+            // Async thread: Vault withdrawal succeeds.
             economyCheckRan.set(true);
             asyncTaskCount.incrementAndGet();
 
             // Dispatch the teleport callback back to the region scheduler.
             regionScheduler.execute(STUB_PLUGIN, null, 0, 0, () -> {
 
-                // ── Step 5 (RegionThread): teleportation logic ────────────
+                // Region thread: teleportation logic.
                 teleportFired.set(true);
                 regionTaskCount.incrementAndGet();
             });
@@ -141,7 +141,7 @@ class FoliaEconomyPipelineTest {
         assertFalse(economyCheckRan.get(),
                 "Economy check must NOT have run before executeAll()");
 
-        // ── Step 2: drain the async scheduler ────────────────────────────
+        // Drain the async scheduler.
         int asyncExecuted = asyncScheduler.executeAll();
 
         assertEquals(1, asyncExecuted,
@@ -157,7 +157,7 @@ class FoliaEconomyPipelineTest {
         assertFalse(teleportFired.get(),
                 "Teleport must NOT have fired before regionScheduler.executeAll()");
 
-        // ── Step 4: drain the region scheduler ───────────────────────────
+        // Drain the region scheduler.
         int regionExecuted = regionScheduler.executeAll();
 
         assertEquals(1, regionExecuted,
@@ -167,7 +167,7 @@ class FoliaEconomyPipelineTest {
         assertEquals(0, regionScheduler.pendingCount(),
                 "Region queue must be empty after executeAll()");
 
-        // ── Step 5 assertion: execution counts ───────────────────────────
+        // Execution-count assertions.
         assertEquals(1, asyncTaskCount.get(),
                 "Async (economy) task must have executed exactly once");
         assertEquals(1, regionTaskCount.get(),
@@ -175,7 +175,7 @@ class FoliaEconomyPipelineTest {
     }
 
     // -----------------------------------------------------------------------
-    // Test 2 – economy failure: teleport must NOT fire
+    // Test 2 - economy failure: teleport must NOT fire
     // -----------------------------------------------------------------------
 
     /**
@@ -205,7 +205,7 @@ class FoliaEconomyPipelineTest {
     }
 
     // -----------------------------------------------------------------------
-    // Test 3 – GlobalRegionScheduler queues and executes tasks correctly
+    // Test 3 - GlobalRegionScheduler queues and executes tasks correctly
     // -----------------------------------------------------------------------
 
     /**

@@ -9,14 +9,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /rtp version} (alias {@code /rtp about}) — a purely descriptive
- * subcommand that reports which RTP plugin and host server are running.
- *
- * <p>Unlike {@code /rtp info}, which captures a live {@code MetricsSnapshot}
- * and renders realtime telemetry (TPS, MSPT, queue depth, pipeline latency,
- * …), this command emits only static identity strings: the plugin version,
- * the platform brand, and the server version. It performs no metrics capture
- * and reads no runtime counters, so it is safe to run cheaply at any time.
+ * {@code /rtp version} (alias {@code /rtp about}) descriptive subcommand.
+ * Reports running plugin version, platform brand, and server version.
  */
 public class VersionCmd extends BaseRTPCmdImpl {
   /**

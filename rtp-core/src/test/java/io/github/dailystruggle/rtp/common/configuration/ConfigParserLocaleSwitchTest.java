@@ -19,20 +19,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Regression test for the locale-switch migration in {@link ConfigParser#check}.
- * Reproduces the {@code rtp info} symptom reported when an operator changed
- * {@code language.yml} from {@code en} to {@code es} but the on-disk
- * {@code messages.yml} kept its English keys: most enum lookups resolved to
- * {@code null} and lines were silently skipped.
- *
- * <p>Verifies that:
- * <ol>
- *   <li>A foreign-locale on-disk file is detected.
- *   <li>The original file is preserved as {@code <name>.old1} (no data loss).
- *   <li>User-customized scalar values survive the migration under the new
- *       locale's key names.
- *   <li>Enum lookups resolve after migration (no more empty strings).
- * </ol>
+ * Regression: locale-switch migration in {@link ConfigParser#check}.
+ * Verifies foreign-locale on-disk detection, .old1 backup preservation, and key migration.
  */
 public class ConfigParserLocaleSwitchTest {
 
@@ -286,7 +274,7 @@ public class ConfigParserLocaleSwitchTest {
         File langDir = tempDir.resolve("lang").toFile();
         assertTrue(langDir.mkdirs() || langDir.isDirectory());
         File langFile = new File(langDir, "test.lang.yml");
-        // Pure identity mapping — locale renames no keys for this file.
+        // Pure identity mapping - locale renames no keys for this file.
         Files.writeString(langFile.toPath(),
                 "alpha: alpha\nbeta: beta\ngamma: gamma\nversion: version\n");
 
@@ -323,7 +311,7 @@ public class ConfigParserLocaleSwitchTest {
         // the migration preserved every recovered scalar verbatim. Now the
         // migration must compare each on-disk value against the English
         // baseline shipped in the JAR and only preserve genuinely modified
-        // entries — so unmodified defaults get the localized text.
+        // entries - so unmodified defaults get the localized text.
         File configFile = tempDir.resolve("test.yml").toFile();
         // alpha == English default ("hello"); beta is operator-modified.
         Files.writeString(configFile.toPath(),

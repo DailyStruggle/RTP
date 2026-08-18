@@ -15,17 +15,8 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Self-contained ANSI-SQL persistence for ADR-060 emergency-platform restore jobs.
- *
- * <p>Owns a single {@code rtp_platform_restores} table created on demand via the shared
- * {@link AbstractSQLDatabaseAccessor} HikariCP-backed connection. The DDL uses only
- * portable types (TEXT/VARCHAR + INTEGER) so it works across the H2/SQLite/MySQL/PostgreSQL
- * accessors without per-dialect tweaks. Rows are written on enrollment, their
- * {@code remaining_seconds} updated as the countdown advances, and deleted on completion.
- *
- * <p>The serialized {@code blocks} payload is newline-delimited records of
- * {@code x\ty\tz\ttoken} (tab-separated) so a Bukkit {@code BlockData} string - which
- * contains commas and brackets - round-trips intact.
+ * ANSI-SQL persistence for emergency platform restore jobs (ADR-060).
+ * Stores pending jobs in {@code rtp_platform_restores} table across supported databases.
  */
 public final class PlatformRestoreSqlStore {
   static final String TABLE = "rtp_platform_restores";

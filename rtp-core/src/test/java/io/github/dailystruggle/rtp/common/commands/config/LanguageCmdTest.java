@@ -21,7 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests for LanguageCmd — /rtp config language &lt;locale&gt;
+ * Tests for LanguageCmd - /rtp config language &lt;locale&gt;
  *
  * <p>Covers REQ-RTP-F-013 (user-facing messages configurable) and S-004 (no silent failures).
  */

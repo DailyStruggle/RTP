@@ -12,7 +12,7 @@ import java.util.logging.Level;
  * into the platform-agnostic identifiers used by {@code commands-api}.
  *
  * <p>Lives in {@code rtp-fabric-common} (where {@code net.minecraft.*} imports
- * are permitted) so that {@code RTPFabricMod} — the Fabric entry-point class —
+ * are permitted) so that {@code RTPFabricMod} - the Fabric entry-point class -
  * can stay free of {@code net.minecraft.*} references and avoid JVM
  * verification failures on MC versions where intermediary names like
  * {@code class_2168} (CommandSourceStack) are not exposed on the runtime
@@ -31,7 +31,7 @@ public final class FabricBrigadierSourceBridge {
     // Cached reflective handles. Resolved lazily from the *runtime* class of
     // the first non-null source we see, so this class's bytecode never names
     // CommandSourceStack (intermediary class_2168), Entity, or ServerPlayer
-    // (class_3222) — both of which are absent on MC 26.1.2's deobfuscated
+    // (class_3222) - both of which are absent on MC 26.1.2's deobfuscated
     // runtime and would fail JVM verify on instanceof / invokevirtual.
     private static volatile Method getEntityMethod;     // CommandSourceStack#getEntity() : Entity
     private static volatile Class<?> serverPlayerCls;   // resolved from runtime entity class chain
@@ -44,15 +44,15 @@ public final class FabricBrigadierSourceBridge {
      */
     public static UUID resolveSenderUuid(Object src) {
         if (src == null) return RTPAPI.serverId;
-        // Phase 4 item 19c: prefer per-version adapter's typed implementation.
+        // Prefer per-version adapter's typed implementation.
         // Adapters that override return a non-null UUID for player sources, or
         // null to mean "not a player → use console sentinel". The default
         // SPI implementation also returns null, which is indistinguishable from
-        // "not a player" — so we use a sentinel-based contract: if the adapter
+        // "not a player" - so we use a sentinel-based contract: if the adapter
         // explicitly overrode (we detect via a marker call), trust its null;
         // otherwise fall back to reflection.
         // Implementation: probe via Throwable on a no-op marker isn't worth
-        // the complexity — instead, we always call the adapter, and if it
+        // the complexity - instead, we always call the adapter, and if it
         // returns non-null we use it; if null, we still fall through to the
         // legacy reflective path. Cost on 26.1.2: one extra adapter call per
         // non-player source (e.g. console /rtp), which is negligible.
@@ -64,7 +64,7 @@ public final class FabricBrigadierSourceBridge {
                 if (viaAdapter != null) return viaAdapter;
             }
         } catch (Throwable ignored) {
-            // Registry not yet populated, or adapter threw — fall through.
+            // Registry not yet populated, or adapter threw - fall through.
         }
         if (reflectionInitFailed) return RTPAPI.serverId;
         try {

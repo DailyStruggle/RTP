@@ -13,14 +13,8 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Validates the mock contract that guarantees all chunk-load futures returned by
- * {@link MockRTPWorld} and {@link MockLocationGenerator} are pre-completed.
- *
- * <p>This directly supports the ARCH-EXCEPTION recorded in {@code RTPArchitectureTest}:
- * {@code LocationGenerator} calls {@code .get()} and {@code .join()} on futures that the
- * platform adapter guarantees are already resolved. These tests prove the mock honours
- * the same contract, so unit tests exercising {@code LocationGenerator} under the mock
- * never block.
+ * Validates that mock chunk-load futures in {@link MockRTPWorld} and
+ * {@link MockLocationGenerator} are pre-completed to prevent test blocking.
  */
 class MockChunkFutureTest {
 
@@ -113,7 +107,7 @@ class MockChunkFutureTest {
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void mockLocationGenerator_getLocation_outerFutureIsAlreadyCompleted() {
         MockLocationGenerator gen = new MockLocationGenerator();
-        // Use the biomeNames overload — the simplest call path that exercises buildResult()
+        // Use the biomeNames overload - the simplest call path that exercises buildResult()
         CompletableFuture<GenerationResult> future = gen.getLocation(new Object(), Set.of());
 
         assertTrue(future.isDone(),

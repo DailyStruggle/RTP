@@ -8,15 +8,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /rtp clear invuln} child verb. Drops a player's post-teleport
- * invulnerability grace marker ({@link RTP#invulnerablePlayers}), immediately
- * ending the temporary damage immunity granted after an RTP teleport. Useful
- * when a player is stuck invulnerable (or is exploiting the grace window).
- *
- * <p>Targeting (self / listed players / console-global) is inherited from
- * {@link PlayerTargetedClearCmd}.
- *
- * <p>Permission: {@code rtp.admin}.
+ * {@code /rtp clear invuln} child verb. Drops post-teleport invulnerability grace markers
+ * ({@link RTP#invulnerablePlayers}). Permission: {@code rtp.admin}.
  */
 public class ClearInvulnCmd extends PlayerTargetedClearCmd {
 

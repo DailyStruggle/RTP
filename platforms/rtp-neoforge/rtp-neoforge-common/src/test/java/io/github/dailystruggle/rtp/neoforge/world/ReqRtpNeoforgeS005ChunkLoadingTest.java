@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>An Anvil-backed {@link NeoForgeRTPChunk} must answer every block-data
  * query from the decoded {@link AnvilChunkView} without touching a live
- * {@code ChunkAccess} / {@code ServerLevel} — i.e. without forcing a
+ * {@code ChunkAccess} / {@code ServerLevel} - i.e. without forcing a
  * synchronous chunk load on the server tick thread. The anvil constructor
  * passes {@code super(null)}, so any leak into the live branch would NPE on the
  * null {@code chunk} field; that these queries return the view-derived answers
@@ -28,8 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>NeoForge analogue of {@code ReqRtpS005FabricAnvilChunkTest}. Because
  * NeoForge ships Mojang-mapped names at runtime there is no obf/intermediary
- * carrier split, but the S-005 invariant — no main-thread chunk I/O on the
- * anvil path — is identical and is the regression this class pins.</p>
+ * carrier split, but the S-005 invariant - no main-thread chunk I/O on the
+ * anvil path - is identical and is the regression this class pins.</p>
  *
  * <p>This test deliberately does NOT bootstrap the Minecraft registry; the
  * anvil path must not depend on it. A regression that introduces a registry or
@@ -74,7 +74,7 @@ class ReqRtpNeoforgeS005ChunkLoadingTest {
         NeoForgeRTPChunk c = new NeoForgeRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
         // Empty sections => every (x,y,z) is "above the highest emitted section"
         // => treated as air per AnvilChunkView contract. The live path would NPE
-        // on a null ChunkAccess — that this returns true is the proof of dispatch.
+        // on a null ChunkAccess - that this returns true is the proof of dispatch.
         assertTrue(c.isAir(0, 64, 0));
         assertTrue(c.isAir(15, 0, 15));
         // Anvil-backed sky light is the vanilla "fully lit" default.
@@ -106,7 +106,7 @@ class ReqRtpNeoforgeS005ChunkLoadingTest {
     void keepAndUnloadAreNoOps() {
         NeoForgeRTPChunk c = new NeoForgeRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
         // No NeoForgeRTPWorld registered against WORLD_ID and RTP.serverAccessor
-        // is unset — if dispatch leaked into the live branch, the world lookup
+        // is unset - if dispatch leaked into the live branch, the world lookup
         // would proceed (or NPE). The anvil branch returns immediately.
         assertDoesNotThrow(() -> c.keep(true));
         assertDoesNotThrow(() -> c.keep(false));

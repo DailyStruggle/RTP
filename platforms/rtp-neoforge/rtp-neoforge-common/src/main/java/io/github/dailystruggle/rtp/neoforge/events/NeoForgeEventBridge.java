@@ -25,8 +25,8 @@ import java.util.logging.Level;
  * NeoForge analogue of {@code FabricEventBridge}.
  *
  * <p><b>Mojmap-at-runtime simplification.</b> Unlike Fabric's obf-carrier
- * bridge — which proxies callbacks reflectively and routes everything through
- * {@code Object}-typed entry points to avoid pinning intermediary class names —
+ * bridge - which proxies callbacks reflectively and routes everything through
+ * {@code Object}-typed entry points to avoid pinning intermediary class names -
  * NeoForge ships Mojang-mapped names at runtime, so this bridge uses plain
  * {@code @SubscribeEvent} handlers with typed {@link ServerPlayer} /
  * {@link ServerLevel} parameters. No reflection, no proxies.</p>
@@ -117,7 +117,7 @@ public final class NeoForgeEventBridge {
             // if (server != null) {
             //     NeoForgeOnEventTeleports.onJoin(server, player);
             // }
-            // ADR-049 — fan a UUID join event out to platform-agnostic subscribers
+            // ADR-049 - fan a UUID join event out to platform-agnostic subscribers
             // (e.g. the network-mode reservation-redeem path).
             NeoForgePlayerLifecycleHook hook = accessor.getNeoForgePlayerLifecycleHook();
             if (hook != null) hook.fireJoinFromPlayer(player);
@@ -130,13 +130,13 @@ public final class NeoForgeEventBridge {
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         try {
             if (event.getEntity() instanceof ServerPlayer player) {
-                // ADR-049 — fan UUID quit out before the accessor forgets the
+                // ADR-049 - fan UUID quit out before the accessor forgets the
                 // player wrapper, so subscribers can still resolve the UUID.
                 NeoForgePlayerLifecycleHook hook = accessor.getNeoForgePlayerLifecycleHook();
                 if (hook != null) hook.fireQuitFromPlayer(player);
                 accessor.unregisterPlayer(player.getUUID());
             }
-            // ADR-023 — Login Reserve Cache refill on quit. Mirror of OnPlayerQuit
+            // ADR-023 - Login Reserve Cache refill on quit. Mirror of OnPlayerQuit
             // (Bukkit): for every region with a login buffer, dispatch one async
             // promotion to top it up. Fail-soft: never throw from the handler.
             refillLoginReserveOnQuit();
@@ -172,11 +172,11 @@ public final class NeoForgeEventBridge {
     }
 
     // -------------------------------------------------------------------------
-    // ADR-023 — login reserve cache (called by RTPNeoForgeMod at server-start)
+    // ADR-023 - login reserve cache (called by RTPNeoForgeMod at server-start)
     // -------------------------------------------------------------------------
 
     /**
-     * ADR-023 — initialise the Login Reserve Cache on the default-world
+     * ADR-023 - initialise the Login Reserve Cache on the default-world
      * (overworld) region when {@code PerformanceKeys.loginCacheEnabled=true}.
      * Sized to {@code loginCacheCap} (or the server max-players count when
      * {@code loginCacheCap=0}). Mirror of {@code RTPBukkitPlugin.initLoginReserveCache()}
@@ -257,7 +257,7 @@ public final class NeoForgeEventBridge {
     }
 
     /**
-     * ADR-023 — refill the login reserve cache on player disconnect. Dispatches
+     * ADR-023 - refill the login reserve cache on player disconnect. Dispatches
      * one async {@code LoginCacheTask.promoteUpTo(1)} per region whose
      * {@code loginLocations} buffer is non-null. Fail-soft per region.
      */

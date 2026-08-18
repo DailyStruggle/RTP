@@ -13,13 +13,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for Square_Normal shape covering:
- * - getRange() boundary conditions
- * - xzToLocation() all 8 octant branches
- * - locationToXZ() round-trip fidelity
- * - xzToLocation(MutableRTPCoords) mirrors long-variant
- * - NormalDistributionParams (mean, deviation) settings
- * - Extreme values (0, negative, large)
+ * Unit tests for {@link Square_Normal} shape covering range bounds, 8-octant coordinate mapping, and parameterization.
  */
 public class SquareNormalTest {
 
@@ -66,7 +60,7 @@ public class SquareNormalTest {
     }
 
     // -------------------------------------------------------------------------
-    // xzToLocation() — all 8 octants
+    // xzToLocation() - all 8 octants
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "xzToLocation({0},{1}) octant coverage")
@@ -127,7 +121,7 @@ public class SquareNormalTest {
     }
 
     // -------------------------------------------------------------------------
-    // xzToLocation() — center offset
+    // xzToLocation() - center offset
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "center=({0},{1}), point=({2},{3})")
@@ -194,7 +188,7 @@ public class SquareNormalTest {
     }
 
     // -------------------------------------------------------------------------
-    // NormalDistributionParams — mean and deviation
+    // NormalDistributionParams - mean and deviation
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "mean={0}, deviation={1}")

@@ -122,7 +122,7 @@ public final class NeoForgeLegacyText {
                             style = style.withColor(
                                     TextColor.fromRgb(Integer.parseInt(hex.toString(), 16)));
                         } catch (NumberFormatException ignored) {
-                            // shouldn't happen — isHex gated above
+                            // shouldn't happen - isHex gated above
                         }
                         i += 14;
                         continue;

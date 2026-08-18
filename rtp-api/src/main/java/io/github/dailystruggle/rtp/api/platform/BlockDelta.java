@@ -3,14 +3,8 @@ package io.github.dailystruggle.rtp.api.platform;
 import java.util.Objects;
 
 /**
- * One recorded original block captured before the emergency landing platform
- * ({@link io.github.dailystruggle.rtp.api.world.RTPWorld#platform}) overwrote it.
- *
- * <p>Carries world-relative coordinates and a platform-opaque, serializable
- * block-state token (the adapter's canonical block-state string, e.g. the Bukkit
- * {@code BlockData#getAsString()} form, or the Fabric block-state string). The token
- * round-trips through the adapter; {@code rtp-core} treats it as an opaque
- * {@link String}. Carries no live world references. See ADR-060.
+ * One recorded original block captured before emergency platform creation (ADR-060).
+ * Holds world coordinates and an opaque serializable block-state token.
  */
 public final class BlockDelta {
   private final int x;

@@ -9,31 +9,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Proxy auto-detection state machine for {@code transport.type: auto}.
- *
- * <p>Implements the lifecycle described in the approved plugin-message
- * transport proposal (§4) and {@code rtp-proxy-ADR-016}:</p>
- *
- * <pre>
- *   UNKNOWN  --evaluatePassive(), bridge unavailable / probe disarmed--&gt; DISABLED
- *   UNKNOWN  --evaluatePassive(), passive probe armed----------------&gt; ARMED
- *   ARMED    --onCarrierAvailable() (first player join): GetServer/GetServers--&gt; PROBING
- *   PROBING  --topology reply within handshakeTimeoutMillis-----------&gt; ENABLED
- *   PROBING  --tick() past handshakeTimeoutMillis (no reply)----------&gt; DISABLED
- *   DISABLED --onCarrierAvailable() (re-probe on reconnect)-----------&gt; PROBING
- * </pre>
- *
- * <p>Heartbeat gossip is only legitimate once {@link #isEnabled()} is true
- * ({@code ENABLED}). A standalone server (no proxy) lands in {@code DISABLED}
- * without log spam; because {@link #onCarrierAvailable()} re-probes from
- * {@code DISABLED}, a server that is later attached to a proxy and gains a
- * player picks the network up without a restart (decision §9.5, re-probe).</p>
- *
- * <p>This class is deliberately platform-neutral and side-effect-light: every
- * transition is driven by an explicit method call so it is fully testable with
- * a {@code MockRTPScheduler}-driven clock and a loopback {@link NetworkBridge}
- * double. It never starts threads itself (guideline <em>Scheduler Usage</em>);
- * the caller pumps {@link #tick()} from {@code RTP.scheduler}.</p>
+ * Proxy auto-detection state machine for {@code transport.type: auto} (UNKNOWN -> ARMED -> PROBING -> ENABLED/DISABLED).
+ * Drives passive configuration checks and active plugin-message handshake.
  */
 public final class ProxyAutoDetector {
 

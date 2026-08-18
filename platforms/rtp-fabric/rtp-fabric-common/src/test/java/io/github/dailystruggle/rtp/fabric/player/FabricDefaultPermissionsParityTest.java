@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * MULTI_PLATFORM_PLAN Step F sub-item 5 — Permission node parity test vs. the
+ * MULTI_PLATFORM_PLAN Step F sub-item 5 - Permission node parity test vs. the
  * Bukkit adapter.
  *
  * <p><b>Why this exists.</b> {@link FabricDefaultPermissions} is the Fabric-side
@@ -22,11 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * {@code Player#hasPermission}, which the server has already initialised against
  * {@code plugin.yml}'s declared {@code default:} values
  * ({@code true} / {@code false} / {@code op}). Fabric has no equivalent
- * descriptor — {@link FabricRTPPlayer#hasPermission} consults
+ * descriptor - {@link FabricRTPPlayer#hasPermission} consults
  * {@link FabricDefaultPermissions#resolve} as its second tier (after
  * {@code fabric-permissions-api}, before the {@code ops.json} fallback). If the
  * Fabric table drifts from {@code plugin.yml}, baseline player permissions like
- * {@code rtp.see} / {@code rtp.use} are silently denied (or the inverse — an
+ * {@code rtp.see} / {@code rtp.use} are silently denied (or the inverse - an
  * op-only permission becomes a default-grant) without any server log.
  *
  * <p><b>What this test pins.</b> For the canonical node set declared in
@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * {@code MinecraftServer} + {@code ServerPlayer} handle which is out of scope
  * for a unit test (and the perms-api / ops.json tiers are themselves stable
  * surfaces; the regression risk lives almost entirely in the middle tier this
- * file pins). The Bukkit adapter is not invoked here — {@code BukkitRTPPlayer}
+ * file pins). The Bukkit adapter is not invoked here - {@code BukkitRTPPlayer}
  * is a one-line delegate to {@code Player#hasPermission}, so "parity vs Bukkit"
  * reduces to "parity vs {@code plugin.yml}". An earlier revision tried a
  * best-effort classpath lookup of {@code /plugin.yml}; that was removed when
@@ -57,7 +57,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * new node is added there, mirror it both into {@link FabricDefaultPermissions}
  * and into {@link #EXPECTED_DEFAULTS} so the parity guard keeps biting.
  *
- * <p><b>Traceability.</b> Candidate {@code REQ-RTP-F-???} — permission semantics
+ * <p><b>Traceability.</b> Candidate {@code REQ-RTP-F-???} - permission semantics
  * parity across Bukkit and Fabric adapters. No existing REQ-* row covers this
  * surface; row to be added in {@code REQUIREMENTS.md §F}.
  */
@@ -71,7 +71,7 @@ class FabricDefaultPermissionsParityTest {
      * output.
      *
      * <p>Nodes omitted from {@code plugin.yml}'s {@code default:} attribute
-     * (the majority) resolve to {@link FabricDefaultPermissions.Verdict#OP} —
+     * (the majority) resolve to {@link FabricDefaultPermissions.Verdict#OP} -
      * that is Bukkit's documented behaviour for an undefaulted permission.
      */
     private static final Map<String, FabricDefaultPermissions.Verdict> EXPECTED_DEFAULTS =
@@ -113,7 +113,7 @@ class FabricDefaultPermissionsParityTest {
         m.put("rtp.biome.*", FabricDefaultPermissions.Verdict.OP);
         m.put("rtp.info", FabricDefaultPermissions.Verdict.OP);
         m.put("rtp.*", FabricDefaultPermissions.Verdict.OP);
-        // rtp.delay / rtp.cooldown are placeholders — plugin.yml has no default,
+        // rtp.delay / rtp.cooldown are placeholders - plugin.yml has no default,
         // so Bukkit treats them as op. FabricDefaultPermissions DENIES them
         // (Verdict.FALSE) because they exist solely as base-keys for the
         // numeric-suffix override system (e.g. rtp.delay.5) and granting them
@@ -225,7 +225,7 @@ class FabricDefaultPermissionsParityTest {
      * Smoke: the public API surface remains stable (Verdict enum cardinality,
      * static {@code resolve}). If this trips, downstream consumers (the three
      * {@code FabricRTPPlayer} variants + future ADR-013 enumeration impl) will
-     * break — this assertion exists so the regression surfaces here first.
+     * break - this assertion exists so the regression surfaces here first.
      */
     @Test
     @DisplayName("Verdict enum cardinality is {TRUE, FALSE, OP}")

@@ -17,7 +17,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Fabric entry point — single-JAR multi-loader bootstrap (rtp-fabric-ADR-002 §2, formerly ADR-022/ADR-031).
+ * Fabric entry point - single-JAR multi-loader bootstrap (rtp-fabric-ADR-002 §2).
  *
  * <p>Counterpart to {@code io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin}. Referenced from
  * {@code fabric.mod.json} as the {@code main} entrypoint. Per rtp-fabric-ADR-002 §4 (Architectural
@@ -32,10 +32,8 @@ import java.util.logging.Level;
  *       {@code rtp-api} / {@code commands-api} / {@code effects-api}.</li>
  * </ul>
  *
- * <p><strong>Current state:</strong> structural skeleton — the wiring body is intentionally
- * minimal so the build structure (Loom + remapJar + multi-loader manifest) can be brought up
- * and verified end-to-end before Phase 2 Steps A–H land. The real wiring (FabricServerAccessor,
- * FabricEventBridge, Brigadier-bridged command tree per commands-api-ADR-001) is deferred to those steps.
+ * <p>Bootstraps the Fabric platform implementation, wiring {@link FabricServerAccessor},
+ * {@link FabricEventBridge}, commands, and lifecycle hooks.
  *
  * @see io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin
  */
@@ -70,31 +68,24 @@ public final class RTPFabricMod implements ModInitializer {
                 io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime
                         .setLogSink(RTP::log);
             } catch (NoClassDefFoundError ignored) {
-                // effects-api stripped (rtp-lite assembly) — nothing to wire.
+                // effects-api stripped (rtp-lite assembly) - nothing to wire.
             }
 
             // ----------------------------------------------------------------
-            // rtp-fabric-ADR-001 — Fabric multiversion: select the per-MC version adapter
+            // rtp-fabric-ADR-001 - Fabric multiversion: select the per-MC version adapter
             // FIRST, before anything in rtp-fabric-common touches a
             // version-volatile call site. Reflective instantiation ensures a
             // Java-21 server never resolves the Java-25 v26_1_R1 class
-            // (UnsupportedClassVersionError) — class loading is lazy, so an
+            // (UnsupportedClassVersionError) - class loading is lazy, so an
             // unnamed class is never resolved.
             // ----------------------------------------------------------------
             installVersionAdapter();
 
             FabricServerAccessor accessor = new FabricServerAccessor();
             RTP.serverAccessor = accessor;
-            // Step E3 — assign RTP.scheduler BEFORE RTP.getInstance(). The
-            // rtp-core RTP() constructor self-schedules SyncTaskProcessing /
-            // AsyncTaskProcessing / DB-flush timers via runTaskTimer*; without
-            // this assignment the constructor NPEs on the first scheduler
-            // call. FabricScheduler queues timers into its tick map and is
-            // safe to use before SERVER_STARTED binds the MinecraftServer
-            // (the tick drain begins once setServer() + tick() wire in via
-            // the event bridge).
+            // Assign RTP.scheduler BEFORE RTP.getInstance().
             RTP.scheduler = accessor.getScheduler();
-            // Construct RTP explicitly — mirrors RTPBukkitPlugin.onEnable
+            // Construct RTP explicitly - mirrors RTPBukkitPlugin.onEnable
             // (`new RTP()`). RTP.getInstance() is a plain field accessor and
             // does NOT lazy-construct; the constructor itself sets the static
             // `instance` field. The constructor builds Configs from
@@ -105,13 +96,11 @@ public final class RTPFabricMod implements ModInitializer {
                 rtp = new RTP();
             }
 
-            // ----------------------------------------------------------------
-            // ADR-049 step 4 — install the platform sampler factory so
+            // ADR-049 - install the platform sampler factory so
             // NetworkModeBootstrap.boot(...) can construct a backend heartbeat
             // sampler that reads live Fabric host state (TPS / MSPT / player
             // count / loaded worlds). Mirrors AbstractServerAccessor.start's
             // RTP.backendStateSamplerFactory = BukkitBackendStateSampler::new.
-            // ----------------------------------------------------------------
             RTP.backendStateSamplerFactory =
                     io.github.dailystruggle.rtp.fabric.network.FabricBackendStateSampler::new;
 
@@ -149,7 +138,7 @@ public final class RTPFabricMod implements ModInitializer {
             // safety.airBlocks/unsafeBlocks. On MC 26.1+ (and arguably any
             // version) BuiltInRegistries is not fully populated during
             // onInitialize, so doing this work pre-start either yields an
-            // empty tag snapshot or — on deobfuscated runtimes — fails JVM
+            // empty tag snapshot or - on deobfuscated runtimes - fails JVM
             // verification on intermediary aliases. Running it from
             // SERVER_STARTED guarantees the registry is live, so #tag
             // expansion succeeds on the first pass without retry storms.
@@ -158,7 +147,7 @@ public final class RTPFabricMod implements ModInitializer {
             // populated.
 
             // ----------------------------------------------------------------
-            // Section C, C2 — install the Fabric metrics binding (single-region
+            // Section C, C2 - install the Fabric metrics binding (single-region
             // EMA sampler). The binding is ticked from FabricEventBridge's
             // END_SERVER_TICK callback via an instanceof probe (so the bridge
             // module need not hard-depend on this install path). Suppliers
@@ -167,7 +156,7 @@ public final class RTPFabricMod implements ModInitializer {
             //
             // Safe to call before SERVER_STARTED: suppliers return 0 until the
             // accessor.getServer() != null, and the first END_SERVER_TICK that
-            // fires after server start seeds the EMA. Idempotent — overwriting
+            // fires after server start seeds the EMA. Idempotent - overwriting
             // a prior binding (if any) is the documented dispatcher behaviour.
             // ----------------------------------------------------------------
             try {
@@ -188,20 +177,9 @@ public final class RTPFabricMod implements ModInitializer {
 
             new FabricEventBridge(accessor).register();
 
-            // ----------------------------------------------------------------
-            // MULTI_PLATFORM_PLAN Step K / rtp-fabric-ADR-014 — install the
-            // Fabric map binding so /rtp visualization charts render to a
-            // vanilla filled-map instead of bottoming out on NoopMapBinding
-            // ("no concrete MapBinding installed"). Mirrors RTPBukkitPlugin's
-            // BukkitMapBinding install. Only install when the active version
-            // adapter actually implements the renderMapChart seam
-            // (supportsMapCharts); otherwise leave MapDispatch on the
-            // NoopMapBinding sentinel so the configurable mapBindingMissing
-            // message still surfaces on un-ported MC lines (1.20.x, etc.).
-            // FabricMapBinding is net.minecraft-free (it routes through the
-            // adapter SPI), so referencing it here keeps the entrypoint clean
-            // per rtp-fabric-ADR-002 / ADR-007.
-            // ----------------------------------------------------------------
+            // rtp-fabric-ADR-014: install the Fabric map binding so /rtp
+            // visualization charts render to a vanilla filled-map instead of
+            // bottoming out on NoopMapBinding. Mirrors RTPBukkitPlugin's BukkitMapBinding.
             try {
                 FabricVersionAdapter mapAdapter = FabricVersionAdapterRegistry.peek();
                 if (mapAdapter != null && mapAdapter.supportsMapCharts()) {
@@ -209,7 +187,7 @@ public final class RTPFabricMod implements ModInitializer {
                             new io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding();
                     io.github.dailystruggle.rtp.common.commands.maps.MapDispatch
                             .setMapBinding(mapBinding);
-                    // REQ-RTP-MAP-003 — release per-viewer map state on disconnect
+                    // REQ-RTP-MAP-003 - release per-viewer map state on disconnect
                     // (parity with Bukkit's OnPlayerQuit -> MapDispatch.firePlayerQuit).
                     accessor.getFabricPlayerLifecycleHook().onPlayerQuit(uuid ->
                             io.github.dailystruggle.rtp.common.commands.maps.MapDispatch
@@ -232,17 +210,17 @@ public final class RTPFabricMod implements ModInitializer {
             }
 
             // ----------------------------------------------------------------
-            // effects-api-ADR-003 — wire the Fabric effects layer.
+            // effects-api-ADR-003 - wire the Fabric effects layer.
             // FabricEffectsHandler.setupEffects:
             //   1. Binds the MinecraftServer into FabricEffectRuntime so
             //      runtime.schedule() has a server to execute() onto.
-            //   2. Calls FabricEffectsInitializer.registerAll() — binds the
+            //   2. Calls FabricEffectsInitializer.registerAll() - binds the
             //      FabricValueCoercer (ADR-004) and registers SOUND/PARTICLE/
             //      TITLE/POTION effect prototypes (Phase-1 scope per ADR-003).
             //   3. Attaches the rtp.effect.* lifecycle hooks (presetup,
             //      postsetup, preload, postload, preteleport, postteleport,
             //      cancel, queuepush, queuepop) onto TeleportPipelineTask /
-            //      RTPTeleportCancel / Region — mirroring BukkitEffectsHandler.
+            //      RTPTeleportCancel / Region - mirroring BukkitEffectsHandler.
             //
             // Deferred to SERVER_STARTED because BuiltInRegistries (used by
             // FabricValueCoercer + the four concrete effects' default values)
@@ -273,19 +251,8 @@ public final class RTPFabricMod implements ModInitializer {
                                     "[RTP] Fabric database setup failed: "
                                             + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
                         }
-                        // ------------------------------------------------
-                        // Step E3 — start the periodic async drain of
-                        // databaseAccessor.processQueries. Required for
-                        // SQL-transport network mode: writes produced on
-                        // this backend (cooldown rows, reservation
-                        // tokens, player-state rows) only become visible
-                        // to peer backends after this timer drains them.
-                        // Mirrors RTPBukkitPlugin's DatabaseProcessing
-                        // .start(this) call. The Bukkit and Fabric paths
-                        // share the same platform-agnostic class in
-                        // rtp-core (the Bukkit-package class is a
-                        // deprecated shim around it).
-                        // ------------------------------------------------
+                        // Start the periodic async drain of database queries.
+                        // Required for SQL-transport network mode writes.
                         try {
                             io.github.dailystruggle.rtp.common.server
                                     .DatabaseProcessing.start();
@@ -296,7 +263,7 @@ public final class RTPFabricMod implements ModInitializer {
                         }
 
                         // ------------------------------------------------
-                        // ADR-049 / rtp-fabric-ADR-013 — boot backend-side
+                        // ADR-049 / rtp-fabric-ADR-013 - boot backend-side
                         // network mode AFTER the DB is up (the SQL transport
                         // reuses the same accessor's DataSource). Strict
                         // REQ-RTP-NET-002 parity with RTPBukkitPlugin: no-op
@@ -323,7 +290,7 @@ public final class RTPFabricMod implements ModInitializer {
 
                         try {
                             // Give the per-version adapter first crack at effects
-                            // wiring — on deobfuscated 26.1.x the default obf path
+                            // wiring - on deobfuscated 26.1.x the default obf path
                             // (FabricEffectsHandler.setupEffects → FabricEffectRuntime
                             // .bindServer) raises NoClassDefFoundError on link due
                             // to intermediary aliases (class_3222, class_2596, ...)
@@ -369,11 +336,11 @@ public final class RTPFabricMod implements ModInitializer {
             // while the scheduler is still alive and can cancel the task
             // cleanly. The final drain of pending mutations is handled by
             // RTP-core's shutdown path (databaseAccessor.shutdown via the
-            // RTPRunnable drain) — this hook only stops the periodic timer.
+            // RTPRunnable drain) - this hook only stops the periodic timer.
             // ----------------------------------------------------------------
             net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
                     .SERVER_STOPPING.register(server -> {
-                        // ADR-049 / rtp-fabric-ADR-013 — reverse-order teardown
+                        // ADR-049 / rtp-fabric-ADR-013 - reverse-order teardown
                         // of network mode BEFORE the DB drain stops, mirroring
                         // RTPBukkitPlugin.onDisable (stop publisher, close
                         // transport, unregister the lifecycle-hook listeners).
@@ -396,7 +363,7 @@ public final class RTPFabricMod implements ModInitializer {
                     });
 
             // ----------------------------------------------------------------
-            // Post-teleport title / subtitle / actionbar — `messages.yml`
+            // Post-teleport title / subtitle / actionbar - `messages.yml`
             // parity with BukkitEffectsHandler. Without this hook the
             // `title`, `subtitle`, `fadeIn`, `stay`, `fadeOut`, and
             // `actionbar` keys are silent no-ops on Fabric, so admins who
@@ -423,7 +390,7 @@ public final class RTPFabricMod implements ModInitializer {
                     // FabricRTPPlayer. Reason: per-MC adapter modules (e.g.
                     // V26_1_R1FabricRTPPlayer compiled under unobf Loom for the
                     // deobf MC 26.1.x runtime) implement RTPPlayer directly and
-                    // do NOT extend the intermediary FabricRTPPlayer — so a
+                    // do NOT extend the intermediary FabricRTPPlayer - so a
                     // FabricRTPPlayer instanceof check silently drops every
                     // post-teleport title/subtitle/actionbar on 26.1.x.
                     // Reflective dispatch keeps this hook adapter-agnostic for
@@ -438,7 +405,7 @@ public final class RTPFabricMod implements ModInitializer {
                                 "sendActionbar", String.class);
                     } catch (NoSuchMethodException nsme) {
                         // RTPPlayer implementation doesn't expose the Fabric
-                        // title/actionbar sinks — silently skip (matches the
+                        // title/actionbar sinks - silently skip (matches the
                         // pre-2026-05 behaviour for non-Fabric players, e.g.
                         // a console-driven /rtp where task.player() is a
                         // DetachedClone).
@@ -488,7 +455,7 @@ public final class RTPFabricMod implements ModInitializer {
             });
 
             // ----------------------------------------------------------------
-            // Post-teleport command dispatch — config.yml `consoleCommands` /
+            // Post-teleport command dispatch - config.yml `consoleCommands` /
             // `playerCommands` parity with BukkitEffectsHandler. Without this
             // hook the two config lists are silent no-ops on Fabric, leaving
             // operators no way to run e.g. `give [player] map` or `effect give
@@ -608,7 +575,7 @@ public final class RTPFabricMod implements ModInitializer {
             //
             // Do NOT re-introduce ArgumentTypeRegistry.registerArgumentType
             // here without first checking that the registered class is one
-            // vanilla clients already know — anything under the `rtp:` (or any
+            // vanilla clients already know - anything under the `rtp:` (or any
             // non-`brigadier:` / non-`minecraft:`) namespace will re-trigger
             // the kick.
             // ----------------------------------------------------------------
@@ -626,14 +593,12 @@ public final class RTPFabricMod implements ModInitializer {
             // We use the platform-neutral TestCmd directly (NOT BukkitTestCmd)
             // because four of its subcommands hard-import org.bukkit.* /
             // commandsapi.bukkit.* / rtp.bukkitplatform.* and would NoClassDefFoundError
-            // on a Fabric runtime. See TestCmd Javadoc for the constructor
-            // split rationale; this path covers the Step G2 follow-up flagged
-            // in MULTI_PLATFORM_PLAN.md and the RTPCmdFabricRoot Javadoc.
+            // on a Fabric runtime.
             try {
                 root.addSubCommand(
                         new io.github.dailystruggle.rtp.bukkit.commands.test.TestCmd(root));
             } catch (Throwable t) {
-                // S-004: never silently swallow. Log and continue — losing
+                // S-004: never silently swallow. Log and continue - losing
                 // `rtp test` on Fabric must not abort the whole mod init.
                 RTP.log(Level.WARNING,
                         "[RTP][fabric] failed to register `rtp test` subtree: "
@@ -646,7 +611,7 @@ public final class RTPFabricMod implements ModInitializer {
                             io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge::resolveSenderUuid,
                             // Permission gating: defer to RTP.serverAccessor.getSender(uuid)
                             // .hasPermission(perm), which on Fabric routes through
-                            // FabricRTPPlayer.hasPermission — that consults
+                            // FabricRTPPlayer.hasPermission - that consults
                             // fabric-permissions-api first (LuckPerms-Fabric, etc.) and
                             // falls back to the vanilla op-level check by reading
                             // ops.json via stable APIs (see FabricRTPPlayer Javadoc).
@@ -655,13 +620,13 @@ public final class RTPFabricMod implements ModInitializer {
                             // rtp.scan=op, rtp.config=op, rtp.other=op, rtp.world=op,
                             // rtp.region=op, rtp.biome=op, rtp.params=op, ...).
                             // Non-player sources (console / command blocks / serverId
-                            // sentinel) are treated as fully privileged — same as Bukkit
+                            // sentinel) are treated as fully privileged - same as Bukkit
                             // ConsoleCommandSender.hasPermission() returning true.
                             io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge::checkPermission,
                             (src, msg) -> {
                                 if (msg == null) return;
                                 // Delegate to FabricServerAccessor.sendMessage, which routes
-                                // through FabricRTPPlayer.sendMessage — the canonical
+                                // through FabricRTPPlayer.sendMessage - the canonical
                                 // NM-touching chat path in rtp-fabric-common. Keeping the
                                 // entrypoint class free of net.minecraft.network.chat /
                                 // net.minecraft.network.protocol references avoids JVM
@@ -674,7 +639,7 @@ public final class RTPFabricMod implements ModInitializer {
                                 try {
                                     UUID uuid = io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge.resolveSenderUuid(src);
                                     if (uuid != null && !uuid.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-                                        // Player source — formats placeholders + legacy
+                                        // Player source - formats placeholders + legacy
                                         // colour codes and dispatches through the player's
                                         // RTPCommandSender. tag is reserved for future
                                         // styled-tag wrapping; null is the documented
@@ -700,14 +665,14 @@ public final class RTPFabricMod implements ModInitializer {
             // FabricCommandRegistrar (rtp-fabric-common). This keeps
             // CommandBuildContext (class_7157), CommandSelection, and
             // CommandSourceStack (class_2168) out of this entrypoint's
-            // constant pool — those intermediary names are not exposed on
+            // constant pool - those intermediary names are not exposed on
             // MC 26.1's deobfuscated runtime and would otherwise fail JVM
             // verify on entrypoint load (rtp-fabric-ADR-002 / ADR-007).
             io.github.dailystruggle.rtp.fabric.commands.FabricCommandRegistrar
                     .registerRtpCommand(root, bridgeCtx);
 
             // ----------------------------------------------------------------
-            // Step E3-3 — non-Folia ChunkUnloadProcessor timer.
+            // Non-Folia ChunkUnloadProcessor timer.
             // Mirrors RTPBukkitPlugin.onEnable's `if (!isFolia()) ...` branch.
             // Fabric has no Folia-style region threading, so the non-Folia
             // branch always applies. Without this, chunks loaded by the
@@ -719,7 +684,7 @@ public final class RTPFabricMod implements ModInitializer {
                     1, 1);
 
             // ----------------------------------------------------------------
-            // Per-adapter periodic ticket refresh — only adapters that use
+            // Per-adapter periodic ticket refresh - only adapters that use
             // auto-expiring tickets (1.21.5+, see rtp-fabric-ADR-004) override
             // tickRefresh(); for all others this is a no-op. Period 100 ticks
             // (5 s) is comfortably below the R5 adapter's REFRESH_TICKS_LEFT
@@ -739,23 +704,7 @@ public final class RTPFabricMod implements ModInitializer {
                 }
             }, 100, 100);
 
-            // ----------------------------------------------------------------
-            // Step E3-6 — drain RTP.startupTasks the same way Bukkit does.
-            // The RTP() constructor enqueues region parsing, world rebind,
-            // scan-task seeding, and softdepend probes onto startupTasks
-            // rather than running them inline. Without these drains the
-            // region prefill never starts, keptLocations / unkeptLocations
-            // stay empty, and /rtp falls through to "no location available"
-            // (or hangs in the per-player polling loop).
-            //
-            //   drain #1: synchronous, immediately
-            //   drain #2: scheduled +1 tick (deferred work needing live server)
-            //   drain #3: synchronous post-banner
-            //
-            // Mirrors RTPBukkitPlugin.onEnable lines ~130 / ~141 / ~184 and
-            // BootstrapSupport.drainStartupTasks. Empty drains are no-ops, so
-            // matching Bukkit's three-drain pattern is cheap insurance.
-            // ----------------------------------------------------------------
+            // Drain startup tasks synchronously and on next tick (matching Bukkit).
             if (rtp != null) {
                 while (rtp.startupTasks.size() > 0) {
                     rtp.startupTasks.execute(Long.MAX_VALUE);
@@ -773,14 +722,7 @@ public final class RTPFabricMod implements ModInitializer {
                 }
             }
 
-            // ----------------------------------------------------------------
-            // Step E3-4 — seed <configDir>/rtp/docs/ from the bundled docs/
-            // tree inside the running mod jar. Mirrors RTPBukkitPlugin's
-            // `JarUtils.extractDocs(getDataFolder(), version)` call so the
-            // admin-facing reference material (architecture diagrams,
-            // requirements, ADRs) ships alongside the config tree on Fabric.
-            // Idempotent + fail-soft — see FabricJarUtils Javadoc.
-            // ----------------------------------------------------------------
+            // Seed <configDir>/rtp/docs/ from bundled docs.
             try {
                 String modVersion = FabricLoader.getInstance()
                         .getModContainer("rtp")
@@ -808,14 +750,14 @@ public final class RTPFabricMod implements ModInitializer {
 
 
     /**
-     * rtp-fabric-ADR-001 — classify the running MC version and reflectively instantiate
+     * rtp-fabric-ADR-001 - classify the running MC version and reflectively instantiate
      * the matching {@link FabricVersionAdapter} from the appropriate
      * {@code rtp-fabric-vXX_YY_R1} submodule, then install it into
      * {@link FabricVersionAdapterRegistry}.
      *
      * <p><b>Why reflection (and not a direct {@code new}):</b> the v26_1_R1
      * adapter is compiled to Java 25 bytecode (MC 26.1's mandated minimum).
-     * Servers running on a Java 21 JVM cannot resolve Java 25 classes —
+     * Servers running on a Java 21 JVM cannot resolve Java 25 classes -
      * they would throw {@code UnsupportedClassVersionError} the moment the
      * JVM tried to verify the class. Class loading in the JVM is lazy: a
      * class that is never named directly is never resolved. Looking up by
@@ -824,7 +766,7 @@ public final class RTPFabricMod implements ModInitializer {
      *
      * <p>If the running MC version doesn't match any of the supported
      * v-submodule lines, this logs a warning per S-006 (no silent no-op)
-     * and re-throws — without an installed adapter, downstream version-
+     * and re-throws - without an installed adapter, downstream version-
      * sensitive call sites would all fail with
      * {@link IllegalStateException} from {@code FabricVersionAdapterRegistry.require()}.
      * Failing here at bootstrap is louder and easier to diagnose.</p>
@@ -836,7 +778,7 @@ public final class RTPFabricMod implements ModInitializer {
         // shifts between MC releases, causing NoSuchMethodError on adjacent
         // patch versions. FabricLoader's mod-container metadata is stable
         // across MC versions and is the recommended source per the Fabric
-        // wiki ("Mappings" — intermediary names for MC internals are not
+        // wiki ("Mappings" - intermediary names for MC internals are not
         // guaranteed stable; loader API is).
         String mcVersion;
         try {
@@ -864,11 +806,11 @@ public final class RTPFabricMod implements ModInitializer {
             Object instance = cls.getDeclaredConstructor().newInstance();
             FabricVersionAdapter adapter = (FabricVersionAdapter) instance;
             FabricVersionAdapterRegistry.install(adapter);
-            // Per-version Loom-compiled effect dispatchers — replaces the
+            // Per-version Loom-compiled effect dispatchers - replaces the
             // fragile reflective resolvers in effects-api on this MC version.
             // Default impl is no-op; only adapters that ship dispatchers
             // (currently v1_21_R11) actually do anything here. Failures must
-            // not abort bootstrap — sound/particle are cosmetic and fall
+            // not abort bootstrap - sound/particle are cosmetic and fall
             // back to the reflective path on error.
             try {
                 adapter.installEffectsDispatchers();
@@ -900,8 +842,8 @@ public final class RTPFabricMod implements ModInitializer {
      * <p>Classification is by major-minor prefix; patch versions within a
      * line usually share the same adapter, but the 1.21 line is split at
      * patch 5 because Mojang refactored {@code DistanceManager} there
-     * (4-arg {@code addRegionTicket} → {@code addTicket(long, Ticket)} —
-     * see {@code rtp-fabric-ADR-004}). 1.21.0–1.21.4 → {@code v1_21_R1};
+     * (4-arg {@code addRegionTicket} → {@code addTicket(long, Ticket)} -
+     * see {@code rtp-fabric-ADR-004}). 1.21.0-1.21.4 → {@code v1_21_R1};
      * 1.21.5 onward → {@code v1_21_R5}. When a future MC line lands that
      * needs its own adapter (e.g. {@code v26_2_R1}), add a row here and
      * create the matching submodule.</p>
@@ -913,8 +855,8 @@ public final class RTPFabricMod implements ModInitializer {
         }
         if (mcVersion.startsWith("1.21")) {
             // The DistanceManager / TicketType API broke twice in this line:
-            //   1.21.0–1.21.4 → 4-arg `addRegionTicket(TicketType, ChunkPos, int, T)` (R1).
-            //   1.21.5–1.21.10 → record `TicketType(long timeout, boolean persist, TicketUse use)`
+            //   1.21.0-1.21.4 → 4-arg `addRegionTicket(TicketType, ChunkPos, int, T)` (R1).
+            //   1.21.5-1.21.10 → record `TicketType(long timeout, boolean persist, TicketUse use)`
             //                    + `ServerChunkCache#addTicketWithRadius` (R5; see ADR-004).
             //   1.21.11+ → record `TicketType(long expiryTicks, int flags)` with the
             //              `TicketUse` inner enum removed entirely (R11; see ADR-007 for
@@ -930,7 +872,7 @@ public final class RTPFabricMod implements ModInitializer {
             return "io.github.dailystruggle.rtp.fabric.v1_21_R1.V1_21_R1FabricVersionAdapter";
         }
         if (mcVersion.startsWith("26.1")) {
-            // Java 25 bytecode — never named on a Java 21 JVM, so never resolved.
+            // Java 25 bytecode - never named on a Java 21 JVM, so never resolved.
             return "io.github.dailystruggle.rtp.fabric.v26_1_R1.V26_1_R1FabricVersionAdapter";
         }
         if (mcVersion.startsWith("26.2")) {
@@ -938,7 +880,7 @@ public final class RTPFabricMod implements ModInitializer {
             // for the pre-release (e.g. "26.2-rc-2") begins with "26.2", so
             // this prefix match catches both the pre-release builds and the
             // eventual 26.2.x finals. Re-verify the pin and this matcher when
-            // 26.2 ships final (rtp-fabric-ADR-014). Java 25 bytecode — never
+            // 26.2 ships final (rtp-fabric-ADR-014). Java 25 bytecode - never
             // named on a Java 21 JVM, so never resolved there.
             return "io.github.dailystruggle.rtp.fabric.v26_2_R1.V26_2_R1FabricVersionAdapter";
         }
@@ -946,13 +888,13 @@ public final class RTPFabricMod implements ModInitializer {
     }
 
     /**
-     * Section C, C2 helper — invoke a zero-arg {@code int}-returning method
+     * Helper to invoke a zero-arg {@code int}-returning method
      * on {@code target} by trying each candidate name in order. Used by the
      * {@code FabricMetricsBinding} suppliers to resolve mojmap /
      * intermediary aliases for {@code MinecraftServer.getPlayerCount()} and
      * {@code getMaxPlayers()} without a hard compile-time pin on either
      * mapping. Returns {@code 0} when {@code target} is {@code null} (the
-     * server has not yet bound — pre-SERVER_STARTED state) or when no
+     * server has not yet bound - pre-SERVER_STARTED state) or when no
      * candidate resolves; throws are swallowed and the next candidate is
      * tried. Callers (the binding) clamp negative results to {@code 0}.
      */
@@ -978,12 +920,12 @@ public final class RTPFabricMod implements ModInitializer {
      * integer value of the third dot-separated component otherwise.
      * Unparseable suffixes (e.g. {@code "1.21.5-rc1"}) are tolerated by
      * stripping non-digits before parsing. Returns {@code 0} on any failure
-     * — callers default to the R1 adapter in that case.
+     * - callers default to the R1 adapter in that case.
      */
     private static int patchOf121(String mcVersion) {
         // mcVersion guaranteed to startWith("1.21") by callers.
         if (mcVersion.length() < 5) return 0; // exactly "1.21"
-        if (mcVersion.charAt(4) != '.') return 0; // e.g. "1.210" — not actually 1.21.x
+        if (mcVersion.charAt(4) != '.') return 0; // e.g. "1.210" - not actually 1.21.x
         String tail = mcVersion.substring(5);
         StringBuilder digits = new StringBuilder();
         for (int i = 0; i < tail.length(); i++) {

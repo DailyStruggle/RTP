@@ -19,13 +19,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Surface-shape tests for the {@code rtp-api} menu types.
- *
- * <p>Stage 1 of the generalized-menu rollout (ADR-035 amended + ADR-044).
- * These tests pin the public contract of the platform-neutral model: defensive
- * copies, null-arg rejection, sealed-action exhaustiveness, and the trivial
- * profile/lookup defaults. No behavior tests — those land alongside the
- * {@code rtp-core} implementations in Stage 2.
+ * Surface-shape tests for the {@code rtp-api} menu types (ADR-035, ADR-044).
+ * Pins defensive copies, null rejection, sealed-action exhaustiveness, and defaults.
  */
 @DisplayName("ADR-035 / ADR-044 § rtp-api menu surface")
 class MenuModelSurfaceTest {

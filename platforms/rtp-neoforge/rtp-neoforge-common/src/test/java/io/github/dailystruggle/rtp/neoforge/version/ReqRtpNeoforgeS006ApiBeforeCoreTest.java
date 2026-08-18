@@ -18,10 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  *
  * <p>Two surfaces are pinned:</p>
  * <ol>
- *   <li>{@link NeoForgeVersionAdapterRegistry#require()} — the process-wide
+ *   <li>{@link NeoForgeVersionAdapterRegistry#require()} - the process-wide
  *       holder of the active per-MC carrier. A lookup before
  *       {@code RTPNeoForgeMod} installs one throws.</li>
- *   <li>{@link NeoForgeServerAccessor#getLocationGenerator()} — the public
+ *   <li>{@link NeoForgeServerAccessor#getLocationGenerator()} - the public
  *       {@code RTPServerAccessor} entry point used by addons; it throws when
  *       {@code rtp-core} has not been constructed.</li>
  * </ol>
@@ -37,7 +37,7 @@ class ReqRtpNeoforgeS006ApiBeforeCoreTest {
 
     @BeforeEach
     void coldBootstrap() {
-        // Ensure no adapter is installed (defensive — other tests in the same
+        // Ensure no adapter is installed (defensive - other tests in the same
         // JVM must not leak an installed carrier into this guard).
         NeoForgeVersionAdapterRegistry.clearForTesting();
     }

@@ -65,7 +65,7 @@ public class SquareTest {
     }
 
     // -------------------------------------------------------------------------
-    // xzToLocation() — all 8 octants
+    // xzToLocation() - all 8 octants
     // Octant boundaries for a square are at 45-degree multiples.
     // For radius R, the 8 octants are determined by which of |x|,|z| is larger
     // and the sign of x and z.
@@ -129,7 +129,7 @@ public class SquareTest {
     }
 
     // -------------------------------------------------------------------------
-    // xzToLocation() — center offset
+    // xzToLocation() - center offset
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "center=({0},{1}), point=({2},{3})")

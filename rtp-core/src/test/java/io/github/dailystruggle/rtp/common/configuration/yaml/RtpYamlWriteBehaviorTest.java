@@ -14,14 +14,8 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Write-behavior verification for {@link RtpYamlConfig}.
- *
- * <p>The pre-existing suite (golden-file, deep-keys parity, etc.) only
- * exercises {@code parse → emit} as strings. This test covers the actual
- * on-disk write path: temp-file + atomic rename, parent-directory
- * creation, round-trip through real file I/O, overwrite semantics, the
- * {@code IllegalStateException} contract on unbound documents, and that
- * no temp-file litter is left behind after a successful save.</p>
+ * Write-behavior verification for {@link RtpYamlConfig}, covering on-disk save,
+ * atomic renames, parent directories, and comment preservation.
  */
 class RtpYamlWriteBehaviorTest {
 

@@ -39,9 +39,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * {@code GLIDE} effects. Fabric uses a parallel
  * {@code FabricEffectsInitializer}.
  *
- * <p>Also retains Bukkit-typed convenience methods —
+ * <p>Also retains Bukkit-typed convenience methods -
  * {@link #buildEffects(String, Collection)} (overloads on
- * {@link PermissionAttachmentInfo}) and {@link #addPermissions(String)} —
+ * {@link PermissionAttachmentInfo}) and {@link #addPermissions(String)} -
  * which previously lived on {@code EffectFactory} but cannot exist there
  * without a hard Bukkit dependency.
  */
@@ -54,7 +54,7 @@ public final class BukkitEffectsInitializer {
     /**
      * Schedule an {@link Effect} on the Bukkit main thread. Replaces the
      * prior {@code effect.runTask(plugin)} pattern that relied on
-     * {@code Effect extends BukkitRunnable} (decoupled 2026-05-07 — see
+     * {@code Effect extends BukkitRunnable} (decoupled 2026-05-07 - see
      * {@code Effect} class javadoc). Falls back to a direct
      * {@link Effect#run()} call if the scheduler rejects the task (e.g. on a
      * Folia region thread under unusual ownership conditions), preserving
@@ -70,7 +70,7 @@ public final class BukkitEffectsInitializer {
 
     /**
      * Register the legacy Bukkit-side effects with {@link EffectFactory}.
-     * Idempotent — safe to call multiple times.
+     * Idempotent - safe to call multiple times.
      */
     public static void registerAll() {
         if (!REGISTERED.compareAndSet(false, true)) return;

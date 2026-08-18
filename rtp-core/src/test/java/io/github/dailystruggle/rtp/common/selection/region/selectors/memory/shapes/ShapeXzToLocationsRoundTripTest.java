@@ -14,29 +14,9 @@ import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Per-shape verification that {@link MemoryShape#chunkToLocations(int, int)}
- * (the new inverse of {@code MemoryShape.xzToLocation(int, int)}) is consistent
- * with {@link MemoryShape#locationToXZ(long)} for every concrete
- * {@code MemoryShape} subclass.
- *
- * <p>Properties asserted, per shape:
- * <ol>
- *   <li><b>Round-trip soundness</b> — for indices produced by sampling the
- *       shape, {@code chunkToLocations(locationToXZ(n))} contains an index
- *       whose own {@code locationToXZ} matches the target chunk, and every
- *       returned index decodes back to that chunk and lies in {@code [0, range)}.</li>
- *   <li><b>≤ 2 cap</b> — per the √2-diagonal / unit-chunk argument in
- *       {@code docs/dev/scratch/CHECKLIST-chunk-to-locations-inverse.md},
- *       no chunk has more than two spiral indices decode to it.</li>
- *   <li><b>Sorted &amp; distinct</b> — the returned array, when of length 2,
- *       is strictly ascending.</li>
- * </ol>
- *
- * <p>Shapes covered: {@link Circle}, {@link Circle_Normal}, {@link Square},
- * {@link Square_Normal}, {@link Rectangle}, {@link Ellipse}, {@link Polygon}.
- *
- * @see MemoryShapeChunkToLocationsTest for the deeper Circle-specific bounds
- *     ({@code p₂} density, {@code addBadChunk} amplification factor).
+ * Verifies {@link MemoryShape#chunkToLocations(int, int)} consistency with
+ * {@link MemoryShape#locationToXZ(long)} across concrete MemoryShape subclasses:
+ * round-trip soundness, <= 2 preimage cap, and ascending sort order for pairs.
  */
 public class ShapeXzToLocationsRoundTripTest {
 
@@ -82,7 +62,7 @@ public class ShapeXzToLocationsRoundTripTest {
     void rectangle_roundTrip() {
         // Unrotated Rectangle uses a strict row-major bijection between
         // (x, z) and the 1D index (z*width + x). By design every chunk in the
-        // rectangle has *exactly one* preimage — never two. The generic verifier
+        // rectangle has *exactly one* preimage - never two. The generic verifier
         // tolerates 0, 1, or 2 results; we additionally assert here that for an
         // unrotated rectangle every sampled rand() index yields a 1-element
         // preimage that matches the source chunk.
@@ -145,16 +125,7 @@ public class ShapeXzToLocationsRoundTripTest {
                                     + " expected " + Arrays.toString(xz));
                 }
             }
-            // Strict contract: every sampled chunk has at least one preimage
-            // (rand() emits indices whose locationToXZ is a valid chunk in the
-            // rotated rectangle).
-            // Rotated row-major curves compose a floating-point rotation with an
-            // integer cast in {@link Rectangle#locationToXZ}, so the inverse
-            // cannot always recover the source index (the chunk on the unrotated
-            // grid that contains the rotated point may differ from the source
-            // row/col under integer-cast asymmetry). We require only that *some*
-            // preimages are recovered — the strict per-index round-trip is still
-            // asserted above for every non-empty result.
+            // Rotated row-major mapping: assert non-empty preimage recovery across sample set.
             assertTrue(sawNonEmpty > 0,
                     "Rectangle@" + degrees + "°: no preimages recovered in " + SAMPLES
                             + " samples. Two-preimage count was " + sawTwo + ".");
@@ -178,18 +149,11 @@ public class ShapeXzToLocationsRoundTripTest {
     }
 
     // ------------------------------------------------------------------------
-    // Generic verifier — works for any MemoryShape subclass
+    // Generic verifier - works for any MemoryShape subclass
     // ------------------------------------------------------------------------
 
     /**
-     * Drives the shape with a seeded RNG, samples {@link MemoryShape#rand()} indices,
-     * and asserts that {@code chunkToLocations(locationToXZ(n))}:
-     * <ul>
-     *   <li>returns at most 2 entries;</li>
-     *   <li>every entry decodes to the same chunk via {@code locationToXZ};</li>
-     *   <li>every entry lies in {@code [0, range)};</li>
-     *   <li>the entries are strictly ascending when there are two.</li>
-     * </ul>
+     * Asserts chunkToLocations round-trip properties: <= 2 entries, correct decoding, in-range, ascending pairs.
      */
     private static void verifyRoundTrip(String shapeName, Supplier<? extends MemoryShape<?>> ctor) {
         MemoryShape<?> shape = ctor.get();
@@ -209,7 +173,7 @@ public class ShapeXzToLocationsRoundTripTest {
             long[] preimage = shape.chunkToLocations(xz[0], xz[1]);
             assertNotNull(preimage, shapeName + ": chunkToLocations must not return null");
 
-            // ≤ 2 bound
+            // <= 2 bound
             assertTrue(preimage.length <= 2,
                     shapeName + ": chunkToLocations(" + xz[0] + "," + xz[1] + ") returned "
                             + preimage.length + " entries: " + Arrays.toString(preimage));
@@ -237,14 +201,7 @@ public class ShapeXzToLocationsRoundTripTest {
             }
         }
 
-        // Informational counters — not strict pre/post-conditions. Rectangle's
-        // default-implementation inverse can legitimately produce empty preimages
-        // for chunks that locationToXZ emits (the row-major curve does not satisfy
-        // the angular-walk assumption baked into MemoryShape.chunkToLocations'
-        // default); that limitation is recorded in POTENTIAL_BUGS.md and is not in
-        // scope for this round-trip test. The strict contract — every returned
-        // index decodes back to the same chunk and is in range — is asserted above
-        // for every shape.
+        // Informational counters for preimage statistics across sample set.
         assertTrue(sawNonEmpty >= 0,
                 shapeName + ": " + sawNonEmpty + "/" + SAMPLES + " non-empty preimages");
         assertTrue(sawTwo >= 0,
@@ -254,7 +211,7 @@ public class ShapeXzToLocationsRoundTripTest {
     }
 
     // ------------------------------------------------------------------------
-    // Exhaustive coverage on a small Circle — every chunk in the bounding box
+    // Exhaustive coverage on a small Circle - every chunk in the bounding box
     // is checked, not just rand() samples. Cheap (~16k chunks) and catches
     // regressions where chunkToLocations diverges from locationToXZ on chunks
     // that rand() happens not to visit.

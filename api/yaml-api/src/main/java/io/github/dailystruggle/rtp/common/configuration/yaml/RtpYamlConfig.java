@@ -22,7 +22,7 @@ import java.nio.file.StandardCopyOption;
  *
  * <p>{@link #save()} writes via a temp file + atomic rename so a
  * mid-write crash leaves either the previous good file or the new good
- * file on disk — never a truncated half-file. (The atomicity guarantee
+ * file on disk - never a truncated half-file. (The atomicity guarantee
  * is whatever the underlying filesystem provides for
  * {@link java.nio.file.Files#move(Path, Path, java.nio.file.CopyOption...)}
  * with {@link StandardCopyOption#ATOMIC_MOVE}.)</p>
@@ -215,7 +215,7 @@ public final class RtpYamlConfig extends RtpYamlSection {
      * Mirrors {@code simpleyaml}'s {@code addDefault(String, Object)}: set the
      * value only if the key is not already present. Implemented in terms of
      * {@link RtpYamlSection#set(String, Object)} so the change is materialized
-     * directly into the root mapping (no separate defaults overlay) — this
+     * directly into the root mapping (no separate defaults overlay) - this
      * matches what call sites expect after a subsequent {@link #save()}.
      */
     public void addDefault(String key, Object value) {

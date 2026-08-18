@@ -17,46 +17,15 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Walks every loaded {@link ConfigParser} (single + {@link MultiConfigParser}
- * sub-parsers) and produces a list of case-insensitive substring hits for a
- * query, matching against color-stripped key names and color-stripped value
- * text. Each {@link Hit} carries the raw (un-stripped) value plus the match
- * ranges projected back onto raw offsets so a renderer can overlay a
- * highlight on top of the literal config text per
- * {@code PROPOSAL-rtp-menu-config-search.md} §2.7 and §2.8.
- *
- * <p>Comments are excluded by design (user direction: "if we ignore comment
- * lines"). No result cap (user direction: "the sum of config files aren't
- * that big"). Minimum query length is 2 characters; shorter queries return
- * an empty list and the caller is expected to surface the
- * {@code menuConfigSearchTooShort} locale message.
- *
- * <p>Pure compute, no I/O. Safe to call from any thread; readers see the
- * current {@link Configs} parser snapshot via {@code RTP.configs}.
+ * Case-insensitive substring search across loaded {@link ConfigParser} instances.
+ * Matches against key names and values with raw-offset projection for highlights.
  */
 public final class ConfigSearchResultsBuilder {
 
     /** Minimum query length below which {@link #search} short-circuits to empty. */
     public static final int MIN_QUERY_LENGTH = 2;
 
-    /**
-     * One match against a single config key.
-     *
-     * @param fileName       parser file/section name (e.g. {@code "messages"} or
-     *                       {@code "regions/default"}).
-     * @param keyName        enum key name as understood by {@code OpenConfigKey}
-     *                       (e.g. {@code "shape"} for {@code RegionKeys.shape}).
-     * @param keyMatched     {@code true} iff the match was against the key name
-     *                       (vs the value). Both can produce separate hits.
-     * @param rawValue       the literal value as written in the config (color
-     *                       codes and all). For value matches, the highlight
-     *                       ranges below index into this string. For key matches,
-     *                       {@code rawValue} is the rendered value (still raw)
-     *                       but the highlight ranges are empty.
-     * @param matchRanges    raw-offset {@code [start,endExclusive)} ranges into
-     *                       {@code rawValue} where the query matched (value
-     *                       matches only). May be empty for key matches.
-     */
+    /** One match against a single config key. */
     public record Hit(
             String fileName,
             String keyName,
@@ -78,10 +47,7 @@ public final class ConfigSearchResultsBuilder {
      * Run a case-insensitive substring search across every loaded parser.
      *
      * @param query free-form user input; trimmed; matched case-insensitively.
-     * @return ordered list of hits (single parsers first in insertion order,
-     *         then each multi-parser's sub-parsers in {@code listParsers()}
-     *         order). Empty if {@code query} is null/blank/shorter than
-     *         {@link #MIN_QUERY_LENGTH}.
+     * @return ordered list of hits, or empty if query is short or configs is null
      */
     public static List<Hit> search(String query) {
         if (query == null) return List.of();

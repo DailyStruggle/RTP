@@ -4,11 +4,10 @@ import io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding;
 
 /**
  * Folia-specific {@code MapBinding} override. Thin subclass of
- * {@link BukkitMapBinding} that exists per {@code CHECKLIST-maps-api.md}
- * Stage 2.3 / REQ-RTP-MAP-001..003 to provide a dedicated home for Folia
+ * {@link BukkitMapBinding} that exists per REQ-RTP-MAP-001..003 to provide a dedicated home for Folia
  * region-affinity scheduling.
  *
- * <p>Stage 2.3 scope (this class):
+ * <p>Scope (this class):
  * <ul>
  *   <li>{@code allocate} -- inherits the Bukkit allocation path.
  *       {@code Bukkit.createMap} is safe to call from any region thread on

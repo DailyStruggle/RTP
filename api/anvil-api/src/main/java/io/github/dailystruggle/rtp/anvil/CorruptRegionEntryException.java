@@ -4,7 +4,7 @@ import java.io.IOException;
 
 /**
  * Signals a known, benign-to-the-pipeline form of region-file corruption detected
- * while decoding a single chunk entry — e.g. a location-table pointer that spans
+ * while decoding a single chunk entry - e.g. a location-table pointer that spans
  * past the end of the {@code .mca} file, an implausible declared chunk length, or
  * a region buffer that is shorter than the 8 KiB header.
  *

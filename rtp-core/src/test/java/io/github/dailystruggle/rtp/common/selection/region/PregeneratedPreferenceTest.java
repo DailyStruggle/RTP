@@ -13,22 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers the {@code pregeneratedPreference} performance knob added so admins
- * can probabilistically bias the location selector away from ungenerated
- * chunks while still allowing fallback to ungenerated land.
- *
- * <p>This is a lightweight verification of three contracts:</p>
- * <ol>
- *   <li>{@link PerformanceKeys#pregeneratedPreference} is part of the enum.</li>
- *   <li>The shipped {@code performance.yml} declares the key with the default
- *       value {@code 0.0} so existing installations see no behavior change.</li>
- *   <li>{@link LocationGenerator.FailTypes#ungenerated} exists for fail
- *       attribution (REQ-RTP-S-004 audit trail).</li>
- *   <li>The probabilistic-drop logic matches the gate inside
- *       {@code PregenTask}: at {@code 0.0} nothing is dropped, at {@code 1.0}
- *       every ungenerated chunk is dropped, and intermediate values produce a
- *       drop rate within tolerance of the configured weight.</li>
- * </ol>
+ * Verifies {@code pregeneratedPreference} behavior: enum presence, default 0.0 value,
+ * fail attribution (REQ-RTP-S-004), and probabilistic chunk rejection gating.
  */
 class PregeneratedPreferenceTest {
 
@@ -60,15 +46,7 @@ class PregeneratedPreferenceTest {
                 "default pregeneratedPreference must be 0.0 to preserve existing behavior");
     }
 
-    /**
-     * Mirrors the rejection rule in {@code PregenTask.runAttempt()}:
-     * <pre>
-     *   if (pref &gt; 0 &amp;&amp; !generated) {
-     *       double c = min(1, pref);
-     *       if (c &gt;= 1 || rng.nextDouble() &lt; c) reject;
-     *   }
-     * </pre>
-     */
+    /** Mirrors rejection rule in {@code PregenTask.runAttempt()}. */
     private static boolean wouldReject(double pref, boolean generated, Random rng) {
         if (pref <= 0.0d) return false;
         if (generated) return false;
@@ -126,7 +104,7 @@ class PregeneratedPreferenceTest {
     @Test
     void boundedAtWeightOneAllUngenerated() {
         // At weight 1.0 with every chunk ungenerated, the consecutive-reject
-        // cap must trip in exactly `cap` iterations — never the iteration
+        // cap must trip in exactly `cap` iterations - never the iteration
         // ceiling. This is the regression guard for the unbounded-rejection
         // concern.
         Random rng = new Random(7L);

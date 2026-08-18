@@ -9,7 +9,7 @@ import java.util.Set;
  *
  * <p>On Bukkit/Spigot/Paper/Folia, the server reads {@code plugin.yml} and applies
  * each node's {@code default:} value (true / false / op) automatically. Fabric has
- * no equivalent descriptor — without this table, every {@code hasPermission}
+ * no equivalent descriptor - without this table, every {@code hasPermission}
  * call on a permsless server fell through to the ops.json check, which meant
  * baseline player permissions like {@code rtp.see} and {@code rtp.use} were
  * silently denied to non-ops, breaking {@code /rtp} on a vanilla-permissions
@@ -17,9 +17,9 @@ import java.util.Set;
  *
  * <p>Verdict semantics ({@link Verdict}):
  * <ul>
- *   <li>{@link Verdict#TRUE}  — granted to everyone (matches {@code default: true}).</li>
- *   <li>{@link Verdict#FALSE} — denied to everyone, including ops (matches {@code default: false}).</li>
- *   <li>{@link Verdict#OP}    — granted to ops only (matches {@code default: op}); caller
+ *   <li>{@link Verdict#TRUE}  - granted to everyone (matches {@code default: true}).</li>
+ *   <li>{@link Verdict#FALSE} - denied to everyone, including ops (matches {@code default: false}).</li>
+ *   <li>{@link Verdict#OP}    - granted to ops only (matches {@code default: op}); caller
  *       falls through to the ops.json scan.</li>
  * </ul>
  *

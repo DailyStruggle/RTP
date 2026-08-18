@@ -13,12 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-FABRIC-F-013 — ADR-023 Login Reserve Cache port to Fabric:
+ * REQ-FABRIC-F-013 - ADR-023 Login Reserve Cache port to Fabric:
  * {@code FabricOnEventTeleports.hasPlayedBefore(...)} must return
  * {@code true} iff the player's {@code playerdata/<uuid>.dat} file exists
  * under the world root. This drives the first-join branch of the join-time
- * RTP path (and therefore which permission node — {@code rtp.onevent.firstjoin}
- * vs. {@code rtp.onevent.join} — gates the consumption of the login reserve
+ * RTP path (and therefore which permission node - {@code rtp.onevent.firstjoin}
+ * vs. {@code rtp.onevent.join} - gates the consumption of the login reserve
  * cache for that join).
  *
  * <p>Validates against a temp directory so the test does not require a live

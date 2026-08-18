@@ -30,7 +30,7 @@ import java.util.logging.Level;
  *
  * <p><b>Permissions.</b> {@link ParsePermissions#hasPerm} resolves through
  * {@code RTPCommandSender.hasPermission}, which on Fabric is implemented by
- * {@code FabricRTPPlayer.hasPermission} — that method already consults
+ * {@code FabricRTPPlayer.hasPermission} - that method already consults
  * {@code fabric-permissions-api} (LuckPerms-Fabric et al.) and falls back to
  * an on-disk {@code ops.json} scan when no perms-api implementer is
  * registered. So {@code rtp.onevent.firstjoin}, {@code rtp.onevent.join} and
@@ -39,13 +39,13 @@ import java.util.logging.Level;
  * <p><b>First-join detection.</b> No Vanilla API exposes Bukkit's
  * {@code Player#hasPlayedBefore()} on Fabric. We probe the on-disk
  * {@code <world>/playerdata/<uuid>.dat} file under
- * {@link MinecraftServer#getWorldPath(LevelResource)} — Vanilla writes this
+ * {@link MinecraftServer#getWorldPath(LevelResource)} - Vanilla writes this
  * file on first save after the player logs in, so its absence at JOIN time
  * is a reliable "first join" signal (one tiny stat() per join; no I/O on
  * subsequent joins beyond that).
  *
  * <p><b>S-005 compliance.</b> Like the Bukkit handler, this method itself
- * does no chunk I/O — it dispatches a {@code TeleportPipelineTask} via
+ * does no chunk I/O - it dispatches a {@code TeleportPipelineTask} via
  * {@code RTP.scheduler.runTaskAsynchronously}; all chunk-touching work
  * happens off the server thread inside the pipeline. The disk stat() of
  * {@code playerdata/<uuid>.dat} is a single non-blocking file-existence
@@ -53,7 +53,7 @@ import java.util.logging.Level;
  * once per first-ever join (parity with Bukkit's
  * {@code Player#hasPlayedBefore()} which reads the same file).
  *
- * <p>No {@code org.bukkit.*} imports — ADR-022 §4 invariant.
+ * <p>No {@code org.bukkit.*} imports - ADR-022 §4 invariant.
  */
 public final class FabricOnEventTeleports {
 
@@ -70,7 +70,7 @@ public final class FabricOnEventTeleports {
      * naming {@code net.minecraft.server.level.ServerPlayer} in this
      * (obf-carrier) class would pin the intermediary class
      * {@code class_3222} into the bytecode constant pool, and that class is
-     * absent on the MC 26.1 deobf runtime — link would fail at JOIN. UUID
+     * absent on the MC 26.1 deobf runtime - link would fail at JOIN. UUID
      * is resolved through {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#getPlayerUUID(Object)}
      * (Loom-remapped per carrier) with a reflective {@code getUUID()}
      * fallback, mirroring {@code FabricServerAccessor#unregisterPlayerObject}.
@@ -144,7 +144,7 @@ public final class FabricOnEventTeleports {
      * {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter}
      * SPI (mojmap on 26.x, intermediary on 1.20/1.21.x), falling back to a
      * reflective {@code getUUID()} lookup. Never names {@code ServerPlayer}
-     * symbolically in this class's bytecode — see {@link #onJoin}.
+     * symbolically in this class's bytecode - see {@link #onJoin}.
      */
     private static UUID resolvePlayerUuid(Object player) {
         if (player == null) return null;
@@ -182,7 +182,7 @@ public final class FabricOnEventTeleports {
                 Object s = component.getClass().getMethod("getString").invoke(component);
                 if (s != null) return s.toString();
             } catch (NoSuchMethodException ignored) {
-                // not a Component — fall back below
+                // not a Component - fall back below
             }
             return component.toString();
         } catch (Throwable ignored) {
@@ -243,7 +243,7 @@ public final class FabricOnEventTeleports {
 
     /**
      * Fabric analogue of Bukkit's {@code Player#hasPlayedBefore()}. Probes
-     * {@code <world-root>/playerdata/<uuid>.dat} — Vanilla writes this file
+     * {@code <world-root>/playerdata/<uuid>.dat} - Vanilla writes this file
      * on the first auto-save after a player joins, so its absence at JOIN
      * time means "fresh UUID, never seen before". Reflective fallback for
      * {@code getWorldPath} mapping drift across MC versions.

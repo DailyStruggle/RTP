@@ -4,32 +4,8 @@ import java.util.Set;
 
 /**
  * Biome-name equivalence helper.
- *
- * <p>Different Bukkit-family platforms expose biome ids in different shapes:
- * older releases where {@code org.bukkit.block.Biome} is a Java enum surface
- * the bare uppercase enum constant (e.g. {@code "PLAINS"}); newer releases
- * (1.21.5+, registry-keyed Biome) surface the namespaced form
- * (e.g. {@code "MINECRAFT:PLAINS"} after uppercasing). The same input typed
- * by a player into a command argument or written into {@code safety.yml}
- * may follow either convention.
- *
- * <p>This helper provides a single comparator that treats the vanilla
- * {@code minecraft:} namespace as optional on either side of the comparison
- * while preserving modded namespaces (e.g. {@code iris:overworld:plains},
- * {@code terralith:emerald_peaks}) verbatim. The contract:
- *
- * <ul>
- *   <li>{@code matches({"PLAINS"}, "MINECRAFT:PLAINS")} - {@code true}</li>
- *   <li>{@code matches({"MINECRAFT:PLAINS"}, "PLAINS")} - {@code true}</li>
- *   <li>{@code matches({"MINECRAFT:PLAINS"}, "MINECRAFT:PLAINS")} - {@code true}</li>
- *   <li>{@code matches({"PLAINS"}, "PLAINS")} - {@code true}</li>
- *   <li>{@code matches({"IRIS:OVERWORLD:PLAINS"}, "PLAINS")} - {@code false}</li>
- *   <li>{@code matches({"IRIS:OVERWORLD:PLAINS"}, "IRIS:OVERWORLD:PLAINS")} - {@code true}</li>
- * </ul>
- *
- * <p>Callers are expected to have already uppercased both sides for
- * case-insensitivity; this helper deals solely with namespace equivalence.
- * Inputs must be non-null.
+ * Treats vanilla {@code minecraft:} namespace as optional while preserving modded namespaces.
+ * Requires caller to uppercase inputs for case-insensitivity.
  */
 public final class BiomeNames {
 
@@ -55,16 +31,8 @@ public final class BiomeNames {
   }
 
   /**
-   * Returns the canonical (vanilla-namespace-stripped, uppercased) form of a biome
-   * id, used as a key for any map keyed by biome name (e.g.
-   * {@link io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape}'s
-   * biome-location maps). Modded namespaces (e.g. {@code IRIS:...},
-   * {@code TERRALITH:...}) are preserved verbatim — only the vanilla
-   * {@code MINECRAFT:} prefix is collapsed so that {@code MINECRAFT:FOREST}
-   * and {@code FOREST} canonicalise to the same key.
-   *
-   * @param name biome id; null/blank yields the input unchanged
-   * @return canonicalised biome key
+   * Canonicalises biome id by stripping vanilla {@code MINECRAFT:} prefix and uppercasing.
+   * Preserves modded namespaces verbatim.
    */
   public static String canonical(String name) {
     if (name == null) return null;

@@ -23,19 +23,10 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Platform-agnostic registrar for the shared {@code /rtp} command tree.
+ * Platform-agnostic registrar assembling the shared {@code /rtp} command tree.
  *
- * <p>Every {@code /rtp} leaf verb and every platform-neutral parameter is
- * defined in {@code rtp-core}; the only genuinely platform-bound pieces are
- * the {@code player} / {@code world} parameter sources (supplied through
- * {@link PlatformCommandParameters}) and the per-platform menu / test
- * wiring (kept in each platform root). This builder is the single place that
- * assembles the common surface so adding a verb is a one-file change.</p>
- *
- * <p>The resulting command tree is identical, in verbs, order-independent
- * map contents, permissions, and the {@link VersionCmd#ALIAS} lookup entry,
- * to the hand-rolled assembly the three platform roots previously
- * duplicated.</p>
+ * <p>Registers common parameters and subcommands, delegating only platform-bound
+ * parameters (player, world) to {@link PlatformCommandParameters}.
  */
 public final class CoreCommandTreeBuilder {
 
@@ -58,14 +49,8 @@ public final class CoreCommandTreeBuilder {
   }
 
   /**
-   * Registers the platform-neutral subcommands onto {@code root}, in the same
-   * set the platform roots previously registered by hand:
-   * {@code reload, gui, config, scan, info, version} (plus the
-   * {@link VersionCmd#ALIAS} lookup alias) and {@code clear}.
-   *
-   * <p>{@code help} is intentionally not registered: commands-api's
-   * {@code TreeCommand} auto-emits a built-in help listing covering every
-   * registered subcommand when no {@code HELP} subcommand exists.</p>
+   * Registers platform-neutral subcommands onto {@code root}:
+   * {@code reload, gui, config, scan, info, version} (plus alias), and {@code clear}.
    *
    * @param root the {@code /rtp} root command
    */
@@ -82,17 +67,8 @@ public final class CoreCommandTreeBuilder {
   }
 
   /**
-   * Builds the {@code region} parameter (with its nested {@code world} /
-   * {@code price} / {@code worldborderoverride} / {@code shape} / {@code vert}
-   * sub-parameters).
-   *
-   * <p>The validator accepts a bare local region name (permission
-   * {@code rtp.regions.<region>}) and, when network mode is live, a qualified
-   * {@code server:region} target reachable per the live
-   * {@link PeerRegionRegistry} (permissions {@code rtp.servers.<server>} and
-   * {@code rtp.regions.<region>}). The extras supplier surfaces peer-qualified
-   * entries in tab-completion. When network mode is not booted, the qualified
-   * path rejects and only local region names resolve.</p>
+   * Builds the {@code region} parameter with nested sub-parameters.
+   * Supports local region names and qualified {@code server:region} network targets.
    */
   private static RegionParameter buildRegionParameter() {
     RegionParameter regionParameter =

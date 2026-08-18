@@ -12,13 +12,8 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Compiled, evaluation-ready form of a safety list (ADR-017 §2). Five disjoint
- * buckets computed once at config load: plain materials, resolved tag keys,
- * per-material state predicates, per-tag state predicates, wildcard state
- * predicates. Hot eval order (ADR-017 §4): plain name → tag membership →
- * state predicates. Tag expansion is a platform concern; live tag membership
- * is supplied by the caller via {@link #isUnsafe(String, Collection, Map)}.
- * Empty membership is fail-open per ADR-017 §3. Immutable and thread-safe.
+ * Compiled safety list representation (ADR-017). Buckets materials, tag keys,
+ * and state predicates for efficient candidate block evaluation. Immutable.
  */
 public final class CompiledUnsafeSet {
 
@@ -111,37 +106,10 @@ public final class CompiledUnsafeSet {
 
   /**
    * Return a new {@code CompiledUnsafeSet} with tag tokens expanded into plain
-   * material entries, using the given {@code tagSnapshot} as the source of
-   * truth for tag → material-name membership.
+   * material entries using {@code tagSnapshot} (ADR-017).
    *
-   * <p>Post-expansion:
-   * <ul>
-   *   <li>{@link #plainTags()} is cleared (entries merged into
-   *       {@link #plainMaterials()}).</li>
-   *   <li>{@link #tagStatePredicates()} is cleared; each tag-scoped predicate
-   *       list is replicated under every material that belongs to that tag in
-   *       {@link #materialStatePredicates()}, preserving AND-semantics per
-   *       ADR-017 §2.</li>
-   *   <li>{@link #wildcardStatePredicates()} and
-   *       {@link #materialStatePredicates()} entries already present are
-   *       untouched; material-scoped predicates are concatenated when a
-   *       material also appears via tag expansion.</li>
-   * </ul>
-   *
-   * <p>Tags that are not present in the snapshot are dropped silently — the
-   * caller (typically {@code SafetyCompilationCache}) is responsible for
-   * surfacing rejected raw tokens before compilation; a valid tag token that
-   * simply has no members in the live snapshot is not a configuration error
-   * (it just contributes no constraints).
-   *
-   * <p>If the snapshot is {@code null} or empty and this set has no tag
-   * entries, {@code this} is returned unchanged for cheap identity reuse.
-   *
-   * @param tagSnapshot {@code namespace:path} → upper-case material names. Keys
-   *     shall match the form used by {@code SafetyToken.TAG.identifier()} and
-   *     by {@code RTPServerAccessor.blockTagSnapshot()}.
-   * @return a new {@code CompiledUnsafeSet} with no tag buckets, or
-   *     {@code this} if no expansion was needed.
+   * @param tagSnapshot {@code namespace:path} to upper-case material names mapping.
+   * @return new {@code CompiledUnsafeSet} with expanded tags, or {@code this} if no tags exist.
    */
   public CompiledUnsafeSet withTagsExpanded(Map<String, Set<String>> tagSnapshot) {
     boolean hasTagBuckets = !plainTags.isEmpty() || !tagStatePredicates.isEmpty();
@@ -167,7 +135,7 @@ public final class CompiledUnsafeSet {
       if (members == null || members.isEmpty()) continue;
       for (String mat : members) {
         // If the material is already plain-unsafe, a state predicate adds
-        // nothing — skip to keep the per-material predicate list minimal.
+        // nothing - skip to keep the per-material predicate list minimal.
         if (expandedPlainMaterials.contains(mat)) continue;
         expandedMatPreds.computeIfAbsent(mat, k -> new ArrayList<>()).addAll(e.getValue());
       }
@@ -240,17 +208,7 @@ public final class CompiledUnsafeSet {
   // ---------------------------------------------------------------------------
 
   /**
-   * Convenience overload for the common case of a block whose tag membership is unknown
-   * and which has no state properties.
-   *
-   * <p>Equivalent to {@link #isUnsafe(String, Collection, Map) isUnsafe(materialName,
-   * Collections.emptyList(), Collections.emptyMap())}.</p>
-   *
-   * @param materialName upper-snake {@code Material.name()} of the candidate block.
-   * @param liveProperties lowercase property map (nullable / empty allowed). Required
-   *     only if a state predicate may apply.
-   * @return {@code true} iff this compiled set would reject a block of the given material
-   *     with the given properties.
+   * Convenience overload for testing a candidate block without tag membership.
    */
   public boolean isUnsafe(String materialName, Map<String, String> liveProperties) {
     return isUnsafe(materialName, Collections.emptyList(), liveProperties);
@@ -269,7 +227,7 @@ public final class CompiledUnsafeSet {
                           Map<String, String> liveProperties) {
     if (materialName == null || materialName.isEmpty()) return false;
 
-    // 1. Plain material membership — set lookup, cheapest possible.
+    // 1. Plain material membership - set lookup, cheapest possible.
     if (plainMaterials.contains(materialName)) return true;
 
     // 2. Plain tag membership.
@@ -302,13 +260,7 @@ public final class CompiledUnsafeSet {
   }
 
   /**
-   * Convenience: lowercase-normalize a live property map in one place so that platform
-   * adapters do not each re-implement the same loop. Both keys and values are lowercased
-   * under {@link Locale#ROOT}.
-   *
-   * @param raw raw property map as produced by parsing {@code BlockData.getAsString()}
-   *     or the NBT palette {@code Properties} compound; may be {@code null}.
-   * @return an unmodifiable lowercase map; never {@code null}.
+   * Normalizes live property keys and values to lowercase under {@link Locale#ROOT}.
    */
   public static Map<String, String> normalizeLiveProperties(Map<String, String> raw) {
     if (raw == null || raw.isEmpty()) return Collections.emptyMap();

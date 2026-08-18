@@ -12,22 +12,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Top-level {@code /rtp clear} verb. Acts purely as a grouping parent for the
- * concrete clear actions:
- *
- * <ul>
- *   <li>{@code /rtp clear cache} - wipe the L1/L2/L3 location caches for every
- *       region (see {@link ClearCacheCmd}).</li>
- *   <li>{@code /rtp clear cooldown} (alias {@code data}) - drop a player's latest
- *       teleport data, lifting their teleport cooldown (see
- *       {@link ClearCooldownCmd}).</li>
- * </ul>
- *
- * <p>Bare {@code /rtp clear} performs no destructive action: with no child
- * selected the command framework emits its built-in help listing of the
- * children, so the parent's own {@link #onCommand} only sends a short usage hint.
- *
- * <p>Permission: {@code rtp.admin}.
+ * Parent {@code /rtp clear} command for sub-actions (cache, cooldown, queue, limit, invuln).
+ * Requires {@code rtp.admin} permission.
  */
 public class ClearCmd extends BaseRTPCmdImpl {
 

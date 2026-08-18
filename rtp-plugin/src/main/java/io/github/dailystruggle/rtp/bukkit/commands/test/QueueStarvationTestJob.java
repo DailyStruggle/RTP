@@ -21,7 +21,7 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test queue-starvation region:<R> [samples:N]} — drains N dummy
+ * {@code rtp test queue-starvation region:<R> [samples:N]} - drains N dummy
  * locations from a region (bypassing {@code TeleportPipelineTask} so cooldowns/
  * verifiers/economy can't mask the regression), then triggers a
  * {@code SelectionAPI.compute()} refill pulse and records its latency. Targets

@@ -34,7 +34,7 @@ import java.util.logging.Level;
  * double-install. {@link #uninstall()} cancels the sampler task (if any)
  * and clears the binding back to NOOP.
  *
- * <p>All failures degrade gracefully — the dispatcher is best-effort
+ * <p>All failures degrade gracefully - the dispatcher is best-effort
  * observability and never aborts plugin enable. Failures log at
  * {@link Level#WARNING} via {@link RTP#log(Level, String, Throwable)}.
  */
@@ -50,16 +50,16 @@ public final class MetricsBindingDispatcher {
     private static final String FOLIA_PROBE_FQN =
             "io.papermc.paper.threadedregions.RegionizedServer";
 
-    /** Resolved by FQN — see class-level rationale. */
+    /** Resolved by FQN - see class-level rationale. */
     private static final String PAPER_BINDING_FQN =
             "io.github.dailystruggle.rtp.paper.metrics.PaperMetricsBinding";
-    /** Resolved by FQN — see class-level rationale. */
+    /** Resolved by FQN - see class-level rationale. */
     private static final String FOLIA_BINDING_FQN =
             "io.github.dailystruggle.rtp.folia.metrics.FoliaMetricsBinding";
-    /** Resolved by FQN — see class-level rationale. */
+    /** Resolved by FQN - see class-level rationale. */
     private static final String SPIGOT_SAMPLER_FQN =
             "io.github.dailystruggle.rtp.bukkitplatform.metrics.BukkitTpsSampler";
-    /** Resolved by FQN — see class-level rationale. */
+    /** Resolved by FQN - see class-level rationale. */
     private static final String SPARK_BINDING_FQN =
             "io.github.dailystruggle.rtp.bukkitplatform.metrics.SparkMetricsBinding";
     /** spark public-API probe class; presence implies the spark plugin is loaded. */
@@ -77,7 +77,7 @@ public final class MetricsBindingDispatcher {
 
     /**
      * Install the platform-appropriate binding into {@link RTP#metrics}.
-     * Safe to call repeatedly — only the first call has effect.
+     * Safe to call repeatedly - only the first call has effect.
      */
     public static synchronized void install() {
         if (installed) {
@@ -146,7 +146,7 @@ public final class MetricsBindingDispatcher {
                         tick.invoke(sampler);
                     } catch (Throwable t) {
                         // Don't spam: a single warning on first failure is
-                        // enough — the binding will simply continue to
+                        // enough - the binding will simply continue to
                         // report UNSAMPLED, which is the documented sentinel.
                         RTP.log(Level.WARNING,
                                 LOG_TAG + " BukkitTpsSampler.tick() invocation failed", t);
@@ -199,7 +199,7 @@ public final class MetricsBindingDispatcher {
      * Attempt to instantiate and install the {@link MetricsBinding} named by
      * {@code bindingFqn}. Returns {@code true} on success. Returns
      * {@code false} (without throwing) if the binding class is absent from the
-     * runtime classpath — this is expected on trimmed assemblies such as the
+     * runtime classpath - this is expected on trimmed assemblies such as the
      * rtp-lite jar, which excludes the platform metrics bindings. In that case
      * the caller falls through to the next applicable binding (or the raw
      * Spigot sampler), so {@code /rtp info} still reports sampled data instead
@@ -228,7 +228,7 @@ public final class MetricsBindingDispatcher {
      * Instantiate the {@link MetricsBinding} named by {@code bindingFqn} without
      * installing it. Returns {@code null} (without throwing) when the class is
      * absent from the runtime classpath (trimmed assembly) or instantiation
-     * fails — the caller then falls through to the next path.
+     * fails - the caller then falls through to the next path.
      */
     private static MetricsBinding instantiateBinding(String bindingFqn, String description) {
         try {
@@ -250,7 +250,7 @@ public final class MetricsBindingDispatcher {
      * Wrap {@code delegate} in {@code SparkMetricsBinding} when the spark plugin
      * (and its public API) is present, so spark's richer TPS/MSPT values are
      * merged over the native binding. Returns {@code delegate} unchanged when
-     * spark is absent or the wrap fails — spark is a pure soft-dependency.
+     * spark is absent or the wrap fails - spark is a pure soft-dependency.
      *
      * <p>The {@code SparkMetricsBinding} itself self-disables (delegating every
      * field) if the spark API cannot be linked, so the up-front probe here is
@@ -261,7 +261,7 @@ public final class MetricsBindingDispatcher {
         try {
             Class.forName(SPARK_API_PROBE_FQN);
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
-            return delegate; // spark not installed — keep native binding
+            return delegate; // spark not installed - keep native binding
         } catch (Throwable t) {
             return delegate;
         }
@@ -273,7 +273,7 @@ public final class MetricsBindingDispatcher {
                     + " spark detected; merging spark TPS/MSPT over native binding");
             return wrapped;
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
-            // SparkMetricsBinding absent (trimmed assembly) — keep native binding.
+            // SparkMetricsBinding absent (trimmed assembly) - keep native binding.
             RTP.log(Level.FINE, LOG_TAG + " SparkMetricsBinding not present; using native binding");
             return delegate;
         } catch (Throwable t) {
@@ -303,7 +303,7 @@ public final class MetricsBindingDispatcher {
         } catch (NoSuchMethodException | ClassNotFoundException e) {
             return false;
         } catch (Throwable t) {
-            // Unexpected probe failure — fall back to Spigot path conservatively.
+            // Unexpected probe failure - fall back to Spigot path conservatively.
             RTP.log(Level.FINER,
                     LOG_TAG + " Paper probe failed (" + t.getClass().getSimpleName()
                             + "); assuming raw Spigot");

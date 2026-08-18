@@ -11,14 +11,14 @@ import java.lang.management.ThreadMXBean;
  * <p>"CPU per teleport" is computed as {@code (cpuEnd - cpuStart) / completedAttempts}
  * by {@link MetricsRecorder#endPhase}. Two flavours are recorded:
  * <ul>
- *   <li><b>Process CPU</b> — total user+system CPU charged to the JVM during the
+ *   <li><b>Process CPU</b> - total user+system CPU charged to the JVM during the
  *       phase. Includes background work (GC, async chunk loaders, other plugins);
  *       useful as the "what does this plugin cost the box" number.</li>
- *   <li><b>Main-thread CPU</b> — the server tick thread's CPU time only. The
+ *   <li><b>Main-thread CPU</b> - the server tick thread's CPU time only. The
  *       most differentiating metric: a plugin that does sync chunk I/O on the
  *       tick thread shows huge main-thread CPU; a properly async plugin shows
  *       very little. Note that wall-clock blocking ({@code .join()} waiting on
- *       a chunk future) is <i>not</i> counted as CPU — that gap surfaces in
+ *       a chunk future) is <i>not</i> counted as CPU - that gap surfaces in
  *       MSPT instead, and the disparity between the two is itself a useful
  *       diagnostic.</li>
  * </ul>

@@ -12,13 +12,10 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
 
 /**
- * Process-wide thread-safe memo of {@link SafetyTokenParser#parseAll(Collection)} +
- * {@link CompiledUnsafeSet#compile(Collection)}, keyed on an immutable snapshot of the
- * raw token set so {@code chunk.isSafe(...)} doesn't re-parse and re-compile per candidate.
+ * Thread-safe memo of {@link SafetyTokenParser} + {@link CompiledUnsafeSet}.
  *
- * <p>Rejected tokens fire {@code rejectionSink} <strong>once</strong> per distinct key
- * (REQ-RTP-S-004 — audit, not spam). Entries are {@link SoftReference}-held so the cache
- * never pins compiled sets during GC pressure.
+ * <p>Keyed on immutable token snapshot. Fires rejection sink once per key (REQ-RTP-S-004).
+ * Uses {@link SoftReference} values to yield to GC pressure.
  */
 public final class SafetyCompilationCache {
 
@@ -48,7 +45,7 @@ public final class SafetyCompilationCache {
     if (ref != null) {
       CompiledUnsafeSet cached = ref.get();
       if (cached != null) return cached;
-      // Soft reference was cleared — fall through and recompile. A concurrent thread
+      // Soft reference was cleared - fall through and recompile. A concurrent thread
       // may also be recomputing; the last writer wins, which is fine because the
       // compiled result is value-equal for a given key.
     }
@@ -84,7 +81,7 @@ public final class SafetyCompilationCache {
   /**
    * Tag-snapshot-aware variant: bakes tag-bucket members into the plain-material fields via
    * {@link CompiledUnsafeSet#withTagsExpanded(Map)} so the hot path skips the snapshot
-   * lookup. Caller MUST reuse the same {@code tagSnapshot} reference between reloads —
+   * lookup. Caller MUST reuse the same {@code tagSnapshot} reference between reloads -
    * {@code RTPServerAccessor.rebuildBlockTagSnapshot()} produces a fresh reference, which
    * invalidates these entries by identity. Tag-free token sets bypass expansion.
    */

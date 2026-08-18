@@ -53,7 +53,7 @@ import java.util.logging.Level;
  * (→ {@code MinecraftServer#execute}). Effect <em>resolution</em> (the
  * {@code EffectFactory.buildEffects} call) runs on the calling thread (which
  * is the pipeline thread on Fabric per ADR-022 §4) and is pure in-memory
- * lookup against {@code BuiltInRegistries} — no chunk I/O.
+ * lookup against {@code BuiltInRegistries} - no chunk I/O.
  */
 public final class FabricEffectsHandler {
 
@@ -129,7 +129,7 @@ public final class FabricEffectsHandler {
      *
      * @param prefix    permission-node prefix (e.g. {@code "rtp.effect.presetup"})
      * @param player    the RTPPlayer for this stage; expected to be a {@link FabricRTPPlayer}
-     * @param runtime   scheduler chokepoint — funnels each effect run() onto the server thread
+     * @param runtime   scheduler chokepoint - funnels each effect run() onto the server thread
      */
     /** UUID-resolving variant for cancel / queue-push / queue-pop hooks. */
     private static void dispatchByUuid(String prefix, UUID uuid, FabricEffectRuntime runtime) {
@@ -154,7 +154,7 @@ public final class FabricEffectsHandler {
             // the multiConfigParserMap) is honored without local cache invalidation.
             // Union permission-derived nodes with the effects.yml-driven token list
             // (effects-api-ADR-005). On Fabric servers without fabric-permissions-api,
-            // perms is empty and the union becomes effects/ only — which is the
+            // perms is empty and the union becomes effects/ only - which is the
             // primary path on this platform per ADR-005.
             Set<String> perms = fp.getEffectivePermissions();
             String stage = stageOf(prefix);

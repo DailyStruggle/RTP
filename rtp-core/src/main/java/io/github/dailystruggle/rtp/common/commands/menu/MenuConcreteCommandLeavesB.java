@@ -15,22 +15,8 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * ADR-050 Stage 1b (Proposed 2026-05-24): the remaining concrete {@code /rtp menu ...}
- * leaves complementing Stage 1a (see {@link MenuConcreteCommandLeaves}).
- *
- * <p>Each leaf routes into the matching package-private {@code dispatch*}
- * helper on {@link MenuRedeemSubcommand}; permission gating, builder
- * dispatch, and S-004 reject paths remain inside the helper. Records
- * required by helpers are constructed defensively from the parsed
- * parameters. Missing required parameters fall through to a polite
- * {@code menuInvalid} via the helper's own reject path (the helper sees
- * empty / null inputs and rejects).
- *
- * <p>{@code OpenMap}-bound leaves are deferred to Stage 3 (ChartSpecTokens
- * deletion + {@code OpenMap(UUID)} -&gt; {@code OpenMap(String)} record
- * change). {@code OpenConfigSubParamPage} has no dedicated dispatcher in
- * {@link MenuRedeemSubcommand} today and is therefore not surfaced as a
- * concrete leaf in 1b.
+ * Concrete {@code /rtp menu ...} command leaves for parameter pickers, selection menus,
+ * config editors, and cart operations (ADR-050).
  */
 final class MenuConcreteCommandLeavesB {
 
@@ -129,14 +115,8 @@ final class MenuConcreteCommandLeavesB {
     // -- /rtp menu world|region|biome|prefab (curated selection menus) -----
 
     /**
-     * Shared base for the dedicated destination / prefab selection leaves.
-     * Each subclass supplies its own wire name, the parent path the selection
-     * stages onto (and Back returns to), the parameter to enumerate, the human
-     * display name for the {@code "pick a <name>"} header, and the per-entry
-     * row color supplier. The entries themselves are the resolved parameter's
-     * {@code relevantValues} (the menu never computes suggestions itself);
-     * the rendering is delegated to {@code SelectionMenuBuilder} via
-     * {@link MenuRedeemSubcommand#dispatchSelectionMenu}.
+     * Shared base for dedicated destination/prefab selection leaves.
+     * Enumerate parameter values and delegates rendering to SelectionMenuBuilder.
      */
     abstract static class SelectionLeaf extends BaseRTPCmdImpl {
         private final MenuRedeemSubcommand owner;
@@ -259,23 +239,7 @@ final class MenuConcreteCommandLeavesB {
     // -- /rtp menu config (selector + file/key/search variants) ------------
 
     /**
-     * Single leaf for the entire {@code /rtp menu config ...} surface.
-     * The branching is parameter-based to keep the wire grammar compact:
-     * <ul>
-     *   <li>no parameters: open the config selector.</li>
-     *   <li>{@code search} alone (with no {@code query}): open the search
-     *       prompt (anvil input).</li>
-     *   <li>{@code search} + {@code query=<q>} (+ optional {@code page=<n>}):
-     *       open the search results page.</li>
-     *   <li>{@code file=<file>}: open the curated file page.</li>
-     *   <li>{@code file=<file> key=<param>}: open the key page (anvil input
-     *       prompt for the staged value).</li>
-     *   <li>{@code file=<file> key=<param> type=<type>}: sub-parameter page
-     *       (no dispatcher in core today; falls through to the key page
-     *       per current behaviour).</li>
-     * </ul>
-     * The {@code search} discriminator is registered as a bare subcommand
-     * so the wire grammar reads {@code /rtp menu config search query=...}.
+     * Single leaf for {@code /rtp menu config ...} handling selector, directory, file, and key paths.
      */
     static final class ConfigCmd extends BaseRTPCmdImpl {
         private final MenuRedeemSubcommand owner;

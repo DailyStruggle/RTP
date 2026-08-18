@@ -19,17 +19,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /rtp config <file> viewraw} &mdash; streams the raw contents of the
- * underlying YAML configuration file back to the caller, line by line.
- *
- * <p>This is the legacy chat-dump behavior previously offered by
- * {@code ViewSubConfigCmd}. It was split out as part of the
- * &quot;config view as book&quot; rework (checklist step 6 / proposal v3.6.1)
- * so {@code view} could open the interactive book menu while operators that
- * still need the raw dump (e.g. on platforms without the book renderer, or
- * for copy/paste diagnostics) retain a stable entry point.
- *
- * <p>Read-only by design: this command never mutates state.
+ * Command {@code /rtp config <file> viewraw}: streams raw YAML lines to chat.
+ * Read-only entry point for raw configuration inspection.
  */
 public class ViewRawSubConfigCmd extends BaseRTPCmdImpl {
 

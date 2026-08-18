@@ -26,24 +26,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests for documented failure modes FM-001 and FM-002.
- *
- * <h3>FM-001 — Queue Empty at Teleport Time (REQ-RTP-S-004)</h3>
- * <p>When no pre-generated location is available for a region, the player's UUID
- * must be added to the deferred queue ({@code playerQueue}) so the next
- * replenishment cycle can fulfil the request automatically.
- *
- * <h3>FM-002 — All Sectors Marked Bad / Fill Exhaustion (REQ-RTP-S-004)</h3>
- * <p>When every sector in a region's shape is marked invalid, the shape must
- * report zero effective good locations and must not enter an infinite loop during
- * selection.  The {@code @Timeout} annotation acts as a hard trip-wire.
+ * Tests for documented failure modes FM-001 (Queue Empty) and FM-002 (Fill Exhaustion)
+ * under REQ-RTP-S-004.
  */
 class FailureModeTest {
 
     @TempDir
     File tempDir;
 
-    /** Pre-warmed mock region — created in setUp() so Mockito class-gen is outside @Timeout. */
+    /** Pre-warmed mock region - created in setUp() so Mockito class-gen is outside @Timeout. */
     private Region mockRegion;
 
     @BeforeEach
@@ -55,12 +46,12 @@ class FailureModeTest {
     }
 
     // =========================================================================
-    // FM-001 — Queue empty → player deferred, fulfilled on replenishment
+    // FM-001 - Queue empty → player deferred, fulfilled on replenishment
     // =========================================================================
 
     /**
      * FM-001 step 1: when all queues are empty, {@link RegionQueueManager#poll}
-     * returns {@code null} — no blocking, no exception.
+     * returns {@code null} - no blocking, no exception.
      */
     @Test
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
@@ -73,13 +64,8 @@ class FailureModeTest {
     }
 
     /**
-     * FM-001 step 2 (post-ADR-043): calling
-     * {@link RegionQueueManager#requestTeleport} when the queue is empty
-     * must add the player to the deferred {@code playerQueue} and to the
-     * global awaiting-teleport flag, but must NOT create a personal bucket.
-     * Bucket creation is the strict preserve of
-     * {@link RegionQueueManager#openPersonalQueue} under the
-     * {@code rtp.personalqueue} opt-in.
+     * FM-001 step 2 (ADR-043): {@link RegionQueueManager#requestTeleport} on an empty queue
+     * defers player to {@code playerQueue} without creating a personal queue bucket.
      */
     @Test
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
@@ -112,7 +98,7 @@ class FailureModeTest {
         // Personal-bucket opt-in for the replenishment path is a separate
         // concern post-ADR-043. The full openPersonalQueue() path schedules
         // a RegionCacheTask via RTP.scheduler against the mock region,
-        // which is out of scope for this failure-mode test — bypass the
+        // which is out of scope for this failure-mode test - bypass the
         // scheduling and just install the empty bucket directly so the
         // replenishment cycle has somewhere to deliver into.
         qm.perPlayerLocationQueue.putIfAbsent(
@@ -123,7 +109,7 @@ class FailureModeTest {
         RTPLocation location = new RTPLocation(coords, 1L, null);
         qm.perPlayerLocationQueue.get(player).offer(location);
 
-        // Now poll — must return the replenished location
+        // Now poll - must return the replenished location
         CompletableFuture<RTPLocation> result = qm.poll(player);
         assertNotNull(result,
                 "FM-001: poll() must return a future once the per-player queue has been replenished");
@@ -134,7 +120,7 @@ class FailureModeTest {
     }
 
     // =========================================================================
-    // FM-002 — All sectors bad → zero good locations, no infinite loop
+    // FM-002 - All sectors bad → zero good locations, no infinite loop
     // =========================================================================
 
     /**
@@ -146,7 +132,7 @@ class FailureModeTest {
     void fm002_allSectorsBad_effectiveGoodCountIsZero() {
         TestMemoryShape shape = new TestMemoryShape(10);
 
-        // Mark all 10 sectors as bad (range = 10, so locations 0–9)
+        // Mark all 10 sectors as bad (range = 10, so locations 0-9)
         for (long i = 0; i < 10; i++) {
             shape.addBadLocation(i);
         }
@@ -160,7 +146,7 @@ class FailureModeTest {
 
     /**
      * FM-002 contract: {@link MemoryShape#select()} must terminate within the
-     * timeout window even when all sectors are bad — no infinite loop.
+     * timeout window even when all sectors are bad - no infinite loop.
      * The {@code @Timeout(1s)} annotation is the hard trip-wire.
      */
     @Test

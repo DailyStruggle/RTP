@@ -33,19 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-S-005 / ADR-015: Paper chunk-system-v2 ticket-application race.
- *
- * <p>On Paper, {@code setForceLoadedImpl(true)} schedules {@code addPluginChunkTicket}
- * onto the next primary-thread tick, so {@code new ChunkReservation(...)} returns
- * before the ticket is applied. Without {@code awaitReady}, the stale-chunk guard
- * sees {@code isChunkLoaded=false} (chunk-system-v2 GC'd the async-returned chunk)
- * and every candidate fails with {@code staleChunkBeforeVert}.
- *
- * <p>This test uses a deferred-apply mock world (ticket count only increments
- * after a background "primary-thread simulator" drains the queue) and asserts
- * {@link LocationGenerator#getLocation(Region, Set)} blocks in
- * {@code reservation.awaitReady(...)} until drain, then proceeds past the guard
- * and releases all tickets to zero on exit.
+ * REQ-RTP-S-005 / ADR-015: Paper chunk-system-v2 ticket-application race coverage.
+ * Verifies that awaitReady blocks until deferred ticket application completes before the stale guard runs.
  */
 @DisplayName("REQ-RTP-S-005 / ADR-015: Paper chunk-system-v2 ticket-application race is covered by awaitReady")
 public class ReqRtpS005PaperTicketApplicationRaceTest {
@@ -67,7 +56,7 @@ public class ReqRtpS005PaperTicketApplicationRaceTest {
         accessor.addWorld(world);
 
         // Paper chunk-system-v2 simulation: the chunk is "loaded" only while the
-        // plugin chunk ticket has actually been applied on the primary thread —
+        // plugin chunk ticket has actually been applied on the primary thread -
         // i.e. only after the DeferredApplyWorld's drain has run. Before the
         // drain runs, isChunkLoaded returns false, which is the exact state the
         // production stale-chunk guard saw in the user's Paper 26.1 log.
@@ -155,7 +144,7 @@ public class ReqRtpS005PaperTicketApplicationRaceTest {
         // guard reads isChunkLoaded. activeTicketCount is therefore >0 when
         // the guard runs, the guard passes, and block evaluation fires. In the
         // pre-fix state the guard would run first (with activeTicketCount=0)
-        // and reject every candidate — exactly the user's Paper 26.1 log.
+        // and reject every candidate - exactly the user's Paper 26.1 log.
         assertTrue(world.isSafeCallCount.get() > 0,
                 "ADR-015 ticket-application race: with awaitReady the pregen path "
                         + "must wait for the deferred addPluginChunkTicket to complete "
@@ -192,15 +181,7 @@ public class ReqRtpS005PaperTicketApplicationRaceTest {
     }
 
     /**
-     * {@link TrackedMockWorld} subclass whose {@code setForceLoadedImpl} simulates
-     * Paper's deferred (main-thread-scheduled) plugin chunk ticket application.
-     *
-     * <p>Each invocation enqueues a {@link PendingApply} task; the background
-     * "primary-thread simulator" drains the queue and applies the +/- 1 to the
-     * active ticket counter, then completes the apply future. Until the drain
-     * runs, the returned future is incomplete and the counter is unchanged —
-     * exactly mirroring the state the real {@code BukkitRTPWorld} off-thread
-     * branch leaves the world in between enqueue and main-thread execution.
+     * {@link TrackedMockWorld} subclass simulating Paper's deferred plugin chunk ticket application.
      */
     static final class DeferredApplyWorld extends TrackedMockWorld {
 
@@ -216,7 +197,7 @@ public class ReqRtpS005PaperTicketApplicationRaceTest {
 
         @Override
         protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
-            // DO NOT touch the parent counter here — the counter must only move
+            // DO NOT touch the parent counter here - the counter must only move
             // after the deferred apply runs, otherwise the mock would degenerate
             // to the synchronous path and hide the Paper race we want to catch.
             CompletableFuture<Void> future = new CompletableFuture<>();

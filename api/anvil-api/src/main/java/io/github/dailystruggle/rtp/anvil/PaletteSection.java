@@ -8,16 +8,16 @@ import java.util.Objects;
  *
  * <p>Mirrors the on-disk shape of {@code sections[i].block_states}:
  * <ul>
- *   <li>{@link #sectionY()} — the section's Y index (e.g. {@code -4..19} in 1.18+ overworld)</li>
- *   <li>{@link #palette()} — raw NBT identifiers as found in {@code palette[i].Name}, in the
+ *   <li>{@link #sectionY()} - the section's Y index (e.g. {@code -4..19} in 1.18+ overworld)</li>
+ *   <li>{@link #palette()} - raw NBT identifiers as found in {@code palette[i].Name}, in the
  *       exact order they appear on disk; never {@code null}, never empty</li>
- *   <li>{@link #data()} — packed palette indices (YZX-major, 4096 entries per section);
+ *   <li>{@link #data()} - packed palette indices (YZX-major, 4096 entries per section);
  *       {@code null} iff {@link #palette()} has exactly one entry (vanilla omits {@code data}
  *       in that case to save space)</li>
  * </ul>
  *
  * <p>This record intentionally carries raw identifier strings, not normalized forms, so the
- * verdict layer (Phase 3) can apply {@code PaletteNormalizer} / the
+ * verdict layer can apply the
  * {@code rtp-api} normalizer symmetrically against the user-supplied unsafe set. See
  * ADR-016 Decision §3.
  */
@@ -30,7 +30,7 @@ public record PaletteSection(int sectionY, List<String> palette, long[] data) {
         }
         if (palette.size() == 1 && data != null && data.length != 0) {
             // Tolerated but non-canonical: some generators emit an all-zero data array
-            // alongside a single-entry palette. We accept it silently — the decoder is
+            // alongside a single-entry palette. We accept it silently - the decoder is
             // short-circuited for single-entry palettes regardless.
         }
         if (palette.size() > 1 && data == null) {

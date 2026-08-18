@@ -26,19 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests for {@link ChatMenuRenderer} (ADR-050 Stage 3β.D.2b,
- * rtp-fabric-ADR-012 §1).
- *
- * <p>Two surfaces under test:
- * <ol>
- *   <li>{@link MenuActionToCommand} - the shared {@code MenuAction -> /rtp ...}
- *       wire-form mapping. Asserted directly so the helper has a regression
- *       guard independent of the renderer.</li>
- *   <li>{@link ChatMenuRenderer} - end-to-end render of a synthetic
- *       {@link MenuModel}: title, page divider, decorative-line coalesce,
- *       and one-message-per-clickable-fragment dispatch through the
- *       {@code sendMessageWithRunCommand} sink.</li>
- * </ol>
+ * Tests for {@link ChatMenuRenderer} and {@link MenuActionToCommand}.
  */
 class ChatMenuRendererTest {
 

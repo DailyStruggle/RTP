@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Fabric console log path must not transitively load any
  * {@code net.minecraft.*} chat/network-protocol types.
  *
- * <p>Background — the original 26.1 crash:
+ * <p>Background - the original 26.1 crash:
  * <pre>
  * Caused by: java.lang.NoClassDefFoundError: net/minecraft/class_2561
  *   at FabricServerAccessor.log(FabricServerAccessor.java:501)
@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and aborts {@code onInitialize}.
  *
  * <p>The fix routes the early-log path through {@link FabricAnsiText}
- * — a pure-string utility with <b>no</b> {@code net.minecraft.*}
+ * - a pure-string utility with <b>no</b> {@code net.minecraft.*}
  * imports. This test asserts that property on the compiled class file,
  * so any future edit that pulls a {@code net.minecraft.*} symbol into
  * {@code FabricAnsiText} fails the build instead of crashing servers.
@@ -65,7 +65,7 @@ public class ReqRtpFabricAnsiTextNoNetworkMinecraftTest {
 
     @Test
     public void fabricAnsiText_handlesRepresentativeInputsWithoutNetMinecraft() {
-        // Quick functional sanity — the class itself must be loadable and
+        // Quick functional sanity - the class itself must be loadable and
         // usable in a JVM that has no net.minecraft.* on the classpath
         // (which is true for our test JVM). Failing this would mean
         // FabricAnsiText is silently depending on something it shouldn't.

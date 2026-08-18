@@ -39,13 +39,13 @@ public final class OnPlayerQuit implements Listener {
 
     new RTPTeleportCancel(uuid).run();
 
-    // CHECKLIST-maps-api.md Stage 2.2 / REQ-RTP-MAP-003 — bridge the
+    // CHECKLIST-maps-api.md Stage 2.2 / REQ-RTP-MAP-003 - bridge the
     // PlayerQuitEvent into the MapDispatch lifecycle bus so any registered
     // MapBindingLifecycle (e.g. BukkitMapBinding) can release per-viewer
     // cached MapHandles. Mirrors the registration pattern used by
     // commands-api / effects-api: maps-api defines the SPI, rtp-core owns
     // the registry, the platform listener forwards the event. Best-effort,
-    // guarded — the quit listener must never throw.
+    // guarded - the quit listener must never throw.
     try {
       io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.firePlayerQuit(uuid);
     } catch (Throwable t) {
@@ -53,13 +53,13 @@ public final class OnPlayerQuit implements Listener {
           "[RTP] MapDispatch.firePlayerQuit failed for " + uuid + ": " + t, t);
     }
 
-    // ADR-043 — Close the player's personal coordinate bucket on every
+    // ADR-043 - Close the player's personal coordinate bucket on every
     // region. The bucket was opened by OnPlayerJoin / OnPlayerRespawn /
     // OnPlayerChangeWorld under the `rtp.personalqueue` opt-in, and
     // leaking it across a disconnect would strand banked coordinates'
     // chunk reservations (S-002 adjacent) and grow
     // `perPlayerLocationQueue` without bound under churn. Idempotent,
-    // best-effort, guarded — the quit listener must never throw.
+    // best-effort, guarded - the quit listener must never throw.
     try {
       for (io.github.dailystruggle.rtp.common.selection.region.Region region :
           RTP.selectionAPI.permRegionLookup.values()) {
@@ -75,7 +75,7 @@ public final class OnPlayerQuit implements Listener {
       // never let the quit listener throw
     }
 
-    // ADR-023 — Login Reserve Cache lazy refill: a slot just opened up, so
+    // ADR-023 - Login Reserve Cache lazy refill: a slot just opened up, so
     // dispatch a single-entry promotion on every region that has the buffer
     // enabled (in practice only the default-world region per ADR-023).
     try {

@@ -113,13 +113,9 @@ public class Configs {
    * @return the configuration parser, or null if not found
    */
   /**
-   * Generic value shortcut: resolve the configured value for any config-parser
-   * enum constant by routing to the parser registered under the key's declaring
-   * enum (ADR-071). Returns {@code def} when no parser owns the key. This is the
-   * single mechanism replacing the former per-file parser lookups at message
-   * call sites.
+   * Generic value shortcut: resolve configured value for any config enum key (ADR-071).
    *
-   * @param key the config enum constant (its declaring class identifies the parser)
+   * @param key the config enum constant identifying the owning parser
    * @param def the fallback value
    * @return the resolved value, or {@code def}
    */
@@ -142,10 +138,7 @@ public class Configs {
   }
 
   /**
-   * Resolve the database/persistence settings map (ADR-071: served from
-   * database.yml, split out of config.yml). Returns an empty map when the
-   * database parser is absent (e.g. the rtp-lite assembly, ADR-024), letting
-   * callers fall back to the yaml/flat-file default.
+   * Resolve database settings map (ADR-071: split from config.yml into database.yml).
    *
    * @return the {@code database:} settings map; never {@code null}
    */
@@ -156,11 +149,7 @@ public class Configs {
       newMap = parser.getMap(DatabaseKeys.database);
     }
 
-    // ADR-071 rule 4/5: read-legacy -> apply-new -> warn-once migration. Older
-    // installs carried the database settings inside config.yml's `database` block.
-    // Honor a still-present legacy block so an existing install keeps working on
-    // upgrade, with database.yml taking precedence for any key the operator has
-    // customized away from the bundled default there.
+    // ADR-071: read-legacy -> apply-new -> warn-once migration.
     Map<String, Object> legacy = readLegacyConfigSection("database");
     if (legacy.isEmpty()) {
       return newMap;
@@ -171,22 +160,18 @@ public class Configs {
     return merged;
   }
 
-  // ADR-071: warn-once latches so the deprecation log fires a single time per JVM
-  // rather than on every reload / database setup.
+  // ADR-071: warn-once latches for deprecation logging per JVM.
   private static volatile boolean warnedLegacyDatabase = false;
   private static volatile boolean warnedLegacyNetworkRedis = false;
 
   /**
-   * Merges a deprecated legacy config block into the authoritative new map (ADR-071
-   * rule 4/5). A legacy value is applied only where the new map still holds the
-   * bundled default (i.e. the operator has not overridden it in the new file), so a
-   * customized new file always wins while an un-customized one inherits the legacy
-   * value, keeping existing installs working across the upgrade.
+   * Merges a deprecated legacy config block into the new map (ADR-071).
+   * Legacy values apply only where the new map still holds bundled defaults.
    *
-   * @param newMap the authoritative new-file settings (never {@code null})
-   * @param legacy the deprecated legacy block read from config.yml
-   * @param defaults the bundled defaults of the new file
-   * @return the merged settings map
+   * @param newMap authoritative new-file settings (never {@code null})
+   * @param legacy deprecated legacy block read from config.yml
+   * @param defaults bundled defaults of the new file
+   * @return merged settings map
    */
   static Map<String, Object> mergeLegacyConfig(
       Map<String, Object> newMap, Map<String, Object> legacy, Map<String, Object> defaults) {
@@ -248,24 +233,16 @@ public class Configs {
     }
   }
 
-  // ADR-071 rule 4: whole-file relocations into advanced/ that have already fired
-  // their one-time deprecation log, keyed by the legacy root file name.
+  // ADR-071 rule 4: whole-file relocations into advanced/.
   private static final java.util.Set<String> warnedLegacyRootFiles =
       java.util.concurrent.ConcurrentHashMap.newKeySet();
 
   /**
-   * ADR-071/ADR-076: reliably vacate a legacy config file or emptied directory from the
-   * plugin root by moving it to a {@code <name>.migrated} sibling (or, when that target is
-   * already taken from a prior migration, {@code <name>.migrated.<n>}), so the legacy path
-   * is always freed. Uses {@link java.nio.file.Files#move} rather than
-   * {@link File#renameTo}: {@code renameTo} silently fails when its target already exists
-   * (notably on Windows), which left the legacy file in place and caused it to be
-   * re-migrated - and its relocated copy re-backed-up - on every reboot, surfacing as a
-   * duplicated config file that reappeared after each restart. Best-effort: when even the
-   * move fails, the legacy path is deleted so it cannot re-trigger the migration.
+   * Vacates a legacy config file or directory by renaming to {@code <name>.migrated}.
+   * Uses {@link java.nio.file.Files#move} to avoid silent rename failures (ADR-071/ADR-076).
    *
-   * @param legacy the legacy file/directory to vacate
-   * @param legacyName the legacy path's base name (used to build the archive name)
+   * @param legacy legacy file/directory to vacate
+   * @param legacyName base name of legacy path
    * @return {@code true} when the legacy path no longer exists after the call
    */
   private boolean archiveLegacy(File legacy, String legacyName) {
@@ -293,12 +270,8 @@ public class Configs {
   }
 
   /**
-   * ADR-071 rule 4: migrate a whole config file that has been relocated into a
-   * subdirectory (e.g. {@code logging.yml} -> {@code advanced/logging.yml}). When a
-   * legacy copy is still present at the plugin root, its operator-customized values
-   * are folded into the relocated parser, the legacy file is archived (renamed, not
-   * deleted), and a one-time deprecation warning is logged. A silent relocation that
-   * strands an operator's tuned values is prohibited.
+   * Migrates a whole config file relocated into a subdirectory (ADR-071).
+   * Customized values are folded into the new parser, and the legacy file is archived.
    *
    * @param parser the relocated parser (authoritative new location)
    * @param legacyFileName the legacy root file name to migrate from
@@ -339,23 +312,13 @@ public class Configs {
     }
   }
 
-  // ADR-071 rule 4: split-key migrations (a subset of keys moved out of a file
-  // that itself stays in place, e.g. airBlocks/biomes leaving safety.yml) that
-  // have already fired their one-time deprecation log, keyed by category label.
+  // ADR-071 rule 4: split-key migrations warning latch per category.
   private static final java.util.Set<String> warnedLegacySplitKeys =
       java.util.concurrent.ConcurrentHashMap.newKeySet();
 
   /**
-   * ADR-071 rule 4: migrate a subset of keys that were extracted out of a config
-   * file which itself remains at its original location. Unlike
-   * {@link #migrateLegacyRootConfig}, the legacy source file is <i>not</i>
-   * archived: it still owns the keys that did not move (e.g. {@code safety.yml}
-   * keeps the safety knobs after {@code airBlocks}/{@code unsafeBlocks} and
-   * {@code biomeWhitelist}/{@code biomes} move into {@code advanced/blocks.yml} /
-   * {@code advanced/biomes.yml}). Any value the legacy file still carries for a key
-   * the relocated parser recognizes is folded in (so an operator's customization is
-   * not stranded when the source file is rewritten on its own version bump), then a
-   * one-time deprecation warning is logged per category.
+   * Migrates subset of extracted keys while legacy file remains at original path (ADR-071).
+   * Folds customized values into relocated parser without archiving source file.
    *
    * @param parser the relocated parser (authoritative new location)
    * @param legacySourceFile the file the keys were extracted from (left in place)
@@ -399,18 +362,14 @@ public class Configs {
     }
   }
 
-  /** ADR-071 rule 4: one-time latch for the legacy flat messages.yml deprecation log. */
+  /** ADR-071 rule 4: one-time latch for legacy flat messages.yml deprecation log. */
   private static volatile boolean warnedLegacyFlatMessages = false;
 
   /**
-   * ADR-071 rule 4: migrate a legacy flat {@code messages.yml} (the pre-split
-   * monolithic message file) into the per-concern {@code messages/} files. Each
-   * top-level key is routed to the parser that now owns it (resolved via
-   * {@link Messages#byName(String)}), the affected files are saved, the legacy
-   * file is archived (renamed, not deleted), and a one-time deprecation warning
-   * is logged. No operator loses a tuned string on upgrade.
+   * Migrates legacy flat {@code messages.yml} into {@code messages/} files (ADR-071).
+   * Routes top-level keys to owning parsers, saves files, and archives legacy file.
    *
-   * @param parserMap the freshly-built parser map (message parsers already registered)
+   * @param parserMap parser map with message parsers registered
    */
   void migrateLegacyFlatMessages(Map<Class<?>, ConfigParser<?>> parserMap) {
     File legacy = new File(pluginDirectory, "messages.yml");
@@ -454,23 +413,16 @@ public class Configs {
     }
   }
 
-  // ADR-076 rule 4: MultiConfigParser directory relocations into definitions/ that
-  // have already fired their one-time deprecation log, keyed by the legacy dir name.
+  // ADR-076 rule 4: MultiConfigParser relocations warning latch.
   private static final java.util.Set<String> warnedLegacyMultiDirs =
       java.util.concurrent.ConcurrentHashMap.newKeySet();
 
   /**
-   * ADR-076 rule 4: relocate a legacy top-level {@code MultiConfigParser} folder
-   * (e.g. {@code regions/}) into its new home under {@code definitions/}
-   * (e.g. {@code definitions/regions/}). Every {@code .yml} definition the operator
-   * authored at the legacy location is moved into the new directory (files that already
-   * exist at the target are left untouched, so a re-run is idempotent and never clobbers
-   * a newer copy), the emptied legacy directory is archived (renamed, not deleted), and
-   * a one-time deprecation warning is logged. Runs before the parser is constructed so no
-   * operator-authored definition is stranded on upgrade.
+   * Relocates legacy MultiConfigParser folder (e.g. {@code regions/}) to {@code definitions/} (ADR-076).
+   * Moves {@code .yml} definitions, archives empty legacy directory, and logs deprecation notice.
    *
-   * @param legacyDir the legacy top-level directory name (relative to the plugin dir)
-   * @param newDir the new directory path under {@code definitions/}
+   * @param legacyDir legacy top-level directory name
+   * @param newDir new directory path under {@code definitions/}
    */
   void migrateLegacyMultiDir(String legacyDir, String newDir) {
     File legacy = new File(pluginDirectory, legacyDir);
@@ -907,7 +859,7 @@ public class Configs {
       String name = settings.name();
       regionCount++;
 
-      // Detect "dormant region" — the configured world wasn't loaded yet (common when
+      // Detect "dormant region" - the configured world wasn't loaded yet (common when
       // automatic world generators like Multiverse load their worlds after plugin enable).
       // The region is constructed with a null world; OnWorldLoadUnload rebinds the real
       // world via Region.rebindWorld once WorldLoadEvent fires.
@@ -940,7 +892,7 @@ public class Configs {
                       new RTPRunnable(
                               () -> {
                                 // Dormant regions (world not yet loaded) must not select a
-                                // shape region — the shape's data file hasn't been loaded.
+                                // shape region - the shape's data file hasn't been loaded.
                                 if (region.getWorld() == null) {
                                   RTP.log(Level.FINER,
                                       "[RTP] reloadRegions(): skipping shape.select for dormant region '"

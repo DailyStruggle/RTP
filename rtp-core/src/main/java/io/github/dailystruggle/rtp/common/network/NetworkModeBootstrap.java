@@ -25,34 +25,14 @@ import java.time.Duration;
 import java.util.logging.Level;
 
 /**
- * Self-contained backend-side network-mode bootstrap. Called once from
- * {@code RTPBukkitPlugin.onEnable} after the database is set up; mirror call
- * in {@code onDisable} via {@link #shutdown()}. Keeps the network-mode
- * lifecycle out of {@code RTPBukkitPlugin}'s already-large {@code onEnable}.
- *
- * <p>Strict REQ-RTP-NET-002 (Behavioural Parity When Disabled): when
- * {@code network.enabled: false} (the default), {@link #boot(File)}
- * does nothing observable except read-and-discard the file. No transport
- * opens, no scheduler starts, no DDL runs.</p>
- *
- * <p>Pinned by rtp-proxy-ADR-011 §Backend Wiring. Holds the live
- * {@link NetworkTransport} + {@link BackendStatePublisher} for the lifetime
- * of the plugin; both are released in reverse order on {@link #shutdown()}.</p>
+ * Backend network-mode bootstrap. Manages lifecycle of network transport,
+ * backend state publisher, and router hooks across plugin enable/disable.
  */
 public final class NetworkModeBootstrap {
 
     /**
      * Most-recently-booted instance, or {@code null} when network mode is
-     * disabled / not yet booted / has been shut down. Set as a side effect
-     * of a successful {@link #boot(File)} that reaches command-hook wiring,
-     * cleared by {@link #shutdown()}. Read by callers outside the bootstrap
-     * (e.g. {@code RTPCmdBukkit}'s {@code RegionParameter} validator) that
-     * need the live {@link PeerRegionRegistry} but cannot hold a direct
-     * field reference because they were constructed before the bootstrap
-     * finished. Volatile so the publish happens-before relationship is
-     * tight.
-     *
-     * @since rtp-proxy-ADR-014
+     * disabled, unbooted, or shut down.
      */
     public static volatile NetworkModeBootstrap LIVE;
 
@@ -95,47 +75,21 @@ public final class NetworkModeBootstrap {
      */
     private LobbyDispatchRetryQueue lobbyRetryQueue;
 
-    // Snapshot refresher (fix 2026-05-21): NetworkTransport.readSnapshot() is
-    // async (Redis SCAN, SQL poll, etc.) and the previous suppliers used
-    // future.getNow(null), which returns null on the calling thread until
-    // the async completes. That meant PeerRegionRegistry.peerEntries() and
-    // NetworkRouter's snapshot lookup almost always observed a null snapshot,
-    // so tab-completion never surfaced peer 'server:region' entries even
-    // though heartbeats were landing in Redis correctly. We now refresh a
-    // volatile cached snapshot on a small dedicated scheduler at the same
-    // cadence as the heartbeat publisher; both suppliers read the cache
-    // synchronously without blocking the calling thread.
+    // Periodically refreshes cachedSnapshot asynchronously to avoid blocking callers.
     private volatile NetworkSnapshot cachedSnapshot;
     // Platform-scheduler task handle for the periodic snapshot refresh.
-    // Stored so shutdown() can cancel via RTP.scheduler.cancelTask.
     private Object snapshotRefreshTask;
-    // When transport.type=auto resolves to the plugin-message
-    // tier, the auto-detect state machine is stored here so boot() can pump it
-    // (tick + carrier-availability re-probe) on RTP.scheduler and shutdown()
-    // can cancel the pump. Null for every other transport.type.
+    // Auto-detect state machine when transport.type=auto.
     private io.github.dailystruggle.rtp.common.network.pluginmessage.ProxyAutoDetector autoDetector;
-    // The bridge shared by the auto-detector and the plugin-message binding;
-    // retained so the pump can check carrier availability without building a
-    // second bridge (which would re-register the channel/listener).
+    // Bridge shared by auto-detector and plugin-message binding.
     private io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge autoDetectorBridge;
     // Platform-scheduler task handle for the periodic auto-detector pump.
     private Object autoDetectorTask;
 
     /**
-     * Run boot logic. Idempotent for the disabled-mode path; calling
-     * {@link #boot(File)} twice with {@code enabled:false} is a no-op.
-     * Calling {@code boot} twice with {@code enabled:true} is undefined -
-     * the host (RTPBukkitPlugin) only invokes once per lifecycle.
+     * Run boot logic. Idempotent when disabled.
      *
-     * <p>L2 of {@code CHECKLIST-cross-server-rtp.md}: when the transport
-     * opens successfully the host should call {@link #registerJoinTriggerSource()}
-     * after platform startup so cross-server arrivals are redeemed at
-     * player-join time. The bootstrap stores the resolved serverId for that
-     * follow-up call.</p>
-     *
-     * @param networkYml the {@code network.yml} file under the plugin's
-     *                   data folder; may be absent (treated as
-     *                   {@code enabled:false})
+     * @param networkYml the {@code network.yml} file under the plugin's data folder
      */
     public void boot(File networkYml) {
         // REQ-RTP-NET-002 fast-exit: file absent => disabled, byte-identical no-op.
@@ -220,7 +174,7 @@ public final class NetworkModeBootstrap {
         }
         if (selected == null) return;
 
-        // Install on the SQL accessor (D3 slot) so any future consumer of
+        // Install on the SQL accessor so any future consumer of
         // RTP.serverAccessor.getDatabaseAccessor()...getNetworkStateBinding()
         // sees the active binding without needing to hop through this helper.
         try {
@@ -267,15 +221,7 @@ public final class NetworkModeBootstrap {
         BackendStatePublisher pub = new BackendStatePublisher(selected, sampler, serverId, intervalMs);
         pub.start();
 
-        // Fix 2026-05-21: start the cached-snapshot refresher BEFORE wiring
-        // PeerRegionRegistry / NetworkRouter so the first tab-complete call
-        // already has a non-null snapshot to read (modulo the initial
-        // intervalMs delay before the first refresh tick lands). Kicks off
-        // an initial async refresh immediately so we are not waiting a full
-        // intervalMs for the first cache fill.
-        // Use RTP.scheduler (Folia-safe async path) instead of a raw
-        // ScheduledExecutorService. Period is converted from ms to server
-        // ticks (1 tick == 50 ms), clamped to >=1 tick.
+        // Refresh cached snapshot periodically via async scheduler.
         final NetworkTransport refresherTransport = selected;
         Runnable refresh = () -> {
             try {
@@ -292,18 +238,7 @@ public final class NetworkModeBootstrap {
         this.snapshotRefreshTask =
                 RTP.scheduler.runTaskTimerAsynchronously(refresh, refreshTicks, refreshTicks);
 
-        // Pump the auto-detect state machine for
-        // transport.type=auto on the plugin-message tier. The detector is
-        // platform-neutral and starts no threads itself (guideline Scheduler
-        // Usage); we drive it from RTP.scheduler. Each pulse:
-        //   - drives onCarrierAvailable() once a carrier player exists (this
-        //     fires the active GetServer/GetServers handshake from ARMED, and
-        //     re-probes from DISABLED so a server later attached to a proxy
-        //     picks the network up without a restart - decision §9.5), and
-        //   - calls tick() to time out an over-due handshake back to standalone.
-        // The plugin-message binding gossips only when a carrier is online
-        // regardless of detector state, so this pump adds topology discovery
-        // and the re-probe lifecycle on top of an already-functional tier.
+        // Periodically pump auto-detect state machine for transport.type=auto.
         final io.github.dailystruggle.rtp.common.network.pluginmessage.ProxyAutoDetector detector =
                 this.autoDetector;
         final io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge probeBridge =
@@ -340,19 +275,18 @@ public final class NetworkModeBootstrap {
         this.transport = selected;
         this.publisher = pub;
         this.reservationReaper = reaper;
-        // L2: prepare the join-time redeem listener. Actual Bukkit listener
+        // Prepare the join-time redeem listener. Actual Bukkit listener
         // registration is deferred to registerJoinTriggerSource(Plugin) so
         // RTPBukkitPlugin can register us alongside its other listeners.
-        // proxy-direct is now a remote view of the proxy store (PROPOSAL-
-        // proxy-direct-as-remote-store): the standard JoinTriggerSource reads
-        // the reservation via findReservation/redeem RPC, so no dedicated
-        // proxy-direct arrival listener is needed.
+        // proxy-direct is a remote view of the proxy store: the standard
+        // JoinTriggerSource reads the reservation via findReservation/redeem
+        // RPC, so no dedicated proxy-direct arrival listener is needed.
         this.joinTriggerSource = new JoinTriggerSource(selected, serverId);
 
         // Wire router + enrolment buffer + status cache.
         // Until then the buffer's flushSink is a no-op and the cache's
         // supplier returns an empty Collection, so the timers spin but do
-        // not move any cross-server traffic - matching D2 (routing.mode=local).
+        // not move any cross-server traffic - matching routing.mode=local.
         try {
             RtpYamlSection routing = cfg.getConfigurationSection("routing");
             String modeRaw = routing == null ? "local" : routing.getString("mode", "local");
@@ -387,9 +321,8 @@ public final class NetworkModeBootstrap {
                                 + ": " + t.getMessage() + " - cross-server enrolment stays disabled.", t);
                 rq = null;
             }
-            // proxy-direct (PROPOSAL-proxy-direct-as-remote-store): the
-            // backend's request queue is a thin RPC client of the proxy's
-            // in-memory queue, riding the same outbound socket as the
+            // proxy-direct: the backend's request queue is a thin RPC client
+            // of the proxy's in-memory queue, riding the same outbound socket as the
             // transport. openRequestQueue returns null for this tier, so build
             // the remote client here from the already-open
             // ProxyDirectNetworkBinding. The standard qref!=null flush/poll
@@ -443,7 +376,7 @@ public final class NetworkModeBootstrap {
                 // status poll can ask the queue specifically about "my"
                 // players. The buffer doesn't expose a UUID listing
                 // directly; reading from the existing statusCache snapshot
-                // is the cheapest available stand-in until E2 lands a real
+                // is the cheapest available stand-in until there is a real
                 // local-enrolment ledger.
                 java.util.function.Supplier<java.util.List<java.util.UUID>> knownIds = () -> {
                     if (this.statusCache == null) return java.util.Collections.emptyList();
@@ -504,31 +437,9 @@ public final class NetworkModeBootstrap {
             this.enrolmentBuffer.start(flushTicks);
             this.statusCache.start(pollTicks);
 
-            // Cross-server terminal-state release of the local
-            // processingPlayers lock. The lock is acquired by RTPCmd.onCommand
-            // on every /rtp and intentionally RETAINED by the CrossServer
-            // branch (anti-spam: prevents the player re-enrolling on every
-            // keystroke). It is therefore the job of the lobby to release
-            // the lock once the proxy reports COMPLETED / FAILED / CANCELLED
-            // or stops reporting the row entirely (eviction). Without this
-            // release the player gets a one-shot "queued" message and is
-            // then permanently in the alreadyTeleporting state until they
-            // disconnect - which is exactly the symptom this hook fixes.
-            // Also clears any LobbyDispatchRetryQueue entry for the player
-            // (defence in depth; the retry queue normally clears itself on
-            // enrolment).
+            // Release local processing lock on terminal queue state transitions.
             this.statusCache.setTerminalListener((uuid, terminalState) -> {
-                // Stuck-after-enrolment auto-retry: when the proxy never
-                // produces a terminal transition the sticky-TTL in
-                // NetworkStatusCache fires terminalState=FAILED. If we
-                // remembered the player's original /rtp args on the
-                // retry queue (recordEnrolment from the hook), re-park
-                // them for a fresh retry pulse INSTEAD of releasing the
-                // lock. For genuine terminal transitions (COMPLETED,
-                // supplier-confirmed FAILED/CANCELLED, eviction), we
-                // clear the recorded enrolment and release the lock as
-                // before. This is the user-approved retry mechanism for
-                // the "queue position 0 forever" symptom.
+                // On FAILED, attempt re-parking on retry queue if configured.
                 boolean reparked = false;
                 if (this.lobbyRetryQueue != null
                         && terminalState == NetworkStatusCache.QueueStatus.State.FAILED) {
@@ -539,33 +450,19 @@ public final class NetworkModeBootstrap {
                     }
                 }
                 if (reparked) {
-                    // Re-seed the sticky row so anti-spam guards still
-                    // see the player as non-terminal during the retry
-                    // pulse. The next pulse will either re-enrol (new
-                    // sticky window starts) or terminate via attempts/
-                    // TTL bounds inside the retry queue.
                     try { this.statusCache.seedLocal(uuid); } catch (Throwable ignored) {}
                     return;
                 }
                 try {
                     RTP.getInstance().processingPlayers.remove(uuid);
                 } catch (Throwable ignored) {
-                    // RTP.getInstance() should never be null here, but the
-                    // listener must never propagate.
                 }
                 if (this.lobbyRetryQueue != null) {
                     try { this.lobbyRetryQueue.cancel(uuid, null); } catch (Throwable ignored) {}
                 }
             });
 
-            // ADR-015 / REQ-RTP-NET-015: waitlist UX.
-            // Knobs live under network.waitlist.* with conservative defaults:
-            //   notifyIntervalSeconds: 5  (min re-notify gap per UUID)
-            // The notifier pulse uses the same pollIntervalMs as the status
-            // cache so we never notify ahead of a position change. The
-            // guard + quitListener are no-ops when the cache is empty, so
-            // they cost nothing on single-server installs that still go
-            // through this code path (network.enabled is already true here).
+            // Waitlist notifier and guard UX setup.
             RtpYamlSection waitlistSec = cfg.getConfigurationSection("network.waitlist");
             long notifyIntervalMs = waitlistSec == null
                     ? 5_000L
@@ -574,13 +471,7 @@ public final class NetworkModeBootstrap {
             this.waitlistNotifier.start(pollTicks);
             this.waitlistGuard = new NetworkWaitlistGuard(this.statusCache);
 
-            // Lobby auto-retry queue. Instantiated BEFORE
-            // the quit listener (so disconnect can clear the parked
-            // entry) and BEFORE the command hook (so transient
-            // LocalFallbacks park instead of falling through to a dead
-            // local pipeline). Lobby-only by design - on a normal
-            // backend the local pipeline can genuinely serve /rtp, so
-            // the prior graceful-degradation behaviour is preserved.
+            // Lobby auto-retry queue.
             if (lobbyMode) {
                 this.lobbyRetryQueue = new LobbyDispatchRetryQueue(
                         this.router, this.enrolmentBuffer);
@@ -591,19 +482,7 @@ public final class NetworkModeBootstrap {
                 this.waitlistQuitListener = new NetworkWaitlistQuitListener(rq, this.lobbyRetryQueue);
             }
 
-            // rtp-proxy-ADR-014: install the cross-server
-            // command hook into RTP.networkCommandHook so /rtp consults
-            // the router on every invocation. The hook also drives
-            // RegionParameter's extras supplier (the snapshot-adapter
-            // PeerRegionRegistry) so tab-completion lists peer-qualified
-            // server:region entries.
-            // Parse the operator-tuned loadBalancer scoring table from
-            // network.yml so PeerRegionRegistry.pickMostKept() and the
-            // proxy-side selector share one curves/weights definition
-            // (rtp-proxy-ADR-004 *Region-Pair Scoring*). Malformed config
-            // degrades to LoadBalancerConfig.defaults() with a WARNING
-            // rather than disabling lobby mode - the bundled defaults
-            // already produce the prior "most-kept wins" behaviour.
+            // Install cross-server command hook and load balancer config.
             LoadBalancerConfig loadBalancerConfig;
             try {
                 RtpYamlSection lbSec = cfg.getConfigurationSection("loadBalancer");
@@ -624,56 +503,23 @@ public final class NetworkModeBootstrap {
                     () -> this.cachedSnapshot,
                     serverId,
                     loadBalancerConfig);
-            // Option 1 (plugin-message tier): seed cross-server destinations
-            // from the proxy's GetServers topology that the `auto` resolver
-            // discovers. On the DB-free transport a single player cannot carry
-            // heartbeat gossip off a player-empty backend, so the snapshot is
-            // often empty even though the proxy knows every backend; feeding
-            // the discovered server list lets /rtp suggest and accept
-            // `server:region` destinations (availability UNKNOWN -> the
-            // destination decides on arrival). Durable Redis/SQL tiers leave
-            // the detector null and rely purely on heartbeats.
+            // Topology supplier: seed discovered peer servers.
             this.peerRegionRegistry.setTopologyPeerSupplier(() -> {
                 io.github.dailystruggle.rtp.common.network.pluginmessage.ProxyAutoDetector d =
                         this.autoDetector;
                 return d == null ? java.util.Set.of() : d.peerServerIds();
             });
-            // Pass lobbyMode through so a no-arg /rtp on a
-            // lobby backend auto-routes to the "most kept" remote region.
-            // Pass the backend state publisher so
-            // cross-server dispatches force an immediate heartbeat publish
-            // (propagating the local PeerRegionRegistry.recordDispatch
-            // decrement to peers before the next 1s tick).
-            // Pass the LobbyDispatchRetryQueue so transient
-            // LocalFallbacks (NETWORK_DISABLED / NO_LIVE_PEER /
-            // QUEUE_FULL / TOKEN_BUCKET_EXHAUSTED) park the player on
-            // the local retry pulse instead of silently falling through
-            // to a dead local pipeline.
+            // Wire BukkitNetworkCommandHook with lobby and retry parameters.
             this.commandHook = new BukkitNetworkCommandHook(
                     this.router, this.enrolmentBuffer,
                     this.peerRegionRegistry, lobbyMode,
                     this.publisher, this.lobbyRetryQueue);
-            // Wire the enrolment seeder so real cross-server enrolments
-            // pre-seed a sticky QUEUED row in the status cache. This is
-            // what guarantees the lobby observes a non-terminal -> terminal
-            // (or sticky-TTL expiration) transition for every enrolled
-            // player, which in turn releases the processingPlayers lock.
-            // Without this seeding, a never-responding proxy leaves the
-            // player locked until disconnect.
+            // Pre-seed sticky queued row on cross-server enrolment.
             this.commandHook.setEnrolmentSeeder(this.statusCache::seedLocal);
             RTP.networkCommandHook = this.commandHook;
-            // Publish self so RTPCmdBukkit's RegionParameter validator and
-            // extras supplier can pick up the live PeerRegionRegistry at
-            // call time. Single-process / single-bootstrap invariant: only
-            // one live instance per JVM (the static field is volatile so
-            // the publish happens-before any subsequent read).
             LIVE = this;
 
-            // C3 (D6 C-warn): one-shot startup audit. The transport may not
-            // have assembled a non-empty snapshot yet; in that case the
-            // helper logs nothing now and a future heartbeat cycle will
-            // expose any overlap on the next operator invocation of
-            // /rtp test network. (A scheduled re-audit is a deferred follow-up.)
+            // One-shot region collision audit on boot.
             try {
                 NetworkSnapshot bootSnap = selected.readSnapshot()
                         .get(2000L, java.util.concurrent.TimeUnit.MILLISECONDS);
@@ -684,10 +530,7 @@ public final class NetworkModeBootstrap {
                         "[RTP] region-collision boot audit skipped: " + warnFail.getMessage());
             }
         } catch (Throwable t) {
-            // C7: wiring is best-effort; if it fails we still leave the
-            // transport / publisher / reaper / joinTriggerSource installed
-            // so cross-server arrivals still redeem. Router-less means
-            // /rtp stays purely local, which is the D2 default anyway.
+            // Degrade gracefully on wiring failure: keep local pipeline active.
             RTP.log(Level.WARNING,
                     "[RTP] router / enrolment buffer / status cache wiring failed: "
                             + t.getMessage() + " - /rtp stays local for this lifecycle.", t);
@@ -698,7 +541,6 @@ public final class NetworkModeBootstrap {
             this.waitlistGuard = null;
             this.waitlistQuitListener = null;
             if (this.statusCache != null) { try { this.statusCache.shutdown(); } catch (Throwable ignored) {} this.statusCache = null; }
-            // H2: unwind the hook so single-server pipeline is restored.
             if (RTP.networkCommandHook == this.commandHook) {
                 RTP.networkCommandHook = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
             }
@@ -707,18 +549,7 @@ public final class NetworkModeBootstrap {
             if (LIVE == this) LIVE = null;
         }
 
-        // One-shot boot reconcile (per
-        // sub-scope "skip steady-state pulse, do startup reconcile only"):
-        // ask the transport for every active reservation (PENDING/CLAIMED,
-        // expiresAtMs > now) owned by this backend's serverId and try to
-        // repopulate networkReservedLocations so a cross-server arrival
-        // mid-restart still finds its earmarked coord on join. On a region
-        // miss we release the token with BACKEND_REJECTED so the proxy
-        // stops counting the slot under networkReservedCount and the
-        // reaper can recycle it. Failures here are non-fatal: the proxy
-        // still owns the canonical reservation table and a missed
-        // reconcile only degrades to "local pipeline serves the joining
-        // player a fresh coord", which is the L2 baseline behaviour.
+        // Reconcile active network reservations on boot.
         try {
             reconcileNetworkReservations(selected, serverId);
         } catch (Throwable reconcileFail) {
@@ -916,15 +747,7 @@ public final class NetworkModeBootstrap {
     public BukkitNetworkCommandHook commandHook() { return commandHook; }
 
     /**
-     * Open a {@link NetworkRequestQueue} matching the
-     * configured transport kind. {@code in-memory}, {@code sql},
-     * and {@code redis} are all wired. The static factory
-     * {@link io.github.dailystruggle.rtp.proxy.common.transport.NetworkBindings#openRequestQueue}
-     * is the canonical entry point for vendor-free callers; this local
-     * helper mirrors its dispatch but sources connection settings from
-     * the backend's {@code network.yml} {@code transport} section (the
-     * same one {@link #openTransport} reads) so a single config drives
-     * both the state binding and the request queue.
+     * Open a {@link NetworkRequestQueue} matching the configured transport kind.
      */
     private static NetworkRequestQueue openRequestQueue(String transportType, RtpYamlSection transportSec) {
         String t = transportType == null ? "in-memory"
@@ -984,25 +807,7 @@ public final class NetworkModeBootstrap {
     }
 
     /**
-     * One-shot boot reconcile. Lists every active
-     * reservation token owned by this backend's {@code serverId} from the
-     * shared store, then for each token tries every known region (perm +
-     * temp) until {@link io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager#reserveFromNetworkKept}
-     * returns a non-null coordinate. On a region miss the token is released
-     * with {@link io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason#BACKEND_REJECTED}
-     * so the proxy stops counting the slot under {@code networkReservedCount}.
-     *
-     * <p>Per user-confirmed F1 sub-scope (2026-05-21): no steady-state
-     * polling timer. This single pass at boot covers the only case the
-     * polling pulse would have covered - a backend restarted while a
-     * reservation was outstanding on the shared store but missing from
-     * its in-memory {@code networkReservedLocations} map. The hot path
-     * (proxy claims -> player joins -> {@code JoinTriggerSource.onRedeemed}
-     * drives F2 redeem) covers steady-state correctness without a pulse.
-     *
-     * <p>Async, non-blocking: the future completes on the transport's
-     * executor and is logged at WARNING on failure (S-004). Boot does NOT
-     * wait for it; a slow shared store cannot stall the plugin start-up.
+     * One-shot boot reconcile for active reservations owned by this backend.
      */
     static void reconcileNetworkReservations(NetworkTransport transport, String serverId) {
         if (transport == null || serverId == null || serverId.isEmpty()) return;
@@ -1140,11 +945,10 @@ public final class NetworkModeBootstrap {
             }
             case "proxy-cache":
             case "proxycache": {
-                // Tier-1, DB-free "proxy is the database" transport
-                // (PROPOSAL-proxy-as-availability-store). Backends push their
-                // heartbeat to the proxy companion's in-memory cache and pull
-                // the cached snapshot back; converges without player presence
-                // on the peer side (unlike backend-to-backend gossip).
+                // Tier-1, DB-free "proxy is the database" transport. Backends
+                // push their heartbeat to the proxy companion's in-memory cache
+                // and pull the cached snapshot back; converges without player
+                // presence on the peer side (unlike backend-to-backend gossip).
                 io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge bridge =
                         openNetworkBridgeOrNull();
                 if (bridge == null) {
@@ -1156,15 +960,7 @@ public final class NetworkModeBootstrap {
                         .ProxyCacheNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis);
             }
             case "auto": {
-                // Proxy auto-detect: build the detector and
-                // run its cheap passive evaluation. When the bridge is absent
-                // or the passive proxy-forwarding probe is disarmed we resolve
-                // silently to disabled (return null -> boot() short-circuits)
-                // so a standalone server prints no warning spam
-                // (rtp-proxy-ADR-016 open item 3). When the probe is armed we
-                // open the plugin-message tier and retain the detector so
-                // boot() can pump it (active GetServer/GetServers handshake +
-                // re-probe on carrier availability) via RTP.scheduler.
+                // Auto-detect proxy transport via passive probe and plugin-message bridge.
                 io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge bridge =
                         openNetworkBridgeOrNull();
                 if (bridge == null || !bridge.isAvailable()) {
@@ -1187,13 +983,7 @@ public final class NetworkModeBootstrap {
                 }
                 this.autoDetector = detector;
                 this.autoDetectorBridge = bridge;
-                // Prefer the proxy-cache tier under auto: it reuses the proxy
-                // companion as the availability store and converges without
-                // peer-side player presence (the backend-to-backend gossip tier
-                // could not). When no companion answers, snapshots stay empty
-                // and the topology seeding (Option 1) still routes default
-                // regions, so this is strictly >= the gossip tier
-                // (PROPOSAL-proxy-as-availability-store Q2: prefer when armed).
+                // Proxy-cache binding under auto mode.
                 return new io.github.dailystruggle.rtp.common.network.pluginmessage
                         .ProxyCacheNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis);
             }
@@ -1230,7 +1020,7 @@ public final class NetworkModeBootstrap {
             }
             case "sql": {
                 // Reuse the existing AbstractSQLDatabaseAccessor pool via asDataSource()
-                // - REQ-RTP-PROXY-COMMON-010 / ADR-011 §HikariCP Pool Sharing (Q2).
+                // - REQ-RTP-PROXY-COMMON-010 / ADR-011 §HikariCP Pool Sharing.
                 AbstractSQLDatabaseAccessor accessor = sqlAccessorOrNull();
                 if (accessor == null) {
                     throw new IllegalStateException(
@@ -1264,10 +1054,8 @@ public final class NetworkModeBootstrap {
     }
 
     /**
-     * Resolve the platform-installed plugin-message {@link io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge}
-     * via {@link RTP#networkBridgeFactory}, or {@code null} when no platform
-     * installed one (single-server / unsupported platform). Defensive: a
-     * throwing factory degrades to {@code null} rather than aborting boot.
+     * Resolve the platform-installed {@link io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge}
+     * via {@link RTP#networkBridgeFactory}, or {@code null} if unsupported.
      */
     private static io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge openNetworkBridgeOrNull() {
         try {
@@ -1296,24 +1084,10 @@ public final class NetworkModeBootstrap {
     }
 
     /**
-     * Read {@code routing.lobbyMode} from {@code network.yml}
-     * without booting anything else. Called by the host plugin (e.g.
-     * {@code RTPBukkitPlugin.onEnable}) BEFORE
-     * {@code BukkitDatabaseHandler#setupDatabase}
-     * (which constructs {@code Region} instances and would otherwise schedule
-     * pre-fill / hydrate work). The host writes the result to
-     * {@link RTP#lobbyMode} so the gates in {@code Region} are armed before
-     * any region is built.
+     * Read {@code routing.lobbyMode} from {@code network.yml} early.
      *
-     * <p>Strictly defensive: any failure (missing file, malformed YAML,
-     * {@code network.enabled=false}, missing {@code routing} section) returns
-     * {@code false}. Single-server deployments and network-disabled backends
-     * therefore behave byte-identically to non-lobby builds.
-     *
-     * @param networkYml the {@code network.yml} file under the plugin's data
-     *                   folder; may be {@code null} or absent
-     * @return {@code true} iff {@code network.enabled=true} AND
-     *         {@code routing.lobbyMode=true}
+     * @param networkYml the {@code network.yml} file under the plugin's data folder
+     * @return {@code true} iff {@code network.enabled=true} AND {@code routing.lobbyMode=true}
      */
     public static boolean readLobbyModeEarly(File networkYml) {
         if (networkYml == null || !networkYml.isFile()) return false;
@@ -1338,20 +1112,7 @@ public final class NetworkModeBootstrap {
     private static volatile boolean warnedLegacyNetworkYml = false;
 
     /**
-     * Ensure the backend's network config exists at {@code advanced/network.yml}
-     * under the plugin data folder, returning that file.
-     *
-     * <p>ADR-071 relocates this advanced-tuning file from the plugin root into the
-     * deliberate {@code advanced/} tier. The resolution order is:
-     * <ol>
-     *   <li>If {@code advanced/network.yml} already exists, use it.</li>
-     *   <li>Otherwise, if a legacy root {@code network.yml} exists (a pre-ADR-071
-     *       install), move the operator's file into {@code advanced/} verbatim and
-     *       log a one-time deprecation warning. A silent relocation that strands an
-     *       operator's tuned transport settings is prohibited (rule 4).</li>
-     *   <li>Otherwise, extract the bundled {@code advanced/network.yml} resource.</li>
-     * </ol>
-     * Idempotent.
+     * Ensure the backend's network config exists at {@code advanced/network.yml}.
      */
     public static File ensureNetworkYml(File pluginDataFolder, Class<?> resourceOwner) {
         File target = new File(pluginDataFolder, "advanced" + File.separator + "network.yml");

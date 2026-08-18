@@ -140,7 +140,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         ServerPlayer p = handle;
         if (p == null) return false;
         if (permission == null || permission.isEmpty()) return true;
-        // N2.5: PRIMARY — consult LuckPerms (if present) FIRST so explicit
+        // N2.5: PRIMARY - consult LuckPerms (if present) FIRST so explicit
         // grants and denials win over the plugin.yml defaults and the op-level
         // check. The reflective enumerator routes through LuckPerms' cached
         // permission data (wildcard- and inheritance-aware) and degrades to a

@@ -13,46 +13,29 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 /**
- * Biome-first menu source (ADR-063). Computes, from the per-region
- * {@code MemoryShape.getObservedBiomes()} spatial memory, the set of biomes a
- * player can actually be teleported to and, for each, the region that offers
- * it best. This backs both the menu biome picker
- * ({@code BiomeParameter.relevantValues}) and the auto-region-by-biome
- * resolution in {@code RTPCmd}, keeping CLI and menu in parity.
+ * Biome-first menu source (ADR-063).
  *
- * <p>All reads are chunk-I/O-free (REQ-RTP-S-005): the observed-biome data is
- * populated only by the pipeline / background sampler, never by opening the
- * menu. The biome identifiers returned are canonical (uppercase,
- * vanilla-namespace stripped), matching {@link BiomeNames#canonical(String)}.
+ * <p>Computes accessible biomes and optimal target regions from per-region
+ * {@code MemoryShape.getObservedBiomes()} spatial memory. Chunk-I/O-free (REQ-RTP-S-005).
  */
 public final class BiomeMenuSource {
 
     private BiomeMenuSource() {}
 
     /**
-     * Union of canonical biome identifiers observed across every region the
-     * {@code senderId} can access. Empty before the background sampler has
-     * observed any biome in an accessible region (cold-data state), in which
-     * case the front-page biome row hides via the existing
-     * {@code parameterHasSuggestions} gating.
+     * Returns union of canonical biome identifiers observed across accessible regions.
      *
-     * @param senderId command sender id (may be {@code null} for console)
-     * @return sorted, possibly-empty set of canonical biome names
+     * @param senderId command sender id (or {@code null} for console)
+     * @return sorted set of canonical biome names
      */
     public static Set<String> observedBiomes(UUID senderId) {
         return new TreeSet<>(bestRegionByBiome(senderId).keySet());
     }
 
     /**
-     * Maps each accessible, observed canonical biome name to the region that
-     * offers it best. "Best" prefers the region with the strongest observation
-     * (largest recorded per-biome run count); ties break on region name for
-     * determinism. The accessible-region set mirrors
-     * {@code RTPAPI.getAllowedTargets} gating: a region with
-     * {@code requirePermission} is included only when the sender holds
-     * {@code rtp.regions.<name>}.
+     * Maps each accessible observed biome to the region offering the highest observation count.
      *
-     * @param senderId command sender id (may be {@code null} for console)
+     * @param senderId command sender id (or {@code null} for console)
      * @return sorted map of canonical biome name to best region name
      */
     public static Map<String, String> bestRegionByBiome(UUID senderId) {
@@ -100,16 +83,12 @@ public final class BiomeMenuSource {
     }
 
     /**
-     * Resolves the best accessible region offering {@code biome}, preferring
-     * {@code preferredRegion} when it has itself observed the biome (so callers
-     * can preserve existing world-default behavior where it already works).
+     * Resolves the best accessible region offering {@code biome}, checking {@code preferredRegion} first.
      *
-     * @param senderId        command sender id (may be {@code null})
-     * @param biome           requested biome (any namespace/case form)
-     * @param preferredRegion region to keep if it already observes the biome,
-     *                        or {@code null} for no preference
-     * @return region name to use, or {@code null} when no accessible region has
-     *         observed the biome
+     * @param senderId        command sender id (or {@code null})
+     * @param biome           requested biome
+     * @param preferredRegion region to keep if it already contains the biome, or {@code null}
+     * @return region name, or {@code null} if unobserved in accessible regions
      */
     public static String bestRegionForBiome(UUID senderId, String biome, String preferredRegion) {
         if (biome == null) return null;
@@ -141,17 +120,10 @@ public final class BiomeMenuSource {
     }
 
     /**
-     * Aggregated per-biome observation counts across every region whose world
-     * name matches {@code worldName}. Used to compute a representative
-     * "average biome color" for a world row in the menu (ADR-063 follow-up:
-     * world rows are colored by the biomes in those worlds). Chunk-I/O-free:
-     * reads only persisted spatial memory. Empty before the background sampler
-     * has observed any biome in the world (cold-data state), in which case the
-     * caller falls back to a neutral row color.
+     * Aggregates per-biome observation counts across regions matching {@code worldName}.
      *
-     * @param worldName world name (as returned by {@code RTPWorld.name()})
-     * @return map of canonical biome name to total observation count, possibly
-     *         empty; never {@code null}
+     * @param worldName world name (from {@code RTPWorld.name()})
+     * @return map of canonical biome name to total observation count
      */
     public static Map<String, Long> biomeWeightsForWorld(String worldName) {
         Map<String, Long> weights = new TreeMap<>();
@@ -187,16 +159,10 @@ public final class BiomeMenuSource {
     }
 
     /**
-     * Per-biome observation counts for a single region, used to compute a
-     * representative "average biome color" for a region row in the menu
-     * (the colors that would appear on that region's map). Chunk-I/O-free:
-     * reads only persisted spatial memory. Empty before the background
-     * sampler has observed any biome in the region (cold-data state), in
-     * which case the caller falls back to a neutral row color.
+     * Computes per-biome observation counts for a single region.
      *
-     * @param regionName region name (as returned by {@code Region} keys)
-     * @return map of canonical biome name to total observation count, possibly
-     *         empty; never {@code null}
+     * @param regionName region name
+     * @return map of canonical biome name to total observation count
      */
     public static Map<String, Long> biomeWeightsForRegion(String regionName) {
         Map<String, Long> weights = new TreeMap<>();

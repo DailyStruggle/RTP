@@ -14,7 +14,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Read-only Anvil pre-filter (ADR-016 Phase 3a). Off-tick parses {@code r.X.Z.mca}
+ * Read-only Anvil pre-filter (ADR-016). Off-tick parses {@code r.X.Z.mca}
  * to reject candidates whose on-disk surface stack hits the caller's unsafe set;
  * all other outcomes ({@link Verdict#ACCEPT} / {@link Verdict#UNKNOWN}) fall through
  * to the live chunk load, where {@code RTPChunk.isSafe(...)} remains authoritative.
@@ -95,7 +95,7 @@ public final class AnvilPrefilter {
    * {@link AnvilChunkView} that the verdict was computed from.
    *
    * <p>Under ADR-016, the view is attached on both {@link Verdict#ACCEPT} and
-   * {@link Verdict#REJECT} — the verdict becomes an advisory telemetry signal
+   * {@link Verdict#REJECT} - the verdict becomes an advisory telemetry signal
    * and the view is the actual load-free source for a subsequent Anvil-backed
    * {@code BukkitRTPChunk} (ADR-016). The view is {@code null} only when no
    * decode was possible (missing region file, unsupported DataVersion, parse
@@ -108,14 +108,14 @@ public final class AnvilPrefilter {
   public record ProbeResult(Verdict verdict, AnvilChunkView view) {}
 
   /**
-   * ADR-016 Phase 3b: asynchronously probe a chunk and return both the verdict and the
+   * Asynchronously probe a chunk and return both the verdict and the
    * decoded {@link AnvilChunkView} (on ACCEPT). Callers that want only the verdict
    * use {@link #probeSync(Path, String, int, int, Set)}; callers that want the
    * load-free chunk source use this entry point.
    *
    * <p>On {@link Verdict#REJECT} or {@link Verdict#UNKNOWN}, {@link ProbeResult#view()}
    * is {@code null} and the caller falls through to the live-load path. On
-   * {@link Verdict#ACCEPT}, the view is the same one used to compute the verdict —
+   * {@link Verdict#ACCEPT}, the view is the same one used to compute the verdict -
    * reusing it avoids a second region-file read.
    */
   public static CompletableFuture<ProbeResult> probeDetailed(
@@ -181,11 +181,10 @@ public final class AnvilPrefilter {
             worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
       }
-      // PR-10/PR-15 alignment: route region-file reads through AnvilRegionByteCache so
-      // that ScanTask's up-to-50-in-flight probes per region collapse onto a single
-      // shared byte[] (LRU reuse + miss coalescing). Calling Files.readAllBytes directly
-      // here caused 50x transient 2–8 MB allocations on the ForkJoin common pool and
-      // OOM'd the heap (see 2026-04-23 incident on world=.\test chunk=(132,147)).
+      // Route region-file reads through AnvilRegionByteCache so that ScanTask's
+      // up-to-50-in-flight probes per region collapse onto a single shared byte[]
+      // (LRU reuse + miss coalescing). Calling Files.readAllBytes directly here caused
+      // 50x transient 2-8 MB allocations on the ForkJoin common pool and OOM'd the heap.
       byte[] regionBytes = AnvilRegionByteCache.get(regionFile);
       if (regionBytes == null) {
         // Either the file vanished between the isRegularFile check and the cache read,
@@ -200,7 +199,7 @@ public final class AnvilPrefilter {
 
       AnvilReader.ChunkEntry entry = AnvilReader.readChunk(regionBytes, rx, rz);
       if (entry == null) {
-        // Location entry is zeroed — chunk slot unused in this region file.
+        // Location entry is zeroed - chunk slot unused in this region file.
         diagLog("UNKNOWN:empty-location-entry",
             worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
@@ -227,7 +226,7 @@ public final class AnvilPrefilter {
         return new ProbeResult(Verdict.UNKNOWN, null);
       }
       // 2026-04-20 housekeeping: VIEW-DECODED is the happy-path confirmation
-      // that a chunk decoded cleanly. Log at FINE only — the probe outcome
+      // that a chunk decoded cleanly. Log at FINE only - the probe outcome
       // (PUBLISH) already logs at FINE in AnvilProbeSupport, and the
       // `rtp test biome-source` counters (`anvil-hit`) are the authoritative
       // steady-state signal. The UNKNOWN:* diag lines above remain at INFO
@@ -255,12 +254,12 @@ public final class AnvilPrefilter {
       for (int lx = 0; lx < 16; lx++) {
         for (int lz = 0; lz < 16; lz++) {
           int rawHeight = readHeightmapEntry(packedHeightmap, lx, lz);
-          if (rawHeight <= 0) continue; // Empty column — nothing to sample.
+          if (rawHeight <= 0) continue; // Empty column - nothing to sample.
           int groundY = minHeight + rawHeight - 1;
           if (isUnsafe(view, lx, groundY, lz, reconciledUnsafe, r)
               || isUnsafe(view, lx, groundY + 1, lz, reconciledUnsafe, r)
               || isUnsafe(view, lx, groundY + 2, lz, reconciledUnsafe, r)) {
-            // ADR-016: REJECT is now advisory — the view is still returned so the
+            // ADR-016: REJECT is now advisory - the view is still returned so the
             // caller (BukkitRTPWorld.getChunkAt) can mint an Anvil-backed RTPChunk
             // and let the vert adjustor scan below the unsafe surface for a safe Y.
             // The live chunk.isSafe(...) re-check at teleport commit (ADR-016 §4)
@@ -275,7 +274,7 @@ public final class AnvilPrefilter {
       // truncated (e.g. location-table pointer spans past EOF, implausible declared
       // length, region buffer shorter than header). The live load path handles this
       // transparently, so log it at INFO via the same rate-limited diag channel used
-      // for other UNKNOWN:* outcomes — no stacktrace needed.
+      // for other UNKNOWN:* outcomes - no stacktrace needed.
       diagLog("UNKNOWN:corrupt-region-entry(" + e.getMessage() + ")",
           worldFolder, dimensionSubpath, cx, cz);
       return new ProbeResult(Verdict.UNKNOWN, null);

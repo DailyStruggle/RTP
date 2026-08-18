@@ -4,16 +4,13 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Async batch of chunks around a candidate teleport location. Construction wires an
- * {@code allOf} fan-in to {@link #complete}: {@code true} when every chunk future
- * resolves, {@code false} if any completes exceptionally. {@code x}/{@code z} are
- * <em>chunk</em> coordinates (block &gt;&gt; 4) of the centre chunk. Thread-safe.
+ * Async batch of chunks around a candidate teleport location. Thread-safe record.
  *
  * @param world    target world
  * @param x        centre chunk X
  * @param z        centre chunk Z
- * @param chunks   per-chunk load futures (each yields a platform chunk-ticket handle)
- * @param complete single fan-in future ({@code true} = all loaded, {@code false} = any failed)
+ * @param chunks   per-chunk load futures
+ * @param complete fan-in future (true = all loaded, false = failed)
  */
 public record ChunkSet(RTPWorld<?> world, int x, int z, List<CompletableFuture<Long>> chunks, CompletableFuture<Boolean> complete) {
 

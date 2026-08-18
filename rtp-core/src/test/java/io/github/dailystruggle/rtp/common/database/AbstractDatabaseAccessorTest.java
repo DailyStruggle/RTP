@@ -20,7 +20,7 @@ public abstract class AbstractDatabaseAccessorTest {
     protected abstract DatabaseAccessor<?> accessor();
 
     // -------------------------------------------------------------------------
-    // getValue / setValue — in-memory localTables contract
+    // getValue / setValue - in-memory localTables contract
     // -------------------------------------------------------------------------
 
     @Test
@@ -96,7 +96,7 @@ public abstract class AbstractDatabaseAccessorTest {
         try {
             db.cacheValue(null, Map.of("id", "x"));
         } catch (NullPointerException ignored) {
-            // acceptable — null table name is a programming error
+            // acceptable - null table name is a programming error
         }
         // If it didn't throw, the cache must still be empty
         boolean hasNullKey = db.dirtyCache.keySet().stream().anyMatch(k -> k != null && k.startsWith("null:"));

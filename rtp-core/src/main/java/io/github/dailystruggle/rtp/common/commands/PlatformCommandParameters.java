@@ -3,20 +3,7 @@ package io.github.dailystruggle.rtp.common.commands;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 
 /**
- * Platform-supplied source for the two {@code /rtp} command parameters that
- * are genuinely platform-bound: {@code player} and {@code world}.
- *
- * <p>Every other top-level parameter ({@code region}, {@code biome},
- * {@code toggletargetperms}) is platform-agnostic and is constructed once in
- * {@link CoreCommandTreeBuilder}. The {@code player} and {@code world}
- * parameters cannot be: their validation predicate <em>and</em> their
- * tab-complete {@code values()} reach for platform-specific online-player /
- * world enumeration APIs (e.g. {@code Bukkit.getPlayer} /
- * {@code Bukkit.getWorld} on the Bukkit family, the platform server-accessor's
- * online-player snapshot on Fabric / NeoForge). Each platform root supplies
- * its own implementations through this seam so the common builder can wire a
- * byte-for-byte equivalent command tree without leaking platform imports into
- * {@code rtp-core}.</p>
+ * Platform-supplied source for platform-bound command parameters ({@code player} and {@code world}).
  */
 public interface PlatformCommandParameters {
 

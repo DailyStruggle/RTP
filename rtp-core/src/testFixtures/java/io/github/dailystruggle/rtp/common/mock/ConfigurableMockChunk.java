@@ -44,7 +44,7 @@ public class ConfigurableMockChunk extends RTPChunk<Object> {
     }
 
     /**
-     * Mark the given Y-coordinate as a solid but safe block (non-air, safe — e.g. stone floor).
+     * Mark the given Y-coordinate as a solid but safe block (non-air, safe - e.g. stone floor).
      * {@link #isAir} returns {@code false} and {@link #isSafe} returns {@code true} for these.
      *
      * @param y world Y-coordinate to mark solid-safe

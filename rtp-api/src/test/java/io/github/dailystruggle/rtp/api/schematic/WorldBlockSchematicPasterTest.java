@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Surface guard for {@link WorldBlockSchematicPaster} (ADR-058): verifies that its paste
  * plans the decoded schematic into placements, converts them to {@link BlockDelta}s, routes them
  * through {@link RTPWorld#setBlocks(java.util.List)}, and maps the placed count to a
- * {@link PasteResult}. No live world / file I/O — the schematic and world are deterministic doubles.
+ * {@link PasteResult}. No live world / file I/O - the schematic and world are deterministic doubles.
  */
 class WorldBlockSchematicPasterTest {
 

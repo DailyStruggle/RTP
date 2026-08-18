@@ -5,19 +5,10 @@ import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 
 /**
- * Single-binding SPI for the optional Anvil-NBT pre-filter (see ADR-016 and the
- * {@code rtp-anvil} module).
+ * Single-binding SPI for optional Anvil-NBT pre-filter (ADR-016, ADR-026).
  *
- * <p>This registry replaces the historical reflective lookup of
- * {@code io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache} performed by
- * {@code ScanTask}. Modules that ship anvil-style fast pre-filters bind their
- * provider during their own initialisation; consumers in {@code rtp-core} read it
- * via the bound {@link Provider} or fall back to a per-attempt chunk load when
- * unbound (ADR-026).
- *
- * <p><b>Threading.</b> {@link Provider} methods are called from the scan pipeline
- * (off the main thread on Folia) and from per-attempt verification. Implementations
- * shall be thread-safe.
+ * <p>When bound, provides fast NBT-based chunk rejection before chunk loading.
+ * Thread safety: {@link Provider} implementations must be thread-safe.
  */
 @PublicApi
 public interface AnvilPrefilterRegistry {

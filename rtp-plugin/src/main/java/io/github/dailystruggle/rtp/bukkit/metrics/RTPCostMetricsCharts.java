@@ -28,10 +28,10 @@ import java.util.TreeSet;
 import java.util.logging.Level;
 
 /**
- * Registers RTP's bStats chart catalogue (Phase M1+M2 cost-metrics subset) on
- * the Bukkit-family bStats {@link Metrics} instance owned by the plugin.
+ * Registers RTP's bStats chart catalogue (cost-metrics subset) on the
+ * Bukkit-family bStats {@link Metrics} instance owned by the plugin.
  *
- * <p>Per {@code docs/dev/METRICS_PLAN.md > bStats Integration}:
+ * <p>Privacy constraints:
  * <ul>
  *   <li>All lambdas read pre-cached values from
  *       {@link io.github.dailystruggle.rtp.common.metrics.CoreMetrics#snapshot()};
@@ -56,7 +56,7 @@ public final class RTPCostMetricsCharts {
    * Registers all charts on the supplied bStats {@link Metrics} instance.
    *
    * @param metrics  the bStats Metrics handle (id 30865 for the full assembly,
-   *                 12277 for the lite assembly per ADR-024 — caller decides).
+   *                 12277 for the lite assembly per ADR-024 - caller decides).
    * @param assemblyVariant {@code "full"} or {@code "lite"}; reported as the
    *                        {@link BStatsChartIds#ASSEMBLY_VARIANT} pie slice.
    */
@@ -87,7 +87,7 @@ public final class RTPCostMetricsCharts {
     // Addons loaded: AdvancedPie tallying which known third-party integrations
     // are *enabled* on this server. Limited to the hard-coded softdepend
     // whitelist below (mirrors plugin.yml softdepend). Any plugin name not on
-    // this list is ignored — prevents fingerprinting via arbitrary plugin lists.
+    // this list is ignored - prevents fingerprinting via arbitrary plugin lists.
     metrics.addCustomChart(new AdvancedPie(BStatsChartIds.ADDONS_LOADED,
             RTPCostMetricsCharts::detectAddonsLoaded));
 
@@ -121,9 +121,8 @@ public final class RTPCostMetricsCharts {
     }));
 
     // --- Bucketised cost histograms ---
-    // Buckets per METRICS_PLAN.md > Recommended chart catalogue. Each chart
-    // reports a single 1-bucket pie per submission; bStats aggregates into a
-    // distribution across the fleet.
+    // Each chart reports a single 1-bucket pie per submission; bStats
+    // aggregates into a distribution across the fleet.
     metrics.addCustomChart(new AdvancedPie(BStatsChartIds.TPS_BUCKETS, () -> {
       Map<String, Integer> b = new HashMap<>();
       double tps = safeTps();
@@ -227,7 +226,7 @@ public final class RTPCostMetricsCharts {
     }));
 
     // Heap pressure: bucketised heapUsed / heapMax percentage. Single biggest
-    // RTP-cost dimension after TPS — caches and the pipeline both allocate.
+    // RTP-cost dimension after TPS - caches and the pipeline both allocate.
     metrics.addCustomChart(new AdvancedPie(BStatsChartIds.HEAP_PRESSURE, () -> {
       Map<String, Integer> b = new HashMap<>();
       MetricsSnapshot snap = RTP.metrics.snapshot();
@@ -237,7 +236,7 @@ public final class RTPCostMetricsCharts {
 
     // Tick-budget utilisation: meaningful on Folia (per-region tick budget
     // headroom); on Paper/Bukkit/Fabric this is typically NaN and buckets
-    // into "unknown" — that is the correct answer for a single-region runtime.
+    // into "unknown" - that is the correct answer for a single-region runtime.
     metrics.addCustomChart(new AdvancedPie(BStatsChartIds.TICK_BUDGET_UTILISATION, () -> {
       Map<String, Integer> b = new HashMap<>();
       double u = RTP.metrics.snapshot().tickBudgetUtilisation;
@@ -257,7 +256,7 @@ public final class RTPCostMetricsCharts {
       return b;
     }));
 
-    // Pending teleports: bucketised pendingTeleports — distinct from queueDepth
+    // Pending teleports: bucketised pendingTeleports - distinct from queueDepth
     // (pre-verified location pool) in that it counts players actively awaiting
     // a coordinate. Symmetric with QUEUE_DEPTH_PRESSURE.
     metrics.addCustomChart(new AdvancedPie(BStatsChartIds.PENDING_TELEPORTS_PRESSURE, () -> {
@@ -636,7 +635,7 @@ public final class RTPCostMetricsCharts {
         try {
           if (pm.isPluginEnabled(name)) tally.put(name, 1);
         } catch (Throwable ignored) {
-          // skip — chart must never throw.
+          // skip - chart must never throw.
         }
       }
       if (tally.isEmpty()) tally.put("none", 1);
@@ -979,10 +978,9 @@ public final class RTPCostMetricsCharts {
 
   /**
    * Returns {@code [L1_pct, L2_pct]} averaged across configured regions.
-   * Reads buffers directly because the current {@link MetricsSnapshot} doesn't
-   * yet carry per-cache fill ratios (deferred — see
-   * {@code CHECKLIST-metrics-and-multiserver.md} row B11/C3 for the snapshot
-   * extension). All access is null-defended so the chart never throws.
+   * Reads buffers directly because the current {@link MetricsSnapshot} does not
+   * yet carry per-cache fill ratios. All access is null-defended so the chart
+   * never throws.
    */
   private static double[] computeCacheFillPercentages() {
     long keptUsed = 0L, keptCap = 0L, unkeptUsed = 0L, unkeptCap = 0L;
@@ -1009,18 +1007,17 @@ public final class RTPCostMetricsCharts {
   }
 
   private static double safeTps() {
-    // C6 (Section C of CHECKLIST-metrics-and-multiserver, §1.6.4) — the
-    // metrics facade is the single TPS source. The previous reflective
-    // Bukkit.getServer().getTPS() fallback was redundant: when a
+    // The metrics facade is the single TPS source. A reflective
+    // Bukkit.getServer().getTPS() fallback would be redundant: when a
     // BukkitTpsBinding is installed snapshot.tps1m is sampled, and when it
     // is not the chart correctly degrades to the "unknown" bucket. The
     // RTPServerAccessor#getTPS path (used elsewhere) already routes through
-    // this same snapshot per §1.6.1, so any reflective probe re-introduced
-    // here would only fingerprint stale data.
+    // this same snapshot, so any reflective probe re-introduced here would
+    // only fingerprint stale data.
     return RTP.metrics.snapshot().tps1m;
   }
 
-  // --- Bucket functions (METRICS_PLAN.md ranges) ---
+  // --- Bucket functions ---
 
   private static String tpsBucket(double tps) {
     if (Double.isNaN(tps)) return "unknown";
@@ -1060,7 +1057,7 @@ public final class RTPCostMetricsCharts {
     return "100+";
   }
 
-  // --- M2 Runtime health bucket helpers (Section C / row C4) ---
+  // --- Runtime health bucket helpers ---
 
   /**
    * Scales a TPS double to int *100 for bStats line charts. NaN -> 0 so the

@@ -18,26 +18,10 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Shared base for the player-targeted {@code /rtp clear} children
- * ({@code cooldown}, {@code queue}, {@code limit}, {@code invuln}).
+ * Shared base for player-targeted {@code /rtp clear} subcommands
+ * (cooldown, queue, limit, invuln).
  *
- * <p>All of these share the same targeting grammar and resolution rules; only
- * the per-player and global clearing actions differ. Subclasses implement
- * {@link #clearOne(UUID)} (clear a single player and report whether anything was
- * cleared) and {@link #clearAll()} (wipe the state for every player), plus a few
- * naming hooks.
- *
- * <p>Targeting via the optional {@code player} parameter:
- * <ul>
- *   <li>{@code /rtp clear <verb>} - clears the caller's own state when run by a
- *       player; clears <em>every</em> player's state when run from the console
- *       (the {@link RTPAPI#serverId} sentinel).</li>
- *   <li>{@code /rtp clear <verb> player=a,b,c} - clears just the named players,
- *       resolved by online name; unknown names are reported, not silently
- *       dropped (S-004).</li>
- * </ul>
- *
- * <p>Permission: {@code rtp.admin}.
+ * <p>Supports targeting self, explicit player lists, or all players (console).
  */
 public abstract class PlayerTargetedClearCmd extends BaseRTPCmdImpl {
 
@@ -45,13 +29,9 @@ public abstract class PlayerTargetedClearCmd extends BaseRTPCmdImpl {
   public static final String PERMISSION = "rtp.admin";
 
   /**
-   * Constructs the verb and declares its optional {@code player} parameter so
-   * {@code player=<name>[,<name>...]} routes through the command framework.
-   * Tab-completion is intentionally free-form (no value list): the set of
-   * resolvable players is platform-specific and supplied at runtime via
-   * {@link RTP#serverAccessor}.
+   * Registers subcommand and declares optional {@code player} parameter.
    *
-   * @param parent the {@code /rtp clear} parent command, or {@code null}
+   * @param parent parent command, or {@code null}
    */
   protected PlayerTargetedClearCmd(@Nullable CommandsAPICommand parent) {
     super(parent);

@@ -9,22 +9,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Expands MiniMessage gradient/rainbow/transition tags into per-character
- * legacy {@code xrrggbb} hex color codes so that gradient text
- * renders on servers that do not bundle Adventure (e.g. pure Spigot).
+ * Expands MiniMessage gradient/rainbow/transition tags into legacy hex color codes
+ * ({@code \u00a7x\u00a7r...}) when Adventure MiniMessage is unavailable.
  *
- * <p>On Paper/Folia the full Adventure MiniMessage path is used instead; this class is only invoked when
- * {@code MINIMESSAGE_AVAILABLE} is {@code false}.
- *
- * <p>Supported tags:
- * <ul>
- *   <li>{@code <gradient:[color1]:[color2]:...:[phase]>text</gradient>}
- *   <li>{@code <transition:[color1]:[color2]:...:[phase]>text</transition>}
- *   <li>{@code <rainbow:[!][phase]>text</rainbow>}
- * </ul>
- * Color arguments may be {@code #rrggbb} hex or any of the 16 standard
- * Minecraft named colors (e.g. {@code red}, {@code dark_blue}).
- * The optional {@code phase} argument is a float in {@code [-1, 1]}.
+ * <p>Supports {@code <gradient>}, {@code <transition>}, and {@code <rainbow>} tags
+ * with hex or named colors and optional phase.
  */
 public final class GradientExpander {
 
@@ -129,14 +118,8 @@ public final class GradientExpander {
   }
 
   /**
-   * Detects the Bungee/Spigot legacy hex marker
-   * {@code \u00a7x\u00a7r\u00a7r\u00a7g\u00a7g\u00a7b\u00a7b} (a section sign, an
-   * {@code x}, then six {@code \u00a7}-prefixed hex digits) starting at index
-   * {@code i} in {@code chars}. Returns its full length (14) when present, or 0
-   * otherwise. Nested gradient/rainbow/transition tags emit this form via
-   * {@link #legacyHex}, so the per-character coloring loops must treat it as an
-   * already-colored run rather than as plain text - otherwise the outer tag
-   * injects its own color and leaks the marker's {@code x} as a literal glyph.
+   * Detects legacy hex marker ({@code \u00a7x\u00a7r\u00a7r\u00a7g\u00a7g\u00a7b\u00a7b}) starting at index {@code i}.
+   * Returns its length (14) if present, or 0 otherwise to avoid splitting nested tags.
    */
   private static int hexMarkerLen(char[] chars, int i) {
     if (i + 13 >= chars.length) return 0;
@@ -216,7 +199,7 @@ public final class GradientExpander {
         i += hm;
         continue;
       }
-      // Skip existing legacy color/format codes (X) - copy them verbatim.
+      // Skip existing legacy color/format codes (\u00a7X) - copy them verbatim.
       if (chars[i] == '\u00a7' && i + 1 < chars.length) {
         char code = chars[i + 1];
         if (isLegacyColorCode(code) || "klmnoKLMNO".indexOf(code) >= 0

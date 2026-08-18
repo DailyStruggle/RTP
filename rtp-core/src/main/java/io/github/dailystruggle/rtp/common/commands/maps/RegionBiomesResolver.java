@@ -15,64 +15,8 @@ import java.util.Map;
 
 /**
  * Resolver for {@link ChartSpec.Kind#REGION_BIOMES}.
- *
- * <p>Produces a {@link RegionBiomesRgb} model carrying per-pixel 24-bit RGB
- * plus a parallel mask byte; {@link RegionBiomesRgbRenderer} routes sampled
- * cells through {@code MapCanvas#setPixelRgb} (Bukkit-family:
- * {@code MapPalette.matchColor} over the ~144-entry vanilla palette) and
- * unsampled / outside-disk cells through {@code setPixel(PaletteIndex.BLACK)}.
- *
- * <p><b>Data source</b>
- *
- * <p>Per-pixel biome data comes exclusively from the region's saved biome
- * data via {@link MemoryShape#biomeAt(int, int)} — i.e. the persisted,
- * in-memory {@code biomeKeysCache} / {@code biomePrefixSumsCache} accumulated
- * by the scan pipeline. No on-disk {@code .mca} palettes are read. The chart
- * answers "what biomes has the scan recorded for this region"; pixels with no
- * recorded biome render as unsampled (BLACK).
- *
- * <p>Per-biome RGB resolution still flows through
- * {@link BiomeColorSource#resolve(String)} — the Bukkit-family
- * {@code BukkitBiomeColorSource} installs dimension-aware overrides for the
- * well-known nether / end biomes so {@code NETHER_WASTES},
- * {@code CRIMSON_FOREST}, etc. each get distinct hues regardless of how
- * Mojang's {@code Biome#getMapColor()} quantises them.
- *
- * <p><b>Per-pixel classification</b>
- *
- * <ul>
- *   <li>{@link RegionBiomesRgb#MASK_OUTSIDE} — pixel outside the shape's
- *       spatial domain ({@link MemoryShape#contains(int, int)} returned
- *       {@code false}).</li>
- *   <li>{@link RegionBiomesRgb#MASK_RGB} with the biome's RGB — pixel inside
- *       the shape AND the region has a saved biome recorded at that
- *       coordinate.</li>
- *   <li>{@link RegionBiomesRgb#MASK_UNSAMPLED} — pixel inside the shape but
- *       the scan has not yet recorded a biome there
- *       ({@link MemoryShape#biomeAt(int, int)} returned {@code null}). The
- *       renderer paints these BLACK.</li>
- * </ul>
- *
- * <p><b>Threading</b>
- *
- * <p>Classification reads only the in-memory saved biome cache via
- * {@link MemoryShape#biomeAt(int, int)} (S-005-clean: no chunk I/O, no
- * {@code .mca} reads). It is a sibling of the bad-locations resolver,
- * dispatched from {@code VisualizationDispatch} on the async scheduler arm,
- * and sidesteps the {@code REQ-RTP-MAP-006} prohibition on resolver-side
- * {@code CompletableFuture#get / #join}.
- *
- * <p><b>Failure modes</b>
- *
- * <ul>
- *   <li>Spec is null / wrong kind / region missing -&gt;
- *       {@link UnresolvableChartSpecException}.</li>
- *   <li>Region's shape is not a {@link MemoryShape} (no
- *       {@code contains(x, z)} surface) -&gt;
- *       {@link UnresolvableChartSpecException}.</li>
- *   <li>Region has no saved biome data yet -&gt; every in-disk pixel
- *       classifies as {@code MASK_UNSAMPLED} and renders BLACK.</li>
- * </ul>
+ * Builds a {@link RegionBiomesRgb} model from in-memory saved biome data ({@link MemoryShape#biomeAt(int, int)})
+ * with RGB mapping via {@link BiomeColorSource#resolve(String)}. S-005 compliant (no chunk I/O).
  */
 public final class RegionBiomesResolver implements ChartSpecResolver {
 

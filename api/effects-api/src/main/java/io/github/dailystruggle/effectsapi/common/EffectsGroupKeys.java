@@ -27,7 +27,7 @@ package io.github.dailystruggle.effectsapi.common;
  * </ul>
  *
  * <p>Stage tokens (the value of {@code when:}) and effect-name tokens are
- * <em>kept literal</em> across locales — only field keys are localized. This
+ * <em>kept literal</em> across locales - only field keys are localized. This
  * matches project precedent (e.g. {@code shape: SQUARE} in
  * {@code lang/zh/regions/default.yml}).
  */

@@ -10,10 +10,10 @@ import java.util.Objects;
  *
  * <p>State bytes use the following encoding:
  * <ul>
- *   <li>{@code 0} — unattempted</li>
- *   <li>{@code 1} — attempted, succeeded</li>
- *   <li>{@code 2} — attempted, failed</li>
- *   <li>{@code 3} — currently pending in the pipeline</li>
+ *   <li>{@code 0} - unattempted</li>
+ *   <li>{@code 1} - attempted, succeeded</li>
+ *   <li>{@code 2} - attempted, failed</li>
+ *   <li>{@code 3} - currently pending in the pipeline</li>
  * </ul>
  *
  * <p>The constructor defensively copies {@code states} (REQ-RTP-MAP-002).
@@ -42,7 +42,7 @@ public record RegionCoverage(String regionName, int centerX, int centerZ,
         states = states.clone();
     }
 
-    /** Defensive accessor — returns a clone of the internal state array. */
+    /** Defensive accessor - returns a clone of the internal state array. */
     @Override
     public byte[] states() {
         return states.clone();

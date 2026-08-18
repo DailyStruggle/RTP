@@ -1,30 +1,12 @@
 package io.github.dailystruggle.rtp.common.commands.docs;
 
 /**
- * Tunables for {@code MarkdownToMenuModel}. Immutable.
+ * Options for markdown-to-menu-model conversion (ADR-045).
  *
- * <p>Defaults match ADR-045 §"Configuration surface". The lowerer is a pure
- * function of {@code (relpath, source, options)}; no platform types, no I/O.
- *
- * @param maxLineWidth         soft wrap cap for paragraph and list lines, in
- *                             characters. Lines longer than this are word-wrapped
- *                             into multiple {@link io.github.dailystruggle.rtp.api.menu.MenuLine}s.
- *                             Default 56 — empirically the widest a book page
- *                             renders cleanly at default GUI scale.
- * @param maxCodeLineWidth     hard truncate cap for code-fence lines. Lines
- *                             exceeding this are truncated with a trailing
- *                             {@code …} and the full original line is exposed
- *                             via {@code hover} (ADR-045 §"Markdown lowering").
- *                             Default 48.
- * @param exposeDeveloperDocs  whether {@code docs/dev/}, {@code docs/adr/} and
- *                             {@code docs/architecture/} subtrees are included
- *                             in the lowered cache. Default {@code false} —
- *                             admin/operational audience per ADR-045
- *                             §"Permission and visibility".
- * @param maxFileBytes         hard upper bound per {@code *.md} file in bytes.
- *                             Files over this cap are lowered to a single-page
- *                             {@code docs.tooLarge} chrome page instead of their
- *                             content. Default 262144 (256 KiB).
+ * @param maxLineWidth        soft wrap cap for paragraphs in characters (default 56)
+ * @param maxCodeLineWidth    hard truncate cap for code lines in characters (default 48)
+ * @param exposeDeveloperDocs whether developer/internal docs are exposed (default false)
+ * @param maxFileBytes        maximum file size in bytes before tooLarge page (default 256 KiB)
  */
 public record DocsLoweringOptions(
         int maxLineWidth,
@@ -46,7 +28,7 @@ public record DocsLoweringOptions(
     }
 
     /**
-     * Returns the default options per ADR-045 §"Configuration surface".
+     * Returns the default options per ADR-045.
      *
      * @return a {@link DocsLoweringOptions} with default values
      */

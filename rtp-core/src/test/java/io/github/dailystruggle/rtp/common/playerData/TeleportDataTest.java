@@ -37,7 +37,7 @@ class TeleportDataTest {
         assertEquals(0L, data.attempts);
         assertEquals(0L, data.queueLocation);
         assertEquals(0L, data.processingTime);
-        // time is set to System.currentTimeMillis() at construction – just verify it is positive
+        // time is set to System.currentTimeMillis() at construction - just verify it is positive
         assertTrue(data.time > 0);
     }
 
@@ -124,7 +124,7 @@ class TeleportDataTest {
     }
 
     // -------------------------------------------------------------------------
-    // Clone – null coords / biomes
+    // Clone - null coords / biomes
     // -------------------------------------------------------------------------
 
     @Test

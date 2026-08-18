@@ -13,15 +13,7 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Gap-filling coverage for block-comment preservation beyond the basic
- * cases in {@link RtpYamlBlockCommentRoundTripTest}. Targets edge cases
- * that real shipped configs exercise: multi-line comment blocks,
- * deeply-nested keys, comments above list items, comments preserved
- * through {@code set()} on the same key, document-leading/trailing
- * comments, and the full file-load → mutate → save → reload cycle
- * on real disk.
- *
- * <p>ADR-025 §Migration step 4 / ADR-042 block-only scope.</p>
+ * Coverage for block-comment preservation in {@link RtpYamlConfig} (ADR-025, ADR-042).
  */
 class RtpYamlBlockCommentPreservationTest {
 

@@ -11,34 +11,8 @@ import java.util.logging.Level;
 
 import org.jetbrains.annotations.Nullable;
 /**
- * Single render boundary for the menu subsystem.
- *
- * <p>Extracted from {@code MenuRedeemSubcommand} as part of the ADR-050
- * menu-package split (item 1c.4 of
- * {@code docs/dev/scratch/CHECKLIST-concrete-menu-commands.md}). Previously
- * every {@code dispatchOpenXxx} method inlined the same wrap:
- *
- * <pre>{@code
- * try {
- *     renderer.render(viewer, model);
- *     return true;
- * } catch (RuntimeException e) {
- *     RTP.log(Level.WARNING, "menu <context> render failed for " + viewer
- *             + ": " + e.getMessage(), e);
- *     reject(viewer, CommandMessages.menuInvalid,
- *             "menu <context> rejected: renderer failure", messageMethod);
- *     return false;
- * }
- * }</pre>
- *
- * <p>That pattern is consolidated here. Callers pass the {@code MenuRenderer},
- * the viewer, the model, an optional player-facing message sink, an optional
- * S-004 audit message sink (from {@code MenuRedeemSubcommand.reject}), and a
- * short {@code context} label used to disambiguate WARN log lines (e.g.
- * {@code "param-picker"}, {@code "admin-panel"}).
- *
- * <p>Package-private: only the dispatcher and the menu leaves under this
- * package may call into the drawer.
+ * Render boundary for the menu subsystem (ADR-050).
+ * Consolidated S-004 error handling wrapper around {@link MenuRenderer#render}.
  */
 final class MenuDrawer {
 
@@ -47,29 +21,7 @@ final class MenuDrawer {
     }
 
     /**
-     * Render {@code model} to {@code viewer} via {@code renderer}, applying
-     * the canonical S-004 reject path on any {@link RuntimeException} thrown
-     * by the renderer.
-     *
-     * @param renderer the renderer to invoke; must be non-null. The caller
-     *                 is responsible for the null-check on the configured
-     *                 renderer field; passing {@code null} is a programming
-     *                 error and is fast-failed via NPE rather than masked.
-     * @param viewer   the clicking player's UUID.
-     * @param model    the model to render; must be non-null.
-     * @param messageMethod player-facing message sink for the {@code menuInvalid}
-     *                      reject path on renderer failure; may be {@code null}.
-     * @param rejecter audit hook invoked on renderer failure with a
-     *                 short S-004 diagnostic string. Implemented by
-     *                 {@code MenuRedeemSubcommand::reject} (curried over
-     *                 {@code (viewer, CommandMessages.menuInvalid, msg, messageMethod)});
-     *                 may be {@code null} to suppress the audit (tests).
-     * @param context  short label naming the dispatch site (e.g.
-     *                 {@code "param-picker"}, {@code "admin-panel"}).
-     *                 Included verbatim in the WARN log and the audit
-     *                 diagnostic.
-     * @return {@code true} on successful render; {@code false} on
-     *         {@link RuntimeException} from the renderer.
+     * Renders {@code model} to {@code viewer} via {@code renderer}, applying S-004 rejection on failure.
      */
     static boolean draw(MenuRenderer renderer,
                         UUID viewer,

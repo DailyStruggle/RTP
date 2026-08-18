@@ -84,7 +84,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
     if (files == null) return res;
     for (File file : files) {
       if (!file.isFile()) continue;
-      // Skip the locale bootstrap file — it is plugin configuration, not a database table.
+      // Skip the locale bootstrap file - it is plugin configuration, not a database table.
       if (io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap.FILE_NAME
           .equalsIgnoreCase(file.getName())) continue;
 
@@ -321,36 +321,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
 
   @Override
   public void setValue(String tableName, Map<?, ?> keyValuePairs) {
-    // Flat-row re-nesting for YAML persistence.
-    //
-    // Note: we deliberately do NOT delegate to super.setValue(tableName, keyValuePairs).
-    // The parent enqueues the caller's map verbatim and asynchronously via
-    // getTable().thenAccept(...). If that completion lands after our own
-    // enqueue below (race observed under full-suite load, see
-    // YamlFileDatabaseTest.setValue_flatRow_isNestedUnderPrimaryKey), the
-    // flat-shape entry is processed by write() AFTER the nested one and
-    // re-creates the top-level `region:` / `x:` / `y:` / ... scalars at
-    // document root - the exact pre-fix mojibake the re-nesting was meant
-    // to prevent. We replicate the parent's localTables update inline below
-    // (with the EFFECTIVE shape) so the in-memory snapshot stays consistent
-    // for read()/getTable() without re-introducing the second enqueue.
-    //
-    // Callers such as DatabaseAccessor.saveCachedLocation() pass a flat
-    // {column -> value} map whose primary-key column ("UUID" or "id") identifies
-    // the row. SQL backends INSERT that flat shape as one row directly. The YAML
-    // backend, however, stores each row as a YAML section keyed by the primary
-    // key (so loadCachedLocations() can iterate sections and read `region`,
-    // `world`, `x`, ... beneath each). Writing the flat shape would produce
-    // top-level keys (`region:`, `x:`, ...) that collide across rows: every
-    // subsequent write overwrites them, so only the most recently-written row
-    // survives, and loadCachedLocations() skips it because there is no
-    // configuration section to descend into. Symptom: `rtp_cached_locations.yml`
-    // contains a single flat row at shutdown and nothing is recovered on
-    // startup (no "loaded N locations" log line).
-    //
-    // Detect the flat-row shape and re-nest as {primaryKey -> columnsMap} before
-    // enqueueing. Maps that already look nested (a single entry whose value is
-    // itself a Map) are passed through unchanged.
+    // Re-nest flat rows under primary key before enqueueing for YAML write.
     Map<?, ?> effective = keyValuePairs;
     if (looksLikeFlatRow(keyValuePairs)) {
       String pk = extractPrimaryKey(keyValuePairs);
@@ -368,8 +339,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
     Map<TableObj, TableObj> writeValues = new HashMap<>();
     effective.forEach((o, o2) -> writeValues.put(new TableObj(o), new TableObj(o2)));
 
-    // Mirror the parent's localTables update (synchronously) so read()/getTable()
-    // see the in-memory snapshot reflecting the effective (re-nested) shape.
+    // Update local snapshot synchronously so getTable() sees effective shape.
     Map<TableObj, TableObj> table =
         localTables.computeIfAbsent(tableName, k -> new ConcurrentHashMap<>());
     table.putAll(writeValues);

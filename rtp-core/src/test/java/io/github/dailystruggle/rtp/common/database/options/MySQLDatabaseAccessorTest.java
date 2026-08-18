@@ -18,13 +18,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests for MySQL-specific read/write logic using Mockito mocks.
- *
- * A testable subclass of {@link AbstractSQLDatabaseAccessor} is used to avoid
- * any real HikariCP / MySQL driver initialisation.  The MySQL-specific
- * {@code read} and {@code write} implementations are copied verbatim from
- * {@link MySQLDatabaseAccessor} so that the same code paths (including every
- * {@code catch (SQLException)} block) are exercised.
+ * Unit tests for MySQL-specific read/write database logic using mocked connections.
  */
 class MySQLDatabaseAccessorTest {
 
@@ -32,7 +26,7 @@ class MySQLDatabaseAccessorTest {
     Path tempDir;
 
     // -------------------------------------------------------------------------
-    // Testable subclass — mirrors MySQLDatabaseAccessor read/write exactly
+    // Testable subclass - mirrors MySQLDatabaseAccessor read/write exactly
     // -------------------------------------------------------------------------
 
     static class TestableMySQLAccessor extends AbstractSQLDatabaseAccessor {
@@ -116,7 +110,7 @@ class MySQLDatabaseAccessorTest {
                 }
                 statement.executeUpdate();
             } catch (SQLException e) {
-                // logged — swallowed
+                // logged - swallowed
             }
         }
     }
@@ -148,7 +142,7 @@ class MySQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // read() — happy path
+    // read() - happy path
     // -------------------------------------------------------------------------
 
     @Test
@@ -210,13 +204,13 @@ class MySQLDatabaseAccessorTest {
                 accessor.read(mockConn, "rtp_teleport_data",
                         new AbstractMap.SimpleEntry<>("senderId", "uuid-1"));
 
-        // Row was found but the only column was null — map is empty, Optional still present
+        // Row was found but the only column was null - map is empty, Optional still present
         assertTrue(result.isPresent());
         assertTrue(result.get().isEmpty());
     }
 
     // -------------------------------------------------------------------------
-    // read() — SQLException coverage
+    // read() - SQLException coverage
     // -------------------------------------------------------------------------
 
     @Test
@@ -244,7 +238,7 @@ class MySQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // write() — happy path
+    // write() - happy path
     // -------------------------------------------------------------------------
 
     @Test
@@ -274,7 +268,7 @@ class MySQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // write() — SQLException coverage
+    // write() - SQLException coverage
     // -------------------------------------------------------------------------
 
     @Test
@@ -300,7 +294,7 @@ class MySQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // delete() — inherited from AbstractSQLDatabaseAccessor
+    // delete() - inherited from AbstractSQLDatabaseAccessor
     // -------------------------------------------------------------------------
 
     @Test
@@ -324,7 +318,7 @@ class MySQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // connect() / disconnect() — inherited
+    // connect() / disconnect() - inherited
     // -------------------------------------------------------------------------
 
     @Test
@@ -380,12 +374,12 @@ class MySQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // flush() — inherited, uses getConnection()
+    // flush() - inherited, uses getConnection()
     // -------------------------------------------------------------------------
 
     @Test
     void flush_emptyQueue_doesNothing() throws SQLException {
-        // No items queued — getConnection should never be called
+        // No items queued - getConnection should never be called
         accessor.flush();
         verify(mockConn, never()).prepareStatement(anyString());
     }
@@ -445,7 +439,7 @@ class MySQLDatabaseAccessorTest {
     }
 
     // -------------------------------------------------------------------------
-    // loadCachedLocations() — inherited, uses getConnection()
+    // loadCachedLocations() - inherited, uses getConnection()
     // -------------------------------------------------------------------------
 
     @Test

@@ -27,7 +27,7 @@ import net.jpountz.lz4.LZ4FrameInputStream;
  * mode {@code 2} (zlib-wrapped Deflate). Mode {@code 1} (gzip) is supported for forward
  * compatibility. Mode {@code 3} (uncompressed) is supported. Mode {@code 4} (LZ4) and the
  * {@code 0x80}-or'd "external" variants are rejected with {@link UnsupportedAnvilFormatException}
- * so the pre-filter returns {@link Verdict#UNKNOWN} and the live load path takes over — this
+ * so the pre-filter returns {@link Verdict#UNKNOWN} and the live load path takes over - this
  * is the deliberate safe fallback for formats we have not yet validated against real data.
  *
  * <p>All methods are thread-safe: the class is stateless and operates on caller-owned buffers.
@@ -192,14 +192,14 @@ public final class AnvilReader {
         return (v instanceof Nbt.NbtList) ? (Nbt.NbtList) v : null;
     }
 
-    // -------------------------------------------------------------------- typed view (Phase 2)
+    // -------------------------------------------------------------------- typed view
 
     /**
      * Reads the chunk at region-local coordinates {@code (cx, cz)} and lifts the raw
      * NBT root into an {@link AnvilChunkView} typed view. Returns {@code null} if the
      * chunk is not present in the region (same semantics as {@link #readChunk}).
      *
-     * <p>This overload is the preferred entry point for the Phase 3 verdict layer — it
+     * <p>This overload is the preferred entry point for the verdict layer - it
      * exposes only the fields the pre-filter actually consults, and shields callers from
      * the {@link Nbt.NbtList} / {@link LinkedHashMap} wire shape.
      */
@@ -209,7 +209,7 @@ public final class AnvilReader {
         return toView(entry.root);
     }
 
-    // ----------------------------------------------------------- PR-1 (ADR-016) column probe
+    // ----------------------------------------------------------- column probe (ADR-016)
 
     /**
      * Reads the chunk at region-local {@code (cx, cz)} and returns a lean
@@ -217,9 +217,9 @@ public final class AnvilReader {
      *
      * <p>Semantically equivalent to {@code readChunkView(...).blockIdAt(8, y, 8)} /
      * {@code .getBiomeAt(8, y, 8)} / {@code .getSurfaceHeight(8, 8)} for every Y in the
-     * window — the probe exists to make those queries cheaper, not to change what they
-     * answer (see {@code docs/dev/BIOME_LOOKUP_PERF_PLAN.md}). Internally the NBT parse
-     * skips every root child we do not need ({@code block_entities}, {@code structures},
+     * window - the probe exists to make those queries cheaper, not to change what they
+     * answer. Internally the NBT parse skips every root child we do not need
+     * ({@code block_entities}, {@code structures},
      * {@code Entities}, tick queues, {@code Heightmaps} entries other than
      * {@code MOTION_BLOCKING_NO_LEAVES}, etc.) and every section child other than
      * {@code Y}, {@code block_states}, and {@code biomes}.
@@ -289,7 +289,7 @@ public final class AnvilReader {
         }
         if ("sections".equals(top)) {
             if (depth == 1) {
-                // Each list element is a compound — recurse to filter its children.
+                // Each list element is a compound - recurse to filter its children.
                 return Nbt.SelectiveFilter.Decision.RECURSE;
             }
             if (depth == 2) {
@@ -418,7 +418,7 @@ public final class AnvilReader {
      * <p>The biome container has the same wire shape as {@code block_states} except:
      * (1) {@code palette[i]} is a bare {@code TAG_String} (namespaced identifier)
      * rather than a compound with a {@code Name} field, and (2) the packed {@code data}
-     * array is 64 cells (4×4×4) rather than 4096 blocks — see ADR-016 (biome) §3.
+     * array is 64 cells (4×4×4) rather than 4096 blocks - see ADR-016 (biome) §3.
      */
     @SuppressWarnings("unchecked")
     private static BiomePaletteSection biomeSectionFromCompound(Object raw) {
@@ -442,7 +442,7 @@ public final class AnvilReader {
         for (Object entry : palList.items) {
             // Unlike the block palette, the biome palette stores bare strings, not
             // compounds with a Name field. Reject the section if an entry is not a
-            // string — that indicates a format drift we have not characterised.
+            // string - that indicates a format drift we have not characterised.
             if (!(entry instanceof String)) return null;
             paletteNames.add((String) entry);
         }

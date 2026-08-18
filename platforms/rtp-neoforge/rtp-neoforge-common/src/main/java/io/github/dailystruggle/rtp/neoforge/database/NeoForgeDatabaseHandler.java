@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.logging.Level;
 
 /**
- * NeoForge-side database bootstrap — mirrors {@code BukkitDatabaseHandler#setupDatabase}
+ * NeoForge-side database bootstrap - mirrors {@code BukkitDatabaseHandler#setupDatabase}
  * and {@code FabricDatabaseHandler#setupDatabase}.
  *
  * <p>The per-mod config dir is resolved through
@@ -21,7 +21,7 @@ import java.util.logging.Level;
  * {@code rtp-core}'s platform-agnostic {@code DatabaseAccessorFactory}. No
  * {@code org.bukkit.*} imports.</p>
  *
- * <p>REQ-RTP-S-006 — fail-loud if invoked before {@code rtp-core} is ready.</p>
+ * <p>REQ-RTP-S-006 - fail-loud if invoked before {@code rtp-core} is ready.</p>
  */
 public final class NeoForgeDatabaseHandler {
 

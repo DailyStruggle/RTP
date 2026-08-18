@@ -3,27 +3,8 @@ package io.github.dailystruggle.rtp.common.metrics;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
- * Process-global, always-on accumulator of the wall-clock time RTP's own
- * scheduler spends executing the tasks RTP submits to it.
- *
- * <p>Unlike the host MSPT (which measures whole-server tick utilisation and is
- * therefore not attributable to RTP), every task counted here was submitted
- * through {@code RTP.scheduler}, so the totals are RTP-attributable cost. The
- * decorator that feeds this profile classifies each task by submission family:
- * <ul>
- *   <li>{@code sync} - work routed onto the main server thread (on Folia, the
- *       global/region scheduler): {@code runTask}, {@code runTaskLater},
- *       {@code runTask(location/chunk, ...)}, and the main-thread timer bodies.</li>
- *   <li>{@code async} - work routed onto an asynchronous pool:
- *       {@code runTaskAsynchronously} and the async timer bodies.</li>
- * </ul>
- *
- * <p>Wait-free: counters are {@link LongAdder}. No locking, no tick-thread
- * blocking. Reads are eventually-consistent snapshots; callers must tolerate a
- * counter advancing between two reads.
- *
- * <p>Lifecycle: a single {@link #GLOBAL} instance lives for the process.
- * {@link #reset()} exists for tests; it is not called on {@code /reload}.
+ * Process-global accumulator of wall-clock time spent executing RTP tasks.
+ * Uses lock-free {@link LongAdder} counters for sync and async execution timing.
  */
 public final class RtpSchedulerProfile {
 

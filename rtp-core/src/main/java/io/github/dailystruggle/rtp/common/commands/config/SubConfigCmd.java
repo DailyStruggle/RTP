@@ -31,21 +31,8 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 public class SubConfigCmd extends BaseRTPCmdImpl {
 
   /**
-   * Thin {@link BaseRTPCmdImpl} alias that exposes the same parameter /
-   * sub-command graph as a target {@link SubConfigCmd} under a different
-   * {@link #name()}. Used by the multi-config child registration to make
-   * a per-entry editor reachable under both its parser-key form
-   * ({@code default.yml}) and its bare form ({@code default}) without
-   * mutating {@code commandLookup} directly from outside the owning
-   * class - the only supported way to register a sub-command is
-   * {@link io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand#addSubCommand},
-   * which keys on {@code command.name().toUpperCase()}, so an alias
-   * requires a distinct {@code CommandsAPICommand} instance.
-   *
-   * <p>The alias delegates {@link #onCommand},
-   * {@link #getParameterLookup} and {@link #getCommandLookup} to the
-   * target so the two forms share parameter/child state, and reports
-   * the target's permission and description.
+   * Thin {@link BaseRTPCmdImpl} alias exposing the target {@link SubConfigCmd}'s parameter and
+   * sub-command graph under an alternative name (e.g. bare "default" alongside "default.yml").
    */
   public static final class Alias extends BaseRTPCmdImpl {
     private final String aliasName;
@@ -120,15 +107,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-    // When this node is an intermediate in the command path (e.g. the
-    // `regions` node while resolving `/rtp config regions default ...`),
-    // TreeCommand invokes us with the matched child as `nextCommand` to give
-    // the current command a chance at its own independent functionality, and
-    // separately re-runs that child through its recursive walk. Running the
-    // child here as well would execute the leaf (update + save + reload)
-    // twice, producing every "updating/updated/loading configs" line in
-    // duplicate. Mirror ConfigCmd#onCommand: do nothing and return true so the
-    // recursive walk runs the child exactly once.
+    // If an intermediate node (nextCommand != null), do nothing and return true so
+    // recursive walk runs child exactly once without duplicating execution.
     if (nextCommand != null) return true;
 
     String updateMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updating, ""));
@@ -219,37 +199,14 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         if (key.contains(".")) {
           RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
           if (RtpYamlConfig != null) {
-            // A dotted leaf edit (e.g. `shape.radius`) must not clobber the
-            // parent block. When the on-disk parent is still a scalar (the
-            // `"@config"` inheritance token shipped in region/world files) or
-            // is missing, a bare `set("shape.radius", v)` would build a fresh
-            // single-key mapping, discarding `name` and every sibling key (and
-            // breaking `@config` inheritance). Materialize the full effective
-            // parent block from the loaded FactoryValue first, then overlay the
-            // edited leaf so the saved YAML stays a complete nested block.
+            // Materialize parent block if scalar (@config token) to avoid clobbering sibling keys.
             materializeSectionParentIfScalar(configParser, RtpYamlConfig, key);
-            // The commands-api parser lower-cases every parameter name
-            // (TreeCommand#onCommand, `argSplit[0].toLowerCase()`), so a menu
-            // edit of `shape.centerZ` arrives here as the dotted key
-            // `shape.centerz`. YAML mappings are case-sensitive, so a bare
-            // `set("shape.centerz", v)` would add a NEW orphan leaf alongside
-            // the real `centerZ` (which keeps its old value) instead of
-            // updating it - the edit appears to vanish on reload. Restore the
-            // canonical leaf case from the parent block's known keys before
-            // writing so the intended sub-parameter is actually overwritten.
+            // Restore canonical case of dotted leaf to overwrite existing key instead of creating orphan.
             String canonicalKey = canonicalizeDottedKey(configParser, RtpYamlConfig, key);
             RtpYamlConfig.set(canonicalKey, value);
           }
         } else if (ownedTypeFactoryForKey(key) != null && value instanceof Map) {
-          // Explicit top-level type-bearing (shape/vert) override. When the on-disk slot is
-          // still the `"@config"` inheritance token (ADR-073), routing through
-          // ConfigParser.set would preserve that token verbatim and silently
-          // discard the operator's chosen type - so a user who selects SQUARE
-          // sees it revert to the global default (CIRCLE) on the next reload.
-          // The value here is already the fully materialized block (name plus
-          // every sub-parameter), so write it straight to the YAML document,
-          // materializing only this edited key while every untouched key keeps
-          // its `@config` token (materialize-only-changed-keys).
+          // Top-level type override: write materialized block directly if slot is @config reference (ADR-073).
           RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
           if (RtpYamlConfig != null
               && io.github.dailystruggle.rtp.common.configuration.ConfigDefaultResolver
@@ -339,14 +296,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
   }
 
   /**
-   * Return the type-bearing {@link Factory} we own whose {@link RTP.factoryNames}
-   * enum constant matches {@code key} (case-insensitively), or {@code null} when
-   * {@code key} is not one of our owned type factories. This generifies the
-   * former hard-coded {@code shape}/{@code vert} special-casing: any factory
-   * registered under {@link RTP.factoryNames} that holds {@link FactoryValue}
-   * type instances - i.e. every factory except the {@code singleConfig} /
-   * {@code multiConfig} config-parser factories, which are not type-bearing
-   * config keys - is treated as a type-bearing block key.
+   * Return the type-bearing {@link Factory} matching {@code key} case-insensitively, or {@code null}.
+   * Filters out non-type config-parser factories ({@code singleConfig}/{@code multiConfig}).
    */
   @Nullable
   static Factory<?> ownedTypeFactoryForKey(String key) {
@@ -361,18 +312,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
   }
 
   /**
-   * Materialize the parent block of a dotted leaf key (e.g. the {@code shape}
-   * block for {@code shape.radius}) when the on-disk parent is not already a
-   * nested section. Region/world files ship inheritance tokens such as
-   * {@code shape: "@config"}; a bare {@code set("shape.radius", v)} against
-   * that scalar would create a one-key mapping and silently drop {@code name}
-   * plus every sibling key. This resolves the full effective block from the
-   * parser's loaded {@link FactoryValue} (which already has {@code @config}
-   * expanded against {@code config.yml} defaults) and writes it as the parent
-   * mapping, so the subsequent leaf write only overrides a single value.
-   *
-   * <p>No-op when the key is not dotted, the parent is already a section, or no
-   * matching FactoryValue is loaded.</p>
+   * Materializes the parent block of a dotted leaf key when the on-disk parent is a scalar
+   * (e.g. {@code @config} inheritance token), preventing single-leaf overwrites from dropping siblings.
    */
   static void materializeSectionParentIfScalar(
       ConfigParser<?> configParser, RtpYamlConfig yaml, String dottedKey) {
@@ -403,19 +344,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
   }
 
   /**
-   * Restore the canonical case of a dotted leaf key before it is written to
-   * the (case-sensitive) YAML document. The commands-api parser lower-cases
-   * every parameter name, so a menu/CLI edit of {@code shape.centerZ} arrives
-   * as {@code shape.centerz}. Writing that verbatim would add a new orphan
-   * leaf ({@code centerz}) alongside the real key ({@code centerZ}) instead of
-   * overwriting it, so the edit silently vanishes on reload.
-   *
-   * <p>The canonical leaf name is resolved from the parent block's known keys:
-   * first the on-disk parent section (already materialized by
-   * {@link #materializeSectionParentIfScalar}), then the parser's loaded
-   * {@link FactoryValue} data (which carries the enum-cased sub-parameter
-   * names and the {@code name} discriminator). Falls back to the original key
-   * when no case-insensitive match is found (a genuinely new leaf).</p>
+   * Restores canonical case of a dotted leaf key from parent section or {@link FactoryValue} data,
+   * preventing lower-cased parameter names from inserting orphan leaves.
    */
   static String canonicalizeDottedKey(
       ConfigParser<?> configParser, RtpYamlConfig yaml, String dottedKey) {
@@ -476,16 +406,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
   }
 
   /**
-   * ADR-050 follow-up (2026-05-24): register typed dotted leaf parameters
-   * (e.g. {@code shape.radius}, {@code shape.centerX}, {@code shape.name})
-   * derived from a {@link FactoryValue}'s {@link FactoryValue#getData()}
-   * map. Used by the {@code Shape}/{@code VerticalAdjustor} arms of
-   * {@link #addParameters()} so the curated menu's flattened-row click
-   * path can stage individual sub-knobs without rewriting the whole
-   * shape/vert value. The {@code name} discriminator is registered as a
-   * generic string parameter so the operator can switch factory types
-   * from the same flat view. Numeric/boolean leaves get typed parameters
-   * so tab-complete and validation match {@link #addSectionParameters}.
+   * Registers typed dotted leaf parameters (e.g. {@code shape.radius}, {@code shape.name}) from a
+   * {@link FactoryValue}'s data map for menu/CLI sub-knob staging (ADR-050).
    */
   private void addFactoryValueDottedParameters(String prefix, FactoryValue<?> fv) {
     // Discriminator (`shape.name`, `vert.name`) so the factory type can
@@ -526,17 +448,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
   }
 
   /**
-   * Register the dotted sub-knob leaves for a {@code shape} / {@code vert}
-   * key whose stored value is an inheritance-reference String (e.g.
-   * {@code @config}) rather than a resolved {@link FactoryValue} or a raw
-   * {@link RtpYamlSection}. Reuses each factory entry's own sub-parameter
-   * (so {@code shape.centerX} / {@code shape.centerZ} keep the
-   * {@code CoordinateParameter} type/filter, {@code shape.radius} keeps the
-   * {@code IntegerParameter} type, etc.) and registers the {@code name}
-   * discriminator leaf so the factory type can be switched from the flat
-   * view. The union across all registered factory entries is registered so
-   * every shape/vert variant's knobs resolve regardless of which concrete
-   * type the reference ultimately inherits.
+   * Registers dotted sub-knob leaves for a {@code shape}/{@code vert} key whose stored value is an
+   * inheritance reference (e.g. {@code @config}), registering the union across all factory variants.
    */
   private void addFactoryReferenceDottedParameters(String prefix, RTP.factoryNames factoryName) {
     addParameter(
@@ -616,7 +529,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         if (nameObj != null) s = nameObj.toString();
         Object o = e.getValue();
         // Try the in-file display name first (s), then fall back to the enum
-        // name — the yaml is keyed by whichever the language_mapping points to.
+        // name - the yaml is keyed by whichever the language_mapping points to.
         String desc = descriptionFromComment(parserYaml, s);
         if (desc.isEmpty() && !s.equals(name)) desc = descriptionFromComment(parserYaml, name);
 
@@ -625,27 +538,11 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         } else if (name.contains("region")) {
           addParameter(s, new RegionParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof String && name.equalsIgnoreCase("shape")) {
-          // A region whose `shape` is stored as an inheritance-reference
-          // token (e.g. `@config`, or a bare shape name) resolves the value
-          // as a String rather than a `Shape` FactoryValue or a raw
-          // `RtpYamlSection`. Without special-casing it here the generic
-          // String branch below would register only a bare `shape`
-          // parameter with no sub-parameters and no dotted leaves, so both
-          // `shape=SQUARE <sub-knob>=...` (chaining) and
-          // `shape.centerX=...` / `shape.centerZ=...` (dotted) are rejected
-          // with "invalid command argument" and never tab-complete (the v2
-          // regression reported for referenced shapes). Register the proper
-          // ShapeParameter (restores chaining sub-knobs) plus the dotted
-          // sub-knob leaves drawn from the shape factory (restores the
-          // `shape.centerZ` grammar), reusing each shape's own sub-parameter
-          // so the type/validity filter matches (CoordinateParameter for
-          // centerX/centerZ, IntegerParameter for radius, ...).
+          // Referenced shape (@config or bare name): register ShapeParameter and factory dotted leaves.
           addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
           addFactoryReferenceDottedParameters(s, RTP.factoryNames.shape);
         } else if (o instanceof String && name.equalsIgnoreCase("vert")) {
-          // Symmetric to the referenced-`shape` case above: a `vert` stored
-          // as an inheritance-reference String must still expose its
-          // VerticalAdjustor sub-knobs and dotted leaves.
+          // Referenced vert (@config or bare name): register VertParameter and factory dotted leaves.
           addParameter(s, new VertParameter("rtp.update", desc, (uuid, s1) -> true));
           addFactoryReferenceDottedParameters(s, RTP.factoryNames.vert);
         } else if (o instanceof String) {
@@ -666,50 +563,22 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           addParameter(s, new FloatParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof Shape) {
           addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
-          // ADR-050 follow-up (2026-05-24): also register the dotted
-          // scalar leaves derived from this FactoryValue's data
-          // (`shape.radius`, `shape.centerX`, `shape.name`, ...) so
-          // the menu's flattened-row click path can stage individual
-          // sub-knobs via `/rtp config <file> shape.radius=320`. Without
-          // this, the commands-api parser rejects "shape.radius=320"
-          // with "invalid command argument shape.radius=320" because
-          // only the bare `shape` parameter is registered for built-in
-          // regions whose stored value is already a FactoryValue (not
-          // a raw RtpYamlSection). The dispatcher's dotted-key write
-          // branch (onCommand line ~254-258) routes the typed value
-          // through `RtpYamlConfig.set("shape.radius", value)`.
+          // ADR-050: register dotted scalar leaves (shape.radius, shape.centerX, ...) for menu/CLI staging.
           addFactoryValueDottedParameters(s, (FactoryValue<?>) o);
         } else if (o instanceof VerticalAdjustor) {
           addParameter(s, new VertParameter("rtp.update", desc, (uuid, s1) -> true));
-          // Same dotted-leaf registration as the shape branch above
-          // (vert is the symmetric FactoryValue-backed top-level key
-          // alongside shape).
+          // Symmetrical dotted-leaf registration for vert.
           addFactoryValueDottedParameters(s, (FactoryValue<?>) o);
         } else if (o instanceof Region) {
           addParameter(s, new RegionParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof RtpYamlSection) {
           if (s.equalsIgnoreCase("shape")) {
             addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
-            // Also register each scalar leaf as a dotted parameter
-            // (`shape.radius`, `shape.centerX`, ...) so the menu's
-            // flattened-row click path (CommandTreeMenuBuilder
-            // .buildConfigFile line ~894-910) can stage individual
-            // sub-knobs without rewriting the whole shape value. This
-            // is reached only when the stored value is still a raw
-            // RtpYamlSection - i.e. the freshly-added multi-config
-            // entry case where the shape/vert FactoryValue merge pass
-            // has not yet run. For built-in `default` the value is
-            // already a `Shape` FactoryValue and this branch is not
-            // entered. The dispatcher's dotted-key write branch
-            // (onCommand line ~254-258) routes the typed value through
-            // `RtpYamlConfig.set("shape.radius", value)`.
+            // Register dotted sub-parameters for raw RtpYamlSection before FactoryValue merge pass.
             addSectionParameters(s, (RtpYamlSection) o);
           } else if (s.equalsIgnoreCase("vert")) {
             VertParameter vertParameter = new VertParameter("rtp.update", desc, (uuid, s1) -> true);
             addParameter(s, vertParameter);
-            // Same dotted-leaf registration as the shape branch above
-            // (vert is the symmetric factory-backed RtpYamlSection
-            // top-level key).
             addSectionParameters(s, (RtpYamlSection) o);
           } else {
             addSectionParameters(s, (RtpYamlSection) o);
@@ -741,23 +610,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           SubConfigCmd childCmd =
               new SubConfigCmd(this, entryName, (FactoryValue<?>) entryValue);
           addSubCommand(childCmd);
-          // Parity with flat ConfigCmd.addCommands (lines 56-67): also
-          // register the child under its bare (suffix-stripped) name so
-          // `/rtp config <kind> <entry> ...` resolves regardless of
-          // whether the caller writes the .yml suffix. Without this
-          // alias, the STAGE-mode anvil reopen `/rtp menu config regions
-          // default` resolved through the menu's TreeCommand walker but
-          // a direct `/rtp config regions default ...` (or the menu's
-          // Apply pathway) failed with "invalid command - default".
-          // Use a dedicated {@link Alias} sub-command + `addSubCommand`
-          // (the supported registration route) rather than touching
-          // `commandLookup` directly - the latter bypasses the framework
-          // and, critically, would not be picked up by
-          // `MenuMirrorSubcommand` (which snapshots `getCommandLookup`
-          // and re-wraps each `TreeCommand` child as a mirror; a raw
-          // map entry is just as visible, but going through the
-          // documented API keeps registration uniform with everything
-          // else in `addParameters`).
+          // Register bare (suffix-stripped) Alias so `/rtp config <kind> <entry>` resolves without .yml.
           String bare = entryName.replace(".yml", "").replace(".YML", "");
           if (!bare.equalsIgnoreCase(entryName)) {
             addSubCommand(new Alias(this, bare, childCmd));
@@ -772,7 +625,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
               return new HashSet<>();
             }
           });
-      // `remove`: never offer `default` as a removable entry — the
+      // `remove`: never offer `default` as a removable entry - the
       // default.yml is required (MultiConfigParser re-extracts it from the
       // jar on construction). When the filtered set is empty (only default
       // exists), omit the `remove` parameter entirely so the menu doesn't

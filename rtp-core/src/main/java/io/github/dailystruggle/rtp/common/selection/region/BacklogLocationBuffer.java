@@ -7,38 +7,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Bounded, order-preserving FIFO buffer of pre-selected but not-yet-fully-verified
- * candidate locations for the L3 backlog cache (ADR-028).
- *
- * <p>Each entry carries a tri-state {@link Validity} tag:
- * <ul>
- *   <li>{@link Validity#UNVERIFIED} — the candidate has not yet been examined by
- *       the Anvil pre-filter.</li>
- *   <li>{@link Validity#VALIDATED} — the candidate passed the Anvil pre-filter
- *       and is ready to be promoted into L2 ({@code unkeptLocations}).</li>
- *   <li>{@link Validity#INVALIDATED} — the candidate failed the Anvil pre-filter
- *       and must be discarded; it does not stall promotion of younger entries.</li>
- * </ul>
- *
- * <h2>Order preservation</h2>
- * Insertion order is preserved. Promotion via {@link #pollContiguousValidatedHead(int)}
- * drains the head while it is {@link Validity#VALIDATED}, dropping any
- * {@link Validity#INVALIDATED} entries it encounters at the head, and stops at
- * the first {@link Validity#UNVERIFIED} entry. This is the &quot;head-blocking&quot;
- * semantics that lets L3 behave as a virtual L2 from the consumer's perspective.
- *
- * <h2>Capacity</h2>
- * The buffer is bounded by its construction-time capacity (mirroring
- * {@code backlogCacheCap} from the owning region's {@link RegionSettings}). Once
- * full, {@link #offerUnverified(RTPLocation)} returns {@code null} and the caller
- * is expected to skip the insert; older entries are <em>not</em> evicted.
- *
- * <h2>Thread-safety</h2>
- * This class is not internally synchronized. The expected usage model is
- * single-writer from {@code Region.execute()}; cross-thread visibility of
- * validity transitions is provided by the {@code volatile} field on
- * {@link BacklogEntry}. If multi-threaded mutation is ever required, callers
- * must add their own synchronization.
+ * Bounded FIFO buffer of pre-selected candidate locations for L3 backlog cache (ADR-028).
+ * Preserves insertion order and supports head-blocking promotion of validated entries.
  *
  * @see BacklogEntry
  * @see Validity
@@ -123,16 +93,7 @@ public final class BacklogLocationBuffer {
 
   private final int capacity;
   private final Deque<BacklogEntry> entries;
-  /**
-   * Guards every access to {@link #entries}. {@code ArrayDeque} is not
-   * internally synchronized, and the backlog drain / refill / verification
-   * paths can run on different async scheduler threads. Without this lock a
-   * concurrent drain could leave {@code isEmpty()==false} while
-   * {@code peekFirst()==null} (observed as an NPE in
-   * {@link #pollContiguousValidatedHead(int)}), or corrupt the deque's
-   * internal state outright. All public methods that touch {@code entries}
-   * synchronize on this monitor.
-   */
+  /** Lock guarding all access to {@link #entries} across concurrent drain/refill paths. */
   private final Object lock = new Object();
 
   /**
@@ -176,15 +137,11 @@ public final class BacklogLocationBuffer {
   }
 
   /**
-   * Drains contiguous {@link Validity#VALIDATED} entries from the head, dropping
-   * any {@link Validity#INVALIDATED} head entries it encounters along the way.
-   * Stops at the first {@link Validity#UNVERIFIED} entry, when {@code maxN}
-   * validated entries have been collected, or when the buffer is empty.
+   * Drains contiguous {@link Validity#VALIDATED} entries from head, dropping {@link Validity#INVALIDATED} entries.
+   * Stops at the first unverified entry or once {@code maxN} entries are drained.
    *
-   * @param maxN maximum number of validated entries to return; must be
-   *             non-negative. {@code 0} returns an empty list (but still drops
-   *             any {@code INVALIDATED} head entries as a side effect).
-   * @return validated entries in insertion order; never {@code null}, possibly empty
+   * @param maxN maximum validated entries to return (non-negative)
+   * @return validated entries in insertion order (never null)
    */
   public List<BacklogEntry> pollContiguousValidatedHead(int maxN) {
     if (maxN < 0) throw new IllegalArgumentException("maxN must be non-negative: " + maxN);
@@ -194,7 +151,7 @@ public final class BacklogLocationBuffer {
         BacklogEntry head = entries.peekFirst();
         // Defensive null guard: even under the lock this stays correct, and it
         // documents that a null head means "nothing more to drain" rather than
-        // an NPE — the symptom seen on the lite assembly where the L3 backlog
+        // an NPE - the symptom seen on the lite assembly where the L3 backlog
         // is unsupported but the drain path is still pulsed by Region.execute().
         if (head == null) break;
         Validity v = head.validity();
@@ -254,21 +211,9 @@ public final class BacklogLocationBuffer {
   }
 
   /**
-   * Eagerly removes every entry currently tagged {@link Validity#INVALIDATED}
-   * from anywhere in the buffer, not just the head. Intended to be called by
-   * {@code Region.processBacklog()} immediately after a bin-verification pass
-   * so explicit Anvil-pre-filter rejections are ejected (and the displayed L3
-   * occupancy reflects only candidates still in play) without waiting for the
-   * rejected entries to drift to the head via head-blocking drain.
+   * Removes all entries tagged {@link Validity#INVALIDATED} while preserving relative order.
    *
-   * <p>Order of remaining entries is preserved. {@code WorldBacklogBinIndex}
-   * may still hold weak/list references to the removed entries; this is
-   * harmless because the verification loop skips any entry whose validity is
-   * no longer {@code UNVERIFIED}, and the bin list itself becomes
-   * GC-eligible once every contributing buffer has dropped its strong
-   * references.
-   *
-   * @return the number of entries removed
+   * @return number of removed entries
    */
   public int removeInvalidated() {
     synchronized (lock) {

@@ -24,8 +24,7 @@ import java.util.logging.Level;
 /**
  * MC 26.1.2 implementation of {@link FabricVersionAdapter}.
  *
- * <p><b>Status: stub (rtp-fabric-ADR-001).</b> Bodies are deferred to a follow-up
- * Phase 2.5 task. The 26.1 porting diff against the v1_21_R1 reference is
+ * <p><b>Status: stub (rtp-fabric-ADR-001).</b> The 26.1 porting diff against the v1_21_R1 reference is
  * non-trivial and benefits from being done in one focused pass once a JDK 25
  * + Loom 1.15 build environment is verified locally:</p>
  *
@@ -43,11 +42,11 @@ import java.util.logging.Level;
  * </ul>
  *
  * <p>Methods throw {@link UnsupportedOperationException} with a
- * {@code TODO(rtp-fabric-ADR-001)} marker — fail-loud per S-006.</p>
+ * {@code TODO(rtp-fabric-ADR-001)} marker - fail-loud per S-006.</p>
  */
 public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter {
 
-    // Non-persistent RTP-owned chunk ticket — see rtp-fabric-ADR-003 / -006 / -016.
+    // Non-persistent RTP-owned chunk ticket - see rtp-fabric-ADR-003 / -006 / -016.
     // Same TicketType shape as 1.21.11: (long timeout, int flags). Omit
     // FLAG_PERSIST so the ticket is never written to level.dat (S-002 safe).
     // radius=1 → effective level 33-1=32 (FULL/BORDER, below ENTITY_TICKING):
@@ -265,17 +264,17 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
 
     @Override
     public void installEffectsDispatchers() {
-        // Independent of the unimplemented stubs above — see V26_2_R1FabricEffectDispatchers.
+        // Independent of the unimplemented stubs above - see V26_2_R1FabricEffectDispatchers.
         V26_2_R1FabricEffectDispatchers.install();
     }
 
     /**
-     * Effects-api wiring for deobf MC 26.1.2 — Phase 5 item 21 + ADR-009 step 7.
+     * Effects-api wiring for deobf MC 26.1.2 - ADR-009 step 7.
      *
      * <p>The default obf-carrier path ({@code FabricEffectsHandler.setupEffects} →
      * {@code FabricEffectRuntime.bindServer}) names intermediary NM types
      * ({@code class_3222}, {@code class_2596}, {@code class_7923}, ...) in its
-     * constant pool — these aliases don't exist on the deobfuscated 26.1.2
+     * constant pool - these aliases don't exist on the deobfuscated 26.1.2
      * runtime, so the obf path raises {@link NoClassDefFoundError} on link.
      *
      * <p>This override routes the same setup through the unobf carrier
@@ -298,7 +297,7 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // On-screen progress bars (world-scan boss-bar) — rendered through the unobf
+    // On-screen progress bars (world-scan boss-bar) - rendered through the unobf
     // carrier so the typed ServerBossEvent calls link on the deobf 26.2.x
     // runtime where the obf carrier's intermediary-remapped path no-ops.
     // -------------------------------------------------------------------------
@@ -375,7 +374,7 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
 
     /**
      * Construct an MC 26.1.2 world wrapper. Same rationale as
-     * {@link #createPlayer(Object)} — the default {@code FabricRTPWorld} in
+     * {@link #createPlayer(Object)} - the default {@code FabricRTPWorld} in
      * {@code rtp-fabric-common} is Loom-remapped to intermediary aliases
      * ({@code class_3218} for {@code ServerLevel}, etc.) that don't exist on
      * the deobfuscated 26.1.2 runtime. This module's bytecode references
@@ -388,7 +387,7 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     /**
-     * Construct a native-backed worldborder for MC 26.1.2 — direct typed
+     * Construct a native-backed worldborder for MC 26.1.2 - direct typed
      * call against {@code ServerLevel#getWorldBorder()}; common's typed
      * path can't link on the deobfuscated runtime. Mirrors the
      * {@code FabricServerAccessor#createNativeWorldBorder} divisor pair
@@ -430,7 +429,7 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
      * Apply a non-persistent RTP-owned chunk ticket via
      * {@link ServerChunkCache#addTicketWithRadius}. The ticket type's
      * {@code FLAG_PERSIST} bit is omitted, so the ticket lives only for the
-     * JVM lifetime — replaces the previous leaky
+     * JVM lifetime - replaces the previous leaky
      * {@code level.setChunkForced(cx, cz, true)} call which writes through
      * to {@code level.dat#ForcedChunks} and would survive an unclean
      * shutdown (S-002 hazard). Caller is responsible for hopping to the
@@ -460,7 +459,7 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
      * semantics).
      */
     /**
-     * Typed override — direct {@code MinecraftServer#getRunningThread()} call.
+     * Typed override - direct {@code MinecraftServer#getRunningThread()} call.
      * Replaces the reflective lookup in
      * {@code FabricServerAccessor#isPrimaryThread} and
      * {@code FabricScheduler#serverRunningThread} on this runtime.
@@ -472,7 +471,7 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     /**
-     * Typed override — direct
+     * Typed override - direct
      * {@code server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command)}
      * dispatch. Replaces the reflective lookup in
      * {@code FabricServerAccessor.FabricConsoleSender#performCommand} on this runtime.
@@ -485,7 +484,7 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     /**
-     * Typed override — direct {@code CommandSourceStack#getEntity()} +
+     * Typed override - direct {@code CommandSourceStack#getEntity()} +
      * {@code instanceof ServerPlayer} + {@code Entity#getUUID()} dispatch.
      * Replaces the reflective `findMethod` walk in
      * {@code FabricBrigadierSourceBridge#resolveSenderUuid} on this runtime.
@@ -565,7 +564,7 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // Maps-api parity — rtp-fabric-ADR-014.
+    // Maps-api parity - rtp-fabric-ADR-014.
     // Vanilla filled-map rendering for the deobf MC 26.2.x runtime.
     // -------------------------------------------------------------------------
 

@@ -18,11 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
  * Verifies that {@link FabricEventBridge#extractPlayerFromHandler(Object)} dispatches
- * to the active {@link FabricVersionAdapter} via the registry — replacing the previous
+ * to the active {@link FabricVersionAdapter} via the registry - replacing the previous
  * reflective {@code getPlayer()} / public-{@code player}-field walk.
  *
- * <p>This is the test gate for V7 of CHECKLIST-fabric-versioned-extractplayer.
- * It exercises three cases: null handler, no adapter installed, and a stub adapter
+ * <p>It exercises three cases: null handler, no adapter installed, and a stub adapter
  * that returns a sentinel object. The sentinel verifies that the bridge passes the
  * incoming handler through unchanged and returns whatever the adapter resolves.
  */

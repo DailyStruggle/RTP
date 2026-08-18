@@ -97,29 +97,11 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
   public abstract int maxY();
 
   /**
-   * Re-resolves a safe standing Y on one specific column of {@code input},
-   * identified by its in-chunk local coordinates {@code [0..15]}.
-   *
-   * <p>Unlike {@link #adjust(RTPChunk)} - which samples a small, fixed set of
-   * sub-columns and returns the first that yields a safe column - this entry
-   * point validates exactly the column the caller asks for. The cold-&gt;hot
-   * (L2-&gt;L1) promotion path uses it to re-verify the column where a candidate
-   * was originally selected (by the spiral, or by the L3 anvil backlog
-   * prefilter), instead of discarding that column and re-sampling the fixed
-   * sub-columns - which silently dropped good land locations whose safe column
-   * was not one of the sampled few.
-   *
-   * <p>The default returns {@code null}; the caller then falls back to the
-   * full {@link #adjust(RTPChunk)} sweep, so adjustors that do not override
-   * this keep their previous behavior. Async-safe with respect to chunk I/O
-   * only when {@code input} is already loaded (the promotion path guarantees
-   * this); no synchronous chunk load is triggered (S-005).
-   *
-   * @param input  the (already loaded) chunk to validate within
+   * Re-resolves safe standing Y on a specific in-chunk column {@code [0..15]}.
+   * @param input  loaded chunk to validate within
    * @param localX in-chunk X in {@code [0..15]}
    * @param localZ in-chunk Z in {@code [0..15]}
-   * @return the selected coordinates on that column, or {@code null} if no
-   *     valid Y was found there
+   * @return selected coordinates on that column, or {@code null}
    */
   public @Nullable RTPCoords adjustColumn(
       @NotNull RTPChunk input, int localX, int localZ) {
@@ -127,14 +109,11 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
   }
 
   /**
-   * Probe-backed fast path for Y selection. Default returns
-   * null (UNKNOWN); subclasses override to scan the probe's center column over
-   * {@code [probe.minY(), probe.maxY()]}. Returning null means UNKNOWN or NO-MATCH
-   * - caller falls back to {@link #adjust(RTPChunk)}. Async-safe; no chunk I/O (S-005).
+   * Probe-backed fast path for Y selection without chunk I/O (S-005).
    *
-   * @param probe     the chunk column probe to scan
-   * @param worldName the world name for context
-   * @return the selected coordinates, or {@code null} if no valid Y was found
+   * @param probe     chunk column probe to scan
+   * @param worldName world name for context
+   * @return selected coordinates, or {@code null} on miss/unknown
    */
   public @Nullable RTPCoords adjustFromProbe(
       @NotNull ChunkColumnProbe probe, @NotNull String worldName) {
@@ -146,7 +125,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
    * attribute the single {@code adjustNull} outcome into {@code light /
    * window / scan / threw} sub-buckets for platform-asymmetry diagnosis. See
    * {@link #adjustFromProbeWithReason(ChunkColumnProbe, String)}. Diagnostic
-   * only — does not change behavior.
+   * only - does not change behavior.
    */
   public enum ProbeRejectReason {
     /** The probe succeeded; {@code AdjustResult.picked()} is non-null. */
@@ -187,19 +166,11 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
   }
 
   /**
-   * Probe-backed fast path with typed rejection reason. The default delegates
-   * to {@link #adjustFromProbe(ChunkColumnProbe, String)} and maps a null
-   * result to {@link ProbeRejectReason#SCAN_MISS} (preserves back-compat for
-   * third-party adjustors that only override the nullable-return entry point).
+   * Probe-backed fast path returning a typed rejection reason on failure.
    *
-   * <p>Concrete adjustors with distinct rejection branches (e.g.
-   * {@code LinearAdjustor}, {@code JumpAdjustor}) override this to return the
-   * specific reason; their {@link #adjustFromProbe} then delegates here and
-   * unwraps {@code picked()} to keep a single source of truth.
-   *
-   * @param probe     the chunk column probe to scan
-   * @param worldName the world name for context
-   * @return the typed result; never {@code null}
+   * @param probe     chunk column probe to scan
+   * @param worldName world name for context
+   * @return adjustment result with {@link ProbeRejectReason}
    */
   public @NotNull AdjustResult adjustFromProbeWithReason(
       @NotNull ChunkColumnProbe probe, @NotNull String worldName) {

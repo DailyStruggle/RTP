@@ -30,7 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 /**
- * MC 26.x (Minecraft 26.1) implementation of {@link NeoForgeVersionAdapter} —
+ * MC 26.x (Minecraft 26.1) implementation of {@link NeoForgeVersionAdapter} -
  * the second NeoForge carrier per rtp-neoforge-ADR-001, cloned from
  * {@code V1_21_R1NeoForgeVersionAdapter} and pinned to the deobfuscated 26.1
  * runtime (NeoForge 26.1.x, Java 25).
@@ -38,7 +38,7 @@ import java.util.logging.Level;
  * <p><b>Mojmap-at-runtime.</b> NeoForge ships Mojang-mapped names at runtime,
  * and the 26.x line is fully deobfuscated (Mojang parameter names ship
  * natively), so this carrier compiles directly against {@code net.minecraft.*}
- * Mojmap types — there is no Loom/intermediary remap step. The
+ * Mojmap types - there is no Loom/intermediary remap step. The
  * {@code DistanceManager} region-ticket pair is package-private, so it is
  * resolved reflectively (one-shot, cached) by structural signature rather than
  * via an access transformer; that structural resolution is deliberately
@@ -64,7 +64,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     }
 
     // -------------------------------------------------------------------------
-    // Block-tag snapshot — typed walk of BuiltInRegistries.BLOCK (no reflection).
+    // Block-tag snapshot - typed walk of BuiltInRegistries.BLOCK (no reflection).
     // -------------------------------------------------------------------------
 
     @Override
@@ -108,7 +108,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             }
             return Collections.unmodifiableMap(immutable);
         } catch (Throwable t) {
-            // Hard failure (linkage, registry torn down) — fall back to the
+            // Hard failure (linkage, registry torn down) - fall back to the
             // reflective walk in NeoForgeServerAccessor by returning null.
             return null;
         }
@@ -406,7 +406,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     }
 
     // -------------------------------------------------------------------------
-    // Non-persistent chunk tickets — see NeoForgeVersionAdapter Javadoc and
+    // Non-persistent chunk tickets - see NeoForgeVersionAdapter Javadoc and
     // rtp-fabric-ADR-006 / -016 (ported). A non-persistent, non-expiring
     // TicketType (timeout NO_TIMEOUT, FLAG_PERSIST omitted); distance 1 ->
     // effective level 33-1=32 (FULL/BORDER, below ENTITY_TICKING): the chunk
@@ -477,7 +477,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     }
 
     // -------------------------------------------------------------------------
-    // Typed player / command seams (Mojmap — no reflection needed).
+    // Typed player / command seams (Mojmap - no reflection needed).
     // -------------------------------------------------------------------------
 
     @Override
@@ -514,7 +514,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     }
 
     // -------------------------------------------------------------------------
-    // Menu parity — typed written-book modal (NeoForge analogue of the Fabric
+    // Menu parity - typed written-book modal (NeoForge analogue of the Fabric
     // v1_21_R1 carrier's openBookMenu).
     // -------------------------------------------------------------------------
 

@@ -8,14 +8,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Regression coverage for the UTF-8 BOM (U+FEFF) tolerance in {@link
- * RtpYamlReader#parse(String)}. Files written by Windows tools (notably
- * PowerShell's {@code Add-Content -Encoding utf8} and {@code Set-Content
- * -Encoding utf8} prior to PS 6+) prepend a BOM by default; without an
- * explicit strip the BOM lands as a literal character at line 1, column
- * 0 and the lexer rejects it as "missing ':' in mapping entry". This
- * surfaced live as a devstack lobby boot failure and is
- * a recurring papercut, so it gets a dedicated guard.
+ * Tests UTF-8 BOM (U+FEFF) handling in {@link RtpYamlReader#parse(String)}.
+ *
+ * <p>Verifies BOM stripping at position 0 without corrupting mid-document characters.
  */
 class RtpYamlReaderBomTest {
 

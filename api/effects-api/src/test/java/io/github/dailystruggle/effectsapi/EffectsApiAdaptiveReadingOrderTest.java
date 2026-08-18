@@ -32,7 +32,7 @@ class EffectsApiAdaptiveReadingOrderTest {
 
     @BeforeEach
     void captureWarnings() {
-        // Reflectively snapshot is overkill — Effect exposes a setter.
+        // Reflectively snapshot is overkill - Effect exposes a setter.
         savedDefaultWarn = msg -> {}; // we don't need the prior value, only restoration to a no-op-equivalent
         Effect.setDefaultWarn(warnings::add);
         // effects-api-ADR-004: Effect#canParse / #str2Obj / #fixData delegate
@@ -69,7 +69,7 @@ class EffectsApiAdaptiveReadingOrderTest {
         PotionEffect effect = new PotionEffect(PotionEffectType.BLINDNESS);
         effect.setData("5", "true", "false", "true");
 
-        // TYPE retains its constructor default — was not clobbered with "5".
+        // TYPE retains its constructor default - was not clobbered with "5".
         assertEquals(PotionEffectType.BLINDNESS, effect.getData().get(PotionEffect.PotionKeys.TYPE),
                 "TYPE must keep its default when no token parses as a PotionEffectType");
         assertEquals(5, ((Number) effect.getData().get(PotionEffect.PotionKeys.DURATION)).intValue(),
@@ -102,7 +102,7 @@ class EffectsApiAdaptiveReadingOrderTest {
     @DisplayName("SoundEffect: numeric tokens skip the Sound-typed first key and fill the int+float keys")
     void soundEffectSkipsTypeWhenOnlyNumbersGiven() {
         SoundEffect effect = new SoundEffect(Sound.ENTITY_PLAYER_LEVELUP);
-        // First key is TYPE (Sound) — none of these tokens parse as a Sound.
+        // First key is TYPE (Sound) - none of these tokens parse as a Sound.
         // VOLUME/PITCH default to Integer (100/100); DX/DY/DZ default to Double.
         // Adaptive order must skip TYPE and feed:
         //   "50","200" -> VOLUME, PITCH (int-parsable),
@@ -127,7 +127,7 @@ class EffectsApiAdaptiveReadingOrderTest {
     @DisplayName("SoundEffect: a leading float token leapfrogs Sound + Integer slots to land on the first Double key")
     void soundEffectFloatTokenSkipsToFloatKey() {
         SoundEffect effect = new SoundEffect(Sound.ENTITY_PLAYER_LEVELUP);
-        // "0.5" parses neither as Sound nor as Integer — it must skip TYPE,
+        // "0.5" parses neither as Sound nor as Integer - it must skip TYPE,
         // VOLUME, PITCH and land on DX (the first Double-typed key).
         effect.setData("0.5");
 

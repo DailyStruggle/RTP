@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Verifies two contracts:
  * <ol>
  *   <li>{@link ServerAccessorImpl#getBiomes()} delegates to
- *       {@code org.bukkit.Registry.BIOME} — the Paper-specific registry path —
+ *       {@code org.bukkit.Registry.BIOME} - the Paper-specific registry path -
  *       and returns a non-empty, upper-case set of biome keys.</li>
  *   <li>The Paper {@link BukkitSchedulerImpl} dispatches synchronous tasks
  *       correctly, confirming the {@code getChunkAtAsync} Paper scheduler

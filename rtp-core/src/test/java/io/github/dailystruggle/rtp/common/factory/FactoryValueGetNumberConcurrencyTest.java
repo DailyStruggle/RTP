@@ -14,8 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression for {@link FactoryValue#getNumber} CME race (BIOME_LOOKUP_PERF_PLAN
- * PR-9+, 2026-04-26): pre-fix unconditional cache-back races fail-fast iterators
+ * Regression for {@link FactoryValue#getNumber} CME race: pre-fix unconditional cache-back races fail-fast iterators
  * on {@code toString}/{@code toYAML}/{@code setData}. Asserts post-fix:
  * Number-typed reads never write back; String-typed reads cache once under
  * {@code synchronized(data)}; {@code getData()} returns a snapshot.
@@ -60,14 +59,8 @@ class FactoryValueGetNumberConcurrencyTest {
   }
 
   /**
-   * Race many readers against {@code toString} (fail-fast iterator on the
-   * underlying {@code EnumMap}) plus a writer that invokes
-   * {@code setData(EnumMap)} repeatedly. Pre-fix this would intermittently
-   * throw CME from the {@code toString} iterator the moment {@code getNumber}
-   * wrote back its cached parse on the {@code STRINGY} key. Post-fix the
-   * cache-back is conditional and synchronized, and {@code toString} iterates
-   * a {@link FactoryValue#getData()} snapshot, so no iterator ever sees a
-   * concurrent modification.
+   * Concurrency test: races readers against {@code toString} and {@code setData(EnumMap)}.
+   * Verifies no CME occurs during snapshot reads and synchronized cache-back.
    */
   @Test
   void concurrent_getNumber_and_toString_doNotThrow() throws Exception {
@@ -140,7 +133,7 @@ class FactoryValueGetNumberConcurrencyTest {
 
   /**
    * Sanity: {@code getNumber} on a Number-typed value returns the same
-   * boxed instance and does not mutate the underlying map — pre-fix this
+   * boxed instance and does not mutate the underlying map - pre-fix this
    * write-back was the source of the CME race; post-fix the hot path is a
    * pure read.
    */

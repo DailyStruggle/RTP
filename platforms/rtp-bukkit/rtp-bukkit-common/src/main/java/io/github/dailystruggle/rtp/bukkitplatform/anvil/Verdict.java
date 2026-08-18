@@ -6,7 +6,7 @@ package io.github.dailystruggle.rtp.bukkitplatform.anvil;
  *
  * <p>The pre-filter is <strong>advisory only</strong>. A {@link #REJECT} verdict is trusted
  * to short-circuit the candidate off-thread; an {@link #ACCEPT} verdict is <em>not</em>
- * authoritative — it merely indicates that the region file passed the cheap on-disk sample,
+ * authoritative - it merely indicates that the region file passed the cheap on-disk sample,
  * and the candidate still proceeds through the existing live-load path where
  * {@code chunk.isSafe(...)} remains the source of truth.</p>
  */
@@ -26,7 +26,7 @@ public enum Verdict {
   ACCEPT,
 
   /**
-   * The pre-filter did not produce a definitive answer — region file missing, custom
+   * The pre-filter did not produce a definitive answer - region file missing, custom
    * generator in use, chunk currently loaded, unsupported {@code DataVersion}, unsupported
    * compression mode (e.g. LZ4 in phase 1), or any I/O error. The candidate proceeds
    * through the existing live-load path unchanged.

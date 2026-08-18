@@ -41,14 +41,12 @@ public final class SafetyToken {
   }
 
   /**
-   * Build a material token (possibly wildcard).
+   * Builds a material token (possibly wildcard; ADR-017).
    *
-   * @param identifier upper-snake material name, or {@link #WILDCARD}. Must be non-empty.
-   * @param predicates optional bracket predicates; may be {@code null} or empty.
-   * @param sourceToken original token string, retained for diagnostics.
-   * @throws IllegalArgumentException if {@code identifier} is empty, or if it is the
-   *     wildcard and {@code predicates} is empty (bare {@code *} is rejected by
-   *     ADR-017 &sect;1).
+   * @param identifier  material name or {@link #WILDCARD}
+   * @param predicates  optional state predicates
+   * @param sourceToken original token string
+   * @throws IllegalArgumentException if identifier is empty or bare wildcard without predicates
    */
   public static SafetyToken material(String identifier, List<StatePredicate> predicates,
                                      String sourceToken) {

@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
  * (block safety) and REQ-RTP-S-003 (claim verifiers) in a single pass, including
  * the async-verifier timeout leg via a hang-mock registered/unregistered in a
  * {@code try/finally}. No chunk I/O; coords are sampled from the first
- * {@link RTPWorld}. See {@code RUNTIME_TEST_SUITE_PLAN.md &sect;4}.
+ * {@link RTPWorld}.
  */
 public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
 
@@ -80,7 +80,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
   static Result runProbe() {
     Result r = new Result();
 
-    // --- Step 1: sample a coord directly from the engine's world list. ---
+    // Sample a coord directly from the engine's world list.
     // We deliberately do not force a chunk load (S-005). Using spawn-relative
     // coordinates mirrors what the queue would serve for a freshly-loaded
     // world.
@@ -93,7 +93,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
     RTPCoords sampled = new RTPCoords(world.name(), 0, 64, 0);
     r.sampledWorld = world.name();
 
-    // --- Step 2: assert unsafe-block lookup uses a cached snapshot. ---
+    // Assert unsafe-block lookup uses a cached snapshot.
     // LocationGenerator materialises BlocksKeys.unsafeBlocks once per
     // getLocation() call and iterates it per candidate; the list reference
     // must therefore be stable across repeated reads inside a single
@@ -115,9 +115,9 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
     // configured unsafeBlocks list length without scraping the YAML.
     if (snap1 instanceof List<?>) r.unsafeBlocksSize = ((List<?>) snap1).size();
 
-    // --- Step 3 & 4: round-trip through GlobalRegionVerifiers with a
-    // hang-mock async verifier, and assert the returned value is a
-    // live CompletableFuture that is NOT pre-completed.
+    // Round-trip through GlobalRegionVerifiers with a hang-mock async
+    // verifier, and assert the returned value is a live CompletableFuture
+    // that is NOT pre-completed.
     CountDownLatch verifierEntered = new CountDownLatch(1);
     AtomicBoolean verifierShouldHang = new AtomicBoolean(true);
     Function<RTPCoords, CompletableFuture<Boolean>> hangMock =

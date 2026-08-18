@@ -6,34 +6,7 @@ import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 
 /**
  * SPI: resolves a declarative {@link ChartSpec} into a concrete pair of
- * {@link ChartRenderer} + {@link ChartModel} that the active
- * {@link io.github.dailystruggle.mapsapi.MapBinding} can paint.
- *
- * <p>Authored as part of the ADR-047 declarative chart-composition bridge
- * (REQ-RTP-MAP-006). Each implementation handles exactly one
- * {@link ChartSpec.Kind} and is registered in {@link ChartSpecResolvers}.
- * Resolvers are pure data transforms over already-collected state
- * (e.g. {@code MemoryShape.badKeysSnapshot()},
- * {@code io.github.dailystruggle.metrics.api.MetricsSnapshot}) and shall
- * never:
- *
- * <ul>
- *   <li>perform synchronous chunk I/O (REQ-RTP-S-005),</li>
- *   <li>block on {@code CompletableFuture#get} / {@code #join}
- *       (REQ-RTP-F-008),</li>
- *   <li>import {@code org.bukkit.*} or {@code net.minecraft.*}
- *       (rtp-core platform-neutrality),</li>
- *   <li>silently swallow a failure (REQ-RTP-S-004): on any unsatisfiable
- *       request, throw {@link UnresolvableChartSpecException} so
- *       {@link MapDispatch} can surface the configurable
- *       {@code mapUnavailable} message.</li>
- * </ul>
- *
- * <p>The {@link Resolution} record is intentionally heterogeneous-safe: it
- * carries an erased {@code ChartRenderer<ChartModel>} reference so callers
- * can hand it straight to
- * {@link io.github.dailystruggle.mapsapi.MapBinding#renderEphemeral}
- * without a cast (see {@link MapDispatch#paint}).
+ * {@link ChartRenderer} + {@link ChartModel} (REQ-RTP-MAP-006, ADR-047).
  *
  * @see ChartSpec
  * @see ChartSpecResolvers
@@ -43,27 +16,19 @@ import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 public interface ChartSpecResolver {
 
   /**
-   * Composes the renderer + model pair for {@code spec}. Implementations are
-   * called on the thread that invoked {@link MapDispatch#paint} (typically a
-   * scheduler-async worker) and shall be reentrant.
+   * Composes the renderer + model pair for {@code spec}.
    *
    * @param spec the declarative request; never {@code null}
    * @return a non-null {@link Resolution}
-   * @throws UnresolvableChartSpecException if the underlying data source is
-   *     unavailable (e.g. unknown region, world unloaded, snapshot empty in
-   *     a way the resolver treats as failure)
+   * @throws UnresolvableChartSpecException if data is unavailable
    */
   Resolution resolve(ChartSpec spec) throws UnresolvableChartSpecException;
 
   /**
-   * The composed pair handed back to {@link MapDispatch}. The
-   * {@code renderer} type parameter is intentionally erased to
-   * {@link ChartModel} so heterogeneous resolvers can be registered behind
-   * the same SPI; the {@code model} is the concrete subtype the renderer
-   * expects, paired by construction.
+   * Composed renderer and model pair handed to {@link MapDispatch}.
    *
    * @param renderer the chart renderer; never {@code null}
-   * @param model    the chart model matched to {@code renderer}; never {@code null}
+   * @param model    the matched chart model; never {@code null}
    */
   record Resolution(ChartRenderer<ChartModel> renderer, ChartModel model) {
     /** Validates that neither component is null. */
@@ -77,9 +42,7 @@ public interface ChartSpecResolver {
     }
 
     /**
-     * Convenience factory that erases the {@code <M>} type parameter so a
-     * resolver may write {@code Resolution.of(HeatmapRenderer.INSTANCE,
-     * heatmap)} without a manual unchecked cast at the call site.
+     * Erases the {@code <M>} type parameter for convenient resolution factory.
      *
      * @param <M>      the concrete chart model type
      * @param renderer the chart renderer; never {@code null}

@@ -14,23 +14,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 
 /**
- * The {@code /rtp gui} subcommand: an explicit opener for whatever menu a GUI addon
- * has bound to the bare-{@code /rtp} root action (ADR-056).
- *
- * <p>Lives in {@code rtp-core} (not in the GUI addon) on purpose: the released RTP jar
- * relocates {@code commands-api} into its own package, so a {@code CommandsAPICommand}
- * compiled inside an addon jar (which links the un-relocated package) would fail to
- * resolve at runtime. By keeping the command in core it is relocated consistently with
- * the rest of the jar, and it couples to the addon only through the platform-neutral
- * {@link RootActionRegistry} hook - the same single source of truth the bare {@code /rtp}
- * uses - so the addon never needs to touch {@code commands-api}.
- *
- * <p>It is registered on every platform's {@code /rtp} root command, so it is present
- * however the GUI addon was loaded (standalone plugin/mod, {@code plugins/RTP/addons/}
- * folder, or extracted from the bundled RTP jar) and even when no GUI addon is present.
- * When the bound action opens a menu the command is done; when no action is bound, the
- * action declines, or the caller is not a resolvable player, it defers to RTP's classic
- * teleport rather than silently doing nothing.
+ * The {@code /rtp gui} subcommand: an explicit opener for menu actions bound to /rtp (ADR-056).
  */
 public final class GuiCmd extends BaseRTPCmdImpl {
 

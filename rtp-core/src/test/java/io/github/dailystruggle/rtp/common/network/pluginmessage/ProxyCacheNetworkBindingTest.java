@@ -27,8 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Unit coverage for the proxy-cache tier transport
- * (PROPOSAL-proxy-as-availability-store). The fake bridge stands in for the
+ * Unit coverage for the proxy-cache tier transport. The fake bridge stands in for the
  * proxy companion: {@code pushHeartbeatToProxy} stores the row in a shared
  * cache, and {@code requestSnapshot} replays every cached row back to the
  * caller's inbound sink (exactly what the Velocity companion will do).

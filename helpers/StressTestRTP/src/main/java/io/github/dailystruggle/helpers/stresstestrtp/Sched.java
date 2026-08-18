@@ -18,19 +18,19 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * <p>We resolve the right target reflectively at plugin enable, then route:
  * <ul>
- *   <li>{@link #runAsync(Plugin, Runnable)} — TPS / MSPT / heap sampling and
+ *   <li>{@link #runAsync(Plugin, Runnable)} - TPS / MSPT / heap sampling and
  *       CSV writes. Always async.</li>
- *   <li>{@link #runOnPlayer(Plugin, Player, Runnable)} — anything that must
+ *   <li>{@link #runOnPlayer(Plugin, Player, Runnable)} - anything that must
  *       run on the thread that owns the player (command dispatch attributed
  *       to the player). On Folia this targets the player's {@code EntityScheduler}.
  *       On Spigot/Paper it falls back to the main thread.</li>
- *   <li>{@link #runGlobal(Plugin, Runnable)} — server-global state (no
+ *   <li>{@link #runGlobal(Plugin, Runnable)} - server-global state (no
  *       specific entity). On Folia this is the {@code GlobalRegionScheduler};
  *       on Spigot/Paper it is the main thread.</li>
  * </ul>
  *
  * <p>All reflective method handles are resolved once and cached. There is
- * intentionally no fallback to {@code .get()} on a future — see the helpers/
+ * intentionally no fallback to {@code .get()} on a future - see the helpers/
  * contract note in {@code build.gradle} and rules S-005 / Folia threading
  * in {@code .junie/AGENTS.md}.
  */
@@ -130,7 +130,7 @@ public final class Sched {
                         (java.util.function.Consumer<Object>) task -> r.run(),
                         period, period, java.util.concurrent.TimeUnit.MILLISECONDS);
             } catch (ReflectiveOperationException e) {
-                // fall through to BukkitScheduler — likely to throw on Folia,
+                // fall through to BukkitScheduler - likely to throw on Folia,
                 // but at least surfaces a useful stack trace.
             }
         }
@@ -180,7 +180,7 @@ public final class Sched {
             if (id > 0) Bukkit.getScheduler().cancelTask(id);
             return;
         }
-        // Folia ScheduledTask — call cancel() reflectively to avoid compile-time
+        // Folia ScheduledTask - call cancel() reflectively to avoid compile-time
         // dependency on io.papermc.paper.threadedregions.scheduler.ScheduledTask.
         try {
             handle.getClass().getMethod("cancel").invoke(handle);

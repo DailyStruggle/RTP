@@ -13,13 +13,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for Rectangle shape covering:
- * - getRange() boundary conditions (width, height, zero, large)
- * - xzToLocation() with and without rotation
- * - contains() with and without rotation, inside/outside/boundary
- * - locationToXZ() round-trip fidelity
- * - xzToLocation(MutableRTPCoords) mirrors long-variant
- * - Extreme values (0, negative, large)
+ * Tests for Rectangle shape range, coordinate conversion, bounds, and rotation.
  */
 public class RectangleTest {
 
@@ -52,7 +46,7 @@ public class RectangleTest {
     }
 
     // -------------------------------------------------------------------------
-    // xzToLocation() — no rotation
+    // xzToLocation() - no rotation
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "xzToLocation({0},{1}) no rotation")
@@ -99,7 +93,7 @@ public class RectangleTest {
     }
 
     // -------------------------------------------------------------------------
-    // xzToLocation() — with rotation
+    // xzToLocation() - with rotation
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "xzToLocation({0},{1}) rotation={2}")
@@ -121,7 +115,7 @@ public class RectangleTest {
     }
 
     // -------------------------------------------------------------------------
-    // contains() — no rotation
+    // contains() - no rotation
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "contains({0},{1}) width={2} height={3} => {4}")
@@ -151,7 +145,7 @@ public class RectangleTest {
     }
 
     // -------------------------------------------------------------------------
-    // contains() — with rotation (non-zero degrees branch)
+    // contains() - with rotation (non-zero degrees branch)
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "contains({0},{1}) rotation={2} => {3}")

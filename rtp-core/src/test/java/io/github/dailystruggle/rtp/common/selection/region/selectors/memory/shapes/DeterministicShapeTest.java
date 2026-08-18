@@ -10,16 +10,8 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Verifies that every MemoryShape subclass produces a fully deterministic rand() sequence
- * when a seeded Random is injected via setRng(). This eliminates RNG as a source of
- * flakiness in unit tests — the same seed always produces the same coordinate outputs.
- *
- * <p>Covered requirements:
- * <ul>
- *   <li>REQ-CORE-F-003 — uniform distribution guarantee (reproducible under seed)</li>
- *   <li>REQ-CORE-F-004 — deterministic execution, no rerolling</li>
- *   <li>REQ-RTP-F-007  — uniform spatial distribution (verifiable via fixed-seed sampling)</li>
- * </ul>
+ * Verifies deterministic {@code MemoryShape#rand()} sequence when seeded RNG is injected.
+ * Traces REQ-CORE-F-003, REQ-CORE-F-004, and REQ-RTP-F-007.
  */
 public class DeterministicShapeTest {
 
@@ -121,7 +113,7 @@ public class DeterministicShapeTest {
 
     // -------------------------------------------------------------------------
     // rand() output is within-bounds and locationToXZ round-trips through the spiral
-    // REQ-CORE-F-004 — 1D spiral mapping must be lossless for locations it actually emits
+    // REQ-CORE-F-004 - 1D spiral mapping must be lossless for locations it actually emits
     // -------------------------------------------------------------------------
 
     @Test

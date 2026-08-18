@@ -242,14 +242,11 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
   }
 
   /**
-   * Register a new parser named {@code name}, seeded from the already-registered
-   * parser {@code fromName} instead of the bundled {@code default.yml}. Mirrors
-   * the {@code /rtp config regions add} region-creation flow but lets the caller
-   * choose the originating file. Falls back to default-seeding when
-   * {@code fromName} is absent.
+   * Register a new parser seeded from an existing parser {@code fromName}.
+   * Falls back to default template if {@code fromName} is missing.
    *
    * @param name     the new parser/file name
-   * @param fromName the originating parser/file name to clone from
+   * @param fromName originating parser/file name to clone from
    */
   public void addParser(String name, String fromName) {
     String safe = ConfigParser.sanitizeName(name);

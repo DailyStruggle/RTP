@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * C6 §1.6.1 of {@code CHECKLIST-metrics-and-multiserver.md} — verifies the
+ * C6 §1.6.1 of {@code CHECKLIST-metrics-and-multiserver.md} - verifies the
  * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#getTPS(int)
  * RTPServerAccessor#getTPS} contract that a non-NOOP {@link MetricsBinding}
  * overrides the per-platform fallback constant on every adapter, and that
@@ -54,13 +54,13 @@ class RTPServerAccessorTpsParityTest {
         @Override public int softCap() { return 0; }
     }
 
-    /** Tiny concrete subclass — only present so {@link AbstractServerAccessor}
+    /** Tiny concrete subclass - only present so {@link AbstractServerAccessor}
      *  can be instantiated. Its {@code getTPS(int)} is the inherited C6 routing
      *  implementation under test.
      */
     private static AbstractServerAccessor newAccessor() {
         return new AbstractServerAccessor() {
-            // No overrides — we exercise the inherited concrete getTPS(int).
+            // No overrides - we exercise the inherited concrete getTPS(int).
         };
     }
 
@@ -100,7 +100,7 @@ class RTPServerAccessorTpsParityTest {
 
     @Test
     void bukkit_accessor_falls_back_when_binding_is_noop() {
-        // Binding is the NOOP — snapshot.tps1m is NaN — accessor should
+        // Binding is the NOOP - snapshot.tps1m is NaN - accessor should
         // return *something* (the reflective recentTps probe is what runs
         // in production; under the test classpath Bukkit.getServer() may
         // be null so the catch returns 20.0). We only assert finiteness +

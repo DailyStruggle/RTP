@@ -17,8 +17,7 @@ import java.util.logging.Level;
  * extraction).
  *
  * <p>Installed onto {@code RTP.testUmbrellaContext} from
- * {@code RTPBukkitPlugin} during {@code onEnable}; see
- * {@code docs/dev/scratch/CHECKLIST-fabric-rtp-test-full.md} Phase 1.4.
+ * {@code RTPBukkitPlugin} during {@code onEnable}.
  */
 public final class BukkitTestUmbrellaSender implements TestUmbrellaSender {
 
@@ -49,8 +48,7 @@ public final class BukkitTestUmbrellaSender implements TestUmbrellaSender {
    * Delegates to {@link SendMessage#addInterceptor(Consumer)} so the
    * {@code TestFullCmd} {@code FullAudit} observes every caller-facing
    * line emitted through the Bukkit sender for the duration of an
-   * umbrella sweep (REQ-RTP-S-004 audit channel; see
-   * {@code docs/dev/scratch/CHECKLIST-fabric-rtp-test-full.md} Phase 2.1).
+   * umbrella sweep (REQ-RTP-S-004 audit channel).
    */
   @Override
   public void addAuditInterceptor(Consumer<String> interceptor) {

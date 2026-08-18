@@ -8,10 +8,10 @@ import org.jetbrains.annotations.NotNull;
  *
  * <ul>
  *   <li>{@code io.github.dailystruggle.effectsapi.bukkit.BukkitEffectRuntime}
- *       — backed by Bukkit's scheduler, {@code World#playSound}, {@code World#spawnParticle}
+ *       - backed by Bukkit's scheduler, {@code World#playSound}, {@code World#spawnParticle}
  *       and {@code Player#addPotionEffect}.</li>
  *   <li>{@code io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime}
- *       — backed by {@code MinecraftServer#execute}, {@code ServerLevel#playSound},
+ *       - backed by {@code MinecraftServer#execute}, {@code ServerLevel#playSound},
  *       {@code ServerLevel#sendParticles} and clientbound packets.</li>
  * </ul>
  *
@@ -27,7 +27,7 @@ import org.jetbrains.annotations.NotNull;
  * for sounds, {@code "minecraft:flame"} for particles, {@code "minecraft:speed"}
  * for potions). Each implementation resolves them to its native enum / registry
  * lookup. Unknown keys shall be logged via {@code RTP.log} and treated as no-ops
- * (per S-007 — never silently dropped without a configurable warning).</p>
+ * (per S-007 - never silently dropped without a configurable warning).</p>
  *
  * <p><b>Thread context (S-005):</b> Implementations are responsible for
  * dispatching all calls onto the correct thread. On Folia, {@link #schedule}
@@ -64,9 +64,9 @@ public interface EffectRuntime {
      *
      * @param target    the spatial / per-player target; must not be {@code null}
      * @param soundKey  resource-location key; must not be {@code null}
-     * @param volume    sound volume (typically {@code 0.0f}–{@code 1.0f}; values
+     * @param volume    sound volume (typically {@code 0.0f}-{@code 1.0f}; values
      *                  above {@code 1.0f} extend audible range as on vanilla)
-     * @param pitch     sound pitch ({@code 0.5f}–{@code 2.0f} on vanilla)
+     * @param pitch     sound pitch ({@code 0.5f}-{@code 2.0f} on vanilla)
      */
     void playSound(@NotNull EffectTarget target, @NotNull String soundKey,
                    float volume, float pitch);
@@ -81,7 +81,7 @@ public interface EffectRuntime {
      * @param dx            x-axis spread (block radius)
      * @param dy            y-axis spread (block radius)
      * @param dz            z-axis spread (block radius)
-     * @param speed         particle motion speed (vanilla parameter; typically {@code 0.0}–{@code 1.0})
+     * @param speed         particle motion speed (vanilla parameter; typically {@code 0.0}-{@code 1.0})
      */
     void spawnParticle(@NotNull EffectTarget target, @NotNull String particleKey,
                        int count, double dx, double dy, double dz, double speed);

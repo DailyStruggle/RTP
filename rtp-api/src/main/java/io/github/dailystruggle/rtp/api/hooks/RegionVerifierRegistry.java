@@ -8,25 +8,11 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * Registry of third-party predicates that veto candidate teleport coordinates before
- * a player is sent there.
+ * Registry of predicates that veto candidate teleport coordinates (S-003, ADR-026).
+ * Extension point for claim plugins and custom veto logic.
  *
- * <p>This is the canonical extension point for claim-plugin integrations
- * (GriefPrevention, GriefDefender, WorldGuard, Lands, RedProtect, Towny,
- * Factions, SaberFactions, FactionsBridge, Residence, CrashClaim, HuskClaims, KingdomsX) and for any addon that wants to refuse locations based on its own rules
- * (REQ-RTP-S-003, REQ-API-F-003). It is the API-level facade in front of
- * {@code rtp-core}'s {@code GlobalRegionVerifiers}; the legacy static entry points on
- * {@code GlobalRegionVerifiers} continue to work for source compatibility (ADR-026).
- *
- * <p><b>Threading.</b> Sync verifiers run on the verification chain that already
- * services teleport candidates and shall complete quickly without blocking I/O. Async
- * verifiers shall return a {@link CompletableFuture} and may perform I/O off the main
- * thread, but shall not block a region/tick thread (REQ-RTP-S-005, see Folia threading
- * rules in {@code .junie/AGENTS.md}).
- *
- * <p><b>Failure mode.</b> A verifier that throws is logged and treated as if it
- * returned {@code false} (location rejected); RTP will not silently swallow the
- * failure (REQ-RTP-S-004).
+ * <p><b>Threading:</b> Sync verifiers must not block. Async verifiers must return
+ * a future and never block a tick thread (S-005). Throwing vetoes the location (S-004).
  */
 @PublicApi
 public interface RegionVerifierRegistry {

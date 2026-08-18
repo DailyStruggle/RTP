@@ -15,19 +15,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Parameterized edge-case tests for all MemoryShape subclasses.
- *
- * Covers:
- * - Zero radius / min-radius boundary
- * - Large radius (max-int-like values)
- * - All rand() modes: ACCUMULATE, NEAREST, REROLL
- * - weight parameter effect on distribution skew
- * - uniquePlacements flag
- * - expand flag
- * - Distribution uniformity across 10,000 samples (Circle, Square, Rectangle,
- *   Circle_Normal, Square_Normal)
- * - contains() boundary checks
- * - locationToXZ round-trip
+ * Parameterized edge-case and boundary tests for all {@link MemoryShape} subclasses.
  */
 public class ShapeEdgeCaseTest {
 
@@ -41,7 +29,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // Radius boundary tests — Circle
+    // Radius boundary tests - Circle
     // -------------------------------------------------------------------------
 
     @Test
@@ -79,7 +67,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // Radius boundary tests — Square
+    // Radius boundary tests - Square
     // -------------------------------------------------------------------------
 
     @Test
@@ -101,7 +89,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // Radius boundary tests — Rectangle
+    // Radius boundary tests - Rectangle
     // -------------------------------------------------------------------------
 
     @Test
@@ -130,7 +118,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // rand() mode: NEAREST — Circle
+    // rand() mode: NEAREST - Circle
     // -------------------------------------------------------------------------
 
     @Test
@@ -150,7 +138,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // rand() mode: REROLL — Circle
+    // rand() mode: REROLL - Circle
     // -------------------------------------------------------------------------
 
     @Test
@@ -171,7 +159,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // rand() mode: ACCUMULATE — Square
+    // rand() mode: ACCUMULATE - Square
     // -------------------------------------------------------------------------
 
     @Test
@@ -197,7 +185,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // weight parameter — Circle
+    // weight parameter - Circle
     // -------------------------------------------------------------------------
 
     @Test
@@ -227,7 +215,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // expand flag — Circle
+    // expand flag - Circle
     // -------------------------------------------------------------------------
 
     @Test
@@ -247,7 +235,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // uniquePlacements — Circle
+    // uniquePlacements - Circle
     // -------------------------------------------------------------------------
 
     @Test
@@ -309,11 +297,11 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // Distribution uniformity — parameterized across all 5 shapes
+    // Distribution uniformity - parameterized across all 5 shapes
     // -------------------------------------------------------------------------
 
     static Stream<String> uniformShapeNames() {
-        // Normal-distribution shapes are bell-curved — excluded from uniform bucket check
+        // Normal-distribution shapes are bell-curved - excluded from uniform bucket check
         return Stream.of("CIRCLE", "SQUARE", "RECTANGLE");
     }
 
@@ -340,7 +328,7 @@ public class ShapeEdgeCaseTest {
             if (bucket >= 0 && bucket < buckets) counts[bucket]++;
         }
 
-        // Each bucket should have at least 1% of samples (very loose — just checks no dead zones)
+        // Each bucket should have at least 1% of samples (very loose - just checks no dead zones)
         int minExpected = samples / (buckets * 10);
         for (int b = 0; b < buckets; b++) {
             assertTrue(counts[b] >= minExpected,
@@ -353,7 +341,7 @@ public class ShapeEdgeCaseTest {
     @ParameterizedTest(name = "normalDistribution_centreHeavy_{0}")
     @MethodSource("allShapeNames")
     void allShapes_10kSamples_produceNonZeroOutput(String shapeName) {
-        // Verifies all shapes produce output without throwing — distribution shape is not asserted
+        // Verifies all shapes produce output without throwing - distribution shape is not asserted
         MemoryShape<?> shape = createShape(shapeName);
         shape.setRng(new Random(SEED));
 
@@ -374,7 +362,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // contains() — Circle
+    // contains() - Circle
     // -------------------------------------------------------------------------
 
     @Test
@@ -412,7 +400,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // contains() — Square
+    // contains() - Square
     // -------------------------------------------------------------------------
 
     @Test
@@ -437,7 +425,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // locationToXZ round-trip — Square
+    // locationToXZ round-trip - Square
     // -------------------------------------------------------------------------
 
     @Test
@@ -459,7 +447,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // Circle_Normal — basic sanity
+    // Circle_Normal - basic sanity
     // -------------------------------------------------------------------------
 
     @Test
@@ -485,7 +473,7 @@ public class ShapeEdgeCaseTest {
     }
 
     // -------------------------------------------------------------------------
-    // Square_Normal — basic sanity
+    // Square_Normal - basic sanity
     // -------------------------------------------------------------------------
 
     @Test

@@ -13,43 +13,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * Regression for the "Lifetime Chunks Loaded ~= 2x cached locations" double-count bug
- * (CHANGELOG 3.0.0-beta.1, "Lifetime Chunks Loaded (/rtp info) double-counted every live
- * chunk load").
- *
- * <p>{@code RTPWorld.getOrLoadChunk} composes {@code getChunkAt} (probe) and
- * {@code getChunkAtAsync} (live load) to satisfy a single logical chunk-load attempt.
- * Platform adapters must increment {@code RTPWorld.totalChunkLoads} <strong>at most
- * once per logical attempt</strong>: only on the live-load path. Probe-only paths
- * (anvil-cache hits) and {@code getCachedChunk} hits must NOT bump the counter.
- *
- * <p>This test simulates the corrected adapter accounting with a {@link MockRTPWorld}
- * subclass that increments {@code totalChunkLoads} only inside {@code getChunkAtAsync}
- * (the live-load entry point). Each scenario asserts the resulting counter delta:
- * <ul>
- *   <li>Cache hit — {@code getCachedChunk} returns directly, no increment.</li>
- *   <li>Probe-cache hit — probe populates the cache, no live load, no increment.</li>
- *   <li>Probe-fallthrough — probe yields no cache, live load fires, exactly one
- *       increment.</li>
- * </ul>
+ * Regression: totalChunkLoads double-count accounting tests.
+ * {@code RTPWorld.getOrLoadChunk} increments {@code totalChunkLoads} at most once per logical
+ * attempt (live loads only; cache hits and probe hits do not increment).
  */
 class GetOrLoadChunkTotalLoadsAccountingTest {
 
     /**
-     * Adapter-shaped fake: {@code getChunkAt} (probe) does NOT increment;
-     * {@code getChunkAtAsync} (live load) increments exactly once. Mirrors the
-     * post-fix semantics of {@code BukkitRTPWorld}, {@code FoliaRTPWorld}, and
-     * {@code FabricRTPWorld}.
-     *
-     * <p>Two test hooks:
-     * <ul>
-     *   <li>{@code probePopulatesCache} — when {@code true}, {@code getChunkAt}
-     *       behaves as if the anvil probe yielded a cached view (subsequent
-     *       {@code getCachedChunk} call returns non-null).</li>
-     *   <li>{@code preCached} — when {@code true}, the very first
-     *       {@code getCachedChunk} call (before any probe) returns non-null,
-     *       simulating a live-chunk-cache or kept-cache replay.</li>
-     * </ul>
+     * Fake world where probe ({@code getChunkAt}) does not increment and
+     * async live load ({@code getChunkAtAsync}) increments once.
      */
     private static class AccountingFakeWorld extends MockRTPWorld {
         volatile boolean probePopulatesCache = false;
@@ -64,7 +36,7 @@ class GetOrLoadChunkTotalLoadsAccountingTest {
 
         @Override
         public CompletableFuture<Long> getChunkAt(int cx, int cz) {
-            // Probe entry — explicitly does NOT increment totalChunkLoads.
+            // Probe entry - explicitly does NOT increment totalChunkLoads.
             // Resolve to the canonical key so the post-probe getCachedChunk lookup
             // can run; the *behavior* of that lookup (cache hit vs miss) is driven
             // by the test hooks below.
@@ -74,12 +46,12 @@ class GetOrLoadChunkTotalLoadsAccountingTest {
 
         @Override
         public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
-            // Live-load entry — the only place that increments. Mirrors the
+            // Live-load entry - the only place that increments. Mirrors the
             // post-fix accounting in BukkitRTPWorld#loadChunkFuture / FoliaRTPWorld
             // #loadLiveChunk + #getChunkAtAsync / FabricRTPWorld#getChunkAt's
             // server.submit body.
             totalChunkLoads.incrementAndGet();
-            // After a live load completes, the cache will hold an entry — flip the
+            // After a live load completes, the cache will hold an entry - flip the
             // hook so getCachedChunk(key) returns non-null on the post-load lookup
             // inside RTPWorld#getOrLoadChunk.
             probePopulatesCache = true;
@@ -155,7 +127,7 @@ class GetOrLoadChunkTotalLoadsAccountingTest {
     @Test
     void liveLoadReturningNullChunkSet_stillCountsAsAttempt() throws Exception {
         // Edge case: if the live load fails (the fallback in getOrLoadChunk receives a
-        // null ChunkSet), the increment still happened — counting "attempts" not
+        // null ChunkSet), the increment still happened - counting "attempts" not
         // "successes" matches operator intuition for "lifetime loads we asked the
         // chunk system to perform", and parallels how a failed Bukkit synchronous
         // generate also increments before returning null.

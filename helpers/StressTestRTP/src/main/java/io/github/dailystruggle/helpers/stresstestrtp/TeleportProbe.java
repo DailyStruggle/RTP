@@ -25,7 +25,7 @@ import java.util.function.Consumer;
  * {@code COMMAND}, {@code PLUGIN}, {@code UNKNOWN} (Folia) for that player
  * within the timeout window is treated as completion.
  *
- * <p>The listener runs at {@link EventPriority#MONITOR} and is read-only —
+ * <p>The listener runs at {@link EventPriority#MONITOR} and is read-only -
  * it never cancels or modifies the event.
  */
 public final class TeleportProbe implements Listener {
@@ -57,7 +57,7 @@ public final class TeleportProbe implements Listener {
 
     /** Called by {@link Runner} just before dispatching the command.
      *  Returns the previously-registered attempt for that player (if any) so
-     *  the caller can record it as a missed-attribution TIMEOUT — this matters
+     *  the caller can record it as a missed-attribution TIMEOUT - this matters
      *  when a target plugin never fires {@code PlayerTeleportEvent} (or fires
      *  it with a cause we don't recognise), because otherwise the prior
      *  expectation would linger until the per-attempt timeout reaper runs. */
@@ -113,13 +113,13 @@ public final class TeleportProbe implements Listener {
         // causes, leaving the slot pinned until the timeout reaper fired and
         // producing the symptom "a teleport will not always be attributed,
         // particularly if a person is already mid flight". The only cause we
-        // actively reject is ENDER_PEARL / CHORUS_FRUIT-style player actions —
+        // actively reject is ENDER_PEARL / CHORUS_FRUIT-style player actions -
         // and even those are unlikely to coincide with an /rtp window.
         switch (event.getCause()) {
             case ENDER_PEARL:
             case CHORUS_FRUIT:
             case SPECTATE:
-                // Player-initiated movement that is not our /rtp — re-arm.
+                // Player-initiated movement that is not our /rtp - re-arm.
                 expecting.put(player.getUniqueId(), attempt);
                 return;
             default:

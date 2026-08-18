@@ -18,23 +18,8 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code /rtp clear queue} child verb. Un-sticks a player who is wedged in the
- * teleport pipeline: it drops them from every region's teleport waitlist
- * ({@link RegionQueueManager#playerQueue}) and personal coordinate bucket
- * ({@code perPlayerLocationQueue}), clears the global awaiting-teleport and
- * mid-attempt markers ({@link RTP#queuedPlayers}, {@link RTP#processingPlayers},
- * {@link RTP#invulnerablePlayers}), and cancels any in-flight
- * {@link TeleportPipelineTask} through the normal cancel path so the reserved
- * chunk ticket is released rather than leaked (S-004 / S-002).
- *
- * <p>This intentionally does <em>not</em> touch the player's cooldown
- * ({@code latestTeleportData} timestamp); use {@code /rtp clear cooldown} for
- * that. The two are separate gates.
- *
- * <p>Targeting (self / listed players / console-global) is inherited from
- * {@link PlayerTargetedClearCmd}.
- *
- * <p>Permission: {@code rtp.admin}.
+ * {@code /rtp clear queue} command. Drops players from region waitlists and personal queues,
+ * resets teleport status markers, and cancels in-flight tasks without leaking chunk tickets.
  */
 public class ClearQueueCmd extends PlayerTargetedClearCmd {
 

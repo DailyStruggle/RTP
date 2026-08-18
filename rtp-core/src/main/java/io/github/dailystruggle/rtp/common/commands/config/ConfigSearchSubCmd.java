@@ -14,22 +14,8 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Subcommand: {@code /rtp config search query:<text>}.
- *
- * <p>Implements the submit-landing leaf for the {@code rtp menu} config search
- * feature (PROPOSAL-rtp-menu-config-search.md §6 Q4 Decision A). The menu
- * renderer mints a {@link io.github.dailystruggle.rtp.api.menu.MenuAction.PromptAnvilInput}
- * with parent path {@code ["menu","config","search"]} and parameter
- * {@code "query"}; the anvil opener submits {@code /rtp menu config search query:&lt;typed&gt;}
- * as the player which lands here (after walking through the menu mirror
- * subtree). This leaf delegates to the injected {@link Handler} which is
- * responsible for running the cross-parser search and rendering the results
- * book.
- *
- * <p>When no {@link Handler} is wired (e.g. a platform without a renderer)
- * the leaf accepts the command silently with a WARN log; the menu prompt
- * never reaches this code path in that configuration because the prompt
- * dispatch arm gates on the same builder being present.
+ * Subcommand {@code /rtp config search query:<text>}.
+ * Receives anvil search input from the menu and delegates to the injected {@link Handler}.
  */
 public class ConfigSearchSubCmd extends BaseRTPCmdImpl {
 
@@ -84,11 +70,7 @@ public class ConfigSearchSubCmd extends BaseRTPCmdImpl {
     }
 
     /**
-     * Replace the wired handler after construction. Used by platform wiring
-     * (e.g. {@code RTPCmdBukkit}) so the leaf can be registered eagerly by
-     * {@link ConfigCmd#addCommands()} (5-tick deferred) and have its handler
-     * filled in once the renderer + token registry + search builder are
-     * available.
+     * Replace the wired handler after construction.
      *
      * @param handler the new handler, or {@code null} to disable
      */

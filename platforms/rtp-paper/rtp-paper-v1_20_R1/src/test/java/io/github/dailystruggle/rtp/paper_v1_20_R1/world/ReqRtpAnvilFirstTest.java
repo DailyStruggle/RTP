@@ -9,14 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
- * Regression guard for ADR-016 §13.1–§13.2: the Anvil-first chunk-data
+ * Regression guard for ADR-016 §13.1-§13.2: the Anvil-first chunk-data
  * precedence rule requires every Bukkit-family adapter in scope (Spigot,
  * Paper, Folia) to consult the on-disk {@code .mca} palette <i>before</i>
  * any live {@code world.getBiome(...)}/{@code world.getChunkAt(...)} call.
  *
  * <p>Prior to ADR-016 §13, {@code PaperRTPWorld} carried a
  * {@code getChunkAt(int, int)} override that short-circuited directly to
- * {@code world.getChunkAtAsync(cx, cz)} with no Anvil probe — silently
+ * {@code world.getChunkAtAsync(cx, cz)} with no Anvil probe - silently
  * bypassing the pre-filter and defeating the §13.1 precedence rule. The
  * override has since been removed; Paper now inherits the
  * {@link BukkitRTPWorld} implementation verbatim, which routes every
@@ -33,7 +33,7 @@ class ReqRtpAnvilFirstTest {
 
     /**
      * {@code PaperRTPWorld} must not declare its own {@code getChunkAt}
-     * method — it must inherit the parent Spigot implementation that
+     * method - it must inherit the parent Spigot implementation that
      * threads through the Anvil pre-filter (ADR-016 §13.2).
      */
     @Test
@@ -47,7 +47,7 @@ class ReqRtpAnvilFirstTest {
     }
 
     /**
-     * The same invariant applies to {@code getBiome} — a Paper override that
+     * The same invariant applies to {@code getBiome} - a Paper override that
      * reads {@code world.getBiome(...)} directly would defeat the
      * Anvil-first biome resolution path established in
      * {@code BukkitRTPWorld#getBiome}.

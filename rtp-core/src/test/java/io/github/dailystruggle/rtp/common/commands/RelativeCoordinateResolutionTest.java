@@ -7,13 +7,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Regression coverage for the {@code /rtp centerx=~} relative-coordinate fix.
- *
- * <p>Previously a {@code centerx}/{@code centerz} override of {@code ~} (advertised in the Bukkit
- * {@code CoordinateParameter} tab-completion) fell through {@code Long.parseLong}/
- * {@code Double.parseDouble} to {@code Boolean.valueOf("~") == false}, silently producing a garbage
- * center. These tests pin {@link RTPCmd#resolveRelativeCoordinate(String, long)} to the vanilla
- * {@code /spreadplayers}-style relative-coordinate semantics.
+ * Regression coverage for {@code /rtp centerx=~} relative-coordinate resolution.
+ * Verifies {@link RTPCmd#resolveRelativeCoordinate(String, long)}.
  */
 class RelativeCoordinateResolutionTest {
 

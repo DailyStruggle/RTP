@@ -28,13 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-API-F-006 — Bare-command root action.
- *
- * <p>Verifies the {@code RTPHooks.rootAction()} single-binding SPI: a bound action
- * handles a bare {@code /rtp} (replacing the classic teleport and bypassing the
- * teleport guards), an action that defers ({@code return false}) or that is unbound
- * falls through to the classic teleport, a thrown action does not suppress the
- * classic teleport, and subcommands are never routed through the action.
+ * REQ-API-F-006: Bare-command root action.
+ * Verifies {@code RTPHooks.rootAction()} SPI binding, fall-through on unhandled/exception,
+ * and exclusion of subcommands.
  */
 @DisplayName("REQ-API-F-006: pluggable bare-/rtp root action")
 public class ReqApiF006RootActionTest {

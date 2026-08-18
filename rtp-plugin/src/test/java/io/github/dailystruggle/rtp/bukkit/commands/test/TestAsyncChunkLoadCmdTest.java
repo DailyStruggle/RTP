@@ -90,7 +90,7 @@ class TestAsyncChunkLoadCmdTest {
     // violation: getChunkAt returned an already-complete future without
     // bouncing work off-thread). We simulate primary-thread status by
     // overriding the spy via isBukkitPrimaryThread's reflective fallback
-    // — the real check returns false in the test harness, so we instead
+    // - the real check returns false in the test harness, so we instead
     // rely on alreadyDoneOnReturn AND completingThread==callerThread as
     // the tell-tale. To exercise the FAIL branch we use a fake world
     // that returns an already-complete future and rename the current
@@ -100,7 +100,7 @@ class TestAsyncChunkLoadCmdTest {
     TestAsyncChunkLoadCmd.Result r = TestAsyncChunkLoadCmd.runProbe(world, 0, 0, 1_000L);
 
     // Because the test harness is NOT on the Bukkit primary thread,
-    // callerIsPrimary is false and the inline completion is tolerated —
+    // callerIsPrimary is false and the inline completion is tolerated -
     // S-005 permits sync completion when the caller is already off-main.
     // This is the documented contract in the Javadoc.
     assertFalse(r.callerIsPrimary, "test harness is never the Bukkit primary thread");

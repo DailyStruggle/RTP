@@ -68,7 +68,7 @@ public class SendMessage {
    * string-only {@link #interceptors} receive, plus the {@link Level} the
    * caller supplied to {@link #log(Level, String)} / {@link #log(Level, String, Throwable)}.
    * For non-log {@code sendMessage} paths (player chat, hover/click), the
-   * level is {@code null} — leveled interceptors should treat that as
+   * level is {@code null} - leveled interceptors should treat that as
    * "unknown / not a warning".
    *
    * <p>This is the channel {@code rtp test full}'s {@code FullAudit} subscribes
@@ -382,13 +382,13 @@ public class SendMessage {
    *
    * <p>This value is the sole gate in {@link #isLoggable(Level)}. After parsing, the
    * threshold is also pushed onto {@link Bukkit#getLogger()} (and its parent / handler
-   * chain) via {@link #applyToBukkitLogger(Level)} so that JUL-routed log calls — in
-   * particular the throwable-carrying {@code log} overload — aren't silently filtered
+   * chain) via {@link #applyToBukkitLogger(Level)} so that JUL-routed log calls - in
+   * particular the throwable-carrying {@code log} overload - aren't silently filtered
    * by the server's default {@code INFO} threshold when an admin configures FINE-and-
    * below verbosity in {@code logging.yml}.
    *
    * <p>Returns {@link Level#ALL} when the config parser hasn't been initialized yet
-   * (e.g. very early in startup) or when the configured value can't be parsed —
+   * (e.g. very early in startup) or when the configured value can't be parsed -
    * keeping the gate purely additive in those cases.
    */
   private static Level resolveMinLevel() {
@@ -426,8 +426,8 @@ public class SendMessage {
 
   /**
    * Lowers {@link Bukkit#getLogger()} (and its parent / root handlers) to at least the
-   * given level so records published via the throwable-carrying {@code log} overload —
-   * which always routes through the JUL logger so the stack trace is preserved — are
+   * given level so records published via the throwable-carrying {@code log} overload -
+   * which always routes through the JUL logger so the stack trace is preserved - are
    * not silently dropped by the server's default {@code INFO} threshold when an admin
    * configures {@code logging.yml#min_level: FINE/FINER/FINEST}. Never raises the
    * server's logger level (i.e. only relaxes filtering for our records).
@@ -493,7 +493,6 @@ public class SendMessage {
     // (for example, codes re-introduced by a placeholder substitution after
     // `translateAlternateColorCodes` already ran in format) are converted
     // here so the literal '&c' never reaches the console sender on Folia.
-    // This addresses the F4 finding in RTP_TEST_FULL_RELEASE_PLAN.md.
     message = ChatColor.translateAlternateColorCodes('&', message);
     intercept(level, message);
 

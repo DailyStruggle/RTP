@@ -27,8 +27,7 @@ import java.util.logging.Logger;
 
 /**
  * Default {@link RtpDispatcher} implementation living in
- * {@code rtp-proxy-common} so it is shared by every proxy adapter (Velocity
- * today, BungeeCord in Phase 3). Composes a {@link BackendSelector}, a
+ * {@code rtp-proxy-common} so it is shared by every proxy adapter. Composes a {@link BackendSelector}, a
  * {@link NetworkTransport}, a {@link ProxySender}, and an {@link Executor}.
  *
  * <p>Pipeline per dispatch:</p>

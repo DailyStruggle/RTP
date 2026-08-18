@@ -28,7 +28,7 @@ public abstract class RTPWorld<T> {
    */
   public final AtomicLong totalChunkLoads = new AtomicLong(0);
   /**
-   * Lifetime count of orphaned tickets caught by {@link #releaseOrphanedTickets(Set)} —
+   * Lifetime count of orphaned tickets caught by {@link #releaseOrphanedTickets(Set)} -
    * tickets held without a matching kept-cache / per-player-queue / in-flight entry.
    * Numerator of the {@code leakRate} placeholder; denominator is
    * {@link #lifetimeTicketsIssued}.
@@ -36,20 +36,16 @@ public abstract class RTPWorld<T> {
   public final AtomicLong lifetimeOrphanedTicketsScanned = new AtomicLong(0);
   /**
    * Lifetime count of ticket acquires via {@link #setForceLoaded(int, int, boolean)} with
-   * {@code forceLoad=true} — including ref-counted increments on already-ticketed chunks.
+   * {@code forceLoad=true} - including ref-counted increments on already-ticketed chunks.
    * Correct denominator for {@code leakRate}; distinct from {@link #totalChunkLoads},
    * which counts only live loads and would undercount ref-counted acquires.
    */
   public final AtomicLong lifetimeTicketsIssued = new AtomicLong(0);
   /**
    * Per-origin breakdown of chunk-load requests routed through
-   * {@link #getOrLoadChunk(int, int, String)}. Each entry is incremented once per call
-   * regardless of whether the load hits cache, anvil, or live generation; sum across all
-   * origins is an upper bound on (and typically equal to) the orchestration-layer load
-   * volume. Use to attribute climbs in {@link #totalChunkLoads} to a specific call site
-   * (e.g. {@code "QueueTask.runFullLoadAndResolve"}, {@code "ScanTask"},
-   * {@code "Region.processBacklog"}). The 2-arg {@link #getOrLoadChunk(int, int)} accrues
-   * under {@code "unknown"}.
+   * {@link #getOrLoadChunk(int, int, String)}. Incremented once per call to attribute
+   * climbs in {@link #totalChunkLoads} to a call site. The 2-arg
+   * {@link #getOrLoadChunk(int, int)} accrues under {@code "unknown"}.
    */
   public final Map<String, AtomicLong> chunkLoadsByOrigin = new ConcurrentHashMap<>();
   protected final Map<Long, AtomicInteger> chunkTickets = new ConcurrentHashMap<>();
@@ -165,14 +161,13 @@ public abstract class RTPWorld<T> {
   }
 
   /**
-   * Adapter hook for {@link #setForceLoaded}. The returned future MUST complete only after
-   * the native ticket call has executed; if the call is scheduled onto another thread,
-   * complete the future from inside that lambda (ADR-015).
+   * Adapter hook for {@link #setForceLoaded}. The returned future must complete only after
+   * the native ticket call has executed (ADR-015).
    *
    * @param cx        the chunk's X coordinate
    * @param cz        the chunk's Z coordinate
    * @param forceLoad {@code true} to force-load, {@code false} to un-force-load
-   * @return a future that completes when the platform call has been applied
+   * @return future completed when the platform call has been applied
    */
   protected abstract CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad);
 
@@ -204,10 +199,7 @@ public abstract class RTPWorld<T> {
   /**
    * Tagged variant of {@link #getOrLoadChunk(int, int)}: records the call site under
    * {@link #chunkLoadsByOrigin} for diagnostic attribution, then delegates to the 2-arg
-   * implementation. Callers should pass a short stable tag identifying the source
-   * (e.g. {@code "QueueTask.runFullLoadAndResolve"}, {@code "PregenTask.neighbourGrid"},
-   * {@code "ScanTask"}, {@code "Region.processBacklog"},
-   * {@code "RegionCacheTask.observational"}).
+   * implementation.
    *
    * @param cx     chunk X
    * @param cz     chunk Z
@@ -215,7 +207,7 @@ public abstract class RTPWorld<T> {
    * @return same future contract as {@link #getOrLoadChunk(int, int)}
    */
   public CompletableFuture<RTPChunk<?>> getOrLoadChunk(int cx, int cz, String origin) {
-    // Record the origin ONLY for calls that actually fall through to a live load —
+    // Record the origin ONLY for calls that actually fall through to a live load -
     // cache hits and probe-cache hits do not increment totalChunkLoads, so recording
     // them here would inflate chunkLoadsByOrigin past the real total. Mirrors the
     // ADR-016 §13.1 precedence used by the 2-arg getOrLoadChunk: cached → anvil probe → live.
@@ -266,7 +258,7 @@ public abstract class RTPWorld<T> {
         return CompletableFuture.completedFuture(afterProbe);
       }
       // Fall back to live load. Untagged callers still attribute to "unknown" so
-      // chunkLoadsByOrigin always sums to totalChunkLoads — see the 3-arg overload
+      // chunkLoadsByOrigin always sums to totalChunkLoads - see the 3-arg overload
       // for the recommended tagging convention.
       recordChunkLoadOrigin("unknown");
       return getChunkAtAsync(cx, cz).thenApply(chunkSet -> {
@@ -320,7 +312,7 @@ public abstract class RTPWorld<T> {
    * Vanilla-generator exemption flag (ADR-016 §13.3). When {@code true}, the selection
    * pipeline may use the seed-synthesised {@code world.getBiome(x,y,z)} for ungenerated
    * chunks; otherwise it must defer to the post-load biome read (§13.1 chain:
-   * loaded chunk → AnvilChunkView → live getter). Default {@code false} (conservative —
+   * loaded chunk → AnvilChunkView → live getter). Default {@code false} (conservative -
    * Iris/Terra/datapack worlds do not match the seed answer).
    */
   public boolean isVanilla() {
@@ -328,15 +320,10 @@ public abstract class RTPWorld<T> {
   }
 
   /**
-   * The destination world's environment as a platform-neutral string (e.g.
-   * {@code "NORMAL"}, {@code "NETHER"}, {@code "THE_END"}, or a custom-dimension
-   * name), or {@code null} when the platform cannot supply one. Used purely as a
-   * display hint so a menu can pick a representative surface block locally.
+   * Destination world environment as a platform-neutral string (e.g. {@code "NORMAL"},
+   * {@code "NETHER"}, {@code "THE_END"}), or {@code null} when unknown. Used as a display hint.
    *
-   * <p>Default {@code null}; adapters that can resolve their world's environment
-   * ({@code BukkitRTPWorld}, {@code FoliaRTPWorld}) override this.
-   *
-   * @return the environment string, or {@code null} when unknown
+   * @return environment string, or {@code null} when unknown
    */
   public String environment() {
     return null;
@@ -345,7 +332,7 @@ public abstract class RTPWorld<T> {
   /**
    * Non-blocking "is this chunk on disk?" check (ADR-016 §13.3). Must not trigger
    * generation or block. Gates the seed-synthesised biome pre-check off for already-generated
-   * chunks even on vanilla worlds — Mojang's biome source drifts across MC versions, so the
+   * chunks even on vanilla worlds - Mojang's biome source drifts across MC versions, so the
    * persisted {@code .mca} palette is authoritative. Default {@code true} (conservative);
    * adapters SHOULD override with the native lookup ({@code World#isChunkGenerated}).
    */
@@ -365,36 +352,10 @@ public abstract class RTPWorld<T> {
   }
 
   /**
-   * Bulk biome read over a single anvil region file ({@code r.<rcx>.<rcz>.mca}),
-   * used by {@code RegionBiomesResolver} to paint a biome chart without doing
-   * per-pixel chunk loads.
+   * Bulk biome read over a single anvil region file ({@code r.<rcx>.<rcz>.mca}) for biome charts.
    *
-   * <p>Returns a map keyed by chunk-pos-packed
-   * ({@code ((long)cx << 32) | (cz & 0xFFFF_FFFFL)}) -> uppercase biome name as
-   * stored by {@code MemoryShape.addBiomeLocation} (vanilla {@code MINECRAFT:}
-   * prefix stripped). Missing / ungenerated chunks within the region file are
-   * simply absent from the map.
-   *
-   * <p>Read at world-Y {@code y}; biomes vary by 3D position in modern MC, so
-   * the caller picks a sampling y (typically a surface anchor such as 64).
-   *
-   * <p><b>Blocking, off-tick-thread only.</b> Implementations perform
-   * synchronous {@code .mca} I/O on the calling thread; callers shall invoke
-   * from an async / background context such as {@code RTP.scheduler}'s async
-   * executor or the {@code MapDispatch.paint} dispatch path. Calling from a
-   * Folia region thread or the Bukkit main tick thread is a defect (S-005).
-   * The caller's resolver is forbidden from blocking on
-   * {@code CompletableFuture#get / #join} by REQ-RTP-MAP-006, but a
-   * direct synchronous read off the tick thread does not violate that rule.
-   *
-   * <p>Default returns an empty map. Adapters with {@code .mca}-backed stores
-   * ({@code BukkitRTPWorld}, {@code FoliaRTPWorld}, {@code FabricRTPWorld})
-   * SHOULD override using {@code AnvilPrefilter.regionFileFor} +
-   * {@code AnvilRegionByteCache.get} + {@code AnvilReader.readChunkView} +
-   * {@code AnvilChunkView.getBiomeAt}.
-   *
-   * <p>S-005: implementations shall NOT perform live chunk I/O; the contract
-   * is on-disk anvil-only.
+   * <p>Blocking, off-tick-thread only (S-005). Never performs live chunk I/O; on-disk anvil only.
+   * Returns chunk-pos-packed ({@code ((long)cx << 32) | (cz & 0xFFFF_FFFFL)}) to uppercase biome name.
    *
    * @param rcx region-file X coord ({@code cx >> 5})
    * @param rcz region-file Z coord ({@code cz >> 5})
@@ -413,87 +374,43 @@ public abstract class RTPWorld<T> {
   public abstract void platform(RTPLocation location);
 
   /**
-   * The region-schematic paster active for this platform (ADR-058). Used by {@code rtp-core}
-   * at teleport commit to load (off-thread) and paste (on the region-owning thread) a
-   * region-specific arrival structure when one is present on disk.
+   * Region-schematic paster for this platform (ADR-058).
+   * Returns {@link io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster} by default (never null, S-006).
    *
-   * <p>The default returns the platform-neutral
-   * {@link io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster} (never {@code null},
-   * S-006), so a platform with no paster installed simply reports
-   * {@link io.github.dailystruggle.rtp.api.schematic.PasteResult#SKIPPED_UNSUPPORTED} and the
-   * teleport proceeds unchanged. Adapters that ship a paster
-   * ({@code BukkitRTPWorld}, {@code FoliaRTPWorld}, {@code FabricRTPWorld}) override this to
-   * return their swappable static paster (mirroring the {@code setBiomeGetter} idiom).
-   *
-   * @return the active paster; never {@code null}
+   * @return active paster; never null
    */
   public io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster() {
     return io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster.INSTANCE;
   }
 
   /**
-   * Writes a list of recorded original blocks back into this world, reversing an emergency
-   * landing platform built by {@link #platform(RTPLocation)}. See ADR-060.
+   * Reverses an emergency landing platform built by {@link #platform(RTPLocation)} (ADR-060).
+   * Must be called on region-owning thread with loaded chunks (S-005).
    *
-   * <p>MUST be invoked on the thread that owns the footprint region (Folia region thread;
-   * Bukkit/Paper main thread) - the caller schedules it through {@code RTP.scheduler}. The
-   * implementation performs only block writes and never loads chunks: the caller invokes it
-   * only when the footprint chunk is already loaded (S-005).
-   *
-   * <p>The default implementation is a no-op returning {@code false} (the platform does not
-   * support block restoration); {@code .schem}-free adapters with a serializable block-state
-   * token ({@code BukkitRTPWorld}, {@code FoliaRTPWorld}, Fabric peer) override it.
-   *
-   * @param blocks the recorded original blocks to write back; never {@code null}
-   * @return {@code true} when the blocks were applied; {@code false} when unsupported or failed
+   * @param blocks original blocks to restore; never null
+   * @return {@code true} if applied, {@code false} if unsupported or failed
    */
   public boolean restoreBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
     return false;
   }
 
   /**
-   * Best-effort native bulk block write (ADR-058). Writes each entry of a block-location map
-   * - a {@link io.github.dailystruggle.rtp.api.platform.BlockDelta} carrying world block
-   * coordinates plus the adapter's canonical block-state token - into this world, and returns
-   * the number of blocks actually placed.
+   * Best-effort native bulk block write (ADR-058).
+   * Must be called on region-owning thread with loaded chunks (S-005). Unparseable tokens are skipped (S-004).
    *
-   * <p>This is the platform-neutral primitive the region-schematic paster
-   * ({@code WorldBlockSchematicPaster}) drives: core plans the schematic into placements off the
-   * region thread, then calls this on the region-owning thread (Folia region thread; Bukkit/Paper
-   * main thread; Fabric server thread) to write the blocks. The caller invokes it only when the
-   * footprint chunk is already loaded, so the implementation performs block writes only and never
-   * loads chunks (S-005).
-   *
-   * <p>A single undecodable token must be counted as a skip and audited, never thrown (S-004); the
-   * paste is best-effort and never aborts the teleport. The default implementation is a no-op
-   * returning {@code 0} (the platform does not support native block writes); adapters with a
-   * serializable block-state token override it.
-   *
-   * @param blocks the block-location map to write; never {@code null}
-   * @return the count of blocks successfully placed ({@code 0} when unsupported or none applied)
+   * @param blocks block-location map to write; never null
+   * @return count of blocks placed (0 if unsupported or none)
    */
   public int setBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
     return 0;
   }
 
   /**
-   * Best-effort native restore of block-entity payloads (chest/container contents, ...) for a
-   * schematic paste (ADR-058). Called by the region-schematic paster
-   * ({@code WorldBlockSchematicPaster}) after {@link #setBlocks(java.util.List)} has written the
-   * block states, on the region-owning thread, with each block entity already resolved to its
-   * absolute world coordinates by {@code SchematicPlacementPlanner#planBlockEntities}.
+   * Best-effort native restore of block-entity payloads (chest contents, etc.) for a schematic paste (ADR-058).
+   * Called on region-owning thread with loaded chunks (S-005); failures are audited and never thrown (S-004).
    *
-   * <p>This is the second half of the platform-neutral paster's symmetric two-primitive contract:
-   * {@link #setBlocks} writes block states and this restores their inhabited payloads, so a single
-   * shared {@code SchematicPaster} can serve every platform without a per-platform paster subclass.
-   * The implementation performs writes against blocks that are already loaded and placed; it never
-   * loads chunks (S-005) and a per-entity failure is counted and audited, never thrown (S-004).
-   *
-   * <p>The default implementation is a no-op returning {@code 0} (the platform restores block
-   * states only); platforms with a native container API (e.g. Bukkit/Paper/Folia) override it.
-   *
-   * @param entities the planned block entities to restore; never {@code null}
-   * @return the count of block entities (containers) successfully restored
+   * @param entities planned block entities to restore; never null
+   * @return count of containers/entities restored
    */
   public int restoreBlockEntities(
       java.util.List<io.github.dailystruggle.rtp.api.schematic.PlacedBlockEntity> entities) {
@@ -536,13 +453,10 @@ public abstract class RTPWorld<T> {
   public abstract int getMinHeight();
 
   /**
-   * Release any chunk tickets whose keys are not present in the provided keep-alive set.
+   * Release chunk tickets whose keys are absent from {@code keepAliveKeys}.
+   * Called by MemoryTracker GC sweep to reclaim abandoned tickets.
    *
-   * <p>This is called by the MemoryTracker GC sweep to reclaim orphaned tickets that were
-   * never released because their owning reservation was abandoned (e.g. a location was
-   * evicted from the kept-locations cache without closing its ChunkReservation).
-   *
-   * @param keepAliveKeys the set of chunk keys that must NOT be released
+   * @param keepAliveKeys set of chunk keys that must not be released
    */
   public final void releaseOrphanedTickets(Set<Long> keepAliveKeys) {
     // Snapshot the keys to avoid ConcurrentModificationException during removal

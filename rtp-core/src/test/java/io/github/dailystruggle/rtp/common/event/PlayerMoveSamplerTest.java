@@ -19,18 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Exercises the shared, tick-sampled {@link PlayerMoveSampler} that Fabric and
- * NeoForge use to produce the ADR-075 platform-neutral {@link PlayerMoveEvent}
- * from server-tick position diffs.
- *
- * <p>Contract verified:
- * <ul>
- *   <li>the first sample of a watched player establishes a baseline without firing;</li>
- *   <li>a same-world block change fires exactly one event with correct from/to;</li>
- *   <li>staying in the same block fires nothing;</li>
- *   <li>a world change resets the baseline without firing;</li>
- *   <li>an offline / unwatched player is dropped and produces nothing.</li>
- * </ul>
+ * Unit tests for {@link PlayerMoveSampler} (ADR-075).
+ * Verifies tick-sampled {@link PlayerMoveEvent} baseline establishment, block changes, world changes, and watch filters.
  */
 class PlayerMoveSamplerTest {
 

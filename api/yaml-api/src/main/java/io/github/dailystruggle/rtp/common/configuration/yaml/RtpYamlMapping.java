@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * Mapping node: an ordered collection of {@code key: value} pairs.
  *
- * <p>Insertion order is preserved via {@link LinkedHashMap} — important
+ * <p>Insertion order is preserved via {@link LinkedHashMap} - important
  * for idempotent re-emit per ADR-042. Keys are strings (RTP's YAML
  * subset does not permit non-scalar mapping keys).</p>
  *

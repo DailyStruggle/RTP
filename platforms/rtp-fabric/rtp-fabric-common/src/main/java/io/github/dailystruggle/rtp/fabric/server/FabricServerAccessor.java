@@ -101,7 +101,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   // so that per-version adapters can register a wrapper compiled against their
   // own MC mappings (see FabricVersionAdapter#createPlayer). On deobfuscated
   // runtimes (MC 26.1+) the legacy FabricRTPPlayer's bytecode cannot link, but
-  // its class file still loads fine when only used as a default fallback —
+  // its class file still loads fine when only used as a default fallback -
   // older adapters (1.20 / 1.21) don't override createPlayer and continue to
   // use FabricRTPPlayer transparently.
   private final Map<UUID, RTPPlayer> playersById = new ConcurrentHashMap<>();
@@ -181,7 +181,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     try {
       serverLevelCls = Class.forName("net.minecraft.server.level.ServerLevel");
     } catch (Throwable t) {
-      return null; // ServerLevel not resolvable on this runtime (e.g. 26.1 deobf) — skip.
+      return null; // ServerLevel not resolvable on this runtime (e.g. 26.1 deobf) - skip.
     }
     if (!serverLevelCls.isInstance(level)) return null;
 
@@ -213,7 +213,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
     // FALLBACK PATH (1.20 / 1.21 obf-era runtimes): construct the legacy
     // FabricRTPWorld via the existing typed registerWorld((ServerLevel) level)
-    // — invoked reflectively so this method's own constant pool stays free
+    // - invoked reflectively so this method's own constant pool stays free
     // of intermediary aliases.
     try {
       java.lang.reflect.Method m = FabricServerAccessor.class.getDeclaredMethod("registerWorld", serverLevelCls);
@@ -241,7 +241,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       java.lang.reflect.Method m = FabricServerAccessor.class.getDeclaredMethod("unregisterWorld", serverLevelCls);
       m.invoke(this, level);
     } catch (Throwable t) {
-      // swallow — sticky-fail behaviour matches register path.
+      // swallow - sticky-fail behaviour matches register path.
     }
   }
 
@@ -270,7 +270,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   /**
    * Object-typed entry point for the Fabric event bridge's JOIN proxy.
    * Avoids pinning {@code net.minecraft.server.level.ServerPlayer} (intermediary
-   * {@code class_3222}) into the bridge's bytecode constant pool — that alias
+   * {@code class_3222}) into the bridge's bytecode constant pool - that alias
    * is absent on MC 26.1.2's deobfuscated runtime and would fail JVM verify.
    * The cast lives here in the accessor where {@code ServerPlayer} resolves
    * fine on every supported MC version.
@@ -369,7 +369,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       }
       if (uuid != null) unregisterPlayer(uuid);
     } catch (Throwable t) {
-      // swallow — DISCONNECT cleanup is best-effort.
+      // swallow - DISCONNECT cleanup is best-effort.
     }
   }
 
@@ -548,10 +548,6 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    *
    * <p>The returned set is a defensive copy taken at call time; callers may
    * iterate without external synchronization. Empty when no server is bound.
-   *
-   * <p>commands-api-ADR-001 addendum (2026-05-06): unblocks the
-   * {@code Collections.emptySet()} stub in {@code RTPCmdFabricRoot} `player`
-   * parameter; resolves CHECKLIST-fabric-tabcompletion-audit P3.
    */
   @Override
   public Set<String> getOnlinePlayerNames() {
@@ -562,7 +558,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public RTPPlayer getConsolePlayer() {
     // Bukkit parity: AbstractServerAccessor.getConsolePlayer() returns
-    // getPlayer(RTPAPI.serverId). Fabric has no "console as player" — return
+    // getPlayer(RTPAPI.serverId). Fabric has no "console as player" - return
     // null and let callers fall back to getSender(serverId), which yields
     // FabricConsoleSender.
     return null;
@@ -595,7 +591,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public File getPluginDirectory() {
     // Fabric stores per-mod config under <run>/config/<modid>/.
-    // Ensure the directory exists — rtp-core's Configs ctor reads/writes
+    // Ensure the directory exists - rtp-core's Configs ctor reads/writes
     // immediately on construction, so a missing dir would fail YAML init.
     File dir = FabricLoader.getInstance().getConfigDir().resolve("rtp").toFile();
     if (!dir.exists() && !dir.mkdirs() && !dir.exists()) {
@@ -639,14 +635,14 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
     // Build a clickable Component with ClickEvent.SUGGEST_COMMAND so the player
-    // can tap the message to prefill the suggestion in their chat input — mirrors
+    // can tap the message to prefill the suggestion in their chat input - mirrors
     // the rtp-spigot SendMessage path that uses BaseComponent#setClickEvent.
     //
     // Defensive: any failure here (e.g. mapping drift on the chat-event
     // constructors in 1.21.5+, see FabricLegacyText#parseInteractive) MUST
     // NOT truncate callers that loop over multiple lines (InfoCmd and
     // the commands-api built-in TreeCommand#help() dispatch each row via
-    // forEach — a propagated exception aborts the whole iteration and
+    // forEach - a propagated exception aborts the whole iteration and
     // leaves the user with a half-printed /rtp info or /rtp help). On
     // any error, fall back to the plain-string sink.
     if (target == null || message == null) return;
@@ -806,7 +802,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     // the configured plugin prefix) are resolved on console too. Mirrors
     // rtp-spigot SendMessage.log, which calls format(null, message) before
     // routing to the console sender. format() gracefully skips numeric
-    // [Pn] expansion when messages.yml hasn't been parsed yet — early-boot
+    // [Pn] expansion when messages.yml hasn't been parsed yet - early-boot
     // log lines that reference [P0] simply pass through unsubstituted, but
     // every log emitted after configs load (e.g. the locationLoaded
     // hydration banner) renders with the prefix resolved.
@@ -852,7 +848,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   /**
    * Returns true when {@code level} meets the plugin-scoped {@code logging.yml#min_level}.
    * Defaults to {@link Level#ALL} (everything passes) when the config parser isn't
-   * built yet or the configured value can't be parsed — keeping the gate purely
+   * built yet or the configured value can't be parsed - keeping the gate purely
    * additive in those cases.
    */
   private static boolean isLoggable(Level level) {
@@ -894,7 +890,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    * Map JUL level → Log4j2 level for routing.
    *
    * <p>Sub-INFO records (FINE/FINER/FINEST) only reach this method when
-   * {@link #isLoggable(Level)} already accepted them — i.e. when the admin set
+   * {@link #isLoggable(Level)} already accepted them - i.e. when the admin set
    * {@code logging.yml#min_level} to FINE or finer (or left it at the default
    * {@code ALL}). In that case the operator has explicitly opted into verbose
    * output, so route FINE/FINER/FINEST to Log4j {@code INFO} rather than
@@ -976,9 +972,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   public boolean isPrimaryThread() {
     MinecraftServer s = server;
     if (s == null) return false;
-    // Prefer per-version adapter override (Phase 4 migration of the prior
-    // reflective patch). Falls through to reflective lookup for adapters
-    // that don't override (1.20 / 1.21 family).
+    // Prefer the per-version adapter override; falls through to reflective
+    // lookup for adapters that don't override (1.20 / 1.21 family).
     try {
       io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
           io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
@@ -1015,7 +1010,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   }
 
   // ---------------------------------------------------------------------------
-  // Block-tag snapshot (ADR-017) — Fabric mirror of
+  // Block-tag snapshot (ADR-017) - Fabric mirror of
   // AbstractServerAccessor.blockTagSnapshot / rebuildBlockTagSnapshot.
   //
   // Source: BuiltInRegistries.BLOCK. Each registered block's
@@ -1027,7 +1022,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   // Built lazily and cached; rebuildBlockTagSnapshot() forces a fresh pass
   // (e.g. after /rtp reload or /reload). Any failure (registry not yet
   // populated, missing TagKey API on an unsupported MC version) falls through
-  // to an empty map — never null — so the SafetyTokenExpander preserves the
+  // to an empty map - never null - so the SafetyTokenExpander preserves the
   // original tokens for a later retry.
   // ---------------------------------------------------------------------------
 
@@ -1045,7 +1040,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    * hard linkage error (e.g. {@code NoClassDefFoundError: net/minecraft/class_7923} on MC
    * 26.1's deobfuscated runtime, where the intermediary {@code BuiltInRegistries} symbol is
    * not exposed). Once set, subsequent rebuilds short-circuit to an empty map without
-   * re-attempting the registry walk and without re-logging — otherwise
+   * re-attempting the registry walk and without re-logging - otherwise
    * {@code SafetyTokenExpander.scheduleRetry} produces a per-2s WARNING storm.
    */
   private volatile boolean blockTagSnapshotPermanentlyUnavailable = false;
@@ -1094,7 +1089,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     }
     if (blockTagSnapshotPermanentlyUnavailable) {
       // Sticky-failed earlier (e.g. BuiltInRegistries class_7923 unresolvable on MC 26.1).
-      // Return an empty snapshot silently — SafetyTokenExpander will preserve original
+      // Return an empty snapshot silently - SafetyTokenExpander will preserve original
       // #tag tokens, and we avoid the per-2s WARNING spam from its retry loop.
       return Collections.emptyMap();
     }
@@ -1102,7 +1097,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     // rtp-fabric-ADR-010: prefer the typed per-version adapter SPI over the
     // reflective walk below. Each rtp-fabric-vXX_YY_RN module compiles against
     // its own Loom-mapped MC types and can walk BuiltInRegistries.BLOCK without
-    // any reflection — bypassing the fragile Mojang-vs-intermediary method-name
+    // any reflection - bypassing the fragile Mojang-vs-intermediary method-name
     // dispatch entirely. Returning null from the SPI means "adapter cannot
     // resolve, fall through" so the legacy reflective path remains as a safety
     // net for runtimes without a registered adapter or with a stub adapter
@@ -1115,7 +1110,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
         Map<String, Set<String>> typed = adapter.snapshotBlockTags();
         if (typed != null) {
           // Adapter returned a result (possibly empty). An empty result is
-          // valid — registry walked but yielded zero tags (data-pack bindings
+          // valid - registry walked but yielded zero tags (data-pack bindings
           // not yet attached); SafetyTokenExpander preserves original #tag
           // tokens and a later /rtp reload picks up the populated registry.
           if (!typed.isEmpty()) {
@@ -1129,7 +1124,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       }
     } catch (Throwable t) {
       // Adapter threw (e.g. UnsupportedOperationException from the v26_1_R1
-      // stub adapter). Log at FINE and fall through — the reflective path
+      // stub adapter). Log at FINE and fall through - the reflective path
       // below already handles all failure modes for the unmapped runtime.
       log(Level.FINE,
           "[RTP][Fabric] Adapter snapshotBlockTags() failed; falling back to reflection: "
@@ -1173,7 +1168,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       intermediaryAvailable = false;
     }
     if (!mojangAvailable && !intermediaryAvailable) {
-      // Neither registries class name resolves on this runtime — give up.
+      // Neither registries class name resolves on this runtime - give up.
       blockTagSnapshotPermanentlyUnavailable = true;
       log(Level.WARNING,
           "[RTP][Fabric] Block-tag snapshot disabled: BuiltInRegistries unavailable on this"
@@ -1282,7 +1277,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       ClassLoader cl = FabricServerAccessor.class.getClassLoader();
       // Entry point: the registries class was already verified resolvable by
       // the pre-probe above. Everything below is discovered dynamically from
-      // the actual runtime classes of the returned instances — we never load
+      // the actual runtime classes of the returned instances - we never load
       // any hardcoded net.minecraft.* class name beyond this one. The class
       // name is parameterised so the same body works for both the Mojang
       // entry (net.minecraft.core.registries.BuiltInRegistries on
@@ -1332,7 +1327,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
           if (rlGetNamespace == null || rlGetPath == null) {
             // Last-resort signature-based scan: ResourceLocation has exactly
             // two zero-arg String getters (namespace, path). Pick them in
-            // declaration order — namespace is declared before path in both
+            // declaration order - namespace is declared before path in both
             // Mojang and intermediary ResourceLocation/class_2960.
             java.lang.reflect.Method[] stringGetters =
                 findZeroArgStringMethods(blockId.getClass(), 2);
@@ -1543,7 +1538,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public void start() {
-    // Initialization is event-bridge driven on Fabric — see RTPFabricMod.onInitialize().
+    // Initialization is event-bridge driven on Fabric - see RTPFabricMod.onInitialize().
     // No-op here so RTP.start() codepaths that call this don't fail.
   }
 
@@ -1661,8 +1656,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   public RTPTaskPipe createTaskPipe() {
     // Mirror AbstractServerAccessor: TimeBoundTaskPipe is the canonical default
     // for Spigot/Paper. Folia uses CountBound; Fabric's tick model is closest
-    // to a single-region Folia, but for Phase 2 startup parity we use the same
-    // default Bukkit ships.
+    // to a single-region Folia, but for startup parity we use the same default
+    // Bukkit ships.
     return new TimeBoundTaskPipe();
   }
 
@@ -1683,7 +1678,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     return scheduler;
   }
 
-  // ADR-049 — platform-agnostic player join/quit dispatcher. The Fabric event
+  // ADR-049 - platform-agnostic player join/quit dispatcher. The Fabric event
   // wiring lives in FabricEventBridge (reflective registration of
   // ServerPlayConnectionEvents.JOIN/DISCONNECT, see rtp-fabric-ADR-009);
   // the bridge invokes fireJoinFromPlayer / fireQuitFromPlayer on the hook.
@@ -1705,23 +1700,22 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public double getTPS(int ticks) {
-    // C6 (Section C of CHECKLIST-metrics-and-multiserver) — when a
-    // FabricMetricsBinding is installed the canonical TPS source is the
-    // M2 metrics facade (the EMA-blended sampler driven from
+    // When a FabricMetricsBinding is installed the canonical TPS source is the
+    // metrics facade (the EMA-blended sampler driven from
     // FabricEventBridge.onEndServerTick). Read the snapshot first; if the
-    // binding is the M0 NOOP the scalar is NaN and we fall back to the
-    // reflective Mojang-API probe documented below.
+    // binding is the NOOP the scalar is NaN and we fall back to the reflective
+    // Mojang-API probe documented below.
     try {
       io.github.dailystruggle.metrics.api.MetricsSnapshot snap =
           RTP.metrics.snapshot();
       double v = (ticks >= 600) ? snap.tps15m : (ticks >= 100 ? snap.tps5m : snap.tps1m);
       if (!Double.isNaN(v)) return v;
     } catch (Throwable ignored) {
-      // Defensive — snapshot() is non-throwing by contract.
+      // Defensive - snapshot() is non-throwing by contract.
     }
     // Compute TPS from the server's recent average tick time. Mojang exposes
     // this via {@code MinecraftServer#getAverageTickTimeNanos()} on 1.21.x and
-    // via {@code tickTimes} (long[] of ms*1000-ish) on older releases — we
+    // via {@code tickTimes} (long[] of ms*1000-ish) on older releases - we
     // resolve reflectively so the rtp-fabric-common module compiles against
     // any in-scope mappings without a hard dependency on a single Mojang API.
     // Falls back to the nominal 20 TPS when the server is not bound or no
@@ -1742,7 +1736,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
         else if (v instanceof Double d) cap = d;
       }
     } catch (Throwable ignored) {
-      // Pre-1.20.5 server or relocated mapping — use the vanilla 20 default.
+      // Pre-1.20.5 server or relocated mapping - use the vanilla 20 default.
     }
 
     // Try nanos first (1.21+). Average over the requested window length isn't
@@ -1766,14 +1760,14 @@ public final class FabricServerAccessor implements RTPServerAccessor {
         return Math.min(tps, cap);
       }
     } catch (Throwable ignored) {
-      // No accessible metric — fall through.
+      // No accessible metric - fall through.
     }
     return cap;
   }
 
   @Override
   public void setBiomeGetter(Function<RTPLocation, String> getter) {
-    // Mirror AbstractServerAccessor.setBiomeGetter — addons can override the
+    // Mirror AbstractServerAccessor.setBiomeGetter - addons can override the
     // per-location biome resolver. Default lookup happens via the level's
     // dynamic biome registry (see #defaultBiomeAt).
     this.biomeGetter = getter;
@@ -1840,7 +1834,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    * Return every biome key present in the bound server's biome registry. Falls
    * back to an empty set when the server is not yet bound (e.g. before
    * SERVER_STARTED) so callers get a deterministic empty result rather than
-   * an NPE. The {@code rtpWorld} argument is currently ignored — Fabric's
+   * an NPE. The {@code rtpWorld} argument is currently ignored - Fabric's
    * biome registry is server-wide on 1.21.1; per-world filtering is not yet implemented.
    */
   private Set<String> defaultBiomesFor(@Nullable RTPWorld<?> rtpWorld) {
@@ -1857,7 +1851,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       Set<String> typed = defaultBiomesForTyped(s);
       if (!typed.isEmpty()) return typed;
     } catch (Throwable typedFail) {
-      // deobf 26.x runtime — fall through to the reflective path below.
+      // deobf 26.x runtime - fall through to the reflective path below.
     }
     // Both MinecraftServer.registryAccess() and Registry.registryOrThrow are
     // baked as Yarn-intermediary descriptors (method_30611, method_29107) in
@@ -1981,7 +1975,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     Set<String> out = new HashSet<>();
     for (Object rawKey : keys) {
       if (rawKey == null) continue;
-      // Accept either ResourceLocation or 26.1.2's Identifier — both render
+      // Accept either ResourceLocation or 26.1.2's Identifier - both render
       // `namespace:path` via toString(). Avoid an instanceof on a class literal
       // (would re-introduce the intermediary class dependency we just removed).
       // Normalise to the same shape ScanTask / probe comparisons use:
@@ -2246,9 +2240,9 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     @Override public void performCommand(@Nullable RTPPlayer player, String command) {
       MinecraftServer s = server;
       if (s == null || command == null) return;
-      // Phase 4 migration: prefer per-version adapter's typed dispatch.
-      // Falls through to the reflective path for adapters that don't override
-      // (1.20 / 1.21 family) — those bytecode descriptors link cleanly there.
+      // Prefer the per-version adapter's typed dispatch. Falls through to the
+      // reflective path for adapters that don't override (1.20 / 1.21 family) -
+      // those bytecode descriptors link cleanly there.
       try {
         io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
             io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
@@ -2263,7 +2257,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       // descriptors (method_3734 / method_3739). Those aliases don't exist on
       // MC 26.1.2's deobfuscated runtime, so a direct typed call throws
       // NoSuchMethodError. Resolve both reflectively from the live class
-      // instance — descriptors are computed at lookup time, not pinned in
+      // instance - descriptors are computed at lookup time, not pinned in
       // the constant pool. Same fix family as serverRunningThread / the
       // FabricScheduler.serverRunningThread path.
       try {
@@ -2271,7 +2265,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
         java.lang.reflect.Method createSrc = s.getClass().getMethod("createCommandSourceStack");
         Object commands = getCommands.invoke(s);
         Object source = createSrc.invoke(s);
-        // performPrefixedCommand(CommandSourceStack, String) — resolve on the
+        // performPrefixedCommand(CommandSourceStack, String) - resolve on the
         // commands-instance class so the param type binds at lookup time too.
         java.lang.reflect.Method perform = null;
         for (java.lang.reflect.Method m : commands.getClass().getMethods()) {

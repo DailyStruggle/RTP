@@ -25,16 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Reservation-token regression suite covering the failure modes called out as
- * Phase 2 acceptance gates in {@code MULTI_SERVER_PLAN.md}: double-redeem
+ * Reservation-token regression suite covering failure modes: double-redeem
  * rejection, expired-token rejection at lookup time, orphan release via the
  * TTL reaper, and reaper idempotency across repeated passes.
  *
  * <p>Run against {@link InMemoryNetworkStateBinding} because every contract
  * exercised here is SPI-level. SQL-binding parity for the same contracts is
- * covered by {@code SqlNetworkStateBindingH2Test}; live-Redis parity is
- * deferred to the Phase 2 acceptance devstack alongside the existing
- * deferred-Redis suite.</p>
+ * covered by {@code SqlNetworkStateBindingH2Test}.</p>
  *
  * <p>Pinned by REQ-RTP-NET-011 (TTL reaper), REQ-RTP-PROXY-004 (atomic
  * state transitions), REQ-RTP-PROXY-VELOCITY-002 (findReservation returns

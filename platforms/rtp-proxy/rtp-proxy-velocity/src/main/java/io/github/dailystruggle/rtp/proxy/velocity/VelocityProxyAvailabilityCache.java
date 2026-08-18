@@ -15,8 +15,7 @@ import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 /**
- * Proxy-side availability store for the {@code proxy-cache} transport tier
- * (PROPOSAL-proxy-as-availability-store, build-order step 3). The Velocity
+ * Proxy-side availability store for the {@code proxy-cache} transport tier. The Velocity
  * companion is the one process that is always present (never player-empty),
  * so it is the natural authority for the cross-server region snapshot a lobby
  * reads to populate {@code /rtp region=} tab-completion.

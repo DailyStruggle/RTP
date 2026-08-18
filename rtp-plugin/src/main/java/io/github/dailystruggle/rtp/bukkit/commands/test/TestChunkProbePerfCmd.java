@@ -247,7 +247,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
       File regionFile = regionFileForSample(regionDir, cx, cz);
       if (regionFile != null && regionFile.isFile()) {
         // AnvilReader.readChunk expects region-local (0..31) chunk coords, not
-        // world-space — mirrors AnvilPrefilter.probeSyncDetailed's convention.
+        // world-space - mirrors AnvilPrefilter.probeSyncDetailed's convention.
         int rxLocal = Math.floorMod(cx, 32);
         int rzLocal = Math.floorMod(cz, 32);
         long t2 = System.nanoTime();
@@ -376,7 +376,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
    * that has a nonzero sector offset (i.e. the chunk is actually stored).
    *
    * <p>To bound memory and scan cost, the collection phase short-circuits once
-   * a comfortable oversample pool has been accumulated — roughly
+   * a comfortable oversample pool has been accumulated - roughly
    * {@code targetSamples * 8}, clamped to a floor that still gives adequate
    * spread even for small worlds.
    */
@@ -414,7 +414,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
         if (raf.length() < 4096) continue;
         raf.readFully(header);
       } catch (Throwable t) {
-        // Skip unreadable region files — diagnostic, not fatal.
+        // Skip unreadable region files - diagnostic, not fatal.
         continue;
       }
       for (int i = 0; i < 1024; i++) {
@@ -523,7 +523,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
     java.util.concurrent.CompletableFuture<long[]> result = new java.util.concurrent.CompletableFuture<>();
 
     // Try the legacy global scheduler first (Spigot/Paper). On Folia this
-    // throws UnsupportedOperationException — fall through to per-chunk region
+    // throws UnsupportedOperationException - fall through to per-chunk region
     // scheduling.
     try {
       Bukkit.getScheduler().runTask(plugin, () -> {

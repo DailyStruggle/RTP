@@ -57,10 +57,10 @@ public class BukkitEffectsHandler {
      * atomically swaps the {@code multiConfigParserMap}) is honored without
      * any local cache invalidation:
      * <ol>
-     *   <li>{@code player.getEffectivePermissions()} — historical
+     *   <li>{@code player.getEffectivePermissions()} - historical
      *       permission-driven path; preserved verbatim for backwards compat.</li>
      *   <li>{@link EffectsResolver#resolveTokens(String, RTPPlayer, String)}
-     *       — declarative {@code effects/<group>.yml} groups whose
+     *       - declarative {@code effects/<group>.yml} groups whose
      *       {@code when:} matches this stage and whose {@code permission:} /
      *       {@code players:} gating the player passes (effects-api-ADR-005).</li>
      * </ol>
@@ -151,7 +151,7 @@ public class BukkitEffectsHandler {
 
     public static void setupEffects(JavaPlugin plugin) {
         // Per effects-api-ADR-003: EffectFactory no longer registers Bukkit
-        // effects in a static block — the platform initializer must be invoked
+        // effects in a static block - the platform initializer must be invoked
         // explicitly. Idempotent.
         BukkitEffectsInitializer.registerAll();
         Configs configs = RTP.configs;

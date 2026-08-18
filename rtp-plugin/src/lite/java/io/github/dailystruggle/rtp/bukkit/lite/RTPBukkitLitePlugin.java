@@ -22,37 +22,19 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.logging.Level;
 
 /**
- * RTP-lite bootstrap (ADR-024). DRAFT SKELETON pending Rule D-005 approval.
+ * RTP-lite bootstrap (ADR-024) for the lite assembly variant. Mirrors the surviving
+ * steps of {@link RTPBukkitPlugin} and OMITS, in this order: the {@code org.sqlite.JDBC}
+ * probe (no SQL drivers shipped); {@code BukkitDatabaseHandler.setupDatabase} (lite uses
+ * {@code YamlFileDatabase}); the login reserve cache (ADR-023); Folia branching (lite is
+ * Spigot/Paper only); PlaceholderAPI registration; and visitor/observation mode wiring.
  *
- * <p>Mirrors the surviving steps of {@link RTPBukkitPlugin} for the lite assembly variant
- * and OMITS the following, in this exact order of omission:
- * <ol>
- *   <li>{@code org.sqlite.JDBC} probe in {@code onLoad}.</li>
- *   <li>{@code BukkitDatabaseHandler.setupDatabase} -- lite uses {@code YamlFileDatabase}
- *       (or an in-memory accessor) wired by {@link RTP}'s default constructor path.</li>
- *   <li>Login reserve cache initialization (ADR-023).</li>
- *   <li>{@code isFolia()} branching -- lite is Spigot/Paper only.</li>
- *   <li>PlaceholderAPI registration -- lite does not declare PAPI as a softdepend.</li>
- *   <li>Visitor / observation mode wiring ({@code PerformanceKeys.visitorEnabled}).</li>
- * </ol>
+ * <p>S-001..S-007 compliance is shared with the full bootstrap: all chunk I/O,
+ * MemoryTracker accounting, and stale-chunk guard logic live in {@code rtp-core} and load
+ * identically. Shared, branch-free bootstrap steps route through {@code BootstrapSupport}.
  *
- * <p>S-001..S-007 compliance is shared with the full bootstrap because all chunk I/O,
- * MemoryTracker accounting, and stale-chunk guard logic live in {@code rtp-core} and
- * are loaded identically.
- *
- * <p>This class is intentionally divergent from {@link RTPBukkitPlugin}. Do NOT collapse
- * the two via runtime flags; the whole point of ADR-024 is that the lite bootstrap reads
- * top-to-bottom with no "if (lite)" branches and no dead code paths.
- *
- * <p><b>Implementation note for the proposal phase:</b> several method calls below
- * (database setup, command registration, listener registration) currently route through
- * package-private helpers on {@code RTPBukkitPlugin}. Before this skeleton is moved out
- * of draft status, those helpers must be either:
- * (a) extracted to a shared {@code BootstrapSupport} class in
- *     {@code io.github.dailystruggle.rtp.bukkit} (preferred), or
- * (b) given package-visible counterparts in a way that preserves the "no shared bootstrap
- *     conditionals" invariant of ADR-024.
- * The TODO markers below pinpoint each such site.
+ * <p>Intentionally divergent from {@link RTPBukkitPlugin}. Do NOT collapse the two via
+ * runtime flags: ADR-024 requires the lite bootstrap to read top-to-bottom with no
+ * {@code if (lite)} branches and no dead code paths.
  */
 @SuppressWarnings("unused")
 public final class RTPBukkitLitePlugin extends JavaPlugin {
@@ -85,30 +67,26 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     if (instance == null) {
       instance = this;
 
-      // Step 1: server-model resolve + accessor / scheduler wiring.
-      // Lite supports Spigot and Paper only (no Folia branch). BukkitServerProvider
-      // already returns the correct accessor/scheduler pair for the host; lite simply
-      // never reaches the Folia code path because :rtp-folia:** is not on the classpath.
-      // Shared helper with the full bootstrap (ADR-024).
+      // Server-model resolve + accessor/scheduler wiring (shared helper, ADR-024).
+      // Lite is Spigot/Paper only: :rtp-folia:** is not on the classpath, so the
+      // Folia code path is never reached even though BukkitServerProvider handles it.
       if (!BootstrapSupport.wireServerAccessorAndScheduler(this, "LIFECYCLE-LITE")) {
         onDisable();
         return;
       }
     }
 
-    // Step 2: bStats with a distinct pluginId so lite installs are tracked separately.
-    // ADR-024: lite uses the v2-branch bStats id (12277) to keep historical continuity
-    // for the lite-style install base; full uses 30865.
+    // bStats: lite uses a distinct pluginId (12277) so lite installs are tracked
+    // separately from full (30865), preserving continuity for the lite install base.
     RTP.log(Level.FINE, "[RTP] onEnable initializing bStats id=12277");
     metrics = new Metrics(this, 12277);
     // Same cost-metrics chart catalogue as the full assembly, with the
     // assembly_variant pie reporting "lite" so dashboards can split.
     io.github.dailystruggle.rtp.bukkit.metrics.RTPCostMetricsCharts.register(metrics, "lite");
 
-    // CHECKLIST-metrics-and-multiserver.md row B9: install the platform-
-    // appropriate MetricsBinding (Paper vs raw Spigot). Mirrors the full
-    // bootstrap; lite has no Folia branch, but the dispatcher's Paper
-    // probe is platform-symmetric so the same call works. Best-effort.
+    // Install the platform-appropriate MetricsBinding (Paper vs raw Spigot).
+    // The dispatcher's Paper probe is platform-symmetric, so the same call works
+    // as in the full bootstrap. Best-effort.
     io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.install();
 
     if (RTP.getInstance() == null) {
@@ -185,22 +163,19 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       }
     }
 
-    // Step 3: command registration. Shared with the full bootstrap (ADR-024 helper).
-    // The helper builds the platform-neutral CoreRtpRoot (ADR-070) with the
-    // Bukkit seams; passing `this` (the lite JavaPlugin) is the parity-correct
-    // call for both editions.
+    // Command registration (shared helper, ADR-024). Builds the platform-neutral
+    // CoreRtpRoot (ADR-070) with the Bukkit seams; passing `this` is parity-correct
+    // for both editions.
     BootstrapSupport.registerRtpAndWildCommands(this);
 
-    // Step 4: drain startup tasks (region binding etc.). Shared helper (ADR-024).
+    // Drain startup tasks (region binding etc.); shared helper (ADR-024).
     BootstrapSupport.drainStartupTasks();
 
-    // Step 5: register listeners. Lite registers a strict subset:
-    //   - OnPlayerJoin, OnPlayerQuit, OnWorldLoadUnload (required for region lifecycle)
-    //   - OnEventTeleports (for rtp.onevent.* permissions that survive in lite, if any)
-    // It does NOT register the PAPI hook or the visitor-mode listener.
-    // TODO(ADR-024): decide whether to keep rtp.onevent.* in lite at all (per the open
-    // question in the research thread). If dropped, register only OnWorldLoadUnload +
-    // the join/quit listeners required for region lifecycle.
+    // Register a strict listener subset: join/quit/world-load (region lifecycle) plus
+    // OnEventTeleports (surviving rtp.onevent.* permissions). No PAPI hook, no
+    // visitor-mode listener.
+    // TODO(ADR-024): decide whether rtp.onevent.* stays in lite; if dropped, keep only
+    // the world-load + join/quit listeners required for region lifecycle.
     Bukkit.getPluginManager().registerEvents(new OnPlayerJoin(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
     Bukkit.getPluginManager().registerEvents(new OnWorldLoadUnload(), this);
@@ -234,29 +209,23 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
           "[RTP] waitlist wiring failed; continuing: " + t.getMessage(), t);
     }
 
-    // Step 6: chunk-unload processor (Spigot/Paper only -- safe in lite, no Folia branch).
+    // Chunk-unload processor (Spigot/Paper only; safe in lite, no Folia branch).
     RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
 
-    // Step 7: database processor. With yaml-only persistence this is effectively a
-    // no-op flush loop; kept for symmetry with the full bootstrap so /rtp reload
-    // behaves identically.
+    // Database processor. Under yaml-only persistence this is effectively a no-op
+    // flush loop, kept for symmetry so /rtp reload behaves identically to full.
     DatabaseProcessing.start();
 
     SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
 
-    // Step 8: drain late startup tasks. Shared helper (ADR-024).
+    // Drain late startup tasks; shared helper (ADR-024).
     BootstrapSupport.drainStartupTasks();
 
-    // Maps subsystem (ADR-047 / CHECKLIST-metrics-to-maps Stage 2.6). The
-    // maps-api, BukkitMapBinding, BukkitBiomeColorSource, and the
-    // visualization resolvers are all shipped in the lite jar (ADR-024 does
-    // not exclude mapsapi/**). Without this install MapDispatch stays on
-    // NoopMapBinding and every `/rtp visualization ...` click bottoms out
-    // in the configurable `mapBindingMissing` message ("map rendering is
-    // not available on this server"). Lite is Paper-only per ADR-024
-    // (line 190), so unconditionally install the plain BukkitMapBinding;
-    // no Folia branch is needed here. Failure is logged and swallowed so a
-    // hypothetical platform that can't allocate maps degrades gracefully
+    // Maps subsystem (ADR-047). The maps-api, BukkitMapBinding, BukkitBiomeColorSource,
+    // and visualization resolvers all ship in the lite jar. Without this install
+    // MapDispatch stays on NoopMapBinding and every `/rtp visualization ...` click
+    // yields the configurable `mapBindingMissing` message. Lite is Paper-only, so
+    // install the plain BukkitMapBinding unconditionally; failure degrades gracefully
     // to the same `mapBindingMissing` UX rather than crashing onEnable.
     try {
       io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding binding =
@@ -285,9 +254,8 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
           t);
     }
 
-    // Step 9: per-permission effects parse, deferred to tick+1 to mirror the
-    // full bootstrap. Lite ships effects-api shaded so per-permission effects
-    // (e.g. rtp.effects.<name>) must fire identically to the full edition.
+    // Per-permission effects parse, deferred to tick+1 to mirror full. effects-api
+    // is shaded into lite so rtp.effects.<name> fires identically to the full edition.
     RTP.log(Level.FINE,
         "[RTP] onEnable scheduling deferred BukkitEffectsHandler.setupEffects (tick+1)");
     RTP.scheduler.runTaskLater(() -> {
@@ -299,10 +267,10 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       BukkitEffectsHandler.setupEffects(null);
     }, 1);
 
-    // Step 10: Vault/economy is wired here identically to the full bootstrap: when Vault
-    // is present and no economy provider is bound yet, bind VaultChecker through
-    // the public RTPHooks facade. Lite ships economy.yml, so optional per-region
-    // teleport charging works out of the box (ADR-024, 2026-06-01 amendment).
+    // Vault/economy wiring, identical to full: when Vault is present and no economy
+    // provider is bound yet, bind VaultChecker through the public RTPHooks facade.
+    // Lite ships economy.yml, so optional per-region teleport charging works out of
+    // the box (ADR-024).
     RTP.scheduler.runTaskLater(() -> {
       try {
         if (RTP.economy == null
@@ -362,8 +330,8 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
           "[RTP] onDisable network-mode shutdown failed (continuing): "
               + t.getMessage(), t);
     }
-    // CHECKLIST-metrics-and-multiserver.md row B9: mirror the full bootstrap
-    // teardown so a /reload cycle reinstalls the binding cleanly. Idempotent.
+    // Mirror the full-bootstrap metrics teardown so a /reload cycle reinstalls the
+    // binding cleanly. Idempotent.
     try {
       io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.uninstall();
     } catch (Throwable ignored) {

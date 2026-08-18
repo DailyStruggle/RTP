@@ -109,21 +109,18 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   public CompletableFuture<Boolean> setLocation(RTPLocation to) {
     World world = ((FoliaRTPWorld) to.world()).world();
 
-    // Step 1: Prepare the Destination
-    // Create an org.bukkit.Location directly from the cached RTPLocation.
-    // Because the coordinates are already pre-centered by the generation pipeline, do not add any offsets to X, Y, or Z.
-    // Just apply the player's current yaw and pitch to the new location.
+    // Destination: build the Location from the cached RTPLocation, carrying the
+    // player's current yaw/pitch. Coordinates are pre-centered by the generation
+    // pipeline (only the +0.5 block-center offset on X/Z).
     double x = to.x() + 0.5;
     double y = to.y();
     double z = to.z() + 0.5;
     Location destinationLocation = new Location(world, x, y, z, player.getLocation().getYaw(), player.getLocation().getPitch());
 
-    // Step 2: Fire the Initial Teleport
-    // Call player.teleportAsync(destinationLocation). This allows Folia's native engine to instantly transfer
-    // the player's entity object to the destination Region Thread without waiting for a scheduler tick.
+    // Initial teleport: Folia's native engine transfers the entity to the destination
+    // region thread without waiting for a scheduler tick.
     return player.teleportAsync(destinationLocation).thenCompose(success -> {
-      // Step 3: Hijack the Callback
-      // If success is false or the player is offline, immediately call rtpLoc.getReservation().close() to prevent memory leaks and return.
+      // On failure or offline player, close the reservation (leak guard) and bail.
       if (!success || !player.isOnline()) {
         if (to.getReservation() != null) to.getReservation().close();
         return CompletableFuture.completedFuture(false);
@@ -135,20 +132,17 @@ public final class FoliaRTPPlayer implements RTPPlayer {
 
       CompletableFuture<Boolean> completionFuture = new CompletableFuture<>();
 
-      // Step 4: Define the Build and Secure Task
+      // Build-and-secure task: physically build the destination blocks (also closes the
+      // reservation in the Folia impl), then hop to the entity scheduler.
       Runnable buildPlatformTask = () -> {
         try {
-          // Call to.world().platform(to); to physically build the blocks on the destination region.
-          // This also handles reservation closure in the Folia implementation.
           to.world().platform(to);
 
-          // Jump to the Entity Scheduler using: player.getScheduler().run(...)
           player.getScheduler().run((Plugin) RTP.getInstance().getPlugin(), task -> {
-            // Inside the Entity Scheduler task: Set player.setFallDistance(0.0f) and perform a
-            // micro-rubberband by calling player.teleportAsync(destinationLocation) again to snap
-            // the player safely onto the newly built platform. The previously hardcoded
-            // SLOW_FALLING / BLINDNESS effects now live in effects/default.yml (postteleport
-            // fallback group) so admins can customise or remove them without a code change.
+            // On the entity scheduler: reset fall distance and micro-rubberband (a second
+            // teleportAsync) to snap the player onto the newly built platform. Any
+            // slow-falling / blindness effects live in effects/default.yml (postteleport
+            // fallback group), configurable without a code change.
             player.setFallDistance(0.0f);
             player.teleportAsync(destinationLocation).thenAccept(s -> completionFuture.complete(true));
           }, null);
@@ -158,8 +152,8 @@ public final class FoliaRTPPlayer implements RTPPlayer {
         }
       };
 
-      // Step 5: The 0-Tick Execution Check
-      // To bypass the 50ms RegionScheduler delay, use the RTP scheduler which checks for current region ownership.
+      // Bypass the 50ms RegionScheduler delay via the RTP scheduler, which runs inline
+      // when the current thread already owns the target region.
       RTP.serverAccessor.getScheduler().runTask(to.world(), chunkX, chunkZ, buildPlatformTask);
       return completionFuture;
     });
@@ -423,7 +417,7 @@ public final class FoliaRTPPlayer implements RTPPlayer {
    *
    * @return {@code true} if the scheduler accepted the task, {@code false} if the
    *         player is no longer schedulable (caller should use a fallback path so
-   *         the runnable is not silently dropped — see REQ-RTP-S-004).
+   *         the runnable is not silently dropped - see REQ-RTP-S-004).
    */
   public boolean scheduleOnSelf(Runnable task, Runnable retired, long delayTicks) {
     if (player == null) return false;

@@ -86,7 +86,7 @@ public final class AnvilProbeSupport {
           } else {
             // ADR-016 §13.1 follow-up (2026-04-20): emit a rate-limited line on
             // every UNKNOWN so operators can see the probe ran (applicability
-            // gate passed, probe executed) and still produced no view — i.e.
+            // gate passed, probe executed) and still produced no view - i.e.
             // the `rtp-anvil` decoder fell through at one of the attribution
             // points in `AnvilPrefilter.probeSyncDetailed` (no-region-file,
             // empty-location-entry, unsupported-dataversion,
@@ -115,7 +115,7 @@ public final class AnvilProbeSupport {
 
   /**
    * Publish a decoded view into the cache under {@code key}, enforcing the
-   * FIFO size cap. Safe to call multiple times for the same key — the later
+   * FIFO size cap. Safe to call multiple times for the same key - the later
    * call replaces the earlier view without double-counting the FIFO slot.
    */
   public void publish(long key, AnvilChunkView view) {
@@ -139,7 +139,7 @@ public final class AnvilProbeSupport {
   }
 
   /**
-   * Explicit eviction — called by the adapter's {@code getCachedChunk} once a
+   * Explicit eviction - called by the adapter's {@code getCachedChunk} once a
    * live chunk supersedes the Anvil snapshot for the same key.
    */
   public void evict(long key) {
@@ -192,7 +192,7 @@ public final class AnvilProbeSupport {
       String outcome, Path worldFolder, String dimSubpath, int cx, int cz,
       Verdict verdict) {
     // 2026-04-20 housekeeping (post-Folia-1.21.11 debug arc): PUBLISH is the
-    // happy path and confirmed working end-to-end — log at FINER only. UNKNOWN
+    // happy path and confirmed working end-to-end - log at FINER only. UNKNOWN
     // keeps its first-N-at-FINE budget because it still signals a real
     // diagnostic (probe ran, but no view produced) that an operator triaging
     // a stuck `anvil-hits=0` metric needs to see. The per-reason attribution

@@ -9,32 +9,8 @@ import java.util.List;
 import java.util.logging.Level;
 
 /**
- * Platform-neutral {@link SchematicPaster} that pastes through the world's native bulk
- * block-write primitive ({@link RTPWorld#setBlocks(java.util.List)}) instead of a
- * platform-specific block parser (ADR-058).
- *
- * <p>It inherits the decode half ({@link #load} / {@link #supports}) from
- * {@link AbstractFileSchematicPaster} (the in-repo Sponge {@code .schem} decoder) and implements
- * {@link #paste} entirely in terms of the platform-neutral {@link SchematicPlacementPlanner}: the
- * planned {@link BlockPlacement}s are converted to {@link BlockDelta}s (a location plus the
- * canonical block-state token) and handed to {@code RTPWorld#setBlocks}, which each adapter
- * implements with its native block writer; block-entity payloads (planned via
- * {@link SchematicPlacementPlanner#planBlockEntities}) are then restored through
- * {@link RTPWorld#restoreBlockEntities(java.util.List)}. This is the "one schematic translator"
- * design: the decode/plan half and the paste orchestration live here once, and every platform
- * (Bukkit, Paper, Folia, Fabric) supplies only the two native primitives, so no platform needs a
- * bespoke {@code SchematicPaster} subclass.
- *
- * <p>S-004: the paste is best-effort. A world that does not implement {@code setBlocks} (default
- * no-op returning {@code 0}) yields {@link PasteResult#PASTE_ERROR} and the caller falls back to
- * the default platform; nothing here ever throws to abort the teleport. {@code setBlocks} must be
- * invoked on the region-owning thread, which is the {@code paste} contract the caller already
- * honours.
- *
- * <p>Block-entity payloads (chest contents, ...) are restored on platforms whose
- * {@link RTPWorld#restoreBlockEntities(java.util.List)} override implements a native container
- * API (e.g. Bukkit/Paper/Folia). Platforms that leave it the default no-op (e.g. Fabric, this
- * pass) paste block states only.
+ * Platform-neutral {@link SchematicPaster} pasting via {@link RTPWorld#setBlocks} (ADR-058).
+ * Paste is best-effort and never aborts a teleport (S-004).
  */
 public final class WorldBlockSchematicPaster extends AbstractFileSchematicPaster {
 

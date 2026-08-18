@@ -45,20 +45,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 /**
- * Core class for the RTP (Random Teleport) plugin.
- * This class serves as the central hub for the plugin's platform-agnostic logic, separating
- * the core functionality from Bukkit/Spigot/Paper-specific APIs.
- *
- * <p>Key responsibilities include:
- * <ul>
- *   <li>Managing the selection API (Shapes, Vertical Adjustors).</li>
- *   <li>Maintaining references to server accessors, schedulers, and economy integrations.</li>
- *   <li>Tracking queued players and teleport data.</li>
- *   <li>Handling synchronization and task pipelining across the plugin.</li>
- * </ul>
- *
- * <p>This class acts as a singleton, accessible via {@link #getInstance()}, and delegates
- * platform-specific operations to the injected `serverAccessor` and `scheduler`.
+ * Core class for RTP platform-agnostic logic.
+ * Manages selections, configurations, tasks, server accessor references,
+ * and teleport execution state across supported platforms.
  */
 public class RTP {
   public static final ConcurrentLinkedQueue<CompletableFuture<?>> futures =
@@ -104,98 +93,40 @@ public class RTP {
   public static RTPEconomy economy = null;
 
   /**
-   * Pre-dispatch hook consulted at the top of {@code RTPCmd.compute(...)}
-   * to decide whether a {@code /rtp} call should be served locally,
-   * enrolled on the cross-server wait queue, or rejected with a localized
-   * message. Defaults to {@link io.github.dailystruggle.rtp.api.network.NetworkCommandHook#LOCAL_ONLY}
-   * so plain single-server deployments incur zero behavioural change.
-   * Network-mode adapters (Bukkit's {@code NetworkModeBootstrap}) install
-   * a richer impl during startup and revert to {@code LOCAL_ONLY} on
-   * shutdown. See {@code rtp-proxy-ADR-014}.
+   * Pre-dispatch hook to decide whether {@code /rtp} is served locally,
+   * enrolled on cross-server wait queue, or rejected.
+   * Defaults to {@link io.github.dailystruggle.rtp.api.network.NetworkCommandHook#LOCAL_ONLY}.
    */
   public static volatile io.github.dailystruggle.rtp.api.network.NetworkCommandHook
       networkCommandHook =
           io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
 
   /**
-   * Platform-supplied factory for the backend heartbeat sampler (ADR-049
-   * step 4). Each backend platform adapter (Bukkit / Paper / Folia / Fabric)
-   * installs a factory during startup that builds a
-   * {@link io.github.dailystruggle.rtp.common.network.BackendStateSampler}
-   * reading live host state (TPS / MSPT / player count / loaded worlds). The
-   * boolean argument is the {@code routing.lobbyMode} flag so the sampler can
-   * advertise an empty region inventory + {@code acceptingRequests=false}
-   * when this backend is a pure cross-server lobby.
-   *
-   * <p>The factory lives on {@code RTP} (rtp-core) rather than
-   * {@code RTPServerAccessor} (rtp-api) because {@code BackendStateSampler}
-   * produces a {@code rtp-proxy-common} {@code BackendHeartbeat}, a type
-   * rtp-api does not depend on. Remains {@code null} until a platform installs
-   * one; {@code NetworkModeBootstrap.boot(...)} treats a {@code null} factory
-   * as "platform has no sampler" and logs rather than throwing, so a missing
-   * factory degrades network mode gracefully instead of crashing startup.
-   *
-   * @since 3.0.0-beta.4 (ADR-049)
+   * Platform-supplied factory for the backend heartbeat sampler.
+   * Constructs a sampler reading host TPS/MSPT/player count/worlds.
+   * Boolean argument is the lobbyMode flag. Null indicates no sampler installed.
    */
   public static volatile java.util.function.Function<Boolean,
       io.github.dailystruggle.rtp.common.network.BackendStateSampler>
       backendStateSamplerFactory;
 
   /**
-   * Platform-supplied factory for the tier-1 (DB-free) plugin-message
-   * {@link io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge}.
-   * Each backend platform adapter that supports proxy plugin messaging
-   * (Bukkit / Paper / Folia; later Fabric / NeoForge) installs a factory
-   * during startup that wires the {@code bungeecord:main} channel and the
-   * passive proxy-forwarding probe. Consumed by
-   * {@code NetworkModeBootstrap.openTransport} when {@code transport.type} is
-   * {@code plugin-message} or {@code auto}.
-   *
-   * <p>The factory lives on {@code RTP} (rtp-core) rather than
-   * {@code RTPServerAccessor} (rtp-api) because {@code NetworkBridge} feeds a
-   * {@code rtp-proxy-common}-typed transport. Remains {@code null} until a
-   * platform installs one; the bootstrap treats {@code null} as "this platform
-   * has no plugin-message bridge" and keeps the plugin-message / auto tiers
-   * disabled (graceful, no crash). See {@code rtp-proxy-ADR-016}.
+   * Platform-supplied factory for plugin-message network bridge.
+   * Wires proxy messaging channels where supported.
    */
   public static volatile java.util.function.Supplier<
       io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge>
       networkBridgeFactory;
 
   /**
-   * When {@code true}, this backend is configured as a pure
-   * cross-server lobby and skips all local region processing - the per-region
-   * pre-fill ({@link io.github.dailystruggle.rtp.common.tasks.ScanTask}
-   * scheduling), the per-region DB hydrate, and the steady-state
-   * {@code Region.execute()} pulse all short-circuit. The lobby still owns
-   * {@link io.github.dailystruggle.rtp.common.selection.region.Region}
-   * instances (so {@code /rtp info} and config menus keep working), but those
-   * regions never fill their {@code keptLocations}/{@code unkeptLocations}
-   * pools and never accept reservations from peers (see
-   * {@code BukkitBackendStateSampler}
-   * which advertises {@code regions=[]} + {@code acceptingRequests=false}
-   * under the same flag).
-   *
-   * <p>Read from {@code routing.lobbyMode} in {@code network.yml} by
-   * {@code NetworkModeBootstrap.readLobbyModeEarly(File)} BEFORE the region
-   * config is loaded, so the gate is in effect when regions are first
-   * constructed. Defaults to {@code false} so non-lobby deployments incur
-   * zero behavioural change. Volatile so the early-startup publish
-   * happens-before the construction reads.
-   *
+   * When true, this backend operates as a pure cross-server lobby,
+   * skipping local region pre-fill and steady-state generation pulses.
    */
   public static volatile boolean lobbyMode = false;
 
   /**
-   * Platform-supplied carrier for the {@code /rtp test ...} umbrella SPI
-   * (sender + deferred scheduler + audit sink). Populated by each platform
-   * plugin during startup; remains {@code null} until then. Callers inside
-   * {@code rtp-core} should resolve this via
-   * {@link io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext#require()}
-   * which enforces S-006 (throws {@link IllegalStateException} rather than
-   * silently no-opping when the umbrella runs before core load).
-   *
-   * <p>See {@code docs/dev/scratch/CHECKLIST-fabric-rtp-test-full.md} Phase 1.
+   * Platform-supplied carrier for {@code /rtp test} runtime umbrella SPI.
+   * Resolved via {@link io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext#require()}.
    */
   public static volatile io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext
       testUmbrellaContext;
@@ -204,7 +135,7 @@ public class RTP {
    * Process-wide runtime metrics aggregator. Defaults to a {@link CoreMetrics} with a
    * {@link io.github.dailystruggle.metrics.api.MetricsBinding#NOOP NOOP} binding so
    * callers never have to null-check; platform adapters install a real binding via
-   * {@link CoreMetrics#setBinding} during startup. See {@code METRICS_PLAN.md}.
+   * {@link CoreMetrics#setBinding} during startup.
    */
   public static final CoreMetrics metrics = new CoreMetrics();
 
@@ -212,18 +143,8 @@ public class RTP {
   public static final ThreadLocal<Region> regionContext = new ThreadLocal<>();
 
   /**
-   * Optional per-thread message interceptor used by {@code /rtp info} when its
-   * output is being mirrored into a book renderer (PROPOSAL-info-as-book.md
-   * section 4.6). When non-null, {@code InfoCmd} routes every line it would
-   * have sent to {@code RTP.serverAccessor.sendMessage(callerId, …)} into this
-   * consumer instead — the chat path is skipped while the tap is installed so
-   * the player is not double-served. Code outside {@code InfoCmd} ignores this
-   * field; only paths that opt in via the helper consult it.
-   *
-   * <p>Always {@code null} on the chat-output path. The tap is set on the
-   * dispatching thread, the {@code InfoCmd} body executes synchronously on the
-   * same thread, and the tap is cleared in a {@code finally} block — so no
-   * cross-invocation leakage is possible. Tests verify this invariant.
+   * Optional per-thread message interceptor for book-mode mirroring in {@code /rtp info}.
+   * Non-null redirects output to this consumer instead of player chat.
    */
   public static final ThreadLocal<java.util.function.Consumer<String>> messageTap = new ThreadLocal<>();
 
@@ -510,8 +431,8 @@ public class RTP {
       return (d != null && !d.completed) || getInstance().processingPlayers.contains(uuid);
     };
 
-    // GUI-author SPI reads (PROPOSAL-gui-author-spi.md). Permission-gated target
-    // list + per-target status for populating third-party menu items. Read-only:
+    // GUI-author SPI reads. Permission-gated target list + per-target status
+    // for populating third-party menu items. Read-only:
     // these never trigger a teleport or charge a player - RTPAPI.teleport(...)
     // re-enforces every safety/permission/economy check regardless.
     io.github.dailystruggle.rtp.api.RTPAPI.allowedTargetsDelegate = uuid -> {
@@ -885,11 +806,8 @@ public class RTP {
   public io.github.dailystruggle.rtp.common.network.RTPNetworkManager networkManager;
 
   /**
-   * Wraps the installed platform {@link #scheduler} in a {@link io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler}
-   * so the wall-clock cost of RTP's own sync/async tasks is attributable. Idempotent:
-   * never double-wraps if a previous instance already installed the decorator. Kept
-   * static so the write to the static {@code scheduler} field is not performed from an
-   * instance method.
+   * Wraps the installed platform {@link #scheduler} in a profiling decorator
+   * to track wall-clock execution time of sync/async tasks. Idempotent.
    */
   private static synchronized void installProfilingScheduler() {
     if (!(scheduler instanceof io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler)) {
@@ -1052,13 +970,8 @@ public class RTP {
   }
 
   /**
-   * Reflectively construct the Redis-backed {@code RTPNetworkManager}, returning
-   * {@code null} if the class (or its Jedis dependency) is not on the classpath.
-   *
-   * <p>ADR-024: the lite assembly excludes {@code RedisManager} and the Jedis
-   * driver entirely. Resolving the class via {@code Class.forName} keeps the
-   * symbolic reference inside a string literal so {@code RTP.class} itself can
-   * load on a verifier-strict JVM without the driver present.
+   * Reflectively constructs the Redis-backed {@code RTPNetworkManager}.
+   * Returns null if RedisManager or Jedis is not on the classpath (ADR-024).
    */
   private static io.github.dailystruggle.rtp.common.network.RTPNetworkManager createRedisNetworkManager(String host, int port, String password) {
     try {
@@ -1197,15 +1110,8 @@ public class RTP {
   }
 
   /**
-   * Bounded buffer for sub-INFO log entries emitted before the {@code logging.yml}
-   * parser is built. Without this, FINE/FINER/FINEST/CONFIG records emitted during
-   * the bootstrap window (plugin enable, very early {@code reloadConfigs}) bypass
-   * the configured {@code min_level} gate because the platform sink (e.g.
-   * {@code SendMessage#getMinLevel()} on Bukkit) falls back to {@link Level#ALL}
-   * when the parser is unavailable, causing them to render as INFO on the
-   * console. After the parser is wired, {@link #flushPendingLogs()}
-   * drains the buffer through the normal sink so the configured threshold gates
-   * them retroactively.
+   * Bounded buffer for sub-INFO log entries emitted before {@code logging.yml} parser is built.
+   * Drained via {@link #flushPendingLogs()} once configuration is loaded.
    */
   private static final java.util.concurrent.ConcurrentLinkedQueue<Object[]> pendingLogs =
       new java.util.concurrent.ConcurrentLinkedQueue<>();
@@ -1390,7 +1296,7 @@ public class RTP {
       instance.databaseAccessor.flushDirtyCache();
       // CRITICAL: actually drain the writeQueue (and deleteQueue) to disk. Previously this
       // step was missing on shutdown, so every cached-location save/delete that accumulated
-      // between the 5-minute periodic flushDirtyCache cycle and server stop was lost —
+      // between the 5-minute periodic flushDirtyCache cycle and server stop was lost -
       // which is why the kept cache appeared empty after restart. Must happen BEFORE
       // stop.set(true) below, because processQueries bails immediately if stop is set.
       log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop processQueries(MAX) drain BEFORE stop.set(true)");

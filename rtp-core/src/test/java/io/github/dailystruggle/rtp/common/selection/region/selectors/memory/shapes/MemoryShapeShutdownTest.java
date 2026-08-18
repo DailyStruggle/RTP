@@ -14,16 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Verifies that bad location data written by {@link MemoryShape#save} during a
- * simulated shutdown sequence can be read back by {@link MemoryShape#load} on
- * the next startup, and that {@link MemoryShape#isKnownBad} correctly reflects
- * the persisted data.
- *
- * <p>This test exercises the ordering fix in {@code RTP.stop()} that moves
- * {@code databaseAccessor.stop.set(true)} to <em>after</em> the region
- * shutdown loops, ensuring that file-write requests enqueued by
- * {@code shape.save()} are not silently dropped when
- * {@code processQueries(Long.MAX_VALUE)} is called during {@code onDisable()}.
+ * Verifies bad location persistence across shutdown and startup cycles in {@link MemoryShape}.
  */
 class MemoryShapeShutdownTest {
 
@@ -66,7 +57,7 @@ class MemoryShapeShutdownTest {
     void shutdown_savesAndLoads_badLocations() throws Exception {
         YamlFileDatabase db = wireDatabaseAccessor();
 
-        // --- Phase 1: simulate a running server that marks locations as bad ---
+        // Simulate a running server that marks locations as bad
         Circle shape = new Circle();
         long loc1 = 100L;
         long loc2 = 200L;
@@ -83,11 +74,11 @@ class MemoryShapeShutdownTest {
         shape.save("shutdown_test", "test_world");
 
         // Simulate the correct shutdown ordering: processQueries runs BEFORE stop is set
-        // (this is the fix — stop must NOT be true yet when we flush writes)
+        // (this is the fix - stop must NOT be true yet when we flush writes)
         assertFalse(db.stop.get(), "stop must be false when flushing writes on shutdown");
         flushIO(db);
 
-        // --- Phase 2: simulate a fresh server startup loading the saved data ---
+        // Simulate a fresh server startup loading the saved data
         Circle freshShape = new Circle();
 
         // load() enqueues a binary file read; the future completes when processQueries runs
@@ -147,7 +138,7 @@ class MemoryShapeShutdownTest {
         shape.save("shutdown_race_test", "test_world");
 
         // Simulate the correct shutdown ordering: stop is set AFTER processQueries runs
-        // (this is the fix in RTP.stop() — stop must NOT be true yet when we flush writes)
+        // (this is the fix in RTP.stop() - stop must NOT be true yet when we flush writes)
         flushIO(db); // write completes because stop is still false
         db.stop.set(true);
 

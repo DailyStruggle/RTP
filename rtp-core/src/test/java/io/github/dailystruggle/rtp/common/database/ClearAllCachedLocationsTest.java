@@ -16,20 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression test for the 2026-04-20 issue: after a server restart, the database
- * loaded "extra locations that were supposedly consumed". Root cause: per-poll
- * {@code deleteCachedLocation} calls race with per-offer {@code saveCachedLocation}
- * calls in {@link DatabaseAccessor#processQueries(long)} (writes drain before
- * deletes, but deletes can also be stranded by server crashes between flush
- * cycles), leaving stale rows in {@code rtp_cached_locations} that get
- * re-hydrated on the next boot.
- *
- * <p>Fix: every save cycle now calls
- * {@link DatabaseAccessor#rebuildCachedLocationsFromMemory()}, which wipes the
- * table via {@link DatabaseAccessor#clearAllCachedLocations()} and re-enqueues
- * writes for the authoritative in-memory state. This test verifies the wipe
- * half of that contract: stale rows present in the table before the wipe are
- * gone after the wipe, with no dependency on per-row delete bookkeeping.
+ * Regression test for stale cached locations persisting across restarts.
+ * Verifies {@link DatabaseAccessor#clearAllCachedLocations()} and
+ * {@link DatabaseAccessor#rebuildCachedLocationsFromMemory()}.
  */
 class ClearAllCachedLocationsTest {
 
@@ -78,7 +67,7 @@ class ClearAllCachedLocationsTest {
         db.processQueries(Long.MAX_VALUE);
         assertEquals(1, db.loadCachedLocations("default").size());
 
-        // RTPTestSetup.install leaves permRegionLookup/tempRegions empty — the
+        // RTPTestSetup.install leaves permRegionLookup/tempRegions empty - the
         // rebuild must NOT wipe the table in that case, so direct unit-test
         // calls to flushDirtyCache retain their original behaviour.
         assertTrue(RTP.selectionAPI == null

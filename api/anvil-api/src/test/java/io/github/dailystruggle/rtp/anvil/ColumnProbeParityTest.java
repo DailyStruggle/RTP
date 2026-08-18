@@ -13,16 +13,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * PR-1 parity gate for {@link AnvilReader#readColumnProbe}.
+ * Parity gate for {@link AnvilReader#readColumnProbe}.
  *
- * <p>Guards the contract stated in {@code docs/dev/BIOME_LOOKUP_PERF_PLAN.md} and in
+ * <p>Guards the contract stated in
  * {@link ColumnProbe}'s javadoc: for every center-column world-Y, the probe returns the
  * same block identifier, biome identifier, and surface Y as the full-parse
  * {@link AnvilChunkView} would. Any divergence is a bug in the selective-parser filter
  * (most likely a missing or mis-pathed keep rule in
  * {@code AnvilReader#columnProbeDecision}).
  *
- * <p>Run across every {@code DataVersion} the anvil module claims to support — if only
+ * <p>Run across every {@code DataVersion} the anvil module claims to support - if only
  * one fixture is covered, a version-specific section-layout drift would slip through.
  */
 class ColumnProbeParityTest {
@@ -113,7 +113,7 @@ class ColumnProbeParityTest {
         byte[] regionBytes = loadRealFixture("1_20_R1");
         ColumnProbe absent = AnvilReader.readColumnProbe(regionBytes, 5, 5, 0, 16);
         // chunk (5,5) may or may not be present in the trimmed fixture. Guard by checking
-        // the underlying readChunk first — if that's null, readColumnProbe must be too.
+        // the underlying readChunk first - if that's null, readColumnProbe must be too.
         AnvilReader.ChunkEntry entry = AnvilReader.readChunk(regionBytes, 5, 5);
         if (entry == null) {
             assertEquals(null, absent, "probe must return null when chunk slot is empty");

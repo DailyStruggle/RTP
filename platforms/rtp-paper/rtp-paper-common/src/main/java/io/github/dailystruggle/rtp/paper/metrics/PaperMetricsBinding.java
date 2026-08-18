@@ -31,7 +31,7 @@ import java.util.function.IntSupplier;
  * values from a unit test. Production code uses the public no-arg constructor
  * which binds to {@link Bukkit#getServer()}.
  *
- * <p>Wiring (per {@code METRICS_PLAN.md}, Phase M1): the platform plugin
+ * <p>Wiring: the platform plugin
  * installs an instance via {@code RTP.metrics.setBinding(new PaperMetricsBinding())}
  * during plugin enable, after {@code Bukkit.getServer()} is non-null. All calls
  * are non-blocking and never throw on the calling thread.

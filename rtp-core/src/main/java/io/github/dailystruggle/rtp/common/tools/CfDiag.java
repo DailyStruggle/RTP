@@ -8,38 +8,8 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Level;
 
 /**
- * Lightweight allocation/dispatch counters for hunting CompletableFuture leaks.
- *
- * <p>Added 2026-05-08 to pinpoint the source of the heap-histogram signature
- * observed on Fabric (~96 M {@link java.util.concurrent.CompletableFuture},
- * ~94 M {@code CoCompletion}, ~48 M {@code BiApply}, ~46 M {@code BiRelay} in
- * 117 s of uptime). Both the {@code BiApply}/{@code BiRelay} ratio and the
- * fact that the only call sites in {@code rtp-core} producing those node
- * shapes are {@link java.util.concurrent.CompletableFuture#allOf} fan-outs
- * point at the neighbour-grid loads in {@code PregenTask} / {@code QueueTask},
- * but the multiplier (the rate at which those fan-outs are issued) was not
- * directly observable. This class makes that rate visible.</p>
- *
- * <p>Counters are bumped from a small set of well-known hot paths and are
- * read by a self-scheduled periodic INFO dump. The log prefix
- * {@code [RTP][CFDIAG]} is deliberately searchable so a future commit can
- * batch-demote to FINE (or remove) once the leak is closed and the data is
- * captured.</p>
- *
- * <p><b>Cost.</b> {@link LongAdder#increment()} is sub-nanosecond on amd64;
- * one increment per allOf dispatch and one per attempt is well below the
- * noise floor of the surrounding chunk-I/O cost. The periodic dump is a
- * single async task scheduled every 10 s.</p>
- *
- * <p><b>Thread safety.</b> All counters are {@link LongAdder}; the periodic
- * dump runs on RTP's async scheduler. {@link #ensureStarted()} uses CAS so
- * the dump is started exactly once across all caller threads.</p>
- *
- * <p>Search-and-replace targets when retiring this scaffolding:
- * <ul>
- *   <li>{@code CfDiag.}</li>
- *   <li>{@code [RTP][CFDIAG]}</li>
- * </ul>
+ * Diagnostic allocation and dispatch counters for CompletableFuture pipeline profiling.
+ * Thread-safe {@link LongAdder} counters with periodic async logging under {@code [RTP][CFDIAG]}.
  */
 public final class CfDiag {
 
@@ -62,11 +32,7 @@ public final class CfDiag {
     /** PregenTask attempt resubmits via {@code rescheduleNextAttempt} (the retry-storm proxy). */
     public static final LongAdder pregenReschedule         = new LongAdder();
 
-    // -- Widened instrumentation (2026-05-08, second pass) --------------------
-    // Each ChunkSet(...) ctor wires an internal CompletableFuture.allOf over its
-    // chunk futures (rtp-api/.../ChunkSet.java:21). That allOf is the smallest
-    // BiApply/BiRelay-shaped construct in the codebase, so per-callsite ChunkSet
-    // ctor rates fingerprint which call path multiplies CFs.
+    // ChunkSet ctor counters to track internal CompletableFuture.allOf allocations.
     /** PregenTask single-chunk live-load reservation ChunkSet ctor count. */
     public static final LongAdder chunkSetPregenLive       = new LongAdder();
     /** PregenTask multi-chunk neighbour reservation ChunkSet ctor count. */
@@ -88,15 +54,7 @@ public final class CfDiag {
     /** Fabric loadLiveChunk entry. */
     public static final LongAdder fabricLoadLiveChunk      = new LongAdder();
 
-    // -- Third pass (2026-05-08, idle-leak hunt) ------------------------------
-    // CFDIAG showed all instrumented sites near zero while heap allocated
-    // ~6 M CFs/sec with 0 players online. The remaining hot driver with NO
-    // instrumentation is ScanTask: ScanTask.run() iterates testPos() per
-    // spiral position, gated only by inFlightGate (MAX_PENDING_CHUNKS
-    // permits). Each testPos -> runFullLoadPath does
-    // getOrLoadChunk(cx,cz).orTimeout(30 s).whenComplete(...) — a 30 s
-    // pinning ceiling and a chain of CFs per call. Region.execute's
-    // cold-promote deficit loop is also a candidate. Instrument both.
+    // ScanTask and deficit-loop counters for idle pipeline diagnostics.
     /** ScanTask.run() entry count. */
     public static final LongAdder scanRunBatch            = new LongAdder();
     /** ScanTask.testPos entry count. */

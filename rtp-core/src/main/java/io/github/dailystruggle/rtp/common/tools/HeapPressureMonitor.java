@@ -7,23 +7,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 /**
- * Heap-pressure gate for background cache work.
- *
- * <p>RTP fills its location caches (cold-&gt;hot promotion in
- * {@link io.github.dailystruggle.rtp.common.selection.region.Region#execute(long)}
- * and the L3 backlog refill) on every async pulse. Each kept location retains a
- * chunk ticket, so an unbounded fill on a small-heap server steadily grows the
- * retained set until the JVM spends most of its time in garbage collection and
- * the server appears to hang ("server becomes unresponsive" with no console
- * error). This monitor lets the fill paths back off while the heap is under
- * pressure: background <em>generation</em> pauses, while serving already-cached
- * locations to waiting players keeps working.
- *
- * <p>The fraction is sampled from {@link Runtime} (used / max heap) and cached
- * for a short interval so the per-pulse check is effectively free and never
- * triggers extra allocation. The threshold is read from
- * {@link PerformanceKeys#maxHeapPercent} (percent of max heap; default 85).
- * A value at or below 0, or at or above 100, disables the gate.
+ * Heap-pressure gate for background cache generation and promotion tasks.
+ * Samples {@link Runtime} memory usage against {@link PerformanceKeys#maxHeapPercent}.
  */
 public final class HeapPressureMonitor {
   /** Minimum interval between fresh heap samples. */

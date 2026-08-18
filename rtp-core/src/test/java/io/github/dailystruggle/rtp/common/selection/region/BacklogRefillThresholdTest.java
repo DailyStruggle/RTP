@@ -13,22 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers the {@code backlogRefillThreshold} performance knob added so the L3
- * backlog cache refills in hysteresis bursts rather than continuously. The
- * burst behaviour groups multiple shape picks (and their downstream Anvil
- * bin verifications) into batches that share {@code .mca} files, improving
- * CPU and memory efficiency.
- *
- * <p>This is a lightweight verification of three contracts:</p>
- * <ol>
- *   <li>{@link PerformanceKeys#backlogRefillThreshold} is part of the enum.</li>
- *   <li>The shipped {@code performance.yml} declares the key with the default
- *       value {@code 0.5}.</li>
- *   <li>The hysteresis latch logic — modelled inline to mirror the rule in
- *       {@code Region#processBacklog} — never refills until the buffer has
- *       drained below {@code threshold * capacity}, and once active continues
- *       until full.</li>
- * </ol>
+ * Tests for {@code backlogRefillThreshold} performance knob governing L3 backlog cache refill hysteresis.
  */
 class BacklogRefillThresholdTest {
 

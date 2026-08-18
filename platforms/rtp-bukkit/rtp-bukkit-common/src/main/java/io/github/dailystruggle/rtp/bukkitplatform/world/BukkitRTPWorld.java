@@ -60,7 +60,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   private final ConcurrentHashMap<Long, WeakReference<Chunk>> chunkCache = new ConcurrentHashMap<>();
 
   /**
-   * ADR-016 — per-world cache of Anvil-backed chunk views keyed by the same
+   * ADR-016 - per-world cache of Anvil-backed chunk views keyed by the same
    * {@code (cx, cz) -> long} packing used by {@link #chunkCache}. The cache +
    * FIFO-eviction lifecycle is owned by {@link io.github.dailystruggle.rtp.anvil.AnvilProbeSupport},
    * which is shared by every adapter that wires the ADR-016 pipeline (currently
@@ -72,7 +72,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       new io.github.dailystruggle.rtp.anvil.AnvilProbeSupport();
 
   /**
-   * Reflective handle to {@code World#getChunkAtAsync(int, int)} — an overload that returns
+   * Reflective handle to {@code World#getChunkAtAsync(int, int)} - an overload that returns
    * {@link CompletableFuture}&lt;{@link Chunk}&gt;. The Bukkit API shipped with
    * {@code spigot-api:1.20.1-R0.1-SNAPSHOT} only declares the {@code Consumer}-based async
    * overloads, so we cannot bind to this method at compile time, but Paper, Folia, and modern
@@ -91,7 +91,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         m = null;
       }
     } catch (Throwable ignored) {
-      // No such method on the running server — fall back to synchronous loading.
+      // No such method on the running server - fall back to synchronous loading.
     }
     CHUNK_AT_ASYNC_FUTURE = m;
   }
@@ -108,7 +108,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-058 — swappable region-schematic paster, mirroring the {@link #setBiomeGetter}
+   * ADR-058 - swappable region-schematic paster, mirroring the {@link #setBiomeGetter}
    * idiom. Defaults to {@link io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster}
    * (never {@code null}, S-006); the adapter installs a WorldEdit/FAWE-backed paster at
    * bootstrap when the soft-depend is present, and an addon may override it via
@@ -164,8 +164,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   public static Set<String> getBiomes(RTPWorld<?> world) {
-    // BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §4 step 6 — the `AnvilRegionScanner.scanBiomes`
-    // union has been retired from the runtime getter. The authoritative runtime enumeration
+    // The `AnvilRegionScanner.scanBiomes` union is not used by the runtime
+    // getter. The authoritative runtime enumeration
     // for the biome-allow-list inversion is now `MemoryShape#getObservedBiomes()`
     // (consulted inside `LocationGenerator`); the platform enumeration returned here is
     // a fallback used only before the region has observed its first candidate. The
@@ -193,7 +193,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
-    // ADR-016 — Anvil read-only data source (no longer a gate).
+    // ADR-016 - Anvil read-only data source (no longer a gate).
     //
     // For candidate chunks that are not currently loaded and the world uses the
     // vanilla chunk generator, we probe the persisted r.X.Z.mca region file
@@ -204,7 +204,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // use, so the immediately-following getCachedChunk(key) call in
     // LocationGenerator receives an Anvil-backed BukkitRTPChunk and lets the
     // vert adjustor scan across the whole decoded Y range. An advisory REJECT
-    // (surface unsafe) no longer drops the candidate — the vert adjustor may
+    // (surface unsafe) no longer drops the candidate - the vert adjustor may
     // still find a safe air pocket below the surface (e.g. sub-lava caverns
     // in the nether).
     //
@@ -213,7 +213,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // fall through to the live-load path. The live chunk.isSafe(...) re-check
     // at teleport commit (ADR-016 §4) remains the authoritative arbiter.
     //
-    // ADR-016 §13.2 — every Bukkit-family adapter in scope (Spigot, Paper,
+    // ADR-016 §13.2 - every Bukkit-family adapter in scope (Spigot, Paper,
     // Folia) goes through this pre-filter. Paper inherits it verbatim via
     // this class (its `PaperRTPWorld` subclass deliberately adds no
     // `getChunkAt` override). Folia re-implements the same probe-and-publish
@@ -263,8 +263,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * BIOME_LOOKUP_PERF_PLAN.md PR-3b — fast-path probe that reads a single chunk's
-   * center column from the persisted {@code r.X.Z.mca} region file and hands
+   * Fast-path probe that reads a single chunk's center column from the
+   * persisted {@code r.X.Z.mca} region file and hands
    * {@code PregenTask} a {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe}
    * that {@code VerticalAdjustor.adjustFromProbe} can evaluate without triggering
    * a full chunk decode or live load.
@@ -272,7 +272,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * <p>Gated on the same applicability check as the ADR-016 full-chunk prefilter
    * ({@link #shouldPrefilter}): off when the chunk is already loaded (live state
    * is authoritative) or when {@code SafetyKeys.anvilPrefilterEnabled} is false.
-   * A null/empty return signals UNKNOWN — the caller falls back to the full
+   * A null/empty return signals UNKNOWN - the caller falls back to the full
    * {@link #getChunkAt} pipeline, which remains the authoritative path.</p>
    *
    * <p>S-005: file I/O is dispatched to {@link io.github.dailystruggle.rtp.anvil.AnvilIoPool}
@@ -290,20 +290,19 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     final String dim = dimensionRegionSubpath(world);
     final int finalMinY = minY;
     final int finalMaxY = maxY;
-    // BIOME_LOOKUP_PERF_PLAN.md PR-9: revert PR-8's inline dispatch. The concurrency
-    // gauge in ScanTask showed peak in-flight at 11–12 vs cap 50 — the driver loop
-    // was serializing ~7ms of probe I/O onto its single thread. Dispatch back onto
-    // AnvilIoPool (dedicated blocking-I/O executor, sized for disk parallelism) so
-    // the driver can saturate its semaphore and the AnvilIoPool runs probes in
-    // parallel. Scheduler handoff overhead (~tens of µs) is vastly cheaper than
+    // Dispatch onto AnvilIoPool rather than inline: inline dispatch serialized
+    // ~7ms of probe I/O onto the driver's single thread, holding peak in-flight
+    // at 11-12 vs cap 50. AnvilIoPool (dedicated blocking-I/O executor, sized
+    // for disk parallelism) lets the driver saturate its semaphore and run
+    // probes in parallel; the scheduler handoff overhead is far cheaper than
     // serializing 7ms onto the driver. S-005 preserved: AnvilIoPool threads are
     // daemons with no region-thread affinity.
     return CompletableFuture.supplyAsync(() -> {
       try {
         java.nio.file.Path regionFile =
             io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(worldFolder, dim, cx, cz);
-        // BIOME_LOOKUP_PERF_PLAN.md PR-10: share raw region bytes across sibling-chunk
-        // probes in the same r.X.Z.mca via a 4-entry LRU, with mtime invalidation.
+        // Share raw region bytes across sibling-chunk probes in the same
+        // r.X.Z.mca via a 4-entry LRU, with mtime invalidation.
         byte[] regionBytes = io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
         if (regionBytes == null) return null;
         int rx = Math.floorMod(cx, 32);
@@ -433,7 +432,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     try {
       ConfigParser<SafetyKeys> safety =
           (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-      if (safety == null) return true; // Config not available yet — default-on.
+      if (safety == null) return true; // Config not available yet - default-on.
       Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
       boolean enabled;
       if (raw instanceof Boolean b) enabled = b;
@@ -521,7 +520,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   /**
    * Snapshot the current {@code BlocksKeys.unsafeBlocks} list as a plain {@code Set<String>}.
-   * Returns an empty set on any lookup failure — the pre-filter treats an empty set as
+   * Returns an empty set on any lookup failure - the pre-filter treats an empty set as
    * "never reject", which is the safe default.
    */
   @SuppressWarnings("unchecked")
@@ -547,14 +546,14 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * failed), or resolves to a {@code null} {@link Chunk} (some Paper/Folia builds
    * return null when a chunk cannot be provided off-tick without generation), this
    * method falls back to {@link World#getChunkAt(int, int)} on the primary thread
-   * — the only Bukkit API guaranteed to generate a missing chunk. Each failure edge
+   * - the only Bukkit API guaranteed to generate a missing chunk. Each failure edge
    * is logged at {@code WARNING} so operators can isolate problems in the pregen
    * summary's {@code nullChunk} bucket (REQ-RTP-S-004).
    */
   private CompletableFuture<Long> loadChunkFuture(int cx, int cz, long key) {
     // Count only actual live chunk-load attempts dispatched to the chunk system.
     // Probe-only paths (ADR-016 anvil pre-filter) and probe-cache hits MUST NOT bump
-    // this counter — see the Javadoc on RTPWorld.totalChunkLoads. This avoids the
+    // this counter - see the Javadoc on RTPWorld.totalChunkLoads. This avoids the
     // double-count that previously occurred when RTPWorld.getOrLoadChunk called both
     // getChunkAt (probe) and getChunkAtAsync (live) for the same logical attempt.
     totalChunkLoads.incrementAndGet();
@@ -575,7 +574,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // call and keeps the location pipeline off the tick thread wherever the server
     // fork implements true async generation (Paper/Folia). On vanilla Spigot the
     // scheduling still resolves on the main thread internally, but the caller is
-    // not blocked — a strict improvement over the previous runTask+getChunkAt path.
+    // not blocked - a strict improvement over the previous runTask+getChunkAt path.
     if (CHUNK_AT_ASYNC_FUTURE != null) {
       try {
         @SuppressWarnings("unchecked")
@@ -607,7 +606,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         }
       } catch (Throwable t) {
         // Some test doubles (e.g. MockBukkit builds) or very old forks may not
-        // honor the async API — fall through to the synchronous generation path.
+        // honor the async API - fall through to the synchronous generation path.
         RTP.log(java.util.logging.Level.WARNING,
             "[RTP] Reflective async chunk API failed for world=" + name + " chunk=(" + cx
                 + "," + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage()
@@ -698,7 +697,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * Non-blocking lookup — delegates to Bukkit's {@code World#isChunkLoaded(int,int)}, which is
+   * Non-blocking lookup - delegates to Bukkit's {@code World#isChunkLoaded(int,int)}, which is
    * documented as a pure state query and does NOT trigger a chunk load. Used by the stale-chunk
    * guard (ADR-015 / REQ-RTP-S-005) to abort block evaluation when the chunk was GC'd while the
    * Count-Bound pipe was backlogged.
@@ -790,7 +789,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public RTPChunk<?> getCachedChunk(long key) {
-    // Live chunk takes precedence over any Anvil snapshot — the live path is
+    // Live chunk takes precedence over any Anvil snapshot - the live path is
     // authoritative once a real chunk has been loaded.
     WeakReference<org.bukkit.Chunk> ref = chunkCache.get(key);
     if (ref != null) {
@@ -803,7 +802,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       chunkCache.remove(key); // Cleanup stale reference
     }
 
-    // ADR-016 fallback: no live chunk cached, but the Phase 3a probe may
+    // ADR-016 fallback: no live chunk cached, but the anvil prefilter probe may
     // have produced an Anvil-backed view earlier in this candidate's evaluation.
     io.github.dailystruggle.rtp.anvil.AnvilChunkView view = anvilProbeSupport.takeCached(key);
     if (view != null) {
@@ -851,9 +850,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public String getBiome(int x, int y, int z) {
-    // ADR-016 / ADR-016 (biome) §6 — in-place amendment. Anvil-first:
-    // if the Phase-3a pre-filter already decoded this chunk and its view
-    // is still cached (no I/O on this path — O(1) ConcurrentHashMap read),
+    // ADR-016 (biome) §6. Anvil-first:
+    // if the anvil pre-filter already decoded this chunk and its view
+    // is still cached (no I/O on this path - O(1) ConcurrentHashMap read),
     // return the raw namespaced biome identifier from the on-disk palette.
     // Only fall through to the pre-existing getter when:
     //   - no Anvil view is cached for this chunk key (unpopulated / live-loaded), OR
@@ -863,8 +862,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // when the Iris addon is installed, the addon's setBiomeGetter has already
     // replaced the static function with its engine-backed override, so Anvil-first
     // layers on top of whatever the last-registered setter installed. Biome reads
-    // never gate safety (plan §5), so a null from the Anvil branch is always a
-    // quiet fall-through.
+    // never gate safety, so a null from the Anvil branch is always a quiet
+    // fall-through.
     // Reason-keyed metric + rate-limited log so operators can tell *why* a
     // live-tier read happened (ADR-016 §13.1 observability, audit option A+C).
     String reason;
@@ -941,7 +940,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * public Bukkit hooks that Iris, Terra, Chunky, and the datapack world-preset
    * bootstrapper use to install a non-vanilla generator. It cannot positively
    * detect mods that replace generation via NMS mixins, so any {@link Throwable}
-   * collapses to {@code false} — "assume non-vanilla" is the safe default that
+   * collapses to {@code false} - "assume non-vanilla" is the safe default that
    * keeps the §13.3 exemption from over-firing.</p>
    */
   @Override
@@ -955,20 +954,20 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-016 §13.3 upgrade-drift gate — region-file backed probe.
+   * ADR-016 §13.3 upgrade-drift gate - region-file backed probe.
    *
    * <p>Resolution order:</p>
    * <ol>
-   *   <li>{@link World#isChunkLoaded(int, int)} — a loaded chunk is by
+   *   <li>{@link World#isChunkLoaded(int, int)} - a loaded chunk is by
    *       definition generated; cheapest answer, safe to call off-tick
    *       (concurrent map lookup).</li>
    *   <li>{@link io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache#isOccupied}
    *       against the {@code r.X.Z.mca} file resolved via
    *       {@link io.github.dailystruggle.rtp.anvil.AnvilPrefilter#regionFileFor}.
    *       The cache amortises the 32x32 region-tile occupancy bitmap across
-   *       all ~1024 sibling-chunk queries — crucial for {@code ScanTask}
+   *       all ~1024 sibling-chunk queries - crucial for {@code ScanTask}
    *       PRESCAN which sweeps adjacent chunks in spiral order.</li>
-   *   <li>Any {@link Throwable} collapses to {@code true} — "assume
+   *   <li>Any {@link Throwable} collapses to {@code true} - "assume
    *       generated, skip the perf fast path" preserves the ADR-016 §13.3
    *       palette-drift correctness (false-positives only forfeit a fast
    *       path; false-negatives would risk the bug).</li>

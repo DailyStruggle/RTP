@@ -33,7 +33,7 @@ import java.util.logging.Level;
  *
  * <p>Lives in {@code rtp-fabric-V26_2_R1} (Loom unobfuscated, no intermediary
  * remapping) so its compiled bytecode references {@code net.minecraft.server.level.ServerLevel}
- * and friends by Mojang names — which is the actual class layout on a deobfuscated
+ * and friends by Mojang names - which is the actual class layout on a deobfuscated
  * 26.1.2 runtime. Common's {@code FabricRTPWorld} cannot link there because its
  * constant pool contains intermediary aliases ({@code class_3218} etc.) that
  * don't exist on that runtime.
@@ -156,7 +156,7 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         MinecraftServer server = level.getServer();
         if (server == null) return CompletableFuture.completedFuture(null);
         long k = key(cx, cz);
-        // Cache hit short-circuits — keeps getOrLoadChunk's cached path cheap.
+        // Cache hit short-circuits - keeps getOrLoadChunk's cached path cheap.
         if (chunkCache.containsKey(k)) {
             return CompletableFuture.completedFuture(k);
         }
@@ -221,7 +221,7 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
      * on 1.20.5+), so the inner value is unwrapped reflectively (see
      * {@link #unwrapChunk}). Returns {@code null} (an absent future) on a
      * resolution failure so the caller attributes it through the standard
-     * {@code FailTypes.nullChunk} path (S-004 — no silent discard).
+     * {@code FailTypes.nullChunk} path (S-004 - no silent discard).
      */
     @SuppressWarnings("unchecked")
     private CompletableFuture<ChunkAccess> requestChunkFuture(ServerLevel level, int cx, int cz) {
@@ -741,14 +741,14 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public void platform(RTPLocation location) {
-        // No-op — safety platform placement is a follow-up phase. Pipeline still
+        // No-op - safety platform placement is a follow-up phase. Pipeline still
         // works without it (commit-time recheck remains authoritative).
     }
 
     /**
-     * ADR-058 — region-schematic paster. The decode/plan half is platform-neutral
+     * ADR-058 - region-schematic paster. The decode/plan half is platform-neutral
      * ({@link io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster}); the native
-     * block writes route back through {@link #setBlocks(java.util.List)} below. Shared instance —
+     * block writes route back through {@link #setBlocks(java.util.List)} below. Shared instance -
      * the paster is stateless.
      */
     private static final io.github.dailystruggle.rtp.api.schematic.SchematicPaster SCHEMATIC_PASTER =
@@ -794,7 +794,7 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                                 .parseForBlock(blockLookup, delta.token(), false)
                                 .blockState();
                 // flags=2 (Block.UPDATE_CLIENTS): send to clients without triggering neighbour
-                // physics updates — a bulk world rewrite, not a player edit.
+                // physics updates - a bulk world rewrite, not a player edit.
                 level.setBlock(new BlockPos(delta.x(), delta.y(), delta.z()), state, 2);
                 placed++;
             } catch (Throwable e) {
@@ -823,7 +823,7 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public int getMaxHeight() {
         try {
-            // LevelHeightAccessor#getMaxY() on MC 26.1.2 — inclusive max build Y.
+            // LevelHeightAccessor#getMaxY() on MC 26.1.2 - inclusive max build Y.
             return world.getMaxY();
         } catch (Throwable t) {
             return 320;

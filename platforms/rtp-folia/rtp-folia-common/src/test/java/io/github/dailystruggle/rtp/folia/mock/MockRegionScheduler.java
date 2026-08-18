@@ -61,7 +61,7 @@ public class MockRegionScheduler implements RegionScheduler {
     @Override
     public ScheduledTask runDelayed(Plugin plugin, World world, int chunkX, int chunkZ,
                                     Consumer<ScheduledTask> task, long delayTicks) {
-        // Delay is ignored in the mock — task is queued immediately.
+        // Delay is ignored in the mock - task is queued immediately.
         return run(plugin, world, chunkX, chunkZ, task);
     }
 

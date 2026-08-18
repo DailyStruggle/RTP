@@ -249,7 +249,7 @@ class TagResolverTest {
   @DisplayName("non-namespaced reference defaults to 'minecraft'")
   void bareReferenceDefaultsMinecraft() throws IOException {
     Path root = dataRoot();
-    // 'values' contains a bare '#leaves' (no namespace) — vanilla treats as minecraft:leaves.
+    // 'values' contains a bare '#leaves' (no namespace) - vanilla treats as minecraft:leaves.
     writeTag(
         root,
         "minecraft",

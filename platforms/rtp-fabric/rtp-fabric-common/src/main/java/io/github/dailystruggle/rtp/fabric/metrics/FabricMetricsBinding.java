@@ -21,7 +21,7 @@ import java.util.function.LongSupplier;
  * {@code tickBudgetUtilisation > 1.0} via the snapshot derivation.
  *
  * <p>Per-region surface ({@link #foliaRegions()}) inherits the default
- * {@link MetricsBinding} empty-list — Fabric is a single-region runtime
+ * {@link MetricsBinding} empty-list - Fabric is a single-region runtime
  * and its tick rate is fully described by the four scalar fields.
  *
  * <p>{@link #tick(long)} is intended to be driven once per
@@ -33,7 +33,7 @@ import java.util.function.LongSupplier;
  *
  * <p>{@link #playerCount()} and {@link #softCap()} are supplied via
  * {@link IntSupplier} hooks so the binding stays free of any direct
- * {@code MinecraftServer} or {@code net.minecraft} imports — the Fabric
+ * {@code MinecraftServer} or {@code net.minecraft} imports - the Fabric
  * event bridge wires reflective accessors at construction time (matching
  * the existing {@code resolveOnlinePlayerCount} / {@code resolveMaxPlayers}
  * helpers in {@code FabricEventBridge}). This also lets the test harness
@@ -66,7 +66,7 @@ public final class FabricMetricsBinding implements MetricsBinding {
     private volatile double ema15m = Double.NaN;
 
     /**
-     * Production constructor — uses {@link System#nanoTime()} and
+     * Production constructor - uses {@link System#nanoTime()} and
      * caller-supplied count suppliers.
      *
      * @param playerCountSupplier {@code () ->} online-player count (e.g.

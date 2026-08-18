@@ -4,19 +4,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 
 /**
- * Fixed-size rolling sample window for {@code TeleportPipelineTask} completion times,
- * recorded in milliseconds.
- *
- * <p>Phase M0 ships the data structure; Phase M1 wires
- * {@code TeleportPipelineTask} completion paths to call {@link #record(long)}.
- *
- * <p>Design (per {@code METRICS_PLAN.md > Open Items}): 256-sample ring buffer, never
- * resets. Writes are wait-free via an atomic monotonically-increasing index; reads are
- * snapshots that walk the populated portion of the ring. Callers shall not assume
- * temporal ordering of samples within a snapshot &mdash; only that {@link #mean()}
- * returns the arithmetic mean of the most recent up-to-{@link #CAPACITY} samples.
- *
- * <p>No tick-thread blocking. No locking.
+ * Fixed-size rolling sample window for {@code TeleportPipelineTask} completion times (ms).
+ * Wait-free ring buffer (256 samples) with lock-free atomic index.
  */
 public final class PipelineHistogram {
 

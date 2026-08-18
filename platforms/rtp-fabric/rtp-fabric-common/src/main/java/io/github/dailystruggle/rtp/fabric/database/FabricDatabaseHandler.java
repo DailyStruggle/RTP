@@ -14,14 +14,14 @@ import java.util.Map;
 import java.util.logging.Level;
 
 /**
- * Fabric-side database bootstrap — mirrors {@code BukkitDatabaseHandler#setupDatabase}.
+ * Fabric-side database bootstrap - mirrors {@code BukkitDatabaseHandler#setupDatabase}.
  *
  * <p>Locates the per-mod config dir via {@link FabricLoader#getConfigDir()} (typically
  * {@code <server>/config/rtp/}) and delegates accessor selection to {@code rtp-core}'s
  * platform-agnostic {@code DatabaseHandler} primitives. No {@code org.bukkit.*} imports
  * (ADR-022 §4 invariant). No new {@code rtp-api} abstraction (ADR-022 §5).
  *
- * <p>REQ-RTP-S-006 — fail-loud if invoked before {@code rtp-core} is ready.
+ * <p>REQ-RTP-S-006 - fail-loud if invoked before {@code rtp-core} is ready.
  */
 public final class FabricDatabaseHandler {
 

@@ -128,7 +128,7 @@ public class SubcommandBypassesTeleportGuardsTest {
 
         sender.sentMessages.clear();
 
-        // Root command (no subcommand arg) — the guard must still fire.
+        // Root command (no subcommand arg) - the guard must still fire.
         rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[0]);
 
         boolean alreadyTeleportingFired = sender.sentMessages.stream()

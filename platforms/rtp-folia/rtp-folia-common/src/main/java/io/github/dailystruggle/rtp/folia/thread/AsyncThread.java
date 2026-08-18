@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 import org.checkerframework.framework.qual.SubtypeOf;
 
 /**
- * Declares that the annotated method or constructor must execute on a Folia {@code AsyncThread} —
+ * Declares that the annotated method or constructor must execute on a Folia {@code AsyncThread} -
  * a thread managed by {@code Bukkit.getAsyncScheduler()}.
  *
  * <p><b>Thread-affinity contract</b>
@@ -17,7 +17,7 @@ import org.checkerframework.framework.qual.SubtypeOf;
  *       annotated with {@code @AsyncThread} (or {@link GlobalRegionThread}).</li>
  *   <li>A {@code @RegionThread} method <strong>must not</strong> call an {@code @AsyncThread}
  *       method directly. The only legal bridge is submitting a lambda to
- *       {@code Bukkit.getAsyncScheduler().runNow(plugin, task)} — the scheduler acts as the
+ *       {@code Bukkit.getAsyncScheduler().runNow(plugin, task)} - the scheduler acts as the
  *       explicit interrupt-vector crossing between the two isolated execution domains.</li>
  *   <li>Calling an {@code @AsyncThread} method from {@link AnyThread} context is permitted
  *       (the caller makes no affinity promise, so no boundary is crossed).</li>

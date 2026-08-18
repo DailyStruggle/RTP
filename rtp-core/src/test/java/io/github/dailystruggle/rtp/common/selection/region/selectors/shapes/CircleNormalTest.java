@@ -13,13 +13,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for Circle_Normal shape covering:
- * - getRange() boundary conditions
- * - xzToLocation() all 4 quadrant branches
- * - locationToXZ() round-trip fidelity
- * - xzToLocation(MutableRTPCoords) mirrors long-variant
- * - NormalDistributionParams (mean, deviation) defaults
- * - Extreme values (0, negative, large)
+ * Tests for Circle_Normal shape: ranges, quadrant mappings, and coordinate conversions.
  */
 public class CircleNormalTest {
 
@@ -67,7 +61,7 @@ public class CircleNormalTest {
     }
 
     // -------------------------------------------------------------------------
-    // xzToLocation() — quadrant branch coverage
+    // xzToLocation() - quadrant branch coverage
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "xzToLocation({0},{1}) >= 0")
@@ -123,7 +117,7 @@ public class CircleNormalTest {
     }
 
     // -------------------------------------------------------------------------
-    // xzToLocation() — center offset
+    // xzToLocation() - center offset
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "center=({0},{1}), point=({2},{3})")
@@ -190,7 +184,7 @@ public class CircleNormalTest {
     }
 
     // -------------------------------------------------------------------------
-    // NormalDistributionParams — mean and deviation
+    // NormalDistributionParams - mean and deviation
     // -------------------------------------------------------------------------
 
     @ParameterizedTest(name = "mean={0}, deviation={1}")

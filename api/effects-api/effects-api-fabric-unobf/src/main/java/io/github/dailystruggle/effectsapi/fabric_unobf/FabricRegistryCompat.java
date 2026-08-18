@@ -98,7 +98,7 @@ public final class FabricRegistryCompat {
 
         // Fallback: scan by signature instead of by name. On a production
         // Fabric server with intermediary mappings (the common case), the
-        // Mojmap method names "getValue" / "get" do NOT exist at runtime —
+        // Mojmap method names "getValue" / "get" do NOT exist at runtime -
         // Loom only remaps method *references* in bytecode, not the string
         // literals passed to reflection / MethodHandles. So a name-based
         // findVirtual misses on a real server, but the *signature*
@@ -140,7 +140,7 @@ public final class FabricRegistryCompat {
                 return new Resolved(Shape.OPTIONAL_HOLDER, lookup.unreflect(opt));
             } catch (Throwable ignored) { /* fall through */ }
         }
-        // No method bound — log loudly so the operator can see why every
+        // No method bound - log loudly so the operator can see why every
         // sound/particle/potion token resolves to null (cosmetic effects
         // would otherwise silently no-op).
         System.err.println("[effects-api] [FabricRegistryCompat] no "

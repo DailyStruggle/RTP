@@ -97,7 +97,7 @@ public final class AnvilRegionScanner {
         CACHE.clear();
     }
 
-    /** Visible for tests — the current cache size. */
+    /** Visible for tests - the current cache size. */
     static int cacheSize() {
         return CACHE.size();
     }
@@ -115,7 +115,7 @@ public final class AnvilRegionScanner {
     /**
      * Maximum {@link Files#getLastModifiedTime(Path, java.nio.file.LinkOption...) lastModified}
      * across every region file in the folder. Returns {@code 0} when the folder has
-     * no region files or cannot be listed — in which case {@link #scanBiomes} will
+     * no region files or cannot be listed - in which case {@link #scanBiomes} will
      * also return an empty set, so the 0-signature cache entry is harmless.
      */
     private static long mtimeSignature(Path regionFolder) {
@@ -128,7 +128,7 @@ public final class AnvilRegionScanner {
                     long t = Files.getLastModifiedTime(p).toMillis();
                     if (t > max) max = t;
                 } catch (IOException ignored) {
-                    // Skip unreadable files — mtime signature will still be stable
+                    // Skip unreadable files - mtime signature will still be stable
                     // across calls because the same files fail the same way.
                 }
             }
@@ -147,7 +147,7 @@ public final class AnvilRegionScanner {
                 scanRegionFile(p, out);
             }
         } catch (IOException ignored) {
-            // Directory unreadable — return what we have (possibly empty). Matches
+            // Directory unreadable - return what we have (possibly empty). Matches
             // the "never crash" posture: callers get the same empty-set fallthrough
             // as on an unpopulated world.
         }

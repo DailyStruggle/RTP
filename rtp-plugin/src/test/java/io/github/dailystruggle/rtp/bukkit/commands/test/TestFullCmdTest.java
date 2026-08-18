@@ -25,13 +25,12 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit tests for {@link TestFullCmd}'s shipped-coverage audit.
  *
- * <p>{@link TestFullCmd} is the <b>intent-of-continuity anchor</b> defined
- * by {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md &sect;3.2}: every new {@code
+ * <p>{@link TestFullCmd} ensures every new {@code
  * rtp test *} subcommand registered on {@link TestCmd} must either be added
  * to {@link TestFullCmd#SHIPPED_SUBCOMMAND_NAMES} (and dispatched from
  * {@code runShippedSubcommands}) or listed in
  * {@link TestFullCmd#DELIBERATELY_EXCLUDED_SUBCOMMANDS}. These tests guard
- * that contract so a future agent cannot silently drop a subcommand from
+ * that contract so a future change cannot silently drop a subcommand from
  * the umbrella sweep.
  *
  * <p>Traces REQ-RTP-S-004 via {@link TestFullCmd}: a missing dispatch would
@@ -146,14 +145,14 @@ class TestFullCmdTest {
   // Parity test against the real TestCmd registration: any name that
   // TestCmd.addSubCommand registers must be either dispatched from
   // TestFullCmd or deliberately excluded. This is the S-004 continuity
-  // contract from RUNTIME_TEST_SUITE_PLAN.md §3.2, asserted at test time.
+  // contract, asserted at test time.
   // -----------------------------------------------------------------
 
   @Test
   @DisplayName("every subcommand registered on BukkitTestCmd is either shipped or deliberately excluded")
   void testCmdRegistrationMatchesShippedOrExcluded() {
     // Must use BukkitTestCmd (the Bukkit-flavoured subclass), not the bare
-    // TestCmd — TestFullCmd / `stress` / `chunk-probe-perf` / `async-reply`
+    // TestCmd - TestFullCmd / `stress` / `chunk-probe-perf` / `async-reply`
     // are Bukkit-only and registered by BukkitTestCmd.registerPlatformSpecificChildren().
     // See TestCmd Javadoc and TestCmdPlatformSplitTest for the cross-platform
     // constructor split rationale.
@@ -190,7 +189,7 @@ class TestFullCmdTest {
   }
 
   // --------------------------------------------------------------------------
-  // Minimal TreeCommand fake — same pattern as TestCommandsCmdAuditTest so
+  // Minimal TreeCommand fake - same pattern as TestCommandsCmdAuditTest so
   // that reviewers can cross-reference the two.
   // --------------------------------------------------------------------------
 

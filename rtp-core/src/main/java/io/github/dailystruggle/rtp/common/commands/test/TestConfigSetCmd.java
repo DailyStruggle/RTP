@@ -12,28 +12,10 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test config-set} &mdash; runtime self-test that proves the
- * {@code /rtp config &lt;file&gt; &lt;key&gt; &lt;value&gt;} write path
- * actually mutates a live {@link ConfigParser} (and not just the YAML
- * file on disk).
- *
- * <p>The probe targets {@link PerformanceKeys#viewDistanceSelect} because
- * it is a simple long-valued key with no side effects on the teleport
- * pipeline at the values used here.
- *
- * <p>Behaviour: read current value &rarr; write {@code current + 1} via
- * {@link ConfigParser#set(String, Object)} &rarr; read back &rarr;
- * compare &rarr; restore original. Each step is reported to the caller
- * and to {@code RTP.log}; a mismatch is logged at {@link Level#WARNING}.
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>REQ-RTP-S-004</b> &mdash; every outcome (success, mismatch,
- *       missing parser) produces a player-visible line and a log entry;
- *       no silent returns.</li>
- *   <li><b>REQ-RTP-S-005</b> &mdash; the set/get round-trip runs on the
- *       async tier; no chunk I/O is performed.</li>
- * </ul>
+ * {@code rtp test config-set} - runtime self-test verifying that
+ * {@link ConfigParser#set(String, Object)} updates live in-memory state.
+ * Targets {@link PerformanceKeys#viewDistanceSelect} with mutate-verify-restore cycle.
+ * Complies with REQ-RTP-S-004 (no silent returns) and REQ-RTP-S-005 (async execution).
  */
 public class TestConfigSetCmd extends BaseRTPCmdImpl {
 

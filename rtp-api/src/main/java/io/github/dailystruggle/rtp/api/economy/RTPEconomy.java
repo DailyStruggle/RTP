@@ -5,17 +5,8 @@ import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import java.util.UUID;
 
 /**
- * Platform-agnostic economy abstraction used to charge and refund players for
- * random teleport requests.
- *
- * <p>Implementations bridge to a concrete economy plugin (e.g. Vault + EssentialsX)
- * and are injected into the plugin at startup. When no economy plugin is present,
- * the server accessor returns a no-op implementation so that the teleport pipeline
- * never throws a {@link NullPointerException}.
- *
- * <p><b>Thread safety:</b> All methods may be called from the async generation
- * pipeline; implementations must be safe to invoke off the main server thread
- * (REQ-API-ARCH-001).
+ * Platform-agnostic economy SPI for charges and refunds (REQ-API-ARCH-001).
+ * Methods must be safe to call off the main server thread.
  */
 @PublicApi
 public interface RTPEconomy {

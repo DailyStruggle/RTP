@@ -35,8 +35,8 @@ import java.util.Map;
  * NBT string format for all code points observed in vanilla chunk data (ASCII identifiers).
  *
  * <p>This codec is read/write symmetric for every tag type it reads: round-tripping
- * {@code bytes → read → write → read} yields structurally-identical values, and — for
- * compound payloads without embedded {@code TAG_List} of mixed-empty shape — also yields
+ * {@code bytes → read → write → read} yields structurally-identical values, and - for
+ * compound payloads without embedded {@code TAG_List} of mixed-empty shape - also yields
  * byte-identical output of the raw tag tree (compression is separate, see {@link AnvilReader}).
  */
 public final class Nbt {
@@ -201,7 +201,7 @@ public final class Nbt {
                 }
                 int fixed = fixedPayloadSize(elemType);
                 if (fixed > 0) {
-                    // All fixed-width numeric elements — bulk skip.
+                    // All fixed-width numeric elements - bulk skip.
                     long total = (long) fixed * (long) n;
                     skipBytes(in, total);
                     return;
@@ -277,7 +277,7 @@ public final class Nbt {
      *
      * <p>{@code RECURSE} is only meaningful for {@code TAG_COMPOUND} children. For
      * {@code TAG_LIST} elements, the filter is consulted once per element using the
-     * synthetic child name {@code "[]"} — returning {@code RECURSE} there descends into
+     * synthetic child name {@code "[]"} - returning {@code RECURSE} there descends into
      * each element compound individually (useful e.g. for {@code sections[*]}).
      */
     @FunctionalInterface

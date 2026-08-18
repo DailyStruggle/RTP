@@ -107,9 +107,13 @@ public enum CommandMessages {
   infoConsoleRegionHeader,
   /** Template for a single region entry line in {@code /rtp info} (player view). */
   infoRegion,
-  /** Header line introducing the biome-occupancy leaderboard shown by {@code /rtp info biomes}. Empty template skips silently. */
+  /**
+   * Header line introducing the biome-occupancy leaderboard in {@code /rtp info biomes}. Empty skips silently.
+   */
   infoBiomeActivityHeader,
-  /** Per-row template for a single biome in the {@code /rtp info biomes} occupancy leaderboard. Empty template skips silently. */
+  /**
+   * Per-row template for a single biome in the {@code /rtp info biomes} occupancy leaderboard. Empty skips silently.
+   */
   infoBiomeActivityRow,
   /** Line shown by {@code /rtp info biomes} when no occupancy has been sampled yet. Empty template skips silently. */
   infoBiomeActivityEmpty,
@@ -134,7 +138,9 @@ public enum CommandMessages {
   menuPickValue,
   /** Label for the "type a custom value..." fallback row on a parameter-value picker page. */
   menuTypeValue,
-  /** Non-clickable header row prepended to every non-root menu page surfacing the assembled command. {@code [command]} placeholder. */
+  /**
+   * Non-clickable header row prepended to every non-root menu page surfacing the command. {@code [command]} placeholder.
+   */
   menuConstructed,
   /** Non-clickable title row prepended to the root {@code /rtp menu} page. */
   menuRootTitle,
@@ -271,13 +277,13 @@ public enum CommandMessages {
   infoBookRefreshRow,
   /** Hover text for the info-book refresh row. No placeholders. */
   infoBookRefreshHover,
-  /** Clickable row label for the {@code Switch to chat} affordance at the bottom of the {@code /rtp info} book. No placeholders. */
+  /** Clickable row label for the {@code Switch to chat} affordance in {@code /rtp info} book. No placeholders. */
   infoBookSwitchToTextRow,
   /** Hover text for the info-book "switch to chat" row. No placeholders. */
   infoBookSwitchToTextHover,
   /** Footer row rendered when the {@code /rtp info} book content exceeds the book page cap. No placeholders. */
   infoBookOverflowFooter,
-  /** Non-clickable note row indicating that periodic auto-refresh for the info book is not currently supported. No placeholders. */
+  /** Non-clickable note row: periodic auto-refresh for the info book is not supported. No placeholders. */
   infoBookAutoRefreshDeferredNote,
   // --- Stage C config-view book pages ---
   /** Non-clickable title row at the top of the config-file selector page. */
@@ -304,7 +310,7 @@ public enum CommandMessages {
   configValueUnsetPlaceholder,
   /** Non-clickable header row separating the "Changeable" list from the "Pending" staging-cart list. No placeholders. */
   configPendingHeader,
-  /** Per-row label for a staged (pending) {@code key=value} entry on a config-file page. {@code [key]} / {@code [value]} placeholders. */
+  /** Per-row label for staged {@code key=value} on a config page. {@code [key]} / {@code [value]} placeholders. */
   configPendingRowFormat,
   /** Hover text shown when the viewer hovers over a pending (staged) row. No placeholders. */
   configPendingRowHover,
@@ -313,9 +319,9 @@ public enum CommandMessages {
   /** Clickable label for the "discard staged changes" row on a config-file page. No placeholders. */
   configDiscardRow,
   // --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
-  /** Sent to the viewer when an {@code OPEN_MAP} menu action fires but no concrete {@code MapBinding} is registered. No placeholders. */
+  /** Sent when an {@code OPEN_MAP} menu action fires without a registered {@code MapBinding}. No placeholders. */
   mapBindingMissing,
-  /** Sent to the viewer when {@code MapDispatch} receives a {@code ChartSpec} whose {@code Kind} has no registered resolver. No placeholders. */
+  /** Sent when {@code MapDispatch} receives a {@code ChartSpec} with no resolver. No placeholders. */
   mapResolverMissing,
   /** Sent to the viewer when a resolver runs but the underlying data source is unavailable. {@code [region]} placeholder. */
   mapUnavailable,

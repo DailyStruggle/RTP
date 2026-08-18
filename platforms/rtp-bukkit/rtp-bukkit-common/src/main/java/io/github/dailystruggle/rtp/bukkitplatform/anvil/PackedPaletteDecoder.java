@@ -42,7 +42,7 @@ public final class PackedPaletteDecoder {
      *
      * @param data         packed long array from {@code block_states.data}; must be non-null
      *                     and long enough to contain {@code entryIndex}
-     * @param paletteSize  palette size (must be {@code >= 2} — single-entry palettes are
+     * @param paletteSize  palette size (must be {@code >= 2} - single-entry palettes are
      *                     handled by the caller and do not have a {@code data} array)
      * @param entryIndex   section-flat index {@code (y * 16 + z) * 16 + x}, 0..4095
      * @return palette index at {@code entryIndex}

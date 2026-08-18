@@ -88,10 +88,9 @@ public final class NetworkBindings {
                             "NetworkBindings.open: transport.type=sql requires a non-null DataSource "
                                     + "(typically the host's AbstractSQLDatabaseAccessor pool).");
                 }
-                // Load the HMAC envelope verifier the same
-                // way as the Redis branch. Loader failure degrades-to-disabled
-                // (InMemory fallback) per MULTI_SERVER_PLAN.md §Failure-Mode
-                // Policy (network-mode bootstrap).
+                // Load the HMAC envelope verifier the same way as the Redis
+                // branch. Loader failure degrades to disabled (InMemory
+                // fallback) per the network-mode failure-mode policy.
                 HmacVerifier sqlVerifier;
                 try {
                     sqlVerifier = HmacVerifier.loadFromEnv(
@@ -110,9 +109,8 @@ public final class NetworkBindings {
                 // Redis: heartbeats + snapshot + pub/sub fan-out +
                 // atomic claim + HMAC envelope. Verifier is constructed from
                 // network.secretEnv (REQ-RTP-PROXY-007); loader failure is the
-                // single fail-fast on the security path per
-                // MULTI_SERVER_PLAN.md §Failure-Mode Policy - other Redis-side
-                // faults (connect, SCRIPT LOAD, pub/sub) degrade-to-disabled.
+                // single fail-fast on the security path - other Redis-side
+                // faults (connect, SCRIPT LOAD, pub/sub) degrade to disabled.
                 HmacVerifier verifier;
                 try {
                     verifier = HmacVerifier.loadFromEnv(
@@ -156,7 +154,7 @@ public final class NetworkBindings {
      * §HikariCP Pool Sharing); a null DataSource throws
      * {@link IllegalArgumentException}. The {@code redis} kind constructs
      * {@link RedisNetworkRequestQueue}; open-time failures degrade to
-     * in-memory per {@code MULTI_SERVER_PLAN.md} §Failure-Mode Policy.</p>
+     * in-memory per the network-mode failure-mode policy.</p>
      *
      * @param cfg        validated config (must have {@code enabled() == true})
      * @param dataSource shared JDBC source for the {@code sql} branch;
@@ -200,9 +198,8 @@ public final class NetworkBindings {
                 // already delete per-envelope and per-status HASHes; passing
                 // ttlSeconds = 0 disables EXPIRE so entries persist until
                 // their terminal COMPLETED/FAILED/CANCELLED transition.
-                // Operators who want passive aging on a crashed-backend
-                // path should later wire a `network.queue.ttlSeconds` knob;
-                // tracked under MULTI_SERVER_PLAN.md Phase 3.
+                // A `network.queue.ttlSeconds` knob for passive aging on a
+                // crashed-backend path is not yet wired.
                 try {
                     return new RedisNetworkRequestQueue(
                             cfg.redisHost(), cfg.redisPort(), cfg.redisPassword(), 0);
@@ -227,8 +224,8 @@ public final class NetworkBindings {
      * (ADR-015 / REQ-RTP-NET-015). {@code sql} transport currently falls
      * back to in-memory with a WARNING since the SQL waitlist binding is
      * not yet implemented. {@code redis} open-time failures degrade to
-     * in-memory per {@code MULTI_SERVER_PLAN.md} §Failure-Mode Policy, so
-     * a misconfigured Redis host does not break the proxy boot.
+     * in-memory per the network-mode failure-mode policy, so a misconfigured
+     * Redis host does not break the proxy boot.
      *
      * <p>The returned waitlist is owned by the caller; closing the
      * Redis-backed waitlist releases its {@link redis.clients.jedis.JedisPool}.

@@ -12,28 +12,8 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 
 /**
- * ADR-015 / REQ-RTP-NET-015: a sender-check
- * predicate registered on {@code RTPCmdBukkit} via
- * {@code addSenderCheck(...)} that rejects new {@code /rtp*} invocations
- * while the caller already has a non-terminal cross-server enrolment.
- *
- * <p>Lookup is read-only against {@link NetworkStatusCache} (never blocks
- * the command thread on the transport). When the player's state is one of
- * {@code QUEUED}, {@link NetworkStatusCache.QueueStatus.State#WAITLISTED
- * WAITLISTED}, {@code ROUTING}, {@code RESERVED}, or {@code TRANSFERRING},
- * we send the configured {@code msgAlreadyQueued} message and short-circuit
- * the command by returning {@code false}.</p>
- *
- * <p>Console / non-player senders always pass (their UUID is the synthetic
- * server-id and can never sit on the waitlist). When network mode is off
- * the cache is empty, so the predicate is a no-op without any extra branch.
- * </p>
- *
- * <p>The rendered body is sourced from
- * {@link NetworkMessages#alreadyQueued} in {@code messages.yml} per
- * REQ-RTP-F-013. Placeholder {@code [position]} is substituted client-side
- * with the FIFO position when known; an empty value is emitted when the
- * proxy has not yet assigned one (e.g. {@code TRANSFERRING}).</p>
+ * Rejects new {@code /rtp*} invocations while caller has non-terminal cross-server enrolment.
+ * Read-only lookup against {@link NetworkStatusCache} (ADR-015 / REQ-RTP-NET-015 / REQ-RTP-F-013).
  */
 public final class NetworkWaitlistGuard implements Predicate<RTPCommandSender> {
 

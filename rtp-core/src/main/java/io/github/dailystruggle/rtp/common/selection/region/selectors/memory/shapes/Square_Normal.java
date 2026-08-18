@@ -446,7 +446,7 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
       u = Boolean.parseBoolean(String.valueOf(unique));
       data.put(NormalDistributionParams.uniquePlacements, u);
     }
-    // addBadChunk: chunk-uniform (uniqueplacements knob) — within a chunk the per-column
+    // addBadChunk: chunk-uniform (uniqueplacements knob) - within a chunk the per-column
     // selection order is deterministic, so re-rolling onto the same chunk produces the
     // same effective placement. Marking the twin spiral index prevents that chunk-level
     // re-roll and is the correct semantics for "unique" placements.

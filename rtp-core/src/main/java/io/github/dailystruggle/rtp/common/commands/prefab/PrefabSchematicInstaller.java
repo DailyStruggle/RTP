@@ -13,26 +13,10 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Extracts the {@code .schem} file(s) a prefab references into the platform's
- * on-disk {@code schematics/} directory so the per-region {@code schematic}
- * knob (ADR-058) resolves to a real file after the prefab is applied.
+ * Extracts prefab {@code .schem} files into {@code advanced/schematics/<region>.schem}
+ * on disk so per-region arrival schematics (ADR-058) resolve at runtime.
  *
- * <p>A prefab such as {@link io.github.dailystruggle.rtp.common.commands.prefab.builtin.Skyblock}
- * writes {@code schematic: "skyblock"} into the overlay for the {@code default}
- * region. The {@code schematic} value names the <em>bundled resource</em>
- * ({@code /schematics/skyblock.schem} in the jar); the <em>destination</em> is
- * keyed by the region the overlay targets, because core resolves the per-region
- * arrival schematic by file presence at {@code <pluginDir>/schematics/<region>.schem}
- * (ADR-058 Amendment 2 - there is no config-key lookup). So this installer copies
- * the bundled {@code skyblock.schem} out to {@code <pluginDir>/schematics/default.schem}
- * the first time the Skyblock prefab is confirmed, which is exactly the file
- * {@code RegionSchematicService.resolveSource("default")} then finds.
- *
- * <p>Behaviour mirrors {@code ConfigLoader.saveResourceFromJar}: the copy is
- * skipped when the destination already exists (operators may have edited or
- * replaced it), and a missing bundled resource is recorded rather than thrown
- * so a paste failure never aborts the prefab apply. The caller audits the
- * {@link Result} via {@code RTP.log} per S-004.
+ * <p>Skips existing destination files and records missing jar resources per S-004.
  */
 public final class PrefabSchematicInstaller {
 
@@ -51,15 +35,11 @@ public final class PrefabSchematicInstaller {
     }
 
     /**
-     * Outcome of {@link #install}. Each list holds schematic names (sans
-     * extension): {@code installed} were copied out of the jar this call,
-     * {@code skippedExisting} were already present on disk, and
-     * {@code missingResource} are referenced by the prefab but absent from the
-     * jar (a defect to audit, never fatal).
+     * Outcome of {@link #install}.
      *
-     * @param installed       schematic names copied from the jar this call
+     * @param installed       schematic names copied from jar
      * @param skippedExisting schematic names already present on disk
-     * @param missingResource schematic names referenced by the prefab but absent from the jar
+     * @param missingResource schematic names referenced by prefab but absent from jar
      */
     public record Result(
             List<String> installed,
@@ -104,26 +84,13 @@ public final class PrefabSchematicInstaller {
     }
 
     /**
-     * Extract every schematic the prefab references from the jar into
-     * {@code <pluginDir>/schematics/}. For each region overlay that carries a
-     * {@value #SCHEMATIC_KEY} value, the bundled resource named by that value
-     * ({@code /schematics/<value>.schem}) is copied to the destination keyed by
-     * the <strong>region id</strong> ({@code <pluginDir>/schematics/<regionId>.schem}),
-     * because core resolves the arrival schematic by region name, not by the
-     * {@value #SCHEMATIC_KEY} value (ADR-058 Amendment 2). Existing destination
-     * files are left untouched; a bundled resource that cannot be found is
-     * recorded in {@link Result#missingResource()} rather than thrown.
+     * Extracts schematics referenced by prefab overlays to {@code <pluginDir>/advanced/schematics/<regionId>.schem}.
+     * Skips existing files and records missing jar resources in {@link Result}.
      *
-     * <p>The {@link Result} lists hold the <em>bundled resource names</em> (the
-     * {@value #SCHEMATIC_KEY} values), not the destination region ids, so the
-     * audit log and confirmation message read in terms of the schematic the
-     * operator chose.
-     *
-     * @param pluginDir the platform plugin directory (the {@code schematics/}
-     *                  subdirectory is created beneath it); never {@code null}.
-     * @param prefab    the prefab being applied; never {@code null}.
-     * @return a {@link Result} describing what was copied, skipped, or missing.
-     * @throws IOException if a destination file could not be written.
+     * @param pluginDir platform plugin directory
+     * @param prefab prefab being applied
+     * @return {@link Result} of copied, skipped, and missing schematics
+     * @throws IOException if destination file cannot be written
      */
     public static Result install(File pluginDir, Prefab prefab) throws IOException {
         Objects.requireNonNull(pluginDir, "pluginDir");

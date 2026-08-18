@@ -115,9 +115,6 @@ public final class AsyncTaskProcessing extends RTPRunnable {
 
       AsyncTaskProcessing.betweenStep.set(betweenStep);
       AsyncTaskProcessing.step.set(step);
-
-//      System.out.println("[RTP-DEBUG] AsyncTaskProcessing: Math calculated -> betweenTime: " + betweenTime + " | betweenStep: " + betweenStep + " | step: " + step);
-
     } catch (InterruptedException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
       return;
