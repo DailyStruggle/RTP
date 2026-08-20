@@ -1,6 +1,10 @@
 # Region Configuration Reference (`regions/*.yml`)
 
-This document provides a detailed reference for all configuration options available in a region file (e.g., `plugins/RTP/regions/default.yml`).
+A **region** is a named, reusable teleport destination: a target world plus the geometry players are placed in (`shape`), the vertical window (`vert`), safety and biome overrides, caching, and price. It is the unit RTP pre-generates locations for, and it is where teleport distance lives - see [Region Size: `radius` and `centerRadius`](#region-size-radius-and-centerradius).
+
+Regions are a separate concept from worlds on purpose. A [world file](WORLDS.md) carries no geometry of its own; it only names the region that answers `/rtp` there. So one region can serve many worlds, one world can be served by many regions (permission tiers, or an explicit `region=<name>` on the command), and a region can send players into a world other than the one they ran the command in.
+
+This document provides a detailed reference for all configuration options available in a region file (e.g., `plugins/RTP/definitions/regions/default.yml`).
 
 ---
 
@@ -9,7 +13,7 @@ This document provides a detailed reference for all configuration options availa
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `world` | String | `"[0]"` | The target world for this region. Supports `[0]`, `[1]`, `[2]` placeholders or exact names. |
-| `worldBorderOverride` | Boolean | `false` | If true, the region radius is automatically set to match the vanilla world border. |
+| `worldBorderOverride` | Boolean | `false` | If true, the `shape` block is replaced by a square matching the world's vanilla `/worldborder`, and the configured `radius` / `centerRadius` / `centerX` / `centerZ` are ignored. See [Region Size](#region-size-radius-and-centerradius). |
 | `requirePermission` | Boolean | `false` | If true, players need `rtp.regions.<name>` permission to use this region. |
 | `override` | String | `"default"` | If a player lacks permission, they are redirected to this region instead. |
 | `cacheCap` | Integer | `50` | Maximum number of safe locations to pre-calculate and store in the background. |
@@ -31,6 +35,58 @@ This document provides a detailed reference for all configuration options availa
 
 The `shape` block defines the horizontal area where players can land.
 
+### Region Size: `radius` and `centerRadius`
+
+**Every distance in the `shape` block is measured in chunks, not blocks.** A chunk is 16x16 blocks, so multiply by 16 to get blocks. This is the single most common configuration mistake: `radius: 5000` is not a 5,000-block region, it is an 80,000-block one.
+
+| Key | Meaning | In blocks |
+|---|---|---|
+| `radius` | **Outer** bound. Players never land farther than this from the center. | `radius x 16` |
+| `centerRadius` | **Inner** bound (the donut hole). Players never land closer than this to the center. `0` means the center itself is fair game. | `centerRadius x 16` |
+| `centerX` / `centerZ` | Center of the region, in chunk coordinates. `0, 0` is the chunk containing blocks `0..15`. | `centerX x 16` |
+
+Handy conversions:
+
+| `radius` (chunks) | Max distance from center (blocks) | Widest span, edge to edge (blocks) |
+|---|---|---|
+| `64` | 1,024 | 2,048 |
+| `256` (default) | 4,096 | 8,192 |
+| `625` | 10,000 | 20,000 |
+| `1875` | 30,000 | 60,000 |
+| `3750` | 60,000 | 120,000 |
+
+Rules and gotchas:
+
+- `centerRadius` must be **smaller** than `radius`. If the two are equal, or `centerRadius` is larger, there is no band left to pick from and the region cannot produce locations.
+- The pickable band is `radius - centerRadius` chunks wide. Raising `centerRadius` to push players away from spawn without raising `radius` shrinks the usable land, so raise both together.
+- Total selectable area is roughly `pi x (radius^2 - centerRadius^2)` chunks for `CIRCLE`, and `(2 x radius)^2 - (2 x centerRadius)^2` chunks for `SQUARE`.
+- Radius is **not** clamped to the vanilla world border unless you ask for it. A `radius` that reaches past the border wastes selection attempts on unreachable land; either shrink it or set `worldBorderOverride: true`.
+- `worldBorderOverride: true` **replaces the whole `shape` block** with a square derived from the world's `/worldborder` (chunk radius = border size / 32). Your `radius`, `centerRadius`, `centerX`, and `centerZ` are ignored while it is on.
+- Large radii cost pre-calculation time, not memory: see *Massive Radii* under [Tips for Customization](#tips-for-customization) and the *Backlog Cache (L3)* section below.
+
+#### Where to set the radius
+
+Four places, in increasing precedence:
+
+1. **Shared default** - `defaults.shape.radius` in `config.yml`. Applies to every region whose `shape` key is the literal `"@config"`. This is the right place on a single-world server: set it once.
+2. **Per region** - replace `shape: "@config"` in `regions/<name>.yml` with an inline block. An inline block wins over the shared default and must be complete (copy the `defaults.shape` block from `config.yml` and edit it).
+   ```yaml
+   shape:
+     name: "CIRCLE"
+     mode: "ACCUMULATE"
+     radius: 625          # 10,000 blocks from the center
+     centerRadius: 64     # keep players 1,024+ blocks away from the center
+     centerX: 0
+     centerZ: 0
+     weight: 1.0
+     uniquePlacements: 0
+     expand: false
+   ```
+3. **Persistent edit from in-game** - `/rtp config regions <region> shape.radius=625` writes the value to the region file. Add `--dry-run` to preview it first.
+4. **One-off teleport** - `/rtp region=default shape=SQUARE radius=256` applies to that teleport only and changes nothing on disk.
+
+Changing a radius invalidates cached locations for that region, so the first few `/rtp` calls afterwards may be slower while the cache refills.
+
 ### Common Shape Keys
 - `name`: The shape engine to use.
 - `mode`: The selection logic.
@@ -45,19 +101,20 @@ The `shape` block defines the horizontal area where players can land.
 
 #### `CIRCLE` / `SQUARE`
 Standard shapes with uniform or weighted distribution.
-- `radius`: Outer radius in **chunks**.
-- `centerRadius`: Inner radius (donut hole) in **chunks**.
-- `weight`: `> 1.0` pulls landings toward center; `< 1.0` pushes toward edges.
+- `radius`: Outer radius in **chunks**. For `CIRCLE` it is the disk radius; for `SQUARE` it is the half-extent, so the square spans `2 x radius` chunks per side.
+- `centerRadius`: Inner radius (donut hole) in **chunks**. Must be less than `radius`. `CIRCLE` becomes a ring, `SQUARE` becomes a square frame.
+- `weight`: `> 1.0` pulls landings toward center; `< 1.0` pushes toward edges. Applies within the `centerRadius`-to-`radius` band; it does not move the bounds themselves.
 - `expand`: If true, radius grows as locations are used.
 
 #### `CIRCLE_NORMAL` / `SQUARE_NORMAL`
 Gaussian distribution variants.
-- `radius` / `centerRadius`: Same as above.
-- `mean`: Center of the bell curve (0.0 center, 1.0 edge).
-- `deviation`: Spread of the bell curve.
+- `radius` / `centerRadius`: Same as above - still chunks, still the hard outer and inner bounds.
+- `mean`: Center of the bell curve, expressed as a fraction of the band (0.0 = at `centerRadius`, 1.0 = at `radius`).
+- `deviation`: Spread of the bell curve. Smaller = tighter clustering around `mean`.
 
 #### `RECTANGLE`
-- `width` / `height`: Half-extents in **chunks** (X and Z axis).
+Uses explicit side lengths instead of a radius.
+- `width` / `height`: Full X-axis and Z-axis extent in **chunks**, centred on `centerX` / `centerZ` (so `width: 256` reaches 128 chunks / 2,048 blocks either side). There is no `centerRadius` hole for this shape.
 - `rotation`: Rotation in degrees around the center.
 
 ---
@@ -124,5 +181,5 @@ Candidates flow through three tiers: the backlog (L3, unverified) → the cold c
 
 1. **Nether Support**: Use `vert: LINEAR` with `direction: 0` (bottom-up), `maxY: 120`, and `requireSkyLight: false` to land on the nether floor rather than the roof. Avoid `vert: JUMP` here: its coarse `step` (default `16`) skips over the thin one- and two-block-thick platforms that are common in the Nether, so it frequently fails to find otherwise-valid footing. `LINEAR` scans every Y level and reliably catches those thin platforms.
 2. **Cave Teleports**: Use `vert: LINEAR` with `direction: 0` (bottom-up) and a low `maxY` to favor underground locations.
-3. **Massive Radii**: If your radius is > 50,000 blocks, use `mode: NONE` to avoid long pre-calculation times on startup.
+3. **Massive Radii**: If your radius is > 50,000 blocks (roughly 3,125 chunks), use `mode: NONE` to avoid long pre-calculation times on startup.
 4. **Skyblock / Mid-Air Drops**: Use `vert: FIXED` with `y: 128` and a platform tool enabled. The platform spawns under the player so they don't fall through the void.

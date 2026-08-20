@@ -70,7 +70,7 @@ When code and an ADR are found to disagree, priority is chosen case by case: the
 
 ### 7. Communication surfaces
 
-Completed work is reflected outward at registers appropriate to each audience (Rule D-004): `CHANGELOG.md` (net delta against the last released tag, Pro-only entries tagged), wiki and `docs/admin/` operator docs, locale parity for every user-facing string (the English baseline mirrored into every shipped locale in the same change), and maintainer-voice prose for listings and front pages. These surfaces are downstream of the record layer - they describe what shipped, they do not decide anything.
+Completed work is reflected outward at registers appropriate to each audience (Rule D-004): `CHANGELOG.md` (net delta against the last released tag, Pro-only entries tagged), the `docs/admin/` operator docs and the documentation site generated from `docs/`, locale parity for every user-facing string (the English baseline mirrored into every shipped locale in the same change), and maintainer-voice prose for listings and front pages. These surfaces are downstream of the record layer - they describe what shipped, they do not decide anything.
 
 ### 8. Self-maintenance
 

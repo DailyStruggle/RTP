@@ -1,13 +1,17 @@
 # --- RTP World Configuration ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Worlds
+# Documentation: plugins/RTP/docs/admin/configuration/WORLDS.md
 
-# Region used for this world
+# Region used for this world: /rtp in this world answers with this region, and the region
+# owns the destination - target world, distance (radius), shape, vertical range, price.
+# Point several worlds at one region to share its settings, or at their own regions to
+# tune them separately. This file is routing only; it holds no distance of its own.
+# See plugins/RTP/docs/admin/configuration/REGIONS.md
 # @type: enum
 # @source: region
 region: "default"
 # true = need permission rtp.worlds.<worldname>. "@config" inherits
 # defaults.requirePermission from config.yml.
-# See https://github.com/DailyStruggle/RTP/wiki/Config-yml
+# See plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
 # Replace with a literal to override per-world, e.g.:
 #   requirePermission: true
 requirePermission: "@config"

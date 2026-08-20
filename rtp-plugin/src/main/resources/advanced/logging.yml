@@ -1,5 +1,5 @@
 # --- Plugin Logging Toggles ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Logging
+# Documentation: plugins/RTP/docs/admin/configuration/LOGGING.md
 
 # Minimum log level (finer of this and the server logger's own level).
 # ALL keeps behavior identical to the server logger.

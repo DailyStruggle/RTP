@@ -1,5 +1,5 @@
 # --- effects/default-pre.yml: plays just before a teleport ---
-# Docs: https://github.com/DailyStruggle/RTP/wiki/Effects (see effects/default.yml too)
+# Docs: plugins/RTP/docs/admin/configuration/EVENTS_AND_EFFECTS.md (see effects/default.yml too)
 
 when: preteleport
 effects:

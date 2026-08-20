@@ -428,8 +428,9 @@ A: Yes - same configuration, same data files, same commands. The free build stil
 
 ## Links
 
-- [**LeafRTP admin & configuration guide**](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md) - install, configure, command reference
-- [**LeafRTP addon / API developer guide**](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md) - `rtp-api` & examples
+- [**LeafRTP documentation site**](https://dailystruggle.github.io/RTP/) - searchable, every doc in one place
+- [**LeafRTP admin & configuration guide**](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/) - install, configure, command reference
+- [**LeafRTP addon / API developer guide**](https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/) - `rtp-api` & examples
 - [**LeafRTP changelog & roadmap**](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md)
 - [**LeafRTP source on GitHub**](https://github.com/dailystruggle/RTP) - star, watch, contribute, file issues
 - [**Free LeafRTP plugin (download)**](https://modrinth.com/plugin/rtpv3) - the open, single-server build of this same random teleport engine

@@ -1,5 +1,5 @@
 # --- RTP Metrics Settings ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Metrics
+# Documentation: plugins/RTP/docs/admin/configuration/METRICS.md
 
 # Report per-region detail on Folia. Does nothing on other platforms.
 # @type: boolean

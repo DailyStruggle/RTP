@@ -1,5 +1,5 @@
 # --- effects/default-cancel.yml: plays when a teleport is cancelled ---
-# Docs: https://github.com/DailyStruggle/RTP/wiki/Effects (see effects/default.yml too)
+# Docs: plugins/RTP/docs/admin/configuration/EVENTS_AND_EFFECTS.md (see effects/default.yml too)
 
 when: cancel
 effects:

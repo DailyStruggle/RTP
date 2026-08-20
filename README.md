@@ -13,6 +13,7 @@ The Folia-native, region-aware random teleport plugin for production Minecraft s
 [![BuiltByBit](https://img.shields.io/badge/BuiltByBit-RTP%20Pro-blue)](https://builtbybit.com/resources/leafrtp-pro.105418/)
 [![Modrinth](https://img.shields.io/badge/Modrinth-LeafRTP-green)](https://modrinth.com/plugin/leafrtp)
 
+🔗 [Documentation site](https://dailystruggle.github.io/RTP/)
 🔗 [SpigotMC Resource Page](https://www.spigotmc.org/resources/leafrtp.94812/)
 🔗 [BuiltByBit Resource Page](https://builtbybit.com/resources/leafrtp-pro.105418/)
 🔗 [Modrinth Resource Page](https://modrinth.com/plugin/leafrtp)
@@ -144,6 +145,11 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 ---
 
 ## Documentation
+
+The operator and developer docs under `docs/` are published as a browsable, searchable
+website: **<https://dailystruggle.github.io/RTP/>** (rebuilt on every merge to `V3`). The
+same pages ship inside the jar under `plugins/RTP/docs/`, so they are readable offline and
+always match the installed version.
 
 **Choose your path:**
 

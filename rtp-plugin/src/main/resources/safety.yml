@@ -1,5 +1,5 @@
 # --- RTP Safety Configuration ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Safety
+# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
 
 # Seconds you can't be hurt after teleporting. 0 = off.
 # @type: integer

@@ -54,7 +54,7 @@ Two observations shape the design:
 **Docs / index (this change, already applied):**
 
 - `docs/adr/ADR-075-...md`, this proposal, `docs/adr/README.md` (index + subproject rows),
-  `settings.gradle`, `docs/dev/ROADMAP.md`, and wiki synonym notes for "zone".
+  `settings.gradle`, `docs/dev/ROADMAP.md`, and the `GLOSSARY.md` synonym note for "zone".
 
 ## 3. Intended before/after structure
 

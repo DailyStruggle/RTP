@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        > **Solo Developer Disclaimer:** I maintain this project alone with limited time. Reports that are missing logs, version info, or were clearly answered in the Wiki/FAQ will be closed without a response. Before filing, read [`SUPPORT.md`](../../SUPPORT.md). By participating you agree to the [Code of Conduct](../../CODE_OF_CONDUCT.md).
+        > **Solo Developer Disclaimer:** I maintain this project alone with limited time. Reports that are missing logs, version info, or were clearly answered in the docs/FAQ will be closed without a response. Before filing, read [`SUPPORT.md`](../../SUPPORT.md). By participating you agree to the [Code of Conduct](../../CODE_OF_CONDUCT.md).
 
   - type: checkboxes
     id: preflight
@@ -128,7 +128,7 @@ body:
     attributes:
       label: Required validation
       options:
-        - label: I have read the Wiki and FAQ.
+        - label: I have read the docs (https://dailystruggle.github.io/RTP/) and the FAQ.
           required: true
         - label: I have verified this is not a configuration mismatch.
           required: true

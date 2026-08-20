@@ -9,7 +9,9 @@ renders around the reference documentation.
 
 The user-facing reference pages historically lived in the detached GitHub Wiki repo
 (`<repo>.wiki.git`, cloned into the top-level `wiki/` working copy). That wiki repo is
-not part of the main repository's history and is awkward to reach from pipeline jobs.
+retired: it is not part of the main repository's history, is awkward to reach from
+pipeline jobs, and its content now lives under `docs/` (operator reference in
+`docs/admin/`, narrative pages here).
 
 This folder is the tracked home, inside the main repo, for the narrative pages that do
 not describe a specific config knob or command. Keeping them here means:
@@ -28,8 +30,8 @@ not describe a specific config knob or command. Keeping them here means:
 
 ## What does NOT belong here
 
-- Per-knob configuration reference (`Config-yml`, `Regions`, `Worlds`, ...) - those stay
-  in the reference set until the wiki is fully consolidated.
+- Per-knob configuration reference (core config, regions, worlds, ...) - that lives in
+  `docs/admin/configuration/`.
 - Engineering docs (`dev/`), decisions (`adr/`), architecture slices (`architecture/`),
   and operator runbooks (`admin/`) - those already have homes under `docs/`.
 
@@ -39,6 +41,10 @@ not describe a specific config knob or command. Keeping them here means:
 - MkDocs Material admonition syntax (`!!! note`, `!!! warning`, `!!! tip`) and content
   tabs (`=== "..."`) are used where helpful, matching the pages already authored in that
   style.
-- Links between pages in this folder are relative (e.g. `what-not-to-do.md`). Links to
-  reference pages that still live in the wiki keep their absolute wiki URL until those
-  pages are consolidated.
+- Links between pages in this folder are relative (e.g. `what-not-to-do.md`), as are
+  links into the reference set (e.g. `../admin/configuration/CORE_CONFIG.md`). Do not
+  link to the retired GitHub Wiki.
+- Absolute site URLs (`https://dailystruggle.github.io/RTP/<path>/`) are for copy that is
+  read *outside* the repo: `README.md`, `SUPPORT.md`, `FRONT_PAGE*`, issue templates,
+  listing bodies. Inside `docs/`, keep links relative so they also resolve on GitHub and
+  in the jar-bundled copy under `plugins/RTP/docs/`.
