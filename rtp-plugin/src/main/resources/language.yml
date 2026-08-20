@@ -1,5 +1,5 @@
 # --- RTP Language Selection ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Language
+# Documentation: plugins/RTP/docs/admin/configuration/LANGUAGE.md
 
 # Loaded first so every other file reads from lang/<language>/.
 # Bundled: en, de, es, fr, ja, ko, nl, zh. Add more in lang/<code>/.

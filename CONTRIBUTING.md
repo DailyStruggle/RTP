@@ -49,7 +49,7 @@ If you use an agentic AI coding assistant, point it at [`.junie/AGENTS.md`](.jun
 
 This codebase was put together in Intellij IDEA. You can open the base directory as a project, trust the sources, and build as-is with Gradle wrapper (`./gradlew build`).
 
-More detailed instructions can be found here - https://github.com/DailyStruggle/RTP/wiki/Compiling-and-Editing
+More detailed instructions can be found here - [`docs/FOR_CONTRIBUTORS.md`](docs/FOR_CONTRIBUTORS.md)
 
 1. **Clone the repository**:
    ```sh

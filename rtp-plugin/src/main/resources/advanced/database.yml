@@ -1,5 +1,5 @@
 # --- RTP Database / Persistence Configuration ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Core-Configuration
+# Documentation: plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
 
 # Where RTP saves its data.
 database:

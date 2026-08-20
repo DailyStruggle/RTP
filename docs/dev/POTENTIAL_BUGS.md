@@ -127,6 +127,22 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** None today (deprecation warning only). Future Lands API removal would break the `rtp-plugin` build until the checker is rewritten to the current factory/query API.
 - **Suggested next step:** Rewrite `LandsChecker` against the current `LandsIntegration.of(plugin)` factory and the non-deprecated land/area query API for 7.x, ideally with a precise (block-resolution) claim check (see the granularity entry above).
 
+### 2026-08-18 - `Rectangle.contains` treats `width`/`height`/`centerX`/`centerZ` as blocks (`>> 4`) while every other shape treats them as chunks
+
+- **Discovered during:** documenting radius/size semantics in `config.yml` and `docs/admin/configuration/REGIONS.md` (this session, docs-only change).
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/selectors/memory/shapes/Rectangle.java#contains` lines 91-112 (the four `>> 4` shifts), versus `Rectangle.getRange` / `xzToLocation` in the same file and `MemoryShape.contains` (line 1458), which use the raw configured values.
+- **Symptom / hypothesis:** `contains(int x, int z)` is called with chunk coordinates everywhere else in the shape hierarchy, but the rectangle override divides its configured extents and center by 16 before comparing, i.e. it reads the config as blocks. With the default `width: 256` it therefore accepts only a 16x16-chunk box while `getRange()`/`xzToLocation` parameterise the full 256x256-chunk one.
+- **Impact:** `RECTANGLE` regions are likely to report `contains(...) == false` for most coordinates they actually generate, which would misbehave for any caller that gates on containment (world-border checks, `/rtp` coordinate validation, region lookup by position). `CIRCLE`/`SQUARE` are unaffected. Predates this session and is not exercised by the shipped default config.
+- **Suggested next step:** Confirm the unit contract of `Shape.contains` from its call sites, then drop the four `>> 4` shifts (or convert the incoming coordinates instead, whichever matches the contract) and add a `RectangleTest` case asserting `contains` agrees with `xzToLocation(...) < getRange()` for a sample of in-band and out-of-band chunk coordinates.
+
+### 2026-08-18 - BetterRTP import writes `regions/<world>.yml` but never points `worlds/<world>.yml#region` at it
+
+- **Discovered during:** documenting the world -> region routing model in `WORLDS.md` / `REGIONS.md` / `FAQ.md` / `MIGRATION.md` (this session, docs-only change). Worked around in the migration guide by telling the operator to wire the world files by hand.
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/importer/BetterRtpConfigImporter.java#translate` line 168 (`String region = "regions/" + leaf.scope();`) - every per-world leaf targets `regions/<worldName>`, and no branch in the file emits an `ImportedKey` against a `worlds/...` target.
+- **Symptom / hypothesis:** BetterRTP's per-world overrides (`MaxRadius`, `MinRadius`, `CenterX/Z`, `Shape`, `Price`, `Enabled`) are imported into a region named after the source world, but nothing sets `region: "<world>"` in `definitions/worlds/<world>.yml`. Since a world file defaults to `region: "default"`, the imported regions are orphaned.
+- **Impact:** After a seemingly successful import, `/rtp` in a non-default world still uses the `default` region, so the operator's imported per-world radius/shape/price silently do not apply. The preview report shows the keys as `MAPPED`, which makes the failure invisible until a player complains about the distance.
+- **Suggested next step:** Extend `translate` (or a post-pass in the import writer) to emit an `ImportedKey` targeting `worlds/<world>` with `region = <world>` for every non-default scope encountered, so the routing is written alongside the region. Add a case to `ConfigImporterTest` asserting a per-world source block produces both a `regions/<world>` and a `worlds/<world>#region` key.
+
 ### 2026-05-23 - multi-config entry editor renders differently from built-in `default` (shape/vert stored as section vs FactoryValue)
 
 - **Discovered during:** menu nested-config editing fix (this session, route A). Resolved the nested-row editability symptom (clickable dotted `OpenConfigKey` + dotted-param registration in `SubConfigCmd`) but left the visual/UX divergence between built-in `default` and runtime-added entries (e.g. `default1234`) untouched.

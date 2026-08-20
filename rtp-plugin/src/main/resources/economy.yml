@@ -1,5 +1,5 @@
 # --- RTP Economy Settings ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Economy
+# Documentation: plugins/RTP/docs/admin/configuration/ECONOMY.md
 
 # Cost for a /rtp.
 # @type: number

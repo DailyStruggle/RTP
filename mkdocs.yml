@@ -1,6 +1,9 @@
 site_name: LeafRTP
 site_description: Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.
 site_author: DailyStruggle
+# Published location. Needed for canonical URLs, a correct sitemap.xml, and the
+# theme's social/share links; without it Material emits relative canonicals.
+site_url: https://dailystruggle.github.io/RTP/
 repo_name: DailyStruggle/RTP
 repo_url: https://github.com/DailyStruggle/RTP
 edit_uri: edit/V3/docs/

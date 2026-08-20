@@ -157,7 +157,9 @@ helpers/StressTestRTP/runs/
 # Agent / contributor scratch notes (per .junie/AGENTS.md, Checklist-Based State Tracking)
 docs/dev/scratch/
 
-# GitHub wiki working clone (separate RTP.wiki.git repo; edited alongside source, not part of this repo)
+# Retired GitHub wiki working clone (separate RTP.wiki.git repo, never part of this repo).
+# Its content now lives under docs/ (operator reference in docs/admin/, narrative in docs/site/).
+# Kept ignored so a leftover local clone does not get committed.
 /wiki/
 .junie/memory/tasks.md
 .junie/memory/memory.version

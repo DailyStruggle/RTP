@@ -165,6 +165,17 @@ region: "myRegionName"
 
 That world will now use `myRegionName` as its default region when players run `/rtp` there.
 
+### How do I change the teleport radius for one world? There is no `radius` in `worlds/<world>.yml`.
+
+Correct, and it is not missing - radius is not a world setting. A world file only names the region that answers `/rtp` there; the **region** owns the destination, including distance, shape, vertical range, and price. So you change the region, not the world:
+
+1. **Edit the region that world points at.** Read the name out of `plugins/RTP/definitions/worlds/<world>.yml` (`region:`), then either run `/rtp config regions <region> shape.radius=625` or edit the `shape:` block in `plugins/RTP/definitions/regions/<region>.yml`. Add `--dry-run` to the command to preview it.
+2. **If that region is shared** by other worlds and you only want this one to change, create a new region file and point the world at it instead.
+
+On a fresh install the region ships `shape: "@config"`, which inherits the whole `defaults.shape` block from `config.yml`. That is why a new setup has only one `radius` on disk: editing `defaults.shape.radius` moves every region that still inherits, which is what a single-world server wants. To give one world its own distance, replace `"@config"` with an inline `shape:` block in that region. Full walkthrough: [Where to set the radius](configuration/REGIONS.md#where-to-set-the-radius).
+
+The payoff for the extra hop: because distance belongs to the region, one world can offer several distances at the same time. Ship `wild` at `radius: 625` and `wild_far` at `radius: 3125`, gate the second with `requirePermission: true`, and players who have it use `/rtp region=wild_far`. A radius attached to the world could not do that.
+
 ### Can I disable the invulnerability period?
 
 Set `invulnerabilityTime: 0` in `plugins/RTP/safety.yml`.

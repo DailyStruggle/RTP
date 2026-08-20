@@ -135,7 +135,7 @@ Drop the produced `LeafRTPRiftAddon-<version>.jar` into `plugins/RTP/addons/`.
 
 ## See also
 
-- `wiki/Writing-an-Effect.md` - the full effect-authoring guide.
+- `docs/FOR_ADDON_DEVELOPERS.md` - the full effect-authoring guide.
 - `api/effects-api/README.md` - the effects framework reference.
 - `addons/LeafRTPCountdownAddon` - the canonical reference addon (config, safety verifier,
   post-teleport observer, countdowns).

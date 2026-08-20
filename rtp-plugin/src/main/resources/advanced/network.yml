@@ -1,4 +1,4 @@
-# RTP Network Mode (multi-server / proxy). Documentation: https://github.com/DailyStruggle/RTP/wiki/Network
+# RTP Network Mode (multi-server / proxy). Documentation: plugins/RTP/docs/admin/proxies/CONFIGURATION.md
 
 # Off by default. Set network.enabled true to use it.
 network:
@@ -133,7 +133,7 @@ regionCollision:
 #    # @type: boolean
 #    # @default: true
 #    allow-when-unavailable: true
-# Picks the best server for a plain /rtp. Lowest score wins. Documentation: https://github.com/DailyStruggle/RTP/wiki/Network
+# Picks the best server for a plain /rtp. Lowest score wins. Documentation: plugins/RTP/docs/admin/proxies/CONFIGURATION.md
 loadBalancer:
   # Weight of the built-in scarcity term. 0 = the `region` term handles it.
   # @type: number

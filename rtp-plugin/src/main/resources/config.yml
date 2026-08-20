@@ -1,5 +1,5 @@
 # --- RTP Core Configuration ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Core-Configuration
+# Documentation: plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
 # Pick your language in language.yml.
 #
 # Where to find things (files/folders in this RTP folder):
@@ -74,17 +74,32 @@ menu:
 # Shared defaults. A region/world value of "@config" copies the matching entry below,
 # so you change a setting once here instead of in every region file.
 defaults:
-  # Default area shape and size. radius/centerRadius = how far out you land, measured in chunks.
+  # Default area shape and size, used by every region whose shape is "@config".
+  #
+  # SIZES HERE ARE IN CHUNKS, NOT BLOCKS. 1 chunk = 16 blocks, so multiply by 16:
+  #   radius: 64   ->  1,024 blocks from the center
+  #   radius: 256  ->  4,096 blocks from the center   (the default below)
+  #   radius: 625  -> 10,000 blocks from the center
+  # radius       = outer edge. Nobody lands farther out than this.
+  # centerRadius = inner edge / donut hole. Nobody lands closer in than this.
+  #                Must stay below radius, or there is no land left to pick from.
+  # Players land somewhere between centerRadius and radius, so raise both together
+  # if you want to push people away from spawn without shrinking the usable area.
+  # Full explanation: plugins/RTP/docs/admin/configuration/REGIONS.md
   shape:
     # Landing area shape algorithm.
     # @type: enum
     # @source: shape
     name: "CIRCLE"
     mode: "ACCUMULATE"
+    # Outer edge, in chunks (256 chunks = 4,096 blocks).
     radius: 256
+    # Inner edge / donut hole, in chunks (64 chunks = 1,024 blocks). 0 = no hole.
     centerRadius: 64
+    # Center of the area, in CHUNK coordinates (chunk 0,0 covers blocks 0-15).
     centerX: 0
     centerZ: 0
+    # Bias inside the centerRadius-to-radius band: >1.0 favors the center, <1.0 the edge.
     weight: 1.0
     # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
     uniquePlacements: 0

@@ -10,14 +10,20 @@ question belongs and how to ask it so you actually get a useful answer.
 
 Check these first. Most questions are already answered:
 
-1. **Wiki / resource page** — <https://www.spigotmc.org/resources/rtp.94812/>
-2. **Server-admin docs** — [`docs/FOR_SERVER_ADMINS.md`](docs/FOR_SERVER_ADMINS.md)
-   and the rest of [`docs/admin/`](docs/admin/)
-3. **FAQ** — [`docs/admin/FAQ.md`](docs/admin/FAQ.md)
-4. **Commands reference** — [`docs/admin/COMMANDS.md`](docs/admin/COMMANDS.md)
-5. **Existing issues** — search **open *and* closed** issues; your problem has
+1. **Documentation site** (searchable) — <https://dailystruggle.github.io/RTP/>.
+   The same pages ship inside the jar under `plugins/RTP/docs/` and live in this
+   repo under [`docs/`](docs/). They replace the old GitHub Wiki.
+2. **Server-admin docs** — <https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/>
+   ([`docs/FOR_SERVER_ADMINS.md`](docs/FOR_SERVER_ADMINS.md)) and the rest of
+   [`docs/admin/`](docs/admin/).
+3. **FAQ** — <https://dailystruggle.github.io/RTP/admin/FAQ/>
+   ([`docs/admin/FAQ.md`](docs/admin/FAQ.md))
+4. **Commands reference** — <https://dailystruggle.github.io/RTP/admin/COMMANDS/>
+   ([`docs/admin/COMMANDS.md`](docs/admin/COMMANDS.md))
+5. **Resource page** — <https://www.spigotmc.org/resources/rtp.94812/>
+6. **Existing issues** — search **open *and* closed** issues; your problem has
    probably been reported.
-6. **Update first** — confirm the problem reproduces on the latest release
+7. **Update first** — confirm the problem reproduces on the latest release
    (`/rtp version`). Old builds do not get support.
 
 ---
@@ -32,7 +38,7 @@ Check these first. Most questions are already answered:
 | Feature idea | Open a **Discussion** first; issues only after triage |
 | **Security vulnerability** | **Do not open a public issue.** See [`SECURITY.md`](SECURITY.md) and use [private advisories](https://github.com/DailyStruggle/RTP/security/advisories/new) |
 | Commercial / paid support | Not offered |
-| Addon development help | [`docs/FOR_ADDON_DEVELOPERS.md`](docs/FOR_ADDON_DEVELOPERS.md) first, then Discussions |
+| Addon development help | [Addon developer guide](https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/) first, then Discussions |
 
 **Do not** use the issue tracker for questions, "how do I" requests, or
 plugin-conflict debugging without first reproducing with RTP alone. Those

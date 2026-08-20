@@ -1,5 +1,5 @@
 # --- RTP Biome Filter (advanced) ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Biome-Controls
+# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
 
 # true = only land in the listed biomes. false = never land in them.
 # @type: boolean

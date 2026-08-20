@@ -72,7 +72,7 @@ A region/world setting whose value is the token `@config` resolves to the matchi
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `shape` | Block | (`CIRCLE` block) | Default shape block inherited whole by a region whose `shape` is `@config`. |
+| `shape` | Block | (`CIRCLE` block) | Default shape block inherited whole by a region whose `shape` is `@config`. Holds the teleport size knobs: `radius` (outer edge, default `256`) and `centerRadius` (inner edge / donut hole, default `64`), both in **chunks**. See [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius). |
 | `vert` | Block | (`LINEAR` block) | Default vertical adjustor block inherited whole by a region whose `vert` is `@config`. |
 | `cacheCap` | Integer | `50` | Default region `cacheCap` (max pre-calculated safe locations). |
 | `backlogCacheCap` | Integer | `1000` (lite: `0`) | Default region `backlogCacheCap` (L3 backlog buffer; `0` disables). |
@@ -81,6 +81,8 @@ A region/world setting whose value is the token `@config` resolves to the matchi
 | `requirePermission` | Boolean | `false` | Default `requirePermission` for regions/worlds. |
 
 > The type-bearing `shape`/`vert` settings inherit as a **whole named block** (a per-type parameter set is only coherent as a unit), while type-free scalars inherit individually. Other source files own their own defaults: e.g. a region's `price` can reference `@economy` to inherit from [economy.yml](ECONOMY.md).
+
+> **Teleport distance lives here.** On a single-world server, `defaults.shape.radius` is the one place to set how far `/rtp` throws players, because the bundled `regions/default.yml` ships `shape: "@config"`. Sizes are in **chunks** (1 chunk = 16 blocks), so `radius: 256` is 4,096 blocks and `radius: 625` is 10,000 blocks; `centerRadius` is the matching minimum distance. Full reference, including the per-region and per-command overrides: [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius).
 
 ---
 

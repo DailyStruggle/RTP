@@ -1,5 +1,5 @@
 # --- RTP Landing Block Lists (advanced) ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Safety
+# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
 
 # Blocks you can stand in (counted as air). Use names or #minecraft:<tag>.
 # @type: list<material>
@@ -74,7 +74,7 @@ airBlocks:
   - "#minecraft:leaves"
 
 # Blocks that make a spot unsafe (lava, hazards). Names, #minecraft:<tag>,
-# or state checks like "LAVA[level<=3]". See the wiki for the full syntax.
+# or state checks like "LAVA[level<=3]". See SAFETY.md for the full syntax.
 # @type: list<material>
 # @source: material
 unsafeBlocks:

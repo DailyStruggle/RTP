@@ -1,5 +1,5 @@
 # --- RTP Performance Settings ---
-# Documentation: https://github.com/DailyStruggle/RTP/wiki/Performance
+# Documentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
 
 # --- Server health ---
 # Pause background work when server TPS drops below this.
