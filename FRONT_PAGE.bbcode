@@ -474,11 +474,11 @@ LeafRTP-Pro splits configuration by concern under [I]plugins/RTP/[/I]. Every fil
 [TD]4 504[/TD]
 [TD]19.95[/TD]
 [TD]88.9[/TD]
-[TD]75.9 % §[/TD]
+[TD]75.9 % *[/TD]
 [/TR]
 [/TABLE]
 
-§ EssentialsX [I]/tpr[/I] is a teleport-[I]request[/I] command (handshake + accept), not a teleport-[I]do[/I] command; the harness's 5 s per-attempt deadline times out a fraction of the request-accept latencies. Numbers are dispatch-shaped, not plugin-broken.
+* EssentialsX [I]/tpr[/I] is a teleport-[I]request[/I] command (handshake + accept), not a teleport-[I]do[/I] command; the harness's 5 s per-attempt deadline times out a fraction of the request-accept latencies. Numbers are dispatch-shaped, not plugin-broken.
 
 [B]Spigot 1.20.1[/B] - platform-wide chunk-gen ceiling caps everyone at 1-1.5 TP/s; the latency tail is what matters.
 [TABLE]
@@ -787,8 +787,9 @@ A: Yes - same configuration, same data files, same commands. The free build stil
 
 [SIZE=6][B][COLOR=#7F8C8D]Links[/COLOR][/B][/SIZE]
 [LIST]
-[*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md'][B]LeafRTP admin & configuration guide[/B][/URL] - install, configure, command reference
-[*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md'][B]LeafRTP addon / API developer guide[/B][/URL] - [I]rtp-api[/I] & examples
+[*][URL='https://dailystruggle.github.io/RTP/'][B]LeafRTP documentation site[/B][/URL] - searchable, every doc in one place
+[*][URL='https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/'][B]LeafRTP admin & configuration guide[/B][/URL] - install, configure, command reference
+[*][URL='https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/'][B]LeafRTP addon / API developer guide[/B][/URL] - [I]rtp-api[/I] & examples
 [*][URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md'][B]LeafRTP changelog & roadmap[/B][/URL]
 [*][URL='https://github.com/dailystruggle/RTP'][B]LeafRTP source on GitHub[/B][/URL] - star, watch, contribute, file issues
 [*][URL='https://modrinth.com/plugin/rtpv3'][B]Free LeafRTP plugin (download)[/B][/URL] - the open, single-server build of this same random teleport engine

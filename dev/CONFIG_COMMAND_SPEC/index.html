@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/CONFIG_COMMAND_SPEC/">
+      
       
       
       
@@ -3490,7 +3492,7 @@
 </ul>
 <hr />
 <h2 id="2-command-grammar">2. Command Grammar<a class="headerlink" href="#2-command-grammar" title="Permanent link">&para;</a></h2>
-<p>The grammar is <strong>flat</strong> (no nested operator precedence), <strong>single-file</strong> per invocation, and <strong>derived from the parameter registry</strong> — never hand-rolled per command. The same grammar object drives <code>onCommand</code> and <code>onTabComplete</code> (contract §9).</p>
+<p>The grammar is <strong>flat</strong> (no nested operator precedence), <strong>single-file</strong> per invocation, and <strong>derived from the parameter registry</strong> — never hand-rolled per command. The same grammar object drives <code>onCommand</code> and <code>onTabComplete</code> (contract section 9).</p>
 <h3 id="21-top-level-forms">2.1 Top-level forms<a class="headerlink" href="#21-top-level-forms" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>/rtp config &lt;file&gt; &lt;key&gt;:&lt;value&gt; [&lt;key&gt;:&lt;value&gt; …] [--dry-run]
 /rtp config &lt;file&gt; &lt;list-key&gt; add:&lt;value&gt; [add:&lt;value&gt; …] [remove:&lt;value&gt; …] [--dry-run]
@@ -3525,29 +3527,29 @@
 <li>Each rendered value carries a <strong>click-suggest</strong> action that pre-fills the caller's chat with <code>/rtp config &lt;file&gt; &lt;key&gt;:</code> ready for the new value (or <code>/rtp config &lt;file&gt; &lt;list-key&gt; add:</code> / <code>remove:</code> for list-typed keys), so the admin's next keystroke is the new value.</li>
 <li>On consoles and platforms without interactive chat, the view degrades to plain text; the click-suggest and hover are simply absent. No audit-record shape change between modes.</li>
 </ul>
-<p><code>view</code> is read-only: it takes no <code>ConfigTransaction</code>, never opens a temp file, never enters §3.4–§3.6, and is unaffected by <code>RELOAD_IN_PROGRESS</code> (it reads whichever parser snapshot is current at the moment it serializes its output). Failure modes are limited to <code>NO_PERMISSION</code>, <code>UNKNOWN_FILE</code>, and <code>UNKNOWN_KEY</code>.</p>
+<p><code>view</code> is read-only: it takes no <code>ConfigTransaction</code>, never opens a temp file, never enters section 3.4–section 3.6, and is unaffected by <code>RELOAD_IN_PROGRESS</code> (it reads whichever parser snapshot is current at the moment it serializes its output). Failure modes are limited to <code>NO_PERMISSION</code>, <code>UNKNOWN_FILE</code>, and <code>UNKNOWN_KEY</code>.</p>
 <h3 id="25-reserved-tokens">2.5 Reserved tokens<a class="headerlink" href="#25-reserved-tokens" title="Permanent link">&para;</a></h3>
 <p>The literal tokens <code>add:</code>, <code>remove:</code>, <code>view</code>, and the configured <code>dryRunFlag</code> are reserved at the grammar level. A <code>&lt;key&gt;</code> that collides with a reserved token (none currently do; this is forward-defensive) shall be rejected with <code>reasonCode = RESERVED_TOKEN_COLLISION</code> at parse time.</p>
 <hr />
 <h2 id="3-lifecycle-of-a-single-invocation">3. Lifecycle of a Single Invocation<a class="headerlink" href="#3-lifecycle-of-a-single-invocation" title="Permanent link">&para;</a></h2>
-<p>Every mutating invocation proceeds through a fixed seven-stage lifecycle. No stage may be reordered, skipped, or short-circuited; failure at any stage routes to <em>Audit + Reject</em> (§3.7) without leaving in-memory or on-disk state mutated.</p>
+<p>Every mutating invocation proceeds through a fixed seven-stage lifecycle. No stage may be reordered, skipped, or short-circuited; failure at any stage routes to <em>Audit + Reject</em> (section 3.7) without leaving in-memory or on-disk state mutated.</p>
 <h3 id="31-parse">3.1 Parse<a class="headerlink" href="#31-parse" title="Permanent link">&para;</a></h3>
-<p>The raw argument list is tokenized against the grammar (§2). Output: a <code>ParsedInvocation { targetFile, mutations[], dryRun }</code>. Parse-time failures (<code>UNKNOWN_FILE</code>, <code>WRONG_OPERATOR_FOR_TYPE</code>, <code>RESERVED_TOKEN_COLLISION</code>, <code>MALFORMED_ARGUMENT</code>) are reported with the offending token's index for tab-complete attribution.</p>
+<p>The raw argument list is tokenized against the grammar (section 2). Output: a <code>ParsedInvocation { targetFile, mutations[], dryRun }</code>. Parse-time failures (<code>UNKNOWN_FILE</code>, <code>WRONG_OPERATOR_FOR_TYPE</code>, <code>RESERVED_TOKEN_COLLISION</code>, <code>MALFORMED_ARGUMENT</code>) are reported with the offending token's index for tab-complete attribution.</p>
 <h3 id="32-authorize">3.2 Authorize<a class="headerlink" href="#32-authorize" title="Permanent link">&para;</a></h3>
-<p>The caller's permissions are checked against the most-specific node implied by <code>targetFile</code> (§7). All mutations in one invocation target one file, so authorization is a single check, not per-mutation. Failure → <code>NO_PERMISSION</code>.</p>
+<p>The caller's permissions are checked against the most-specific node implied by <code>targetFile</code> (section 7). All mutations in one invocation target one file, so authorization is a single check, not per-mutation. Failure → <code>NO_PERMISSION</code>.</p>
 <h3 id="33-validate">3.3 Validate<a class="headerlink" href="#33-validate" title="Permanent link">&para;</a></h3>
-<p>Each mutation is run through <code>ConfigParameterValidator</code> (§5). Validators are pure functions over <code>(parameterPath, attemptedValue, currentInMemoryState)</code>. No mutation has been applied yet. First failure short-circuits the stage; subsequent mutations are not validated (their state in the audit record is <code>NOT_REACHED</code>).</p>
+<p>Each mutation is run through <code>ConfigParameterValidator</code> (section 5). Validators are pure functions over <code>(parameterPath, attemptedValue, currentInMemoryState)</code>. No mutation has been applied yet. First failure short-circuits the stage; subsequent mutations are not validated (their state in the audit record is <code>NOT_REACHED</code>).</p>
 <h3 id="34-snapshot">3.4 Snapshot<a class="headerlink" href="#34-snapshot" title="Permanent link">&para;</a></h3>
-<p>A snapshot of every <code>FactoryValue</code> the mutations will touch is captured into the transaction. The snapshot is the rollback source-of-truth (§3.7) and the <code>oldValue</code> source for the audit record (§6).</p>
+<p>A snapshot of every <code>FactoryValue</code> the mutations will touch is captured into the transaction. The snapshot is the rollback source-of-truth (section 3.7) and the <code>oldValue</code> source for the audit record (section 6).</p>
 <h3 id="35-apply-in-memory">3.5 Apply (in-memory)<a class="headerlink" href="#35-apply-in-memory" title="Permanent link">&para;</a></h3>
 <p>Mutations are applied to the in-memory parser state in argument order. Re-validation against schema invariants that depend on multiple keys (e.g. <code>Polygon.expand == false</code>, <code>Rectangle</code> half-extent positivity per <a href="../../adr/ADR-034-memory-shape-catalog/">ADR-034</a>) runs after all mutations are applied but before any disk write. Failure here triggers immediate rollback from the snapshot.</p>
 <h3 id="36-persist-if-not-dry-run">3.6 Persist (if not dry-run)<a class="headerlink" href="#36-persist-if-not-dry-run" title="Permanent link">&para;</a></h3>
-<p>The targeted file is written via the atomic save mechanics of §4. On any I/O failure (temp-file write, fsync, rename), the snapshot is restored to the in-memory parser and the temp file is deleted; the invocation fails with <code>reasonCode = PERSIST_IO</code>.</p>
+<p>The targeted file is written via the atomic save mechanics of section 4. On any I/O failure (temp-file write, fsync, rename), the snapshot is restored to the in-memory parser and the temp file is deleted; the invocation fails with <code>reasonCode = PERSIST_IO</code>.</p>
 <h3 id="37-audit-reload-or-audit-reject">3.7 Audit + Reload (or Audit + Reject)<a class="headerlink" href="#37-audit-reload-or-audit-reject" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Success (live).</strong> A targeted reload of the affected parser is dispatched (per architecture diagram 09). One <code>INFO</code> audit record is emitted (§6).</li>
+<li><strong>Success (live).</strong> A targeted reload of the affected parser is dispatched (per architecture diagram 09). One <code>INFO</code> audit record is emitted (section 6).</li>
 <li><strong>Success (dry-run).</strong> No reload. The would-be diff is rendered to the caller via <code>messages.yml → config.dryRun.*</code> and an <code>INFO</code> audit record is emitted with <code>dryRun = true</code>.</li>
-<li><strong>Failure (any stage).</strong> Rollback is complete (no in-memory mutation survives, no temp file survives), one <code>WARNING</code> audit record is emitted with the failing <code>reasonCode</code>, and the configurable failure message (§5.2) is delivered to the caller.</li>
+<li><strong>Failure (any stage).</strong> Rollback is complete (no in-memory mutation survives, no temp file survives), one <code>WARNING</code> audit record is emitted with the failing <code>reasonCode</code>, and the configurable failure message (section 5.2) is delivered to the caller.</li>
 </ul>
 <blockquote>
 <p><strong>S-004 (no silently discarded failures).</strong> Every exit path of this lifecycle emits exactly one audit record. Catch-and-swallow, silent <code>return false</code>, and <code>null</code> returns are prohibited.</p>
@@ -3578,7 +3580,7 @@
 </ul>
 <p>Not writable via the <strong>general</strong> <code>/rtp config &lt;file&gt; &lt;key&gt;:&lt;value&gt;</code> path:</p>
 <ul>
-<li><code>language.yml</code> — read by <code>LanguageBootstrap</code> before any <code>ConfigParser</code> exists (<a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a>). A live mutation requires re-initializing <strong>every</strong> parser (because the locale-aware <code>ConfigParser</code> resolves keys against the active locale at construction), which is a heavier operation than the per-file lifecycle of §3. Therefore <code>language.yml</code> is <strong>not</strong> exposed as a generic <code>SubConfigCmd</code> target; instead, a dedicated path (the existing <code>LanguageCmd</code> family under <code>commands/config/</code>, hardened to the same audit + permission + atomic-write contracts as this spec) handles locale changes by running the lifecycle of §3 <strong>and then</strong> triggering a full <code>Configs.reload</code>-equivalent re-init in §3.7 of its own invocation. Attempts to address <code>language</code> through the generic <code>/rtp config language …</code> path shall be <strong>redirected</strong> to the dedicated <code>LanguageCmd</code> (not failed) when the grammar allows; if the syntax is ambiguous, the command shall fail with <code>reasonCode = USE_DEDICATED_COMMAND</code> and the configurable message shall name the right command.</li>
+<li><code>language.yml</code> — read by <code>LanguageBootstrap</code> before any <code>ConfigParser</code> exists (<a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a>). A live mutation requires re-initializing <strong>every</strong> parser (because the locale-aware <code>ConfigParser</code> resolves keys against the active locale at construction), which is a heavier operation than the per-file lifecycle of section 3. Therefore <code>language.yml</code> is <strong>not</strong> exposed as a generic <code>SubConfigCmd</code> target; instead, a dedicated path (the existing <code>LanguageCmd</code> family under <code>commands/config/</code>, hardened to the same audit + permission + atomic-write contracts as this spec) handles locale changes by running the lifecycle of section 3 <strong>and then</strong> triggering a full <code>Configs.reload</code>-equivalent re-init in section 3.7 of its own invocation. Attempts to address <code>language</code> through the generic <code>/rtp config language …</code> path shall be <strong>redirected</strong> to the dedicated <code>LanguageCmd</code> (not failed) when the grammar allows; if the syntax is ambiguous, the command shall fail with <code>reasonCode = USE_DEDICATED_COMMAND</code> and the configurable message shall name the right command.</li>
 <li>Any non-registered <code>.yml</code> file under <code>plugins/RTP/</code> (third-party drop-ins, addon configs not exposed through <code>Configs</code>). Tab-complete enumerates only registered files; explicit invocation against an unregistered file fails with <code>UNKNOWN_FILE</code>.</li>
 </ul>
 <h3 id="45-tab-complete-enumeration">4.5 Tab-complete enumeration<a class="headerlink" href="#45-tab-complete-enumeration" title="Permanent link">&para;</a></h3>
@@ -3587,17 +3589,17 @@
 <p>A <code>/rtp config</code> write and a <code>/rtp reload</code> are mutually serialized:</p>
 <ul>
 <li>A reload in progress (i.e. between the in-memory swap and the post-swap region rebuild of architecture diagram 09) shall reject incoming writes with <code>reasonCode = RELOAD_IN_PROGRESS</code>. The reject is fast (no temp file is opened).</li>
-<li>A write in progress (i.e. between §3.4 <em>Snapshot</em> and §3.7 <em>Reload</em>) shall block a concurrently-issued reload by deferring it until the write's reload-affected step completes. The deferral is a single short await on the per-file write lock; reloads do not stack.</li>
+<li>A write in progress (i.e. between section 3.4 <em>Snapshot</em> and section 3.7 <em>Reload</em>) shall block a concurrently-issued reload by deferring it until the write's reload-affected step completes. The deferral is a single short await on the per-file write lock; reloads do not stack.</li>
 <li>In-flight teleports holding a pre-write parser snapshot are unaffected — they see the old values until they finish, exactly as documented in architecture diagram 09. This is the same invariant the read path already provides.</li>
 </ul>
 <blockquote>
-<p><strong>No background save queue.</strong> Writes are dispatched on the command's caller thread (or its scheduled platform handoff for Folia per the platform adapter's <code>RTP.scheduler</code> runAsync), never queued behind unrelated work. There is no risk of a config save being lost on shutdown because none are pending: every successful invocation has already completed §4.2 before the audit record is emitted.</p>
+<p><strong>No background save queue.</strong> Writes are dispatched on the command's caller thread (or its scheduled platform handoff for Folia per the platform adapter's <code>RTP.scheduler</code> runAsync), never queued behind unrelated work. There is no risk of a config save being lost on shutdown because none are pending: every successful invocation has already completed section 4.2 before the audit record is emitted.</p>
 </blockquote>
 <hr />
 <h2 id="5-validation-model-and-reasoncode-catalog">5. Validation Model and <code>reasonCode</code> Catalog<a class="headerlink" href="#5-validation-model-and-reasoncode-catalog" title="Permanent link">&para;</a></h2>
 <h3 id="51-validator-chain">5.1 Validator chain<a class="headerlink" href="#51-validator-chain" title="Permanent link">&para;</a></h3>
 <p>Validation is centralized in <code>ConfigParameterValidator</code> (per <a href="../../adr/ADR-037-harden-rtp-config-commands/">ADR-037</a> contract 1). One validator instance per parameter type. The validator receives <code>(parameterPath, attemptedValue, inMemoryStateSnapshot)</code> and returns either <code>Ok</code> or <code>ConfigValidationFailure(parameterPath, attemptedValue, reasonCode, detail)</code>.</p>
-<p>Validators are pure: no I/O, no chunk access, no scheduling. They run on the calling thread. Composite invariants (cross-parameter, e.g. <code>Polygon.expand</code> vs. <code>Polygon.vertices</code>) run as a second pass after per-parameter validators pass, before §3.5 <em>Apply</em> commits the in-memory state.</p>
+<p>Validators are pure: no I/O, no chunk access, no scheduling. They run on the calling thread. Composite invariants (cross-parameter, e.g. <code>Polygon.expand</code> vs. <code>Polygon.vertices</code>) run as a second pass after per-parameter validators pass, before section 3.5 <em>Apply</em> commits the in-memory state.</p>
 <h3 id="52-reasoncode-enumeration">5.2 <code>reasonCode</code> enumeration<a class="headerlink" href="#52-reasoncode-enumeration" title="Permanent link">&para;</a></h3>
 <p>Every failure mode is exactly one <code>reasonCode</code>. The set is closed; adding a new code requires updating this spec and adding the corresponding <code>messages.yml → config.error.&lt;reasonCode&gt;</code> key.</p>
 <table>
@@ -3710,7 +3712,7 @@
 <td><code>timestamp</code></td>
 <td>ISO-8601 UTC</td>
 <td>yes</td>
-<td>When the lifecycle entered §3.1 <em>Parse</em>.</td>
+<td>When the lifecycle entered section 3.1 <em>Parse</em>.</td>
 </tr>
 <tr>
 <td><code>actor</code></td>
@@ -3752,7 +3754,7 @@
 <td><code>reasonCode</code></td>
 <td>string</td>
 <td>only when <code>outcome ∈ {REJECTED, ROLLED_BACK}</code></td>
-<td>The closed-set code from §5.2.</td>
+<td>The closed-set code from section 5.2.</td>
 </tr>
 <tr>
 <td><code>detail</code></td>
@@ -3764,13 +3766,13 @@
 <td><code>durationMs</code></td>
 <td>integer</td>
 <td>yes</td>
-<td>Wall-clock time from §3.1 to record emission.</td>
+<td>Wall-clock time from section 3.1 to record emission.</td>
 </tr>
 </tbody>
 </table>
 <p>Success records are emitted at <code>Level.INFO</code>; failure and rollback records at <code>Level.WARNING</code>. The <code>view</code> sub-form is <code>Level.INFO</code> with <code>outcome = DRY_RUN_OK</code> and an empty <code>mutations</code> array (its read-only payload, if any, is delivered to the caller, not the audit log, to avoid <code>messages.yml</code> content leaking into log files when an admin runs <code>view</code> against <code>messages.yml</code>).</p>
 <h3 id="62-single-formatter-single-sink">6.2 Single formatter, single sink<a class="headerlink" href="#62-single-formatter-single-sink" title="Permanent link">&para;</a></h3>
-<p>All records flow through one <code>ConfigAuditFormatter</code>. Per the existing <code>SendMessage.addInterceptor(Consumer&lt;String&gt;)</code> pattern documented in <code>AGENTS.md → Logging &amp; Feedback</code>, tests and the <code>rtp test full</code> audit pass shall consume the formatted line stream rather than scraping platform-specific logger output. The formatter's output is deterministic given the record (no clock-derived suffix beyond <code>timestamp</code>, no <code>Object#toString</code> leakage of identity hash codes). The single invocation produces exactly one record; rollback in §3.7 emits the same record (with <code>outcome = ROLLED_BACK</code> and the failing <code>reasonCode</code>) rather than a paired pre/post record, so no cross-record correlation key is needed.</p>
+<p>All records flow through one <code>ConfigAuditFormatter</code>. Per the existing <code>SendMessage.addInterceptor(Consumer&lt;String&gt;)</code> pattern documented in <code>AGENTS.md → Logging &amp; Feedback</code>, tests and the <code>rtp test full</code> audit pass shall consume the formatted line stream rather than scraping platform-specific logger output. The formatter's output is deterministic given the record (no clock-derived suffix beyond <code>timestamp</code>, no <code>Object#toString</code> leakage of identity hash codes). The single invocation produces exactly one record; rollback in section 3.7 emits the same record (with <code>outcome = ROLLED_BACK</code> and the failing <code>reasonCode</code>) rather than a paired pre/post record, so no cross-record correlation key is needed.</p>
 <hr />
 <h2 id="7-permission-grammar">7. Permission Grammar<a class="headerlink" href="#7-permission-grammar" title="Permanent link">&para;</a></h2>
 <h3 id="71-node-hierarchy">7.1 Node hierarchy<a class="headerlink" href="#71-node-hierarchy" title="Permanent link">&para;</a></h3>
@@ -3789,7 +3791,7 @@
 </tr>
 <tr>
 <td><code>rtp.config.view</code></td>
-<td>The <code>view</code> sub-form (§2.4) against any file.</td>
+<td>The <code>view</code> sub-form (section 2.4) against any file.</td>
 </tr>
 <tr>
 <td><code>rtp.config.set</code></td>
@@ -3814,7 +3816,7 @@
 <p>Per-region scoping (e.g. "edit only <code>regions/nether.yml</code>") is <strong>not</strong> part of the beta.3 hardening; the section is the smallest grain. A wizard that needs finer scoping shall propose its own ADR.</p>
 <hr />
 <h2 id="8-schema-checked-reload">8. Schema-Checked Reload<a class="headerlink" href="#8-schema-checked-reload" title="Permanent link">&para;</a></h2>
-<p><code>/rtp reload</code> (whether issued directly, dispatched by §3.7, or triggered by the dedicated <code>LanguageCmd</code>) runs the parsed-but-not-applied config through the same <code>ConfigParameterValidator</code> chain (§5) <strong>before</strong> swapping it in. The check runs against the same composite-invariant pass §3.5 uses, so a reload of a file that was edited offline (bypassing the command surface) is guarded by the same invariant set as a write through the command surface.</p>
+<p><code>/rtp reload</code> (whether issued directly, dispatched by section 3.7, or triggered by the dedicated <code>LanguageCmd</code>) runs the parsed-but-not-applied config through the same <code>ConfigParameterValidator</code> chain (section 5) <strong>before</strong> swapping it in. The check runs against the same composite-invariant pass section 3.5 uses, so a reload of a file that was edited offline (bypassing the command surface) is guarded by the same invariant set as a write through the command surface.</p>
 <h3 id="81-failure-semantics">8.1 Failure semantics<a class="headerlink" href="#81-failure-semantics" title="Permanent link">&para;</a></h3>
 <p>A reload-time validation failure aborts the swap with the previous in-memory state intact. The audit record carries <code>outcome = REJECTED</code> and the failing <code>reasonCode</code>. The diagram-09 swap node is not entered; in-flight teleports continue to see the previous state. The caller is told which file and which key failed and is invited to re-edit and retry. No partial-swap state is observable.</p>
 <h3 id="82-shape-invariants">8.2 Shape invariants<a class="headerlink" href="#82-shape-invariants" title="Permanent link">&para;</a></h3>
@@ -3823,16 +3825,16 @@
 <h2 id="9-tab-complete-contract-parsecomplete-parity">9. Tab-Complete Contract (Parse/Complete Parity)<a class="headerlink" href="#9-tab-complete-contract-parsecomplete-parity" title="Permanent link">&para;</a></h2>
 <p><code>onCommand</code> and <code>onTabComplete</code> consume the <strong>same</strong> <code>ConfigParameterGrammar</code> definition per parameter. There is exactly one source of truth for:</p>
 <ul>
-<li>The set of valid <code>&lt;file&gt;</code> tokens at position 1 (the <code>Configs</code> registry, §4.5).</li>
+<li>The set of valid <code>&lt;file&gt;</code> tokens at position 1 (the <code>Configs</code> registry, section 4.5).</li>
 <li>The set of valid <code>&lt;subfile&gt;</code> tokens at position 2 for multi-config groups (filesystem enumeration of the group directory).</li>
 <li>The set of valid <code>&lt;key&gt;</code> tokens at the next position (the file's parameter registry).</li>
 <li>The set of valid <code>&lt;value&gt;</code> completions for a typed key (enum members for enum-typed keys; <code>add:</code> / <code>remove:</code> literal completions plus current-list-members for <code>remove:</code> on <code>List</code> keys; numeric placeholder hints with the declared range for numeric keys).</li>
 </ul>
 <p>Any completion the player sees is a <strong>parseable</strong> command. The test <code>ConfigParameterGrammarParseCompleteParityTest</code> (per ADR-037 <em>Migration / Rollout</em>) asserts this by, for every registered parameter, completing one step deeper than the previous tab and round-tripping the completion through the parser; any completion that fails to parse fails the test.</p>
-<p>Tab-complete may filter by the caller's permissions (a holder of <code>rtp.config.set.regions</code> who tabs at position 1 shall see only <code>regions</code>, <code>worlds</code>-if-also-granted, etc.). This is a UX nicety and does not change the parser; it only suppresses suggestions the caller could not act on. It is <strong>not</strong> a substitute for the §7 authorization step in the lifecycle.</p>
+<p>Tab-complete may filter by the caller's permissions (a holder of <code>rtp.config.set.regions</code> who tabs at position 1 shall see only <code>regions</code>, <code>worlds</code>-if-also-granted, etc.). This is a UX nicety and does not change the parser; it only suppresses suggestions the caller could not act on. It is <strong>not</strong> a substitute for the section 7 authorization step in the lifecycle.</p>
 <hr />
 <h2 id="10-error-matrix">10. Error Matrix<a class="headerlink" href="#10-error-matrix" title="Permanent link">&para;</a></h2>
-<p>The matrix below is exhaustive over the §3 lifecycle stages cross-producted with the §5 reasonCodes. Read it as: <em>for input class X, the expected outcome is Y, with audit <code>outcome</code> Z</em>. Cells marked "n/a" are unreachable by construction (e.g. <code>PERSIST_IO</code> cannot occur before §3.6).</p>
+<p>The matrix below is exhaustive over the section 3 lifecycle stages cross-producted with the section 5 reasonCodes. Read it as: <em>for input class X, the expected outcome is Y, with audit <code>outcome</code> Z</em>. Cells marked "n/a" are unreachable by construction (e.g. <code>PERSIST_IO</code> cannot occur before section 3.6).</p>
 <table>
 <thead>
 <tr>
@@ -3982,73 +3984,73 @@
 <tr>
 <td>A1</td>
 <td><code>SubConfigCmd#onCommand</code> inlines per-type parse-and-coerce with mixed <code>return false</code> / silent-fail branches; no central <code>ConfigParameterValidator</code>.</td>
-<td>§3.3, §5</td>
+<td>section 3.3, section 5</td>
 <td>1</td>
 </tr>
 <tr>
 <td>A2</td>
 <td>No <code>ConfigTransaction</code>; mutations are applied to in-memory state directly and serialized lazily; rollback is not available.</td>
-<td>§3.4, §3.5, §3.7</td>
+<td>section 3.4, section 3.5, section 3.7</td>
 <td>2</td>
 </tr>
 <tr>
 <td>A3</td>
 <td>No <code>--dry-run</code> flag; no preview path.</td>
-<td>§2.1, §3.7</td>
+<td>section 2.1, section 3.7</td>
 <td>3</td>
 </tr>
 <tr>
 <td>A4</td>
 <td>Audit records are partial: some successful sets are not logged; some failures are silently rejected.</td>
-<td>§6</td>
+<td>section 6</td>
 <td>4</td>
 </tr>
 <tr>
 <td>A5</td>
 <td><code>BukkitBaseRTPCmd#msgInvalidCommand</code> / <code>msgBadParameter</code> carry hardcoded English fallbacks.</td>
-<td>§5.3</td>
+<td>section 5.3</td>
 <td>5</td>
 </tr>
 <tr>
 <td>A6</td>
 <td>Permission grain is <code>rtp.config</code> (umbrella) only; no scoped <code>rtp.config.set.&lt;section&gt;</code> nodes.</td>
-<td>§7</td>
+<td>section 7</td>
 <td>6</td>
 </tr>
 <tr>
 <td>A7</td>
 <td><code>ReloadCmd</code> re-reads config without running the validator chain against the resulting state; shape-invariant violations surface at sample time.</td>
-<td>§8</td>
+<td>section 8</td>
 <td>7</td>
 </tr>
 <tr>
 <td>A8</td>
 <td><code>onTabComplete</code> and <code>onCommand</code> parse the argument grammar independently; some completions do not round-trip.</td>
-<td>§9</td>
+<td>section 9</td>
 <td>8</td>
 </tr>
 <tr>
 <td>A9</td>
 <td>Writes are not atomic-rename: the parser serializes directly to the target file. A crash mid-write can leave the file truncated.</td>
-<td>§4.2, §4.6</td>
+<td>section 4.2, section 4.6</td>
 <td>2 (persist substep)</td>
 </tr>
 <tr>
 <td>A10</td>
 <td><code>language.yml</code> cannot be mutated at runtime through any command surface; locale changes require a server restart.</td>
-<td>§4.4</td>
+<td>section 4.4</td>
 <td>2 (LanguageCmd hardening)</td>
 </tr>
 <tr>
 <td>A11</td>
 <td>Startup does not log/clean stray <code>*.tmp</code> siblings of registered config files (no temp files exist today; this row is "starting state for the new contract," not a regression).</td>
-<td>§4.2</td>
+<td>section 4.2</td>
 <td>2</td>
 </tr>
 <tr>
 <td>A12</td>
-<td>The YAML substrate does not guarantee that block / inline comments survive a write-back round-trip. The <code>view</code> hover-text feature (§2.4) depends on comment preservation; until the substrate is upgraded (or replaced with an in-house parser), hover-text falls back to declared type + bounds. Comment preservation is also valuable independently of <code>/rtp config</code> for admins who hand-edit YAML and reload.</td>
-<td>§2.4, §4.2</td>
+<td>The YAML substrate does not guarantee that block / inline comments survive a write-back round-trip. The <code>view</code> hover-text feature (section 2.4) depends on comment preservation; until the substrate is upgraded (or replaced with an in-house parser), hover-text falls back to declared type + bounds. Comment preservation is also valuable independently of <code>/rtp config</code> for admins who hand-edit YAML and reload.</td>
+<td>section 2.4, section 4.2</td>
 <td>— (separate ADR; tracked here for visibility)</td>
 </tr>
 </tbody>

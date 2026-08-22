@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-045-rtp-docs-menu-consumer/">
+      
       
         <link rel="prev" href="../ADR-044-command-tree-menu-reflector/">
       
@@ -3523,7 +3525,7 @@
 </ul>
 <p>A new top-level note will be added to <code>docs/dev/RULES.md</code> ("Authoring docs for the in-game reader") that mirrors the supported / forbidden tables above, so the rule lives with the rest of the requirement-documentation style guide.</p>
 <h3 id="page-break-model">Page-break model<a class="headerlink" href="#page-break-model" title="Permanent link">&para;</a></h3>
-<p><code>MarkdownToMenuModel</code> produces a <code>MenuModel</code> whose pages are <strong>logical</strong> breaks — driven by <code>#</code> / <code>##</code> headings — not renderer-cap pages. The renderer paginates each logical page against its own per-page line cap (book: ~12 lines/page; chat: configurable) using <code>MenuAction.ChangePage</code> per <a href="../ADR-035-interactive-menus-book-first/">ADR-035 §4</a>. This keeps the cached <code>MenuModel</code> renderer-agnostic: the same cache serves the Adventure book renderer and any future chat / GUI renderer.</p>
+<p><code>MarkdownToMenuModel</code> produces a <code>MenuModel</code> whose pages are <strong>logical</strong> breaks — driven by <code>#</code> / <code>##</code> headings — not renderer-cap pages. The renderer paginates each logical page against its own per-page line cap (book: ~12 lines/page; chat: configurable) using <code>MenuAction.ChangePage</code> per <a href="../ADR-035-interactive-menus-book-first/">ADR-035 section 4</a>. This keeps the cached <code>MenuModel</code> renderer-agnostic: the same cache serves the Adventure book renderer and any future chat / GUI renderer.</p>
 <p>Every page after the first carries a synthetic "↩ back to index" line emitting <code>MenuAction.RunRtpCommand("docs")</code> (or <code>"docs", "&lt;parent&gt;"</code> when navigated into from an index page).</p>
 <h3 id="index-pages">Index pages<a class="headerlink" href="#index-pages" title="Permanent link">&para;</a></h3>
 <p><code>/rtp docs</code> with no relpath opens the docs root index. The root index is:</p>
@@ -3534,7 +3536,7 @@
 <p>A directory relpath (<code>/rtp docs admin/</code>) opens the synthetic index for that directory. A file relpath (<code>/rtp docs FOR_SERVER_ADMINS.md</code>) opens the cached lowered model directly.</p>
 <h3 id="permission-and-visibility">Permission and visibility<a class="headerlink" href="#permission-and-visibility" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>rtp.docs</code> (default: <code>op</code>) gates <code>/rtp docs</code> itself. Hidden — not greyed out — for users without it, consistent with <a href="../ADR-044-command-tree-menu-reflector/">ADR-044</a> §<em>Applicability semantics</em>.</li>
+<li><code>rtp.docs</code> (default: <code>op</code>) gates <code>/rtp docs</code> itself. Hidden — not greyed out — for users without it, consistent with <a href="../ADR-044-command-tree-menu-reflector/">ADR-044</a> section <em>Applicability semantics</em>.</li>
 <li>Developer docs (<code>docs/dev/</code>, <code>docs/adr/</code>, <code>docs/architecture/</code>) are excluded from the cache when <code>docs.exposeDeveloperDocs: false</code> (the default). Setting it <code>true</code> re-includes them on the next <code>rebuild()</code>. There is no per-section permission in v1; the boolean is sufficient for the only real cohort split (server admin vs. developer).</li>
 <li>Path sandboxing: every <code>&lt;relpath&gt;</code> is normalized and verified to remain under the configured <code>docs.root</code>. Symlinks are not followed. Sandbox violations are recorded as <code>RTP.log(Level.WARNING, "docs.invalidPath", …)</code> and surface as <code>messages.yml → docs.invalid</code> to the caller (REQ-RTP-S-004 / S-007).</li>
 </ul>
@@ -3658,7 +3660,7 @@
 <li><a href="../ADR-041-config-command-and-save-implementation/">ADR-041</a> — Config command and save implementation. The reload path that triggers <code>DocsRegistry#rebuild()</code>.</li>
 <li><a href="../ADR-042-yaml-comment-preservation-block-only/">ADR-042</a> — Block-comment preservation. Cross-reference only; docs lowering does not touch YAML.</li>
 <li><a href="../ADR-044-command-tree-menu-reflector/">ADR-044</a> — Command-tree menu reflector. Defines <code>MenuConsumerProfile</code>; <code>DocsConsumerProfile</code> is the second concrete profile after <code>ConfigMenuConsumerProfile</code>.</li>
-<li><a href="../../dev/REQUIREMENTS/">REQUIREMENTS.md §3</a> — Prohibitions; this ADR inherits S-004, S-005, S-006, S-007.</li>
+<li><a href="../../dev/REQUIREMENTS/">REQUIREMENTS.md section 3</a> — Prohibitions; this ADR inherits S-004, S-005, S-006, S-007.</li>
 <li><a href="../dev/scratch/CHECKLIST-generalized-menu.md"><code>docs/dev/scratch/CHECKLIST-generalized-menu.md</code></a> — Stage 5.7 entry tracks implementation.</li>
 <li><a href="../../dev/TRACEABILITY/">TRACEABILITY.md</a> — new test rows added as part of beta.3.</li>
 </ul>

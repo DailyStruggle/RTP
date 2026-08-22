@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/LOGGING/">
+      
       
         <link rel="prev" href="../LANGUAGE/">
       
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#console-logging-reference-loggingyml" class="md-skip">
+        <a href="#console-logging-reference-advancedloggingyml" class="md-skip">
           Skip to content
         </a>
       
@@ -1142,6 +1144,15 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#categories" class="md-nav__link">
@@ -3097,6 +3108,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#categories" class="md-nav__link">
     <span class="md-ellipsis">
       Categories
@@ -3141,9 +3161,17 @@
   
 
 
-<h1 id="console-logging-reference-loggingyml">Console Logging Reference (<code>logging.yml</code>)<a class="headerlink" href="#console-logging-reference-loggingyml" title="Permanent link">&para;</a></h1>
-<p><code>logging.yml</code> enables or disables individual console-log categories and sets the plugin's minimum log level. Every category key is a boolean; flip one to <code>true</code> to surface that category in the console, or to <code>false</code> to silence it.</p>
-<p>Apply changes by editing on disk and running <code>/rtp reload</code>, or change one key at runtime with <code>/rtp config logging &lt;key&gt;=&lt;value&gt;</code>.</p>
+<h1 id="console-logging-reference-advancedloggingyml">Console Logging Reference (<code>advanced/logging.yml</code>)<a class="headerlink" href="#console-logging-reference-advancedloggingyml" title="Permanent link">&para;</a></h1>
+<p><code>advanced/logging.yml</code> enables or disables individual console-log categories and sets the plugin's minimum log level. Every category key is a boolean; flip one to <code>true</code> to surface that category in the console, or to <code>false</code> to silence it.</p>
+<hr />
+<h2 id="updating-settings">Updating Settings<a class="headerlink" href="#updating-settings" title="Permanent link">&para;</a></h2>
+<p>You can update logging configuration through:
+1. <strong>In-game admin menu</strong>: Run <code>/rtp admin</code> or <code>/rtp menu</code> -&gt; click <strong>Logging</strong>.
+2. <strong>Command line</strong>: Use <code>/rtp config logging &lt;key&gt;=&lt;value&gt;</code> (e.g. <code>/rtp config logging detailed_reload=true</code>).
+3. <strong>Direct editing</strong>: Edit <code>advanced/logging.yml</code> on disk and run <code>/rtp reload</code>.</p>
+<blockquote>
+<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full menu and command navigation details.</p>
+</blockquote>
 <hr />
 <h2 id="categories">Categories<a class="headerlink" href="#categories" title="Permanent link">&para;</a></h2>
 <table>

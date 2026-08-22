@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/PUBLISHING/">
+      
       
       
       
@@ -3056,9 +3058,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#consumer-buildgradle-out-of-repo-addon" class="md-nav__link">
+  <a href="#consumer-config-out-of-repo-addon" class="md-nav__link">
     <span class="md-ellipsis">
-      Consumer build.gradle (out-of-repo addon)
+      Consumer config (out-of-repo addon)
     </span>
   </a>
   
@@ -3134,9 +3136,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#consumer-buildgradle-out-of-repo-addon_1" class="md-nav__link">
+  <a href="#consumer-config-out-of-repo-addon_1" class="md-nav__link">
     <span class="md-ellipsis">
-      Consumer build.gradle (out-of-repo addon)
+      Consumer config (out-of-repo addon)
     </span>
   </a>
   
@@ -3221,9 +3223,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#consumer-buildgradle-after-central-release" class="md-nav__link">
+  <a href="#consumer-config-maven-central" class="md-nav__link">
     <span class="md-ellipsis">
-      Consumer build.gradle (after Central release)
+      Consumer config (Maven Central)
     </span>
   </a>
   
@@ -3269,9 +3271,10 @@ configurable selection model) and <code>rtp-core</code> (the <code>RTP</code> fa
 inter-module project-dependency closure) are published to a public Maven coordinate.</p>
 <p>This document covers the channels:</p>
 <ol>
-<li><strong>JitPack</strong> - active now, zero-credentials, builds straight from a git tag.</li>
+<li><strong>Maven Central</strong> - active now; the durable, discoverable, zero-credentials channel for
+   consumers (<code>io.github.dailystruggle:rtp-api</code> / <code>:rtp-core</code>, currently <code>3.2.1</code>).</li>
+<li><strong>JitPack</strong> - active now, zero-credentials, builds straight from a git tag / branch / commit.</li>
 <li><strong>GitHub Packages</strong> - repo-scoped Maven registry, credentialed; wiring is in place.</li>
-<li><strong>Maven Central</strong> - the durable, discoverable channel; not yet enabled, full how-to below.</li>
 </ol>
 <p>The publication wiring itself lives in the root <code>build.gradle</code> (<code>maven-publish</code> applied to
 the <code>publishedModulePaths</code> closure) and is shared by all channels.</p>
@@ -3351,18 +3354,43 @@ and exposes each as:</p>
 <p>JitPack handles the inter-module references (the generated POMs use the
 <code>io.github.dailystruggle</code> group; JitPack maps the same-group cross-references to the
 <code>com.github.DailyStruggle.RTP</code> group it serves), so a consumer only needs the JitPack repo.</p>
-<h3 id="consumer-buildgradle-out-of-repo-addon">Consumer build.gradle (out-of-repo addon)<a class="headerlink" href="#consumer-buildgradle-out-of-repo-addon" title="Permanent link">&para;</a></h3>
+<h3 id="consumer-config-out-of-repo-addon">Consumer config (out-of-repo addon)<a class="headerlink" href="#consumer-config-out-of-repo-addon" title="Permanent link">&para;</a></h3>
+<p>Gradle (<code>build.gradle</code>):</p>
 <div class="highlight"><pre><span></span><code>repositories {
     mavenCentral()
     maven { url &#39;https://jitpack.io&#39; }
 }
 
 dependencies {
-    compileOnly &#39;com.github.DailyStruggle.RTP:rtp-api:3.0.1&#39;
-    compileOnly &#39;com.github.DailyStruggle.RTP:rtp-core:3.0.1&#39;
+    compileOnly &#39;com.github.DailyStruggle.RTP:rtp-api:3.2.1&#39;
+    compileOnly &#39;com.github.DailyStruggle.RTP:rtp-core:3.2.1&#39;
 }
 </code></pre></div>
-<p>Replace <code>3.0.1</code> with any git tag, a branch (<code>master-SNAPSHOT</code>), or a commit SHA. The first
+<p>Maven (<code>pom.xml</code>) - JitPack is not a default Maven repository, so declare it explicitly
+(<code>compileOnly</code> maps to Maven <code>&lt;scope&gt;provided&lt;/scope&gt;</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&lt;repositories&gt;</span>
+<span class="w">    </span><span class="nt">&lt;repository&gt;</span>
+<span class="w">        </span><span class="nt">&lt;id&gt;</span>jitpack.io<span class="nt">&lt;/id&gt;</span>
+<span class="w">        </span><span class="nt">&lt;url&gt;</span>https://jitpack.io<span class="nt">&lt;/url&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/repository&gt;</span>
+<span class="nt">&lt;/repositories&gt;</span>
+
+<span class="nt">&lt;dependencies&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>com.github.DailyStruggle.RTP<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>rtp-api<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>3.2.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>com.github.DailyStruggle.RTP<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>rtp-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>3.2.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="nt">&lt;/dependencies&gt;</span>
+</code></pre></div>
+<p>Replace <code>3.2.1</code> with any git tag, a branch (<code>master-SNAPSHOT</code>), or a commit SHA. The first
 build for a new tag triggers JitPack to compile; subsequent resolves are cached.</p>
 <h3 id="triggering-verifying-a-build">Triggering / verifying a build<a class="headerlink" href="#triggering-verifying-a-build" title="Permanent link">&para;</a></h3>
 <ol>
@@ -3464,8 +3492,9 @@ closure and the GitHub Packages target only.</p>
 <p>For the Jenkins pipeline, inject a PAT as <code>gpr.user</code> / <code>gpr.key</code> (or <code>GITHUB_ACTOR</code> /
 <code>GITHUB_TOKEN</code>) secrets and swap the <code>publishToMavenLocal</code> tasks in <code>PUBLISH_TASKS</code> for the
 <code>...ToGitHubPackagesRepository</code> targets.</p>
-<h3 id="consumer-buildgradle-out-of-repo-addon_1">Consumer build.gradle (out-of-repo addon)<a class="headerlink" href="#consumer-buildgradle-out-of-repo-addon_1" title="Permanent link">&para;</a></h3>
-<p>GitHub Packages requires the consumer to authenticate too (there is no anonymous read):</p>
+<h3 id="consumer-config-out-of-repo-addon_1">Consumer config (out-of-repo addon)<a class="headerlink" href="#consumer-config-out-of-repo-addon_1" title="Permanent link">&para;</a></h3>
+<p>GitHub Packages requires the consumer to authenticate too (there is no anonymous read).</p>
+<p>Gradle (<code>build.gradle</code>):</p>
 <div class="highlight"><pre><span></span><code>repositories {
     mavenCentral()
     maven {
@@ -3482,14 +3511,41 @@ dependencies {
     compileOnly &#39;io.github.dailystruggle:rtp-core:3.2.1&#39;
 }
 </code></pre></div>
+<p>Maven (<code>pom.xml</code>) - declare the repository and put the credentials in <code>~/.m2/settings.xml</code>
+under a matching <code>&lt;server&gt;&lt;id&gt;github&lt;/id&gt;...&lt;/server&gt;</code> (username = GitHub user, password = a
+PAT with <code>read:packages</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&lt;repositories&gt;</span>
+<span class="w">    </span><span class="nt">&lt;repository&gt;</span>
+<span class="w">        </span><span class="nt">&lt;id&gt;</span>github<span class="nt">&lt;/id&gt;</span>
+<span class="w">        </span><span class="nt">&lt;url&gt;</span>https://maven.pkg.github.com/DailyStruggle/RTP<span class="nt">&lt;/url&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/repository&gt;</span>
+<span class="nt">&lt;/repositories&gt;</span>
+
+<span class="nt">&lt;dependencies&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>io.github.dailystruggle<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>rtp-api<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>3.2.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>io.github.dailystruggle<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>rtp-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>3.2.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="nt">&lt;/dependencies&gt;</span>
+</code></pre></div>
 <p>The consumer's token only needs <code>read:packages</code>. Because of this read-time credential
 requirement, JitPack remains the friendlier choice for public addon authors; GitHub Packages
 is best for internal / org-scoped consumers who already authenticate to GitHub.</p>
 <hr />
 <h2 id="maven-central-first-party-wiring-manual-portal-upload">Maven Central (first-party wiring, manual Portal upload)<a class="headerlink" href="#maven-central-first-party-wiring-manual-portal-upload" title="Permanent link">&para;</a></h2>
-<p>Maven Central is the right destination once the <code>rtp-api</code> contract is stable and you expect
-real third-party volume. It is more work than JitPack (one-time account + signing setup) but
-gives discoverable, permanent coordinates with no per-tag build step on the consumer side.</p>
+<p>Maven Central is <strong>live</strong> - <code>io.github.dailystruggle:rtp-api</code> / <code>:rtp-core</code> (and their published
+closure) are available at <code>3.2.1</code>, resolvable with a bare <code>mavenCentral()</code> and no credentials.
+It gives discoverable, permanent coordinates with no per-tag build step on the consumer side.
+The rest of this section is the release procedure for cutting the <em>next</em> version; consumers only
+need the <a href="#consumer-buildgradle-maven-central">consumer snippet below</a>.</p>
 <p><strong>Trust posture:</strong> this build deliberately uses <strong>only first-party Gradle tooling</strong> for the
 Central path - <code>maven-publish</code> and the built-in <code>signing</code> plugin, both of which ship inside
 the Gradle distribution. No third-party publish plugin is applied, so no external, auto-
@@ -3662,15 +3718,35 @@ that <code>.asc</code> signatures were actually produced before uploading (fail-
 <strong>not</strong> auto-release - the deployment lands VALIDATED and a human clicks <strong>Publish</strong> on the
 Portal. To auto-release instead, append <code>?publishingType=AUTOMATIC</code> to the upload URL in the
 workflow.</p>
-<h3 id="consumer-buildgradle-after-central-release">Consumer build.gradle (after Central release)<a class="headerlink" href="#consumer-buildgradle-after-central-release" title="Permanent link">&para;</a></h3>
+<h3 id="consumer-config-maven-central">Consumer config (Maven Central)<a class="headerlink" href="#consumer-config-maven-central" title="Permanent link">&para;</a></h3>
+<p>Central is in the default repository set of both Gradle and Maven, so no repository block or
+credentials are needed.</p>
+<p>Gradle (<code>build.gradle</code>):</p>
 <div class="highlight"><pre><span></span><code>repositories { mavenCentral() }
 
 dependencies {
-    compileOnly &#39;io.github.dailystruggle:rtp-api:&lt;version&gt;&#39;
-    compileOnly &#39;io.github.dailystruggle:rtp-core:&lt;version&gt;&#39;
+    compileOnly &#39;io.github.dailystruggle:rtp-api:3.2.1&#39;
+    compileOnly &#39;io.github.dailystruggle:rtp-core:3.2.1&#39;
 }
 </code></pre></div>
-<p>No special repository block needed - Central is in every build's default set.</p>
+<p>Maven (<code>pom.xml</code>) - <code>compileOnly</code> maps to Maven <code>&lt;scope&gt;provided&lt;/scope&gt;</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&lt;dependencies&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>io.github.dailystruggle<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>rtp-api<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>3.2.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>io.github.dailystruggle<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>rtp-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>3.2.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="nt">&lt;/dependencies&gt;</span>
+</code></pre></div>
+<p>This is the recommended dependency for out-of-repo addon authors (see
+<code>docs/FOR_ADDON_DEVELOPERS.md</code> and <code>docs/ADDON_QUICKSTART.md</code>).</p>
 <hr />
 <h2 id="compatibility-policy-to-document-with-the-first-stable-release">Compatibility policy (to document with the first stable release)<a class="headerlink" href="#compatibility-policy-to-document-with-the-first-stable-release" title="Permanent link">&para;</a></h2>
 <ul>

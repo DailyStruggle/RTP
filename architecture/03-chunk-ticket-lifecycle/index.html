@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/architecture/03-chunk-ticket-lifecycle/">
+      
       
       
       
@@ -3032,9 +3034,9 @@
 <p><strong>Scope of this diagram.</strong> This chart covers the lifecycle of a <em>single</em> chunk ticket (<code>ChunkReservation</code>) — from allocation on behalf of a pending task, through <code>MemoryTracker</code> registration, through release on every exit path (normal, exception, disconnect, plugin disable). This is the <strong>invariant core</strong> that S-002 (no permanently force-loaded chunks) and S-005 (no sync chunk loads) both depend on. Related-but-separate behavior paths are intentionally <strong>out of scope</strong> here:
 - <strong>Who allocates the ticket and why</strong> — see diagram 01 (teleport pipeline <code>ReqTicket</code> stage), diagram 02 (cache generator <code>GenerateLocation</code>), diagram 05 (scan crawler), and diagram 08 (per-attempt chunk resolution). All of them funnel through the state machine shown here.
 - <strong>Platform-specific async chunk-load primitive</strong> — Spigot <code>PaperLib.getChunkAtAsync</code>, Folia <code>RegionizedWorld.getChunkAtAsync</code>, Fabric <code>ServerWorld.getChunkFuture</code> — see <code>rtp-bukkit</code> / <code>rtp-paper</code> / <code>rtp-folia</code> / <code>rtp-fabric</code> world adapters.
-- <strong>Anvil pre-filter</strong> (which <em>avoids</em> needing a ticket at all) — see <code>CODE_TOUR.md</code> §7 nuance on S-005 and ADR-016.</p>
+- <strong>Anvil pre-filter</strong> (which <em>avoids</em> needing a ticket at all) — see <code>CODE_TOUR.md</code> section 7 nuance on S-005 and ADR-016.</p>
 <blockquote>
-<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §4 — Chunk ticket lifecycle</a>.</p>
+<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> section 4 — Chunk ticket lifecycle</a>.</p>
 </blockquote>
 <pre class="mermaid"><code>stateDiagram-v2
     [*] --&gt; ReqTicket : Task Needs Chunk

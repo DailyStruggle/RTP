@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-040-cross-backend-metric-time-series-publication/">
+      
       
         <link rel="prev" href="../ADR-039-rtpadmin-diagnostic-surfaces/">
       
@@ -3507,7 +3509,7 @@ INDEX       (metric_key, window_start_epoch)  -- supports --backend all range sc
 </ul>
 <h2 id="migration-rollout">Migration / Rollout<a class="headerlink" href="#migration-rollout" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Phase 1 (beta.5):</strong> Ship the writer behind <code>metrics.networkTimeSeries.publish</code> (default <code>false</code>). Add <code>metrics.networkTimeSeries.{tier,retentionDays,perPassWriteCap}</code> config keys (defaults: tier = <code>24h@1m</code>, retention = 7 days, cap = 64 rows/pass). Schema bootstrap on first enabled startup. ADR-039's <code>NetworkSnapshotReader</code> extended to range-scan <code>rtp_metric_bucket</code>; <code>MetricChartRenderer</code> draws the <code>(min, max)</code> band when present. Document the new table in <code>MULTI_SERVER_PLAN.md</code> and <code>METRICS_PLAN.md §Phased Roadmap</code>.</li>
+<li><strong>Phase 1 (beta.5):</strong> Ship the writer behind <code>metrics.networkTimeSeries.publish</code> (default <code>false</code>). Add <code>metrics.networkTimeSeries.{tier,retentionDays,perPassWriteCap}</code> config keys (defaults: tier = <code>24h@1m</code>, retention = 7 days, cap = 64 rows/pass). Schema bootstrap on first enabled startup. ADR-039's <code>NetworkSnapshotReader</code> extended to range-scan <code>rtp_metric_bucket</code>; <code>MetricChartRenderer</code> draws the <code>(min, max)</code> band when present. Document the new table in <code>MULTI_SERVER_PLAN.md</code> and <code>METRICS_PLAN.md section Phased Roadmap</code>.</li>
 <li><strong>Phase 2 (post-beta.5):</strong> Optional per-metric publish allowlist (cap shared-store cost when only a subset of metrics is operationally interesting). Optional second published tier (<code>1h@10s</code>) for high-resolution chart pages, gated on shared-store budget.</li>
 <li><strong>Phase 3 (post-network-mode-GA):</strong> Evaluate live push (event-bus or similar) for sub-minute cross-backend visibility; gated on a separate ADR and on ADR-035 relaxing its no-live-update stance.</li>
 </ul>
@@ -3545,7 +3547,7 @@ INDEX       (metric_key, window_start_epoch)  -- supports --backend all range sc
 <li>ADR-039 — <code>/rtpadmin</code> Diagnostic Surfaces</li>
 <li><a href="../../dev/METRICS_PLAN/"><code>docs/dev/METRICS_PLAN.md</code></a></li>
 <li><a href="../../dev/MULTI_SERVER_PLAN/"><code>docs/dev/MULTI_SERVER_PLAN.md</code></a></li>
-<li><a href="../../dev/REQUIREMENTS/"><code>docs/dev/REQUIREMENTS.md §3</code></a> (S-00x prohibitions)</li>
+<li><a href="../../dev/REQUIREMENTS/"><code>docs/dev/REQUIREMENTS.md section 3</code></a> (S-00x prohibitions)</li>
 </ul>
 
 

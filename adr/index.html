@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/">
+      
       
         <link rel="prev" href="../FOR_CONTRIBUTORS/">
       
@@ -3247,7 +3249,7 @@
 <tr>
 <td><a href="ADR-019-claim-plugin-integrations-folded-into-plugin/">ADR-019</a></td>
 <td>Claim-Plugin Integrations Folded Into <code>rtp-plugin</code>; Example Addon Retained</td>
-<td>Accepted</td>
+<td>Superseded by <a href="ADR-069-claim-integrations-extracted-to-bundled-addon/">ADR-069</a></td>
 </tr>
 <tr>
 <td><a href="ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a></td>
@@ -3272,7 +3274,7 @@
 <tr>
 <td><a href="ADR-024-rtp-lite-assembly-variant/">ADR-024</a></td>
 <td>RTP Lite Assembly Variant</td>
-<td>Accepted</td>
+<td>Accepted (amended 2026-08-14)</td>
 </tr>
 <tr>
 <td><a href="ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/">ADR-025</a></td>
@@ -3292,7 +3294,12 @@
 <tr>
 <td><a href="ADR-032-teleport-pipeline-latency-histogram/">ADR-032</a></td>
 <td>Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset</td>
-<td>Proposed</td>
+<td>Proposed (extended by ADR-053)</td>
+</tr>
+<tr>
+<td><a href="ADR-033-neoforge-platform-in-scope/">ADR-033</a></td>
+<td>NeoForge Platform Is In Scope (Per-MC-Version Submodule Layout, Mojmap-at-Runtime)</td>
+<td>Accepted</td>
 </tr>
 <tr>
 <td><a href="ADR-034-memory-shape-catalog/">ADR-034</a></td>
@@ -3301,8 +3308,8 @@
 </tr>
 <tr>
 <td><a href="ADR-035-interactive-menus-book-first/">ADR-035</a></td>
-<td>Interactive Menus via Written Book (Book-First, Chat Fallback)</td>
-<td>Proposed</td>
+<td>Interactive Menus via Written Book (Book-First, Chat Fallback; Optional User GUI via Addon)</td>
+<td>Accepted (token-registry sections superseded by ADR-050)</td>
 </tr>
 <tr>
 <td><a href="ADR-036-network-mode-multi-server-multi-proxy/">ADR-036</a></td>
@@ -3335,14 +3342,29 @@
 <td>Proposed</td>
 </tr>
 <tr>
+<td><a href="ADR-042-yaml-comment-preservation-block-only/">ADR-042</a></td>
+<td>YAML Comment Preservation (Block-Only)</td>
+<td>Proposed</td>
+</tr>
+<tr>
 <td><a href="ADR-043-personal-queue-permission-semantics/">ADR-043</a></td>
 <td><code>rtp.personalqueue</code> Permission Semantics: Bucket-Only Opt-In (supersedes operational details of ADR-007)</td>
 <td>Accepted</td>
 </tr>
 <tr>
+<td><a href="ADR-044-command-tree-menu-reflector/">ADR-044</a></td>
+<td><code>menu-api</code> Module for Generalized Interactive Menus</td>
+<td>Proposed</td>
+</tr>
+<tr>
+<td><a href="ADR-045-rtp-docs-menu-consumer/">ADR-045</a></td>
+<td><code>/rtp docs</code> Menu Consumer (Markdown -&gt; <code>MenuModel</code>, converted at config load)</td>
+<td>Proposed</td>
+</tr>
+<tr>
 <td><a href="ADR-046-maps-api-module/">ADR-046</a></td>
 <td><code>maps-api</code> Module for Runtime Cartography Chart Generation</td>
-<td>Accepted</td>
+<td>Accepted (amended 2026-06-04)</td>
 </tr>
 <tr>
 <td><a href="ADR-047-declarative-chart-composition-bridge/">ADR-047</a></td>
@@ -3360,6 +3382,21 @@
 <td>Accepted</td>
 </tr>
 <tr>
+<td><a href="ADR-050-concrete-menu-commands-supersede-tokens/">ADR-050</a></td>
+<td>Concrete Menu Commands Supersede Token Registries</td>
+<td>Accepted</td>
+</tr>
+<tr>
+<td><a href="ADR-051-two-tier-api-extension-model/">ADR-051</a></td>
+<td>Two-Tier API Extension Model</td>
+<td>Accepted</td>
+</tr>
+<tr>
+<td><a href="ADR-052-outcome-metrics-and-cause-tagged-bad-locations/">ADR-052</a></td>
+<td>Outcome Metrics and Cause-Tagged Bad Locations</td>
+<td>Accepted</td>
+</tr>
+<tr>
 <td><a href="ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a></td>
 <td>Pipeline Latency Percentiles and Slow-Teleport Audit (extends ADR-032; <code>/rtp info</code> readout)</td>
 <td>Accepted</td>
@@ -3370,6 +3407,16 @@
 <td>Accepted</td>
 </tr>
 <tr>
+<td><a href="ADR-055-pvp-combat-gate/">ADR-055</a></td>
+<td>PvP Combat Gate</td>
+<td>Accepted</td>
+</tr>
+<tr>
+<td><a href="ADR-056-bare-rtp-root-action/">ADR-056</a></td>
+<td>Pluggable bare-<code>/rtp</code> root action (enables optional user GUI via example addon)</td>
+<td>Accepted</td>
+</tr>
+<tr>
 <td><a href="ADR-057-platform-agnostic-addon-spi/">ADR-057</a></td>
 <td>Platform-agnostic addon SPI (<code>RTPAddon</code> + <code>AddonRegistry</code> ServiceLoader discovery; replaces Bukkit <code>JavaPlugin</code> addon loading)</td>
 <td>Accepted</td>
@@ -3377,7 +3424,7 @@
 <tr>
 <td><a href="ADR-058-region-specific-schematic-paste/">ADR-058</a></td>
 <td>Region-Specific Schematic (<code>.schem</code>) Paste at the Arrival Location (<code>SchematicPaster</code> SPI + swappable per-adapter getter; load-async/paste-on-region-thread)</td>
-<td>Accepted</td>
+<td>Accepted (amended 2026-05-30)</td>
 </tr>
 <tr>
 <td><a href="ADR-059-relative-ground-distance-safety-predicate/">ADR-059</a></td>
@@ -3407,12 +3454,12 @@
 <tr>
 <td><a href="ADR-064-config-comment-format-summary-line-as-menu-hover/">ADR-064</a></td>
 <td>Config-Comment Format: Summary Line as Menu Hover Text (fixed two-part template — standalone first-line summary + prose + <code>@type</code>/<code>@options</code>/<code>@range</code>/<code>@unit</code>/<code>@default</code>/<code>@source</code> directives; canonical style guide <code>docs/dev/CONFIG_COMMENT_STYLE.md</code>)</td>
-<td>Accepted</td>
+<td>Accepted (amended 2026-08-14)</td>
 </tr>
 <tr>
 <td><a href="ADR-065-world-override-region-and-world-menu/">ADR-065</a></td>
 <td>World-Override Regions and the <code>/rtp</code> World Menu (shared <code>world:&lt;x&gt;</code> override builds a cached <code>&lt;region&gt;_&lt;world&gt;</code> region so <code>rtp world:nether</code> and <code>rtp region:r world:nether</code> actually land in the target world; adds the front-page world picker row)</td>
-<td>Accepted</td>
+<td>Accepted (amended 2026-06-18)</td>
 </tr>
 <tr>
 <td><a href="ADR-066-foreign-config-importer/">ADR-066</a></td>
@@ -3430,6 +3477,11 @@
 <td>Accepted</td>
 </tr>
 <tr>
+<td><a href="ADR-069-claim-integrations-extracted-to-bundled-addon/">ADR-069</a></td>
+<td>Claim Integrations Extracted to Bundled Addon (<code>LeafRTPClaimAddon</code>)</td>
+<td>Accepted (supersedes ADR-019)</td>
+</tr>
+<tr>
 <td><a href="ADR-070-platform-neutral-rtp-command-root/">ADR-070</a></td>
 <td>Platform-neutral <code>/rtp</code> command root (<code>CoreRtpRoot</code>) for Brigadier-bridged platforms (collapses the duplicated Fabric / NeoForge roots into thin subclasses of one rtp-core root; accessor-backed <code>ServerAccessorCommandParameters</code> for <code>player</code>/<code>world</code>; new default <code>RTPServerAccessor.getOnlinePlayerNames()</code> SPI; Bukkit root left bespoke)</td>
 <td>Accepted</td>
@@ -3437,7 +3489,7 @@
 <tr>
 <td><a href="ADR-071-config-organization-and-discoverability/">ADR-071</a></td>
 <td>Config Organization and Discoverability (keep split-by-concern files; virtual Teleport/Safety/Economy/... grouping in menu+docs rather than physical YAML merges; relevance ordering of keys; staged <code>messages.yml</code> plan: section refinement now, planned <code>messages/</code>-directory split later via a merge-loader that keeps the closed <code>MessagesKeys</code> enum + legacy flat-file fallback; read-legacy-warn-prefer-new migration on key moves; first action de-duplicates <code>config.yml</code>'s <code>network.redis</code> against the authoritative <code>network.yml</code>)</td>
-<td>Proposed</td>
+<td>Proposed (top-level directory layout in rule 1 superseded by ADR-076)</td>
 </tr>
 <tr>
 <td><a href="ADR-072-teleport-view-distance-clamp-and-restore/">ADR-072</a></td>
@@ -3447,7 +3499,7 @@
 <tr>
 <td><a href="ADR-073-config-default-inheritance-references/">ADR-073</a></td>
 <td>Config Default Inheritance via <code>@&lt;file&gt;</code> References (region/world settings may resolve to a global default owned by a named file instead of a literal; the <code>@&lt;file&gt;</code> token names the owning file so each default stays in its concern file - <code>price</code> -&gt; <code>@economy</code>, shape/vert/cache caps/<code>spatialResolution</code>/world <code>requirePermission</code> -&gt; <code>@config#defaults</code>; type-bearing <code>shape</code>/<code>vert</code> inherit as whole named blocks, type-free scalars inherit individually; shipped <code>regions</code>/<code>worlds</code> defaults use the reference; read-time fail-safe resolution with warn-on-missing/unknown-file; non-rewriting opt-in migration + version bumps; menu inherit/override toggle; extends ADR-071, builds on the ADR-034 shape catalog)</td>
-<td>Proposed</td>
+<td>Accepted</td>
 </tr>
 <tr>
 <td><a href="ADR-074-operator-facing-throughput-and-cost-metrics/">ADR-074</a></td>

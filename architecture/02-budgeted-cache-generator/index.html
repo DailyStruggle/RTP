@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/architecture/02-budgeted-cache-generator/">
+      
       
       
       
@@ -3032,10 +3034,9 @@
 <p><strong>Scope of this diagram.</strong> This chart covers the <em>background</em> loop that keeps each region's location cache warm: the periodic <code>SelectionAPI.compute()</code> pulse, the region-by-region budget enforcement (<code>queueLen</code> / maxBiasedAttempts), the hand-off to <code>LocationGenerator</code>, and the insertion of successful results into the cache that diagram 01 pops from. Related-but-separate behavior paths are intentionally <strong>out of scope</strong> here:
 - <strong>What happens inside one candidate attempt</strong> — see diagram 08 (location selection per attempt); <code>GenerateLocation</code> in this chart expands into that flowchart.
 - <strong>How a waiting <code>/rtp</code> consumes the cache</strong> — see diagram 01 (<code>QueryCache</code> / <code>QueueWait</code>).
-- <strong>Chunk ticket book-keeping</strong> — see diagram 03; every generated candidate reserves a ticket via <code>ChunkReservation</code>.
-- <strong><code>/rtp scan</code> pre-warm</strong> — see diagram 05; scan is an admin tool that <em>pushes</em> into the same cache but uses a different crawler.</p>
+- <strong>Chunk ticket book-keeping</strong> — see diagram 03; every generated candidate reserves a ticket via <code>ChunkReservation</code>.</p>
 <blockquote>
-<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §3 — Budgeted cache generator</a>.</p>
+<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> section 3 — Budgeted cache generator</a>.</p>
 </blockquote>
 <pre class="mermaid"><code>stateDiagram-v2
     PulseTrigger : selectionAPI.compute() [Async]

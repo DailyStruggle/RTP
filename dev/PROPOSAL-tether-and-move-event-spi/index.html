@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/PROPOSAL-tether-and-move-event-spi/">
+      
       
       
       
@@ -3149,7 +3151,7 @@ platforms. To make confinement work on every platform, RTP must own the mechanis
 <p><strong>Docs / index (this change, already applied):</strong></p>
 <ul>
 <li><code>docs/adr/ADR-075-...md</code>, this proposal, <code>docs/adr/README.md</code> (index + subproject rows),
-  <code>settings.gradle</code>, <code>docs/dev/ROADMAP.md</code>, and wiki synonym notes for "zone".</li>
+  <code>settings.gradle</code>, <code>docs/dev/ROADMAP.md</code>, and the <code>GLOSSARY.md</code> synonym note for "zone".</li>
 </ul>
 <h2 id="3-intended-beforeafter-structure">3. Intended before/after structure<a class="headerlink" href="#3-intended-beforeafter-structure" title="Permanent link">&para;</a></h2>
 <p><strong>Before:</strong> RTP has no move signal. Region confinement is only achievable per-platform (WorldGuard on
@@ -3180,7 +3182,7 @@ confinement.</p>
 <li><a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a> - external hook surface (optional bounds).</li>
 <li><a href="../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/">ADR-054</a> - thread routing reused for pull-back.</li>
 <li><a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/">ADR-002</a> - the database interface tethers persist through.</li>
-<li>S-001..S-005 (REQUIREMENTS.md §3) - pull-back destinations must satisfy all teleport safety rules; no chunk I/O on tick/region threads; no silently dropped enforcement.</li>
+<li>S-001..S-005 (REQUIREMENTS.md section 3) - pull-back destinations must satisfy all teleport safety rules; no chunk I/O on tick/region threads; no silently dropped enforcement.</li>
 </ul>
 <h2 id="5-risks-and-trade-offs">5. Risks and trade-offs<a class="headerlink" href="#5-risks-and-trade-offs" title="Permanent link">&para;</a></h2>
 <ul>

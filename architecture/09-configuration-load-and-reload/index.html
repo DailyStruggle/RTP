@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/architecture/09-configuration-load-and-reload/">
+      
       
       
       
@@ -3067,12 +3069,12 @@
 <p><strong>Scope of this diagram.</strong> This chart covers the <strong>configuration data flow</strong> — how the YAML files under <code>plugins/RTP/</code> become the in-memory <code>ConfigParser</code> / <code>MultiConfigParser</code> objects that every runtime path reads from, and what happens during <code>/rtp reload</code>. This is the single most error-prone surface (most "bug reports" are misread config), so this diagram is the one to open first when a key appears to have no effect. Related-but-separate behavior paths are intentionally <strong>out of scope</strong>:</p>
 <ul>
 <li><strong>Plugin enable ordering</strong> (when <code>reloadAction</code> is first called) — see diagram 06.</li>
-<li><strong>How a runtime task reads a value</strong> (<code>getWorldParserValue</code> vs. direct <code>ConfigParser.getConfigValue</code>) — see diagrams 01 / 08 / 09 and <code>CODE_TOUR.md</code> §11.</li>
-<li><strong>Message routing</strong> (<code>messages.yml</code> keys → player feedback) — see <code>CODE_TOUR.md</code> §7 and ADR-020 (locale resolution lives in <code>LanguageBootstrap</code> + locale-aware <code>ConfigParser</code>).</li>
+<li><strong>How a runtime task reads a value</strong> (<code>getWorldParserValue</code> vs. direct <code>ConfigParser.getConfigValue</code>) — see diagrams 01 / 08 / 09 and <code>CODE_TOUR.md</code> section 11.</li>
+<li><strong>Message routing</strong> (<code>messages.yml</code> keys → player feedback) — see <code>CODE_TOUR.md</code> section 7 and ADR-020 (locale resolution lives in <code>LanguageBootstrap</code> + locale-aware <code>ConfigParser</code>).</li>
 <li><strong>Persistent storage of player/teleport state</strong> (<code>YamlFileDatabase</code>) — see <code>LESSONS_LEARNED.md</code> and diagram 02.</li>
 </ul>
 <blockquote>
-<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §13 — Configuration load and reload</a>.</p>
+<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> section 13 — Configuration load and reload</a>.</p>
 </blockquote>
 <pre class="mermaid"><code>flowchart TD
     %% Color legend: green = live-parser swap (new readers see new values), red = in-flight cancel / region shutdown, blue = disk I/O + async shape selection, yellow = config data / snapshot

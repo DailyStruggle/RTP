@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/RECIPES/">
+      
       
         <link rel="prev" href="../FAQ/">
       
@@ -714,9 +716,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pre-generate-warm-the-map" class="md-nav__link">
+  <a href="#pre-scan-build-spatial-memory-for-a-region" class="md-nav__link">
     <span class="md-ellipsis">
-      Pre-generate / warm the map
+      Pre-scan / build spatial memory for a region
     </span>
   </a>
   
@@ -3232,9 +3234,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pre-generate-warm-the-map" class="md-nav__link">
+  <a href="#pre-scan-build-spatial-memory-for-a-region" class="md-nav__link">
     <span class="md-ellipsis">
-      Pre-generate / warm the map
+      Pre-scan / build spatial memory for a region
     </span>
   </a>
   
@@ -3425,9 +3427,9 @@
 <span class="nt">balanceFloor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span><span class="w">     </span><span class="c1"># don&#39;t let players go into debt</span>
 </code></pre></div>
 <hr />
-<h2 id="pre-generate-warm-the-map">Pre-generate / warm the map<a class="headerlink" href="#pre-generate-warm-the-map" title="Permanent link">&para;</a></h2>
-<p><strong>What you want:</strong> make sure <code>/rtp</code> always has somewhere fast and safe to land, even for the very first players.</p>
-<p><strong>The LeafRTP way:</strong> <code>/rtp scan</code>. LeafRTP does not pre-generate the whole world; it pre-<strong>verifies</strong> candidates off the main thread and <strong>remembers</strong> which sectors are unsafe (persistent spatial memory), so the selector learns to avoid loading bad ground at all. The longer a region runs, the faster and more reliable its teleports get.</p>
+<h2 id="pre-scan-build-spatial-memory-for-a-region">Pre-scan / build spatial memory for a region<a class="headerlink" href="#pre-scan-build-spatial-memory-for-a-region" title="Permanent link">&para;</a></h2>
+<p><strong>What you want:</strong> help the selection algorithm avoid loading invalid terrain (oceans, blacklisted biomes, unsafe vertical drops).</p>
+<p><strong>The LeafRTP way:</strong> <code>/rtp scan</code>. LeafRTP pre-<strong>verifies</strong> candidate locations off the main thread and <strong>remembers</strong> which sectors are unsafe (persistent spatial memory), so the selector learns to avoid loading bad ground at all. The longer a region runs, the faster and more reliable its teleports get.</p>
 <p>The recommended bring-up sequence for a new region is:</p>
 <ol>
 <li><strong>Install</strong> LeafRTP and start the server once so it generates its config tree.</li>

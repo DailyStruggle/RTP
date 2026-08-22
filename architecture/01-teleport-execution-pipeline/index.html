@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/architecture/01-teleport-execution-pipeline/">
+      
       
       
       
@@ -3034,9 +3036,9 @@
 - <strong>How the cache was filled</strong> — see diagram 02 (budgeted cache generator); <code>QueueWait</code> simply pops a result prepared by that loop.
 - <strong>How chunk tickets are actually issued and released</strong> — see diagram 03 (chunk ticket lifecycle); <code>ReqTicket</code> and <code>Teardown</code> are abstractions over it.
 - <strong>Region / world resolution</strong> — see diagram 07 (<code>/rtp</code> command region selection); this chart starts after a region has been chosen.
-- <strong>Failure attribution and user-facing messages</strong> — see <code>CODE_TOUR.md</code> §7 and S-004 / S-007.</p>
+- <strong>Failure attribution and user-facing messages</strong> — see <code>CODE_TOUR.md</code> section 7 and S-004 / S-007.</p>
 <blockquote>
-<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §2 — Teleport pipeline (end-to-end)</a>.</p>
+<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> section 2 — Teleport pipeline (end-to-end)</a>.</p>
 </blockquote>
 <pre class="mermaid"><code>stateDiagram-v2
     CmdTrigger : Player executes /rtp

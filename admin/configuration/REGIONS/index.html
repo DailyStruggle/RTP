@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/">
+      
       
         <link rel="prev" href="../CORE_CONFIG/">
       
@@ -934,6 +936,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#top-level-settings" class="md-nav__link">
     <span class="md-ellipsis">
       Top-Level Settings
@@ -951,6 +962,30 @@
   
     <nav class="md-nav" aria-label="shape Section">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#region-size-radius-and-centerradius" class="md-nav__link">
+    <span class="md-ellipsis">
+      Region Size: radius and centerRadius
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Region Size: radius and centerRadius">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-to-set-the-radius" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where to set the radius
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#common-shape-keys" class="md-nav__link">
@@ -3262,6 +3297,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#top-level-settings" class="md-nav__link">
     <span class="md-ellipsis">
       Top-Level Settings
@@ -3279,6 +3323,30 @@
   
     <nav class="md-nav" aria-label="shape Section">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#region-size-radius-and-centerradius" class="md-nav__link">
+    <span class="md-ellipsis">
+      Region Size: radius and centerRadius
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Region Size: radius and centerRadius">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-to-set-the-radius" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where to set the radius
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#common-shape-keys" class="md-nav__link">
@@ -3472,7 +3540,18 @@
 
 
 <h1 id="region-configuration-reference-regionsyml">Region Configuration Reference (<code>regions/*.yml</code>)<a class="headerlink" href="#region-configuration-reference-regionsyml" title="Permanent link">&para;</a></h1>
-<p>This document provides a detailed reference for all configuration options available in a region file (e.g., <code>plugins/RTP/regions/default.yml</code>).</p>
+<p>A <strong>region</strong> is a named, reusable teleport destination: a target world plus the geometry players are placed in (<code>shape</code>), the vertical window (<code>vert</code>), safety and biome overrides, caching, and price. It is the unit RTP pre-generates locations for, and it is where teleport distance lives - see <a href="#region-size-radius-and-centerradius">Region Size: <code>radius</code> and <code>centerRadius</code></a>.</p>
+<p>Regions are a separate concept from worlds on purpose. A <a href="../WORLDS/">world file</a> carries no geometry of its own; it only names the region that answers <code>/rtp</code> there. So one region can serve many worlds, one world can be served by many regions (permission tiers, or an explicit <code>region=&lt;name&gt;</code> on the command), and a region can send players into a world other than the one they ran the command in.</p>
+<p>This document provides a detailed reference for all configuration options available in a region file (e.g., <code>plugins/RTP/definitions/regions/default.yml</code>).</p>
+<hr />
+<h2 id="updating-settings">Updating Settings<a class="headerlink" href="#updating-settings" title="Permanent link">&para;</a></h2>
+<p>You can create and update regions through:
+1. <strong>In-game admin menu</strong>: Run <code>/rtp admin</code> or <code>/rtp menu</code> -&gt; click <strong>Regions</strong>.
+2. <strong>Command line</strong>: Use <code>/rtp config region &lt;name&gt; &lt;key&gt;=&lt;value&gt;</code> (e.g. <code>/rtp config region default shape.radius=625</code>).
+3. <strong>Direct editing</strong>: Edit <code>definitions/regions/&lt;name&gt;.yml</code> on disk and run <code>/rtp reload</code>.</p>
+<blockquote>
+<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full menu and command navigation details.</p>
+</blockquote>
 <hr />
 <h2 id="top-level-settings">Top-Level Settings<a class="headerlink" href="#top-level-settings" title="Permanent link">&para;</a></h2>
 <table>
@@ -3495,7 +3574,7 @@
 <td><code>worldBorderOverride</code></td>
 <td>Boolean</td>
 <td><code>false</code></td>
-<td>If true, the region radius is automatically set to match the vanilla world border.</td>
+<td>If true, the <code>shape</code> block is replaced by a square matching the world's vanilla <code>/worldborder</code>, and the configured <code>radius</code> / <code>centerRadius</code> / <code>centerX</code> / <code>centerZ</code> are ignored. See <a href="#region-size-radius-and-centerradius">Region Size</a>.</td>
 </tr>
 <tr>
 <td><code>requirePermission</code></td>
@@ -3554,7 +3633,7 @@
 <tr>
 <td><code>version</code></td>
 <td>String</td>
-<td><code>"1.0"</code></td>
+<td><code>"1.1"</code></td>
 <td>Internal config version. <strong>Do not modify.</strong></td>
 </tr>
 </tbody>
@@ -3566,6 +3645,100 @@
 <hr />
 <h2 id="shape-section"><code>shape</code> Section<a class="headerlink" href="#shape-section" title="Permanent link">&para;</a></h2>
 <p>The <code>shape</code> block defines the horizontal area where players can land.</p>
+<h3 id="region-size-radius-and-centerradius">Region Size: <code>radius</code> and <code>centerRadius</code><a class="headerlink" href="#region-size-radius-and-centerradius" title="Permanent link">&para;</a></h3>
+<p><strong>Every distance in the <code>shape</code> block is measured in chunks, not blocks.</strong> A chunk is 16x16 blocks, so multiply by 16 to get blocks. This is the single most common configuration mistake: <code>radius: 5000</code> is not a 5,000-block region, it is an 80,000-block one.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+<th>In blocks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>radius</code></td>
+<td><strong>Outer</strong> bound. Players never land farther than this from the center.</td>
+<td><code>radius x 16</code></td>
+</tr>
+<tr>
+<td><code>centerRadius</code></td>
+<td><strong>Inner</strong> bound (the donut hole). Players never land closer than this to the center. <code>0</code> means the center itself is fair game.</td>
+<td><code>centerRadius x 16</code></td>
+</tr>
+<tr>
+<td><code>centerX</code> / <code>centerZ</code></td>
+<td>Center of the region, in chunk coordinates. <code>0, 0</code> is the chunk containing blocks <code>0..15</code>.</td>
+<td><code>centerX x 16</code></td>
+</tr>
+</tbody>
+</table>
+<p>Handy conversions:</p>
+<table>
+<thead>
+<tr>
+<th><code>radius</code> (chunks)</th>
+<th>Max distance from center (blocks)</th>
+<th>Widest span, edge to edge (blocks)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>64</code></td>
+<td>1,024</td>
+<td>2,048</td>
+</tr>
+<tr>
+<td><code>256</code> (default)</td>
+<td>4,096</td>
+<td>8,192</td>
+</tr>
+<tr>
+<td><code>625</code></td>
+<td>10,000</td>
+<td>20,000</td>
+</tr>
+<tr>
+<td><code>1875</code></td>
+<td>30,000</td>
+<td>60,000</td>
+</tr>
+<tr>
+<td><code>3750</code></td>
+<td>60,000</td>
+<td>120,000</td>
+</tr>
+</tbody>
+</table>
+<p>Rules and gotchas:</p>
+<ul>
+<li><code>centerRadius</code> must be <strong>smaller</strong> than <code>radius</code>. If the two are equal, or <code>centerRadius</code> is larger, there is no band left to pick from and the region cannot produce locations.</li>
+<li>The pickable band is <code>radius - centerRadius</code> chunks wide. Raising <code>centerRadius</code> to push players away from spawn without raising <code>radius</code> shrinks the usable land, so raise both together.</li>
+<li>Total selectable area is roughly <code>pi x (radius^2 - centerRadius^2)</code> chunks for <code>CIRCLE</code>, and <code>(2 x radius)^2 - (2 x centerRadius)^2</code> chunks for <code>SQUARE</code>.</li>
+<li>Radius is <strong>not</strong> clamped to the vanilla world border unless you ask for it. A <code>radius</code> that reaches past the border wastes selection attempts on unreachable land; either shrink it or set <code>worldBorderOverride: true</code>.</li>
+<li><code>worldBorderOverride: true</code> <strong>replaces the whole <code>shape</code> block</strong> with a square derived from the world's <code>/worldborder</code> (chunk radius = border size / 32). Your <code>radius</code>, <code>centerRadius</code>, <code>centerX</code>, and <code>centerZ</code> are ignored while it is on.</li>
+<li>Large radii cost pre-calculation time, not memory: see <em>Massive Radii</em> under <a href="#tips-for-customization">Tips for Customization</a> and the <em>Backlog Cache (L3)</em> section below.</li>
+</ul>
+<h4 id="where-to-set-the-radius">Where to set the radius<a class="headerlink" href="#where-to-set-the-radius" title="Permanent link">&para;</a></h4>
+<p>Four places, in increasing precedence:</p>
+<ol>
+<li><strong>Shared default</strong> - <code>defaults.shape.radius</code> in <code>config.yml</code>. Applies to every region whose <code>shape</code> key is the literal <code>"@config"</code>. This is the right place on a single-world server: set it once.</li>
+<li><strong>Per region</strong> - replace <code>shape: "@config"</code> in <code>regions/&lt;name&gt;.yml</code> with an inline block. An inline block wins over the shared default and must be complete (copy the <code>defaults.shape</code> block from <code>config.yml</code> and edit it).
+   <div class="highlight"><pre><span></span><code><span class="nt">shape</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;CIRCLE&quot;</span>
+<span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ACCUMULATE&quot;</span>
+<span class="w">  </span><span class="nt">radius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">625</span><span class="w">          </span><span class="c1"># 10,000 blocks from the center</span>
+<span class="w">  </span><span class="nt">centerRadius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span><span class="w">     </span><span class="c1"># keep players 1,024+ blocks away from the center</span>
+<span class="w">  </span><span class="nt">centerX</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">  </span><span class="nt">centerZ</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">  </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+<span class="w">  </span><span class="nt">uniquePlacements</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">  </span><span class="nt">expand</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div></li>
+<li><strong>Persistent edit from in-game</strong> - <code>/rtp config regions &lt;region&gt; shape.radius=625</code> writes the value to the region file. Add <code>--dry-run</code> to preview it first.</li>
+<li><strong>One-off teleport</strong> - <code>/rtp region=default shape=SQUARE radius=256</code> applies to that teleport only and changes nothing on disk.</li>
+</ol>
+<p>Changing a radius invalidates cached locations for that region, so the first few <code>/rtp</code> calls afterwards may be slower while the cache refills.</p>
 <h3 id="common-shape-keys">Common Shape Keys<a class="headerlink" href="#common-shape-keys" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>name</code>: The shape engine to use.</li>
@@ -3580,20 +3753,19 @@
 <h3 id="shape-engines-and-parameters">Shape Engines and Parameters<a class="headerlink" href="#shape-engines-and-parameters" title="Permanent link">&para;</a></h3>
 <h4 id="circle-square"><code>CIRCLE</code> / <code>SQUARE</code><a class="headerlink" href="#circle-square" title="Permanent link">&para;</a></h4>
 <p>Standard shapes with uniform or weighted distribution.
-- <code>radius</code>: Outer radius in <strong>chunks</strong>.
-- <code>centerRadius</code>: Inner radius (donut hole) in <strong>chunks</strong>.
-- <code>weight</code>: <code>&gt; 1.0</code> pulls landings toward center; <code>&lt; 1.0</code> pushes toward edges.
+- <code>radius</code>: Outer radius in <strong>chunks</strong>. For <code>CIRCLE</code> it is the disk radius; for <code>SQUARE</code> it is the half-extent, so the square spans <code>2 x radius</code> chunks per side.
+- <code>centerRadius</code>: Inner radius (donut hole) in <strong>chunks</strong>. Must be less than <code>radius</code>. <code>CIRCLE</code> becomes a ring, <code>SQUARE</code> becomes a square frame.
+- <code>weight</code>: <code>&gt; 1.0</code> pulls landings toward center; <code>&lt; 1.0</code> pushes toward edges. Applies within the <code>centerRadius</code>-to-<code>radius</code> band; it does not move the bounds themselves.
 - <code>expand</code>: If true, radius grows as locations are used.</p>
 <h4 id="circle_normal-square_normal"><code>CIRCLE_NORMAL</code> / <code>SQUARE_NORMAL</code><a class="headerlink" href="#circle_normal-square_normal" title="Permanent link">&para;</a></h4>
 <p>Gaussian distribution variants.
-- <code>radius</code> / <code>centerRadius</code>: Same as above.
-- <code>mean</code>: Center of the bell curve (0.0 center, 1.0 edge).
-- <code>deviation</code>: Spread of the bell curve.</p>
+- <code>radius</code> / <code>centerRadius</code>: Same as above - still chunks, still the hard outer and inner bounds.
+- <code>mean</code>: Center of the bell curve, expressed as a fraction of the band (0.0 = at <code>centerRadius</code>, 1.0 = at <code>radius</code>).
+- <code>deviation</code>: Spread of the bell curve. Smaller = tighter clustering around <code>mean</code>.</p>
 <h4 id="rectangle"><code>RECTANGLE</code><a class="headerlink" href="#rectangle" title="Permanent link">&para;</a></h4>
-<ul>
-<li><code>width</code> / <code>height</code>: Half-extents in <strong>chunks</strong> (X and Z axis).</li>
-<li><code>rotation</code>: Rotation in degrees around the center.</li>
-</ul>
+<p>Uses explicit side lengths instead of a radius.
+- <code>width</code> / <code>height</code>: Full X-axis and Z-axis extent in <strong>chunks</strong>, centred on <code>centerX</code> / <code>centerZ</code> (so <code>width: 256</code> reaches 128 chunks / 2,048 blocks either side). There is no <code>centerRadius</code> hole for this shape.
+- <code>rotation</code>: Rotation in degrees around the center.</p>
 <hr />
 <h2 id="vert-section"><code>vert</code> Section<a class="headerlink" href="#vert-section" title="Permanent link">&para;</a></h2>
 <p>The <code>vert</code> block controls the Y-coordinate (height) selection.</p>
@@ -3646,7 +3818,7 @@
 <ol>
 <li><strong>Nether Support</strong>: Use <code>vert: LINEAR</code> with <code>direction: 0</code> (bottom-up), <code>maxY: 120</code>, and <code>requireSkyLight: false</code> to land on the nether floor rather than the roof. Avoid <code>vert: JUMP</code> here: its coarse <code>step</code> (default <code>16</code>) skips over the thin one- and two-block-thick platforms that are common in the Nether, so it frequently fails to find otherwise-valid footing. <code>LINEAR</code> scans every Y level and reliably catches those thin platforms.</li>
 <li><strong>Cave Teleports</strong>: Use <code>vert: LINEAR</code> with <code>direction: 0</code> (bottom-up) and a low <code>maxY</code> to favor underground locations.</li>
-<li><strong>Massive Radii</strong>: If your radius is &gt; 50,000 blocks, use <code>mode: NONE</code> to avoid long pre-calculation times on startup.</li>
+<li><strong>Massive Radii</strong>: If your radius is &gt; 50,000 blocks (roughly 3,125 chunks), use <code>mode: NONE</code> to avoid long pre-calculation times on startup.</li>
 <li><strong>Skyblock / Mid-Air Drops</strong>: Use <code>vert: FIXED</code> with <code>y: 128</code> and a platform tool enabled. The platform spawns under the player so they don't fall through the void.</li>
 </ol>
 

@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/SAFETY/">
+      
       
         <link rel="prev" href="../SCHEMATICS/">
       
@@ -997,6 +999,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#landing-protection" class="md-nav__link">
     <span class="md-ellipsis">
       Landing Protection
@@ -1015,13 +1026,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#block-filters-token-grammar" class="md-nav__link">
+  <a href="#pvp-combat-checks" class="md-nav__link">
     <span class="md-ellipsis">
-      Block Filters &amp; Token Grammar
+      PvP / Combat Checks
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Block Filters & Token Grammar">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#block-filters-advancedblocksyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Block Filters (advanced/blocks.yml)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Block Filters (advanced/blocks.yml)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1072,9 +1092,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#biome-filter" class="md-nav__link">
+  <a href="#biome-filters-advancedbiomesyml" class="md-nav__link">
     <span class="md-ellipsis">
-      Biome Filter
+      Biome Filters (advanced/biomes.yml)
     </span>
   </a>
   
@@ -3163,6 +3183,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#landing-protection" class="md-nav__link">
     <span class="md-ellipsis">
       Landing Protection
@@ -3181,13 +3210,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#block-filters-token-grammar" class="md-nav__link">
+  <a href="#pvp-combat-checks" class="md-nav__link">
     <span class="md-ellipsis">
-      Block Filters &amp; Token Grammar
+      PvP / Combat Checks
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Block Filters & Token Grammar">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#block-filters-advancedblocksyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Block Filters (advanced/blocks.yml)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Block Filters (advanced/blocks.yml)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3238,9 +3276,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#biome-filter" class="md-nav__link">
+  <a href="#biome-filters-advancedbiomesyml" class="md-nav__link">
     <span class="md-ellipsis">
-      Biome Filter
+      Biome Filters (advanced/biomes.yml)
     </span>
   </a>
   
@@ -3275,6 +3313,15 @@
 
 <h1 id="safety-configuration-reference-safetyyml">Safety Configuration Reference (<code>safety.yml</code>)<a class="headerlink" href="#safety-configuration-reference-safetyyml" title="Permanent link">&para;</a></h1>
 <p>This document provides a detailed reference for all configuration options available in <code>plugins/RTP/safety.yml</code>.</p>
+<hr />
+<h2 id="updating-settings">Updating Settings<a class="headerlink" href="#updating-settings" title="Permanent link">&para;</a></h2>
+<p>You can update safety settings through:
+1. <strong>In-game admin menu</strong>: Run <code>/rtp admin</code> or <code>/rtp menu</code> -&gt; click <strong>Safety</strong>.
+2. <strong>Command line</strong>: Use <code>/rtp config safety &lt;key&gt;=&lt;value&gt;</code> (e.g. <code>/rtp config safety invulnerabilityTime=10</code>).
+3. <strong>Direct editing</strong>: Edit <code>safety.yml</code> on disk and run <code>/rtp reload</code>.</p>
+<blockquote>
+<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full menu and command navigation details.</p>
+</blockquote>
 <hr />
 <h2 id="landing-protection">Landing Protection<a class="headerlink" href="#landing-protection" title="Permanent link">&para;</a></h2>
 <table>
@@ -3361,7 +3408,59 @@
 <p><strong>Note on <code>platformRestoreSeconds</code>.</strong> Restoration writes the captured original blocks back; every restore (and any failure) is logged, never silently dropped. Available on the Bukkit/Spigot/Paper and Folia platforms; the Fabric platform does not build emergency platforms, so the timeout has no effect there. Because the platform is only ever built on land the safety pipeline already cleared of claims, the footprint starts in unclaimed terrain; if you expect players to build on top of the temporary platform before it expires, leave restoration disabled (<code>-1</code>).</p>
 </blockquote>
 <hr />
-<h2 id="block-filters-token-grammar">Block Filters &amp; Token Grammar<a class="headerlink" href="#block-filters-token-grammar" title="Permanent link">&para;</a></h2>
+<h2 id="pvp-combat-checks">PvP / Combat Checks<a class="headerlink" href="#pvp-combat-checks" title="Permanent link">&para;</a></h2>
+<p>Configure whether players can teleport while in combat.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pvpCheckEnabled</code></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>When <code>true</code>, checks if a player is in combat before teleporting.</td>
+</tr>
+<tr>
+<td><code>pvpCombatTagSeconds</code></td>
+<td>Integer</td>
+<td><code>15</code></td>
+<td>Duration (seconds) a player remains in combat after a PvP hit (built-in tracker).</td>
+</tr>
+<tr>
+<td><code>pvpOnCombat</code></td>
+<td>Enum</td>
+<td><code>"DENY"</code></td>
+<td>Action taken when a player in combat attempts <code>/rtp</code>. Options: <code>ALLOW</code>, <code>DENY</code>, <code>DELAY</code>, <code>CANCEL</code>.</td>
+</tr>
+<tr>
+<td><code>pvpSource</code></td>
+<td>Enum</td>
+<td><code>"AUTO"</code></td>
+<td>Source for combat state. Options: <code>AUTO</code> (external plugin if present, else native), <code>NATIVE</code> (built-in tracker only), <code>EXTERNAL</code> (plugin hook only).</td>
+</tr>
+<tr>
+<td><code>pvpTagVictim</code></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Built-in tracker: tag the player taking damage.</td>
+</tr>
+<tr>
+<td><code>pvpTagAggressor</code></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Built-in tracker: tag the attacking player.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="block-filters-advancedblocksyml">Block Filters (<code>advanced/blocks.yml</code>)<a class="headerlink" href="#block-filters-advancedblocksyml" title="Permanent link">&para;</a></h2>
+<p>Block filter settings are configured in <a href="../CONFIGURATION/#blocks-advancedblocksyml"><code>advanced/blocks.yml</code></a>.</p>
 <p>The <code>airBlocks</code> and <code>unsafeBlocks</code> lists use a specific grammar to match blocks and properties.</p>
 <blockquote>
 <p><strong>Edition note (Pro only).</strong> The plain-material rows below work in every edition, but the <strong>block-tag and block-state-predicate grammar</strong> (<code>#namespace:tag</code>, <code>MATERIAL[...]</code>, <code>*[...]</code>, including the numeric range predicates) ships only in the full (Pro) edition. The <strong>rtp-lite</strong> build parses <code>unsafeBlocks</code> / <code>airBlocks</code> as a <strong>flat material allow/deny list</strong> and does not honour any <code>#tag</code> token or <code>[...]</code> predicate. See the bundled lite docs (<code>SAFETY.md</code> inside the lite jar) for the lite-only surface.</p>
@@ -3389,7 +3488,8 @@
 <p>Materials the plugin will reject as a landing target.
 - Includes: <code>LAVA</code>, <code>WATER</code>, <code>*[waterlogged=true]</code>, <code>MAGMA_BLOCK</code>, <code>CACTUS</code>, <code>#minecraft:logs</code> (to prevent landing on top of trees), etc.</p>
 <hr />
-<h2 id="biome-filter">Biome Filter<a class="headerlink" href="#biome-filter" title="Permanent link">&para;</a></h2>
+<h2 id="biome-filters-advancedbiomesyml">Biome Filters (<code>advanced/biomes.yml</code>)<a class="headerlink" href="#biome-filters-advancedbiomesyml" title="Permanent link">&para;</a></h2>
+<p>Biome whitelist/blacklist settings are configured in <a href="../CONFIGURATION/#biomes-advancedbiomesyml"><code>advanced/biomes.yml</code></a>.</p>
 <table>
 <thead>
 <tr>
@@ -3405,6 +3505,12 @@
 <td>Boolean</td>
 <td><code>false</code></td>
 <td>If <code>true</code>, the <code>biomes</code> list is a <strong>whitelist</strong>. If <code>false</code>, it is a <strong>blacklist</strong>.</td>
+</tr>
+<tr>
+<td><code>biomeWeighted</code></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>If <code>true</code>, enables weighted biome selection.</td>
 </tr>
 <tr>
 <td><code>biomes</code></td>

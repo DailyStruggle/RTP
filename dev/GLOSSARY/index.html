@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/GLOSSARY/">
+      
       
       
       
@@ -3229,7 +3231,7 @@
 <p>This glossary defines domain-specific terms used throughout the RTP codebase and documentation. Any contributor or addon developer should be able to read the requirements, architecture, and design documents using only this reference — without needing to read source code first.</p>
 <hr />
 <h2 id="audience-roles-personas">👤 Audience Roles / Personas<a class="headerlink" href="#audience-roles-personas" title="Permanent link">&para;</a></h2>
-<p>RTP documentation is written for several distinct audiences. Because these words are used loosely in everyday speech, this section fixes their <strong>RTP-specific</strong> meaning so requirements, ADRs, wiki pages, and <code>messages.yml</code> copy can address the right reader unambiguously. A single human can wear more than one hat (a solo server owner is often operator, administrator, and player at once), but the roles describe <em>responsibilities</em>, not people.</p>
+<p>RTP documentation is written for several distinct audiences. Because these words are used loosely in everyday speech, this section fixes their <strong>RTP-specific</strong> meaning so requirements, ADRs, operator docs, and <code>messages.yml</code> copy can address the right reader unambiguously. A single human can wear more than one hat (a solo server owner is often operator, administrator, and player at once), but the roles describe <em>responsibilities</em>, not people.</p>
 <table>
 <thead>
 <tr>
@@ -3244,7 +3246,7 @@
 </tr>
 <tr>
 <td><strong>Operator</strong></td>
-<td>The person who installs, configures, and runs the RTP plugin on a live server: edits <code>config.yml</code> / <code>regions.yml</code> / <code>messages.yml</code>, tunes queue depth and safety lists, and reads the wiki and in-game admin messages. Does not write Java. The default audience for shipped config comments and <code>messages.yml</code> values (see <em>Locale Parity Maintenance</em> in <code>.junie/AGENTS.md</code>). Also called <em>server owner</em> or <em>admin</em> informally, but prefer <em>operator</em> for the config/runtime role.</td>
+<td>The person who installs, configures, and runs the RTP plugin on a live server: edits <code>config.yml</code> / <code>regions.yml</code> / <code>messages.yml</code>, tunes queue depth and safety lists, and reads the operator docs (<code>docs/admin/</code>, bundled in the jar under <code>plugins/RTP/docs/</code>) and in-game admin messages. Does not write Java. The default audience for shipped config comments and <code>messages.yml</code> values (see <em>Locale Parity Maintenance</em> in <code>.junie/AGENTS.md</code>). Also called <em>server owner</em> or <em>admin</em> informally, but prefer <em>operator</em> for the config/runtime role.</td>
 </tr>
 <tr>
 <td><strong>Administrator</strong></td>

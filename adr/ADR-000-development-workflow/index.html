@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-000-development-workflow/">
+      
       
         <link rel="prev" href="../">
       
@@ -3448,7 +3450,7 @@
 <h3 id="6-divergence-handling">6. Divergence handling<a class="headerlink" href="#6-divergence-handling" title="Permanent link">&para;</a></h3>
 <p>When code and an ADR are found to disagree, priority is chosen case by case: the divergence reveals information about both, and examining it may show the code needs updated architecture rather than the ADR being right by default. That in-the-moment decision process has produced more value than predetermined architecture. Findings worth keeping flow to a superseding/amending ADR, a requirement refinement, or a dated <code>LESSONS_LEARNED.md</code> entry, at the maintainer's judgment. Incidental discoveries made mid-change are recorded rather than chased (<code>POTENTIAL_BUGS.md</code>), keeping each change traceable to a single driving need. Drift is also caught mechanically: <code>TRACEABILITY.md</code> updates on symbol renames and the automated backstops above.</p>
 <h3 id="7-communication-surfaces">7. Communication surfaces<a class="headerlink" href="#7-communication-surfaces" title="Permanent link">&para;</a></h3>
-<p>Completed work is reflected outward at registers appropriate to each audience (Rule D-004): <code>CHANGELOG.md</code> (net delta against the last released tag, Pro-only entries tagged), wiki and <code>docs/admin/</code> operator docs, locale parity for every user-facing string (the English baseline mirrored into every shipped locale in the same change), and maintainer-voice prose for listings and front pages. These surfaces are downstream of the record layer - they describe what shipped, they do not decide anything.</p>
+<p>Completed work is reflected outward at registers appropriate to each audience (Rule D-004): <code>CHANGELOG.md</code> (net delta against the last released tag, Pro-only entries tagged), the <code>docs/admin/</code> operator docs and the documentation site generated from <code>docs/</code>, locale parity for every user-facing string (the English baseline mirrored into every shipped locale in the same change), and maintainer-voice prose for listings and front pages. These surfaces are downstream of the record layer - they describe what shipped, they do not decide anything.</p>
 <h3 id="8-self-maintenance">8. Self-maintenance<a class="headerlink" href="#8-self-maintenance" title="Permanent link">&para;</a></h3>
 <p>The doc system maintains itself through the Self-Updating Protocol in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>: every durable discovery has a designated destination (environment fixes, engineering pitfalls, glossary terms, aliases, plan-status updates, traceability rows, new ADRs), so knowledge lands where the next reader will look for it instead of decaying in chat history or memory.</p>
 <h3 id="constraints-applied-to-the-workflow">Constraints applied to the workflow<a class="headerlink" href="#constraints-applied-to-the-workflow" title="Permanent link">&para;</a></h3>

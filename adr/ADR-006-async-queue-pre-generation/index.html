@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-006-async-queue-pre-generation/">
+      
       
         <link rel="prev" href="../ADR-005-paperlib-removal/">
       
@@ -3173,13 +3175,13 @@
 <h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
 <p>Maintain a standing pre-generation queue (<code>RegionQueueManager</code>) replenished by a <strong>periodic rotating background task</strong>.</p>
 <p>The replenishment task is scheduled on a fixed cadence rather than triggered reactively. This distributes validation work evenly across server ticks, giving the server predictable recovery periods between replenishment cycles — analogous to real-time scheduling, where a bounded time slice is granted periodically and work does not accumulate into uncontrolled bursts.</p>
-<p>Pre-filling the queue via <code>/rtp scan</code> further guards against runtime chunk-loading costs: when a region has been pre-filled into the spatial memory database (<code>MemoryShape</code>), background replenishment can skip the most expensive step (loading and ticking unknown chunks) entirely, because safe sectors are already known.</p>
+<p>Persistent spatial memory (<code>MemoryShape</code>) further guards against runtime chunk-loading costs: as unsafe sectors are recorded, background replenishment skips known-bad ground without loading or ticking candidate chunks repeatedly.</p>
 <h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Positive:</strong></li>
 <li>Teleport execution is O(1) (queue dequeue) from the player's perspective — no blocking on the main thread.</li>
 <li>Server CPU load from location validation is spread evenly over time with deterministic per-cycle cost, analogous to real-time scheduling.</li>
-<li>Pre-filling via <code>/rtp scan</code> eliminates runtime chunk-loading costs, making replenishment nearly free for well-seeded regions.</li>
+<li>Persistent spatial memory minimizes unnecessary chunk-loading costs during background replenishment.</li>
 <li>
 <p>The queue depth and replenishment rate are configurable, allowing operators to tune memory usage against responsiveness.</p>
 </li>
@@ -3187,13 +3189,13 @@
 <p><strong>Negative / Trade-offs:</strong></p>
 </li>
 <li>The standing queue consumes memory proportional to its configured depth and the number of active regions.</li>
-<li>There is a brief cold-start period after server startup (or after <code>/rtp scan reset</code>) during which the queue may be empty and teleports shall wait.</li>
+<li>There is a brief cold-start period after server startup during which the queue may be empty and teleports shall wait.</li>
 <li>Over-provisioning the queue depth wastes chunk ticket allocations; operators shall tune depth to their expected concurrent player count.</li>
 </ul>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Implementing classes: <code>RegionQueueManager</code>, <code>TeleportPipelineTask</code> (<code>rtp-core</code>)</li>
-<li>Design reference: <a href="../../dev/DESIGN/"><code>DESIGN.md</code> §1 — Asynchronous Queue-Based Pre-Generation</a></li>
+<li>Design reference: <a href="../../dev/DESIGN/"><code>DESIGN.md</code> section 1 — Asynchronous Queue-Based Pre-Generation</a></li>
 <li>Related: <a href="../ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a> (bounded spatial selection), <a href="../ADR-008-memory-tracker-active-gc/">ADR-008</a> (chunk allocation management)</li>
 <li>Requirements: <code>REQ-RTP-F-001</code> (instant execution), <code>REQ-RTP-NF-001</code> (bounded computation overhead)</li>
 </ul>

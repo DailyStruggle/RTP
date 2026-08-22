@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/METRICS_PLAN/">
+      
       
       
       
@@ -3660,7 +3662,7 @@
 <tr>
 <td><code>slowPipelineCount</code></td>
 <td>long</td>
-<td>Cumulative count (since process start) of <strong>immediate/unqueued</strong> <code>TeleportPipelineTask</code> completions whose latency exceeded <code>slowPipelineThresholdMs</code>. Queued (at-rate) teleports are excluded because their elapsed window includes queue-wait time and would false-positive (see ADR-053 §2a). Incremented once per task at the existing single-shot <code>runCleanup</code> recorder site, alongside a <code>WARN</code> log. <code>0</code> when the audit is disabled. See <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> and REQ-RTP-OBS-005.</td>
+<td>Cumulative count (since process start) of <strong>immediate/unqueued</strong> <code>TeleportPipelineTask</code> completions whose latency exceeded <code>slowPipelineThresholdMs</code>. Queued (at-rate) teleports are excluded because their elapsed window includes queue-wait time and would false-positive (see ADR-053 section 2a). Incremented once per task at the existing single-shot <code>runCleanup</code> recorder site, alongside a <code>WARN</code> log. <code>0</code> when the audit is disabled. See <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> and REQ-RTP-OBS-005.</td>
 </tr>
 <tr>
 <td><code>slowPipelineThresholdMs</code></td>
@@ -3670,7 +3672,7 @@
 <tr>
 <td><code>queueGrowthWarnCount</code></td>
 <td>long</td>
-<td>Cumulative count (since process start) of edge-triggered queue-backpressure warnings: incremented once each time the summed <code>queueDepth</code> transitions from below <code>queueGrowthWarnThreshold</code> to at-or-above it (re-armed only after it falls back below). Paired with a <code>WARN</code> log. <code>0</code> when the audit is disabled. Distinct from <code>slowPipelineCount</code>: this is the queued-path signal where per-teleport latency is dominated by at-rate queue wait. See <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> §2b and REQ-RTP-OBS-006.</td>
+<td>Cumulative count (since process start) of edge-triggered queue-backpressure warnings: incremented once each time the summed <code>queueDepth</code> transitions from below <code>queueGrowthWarnThreshold</code> to at-or-above it (re-armed only after it falls back below). Paired with a <code>WARN</code> log. <code>0</code> when the audit is disabled. Distinct from <code>slowPipelineCount</code>: this is the queued-path signal where per-teleport latency is dominated by at-rate queue wait. See <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> section 2b and REQ-RTP-OBS-006.</td>
 </tr>
 <tr>
 <td><code>queueGrowthWarnThreshold</code></td>
@@ -4166,8 +4168,8 @@ platforms/rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 <ul>
 <li><strong><code>avgPipelineMs</code> window length and reset semantics</strong> — <em>resolved (2026-05-15)</em> by <a href="../../adr/ADR-032-teleport-pipeline-latency-histogram/">ADR-032</a>: 256-sample wait-free ring, never resets, mean-only readout.</li>
 <li><strong>Pipeline latency percentiles (p50/p75/p90/p95/p99)</strong> — <em>resolved (2026-05-29)</em> by <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a>: exposed as an additive on-demand read path that sorts a point-in-time copy of the existing bounded ring (no sketch dependency, no change to the wait-free write path). Amends ADR-032's deferred "mean-only readout" item.</li>
-<li><strong>Slow-teleport audit threshold</strong> — <em>resolved (2026-05-29)</em> by <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a>: <code>performance.yml &gt; slowPipelineThresholdMs</code> (default <code>5000</code> ms; <code>&lt;= 0</code> disables). Drives a once-per-task <code>WARN</code> log and the cumulative <code>slowPipelineCount</code>, <strong>gated to immediate/unqueued teleports only</strong> (queued at-rate teleports include queue-wait time in their elapsed window and would false-positive — see ADR-053 §2a / REQ-RTP-OBS-005). Confirm the default during the implementation slice from beta-server data; lite-assembly servers on lower-end hardware may want a higher default.</li>
-<li><strong>Queue-growth audit threshold</strong> — <em>resolved (2026-05-29)</em> by <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> §2b / REQ-RTP-OBS-006: <code>performance.yml &gt; queueGrowthWarnThreshold</code> (int players; default <code>0</code> = disabled/opt-in). Edge-triggered <code>WARN</code> + cumulative <code>queueGrowthWarnCount</code> evaluated on the existing snapshot cadence against the summed <code>queueDepth</code>. This is the queued-path backpressure signal that replaces a naive per-queued-teleport latency alarm. Confirm the default arming value (and whether to ship a non-zero default) during the implementation slice from beta-server data — acceptable queue depth is highly rate- and capacity-dependent.</li>
+<li><strong>Slow-teleport audit threshold</strong> — <em>resolved (2026-05-29)</em> by <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a>: <code>performance.yml &gt; slowPipelineThresholdMs</code> (default <code>5000</code> ms; <code>&lt;= 0</code> disables). Drives a once-per-task <code>WARN</code> log and the cumulative <code>slowPipelineCount</code>, <strong>gated to immediate/unqueued teleports only</strong> (queued at-rate teleports include queue-wait time in their elapsed window and would false-positive — see ADR-053 section 2a / REQ-RTP-OBS-005). Confirm the default during the implementation slice from beta-server data; lite-assembly servers on lower-end hardware may want a higher default.</li>
+<li><strong>Queue-growth audit threshold</strong> — <em>resolved (2026-05-29)</em> by <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> section 2b / REQ-RTP-OBS-006: <code>performance.yml &gt; queueGrowthWarnThreshold</code> (int players; default <code>0</code> = disabled/opt-in). Edge-triggered <code>WARN</code> + cumulative <code>queueGrowthWarnCount</code> evaluated on the existing snapshot cadence against the summed <code>queueDepth</code>. This is the queued-path backpressure signal that replaces a naive per-queued-teleport latency alarm. Confirm the default arming value (and whether to ship a non-zero default) during the implementation slice from beta-server data — acceptable queue depth is highly rate- and capacity-dependent.</li>
 <li><strong><code>biomeRerolls</code> cap / top-N policy</strong> — straw-man: no cap (vanilla biome cardinality is naturally bounded). Revisit if a modpack pushes the map past ~500 keys, at which point introduce <code>metrics.biomeRerolls.topN</code> (default 32). Confirm during M1.</li>
 <li><strong><code>biomeRerolls</code> reset semantics</strong> — straw-man: cumulative since process start. Operators wanting deltas compute them from successive snapshots, consistent with the <em>Snapshot, not stream</em> goal.</li>
 <li><strong><code>biomeRerolls</code> window default</strong> — straw-man: 300s. Short enough to attribute the next <code>/rtp</code> to dissatisfaction with the prior outcome, long enough to absorb a player looking around before deciding. Confirm during M1 from beta-server data.</li>
@@ -4400,7 +4402,7 @@ platforms/rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 <tr>
 <td><code>pipeline_latency_buckets</code></td>
 <td><em>removed</em></td>
-<td>Withdrawn: <code>avgPipelineMs</code> is the mean of every <code>TeleportPipelineTask</code>, whose sample window starts at task construction and so includes at-rate queue-wait / configured-delay time (ADR-032 / <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> §2). Bucketising that mean misrepresents pipeline latency across the fleet, so the bStats chart was dropped. The honest per-teleport latency signal remains operator-local via <code>/rtp info</code> percentiles (immediate/unqueued-gated slow-teleport audit).</td>
+<td>Withdrawn: <code>avgPipelineMs</code> is the mean of every <code>TeleportPipelineTask</code>, whose sample window starts at task construction and so includes at-rate queue-wait / configured-delay time (ADR-032 / <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> section 2). Bucketising that mean misrepresents pipeline latency across the fleet, so the bStats chart was dropped. The honest per-teleport latency signal remains operator-local via <code>/rtp info</code> percentiles (immediate/unqueued-gated slow-teleport audit).</td>
 </tr>
 <tr>
 <td><code>memory_tracker_pressure</code></td>

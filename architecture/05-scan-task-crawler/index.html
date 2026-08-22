@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/architecture/05-scan-task-crawler/">
+      
       
       
       
@@ -3029,13 +3031,12 @@
 
 
 <h1 id="rtp-scan-task-crawler"><code>/rtp scan</code> task crawler<a class="headerlink" href="#rtp-scan-task-crawler" title="Permanent link">&para;</a></h1>
-<p><strong>Scope of this diagram.</strong> This chart covers the admin-triggered bulk pre-warm loop — <code>/rtp scan &lt;region&gt; &lt;count&gt;</code> — that crawls a region's spiral index in bounded ticks, pushes accepted locations into the same per-region cache that diagram 02 fills, and reports progress. Related-but-separate behavior paths are intentionally <strong>out of scope</strong> here:
-- <strong>What makes a single candidate acceptable</strong> — see diagram 08 (per-attempt pipeline); scan just invokes it in a loop.
-- <strong>How <code>/rtp</code> consumes those pre-warmed locations</strong> — see diagram 01 (cache-hot branch).
-- <strong>Background refill without admin intervention</strong> — see diagram 02; the two crawlers both write to the same cache but scan is one-shot, budget-bounded by count rather than <code>queueLen</code>.
+<p><strong>Scope of this diagram.</strong> This chart covers the admin-triggered spatial memory crawler — <code>/rtp scan &lt;region&gt; &lt;count&gt;</code> — that crawls a region's spiral index in bounded ticks, evaluates candidate safety, updates the persistent spatial memory (<code>MemoryShape</code>), and reports progress. Related-but-separate behavior paths are intentionally <strong>out of scope</strong> here:
+- <strong>What makes a single candidate acceptable</strong> — see diagram 08 (per-attempt pipeline); scan evaluates safety per candidate.
+- <strong>How <code>/rtp</code> consumes ready locations</strong> — see diagram 01 (cache-hot branch).
 - <strong>Command parsing / permissions for <code>/rtp scan</code></strong> — see <code>commands-api</code> and <code>BukkitBaseRTPCmd</code>; this chart starts after the command has been dispatched.</p>
 <blockquote>
-<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §6 — Scan task crawler</a>.</p>
+<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> section 6 — Scan task crawler</a>.</p>
 </blockquote>
 <pre class="mermaid"><code>stateDiagram-v2
     CmdTrigger : Admin executes /rtp scan

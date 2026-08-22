@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-046-maps-api-module/">
+      
       
         <link rel="prev" href="../ADR-045-rtp-docs-menu-consumer/">
       
@@ -3282,7 +3284,7 @@ mod, and it is reachable from every supported platform.</p>
    <code>rtp-core</code> and <code>rtp-anvil</code>.</li>
 </ol>
 <p>Folding this into <code>rtp-core</code> would force a platform import there (forbidden by
-<em>Architecture Boundaries §2</em>). Folding it into <code>effects-api</code> or <code>commands-api</code>
+<em>Architecture Boundaries section 2</em>). Folding it into <code>effects-api</code> or <code>commands-api</code>
 would conflate concerns: <code>effects-api</code> dispatches discrete sensory effects
 (sounds, particles), <code>commands-api</code> dispatches Brigadier nodes, neither owns a
 persistent 2D pixel surface or a per-viewer refresh cadence.</p>
@@ -3429,7 +3431,7 @@ during Stage 2.</p>
 <tbody>
 <tr>
 <td>Fold the SPI into <code>rtp-core</code> directly</td>
-<td>Forces a platform import (<code>org.bukkit.map.MapView</code>) into <code>rtp-core</code>, breaking <em>Architecture Boundaries §2</em>.</td>
+<td>Forces a platform import (<code>org.bukkit.map.MapView</code>) into <code>rtp-core</code>, breaking <em>Architecture Boundaries section 2</em>.</td>
 </tr>
 <tr>
 <td>Fold into <code>effects-api</code></td>
@@ -3445,7 +3447,7 @@ during Stage 2.</p>
 </tr>
 <tr>
 <td>Per-platform fork (separate map renderer in each adapter)</td>
-<td>Already proven anti-pattern by <code>effects-api</code> and <code>commands-api</code>; <em>Architecture Boundaries §3</em> explicitly says "extend these, don't fork per-platform."</td>
+<td>Already proven anti-pattern by <code>effects-api</code> and <code>commands-api</code>; <em>Architecture Boundaries section 3</em> explicitly says "extend these, don't fork per-platform."</td>
 </tr>
 <tr>
 <td>Skip the Fabric obf/unobf split and use reflection in a single common module</td>
@@ -3553,7 +3555,7 @@ real cartography map item on the free build across every supported platform.</p>
   (rather than excluding the concrete bindings as originally planned).</li>
 </ul>
 <p>This amendment is documentation-only at the ADR level; the code already
-behaves as described. <code>maps-api-ADR-001</code> §3 (Lite-assembly inclusion /
+behaves as described. <code>maps-api-ADR-001</code> section 3 (Lite-assembly inclusion /
 exclusion) is amended in lockstep.</p>
 
 

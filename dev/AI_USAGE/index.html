@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/AI_USAGE/">
+      
       
       
       
@@ -3068,6 +3070,7 @@
 <p>The timeframe is a real part of this. I was in the middle of a personal move during V3 work and didn't have time to burn on extraneous gruntwork in a system I already know. So the honest answer isn't "AI is the future of programming". It's "I had a list of mechanical tasks and a finite week".</p>
 <hr />
 <h2 id="b-the-how">B. The "how"<a class="headerlink" href="#b-the-how" title="Permanent link">&para;</a></h2>
+<p>Since people are using AI now and I needed some raw output, I gave it a try. I added guards (process rules in documentation and AGENTS.md) for LLM-based tooling to ensure human-originated architecture. It was able to help with speed, but watching the diff I saw some issues. I had to pull in specific reference material and establish a "read and document" practice for the tools to hit a viable quality standard, which I maintain based on reviewing diffs.</p>
 <p>The ADR workflow and the documentation discipline in this repo (the <code>shall</code> phrasing in <code>REQUIREMENTS.md</code>, the separation of <em>what</em> from <em>how</em>, the per-subproject ADR sequences, the REQ-* traceability matrix) didn't come from AI. That came from my time working on human-safety-related systems, where auditors and post-incident reviewers expect a particular shape of paper trail.</p>
 <p>Lucky for me, that same shape happens to be exactly what regulates an LLM well. The format forces explicit <em>what</em>, explicit <em>why</em>, explicit trade-offs, explicit consequences, and numbered so nothing gets quietly retconned. A model told "produce an ADR matching this template, here's the brainstorm, here are the trade-offs we identified" produces useful drafts. A model told "design the system" produces plausible noise.</p>
 <p>When AI is left to prioritize on its own it picks badly. It treats whatever was mentioned most recently as the most important thing, regardless of whether it matters at the system level. The fix is what you'd do with a junior dev who just learned a new pattern and is now seeing it everywhere: somebody with the wider context window says "no, that's a footnote, not a chapter".</p>

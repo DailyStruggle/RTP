@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/TRACEABILITY/">
+      
       
       
       
@@ -3187,63 +3189,63 @@
 <tr>
 <td>REQ-RTP-F-001</td>
 <td>0–2 tick response</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td><code>RegionQueueManager</code></td>
 <td><code>SLATest</code>, <code>RegionPipelineTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-F-002</td>
 <td>Geometry (Circle/Square/Rect)</td>
-<td>DESIGN.md §3</td>
+<td>DESIGN.md section 3</td>
 <td><code>Circle</code>, <code>Square</code>, <code>Rectangle</code></td>
 <td><code>MemoryShapeTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-F-003</td>
 <td>Distributions (Flat/Normal)</td>
-<td>DESIGN.md §3</td>
+<td>DESIGN.md section 3</td>
 <td><code>Circle_Normal</code>, <code>Square_Normal</code></td>
 <td><code>MemoryShapeTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-F-004</td>
 <td>Multi-region management</td>
-<td>DESIGN.md §5</td>
+<td>DESIGN.md section 5</td>
 <td><code>Region</code>, <code>RegionQueueManager</code></td>
 <td><code>RegionConfigLoaderTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-F-005</td>
 <td>O(log n) complexity</td>
-<td>DESIGN.md §3</td>
+<td>DESIGN.md section 3</td>
 <td><code>MemoryShape</code></td>
 <td><code>MemoryShapeTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-F-006</td>
 <td>No unbounded rerolling</td>
-<td>DESIGN.md §3</td>
+<td>DESIGN.md section 3</td>
 <td><code>MemoryShape</code></td>
 <td><code>RegionPipelineTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-F-007</td>
 <td>Uniform distribution</td>
-<td>DESIGN.md §3</td>
+<td>DESIGN.md section 3</td>
 <td><code>Circle</code>, <code>Square</code></td>
 <td><code>DeterministicShapeTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-F-008</td>
 <td>Non-blocking execution</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td><code>RTPTaskPipe</code>, adapters</td>
 <td><code>RTPArchitectureTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-F-009</td>
 <td>Redundancy elimination</td>
-<td>DESIGN.md §3</td>
+<td>DESIGN.md section 3</td>
 <td><code>MemoryTracker</code></td>
 <td><code>MemoryShapeTest</code></td>
 </tr>
@@ -3264,7 +3266,7 @@
 <tr>
 <td>REQ-RTP-F-012</td>
 <td>Admin scan lifecycle</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td><code>ScanCmd</code>, <code>ScanTask</code></td>
 <td><code>ScanCmdTest</code></td>
 </tr>
@@ -3278,14 +3280,14 @@
 <tr>
 <td>REQ-RTP-NF-001</td>
 <td>Persistent state</td>
-<td>DESIGN.md §4</td>
+<td>DESIGN.md section 4</td>
 <td><code>DatabaseAccessor</code></td>
 <td><code>CachedLocationRoundTripTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-NF-002</td>
 <td>Thread safety</td>
-<td>DESIGN.md §2</td>
+<td>DESIGN.md section 2</td>
 <td><code>RTPTaskPipe</code></td>
 <td><code>RTPArchitectureTest</code></td>
 </tr>
@@ -3313,14 +3315,14 @@
 <tr>
 <td>REQ-RTP-S-001</td>
 <td>No lethal destination</td>
-<td>DESIGN.md §3</td>
+<td>DESIGN.md section 3</td>
 <td><code>SafetyCheck</code></td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-S-002</td>
 <td>No chunk leaks</td>
-<td>DESIGN.md §6</td>
+<td>DESIGN.md section 6</td>
 <td><code>ChunkReservation</code>, <code>MemoryTracker</code></td>
 <td><code>ChunkTicketLifecycleTest</code></td>
 </tr>
@@ -3334,7 +3336,7 @@
 <tr>
 <td>REQ-RTP-S-004</td>
 <td>No silent failure</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td>TeleportPipelineTask; <code>GlobalRegionVerifiers</code> (a throwing sync <em>or</em> async region verifier is logged at WARNING and the location is rejected/fail-safe, never silently accepted)</td>
 <td>FailureModeTest, RegionPipelineTest, <code>ReqRtpS004VerifierFailSafeTest</code></td>
 </tr>
@@ -3425,14 +3427,14 @@
 <tr>
 <td>REQ-RTP-OBS-005</td>
 <td>Slow-teleport audit (immediate/unqueued only; opt-out threshold; WARN + cumulative <code>slowPipelineCount</code>)</td>
-<td><a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> §2a, <a href="../METRICS_PLAN/">METRICS_PLAN.md</a></td>
+<td><a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> section 2a, <a href="../METRICS_PLAN/">METRICS_PLAN.md</a></td>
 <td><code>CoreMetrics.auditImmediateTeleport</code>/<code>slowPipelineCount</code>/<code>slowPipelineThresholdMs</code>, <code>TeleportPipelineTask</code> (<code>immediateTeleport</code> flag + <code>runCleanup</code> audit call), <code>PerformanceKeys.slowPipelineThresholdMs</code>, <code>RTPMetricsExtension.slowPipelineCount/slowPipelineThresholdMs</code>; <code>InfoCmd</code> <code>infoSlowPipeline</code></td>
 <td><code>ReqRtpObs005SlowTeleportAuditTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-OBS-006</td>
 <td>Queue-growth audit (edge-triggered on <code>queueDepth</code>; opt-in threshold; WARN + cumulative <code>queueGrowthWarnCount</code>)</td>
-<td><a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> §2b, <a href="../METRICS_PLAN/">METRICS_PLAN.md</a></td>
+<td><a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> section 2b, <a href="../METRICS_PLAN/">METRICS_PLAN.md</a></td>
 <td><code>CoreMetrics.evaluateQueueGrowth</code>/<code>queueGrowthWarnCount</code>/<code>queueGrowthWarnThreshold</code>, <code>PerformanceKeys.queueGrowthWarnThreshold</code>, <code>RTPMetricsExtension.queueGrowthWarnCount/queueGrowthWarnThreshold</code>; <code>InfoCmd</code> <code>infoQueueGrowth</code></td>
 <td><code>ReqRtpObs005SlowTeleportAuditTest</code> (queue-growth disabled-by-default + snapshot wiring cases)</td>
 </tr>
@@ -3475,7 +3477,7 @@
 <tr>
 <td>REQ-API-F-003</td>
 <td>Validation hooks</td>
-<td>DESIGN.md §2</td>
+<td>DESIGN.md section 2</td>
 <td>GlobalRegionVerifiers</td>
 <td>-</td>
 </tr>
@@ -3517,28 +3519,28 @@
 <tr>
 <td>REQ-API-ARCH-001</td>
 <td>Thread-safe API</td>
-<td>DESIGN.md §2</td>
+<td>DESIGN.md section 2</td>
 <td>FactoryValue</td>
 <td>-</td>
 </tr>
 <tr>
 <td>REQ-API-ARCH-002</td>
 <td>Non-blocking API</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td>ILocationGenerator</td>
 <td>RTPArchitectureTest</td>
 </tr>
 <tr>
 <td>REQ-API-ARCH-003</td>
 <td>API exception handling</td>
-<td>DESIGN.md §6</td>
+<td>DESIGN.md section 6</td>
 <td>TeleportPipelineTask</td>
 <td>RTPAPIGuardTest</td>
 </tr>
 <tr>
 <td>REQ-API-ARCH-004</td>
 <td>Lock-free reads</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td>ConfigParser</td>
 <td>ConfigParserLanguageTest</td>
 </tr>
@@ -3567,63 +3569,63 @@
 <tr>
 <td>REQ-CORE-F-001</td>
 <td>Async queue</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td>RegionQueueManager</td>
 <td>FailureModeTest</td>
 </tr>
 <tr>
 <td>REQ-CORE-F-002</td>
 <td>Bounded refill</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td>RegionCacheTask</td>
 <td>-</td>
 </tr>
 <tr>
 <td>REQ-CORE-F-003</td>
 <td>Uniform distribution</td>
-<td>DESIGN.md §3</td>
+<td>DESIGN.md section 3</td>
 <td>MemoryShape</td>
 <td>MemoryShapeTest</td>
 </tr>
 <tr>
 <td>REQ-CORE-F-004</td>
 <td>Deterministic execution</td>
-<td>DESIGN.md §3</td>
+<td>DESIGN.md section 3</td>
 <td>MemoryShape</td>
 <td>RegionPipelineTest</td>
 </tr>
 <tr>
 <td>REQ-CORE-F-005</td>
 <td>Spatial memory</td>
-<td>DESIGN.md §3</td>
+<td>DESIGN.md section 3</td>
 <td>MemoryShape</td>
 <td>MemoryShapeTest</td>
 </tr>
 <tr>
 <td>REQ-CORE-F-006</td>
 <td>DB integration</td>
-<td>DESIGN.md §4</td>
+<td>DESIGN.md section 4</td>
 <td>DatabaseAccessor</td>
 <td>-</td>
 </tr>
 <tr>
 <td>REQ-CORE-F-007</td>
 <td>Task lifespan</td>
-<td>DESIGN.md §6</td>
+<td>DESIGN.md section 6</td>
 <td>MemoryTracker</td>
 <td>-</td>
 </tr>
 <tr>
 <td>REQ-CORE-F-008</td>
 <td>Orphaned chunk recovery</td>
-<td>DESIGN.md §6</td>
+<td>DESIGN.md section 6</td>
 <td>ChunkUnloadProcessor</td>
 <td>-</td>
 </tr>
 <tr>
 <td>REQ-CORE-F-009</td>
 <td>L3 backlog cache (order-preserving FIFO; head-blocking promotion on <code>UNVERIFIED</code>; head-drop on <code>INVALIDATED</code>; one <code>.mca</code> bin verified per <code>Region.execute()</code> pulse)</td>
-<td>DESIGN.md §1.1, <a href="../../adr/ADR-028-l3-backlog-cache/">ADR-028</a></td>
+<td>DESIGN.md section 1.1, <a href="../../adr/ADR-028-l3-backlog-cache/">ADR-028</a></td>
 <td><code>BacklogLocationBuffer</code>, <code>WorldBacklogBinIndex</code>, <code>RegionQueueManager.backlogLocations</code>, <code>Region.processBacklog</code></td>
 <td><code>BacklogLocationBufferTest</code>, <code>WorldBacklogBinIndexTest</code></td>
 </tr>
@@ -3637,56 +3639,56 @@
 <tr>
 <td>REQ-CORE-ARCH-001</td>
 <td>Lock-free config</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td>FactoryValue</td>
 <td>ConfigParserLanguageTest</td>
 </tr>
 <tr>
 <td>REQ-CORE-ARCH-002</td>
 <td>Data access pattern</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td>FactoryValue.getData()</td>
 <td>MultiConfigParserIsolationTest</td>
 </tr>
 <tr>
 <td>REQ-CORE-ARCH-003</td>
 <td>Fault encapsulation</td>
-<td>DESIGN.md §6</td>
+<td>DESIGN.md section 6</td>
 <td>TeleportPipelineTask</td>
 <td>-</td>
 </tr>
 <tr>
 <td>REQ-CORE-ARCH-004</td>
 <td>runCleanup()</td>
-<td>DESIGN.md §6</td>
+<td>DESIGN.md section 6</td>
 <td>TeleportPipelineTask</td>
 <td>-</td>
 </tr>
 <tr>
 <td>REQ-CORE-ARCH-005</td>
 <td>Pulse maintenance</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td>AsyncTaskProcessing</td>
 <td>-</td>
 </tr>
 <tr>
 <td>REQ-CORE-ARCH-006</td>
 <td>Time-bounded tasks</td>
-<td>DESIGN.md §1</td>
+<td>DESIGN.md section 1</td>
 <td>TimeBoundTaskPipe</td>
 <td>-</td>
 </tr>
 <tr>
 <td>REQ-CORE-ARCH-007</td>
 <td>Tracker registration</td>
-<td>DESIGN.md §6</td>
+<td>DESIGN.md section 6</td>
 <td>MemoryTracker</td>
 <td>-</td>
 </tr>
 <tr>
 <td>REQ-CORE-ARCH-008</td>
 <td>Max lifespan</td>
-<td>DESIGN.md §6</td>
+<td>DESIGN.md section 6</td>
 <td>MemoryTracker</td>
 <td>-</td>
 </tr>
@@ -3707,7 +3709,7 @@
 <tr>
 <td>REQ-CORE-NF-001</td>
 <td>Shutdown flush</td>
-<td>DESIGN.md §4</td>
+<td>DESIGN.md section 4</td>
 <td>RTP.stop()</td>
 <td>MemoryShapeShutdownTest</td>
 </tr>
@@ -3729,14 +3731,14 @@
 <tr>
 <td>REQ-SPIGOT-F-001</td>
 <td>Synchronous chunk loading</td>
-<td>DESIGN.md §2 — rtp-bukkit</td>
+<td>DESIGN.md section 2 — rtp-bukkit</td>
 <td><code>rtp-bukkit</code> adapter (Bukkit chunk API)</td>
 <td><code>BukkitSchedulerImplTest</code> (<code>runTask_onPrimaryThread_executesImmediately</code>, <code>runTaskAsynchronously_dispatchesTask_andCompletes</code>)</td>
 </tr>
 <tr>
 <td>REQ-SPIGOT-F-002</td>
 <td>Rate-limited sync tasks</td>
-<td>DESIGN.md §1 — Bounded Computation Overhead</td>
+<td>DESIGN.md section 1 — Bounded Computation Overhead</td>
 <td><code>TimeBoundTaskPipe</code> (spigot binding)</td>
 <td>Manual verification required (TimeBoundTaskPipe core logic covered by <code>SLATest</code>)</td>
 </tr>
@@ -3750,42 +3752,42 @@
 <tr>
 <td>REQ-SPIGOT-ARCH-001</td>
 <td><code>addPluginChunkTicket</code> over <code>setForceLoaded</code></td>
-<td>DESIGN.md §6 — Chunk Allocation Management</td>
+<td>DESIGN.md section 6 — Chunk Allocation Management</td>
 <td><code>rtp-bukkit</code> chunk reservation impl</td>
 <td><code>ChunkTicketLifecycleTest</code> (<code>ticket_is_held_during_reservation_and_released_on_close</code>)</td>
 </tr>
 <tr>
 <td>REQ-SPIGOT-ARCH-002</td>
 <td>Plugin-owned ticket leak prevention</td>
-<td>DESIGN.md §6 — Chunk Allocation Management</td>
+<td>DESIGN.md section 6 — Chunk Allocation Management</td>
 <td><code>rtp-bukkit</code> chunk reservation impl</td>
 <td>Manual verification required</td>
 </tr>
 <tr>
 <td>REQ-SPIGOT-ARCH-003</td>
 <td><code>TimeBoundTaskPipe</code> for main-thread ops</td>
-<td>DESIGN.md §1 — Bounded Computation Overhead</td>
+<td>DESIGN.md section 1 — Bounded Computation Overhead</td>
 <td><code>TimeBoundTaskPipe</code></td>
 <td><code>BukkitSchedulerImplTest</code> (<code>runTask_onPrimaryThread_executesImmediately</code>)</td>
 </tr>
 <tr>
 <td>REQ-SPIGOT-ARCH-004</td>
 <td>Wall-clock time bounding</td>
-<td>DESIGN.md §1 — Bounded Computation Overhead</td>
+<td>DESIGN.md section 1 — Bounded Computation Overhead</td>
 <td><code>TimeBoundTaskPipe</code> (nanosecond budget)</td>
 <td><code>BukkitSchedulerImplTest</code> (<code>runTaskTimer_returnsNonNullBukkitTaskHandle</code>, <code>cancelTask_preventsScheduledTaskFromRunning</code>)</td>
 </tr>
 <tr>
 <td>REQ-SPIGOT-ARCH-005</td>
 <td>Ticket lifecycle pairing</td>
-<td>DESIGN.md §6 — Chunk Allocation Management</td>
+<td>DESIGN.md section 6 — Chunk Allocation Management</td>
 <td><code>rtp-bukkit</code> <code>removePluginChunkTicket</code> call sites</td>
 <td><code>ChunkTicketLifecycleTest</code> (<code>ticket_is_held_during_reservation_and_released_on_close</code>, <code>ticket_is_released_even_when_validator_throws</code>)</td>
 </tr>
 <tr>
 <td>REQ-SPIGOT-ARCH-006</td>
 <td>Forced reclamation on disconnect</td>
-<td>DESIGN.md §6 — Orphaned Allocation Recovery</td>
+<td>DESIGN.md section 6 — Orphaned Allocation Recovery</td>
 <td><code>MemoryTracker</code> + spigot cleanup listener</td>
 <td>Manual verification required</td>
 </tr>
@@ -3807,63 +3809,63 @@
 <tr>
 <td>REQ-PAPER-F-001</td>
 <td><code>getChunkAtAsync</code> for non-blocking load</td>
-<td>DESIGN.md §2 — rtp-paper</td>
+<td>DESIGN.md section 2 — rtp-paper</td>
 <td><code>rtp-paper</code> async chunk impl</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-PAPER-F-002</td>
 <td>Callback/future-only, no sync waits</td>
-<td>DESIGN.md §2 — rtp-paper</td>
+<td>DESIGN.md section 2 — rtp-paper</td>
 <td><code>rtp-paper</code> async chunk impl</td>
 <td><code>RTPArchitectureTest</code> (<code>no_blocking_future_calls_in_core_or_api</code>)</td>
 </tr>
 <tr>
 <td>REQ-PAPER-F-003</td>
 <td>Paper-specific API prioritization</td>
-<td>DESIGN.md §2 — rtp-paper</td>
+<td>DESIGN.md section 2 — rtp-paper</td>
 <td><code>rtp-paper</code> adapter</td>
 <td><code>ServerAccessorImplTest</code> (<code>getBiomes_returnsNonEmptyUpperCaseSet</code> — asserts <code>Registry.BIOME</code> path)</td>
 </tr>
 <tr>
 <td>REQ-PAPER-ARCH-001</td>
 <td><code>addPluginChunkTicket</code> over <code>setForceLoaded</code></td>
-<td>DESIGN.md §6 — Chunk Allocation Management</td>
+<td>DESIGN.md section 6 — Chunk Allocation Management</td>
 <td><code>rtp-paper</code> chunk reservation impl</td>
 <td><code>ChunkTicketLifecycleTest</code> (<code>ticket_is_held_during_reservation_and_released_on_close</code>)</td>
 </tr>
 <tr>
 <td>REQ-PAPER-ARCH-002</td>
 <td>Plugin-owned ticket leak prevention</td>
-<td>DESIGN.md §6 — Chunk Allocation Management</td>
+<td>DESIGN.md section 6 — Chunk Allocation Management</td>
 <td><code>rtp-paper</code> chunk reservation impl</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-PAPER-ARCH-003</td>
 <td><code>TimeBoundTaskPipe</code> for main-thread ops</td>
-<td>DESIGN.md §1 — Bounded Computation Overhead</td>
+<td>DESIGN.md section 1 — Bounded Computation Overhead</td>
 <td><code>TimeBoundTaskPipe</code> (paper binding)</td>
 <td><code>ServerAccessorImplTest</code> (<code>paperScheduler_runTask_executesOnPrimaryThread</code>)</td>
 </tr>
 <tr>
 <td>REQ-PAPER-ARCH-004</td>
 <td>Wall-clock time bounding</td>
-<td>DESIGN.md §1 — Bounded Computation Overhead</td>
+<td>DESIGN.md section 1 — Bounded Computation Overhead</td>
 <td><code>TimeBoundTaskPipe</code> (nanosecond budget)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-PAPER-ARCH-005</td>
 <td>Ticket lifecycle pairing</td>
-<td>DESIGN.md §6 — Chunk Allocation Management</td>
+<td>DESIGN.md section 6 — Chunk Allocation Management</td>
 <td><code>rtp-paper</code> <code>removePluginChunkTicket</code> call sites</td>
 <td><code>ChunkTicketLifecycleTest</code> (<code>ticket_is_held_during_reservation_and_released_on_close</code>, <code>ticket_is_released_even_when_validator_throws</code>)</td>
 </tr>
 <tr>
 <td>REQ-PAPER-ARCH-006</td>
 <td>Forced reclamation on disconnect</td>
-<td>DESIGN.md §6 — Orphaned Allocation Recovery</td>
+<td>DESIGN.md section 6 — Orphaned Allocation Recovery</td>
 <td><code>MemoryTracker</code> + paper cleanup listener</td>
 <td>—</td>
 </tr>
@@ -3885,98 +3887,98 @@
 <tr>
 <td>REQ-FOLIA-F-001</td>
 <td>Regional thread isolation</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> regional task dispatcher</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-F-002</td>
 <td><code>RegionScheduler</code> / <code>EntityScheduler</code> usage</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> scheduler impl</td>
 <td><code>RTPArchitectureTest</code> (<code>scheduler_implementations_must_not_reside_in_core</code>)</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-F-003</td>
 <td>Concurrent state mutation safety</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> adapter, <code>LockFreeLocationBuffer</code></td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-F-004</td>
 <td>Cross-region teleport pipelining</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>TeleportPipelineTask</code> + folia scheduler</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-001</td>
 <td><code>isOwnedByCurrentRegion</code> pre-check</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> regional dispatcher</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-002</td>
 <td>Immediate execution if region owned</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> regional dispatcher</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-003</td>
 <td><code>RegionScheduler.run()</code> only when not owned</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> regional dispatcher</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-004</td>
 <td>No <code>System.nanoTime()</code> in regional threads</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> (uses <code>CountBoundTaskPipe</code>)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-005</td>
 <td><code>CountBoundTaskPipe</code> for iterative ops</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> queue replenishment</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-006</td>
 <td>Count-based task slicing</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> <code>CountBoundTaskPipe</code> binding</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-007</td>
 <td>No Vault calls on region threads</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> economy delegation</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-008</td>
 <td>Economy delegated to <code>GlobalRegionScheduler</code></td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> economy delegation</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-009</td>
 <td>Async economy result pipelining</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> economy delegation</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-010</td>
 <td>Native Folia async chunk APIs</td>
-<td>DESIGN.md §2 — rtp-folia</td>
+<td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> chunk impl</td>
 <td>—</td>
 </tr>
@@ -4006,7 +4008,7 @@
 </table>
 <hr />
 <h2 id="rtp-neoforge-requirements">rtp-neoforge Requirements<a class="headerlink" href="#rtp-neoforge-requirements" title="Permanent link">&para;</a></h2>
-<p>NeoForge is in-scope per <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a> (Accepted). Per ADR-033 §3.4 the S-005 and S-006 guards are authored as part of the Phase N2 platform-adapter bring-up; both rows below are now <strong>implemented</strong>. Remaining NeoForge functional parity (the <code>/rtp</code> round-trip exit gate and the final <code>-PincludeNeoforge</code> build) is tracked in <a href="scratch/CHECKLIST-neoforge-phase-n2.md"><code>scratch/CHECKLIST-neoforge-phase-n2.md</code></a>.</p>
+<p>NeoForge is in-scope per <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a> (Accepted). Per ADR-033 section 3.4 the S-005 and S-006 guards are authored as part of the Phase N2 platform-adapter bring-up; both rows below are now <strong>implemented</strong>. Remaining NeoForge functional parity (the <code>/rtp</code> round-trip exit gate and the final <code>-PincludeNeoforge</code> build) is tracked in <a href="scratch/CHECKLIST-neoforge-phase-n2.md"><code>scratch/CHECKLIST-neoforge-phase-n2.md</code></a>.</p>
 <table>
 <thead>
 <tr>
@@ -4021,14 +4023,14 @@
 <tr>
 <td>REQ-NEOFORGE-ARCH-S005</td>
 <td>No synchronous chunk I/O on the main thread (<code>NeoForgeRTPWorld.getChunkAt</code> returns <code>CompletableFuture</code>; anvil-backed <code>NeoForgeRTPChunk</code> answers block queries from the decoded view without a live load)</td>
-<td>ADR-033 §3.4; rtp-neoforge-ADR-001 §6; REQ-RTP-S-005</td>
+<td>ADR-033 section 3.4; rtp-neoforge-ADR-001 section 6; REQ-RTP-S-005</td>
 <td><code>NeoForgeRTPChunk</code> (anvil dual-mode dispatch); <code>NeoForgeVersionAdapter#requestFullChunkAsync</code> (async path)</td>
 <td><code>ReqRtpNeoforgeS005ChunkLoadingTest</code> (6 tests: anvil-mode flags, null-view rejection, view-routed block queries, isSafe short-circuit + delegation, keep/unload no-ops)</td>
 </tr>
 <tr>
 <td>REQ-NEOFORGE-ARCH-S006</td>
 <td>Fail-loud on early API access (<code>IllegalStateException</code>, never null / no-op) pre-init</td>
-<td>ADR-033 §3.4; rtp-neoforge-ADR-001 §6; REQ-RTP-S-006</td>
+<td>ADR-033 section 3.4; rtp-neoforge-ADR-001 section 6; REQ-RTP-S-006</td>
 <td><code>NeoForgeVersionAdapterRegistry#require</code>; <code>NeoForgeServerAccessor#getLocationGenerator</code></td>
 <td><code>ReqRtpNeoforgeS006ApiBeforeCoreTest</code> (3 tests: registry not-installed, <code>require()</code> throws, <code>getLocationGenerator()</code> throws pre-core)</td>
 </tr>
@@ -4135,7 +4137,7 @@
 <tr>
 <td>REQ-RTP-NET-013</td>
 <td>Multi-flavour persistence compatibility (any shipped SQL accessor)</td>
-<td>MULTI_SERVER_PLAN.md <em>Storage - Reuse <code>AbstractSQLDatabaseAccessor</code></em>; ADR-036 §D3</td>
+<td>MULTI_SERVER_PLAN.md <em>Storage - Reuse <code>AbstractSQLDatabaseAccessor</code></em>; ADR-036 section D3</td>
 <td><code>AbstractSQLDatabaseAccessor.networkStateBinding</code> slot is inherited by every concrete accessor (<code>H2</code>, <code>SQLite</code>, <code>MySQL</code>, <code>PostgreSQL</code>)</td>
 <td>(covered transitively by accessor tests; binding plumbing exercised by <code>ReqRtpNet002NetworkDisabledNoOpTest</code>)</td>
 </tr>
@@ -4172,77 +4174,77 @@
 <tr>
 <td>REQ-RTP-PROXY-001</td>
 <td>Adapter SPI Conformance</td>
-<td>ADR-036 §7; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
+<td>ADR-036 section 7; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-002</td>
 <td>No World State</td>
-<td>ADR-036 §2 Non-Goals; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
+<td>ADR-036 section 2 Non-Goals; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-003</td>
 <td>Non-Blocking Event Loop</td>
-<td>ADR-036 §7; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
+<td>ADR-036 section 7; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-004</td>
 <td>Reservation Claim Idempotency</td>
-<td>ADR-036 §5; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
+<td>ADR-036 section 5; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
 <td><code>InMemoryNetworkStateBinding</code> (reference)</td>
 <td><code>InMemoryNetworkStateBindingTest</code> (claim atomicity / per-player idempotency)</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-005</td>
 <td>Proxy Heartbeat Publication</td>
-<td>ADR-036 §5; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
+<td>ADR-036 section 5; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-006</td>
 <td>Configurable Messaging</td>
-<td>ADR-036 §3 Locked-In; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
+<td>ADR-036 section 3 Locked-In; <code>platforms/rtp-proxy/REQUIREMENTS.md</code></td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-007</td>
 <td>Authenticated Transport</td>
-<td>ADR-036 §3 D4; <code>rtp-proxy-ADR-010</code> (Proposed)</td>
+<td>ADR-036 section 3 D4; <code>rtp-proxy-ADR-010</code> (Proposed)</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-008</td>
 <td>Disabled-Mode No-Op</td>
-<td>ADR-036 §1 (REQ-RTP-NET-002 release gate)</td>
+<td>ADR-036 section 1 (REQ-RTP-NET-002 release gate)</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-009</td>
 <td>Single-Artifact Activation</td>
-<td>ADR-036 §7; <code>rtp-fabric-ADR-002</code> precedent</td>
+<td>ADR-036 section 7; <code>rtp-fabric-ADR-002</code> precedent</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-010</td>
 <td>Adapter Isolation</td>
-<td>ADR-036 §7</td>
+<td>ADR-036 section 7</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-011</td>
 <td>Bounded Tab-Completion Cost</td>
-<td>ADR-036 §3 Locked-In (Brigadier reuse)</td>
+<td>ADR-036 section 3 Locked-In (Brigadier reuse)</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
@@ -4279,21 +4281,21 @@
 <tr>
 <td>REQ-RTP-PROXY-COMMON-003</td>
 <td>Snapshot Freshness Filter</td>
-<td><code>rtp-proxy-ADR-004</code> §scoring; ADR-036 §6</td>
+<td><code>rtp-proxy-ADR-004</code> section scoring; ADR-036 section 6</td>
 <td><code>WeightedAverageBackendSelector#qualifies</code></td>
 <td><code>WeightedAverageBackendSelectorTest</code> (stale filter, all-stale ⇒ empty)</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-COMMON-004</td>
 <td>Capped Retry Chain</td>
-<td>ADR-036 §6 Fallback chain</td>
+<td>ADR-036 section 6 Fallback chain</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-COMMON-005</td>
 <td>Trigger Source Plurality</td>
-<td>ADR-036 §3 D1; MULTI_SERVER_PLAN.md Phase 1 item 1 (amended 2026-05-18; promoted to <code>rtp-api</code> 2026-05-19)</td>
+<td>ADR-036 section 3 D1; MULTI_SERVER_PLAN.md Phase 1 item 1 (amended 2026-05-18; promoted to <code>rtp-api</code> 2026-05-19)</td>
 <td><code>io.github.dailystruggle.rtp.api.network.RtpTriggerSource</code> (producer-side abstraction in <code>rtp-api</code> with <code>Kind</code>/<code>Trigger</code> and <code>start</code>/<code>stop</code> lifecycle); <code>io.github.dailystruggle.rtp.proxy.common.trigger.CommandTriggerSource</code> (Phase 2c-β / Phase 2d concrete producer); consumer-side <code>RtpDispatcher</code> lives in <code>rtp-proxy-common/spi/</code></td>
 <td><code>CommandTriggerSourceTest</code> (6/6: lifecycle, fire-before-start, double-start rejection, stop idempotency, null guard)</td>
 </tr>
@@ -4314,7 +4316,7 @@
 <tr>
 <td>REQ-RTP-PROXY-COMMON-008</td>
 <td>Hot-Spot Counter Locality</td>
-<td>ADR-036 §5 Local state is advisory</td>
+<td>ADR-036 section 5 Local state is advisory</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
@@ -4344,7 +4346,7 @@
 <tr>
 <td>REQ-RTP-PROXY-VELOCITY-002</td>
 <td>Brigadier Command Hosting</td>
-<td><code>commands-api-ADR-001</code>; ADR-036 §3 Locked-In; MULTI_SERVER_PLAN.md <em>Phase 2d</em> (2026-05-19)</td>
+<td><code>commands-api-ADR-001</code>; ADR-036 section 3 Locked-In; MULTI_SERVER_PLAN.md <em>Phase 2d</em> (2026-05-19)</td>
 <td><code>RtpVelocityPlugin#registerRtpCommand</code> (Velocity <code>BrigadierCommand</code> for <code>/rtp</code> with optional <code>&lt;world&gt;</code> literal; player-only; fires <code>CommandTriggerSource</code>); <code>RtpVelocityPlugin#onCommandTrigger</code> (selector -&gt; <code>transport.claim</code> -&gt; <code>player.createConnectionRequest</code>, with <code>ServerPreConnectEvent</code> redeeming at the connect boundary)</td>
 <td><code>RtpVelocityPluginPhase2dTest</code> (3/3: <code>registerRtpCommand</code> shape, <code>onCommandTrigger</code> shape, test-accessor presence); behavioural pipeline covered indirectly by <code>RtpVelocityPluginPhase2cTest</code> + <code>CommandTriggerSourceTest</code></td>
 </tr>
@@ -4358,7 +4360,7 @@
 <tr>
 <td>REQ-RTP-PROXY-VELOCITY-004</td>
 <td>Player Session Continuity</td>
-<td>ADR-036 §1 Headline Goals</td>
+<td>ADR-036 section 1 Headline Goals</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
@@ -4372,7 +4374,7 @@
 <tr>
 <td>REQ-RTP-PROXY-VELOCITY-006</td>
 <td>Telemetry Scheduling</td>
-<td>ADR-036 §5 Proxy heartbeat</td>
+<td>ADR-036 section 5 Proxy heartbeat</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
@@ -4423,14 +4425,14 @@
 <tr>
 <td>REQ-RTP-PROXY-BUNGEE-004</td>
 <td>Scheduler Discipline</td>
-<td>ADR-036 §7 Adapter isolation</td>
+<td>ADR-036 section 7 Adapter isolation</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-BUNGEE-005</td>
 <td>Plugin-Message Transport Eligibility</td>
-<td>ADR-036 §3 D2 (dev-only)</td>
+<td>ADR-036 section 3 D2 (dev-only)</td>
 <td>— (unimplemented)</td>
 <td>—</td>
 </tr>

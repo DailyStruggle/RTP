@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/QUICK_START/">
+      
       
         <link rel="prev" href="../../FOR_SERVER_ADMINS/">
       
@@ -621,9 +623,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-9-pre-warm-with-rtp-scan-spatial-memory" class="md-nav__link">
+  <a href="#step-9-build-spatial-memory-with-rtp-scan" class="md-nav__link">
     <span class="md-ellipsis">
-      Step 9 — Pre-warm with /rtp scan (Spatial Memory)
+      Step 9 — Build Spatial Memory with /rtp scan
     </span>
   </a>
   
@@ -3307,9 +3309,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-9-pre-warm-with-rtp-scan-spatial-memory" class="md-nav__link">
+  <a href="#step-9-build-spatial-memory-with-rtp-scan" class="md-nav__link">
     <span class="md-ellipsis">
-      Step 9 — Pre-warm with /rtp scan (Spatial Memory)
+      Step 9 — Build Spatial Memory with /rtp scan
     </span>
   </a>
   
@@ -3494,7 +3496,7 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 </tr>
 <tr>
 <td><code>rtp.config.set.&lt;section&gt;</code></td>
-<td>Write only the named section (e.g. <code>rtp.config.set.regions</code>); see <a href="../COMMANDS/">COMMANDS.md</a> §<code>/rtp config</code></td>
+<td>Write only the named section (e.g. <code>rtp.config.set.regions</code>); see <a href="../COMMANDS/">COMMANDS.md</a> section <code>/rtp config</code></td>
 </tr>
 <tr>
 <td><code>rtp.config</code></td>
@@ -3506,7 +3508,7 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 </tr>
 <tr>
 <td><code>rtp.scan</code></td>
-<td>Use <code>/rtp scan</code> to pre-generate locations</td>
+<td>Use <code>/rtp scan</code> to build spatial memory</td>
 </tr>
 <tr>
 <td><code>rtp.test</code></td>
@@ -3518,7 +3520,7 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 <div class="highlight"><pre><span></span><code>/lp group default permission set rtp.use true
 /lp group default permission set rtp.see true
 </code></pre></div>
-<p>Full permission reference (including world/region permissions like <code>rtp.worlds.&lt;world&gt;</code> and <code>rtp.regions.&lt;name&gt;</code>): <a href="../COMMANDS/">COMMANDS.md</a> §"Full Permission Reference".</p>
+<p>Full permission reference (including world/region permissions like <code>rtp.worlds.&lt;world&gt;</code> and <code>rtp.regions.&lt;name&gt;</code>): <a href="../COMMANDS/">COMMANDS.md</a> section "Full Permission Reference".</p>
 <hr />
 <h2 id="step-7-optional-enable-economy">Step 7 — (Optional) Enable Economy<a class="headerlink" href="#step-7-optional-enable-economy" title="Permanent link">&para;</a></h2>
 <p>If you have <strong>Vault</strong> and an economy plugin installed, RTP will automatically detect them.</p>
@@ -3557,7 +3559,7 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 /rtp config &lt;file&gt; view              # inspect current state interactively
 /rtp config &lt;file&gt; view &lt;key&gt;
 </code></pre></div>
-<p>Permissions are additive (see <a href="../COMMANDS/">COMMANDS.md</a> §<code>/rtp config</code>): <code>rtp.config.set</code> grants all writes; <code>rtp.config.set.&lt;section&gt;</code> (e.g. <code>rtp.config.set.regions</code>) grants only that section; <code>rtp.config.view</code> grants the read-only <code>view</code> form; the legacy <code>rtp.config</code> continues to grant view + set.</p>
+<p>Permissions are additive (see <a href="../COMMANDS/">COMMANDS.md</a> section <code>/rtp config</code>): <code>rtp.config.set</code> grants all writes; <code>rtp.config.set.&lt;section&gt;</code> (e.g. <code>rtp.config.set.regions</code>) grants only that section; <code>rtp.config.view</code> grants the read-only <code>view</code> form; the legacy <code>rtp.config</code> continues to grant view + set.</p>
 <p>For example, to update the nether region's world after the file already exists:</p>
 <div class="highlight"><pre><span></span><code>/rtp config regions nether world=world_nether
 /rtp config regions nether shape.radius=128 --dry-run    # preview, no change
@@ -3570,11 +3572,11 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 <p><strong>Tip for automation:</strong> Scripts, RCON clients, and addon plugins can issue <code>/rtp config</code> commands programmatically. Use <code>--dry-run</code> to preview the diff before committing; the audit record's <code>outcome</code> field (<code>COMMITTED</code> / <code>DRY_RUN_OK</code> / <code>REJECTED</code> / <code>ROLLED_BACK</code>) tells you what happened without parsing chat output. See <a href="../COMMANDS/">COMMANDS.md</a> for the full syntax and error codes.</p>
 </blockquote>
 <hr />
-<h2 id="step-9-pre-warm-with-rtp-scan-spatial-memory">Step 9 — Pre-warm with <code>/rtp scan</code> (Spatial Memory)<a class="headerlink" href="#step-9-pre-warm-with-rtp-scan-spatial-memory" title="Permanent link">&para;</a></h2>
+<h2 id="step-9-build-spatial-memory-with-rtp-scan">Step 9 — Build Spatial Memory with <code>/rtp scan</code><a class="headerlink" href="#step-9-build-spatial-memory-with-rtp-scan" title="Permanent link">&para;</a></h2>
 <blockquote>
 <p>⚠️ <strong>Run scan only after pregeneration is complete.</strong> <code>/rtp scan</code> (and the background scan that starts automatically when a region first loads) probes every spiral coordinate in the region; if the underlying chunks have not been pregenerated, each probe pays full chunkgen cost and competes with the server's chunk system for tick-thread I/O. On Fabric this can drag steady-state TPS noticeably; on any platform it makes scan throughput abysmal. <strong>Always finish your Chunky / WorldBorder pregeneration pass first</strong> (Step 0), then start the scan.</p>
 </blockquote>
-<p>Once worlds are pregenerated (Step 0) and regions are configured (Steps 4 and 8), map them so future teleports skip known-bad coordinates instantly. Scanning is async on every platform and never blocks tick threads.</p>
+<p>Once worlds are pregenerated (Step 0) and regions are configured (Steps 4 and 8), scan them to identify and persist known-bad coordinates into spatial memory. This allows background location generation and player teleports to skip invalid terrain immediately. Scanning is async on every platform and never blocks tick threads.</p>
 <div class="highlight"><pre><span></span><code>/rtp scan start                       # caller&#39;s region (player) or all (console)
 /rtp scan start  region=mining
 /rtp scan pause  region=mining
@@ -3588,7 +3590,7 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 <li>Monitor progress live via PlaceholderAPI: <code>%rtp_scan_chunks%</code>, <code>%rtp_scan_totalChunks%</code>, <code>%rtp_scan_cps%</code>, <code>%rtp_scan_eta%</code>, <code>%rtp_scan_landPercentage%</code>.</li>
 <li>If a scan is too heavy on the server, lower <code>performance.yml &gt; scanTaskCount</code>, then <code>/rtp scan resume</code>.</li>
 </ul>
-<p>Full sub-command reference: <a href="../COMMANDS/">COMMANDS.md</a> §<code>/rtp scan</code>. Operational playbook (after-safety-edit, chunk-leak, oversized memory file): <a href="../RUNBOOK/">RUNBOOK.md</a>.</p>
+<p>Full sub-command reference: <a href="../COMMANDS/">COMMANDS.md</a> section <code>/rtp scan</code>. Operational playbook (after-safety-edit, chunk-leak, oversized memory file): <a href="../RUNBOOK/">RUNBOOK.md</a>.</p>
 <hr />
 <h2 id="step-10-verify-with-rtp-info-and-rtp-test">Step 10 — Verify with <code>/rtp info</code> and <code>/rtp test</code><a class="headerlink" href="#step-10-verify-with-rtp-info-and-rtp-test" title="Permanent link">&para;</a></h2>
 <p>Inspect runtime state:</p>
@@ -3606,7 +3608,7 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 <li>Per-iteration failures log at <code>WARNING</code> — watch the console.</li>
 <li><code>stress</code> is the only sub-command available today; <code>queue</code>, <code>safety</code>, <code>verifiers</code>, <code>memory</code>, <code>platform</code>, <code>full</code> are planned.</li>
 </ul>
-<p>Full reference: <a href="../COMMANDS/">COMMANDS.md</a> §<code>/rtp test</code>.</p>
+<p>Full reference: <a href="../COMMANDS/">COMMANDS.md</a> section <code>/rtp test</code>.</p>
 <p>Manual smoke checks:</p>
 <div class="highlight"><pre><span></span><code>/rtp                       # default region in current world
 /rtp region=mining
@@ -3651,7 +3653,7 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 <tr>
 <td>Teleport is slow</td>
 <td>Cache empty on first run</td>
-<td>Wait 30–60 seconds for the background queue to fill, or run <code>/rtp scan</code> (Step 9)</td>
+<td>Wait a few moments for the background queue to fill, or check <code>cacheCap</code> in the region config</td>
 </tr>
 <tr>
 <td>Players land in ocean</td>

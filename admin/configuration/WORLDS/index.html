@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/WORLDS/">
+      
       
         <link rel="prev" href="../REGIONS/">
       
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#world-configuration-reference-worldsyml" class="md-skip">
+        <a href="#world-configuration-reference-definitionsworldsyml" class="md-skip">
           Skip to content
         </a>
       
@@ -955,9 +957,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#editing" class="md-nav__link">
+  <a href="#updating-settings" class="md-nav__link">
     <span class="md-ellipsis">
-      Editing
+      Updating Settings
     </span>
   </a>
   
@@ -3097,9 +3099,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#editing" class="md-nav__link">
+  <a href="#updating-settings" class="md-nav__link">
     <span class="md-ellipsis">
-      Editing
+      Updating Settings
     </span>
   </a>
   
@@ -3141,16 +3143,21 @@
   
 
 
-<h1 id="world-configuration-reference-worldsyml">World Configuration Reference (<code>worlds/*.yml</code>)<a class="headerlink" href="#world-configuration-reference-worldsyml" title="Permanent link">&para;</a></h1>
-<p>Each file in the <code>worlds/</code> folder maps a world to its default random teleportation region and permission settings. The filename (without <code>.yml</code>) must match the world name.</p>
-<p>A world file answers one question: when a player runs <code>/rtp</code> from this world (or targets it with <code>world=&lt;name&gt;</code>), which <a href="../REGIONS/">region</a> should be used? Each world points at exactly one default region. If a world has no config file yet, RTP copies and renames <code>default.yml</code> - <strong>do not delete <code>default.yml</code></strong>. A world added at runtime that is not recognized should be available on the next restart.</p>
+<h1 id="world-configuration-reference-definitionsworldsyml">World Configuration Reference (<code>definitions/worlds/*.yml</code>)<a class="headerlink" href="#world-configuration-reference-definitionsworldsyml" title="Permanent link">&para;</a></h1>
+<p>A world file is <strong>routing, not tuning</strong>. Each file in the <code>definitions/worlds/</code> folder answers one question: when a player runs <code>/rtp</code> from this world (or targets it with <code>world=&lt;name&gt;</code>), which <a href="../REGIONS/">region</a> answers? The filename (without <code>.yml</code>) must match the world name.</p>
+<p>Everything about <em>where and how</em> the player lands belongs to the region, not to the world: the destination world, the distance (<code>radius</code> / <code>centerRadius</code>), the shape, the vertical window, the price, the biome rules. That split is deliberate. A world can point at any region, several worlds can share one region, and a single world can be served by several regions (permission tiers via <code>requirePermission</code> / <code>override</code>, or an explicit <code>region=&lt;name&gt;</code> on the command). A radius attached to the world could express none of that.</p>
+<p>So to change teleport distance, edit the region this world points at - see <a href="../REGIONS/#region-size-radius-and-centerradius">Region Size: <code>radius</code> and <code>centerRadius</code></a> - or point the world at a different region.</p>
 <p>The region you map to may live in a <em>different</em> world: a region's own <code>world</code> key decides where players actually land, so a world file can redirect <code>/rtp</code> to a region that teleports the player elsewhere.</p>
+<p>If a world has no config file yet, RTP creates one based on <code>definitions/worlds/default.yml</code> - <strong>do not delete <code>default.yml</code></strong>. A world added at runtime that is not recognized will be available on the next restart.</p>
 <hr />
-<h2 id="editing">Editing<a class="headerlink" href="#editing" title="Permanent link">&para;</a></h2>
-<p>The recommended way to edit a world mapping is <strong>in-game via the menu</strong>: <code>/rtp menu</code> -&gt; <strong>Admin panel -&gt; Config editor</strong> -&gt; pick the Worlds file, then the world and key. It validates the value, writes the file, and reloads for you.</p>
-<p>You can also edit the file on disk and run <code>/rtp reload worlds</code>, or change a key at runtime:</p>
-<div class="highlight"><pre><span></span><code>/rtp config worlds &lt;worldname&gt; region=&lt;regionname&gt;
-</code></pre></div>
+<h2 id="updating-settings">Updating Settings<a class="headerlink" href="#updating-settings" title="Permanent link">&para;</a></h2>
+<p>You can update world mappings through:
+1. <strong>In-game admin menu</strong>: Run <code>/rtp admin</code> or <code>/rtp menu</code> -&gt; click <strong>Worlds</strong>.
+2. <strong>Command line</strong>: Use <code>/rtp config world &lt;worldname&gt; &lt;key&gt;=&lt;value&gt;</code> (e.g. <code>/rtp config world world region=custom_region</code>).
+3. <strong>Direct editing</strong>: Edit <code>definitions/worlds/&lt;world&gt;.yml</code> on disk and run <code>/rtp reload</code>.</p>
+<blockquote>
+<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full menu and command navigation details.</p>
+</blockquote>
 <p>With the <code>rtp.info</code> permission, inspect a world's settings with <code>/rtp info</code> or <code>/rtp info world=&lt;name&gt;</code>.</p>
 <hr />
 <h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
@@ -3172,9 +3179,9 @@
 </tr>
 <tr>
 <td><code>requirePermission</code></td>
-<td>Boolean</td>
+<td>Boolean / String</td>
 <td><code>false</code></td>
-<td>If <code>true</code>, players need the <code>rtp.worlds.&lt;worldname&gt;</code> permission to use RTP in this world.</td>
+<td>If <code>true</code>, players need the <code>rtp.worlds.&lt;worldname&gt;</code> permission to use RTP in this world. Can also be set to <code>"@config"</code> to inherit from <code>config.yml</code>.</td>
 </tr>
 <tr>
 <td><code>override</code></td>

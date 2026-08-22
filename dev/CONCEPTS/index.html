@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/CONCEPTS/">
+      
       
       
       
@@ -3174,7 +3176,7 @@ No Java knowledge required — it's written for server administrators and curiou
 <li>When a player runs <code>/rtp</code>, the plugin pops the next ready location off the queue — instant.</li>
 <li>The background task then refills the queue asynchronously.</li>
 </ul>
-<p>This is why the first teleport after a cold server start might take a moment (the queue is empty), but subsequent teleports are instant. Running <code>/rtp scan</code> manually pre-warms the queue.</p>
+<p>This is why the first teleport after a cold server start might take a moment if the background queue has not yet filled, but subsequent teleports are instant once the queue is populated.</p>
 <hr />
 <h2 id="regions">Regions<a class="headerlink" href="#regions" title="Permanent link">&para;</a></h2>
 <p>A <strong>region</strong> is an independent teleport zone. Each region has:
@@ -3243,7 +3245,7 @@ No Java knowledge required — it's written for server administrators and curiou
        │
    ┌───┴────────────────────────────────────────────────┐
    │ Queue has a ready location                         │ Queue is empty
-   │ (normal case — instant)                            │ (cold start / scan not run)
+   │ (normal case — instant)                            │ (cold start / queue filling)
    ▼                                                    ▼
  Teleport player immediately            Generate location on-demand (may take
        │                                1–2 ticks while chunk loads)

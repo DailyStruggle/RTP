@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/">
+      
       
         <link rel="prev" href="../site/why/">
       
@@ -3368,11 +3370,14 @@
 If you are implementing a custom shape, vertical adjustor, biome filter, or claim-check hook, start here.</p>
 <blockquote>
 <p><strong>In a hurry?</strong> Jump to the <a href="../ADDON_QUICKSTART/">Addon Quickstart</a> - a one-page tutorial that
-registers a custom region shape in about 20 lines (Gradle dependency, <code>ServiceLoader</code> descriptor,
+registers a custom region shape in about 20 lines (dependency, <code>ServiceLoader</code> descriptor,
 and an <code>RTPAddon</code> that calls <code>RTP.addShape(...)</code>).</p>
-<p><strong>Building outside this repository?</strong> Both <code>rtp-api</code> and <code>rtp-core</code> are published on JitPack as
-<code>com.github.DailyStruggle.RTP:rtp-api:&lt;tag&gt;</code> / <code>:rtp-core:&lt;tag&gt;</code>. See
-<a href="../dev/PUBLISHING/">dev/PUBLISHING.md</a> for the dependency snippet and the Maven Central path.</p>
+<p><strong>Your addon is its own project</strong> (the normal case). Both <code>rtp-api</code> and <code>rtp-core</code> are published
+to <strong>Maven Central</strong> as <code>io.github.dailystruggle:rtp-api</code> / <code>:rtp-core</code> (currently <code>3.2.1</code>), so
+add them with <code>mavenCentral()</code> (Gradle) or a plain <code>&lt;dependency&gt;</code> (Maven) - no repository block or
+credentials. They are also served on JitPack (<code>com.github.DailyStruggle.RTP:rtp-api:&lt;tag&gt;</code>) for
+tracking a git tag / branch / commit. The Quickstart has copy-paste Gradle <strong>and</strong> Maven
+(<code>pom.xml</code>) snippets; <a href="../dev/PUBLISHING/">dev/PUBLISHING.md</a> documents every channel.</p>
 </blockquote>
 <hr />
 <h2 id="addons-are-platform-agnostic-by-default">Addons Are Platform-Agnostic by Default<a class="headerlink" href="#addons-are-platform-agnostic-by-default" title="Permanent link">&para;</a></h2>

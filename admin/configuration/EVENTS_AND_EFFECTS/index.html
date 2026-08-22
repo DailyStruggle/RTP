@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/EVENTS_AND_EFFECTS/">
+      
       
         <link rel="prev" href="../ECONOMY/">
       
@@ -1068,6 +1070,24 @@
   
     <nav class="md-nav" aria-label="Part 1 — Effect listeners (for operators)">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#declarative-effect-groups-definitionseffectsyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Declarative Effect Groups (definitions/effects/*.yml)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#permission-driven-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      Permission-Driven Effects
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#enable-disable-globally" class="md-nav__link">
@@ -3257,6 +3277,24 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#declarative-effect-groups-definitionseffectsyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Declarative Effect Groups (definitions/effects/*.yml)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#permission-driven-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      Permission-Driven Effects
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#enable-disable-globally" class="md-nav__link">
     <span class="md-ellipsis">
       Enable / disable globally
@@ -3444,28 +3482,44 @@
 <h1 id="events-effects">Events &amp; Effects<a class="headerlink" href="#events-effects" title="Permanent link">&para;</a></h1>
 <p>Two related but distinct extension points in RTP:</p>
 <ul>
-<li><strong>Part 1 — Effect listeners</strong> are for <strong>server operators</strong> who want visual / audio feedback (sounds, particles, fireworks, potions, notes) when players move through the teleport pipeline — configured entirely through permissions, no code.</li>
+<li><strong>Part 1 — Effect listeners</strong> are for <strong>server operators</strong> who want visual / audio feedback (sounds, particles, fireworks, potions, notes) when players move through the teleport pipeline — configured via definition YAML files or permissions, no code.</li>
 <li><strong>Part 2 — Event listeners</strong> are for <strong>plugin developers</strong> writing an addon that wants to react to RTP's teleport lifecycle (logging, analytics, economy hooks, custom safety checks, etc.).</li>
 </ul>
 <blockquote>
 <p>Supported server versions: <strong>Minecraft 1.20.1 and above</strong>. Anything in this document assumes that baseline — legacy-version caveats have been omitted.</p>
-<p>See also: <a href="../../COMMANDS/"><code>COMMANDS.md</code></a> for permission reference, <a href="../CONFIGURATION/"><code>CONFIGURATION.md</code></a> for <code>performance.yml</code> toggles.</p>
+<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for how to adjust global effect toggles via <code>/rtp admin</code> or <code>/rtp config</code>.
+See also: <a href="../../COMMANDS/"><code>COMMANDS.md</code></a> for permission reference, <a href="../CONFIGURATION/"><code>CONFIGURATION.md</code></a> for <code>performance.yml</code> toggles.</p>
 </blockquote>
 <hr />
 <h2 id="part-1-effect-listeners-for-operators">Part 1 — Effect listeners (for operators)<a class="headerlink" href="#part-1-effect-listeners-for-operators" title="Permanent link">&para;</a></h2>
-<p>RTP bundles the <code>effects-api</code> module (shaded as <code>io.github.dailystruggle.rtp.effectsapi</code>). <code>BukkitEffectsHandler.setupEffects(...)</code> hooks each teleport pipeline stage and — when enabled — dispatches effects driven entirely by <strong>permission nodes</strong> granted to the player (directly, via group, or via a permissions plugin).</p>
+<p>RTP bundles the <code>effects-api</code> module. Teleport effects can be configured declaratively via YAML definition files under <code>definitions/effects/</code> or assigned dynamically via player permissions.</p>
+<h3 id="declarative-effect-groups-definitionseffectsyml">Declarative Effect Groups (<code>definitions/effects/*.yml</code>)<a class="headerlink" href="#declarative-effect-groups-definitionseffectsyml" title="Permanent link">&para;</a></h3>
+<p>Effect groups are defined in YAML files under <code>definitions/effects/</code> (e.g., <code>default.yml</code>, <code>default-pre.yml</code>, <code>default-cancel.yml</code>). Each file specifies:</p>
+<ul>
+<li><code>when</code>: The pipeline trigger stage (<code>presetup</code>, <code>preteleport</code>, <code>postteleport</code>, <code>cancel</code>, <code>join</code>, <code>respawn</code>, etc.).</li>
+<li><code>effects</code>: A list of effect tokens formatted as <code>TYPE.arg1.arg2...</code>.</li>
+</ul>
+<p>Example (<code>definitions/effects/default.yml</code>):
+<div class="highlight"><pre><span></span><code><span class="nt">when</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postteleport</span>
+<span class="nt">effects</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SOUND.ENTITY_ENDERMAN_TELEPORT.100.100.0.0.0</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PARTICLE.PORTAL.32</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POTION.SLOW_FALLING.60.1.false.false.false</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POTION.BLINDNESS.40.1.false.false.false</span>
+</code></pre></div></p>
+<h3 id="permission-driven-effects">Permission-Driven Effects<a class="headerlink" href="#permission-driven-effects" title="Permanent link">&para;</a></h3>
+<p>In addition to definition files, effects can be dispatched via <strong>permission nodes</strong> granted to players / groups.</p>
 <p>Operators write <strong>no code</strong>. Just:</p>
 <ol>
-<li>Enable effect parsing.</li>
+<li>Ensure <code>effectParsing: true</code> is enabled in <code>advanced/performance.yml</code>.</li>
 <li>Grant <code>rtp.effect.&lt;stage&gt;.&lt;TYPE&gt;[.&lt;arg&gt;...]</code> nodes to the players / groups who should see them.</li>
 </ol>
 <h3 id="enable-disable-globally">Enable / disable globally<a class="headerlink" href="#enable-disable-globally" title="Permanent link">&para;</a></h3>
-<p>In <code>performance.yml</code>:</p>
+<p>In <code>advanced/performance.yml</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Scan player permissions for rtp.effect.* on every teleport pipeline stage.</span>
-<span class="c1"># MEDIUM impact. Leave false unless you actually use rtp.effect.* nodes.</span>
-<span class="nt">effectParsing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">effectParsing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
-<p>Set to <code>true</code> to activate effect dispatch. A <code>/rtp reload</code> picks the change up without a restart.</p>
+<p>Set to <code>false</code> if you wish to disable permission-based effect parsing. A <code>/rtp reload</code> picks the change up without a restart.</p>
 <blockquote>
 <p>Unrelated but sometimes confused: <code>onEventParsing</code> gates the <strong>auto-teleport on lifecycle events</strong> listener (<code>rtp.onevent.join</code>, <code>rtp.onevent.respawn</code>, etc.). That is not an effect.</p>
 </blockquote>

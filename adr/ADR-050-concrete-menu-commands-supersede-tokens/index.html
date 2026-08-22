@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-050-concrete-menu-commands-supersede-tokens/">
+      
       
         <link rel="prev" href="../ADR-049-network-mode-platform-neutral-lift/">
       
@@ -3180,7 +3182,7 @@
 <h1 id="adr-050-concrete-menu-commands-supersede-token-registries">ADR-050 - Concrete Menu Commands Supersede Token Registries<a class="headerlink" href="#adr-050-concrete-menu-commands-supersede-token-registries" title="Permanent link">&para;</a></h1>
 <p><strong>Status:</strong> Accepted
 <strong>Date:</strong> 2026-05-24 (Proposed) / 2026-05-24 (Accepted, all stages landed)
-<strong>Supersedes (in part):</strong> <a href="../ADR-035-interactive-menus-book-first/">ADR-035</a> sections on <code>MenuTokenRegistry</code> (§3 "Click handling", §"Security boundary"); <a href="../ADR-047-declarative-chart-composition-bridge/">ADR-047</a> sections on <code>ChartSpecTokens</code> opaque UUID handles for <code>OpenMap</code>.</p>
+<strong>Supersedes (in part):</strong> <a href="../ADR-035-interactive-menus-book-first/">ADR-035</a> sections on <code>MenuTokenRegistry</code> (section 3 "Click handling", section "Security boundary"); <a href="../ADR-047-declarative-chart-composition-bridge/">ADR-047</a> sections on <code>ChartSpecTokens</code> opaque UUID handles for <code>OpenMap</code>.</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
 <p>ADR-035 (interactive menus, book-first) introduced a <code>MenuTokenRegistry</code> (<code>rtp-api</code>) plus a <code>LocalMenuTokenRegistry</code> (<code>rtp-core</code>) that mints opaque single-use, player-bound, TTL-expiring tokens for every clickable book fragment. Each click in the rendered book carries the opaque token as the entire payload of a <code>/rtp menu token=&lt;token&gt;</code> redeem command; the server-side <code>MenuRedeemSubcommand</code> consumes the token atomically and dispatches the stored <code>MenuAction</code>. ADR-047 layered an analogous <code>ChartSpecTokens</code> UUID registry on top of <code>OpenMap</code> so the map-rendering click payload would not embed the <code>ChartSpec</code> directly.</p>
 <p>Two years of operating that design have exposed the following:</p>
@@ -3317,7 +3319,7 @@
 </li>
 <li><strong>Stage 1 (this ADR's first landing):</strong> concrete-command leaves are added alongside the existing token redeem path. The renderer still mints tokens. Both paths reach the same <code>dispatch*</code> helpers. The grammar is reachable end-to-end before any deletion.</li>
 <li><strong>Stage 2:</strong> the renderer switches to emitting concrete <code>runCommand</code> strings; <code>BookMenuRenderer</code>'s <code>MenuTokenRegistry</code> constructor dependency is dropped.</li>
-<li><strong>Stage 3:</strong> the token redeem branch, the registries, <code>ChartSpecTokens</code>, and the now-orphaned message keys are deleted. This ADR is promoted from Proposed to Accepted at the start of Stage 3. ADR-035 §3 and §"Security boundary" and ADR-047's chart-spec-token sections are marked superseded by this ADR (with date) at the same point.</li>
+<li><strong>Stage 3:</strong> the token redeem branch, the registries, <code>ChartSpecTokens</code>, and the now-orphaned message keys are deleted. This ADR is promoted from Proposed to Accepted at the start of Stage 3. ADR-035 section 3 and section "Security boundary" and ADR-047's chart-spec-token sections are marked superseded by this ADR (with date) at the same point.</li>
 </ol>
 <h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
 <table>
@@ -3349,7 +3351,7 @@
 <h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Positive:</strong></li>
-<li>Operators can read the literal admin command from any click in any rendered book; the menu becomes a discovery surface for the command grammar (the original premise of ADR-035 §1).</li>
+<li>Operators can read the literal admin command from any click in any rendered book; the menu becomes a discovery surface for the command grammar (the original premise of ADR-035 section 1).</li>
 <li>No more <code>menu.expired</code> UX failures from a book left open.</li>
 <li>Net code reduction: <code>MenuTokenRegistry</code>, <code>LocalMenuTokenRegistry</code>, <code>ChartSpecTokens</code>, the cap/eviction logic, the token-cap message keys, and <code>MenuTokenRegistryTest</code> all disappear. Estimated 600-800 LoC net negative after Stage 3.</li>
 <li>Future menu surfaces have no template for adding another opaque token registry; the pattern is the concrete-command grammar.</li>

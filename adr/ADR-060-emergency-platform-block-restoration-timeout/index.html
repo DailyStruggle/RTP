@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-060-emergency-platform-block-restoration-timeout/">
+      
       
         <link rel="prev" href="../ADR-059-relative-ground-distance-safety-predicate/">
       
@@ -3340,7 +3342,7 @@
 <p>A new table, e.g. <code>rtp_platform_restores</code>, reusing the existing HikariCP-backed accessor and its <code>cacheValue</code> / <code>flush</code> / <code>delete</code> write path and a dedicated load query (mirroring <code>loadCachedLocations</code> / <code>purgeStaleLocations</code>):</p>
 <ul>
 <li>Columns: <code>id</code> (UUID/text, primary key), <code>world</code> (text), <code>cx</code> / <code>cz</code> (int, the countdown-gate chunk), <code>remaining_seconds</code> (int), <code>blocks</code> (text/BLOB - the serialized <code>BlockDelta</code> list, e.g. newline-delimited <code>x,y,z,token</code> records).</li>
-<li>Written when an entry is enrolled; <code>remaining_seconds</code> is periodically updated (or written lazily on shutdown - see §4) so a restart resumes from approximately the right remaining time; <strong>deleted</strong> when the restore completes or is abandoned.</li>
+<li>Written when an entry is enrolled; <code>remaining_seconds</code> is periodically updated (or written lazily on shutdown - see section 4) so a restart resumes from approximately the right remaining time; <strong>deleted</strong> when the restore completes or is abandoned.</li>
 <li>On core startup, all rows are loaded and re-enrolled into the in-memory reaper so countdowns resume across restarts. This is the "persist across restarts" requirement.</li>
 <li>Not part of any network/proxy state (<code>NetworkStateBinding</code>); this is backend-local world mutation.</li>
 </ul>
@@ -3417,7 +3419,7 @@
 <li>Emergency platform implementation: <code>RTPWorld#platform</code> (<code>rtp-api</code>), <code>BukkitRTPWorld#platform</code>, <code>FoliaRTPWorld#platform</code>, Fabric world peer; knobs <code>platformRadius</code> / <code>platformDepth</code> / <code>platformAirHeight</code> / <code>platformMaterial</code> in <code>safety.yml</code> (<code>SafetyKeys</code>).</li>
 <li>Persistence layer: <code>AbstractSQLDatabaseAccessor</code> (<code>cacheValue</code> / <code>flush</code> / <code>delete</code> / <code>loadCachedLocations</code> / <code>purgeStaleLocations</code>).</li>
 <li>Scheduling contract: <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> <em>Scheduler Usage</em>; <code>RTPScheduler</code> (<code>runTask(RTPLocation, ...)</code>); active-GC prior art: <code>MemoryTracker</code>.</li>
-<li>S-003 / S-004 / S-005: <a href="../../dev/REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a>; claim integration: <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/">ADR-019</a>.</li>
+<li>S-003 / S-004 / S-005: <a href="../../dev/REQUIREMENTS/"><code>REQUIREMENTS.md section 3</code></a>; claim integration: <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/">ADR-019</a>.</li>
 <li>Decoupled-from-paste rationale: <a href="../ADR-058-region-specific-schematic-paste/">ADR-058</a> (the <code>SchematicPaster</code> path this feature deliberately does <strong>not</strong> use).</li>
 <li>Roadmap context: <a href="../../dev/ROADMAP/"><code>docs/dev/ROADMAP.md</code></a>.</li>
 </ul>

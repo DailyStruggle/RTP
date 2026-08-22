@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-008-memory-tracker-active-gc/">
+      
       
         <link rel="prev" href="../ADR-007-per-user-isolated-queues/">
       
@@ -3182,7 +3184,7 @@
 </li>
 </ol>
 <p>Together, the active tracker catches leaks that persist despite live references (stalled tasks), while weak references handle clean deallocation of truly abandoned objects.</p>
-<p>For implementation and code-level details (e.g., <code>MemoryTracker</code>, <code>TeleportPipelineTask</code>), see <a href="../../dev/DESIGN/#6-active-task-and-resource-tracking-memory-and-chunk-management">DESIGN.md §6 — Active Task and Resource Tracking</a>.</p>
+<p>For implementation and code-level details (e.g., <code>MemoryTracker</code>, <code>TeleportPipelineTask</code>), see <a href="../../dev/DESIGN/#6-active-task-and-resource-tracking-memory-and-chunk-management">DESIGN.md section 6 — Active Task and Resource Tracking</a>.</p>
 <h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Positive:</strong></li>
@@ -3201,7 +3203,7 @@
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Implementing classes: <code>MemoryTracker</code>, <code>TeleportPipelineTask</code> (<code>rtp-core</code>); chunk ticket management in platform adapters (<code>rtp-bukkit</code>, <code>rtp-paper</code>, <code>rtp-folia</code>)</li>
-<li>Design reference: <a href="../../dev/DESIGN/"><code>DESIGN.md</code> §6 — Active Task and Resource Tracking</a></li>
+<li>Design reference: <a href="../../dev/DESIGN/"><code>DESIGN.md</code> section 6 — Active Task and Resource Tracking</a></li>
 <li>Related: <a href="../ADR-006-async-queue-pre-generation/">ADR-006</a> (pre-generation pipeline), <a href="../ADR-007-per-user-isolated-queues/">ADR-007</a> (orphaned per-user queue cleanup on disconnect)</li>
 <li>Requirements: <code>REQ-RTP-NF-003</code> (memory stability), <code>REQ-RTP-NF-004</code> (chunk allocation management)</li>
 </ul>

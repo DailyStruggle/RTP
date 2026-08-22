@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/ADDON_QUICKSTART/">
+      
       
         <link rel="prev" href="../FOR_ADDON_DEVELOPERS/">
       
@@ -1406,9 +1408,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-depend-on-rtp-buildgradle" class="md-nav__link">
+  <a href="#1-depend-on-rtp" class="md-nav__link">
     <span class="md-ellipsis">
-      1. Depend on RTP (build.gradle)
+      1. Depend on RTP
     </span>
   </a>
   
@@ -3124,9 +3126,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-depend-on-rtp-buildgradle" class="md-nav__link">
+  <a href="#1-depend-on-rtp" class="md-nav__link">
     <span class="md-ellipsis">
-      1. Depend on RTP (build.gradle)
+      1. Depend on RTP
     </span>
   </a>
   
@@ -3207,28 +3209,85 @@ region shape. It is the "hello world" companion to the router in
 <a href="../adr/ADR-051-two-tier-api-extension-model/">ADR-051</a> for why shape registration is the
 typed <code>RTP.addShape(Shape&lt;?&gt;)</code> call.</p>
 <hr />
-<h2 id="1-depend-on-rtp-buildgradle">1. Depend on RTP (<code>build.gradle</code>)<a class="headerlink" href="#1-depend-on-rtp-buildgradle" title="Permanent link">&para;</a></h2>
+<h2 id="1-depend-on-rtp">1. Depend on RTP<a class="headerlink" href="#1-depend-on-rtp" title="Permanent link">&para;</a></h2>
 <p>Compile against <code>rtp-api</code> (the <code>RTPAddon</code> SPI) and <code>rtp-core</code> (the <code>Shape</code> hierarchy and
-the <code>RTP</code> facade). Both are <code>compileOnly</code> - RTP provides them at runtime.</p>
-<p>In-repo addon (a sub-project of this build):</p>
-<div class="highlight"><pre><span></span><code>dependencies {
-    compileOnly project(&#39;:rtp-api&#39;)   // RTPAddon SPI
-    compileOnly project(&#39;:rtp-core&#39;)  // RTP.addShape, Shape, built-in shapes
+the <code>RTP</code> facade). Both are compile-only - RTP provides them at runtime (Gradle <code>compileOnly</code>,
+Maven <code>&lt;scope&gt;provided&lt;/scope&gt;</code>).</p>
+<p>Your addon is its own project, so pull the published artifacts from <strong>Maven Central</strong> - it is
+in the default repository set of both Gradle and Maven, so no repository block or credentials
+are needed.</p>
+<p>Gradle (<code>build.gradle</code>):</p>
+<div class="highlight"><pre><span></span><code>repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly &#39;io.github.dailystruggle:rtp-api:3.2.1&#39;   // RTPAddon SPI
+    compileOnly &#39;io.github.dailystruggle:rtp-core:3.2.1&#39;  // RTP.addShape, Shape, built-in shapes
 }
 </code></pre></div>
-<p>Building <strong>outside</strong> this repository? Pull the published artifacts from JitPack instead:</p>
+<p>Maven (<code>pom.xml</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&lt;dependencies&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span><span class="w">                                  </span><span class="cm">&lt;!-- RTPAddon SPI --&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>io.github.dailystruggle<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>rtp-api<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>3.2.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span><span class="w">                                  </span><span class="cm">&lt;!-- RTP.addShape, Shape, built-in shapes --&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>io.github.dailystruggle<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>rtp-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>3.2.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="nt">&lt;/dependencies&gt;</span>
+</code></pre></div>
+<p>Prefer to track a git tag / branch / commit instead of a released version? <strong>JitPack</strong> serves
+the same modules on demand.</p>
+<p>Gradle:</p>
 <div class="highlight"><pre><span></span><code>repositories {
     mavenCentral()
     maven { url &#39;https://jitpack.io&#39; }
 }
 
 dependencies {
-    compileOnly &#39;com.github.DailyStruggle.RTP:rtp-api:3.0.1&#39;   // RTPAddon SPI
-    compileOnly &#39;com.github.DailyStruggle.RTP:rtp-core:3.0.1&#39;  // RTP.addShape, Shape, built-in shapes
+    compileOnly &#39;com.github.DailyStruggle.RTP:rtp-api:3.2.1&#39;   // RTPAddon SPI
+    compileOnly &#39;com.github.DailyStruggle.RTP:rtp-core:3.2.1&#39;  // RTP.addShape, Shape, built-in shapes
 }
 </code></pre></div>
-<p>(<code>3.0.1</code> is a git tag; a branch like <code>master-SNAPSHOT</code> or a commit SHA also works. See
-<a href="../dev/PUBLISHING/"><code>dev/PUBLISHING.md</code></a> for the publishing setup and the Maven Central path.)</p>
+<p>Maven:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&lt;repositories&gt;</span>
+<span class="w">    </span><span class="nt">&lt;repository&gt;</span>
+<span class="w">        </span><span class="nt">&lt;id&gt;</span>jitpack.io<span class="nt">&lt;/id&gt;</span>
+<span class="w">        </span><span class="nt">&lt;url&gt;</span>https://jitpack.io<span class="nt">&lt;/url&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/repository&gt;</span>
+<span class="nt">&lt;/repositories&gt;</span>
+
+<span class="nt">&lt;dependencies&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>com.github.DailyStruggle.RTP<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>rtp-api<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>3.2.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>com.github.DailyStruggle.RTP<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>rtp-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>3.2.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="nt">&lt;/dependencies&gt;</span>
+</code></pre></div>
+<p>(On JitPack the version is a git tag; a branch like <code>master-SNAPSHOT</code> or a commit SHA also
+works. See <a href="../dev/PUBLISHING/"><code>dev/PUBLISHING.md</code></a> for all publishing channels, including the
+credentialed GitHub Packages registry.)</p>
+<p>Building your addon <strong>as a sub-project of this repository</strong> instead? Skip the coordinates and
+depend on the modules directly:</p>
+<div class="highlight"><pre><span></span><code>dependencies {
+    compileOnly project(&#39;:rtp-api&#39;)   // RTPAddon SPI
+    compileOnly project(&#39;:rtp-core&#39;)  // RTP.addShape, Shape, built-in shapes
+}
+</code></pre></div>
 <hr />
 <h2 id="2-register-the-addon-for-serviceloader">2. Register the addon for <code>ServiceLoader</code><a class="headerlink" href="#2-register-the-addon-for-serviceloader" title="Permanent link">&para;</a></h2>
 <p>Create one file so RTP can discover your addon on every platform:</p>

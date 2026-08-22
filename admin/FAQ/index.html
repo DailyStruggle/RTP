@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/FAQ/">
+      
       
         <link rel="prev" href="../COMMANDS/">
       
@@ -856,6 +858,15 @@
   <a href="#can-i-have-different-regions-for-different-worlds" class="md-nav__link">
     <span class="md-ellipsis">
       Can I have different regions for different worlds?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-change-the-teleport-radius-for-one-world-there-is-no-radius-in-worldsworldyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      How do I change the teleport radius for one world? There is no radius in worlds/&lt;world&gt;.yml.
     </span>
   </a>
   
@@ -3626,6 +3637,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#how-do-i-change-the-teleport-radius-for-one-world-there-is-no-radius-in-worldsworldyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      How do I change the teleport radius for one world? There is no radius in worlds/&lt;world&gt;.yml.
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#can-i-disable-the-invulnerability-period" class="md-nav__link">
     <span class="md-ellipsis">
       Can I disable the invulnerability period?
@@ -3752,8 +3772,8 @@
 <hr />
 <h2 id="behaviour">Behaviour<a class="headerlink" href="#behaviour" title="Permanent link">&para;</a></h2>
 <h3 id="why-did-the-first-teleport-take-a-few-seconds-but-later-ones-were-instant">Why did the first teleport take a few seconds, but later ones were instant?<a class="headerlink" href="#why-did-the-first-teleport-take-a-few-seconds-but-later-ones-were-instant" title="Permanent link">&para;</a></h3>
-<p>RTP pre-generates a queue of safe locations in the background. On a cold start (server just started, or after <code>/rtp reload</code>), the queue is empty and the first few teleports must generate locations on-demand, which requires loading chunks. Once the queue is warm, all teleports are instant.</p>
-<p>Run <code>/rtp scan</code> to pre-warm the queue before players join, or increase <code>cacheCap</code> in the region config to keep more locations ready.</p>
+<p>RTP pre-generates a queue of safe locations in the background. On a cold start (server just started, or after <code>/rtp reload</code>), the queue starts empty and the first few teleports may generate locations on-demand if the queue has not yet finished filling. Once the background queue populates, all teleports are instant.</p>
+<p>You can increase <code>cacheCap</code> in the region config to maintain a larger pool of ready locations, or tune replenishment intervals in <code>advanced/performance.yml</code>.</p>
 <h3 id="players-keep-landing-in-the-ocean-nether-end-how-do-i-stop-that">Players keep landing in the ocean / nether / end. How do I stop that?<a class="headerlink" href="#players-keep-landing-in-the-ocean-nether-end-how-do-i-stop-that" title="Permanent link">&para;</a></h3>
 <p>Open <code>plugins/RTP/safety.yml</code> and add the unwanted biomes to the biome blacklist. Common entries:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">biomeBlacklist</span><span class="p">:</span>
@@ -3838,6 +3858,14 @@
 <div class="highlight"><pre><span></span><code><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;myRegionName&quot;</span>
 </code></pre></div>
 <p>That world will now use <code>myRegionName</code> as its default region when players run <code>/rtp</code> there.</p>
+<h3 id="how-do-i-change-the-teleport-radius-for-one-world-there-is-no-radius-in-worldsworldyml">How do I change the teleport radius for one world? There is no <code>radius</code> in <code>worlds/&lt;world&gt;.yml</code>.<a class="headerlink" href="#how-do-i-change-the-teleport-radius-for-one-world-there-is-no-radius-in-worldsworldyml" title="Permanent link">&para;</a></h3>
+<p>Correct, and it is not missing - radius is not a world setting. A world file only names the region that answers <code>/rtp</code> there; the <strong>region</strong> owns the destination, including distance, shape, vertical range, and price. So you change the region, not the world:</p>
+<ol>
+<li><strong>Edit the region that world points at.</strong> Read the name out of <code>plugins/RTP/definitions/worlds/&lt;world&gt;.yml</code> (<code>region:</code>), then either run <code>/rtp config regions &lt;region&gt; shape.radius=625</code> or edit the <code>shape:</code> block in <code>plugins/RTP/definitions/regions/&lt;region&gt;.yml</code>. Add <code>--dry-run</code> to the command to preview it.</li>
+<li><strong>If that region is shared</strong> by other worlds and you only want this one to change, create a new region file and point the world at it instead.</li>
+</ol>
+<p>On a fresh install the region ships <code>shape: "@config"</code>, which inherits the whole <code>defaults.shape</code> block from <code>config.yml</code>. That is why a new setup has only one <code>radius</code> on disk: editing <code>defaults.shape.radius</code> moves every region that still inherits, which is what a single-world server wants. To give one world its own distance, replace <code>"@config"</code> with an inline <code>shape:</code> block in that region. Full walkthrough: <a href="../configuration/REGIONS/#where-to-set-the-radius">Where to set the radius</a>.</p>
+<p>The payoff for the extra hop: because distance belongs to the region, one world can offer several distances at the same time. Ship <code>wild</code> at <code>radius: 625</code> and <code>wild_far</code> at <code>radius: 3125</code>, gate the second with <code>requirePermission: true</code>, and players who have it use <code>/rtp region=wild_far</code>. A radius attached to the world could not do that.</p>
 <h3 id="can-i-disable-the-invulnerability-period">Can I disable the invulnerability period?<a class="headerlink" href="#can-i-disable-the-invulnerability-period" title="Permanent link">&para;</a></h3>
 <p>Set <code>invulnerabilityTime: 0</code> in <code>plugins/RTP/safety.yml</code>.</p>
 <h3 id="can-i-use-a-normal-distribution-instead-of-a-flat-spread">Can I use a normal distribution instead of a flat spread?<a class="headerlink" href="#can-i-use-a-normal-distribution-instead-of-a-flat-spread" title="Permanent link">&para;</a></h3>

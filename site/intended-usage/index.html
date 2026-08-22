@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/site/intended-usage/">
+      
       
         <link rel="prev" href="../../admin/QUICK_START/">
       
@@ -564,9 +566,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#why-it-scans-ahead-of-time" class="md-nav__link">
+  <a href="#how-locations-are-prepared-and-verified" class="md-nav__link">
     <span class="md-ellipsis">
-      Why it scans ahead of time
+      How locations are prepared and verified
     </span>
   </a>
   
@@ -3178,9 +3180,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#why-it-scans-ahead-of-time" class="md-nav__link">
+  <a href="#how-locations-are-prepared-and-verified" class="md-nav__link">
     <span class="md-ellipsis">
-      Why it scans ahead of time
+      How locations are prepared and verified
     </span>
   </a>
   
@@ -3279,12 +3281,12 @@
 <li><strong>Install</strong> and start the server once to write the default config.</li>
 <li><strong>Configure</strong> a region's geometry (shape, size, center) - see <a href="../../admin/configuration/REGIONS/">Regions</a>.</li>
 <li><strong>Point each world at a region</strong> in its config - see <a href="../../admin/configuration/WORLDS/">Worlds</a>.</li>
-<li><strong>Warm the cache</strong>: <code>/rtp scan start region=&lt;name&gt;</code> per reasonably-sized region - see the <a href="../../admin/QUICK_START/">Quick start</a> scan step.</li>
+<li><strong>Pre-scan for safety</strong>: optionally run <code>/rtp scan start region=&lt;name&gt;</code> per reasonably-sized region to build the bad-location map ahead of time - see the <a href="../../admin/QUICK_START/">Quick start</a> scan step.</li>
 <li>Players run a plain <strong><code>/rtp</code></strong>, which resolves to their world's region.</li>
 </ol>
 <div class="admonition tip">
 <p class="admonition-title">Plain <code>/rtp</code> is the supported path</p>
-<p>The everyday command for players, signs, and portals is a bare <code>/rtp</code> (or <code>/rtp world=&lt;name&gt;</code> to target a specific world's region). Those resolve to a configured region, so they are cached, safety-checked, and remember failures. <em>Override</em> parameters (<code>shape=</code>, <code>radius=</code>, <code>centerX=</code>, ...) are not - see <a href="#teleport-parameters-are-for-testing">the warning below</a>.</p>
+<p>The everyday command for players, signs, and portals is a bare <code>/rtp</code> (or <code>/rtp world=&lt;name&gt;</code> to target a specific world's region). Those resolve to a configured region, so they utilize the pre-generated location queue, safety caching, and persistent spatial memory. <em>Override</em> parameters (<code>shape=</code>, <code>radius=</code>, <code>centerX=</code>, ...) under <code>rtp.params</code> create temporary, uncached regions - see <a href="#teleport-parameters-are-for-testing">the warning below</a>.</p>
 </div>
 <hr />
 <h2 id="a-worked-example">A worked example<a class="headerlink" href="#a-worked-example" title="Permanent link">&para;</a></h2>
@@ -3296,20 +3298,24 @@
 <span class="w">  </span><span class="nt">centerX</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">       </span><span class="c1"># center, in chunks</span>
 <span class="w">  </span><span class="nt">centerZ</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 </code></pre></div>
-<p>Then point the overworld at that region (<a href="../../admin/configuration/WORLDS/">Worlds</a>), warm it with <code>/rtp scan start region=overworld</code> (watch <code>/rtp scan info</code>), and you are done. A player typing <code>/rtp</code> gets a cached, pre-verified coordinate.</p>
+<p>Then point the overworld at that region (<a href="../../admin/configuration/WORLDS/">Worlds</a>), optionally pre-scan it with <code>/rtp scan start region=overworld</code> (watch <code>/rtp scan info</code>) to map known-bad spots in advance, and you are done. A player typing <code>/rtp</code> gets a pre-verified coordinate from the active queue.</p>
 <div class="admonition note">
 <p class="admonition-title"><code>radius</code>, <code>centerX</code>, and <code>centerZ</code> are measured in chunks</p>
 <p>They live <em>inside</em> the <code>shape:</code> block (not at the top level), and their unit is <strong>chunks</strong>, not blocks - 1 chunk is 16 blocks. A <code>radius</code> of <code>625</code> therefore reaches 10,000 blocks. See <a href="../../admin/configuration/REGIONS/">Regions</a> for the full field reference.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">That is the whole loop</p>
-<p>Configure a region -&gt; point a world at it -&gt; scan to warm it -&gt; players run plain <code>/rtp</code>. The rest of this page explains <em>why</em>.</p>
+<p>Configure a region -&gt; point a world at it -&gt; pre-scan safety -&gt; players run plain <code>/rtp</code>. The rest of this page explains <em>why</em>.</p>
 </div>
 <hr />
-<h2 id="why-it-scans-ahead-of-time">Why it scans ahead of time<a class="headerlink" href="#why-it-scans-ahead-of-time" title="Permanent link">&para;</a></h2>
-<p>Finding a <em>safe</em> spot is expensive: the engine must load (and often generate) the chunk at some <code>(x, z)</code> and check it - solid surface? lava? claimed? void? Doing that the instant a player runs <code>/rtp</code> is what freezes legacy plugins.</p>
-<p>LeafRTP does that work <strong>ahead of time, off the main thread</strong>: a background process pre-generates and safety-checks coordinates into the region's <strong>cache</strong>, and records bad spots in its <strong>failure map</strong> so they are never retried. By the time a player teleports, the answer is already waiting.</p>
-<p>This pre-scanned data <strong>is</strong> the region's memory - which is why changing a region's shape is disruptive.</p>
+<h2 id="how-locations-are-prepared-and-verified">How locations are prepared and verified<a class="headerlink" href="#how-locations-are-prepared-and-verified" title="Permanent link">&para;</a></h2>
+<p>Finding a <em>safe</em> spot requires checking candidate coordinates: is there a solid surface? lava? claim-protected land? void? Doing that synchronously the instant a player runs <code>/rtp</code> is what freezes legacy plugins.</p>
+<p>LeafRTP handles this cleanly and asynchronously off the main thread:</p>
+<ol>
+<li><strong>Location Queue (Cache)</strong>: A background task (<code>QueueTask</code> / <code>RegionQueueManager</code>) continuously generates, validates, and stores verified safe coordinates in the region's cache queues (hot and cold caches). When a player types <code>/rtp</code>, a pre-verified coordinate is served immediately from the queue.</li>
+<li><strong>Spatial Memory &amp; Safety Pre-Scanning (<code>/rtp scan</code>)</strong>: The region maintains persistent spatial memory recording coordinates that fail safety checks so the selection algorithm skips them in future searches. The <code>/rtp scan</code> command acts as a background safety pre-scanner: it walks the region's spiral off-tick to map out unsafe sectors ahead of time. It operates independently of the location queues, building spatial memory so future generation and teleport selection avoid known-bad areas.</li>
+</ol>
+<p>This spatial memory is tied to the region's specific shape and bounds - which is why changing a region's shape resets its memory.</p>
 <hr />
 <h2 id="why-a-shape-change-wipes-a-regions-memory">Why a shape change wipes a region's memory<a class="headerlink" href="#why-a-shape-change-wipes-a-regions-memory" title="Permanent link">&para;</a></h2>
 <p>A region's <strong>shape</strong> is its geometry - the boundary (circle, square, ...), size, and center that decide which coordinates are eligible. The cache and failure map are indexed against the exact coordinate set the shape produces (the engine maps the 2D area onto a 1D Archimedean spiral, and every cached or failed spot is a position in that sequence).</p>
@@ -3356,7 +3362,7 @@
 <ol>
 <li>Edit the default region: set its <code>world</code> to your world's name (e.g. <code>world</code>), pick a <code>shape</code>, <code>radius</code>, and center - see the <a href="#a-worked-example">worked example</a> above.</li>
 <li>Leave the <code>default</code> world file pointed at it (the out-of-the-box mapping already does this).</li>
-<li>Warm it once with <code>/rtp scan start region=&lt;name&gt;</code> and you are done.</li>
+<li>Pre-scan it once with <code>/rtp scan start region=&lt;name&gt;</code> to map safety, and you are done.</li>
 </ol>
 <div class="admonition tip">
 <p class="admonition-title">You do not need extra regions</p>
@@ -3367,7 +3373,7 @@
 <p>Larger servers commonly run <strong>many worlds at once</strong> - separate overworld, nether, end, a resource world that resets, minigame worlds, and modded dimensions - and on regionised-threading platforms those worlds (and even areas within one world) run on <strong>parallel threads</strong>.</p>
 <ul>
 <li>Define <strong>one region per place you want <code>/rtp</code> to send players</strong> (overworld, resource world, each dimension), then point each world file at the right region. See <a href="../../admin/configuration/WORLDS/">Worlds</a> and <a href="../../admin/configuration/REGIONS/">Regions</a>.</li>
-<li>Warm each static region with its own <code>/rtp scan start region=&lt;name&gt;</code>. Skip warming worlds that reset often (a resource world) - their memory would be invalidated on every reset.</li>
+<li>Pre-scan each static region with its own <code>/rtp scan start region=&lt;name&gt;</code> to build spatial memory. Skip scanning worlds that reset often (a resource world) - their memory would be invalidated on every reset.</li>
 <li>Because the engine does all chunk work off the main thread, it stays compatible with regionised, multi-threaded servers - no world's RTP traffic stalls another's.</li>
 </ul>
 <div class="admonition note">
@@ -3399,7 +3405,7 @@
 <td>Configure a region, point the world at it, players run plain <code>/rtp</code></td>
 </tr>
 <tr>
-<td>Avoid first-teleport lag</td>
+<td>Pre-compute spatial safety</td>
 <td><code>/rtp scan start region=&lt;name&gt;</code> after configuring</td>
 </tr>
 <tr>
@@ -3421,7 +3427,7 @@
 <ul>
 <li><a href="../../admin/configuration/REGIONS/">Regions</a> / <a href="../../admin/configuration/WORLDS/">Worlds</a> - configure the model.</li>
 <li><a href="../../admin/QUICK_START/">Quick start</a> - the recommended end-to-end setup sequence.</li>
-<li><a href="../../admin/COMMANDS/">Commands</a> - the <code>/rtp scan</code> reference for warming the cache.</li>
+<li><a href="../../admin/COMMANDS/">Commands</a> - the command reference including <code>/rtp scan</code>.</li>
 <li><a href="../what-not-to-do/">What NOT to do!</a> - the anti-patterns.</li>
 <li><a href="../why/">Why LeafRTP exists</a> - the runtime story and distribution algorithm in depth.</li>
 </ul>

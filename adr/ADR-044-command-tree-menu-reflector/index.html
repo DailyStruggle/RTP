@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-044-command-tree-menu-reflector/">
+      
       
         <link rel="prev" href="../ADR-043-personal-queue-permission-semantics/">
       
@@ -3405,7 +3407,7 @@
 </ol>
 <p>Hover is built at <strong>mint time</strong>, dispatch is <strong>live</strong>. Unchanged from the prior draft.</p>
 <h3 id="per-consumer-hooks">Per-consumer hooks<a class="headerlink" href="#per-consumer-hooks" title="Permanent link">&para;</a></h3>
-<p>The <code>MenuConsumerProfile</code> interface in <code>menu-api</code> (currently <code>rtp-api/.../menu/MenuConsumerProfile.java</code>) carries <code>suggestPrefix</code> + <code>commentLookup</code> + <code>defaultProfile()</code> and an optional <code>includeParameter</code> hook. <code>ConfigMenuConsumerProfile</code> (in <code>rtp-core</code>) binds the comment lookup to the live <code>Configs</code> registry and produces the <code>/rtp config &lt;file&gt; &lt;key&gt;:</code> prefix from <code>CONFIG_COMMAND_SPEC §2.4</code>. Future consumers (region picker, <code>/rtpadmin</code> wizards, addon-authored menus) ship their own profiles; no SPI extension is required.</p>
+<p>The <code>MenuConsumerProfile</code> interface in <code>menu-api</code> (currently <code>rtp-api/.../menu/MenuConsumerProfile.java</code>) carries <code>suggestPrefix</code> + <code>commentLookup</code> + <code>defaultProfile()</code> and an optional <code>includeParameter</code> hook. <code>ConfigMenuConsumerProfile</code> (in <code>rtp-core</code>) binds the comment lookup to the live <code>Configs</code> registry and produces the <code>/rtp config &lt;file&gt; &lt;key&gt;:</code> prefix from <code>CONFIG_COMMAND_SPEC section 2.4</code>. Future consumers (region picker, <code>/rtpadmin</code> wizards, addon-authored menus) ship their own profiles; no SPI extension is required.</p>
 <h3 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h3>
 <p>Four new requirements introduced (to be authored in <code>docs/dev/REQUIREMENTS.md</code> during the module extraction stage — see <em>Migration / Rollout</em>):</p>
 <table>
@@ -3501,7 +3503,7 @@
 <li>The Fabric <code>ChatMenuRenderer</code> (Stage 5.2) has a natural home (<code>menu-api-fabric-unobf/</code>) without dragging Fabric carriers into <code>rtp-api</code>.</li>
 <li>Addons that want to author menus depend on <code>menu-api</code> alone, not the entire RTP-domain API.</li>
 <li>
-<p>Future <code>*-api</code> modules cite the <em>sibling DAG</em> policy in §<em>Module dependency layering</em> instead of re-deriving it.</p>
+<p>Future <code>*-api</code> modules cite the <em>sibling DAG</em> policy in section <em>Module dependency layering</em> instead of re-deriving it.</p>
 </li>
 <li>
 <p><strong>Negative / Trade-offs:</strong></p>
@@ -3540,8 +3542,8 @@
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md">effects-api-ADR-006</a> — obf/unobf carrier dispatch contract reused for Fabric <code>ChatMenuRenderer</code>.</li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md">rtp-fabric-ADR-009</a> — Fabric carrier split rationale.</li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md">commands-api-ADR-001</a> — Brigadier bridge; <code>/rtp menu</code> registration path.</li>
-<li><a href="../../dev/CONFIG_COMMAND_SPEC/">CONFIG_COMMAND_SPEC §2.4</a> — <code>view</code> sub-form; the <code>/rtp config</code> consumer mirrors its hover / click-suggest contract.</li>
-<li><a href="../../dev/REQUIREMENTS/">REQUIREMENTS.md §3</a> — Prohibitions; the menu subsystem inherits S-004, S-005, S-006, S-007.</li>
+<li><a href="../../dev/CONFIG_COMMAND_SPEC/">CONFIG_COMMAND_SPEC section 2.4</a> — <code>view</code> sub-form; the <code>/rtp config</code> consumer mirrors its hover / click-suggest contract.</li>
+<li><a href="../../dev/REQUIREMENTS/">REQUIREMENTS.md section 3</a> — Prohibitions; the menu subsystem inherits S-004, S-005, S-006, S-007.</li>
 <li><a href="../../dev/TRACEABILITY/">TRACEABILITY.md</a> — REQ-RTP-F-013 row covers menu chrome strings; REQ-RTP-MENU-001..004 rows added during Stage 6.</li>
 <li><a href="../dev/scratch/CHECKLIST-generalized-menu.md"><code>docs/dev/scratch/CHECKLIST-generalized-menu.md</code></a> — multi-session implementation plan, including the Stage 6 module-extraction sub-plan ratified by this ADR.</li>
 </ul>

@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/architecture/08-location-selection-per-attempt/">
+      
       
       
       
@@ -3035,7 +3037,7 @@
 <li><strong>Outer attempt-loop re-entry plumbing</strong> — <code>PregenTask.run()</code> / <code>rescheduleNextAttempt()</code> / <code>continueInline(...)</code> is the state-machine harness (ADR-015 Option B) that re-invokes <code>runAttempt</code> without blocking. See <code>PregenTask.java</code> header.</li>
 <li><strong>Chunk ticket lifecycle</strong> (<code>ChunkReservation</code>, <code>MemoryTracker</code>) — see diagram 03.</li>
 <li><strong>Stale-chunk guard</strong> on live-backed chunks — see <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a>.</li>
-<li><strong>Anvil probe ordering</strong> — see <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> §11 and §13.1.</li>
+<li><strong>Anvil probe ordering</strong> — see <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> section 11 and section 13.1.</li>
 </ul>
 <pre class="mermaid"><code>%% Color legend: green=accepting success; red=hard terminal / fail-fast sink; blue=async or thread-hop work; yellow=config / bookkeeping / data-driven choice.
 flowchart TD
@@ -3068,7 +3070,7 @@ flowchart TD
     BorderCap -- No  --&gt; Reschedule[rescheduleNextAttempt&lt;br/&gt;outer loop re-enters]:::async
     BorderCheck -- Yes --&gt; RequestChunk
 
-%% 3. Probe-first chunk resolution (ADR-016 §13.1)
+%% 3. Probe-first chunk resolution (ADR-016 section 13.1)
     subgraph ChunkStage [Chunk resolution — cached then anvil then live]
         RequestChunk[world.getOrLoadChunk cx, cz]:::async --&gt; ChunkOK{resolved&lt;br/&gt;non-null?}
         ChunkOK -- No  --&gt; NullChunk[FailTypes.nullChunk&lt;br/&gt;reason=ticketFailed or&lt;br/&gt;chunkLoadTimeout or&lt;br/&gt;asyncLoadNull]:::fail

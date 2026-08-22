@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/CONFIGURATION/">
+      
       
         <link rel="prev" href="../../ADDONS/">
       
@@ -871,6 +873,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#how-to-update-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      How to Update Configuration
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#file-overview" class="md-nav__link">
     <span class="md-ellipsis">
       File Overview
@@ -1006,27 +1017,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#advancedperformanceyml-performance-settings" class="md-nav__link">
+  <a href="#dedicated-configuration-guides" class="md-nav__link">
     <span class="md-ellipsis">
-      advanced/performance.yml — Performance Settings
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#economyyml-economy-settings" class="md-nav__link">
-    <span class="md-ellipsis">
-      economy.yml — Economy Settings
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#safetyyml-safety-settings" class="md-nav__link">
-    <span class="md-ellipsis">
-      safety.yml — Safety Settings
+      Dedicated Configuration Guides
     </span>
   </a>
   
@@ -1036,24 +1029,6 @@
   <a href="#custom-shapes-and-addons" class="md-nav__link">
     <span class="md-ellipsis">
       Custom Shapes and Addons
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advancedloggingyml-console-logging-verbosity" class="md-nav__link">
-    <span class="md-ellipsis">
-      advanced/logging.yml — Console Logging Verbosity
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advancedmessagesyml-message-customisation" class="md-nav__link">
-    <span class="md-ellipsis">
-      advanced/messages/*.yml — Message Customisation
     </span>
   </a>
   
@@ -3268,6 +3243,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#how-to-update-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      How to Update Configuration
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#file-overview" class="md-nav__link">
     <span class="md-ellipsis">
       File Overview
@@ -3403,27 +3387,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#advancedperformanceyml-performance-settings" class="md-nav__link">
+  <a href="#dedicated-configuration-guides" class="md-nav__link">
     <span class="md-ellipsis">
-      advanced/performance.yml — Performance Settings
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#economyyml-economy-settings" class="md-nav__link">
-    <span class="md-ellipsis">
-      economy.yml — Economy Settings
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#safetyyml-safety-settings" class="md-nav__link">
-    <span class="md-ellipsis">
-      safety.yml — Safety Settings
+      Dedicated Configuration Guides
     </span>
   </a>
   
@@ -3433,24 +3399,6 @@
   <a href="#custom-shapes-and-addons" class="md-nav__link">
     <span class="md-ellipsis">
       Custom Shapes and Addons
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advancedloggingyml-console-logging-verbosity" class="md-nav__link">
-    <span class="md-ellipsis">
-      advanced/logging.yml — Console Logging Verbosity
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advancedmessagesyml-message-customisation" class="md-nav__link">
-    <span class="md-ellipsis">
-      advanced/messages/*.yml — Message Customisation
     </span>
   </a>
   
@@ -3484,8 +3432,17 @@
 
 
 <h1 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h1>
-<p>One jar covers every platform. Configuration is generated on first server start and lives under <code>plugins/RTP/</code> on the Bukkit family (Paper, Spigot, Folia and their forks, Arclight, Mohist) or under <code>config/rtp/</code> on Fabric / NeoForge. Edit the files directly and run <code>/rtp reload</code> to apply changes without a server restart, or change an individual key at runtime with <code>/rtp config &lt;file&gt; &lt;key&gt;=&lt;value&gt;</code> (atomic write + auto-reload).</p>
+<p>One jar covers every platform. Configuration is generated on first server start and lives under <code>plugins/RTP/</code> on the Bukkit family (Paper, Spigot, Folia and their forks, Arclight, Mohist) or under <code>config/rtp/</code> on Fabric / NeoForge.</p>
+<hr />
+<h2 id="how-to-update-configuration">How to Update Configuration<a class="headerlink" href="#how-to-update-configuration" title="Permanent link">&para;</a></h2>
+<p>RTP provides multiple ways to view and update settings:</p>
+<ol>
+<li><strong>Interactive Admin Menu (<code>/rtp admin</code> or <code>/rtp menu</code>)</strong>: The recommended in-game interface for inspecting, editing, and validating settings, worlds, and regions.</li>
+<li><strong>Command Line (<code>/rtp config &lt;section&gt; &lt;key&gt;=&lt;value&gt;</code>)</strong>: Quick runtime updates from console or chat with immediate atomic persistence.</li>
+<li><strong>Direct File Editing (<code>plugins/RTP/...</code>)</strong>: Edit YAML files directly and run <code>/rtp reload</code> to apply changes.</li>
+</ol>
 <blockquote>
+<p>📎 <strong>Detailed Admin Guide:</strong> See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full instructions on navigating the <code>/rtp admin</code> menu and using <code>/rtp config</code> subcommands.</p>
 <p><strong>Folder layout:</strong> the everyday files (<code>config.yml</code>, <code>economy.yml</code>, <code>language.yml</code>, <code>safety.yml</code>) sit at the top level. The named definitions you author (<code>regions/</code>, <code>worlds/</code>, <code>effects/</code>, plus the shared <code>shape/</code> and <code>vert/</code> catalogs) live under <code>definitions/</code>. The rarely-hand-edited tuning and text files (<code>performance.yml</code>, <code>logging.yml</code>, <code>metrics.yml</code>, <code>network.yml</code>, <code>database.yml</code>, <code>biomes.yml</code>, <code>blocks.yml</code>, the <code>messages/</code> tree, and the <code>schematics/</code> folder) live under <code>advanced/</code>. The per-locale translation mirror stays at <code>lang/</code>. Each rename map is a co-located hidden dotfile (<code>.&lt;name&gt;.lang.yml</code>) beside the file it describes. On upgrade from an older layout, RTP relocates your authored files automatically and archives the old folders as <code>&lt;name&gt;.migrated</code>.</p>
 <p><strong>Inheritance:</strong> to avoid repeating the same value across many region/world files, a region/world setting can inherit a global default with an <code>@&lt;file&gt;</code> token (e.g. <code>@config</code>, <code>@economy</code>). See <a href="../CORE_CONFIG/#defaults-inheritance">CORE_CONFIG.md → Defaults (inheritance)</a>.</p>
 <p>📎 <strong>How RTP loads, reloads, and upgrades these files</strong> (including what the <code>.old1</code>/<code>.old2</code> files are, and how your customizations are preserved across version bumps and locale switches): see <a href="../CONFIG_LIFECYCLE/">CONFIG_LIFECYCLE.md</a>.</p>
@@ -3943,7 +3900,7 @@
 </code></pre></div></p>
 <hr />
 <h2 id="definitionsworldsnameyml-world-configuration"><code>definitions/worlds/&lt;name&gt;.yml</code> — World Configuration<a class="headerlink" href="#definitionsworldsnameyml-world-configuration" title="Permanent link">&para;</a></h2>
-<p>Each file in the <code>definitions/worlds/</code> folder maps a world to its default region and permission settings.</p>
+<p>Each file in the <code>definitions/worlds/</code> folder maps a world to its default region and permission settings. See <a href="../WORLDS/">WORLDS.md</a> for the complete reference.</p>
 <table>
 <thead>
 <tr>
@@ -3981,239 +3938,27 @@
 </tbody>
 </table>
 <hr />
-<h2 id="advancedperformanceyml-performance-settings"><code>advanced/performance.yml</code> — Performance Settings<a class="headerlink" href="#advancedperformanceyml-performance-settings" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Type</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>maxAttempts</code></td>
-<td>Integer</td>
-<td><code>32</code></td>
-<td>Maximum location search attempts before giving up. Higher = more CPU per request.</td>
-</tr>
-<tr>
-<td><code>viewDistanceSelect</code></td>
-<td>Integer</td>
-<td><code>0</code></td>
-<td>Chunk radius to pre-load around a candidate location during selection. <code>0</code> = minimum.</td>
-</tr>
-<tr>
-<td><code>viewDistanceTeleport</code></td>
-<td>Integer</td>
-<td><code>0</code></td>
-<td>Chunk radius to pre-load around the final destination before teleporting.</td>
-</tr>
-<tr>
-<td><code>syncAllottedTime</code></td>
-<td>Integer</td>
-<td><code>50</code></td>
-<td>Max milliseconds per tick spent on synchronous RTP tasks. Range: 0–50.</td>
-</tr>
-<tr>
-<td><code>period</code></td>
-<td>Integer</td>
-<td><code>100</code></td>
-<td>Ticks between background cache cycles (where 20 ticks equal 1 second).</td>
-</tr>
-<tr>
-<td><code>asyncAllottedTime</code></td>
-<td>Integer</td>
-<td><code>50</code></td>
-<td>Max milliseconds per tick spent on asynchronous RTP tasks.</td>
-</tr>
-<tr>
-<td><code>minTPS</code></td>
-<td>Double</td>
-<td><code>19.0</code></td>
-<td>Minimum server TPS before the plugin pauses background generation. Range: 0.0–20.0.</td>
-</tr>
-<tr>
-<td><code>postTeleportQueueing</code></td>
-<td>Boolean</td>
-<td><code>false</code></td>
-<td>If <code>true</code>, immediately tries to refill the cache after each teleport.</td>
-</tr>
-<tr>
-<td><code>syncLoading</code></td>
-<td>Boolean</td>
-<td><code>false</code></td>
-<td>Use synchronous chunk loading. This is <strong>not recommended</strong>, as it can cause server hangs.</td>
-</tr>
-<tr>
-<td><code>onEventParsing</code></td>
-<td>Boolean</td>
-<td><code>false</code></td>
-<td>Parse permissions on each event. This is incompatible with wildcard (<code>*.*</code>) permissions.</td>
-</tr>
-<tr>
-<td><code>effectParsing</code></td>
-<td>Boolean</td>
-<td><code>true</code></td>
-<td>Parse effect permissions on startup.</td>
-</tr>
-<tr>
-<td><code>biomeRecall</code></td>
-<td>Boolean</td>
-<td><code>true</code></td>
-<td>Reuse previously found biome locations from cache.</td>
-</tr>
-<tr>
-<td><code>biomeRecallForced</code></td>
-<td>Boolean</td>
-<td><code>false</code></td>
-<td>Only teleport to biomes already in cache (never search for new ones).</td>
-</tr>
-<tr>
-<td><code>checkOnChunkLoads</code></td>
-<td>Boolean</td>
-<td><code>false</code></td>
-<td>Check for safe locations in chunks as they load. This has a <strong>high impact</strong> on busy servers.</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="economyyml-economy-settings"><code>economy.yml</code> — Economy Settings<a class="headerlink" href="#economyyml-economy-settings" title="Permanent link">&para;</a></h2>
-<p>Requires <strong>Vault</strong> and a compatible economy plugin. If Vault is absent, all economy settings are ignored.</p>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Type</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>refundOnCancel</code></td>
-<td>Boolean</td>
-<td><code>true</code></td>
-<td>Refund the cost and reset cooldown if the teleport is cancelled (e.g., player moves).</td>
-</tr>
-<tr>
-<td><code>price</code></td>
-<td>Double</td>
-<td><code>50.0</code></td>
-<td>Base cost for <code>/rtp</code>. Set to <code>0.0</code> to disable.</td>
-</tr>
-<tr>
-<td><code>priceOther</code></td>
-<td>Double</td>
-<td><code>200.0</code></td>
-<td>Cost to teleport another player (<code>/rtp &lt;player&gt;</code>).</td>
-</tr>
-<tr>
-<td><code>paramsPrice</code></td>
-<td>Double</td>
-<td><code>0.0</code></td>
-<td>Additional cost for using parameters (world, region, shape, vert).</td>
-</tr>
-<tr>
-<td><code>biomePrice</code></td>
-<td>Double</td>
-<td><code>0.0</code></td>
-<td>Additional cost for specifying a biome target.</td>
-</tr>
-<tr>
-<td><code>balanceFloor</code></td>
-<td>Double</td>
-<td><code>0.0</code></td>
-<td>Minimum balance a player must retain after paying. Prevents going negative.</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="safetyyml-safety-settings"><code>safety.yml</code> — Safety Settings<a class="headerlink" href="#safetyyml-safety-settings" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Type</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>invulnerabilityTime</code></td>
-<td>Integer</td>
-<td><code>5</code></td>
-<td>Seconds of invulnerability granted after teleporting. Prevents fall/fire/drown damage on arrival.</td>
-</tr>
-<tr>
-<td><code>safetyRadius</code></td>
-<td>Integer</td>
-<td><code>0</code></td>
-<td>Block radius around the landing point to check for hazards. <code>0</code> = check only the landing block.</td>
-</tr>
-<tr>
-<td><code>platformRadius</code></td>
-<td>Integer</td>
-<td><code>0</code></td>
-<td>Radius of a platform created at the landing point. Set to <code>-1</code> to disable platforms entirely.</td>
-</tr>
-<tr>
-<td><code>platformDepth</code></td>
-<td>Integer</td>
-<td><code>1</code></td>
-<td>Depth (downward) of the platform.</td>
-</tr>
-<tr>
-<td><code>platformAirHeight</code></td>
-<td>Integer</td>
-<td><code>2</code></td>
-<td>Height of air to ensure above the platform.</td>
-</tr>
-<tr>
-<td><code>platformMaterial</code></td>
-<td>String</td>
-<td><code>GLASS</code></td>
-<td>Block type used for the platform if no solid block exists at the landing point.</td>
-</tr>
-<tr>
-<td><code>airBlocks</code></td>
-<td>List</td>
-<td><em>(flowers, grass, etc.)</em></td>
-<td>Block types treated as passable air during safety checks.</td>
-</tr>
-<tr>
-<td><code>unsafeBlocks</code></td>
-<td>List</td>
-<td><em>(lava, fire, etc.)</em></td>
-<td>Block types that make a location unsafe.</td>
-</tr>
-<tr>
-<td><code>biomeWhitelist</code></td>
-<td>Boolean</td>
-<td><code>false</code></td>
-<td>If <code>true</code>, the <code>biomes</code> list is a <strong>whitelist</strong> (only allow listed biomes). If <code>false</code>, it is a <strong>blacklist</strong>.</td>
-</tr>
-<tr>
-<td><code>biomes</code></td>
-<td>List</td>
-<td><em>(ocean, nether, end biomes)</em></td>
-<td>Biomes to exclude (blacklist) or exclusively allow (whitelist).</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Default biome blacklist includes:</strong> all ocean variants, deep dark, mushroom fields, nether biomes (nether wastes, soul sand valley, crimson/warped forest, basalt deltas), and end biomes (the end, end highlands/midlands/barrens, small end islands, the void).</p>
+<h2 id="dedicated-configuration-guides">Dedicated Configuration Guides<a class="headerlink" href="#dedicated-configuration-guides" title="Permanent link">&para;</a></h2>
+<p>For in-depth explanations and complete key tables of each configuration file:</p>
+<ul>
+<li><strong>Core &amp; Defaults:</strong> <a href="../CORE_CONFIG/">CORE_CONFIG.md</a></li>
+<li><strong>Safety &amp; Hazard Checks:</strong> <a href="../SAFETY/">SAFETY.md</a></li>
+<li><strong>Economy (Vault):</strong> <a href="../ECONOMY/">ECONOMY.md</a></li>
+<li><strong>Language / Locale:</strong> <a href="../LANGUAGE/">LANGUAGE.md</a></li>
+<li><strong>Regions:</strong> <a href="../REGIONS/">REGIONS.md</a></li>
+<li><strong>Worlds:</strong> <a href="../WORLDS/">WORLDS.md</a></li>
+<li><strong>Events &amp; Effects:</strong> <a href="../EVENTS_AND_EFFECTS/">EVENTS_AND_EFFECTS.md</a></li>
+<li><strong>Performance:</strong> <a href="../PERFORMANCE/">PERFORMANCE.md</a></li>
+<li><strong>Messages:</strong> <a href="../MESSAGES/">MESSAGES.md</a></li>
+<li><strong>Logging:</strong> <a href="../LOGGING/">LOGGING.md</a></li>
+<li><strong>Metrics:</strong> <a href="../METRICS/">METRICS.md</a></li>
+<li><strong>Multi-Server / Proxy Network:</strong> <a href="../../proxies/CONFIGURATION/">proxies/CONFIGURATION.md</a></li>
+<li><strong>Arrival Schematics:</strong> <a href="../SCHEMATICS/">SCHEMATICS.md</a></li>
+</ul>
 <hr />
 <h2 id="custom-shapes-and-addons">Custom Shapes and Addons<a class="headerlink" href="#custom-shapes-and-addons" title="Permanent link">&para;</a></h2>
 <p>All five built-in shape engines (<code>CIRCLE</code>, <code>CIRCLE_NORMAL</code>, <code>SQUARE</code>, <code>SQUARE_NORMAL</code>, <code>RECTANGLE</code>) are configured inline inside each region's <code>shape:</code> block, as there are no separate per-shape config files.</p>
 <p>Custom shapes can be registered at runtime via <code>rtp-api</code>. See <a href="../../addons/"><code>addons/</code></a> for examples. A registered custom shape appears as a valid <code>shape.name</code> value in any region config.</p>
-<hr />
-<h2 id="advancedloggingyml-console-logging-verbosity"><code>advanced/logging.yml</code> — Console Logging Verbosity<a class="headerlink" href="#advancedloggingyml-console-logging-verbosity" title="Permanent link">&para;</a></h2>
-<p>Enables or disables individual console-log categories and sets the plugin's minimum log level. See <a href="../LOGGING/">LOGGING.md</a> for the complete category list and the <code>min_level</code> filter.</p>
-<hr />
-<h2 id="advancedmessagesyml-message-customisation"><code>advanced/messages/*.yml</code> — Message Customisation<a class="headerlink" href="#advancedmessagesyml-message-customisation" title="Permanent link">&para;</a></h2>
-<p>All player-facing strings are defined under <code>advanced/messages/</code>, split by concern into <code>commands.yml</code>, <code>player.yml</code>, <code>system.yml</code>, <code>network.yml</code>, and <code>placeholders.yml</code>. Supports <code>&amp;</code> colour codes, hex codes, MiniMessage tags, and PlaceholderAPI placeholders. Edit any value to localise or rebrand messages. See <a href="../MESSAGES/">MESSAGES.md</a> for the formatting rules, the <code>[Pn]</code> placeholder system, and the section-by-section layout.</p>
 <hr />
 <h2 id="tips">Tips<a class="headerlink" href="#tips" title="Permanent link">&para;</a></h2>
 <ul>

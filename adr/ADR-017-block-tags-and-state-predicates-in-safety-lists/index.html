@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/">
+      
       
         <link rel="prev" href="../ADR-016-anvil-subsystem/">
       
@@ -3366,7 +3368,7 @@ path       := [a-z0-9_/.-]+
   candidate block to have its property map extracted. The compiler
   records whether any wildcard token exists in a boolean flag
   (<code>hasWildcardStatePredicate</code>); when the flag is <code>false</code> the fast path
-  in §4 remains unchanged. Admins who configure a wildcard are
+  in section 4 remains unchanged. Admins who configure a wildcard are
   opting into the cost.</li>
 </ul>
 <h3 id="2-compiled-form-and-module-placement">2. Compiled form and module placement<a class="headerlink" href="#2-compiled-form-and-module-placement" title="Permanent link">&para;</a></h3>
@@ -3447,10 +3449,10 @@ Bukkit <code>BlockData</code>.</p>
 <p><code>AnvilChunkView.isSafe</code> shall read the palette entry's NBT <code>Properties</code>
 compound when evaluating state predicates. An <code>AnvilPrefilter</code> verdict
 of <code>REJECT</code> on a predicated match is legitimate; an <code>ACCEPT</code> remains
-advisory per ADR-016 §3 and is re-checked live at teleport commit.</p>
+advisory per ADR-016 section 3 and is re-checked live at teleport commit.</p>
 <h3 id="6-configuration-migration">6. Configuration migration<a class="headerlink" href="#6-configuration-migration" title="Permanent link">&para;</a></h3>
 <p>No schema change. <code>safety.yml</code> remains a flat list. The file header
-gains a §"Block tags and states" subsection with three worked examples
+gains a section "Block tags and states" subsection with three worked examples
 (bare material, tag, predicated material). Existing configs keep
 working verbatim; <code>legacyConfigSupport.yml</code> emits no SUPERSEDED notice.</p>
 <p>The <code>/rtp config set/add/remove</code> surface round-trips new tokens verbatim. Every token is a single string containing no YAML structural characters other than <code>[</code>, <code>]</code>, <code>,</code>, and <code>=</code>, so the string-list serializer handles them; <code>rtp config set safety unsafeBlocks add "OAK_SLAB[waterlogged=true]"</code> round-trips through <code>SubConfigCmd</code> without quoting damage (covered by <code>SubConfigCmd</code> round-trip test).</p>
@@ -3475,21 +3477,21 @@ working verbatim; <code>legacyConfigSupport.yml</code> emits no SUPERSEDED notic
 </ul>
 <h2 id="amendment-numeric-range-predicates">Amendment (numeric range predicates)<a class="headerlink" href="#amendment-numeric-range-predicates" title="Permanent link">&para;</a></h2>
 <p><strong>Date:</strong> 2026-05-30 — closes the ROADMAP Tier 2 "Safety-list grammar expansion → numeric range predicates" item. The set-subtraction and hot-reload follow-ups from the same ROADMAP entry are explicitly <strong>not</strong> adopted.</p>
-<p>The predicate grammar of §1 is extended so a <code>pred</code> may use a numeric comparison operator in addition to string equality:</p>
+<p>The predicate grammar of section 1 is extended so a <code>pred</code> may use a numeric comparison operator in addition to string equality:</p>
 <div class="highlight"><pre><span></span><code>pred       := propertyName ( &#39;=&#39; propertyValue | compareOp integer )
 compareOp  := &#39;&gt;=&#39; | &#39;&lt;=&#39; | &#39;&gt;&#39; | &#39;&lt;&#39;
 integer    := &#39;-&#39;? [0-9]+
 </code></pre></div>
 <ul>
 <li><code>=</code> retains its existing case-insensitive string-equality semantics; the value is unconstrained except for the reserved characters <code>[</code>, <code>]</code>, <code>=</code>, <code>&lt;</code>, <code>&gt;</code>.</li>
-<li>The four comparison operators parse the bound as a signed integer (<code>long</code>) at config-load time. A non-integer bound is a <strong>malformed token</strong> (single startup <code>WARNING</code>, token dropped — §3, REQ-RTP-S-004), consistent with the existing malformed-token handling.</li>
-<li>At evaluation time the live property value is parsed as a <code>long</code>; an absent or non-numeric live value is a <strong>miss</strong>, not a match (the fail-open policy of §4 is preserved — a range predicate can never cause an over-rejection).</li>
+<li>The four comparison operators parse the bound as a signed integer (<code>long</code>) at config-load time. A non-integer bound is a <strong>malformed token</strong> (single startup <code>WARNING</code>, token dropped — section 3, REQ-RTP-S-004), consistent with the existing malformed-token handling.</li>
+<li>At evaluation time the live property value is parsed as a <code>long</code>; an absent or non-numeric live value is a <strong>miss</strong>, not a match (the fail-open policy of section 4 is preserved — a range predicate can never cause an over-rejection).</li>
 <li>Multiple conditions in one <code>[ … ]</code> still combine with <strong>logical AND</strong>, so two bounds on the same key express an interval (<code>LAVA[level&gt;=2,level&lt;=5]</code>). Duplicate detection is per <code>(key, operator)</code>: <code>level&gt;=2,level&lt;=5</code> is accepted; <code>level&gt;=2,level&gt;=3</code> and <code>waterlogged=true,waterlogged=false</code> are rejected as duplicates.</li>
 </ul>
-<p>Implementation: <code>StatePredicate</code> gains an immutable <code>NumericComparison</code> (key, <code>Comparator</code> operator, <code>long</code> bound) list alongside the existing equality map; <code>SafetyTokenParser</code> locates the operator and routes equalities vs. comparisons. No change to <code>CompiledUnsafeSet</code> bucket structure (range predicates ride inside the same per-material / per-tag / wildcard <code>StatePredicate</code> buckets), so the §4 hot-path fast-path and <code>hasWildcardStatePredicate</code> flag are unaffected. The Anvil path (§5) reads the same NBT <code>Properties</code> compound. This stays pure and Bukkit-free in <code>rtp-api</code>. Regression coverage: <code>SafetyTokenParserTest</code>, <code>CompiledUnsafeSetTest</code>.</p>
+<p>Implementation: <code>StatePredicate</code> gains an immutable <code>NumericComparison</code> (key, <code>Comparator</code> operator, <code>long</code> bound) list alongside the existing equality map; <code>SafetyTokenParser</code> locates the operator and routes equalities vs. comparisons. No change to <code>CompiledUnsafeSet</code> bucket structure (range predicates ride inside the same per-material / per-tag / wildcard <code>StatePredicate</code> buckets), so the section 4 hot-path fast-path and <code>hasWildcardStatePredicate</code> flag are unaffected. The Anvil path (section 5) reads the same NBT <code>Properties</code> compound. This stays pure and Bukkit-free in <code>rtp-api</code>. Regression coverage: <code>SafetyTokenParserTest</code>, <code>CompiledUnsafeSetTest</code>.</p>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>docs/dev/REQUIREMENTS.md §3</code> — REQ-RTP-S-001 (unsafe-block prohibition) and REQ-RTP-S-004 (never-silent failure).</li>
+<li><code>docs/dev/REQUIREMENTS.md section 3</code> — REQ-RTP-S-001 (unsafe-block prohibition) and REQ-RTP-S-004 (never-silent failure).</li>
 <li><a href="../ADR-011-rtp-api-separate-module/">ADR-011</a> — no Bukkit on the <code>rtp-api</code> classpath.</li>
 <li><a href="../ADR-016-anvil-subsystem/">ADR-016</a> — Anvil pre-filter advisory semantics; this ADR extends the pre-filter to consult palette <code>Properties</code>.</li>
 <li><code>rtp-api/.../RTPChunk.java</code> — <code>isSafe</code> contract.</li>

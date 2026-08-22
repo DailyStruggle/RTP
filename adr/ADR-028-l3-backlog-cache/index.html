@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-028-l3-backlog-cache/">
+      
       
         <link rel="prev" href="../ADR-026-external-hook-api-surface/">
       
@@ -3417,7 +3419,7 @@
 <p>Both buffers store <em>fully verified</em> locations. Verification (shape pick →
 chunk load → vertical adjust → biome → safety) is dominated by chunk I/O,
 which on a default region runs serially per candidate. When a region's L2 is
-drained — for example after a join-storm or a deliberate <code>/rtp scan</code> cold
+drained — for example after a join-storm or a server cold
 start — refill rate is bounded by the per-attempt chunk-load cost, even
 though many of those chunks already exist on disk and could be cheaply
 inspected via the Anvil pre-filter (ADR-016) without loading them into the

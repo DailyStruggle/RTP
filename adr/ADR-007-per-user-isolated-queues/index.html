@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-007-per-user-isolated-queues/">
+      
       
         <link rel="prev" href="../ADR-006-async-queue-pre-generation/">
       
@@ -3189,7 +3191,7 @@
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Implementing classes: <code>RegionQueueManager</code> (global + per-UUID queue management), <code>RTPBukkitPlugin</code> (queue initialisation on player join) (<code>rtp-core</code>, <code>rtp-plugin</code>)</li>
-<li>Design reference: <a href="../../dev/DESIGN/"><code>DESIGN.md</code> §1 — Asynchronous Queue-Based Pre-Generation</a></li>
+<li>Design reference: <a href="../../dev/DESIGN/"><code>DESIGN.md</code> section 1 — Asynchronous Queue-Based Pre-Generation</a></li>
 <li>Related: <a href="../ADR-006-async-queue-pre-generation/">ADR-006</a> (pre-generation queue rationale)</li>
 <li>Requirements: <code>REQ-RTP-NF-002</code> (resource starvation prevention), <code>REQ-RTP-S-001</code> (permission-based access control)</li>
 </ul>

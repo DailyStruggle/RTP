@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/CORE_CONFIG/">
+      
       
         <link rel="prev" href="../CONFIG_LIFECYCLE/">
       
@@ -913,6 +915,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#language" class="md-nav__link">
     <span class="md-ellipsis">
       Language
@@ -940,15 +951,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#database" class="md-nav__link">
-    <span class="md-ellipsis">
-      Database
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#menu" class="md-nav__link">
     <span class="md-ellipsis">
       Menu
@@ -958,18 +960,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#network-redis" class="md-nav__link">
+  <a href="#defaults-inheritance" class="md-nav__link">
     <span class="md-ellipsis">
-      Network (Redis)
+      Defaults (inheritance)
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#defaults-inheritance" class="md-nav__link">
+  <a href="#related-files" class="md-nav__link">
     <span class="md-ellipsis">
-      Defaults (inheritance)
+      Related Files
     </span>
   </a>
   
@@ -3142,6 +3144,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#language" class="md-nav__link">
     <span class="md-ellipsis">
       Language
@@ -3169,15 +3180,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#database" class="md-nav__link">
-    <span class="md-ellipsis">
-      Database
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#menu" class="md-nav__link">
     <span class="md-ellipsis">
       Menu
@@ -3187,18 +3189,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#network-redis" class="md-nav__link">
+  <a href="#defaults-inheritance" class="md-nav__link">
     <span class="md-ellipsis">
-      Network (Redis)
+      Defaults (inheritance)
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#defaults-inheritance" class="md-nav__link">
+  <a href="#related-files" class="md-nav__link">
     <span class="md-ellipsis">
-      Defaults (inheritance)
+      Related Files
     </span>
   </a>
   
@@ -3234,8 +3236,17 @@
 <h1 id="core-configuration-reference-configyml">Core Configuration Reference (<code>config.yml</code>)<a class="headerlink" href="#core-configuration-reference-configyml" title="Permanent link">&para;</a></h1>
 <p>This document provides a detailed reference for the core settings in <code>config.yml</code> (under <code>plugins/RTP/</code> on the Bukkit family, or <code>config/rtp/</code> on Fabric / NeoForge).</p>
 <hr />
+<h2 id="updating-settings">Updating Settings<a class="headerlink" href="#updating-settings" title="Permanent link">&para;</a></h2>
+<p>You can view and update core settings using:
+1. <strong>In-game admin menu</strong>: Run <code>/rtp admin</code> or <code>/rtp menu</code> -&gt; click <strong>Admin Panel</strong>.
+2. <strong>Command line</strong>: Use <code>/rtp config &lt;key&gt;=&lt;value&gt;</code> (for instance, <code>/rtp config teleportCooldown=60</code>).
+3. <strong>Direct editing</strong>: Edit <code>config.yml</code> on disk and run <code>/rtp reload</code>.</p>
+<blockquote>
+<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full menu and command navigation details.</p>
+</blockquote>
+<hr />
 <h2 id="language">Language<a class="headerlink" href="#language" title="Permanent link">&para;</a></h2>
-<p>Locale selection now lives in <a href="../LANGUAGE/"><code>language.yml</code></a> (loaded before <code>config.yml</code>). See <a href="../LANGUAGE/">LANGUAGE.md</a> for the full reference.</p>
+<p>Language selection is configured in <a href="../LANGUAGE/"><code>language.yml</code></a>. See <a href="../LANGUAGE/">LANGUAGE.md</a> for the full reference.</p>
 <h2 id="teleportation-settings">Teleportation Settings<a class="headerlink" href="#teleportation-settings" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3291,62 +3302,8 @@
 <li><code>consoleCommands</code>: Executed by the server console.</li>
 <li><code>playerCommands</code>: Executed by the player.</li>
 </ul>
-<h2 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h2>
-<p>Where to store cached locations and player data. Nested under the <code>database:</code> block.</p>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Type</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>type</code></td>
-<td>String</td>
-<td><code>"sqlite"</code></td>
-<td>Backend type: <code>yaml</code>, <code>sqlite</code>, <code>mysql</code>, or <code>postgresql</code>. <code>yaml</code>/<code>sqlite</code> are file-backed and need no extra config.</td>
-</tr>
-<tr>
-<td><code>host</code></td>
-<td>String</td>
-<td><code>"127.0.0.1"</code></td>
-<td>Database host. Used by <code>mysql</code>/<code>postgresql</code> only.</td>
-</tr>
-<tr>
-<td><code>port</code></td>
-<td>Integer</td>
-<td><code>3306</code></td>
-<td>Database port. Used by <code>mysql</code>/<code>postgresql</code> only.</td>
-</tr>
-<tr>
-<td><code>name</code></td>
-<td>String</td>
-<td><code>"rtp"</code></td>
-<td>Database / schema name. Used by <code>mysql</code>/<code>postgresql</code> only.</td>
-</tr>
-<tr>
-<td><code>username</code></td>
-<td>String</td>
-<td><code>"root"</code></td>
-<td>Database username. Used by <code>mysql</code>/<code>postgresql</code> only.</td>
-</tr>
-<tr>
-<td><code>password</code></td>
-<td>String</td>
-<td><code>"password"</code></td>
-<td>Database password. Used by <code>mysql</code>/<code>postgresql</code> only.</td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p><strong>Fabric note:</strong> the Fabric build currently supports <strong>flat-file (<code>yaml</code>) only</strong>. JDBC drivers (H2, SQLite, MySQL, PostgreSQL) are not bundled and Fabric servers do not ship them on the classpath, so any non-<code>yaml</code> <code>type</code> falls back to flat-file at startup with a <code>WARNING</code> in the server log. Track Fabric platform status in <a href="../../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a>.</p>
-<p><strong>Bukkit-family note:</strong> as of <code>3.0.0-beta.2</code>, no JDBC driver is shaded into the RTP jar. To use <code>h2</code>/<code>sqlite</code>/<code>mysql</code>/<code>postgresql</code>, drop the corresponding driver jar onto the server classpath; otherwise the handler falls back along requested → <code>h2</code> → <code>yaml</code> and logs a <code>WARNING</code> for each fallback.</p>
-</blockquote>
 <h2 id="menu">Menu<a class="headerlink" href="#menu" title="Permanent link">&para;</a></h2>
-<p>Generalized menu framework. Nested under the <code>menu:</code> block.</p>
+<p>Configures the menu interface. Nested under the <code>menu:</code> block.</p>
 <table>
 <thead>
 <tr>
@@ -3365,50 +3322,8 @@
 </tr>
 </tbody>
 </table>
-<h2 id="network-redis">Network (Redis)<a class="headerlink" href="#network-redis" title="Permanent link">&para;</a></h2>
-<p>The <code>network.redis</code> block under <code>config.yml</code> enables the Redis-backed network state binding for multi-server synchronization of cached locations.</p>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Type</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>enabled</code></td>
-<td>Boolean</td>
-<td><code>false</code></td>
-<td>Enable the Redis-backed network state binding.</td>
-</tr>
-<tr>
-<td><code>host</code></td>
-<td>String</td>
-<td><code>"127.0.0.1"</code></td>
-<td>Redis host.</td>
-</tr>
-<tr>
-<td><code>port</code></td>
-<td>Integer</td>
-<td><code>6379</code></td>
-<td>Redis port.</td>
-</tr>
-<tr>
-<td><code>password</code></td>
-<td>String</td>
-<td><code>""</code></td>
-<td>Redis password. Empty string disables auth.</td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p><strong>Full multi-server / multi-proxy network mode</strong> (the dedicated <code>network.yml</code> file: transports, routing, wait queue, reservation tokens, load balancer) is documented separately in <a href="../../proxies/CONFIGURATION/"><code>proxies/CONFIGURATION.md</code></a>.</p>
-</blockquote>
 <h2 id="defaults-inheritance">Defaults (inheritance)<a class="headerlink" href="#defaults-inheritance" title="Permanent link">&para;</a></h2>
-<p>Nested under the <code>defaults:</code> block. Holds global default templates and values that region/world files can inherit instead of repeating, so a single-world server changes a knob once here rather than editing every region file.</p>
-<p>A region/world setting whose value is the token <code>@config</code> resolves to the matching entry under <code>defaults:</code>; a literal value in the region/world file always wins. References resolve at read time (the file is never rewritten), and an unresolvable reference falls back to a safe built-in default with a <code>WARNING</code> in the log.</p>
+<p>Nested under the <code>defaults:</code> block. Holds global default templates and values that region/world files inherit when configured with <code>@config</code>.</p>
 <table>
 <thead>
 <tr>
@@ -3423,7 +3338,7 @@
 <td><code>shape</code></td>
 <td>Block</td>
 <td>(<code>CIRCLE</code> block)</td>
-<td>Default shape block inherited whole by a region whose <code>shape</code> is <code>@config</code>.</td>
+<td>Default shape block inherited whole by a region whose <code>shape</code> is <code>@config</code>. Holds the teleport size knobs: <code>radius</code> (outer edge, default <code>256</code>) and <code>centerRadius</code> (inner edge / donut hole, default <code>64</code>), both in <strong>chunks</strong>. See <a href="../REGIONS/#region-size-radius-and-centerradius">REGIONS.md → Region Size</a>.</td>
 </tr>
 <tr>
 <td><code>vert</code></td>
@@ -3464,8 +3379,15 @@
 </tbody>
 </table>
 <blockquote>
-<p>The type-bearing <code>shape</code>/<code>vert</code> settings inherit as a <strong>whole named block</strong> (a per-type parameter set is only coherent as a unit), while type-free scalars inherit individually. Other source files own their own defaults: e.g. a region's <code>price</code> can reference <code>@economy</code> to inherit from <a href="../ECONOMY/">economy.yml</a>.</p>
+<p>The type-bearing <code>shape</code>/<code>vert</code> settings inherit as a <strong>whole named block</strong>, while type-free scalars inherit individually. Other source files own their own defaults: e.g. a region's <code>price</code> can reference <code>@economy</code> to inherit from <a href="../ECONOMY/">economy.yml</a>.</p>
+<p><strong>Teleport distance lives here.</strong> On a single-world server, <code>defaults.shape.radius</code> is the one place to set how far <code>/rtp</code> throws players, because the bundled <code>regions/default.yml</code> ships <code>shape: "@config"</code>. Sizes are in <strong>chunks</strong> (1 chunk = 16 blocks), so <code>radius: 256</code> is 4,096 blocks and <code>radius: 625</code> is 10,000 blocks; <code>centerRadius</code> is the matching minimum distance. Full reference, including per-region and per-command overrides: <a href="../REGIONS/#region-size-radius-and-centerradius">REGIONS.md → Region Size</a>.</p>
 </blockquote>
+<hr />
+<h2 id="related-files">Related Files<a class="headerlink" href="#related-files" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Database persistence settings: <a href="../CONFIGURATION/#database-persistence-advanceddatabaseyml"><code>advanced/database.yml</code></a>.</li>
+<li>Multi-server network settings: <a href="../../proxies/CONFIGURATION/"><code>advanced/network.yml</code></a>.</li>
+</ul>
 <hr />
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">&para;</a></h2>
 <ul>

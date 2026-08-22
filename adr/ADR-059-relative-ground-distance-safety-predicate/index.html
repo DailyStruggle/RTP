@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-059-relative-ground-distance-safety-predicate/">
+      
       
         <link rel="prev" href="../ADR-058-region-specific-schematic-paste/">
       
@@ -3290,11 +3292,11 @@
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;#minecraft:leaves[_groundDistance&gt;3]&quot;</span><span class="w">   </span><span class="c1"># canopy leaves unsafe; ground-level leaves fine</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;#minecraft:logs[_groundDistance&gt;1]&quot;</span><span class="w">     </span><span class="c1"># tree trunks unsafe above the base log; a stump is fine</span>
 </code></pre></div>
-<p><code>_groundDistance</code> is defined as <strong>the number of blocks between the candidate block and the first solid (collision-bearing, non-air, non-<code>airBlocks</code>) block beneath it</strong>, measured downward in the same column. <code>0</code> means the candidate sits directly on solid ground (or is itself the ground); a leaf pile on a stump reads <code>0</code>-<code>1</code>; canopy leaves read the trunk height. The probe is <strong>bounded</strong> by a configurable max scan depth (see below) and <strong>fail-open</strong>: if no ground is found within the probe budget, or the column cannot be read, the property is <strong>absent</strong>, and per ADR-017 §4 an absent property is a <em>miss</em> - the predicate cannot reject, so the candidate falls through to the rest of the pipeline (never an over-rejection, never an S-001 weakening because the authoritative ground/headroom sweep in <code>VerticalAdjustor</code> still runs).</p>
+<p><code>_groundDistance</code> is defined as <strong>the number of blocks between the candidate block and the first solid (collision-bearing, non-air, non-<code>airBlocks</code>) block beneath it</strong>, measured downward in the same column. <code>0</code> means the candidate sits directly on solid ground (or is itself the ground); a leaf pile on a stump reads <code>0</code>-<code>1</code>; canopy leaves read the trunk height. The probe is <strong>bounded</strong> by a configurable max scan depth (see below) and <strong>fail-open</strong>: if no ground is found within the probe budget, or the column cannot be read, the property is <strong>absent</strong>, and per ADR-017 section 4 an absent property is a <em>miss</em> - the predicate cannot reject, so the candidate falls through to the rest of the pipeline (never an over-rejection, never an S-001 weakening because the authoritative ground/headroom sweep in <code>VerticalAdjustor</code> still runs).</p>
 <h3 id="computation-site-and-laziness">Computation site and laziness<a class="headerlink" href="#computation-site-and-laziness" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Where:</strong> computed in the platform safety check that already materialises the property map - <code>BukkitRTPChunk.isSafe(int,int,int,CompiledUnsafeSet)</code> (and the Folia/Fabric peers). The candidate's chunk is already resident there, so the downward column walk is pure in-memory block reads (S-005 safe). On the Anvil off-tick path (<code>AnvilChunkView</code>/<code>rtp-anvil</code>), the same offset is computed from the NBT section palette already in memory.</li>
-<li><strong>Lazy gating (zero cost for plain configs):</strong> <code>CompiledUnsafeSet</code> gains a compile-time boolean <code>requiresGroundDistance()</code> (true iff any retained predicate references the <code>_grounddistance</code> key), mirroring the existing <code>hasWildcardStatePredicate()</code> flag. The column walk runs <strong>only</strong> when that flag is set <em>and</em> a state-predicate bucket applies to the candidate material/tag. A server with no <code>_groundDistance</code> token pays nothing - the flag is <code>false</code>, the probe is never entered, no extra allocation, the ADR-017 §4 hot-path fast-exit is preserved verbatim.</li>
+<li><strong>Lazy gating (zero cost for plain configs):</strong> <code>CompiledUnsafeSet</code> gains a compile-time boolean <code>requiresGroundDistance()</code> (true iff any retained predicate references the <code>_grounddistance</code> key), mirroring the existing <code>hasWildcardStatePredicate()</code> flag. The column walk runs <strong>only</strong> when that flag is set <em>and</em> a state-predicate bucket applies to the candidate material/tag. A server with no <code>_groundDistance</code> token pays nothing - the flag is <code>false</code>, the probe is never entered, no extra allocation, the ADR-017 section 4 hot-path fast-exit is preserved verbatim.</li>
 <li><strong>Injection:</strong> when the flag is set, the adapter computes the integer offset and puts <code>_grounddistance -&gt; Integer.toString(offset)</code> into the same lowercase <code>props</code> map before calling <code>isUnsafe(...)</code>. The numeric range predicate then parses it exactly like any other integer property. No change to <code>StatePredicate</code>, <code>SafetyTokenParser</code>, or <code>CompiledUnsafeSet.isUnsafe</code> evaluation is required beyond the new flag and its compile-time detection.</li>
 </ul>
 <h3 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h3>
@@ -3325,7 +3327,7 @@
 </tr>
 <tr>
 <td><strong>Compute ground distance eagerly for every candidate</strong></td>
-<td>Violates the zero-cost-for-plain-configs invariant of ADR-017 §4; an unbounded or always-on column walk is a per-candidate hot-path tax for a feature most servers never enable.</td>
+<td>Violates the zero-cost-for-plain-configs invariant of ADR-017 section 4; an unbounded or always-on column walk is a per-candidate hot-path tax for a feature most servers never enable.</td>
 </tr>
 <tr>
 <td><strong>Reject the request; tell admins to use vertical adjustors</strong></td>
@@ -3347,7 +3349,7 @@
 <li><a href="../ADR-017-block-tags-and-state-predicates-in-safety-lists/">ADR-017</a> — Block Tags and Block-State Predicates in Safety Lists (this ADR extends its grammar via a synthetic property; the numeric range amendment is the operator this feature consumes).</li>
 <li><a href="../ADR-016-anvil-subsystem/">ADR-016</a> — Anvil Read-Only Subsystem (live-vs-Anvil parity contract for the offset computation).</li>
 <li><a href="../ADR-024-rtp-lite-assembly-variant/">ADR-024</a> — RTP Lite Assembly Variant (edition gating).</li>
-<li><code>docs/dev/REQUIREMENTS.md §3</code> — REQ-RTP-S-001 (unsafe-block prohibition), REQ-RTP-S-004 (never-silent failure), REQ-RTP-S-005 (no main-thread chunk I/O).</li>
+<li><code>docs/dev/REQUIREMENTS.md section 3</code> — REQ-RTP-S-001 (unsafe-block prohibition), REQ-RTP-S-004 (never-silent failure), REQ-RTP-S-005 (no main-thread chunk I/O).</li>
 <li><code>rtp-bukkit-common/.../world/BukkitRTPChunk.java#isSafe(int,int,int,CompiledUnsafeSet)</code> and the Folia/Fabric peers — proposed injection site.</li>
 <li><code>docs/dev/ROADMAP.md</code> Tier 2 "Safety-list grammar expansion".</li>
 </ul>

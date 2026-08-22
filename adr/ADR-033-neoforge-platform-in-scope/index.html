@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-033-neoforge-platform-in-scope/">
+      
       
         <link rel="prev" href="../ADR-032-teleport-pipeline-latency-histogram/">
       
@@ -3180,7 +3182,7 @@
 <h1 id="adr-033-neoforge-platform-in-scope-deferred-until-fabric-stabilizes">ADR-033 — NeoForge Platform In-Scope (Deferred Until Fabric Stabilizes)<a class="headerlink" href="#adr-033-neoforge-platform-in-scope-deferred-until-fabric-stabilizes" title="Permanent link">&para;</a></h1>
 <p><strong>Status:</strong> Accepted
 <strong>Date:</strong> 2026-05-11
-<strong>Activated:</strong> 2026-06-01 (Fabric stabilization gate per §2 confirmed clear; bring-up sequence §3 started — D-005 proposal <code>docs/dev/scratch/PROPOSAL-neoforge-bringup.md</code> and subproject <code>rtp-neoforge-ADR-001</code> on file)</p>
+<strong>Activated:</strong> 2026-06-01 (Fabric stabilization gate per section 2 confirmed clear; bring-up sequence section 3 started — D-005 proposal <code>docs/dev/scratch/PROPOSAL-neoforge-bringup.md</code> and subproject <code>rtp-neoforge-ADR-001</code> on file)</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
 <p>The supported-platform set in <a href="../../dev/REQUIREMENTS/"><code>REQUIREMENTS.md</code></a> historically enumerated Spigot, Paper, Folia, and Fabric, and explicitly listed NeoForge among <strong>unsupported</strong> mod loaders. That exclusion was reasonable when the active platform-expansion frontier was Fabric (still unstable; see <em>Current Development Focus</em> in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> and the open S-005 / null-stub blockers tracked in <a href="../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a>).</p>
 <p>The platform landscape has shifted enough that the blanket exclusion now under-serves the strategic direction of the project:</p>
@@ -3201,7 +3203,7 @@
 <li><strong>NeoForge becomes a first-class, in-scope target platform</strong>, joining Spigot, Paper, Folia, and Fabric. The requirements documents are amended accordingly:</li>
 <li><code>REQ-RTP-NF-002</code> (Cross-Platform Thread Safety) extended to enumerate NeoForge.</li>
 <li><code>REQ-RTP-SYS-002</code> (Server Software) extended to include NeoForge.</li>
-<li>The §0 <em>In Scope</em> and <em>Out of Scope</em> lists updated to reflect NeoForge as supported and to enumerate the platforms that remain unsupported.</li>
+<li>The section 0 <em>In Scope</em> and <em>Out of Scope</em> lists updated to reflect NeoForge as supported and to enumerate the platforms that remain unsupported.</li>
 <li><strong>Activation of NeoForge work is gated</strong> on Fabric stabilization, per the criteria above. Until that gate clears, NeoForge remains a documented in-scope target with <strong>no committed delivery date</strong> and <strong>no module skeleton</strong> under version control.</li>
 <li><strong>When the gate clears</strong>, the bring-up sequence shall be:</li>
 <li>A D-005 proposal referencing this ADR and <code>NEOFORGE_NOTES.md</code>.</li>
@@ -3256,7 +3258,7 @@
 </li>
 <li>The supported platform matrix grows from four to five families, expanding the release-test surface and the lite-jar assembly matrix (<a href="../ADR-024-rtp-lite-assembly-variant/">ADR-024</a>) once NeoForge ships. The matrix expansion is bounded by per-version carriers (<a href="../ADR-010-versioned-platform-adapter-submodules/">ADR-010</a>).</li>
 <li>Documentation surface increases (a <code>rtp-neoforge/REQUIREMENTS.md</code>, subproject ADRs, plan-doc rows, TRACEABILITY entries) before any code lands. Mitigated by the scratch notes already covering most of the design ground.</li>
-<li>Risk of premature implementation work if the Fabric gate is not strictly enforced. Mitigated by the explicit gating clause in §2 of the <em>Decision</em>.</li>
+<li>Risk of premature implementation work if the Fabric gate is not strictly enforced. Mitigated by the explicit gating clause in section 2 of the <em>Decision</em>.</li>
 <li>Future requirement and ADR drift: every cross-platform requirement now must mentally include NeoForge even before the module exists. Mitigated by listing NeoForge alongside the other platforms in the amended requirement text.</li>
 </ul>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>

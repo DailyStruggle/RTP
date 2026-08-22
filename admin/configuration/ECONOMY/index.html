@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/ECONOMY/">
+      
       
         <link rel="prev" href="../PERFORMANCE/">
       
@@ -1037,6 +1039,15 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#costs-refunds" class="md-nav__link">
@@ -3088,6 +3099,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#costs-refunds" class="md-nav__link">
     <span class="md-ellipsis">
       Costs &amp; Refunds
@@ -3129,6 +3149,15 @@
 <p>📎 <strong>Requirement</strong>: This configuration requires <strong>Vault</strong> and a compatible economy plugin. If Vault is absent, these settings are ignored.</p>
 </blockquote>
 <hr />
+<h2 id="updating-settings">Updating Settings<a class="headerlink" href="#updating-settings" title="Permanent link">&para;</a></h2>
+<p>You can update economy settings through:
+1. <strong>In-game admin menu</strong>: Run <code>/rtp admin</code> or <code>/rtp menu</code> -&gt; click <strong>Economy</strong>.
+2. <strong>Command line</strong>: Use <code>/rtp config economy &lt;key&gt;=&lt;value&gt;</code> (e.g. <code>/rtp config economy price=25.0</code>).
+3. <strong>Direct editing</strong>: Edit <code>economy.yml</code> on disk and run <code>/rtp reload</code>.</p>
+<blockquote>
+<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full menu and command navigation details.</p>
+</blockquote>
+<hr />
 <h2 id="costs-refunds">Costs &amp; Refunds<a class="headerlink" href="#costs-refunds" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3155,13 +3184,13 @@
 <tr>
 <td><code>paramsPrice</code></td>
 <td>Double</td>
-<td><code>0.0</code></td>
-<td>Additional cost for using custom parameters (e.g., <code>region:</code>, <code>shape:</code>, <code>vert:</code>).</td>
+<td><code>1000000000.0</code></td>
+<td>Additional cost for using custom parameters (e.g., <code>region:</code>, <code>shape:</code>, <code>vert:</code>). Default high price acts as a soft disable unless deliberately lowered.</td>
 </tr>
 <tr>
 <td><code>biomePrice</code></td>
 <td>Double</td>
-<td><code>0.0</code></td>
+<td><code>5000.0</code></td>
 <td>Additional cost for specifying a biome target (<code>biome:</code>).</td>
 </tr>
 <tr>

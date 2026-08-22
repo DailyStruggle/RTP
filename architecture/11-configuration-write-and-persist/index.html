@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/architecture/11-configuration-write-and-persist/">
+      
       
       
       
@@ -3066,7 +3068,7 @@
 <h1 id="configuration-write-and-persist">Configuration write and persist<a class="headerlink" href="#configuration-write-and-persist" title="Permanent link">&para;</a></h1>
 <p><strong>Scope of this diagram.</strong> This chart covers the <strong>write path</strong> for runtime configuration changes — what happens between <code>/rtp config &lt;file&gt; &lt;key&gt;:&lt;value&gt;</code> (or any other config-mutating command) and a durable on-disk YAML file. It is the companion to diagram 09 (<code>09-configuration-load-and-reload.md</code>), which covers the read / reload path; together they cover the full configuration lifecycle. Related-but-separate behavior paths are intentionally <strong>out of scope</strong>:</p>
 <ul>
-<li><strong>Read-path / reload of the resulting state</strong> — see diagram 09 and <code>CODE_TOUR.md</code> §13.</li>
+<li><strong>Read-path / reload of the resulting state</strong> — see diagram 09 and <code>CODE_TOUR.md</code> section 13.</li>
 <li><strong>Per-attempt teleport reads of config values</strong> — see diagrams 01 / 08.</li>
 <li><strong><code>/rtpadmin</code> setup-wizard flow</strong> — see <a href="../../adr/ADR-038-rtpadmin-setup-wizards/">ADR-038</a>. A wizard is a <em>driver</em> over this lifecycle, not a separate path.</li>
 <li><strong>Cross-server propagation of config changes</strong> — see <a href="../../dev/MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a>. Each backend persists locally; cross-backend fan-out is independent work.</li>
@@ -3079,23 +3081,23 @@
 
     Trigger{{/rtp config write&lt;br/&gt;or LanguageCmd&lt;br/&gt;or wizard-driven mutation}}:::data
 
-    Parse[ConfigParameterGrammar.parse&lt;br/&gt;tokens to ParsedInvocation&lt;br/&gt;spec §3.1]:::async
-    Authorize[ConfigCommandExecutor.authorize&lt;br/&gt;rtp.config.set.section or umbrella&lt;br/&gt;spec §3.2 / §7]:::async
-    ReloadCheck{ReloadCmd holds&lt;br/&gt;per-file write lock?&lt;br/&gt;spec §4.6}:::data
-    Validate[ConfigParameterValidator.validateAll&lt;br/&gt;per-parameter + composite invariants&lt;br/&gt;spec §3.3 / §5 / §8.2]:::async
-    Snapshot[ConfigTransaction.snapshot&lt;br/&gt;capture FactoryValue map&lt;br/&gt;spec §3.4]:::async
-    ApplyMem[ConfigTransaction.apply&lt;br/&gt;mutate in-memory parser&lt;br/&gt;spec §3.5]:::async
-    PostApplyValidate[Composite-invariant re-check&lt;br/&gt;after all mutations applied&lt;br/&gt;spec §3.5 / §8.2]:::async
-    DryRunFork{dryRun set?&lt;br/&gt;spec §3.7}:::data
+    Parse[ConfigParameterGrammar.parse&lt;br/&gt;tokens to ParsedInvocation&lt;br/&gt;spec section 3.1]:::async
+    Authorize[ConfigCommandExecutor.authorize&lt;br/&gt;rtp.config.set.section or umbrella&lt;br/&gt;spec section 3.2 / section 7]:::async
+    ReloadCheck{ReloadCmd holds&lt;br/&gt;per-file write lock?&lt;br/&gt;spec section 4.6}:::data
+    Validate[ConfigParameterValidator.validateAll&lt;br/&gt;per-parameter + composite invariants&lt;br/&gt;spec section 3.3 / section 5 / section 8.2]:::async
+    Snapshot[ConfigTransaction.snapshot&lt;br/&gt;capture FactoryValue map&lt;br/&gt;spec section 3.4]:::async
+    ApplyMem[ConfigTransaction.apply&lt;br/&gt;mutate in-memory parser&lt;br/&gt;spec section 3.5]:::async
+    PostApplyValidate[Composite-invariant re-check&lt;br/&gt;after all mutations applied&lt;br/&gt;spec section 3.5 / section 8.2]:::async
+    DryRunFork{dryRun set?&lt;br/&gt;spec section 3.7}:::data
 
-    WriteTemp[AtomicConfigWriter.write&lt;br/&gt;1 serialize to target.yml.tmp&lt;br/&gt;2 fsync temp&lt;br/&gt;3 rename over target.yml&lt;br/&gt;4 best-effort parent fsync&lt;br/&gt;spec §4.2]:::async
+    WriteTemp[AtomicConfigWriter.write&lt;br/&gt;1 serialize to target.yml.tmp&lt;br/&gt;2 fsync temp&lt;br/&gt;3 rename over target.yml&lt;br/&gt;4 best-effort parent fsync&lt;br/&gt;spec section 4.2]:::async
     TargetedReload[Configs.reloadOne&amp;#40;targetFile&amp;#41;&lt;br/&gt;swap affected parser&lt;br/&gt;per diagram 09]:::async
 
-    AuditOk[[ConfigAuditFormatter.format&lt;br/&gt;RTP.log INFO&lt;br/&gt;outcome = COMMITTED&lt;br/&gt;spec §6]]:::success
+    AuditOk[[ConfigAuditFormatter.format&lt;br/&gt;RTP.log INFO&lt;br/&gt;outcome = COMMITTED&lt;br/&gt;spec section 6]]:::success
     AuditDry[[ConfigAuditFormatter.format&lt;br/&gt;RTP.log INFO&lt;br/&gt;outcome = DRY_RUN_OK&lt;br/&gt;render diff via config.dryRun.&amp;#42;]]:::success
     AuditFail[[ConfigAuditFormatter.format&lt;br/&gt;RTP.log WARNING&lt;br/&gt;outcome = REJECTED or ROLLED_BACK&lt;br/&gt;caller sees config.error.&amp;lt;reasonCode&amp;gt;]]:::fail
 
-    Rollback[ConfigTransaction.rollback&lt;br/&gt;restore snapshot&lt;br/&gt;delete temp file&lt;br/&gt;spec §3.7]:::fail
+    Rollback[ConfigTransaction.rollback&lt;br/&gt;restore snapshot&lt;br/&gt;delete temp file&lt;br/&gt;spec section 3.7]:::fail
 
     Done([Durable on disk&lt;br/&gt;in-memory matches&lt;br/&gt;downstream readers see new values]):::success
     DoneDry([No state change&lt;br/&gt;caller saw preview]):::success
@@ -3137,8 +3139,8 @@
     classDef data    fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;</code></pre>
 <h2 id="how-to-read-this-chart">How to read this chart<a class="headerlink" href="#how-to-read-this-chart" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Three accepting states:</strong> <code>Done</code> (live commit succeeded), <code>DoneDry</code> (dry-run preview succeeded), <code>DoneFail</code> (any failure). Every invocation ends in exactly one of them, and every accepting state has emitted exactly one audit record. This is the spec §6 / S-004 guarantee made visible.</li>
-<li><strong>The seven-stage lifecycle of spec §3 maps 1:1 onto the blue nodes</strong> along the happy path: Parse → Authorize → (reload-check) → Validate → Snapshot → Apply (+ post-apply invariant re-check) → Persist (<code>WriteTemp</code> + <code>TargetedReload</code>) → Audit. The dashed red transitions show where each stage's failure mode routes — all to <code>AuditFail</code> (single record, <code>WARNING</code> level, configurable message).</li>
+<li><strong>Three accepting states:</strong> <code>Done</code> (live commit succeeded), <code>DoneDry</code> (dry-run preview succeeded), <code>DoneFail</code> (any failure). Every invocation ends in exactly one of them, and every accepting state has emitted exactly one audit record. This is the spec section 6 / S-004 guarantee made visible.</li>
+<li><strong>The seven-stage lifecycle of spec section 3 maps 1:1 onto the blue nodes</strong> along the happy path: Parse → Authorize → (reload-check) → Validate → Snapshot → Apply (+ post-apply invariant re-check) → Persist (<code>WriteTemp</code> + <code>TargetedReload</code>) → Audit. The dashed red transitions show where each stage's failure mode routes — all to <code>AuditFail</code> (single record, <code>WARNING</code> level, configurable message).</li>
 <li><strong>Rollback is shared.</strong> Both <code>SCHEMA_INVARIANT</code> (caught after the in-memory mutation) and <code>PERSIST_IO</code> (caught after the temp file exists) route through <code>Rollback</code> before <code>AuditFail</code> — <code>Rollback</code> restores the snapshot and deletes the temp file. Validation-stage failures and authorization failures take the dashed direct edge to <code>AuditFail</code>: no snapshot was taken, nothing to roll back.</li>
 <li><strong>Dry-run takes the same path</strong> through Parse → Validate → Snapshot → Apply → PostApplyValidate, then forks at <code>DryRunFork</code>. The dry-run branch calls <code>Rollback</code> (to restore the in-memory state from the snapshot — there is no temp file to delete) and emits the audit record with <code>outcome = DRY_RUN_OK</code> and the rendered diff. The caller sees the preview; on-disk state is unchanged.</li>
 <li><strong>The atomic-rename pattern is one node</strong> (<code>WriteTemp</code>) because the four substeps (serialize, fsync, rename, parent-fsync) form a single atomic-by-construction unit from the caller's perspective: either the rename happens (durable) or it doesn't (rollback). The substeps live in <code>AtomicConfigWriter</code>; the diagram does not enumerate them to keep the lifecycle visible at one glance.</li>

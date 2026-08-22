@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-001-archimedean-spiral-1d-mapping/">
+      
       
         <link rel="prev" href="../ADR-000-development-workflow/">
       
@@ -3196,13 +3198,13 @@ https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/</p>
 </li>
 <li>The inverse spiral formula (converting a 1D index back to polar coordinates) is non-trivial to implement and verify. Errors in this formula produce subtle distribution bugs that are hard to detect visually.</li>
 <li>The segment granularity (number of discrete steps N) shall be chosen carefully: too coarse and the distribution has visible gaps; too fine and the index range overflows or the bad-sector set becomes large.</li>
-<li>The algorithm is novel enough that new contributors are unlikely to be familiar with it, increasing onboarding cost. This ADR and the <code>DESIGN.md</code> §3 entry exist specifically to address that.</li>
+<li>The algorithm is novel enough that new contributors are unlikely to be familiar with it, increasing onboarding cost. This ADR and the <code>DESIGN.md</code> section 3 entry exist specifically to address that.</li>
 </ul>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Original mathematical proof authored and published by the plugin's sole developer: https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/</li>
 <li>Implementing classes: <code>MemoryShape</code>, <code>Circle</code>, <code>Square</code> (<code>rtp-core</code>)</li>
-<li>Design reference: <a href="../../dev/DESIGN/"><code>DESIGN.md</code> §3 — Deterministic Spatial Algorithms</a></li>
+<li>Design reference: <a href="../../dev/DESIGN/"><code>DESIGN.md</code> section 3 — Deterministic Spatial Algorithms</a></li>
 <li>Requirements: <code>REQ-RTP-F-005</code>, <code>REQ-RTP-F-006</code>, <code>REQ-RTP-F-007</code>, <code>REQ-CORE-F-003</code>, <code>REQ-CORE-F-004</code>, <code>REQ-CORE-F-005</code></li>
 <li>Tests: <code>MemoryShapeTest</code></li>
 </ul>

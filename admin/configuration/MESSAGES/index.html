@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/MESSAGES/">
+      
       
         <link rel="prev" href="../INTEGRATIONS/">
       
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#message-customisation-reference-messagesyml" class="md-skip">
+        <a href="#message-customisation-reference-advancedmessages" class="md-skip">
           Skip to content
         </a>
       
@@ -1102,6 +1104,24 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Messages
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#message-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      Message Files
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#formatting" class="md-nav__link">
     <span class="md-ellipsis">
       Formatting
@@ -1114,15 +1134,6 @@
   <a href="#placeholders" class="md-nav__link">
     <span class="md-ellipsis">
       Placeholders
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#file-layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      File layout
     </span>
   </a>
   
@@ -3106,6 +3117,24 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Messages
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#message-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      Message Files
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#formatting" class="md-nav__link">
     <span class="md-ellipsis">
       Formatting
@@ -3118,15 +3147,6 @@
   <a href="#placeholders" class="md-nav__link">
     <span class="md-ellipsis">
       Placeholders
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#file-layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      File layout
     </span>
   </a>
   
@@ -3159,12 +3179,49 @@
   
 
 
-<h1 id="message-customisation-reference-messagesyml">Message Customisation Reference (<code>messages.yml</code>)<a class="headerlink" href="#message-customisation-reference-messagesyml" title="Permanent link">&para;</a></h1>
-<p><code>messages.yml</code> holds <strong>every</strong> player- and console-facing string RTP emits. Edit it to reword, recolour, or rebrand any message. Read it before requesting formatting support: most "can this text be changed?" questions are answered by a single key here.</p>
-<p>Apply changes by editing on disk and running <code>/rtp reload</code>, or change one key at runtime with <code>/rtp config messages &lt;key&gt;=&lt;value&gt;</code>.</p>
+<h1 id="message-customisation-reference-advancedmessages">Message Customisation Reference (<code>advanced/messages/</code>)<a class="headerlink" href="#message-customisation-reference-advancedmessages" title="Permanent link">&para;</a></h1>
+<p>User-facing and console-facing messages in RTP are organised across categorical message files located in <code>advanced/messages/</code>. Edit these files to reword, recolour, or rebrand any message.</p>
+<hr />
+<h2 id="updating-messages">Updating Messages<a class="headerlink" href="#updating-messages" title="Permanent link">&para;</a></h2>
+<p>You can update messages through:
+1. <strong>In-game admin menu</strong>: Run <code>/rtp admin</code> or <code>/rtp menu</code> -&gt; click <strong>Messages</strong>.
+2. <strong>Command line</strong>: Use <code>/rtp config messages &lt;key&gt;=&lt;value&gt;</code>.
+3. <strong>Direct editing</strong>: Edit files under <code>advanced/messages/</code> on disk and run <code>/rtp reload</code>.</p>
 <blockquote>
-<p>When a non-English locale is active (see <a href="../LANGUAGE/">LANGUAGE.md</a>), the translated <code>messages.yml</code> is read from <code>lang/&lt;code&gt;/</code> instead of this baseline file.</p>
+<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full menu and command navigation details.</p>
 </blockquote>
+<hr />
+<h2 id="message-files">Message Files<a class="headerlink" href="#message-files" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>player.yml</code></td>
+<td>Player-facing teleport flow: delay, arrival, cancel, cooldown, lockout, queue notifications, economy cost/failure.</td>
+</tr>
+<tr>
+<td><code>commands.yml</code></td>
+<td>Command descriptions, help entries, command-line parameter error messages, and menu interface rows.</td>
+</tr>
+<tr>
+<td><code>system.yml</code></td>
+<td>System notices: reload, startup/shutdown, permissions, admin inspection, and administrative audit logs.</td>
+</tr>
+<tr>
+<td><code>network.yml</code></td>
+<td>Multi-server and proxy network teleport messages, routing notices, and cross-server queue messages.</td>
+</tr>
+<tr>
+<td><code>placeholders.yml</code></td>
+<td>Shared placeholder definitions and time unit formatting.</td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="formatting">Formatting<a class="headerlink" href="#formatting" title="Permanent link">&para;</a></h2>
 <p>Message values accept, in any combination:</p>
@@ -3201,73 +3258,12 @@
 </table>
 <h2 id="placeholders">Placeholders<a class="headerlink" href="#placeholders" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Shared <code>[Pn]</code> placeholders</strong> are defined in the <code>placeholders:</code> list at the top of the file. <code>[P0]</code> is the plugin prefix (a rainbow <code>[RTP]</code> by default) and is reused in nearly every message. Append entries to the list to define <code>[P1]</code>, <code>[P2]</code>, and so on.</li>
-<li><strong>Per-message placeholders</strong> (e.g. <code>[attempts]</code>, <code>[world]</code>, <code>[delay]</code>, <code>[remainingCooldown]</code>, <code>[money]</code>, <code>[spot]</code>, <code>[filename]</code>) are documented in a comment directly above each message that uses them. Only the placeholders listed for a given key are substituted in that message.</li>
+<li><strong>Shared <code>[Pn]</code> placeholders</strong> are defined in the <code>placeholders:</code> list inside <code>advanced/messages/placeholders.yml</code>. Every <code>[Pn]</code> placeholder corresponds to the entry at index <code>n</code> of that list (<code>[P0]</code> is the 0th item, <code>[P1]</code> is the 1st item, and so on).</li>
+<li><strong>Per-message placeholders</strong> (e.g. <code>[attempts]</code>, <code>[world]</code>, <code>[delay]</code>, <code>[remainingCooldown]</code>, <code>[money]</code>, <code>[spot]</code>, <code>[filename]</code>) are documented in comments directly above each message that uses them. Only the placeholders listed for a given key are substituted in that message.</li>
 </ul>
-<h2 id="file-layout">File layout<a class="headerlink" href="#file-layout" title="Permanent link">&para;</a></h2>
-<p>The file is split into commented sections so related strings stay together:</p>
-<table>
-<thead>
-<tr>
-<th>Section</th>
-<th>Contents</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1. General Configuration</td>
-<td>The shared <code>placeholders</code> list.</td>
-</tr>
-<tr>
-<td>2. Teleportation</td>
-<td>Player-facing teleport flow: delay, success, cancel, cooldown, lockout, no-locations-queued, queue position, not-enough-money.</td>
-</tr>
-<tr>
-<td>3. Time Formatting</td>
-<td>Unit suffixes for time placeholders (<code>days</code>, <code>hours</code>, <code>minutes</code>, <code>seconds</code>, <code>millis</code>).</td>
-</tr>
-<tr>
-<td>4. System &amp; Management</td>
-<td>Reload, version-mismatch, permission-denied, and management strings.</td>
-</tr>
-<tr>
-<td>5. Administrative Logs</td>
-<td>Console audit / log lines.</td>
-</tr>
-<tr>
-<td>6. Scan Command</td>
-<td><code>/rtp scan</code> progress and result strings.</td>
-</tr>
-<tr>
-<td>7. Info Command</td>
-<td><code>/rtp info</code> output.</td>
-</tr>
-<tr>
-<td>8 / 8b. Command Descriptions &amp; Menu Framework</td>
-<td>Help text and the generalized book/chat menu rows, headers, and dividers.</td>
-</tr>
-<tr>
-<td>9. PlaceholderAPI Support</td>
-<td>PAPI-specific strings.</td>
-</tr>
-<tr>
-<td>10. Visuals</td>
-<td>Visualization-related strings.</td>
-</tr>
-<tr>
-<td>11. Metadata</td>
-<td>Internal <code>version</code> marker.</td>
-</tr>
-<tr>
-<td>12. Developer Options</td>
-<td>Developer-facing toggles / strings.</td>
-</tr>
-</tbody>
-</table>
 <h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Icon glyphs are intentional.</strong> Some values embed single-codepoint UI icons (type-a-value, paginator arrows, run/row markers, the section sign). Preserve them verbatim; do not ASCII-fold or delete them.</li>
-<li><strong>Locale parity.</strong> A custom key added to this baseline must be mirrored into every shipped locale under <code>lang/&lt;code&gt;/messages.yml</code>, or that locale silently falls back to English. See the <a href="../../../dev/TRANSLATION_GUIDE/">Translation Guide</a>.</li>
 <li><strong>Never change <code>version</code></strong> - it is used internally for config migration.</li>
 </ul>
 

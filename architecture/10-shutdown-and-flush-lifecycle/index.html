@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/architecture/10-shutdown-and-flush-lifecycle/">
+      
       
       
       
@@ -3083,7 +3085,7 @@
 <li>Fabric / other-platform shutdown — this diagram is Bukkit-family only; Folia uses the same path with the global-region-scheduler variant of <code>RTPScheduler.cancelTask</code>.</li>
 <li>The synchronous <code>/reload</code> pitfall — see <code>LESSONS_LEARNED.md</code>.</li>
 </ul>
-<p>Companion prose: <code>docs/dev/CODE_TOUR.md §14</code>.</p>
+<p>Companion prose: <code>docs/dev/CODE_TOUR.md section 14</code>.</p>
 <h2 id="how-to-read-this-chart">How to read this chart<a class="headerlink" href="#how-to-read-this-chart" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Green = the one accepting terminal (<code>super.onDisable</code> reached cleanly).</li>
@@ -3159,7 +3161,7 @@
 <li><code>rtp-core/src/main/java/io/github/dailystruggle/rtp/common/RTP.java</code> — <code>stop()</code> (~L382).</li>
 <li><code>rtp-core/src/main/java/io/github/dailystruggle/rtp/common/database/DatabaseAccessor.java</code> — <code>stop</code> flag, <code>flushDirtyCache</code>, <code>rebuildCachedLocationsFromMemory</code>, <code>processQueries</code>, <code>close</code>.</li>
 <li>Regression tests: <code>MemoryShapeShutdownTest</code>, <code>RTPTest#stop_*</code>, <code>SyncTaskProcessingTest</code> (shared-pipe <code>stop=true</code> behavior).</li>
-<li>Background: <code>docs/dev/LESSONS_LEARNED.md</code> §"Shutdown ordering", <code>docs/dev/TRACEABILITY.md</code> row <code>REQ-CORE-NF-001</code>.</li>
+<li>Background: <code>docs/dev/LESSONS_LEARNED.md</code> section "Shutdown ordering", <code>docs/dev/TRACEABILITY.md</code> row <code>REQ-CORE-NF-001</code>.</li>
 </ul>
 
 

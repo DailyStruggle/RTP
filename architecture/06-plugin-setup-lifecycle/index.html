@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/architecture/06-plugin-setup-lifecycle/">
+      
       
       
       
@@ -3030,12 +3032,12 @@
 
 <h1 id="plugin-setup-lifecycle">Plugin setup lifecycle<a class="headerlink" href="#plugin-setup-lifecycle" title="Permanent link">&para;</a></h1>
 <p><strong>Scope of this diagram.</strong> This chart covers the one-shot Bukkit-family plugin lifecycle — <code>onLoad</code> (JDBC probe / fail-fast) → <code>onEnable</code> (strictly ordered: metrics, server-model resolution, reflective accessor wiring, DB setup, Chunky probe, startup-task drains, command binding, event registration, fallback-region rebind, integrations, effects, non-Folia <code>ChunkUnloadProcessor</code>, DB processing loop, PAPI, doc extraction) → <code>onDisable</code> bail-out on any failure. This is the <strong>setup-time counterpart</strong> to every runtime loop in diagrams 01–05 and 08–09. Related-but-separate behavior paths are intentionally <strong>out of scope</strong> here:
-- <strong>Fabric entry point</strong> — Fabric uses a different bootstrap (<code>ModInitializer</code>), out of scope per <code>REQUIREMENTS.md §0</code>.
+- <strong>Fabric entry point</strong> — Fabric uses a different bootstrap (<code>ModInitializer</code>), out of scope per <code>REQUIREMENTS.md section 0</code>.
 - <strong>Runtime teleport / cache / GC / scan loops</strong> — see diagrams 01, 02, 04, 05; this chart ends once those loops are running.
 - <strong>Config reload</strong> — a separate code path (<code>/rtp reload</code>) that re-runs a subset of <code>onEnable</code> steps.
 - <strong>Per-command dispatch</strong> — see diagrams 08 (region selection) and 09 (location selection); this chart stops at <code>BindCmds</code>.</p>
 <blockquote>
-<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §10 — Plugin setup lifecycle</a>.</p>
+<p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> section 10 — Plugin setup lifecycle</a>.</p>
 </blockquote>
 <pre class="mermaid"><code>stateDiagram-v2
     BukkitLoad : Server classloads plugin JAR

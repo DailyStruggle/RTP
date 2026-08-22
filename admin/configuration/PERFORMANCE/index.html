@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/">
+      
       
         <link rel="prev" href="../SAFETY/">
       
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#performance-configuration-reference-performanceyml" class="md-skip">
+        <a href="#performance-configuration-reference-advancedperformanceyml" class="md-skip">
           Skip to content
         </a>
       
@@ -1018,27 +1020,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#task-timing-limits" class="md-nav__link">
+  <a href="#updating-settings" class="md-nav__link">
     <span class="md-ellipsis">
-      Task Timing &amp; Limits
+      Updating Settings
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#world-loading" class="md-nav__link">
+  <a href="#server-health-timing" class="md-nav__link">
     <span class="md-ellipsis">
-      World Loading
+      Server Health &amp; Timing
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#throttling-queueing" class="md-nav__link">
+  <a href="#world-loading-view-distance" class="md-nav__link">
     <span class="md-ellipsis">
-      Throttling &amp; Queueing
+      World Loading &amp; View Distance
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caching-pre-fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      Caching &amp; Pre-fill
     </span>
   </a>
   
@@ -1054,9 +1065,27 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#auditing-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Auditing &amp; Diagnostics
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#observational-mode-visitor" class="md-nav__link">
     <span class="md-ellipsis">
       Observational Mode (Visitor)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prefab-backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prefab Backups
     </span>
   </a>
   
@@ -3124,27 +3153,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#task-timing-limits" class="md-nav__link">
+  <a href="#updating-settings" class="md-nav__link">
     <span class="md-ellipsis">
-      Task Timing &amp; Limits
+      Updating Settings
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#world-loading" class="md-nav__link">
+  <a href="#server-health-timing" class="md-nav__link">
     <span class="md-ellipsis">
-      World Loading
+      Server Health &amp; Timing
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#throttling-queueing" class="md-nav__link">
+  <a href="#world-loading-view-distance" class="md-nav__link">
     <span class="md-ellipsis">
-      Throttling &amp; Queueing
+      World Loading &amp; View Distance
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caching-pre-fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      Caching &amp; Pre-fill
     </span>
   </a>
   
@@ -3160,9 +3198,27 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#auditing-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Auditing &amp; Diagnostics
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#observational-mode-visitor" class="md-nav__link">
     <span class="md-ellipsis">
       Observational Mode (Visitor)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prefab-backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prefab Backups
     </span>
   </a>
   
@@ -3195,10 +3251,19 @@
   
 
 
-<h1 id="performance-configuration-reference-performanceyml">Performance Configuration Reference (<code>performance.yml</code>)<a class="headerlink" href="#performance-configuration-reference-performanceyml" title="Permanent link">&para;</a></h1>
-<p>This document provides a detailed reference for all configuration options available in <code>plugins/RTP/performance.yml</code>.</p>
+<h1 id="performance-configuration-reference-advancedperformanceyml">Performance Configuration Reference (<code>advanced/performance.yml</code>)<a class="headerlink" href="#performance-configuration-reference-advancedperformanceyml" title="Permanent link">&para;</a></h1>
+<p>This document provides a detailed reference for all configuration options available in <code>plugins/RTP/advanced/performance.yml</code>.</p>
 <hr />
-<h2 id="task-timing-limits">Task Timing &amp; Limits<a class="headerlink" href="#task-timing-limits" title="Permanent link">&para;</a></h2>
+<h2 id="updating-settings">Updating Settings<a class="headerlink" href="#updating-settings" title="Permanent link">&para;</a></h2>
+<p>You can update performance settings through:
+1. <strong>In-game admin menu</strong>: Run <code>/rtp admin</code> or <code>/rtp menu</code> -&gt; click <strong>Performance</strong>.
+2. <strong>Command line</strong>: Use <code>/rtp config performance &lt;key&gt;=&lt;value&gt;</code> (e.g. <code>/rtp config performance minTPS=18.5</code>).
+3. <strong>Direct editing</strong>: Edit <code>advanced/performance.yml</code> on disk and run <code>/rtp reload</code>.</p>
+<blockquote>
+<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full menu and command navigation details.</p>
+</blockquote>
+<hr />
+<h2 id="server-health-timing">Server Health &amp; Timing<a class="headerlink" href="#server-health-timing" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3210,6 +3275,20 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>minTPS</code></td>
+<td>Double</td>
+<td><code>19.0</code></td>
+<td>Minimum server TPS required to queue new locations. Range: 0.0–20.0.</td>
+<td><strong>LOW</strong></td>
+</tr>
+<tr>
+<td><code>maxHeapPercent</code></td>
+<td>Double</td>
+<td><code>85.0</code></td>
+<td>Pause cache filling when JVM memory use passes this percentage. <code>0</code> or <code>100</code> disables. Range: 0.0–100.0.</td>
+<td><strong>LOW</strong></td>
+</tr>
 <tr>
 <td><code>maxAttempts</code></td>
 <td>Integer</td>
@@ -3240,7 +3319,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="world-loading">World Loading<a class="headerlink" href="#world-loading" title="Permanent link">&para;</a></h2>
+<h2 id="world-loading-view-distance">World Loading &amp; View Distance<a class="headerlink" href="#world-loading-view-distance" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3256,15 +3335,22 @@
 <td><code>viewDistanceSelect</code></td>
 <td>Integer</td>
 <td><code>0</code></td>
-<td>Chunk radius to pre-load around candidate locations during selection.</td>
+<td>Chunk radius to pre-load around candidate locations during selection. <code>0</code> = just the candidate chunk.</td>
 <td><strong>HIGH</strong> — Higher values cause lag spikes on selection.</td>
 </tr>
 <tr>
 <td><code>viewDistanceTeleport</code></td>
 <td>Integer</td>
 <td><code>0</code></td>
-<td>Chunk radius to pre-load around the destination before teleport.</td>
+<td>Chunk radius to pre-load around the destination before teleport. <code>0</code> = just the destination chunk.</td>
 <td><strong>HIGH</strong></td>
+</tr>
+<tr>
+<td><code>viewDistanceRestoreInterval</code></td>
+<td>Integer</td>
+<td><code>0</code></td>
+<td>Ticks to ease view distance back to normal after arrival. Set to <code>0</code> (off) to prevent client-side flashing.</td>
+<td><strong>LOW</strong></td>
 </tr>
 <tr>
 <td><code>syncLoading</code></td>
@@ -3275,7 +3361,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="throttling-queueing">Throttling &amp; Queueing<a class="headerlink" href="#throttling-queueing" title="Permanent link">&para;</a></h2>
+<h2 id="caching-pre-fill">Caching &amp; Pre-fill<a class="headerlink" href="#caching-pre-fill" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3288,18 +3374,46 @@
 </thead>
 <tbody>
 <tr>
-<td><code>minTPS</code></td>
-<td>Double</td>
-<td><code>19.0</code></td>
-<td>Minimum server TPS required to queue new locations. Range: 0.0–20.0.</td>
-<td><strong>LOW</strong></td>
-</tr>
-<tr>
 <td><code>postTeleportQueueing</code></td>
 <td>Boolean</td>
 <td><code>false</code></td>
 <td>Immediately try to refill the cache after a teleport occurs.</td>
 <td><strong>MEDIUM</strong></td>
+</tr>
+<tr>
+<td><code>checkOnChunkLoads</code></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Learn biomes from chunks already loaded without doing extra work.</td>
+<td><strong>LOW</strong></td>
+</tr>
+<tr>
+<td><code>backlogRefillThreshold</code></td>
+<td>Double</td>
+<td><code>0.5</code></td>
+<td>Refill the L3 backlog buffer when it drops to this fraction (e.g. <code>0.5</code> = 50%). Range: 0.0–1.0.</td>
+<td><strong>LOW</strong></td>
+</tr>
+<tr>
+<td><code>pregeneratedPreference</code></td>
+<td>Double</td>
+<td><code>0.0</code></td>
+<td>Bias toward pregenerated chunks over generating new terrain. Range: 0.0–1.0 (0 = no preference, 1 = avoid ungenerated).</td>
+<td><strong>LOW</strong></td>
+</tr>
+<tr>
+<td><code>loginCacheEnabled</code></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Maintain a dedicated reserve of safe spots for players joining the server (<code>rtp.onevent.join</code>/<code>firstjoin</code>).</td>
+<td><strong>LOW</strong></td>
+</tr>
+<tr>
+<td><code>loginCacheCap</code></td>
+<td>Integer</td>
+<td><code>0</code></td>
+<td>Max size of the login reserve cache. <code>0</code> = auto (server max players).</td>
+<td><strong>LOW</strong></td>
 </tr>
 </tbody>
 </table>
@@ -3316,20 +3430,6 @@
 </thead>
 <tbody>
 <tr>
-<td><code>onEventParsing</code></td>
-<td>Boolean</td>
-<td><code>false</code></td>
-<td>Parse permissions on every event. Incompatible with <code>*.*</code> permissions.</td>
-<td><strong>MEDIUM</strong></td>
-</tr>
-<tr>
-<td><code>effectParsing</code></td>
-<td>Boolean</td>
-<td><code>true</code></td>
-<td>Parse effect permissions on startup.</td>
-<td><strong>LOW</strong></td>
-</tr>
-<tr>
 <td><code>biomeRecall</code></td>
 <td>Boolean</td>
 <td><code>true</code></td>
@@ -3344,11 +3444,46 @@
 <td><strong>MEDIUM</strong></td>
 </tr>
 <tr>
-<td><code>checkOnChunkLoads</code></td>
+<td><code>onEventParsing</code></td>
 <td>Boolean</td>
 <td><code>false</code></td>
-<td>Passive check for safe locations within all loaded chunks in range.</td>
-<td><strong>HIGH</strong> — Significant impact on busy servers.</td>
+<td>Parse permissions on every event. Incompatible with <code>*.*</code> permissions.</td>
+<td><strong>MEDIUM</strong></td>
+</tr>
+<tr>
+<td><code>effectParsing</code></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Parse effect permissions on startup.</td>
+<td><strong>LOW</strong></td>
+</tr>
+</tbody>
+</table>
+<h2 id="auditing-diagnostics">Auditing &amp; Diagnostics<a class="headerlink" href="#auditing-diagnostics" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>slowPipelineThresholdMs</code></td>
+<td>Integer</td>
+<td><code>5000</code></td>
+<td>Log a warning when a teleport takes longer than this threshold in ms. <code>0</code> or negative disables.</td>
+<td><strong>LOW</strong></td>
+</tr>
+<tr>
+<td><code>queueGrowthWarnThreshold</code></td>
+<td>Integer</td>
+<td><code>0</code></td>
+<td>Log a warning when the player wait queue depth exceeds this number. <code>0</code> or negative disables.</td>
+<td><strong>LOW</strong></td>
 </tr>
 </tbody>
 </table>
@@ -3368,9 +3503,28 @@
 <tr>
 <td><code>visitorEnabled</code></td>
 <td>Boolean</td>
-<td><code>true</code></td>
+<td><code>false</code></td>
 <td>Enable background observation mode.</td>
 <td><strong>LOW</strong> — Work only happens when cache is full; skips unknown chunks.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="prefab-backups">Prefab Backups<a class="headerlink" href="#prefab-backups" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prefab.bakRetention</code></td>
+<td>Integer</td>
+<td><code>3</code></td>
+<td>Number of <code>.bak</code> backup files to retain per file when applying <code>/rtp admin prefab</code> presets.</td>
 </tr>
 </tbody>
 </table>

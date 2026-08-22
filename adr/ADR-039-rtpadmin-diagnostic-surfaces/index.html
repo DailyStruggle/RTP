@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-039-rtpadmin-diagnostic-surfaces/">
+      
       
         <link rel="prev" href="../ADR-038-rtpadmin-setup-wizards/">
       
@@ -3494,7 +3496,7 @@
 <tr>
 <td>Adapter-specific concerns (e.g., Folia per-region TPS)</td>
 <td>platform adapters</td>
-<td>Same pattern as existing <code>rtp-folia</code> aggregation in <code>METRICS_PLAN.md §Folia Aggregation</code>.</td>
+<td>Same pattern as existing <code>rtp-folia</code> aggregation in <code>METRICS_PLAN.md section Folia Aggregation</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -3517,7 +3519,7 @@
 <h2 id="what-this-adr-is-not">What this ADR is <strong>not</strong><a class="headerlink" href="#what-this-adr-is-not" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Not</strong> a metrics-plan rewrite. It consumes <code>METRICS_PLAN.md</code>; it does not redefine any metric, bound, or sampler. Metrics phases that haven't shipped render as <code>—</code>.</li>
-<li><strong>Not</strong> a live dashboard. No websocket, no HTTP endpoint, no auto-refresh, no Prometheus exporter. Those are explicitly out of scope and tracked in <code>METRICS_PLAN.md §Phased Roadmap</code> / a future ADR.</li>
+<li><strong>Not</strong> a live dashboard. No websocket, no HTTP endpoint, no auto-refresh, no Prometheus exporter. Those are explicitly out of scope and tracked in <code>METRICS_PLAN.md section Phased Roadmap</code> / a future ADR.</li>
 <li><strong>Not</strong> a write path. No <code>[apply]</code> from a diagnostic page. Surfaces hand off to ADR-038 wizards or to ADR-037 config commands; they never bypass either.</li>
 <li><strong>Not</strong> the place for the heatmap to gain persistence. The fail-rate ring is in-memory only in beta.4. Persisting samples across restarts (and the schema work that implies) is deferred.</li>
 <li><strong>Not</strong> an addon extension point in beta.4. The interface is sealed against third-party surfaces until the API has soaked one release cycle.</li>
@@ -3684,7 +3686,7 @@
 </tr>
 <tr>
 <td>Live websocket-pushed surface</td>
-<td>No live updates per ADR-035 §no-live-update; would also require an out-of-game client.</td>
+<td>No live updates per ADR-035 section no-live-update; would also require an out-of-game client.</td>
 </tr>
 <tr>
 <td>Sample biomes via real chunk loads</td>
@@ -3786,7 +3788,7 @@
 <li>ADR-016 — Anvil Subsystem</li>
 <li>ADR-028 — L3 Backlog Cache</li>
 <li><a href="../../dev/METRICS_PLAN/"><code>docs/dev/METRICS_PLAN.md</code></a></li>
-<li><a href="../../dev/REQUIREMENTS/"><code>docs/dev/REQUIREMENTS.md §3</code></a> (S-00x prohibitions)</li>
+<li><a href="../../dev/REQUIREMENTS/"><code>docs/dev/REQUIREMENTS.md section 3</code></a> (S-00x prohibitions)</li>
 <li>commands-api-ADR-001 — Brigadier Bridge</li>
 </ul>
 

@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/METRICS/">
+      
       
         <link rel="prev" href="../LOGGING/">
       
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#metrics-settings-reference-metricsyml" class="md-skip">
+        <a href="#metrics-settings-reference-advancedmetricsyml" class="md-skip">
           Skip to content
         </a>
       
@@ -1163,6 +1165,15 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#keys" class="md-nav__link">
@@ -3088,6 +3099,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#updating-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating Settings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#keys" class="md-nav__link">
     <span class="md-ellipsis">
       Keys
@@ -3123,9 +3143,18 @@
   
 
 
-<h1 id="metrics-settings-reference-metricsyml">Metrics Settings Reference (<code>metrics.yml</code>)<a class="headerlink" href="#metrics-settings-reference-metricsyml" title="Permanent link">&para;</a></h1>
-<p><code>metrics.yml</code> holds <strong>reporting-only</strong> knobs for the runtime-health metrics SPI (TPS / MSPT / heap / queue samples). Throttle and tuning knobs continue to live in <a href="../PERFORMANCE/"><code>performance.yml</code></a>.</p>
-<p>Most keys affect <strong>Folia only</strong>: single-region runtimes (Paper / Bukkit / Fabric) always return an empty per-region list, which is the correct answer for those platforms, so the Folia knobs have no effect there.</p>
+<h1 id="metrics-settings-reference-advancedmetricsyml">Metrics Settings Reference (<code>advanced/metrics.yml</code>)<a class="headerlink" href="#metrics-settings-reference-advancedmetricsyml" title="Permanent link">&para;</a></h1>
+<p><code>advanced/metrics.yml</code> holds <strong>reporting-only</strong> knobs for the runtime-health metrics SPI (TPS / MSPT / heap / queue samples). Throttle and tuning knobs live in <a href="../PERFORMANCE/"><code>advanced/performance.yml</code></a>.</p>
+<p>Most keys affect <strong>Folia only</strong>: single-region runtimes (Paper / Bukkit / Fabric / NeoForge) return an empty per-region list, so the Folia aggregation knobs have no effect there.</p>
+<hr />
+<h2 id="updating-settings">Updating Settings<a class="headerlink" href="#updating-settings" title="Permanent link">&para;</a></h2>
+<p>You can update metrics configuration through:
+1. <strong>In-game admin menu</strong>: Run <code>/rtp admin</code> or <code>/rtp menu</code> -&gt; click <strong>Admin Panel</strong>.
+2. <strong>Command line</strong>: Use <code>/rtp config metrics &lt;key&gt;=&lt;value&gt;</code>.
+3. <strong>Direct editing</strong>: Edit <code>advanced/metrics.yml</code> on disk and run <code>/rtp reload</code>.</p>
+<blockquote>
+<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full menu and command navigation details.</p>
+</blockquote>
 <hr />
 <h2 id="keys">Keys<a class="headerlink" href="#keys" title="Permanent link">&para;</a></h2>
 <table>
@@ -3144,7 +3173,7 @@
 <td>Boolean</td>
 <td><code>true</code></td>
 <td>(n/a)</td>
-<td>Populate the snapshot's per-region detail on Folia. No effect on Paper / Bukkit / Fabric.</td>
+<td>Populate the snapshot's per-region detail on Folia. No effect on Paper / Bukkit / Fabric / NeoForge.</td>
 </tr>
 <tr>
 <td><code>foliaAggregationTps</code></td>

@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/configuration/LANGUAGE/">
+      
       
         <link rel="prev" href="../MESSAGES/">
       
@@ -1123,29 +1125,86 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#keys" class="md-nav__link">
+  <a href="#configuration-keys" class="md-nav__link">
     <span class="md-ellipsis">
-      Keys
+      Configuration Keys
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-the-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      Changing the Language
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Changing the Language">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-1-in-game-console-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      Method 1: In-Game / Console Command
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-2-editing-languageyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Method 2: Editing language.yml
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#bundled-locales" class="md-nav__link">
     <span class="md-ellipsis">
-      Bundled locales
+      Bundled Locales
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#adding-your-own-locale" class="md-nav__link">
+  <a href="#customizing-messages-vs-developing-translations" class="md-nav__link">
     <span class="md-ellipsis">
-      Adding your own locale
+      Customizing Messages vs. Developing Translations
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Customizing Messages vs. Developing Translations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#customizing-messages-server-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Customizing Messages (Server Operators)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contributing-translations-developers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contributing Translations (Developers)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3097,29 +3156,86 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#keys" class="md-nav__link">
+  <a href="#configuration-keys" class="md-nav__link">
     <span class="md-ellipsis">
-      Keys
+      Configuration Keys
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-the-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      Changing the Language
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Changing the Language">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-1-in-game-console-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      Method 1: In-Game / Console Command
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-2-editing-languageyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Method 2: Editing language.yml
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#bundled-locales" class="md-nav__link">
     <span class="md-ellipsis">
-      Bundled locales
+      Bundled Locales
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#adding-your-own-locale" class="md-nav__link">
+  <a href="#customizing-messages-vs-developing-translations" class="md-nav__link">
     <span class="md-ellipsis">
-      Adding your own locale
+      Customizing Messages vs. Developing Translations
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Customizing Messages vs. Developing Translations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#customizing-messages-server-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Customizing Messages (Server Operators)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contributing-translations-developers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contributing Translations (Developers)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3142,9 +3258,10 @@
 
 
 <h1 id="language-selection-reference-languageyml">Language Selection Reference (<code>language.yml</code>)<a class="headerlink" href="#language-selection-reference-languageyml" title="Permanent link">&para;</a></h1>
-<p><code>language.yml</code> is loaded <strong>before</strong> every other RTP configuration file so that <code>config.yml</code>, <code>messages.yml</code>, <code>economy.yml</code>, <code>performance.yml</code>, <code>safety.yml</code>, and <code>logging.yml</code> are read directly from <code>lang/&lt;language&gt;/</code> when a non-English locale is active.</p>
+<p><code>language.yml</code> defines the active language for RTP. It is loaded at startup before other configuration files so that messages and configuration defaults are initialized in the selected locale.</p>
+<p>Apply changes by editing <code>language.yml</code> on disk and running <code>/rtp reload</code>, or by using the <code>/rtp config language &lt;locale&gt;</code> command.</p>
 <hr />
-<h2 id="keys">Keys<a class="headerlink" href="#keys" title="Permanent link">&para;</a></h2>
+<h2 id="configuration-keys">Configuration Keys<a class="headerlink" href="#configuration-keys" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -3159,21 +3276,100 @@
 <td><code>language</code></td>
 <td>String</td>
 <td><code>"en"</code></td>
-<td>Locale code. Selects the <code>lang/&lt;code&gt;/</code> directory whose translated YAML files are loaded.</td>
+<td>Active locale code (e.g. <code>en</code>, <code>es</code>, <code>de</code>, <code>fr</code>). Sets the language used for generated configuration files, messages, and menus.</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>String</td>
+<td><code>"1.0"</code></td>
+<td>Configuration schema version (internal use; do not edit).</td>
 </tr>
 </tbody>
 </table>
-<h2 id="bundled-locales">Bundled locales<a class="headerlink" href="#bundled-locales" title="Permanent link">&para;</a></h2>
-<p><code>en</code>, <code>de</code>, <code>es</code>, <code>fr</code>, <code>it</code>, <code>ja</code>, <code>ko</code>, <code>nl</code>, <code>pl</code>, <code>pt</code>, <code>ru</code>, <code>zh</code>.</p>
-<h2 id="adding-your-own-locale">Adding your own locale<a class="headerlink" href="#adding-your-own-locale" title="Permanent link">&para;</a></h2>
+<hr />
+<h2 id="changing-the-language">Changing the Language<a class="headerlink" href="#changing-the-language" title="Permanent link">&para;</a></h2>
+<h3 id="method-1-in-game-console-command">Method 1: In-Game / Console Command<a class="headerlink" href="#method-1-in-game-console-command" title="Permanent link">&para;</a></h3>
+<p>Run the command:
+<div class="highlight"><pre><span></span><code>/rtp config language &lt;locale&gt;
+</code></pre></div>
+<em>Example:</em> <code>/rtp config language es</code></p>
+<p>This command updates <code>language.yml</code> and reloads configuration files and messages immediately.</p>
+<h3 id="method-2-editing-languageyml">Method 2: Editing <code>language.yml</code><a class="headerlink" href="#method-2-editing-languageyml" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Create a folder under <code>&lt;pluginDir&gt;/lang/&lt;code&gt;/</code> containing the translated YAML files.</li>
-<li>Set <code>language</code> to that code.</li>
-<li>Run <code>/rtp reload</code> (or restart the server).</li>
+<li>Open <code>plugins/RTP/language.yml</code>.</li>
+<li>Change the <code>language</code> value to your desired locale code (for example, <code>language: de</code>).</li>
+<li>Run <code>/rtp reload</code> in the console or in-game (or restart the server).</li>
 </ol>
 <hr />
+<h2 id="bundled-locales">Bundled Locales<a class="headerlink" href="#bundled-locales" title="Permanent link">&para;</a></h2>
+<p>The following language codes ship with RTP:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Language</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>en</code></td>
+<td>English (Default)</td>
+</tr>
+<tr>
+<td><code>de</code></td>
+<td>German</td>
+</tr>
+<tr>
+<td><code>es</code></td>
+<td>Spanish</td>
+</tr>
+<tr>
+<td><code>fr</code></td>
+<td>French</td>
+</tr>
+<tr>
+<td><code>it</code></td>
+<td>Italian</td>
+</tr>
+<tr>
+<td><code>ja</code></td>
+<td>Japanese</td>
+</tr>
+<tr>
+<td><code>ko</code></td>
+<td>Korean</td>
+</tr>
+<tr>
+<td><code>nl</code></td>
+<td>Dutch</td>
+</tr>
+<tr>
+<td><code>pl</code></td>
+<td>Polish</td>
+</tr>
+<tr>
+<td><code>pt</code></td>
+<td>Portuguese</td>
+</tr>
+<tr>
+<td><code>ru</code></td>
+<td>Russian</td>
+</tr>
+<tr>
+<td><code>zh</code></td>
+<td>Chinese</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="customizing-messages-vs-developing-translations">Customizing Messages vs. Developing Translations<a class="headerlink" href="#customizing-messages-vs-developing-translations" title="Permanent link">&para;</a></h2>
+<h3 id="customizing-messages-server-operators">Customizing Messages (Server Operators)<a class="headerlink" href="#customizing-messages-server-operators" title="Permanent link">&para;</a></h3>
+<p>To reword or customize messages for your server, you do not need to manage locale folders. Edit the message files directly under <code>plugins/RTP/advanced/messages/</code> (<code>player.yml</code>, <code>commands.yml</code>, <code>system.yml</code>, <code>network.yml</code>, <code>placeholders.yml</code>) and run <code>/rtp reload</code>. See <a href="../MESSAGES/">MESSAGES.md</a> for details.</p>
+<h3 id="contributing-translations-developers">Contributing Translations (Developers)<a class="headerlink" href="#contributing-translations-developers" title="Permanent link">&para;</a></h3>
+<p>Translated defaults are packaged inside the plugin JAR under <code>lang/&lt;locale&gt;/</code>. To contribute a new translation or update an existing language bundle for the plugin repository, see the <a href="../../../dev/TRANSLATION_GUIDE/">Translation Guide</a>.</p>
+<hr />
 <blockquote>
-<p>See <a href="../CONFIG_LIFECYCLE/">CONFIG_LIFECYCLE.md</a> for how RTP resolves and reloads locale files.</p>
+<p>See <a href="../CONFIG_LIFECYCLE/">CONFIG_LIFECYCLE.md</a> for how RTP resolves and reloads configuration files across locale changes.</p>
 </blockquote>
 
 

@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/POTENTIAL_BUGS/">
+      
       
       
       
@@ -3161,6 +3163,24 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#2026-08-18-rectanglecontains-treats-widthheightcenterxcenterz-as-blocks-4-while-every-other-shape-treats-them-as-chunks" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-08-18 - Rectangle.contains treats width/height/centerX/centerZ as blocks (&gt;&gt; 4) while every other shape treats them as chunks
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2026-08-18-betterrtp-import-writes-regionsworldyml-but-never-points-worldsworldymlregion-at-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-08-18 - BetterRTP import writes regions/&lt;world&gt;.yml but never points worlds/&lt;world&gt;.yml#region at it
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#2026-05-23-multi-config-entry-editor-renders-differently-from-built-in-default-shapevert-stored-as-section-vs-factoryvalue" class="md-nav__link">
     <span class="md-ellipsis">
       2026-05-23 - multi-config entry editor renders differently from built-in default (shape/vert stored as section vs FactoryValue)
@@ -3325,6 +3345,22 @@
 <li><strong>Symptom / hypothesis:</strong> The deprecated ctor/overload could be removed in a future Lands major, breaking compilation at the next bump.</li>
 <li><strong>Impact:</strong> None today (deprecation warning only). Future Lands API removal would break the <code>rtp-plugin</code> build until the checker is rewritten to the current factory/query API.</li>
 <li><strong>Suggested next step:</strong> Rewrite <code>LandsChecker</code> against the current <code>LandsIntegration.of(plugin)</code> factory and the non-deprecated land/area query API for 7.x, ideally with a precise (block-resolution) claim check (see the granularity entry above).</li>
+</ul>
+<h3 id="2026-08-18-rectanglecontains-treats-widthheightcenterxcenterz-as-blocks-4-while-every-other-shape-treats-them-as-chunks">2026-08-18 - <code>Rectangle.contains</code> treats <code>width</code>/<code>height</code>/<code>centerX</code>/<code>centerZ</code> as blocks (<code>&gt;&gt; 4</code>) while every other shape treats them as chunks<a class="headerlink" href="#2026-08-18-rectanglecontains-treats-widthheightcenterxcenterz-as-blocks-4-while-every-other-shape-treats-them-as-chunks" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Discovered during:</strong> documenting radius/size semantics in <code>config.yml</code> and <code>docs/admin/configuration/REGIONS.md</code> (this session, docs-only change).</li>
+<li><strong>Location:</strong> <code>rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/selectors/memory/shapes/Rectangle.java#contains</code> lines 91-112 (the four <code>&gt;&gt; 4</code> shifts), versus <code>Rectangle.getRange</code> / <code>xzToLocation</code> in the same file and <code>MemoryShape.contains</code> (line 1458), which use the raw configured values.</li>
+<li><strong>Symptom / hypothesis:</strong> <code>contains(int x, int z)</code> is called with chunk coordinates everywhere else in the shape hierarchy, but the rectangle override divides its configured extents and center by 16 before comparing, i.e. it reads the config as blocks. With the default <code>width: 256</code> it therefore accepts only a 16x16-chunk box while <code>getRange()</code>/<code>xzToLocation</code> parameterise the full 256x256-chunk one.</li>
+<li><strong>Impact:</strong> <code>RECTANGLE</code> regions are likely to report <code>contains(...) == false</code> for most coordinates they actually generate, which would misbehave for any caller that gates on containment (world-border checks, <code>/rtp</code> coordinate validation, region lookup by position). <code>CIRCLE</code>/<code>SQUARE</code> are unaffected. Predates this session and is not exercised by the shipped default config.</li>
+<li><strong>Suggested next step:</strong> Confirm the unit contract of <code>Shape.contains</code> from its call sites, then drop the four <code>&gt;&gt; 4</code> shifts (or convert the incoming coordinates instead, whichever matches the contract) and add a <code>RectangleTest</code> case asserting <code>contains</code> agrees with <code>xzToLocation(...) &lt; getRange()</code> for a sample of in-band and out-of-band chunk coordinates.</li>
+</ul>
+<h3 id="2026-08-18-betterrtp-import-writes-regionsworldyml-but-never-points-worldsworldymlregion-at-it">2026-08-18 - BetterRTP import writes <code>regions/&lt;world&gt;.yml</code> but never points <code>worlds/&lt;world&gt;.yml#region</code> at it<a class="headerlink" href="#2026-08-18-betterrtp-import-writes-regionsworldyml-but-never-points-worldsworldymlregion-at-it" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Discovered during:</strong> documenting the world -&gt; region routing model in <code>WORLDS.md</code> / <code>REGIONS.md</code> / <code>FAQ.md</code> / <code>MIGRATION.md</code> (this session, docs-only change). Worked around in the migration guide by telling the operator to wire the world files by hand.</li>
+<li><strong>Location:</strong> <code>rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/importer/BetterRtpConfigImporter.java#translate</code> line 168 (<code>String region = "regions/" + leaf.scope();</code>) - every per-world leaf targets <code>regions/&lt;worldName&gt;</code>, and no branch in the file emits an <code>ImportedKey</code> against a <code>worlds/...</code> target.</li>
+<li><strong>Symptom / hypothesis:</strong> BetterRTP's per-world overrides (<code>MaxRadius</code>, <code>MinRadius</code>, <code>CenterX/Z</code>, <code>Shape</code>, <code>Price</code>, <code>Enabled</code>) are imported into a region named after the source world, but nothing sets <code>region: "&lt;world&gt;"</code> in <code>definitions/worlds/&lt;world&gt;.yml</code>. Since a world file defaults to <code>region: "default"</code>, the imported regions are orphaned.</li>
+<li><strong>Impact:</strong> After a seemingly successful import, <code>/rtp</code> in a non-default world still uses the <code>default</code> region, so the operator's imported per-world radius/shape/price silently do not apply. The preview report shows the keys as <code>MAPPED</code>, which makes the failure invisible until a player complains about the distance.</li>
+<li><strong>Suggested next step:</strong> Extend <code>translate</code> (or a post-pass in the import writer) to emit an <code>ImportedKey</code> targeting <code>worlds/&lt;world&gt;</code> with <code>region = &lt;world&gt;</code> for every non-default scope encountered, so the routing is written alongside the region. Add a case to <code>ConfigImporterTest</code> asserting a per-world source block produces both a <code>regions/&lt;world&gt;</code> and a <code>worlds/&lt;world&gt;#region</code> key.</li>
 </ul>
 <h3 id="2026-05-23-multi-config-entry-editor-renders-differently-from-built-in-default-shapevert-stored-as-section-vs-factoryvalue">2026-05-23 - multi-config entry editor renders differently from built-in <code>default</code> (shape/vert stored as section vs FactoryValue)<a class="headerlink" href="#2026-05-23-multi-config-entry-editor-renders-differently-from-built-in-default-shapevert-stored-as-section-vs-factoryvalue" title="Permanent link">&para;</a></h3>
 <ul>

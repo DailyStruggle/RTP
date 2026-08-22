@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/CODE_TOUR/">
+      
       
       
       
@@ -3197,51 +3199,51 @@
 <tbody>
 <tr>
 <td>"<code>/rtp</code> takes seconds / blocks the server"</td>
-<td><a href="#2-teleport-pipeline-end-to-end">§2 Teleport pipeline</a></td>
+<td><a href="#2-teleport-pipeline-end-to-end">section 2 Teleport pipeline</a></td>
 </tr>
 <tr>
 <td>"Queue never refills / always empty"</td>
-<td><a href="#3-budgeted-cache-generator-queue-refill">§3 Budgeted cache generator</a></td>
+<td><a href="#3-budgeted-cache-generator-queue-refill">section 3 Budgeted cache generator</a></td>
 </tr>
 <tr>
 <td>"Chunks stay loaded forever / RAM grows"</td>
-<td><a href="#4-chunk-ticket-lifecycle">§4 Chunk ticket lifecycle</a> and <a href="#5-active-gc-sweep">§5 Active GC sweep</a></td>
+<td><a href="#4-chunk-ticket-lifecycle">section 4 Chunk ticket lifecycle</a> and <a href="#5-active-gc-sweep">section 5 Active GC sweep</a></td>
 </tr>
 <tr>
 <td>"<code>/rtp scan</code> stalls, crashes, or never finishes"</td>
-<td><a href="#6-scan-task-crawler">§6 Scan task crawler</a></td>
+<td><a href="#6-scan-task-crawler">section 6 Scan task crawler</a></td>
 </tr>
 <tr>
 <td>"I don't know which module to edit"</td>
-<td><a href="#1-module-map-where-does-my-change-go">§1 Module map</a></td>
+<td><a href="#1-module-map-where-does-my-change-go">section 1 Module map</a></td>
 </tr>
 <tr>
 <td>"Teleport silently does nothing / no error message"</td>
-<td><a href="#7-failure-attribution-and-user-feedback">§7 Failure attribution and user feedback</a></td>
+<td><a href="#7-failure-attribution-and-user-feedback">section 7 Failure attribution and user feedback</a></td>
 </tr>
 <tr>
 <td>"Folia throws <code>ThreadAccessException</code> / wrong region"</td>
-<td><a href="#8-folia-threading-gotchas">§8 Folia threading gotchas</a></td>
+<td><a href="#8-folia-threading-gotchas">section 8 Folia threading gotchas</a></td>
 </tr>
 <tr>
 <td>"Plugin doesn't start / missed WorldLoadEvent / integrations didn't hook"</td>
-<td><a href="#10-plugin-setup-lifecycle">§10 Plugin setup lifecycle</a></td>
+<td><a href="#10-plugin-setup-lifecycle">section 10 Plugin setup lifecycle</a></td>
 </tr>
 <tr>
 <td>"Why did <code>/rtp</code> pick <em>that</em> world/region? / override loop error"</td>
-<td><a href="#11-how-behaviors-are-decided">§11 How behaviors are decided</a></td>
+<td><a href="#11-how-behaviors-are-decided">section 11 How behaviors are decided</a></td>
 </tr>
 <tr>
 <td>"Why was this spot rejected? / too many <code>vert</code> / <code>biome</code> / <code>safety</code> misses"</td>
-<td><a href="#12-location-selection-per-attempt">§12 Location selection per attempt</a></td>
+<td><a href="#12-location-selection-per-attempt">section 12 Location selection per attempt</a></td>
 </tr>
 <tr>
 <td>"Changed a config value and it didn't take effect / <code>/rtp reload</code> leaks / messages stuck in English"</td>
-<td><a href="#13-configuration-load-and-reload">§13 Configuration load and reload</a></td>
+<td><a href="#13-configuration-load-and-reload">section 13 Configuration load and reload</a></td>
 </tr>
 <tr>
 <td>"Server stop hangs / cached locations lost after restart / leaked chunks on <code>/stop</code>"</td>
-<td><a href="#14-shutdown-and-flush-lifecycle">§14 Shutdown and flush lifecycle</a></td>
+<td><a href="#14-shutdown-and-flush-lifecycle">section 14 Shutdown and flush lifecycle</a></td>
 </tr>
 </tbody>
 </table>
@@ -3268,10 +3270,10 @@
 <p>Walk the diagram with repair eyes:</p>
 <ol>
 <li>
-<p><strong><code>CmdTrigger</code> → <code>QueryCache</code>.</strong> The player runs <code>/rtp</code>. The command lives in <code>commands-api</code> and the Bukkit dispatch in <code>rtp-plugin/.../bukkit/commands/</code>. <em>Break:</em> if the user sees nothing at all, the command probably failed parameter validation — see REQ-RTP-S-007 ("busy" / "invalid command" messages must be configurable via <code>messages.yml</code>) and §7 below.</p>
+<p><strong><code>CmdTrigger</code> → <code>QueryCache</code>.</strong> The player runs <code>/rtp</code>. The command lives in <code>commands-api</code> and the Bukkit dispatch in <code>rtp-plugin/.../bukkit/commands/</code>. <em>Break:</em> if the user sees nothing at all, the command probably failed parameter validation — see REQ-RTP-S-007 ("busy" / "invalid command" messages must be configurable via <code>messages.yml</code>) and section 7 below.</p>
 </li>
 <li>
-<p><strong><code>QueryCache</code> choice node.</strong> <code>RegionQueueManager</code> checks whether a pre-validated location is already waiting. <em>Break:</em> if teleport is instant when the server is idle but slow under load, the region's queue is starving — jump to <a href="#3-budgeted-cache-generator-queue-refill">§3</a>.</p>
+<p><strong><code>QueryCache</code> choice node.</strong> <code>RegionQueueManager</code> checks whether a pre-validated location is already waiting. <em>Break:</em> if teleport is instant when the server is idle but slow under load, the region's queue is starving — jump to <a href="#3-budgeted-cache-generator-queue-refill">section 3</a>.</p>
 </li>
 <li>
 <p><strong><code>cache_check → ReqTicket</code> (hot path) / <code>perm_check</code> (cold path).</strong> The <code>unqueued</code> permission lets a player skip the wait and trigger an ad-hoc search. <em>Break:</em> a player with <code>unqueued</code> causing server stutter is running an unbounded loop — ensure the shape is an Archimedean 1D mapping, not a reroll loop (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>).</p>
@@ -3285,23 +3287,23 @@
 <li><strong>S-005</strong> — no synchronous chunk I/O on the main thread.</li>
 <li><strong>S-002</strong> — no permanently force-loaded chunks (use plugin chunk tickets, not <code>Chunk.setForceLoaded(true)</code>).</li>
 <li>
-<p>On pure Spigot, <code>BukkitRTPWorld.loadChunkFuture</code> may bounce to tick; see <a href="../DESIGN/"><code>DESIGN.md §rtp-bukkit Implementation Notes</code></a> and <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> for the Anvil pre-filter that avoids a load.</p>
+<p>On pure Spigot, <code>BukkitRTPWorld.loadChunkFuture</code> may bounce to tick; see <a href="../DESIGN/"><code>DESIGN.md section rtp-bukkit Implementation Notes</code></a> and <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> for the Anvil pre-filter that avoids a load.</p>
 </li>
 <li>
 <p><strong><code>EvalBlocks</code> — TELEPORT-prep safety.</strong> Runs on the region-owning thread (Folia) or main thread (Paper/Spigot). <em>Break:</em> if a "safe" spot turns out to be in lava or a claim, inspect <code>Region.isSafe</code> plus the verticalAdjustor and the <code>badLocation</code> predicates — see <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/">ADR-017</a>. S-001 forbids <em>unsafe-block destinations</em>; S-003 forbids <em>claim-protected land</em>. Never add a "second" block check in an adapter — keep all checks in <code>rtp-core</code>.</p>
 </li>
 <li>
-<p><strong><code>EvalBlocks → GenRandom</code> retry / <code>Teardown</code> max-retries.</strong> Bounded by configuration (<code>maxAttempts</code>). <em>Break:</em> silent exhaustion → see §7, and the regression guard <code>ReqRtpS004NullChunkAttributionTest</code> mentioned in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>.</p>
+<p><strong><code>EvalBlocks → GenRandom</code> retry / <code>Teardown</code> max-retries.</strong> Bounded by configuration (<code>maxAttempts</code>). <em>Break:</em> silent exhaustion → see section 7, and the regression guard <code>ReqRtpS004NullChunkAttributionTest</code> mentioned in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>.</p>
 </li>
 <li>
 <p><strong><code>MovePlayer</code> — Entity Scheduler.</strong> On Folia, player mutations go through the Entity Scheduler, not the Region Scheduler. <em>Break:</em> teleport "succeeds" but the player ends up at spawn → wrong scheduler or a pre/post-teleport event handler threw and the pipeline swallowed it (S-004 violation).</p>
 </li>
 <li>
-<p><strong><code>Teardown</code> — Cleanup phase.</strong> <code>TeleportPipelineTask.runCleanup()</code> releases the chunk reservation, untracks from <code>MemoryTracker</code>, and decrements <code>inFlightCalculations</code>. This <strong>must</strong> run on every exit path — normal, exception, disconnect, cancel. Jump to <a href="#4-chunk-ticket-lifecycle">§4</a>.</p>
+<p><strong><code>Teardown</code> — Cleanup phase.</strong> <code>TeleportPipelineTask.runCleanup()</code> releases the chunk reservation, untracks from <code>MemoryTracker</code>, and decrements <code>inFlightCalculations</code>. This <strong>must</strong> run on every exit path — normal, exception, disconnect, cancel. Jump to <a href="#4-chunk-ticket-lifecycle">section 4</a>.</p>
 </li>
 </ol>
 <blockquote>
-<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §Pipeline Phases</code></a>, <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a> for all S-00x.</p>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md section Pipeline Phases</code></a>, <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md section 3</code></a> for all S-00x.</p>
 </blockquote>
 <hr />
 <h2 id="3-budgeted-cache-generator-queue-refill">3. Budgeted cache generator (queue refill)<a class="headerlink" href="#3-budgeted-cache-generator-queue-refill" title="Permanent link">&para;</a></h2>
@@ -3314,7 +3316,7 @@
 <li><strong><code>YieldTask</code>.</strong> When the budget is exhausted the pulse yields. <em>Break:</em> a runaway <code>while</code>-loop in a custom shape will never yield — S-005-adjacent and the reason bounded algorithms are mandated (see <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>).</li>
 </ul>
 <blockquote>
-<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §Pulse-Driven Maintenance</code></a>.</p>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md section Pulse-Driven Maintenance</code></a>.</p>
 </blockquote>
 <hr />
 <h2 id="4-chunk-ticket-lifecycle">4. Chunk ticket lifecycle<a class="headerlink" href="#4-chunk-ticket-lifecycle" title="Permanent link">&para;</a></h2>
@@ -3322,7 +3324,7 @@
 <p>Every chunk the plugin touches <strong>must</strong> be framed by <code>addPluginChunkTicket</code> / <code>removePluginChunkTicket</code> plus a <code>MemoryTracker.track</code> / <code>untrack</code> pair. The diagram has three exit paths and <strong>all three converge</strong> on <code>DropTicket → UntrackRes → RAM Freed</code>:</p>
 <ol>
 <li><strong>Happy path:</strong> <code>EvalBlocks → CloseRes</code> via <code>try-finally</code>.</li>
-<li><strong>Stalled pipeline:</strong> <code>SweepTask → ForceClose</code> from the background GC (see <a href="#5-active-gc-sweep">§5</a>).</li>
+<li><strong>Stalled pipeline:</strong> <code>SweepTask → ForceClose</code> from the background GC (see <a href="#5-active-gc-sweep">section 5</a>).</li>
 <li><strong>Player disconnect:</strong> the quit listener calls <code>reservation.close()</code> for every in-flight task tied to the player.</li>
 </ol>
 <p><em>Break patterns:</em></p>
@@ -3332,7 +3334,7 @@
 <li><code>Chunk.setForceLoaded(true)</code> used instead of plugin tickets — permanent leak, not reclaimed on disable. Hard prohibition.</li>
 </ul>
 <blockquote>
-<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §Chunk Allocation Management</code></a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Code &amp; Testing Conventions</a>.</p>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md section Chunk Allocation Management</code></a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Code &amp; Testing Conventions</a>.</p>
 </blockquote>
 <hr />
 <h2 id="5-active-gc-sweep">5. Active GC sweep<a class="headerlink" href="#5-active-gc-sweep" title="Permanent link">&para;</a></h2>
@@ -3357,7 +3359,7 @@
 <ul>
 <li><strong>Scan stalls at N% forever.</strong> <code>DrainGate</code> is waiting on chunk futures that never complete. Inspect the adapter's <code>getOrLoadChunk</code> — on pure Spigot, uncovered by the Anvil pre-filter, it bounces to the main thread and can starve under heavy TPS drop (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>).</li>
 <li><strong>Scan disagrees with live teleport.</strong> The scan uses <code>AnvilBiome</code> (off-tick pre-filter) while the teleport pipeline may use live generation — see <code>isSelfContained()</code> branch in the diagram. For the deeper rationale of the pre-filter and what it can/cannot decide without a load, read <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>.</li>
-<li><strong>Scan looks like it leaks.</strong> It shouldn't — it goes through the same ticket lifecycle from <a href="#4-chunk-ticket-lifecycle">§4</a>. If it does, look at the <code>DrainGate</code> path: releases happen in the callback, so an exception in <code>VertAdjust</code> / <code>PhysBiome</code> <em>before</em> <code>ReleaseGate</code> leaks a permit and a ticket.</li>
+<li><strong>Scan looks like it leaks.</strong> It shouldn't — it goes through the same ticket lifecycle from <a href="#4-chunk-ticket-lifecycle">section 4</a>. If it does, look at the <code>DrainGate</code> path: releases happen in the callback, so an exception in <code>VertAdjust</code> / <code>PhysBiome</code> <em>before</em> <code>ReleaseGate</code> leaks a permit and a ticket.</li>
 </ul>
 <hr />
 <h2 id="7-failure-attribution-and-user-feedback">7. Failure attribution and user feedback<a class="headerlink" href="#7-failure-attribution-and-user-feedback" title="Permanent link">&para;</a></h2>
@@ -3373,7 +3375,7 @@
 <li>Config loader — a missing or malformed <code>messages.yml</code> key reads as empty string. Check the fallback.</li>
 </ol>
 <blockquote>
-<p>Deep read (optional): <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a> row <code>REQ-RTP-F-013</code>, <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a> for S-004/S-007.</p>
+<p>Deep read (optional): <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a> row <code>REQ-RTP-F-013</code>, <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md section 3</code></a> for S-004/S-007.</p>
 </blockquote>
 <hr />
 <h2 id="8-folia-threading-gotchas">8. Folia threading gotchas<a class="headerlink" href="#8-folia-threading-gotchas" title="Permanent link">&para;</a></h2>
@@ -3387,7 +3389,7 @@
 </ul>
 <p>When a bug reproduces only on Folia, the answer is almost always one of the above.</p>
 <blockquote>
-<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §rtp-folia Implementation Notes</code></a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Folia Threading</a>.</p>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md section rtp-folia Implementation Notes</code></a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Folia Threading</a>.</p>
 </blockquote>
 <hr />
 <h2 id="9-your-first-repair-checklist">9. Your first repair — checklist<a class="headerlink" href="#9-your-first-repair-checklist" title="Permanent link">&para;</a></h2>
@@ -3396,7 +3398,7 @@
 <li>Identify the section above that matches the symptom.</li>
 <li>From the diagram, name the <em>arrow</em> where behavior diverges from the spec.</li>
 <li>Find the enclosing S-00x rule / REQ-* via <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a>.</li>
-<li>Edit the correct module per <a href="#1-module-map-where-does-my-change-go">§1</a>. Before editing any <em>uncommitted code</em> file, make a <code>.bak</code> copy (<a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Backup Policy</a>).</li>
+<li>Edit the correct module per <a href="#1-module-map-where-does-my-change-go">section 1</a>. Before editing any <em>uncommitted code</em> file, make a <code>.bak</code> copy (<a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Backup Policy</a>).</li>
 <li>Add or extend a REQ-traceable test (class name or <code>@DisplayName</code> referencing <code>REQ-*</code> / <code>S-00x</code>) and update <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a> if new.</li>
 <li>Run the targeted test via <code>.\gradlew :&lt;module&gt;:test --tests "&lt;pattern&gt;"</code> (PowerShell, <code>;</code> not <code>&amp;&amp;</code>).</li>
 <li>If the change crosses a module boundary or touches more than one class, <strong>stop and propose first</strong> per <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Propose Before Refactoring</a>.</li>
@@ -3423,7 +3425,7 @@
 <p>The key mental model: <strong>RTP's behavior is data, not code.</strong> From the moment the player issues <code>/rtp</code>, every subsequent choice (which world, which region, which shape, which vertical adjustor, cache size, price, whether to queue or search ad-hoc) is read from configuration and permission nodes. <code>rtp-core</code> never branches on world or region <em>name</em>.</p>
 <p>Walk the diagram as a repair tool:</p>
 <ol>
-<li><strong>Command layer.</strong> Parameter validation failures route to <code>msgBadParameter</code>; a server already saturated with in-flight calculations routes to <code>msgBusy</code>. Both strings are configurable (S-007, REQ-RTP-F-013). If a user says "nothing happens", this is the first lens — see also <a href="#7-failure-attribution-and-user-feedback">§7</a>.</li>
+<li><strong>Command layer.</strong> Parameter validation failures route to <code>msgBadParameter</code>; a server already saturated with in-flight calculations routes to <code>msgBusy</code>. Both strings are configurable (S-007, REQ-RTP-F-013). If a user says "nothing happens", this is the first lens — see also <a href="#7-failure-attribution-and-user-feedback">section 7</a>.</li>
 <li><strong>World resolution loop.</strong> <code>WorldKeys.requirePermission</code> + <code>WorldKeys.override</code> form a chain: if the player lacks <code>rtp.worlds.&lt;name&gt;</code>, the world falls back to the configured override. A <code>Set&lt;String&gt; worldsAttempted</code> guard throws <code>IllegalStateException("infinite override loop detected at world - ...")</code> on cycle — this is <em>not</em> an S-004 violation; it is a configuration bug surfaced loudly on purpose.</li>
 <li><strong>Region resolution loop.</strong> Identical structure with <code>RegionKeys</code> and <code>rtp.regions.&lt;name&gt;</code>. Same cycle guard, same exception. The region key chosen at the end of the world loop is the <em>starting</em> region for this loop.</li>
 <li><strong>Queue vs ad-hoc search.</strong> <code>rtp.unqueued</code> is the pivot. Without it, the player waits on the public queue (diagram 02); with it, an ad-hoc async search is spawned immediately. Avoid granting <code>rtp.unqueued</code> broadly — on large servers every holder can trigger a search, and only the 1D spiral guarantee (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>) keeps that bounded.</li>
@@ -3433,31 +3435,31 @@
 <ul>
 <li><strong>"Player gets teleported to the wrong world."</strong> Almost always a <code>WorldKeys.override</code> chain that quietly redirects. Dump the <code>worldsAttempted</code> set by enabling verbose logging, or trace <code>SelectionAPI.getRegion(player)</code> by hand.</li>
 <li><strong>"<code>IllegalStateException: infinite override loop</code>."</strong> A config author wrote a cycle (e.g., <code>world_nether.override: world</code> and <code>world.override: world_nether</code> both with <code>requirePermission: true</code>). Fix the config; do not catch the exception.</li>
-<li><strong>"Shape feels clustered."</strong> Not a decision-tree bug — see <a href="#2-teleport-pipeline-end-to-end">§2 step 4</a> and <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>.</li>
+<li><strong>"Shape feels clustered."</strong> Not a decision-tree bug — see <a href="#2-teleport-pipeline-end-to-end">section 2 step 4</a> and <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>.</li>
 <li><strong>"Effects don't fire."</strong> Effects are a <em>separate</em> decision tree driven by <code>rtp.effect.&lt;stage&gt;.*</code> permissions; set <code>effectParsing: true</code> in <code>performance.yml</code>. See <a href="../../admin/configuration/EVENTS_AND_EFFECTS/"><code>docs/admin/EVENTS_AND_EFFECTS.md</code></a>.</li>
 <li><strong>"I want one command to use a custom shape."</strong> Use <code>SelectionAPI.tempRegion(params, baseRegionName)</code> — it clones a base region and overrides specific <code>RegionKeys</code>. Never subclass <code>Region</code> in an addon.</li>
 </ul>
 <blockquote>
-<p>Deep read (optional): <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a> (S-007 configurable messages), <a href="../../admin/configuration/EVENTS_AND_EFFECTS/"><code>docs/admin/EVENTS_AND_EFFECTS.md</code></a>, <a href="../GLOSSARY/"><code>GLOSSARY.md</code></a> for the canonical meaning of <em>region</em> vs <em>world</em> vs <em>shape</em>.</p>
+<p>Deep read (optional): <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md section 3</code></a> (S-007 configurable messages), <a href="../../admin/configuration/EVENTS_AND_EFFECTS/"><code>docs/admin/EVENTS_AND_EFFECTS.md</code></a>, <a href="../GLOSSARY/"><code>GLOSSARY.md</code></a> for the canonical meaning of <em>region</em> vs <em>world</em> vs <em>shape</em>.</p>
 </blockquote>
 <hr />
 <h2 id="12-location-selection-per-attempt">12. Location selection (per attempt)<a class="headerlink" href="#12-location-selection-per-attempt" title="Permanent link">&para;</a></h2>
 <p>Canonical diagram: <a href="../../architecture/08-location-selection-per-attempt/"><code>docs/architecture/08-location-selection-per-attempt.md</code></a>. Entry class: <code>PregenTask.runAttempt</code> in <code>rtp-core/.../common/selection/region/PregenTask.java</code>, called via <code>LocationGenerator.getLocationFuture</code>.</p>
-<p>This is the <strong>decision core</strong> of the plugin. Every caller you met earlier — the <code>/rtp</code> command (<a href="#11-how-behaviors-are-decided">§11</a>), the cache generator (<a href="#3-budgeted-cache-generator-queue-refill">§3</a>), <code>/rtp scan</code> (<a href="#6-scan-task-crawler">§6</a>) — ends up asking <code>ILocationGenerator</code> for a coordinate, and that coordinate comes out of this loop. If it emits a bad <code>(x, y, z)</code> or emits one too slowly, <em>everything downstream looks broken</em>. That is why it gets its own diagram separate from the outer attempt-loop plumbing.</p>
+<p>This is the <strong>decision core</strong> of the plugin. Every caller you met earlier — the <code>/rtp</code> command (<a href="#11-how-behaviors-are-decided">section 11</a>), the cache generator (<a href="#3-budgeted-cache-generator-queue-refill">section 3</a>), <code>/rtp scan</code> (<a href="#6-scan-task-crawler">section 6</a>) — ends up asking <code>ILocationGenerator</code> for a coordinate, and that coordinate comes out of this loop. If it emits a bad <code>(x, y, z)</code> or emits one too slowly, <em>everything downstream looks broken</em>. That is why it gets its own diagram separate from the outer attempt-loop plumbing.</p>
 <p>Mental model: one attempt = <strong>pick → probe → resolve → evaluate → accept or recycle</strong>. The loop is orchestrated by <code>PregenTask</code> as a non-blocking state machine (<a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a> Option B) so the async worker is never parked on <code>.get()</code>.</p>
 <p>Walk the diagram as a repair tool:</p>
 <ol>
 <li><strong>Cap check.</strong> <code>i &gt; maxAttempts</code> or <code>biomeChecks &gt;= maxBiomeChecks</code> → <code>completeExhausted</code>. <em>Break:</em> empty <code>GenerationResult</code> with no logged reason almost always means <code>maxBiomeChecks</code> was hit silently. Dump <code>state.failMap</code> (verbose) to see which bucket drained the budget.</li>
 <li><strong>Shape pick.</strong> <code>MemoryShape.rand()</code> is the bounded Archimedean spiral (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>). If <code>biomeRecall: true</code>, a prefix-sum weighted pick is used over biomes already seen; <code>biomeRecallForced: false</code> silently falls back to uniform when memory is empty. <em>Break:</em> "clustered spawns" → recall is on and has converged on a few tiles; toggle it off or lower <code>cacheCap</code> so the memory churns.</li>
 <li><strong>WorldBorder probe.</strong> If the candidate is outside, <code>worldBorderFails++</code> and <code>maxAttempts++</code> — cheap misses. Cap is 1000. <em>Break:</em> a region configured beyond the vanilla border will hit the cap and emit an empty result; check <code>worldBorderOverride</code> in <code>region.yml</code>.</li>
-<li><strong>Probe-first chunk resolution.</strong> <code>world.getOrLoadChunk(cx, cz)</code> walks cached → Anvil → live (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> §13.1). A null return is attributed to <code>FailTypes.nullChunk</code> with a sub-reason (<code>ticketFailed</code>, <code>chunkLoadTimeout</code>, <code>asyncLoadNull</code>). <strong>Do not refactor this attribution</strong> — the regression guard is <code>ReqRtpS004NullChunkAttributionTest</code> (S-004).</li>
-<li><strong>Self-contained vs live branch.</strong> If <code>chunk.isSelfContained()</code> (Anvil), stay on the async thread. Otherwise hop to the region-owning thread via <code>dispatchLiveEvaluation</code>, which allocates the <code>ChunkReservation</code> (<a href="#4-chunk-ticket-lifecycle">§4</a>) and arms the <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a> stale guard. <strong>This branch is where most S-005 violations hide when porting</strong> — if a new platform runs the live path on the wrong thread, you will see <code>ThreadAccessException</code> on Folia or silent corruption on Paper. The Fabric blocker mentioned in <a href="../MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> is exactly this.</li>
+<li><strong>Probe-first chunk resolution.</strong> <code>world.getOrLoadChunk(cx, cz)</code> walks cached → Anvil → live (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> section 13.1). A null return is attributed to <code>FailTypes.nullChunk</code> with a sub-reason (<code>ticketFailed</code>, <code>chunkLoadTimeout</code>, <code>asyncLoadNull</code>). <strong>Do not refactor this attribution</strong> — the regression guard is <code>ReqRtpS004NullChunkAttributionTest</code> (S-004).</li>
+<li><strong>Self-contained vs live branch.</strong> If <code>chunk.isSelfContained()</code> (Anvil), stay on the async thread. Otherwise hop to the region-owning thread via <code>dispatchLiveEvaluation</code>, which allocates the <code>ChunkReservation</code> (<a href="#4-chunk-ticket-lifecycle">section 4</a>) and arms the <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a> stale guard. <strong>This branch is where most S-005 violations hide when porting</strong> — if a new platform runs the live path on the wrong thread, you will see <code>ThreadAccessException</code> on Folia or silent corruption on Paper. The Fabric blocker mentioned in <a href="../MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> is exactly this.</li>
 <li><strong><code>vert.adjust(chunk)</code>.</strong> Returns the <code>(x, y, z)</code> for a given chunk under the region's vertical adjustor (linear, nether-ceiling, etc.). Null = no valid y. <em>Break:</em> "teleports into lava at y=-64" or "always picks y=0" → wrong adjustor for the dimension; verify <code>vert:</code> in <code>region.yml</code>.</li>
 <li><strong>Biome filter.</strong> <code>biomeNames</code> + <code>biomeWhitelist</code>. Misses increment <code>biomeChecks</code> (soft cap <code>maxBiomeChecks</code>) but also <code>maxAttempts++</code>, so biome filtering doesn't prematurely exhaust hard attempts. <em>Break:</em> "infinite misses" when targeting a rare biome → turn on <code>biomeRecall</code> so the shape remembers hits; without it every attempt is uniform across the whole region.</li>
-<li><strong>Neighbour grid load.</strong> For <code>safetyRadius r</code>, loads the <code>(2r+1)²</code> neighbour chunks via <code>getChunkAt</code> with a 5-second <code>orTimeout</code>. Timeout or any null neighbour → <code>FailTypes.nullChunk / neighborNull</code>. <em>Break:</em> scans or caches that stall with <code>neighborNull</code> in verbose output point at a slow chunk backend — check the Anvil pre-filter wiring (ADR-016 §11).</li>
+<li><strong>Neighbour grid load.</strong> For <code>safetyRadius r</code>, loads the <code>(2r+1)²</code> neighbour chunks via <code>getChunkAt</code> with a 5-second <code>orTimeout</code>. Timeout or any null neighbour → <code>FailTypes.nullChunk / neighborNull</code>. <em>Break:</em> scans or caches that stall with <code>neighborNull</code> in verbose output point at a slow chunk backend — check the Anvil pre-filter wiring (ADR-016 section 11).</li>
 <li><strong>Safety y-scan.</strong> Walks <code>±safetyRadius</code> around <code>(x, y, z)</code>, rejecting if any block is in <code>unsafeBlocks</code>. This is the S-001 enforcement point. Never add a second check in an adapter or command; all block safety lives here (and in the <code>badLocation</code> predicates, <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/">ADR-017</a>).</li>
 <li><strong><code>GlobalRegionVerifiers</code>.</strong> Async chain that runs claim-plugin checks (S-003) and any custom verifiers addons have registered. Failure → <code>FailTypes.safetyExternal</code>. <em>Break:</em> "claim overlap still teleports me in" → a verifier is missing or throwing and being swallowed; the pipeline attributes the exception, but addons must register a verifier to enforce their claim system. Inline claim calls in the pipeline or commands are an S-003 violation.</li>
-<li><strong><code>completeSuccess</code>.</strong> Records the biome hit back into <code>MemoryShape</code>, preloads a <code>ChunkSet</code> of radius <code>max(safetyRadius, performance.viewDistanceSelect)</code>, and transfers ownership via <code>GenerationResult</code> so diagram 01's <code>Start LOAD</code> stage can hand it off without a second round-trip. <em>Break:</em> "player arrives and chunks pop in for a second" → <code>viewDistanceSelect</code> is too low, or the <code>ChunkSet</code> was dropped (check <code>MemoryTracker</code> diagnostics, <a href="#4-chunk-ticket-lifecycle">§4</a>).</li>
+<li><strong><code>completeSuccess</code>.</strong> Records the biome hit back into <code>MemoryShape</code>, preloads a <code>ChunkSet</code> of radius <code>max(safetyRadius, performance.viewDistanceSelect)</code>, and transfers ownership via <code>GenerationResult</code> so diagram 01's <code>Start LOAD</code> stage can hand it off without a second round-trip. <em>Break:</em> "player arrives and chunks pop in for a second" → <code>viewDistanceSelect</code> is too low, or the <code>ChunkSet</code> was dropped (check <code>MemoryTracker</code> diagnostics, <a href="#4-chunk-ticket-lifecycle">section 4</a>).</li>
 </ol>
 <p><em>Recurring repair lens:</em> almost every rejection calls <code>MemoryShape.addBadLocation(finalL)</code> so the spiral won't re-propose that 1D index. This is what makes <code>vert</code> / <code>safety</code> / <code>safetyExternal</code> failures self-limiting on a correctly-shaped region. If you see the same coordinate rejected twice within one cache fill, either the shape is not a <code>MemoryShape</code> (so it has no memory) or <code>addBadLocation</code> wasn't called on that path — audit the new branch.</p>
 <blockquote>
@@ -3475,7 +3477,7 @@
 <li><strong>Locale bootstrap</strong> (<a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a> / REQ-RTP-F-013). Before any <code>ConfigParser</code> is constructed, <code>LanguageBootstrap</code> reads <code>plugins/RTP/language.yml</code> (created with <code>language: en</code> on first run) and returns a sanitized locale string. Each fresh parser is then built locale-aware: when the locale is non-<code>en</code>, the parser loads <code>lang/&lt;locale&gt;/&lt;name&gt;.yml</code> (and the optional <code>lang/&lt;locale&gt;/&lt;name&gt;.lang.yml</code> key-name remap) directly from the jar with English fallback. <em>Break:</em> "messages still in English despite <code>language: de</code> in <code>language.yml</code>" → the corresponding <code>lang/de/messages.yml</code> jar resource is missing, or <code>language.yml</code> itself was deleted (it will be recreated as <code>en</code> on next reload). Note: editing <code>language</code> in <code>config.yml</code> has no effect — that key was removed.</li>
 <li><strong>Atomic swap (green).</strong> <code>this.configParserMap = newConfigParserMap;</code> is where new readers start seeing new values. In-flight tasks that captured the old map earlier in their lifetime continue on the old values — this is <em>not</em> a bug, it is the reason reloads are non-disruptive.</li>
 <li><strong><code>ShutRegions</code>.</strong> Every <code>Region</code> in <code>permRegionLookup</code> and <code>tempRegions</code> has <code>shutDown()</code> called before the maps are cleared. <em>Break:</em> "reload duplicated my region" → a third party inserted into <code>permRegionLookup</code> after the clear, or <code>shutDown</code> threw on one entry and bailed out of the loop.</li>
-<li><strong><code>BuildRegions</code> → Dormant decision.</strong> For each <code>regions/*.yml</code>, <code>RegionConfigLoader.load</code> produces a <code>RegionSettings</code>, then <code>detectFallbackConfiguredWorld</code> checks whether the configured world is already loaded. Yes → live region. No → <strong>dormant region</strong> (world is <code>null</code>, rebinds on <code>WorldLoadEvent</code> via <code>OnWorldLoadUnload.rebindWorld</code>). This is the Multiverse-compatibility path — see also <a href="#10-plugin-setup-lifecycle">§10 step 3</a>. <em>Break:</em> "region never activates when my world loads" → confirm the world name matches, and that <code>OnWorldLoadUnload</code> is registered (diagram 07).</li>
+<li><strong><code>BuildRegions</code> → Dormant decision.</strong> For each <code>regions/*.yml</code>, <code>RegionConfigLoader.load</code> produces a <code>RegionSettings</code>, then <code>detectFallbackConfiguredWorld</code> checks whether the configured world is already loaded. Yes → live region. No → <strong>dormant region</strong> (world is <code>null</code>, rebinds on <code>WorldLoadEvent</code> via <code>OnWorldLoadUnload.rebindWorld</code>). This is the Multiverse-compatibility path — see also <a href="#10-plugin-setup-lifecycle">section 10 step 3</a>. <em>Break:</em> "region never activates when my world loads" → confirm the world name matches, and that <code>OnWorldLoadUnload</code> is registered (diagram 07).</li>
 <li><strong><code>ShapePick</code> — deferred async.</strong> Each region's shape is selected on <code>miscAsyncTasks</code> with a 60-tick delay, and skipped entirely when the region is dormant or has no shape. <em>Break:</em> "shape is null on first attempt" after a reload → attempt fired before the 60-tick shape pick; this is expected, the next pulse will succeed.</li>
 <li><strong><code>onReload</code> callbacks.</strong> Integrations, effects, and anything else registered via <code>Configs.onReload(Runnable)</code> fires here. <em>Break:</em> "integration re-hooks on first load but not on reload" → the integration didn't register an <code>onReload</code> callback; it only hooked during <code>setupIntegrations</code> in <code>onEnable</code> (diagram 07).</li>
 </ol>
@@ -3492,16 +3494,16 @@
 <hr />
 <h2 id="14-shutdown-and-flush-lifecycle">14. Shutdown and flush lifecycle<a class="headerlink" href="#14-shutdown-and-flush-lifecycle" title="Permanent link">&para;</a></h2>
 <p>Canonical diagram: <a href="../../architecture/10-shutdown-and-flush-lifecycle/"><code>docs/architecture/10-shutdown-and-flush-lifecycle.md</code></a>. Entry classes: <code>RTPBukkitPlugin.onDisable</code> (<code>rtp-plugin/.../bukkit/RTPBukkitPlugin.java</code>) and <code>RTP.stop()</code> (<code>rtp-core/.../common/RTP.java</code>).</p>
-<p>Shutdown is the symmetric partner of <a href="#10-plugin-setup-lifecycle">§10 Plugin setup lifecycle</a>. Unlike a reload (§13), which reuses allocations, a shutdown must <em>release</em> every allocation made during <code>onEnable</code>. Two classes of bug dominate this path: <strong>data loss</strong> (cached locations not flushed before the DB stop flag is set) and <strong>resource leaks</strong> (chunk tickets not released — an S-002 violation).</p>
+<p>Shutdown is the symmetric partner of <a href="#10-plugin-setup-lifecycle">section 10 Plugin setup lifecycle</a>. Unlike a reload (section 13), which reuses allocations, a shutdown must <em>release</em> every allocation made during <code>onEnable</code>. Two classes of bug dominate this path: <strong>data loss</strong> (cached locations not flushed before the DB stop flag is set) and <strong>resource leaks</strong> (chunk tickets not released — an S-002 violation).</p>
 <p>Mental model: <strong>four phases</strong> — (1) <em>stop accepting new work</em>, (2) <em>drain in-flight work</em>, (3) <em>persist state to disk</em>, (4) <em>release platform resources</em>. The ordering between phases 3 and 4 is load-bearing.</p>
 <p>Walk the diagram as a repair tool:</p>
 <ol>
 <li><strong>Cancel command timers.</strong> <code>commandTimer.cancel</code> and <code>commandProcessing.cancel</code> stop new <code>/rtp</code> dispatches. <em>Break:</em> "a new <code>/rtp</code> ran mid-disable and NPE'd" → a command listener was registered outside <code>setupBukkitEvents</code> and isn't cancelled here.</li>
 <li><strong>Kill the four task processors.</strong> <code>AsyncTeleportProcessing</code>, <code>SyncTeleportProcessing</code>, <code>ScanTaskProcessing</code>, <code>DatabaseProcessing</code> each have a static <code>kill()</code>. Each is wrapped in <code>catch (NoClassDefFoundError ignored)</code> because Bukkit can call <code>onDisable</code> twice on init failure (see the bail-outs at lines 108/119 of <code>RTPBukkitPlugin</code>). <strong>Do not remove those guards.</strong></li>
 <li><strong><code>RTP.stop</code> enters.</strong> Completes every outstanding <code>CompletableFuture</code> with <code>null</code>, cancels in-flight <code>TeleportData</code> via <code>RTPTeleportCancel</code>. <em>Break:</em> "server hang on stop" → something is <code>.get()</code>-ing a future that was never added to <code>RTP.futures</code>; audit new async code for the registration step.</li>
-<li><strong>Database flush sequence — load-bearing ordering.</strong> <code>SQL flush → rebuildCachedLocationsFromMemory → flushDirtyCache → processQueries(MAX)</code>, <strong>all before</strong> <code>stop.set(true)</code>. Regression test: <code>MemoryShapeShutdownTest</code>. <em>Break:</em> "cached locations gone after restart" is almost always a reorder here. <code>processQueries</code> bails immediately if <code>stop</code> is already set, so setting the flag early silently drops the drain. See <a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a> §"Shutdown ordering".</li>
+<li><strong>Database flush sequence — load-bearing ordering.</strong> <code>SQL flush → rebuildCachedLocationsFromMemory → flushDirtyCache → processQueries(MAX)</code>, <strong>all before</strong> <code>stop.set(true)</code>. Regression test: <code>MemoryShapeShutdownTest</code>. <em>Break:</em> "cached locations gone after restart" is almost always a reorder here. <code>processQueries</code> bails immediately if <code>stop</code> is already set, so setting the flag early silently drops the drain. See <a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a> section "Shutdown ordering".</li>
 <li><strong>Stop the task pipes and cancel tracked tasks.</strong> <code>miscAsyncTasks.stop</code> + <code>miscSyncTasks.stop</code> + scheduler <code>cancelTask</code> for every entry in <code>trackedTasks</code>. <em>Break:</em> "a scheduled task kept running after disable" → it wasn't registered via <code>RTP.scheduler</code> (which adds to <code>trackedTasks</code>); fix the registration, not this loop.</li>
-<li><strong>Region shutdown.</strong> <code>permRegionLookup.values().forEach(shutDown)</code> then clear; same for <code>tempRegions</code>. A region's <code>shutDown</code> closes its own chunk reservations (see <a href="#4-chunk-ticket-lifecycle">§4</a>) and unregisters from <code>MemoryTracker</code>. <em>Break:</em> "Folia warning about region threads" during shutdown → a region's <code>shutDown</code> touched entity state without a scheduler hop; route through <code>RTPScheduler</code>.</li>
+<li><strong>Region shutdown.</strong> <code>permRegionLookup.values().forEach(shutDown)</code> then clear; same for <code>tempRegions</code>. A region's <code>shutDown</code> closes its own chunk reservations (see <a href="#4-chunk-ticket-lifecycle">section 4</a>) and unregisters from <code>MemoryTracker</code>. <em>Break:</em> "Folia warning about region threads" during shutdown → a region's <code>shutDown</code> touched entity state without a scheduler hop; route through <code>RTPScheduler</code>.</li>
 <li><strong>Set the DB stop flag and close.</strong> Only now does <code>databaseAccessor.stop.set(true)</code> + <code>close()</code> run. The flag gates new enqueues; <code>close</code> releases the JDBC connection. <em>Break:</em> "DB file locked on next startup" → either <code>close</code> threw (check logs) or an asynchronous write was still in flight (means step 4 didn't fully drain).</li>
 <li><strong>Re-cancel any late <code>TeleportData</code>.</strong> A second pass over <code>latestTeleportData</code> catches any entries that were added during region shutdown. Both cancel passes are required.</li>
 <li><strong><code>ScanTask.kill</code>, <code>networkManager.shutdown</code>, <code>serverAccessor.stop</code>.</strong> Static registry clears and platform hooks. The network bus is now typed as the <code>RTPNetworkManager</code> interface (was <code>RedisManager</code>); concrete <code>RedisManager</code> is constructed reflectively in <code>RTP.createRedisNetworkManager</code> so <code>rtp-core</code> carries no symbolic ref to the Jedis driver class (ADR-024). On Folia, <code>serverAccessor.stop</code> must run on the global region scheduler — the accessor handles that internally; don't relocate the call.</li>
@@ -3515,7 +3517,7 @@
 <li><strong>"<code>NoClassDefFoundError</code> in shutdown logs."</strong> Expected and ignored — a platform class (e.g., Folia's scheduler) wasn't on the classpath because the adapter JAR was never installed, and <code>onDisable</code> ran as part of the <code>onEnable</code> bail-out. Real defects in shutdown will surface as other exceptions, not <code>NoClassDefFoundError</code>.</li>
 </ul>
 <blockquote>
-<p>Deep read (optional): <a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a> §"Shutdown ordering", <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a> row <code>REQ-CORE-NF-001</code> (deterministic shutdown persistence), <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a> S-002 (no permanently force-loaded chunks).</p>
+<p>Deep read (optional): <a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a> section "Shutdown ordering", <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a> row <code>REQ-CORE-NF-001</code> (deterministic shutdown persistence), <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md section 3</code></a> S-002 (no permanently force-loaded chunks).</p>
 </blockquote>
 <hr />
 <p>Welcome to RTP. The diagrams are the map; the S-00x rules are the law; the ADRs are the precedent.</p>

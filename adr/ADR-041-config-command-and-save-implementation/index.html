@@ -12,6 +12,8 @@
         <meta name="author" content="DailyStruggle">
       
       
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-041-config-command-and-save-implementation/">
+      
       
         <link rel="prev" href="../ADR-040-cross-backend-metric-time-series-publication/">
       
@@ -3437,58 +3439,58 @@
 <tbody>
 <tr>
 <td><code>ConfigReasonCode</code> (enum)</td>
-<td>Closed set of failure codes from the spec's §5.2 table. Each constant carries its <code>messages.yml</code> key (<code>config.error.&lt;lowercase&gt;</code>) and a default English fallback.</td>
-<td>§5.2</td>
+<td>Closed set of failure codes from the spec's section 5.2 table. Each constant carries its <code>messages.yml</code> key (<code>config.error.&lt;lowercase&gt;</code>) and a default English fallback.</td>
+<td>section 5.2</td>
 </tr>
 <tr>
 <td><code>ConfigValidationFailure</code></td>
 <td>Immutable record: <code>parameterPath</code>, <code>attemptedValue</code>, <code>reasonCode</code>, optional <code>detail</code>. Thrown / returned from validators; never <code>null</code>, never <code>return false</code>.</td>
-<td>§3.3, §5.1</td>
+<td>section 3.3, section 5.1</td>
 </tr>
 <tr>
 <td><code>ConfigParameterValidator</code></td>
 <td>Strategy interface: <code>validate(parameterPath, attemptedValue, snapshot) → Optional&lt;ConfigValidationFailure&gt;</code>. Implementations per parameter type (numeric range, enum, type, region-name, world-name, shape-specific). Composite invariants implement a separate <code>CompositeInvariant</code> interface invoked after per-parameter validators pass.</td>
-<td>§5.1</td>
+<td>section 5.1</td>
 </tr>
 <tr>
 <td><code>ConfigParameterGrammar</code></td>
 <td>Single source of truth for parse + tab-complete. One <code>GrammarNode</code> per parameter position; both <code>onCommand</code> and <code>onTabComplete</code> walk the same tree.</td>
-<td>§9, §2</td>
+<td>section 9, section 2</td>
 </tr>
 <tr>
 <td><code>ConfigTransaction</code></td>
-<td>Owns: snapshot map (<code>FactoryValue</code> → captured value), mutation list, target file. Methods: <code>addMutation</code>, <code>validateAll</code>, <code>apply</code>, <code>persistAtomically</code>, <code>rollback</code>, <code>audit</code>. Single-file at the command surface (spec §2.2).</td>
-<td>§3.4–§3.7</td>
+<td>Owns: snapshot map (<code>FactoryValue</code> → captured value), mutation list, target file. Methods: <code>addMutation</code>, <code>validateAll</code>, <code>apply</code>, <code>persistAtomically</code>, <code>rollback</code>, <code>audit</code>. Single-file at the command surface (spec section 2.2).</td>
+<td>section 3.4–section 3.7</td>
 </tr>
 <tr>
 <td><code>AtomicConfigWriter</code></td>
 <td>The temp+fsync+rename helper. Method <code>write(targetFile, serializedContent)</code>: writes <code>&lt;target&gt;.tmp</code> in same directory, fsyncs, renames over <code>&lt;target&gt;</code>, best-effort parent-dir fsync. Throws <code>IOException</code> only; never swallows. Also exposes <code>cleanupStaleTempFiles(directory)</code> for the startup hook.</td>
-<td>§4.2, §4.3</td>
+<td>section 4.2, section 4.3</td>
 </tr>
 <tr>
 <td><code>ConfigAuditRecord</code></td>
-<td>Immutable record carrying every field of spec §6.1.</td>
-<td>§6.1</td>
+<td>Immutable record carrying every field of spec section 6.1.</td>
+<td>section 6.1</td>
 </tr>
 <tr>
 <td><code>ConfigAuditFormatter</code></td>
 <td>Pure function <code>format(ConfigAuditRecord) → String</code>. Deterministic; consumed by tests via <code>SendMessage.addInterceptor</code>.</td>
-<td>§6.2</td>
+<td>section 6.2</td>
 </tr>
 <tr>
 <td><code>ConfigCommandExecutor</code></td>
-<td>Orchestrates the seven-stage lifecycle of spec §3. Owned by <code>SubConfigCmd</code>; one instance per invocation. Reduces <code>SubConfigCmd#onCommand</code> to "parse → executor.run → render result."</td>
-<td>§3</td>
+<td>Orchestrates the seven-stage lifecycle of spec section 3. Owned by <code>SubConfigCmd</code>; one instance per invocation. Reduces <code>SubConfigCmd#onCommand</code> to "parse → executor.run → render result."</td>
+<td>section 3</td>
 </tr>
 </tbody>
 </table>
 <h3 id="refactor-of-existing-classes">Refactor of existing classes<a class="headerlink" href="#refactor-of-existing-classes" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong><code>SubConfigCmd</code></strong> — the 245-line <code>onCommand</code> body collapses to: parse via <code>ConfigParameterGrammar</code> → build <code>ConfigTransaction</code> → invoke <code>ConfigCommandExecutor</code> → render the resulting <code>ConfigAuditRecord</code> to the caller. <code>onTabComplete</code> calls the same <code>ConfigParameterGrammar</code> (parity test enforces). The world-aware vertical clamping noted in <code>docs/admin/COMMANDS.md</code> (nether <code>maxY=128</code>, vert→LINEAR, etc.) moves into a <code>CompositeInvariant</code> so it is applied uniformly on both <code>/rtp config</code> writes and <code>/rtp reload</code> paths (spec §8.2).</li>
-<li><strong><code>ViewSubConfigCmd</code></strong> — becomes the renderer for spec §2.4's interactive view. Reads from the current parser snapshot, produces a sequence of <code>ChatComponent</code>-style entries with hover (when comments are available; see Appendix A12) and click-suggest. Emits a single <code>INFO</code> audit record with empty <code>mutations</code>.</li>
+<li><strong><code>SubConfigCmd</code></strong> — the 245-line <code>onCommand</code> body collapses to: parse via <code>ConfigParameterGrammar</code> → build <code>ConfigTransaction</code> → invoke <code>ConfigCommandExecutor</code> → render the resulting <code>ConfigAuditRecord</code> to the caller. <code>onTabComplete</code> calls the same <code>ConfigParameterGrammar</code> (parity test enforces). The world-aware vertical clamping noted in <code>docs/admin/COMMANDS.md</code> (nether <code>maxY=128</code>, vert→LINEAR, etc.) moves into a <code>CompositeInvariant</code> so it is applied uniformly on both <code>/rtp config</code> writes and <code>/rtp reload</code> paths (spec section 8.2).</li>
+<li><strong><code>ViewSubConfigCmd</code></strong> — becomes the renderer for spec section 2.4's interactive view. Reads from the current parser snapshot, produces a sequence of <code>ChatComponent</code>-style entries with hover (when comments are available; see Appendix A12) and click-suggest. Emits a single <code>INFO</code> audit record with empty <code>mutations</code>.</li>
 <li><strong><code>ListAddParameter</code> / <code>ListRemoveParameter</code></strong> — collapsed into the grammar's list-operator nodes; the standalone classes either become thin grammar adapters or are deleted, decided during implementation.</li>
 <li><strong><code>ConfigCmd</code></strong> — gains tab-complete delegation to the registered <code>SubConfigCmd</code> set; no semantic change.</li>
-<li><strong><code>LanguageCmd</code></strong> — hardened to the spec's lifecycle (§3) <strong>plus</strong> a <code>reInitializeAllParsers()</code> step in §3.7 that replaces the standard targeted-reload, per spec §4.4 / the user's clarification. Permission node: <code>rtp.config.set.language</code> (additive, falls back to <code>rtp.config.set</code>).</li>
+<li><strong><code>LanguageCmd</code></strong> — hardened to the spec's lifecycle (section 3) <strong>plus</strong> a <code>reInitializeAllParsers()</code> step in section 3.7 that replaces the standard targeted-reload, per spec section 4.4 / the user's clarification. Permission node: <code>rtp.config.set.language</code> (additive, falls back to <code>rtp.config.set</code>).</li>
 <li><strong><code>ReloadCmd</code> / <code>SubReloadCmd</code></strong> — interpose <code>ConfigParameterValidator.validateAll(parsedConfig)</code> between "read from disk" and "swap into <code>Configs</code>." On failure: abort the swap, restore the previous map, emit one <code>WARNING</code> audit record (<code>outcome = REJECTED</code>), surface to caller.</li>
 <li><strong><code>BukkitBaseRTPCmd#msgInvalidCommand</code> / <code>msgBadParameter</code></strong> — resolve via <code>messages.yml → config.error.&lt;reasonCode&gt;</code> with the same <code>Level.WARNING</code> REQ-RTP-F-013 enforcement on missing keys. The existing <code>RTP.log</code> audit emission for REQ-RTP-S-004 stays; the new audit record subsumes it.</li>
 </ul>
@@ -3496,8 +3498,8 @@
 <p>On plugin enable, after <code>Configs.reload</code> builds the initial parser map and before any command is dispatchable, <code>AtomicConfigWriter.cleanupStaleTempFiles</code> is invoked once per registered config directory (<code>plugins/RTP/</code>, <code>plugins/RTP/regions/</code>, <code>plugins/RTP/worlds/</code>, <code>plugins/RTP/safety/</code>). Each stray <code>&lt;name&gt;.yml.tmp</code> is deleted; one <code>INFO</code> log line per deletion (<code>reasonCode = STALE_TEMP_FILE</code>). No retry on failure to delete (a locked <code>.tmp</code> likely means a parallel plugin instance is mid-write; logged but tolerated).</p>
 <h3 id="concurrency-model">Concurrency model<a class="headerlink" href="#concurrency-model" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Writes execute on the caller thread (or, on Folia, dispatched through <code>RTP.scheduler.runTaskAsynchronously</code> per platform-adapter convention). No background batcher. Per-file write lock is a <code>ReentrantLock</code> held by <code>ConfigTransaction</code> for the duration of §3.4–§3.7; lock acquisition is <code>tryLock(0)</code> so a contended <code>/rtp config</code> returns <code>RELOAD_IN_PROGRESS</code> rather than blocking.</li>
-<li><code>/rtp reload</code> acquires the same per-file write lock (or a global lock for <code>/rtp reload</code> without arguments). A reload in progress causes incoming writes to fast-reject (spec §4.6 / §5.2 <code>RELOAD_IN_PROGRESS</code>); a write in progress causes a concurrent reload to await the write's completion (single deferral, no stacking).</li>
+<li>Writes execute on the caller thread (or, on Folia, dispatched through <code>RTP.scheduler.runTaskAsynchronously</code> per platform-adapter convention). No background batcher. Per-file write lock is a <code>ReentrantLock</code> held by <code>ConfigTransaction</code> for the duration of section 3.4–section 3.7; lock acquisition is <code>tryLock(0)</code> so a contended <code>/rtp config</code> returns <code>RELOAD_IN_PROGRESS</code> rather than blocking.</li>
+<li><code>/rtp reload</code> acquires the same per-file write lock (or a global lock for <code>/rtp reload</code> without arguments). A reload in progress causes incoming writes to fast-reject (spec section 4.6 / section 5.2 <code>RELOAD_IN_PROGRESS</code>); a write in progress causes a concurrent reload to await the write's completion (single deferral, no stacking).</li>
 <li><code>ConfigParameterValidator</code> instances are pure and stateless; no locking required.</li>
 <li><code>AtomicConfigWriter</code> is stateless; safe to use from any thread.</li>
 </ul>
@@ -3515,42 +3517,42 @@
 <tr>
 <td><code>ReqRtpS004ConfigCommandAuditTest</code></td>
 <td>Every failure path emits exactly one audit record with the right <code>outcome</code> and <code>reasonCode</code>.</td>
-<td>§6 + §10</td>
+<td>section 6 + section 10</td>
 </tr>
 <tr>
 <td><code>ConfigTransactionAtomicRollbackTest</code></td>
 <td>A simulated <code>PERSIST_IO</code> failure leaves in-memory state unchanged and removes the temp file.</td>
-<td>§3.6, §4.2</td>
+<td>section 3.6, section 4.2</td>
 </tr>
 <tr>
 <td><code>ConfigDryRunDiffTest</code></td>
 <td><code>--dry-run</code> produces the diff and never touches disk; live mode does both.</td>
-<td>§3.7</td>
+<td>section 3.7</td>
 </tr>
 <tr>
 <td><code>ReloadCmdSchemaValidationTest</code></td>
 <td>An offline-edited shape-invariant violation (Polygon <code>expand=true</code>) is caught at reload time, not at sample time.</td>
-<td>§8</td>
+<td>section 8</td>
 </tr>
 <tr>
 <td><code>ConfigPermissionScopeTest</code></td>
 <td>Holder of <code>rtp.config.set.regions</code> may mutate <code>regions/*.yml</code> but not <code>performance.yml</code>; umbrella holder may mutate everything.</td>
-<td>§7</td>
+<td>section 7</td>
 </tr>
 <tr>
 <td><code>ConfigParameterGrammarParseCompleteParityTest</code></td>
 <td>Every tab-complete suggestion at every grammar position round-trips through the parser.</td>
-<td>§9</td>
+<td>section 9</td>
 </tr>
 <tr>
 <td><code>ReqRtpF013ConfigMessageCoverageTest</code></td>
 <td>Every <code>ConfigReasonCode</code> has a <code>messages.yml → config.error.&lt;code&gt;</code> entry, and vice versa.</td>
-<td>§5.3</td>
+<td>section 5.3</td>
 </tr>
 <tr>
 <td><code>AtomicConfigWriterRenameAtomicityTest</code></td>
 <td>A crash simulated between fsync and rename leaves <code>&lt;target&gt;</code> unchanged; subsequent startup cleans <code>&lt;target&gt;.tmp</code>.</td>
-<td>§4.2, §A11 closure</td>
+<td>section 4.2, section A11 closure</td>
 </tr>
 </tbody>
 </table>
@@ -3566,13 +3568,13 @@
 <li><strong>Scoped permissions.</strong> Add <code>rtp.config.set.&lt;section&gt;</code> resolution in <code>ConfigCommandExecutor#authorize</code>; the umbrella <code>rtp.config.set</code> remains valid. <code>ConfigPermissionScopeTest</code> goes green.</li>
 <li><strong>Grammar unification.</strong> Replace the hand-written <code>onTabComplete</code> branches with <code>ConfigParameterGrammar</code> walks. <code>ConfigParameterGrammarParseCompleteParityTest</code> goes green. Closes spec gap A8.</li>
 <li><strong>Schema-checked reload.</strong> Wire <code>ConfigParameterValidator.validateAll</code> into <code>ReloadCmd</code> / <code>SubReloadCmd</code>. <code>ReloadCmdSchemaValidationTest</code> goes green. Closes spec gap A7.</li>
-<li><strong><code>LanguageCmd</code> hardening.</strong> Apply the same lifecycle to <code>LanguageCmd</code> with the <code>reInitializeAllParsers</code> step in §3.7. Closes spec gap A10.</li>
+<li><strong><code>LanguageCmd</code> hardening.</strong> Apply the same lifecycle to <code>LanguageCmd</code> with the <code>reInitializeAllParsers</code> step in section 3.7. Closes spec gap A10.</li>
 <li><strong>Composite invariants.</strong> Register <code>Polygon.expand=false</code>, <code>Polygon.vertices</code> validity, <code>Rectangle</code> / <code>Ellipse</code> extent positivity (ADR-034) as composite invariants. Run on every write and every reload. Closes the last piece of contract 7.</li>
 </ol>
 <p>Each unit's PR description shall link the spec section(s) it implements and the test class(es) it adds or makes green.</p>
 <h3 id="out-of-scope-for-this-adr">Out of scope for this ADR<a class="headerlink" href="#out-of-scope-for-this-adr" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>LanguageCmd</code>'s detailed re-init algorithm — recorded as a single bullet here ("§3.7 calls <code>reInitializeAllParsers</code>"). If the re-init turns out to be non-trivial (locale switching mid-flight, in-flight teleports holding old locale-aware messages), a separate ADR covers it.</li>
+<li><code>LanguageCmd</code>'s detailed re-init algorithm — recorded as a single bullet here ("section 3.7 calls <code>reInitializeAllParsers</code>"). If the re-init turns out to be non-trivial (locale switching mid-flight, in-flight teleports holding old locale-aware messages), a separate ADR covers it.</li>
 <li>YAML-comment preservation through the write-back round-trip (spec Appendix A12). Closing A12 requires either upgrading the YAML substrate (extension of <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/">ADR-025</a>) or replacing it with an in-house parser. Separate ADR; tracked but not addressed in beta.3.</li>
 <li>Wizard concerns. The wizard ADR (<a href="../ADR-038-rtpadmin-setup-wizards/">ADR-038</a>) consumes these primitives in a later release; this ADR does not commit any of them to a public-API surface.</li>
 <li>Cross-server propagation of config changes (<a href="../../dev/MULTI_SERVER_PLAN/">MULTI_SERVER_PLAN.md</a>). Each backend persists locally; cross-backend fan-out is independent work.</li>
@@ -3608,7 +3610,7 @@
 </tr>
 <tr>
 <td>Background save queue with a shutdown drain</td>
-<td>Adds a category of failure mode the spec explicitly designs out (shutdown-flush ordering, per §4.6 and <code>LESSONS_LEARNED.md</code>). Writes-on-caller-thread are bounded — the atomic-rename pattern's hot path is two syscalls plus a fsync — and the spec's "exactly one record per invocation" rule is much easier to enforce without a queue.</td>
+<td>Adds a category of failure mode the spec explicitly designs out (shutdown-flush ordering, per section 4.6 and <code>LESSONS_LEARNED.md</code>). Writes-on-caller-thread are bounded — the atomic-rename pattern's hot path is two syscalls plus a fsync — and the spec's "exactly one record per invocation" rule is much easier to enforce without a queue.</td>
 </tr>
 <tr>
 <td><code>ConfigAuditRecord</code> as a JSON-serializing record (vs. formatter-rendered string)</td>
@@ -3655,7 +3657,7 @@
 <li><a href="../ADR-037-harden-rtp-config-commands/">ADR-037</a> — decision (the eight contracts). This ADR is the <em>how</em> to ADR-037's <em>what</em>.</li>
 <li><a href="../../dev/CONFIG_COMMAND_SPEC/"><code>docs/dev/CONFIG_COMMAND_SPEC.md</code></a> — target-state normative spec. If any class layout in this ADR conflicts with the spec, the spec wins.</li>
 <li><a href="../ADR-002-h2-sqlite-over-flat-file-cache/">ADR-002</a> — H2/SQLite persistence. Same filesystem-assumption baseline as the atomic-rename pattern here.</li>
-<li><a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a> — Locale-aware parser. <code>LanguageCmd</code> re-init in spec §4.4 composes on top of this.</li>
+<li><a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a> — Locale-aware parser. <code>LanguageCmd</code> re-init in spec section 4.4 composes on top of this.</li>
 <li><a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/">ADR-025</a> — Internal SnakeYAML wrapper. Current YAML substrate; comment-preservation gap tracked at spec Appendix A12.</li>
 <li><a href="../ADR-034-memory-shape-catalog/">ADR-034</a> — Memory shape catalog. Composite invariants (Polygon <code>expand=false</code>, Rectangle / Ellipse extents) plug into <code>ConfigParameterValidator</code>.</li>
 <li><a href="../ADR-035-interactive-menus-book-first/">ADR-035</a> — Interactive menus. Menu redeems that dispatch a config command inherit all of this ADR's primitives for free.</li>
