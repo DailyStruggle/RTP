@@ -8,6 +8,17 @@ This document provides a detailed reference for all configuration options availa
 
 ---
 
+## Updating Settings
+
+You can create and update regions through:
+1. **In-game admin menu**: Run `/rtp admin` or `/rtp menu` -> click **Regions**.
+2. **Command line**: Use `/rtp config region <name> <key>=<value>` (e.g. `/rtp config region default shape.radius=625`).
+3. **Direct editing**: Edit `definitions/regions/<name>.yml` on disk and run `/rtp reload`.
+
+> 📎 See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full menu and command navigation details.
+
+---
+
 ## Top-Level Settings
 
 | Key | Type | Default | Description |
@@ -23,7 +34,7 @@ This document provides a detailed reference for all configuration options availa
 | `spatialResolution` | Integer | `3` | Precision for spatial memory (bad location tracking). 1 is coarse, 5 is extremely fine. |
 | `displayName` | String | (region name) | Optional cosmetic display name shown in menus and messages; does not change the region's identity or the permission node. |
 | `biomeWhitelist` / `biomes` | Boolean / List | (inherited from `safety.yml`) | Optional per-region override of the global biome filter. `biomeWhitelist: true` makes `biomes` an allow-list; `false` makes it a block-list. See [SAFETY.md](SAFETY.md). |
-| `version` | String | `"1.0"` | Internal config version. **Do not modify.** |
+| `version` | String | `"1.1"` | Internal config version. **Do not modify.** |
 
 > **Inheritance (`@config`).** Most of the keys above accept the token `@config` instead of a literal value, in which case they inherit the matching global default from the `defaults:` block of `config.yml`. The type-bearing `shape`/`vert` keys inherit as a whole named block; type-free scalars (`requirePermission`, `cacheCap`, `backlogCacheCap`, `activeChunkCap`, `spatialResolution`) inherit individually; `price` may reference `@economy`. See [CORE_CONFIG.md → Defaults (inheritance)](CORE_CONFIG.md#defaults-inheritance).
 

@@ -4,9 +4,20 @@ This document provides a detailed reference for the core settings in `config.yml
 
 ---
 
+## Updating Settings
+
+You can view and update core settings using:
+1. **In-game admin menu**: Run `/rtp admin` or `/rtp menu` -> click **Admin Panel**.
+2. **Command line**: Use `/rtp config <key>=<value>` (for instance, `/rtp config teleportCooldown=60`).
+3. **Direct editing**: Edit `config.yml` on disk and run `/rtp reload`.
+
+> 📎 See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full menu and command navigation details.
+
+---
+
 ## Language
 
-Locale selection now lives in [`language.yml`](LANGUAGE.md) (loaded before `config.yml`). See [LANGUAGE.md](LANGUAGE.md) for the full reference.
+Language selection is configured in [`language.yml`](LANGUAGE.md). See [LANGUAGE.md](LANGUAGE.md) for the full reference.
 
 ## Teleportation Settings
 
@@ -26,49 +37,17 @@ List of commands to execute after a successful teleport. Use the `[player]` plac
 - `consoleCommands`: Executed by the server console.
 - `playerCommands`: Executed by the player.
 
-## Database
-
-Where to store cached locations and player data. Nested under the `database:` block.
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `type` | String | `"sqlite"` | Backend type: `yaml`, `sqlite`, `mysql`, or `postgresql`. `yaml`/`sqlite` are file-backed and need no extra config. |
-| `host` | String | `"127.0.0.1"` | Database host. Used by `mysql`/`postgresql` only. |
-| `port` | Integer | `3306` | Database port. Used by `mysql`/`postgresql` only. |
-| `name` | String | `"rtp"` | Database / schema name. Used by `mysql`/`postgresql` only. |
-| `username` | String | `"root"` | Database username. Used by `mysql`/`postgresql` only. |
-| `password` | String | `"password"` | Database password. Used by `mysql`/`postgresql` only. |
-
-> **Fabric note:** the Fabric build currently supports **flat-file (`yaml`) only**. JDBC drivers (H2, SQLite, MySQL, PostgreSQL) are not bundled and Fabric servers do not ship them on the classpath, so any non-`yaml` `type` falls back to flat-file at startup with a `WARNING` in the server log. Track Fabric platform status in [`MULTI_PLATFORM_PLAN.md`](../../dev/MULTI_PLATFORM_PLAN.md).
->
-> **Bukkit-family note:** as of `3.0.0-beta.2`, no JDBC driver is shaded into the RTP jar. To use `h2`/`sqlite`/`mysql`/`postgresql`, drop the corresponding driver jar onto the server classpath; otherwise the handler falls back along requested → `h2` → `yaml` and logs a `WARNING` for each fallback.
-
 ## Menu
 
-Generalized menu framework. Nested under the `menu:` block.
+Configures the menu interface. Nested under the `menu:` block.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `renderer` | List | `[ "book" ]` | Ordered preference list of renderer ids. On exception or a missing adapter the framework walks the list and falls back to the next entry. Available ids: `book`, `chat`. If the list is exhausted, the no-token open-page path falls back to the configurable `menuInvalid` message. |
 
-## Network (Redis)
-
-The `network.redis` block under `config.yml` enables the Redis-backed network state binding for multi-server synchronization of cached locations.
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | Boolean | `false` | Enable the Redis-backed network state binding. |
-| `host` | String | `"127.0.0.1"` | Redis host. |
-| `port` | Integer | `6379` | Redis port. |
-| `password` | String | `""` | Redis password. Empty string disables auth. |
-
-> **Full multi-server / multi-proxy network mode** (the dedicated `network.yml` file: transports, routing, wait queue, reservation tokens, load balancer) is documented separately in [`proxies/CONFIGURATION.md`](../proxies/CONFIGURATION.md).
-
 ## Defaults (inheritance)
 
-Nested under the `defaults:` block. Holds global default templates and values that region/world files can inherit instead of repeating, so a single-world server changes a knob once here rather than editing every region file.
-
-A region/world setting whose value is the token `@config` resolves to the matching entry under `defaults:`; a literal value in the region/world file always wins. References resolve at read time (the file is never rewritten), and an unresolvable reference falls back to a safe built-in default with a `WARNING` in the log.
+Nested under the `defaults:` block. Holds global default templates and values that region/world files inherit when configured with `@config`.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -80,9 +59,15 @@ A region/world setting whose value is the token `@config` resolves to the matchi
 | `spatialResolution` | Integer | `3` | Default region `spatialResolution` (bad-location tracking precision, 1-5). |
 | `requirePermission` | Boolean | `false` | Default `requirePermission` for regions/worlds. |
 
-> The type-bearing `shape`/`vert` settings inherit as a **whole named block** (a per-type parameter set is only coherent as a unit), while type-free scalars inherit individually. Other source files own their own defaults: e.g. a region's `price` can reference `@economy` to inherit from [economy.yml](ECONOMY.md).
+> The type-bearing `shape`/`vert` settings inherit as a **whole named block**, while type-free scalars inherit individually. Other source files own their own defaults: e.g. a region's `price` can reference `@economy` to inherit from [economy.yml](ECONOMY.md).
 
-> **Teleport distance lives here.** On a single-world server, `defaults.shape.radius` is the one place to set how far `/rtp` throws players, because the bundled `regions/default.yml` ships `shape: "@config"`. Sizes are in **chunks** (1 chunk = 16 blocks), so `radius: 256` is 4,096 blocks and `radius: 625` is 10,000 blocks; `centerRadius` is the matching minimum distance. Full reference, including the per-region and per-command overrides: [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius).
+> **Teleport distance lives here.** On a single-world server, `defaults.shape.radius` is the one place to set how far `/rtp` throws players, because the bundled `regions/default.yml` ships `shape: "@config"`. Sizes are in **chunks** (1 chunk = 16 blocks), so `radius: 256` is 4,096 blocks and `radius: 625` is 10,000 blocks; `centerRadius` is the matching minimum distance. Full reference, including per-region and per-command overrides: [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius).
+
+---
+
+## Related Files
+- Database persistence settings: [`advanced/database.yml`](CONFIGURATION.md#database-persistence-advanceddatabaseyml).
+- Multi-server network settings: [`advanced/network.yml`](../proxies/CONFIGURATION.md).
 
 ---
 

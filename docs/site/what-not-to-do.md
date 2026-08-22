@@ -41,12 +41,8 @@ These mistakes prevent teleportation from working correctly.
 These setups work, but they make teleports expensive - either lagging the player who
 teleports or stalling the whole server.
 
-!!! warning "Don't run the plugin for the first time on a production server"
-    On first run the plugin is unlikely to be configured for your use case, and an
-    unconfigured region has no warmed cache, so the first teleports do all the expensive
-    chunk loading and safety checking on demand. Do a test run on your PC first, configure
-    your regions, then warm them with `/rtp scan start region=<name>` before players
-    arrive. See the [Quick start](../admin/QUICK_START.md) scan step.
+!!! warning "Don't pass dynamic parameter overrides to regular players"
+    Passing dynamic override parameters (`shape=`, `radius=`, `centerX=`, `centerZ=`, etc. under the `rtp.params` permission) constructs an ephemeral, throwaway region on the fly. Because temporary regions are uncached and have no persistent spatial memory, every invocation forces on-demand chunk loading and real-time safety verification. Keep dynamic parameters restricted to staff testing, and configure permanent named regions for everyday player use.
 
 !!! warning "Don't wire override parameters into player commands, signs, or portals"
     *Override* parameters (`shape=`, `radius=`, `centerX=`, ...) build a throwaway
@@ -68,6 +64,6 @@ teleports or stalling the whole server.
 
 - [Intended usage](intended-usage.md) - the model these anti-patterns violate.
 - [Quick start](../admin/QUICK_START.md) -
-  warm the cache so first teleports are not slow.
+  the recommended end-to-end setup sequence.
 - [Performance](../admin/configuration/PERFORMANCE.md) - the
   symptom-to-knob tuning playbook.

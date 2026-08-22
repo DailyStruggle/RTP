@@ -127,7 +127,7 @@ RTP uses a permission-based system. Assign these to your permission plugin (e.g.
 | `rtp.config.set.<section>` | Write only the named section (e.g. `rtp.config.set.regions`); see [COMMANDS.md](COMMANDS.md) section `/rtp config` |
 | `rtp.config` | Legacy alias — grants `rtp.config.view` + `rtp.config.set` |
 | `rtp.info` | Use `/rtp info` |
-| `rtp.scan` | Use `/rtp scan` to pre-generate locations |
+| `rtp.scan` | Use `/rtp scan` to build spatial memory |
 | `rtp.test` | Use `/rtp test` runtime self-tests |
 
 Example LuckPerms command to grant basic use to all players:
@@ -209,11 +209,11 @@ Each successful `/rtp config` write is **atomic** (write-to-temp → fsync → r
 
 ---
 
-## Step 9 — Pre-warm with `/rtp scan` (Spatial Memory)
+## Step 9 — Build Spatial Memory with `/rtp scan`
 
 > ⚠️ **Run scan only after pregeneration is complete.** `/rtp scan` (and the background scan that starts automatically when a region first loads) probes every spiral coordinate in the region; if the underlying chunks have not been pregenerated, each probe pays full chunkgen cost and competes with the server's chunk system for tick-thread I/O. On Fabric this can drag steady-state TPS noticeably; on any platform it makes scan throughput abysmal. **Always finish your Chunky / WorldBorder pregeneration pass first** (Step 0), then start the scan.
 
-Once worlds are pregenerated (Step 0) and regions are configured (Steps 4 and 8), map them so future teleports skip known-bad coordinates instantly. Scanning is async on every platform and never blocks tick threads.
+Once worlds are pregenerated (Step 0) and regions are configured (Steps 4 and 8), scan them to identify and persist known-bad coordinates into spatial memory. This allows background location generation and player teleports to skip invalid terrain immediately. Scanning is async on every platform and never blocks tick threads.
 
 ```
 /rtp scan start                       # caller's region (player) or all (console)
@@ -286,7 +286,7 @@ Once Steps 0–10 are green, the recurring loop is small:
 | `/rtp` does nothing | Plugin failed to load | Check console for errors on startup |
 | "No safe location found" | Radius too small or all biomes excluded | Increase `radius` in the region file, or relax biome filters in `safety.yml` |
 | Economy not working | Vault not installed | Install Vault + an economy plugin and restart |
-| Teleport is slow | Cache empty on first run | Wait 30–60 seconds for the background queue to fill, or run `/rtp scan` (Step 9) |
+| Teleport is slow | Cache empty on first run | Wait a few moments for the background queue to fill, or check `cacheCap` in the region config |
 | Players land in ocean | Biome filter not active | Check `safety.yml` biome blacklist includes ocean biomes; then `/rtp scan reset` + `/rtp scan start` |
 | Players land too close to spawn | `centerRadius` too small | Increase `centerRadius` in the region's `shape:` block |
 | `/rtp scan` very slow | World not pregenerated | Pregenerate first (Step 0), then `/rtp scan resume` |

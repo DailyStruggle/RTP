@@ -1,6 +1,18 @@
 # Configuration Reference
 
-One jar covers every platform. Configuration is generated on first server start and lives under `plugins/RTP/` on the Bukkit family (Paper, Spigot, Folia and their forks, Arclight, Mohist) or under `config/rtp/` on Fabric / NeoForge. Edit the files directly and run `/rtp reload` to apply changes without a server restart, or change an individual key at runtime with `/rtp config <file> <key>=<value>` (atomic write + auto-reload).
+One jar covers every platform. Configuration is generated on first server start and lives under `plugins/RTP/` on the Bukkit family (Paper, Spigot, Folia and their forks, Arclight, Mohist) or under `config/rtp/` on Fabric / NeoForge.
+
+---
+
+## How to Update Configuration
+
+RTP provides multiple ways to view and update settings:
+
+1. **Interactive Admin Menu (`/rtp admin` or `/rtp menu`)**: The recommended in-game interface for inspecting, editing, and validating settings, worlds, and regions.
+2. **Command Line (`/rtp config <section> <key>=<value>`)**: Quick runtime updates from console or chat with immediate atomic persistence.
+3. **Direct File Editing (`plugins/RTP/...`)**: Edit YAML files directly and run `/rtp reload` to apply changes.
+
+> 📎 **Detailed Admin Guide:** See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full instructions on navigating the `/rtp admin` menu and using `/rtp config` subcommands.
 
 > **Folder layout:** the everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) sit at the top level. The named definitions you author (`regions/`, `worlds/`, `effects/`, plus the shared `shape/` and `vert/` catalogs) live under `definitions/`. The rarely-hand-edited tuning and text files (`performance.yml`, `logging.yml`, `metrics.yml`, `network.yml`, `database.yml`, `biomes.yml`, `blocks.yml`, the `messages/` tree, and the `schematics/` folder) live under `advanced/`. The per-locale translation mirror stays at `lang/`. Each rename map is a co-located hidden dotfile (`.<name>.lang.yml`) beside the file it describes. On upgrade from an older layout, RTP relocates your authored files automatically and archives the old folders as `<name>.migrated`.
 
@@ -168,7 +180,7 @@ vert:
 
 ## `definitions/worlds/<name>.yml` — World Configuration
 
-Each file in the `definitions/worlds/` folder maps a world to its default region and permission settings.
+Each file in the `definitions/worlds/` folder maps a world to its default region and permission settings. See [WORLDS.md](WORLDS.md) for the complete reference.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -179,58 +191,23 @@ Each file in the `definitions/worlds/` folder maps a world to its default region
 
 ---
 
-## `advanced/performance.yml` — Performance Settings
+## Dedicated Configuration Guides
 
-| Key | Type | Default | Description                                                                           |
-|---|---|---|---------------------------------------------------------------------------------------|
-| `maxAttempts` | Integer | `32` | Maximum location search attempts before giving up. Higher = more CPU per request.     |
-| `viewDistanceSelect` | Integer | `0` | Chunk radius to pre-load around a candidate location during selection. `0` = minimum. |
-| `viewDistanceTeleport` | Integer | `0` | Chunk radius to pre-load around the final destination before teleporting.             |
-| `syncAllottedTime` | Integer | `50` | Max milliseconds per tick spent on synchronous RTP tasks. Range: 0–50.                |
-| `period` | Integer | `100` | Ticks between background cache cycles (where 20 ticks equal 1 second).                     |
-| `asyncAllottedTime` | Integer | `50` | Max milliseconds per tick spent on asynchronous RTP tasks.                            |
-| `minTPS` | Double | `19.0` | Minimum server TPS before the plugin pauses background generation. Range: 0.0–20.0.   |
-| `postTeleportQueueing` | Boolean | `false` | If `true`, immediately tries to refill the cache after each teleport.                 |
-| `syncLoading` | Boolean | `false` | Use synchronous chunk loading. This is **not recommended**, as it can cause server hangs.          |
-| `onEventParsing` | Boolean | `false` | Parse permissions on each event. This is incompatible with wildcard (`*.*`) permissions.      |
-| `effectParsing` | Boolean | `true` | Parse effect permissions on startup.                                                  |
-| `biomeRecall` | Boolean | `true` | Reuse previously found biome locations from cache.                                    |
-| `biomeRecallForced` | Boolean | `false` | Only teleport to biomes already in cache (never search for new ones).                 |
-| `checkOnChunkLoads` | Boolean | `false` | Check for safe locations in chunks as they load. This has a **high impact** on busy servers.     |
+For in-depth explanations and complete key tables of each configuration file:
 
----
-
-## `economy.yml` — Economy Settings
-
-Requires **Vault** and a compatible economy plugin. If Vault is absent, all economy settings are ignored.
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `refundOnCancel` | Boolean | `true` | Refund the cost and reset cooldown if the teleport is cancelled (e.g., player moves). |
-| `price` | Double | `50.0` | Base cost for `/rtp`. Set to `0.0` to disable. |
-| `priceOther` | Double | `200.0` | Cost to teleport another player (`/rtp <player>`). |
-| `paramsPrice` | Double | `0.0` | Additional cost for using parameters (world, region, shape, vert). |
-| `biomePrice` | Double | `0.0` | Additional cost for specifying a biome target. |
-| `balanceFloor` | Double | `0.0` | Minimum balance a player must retain after paying. Prevents going negative. |
-
----
-
-## `safety.yml` — Safety Settings
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `invulnerabilityTime` | Integer | `5` | Seconds of invulnerability granted after teleporting. Prevents fall/fire/drown damage on arrival. |
-| `safetyRadius` | Integer | `0` | Block radius around the landing point to check for hazards. `0` = check only the landing block. |
-| `platformRadius` | Integer | `0` | Radius of a platform created at the landing point. Set to `-1` to disable platforms entirely. |
-| `platformDepth` | Integer | `1` | Depth (downward) of the platform. |
-| `platformAirHeight` | Integer | `2` | Height of air to ensure above the platform. |
-| `platformMaterial` | String | `GLASS` | Block type used for the platform if no solid block exists at the landing point. |
-| `airBlocks` | List | *(flowers, grass, etc.)* | Block types treated as passable air during safety checks. |
-| `unsafeBlocks` | List | *(lava, fire, etc.)* | Block types that make a location unsafe. |
-| `biomeWhitelist` | Boolean | `false` | If `true`, the `biomes` list is a **whitelist** (only allow listed biomes). If `false`, it is a **blacklist**. |
-| `biomes` | List | *(ocean, nether, end biomes)* | Biomes to exclude (blacklist) or exclusively allow (whitelist). |
-
-**Default biome blacklist includes:** all ocean variants, deep dark, mushroom fields, nether biomes (nether wastes, soul sand valley, crimson/warped forest, basalt deltas), and end biomes (the end, end highlands/midlands/barrens, small end islands, the void).
+- **Core & Defaults:** [CORE_CONFIG.md](CORE_CONFIG.md)
+- **Safety & Hazard Checks:** [SAFETY.md](SAFETY.md)
+- **Economy (Vault):** [ECONOMY.md](ECONOMY.md)
+- **Language / Locale:** [LANGUAGE.md](LANGUAGE.md)
+- **Regions:** [REGIONS.md](REGIONS.md)
+- **Worlds:** [WORLDS.md](WORLDS.md)
+- **Events & Effects:** [EVENTS_AND_EFFECTS.md](EVENTS_AND_EFFECTS.md)
+- **Performance:** [PERFORMANCE.md](PERFORMANCE.md)
+- **Messages:** [MESSAGES.md](MESSAGES.md)
+- **Logging:** [LOGGING.md](LOGGING.md)
+- **Metrics:** [METRICS.md](METRICS.md)
+- **Multi-Server / Proxy Network:** [proxies/CONFIGURATION.md](../proxies/CONFIGURATION.md)
+- **Arrival Schematics:** [SCHEMATICS.md](SCHEMATICS.md)
 
 ---
 
@@ -239,18 +216,6 @@ Requires **Vault** and a compatible economy plugin. If Vault is absent, all econ
 All five built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `RECTANGLE`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
 
 Custom shapes can be registered at runtime via `rtp-api`. See [`addons/`](../../addons/) for examples. A registered custom shape appears as a valid `shape.name` value in any region config.
-
----
-
-## `advanced/logging.yml` — Console Logging Verbosity
-
-Enables or disables individual console-log categories and sets the plugin's minimum log level. See [LOGGING.md](LOGGING.md) for the complete category list and the `min_level` filter.
-
----
-
-## `advanced/messages/*.yml` — Message Customisation
-
-All player-facing strings are defined under `advanced/messages/`, split by concern into `commands.yml`, `player.yml`, `system.yml`, `network.yml`, and `placeholders.yml`. Supports `&` colour codes, hex codes, MiniMessage tags, and PlaceholderAPI placeholders. Edit any value to localise or rebrand messages. See [MESSAGES.md](MESSAGES.md) for the formatting rules, the `[Pn]` placeholder system, and the section-by-section layout.
 
 ---
 

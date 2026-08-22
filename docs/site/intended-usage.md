@@ -12,11 +12,11 @@ LeafRTP is built around one idea: **a region is a pre-defined area with its own 
 1. **Install** and start the server once to write the default config.
 2. **Configure** a region's geometry (shape, size, center) - see [Regions](../admin/configuration/REGIONS.md).
 3. **Point each world at a region** in its config - see [Worlds](../admin/configuration/WORLDS.md).
-4. **Warm the cache**: `/rtp scan start region=<name>` per reasonably-sized region - see the [Quick start](../admin/QUICK_START.md) scan step.
+4. **Pre-scan for safety**: optionally run `/rtp scan start region=<name>` per reasonably-sized region to build the bad-location map ahead of time - see the [Quick start](../admin/QUICK_START.md) scan step.
 5. Players run a plain **`/rtp`**, which resolves to their world's region.
 
 !!! tip "Plain `/rtp` is the supported path"
-    The everyday command for players, signs, and portals is a bare `/rtp` (or `/rtp world=<name>` to target a specific world's region). Those resolve to a configured region, so they are cached, safety-checked, and remember failures. *Override* parameters (`shape=`, `radius=`, `centerX=`, ...) are not - see [the warning below](#teleport-parameters-are-for-testing).
+    The everyday command for players, signs, and portals is a bare `/rtp` (or `/rtp world=<name>` to target a specific world's region). Those resolve to a configured region, so they utilize the pre-generated location queue, safety caching, and persistent spatial memory. *Override* parameters (`shape=`, `radius=`, `centerX=`, ...) under `rtp.params` create temporary, uncached regions - see [the warning below](#teleport-parameters-are-for-testing).
 
 ---
 
@@ -33,23 +33,26 @@ shape:
   centerZ: 0
 ```
 
-Then point the overworld at that region ([Worlds](../admin/configuration/WORLDS.md)), warm it with `/rtp scan start region=overworld` (watch `/rtp scan info`), and you are done. A player typing `/rtp` gets a cached, pre-verified coordinate.
+Then point the overworld at that region ([Worlds](../admin/configuration/WORLDS.md)), optionally pre-scan it with `/rtp scan start region=overworld` (watch `/rtp scan info`) to map known-bad spots in advance, and you are done. A player typing `/rtp` gets a pre-verified coordinate from the active queue.
 
 !!! note "`radius`, `centerX`, and `centerZ` are measured in chunks"
     They live *inside* the `shape:` block (not at the top level), and their unit is **chunks**, not blocks - 1 chunk is 16 blocks. A `radius` of `625` therefore reaches 10,000 blocks. See [Regions](../admin/configuration/REGIONS.md) for the full field reference.
 
 !!! note "That is the whole loop"
-    Configure a region -> point a world at it -> scan to warm it -> players run plain `/rtp`. The rest of this page explains *why*.
+    Configure a region -> point a world at it -> pre-scan safety -> players run plain `/rtp`. The rest of this page explains *why*.
 
 ---
 
-## Why it scans ahead of time
+## How locations are prepared and verified
 
-Finding a *safe* spot is expensive: the engine must load (and often generate) the chunk at some `(x, z)` and check it - solid surface? lava? claimed? void? Doing that the instant a player runs `/rtp` is what freezes legacy plugins.
+Finding a *safe* spot requires checking candidate coordinates: is there a solid surface? lava? claim-protected land? void? Doing that synchronously the instant a player runs `/rtp` is what freezes legacy plugins.
 
-LeafRTP does that work **ahead of time, off the main thread**: a background process pre-generates and safety-checks coordinates into the region's **cache**, and records bad spots in its **failure map** so they are never retried. By the time a player teleports, the answer is already waiting.
+LeafRTP handles this cleanly and asynchronously off the main thread:
 
-This pre-scanned data **is** the region's memory - which is why changing a region's shape is disruptive.
+1. **Location Queue (Cache)**: A background task (`QueueTask` / `RegionQueueManager`) continuously generates, validates, and stores verified safe coordinates in the region's cache queues (hot and cold caches). When a player types `/rtp`, a pre-verified coordinate is served immediately from the queue.
+2. **Spatial Memory & Safety Pre-Scanning (`/rtp scan`)**: The region maintains persistent spatial memory recording coordinates that fail safety checks so the selection algorithm skips them in future searches. The `/rtp scan` command acts as a background safety pre-scanner: it walks the region's spiral off-tick to map out unsafe sectors ahead of time. It operates independently of the location queues, building spatial memory so future generation and teleport selection avoid known-bad areas.
+
+This spatial memory is tied to the region's specific shape and bounds - which is why changing a region's shape resets its memory.
 
 ---
 
@@ -92,7 +95,7 @@ The same model scales from a one-world survival server to a large, multi-world, 
 
     1. Edit the default region: set its `world` to your world's name (e.g. `world`), pick a `shape`, `radius`, and center - see the [worked example](#a-worked-example) above.
     2. Leave the `default` world file pointed at it (the out-of-the-box mapping already does this).
-    3. Warm it once with `/rtp scan start region=<name>` and you are done.
+    3. Pre-scan it once with `/rtp scan start region=<name>` to map safety, and you are done.
 
     !!! tip "You do not need extra regions"
         A single-world server never needs more than the default region. Skip the nether/end/custom-dimension regions below until you actually add those worlds.
@@ -102,7 +105,7 @@ The same model scales from a one-world survival server to a large, multi-world, 
     Larger servers commonly run **many worlds at once** - separate overworld, nether, end, a resource world that resets, minigame worlds, and modded dimensions - and on regionised-threading platforms those worlds (and even areas within one world) run on **parallel threads**.
 
     - Define **one region per place you want `/rtp` to send players** (overworld, resource world, each dimension), then point each world file at the right region. See [Worlds](../admin/configuration/WORLDS.md) and [Regions](../admin/configuration/REGIONS.md).
-    - Warm each static region with its own `/rtp scan start region=<name>`. Skip warming worlds that reset often (a resource world) - their memory would be invalidated on every reset.
+    - Pre-scan each static region with its own `/rtp scan start region=<name>` to build spatial memory. Skip scanning worlds that reset often (a resource world) - their memory would be invalidated on every reset.
     - Because the engine does all chunk work off the main thread, it stays compatible with regionised, multi-threaded servers - no world's RTP traffic stalls another's.
 
     !!! note "New about big, parallel Minecraft servers?"
@@ -124,7 +127,7 @@ You *can* pass *override* parameters (custom `shape`, `radius`, `centerX`/`cente
 | If you want to... | Do this |
 |---|---|
 | Fast, safe random teleport | Configure a region, point the world at it, players run plain `/rtp` |
-| Avoid first-teleport lag | `/rtp scan start region=<name>` after configuring |
+| Pre-compute spatial safety | `/rtp scan start region=<name>` after configuring |
 | Change where/how a region lands players | Edit the region (it rebuilds and clears that region's memory) |
 | New worlds "just work" | Keep sane, complete **default** config |
 | Test a one-off shape/radius | Use override parameters - never bind them to player commands/signs/portals |
@@ -135,6 +138,6 @@ You *can* pass *override* parameters (custom `shape`, `radius`, `centerX`/`cente
 
 - [Regions](../admin/configuration/REGIONS.md) / [Worlds](../admin/configuration/WORLDS.md) - configure the model.
 - [Quick start](../admin/QUICK_START.md) - the recommended end-to-end setup sequence.
-- [Commands](../admin/COMMANDS.md) - the `/rtp scan` reference for warming the cache.
+- [Commands](../admin/COMMANDS.md) - the command reference including `/rtp scan`.
 - [What NOT to do!](what-not-to-do.md) - the anti-patterns.
 - [Why LeafRTP exists](why.md) - the runtime story and distribution algorithm in depth.

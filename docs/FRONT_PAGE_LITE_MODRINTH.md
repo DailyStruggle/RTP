@@ -172,7 +172,7 @@ Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https:/
 - **/rtp** - teleport to the default region for your current world or open gui (depending on addons).
 - **/rtp [parameter]=[value]** - specify `region=`, `world=`, `player=`, or temporary overrides.
 - **/rtp reload** - reload all configuration from disk.
-- **/rtp scan start|pause|resume|reset|cancel** - pre-warm spatial memory by walking a region (renamed from `/rtp fill` in 2.x). Demo: [youtu.be/Ftjy1zw_S04](https://youtu.be/Ftjy1zw_S04).
+- **/rtp scan start|pause|resume|reset|cancel** - build spatial memory by walking a region (renamed from `/rtp fill` in 2.x). Demo: [youtu.be/Ftjy1zw_S04](https://youtu.be/Ftjy1zw_S04).
 - **/rtp menu** - interactive book menu.
 
 **PlaceholderAPI**

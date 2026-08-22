@@ -34,9 +34,9 @@ BungeeCord is not supported yet. A single backend server still works fully on it
 
 ### Why did the first teleport take a few seconds, but later ones were instant?
 
-RTP pre-generates a queue of safe locations in the background. On a cold start (server just started, or after `/rtp reload`), the queue is empty and the first few teleports must generate locations on-demand, which requires loading chunks. Once the queue is warm, all teleports are instant.
+RTP pre-generates a queue of safe locations in the background. On a cold start (server just started, or after `/rtp reload`), the queue starts empty and the first few teleports may generate locations on-demand if the queue has not yet finished filling. Once the background queue populates, all teleports are instant.
 
-Run `/rtp scan` to pre-warm the queue before players join, or increase `cacheCap` in the region config to keep more locations ready.
+You can increase `cacheCap` in the region config to maintain a larger pool of ready locations, or tune replenishment intervals in `advanced/performance.yml`.
 
 ### Players keep landing in the ocean / nether / end. How do I stop that?
 

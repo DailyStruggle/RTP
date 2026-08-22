@@ -143,11 +143,11 @@ balanceFloor: 0.0     # don't let players go into debt
 
 ---
 
-## Pre-generate / warm the map
+## Pre-scan / build spatial memory for a region
 
-**What you want:** make sure `/rtp` always has somewhere fast and safe to land, even for the very first players.
+**What you want:** help the selection algorithm avoid loading invalid terrain (oceans, blacklisted biomes, unsafe vertical drops).
 
-**The LeafRTP way:** `/rtp scan`. LeafRTP does not pre-generate the whole world; it pre-**verifies** candidates off the main thread and **remembers** which sectors are unsafe (persistent spatial memory), so the selector learns to avoid loading bad ground at all. The longer a region runs, the faster and more reliable its teleports get.
+**The LeafRTP way:** `/rtp scan`. LeafRTP pre-**verifies** candidate locations off the main thread and **remembers** which sectors are unsafe (persistent spatial memory), so the selector learns to avoid loading bad ground at all. The longer a region runs, the faster and more reliable its teleports get.
 
 The recommended bring-up sequence for a new region is:
 
