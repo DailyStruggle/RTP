@@ -4,6 +4,17 @@ This document provides a detailed reference for all configuration options availa
 
 ---
 
+## Updating Settings
+
+You can update safety settings through:
+1. **In-game admin menu**: Run `/rtp admin` or `/rtp menu` -> click **Safety**.
+2. **Command line**: Use `/rtp config safety <key>=<value>` (e.g. `/rtp config safety invulnerabilityTime=10`).
+3. **Direct editing**: Edit `safety.yml` on disk and run `/rtp reload`.
+
+> 📎 See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full menu and command navigation details.
+
+---
+
 ## Landing Protection
 
 | Key | Type | Default | Description |
@@ -29,7 +40,24 @@ Used as a legacy fallback if no solid ground is found.
 
 ---
 
-## Block Filters & Token Grammar
+## PvP / Combat Checks
+
+Configure whether players can teleport while in combat.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `pvpCheckEnabled` | Boolean | `false` | When `true`, checks if a player is in combat before teleporting. |
+| `pvpCombatTagSeconds` | Integer | `15` | Duration (seconds) a player remains in combat after a PvP hit (built-in tracker). |
+| `pvpOnCombat` | Enum | `"DENY"` | Action taken when a player in combat attempts `/rtp`. Options: `ALLOW`, `DENY`, `DELAY`, `CANCEL`. |
+| `pvpSource` | Enum | `"AUTO"` | Source for combat state. Options: `AUTO` (external plugin if present, else native), `NATIVE` (built-in tracker only), `EXTERNAL` (plugin hook only). |
+| `pvpTagVictim` | Boolean | `true` | Built-in tracker: tag the player taking damage. |
+| `pvpTagAggressor` | Boolean | `true` | Built-in tracker: tag the attacking player. |
+
+---
+
+## Block Filters (`advanced/blocks.yml`)
+
+Block filter settings are configured in [`advanced/blocks.yml`](../../admin/configuration/CONFIGURATION.md#blocks-advancedblocksyml).
 
 The `airBlocks` and `unsafeBlocks` lists use a specific grammar to match blocks and properties.
 
@@ -59,11 +87,14 @@ Materials the plugin will reject as a landing target.
 
 ---
 
-## Biome Filter
+## Biome Filters (`advanced/biomes.yml`)
+
+Biome whitelist/blacklist settings are configured in [`advanced/biomes.yml`](../../admin/configuration/CONFIGURATION.md#biomes-advancedbiomesyml).
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `biomeWhitelist` | Boolean | `false` | If `true`, the `biomes` list is a **whitelist**. If `false`, it is a **blacklist**. |
+| `biomeWeighted` | Boolean | `false` | If `true`, enables weighted biome selection. |
 | `biomes` | List | *(Ocean, etc.)* | Biomes to skip or allow. Default blacklist excludes oceans, rivers, and void biomes. |
 
 ---

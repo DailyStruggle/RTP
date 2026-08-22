@@ -1,8 +1,17 @@
-# Console Logging Reference (`logging.yml`)
+# Console Logging Reference (`advanced/logging.yml`)
 
-`logging.yml` enables or disables individual console-log categories and sets the plugin's minimum log level. Every category key is a boolean; flip one to `true` to surface that category in the console, or to `false` to silence it.
+`advanced/logging.yml` enables or disables individual console-log categories and sets the plugin's minimum log level. Every category key is a boolean; flip one to `true` to surface that category in the console, or to `false` to silence it.
 
-Apply changes by editing on disk and running `/rtp reload`, or change one key at runtime with `/rtp config logging <key>=<value>`.
+---
+
+## Updating Settings
+
+You can update logging configuration through:
+1. **In-game admin menu**: Run `/rtp admin` or `/rtp menu` -> click **Logging**.
+2. **Command line**: Use `/rtp config logging <key>=<value>` (e.g. `/rtp config logging detailed_reload=true`).
+3. **Direct editing**: Edit `advanced/logging.yml` on disk and run `/rtp reload`.
+
+> 📎 See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full menu and command navigation details.
 
 ---
 

@@ -2,35 +2,56 @@
 
 Two related but distinct extension points in RTP:
 
-- **Part 1 — Effect listeners** are for **server operators** who want visual / audio feedback (sounds, particles, fireworks, potions, notes) when players move through the teleport pipeline — configured entirely through permissions, no code.
+- **Part 1 — Effect listeners** are for **server operators** who want visual / audio feedback (sounds, particles, fireworks, potions, notes) when players move through the teleport pipeline — configured via definition YAML files or permissions, no code.
 - **Part 2 — Event listeners** are for **plugin developers** writing an addon that wants to react to RTP's teleport lifecycle (logging, analytics, economy hooks, custom safety checks, etc.).
 
 > Supported server versions: **Minecraft 1.20.1 and above**. Anything in this document assumes that baseline — legacy-version caveats have been omitted.
 
+> 📎 See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for how to adjust global effect toggles via `/rtp admin` or `/rtp config`.
 > See also: [`COMMANDS.md`](../COMMANDS.md) for permission reference, [`CONFIGURATION.md`](CONFIGURATION.md) for `performance.yml` toggles.
 
 ---
 
 ## Part 1 — Effect listeners (for operators)
 
-RTP bundles the `effects-api` module (shaded as `io.github.dailystruggle.rtp.effectsapi`). `BukkitEffectsHandler.setupEffects(...)` hooks each teleport pipeline stage and — when enabled — dispatches effects driven entirely by **permission nodes** granted to the player (directly, via group, or via a permissions plugin).
+RTP bundles the `effects-api` module. Teleport effects can be configured declaratively via YAML definition files under `definitions/effects/` or assigned dynamically via player permissions.
+
+### Declarative Effect Groups (`definitions/effects/*.yml`)
+
+Effect groups are defined in YAML files under `definitions/effects/` (e.g., `default.yml`, `default-pre.yml`, `default-cancel.yml`). Each file specifies:
+
+- `when`: The pipeline trigger stage (`presetup`, `preteleport`, `postteleport`, `cancel`, `join`, `respawn`, etc.).
+- `effects`: A list of effect tokens formatted as `TYPE.arg1.arg2...`.
+
+Example (`definitions/effects/default.yml`):
+```yaml
+when: postteleport
+effects:
+  - SOUND.ENTITY_ENDERMAN_TELEPORT.100.100.0.0.0
+  - PARTICLE.PORTAL.32
+  - POTION.SLOW_FALLING.60.1.false.false.false
+  - POTION.BLINDNESS.40.1.false.false.false
+```
+
+### Permission-Driven Effects
+
+In addition to definition files, effects can be dispatched via **permission nodes** granted to players / groups.
 
 Operators write **no code**. Just:
 
-1. Enable effect parsing.
+1. Ensure `effectParsing: true` is enabled in `advanced/performance.yml`.
 2. Grant `rtp.effect.<stage>.<TYPE>[.<arg>...]` nodes to the players / groups who should see them.
 
 ### Enable / disable globally
 
-In `performance.yml`:
+In `advanced/performance.yml`:
 
 ```yaml
 # Scan player permissions for rtp.effect.* on every teleport pipeline stage.
-# MEDIUM impact. Leave false unless you actually use rtp.effect.* nodes.
-effectParsing: false
+effectParsing: true
 ```
 
-Set to `true` to activate effect dispatch. A `/rtp reload` picks the change up without a restart.
+Set to `false` if you wish to disable permission-based effect parsing. A `/rtp reload` picks the change up without a restart.
 
 > Unrelated but sometimes confused: `onEventParsing` gates the **auto-teleport on lifecycle events** listener (`rtp.onevent.join`, `rtp.onevent.respawn`, etc.). That is not an effect.
 

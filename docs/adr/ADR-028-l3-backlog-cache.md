@@ -17,7 +17,7 @@ The plugin currently maintains two general-purpose location buffers per region:
 Both buffers store *fully verified* locations. Verification (shape pick →
 chunk load → vertical adjust → biome → safety) is dominated by chunk I/O,
 which on a default region runs serially per candidate. When a region's L2 is
-drained — for example after a join-storm or a deliberate `/rtp scan` cold
+drained — for example after a join-storm or a server cold
 start — refill rate is bounded by the per-attempt chunk-load cost, even
 though many of those chunks already exist on disk and could be cheaply
 inspected via the Anvil pre-filter (ADR-016) without loading them into the

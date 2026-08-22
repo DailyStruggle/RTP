@@ -1,10 +1,29 @@
-# Message Customisation Reference (`messages.yml`)
+# Message Customisation Reference (`advanced/messages/`)
 
-`messages.yml` holds **every** player- and console-facing string RTP emits. Edit it to reword, recolour, or rebrand any message. Read it before requesting formatting support: most "can this text be changed?" questions are answered by a single key here.
+User-facing and console-facing messages in RTP are organised across categorical message files located in `advanced/messages/`. Edit these files to reword, recolour, or rebrand any message.
 
-Apply changes by editing on disk and running `/rtp reload`, or change one key at runtime with `/rtp config messages <key>=<value>`.
+---
 
-> When a non-English locale is active (see [LANGUAGE.md](LANGUAGE.md)), the translated `messages.yml` is read from `lang/<code>/` instead of this baseline file.
+## Updating Messages
+
+You can update messages through:
+1. **In-game admin menu**: Run `/rtp admin` or `/rtp menu` -> click **Messages**.
+2. **Command line**: Use `/rtp config messages <key>=<value>`.
+3. **Direct editing**: Edit files under `advanced/messages/` on disk and run `/rtp reload`.
+
+> 📎 See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full menu and command navigation details.
+
+---
+
+## Message Files
+
+| File | Contents |
+|---|---|
+| `player.yml` | Player-facing teleport flow: delay, arrival, cancel, cooldown, lockout, queue notifications, economy cost/failure. |
+| `commands.yml` | Command descriptions, help entries, command-line parameter error messages, and menu interface rows. |
+| `system.yml` | System notices: reload, startup/shutdown, permissions, admin inspection, and administrative audit logs. |
+| `network.yml` | Multi-server and proxy network teleport messages, routing notices, and cross-server queue messages. |
+| `placeholders.yml` | Shared placeholder definitions and time unit formatting. |
 
 ---
 
@@ -21,30 +40,10 @@ Message values accept, in any combination:
 
 ## Placeholders
 
-- **Shared `[Pn]` placeholders** are defined in the `placeholders:` list at the top of the file. `[P0]` is the plugin prefix (a rainbow `[RTP]` by default) and is reused in nearly every message. Append entries to the list to define `[P1]`, `[P2]`, and so on.
-- **Per-message placeholders** (e.g. `[attempts]`, `[world]`, `[delay]`, `[remainingCooldown]`, `[money]`, `[spot]`, `[filename]`) are documented in a comment directly above each message that uses them. Only the placeholders listed for a given key are substituted in that message.
-
-## File layout
-
-The file is split into commented sections so related strings stay together:
-
-| Section | Contents |
-|---|---|
-| 1. General Configuration | The shared `placeholders` list. |
-| 2. Teleportation | Player-facing teleport flow: delay, success, cancel, cooldown, lockout, no-locations-queued, queue position, not-enough-money. |
-| 3. Time Formatting | Unit suffixes for time placeholders (`days`, `hours`, `minutes`, `seconds`, `millis`). |
-| 4. System & Management | Reload, version-mismatch, permission-denied, and management strings. |
-| 5. Administrative Logs | Console audit / log lines. |
-| 6. Scan Command | `/rtp scan` progress and result strings. |
-| 7. Info Command | `/rtp info` output. |
-| 8 / 8b. Command Descriptions & Menu Framework | Help text and the generalized book/chat menu rows, headers, and dividers. |
-| 9. PlaceholderAPI Support | PAPI-specific strings. |
-| 10. Visuals | Visualization-related strings. |
-| 11. Metadata | Internal `version` marker. |
-| 12. Developer Options | Developer-facing toggles / strings. |
+- **Shared `[Pn]` placeholders** are defined in the `placeholders:` list inside `advanced/messages/placeholders.yml`. Every `[Pn]` placeholder corresponds to the entry at index `n` of that list (`[P0]` is the 0th item, `[P1]` is the 1st item, and so on).
+- **Per-message placeholders** (e.g. `[attempts]`, `[world]`, `[delay]`, `[remainingCooldown]`, `[money]`, `[spot]`, `[filename]`) are documented in comments directly above each message that uses them. Only the placeholders listed for a given key are substituted in that message.
 
 ## Notes
 
 - **Icon glyphs are intentional.** Some values embed single-codepoint UI icons (type-a-value, paginator arrows, run/row markers, the section sign). Preserve them verbatim; do not ASCII-fold or delete them.
-- **Locale parity.** A custom key added to this baseline must be mirrored into every shipped locale under `lang/<code>/messages.yml`, or that locale silently falls back to English. See the [Translation Guide](../../dev/TRANSLATION_GUIDE.md).
 - **Never change `version`** - it is used internally for config migration.

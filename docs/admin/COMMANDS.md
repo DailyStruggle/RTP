@@ -172,7 +172,7 @@ Discards any existing spatial memory for the region and begins a full-space enum
 
 ### `/rtp scan reset`
 
-Clears all spatial memory and cached locations for a region without starting a new scan pass. This effectively "forgets" everything the plugin knows about safe/unsafe spots in that region.
+Clears all spatial memory for a region without starting a new scan pass. This effectively "forgets" recorded bad spots in that region.
 
 **Syntax**
 ```
