@@ -1,163 +1,120 @@
 [CENTER]
 [SIZE=7][B][COLOR=#27AE60]Leaf[/COLOR][COLOR=#2C3E50]RTP[/COLOR][/B][/SIZE]
-[SIZE=4][B][COLOR=#7F8C8D]Free Random Teleport (RTP) Plugin for Paper, Spigot, Folia, Fabric, NeoForge & Velocity[/COLOR][/B][/SIZE]
+[SIZE=4][B][COLOR=#7F8C8D]Random Teleport[/COLOR][/B][/SIZE]
 [/CENTER]
 
-[CENTER][I]Once upon a time, I wanted to explore a minecraft world. I asked for [/I]/rtp[I] in servers I played on. They told me "no, that's laggy", and I took that personally.[/I][/CENTER]
+[SIZE=6][B][COLOR=#27AE60]Purpose[/COLOR][/B][/SIZE]
 
-[B]LeafRTP is a [/B][I]/rtp[/I][B] command.[/B] It teleports a player to a random, safe spot in the world, and works out those safe spots ahead of time (off the main server thread) so the teleport itself doesn't lag the server. Drop the jar in and [I]/rtp[/I] works with zero config, tune it in-game with [I]/rtp menu[/I], or build on the public [I]rtp-api[/I].
+[B]LeafRTP is a [/B][I]/rtp[/I][B] command.[/B] It teleports a player to a random, safe spot in the world, in the most cpu-efficient way it can.
 
-[B]At a glance:[/B]
-[LIST]
-[*][B]Plug-and-play:[/B] drop the jar in, type [I]/rtp[/I], done. Zero config.
-[*][B]No YAML required:[/B] tune regions, safety, and effects in-game with [I]/rtp menu[/I].
-[*][B]One jar, every platform:[/B] build on the public [I]rtp-api[/I] and ship a single addon for all of them.
-[*][B]No "Finding a safe location..." wait:[/B] destinations are pre-verified off-tick, never on the main thread.
-[*][B]Measured on a public harness:[/B] 19.8 TP/s on Paper, 4 ms worst tick (next-best: 70 ms).
-[*][B]Audited safety:[/B] no unsafe blocks, no force-loaded chunks, no claim bypass, no silent failures.
-[/LIST]
+[SIZE=6][B][COLOR=#27AE60]Origin[/COLOR][/B][/SIZE]
+
+We were all players once, and we've all complained about "lag" on servers. Many of us tried to pinpoint where it came from and tbh in my studies it took days of work just to find out that a random teleport plugin was triggering performance issues. The biggest cost in any profiling tool was never labeled based on who called the api - that part is obscured, so the source of the thousands of extra chunks in memory is misattributed. I went through the "blame the users" phase and wised up to realize that it's better to fix the tool than to tell people not to use it. 
+
+In 2021, this project started as a demonstration of mathematical principles and as a high-difficulty optimization puzzle. I wanted to make something for the community to reference and create a new performance standard, make a name for myself as an obsessive developer. It was received instead as a product and a bunch of features were requested, so I worked on the design elegance so that a few design details resulted in an exponential number of possible configurations. As a result it's a little off-meta but not difficult to fully understand. Measure in chunks, define some regions, and access them via command or api, and anything in between is server design nuance.
+
+"Chunks" were selected as the measurement because the cost to the server is chunk-based rather than block-based and checking adjacent blocks is "optimal" if it doesn't leave a chunk boundary.
+
+I don't like regulating how to use it nor what to use it with, so in V2 I refactored to use more swappable suppliers and consumers, making it easy to programmatically swap safety checks, biome checks, shapes, etc.. There wasn't much optimization to do, so I studied coding practices. Frankly "clean code" is a regret as it increased input latency but the structure gave me a pretty good launch point for reorganization.
+
+For v3 I needed to update for modern game versions and modern web platforms. I got some bright ideas about cache locality optimizations, data access optimizations, cross-platform support via SPI (service provider interface) concepts, and active tracking to catch any "memory leak" that I heard about but could never seem to reproduce on my rig. 
+
+Following the V3 update and micro optimizing the selection process, I've created a test bench plugin to assist with testing throughput up to 1 [I]rtp[/I] call per gametick (20/s) which has demonstrated performance falloff in the pure reroll model, in every implementation I tested, except this one. I was also able to verify that a common optimization to "use loaded chunks" tends towards placing users in each others' bases to exacerbate either griefing or rerolling depending on claim integration.
 
 [CENTER]
-[I]Minecraft 1.20.x / 1.21.x / 26.x. Legacy Forge isn't native; run this jar under Arclight / Mohist.[/I]
-
-[SIZE=4][B][COLOR=#16A085]Trusted since 2021: 4.6 stars over 30+ reviews, 430k+ downloads.[/COLOR][/B][/SIZE]
-
-[SIZE=4][B]Latest builds, Folia-tagged releases, and beta channels also live on [URL='https://modrinth.com/plugin/leafrtp']Modrinth[/URL][/B] (auto-updater and Pterodactyl friendly).[/SIZE]
-
+[I]Paper, Spigot, Folia, Fabric, NeoForge, and Velocity, on Minecraft 1.21.x / 26.x[/I]
 [/CENTER]
+
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#27AE60]What makes it different[/COLOR][/B][/SIZE]
-Most [I]/rtp[/I] plugins pick a random point, load the chunk, and check if it's safe, retrying until one sticks. That's what stalls the server. Async alone doesn't fix it; it just moves the stall. What LeafRTP does differently is the low-latency, high-throughput engineering behind the two lookups every [I]/rtp[/I] depends on: where to send the player, and whether that spot is safe. Those are four named mechanisms.
 
-[SIZE=4][B]Archimedean spiral[/B][/SIZE]
-Destinations come off a space-filling Archimedean spiral curve, a single indexed mapping from one number to a coordinate. Every reachable spot has equal odds instead of piling players near spawn, and picking one is a lookup rather than a reroll. The math, with distribution plots: [URL='https://dailystruggle.github.io/RTP/site/why/'][I]Why LeafRTP exists[/I][/URL].
+Most [I]/rtp[/I] plugins are designed around a script: "pick a spot, check it, try, try again" + "add x feature". This creates non-deterministic compute costs around "try again". LeafRTP is a reconstruction for engineering rigor in the foundations, prioritizing stability under load.
 
-[SIZE=4][B]Spatial memory[/B][/SIZE]
-A persistent spatial memory records which sectors already failed safety checks, so the selector skips known-bad ground instead of rerolling forever. Search time stays predictable as a region fills up.
+I have documented design details more precisely [URL='https://dailystruggle.github.io/RTP/adr/']here[/URL], denoting design/feature decisions, superseding decisions, and alternatives considered.
+
+[SIZE=4][B]Spatial mapping and memory[/B][/SIZE]
+
+Measurements show me about 35-65% of a world is "unsafe" for placement, based on oceans, lava, void.
+
+Selections come off a space-filling Archimedean spiral curve, an indexed mapping from 1D to 2D. The math, with distribution plots: [URL='https://dailystruggle.github.io/RTP/site/why/'][I]Why LeafRTP exists[/I][/URL].
+
+The spatial mapping enables storing and recalling information about prior selections, including biome and invalidity cause, using segments rather than image compression, as this enables a specific optimization - offset selections. The location selection phase is a constant-time lookup with occasional table rebuilding that excludes invalid locations, e.g. oceans, lava, void. 
 
 [SIZE=4][B]Anvil pre-filter[/B][/SIZE]
-An Anvil ([I].mca[/I]) pre-filter reads biome and block data straight from the region files on disk, so unsafe spots are rejected before a chunk is ever loaded. That is the biome lookup done in bulk and off the tick loop, which is where most of the throughput comes from. It also reads what the world actually contains, not what the generator predicts: the common shortcuts ([I]getBiome[/I], [I]getHighestBlockAt[/I]) answer from the generation noise map, which can disagree with the real terrain once a spot has been edited or carried across a Minecraft version. Checking the saved data means the safety verdict matches the world the player lands in. How the engine stays off-tick: [URL='https://dailystruggle.github.io/RTP/FOR_CONTRIBUTORS/'][I]Architecture[/I][/URL].
+
+An Anvil ([I].mca[/I]) pre-filter reads biome and block data straight from the region files on disk, so batches of locations can be filtered if a world is generated and those locations are unloaded. It also helps with reading what the world actually contains, rather than what the generator predicts. The common shortcuts ([I]getBiome[/I], [I]getHighestBlockAt[/I]) answer from the generation noise map, which can disagree with the real terrain once a spot has been edited or carried across a Minecraft version. [URL='https://dailystruggle.github.io/RTP/FOR_CONTRIBUTORS/']Architecture[/URL].
 
 [SIZE=4][B]Pre-verified cache[/B][/SIZE]
-Because selection is cheap and the pre-filter is fast, safe destinations are kept ready in a cache, so serving [I]/rtp[/I] is mostly handing back a coordinate that's already checked. The numbers are in the benchmark section below.
+
+Safe destinations are prepared at-rate and a number of them are kept ready in a cache per defined region, so serving [I]/rtp[/I] is handing back a coordinate that's already checked. The numbers are in the benchmark section below.
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#27AE60]Features[/COLOR][/B][/SIZE]
+
 [LIST]
-[*][B]Zero-config install:[/B] drop the jar in, type [I]/rtp[/I], done. A [I]default[/I] region is ready on first boot.
-[*][B]In-game tuning:[/B] [I]/rtp menu[/I] browses worlds and regions and changes settings live. No YAML, no restart.
-[*][B]12 claim integrations bundled[/B] (GriefDefender, GriefPrevention, WorldGuard, Towny, Lands, +7 more). No teleport into protected land.
-[*][B]Vault economy:[/B] optional charge per teleport, per-region pricing, auto-refund on cancel.
-[*][B]Effects engine:[/B] particles, sounds, fireworks, potions on every teleport phase.
-[*][B]Per-player cooldowns & usage limits[/B] out of the box.
-[*][B]PvP/combat-tag gate, PlaceholderAPI, live map heatmaps, multi-world overrides.[/B]
-[*][B]Folia, out of the box:[/B] regionized scheduling + async teleport, no paid tier.
-[*][B]Cross-server [I]/rtp[/I] without Redis or SQL:[/B] the [I]proxy-direct[/I] Velocity transport ships in the free build.
-[/LIST]
-
-[SIZE=6][B][COLOR=#27AE60]Build on it[/COLOR][/B][/SIZE]
-The whole plugin runs on the public [I]rtp-api[/I], the same surface you get. Every feature above is wired through it, so you extend LeafRTP instead of forking it, and one addon jar runs unchanged on Spigot, Paper, Folia, Fabric, and NeoForge. The [I]rtp-api[/I] hooks take one-line suppliers to veto destinations, charge economy, add placeholders, override the world border, gate combat, replace the bare [I]/rtp[/I] action, register a new region shape, or build custom arrival platforms. The bundled GUI addon does exactly this, swapping bare [I]/rtp[/I] for its own picker. Full API guide: [URL='https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/']addon / API developer guide[/URL].
-
-[CENTER][IMG]https://cdn.modrinth.com/data/TZNIQSHX/images/c80c085c001f5fbc1c2a14ae01c10e0540c26fc9.webp[/IMG]
-[I]A real [I]/rtp[/I] landing: pre-verified destination served in [B]0 attempts, 49 ms[/B] (1 gametick) on Folia, no "Finding a safe location..." wait. The title, sound, and effects shown are fully configurable.[/I][/CENTER]
-
-Performance is in the numbers, not the prose: on Paper, LeafRTP holds a 4 ms worst tick where the next-best plugin hits 70 ms. Full Paper/Spigot/Folia tables and methodology are in the benchmark section below; reproduce them on your own rig: [URL=https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL]. (How each feature stays cheap: [URL='https://dailystruggle.github.io/RTP/FOR_CONTRIBUTORS/'][I]Architecture[/I][/URL].)
-
-[SPOILER='Verification & sources']
-Every number on this page is anchored in the repo:
-[LIST]
+[*][B]In-game tuning[/B] - [I]/rtp menu[/I] opens a clickable book (Paper / Folia; chat-paginated elsewhere) to browse worlds, pick regions, and change settings live. Includes search function.
+[*][B]Effects engine[/B] - particles, sounds, fireworks, potions, titles on every teleport phase.
+[*][B]Live map heatmaps[/B] - [I]/rtp scan[/I] paints region safety onto a real held map.
+[*][B]Economy[/B] - charge per [I]/rtp[/I] (Vault), per-region pricing, auto-refund on cancel.
+[*][B]12 claim integrations[/B] - GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, RedProtect, CrashClaim, KingdomsX, Residence.
+[*][B]PvP / combat-tag gate, PlaceholderAPI, per-player cooldowns & limits, multi-world overrides.[/B]
+[*][B]Cross-server [I]/rtp[/I][/B] - Running on Velocity enables cross-server communication via tcp socket, extensible to addons.
+[*][B]Platform-independent engine[/B] - core code runs on pure java and custom implementations, enabling cross-server support via lightweight suppliers
+[*][B]Docs in jar[/B] - in V3 I started including version-specific docs with the jar in case I update the wiki for newer versions
 [*][B]Reproducible benchmarks[/B] with raw CSVs and per-run analyses: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][B]helpers/StressTestRTP/[/B][/URL]
-[*][B]Requirements traced to tests:[/B] every requirement, including the safety prohibitions, has an implementing class and regression test: [URL='https://github.com/dailystruggle/RTP/blob/V3/docs/dev/TRACEABILITY.md'][B]TRACEABILITY.md[/B][/URL]
-[*][B]Every design decision is documented:[/B] dated, linkable notes on why teleports are queued, how the Anvil pre-filter skips chunk loads, and more: [URL='https://github.com/dailystruggle/RTP/tree/V3/docs/adr'][B]docs/adr/[/B][/URL]
-[*][B]bStats[/B] enabled. Anonymous usage stats help prioritize platform work.
+[*][B]bStats[/B] enabled - anonymous usage stats help prioritize platform work.
+[*][B]Thorough API with examples[/B] - packed addons function as examples of hooking in to add checks or change [I]/rtp[/I] behavior.
+[*][B]Modifiable SPI[/B] - Most compatibility-related parts are swappable, e.g. server backend, economy, location validity, shapes, world border, pvp checks, platform creation, commands.
 [/LIST]
-[/SPOILER]
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#27AE60]Watch it work[/COLOR][/B][/SIZE]
-[I]/rtp scan[/I] paints region safety onto a real in-game map (green safe, red unsafe) [B]as it verifies it[/B], off-tick on every platform. [I]/rtp info[/I] reports live TPS/MSPT, heap, latency percentiles, and rejection causes, no metrics add-on needed.
 
-[URL='https://youtu.be/Ftjy1zw_S04'][B]Watch the scan paint a region live (video)[/B][/URL]. Details: [URL='https://dailystruggle.github.io/RTP/admin/COMMANDS/'][B]Scan & spatial memory[/B][/URL], [URL='https://dailystruggle.github.io/RTP/admin/RUNBOOK/'][B]Diagnostics[/B][/URL].
+[I]/rtp scan[/I] paints region safety onto a real in-game map (green safe, red unsafe) [B]as it verifies it[/B]. [I]/rtp info[/I] reports live TPS/MSPT, heap, latency percentiles, and rejection causes, no metrics add-on. The heavy verification runs off-tick on every platform. [URL='https://youtu.be/Ftjy1zw_S04'][B]Watch the scan paint a region live (video)[/B][/URL]. Details: [URL='https://dailystruggle.github.io/RTP/admin/COMMANDS/'][B]Scan & spatial memory[/B][/URL], [URL='https://dailystruggle.github.io/RTP/admin/RUNBOOK/'][B]Diagnostics[/B][/URL].
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#C0392B]Requirements[/COLOR][/B][/SIZE]
-Hard requirements. If any are a [B]no[/B], EssentialsX [I]/rtp[/I] or HuskHomes are fine alternatives.
 
 [LIST]
-[*][B]Java 21+[/B] (REQ-RTP-SYS-001, non-negotiable).
-[*][B]Paper, Spigot, or a Bukkit-family fork[/B], or Fabric / NeoForge (1.21.x / 26.1.x). Arclight / Mohist for Forge bridges.
-[*][B]Vault[/B] (optional) for the economy charge; dormant when not installed.
+[*][B]Java 21+[/B]
+[*][B]A supported server[/B] - Paper, Spigot, or a Bukkit-family fork (Arclight / Mohist for Forge bridges), or Fabric / NeoForge (1.21.x / 26.x).
 [/LIST]
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
-[SIZE=6][B][COLOR=#16A085]Install (30 seconds)[/COLOR][/B][/SIZE]
+[SIZE=6][B][COLOR=#16A085]Install[/COLOR][/B][/SIZE]
+
 [LIST=1]
-[*]Drop [I]LeafRTP-x.y.z.jar[/I] into [I]plugins/[/I].
-[*]Start the server. A [I]default[/I] region is generated for you.
-[*]Type [B]/rtp[/B].
-[*]Run [B]/rtp menu[/B] to browse regions, worlds, and configuration in-game (clickable book on Paper / Folia, chat-paginated fallback elsewhere).
+[*]Drop [I]LeafRTP-x.y.z.jar[/I] into [I]plugins/[/I] (or [I]mods/[/I]).
+[*]Start the server. A [I]default[/I] region is written for you.
+[*]Type [B]/rtp[/B]. It works.
+[*][B]Size the region to your world[/B], and point each world at a region. [I]radius[/I], [I]centerX[/I], and [I]centerZ[/I] live [I]inside[/I] the region's [I]shape:[/I] block and are measured in [B]chunks[/B], not blocks - a [I]radius[/I] of [I]625[/I] reaches 10,000 blocks. See [URL='https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/'][B]Regions[/B][/URL] and [URL='https://dailystruggle.github.io/RTP/admin/configuration/WORLDS/'][B]Worlds[/B][/URL].
 [/LIST]
 
-Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later, via [I]/rtp menu[/I] or by editing the YAML directly. Full admin guide is auto-unpacked into [I]plugins/RTP/docs/[/I] on first run, and lives online at the [URL='https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/'][B]admin guide[/B][/URL].
+I recommend trying [I]/rtp admin[/I]
 
-[B]Bundled addons unpack themselves on first run.[/B] Four addon jars ride inside the LeafRTP jar and self-extract into [I]plugins/RTP/addons/[/I] the first time the plugin starts - no second download. Delete one from that folder to turn it off (the folder then exists, so it is never re-extracted):
-[LIST]
-[*][B]LeafRTPGuiAddon[/B] (GUI demo) - a clickable chest destination-picker. It binds the bare [I]/rtp[/I] root action, so with a GUI renderer present typing [I]/rtp[/I] opens the picker instead of teleporting immediately (instant teleport stays reachable from the menu and as a fallback), and adds [I]/rtp gui[/I] ([I]rtp.gui[/I]).
-[*][B]LeafRTPClaimAddon[/B] (claim integrations) - the 12 claim/protection checkers, so claim-aware teleport works out of the box on the Bukkit family.
-[*][B]LeafRTPRiftAddon[/B] (effect demo) - registers a "Virtual Rift" teleport effect that tears the terrain open into a void during warmup (presentation-only client-side blocks, so it can never compromise safety), usable by name in [I]effects/*.yml[/I].
-[*][B]LeafRTPCountdownAddon[/B] (addon-system reference demo) - live teleport and queue-position countdowns, and the canonical copy-paste reference addon.
-[/LIST]
-
-For those interested in writing their own: every one of these is shipped as a worked coding example. Their full source lives under [I]addons/[/I] in the repo, and the Rift and Countdown demos are pure [I]rtp-api[/I] / [I]effects-api[/I] (zero platform imports), so they double as copy-paste starting points for your own addon.
-
-[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
-
-[SPOILER='Full free feature list (click to expand)']
-[LIST]
-[*][B]Deterministic spiral selection:[/B] bounded math, no unbounded re-roll loops. Predictable on huge worlds.
-[*][B]Spatial memory that persists across restarts:[/B] LeafRTP [I]learns[/I] which sectors keep failing and stops trying them.
-[*]Most [I]/rtp[/I] calls serve instantly from a [B]pre-generated location queue[/B]: destinations are chunk-loaded and verified before you type the command.
-[*][B]Safety pipeline:[/B] radius check, invulnerability timer, optional landing platform, movement / damage cancel timers, material allow/deny list.
-[*][B]Optional PvP / combat-tag gate:[/B] off by default; when enabled, /rtp is refused or delayed for players who recently dealt or took PvP damage, so a teleport can't be used to escape a fight. Native combat tracking, with optional PvPManager / CombatLogX / Simple Combat Log integration.
-[*][B]Per-region arrival schematics:[/B] drop a [I].schem[/I] named after a region into [I]plugins/RTP/schematics/[/I] and every teleport into that region pastes it (a lobby pad, arrival shrine, or custom platform) on the landing spot. Cross-platform Sponge [I].schem[/I], decoded in-house (no WorldEdit required), claim-aware and audited.
-[*][B]Per-region, per-world config:[/B] shapes (square / circle / rectangle), curve weighting, vertical adjustors, sky-light check, world overrides, hot-reloadable YAML.
-[*][B]Effects on every lifecycle phase:[/B] particles, sounds, fireworks, potion, note effects via the in-tree [I]effects-api[/I], gated by [I]rtp.effects.<name>[/I] permissions.
-[*][B]Twelve claim-plugin integrations bundled:[/B] GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, RedProtect, CrashClaim, KingdomsX, Residence.
-[*]Iris, Terra, and custom datapack generators work out of the box, with modded biome IDs preserved. [B]PlaceholderAPI[/B] and [B]ProtocolLib[/B] are supported as optional soft-deps.
-[*][B]Optional Vault economy:[/B] charge players per [I]/rtp[/I] with per-region price, [I]priceOther[/I], params/biome surcharges, and a balance floor ([I]economy.yml[/I]); cost refunded automatically on cancel or pipeline failure ([I]refundOnCancel: true[/I] default); dormant when Vault is not installed.
-[*][B]Public [I]rtp-api[/I][/B]: same surface as Pro. Trigger LeafRTP from a GUI, NPC, or quest; build your own UX without forking.
-[*][B]Platform-agnostic addons:[/B] addons compile against [I]rtp-api[/I] only and load through the [I]RTPAddon[/I] ServiceLoader SPI, so one addon module runs unchanged on Spigot, Paper, Folia, Fabric, and NeoForge. Config, safety hooks, teleport-pipeline callbacks, and scheduling are reached through platform-neutral APIs; you only add a platform module when the addon opens a platform-native UI. Four demo addons (GUI, claim, effect, reference) self-extract into [I]plugins/RTP/addons/[/I] on first run - see the bundled LeafRTPRiftAddon and LeafRTPCountdownAddon demos.
-[*][B]Live map / heatmap visualizations:[/B] [I]/rtp scan[/I] paints region safety state (green safe / red unsafe) onto a real held map item while the chat readout streams cps, land %, and ETA. Free on Paper, Spigot, Fabric, and NeoForge.
-[*][B]Built-in runtime observability:[/B] [I]/rtp info[/I] reports TPS/MSPT (spark-enhanced when spark is installed), JVM heap, pipeline latency percentiles, generation success/failure breakdown, and a [I]/rtp info biomes[/I] player-occupancy leaderboard, no metrics add-on needed.
-[*][B]12 locales, parity-enforced:[/B] shipped locales are CI-verified so a translated server never silently falls back to English on a new key.
-[*][B]Every feature's design is documented:[/B] the reasoning behind each capability and a requirements-to-tests trace, all public: [URL='https://github.com/dailystruggle/RTP/blob/V3/docs/dev/INDEX.md'][B]docs/dev/INDEX.md[/B][/URL].
-[/LIST]
-
-[CENTER][IMG]https://cdn.modrinth.com/data/TZNIQSHX/images/9bda4b721e8b32db545c98a56dbca7307087133a.webp[/IMG]
-[I]The clickable [I]/rtp menu[/I] book UI: the in-game admin panel, everything tunable without leaving the game.[/I][/CENTER]
-
-[CENTER][IMG]https://cdn.modrinth.com/data/TZNIQSHX/images/e349e726cc4e9ecfcd7823a3bc3c4bf0eeb85f0b.png[/IMG]
-[I]The clickable [I]/rtp menu[/I]: players pick a world or region by clicking, no commands to memorize.[/I][/CENTER]
-
-[/SPOILER]
+Start here: [URL='https://dailystruggle.github.io/RTP/admin/QUICK_START/'][B]Quick start[/B][/URL] and [URL='https://dailystruggle.github.io/RTP/site/intended-usage/'][B]Intended usage[/B][/URL]. The full admin guide is auto-unpacked into [I]plugins/RTP/docs/[/I] on first run, and lives online at the [URL='https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/'][B]admin guide[/B][/URL].
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#16A085]Performance[/COLOR][/B][/SIZE]
-Every number below comes from a public harness you can rerun yourself: [URL=https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL]. How the engine keeps [I]/rtp[/I] off the tick loop: [URL='https://dailystruggle.github.io/RTP/FOR_CONTRIBUTORS/'][I]Architecture[/I][/URL].
 
-[SPOILER='Full benchmark vs. alternative random teleport plugins on Paper, Spigot, and Folia']
+Every number below comes from a public harness: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][I]helpers/StressTestRTP/[/I][/URL].
+
+[SPOILER="Full benchmark vs. alternative random teleport plugins on Paper, Spigot, and Folia"]
+
 [I]Paper rows: 2 OPed clients spamming [I]/rtp[/I] back-to-back, queues enabled where the plugin offers them, cooldowns/delays zeroed. Folia run: 3 OPed clients, radius equalized to 4096 blocks, ~600 s per plugin.[/I]
 
+[I]Every benchmark row below was measured locally on the same rig. In the support matrix, cells read from plugin docs or inferred from architecture are noted inline.[/I]
 
 [B]Metrics:[/B] Throughput (TP/s, higher better) | MSPT p99 (worst 1-in-100 main-thread tick in ms, lower better) | Min TPS (lowest TPS observed; 20.00 = no hiccup) | CPU / TP (main-thread CPU per successful teleport).
 
-[B]Paper 1.20.1 / 1.21.11[/B] is the reference dataset. Eight plugins, same harness, same world, same two OPed clients.
+[B]Paper 1.20.1 / 1.21.11[/B] - the reference dataset. Eight plugins, same harness, same world, same two OPed clients.
+
 [TABLE]
 [TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]MSPT p99 (ms)[/TH][TH]Min TPS[/TH][TH]CPU / TP (ms)[/TH][TH]Success[/TH][/TR]
 [TR][TD][B]LeafRTP[/B][/TD][TD][B]19.8[/B][/TD][TD][B]4[/B][/TD][TD][B]20.00[/B][/TD][TD][B]16.9[/B][/TD][TD][B]100 %[/B][/TD][/TR]
@@ -172,7 +129,8 @@ Every number below comes from a public harness you can rerun yourself: [URL=http
 
 * EssentialsX [I]/tpr[/I] is a teleport-[I]request[/I] command (handshake + accept), not a teleport-[I]do[/I] command; the harness's 5 s per-attempt deadline times out a fraction of the request-accept latencies. Numbers are dispatch-shaped, not plugin-broken.
 
-[B]Spigot 1.20.1[/B]: Spigot's platform-wide chunk-gen ceiling caps everyone in the 1-1.5 TP/s range during the burst; the latency tail is what matters.
+[B]Spigot 1.20.1[/B]
+
 [TABLE]
 [TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]MSPT p99 (ms)[/TH][TH]Min TPS[/TH][/TR]
 [TR][TD][B]LeafRTP[/B][/TD][TD][B]1.52[/B][/TD][TD][B]3[/B][/TD][TD][B]6.4[/B][/TD][/TR]
@@ -181,7 +139,12 @@ Every number below comes from a public harness you can rerun yourself: [URL=http
 [TR][TD]HuskHomes[/TD][TD]0.93[/TD][TD]4 939[/TD][TD]2.59[/TD][/TR]
 [/TABLE]
 
-[B]Folia 26.1[/B]: the free build alone, no Pro adapter; on Folia, throughput plus the server-emitted region watchdog are the discriminators (global MSPT is a single-region sample and not meaningful).
+* JakesRTP ran last in the phase order and inherited chunk pressure left over from the earlier phases, so its TPS floor is not cleanly attributable to JakesRTP alone.
+
+[B]Folia 26.1[/B]
+
+(only EzRTP also completed the Folia run; the other tested plugins had compatibility or performance issues there)
+
 [TABLE]
 [TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]CPU / TP (ms)[/TH][TH]Watchdog stalls[/TH][TH]Success[/TH][/TR]
 [TR][TD][B]LeafRTP[/B][/TD][TD][B]12.5[/B][/TD][TD][B]4.15[/B][/TD][TD][B]0[/B][/TD][TD][B]100 %[/B][/TD][/TR]
@@ -190,297 +153,93 @@ Every number below comes from a public harness you can rerun yourself: [URL=http
 
 EzRTP's 7 watchdog stalls (one region unresponsive 20.4 s) are the server's own record of synchronous [I]World.loadChunk[/I] calls on region threads; LeafRTP issued none. For reference, the Pro Folia adapter cleared the same run at 13.5 TP/s. The shared [I]rtp-core[/I] engine, not a Pro-only adapter, carries the free build's Folia result.
 
-[B]Architecture support matrix[/B] [I](Spigot / Paper-and-forks / Folia)[/I]
-[LIST]
-[*][B]LeafRTP[/B] - Off-tick Anvil pre-filter | Fully async via [I]getChunkAtAsync[/I] | Region Scheduler + off-tick pre-filter, no 1-tick stalls
-[*][B]BetterRTP[/B] - Sync chunk load on miss | No off-tick safety pre-filter | Folia 1.21.11 functional, p99 ~1.2 s
-[*][B]EzRTP[/B] - [I]NoSuchMethodError[/I] on Spigot 1.20.1 (Paper-only API) | Works on Paper, no off-tick pre-filter | Folia: sync [I]World.loadChunk[/I] on region threads, 7 watchdog stalls, 20.4 s freeze
-[*][B]AsyRTP[/B] - Fails to enable on Spigot 1.20.1 (Paper-only API in [I]onEnable[/I]) | Paper | Folia
-[*][B]SorekillRTP[/B] - Designed for Redis cross-server, not single-server perf | Same | Folia: untested
-[*][B]AdvancedRTP[/B] - Safety-first, sync chunk load | Same | No Folia
-[*][B]JakesRTP[/B] - Async via flag; 10-slot cache | Same | No Folia
-[*][B]EssentialsX /rtp[/B] - Main-thread chunk load per candidate | Same | No Folia
-[*][B]HuskHomes RTP[/B] - Bundled with homes suite | Same | Folia functional, p99 ~900 ms
-[/LIST]
+[B]Caveats.[/B] Small client counts (2 on Paper, 3 on Folia); the Folia run's EzRTP failure is corroborated by the server's own watchdog log, independent of the harness. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link.
 
-[B]Caveats.[/B] Small client counts only (2 on Paper, 3 on Folia; the number is a floor, not a ceiling); hardware, view distance, world state, and other plugins will move them. Paper rows are 2-client runs (LeafRTP reproduced n=2; others n=1 on a single rig); the Folia run used 3 clients and its EzRTP failure is corroborated by the server's own watchdog log, independent of the harness. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link. This table measures performance only; feature breadth is not benchmarked here. LeafRTP ships the clickable GUI menu, Vault economy, the lifecycle effects engine, and twelve bundled claim integrations alongside these numbers. It does not trade features for speed.
+Full methodology, raw CSVs, per-run analyses: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][I]helpers/StressTestRTP/[/I][/URL]. Video benchmark of [I]/rtp[/I] on a custom world generator: [URL='https://youtu.be/V0NyNK9JydM']youtu.be/V0NyNK9JydM[/URL].
 
-Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL]. Video benchmark of [I]/rtp[/I] on a custom world generator: [URL=https://youtu.be/V0NyNK9JydM]youtu.be/V0NyNK9JydM[/URL].
-
-[CENTER][IMG]https://cdn.modrinth.com/data/TZNIQSHX/images/afdd5d479888314f08fdf06d6590dea7711dba2d.webp[/IMG] [IMG]https://cdn.modrinth.com/data/TZNIQSHX/images/852ea24885e049462c2c5bca3873ff6ac2f963fc.webp[/IMG]
-[I]Built-in [I]/rtp[/I] visualizations: live MSPT / heap charts while a scan runs (left), and a region safety heatmap (right), the same diagnostics behind the numbers above.[/I][/CENTER]
 [/SPOILER]
 
 
-[SPOILER='Commands & permissions reference']
-[B]Commands[/B] (registered aliases: [I]/rtp[/I], [I]/wild[/I]):
-[TABLE]
-[TR]
-[TH]Command[/TH]
-[TH]Description[/TH]
-[TH]Permission[/TH]
-[/TR]
-[TR]
-[TD][I]/rtp[/I] / [I]/wild[/I][/TD]
-[TD]Random teleport to the default region for your current world[/TD]
-[TD][I]rtp.use[/I][/TD]
-[/TR]
-[TR]
-[TD][I]/rtp region:<name>[/I][/TD]
-[TD]Teleport to a named region[/TD]
-[TD][I]rtp.region[/I] / [I]rtp.regions.*[/I][/TD]
-[/TR]
-[TR]
-[TD][I]/rtp world:<world>[/I][/TD]
-[TD]Teleport within a specific world[/TD]
-[TD][I]rtp.world[/I] / [I]rtp.worlds.*[/I][/TD]
-[/TR]
-[TR]
-[TD][I]/rtp player:<name>[/I][/TD]
-[TD]Teleport another player[/TD]
-[TD][I]rtp.other[/I][/TD]
-[/TR]
-[TR]
-[TD][I]/rtp biome:<biome>[/I][/TD]
-[TD]Teleport to a chosen biome[/TD]
-[TD][I]rtp.biome[/I] / [I]rtp.biome.*[/I][/TD]
-[/TR]
-[TR]
-[TD][I]/rtp centerx=<x> centerz=<z> radius=<r>[/I][/TD]
-[TD]Ephemeral per-call overrides[/TD]
-[TD][I]rtp.params[/I][/TD]
-[/TR]
-[TR]
-[TD][I]/rtp menu[/I][/TD]
-[TD]Interactive book (Paper) or chat-paginated menu[/TD]
-[TD][I]rtp.use[/I][/TD]
-[/TR]
-[TR]
-[TD][I]/rtp reload [file][/I][/TD]
-[TD]Reload all configuration, or one file[/TD]
-[TD][I]rtp.reload[/I][/TD]
-[/TR]
-[TR]
-[TD][I]/rtp config <file> view|set <k>=<v>[/I][/TD]
-[TD]View or set a config key, then auto-reload[/TD]
-[TD][I]rtp.config[/I][/TD]
-[/TR]
-[TR]
-[TD][I]/rtp scan start|pause|resume|reset|cancel[/I][/TD]
-[TD]Background spatial-memory crawl[/TD]
-[TD][I]rtp.scan[/I][/TD]
-[/TR]
-[/TABLE]
+[SPOILER="Commands, placeholders, soft-deps"]
 
-[B]Key permission nodes[/B] (full set in [I]plugin.yml[/I]):
-[TABLE]
-[TR]
-[TH]Permission[/TH]
-[TH]Default[/TH]
-[TH]Grants[/TH]
-[/TR]
-[TR]
-[TD][I]rtp.use[/I][/TD]
-[TD][I]true[/I][/TD]
-[TD]Use /rtp and /wild[/TD]
-[/TR]
-[TR]
-[TD][I]rtp.see[/I][/TD]
-[TD][I]true[/I][/TD]
-[TD]Tab-complete /rtp[/TD]
-[/TR]
-[TR]
-[TD][I]rtp.free[/I][/TD]
-[TD][I]op[/I][/TD]
-[TD]Skip the Vault economy charge[/TD]
-[/TR]
-[TR]
-[TD][I]rtp.params[/I][/TD]
-[TD][I]op[/I][/TD]
-[TD]Custom per-call overrides (centerx=, centerz=, radius=)[/TD]
-[/TR]
-[TR]
-[TD][I]rtp.personalqueue[/I][/TD]
-[TD][I]false[/I][/TD]
-[TD]Reserve a per-player pre-warmed location[/TD]
-[/TR]
-[TR]
-[TD][I]rtp.onevent.*[/I][/TD]
-[TD][I]false[/I][/TD]
-[TD]Auto-RTP on join / firstjoin / respawn / changeworld / move / teleport[/TD]
-[/TR]
-[TR]
-[TD][I]rtp.admin[/I][/TD]
-[TD][I]op[/I][/TD]
-[TD]All admin tooling (reload, config, scan, info)[/TD]
-[/TR]
-[TR]
-[TD][I]rtp.*[/I][/TD]
-[TD][I]op[/I][/TD]
-[TD]Every subcommand[/TD]
-[/TR]
-[/TABLE]
-[/SPOILER]
-
-[SPOILER='Configuration files at a glance']
-LeafRTP splits configuration by concern under [I]plugins/RTP/[/I]. Every file is hot-reloadable ([I]/rtp reload <file>[/I]) and editable in-game via [I]/rtp config <file>[/I] or the clickable [I]/rtp menu[/I].
-[TABLE]
-[TR]
-[TH]File[/TH]
-[TH]Scope[/TH]
-[TH]Example keys[/TH]
-[/TR]
-[TR]
-[TD][I]config.yml[/I][/TD]
-[TD]Core / global behavior, database, menu renderer[/TD]
-[TD][I]teleportDelay[/I], [I]teleportCooldown[/I], [I]cancelDistance[/I], [I]menu.renderer[/I][/TD]
-[/TR]
-[TR]
-[TD][I]regions/<name>.yml[/I][/TD]
-[TD]Per-region shape, radius, center, queue, price, gates[/TD]
-[TD][I]shape[/I], [I]vert[/I], [I]radius[/I], [I]cacheCap[/I], [I]price[/I], [I]requirePermission[/I][/TD]
-[/TR]
-[TR]
-[TD][I]worlds/<name>.yml[/I][/TD]
-[TD]Per-world region routing and overrides[/TD]
-[TD][I]region[/I], [I]override[/I], [I]requirePermission[/I][/TD]
-[/TR]
-[TR]
-[TD][I]safety.yml[/I][/TD]
-[TD]Block / biome safety filter (flat material names in free; tag/state grammar is Pro)[/TD]
-[TD][I]unsafeBlocks[/I], [I]airBlocks[/I][/TD]
-[/TR]
-[TR]
-[TD][I]economy.yml[/I][/TD]
-[TD]Optional Vault pricing (works in the free build)[/TD]
-[TD][I]price[/I], [I]priceOther[/I], [I]biomePrice[/I], [I]balanceFloor[/I], [I]refundOnCancel[/I][/TD]
-[/TR]
-[TR]
-[TD][I]effects/<name>.yml[/I][/TD]
-[TD]Lifecycle effects (particles, sounds, fireworks, potions)[/TD]
-[TD]per-phase effect definitions[/TD]
-[/TR]
-[TR]
-[TD][I]performance.yml[/I][/TD]
-[TD]Tick budgets, queue caps, caches[/TD]
-[TD][I]maxAttempts[/I], [I]syncAllottedTime[/I], [I]minTPS[/I][/TD]
-[/TR]
-[TR]
-[TD][I]integrations.yml[/I][/TD]
-[TD]Claim-plugin reroll toggles[/TD]
-[TD][I]rerollWorldGuard[/I], [I]rerollGriefPrevention[/I][/TD]
-[/TR]
-[TR]
-[TD][I]logging.yml[/I][/TD]
-[TD]Log verbosity and channels[/TD]
-[TD]logging toggles[/TD]
-[/TR]
-[TR]
-[TD][I]metrics.yml[/I][/TD]
-[TD]Runtime-health metrics[/TD]
-[TD]metrics toggles[/TD]
-[/TR]
-[TR]
-[TD][I]language.yml[/I][/TD]
-[TD]Locale selection (works in the free build)[/TD]
-[TD][I]language[/I][/TD]
-[/TR]
-[TR]
-[TD][I]messages.yml[/I][/TD]
-[TD]User-facing text (fully localizable, REQ-RTP-F-013)[/TD]
-[TD]message templates[/TD]
-[/TR]
-[TR]
-[TD][I]network.yml[/I][/TD]
-[TD]Proxy / multi-server selector[/TD]
-[TD][I]enabled[/I], transport settings[/TD]
-[/TR]
-[TR]
-[TD][I]lang/**[/I][/TD]
-[TD]Bundled translation packs[/TD]
-[TD]per-locale value files[/TD]
-[/TR]
-[/TABLE]
-[/SPOILER]
-
-[SPOILER='Commands, placeholders, soft-deps']
 [B]Commands[/B] (full reference: [URL='https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/']admin guide[/URL])
+
 [LIST]
-[*][B]/rtp[/B]: teleport to the default region for your current world.
-[*][B]/rtp [parameter]:[value][/B]: specify [I]region:[/I], [I]world:[/I], [I]player:[/I], or temporary overrides.
-[*][B]/rtp reload[/B]: reload all configuration from disk.
-[*][B]/rtp scan start|pause|resume|reset|cancel[/B]: pre-warm spatial memory by walking a region (renamed from [I]/rtp fill[/I] in 2.x). Demo: [URL=https://youtu.be/Ftjy1zw_S04]youtu.be/Ftjy1zw_S04[/URL].
-[*][B]/rtp menu[/B]: interactive admin menu; book on Paper / Folia, chat-paginated fallback elsewhere. Hardened in [I]3.0.0-beta.3[/I].
+[*][B]/rtp[/B] - teleport to the default region for your current world or open gui (depending on addons).
+[*][B]/rtp <parameter>=<value>[/B] - specify [I]region=[/I], [I]world=[/I], [I]player=[/I], or temporary overrides.
+[*][B]/rtp reload[/B] - reload all configuration from disk.
+[*][B]/rtp scan start|pause|resume|reset|cancel[/B] - pre-warm spatial memory by walking a region (renamed from [I]/rtp fill[/I] in 2.x). Demo: [URL='https://youtu.be/Ftjy1zw_S04']youtu.be/Ftjy1zw_S04[/URL].
+[*][B]/rtp menu[/B] - interactive book menu.
 [/LIST]
 
 [B]PlaceholderAPI[/B]
+
 [LIST]
-[*][B]%rtp_player_status%[/B]: idle, waiting, teleporting, …
+[*][B]%rtp_player_status%[/B] - idle, waiting, teleporting, ...
 [*][B]%rtp_total_queue_length%[/B], [B]%rtp_public_queue_length%[/B], [B]%rtp_personal_queue_length%[/B]
 [*][B]%rtp_teleport_world%[/B], [B]%rtp_teleport_x%[/B], [B]%rtp_teleport_y%[/B], [B]%rtp_teleport_z%[/B]
 [/LIST]
 
 [B]Soft dependencies (all optional):[/B] Vault (for the optional economy charge), PlaceholderAPI, ProtocolLib. [I]PaperLib is no longer required.[/I]
+
 [/SPOILER]
 
-[SPOILER='FAQ']
+[SPOILER="FAQ"]
+
 [B]Q: How do I stop /rtp from lagging my server, and why is LeafRTP faster than other random teleport plugins?[/B]
-A: Destinations are pre-verified and chunk-loaded into a queue before you type the command, so [I]/rtp[/I] serves instantly without loading chunks on the main thread. Persistent spatial memory skips known-bad ground, and an off-tick Anvil pre-filter rejects unsafe spots before any chunk loads.
+A: Most [I]/rtp[/I] calls serve from a pre-warmed queue - chunks are already loaded and safety-checked before you type the command. Two design choices make that queue cheap to keep full: a [B]persistent spatial memory[/B] per region (the plugin remembers which sectors of the world failed safety checks, so the spiral selector skips known-bad ground instead of rerolling forever), and an [B]off-tick async pre-filter[/B] (Anvil region files are read directly to reject unsafe biomes/blocks [I]before[/I] any chunk is loaded, so candidate verification never blocks the main thread). The pre-warmed queue is just the visible tip - the spatial memory keeps candidate selection bounded, and the async pre-filter keeps verification off the tick loop.
 
 [B]Q: Is LeafRTP complicated to set up, and does it have economy, a GUI, and particle effects?[/B]
-A: No, and yes. It works zero-config out of the box; regions, safety, and effects are optional to tune later. The clickable menu, Vault economy, effects engine, heatmaps, and twelve claim integrations all ship in the free build.
+A: No, and yes. Drop the jar in and [I]/rtp[/I] works immediately, on a [I]default[/I] region written for you. Size that region to your world - shape, radius, center - and [I]/rtp menu[/I] does it in-game without editing YAML. It includes a clickable GUI menu, Vault economy (charge per teleport with per-region pricing), a particle / sound / firework effects engine, live map heatmaps, and twelve claim-plugin integrations.
 
 [B]Q: Why is it called "LeafRTP" now instead of just "RTP"?[/B]
-A: "RTP" is the generic term for random teleport, so the old name was nearly impossible to find. It collided with every other random-teleport plugin, command, and forum thread in search and marketplace indexes. "LeafRTP" is a distinct, indexable name that points unambiguously at this plugin while keeping the [I]/rtp[/I] command, [I]rtp-api[/I], config paths, and data files exactly as they were. Nothing changes for existing installs, only the public name.
+A: "RTP" is the generic term for random teleport, so the old name was nearly impossible to find - it collided with every other random-teleport plugin, command, and forum thread in search and marketplace indexes. "LeafRTP" is a distinct, indexable name that points unambiguously at this plugin while keeping the [I]/rtp[/I] command, [I]rtp-api[/I], config paths, and data files exactly as they were. Nothing changes for existing installs - only the public name.
 
 [B]Q: Does it work with Iris / Terra / custom datapack generators?[/B]
-A: Yes. Region files are read directly, so modded and namespaced biome and block IDs are preserved. No configuration needed.
+A: Yes. Region files are read directly, so modded and namespaced biome and block IDs are preserved. No configuration needed. Because biome data comes from the populated [I].mca[/I] files rather than the live generator/noise-map lookup, [I]/rtp biome=<name>[/I] stays correct even on worlds that were pregenerated elsewhere or migrated across a Minecraft version, where seed-based biome assignment has drifted.
 
+[B]Q: Do you support triangle / diamond region shapes?[/B]
+A: Use the [I]Polygon[/I] shape - a triangle is a 3-vertex polygon and a diamond is a rotated square, so both are already expressible without a separate shape type.
+
+[B]Q: Do I need Chunky or another pre-generator?[/B]
+A: No, but they work well together. [I]/rtp scan[/I] walks a region off-tick, verifies safety, and generates any chunks it reaches that aren't on disk yet (via the server's own world generator) while recording which sectors are unsafe in persistent spatial memory. A separate pre-generator stays optional: run Chunky first if you want the whole map on disk up front, and scan will then read those chunks cheaply through the Anvil pre-filter instead of generating them as it goes.
 
 [B]Q: I'm on NeoForge.[/B]
-A: NeoForge is a first-class supported platform on Minecraft 1.21.x / 26.1.x. Just drop the mod in.
+A: NeoForge is a first-class supported platform on Minecraft 1.21.x / 26.x - just drop the mod in.
 
 [B]Q: I'm on Forge.[/B]
 A: Run [B]Arclight[/B] or [B]Mohist[/B] (officially supported) and use this jar. A native Forge adapter is not planned.
 
-[B]Q: Memory and MSPT: should I worry?[/B]
-A: LeafRTP trades a bounded amount of RAM (the queue, bounded by [I]cacheCap[/I]) for speed. TPS should not drop below ~19 from LeafRTP alone on a healthy server; MSPT spikes during new-area generation are expected. That's the cost of generating chunks, not RTP.
+[B]Q: Memory and MSPT - should I worry?[/B]
+A: LeafRTP trades a bounded amount of RAM (the queue, bounded by [I]cacheCap[/I]) for speed. TPS should not drop below ~19 from LeafRTP alone on a healthy server; MSPT spikes during new-area generation are expected - that's the cost of generating chunks, not RTP.
 
 [B]Q: How do I report a bug?[/B]
 A: GitHub issue with server version, LeafRTP version, platform, relevant config files, and the error log section. See the [URL='https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/']admin guide[/URL] for the full reproduction template.
+
 [/SPOILER]
 
-[SPOILER='Community Support Policy (read before filing an issue)']
-Support for the free build is [B]community-tier and best-effort[/B]. I ship fixes when properly-reported issues land. Respecting this is how the plugin stays fast and current.
+[SPOILER="Community Support Policy (read before filing an issue)"]
+
+Support for the free build is [B]community-tier and best-effort[/B]. A solo maintainer ships fixes when properly-reported issues land.
+
 [LIST]
-[*][B]Support covers bugs and configuration questions,[/B] after you've read the admin guide.
-[*][B]Bug reports need a reproduction:[/B] server version, LeafRTP version, platform (Spigot / Paper / fork), [I]config.yml[/I], [I]regions/[/I], [I]safety.yml[/I], and the relevant [I]server.log[/I] section. Reports without these are asked for them once, then closed.
-[*][B]"It doesn't work" is not a bug report.[/B] Tell me what you did, what you expected, and what actually happened.
-[*][B]Unsupported on the free tier:[/B] native Forge (use Arclight / Mohist), plugin conflicts I can't reproduce, general MC-server admin questions.
-[*][B]Response time:[/B] no SLA on the free build. Critical safety issues jump the queue regardless.
-[*][B]Feature requests[/B] via GitHub issues. Priority follows the published roadmap, not ticket volume.
+[*]Support covers bugs and configuration questions, after you've read the admin guide.
+[*]Bug reports need a reproduction: server version, LeafRTP version, platform (Spigot / Paper / fork), [I]config.yml[/I], [I]regions/[/I], [I]safety.yml[/I], and the relevant [I]server.log[/I] section. Reports without these are asked for them once, then closed.
+[*]"It doesn't work" is not a bug report. Tell me what you did, what you expected, and what actually happened.
+[*]Response time: no SLA on the free build. Critical safety issues jump the queue regardless.
+[*]Feature requests via GitHub issues. Priority follows the published roadmap, not ticket volume.
 [/LIST]
-[/SPOILER]
 
-[SPOILER='Known limitations']
-[LIST]
-[*][I]safety.yml[/I] accepts flat material names ([I]LAVA[/I], [I]MAGMA_BLOCK[/I], [I]CACTUS[/I], [I]FIRE[/I]). Block tag / state-predicate grammar and SQL/Redis shared-state backends are not part of this build. Unknown materials log one warning, never silently dropped.
-[*]Edits to [I]safety.yml[/I] and biome filters do not yet invalidate the persisted shape cache. Workaround: [I]/rtp scan reset <region>[/I].
-[*]Emergency landing platform default is now [I]platformRadius: -1[/I] (disabled). Set to [I]0[/I] or higher to restore legacy 2.x behavior.
-[/LIST]
-Live list: [URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known-issues']CHANGELOG[/URL].
 [/SPOILER]
-
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
-
 [SIZE=6][B][COLOR=#7F8C8D]Links[/COLOR][/B][/SIZE]
+
 [LIST]
-[*][URL='https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/'][B]LeafRTP admin & configuration guide[/B][/URL]: install, configure, command reference
-[*][URL='https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/'][B]LeafRTP addon / API developer guide[/B][/URL]: [I]rtp-api[/I] and examples
+[*][URL='https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/'][B]LeafRTP admin & configuration guide[/B][/URL] - install, configure, command reference
+[*][URL='https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/'][B]LeafRTP addon / API developer guide[/B][/URL] - [I]rtp-api[/I] and examples
 [*][URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md'][B]LeafRTP changelog & roadmap[/B][/URL]
-[*][URL='https://modrinth.com/plugin/leafrtp'][B]LeafRTP on Modrinth[/B][/URL]: latest builds, Folia-tagged releases, and beta channels (auto-updater friendly)
-[*][URL='https://github.com/dailystruggle/RTP'][B]LeafRTP source on GitHub[/B][/URL]: star, watch, contribute, file issues
+[*][URL='https://github.com/dailystruggle/RTP'][B]LeafRTP source on GitHub[/B][/URL] - star, watch, contribute, file issues
 [/LIST]
 

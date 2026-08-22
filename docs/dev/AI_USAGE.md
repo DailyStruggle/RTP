@@ -26,6 +26,8 @@ The timeframe is a real part of this. I was in the middle of a personal move dur
 
 ## B. The "how"
 
+Since people are using AI now and I needed some raw output, I gave it a try. I added guards (process rules in documentation and AGENTS.md) for LLM-based tooling to ensure human-originated architecture. It was able to help with speed, but watching the diff I saw some issues. I had to pull in specific reference material and establish a "read and document" practice for the tools to hit a viable quality standard, which I maintain based on reviewing diffs.
+
 The ADR workflow and the documentation discipline in this repo (the `shall` phrasing in `REQUIREMENTS.md`, the separation of *what* from *how*, the per-subproject ADR sequences, the REQ-* traceability matrix) didn't come from AI. That came from my time working on human-safety-related systems, where auditors and post-incident reviewers expect a particular shape of paper trail.
 
 Lucky for me, that same shape happens to be exactly what regulates an LLM well. The format forces explicit *what*, explicit *why*, explicit trade-offs, explicit consequences, and numbered so nothing gets quietly retconned. A model told "produce an ADR matching this template, here's the brainstorm, here are the trade-offs we identified" produces useful drafts. A model told "design the system" produces plausible noise.
