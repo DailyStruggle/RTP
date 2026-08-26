@@ -32,7 +32,9 @@ import net.jpountz.lz4.LZ4FrameInputStream;
  *
  * <p>All methods are thread-safe: the class is stateless and operates on caller-owned buffers.
  */
-public final class AnvilReader {
+public final class AnvilReader implements RegionFileReader {
+
+    public static final AnvilReader INSTANCE = new AnvilReader();
 
     private static final int SECTOR_SIZE = 4096;
 
@@ -40,6 +42,24 @@ public final class AnvilReader {
     private static final int EXTERNAL_FLAG = 0x80;
 
     private AnvilReader() {}
+
+    @Override
+    public boolean isChunkGenerated(byte[] regionBytes, int cx, int cz) {
+        if (regionBytes == null || regionBytes.length < SECTOR_SIZE * 2) {
+            return false;
+        }
+        if (cx < 0 || cx > 31 || cz < 0 || cz > 31) {
+            return false;
+        }
+        int index = (cx & 31) + ((cz & 31) << 5);
+        int locationEntryOffset = index * 4;
+        int sectorOffset =
+                ((regionBytes[locationEntryOffset]     & 0xFF) << 16) |
+                ((regionBytes[locationEntryOffset + 1] & 0xFF) << 8)  |
+                 (regionBytes[locationEntryOffset + 2] & 0xFF);
+        int sectorCount = regionBytes[locationEntryOffset + 3] & 0xFF;
+        return sectorOffset != 0 && sectorCount != 0;
+    }
 
     /**
      * Decoded chunk header + root compound. {@code declaredSectionLength} is the Anvil
@@ -57,6 +77,11 @@ public final class AnvilReader {
         }
     }
 
+    @Override
+    public ChunkEntry readChunk(byte[] regionBytes, int cx, int cz) throws IOException {
+        return readChunkEntry(regionBytes, cx, cz);
+    }
+
     /**
      * Reads the chunk at region-local coordinates {@code (cx, cz)} from {@code regionBytes}.
      *
@@ -67,7 +92,7 @@ public final class AnvilReader {
      * @throws UnsupportedAnvilFormatException if the compression mode is not supported
      * @throws IOException                     on malformed headers or NBT
      */
-    public static ChunkEntry readChunk(byte[] regionBytes, int cx, int cz) throws IOException {
+    public static ChunkEntry readChunkEntry(byte[] regionBytes, int cx, int cz) throws IOException {
         RawChunk raw = readRawChunk(regionBytes, cx, cz);
         if (raw == null) return null;
         LinkedHashMap<String, Object> root = Nbt.readRootCompound(raw.nbtBytes);
@@ -204,7 +229,7 @@ public final class AnvilReader {
      * the {@link Nbt.NbtList} / {@link LinkedHashMap} wire shape.
      */
     public static AnvilChunkView readChunkView(byte[] regionBytes, int cx, int cz) throws IOException {
-        ChunkEntry entry = readChunk(regionBytes, cx, cz);
+        ChunkEntry entry = readChunkEntry(regionBytes, cx, cz);
         if (entry == null) return null;
         return toView(entry.root);
     }

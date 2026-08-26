@@ -47,7 +47,7 @@ class AnvilFixtureParityTest {
     void realFixtureDecodesAtExpectedDataVersion(String dirName, int expectedDataVersion) throws IOException {
         byte[] regionBytes = loadRealFixture(dirName);
 
-        AnvilReader.ChunkEntry entry = AnvilReader.readChunk(regionBytes, 0, 0);
+        AnvilReader.ChunkEntry entry = AnvilReader.readChunkEntry(regionBytes, 0, 0);
         assertNotNull(entry, () -> "Chunk (0,0) missing from real fixture " + dirName);
 
         assertAll("real fixture " + dirName,
@@ -67,7 +67,7 @@ class AnvilFixtureParityTest {
     @DisplayName("Real root → NBT write → NBT re-read is structurally lossless")
     void realRootSurvivesSemanticRoundTrip(String dirName) throws IOException {
         byte[] regionBytes = loadRealFixture(dirName);
-        AnvilReader.ChunkEntry entry = AnvilReader.readChunk(regionBytes, 0, 0);
+        AnvilReader.ChunkEntry entry = AnvilReader.readChunkEntry(regionBytes, 0, 0);
         assertNotNull(entry);
 
         byte[] reEncoded = Nbt.writeNamedRoot("", entry.root);
@@ -107,7 +107,7 @@ class AnvilFixtureParityTest {
                 DataVersionSupport.MC_1_20_DATA_VERSION, heightmap, sections);
         byte[] regionBytes = AnvilTestFixtures.writeSingleChunkRegion(root);
 
-        AnvilReader.ChunkEntry entry = AnvilReader.readChunk(regionBytes, 0, 0);
+        AnvilReader.ChunkEntry entry = AnvilReader.readChunkEntry(regionBytes, 0, 0);
         assertNotNull(entry, "synthetic region must contain chunk (0,0)");
 
         assertAll("synthetic chunk parity",
