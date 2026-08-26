@@ -171,7 +171,7 @@ The backlog cache (controlled by `backlogCacheCap`) is an optional **unverified*
 ### How it works
 
 - The spiral selector drops unverified candidates straight into the backlog — **no chunk load, no database write**.
-- Each region tick pulses the backlog: the oldest unverified entry is picked, the `.mca` file (32×32 chunk bin) it falls in is identified, and *every* unverified entry that shares that bin is classified in one pass via the anvil pre-filter. This amortises the per-bin cost over many candidates.
+- Each region tick pulses the backlog: the oldest unverified entry is picked, the region file (32×32 chunk bin: `.mca` Anvil or `.linear` Linear) it falls in is identified, and *every* unverified entry that shares that bin is classified in one pass via the region pre-filter. This amortises the per-bin cost over many candidates.
 - Entries are promoted into the verified queue **in insertion order**. An unverified head blocks promotion; an invalidated head is dropped silently and the next entry is considered. This preserves spiral order without stalling on failed candidates.
 - The backlog is **not** persisted across restarts by design — entries are re-selected fresh on startup, so the cost of dropping them is bounded.
 

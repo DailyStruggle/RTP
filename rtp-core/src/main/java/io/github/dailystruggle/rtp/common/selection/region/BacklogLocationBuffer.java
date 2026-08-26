@@ -1,20 +1,25 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Bounded FIFO buffer of pre-selected candidate locations for L3 backlog cache (ADR-028).
- * Preserves insertion order and supports head-blocking promotion of validated entries.
+ * Lock-free bounded FIFO buffer of pre-selected candidate locations for L3 backlog cache (ADR-028).
+ * Preserves insertion order and supports head-blocking promotion of validated entries using
+ * lock-free copy-then-swap state transitions.
  *
  * @see BacklogEntry
  * @see Validity
  * @see RegionFileCoord
  */
 public final class BacklogLocationBuffer {
+
+  private static final BacklogEntry[] EMPTY = new BacklogEntry[0];
+  private static final int MAX_CAS_RETRIES = 64;
 
   /** Tri-state per-entry validity tag. */
   public enum Validity {
@@ -92,9 +97,7 @@ public final class BacklogLocationBuffer {
   }
 
   private final int capacity;
-  private final Deque<BacklogEntry> entries;
-  /** Lock guarding all access to {@link #entries} across concurrent drain/refill paths. */
-  private final Object lock = new Object();
+  private final AtomicReference<BacklogEntry[]> state = new AtomicReference<>(EMPTY);
 
   /**
    * Constructs a new buffer with the given maximum capacity.
@@ -108,7 +111,6 @@ public final class BacklogLocationBuffer {
       throw new IllegalArgumentException("capacity must be positive: " + capacity);
     }
     this.capacity = capacity;
-    this.entries = new ArrayDeque<>(Math.min(capacity, 1024));
   }
 
   /**
@@ -128,12 +130,17 @@ public final class BacklogLocationBuffer {
    */
   public BacklogEntry offerUnverified(RTPLocation location) {
     Objects.requireNonNull(location, "location");
-    synchronized (lock) {
-      if (entries.size() >= capacity) return null;
-      BacklogEntry entry = new BacklogEntry(location);
-      entries.addLast(entry);
-      return entry;
+    BacklogEntry entry = new BacklogEntry(location);
+    for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
+      BacklogEntry[] curr = state.get();
+      if (curr.length >= capacity) return null;
+      BacklogEntry[] next = Arrays.copyOf(curr, curr.length + 1);
+      next[curr.length] = entry;
+      if (state.compareAndSet(curr, next)) {
+        return entry;
+      }
     }
+    return null;
   }
 
   /**
@@ -145,27 +152,40 @@ public final class BacklogLocationBuffer {
    */
   public List<BacklogEntry> pollContiguousValidatedHead(int maxN) {
     if (maxN < 0) throw new IllegalArgumentException("maxN must be non-negative: " + maxN);
-    List<BacklogEntry> out = new ArrayList<>(Math.min(maxN, 16));
-    synchronized (lock) {
-      while (!entries.isEmpty()) {
-        BacklogEntry head = entries.peekFirst();
-        // Defensive null guard: even under the lock this stays correct, and it
-        // documents that a null head means "nothing more to drain" rather than
-        // an NPE - the symptom seen on the lite assembly where the L3 backlog
-        // is unsupported but the drain path is still pulsed by Region.execute().
+    for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
+      BacklogEntry[] curr = state.get();
+      if (curr.length == 0) return Collections.emptyList();
+
+      int headIdx = 0;
+      List<BacklogEntry> out = new ArrayList<>(Math.min(maxN, 16));
+      while (headIdx < curr.length) {
+        BacklogEntry head = curr[headIdx];
         if (head == null) break;
         Validity v = head.validity();
         if (v == Validity.INVALIDATED) {
-          entries.pollFirst();
+          headIdx++;
           continue;
         }
         if (v == Validity.UNVERIFIED) break;
         // VALIDATED
         if (out.size() >= maxN) break;
-        out.add(entries.pollFirst());
+        out.add(head);
+        headIdx++;
+      }
+
+      if (headIdx == 0) {
+        return out;
+      }
+
+      int remLen = curr.length - headIdx;
+      BacklogEntry[] next = new BacklogEntry[remLen];
+      System.arraycopy(curr, headIdx, next, 0, remLen);
+
+      if (state.compareAndSet(curr, next)) {
+        return out;
       }
     }
-    return out;
+    return Collections.emptyList();
   }
 
   /**
@@ -176,12 +196,11 @@ public final class BacklogLocationBuffer {
    * @return the oldest unverified entry, or {@code null} if none
    */
   public BacklogEntry peekOldestUnverified() {
-    synchronized (lock) {
-      for (BacklogEntry e : entries) {
-        if (e.validity() == Validity.UNVERIFIED) return e;
-      }
-      return null;
+    BacklogEntry[] curr = state.get();
+    for (BacklogEntry e : curr) {
+      if (e != null && e.validity() == Validity.UNVERIFIED) return e;
     }
+    return null;
   }
 
   /**
@@ -190,9 +209,7 @@ public final class BacklogLocationBuffer {
    * @return current entry count
    */
   public int size() {
-    synchronized (lock) {
-      return entries.size();
-    }
+    return state.get().length;
   }
 
   /**
@@ -201,32 +218,96 @@ public final class BacklogLocationBuffer {
    * @return number of validated entries
    */
   public int validatedSize() {
-    synchronized (lock) {
-      int n = 0;
-      for (BacklogEntry e : entries) {
-        if (e.validity() == Validity.VALIDATED) n++;
-      }
-      return n;
+    BacklogEntry[] curr = state.get();
+    int n = 0;
+    for (BacklogEntry e : curr) {
+      if (e != null && e.validity() == Validity.VALIDATED) n++;
     }
+    return n;
   }
 
   /**
-   * Removes all entries tagged {@link Validity#INVALIDATED} while preserving relative order.
+   * Returns the number of entries currently tagged {@link Validity#INVALIDATED}.
+   *
+   * @return number of invalidated entries
+   */
+  public int invalidatedSize() {
+    BacklogEntry[] curr = state.get();
+    int n = 0;
+    for (BacklogEntry e : curr) {
+      if (e != null && e.validity() == Validity.INVALIDATED) n++;
+    }
+    return n;
+  }
+
+  /**
+   * Cleans invalidated entries via lock-free copy-then-swap compaction if heuristic conditions are met.
+   * Compaction is triggered when the buffer is full (freeing capacity for new candidate selection)
+   * or when the invalidated entry count reaches a significant fraction of capacity.
+   *
+   * @return number of removed invalidated entries, or {@code 0} if heuristic was not met
+   */
+  public int cleanIfHeuristicMet() {
+    for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
+      BacklogEntry[] curr = state.get();
+      int invalidCount = 0;
+      for (BacklogEntry e : curr) {
+        if (e != null && e.validity() == Validity.INVALIDATED) {
+          invalidCount++;
+        }
+      }
+      if (invalidCount == 0) return 0;
+
+      boolean shouldClean = (curr.length >= capacity)
+          || (invalidCount >= Math.max(4, capacity / 4));
+
+      if (!shouldClean) return 0;
+
+      BacklogEntry[] next = new BacklogEntry[curr.length - invalidCount];
+      int idx = 0;
+      for (BacklogEntry e : curr) {
+        if (e != null && e.validity() != Validity.INVALIDATED) {
+          next[idx++] = e;
+        }
+      }
+
+      if (state.compareAndSet(curr, next)) {
+        return invalidCount;
+      }
+    }
+    return 0;
+  }
+
+  /**
+   * Removes all entries tagged {@link Validity#INVALIDATED} using lock-free copy-then-swap compaction
+   * while preserving the relative FIFO order of surviving entries.
    *
    * @return number of removed entries
    */
   public int removeInvalidated() {
-    synchronized (lock) {
-      int removed = 0;
-      java.util.Iterator<BacklogEntry> it = entries.iterator();
-      while (it.hasNext()) {
-        if (it.next().validity() == Validity.INVALIDATED) {
-          it.remove();
-          removed++;
+    for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
+      BacklogEntry[] curr = state.get();
+      int invalidCount = 0;
+      for (BacklogEntry e : curr) {
+        if (e != null && e.validity() == Validity.INVALIDATED) {
+          invalidCount++;
         }
       }
-      return removed;
+      if (invalidCount == 0) return 0;
+
+      BacklogEntry[] next = new BacklogEntry[curr.length - invalidCount];
+      int idx = 0;
+      for (BacklogEntry e : curr) {
+        if (e != null && e.validity() != Validity.INVALIDATED) {
+          next[idx++] = e;
+        }
+      }
+
+      if (state.compareAndSet(curr, next)) {
+        return invalidCount;
+      }
     }
+    return 0;
   }
 
   /**
@@ -235,15 +316,11 @@ public final class BacklogLocationBuffer {
    * @return {@code true} if the buffer is empty
    */
   public boolean isEmpty() {
-    synchronized (lock) {
-      return entries.isEmpty();
-    }
+    return state.get().length == 0;
   }
 
   /** Removes all entries. Validity tags on already-issued entries are unaffected. */
   public void clear() {
-    synchronized (lock) {
-      entries.clear();
-    }
+    state.set(EMPTY);
   }
 }

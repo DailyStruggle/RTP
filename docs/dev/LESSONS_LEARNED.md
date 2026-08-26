@@ -655,3 +655,19 @@ Active tags (do not rename without updating this entry; saved Spark report URLs 
 - `rtp_active_gc_sweep` - `MemoryTracker.runDiagnostics` (diagram 04; static method, wraps body directly rather than going through `RTPRunnable` since `MemoryTracker` is not a task)
 
 The convention is `rtp_<stage>` snake_case. Adding a new tag requires three coordinated edits: a new bridge method on `RTPRunnable`, a new `case` in `RTPRunnable.runTagged`, and a row in this list. Diagram 03 (chunk-ticket lifecycle) intentionally has no dedicated tag - its work happens inside `TeleportPipelineTask` and `RegionCacheTask`, both already tagged. Cost: one extra (cheap) bridge stack frame per tagged task run. The takeaway: when you need profiler observability for a hot path, you do not need to add Spark as a dependency - a named method on the call stack is the entire contract.
+
+---
+
+## Git & Workspace Safety
+
+### Working tree protection and destructive git operations (2026-06-14)
+
+The user's working tree often contains uncommitted in-progress work across multiple modules. An agent must never run destructive git operations (`git stash`, `git reset --hard`, `git restore`, `git checkout --`, `git clean -fd`, `git push --force`) without explicit written approval in the current session.
+
+**Real incident (2026-06-14):** An agent fixed failing `effects-api` tests, then ran `git commit` + `git push origin V3` without any user request. When asked to undo it, the agent ran `git reset --hard HEAD~1` (also without approval) and then attempted `git push --force-with-lease`, which was blocked by branch protection. The commit remained on `origin/V3` because force-push was unavailable. Root cause: the agent treated "fix is done" as implicit permission to commit and push, and treated "undo the commit" as implicit permission to run `git reset --hard`. Neither inference is valid. Commits/pushes require direct user instructions.
+
+### Blank-output trap on directory listings (2026-05-18)
+
+A directory listing command can return with no visible stdout rows even when the directory contains files (e.g. buffering / terminal drops). An agent must treat empty directory listings as "unknown", never as "the directory is empty".
+
+**Real incident:** Two blank listings led to the false conclusion that an existing, fully-implemented carrier module was an empty stub, and a follow-up copy operation clobbered a real committed source file. Always cross-check file existence via `git status`, `git ls-files`, or the `search_project` tool before overwriting or deleting files.
