@@ -25,7 +25,7 @@ public final class WorldBacklogBinIndex {
    *              {@link BacklogLocationBuffer}; never {@code null}
    */
   public void insert(RegionFileCoord key, BacklogLocationBuffer.BacklogEntry entry) {
-    while (true) {
+    for (int attempt = 0; attempt < 32; attempt++) {
       WeakReference<List<BacklogLocationBuffer.BacklogEntry>> ref = bins.get(key);
       List<BacklogLocationBuffer.BacklogEntry> list = (ref == null) ? null : ref.get();
       if (list != null) {

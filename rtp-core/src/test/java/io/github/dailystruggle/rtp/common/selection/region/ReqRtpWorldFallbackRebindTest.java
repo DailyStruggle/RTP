@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -233,6 +234,37 @@ public class ReqRtpWorldFallbackRebindTest {
                 new io.github.dailystruggle.rtp.api.world.RTPCoords("world", 1, 64, 1), 0, null);
         region.queueManager.unkeptLocations.offer(steadyStateLoc);
         verify(db, atLeastOnce()).saveCachedLocation(eq("flush_region"), eq(steadyStateLoc), any());
+    }
+
+    @Test
+    @DisplayName("hydrateCacheFromDatabase seeds RtpOutcomeStats with successes for matching rows only")
+    void hydrate_seedsRtpOutcomeStatsForMatchingRowsOnly() {
+        @SuppressWarnings("unchecked")
+        DatabaseAccessor<Object> db = mock(DatabaseAccessor.class);
+        doReturn(Collections.emptyList()).when(db).loadCachedLocations(anyString());
+        RTP.getInstance().databaseAccessor = db;
+
+        RegionSettings s = settings("stats_region", fallbackWorld);
+        Region region = new Region("stats_region", s);
+
+        RtpOutcomeStats.GLOBAL.reset();
+        assertEquals(0L, RtpOutcomeStats.GLOBAL.successCount());
+
+        long seed = fallbackWorld.getSeed();
+        java.util.List<DatabaseAccessor.StoredLocation> rows = new ArrayList<>();
+        rows.add(new DatabaseAccessor.StoredLocation(
+                "id-1", "stats_region", "world", 100, 64, 200, 1, seed, null));
+        rows.add(new DatabaseAccessor.StoredLocation(
+                "id-2", "stats_region", "world", 300, 64, 400, 1, seed, null));
+        // Stale-seed row: must NOT increment RtpOutcomeStats
+        rows.add(new DatabaseAccessor.StoredLocation(
+                "id-stale", "stats_region", "world", 0, 64, 0, 1, seed + 100, null));
+
+        region.hydrateCacheFromDatabase(rows);
+
+        assertEquals(2L, RtpOutcomeStats.GLOBAL.successCount(), "only matching rows should record successes");
+        assertEquals(0L, RtpOutcomeStats.GLOBAL.totalFailures());
+        assertEquals(1.0d, RtpOutcomeStats.GLOBAL.successRate(), 1e-9);
     }
 
     // ------------------------------------------------------------------

@@ -245,4 +245,98 @@ class BacklogLocationBufferTest {
       throw new AssertionError("concurrent drain threw", failure.get());
     }
   }
+
+  @Test
+  @DisplayName("removeInvalidated cleans all invalidated entries and preserves relative order")
+  void removeInvalidatedPrunesAllAndPreservesOrder() {
+    BacklogLocationBuffer b = new BacklogLocationBuffer(6);
+    BacklogEntry e0 = b.offerUnverified(loc(0));
+    BacklogEntry e1 = b.offerUnverified(loc(1));
+    BacklogEntry e2 = b.offerUnverified(loc(2));
+    BacklogEntry e3 = b.offerUnverified(loc(3));
+    BacklogEntry e4 = b.offerUnverified(loc(4));
+
+    e0.setValidity(Validity.VALIDATED);
+    e1.setValidity(Validity.INVALIDATED);
+    e2.setValidity(Validity.UNVERIFIED);
+    e3.setValidity(Validity.INVALIDATED);
+    e4.setValidity(Validity.VALIDATED);
+
+    assertEquals(2, b.invalidatedSize());
+    assertEquals(5, b.size());
+
+    int cleaned = b.removeInvalidated();
+    assertEquals(2, cleaned);
+    assertEquals(3, b.size());
+    assertEquals(0, b.invalidatedSize());
+
+    List<BacklogEntry> drained = b.pollContiguousValidatedHead(10);
+    assertEquals(1, drained.size());
+    assertSame(e0, drained.get(0));
+
+    // Next at head is e2 (UNVERIFIED)
+    assertEquals(2, b.size());
+    assertSame(e2, b.peekOldestUnverified());
+  }
+
+  @Test
+  @DisplayName("cleanIfHeuristicMet triggers when buffer is full and has invalid entries")
+  void cleanIfHeuristicMetWhenFull() {
+    BacklogLocationBuffer b = new BacklogLocationBuffer(3);
+    BacklogEntry e0 = b.offerUnverified(loc(0));
+    BacklogEntry e1 = b.offerUnverified(loc(1));
+    BacklogEntry e2 = b.offerUnverified(loc(2));
+
+    e1.setValidity(Validity.INVALIDATED);
+    e0.setValidity(Validity.VALIDATED);
+    e2.setValidity(Validity.VALIDATED);
+
+    assertEquals(3, b.size());
+    int cleaned = b.cleanIfHeuristicMet();
+    assertEquals(1, cleaned);
+    assertEquals(2, b.size());
+
+    // Can now insert another candidate
+    BacklogEntry e3 = b.offerUnverified(loc(3));
+    assertNotNull(e3);
+    assertEquals(3, b.size());
+  }
+
+  @Test
+  @DisplayName("cleanIfHeuristicMet triggers when invalid count reaches threshold")
+  void cleanIfHeuristicMetWhenInvalidThresholdReached() {
+    BacklogLocationBuffer b = new BacklogLocationBuffer(16);
+    for (int i = 0; i < 8; i++) {
+      BacklogEntry e = b.offerUnverified(loc(i));
+      if (i < 4) {
+        e.setValidity(Validity.INVALIDATED);
+      } else {
+        e.setValidity(Validity.VALIDATED);
+      }
+    }
+
+    assertEquals(4, b.invalidatedSize());
+    assertEquals(8, b.size());
+
+    int cleaned = b.cleanIfHeuristicMet();
+    assertEquals(4, cleaned);
+    assertEquals(4, b.size());
+    assertEquals(0, b.invalidatedSize());
+  }
+
+  @Test
+  @DisplayName("cleanIfHeuristicMet no-ops when invalid count is below threshold on non-full buffer")
+  void cleanIfHeuristicMetNoopsBelowThreshold() {
+    BacklogLocationBuffer b = new BacklogLocationBuffer(16);
+    BacklogEntry e0 = b.offerUnverified(loc(0));
+    BacklogEntry e1 = b.offerUnverified(loc(1));
+    e0.setValidity(Validity.INVALIDATED);
+
+    assertEquals(1, b.invalidatedSize());
+    assertEquals(2, b.size());
+
+    int cleaned = b.cleanIfHeuristicMet();
+    assertEquals(0, cleaned);
+    assertEquals(2, b.size());
+  }
 }

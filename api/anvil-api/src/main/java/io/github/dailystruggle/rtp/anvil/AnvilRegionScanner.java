@@ -14,8 +14,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Pregen-scan utility (ADR-016 biome section 6.1) that walks every {@code r.X.Z.mca}
- * under a dimension's {@code region/} folder and returns the union of every
+ * Pregen-scan utility (ADR-016 biome section 6.1, ADR-077) that walks every {@code r.X.Z.mca}
+ * and {@code r.X.Z.linear} under a dimension's {@code region/} folder and returns the union of every
  * decodable namespaced biome id. Consumed by the platform's {@code setBiomesGetter}
  * tab-completion hook.
  *
@@ -24,15 +24,15 @@ import java.util.regex.Pattern;
  * {@link #scanBiomes(Path, String)} runs inline and must already be off-tick.
  *
  * <p>Cache key is {@code (regionFolder, mtimeSignature)} where the signature is
- * the max {@code lastModified} across {@code r.*.*.mca}; any change re-runs.
+ * the max {@code lastModified} across {@code r.*.*.mca} and {@code r.*.*.linear}; any change re-runs.
  *
  * <p>Per ADR-016 section 8 "malformed → UNKNOWN, never crash": individual decode
  * failures are skipped; missing region folder → empty set, never an exception.
  */
 public final class AnvilRegionScanner {
 
-    /** Matches {@code r.<X>.<Z>.mca} with optionally-signed integer X/Z coordinates. */
-    private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca");
+    /** Matches {@code r.<X>.<Z>.mca} or {@code r.<X>.<Z>.linear} with optionally-signed integer X/Z coordinates. */
+    private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.(mca|linear)");
 
     /**
      * Process-wide cache. Keyed by absolute region-folder path; value holds the
@@ -120,7 +120,7 @@ public final class AnvilRegionScanner {
      */
     private static long mtimeSignature(Path regionFolder) {
         long max = 0L;
-        try (DirectoryStream<Path> ds = Files.newDirectoryStream(regionFolder, "r.*.*.mca")) {
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(regionFolder)) {
             for (Path p : ds) {
                 Matcher m = REGION_FILE.matcher(p.getFileName().toString());
                 if (!m.matches()) continue;
@@ -140,7 +140,7 @@ public final class AnvilRegionScanner {
 
     private static Set<String> scanUncached(Path regionFolder) {
         LinkedHashSet<String> out = new LinkedHashSet<>();
-        try (DirectoryStream<Path> ds = Files.newDirectoryStream(regionFolder, "r.*.*.mca")) {
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(regionFolder)) {
             for (Path p : ds) {
                 Matcher m = REGION_FILE.matcher(p.getFileName().toString());
                 if (!m.matches()) continue;
@@ -161,16 +161,22 @@ public final class AnvilRegionScanner {
         } catch (IOException ignored) {
             return;
         }
-        // Walk all 1024 chunk slots; absent chunks return null from readChunkView.
+        String fileName = regionFile.getFileName().toString();
+        RegionFileReader reader = fileName.endsWith(".linear")
+                ? LinearRegionReader.INSTANCE
+                : AnvilReader.INSTANCE;
+
+        // Walk all 1024 chunk slots; absent chunks return null from readChunk.
         for (int cz = 0; cz < 32; cz++) {
             for (int cx = 0; cx < 32; cx++) {
-                AnvilChunkView view;
+                AnvilReader.ChunkEntry entry;
                 try {
-                    view = AnvilReader.readChunkView(bytes, cx, cz);
+                    entry = reader.readChunk(bytes, cx, cz);
                 } catch (IOException | RuntimeException ignored) {
                     continue;
                 }
-                if (view == null) continue;
+                if (entry == null || entry.root == null) continue;
+                AnvilChunkView view = AnvilReader.toView(entry.root);
                 out.addAll(view.getBiomesPresent());
             }
         }

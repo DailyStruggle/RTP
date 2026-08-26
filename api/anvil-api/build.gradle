@@ -8,6 +8,8 @@ dependencies {
     implementation 'org.jetbrains:annotations:24.1.0'
     // LZ4 chunk-payload decompression (compression mode 4 in r.X.Z.mca).
     implementation 'org.lz4:lz4-java:1.8.0'
+    // ZSTD decompression for Linear (.linear) region format (ADR-077).
+    implementation 'com.github.luben:zstd-jni:1.5.6-3'
     // ArchUnit — bytecode-level enforcement of the "no platform / no RTP imports"
     // invariant inside this module. See AnvilPackageBoundaryArchTest.
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'

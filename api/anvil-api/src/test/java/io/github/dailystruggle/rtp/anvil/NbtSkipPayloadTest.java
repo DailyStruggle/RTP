@@ -120,7 +120,7 @@ class NbtSkipPayloadTest {
     void realFixtureSelectiveParseKeepsSubtrees() throws IOException {
         // Use the 1.20 fixture; semantics are identical across the three supported DataVersions.
         byte[] regionBytes = loadRealFixture("1_20_R1");
-        AnvilReader.ChunkEntry entry = AnvilReader.readChunk(regionBytes, 0, 0);
+        AnvilReader.ChunkEntry entry = AnvilReader.readChunkEntry(regionBytes, 0, 0);
         assertNotNull(entry);
 
         // Re-encode the full root to NBT bytes, then selectively re-read those bytes.

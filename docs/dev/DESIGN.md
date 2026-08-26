@@ -23,21 +23,21 @@ The general-purpose location pool inside `RegionQueueManager` is layered into ti
 |---|---|---|---|---|---|
 | **L1 — hot / kept** | `keptLocations` (`LockFreeLocationBuffer`) | Fully verified; chunks currently held with `keep(true)` (plugin chunk ticket) | None — chunks already loaded | `activeChunkCap` | Yes |
 | **L2 — cold / unkept** | `unkeptLocations` (`LockFreeLocationBuffer`) | Fully verified through the teleport pipeline; chunk reservations released | One async chunk re-load on promotion to L1 | `cacheCap` | Yes |
-| **L3 — backlog / binned** *(implemented, [ADR-028](../adr/ADR-028-l3-backlog-cache.md))* | `backlogLocations` (`BacklogLocationBuffer`, nullable) | **Unverified** spiral picks with a tri-state per-entry `Validity` (`UNVERIFIED` / `VALIDATED` / `INVALIDATED`); head-blocking FIFO | None on L3 itself; verification is anvil-prefilter only ([ADR-016](../adr/ADR-016-anvil-subsystem.md)) | `backlogCacheCap` (default `1000`; lite default `0` ⇒ disabled) | No |
+| **L3 — backlog / binned** *(implemented, [ADR-028](../adr/ADR-028-l3-backlog-cache.md))* | `backlogLocations` (`BacklogLocationBuffer`, nullable) | **Unverified** spiral picks with a tri-state per-entry `Validity` (`UNVERIFIED` / `VALIDATED` / `INVALIDATED`); head-blocking FIFO | None on L3 itself; verification is region-prefilter only (Anvil `.mca` / Linear `.linear`, [ADR-016](../adr/ADR-016-anvil-subsystem.md), [ADR-077](../adr/ADR-077-multi-format-region-support.md)) | `backlogCacheCap` (default `1000`; lite default `0` ⇒ disabled) | No |
 
 Refill / promotion flow:
 
 ```
-shape pick ─▶ L3 backlog ─(anvil-verified, in-order)─▶ L2 unkept ─▶ L1 kept ─▶ /rtp
+shape pick ─▶ L3 backlog ─(region-verified, in-order)─▶ L2 unkept ─▶ L1 kept ─▶ /rtp
                      ▲ refill (pure math, no chunk I/O)
-                     │ verify: one bin (32×32 chunks = one .mca) per Region.execute() pulse
+                     │ verify: one bin (32×32 chunks = one .mca/.linear) per Region.execute() pulse
 ```
 
 L3 design invariants ([ADR-028](../adr/ADR-028-l3-backlog-cache.md)):
 
 - **Order preservation.** Entries are inserted in spiral-selection order and never reordered. The promotion contract to L2 is *head-only, contiguous-verified*: an unverified entry at L3 head blocks all later entries from advancing, even if those later entries have already been anvil-verified. This preserves the spatial-distribution semantics established by the Archimedean spiral mapping ([ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md)).
-- **One bin per pulse.** Each `Region.execute()` pulse picks the bin (`.mca` region file = 32 × 32 chunks) containing the *oldest* unverified L3 entry, runs the anvil pre-filter for every L3 entry whose chunk lies inside that bin, and marks each entry's `verified` flag. This bounds per-pulse work (count-bound on Folia per [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md)) and amortizes the single `.mca` read across all in-bin candidates.
-- **Anvil-only verification.** L3 verification is a cheap *rejection filter* — anvil-passes still face the full pipeline (chunk load + vert + biome + safety) at L2 → L1 promotion. Anvil-rejects are dropped without chunk I/O, DB row, or chunk reservation. On platforms / worlds where the anvil pre-filter is unavailable (e.g. unflushed region files, custom generators, Fabric pre-stabilization), L3 entries fall through as "verified by default" so L3 never stalls a freshly generated world.
+- **One bin per pulse.** Each `Region.execute()` pulse picks the bin (region file = 32 × 32 chunks; `.linear` or `.mca` per [ADR-077](../adr/ADR-077-multi-format-region-support.md)) containing the *oldest* unverified L3 entry, runs the region pre-filter for every L3 entry whose chunk lies inside that bin, and marks each entry's `verified` flag. This bounds per-pulse work (count-bound on Folia per [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md)) and amortizes the single region-file read across all in-bin candidates.
+- **Anvil/Linear-only verification.** L3 verification is a cheap *rejection filter* — prefilter passes still face the full pipeline (chunk load + vert + biome + safety) at L2 → L1 promotion. Prefilter rejects are dropped without chunk I/O, DB row, or chunk reservation. On platforms / worlds where the region pre-filter is unavailable (e.g. unflushed region files, custom generators, Fabric pre-stabilization), L3 entries fall through as "verified by default" so L3 never stalls a freshly generated world.
 - **No DB persistence.** Unverified entries are not written through `installDatabaseCallbacks`; spiral re-selection after restart is cheap and avoids a "tentative row" schema delta.
 - **Default-off in lite.** The `rtp-lite` assembly ([ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md)) ships with the key omitted; runtime default `0` keeps the trimmed memory profile. The full assembly defaults to `1000`, sized well above `cacheCap` so binning yields meaningful amortization.
 
