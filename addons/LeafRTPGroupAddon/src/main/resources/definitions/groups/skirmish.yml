@@ -1,0 +1,10 @@
+version: 1.0
+
+# Squad vs squad team skirmish.
+# Wide chunk footprint to host two separated team clusters.
+distribution: GRID
+
+subspaceChunkRadius: 6
+minSeparation: 4
+elevationTolerance: 5
+maxGroupSize: 16

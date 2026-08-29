@@ -176,13 +176,23 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
     long micros = (System.nanoTime() - t0) / 1_000L;
 
     // Primary assertion: the executing thread is NOT the caller's
-    // region tick thread. Identity comparison is the strongest form;
-    // name comparison is a defensive backstop if the scheduler happens
-    // to recycle the same Thread instance.
+    // region tick thread / primary thread. If the caller was already an async
+    // task, executing on an async worker (even the same reused worker thread)
+    // is expected and valid.
+    boolean runnerIsAsync = runner.getName() != null
+        && (runner.getName().contains("Async")
+            || runner.getName().contains("Craft Scheduler Thread")
+            || runner.getName().contains("ForkJoinPool"));
+    boolean forbiddenIsRegionOrMain = forbiddenName != null
+        && (forbiddenName.contains("Server thread")
+            || forbiddenName.contains("Region")
+            || forbiddenName.contains("Tick Thread")
+            || forbiddenName.contains("Primary"));
+
     boolean sameInstance = runner == forbiddenThread;
     boolean sameName = forbiddenName != null && forbiddenName.equals(runner.getName());
 
-    if (sameInstance || sameName) {
+    if ((sameInstance || sameName) && (!runnerIsAsync || forbiddenIsRegionOrMain)) {
       String msg =
           "[RTP test/economy-isolation] FAILED: debit ran on caller thread '"
               + runner.getName()
