@@ -25,9 +25,10 @@ import org.jetbrains.annotations.Nullable;
  *
  * <ol>
  *   <li>{@link VerticalAdjustor#adjustColumn(RTPChunk, int, int)} resolves a real standable
- *       {@code Y} for the requested column - no anchor-Y copying (S-001). Adjustors that cannot
- *       resolve a specific column (e.g. {@code LinearAdjustor}, whose {@code adjustColumn} default
- *       returns {@code null}) cause a fail-closed rejection rather than an unsafe guess (S-004).</li>
+ *       {@code Y} for the requested column - no anchor-Y copying (S-001). {@code LinearAdjustor} and
+ *       {@code JumpAdjustor} both implement per-column resolution; any adjustor that cannot resolve a
+ *       specific column falls back to the {@link VerticalAdjustor} default ({@code null}), which
+ *       causes a fail-closed rejection rather than an unsafe guess (S-004).</li>
  *   <li>{@link SafetyScan#isColumnSafe} runs the shared block-clearance verdict over the resident
  *       neighbour grid - the same code the queue path uses (S-001, no drift).</li>
  * </ol>
