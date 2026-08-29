@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,17 +22,19 @@ import java.util.logging.Level;
 
 /**
  * Core implementation of {@link GroupPlacementService}: allocates and validates a localized subspace
- * of safe standable slots for a group, then (in a later phase) dispatches per-participant teleports.
+ * of safe standable slots for a group, then dispatches per-participant teleports.
  *
- * <p>The whole pipeline is non-blocking (S-005): the region anchor draw and every global-verifier
- * check are chained via {@link CompletableFuture} with no {@code get()}/{@code join()}. Every request
- * is answered with a {@link GroupPlacementResult}, never silently dropped (S-004).
+ * <p>The whole pipeline is non-blocking (S-005): the region anchor draw, every global-verifier
+ * check, and each teleport hop are chained via {@link CompletableFuture} with no {@code get()}/{@code
+ * join()}. Every request is answered with a {@link GroupPlacementResult}, never silently dropped
+ * (S-004).
  *
- * <p><b>Current scope.</b> This pass resolves the region, draws an anchor, builds the
- * {@link SubspaceShape}, selects safe slots via {@link Region#candidateValidator()}, and runs the
- * per-slot {@link GlobalRegionVerifiers} stage - producing a fully validated per-participant
- * destination map. It intentionally <em>stops before moving any player</em>: the per-participant
- * Folia region-scheduler dispatch and reservation hand-off are handled separately.
+ * <p><b>Pipeline.</b> Resolve the region, draw an anchor, build the {@link SubspaceShape}, select
+ * safe slots via {@link Region#candidateValidator()}, run the per-slot {@link GlobalRegionVerifiers}
+ * stage to produce a fully validated per-participant destination map, then dispatch teleports binned
+ * by destination chunk (one region-thread task per chunk, launched concurrently and lock-free). A
+ * participant offline at dispatch is logged and skipped (S-004); the returned future completes once
+ * every teleport has been initiated.
  *
  * <p><b>Footprint residency (fail-closed).</b> {@code selectSafeSlots} validates through
  * {@link Region#candidateValidator()}, which reads only <em>resident</em> chunks and fails closed for
@@ -158,7 +161,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     }
 
     return CompletableFuture.allOf(stages.toArray(new CompletableFuture[0]))
-        .thenApply(
+        .thenCompose(
             ignored -> {
               // 7. Assign surviving slots to participants in order. If any slot failed the verifier,
               // the group cannot be placed in full -> fail closed (all-or-nothing).
@@ -168,9 +171,10 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
               for (int i = 0; i < n; i++) {
                 if (!verified[i]) {
                   releaseReservation(genResult);
-                  return GroupPlacementResult.failure(
-                      GroupPlacementResult.Reason.INSUFFICIENT_SAFE_SLOTS,
-                      "slot " + i + " rejected by region verifier");
+                  return CompletableFuture.completedFuture(
+                      GroupPlacementResult.failure(
+                          GroupPlacementResult.Reason.INSUFFICIENT_SAFE_SLOTS,
+                          "slot " + i + " rejected by region verifier"));
                 }
                 RTPCoords c = candidates.get(i).coords();
                 placements.put(
@@ -179,14 +183,146 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
                         world, c.x(), c.y(), c.z(), candidates.get(i).reservation()));
               }
 
-              // Allocation and safety verdict are complete; no player has been moved. The
-              // per-participant Folia region-scheduler dispatch and reservation hand-off are the
-              // next phase. Release the anchor reservation here so this validation-only pass does
-              // not leak the pinned chunk ticket; the dispatch phase will instead hold/transfer it
-              // through teleport.
+              // Allocation and safety verdict are complete. The anchor reservation only pinned the
+              // draw chunks; destinations are independently validated, so release it now (the
+              // per-destination chunks are covered by the slot reservations carried on each
+              // RTPLocation and released by the teleport path).
               releaseReservation(genResult);
-              return GroupPlacementResult.success(placements);
+
+              // 8. Dispatch teleports, binned by destination chunk to cut scheduling overhead.
+              return dispatchTeleports(placements, world);
             });
+  }
+
+  /** A resolved, online participant paired with its destination and a per-teleport completion. */
+  private static final class Member {
+    final UUID uuid;
+    final io.github.dailystruggle.rtp.api.entity.RTPPlayer player;
+    final io.github.dailystruggle.rtp.api.world.RTPLocation dest;
+    final CompletableFuture<Boolean> done = new CompletableFuture<>();
+
+    Member(
+        UUID uuid,
+        io.github.dailystruggle.rtp.api.entity.RTPPlayer player,
+        io.github.dailystruggle.rtp.api.world.RTPLocation dest) {
+      this.uuid = uuid;
+      this.player = player;
+      this.dest = dest;
+    }
+  }
+
+  /**
+   * Dispatches teleports <em>binned by destination chunk</em> and completes once every teleport has
+   * been initiated.
+   *
+   * <p>Rather than one scheduled hop per participant, participants sharing a destination chunk are
+   * batched into a single {@link RTP#scheduler}{@code .runTask(world, cx, cz, ...)} - which lands on
+   * that chunk's owning region thread on Folia and the main thread elsewhere. Because the subspace
+   * footprint is a small NxN block of chunks, this collapses many per-player hops into a handful of
+   * per-chunk tasks. Bins are launched together and run independently on their own region threads,
+   * giving maximal concurrency with no shared locks; each teleport reports through its own future
+   * (S-005, no cross-region blocking).
+   *
+   * <p>A participant offline at dispatch is logged (never silently dropped, S-004) and skipped; the
+   * rest still teleport. If every participant is gone, the request fails closed with
+   * {@link GroupPlacementResult.Reason#CANCELLED}.
+   */
+  private CompletableFuture<GroupPlacementResult> dispatchTeleports(
+      Map<UUID, io.github.dailystruggle.rtp.api.world.RTPLocation> placements, RTPWorld<?> world) {
+
+    // Bin online participants by destination chunk; LinkedHashMap keeps launch order deterministic.
+    Map<Long, List<Member>> bins = new LinkedHashMap<>();
+    List<CompletableFuture<Boolean>> teleports = new ArrayList<>(placements.size());
+    for (Map.Entry<UUID, io.github.dailystruggle.rtp.api.world.RTPLocation> entry :
+        placements.entrySet()) {
+      final UUID uuid = entry.getKey();
+      final io.github.dailystruggle.rtp.api.world.RTPLocation dest = entry.getValue();
+
+      io.github.dailystruggle.rtp.api.entity.RTPPlayer player = null;
+      try {
+        player = RTP.serverAccessor.getPlayer(uuid);
+      } catch (Throwable t) {
+        RTP.log(Level.WARNING, "[group] failed to resolve participant " + uuid + " for dispatch", t);
+      }
+      if (player == null || !player.isOnline()) {
+        RTP.log(
+            Level.WARNING,
+            "[group] participant " + uuid + " offline at dispatch; releasing slot and skipping");
+        releaseSlotReservation(dest);
+        continue;
+      }
+
+      long chunkKey = chunkKey(dest.getBlockX() >> 4, dest.getBlockZ() >> 4);
+      Member member = new Member(uuid, player, dest);
+      bins.computeIfAbsent(chunkKey, k -> new ArrayList<>()).add(member);
+      teleports.add(member.done);
+    }
+
+    if (teleports.isEmpty()) {
+      return CompletableFuture.completedFuture(
+          GroupPlacementResult.failure(
+              GroupPlacementResult.Reason.CANCELLED, "all participants offline at dispatch"));
+    }
+
+    // Launch every bin together. Each runs on its own destination-chunk region thread with no
+    // shared mutable state between bins, so they proceed concurrently without locking.
+    for (List<Member> bin : bins.values()) {
+      final int cx = bin.get(0).dest.getBlockX() >> 4;
+      final int cz = bin.get(0).dest.getBlockZ() >> 4;
+      final List<Member> members = bin;
+      Runnable binTask =
+          () -> {
+            for (Member m : members) {
+              try {
+                m.player
+                    .setLocation(m.dest)
+                    .whenComplete(
+                        (ok, ex) -> {
+                          if (ex != null) {
+                            RTP.log(
+                                Level.WARNING,
+                                "[group] teleport failed for participant " + m.uuid, ex);
+                            m.done.complete(false);
+                          } else {
+                            m.done.complete(Boolean.TRUE.equals(ok));
+                          }
+                        });
+              } catch (Throwable t) {
+                RTP.log(Level.WARNING, "[group] teleport threw for participant " + m.uuid, t);
+                m.done.complete(false);
+              }
+            }
+          };
+      try {
+        RTP.scheduler.runTask(world, cx, cz, binTask);
+      } catch (Throwable t) {
+        RTP.log(
+            Level.WARNING,
+            "[group] failed to schedule teleport bin at chunk (" + cx + "," + cz + ")", t);
+        for (Member m : members) {
+          releaseSlotReservation(m.dest);
+          m.done.complete(false);
+        }
+      }
+    }
+
+    return CompletableFuture.allOf(teleports.toArray(new CompletableFuture[0]))
+        .thenApply(ignored -> GroupPlacementResult.success(placements));
+  }
+
+  /** Packs chunk (x, z) into a single long key (x in low 32 bits, z in high 32). */
+  private static long chunkKey(int cx, int cz) {
+    return ((long) cx & 0xFFFFFFFFL) | (((long) cz & 0xFFFFFFFFL) << 32);
+  }
+
+  /** Best-effort release of a per-slot reservation carried on an api RTPLocation (never throws). */
+  private static void releaseSlotReservation(io.github.dailystruggle.rtp.api.world.RTPLocation loc) {
+    if (loc == null || loc.getReservation() == null) return;
+    try {
+      loc.getReservation().close();
+    } catch (Throwable ignored) {
+      // best-effort close
+    }
   }
 
   /** Best-effort release of the anchor's chunk reservation (fail-closed, never throws). */
