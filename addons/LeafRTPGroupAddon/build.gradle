@@ -1,0 +1,41 @@
+plugins {
+    id 'java'
+}
+group = 'io.github.dailystruggle'
+// LeafRTPGroupAddon carries its OWN version line, independent of the RTP core
+// version: it ships and updates on its own cadence (mirroring the other addons).
+version = '1.0.0'
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+// Installable artifact carries the brand name, so the build produces
+// LeafRTPGroupAddon-<version>.jar - the jar a user drops into plugins/RTP/addons/.
+base {
+    archivesName = 'LeafRTPGroupAddon'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // RTP SPI + core scheduler/server-accessor surface the addon registers through.
+    compileOnly project(':rtp-api')
+    compileOnly project(':rtp-core')
+    // NOTE: no platform (spigot/paper/fabric) dependency. Group/subspace teleport is fully
+    // platform-neutral - it captures spatial memory from the parent region and
+    // dispatches teleports through RTP.scheduler / RTPServerAccessor, so the same
+    // class runs on any platform whose adapter implements the SPI.
+
+    testImplementation project(':rtp-api')
+    testImplementation project(':rtp-core')
+    testImplementation testFixtures(project(':rtp-core'))
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}

@@ -253,7 +253,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
         long t2 = System.nanoTime();
         try {
           byte[] bytes = Files.readAllBytes(regionFile.toPath());
-          AnvilReader.readChunk(bytes, rxLocal, rzLocal);
+          AnvilReader.readChunkEntry(bytes, rxLocal, rzLocal);
           anvilTotalNs += System.nanoTime() - t2;
           anvilSamples++;
         } catch (Throwable t) {

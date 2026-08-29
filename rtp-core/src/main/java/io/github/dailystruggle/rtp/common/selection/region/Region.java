@@ -83,6 +83,15 @@ public class Region extends FactoryValue<RegionKeys> {
    */
   private volatile boolean backlogRefillActive = true;
 
+  /**
+   * Lazily-created, cached shared {@link CandidateValidator} for this region. The validator is
+   * stateless apart from an immutable back-reference to this region (it re-reads world/vert/config
+   * on each call, so it stays correct across {@code rebindWorld}/world-border swaps), so a single
+   * instance is reused for every candidate rather than allocating one per {@link #candidateValidator()}
+   * call - avoiding needless GC pressure on the per-candidate hot path.
+   */
+  private volatile CandidateValidator candidateValidator;
+
   public Region(String name, RegionSettings settings) {
     this(name, settings, false, null);
   }
@@ -1299,6 +1308,31 @@ public class Region extends FactoryValue<RegionKeys> {
 
   public RTPWorld<?> getWorld() {
     return settings.world();
+  }
+
+  /**
+   * Returns the shared per-candidate {@link CandidateValidator} for this region.
+   *
+   * <p>This is the single reusable "turn a column into a verified, standable, claim-safe location"
+   * primitive (S-001/S-003/S-005): it chains this region's {@code VerticalAdjustor}, the shared
+   * {@link SafetyScan} block-clearance verdict, and {@code GlobalRegionVerifiers}. Multi-target
+   * consumers (the {@code SubspaceShape} group path and future addons) should use this rather than
+   * re-deriving safety logic. Must be invoked off-tick (it blocks on async chunk loads).
+   *
+   * @return a region-backed candidate validator (never {@code null})
+   */
+  public CandidateValidator candidateValidator() {
+    CandidateValidator local = candidateValidator;
+    if (local == null) {
+      synchronized (this) {
+        local = candidateValidator;
+        if (local == null) {
+          local = new RegionCandidateValidator(this);
+          candidateValidator = local;
+        }
+      }
+    }
+    return local;
   }
 
   /**

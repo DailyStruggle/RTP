@@ -1349,24 +1349,24 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
             }
           }
         }
-
-        // 2. Overlay values from oldYaml to preserve user settings
-        for (String key : oldYaml.getKeys(true)) {
-          if (key.equalsIgnoreCase("version")) continue;
-          if (!oldYaml.isConfigurationSection(key)) {
-            RtpYamlConfig.set(key, oldYaml.get(key));
-          }
-        }
-
-        // Stamp the file with the version this code targets so the next load
-        // sees a match and does not re-trigger update()/renameFiles(). Without
-        // this, any drift between the bundled resource's version (or a missing
-        // version key) and the code's required version rotates a fresh
-        // <name>.oldN backup on every single load.
-        RtpYamlConfig.set("version", version);
-
-        RtpYamlConfig.save();
       }
+
+      // 2. Overlay values from oldYaml to preserve user settings
+      for (String key : oldYaml.getKeys(true)) {
+        if (key.equalsIgnoreCase("version")) continue;
+        if (!oldYaml.isConfigurationSection(key)) {
+          RtpYamlConfig.set(key, oldYaml.get(key));
+        }
+      }
+
+      // Stamp the file with the version this code targets so the next load
+      // sees a match and does not re-trigger update()/renameFiles(). Without
+      // this, any drift between the bundled resource's version (or a missing
+      // version key) and the code's required version rotates a fresh
+      // <name>.oldN backup on every single load.
+      RtpYamlConfig.set("version", version);
+
+      RtpYamlConfig.save();
     } catch (IOException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
     }
