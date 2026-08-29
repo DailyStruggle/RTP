@@ -363,6 +363,133 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
   }
 
   /**
+   * Shared per-cell acceptance predicate: standable feet-Y {@code y} on column
+   * {@code (x, z)} with head clearance, sky-light gate, block safety, and ground
+   * depth re-check. Identical to the inner test in {@link #adjust(RTPChunk, MutableRTPCoords)}
+   * so the two paths share one definition of "safe cell" (S-001, no drift).
+   */
+  private static boolean acceptColumnY(
+      RTPChunk chunk,
+      int x,
+      int y,
+      int z,
+      boolean requireSkyLight,
+      int columnSkyFloor,
+      Set<String> unsafeBlocks,
+      int platformDepth) {
+    int skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
+    return !chunk.isAir(x, y - 1, z)
+        && chunk.isAir(x, y, z)
+        && chunk.isAir(x, y + 1, z)
+        && skylight > 7
+        && chunk.isSafe(x, y, z, unsafeBlocks)
+        && chunk.isSafe(x, y + 1, z, unsafeBlocks)
+        && isGroundSafe(chunk, x, y, z, unsafeBlocks, platformDepth);
+  }
+
+  /**
+   * Re-validates a single, caller-specified column {@code (localX, localZ)} using the
+   * same direction sweep and safety predicate as {@link #adjust(RTPChunk, MutableRTPCoords)}.
+   * Used by the group subspace path (per-slot resolution) where a specific column - not any
+   * column in the chunk - must be resolved. Returns {@code null} when the column has no safe
+   * standing Y (fail-closed, S-004).
+   */
+  @Override
+  public @Nullable RTPCoords adjustColumn(@NotNull RTPChunk chunk, int localX, int localZ) {
+    if (chunk == null) return null;
+
+    int maxY = getNumber(GenericVerticalAdjustorKeys.maxY, 320L).intValue();
+    int minY = getNumber(GenericVerticalAdjustorKeys.minY, 0L).intValue();
+    int dir = getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue();
+
+    maxY = Math.min(maxY, chunk.getWorld().getMaxHeight());
+
+    boolean requireSkyLight;
+    Object o = getData().getOrDefault(GenericVerticalAdjustorKeys.requireSkyLight, false);
+    if (o instanceof Boolean) {
+      requireSkyLight = (Boolean) o;
+    } else requireSkyLight = Boolean.parseBoolean(o.toString());
+
+    SafetySnapshot snap = readSafetySnapshot();
+    Set<String> unsafeBlocks = snap.unsafeBlocks();
+    int platformDepth = snap.platformDepth();
+
+    int x = localX & 15;
+    int z = localZ & 15;
+    int globalX = (chunk.x() << 4) + x;
+    int globalZ = (chunk.z() << 4) + z;
+    int columnSkyFloor = requireSkyLight ? computeColumnSkyFloor(chunk, x, z) : Integer.MIN_VALUE;
+
+    Integer y = scanColumnForY(
+        chunk, x, z, minY, maxY, dir, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth);
+    if (y == null) return null;
+    return new MutableRTPCoords(chunk.getWorld().name(), globalX, y, globalZ).toImmutable();
+  }
+
+  /**
+   * Direction-aware single-column Y sweep mirroring the {@code dir} switch in
+   * {@link #adjust(RTPChunk, MutableRTPCoords)}. Returns the first accepted feet-Y, or
+   * {@code null} if none on this column.
+   */
+  private Integer scanColumnForY(
+      RTPChunk chunk,
+      int x,
+      int z,
+      int minY,
+      int maxY,
+      int dir,
+      boolean requireSkyLight,
+      int columnSkyFloor,
+      Set<String> unsafeBlocks,
+      int platformDepth) {
+    switch (dir) {
+      case 0: { // bottom up
+        for (int i = minY; i < maxY; i++) {
+          if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
+        }
+        break;
+      }
+      case 1: { // top down
+        for (int i = maxY; i > minY; i--) {
+          if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
+        }
+        break;
+      }
+      case 2: { // middle out
+        int maxDistance = (maxY - minY) / 2;
+        int middle = minY + maxDistance;
+        for (int i = 0; i <= maxDistance; i++) {
+          int yTop = middle + i;
+          if (acceptColumnY(chunk, x, yTop, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yTop;
+          int yBot = middle - i;
+          if (acceptColumnY(chunk, x, yBot, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yBot;
+        }
+        break;
+      }
+      case 3: { // edges in
+        int maxDistance = (maxY - minY) / 2;
+        int middle = minY + maxDistance;
+        for (int i = maxDistance; i >= 0; i--) {
+          int yTop = middle + i;
+          if (acceptColumnY(chunk, x, yTop, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yTop;
+          int yBot = middle - i;
+          if (acceptColumnY(chunk, x, yBot, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yBot;
+        }
+        break;
+      }
+      default: { // random order
+        List<Integer> trials = new ArrayList<>(Math.max(0, maxY - minY + 1));
+        for (int i = minY; i < maxY; i++) trials.add(i);
+        Collections.shuffle(trials, rng);
+        for (int i : trials) {
+          if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Probe-backed fast path mirroring {@link #adjust(RTPChunk, MutableRTPCoords)}.
    * Returns {@code null} (fall back to live {@link #adjust}) when the probe
    * window doesn't cover {@code [minY, maxY]} or no acceptable Y was found.

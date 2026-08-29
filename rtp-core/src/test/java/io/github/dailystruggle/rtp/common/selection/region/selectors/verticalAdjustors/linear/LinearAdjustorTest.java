@@ -233,6 +233,76 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
+    // adjustColumn - per-column re-validation (group subspace per-slot path)
+    // -----------------------------------------------------------------------
+
+    /**
+     * {@code adjustColumn} resolves exactly the requested in-chunk column using the same
+     * landing predicate as {@code adjust}, deriving global X/Z from the chunk origin and the
+     * requested local column. This is the per-slot resolver the group subspace path relies on
+     * (S-001 single "safe column" definition).
+     */
+    @Test
+    void adjustColumn_findsLandingOnRequestedColumn() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(2, 3, world);
+        for (int y = 32; y <= 67; y++) chunk.setSolidSafe(y); // ground up to 67, air 68+
+
+        LinearAdjustor adj = buildAdjustor(0, 32, 255);
+        RTPCoords result = adj.adjustColumn(chunk, 5, 9);
+
+        assertNotNull(result, "adjustColumn should find the landing on the requested column");
+        assertEquals(68, result.y(), "Landing should be Y=68 (one above the solid ground at Y=67)");
+        assertEquals((2 << 4) + 5, result.x(), "Global X should be derived from the requested local X");
+        assertEquals((3 << 4) + 9, result.z(), "Global Z should be derived from the requested local Z");
+    }
+
+    /**
+     * {@code adjustColumn} fails closed (returns {@code null}) when the requested column has no
+     * safe standing spot, so the group path denies rather than fabricating a Y (S-004).
+     */
+    @Test
+    void adjustColumn_entireRangeUnsafe_returnsNull() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 32; y <= 100; y++) chunk.setSolid(y); // all unsafe
+
+        LinearAdjustor adj = buildAdjustor(0, 32, 100);
+        assertNull(adj.adjustColumn(chunk, 7, 7),
+                "adjustColumn should return null when the column has no safe landing");
+    }
+
+    /**
+     * Out-of-range local coordinates are masked into {@code [0..15]}, so a global block X/Z
+     * passed verbatim still resolves to the correct in-chunk column.
+     */
+    @Test
+    void adjustColumn_masksLocalCoordsIntoChunk() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 32; y <= 67; y++) chunk.setSolidSafe(y);
+
+        LinearAdjustor adj = buildAdjustor(0, 32, 255);
+        RTPCoords result = adj.adjustColumn(chunk, 21, 0); // 21 & 15 == 5
+
+        assertNotNull(result, "adjustColumn should mask local coords and still find a landing");
+        assertEquals(5, result.x(), "Local X should be masked (21 & 15 == 5)");
+    }
+
+    /**
+     * {@code adjustColumn} honors the top-down direction, mirroring {@code adjust(dir=1)}.
+     */
+    @Test
+    void adjustColumn_topDown_findsHighestLanding() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 67; y <= 80; y++) chunk.setSolid(y);
+        chunk.setSolidSafe(64); // safe floor - player lands at Y=65
+
+        LinearAdjustor adj = buildAdjustor(1, 60, 80);
+        RTPCoords result = adj.adjustColumn(chunk, 3, 3);
+
+        assertNotNull(result, "top-down adjustColumn should find a landing");
+        assertEquals(65, result.y(), "top-down adjustColumn should land at Y=65");
+    }
+
+    // -----------------------------------------------------------------------
     // requireSkyLight = true - per-Y sky-light gate (V2 behavior, not a fast-path)
     // -----------------------------------------------------------------------
 

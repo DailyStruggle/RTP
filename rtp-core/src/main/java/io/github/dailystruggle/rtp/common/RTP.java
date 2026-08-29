@@ -93,6 +93,16 @@ public class RTP {
   public static RTPEconomy economy = null;
 
   /**
+   * Process-wide entry point for multi-participant subspace group teleports.
+   * Eagerly constructed and stateless: it reads {@link #selectionAPI} at call time and fails
+   * closed (structured {@link io.github.dailystruggle.rtp.api.group.GroupPlacementResult.Reason})
+   * when the region/world is not resolvable, so it is safe to reference before core is fully wired.
+   */
+  public static final io.github.dailystruggle.rtp.api.group.GroupPlacementService
+      groupPlacementService =
+          new io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher();
+
+  /**
    * Pre-dispatch hook to decide whether {@code /rtp} is served locally,
    * enrolled on cross-server wait queue, or rejected.
    * Defaults to {@link io.github.dailystruggle.rtp.api.network.NetworkCommandHook#LOCAL_ONLY}.
