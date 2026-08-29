@@ -3,10 +3,9 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Level;
@@ -17,9 +16,8 @@ import java.util.logging.Level;
  * their own safety checks, such as claim protection or custom area restrictions.
  */
 public class GlobalRegionVerifiers {
-    private static final Semaphore regionVerifiersLock = new Semaphore(1);
-    private static final List<Predicate<RTPCoords>> regionVerifiers = new ArrayList<>();
-    private static final List<Function<RTPCoords, CompletableFuture<Boolean>>> asyncRegionVerifiers = new ArrayList<>();
+    private static final List<Predicate<RTPCoords>> regionVerifiers = new CopyOnWriteArrayList<>();
+    private static final List<Function<RTPCoords, CompletableFuture<Boolean>>> asyncRegionVerifiers = new CopyOnWriteArrayList<>();
 
     /**
      * Adds a synchronous global region verifier. This verifier will be executed
@@ -29,16 +27,7 @@ public class GlobalRegionVerifiers {
      *                      or {@code false} for an invalid one.
      */
     public static void addGlobalRegionVerifier(Predicate<RTPCoords> locationCheck) {
-        boolean acquired = false;
-        try {
-            regionVerifiersLock.acquire();
-            acquired = true;
-            regionVerifiers.add(locationCheck);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } finally {
-            if (acquired) regionVerifiersLock.release();
-        }
+        regionVerifiers.add(locationCheck);
     }
 
     /**
@@ -50,16 +39,7 @@ public class GlobalRegionVerifiers {
      *                      or {@code false} for an invalid one.
      */
     public static void addGlobalRegionVerifierAsync(Function<RTPCoords, CompletableFuture<Boolean>> locationCheck) {
-        boolean acquired = false;
-        try {
-            regionVerifiersLock.acquire();
-            acquired = true;
-            asyncRegionVerifiers.add(locationCheck);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } finally {
-            if (acquired) regionVerifiersLock.release();
-        }
+        asyncRegionVerifiers.add(locationCheck);
     }
 
     /**
@@ -69,34 +49,15 @@ public class GlobalRegionVerifiers {
      * @return the total registered verifier count
      */
     public static int registeredCount() {
-        boolean acquired = false;
-        try {
-            regionVerifiersLock.acquire();
-            acquired = true;
-            return regionVerifiers.size() + asyncRegionVerifiers.size();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return 0;
-        } finally {
-            if (acquired) regionVerifiersLock.release();
-        }
+        return regionVerifiers.size() + asyncRegionVerifiers.size();
     }
 
     /**
      * Removes all registered global region verifiers.
      */
     public static void clearGlobalRegionVerifiers() {
-        boolean acquired = false;
-        try {
-            regionVerifiersLock.acquire();
-            acquired = true;
-            regionVerifiers.clear();
-            asyncRegionVerifiers.clear();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } finally {
-            if (acquired) regionVerifiersLock.release();
-        }
+        regionVerifiers.clear();
+        asyncRegionVerifiers.clear();
     }
 
     /**
@@ -108,49 +69,38 @@ public class GlobalRegionVerifiers {
      *         if the location is valid according to all verifiers, otherwise {@code false}.
      */
     public static CompletableFuture<Boolean> checkGlobalRegionVerifiers(RTPCoords location) {
-        try {
-            regionVerifiersLock.acquire();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return CompletableFuture.completedFuture(false);
-        }
-
-        try {
-            for (Predicate<RTPCoords> verifier : regionVerifiers) {
-                try {
-                    if (!verifier.test(location)) {
-                        return CompletableFuture.completedFuture(false);
-                    }
-                } catch (Throwable throwable) {
-                    // Fail safe: a throwing verifier is logged at WARNING and the location is
-                    // rejected (treated as false), never silently accepted (REQ-RTP-S-004).
-                    // This mirrors the async-verifier path below and the documented contract
-                    // in docs/dev/EXTERNAL_HOOKS.md.
-                    RTP.log(Level.WARNING, "Global region verifier threw an exception", throwable);
+        for (Predicate<RTPCoords> verifier : regionVerifiers) {
+            try {
+                if (!verifier.test(location)) {
                     return CompletableFuture.completedFuture(false);
                 }
+            } catch (Throwable throwable) {
+                // Fail safe: a throwing verifier is logged at WARNING and the location is
+                // rejected (treated as false), never silently accepted (REQ-RTP-S-004).
+                // This mirrors the async-verifier path below and the documented contract
+                // in docs/dev/EXTERNAL_HOOKS.md.
+                RTP.log(Level.WARNING, "Global region verifier threw an exception", throwable);
+                return CompletableFuture.completedFuture(false);
             }
-
-            if (asyncRegionVerifiers.isEmpty()) {
-                return CompletableFuture.completedFuture(true);
-            }
-
-            CompletableFuture<Boolean> result = CompletableFuture.completedFuture(true);
-            for (Function<RTPCoords, CompletableFuture<Boolean>> verifier : asyncRegionVerifiers) {
-                result = result.thenCompose(pass -> {
-                    if (!pass) return CompletableFuture.completedFuture(false);
-                    try {
-                        return verifier.apply(location);
-                    } catch (Throwable throwable) {
-                        RTP.log(Level.WARNING, "Async global region verifier threw an exception", throwable);
-                        return CompletableFuture.completedFuture(false); // Fail safe
-                    }
-                });
-            }
-            return result;
-        } finally {
-            regionVerifiersLock.release();
         }
+
+        if (asyncRegionVerifiers.isEmpty()) {
+            return CompletableFuture.completedFuture(true);
+        }
+
+        CompletableFuture<Boolean> result = CompletableFuture.completedFuture(true);
+        for (Function<RTPCoords, CompletableFuture<Boolean>> verifier : asyncRegionVerifiers) {
+            result = result.thenCompose(pass -> {
+                if (!pass) return CompletableFuture.completedFuture(false);
+                try {
+                    return verifier.apply(location);
+                } catch (Throwable throwable) {
+                    RTP.log(Level.WARNING, "Async global region verifier threw an exception", throwable);
+                    return CompletableFuture.completedFuture(false); // Fail safe
+                }
+            });
+        }
+        return result;
     }
 
     /**

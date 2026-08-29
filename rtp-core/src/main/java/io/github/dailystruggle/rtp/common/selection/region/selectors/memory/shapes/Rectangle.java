@@ -89,13 +89,13 @@ public class Rectangle extends MemoryShape<RectangleParams> {
 
   @Override
   public boolean contains(int x, int z) {
-    long cx = getNumber(RectangleParams.centerX, 0L).longValue() >> 4;
-    long cz = getNumber(RectangleParams.centerZ, 0L).longValue() >> 4;
-    long width = getNumber(RectangleParams.width, 256L).longValue() >> 4;
-    long height = getNumber(RectangleParams.height, 256L).longValue() >> 4;
+    long cx = getNumber(RectangleParams.centerX, 0L).longValue();
+    long cz = getNumber(RectangleParams.centerZ, 0L).longValue();
+    long width = getNumber(RectangleParams.width, 256L).longValue();
+    long height = getNumber(RectangleParams.height, 256L).longValue();
     long degrees = getNumber(RectangleParams.rotation, 0L).longValue();
 
-    if (width == 0 || height == 0) return false;
+    if (width <= 0 || height <= 0) return false;
 
     if (degrees == 0) {
       return Math.abs(x - cx) <= width / 2 && Math.abs(z - cz) <= height / 2;

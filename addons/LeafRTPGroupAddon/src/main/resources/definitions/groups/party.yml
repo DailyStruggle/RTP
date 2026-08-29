@@ -1,0 +1,12 @@
+version: 1.0
+
+# Tight co-op party cluster.
+# subspaceChunkRadius is the Stage 1 (chunk) footprint;
+# minSeparation/elevationTolerance are in blocks. The Stage 2 sampling stride is
+# derived internally from minSeparation.
+distribution: CLUSTER
+
+subspaceChunkRadius: 1
+minSeparation: 2
+elevationTolerance: 4
+maxGroupSize: 8

@@ -1,0 +1,10 @@
+version: 1.0
+
+# Perimeter target pursuit / bounty drop.
+# Ring around a live target anchor; wide footprint, single participant.
+distribution: RING
+
+subspaceChunkRadius: 6
+minSeparation: 5
+elevationTolerance: 6
+maxGroupSize: 1

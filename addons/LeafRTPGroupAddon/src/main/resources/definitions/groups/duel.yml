@@ -1,0 +1,10 @@
+version: 1.0
+
+# 1v1 PvP duel with polar opposition.
+# Larger chunk footprint so the two opponents can be spaced far apart in blocks.
+distribution: OPPOSING_POLES
+
+subspaceChunkRadius: 4
+minSeparation: 50
+elevationTolerance: 4
+maxGroupSize: 2
