@@ -1,10 +1,12 @@
 version: 1.0
 
 # Perimeter target pursuit / bounty drop.
-# Ring around a live target anchor; wide footprint, single participant.
-distribution: RING
+# A circle (ring) around a live target anchor; centerRadius carves out the middle to push the
+# participant onto the perimeter. radius is the footprint in BLOCKS.
+shape:
+  name: "CIRCLE"
+  radius: 100
+  centerRadius: 4
+  spatialResolution: 5
 
-subspaceChunkRadius: 6
-minSeparation: 5
-elevationTolerance: 6
 maxGroupSize: 1

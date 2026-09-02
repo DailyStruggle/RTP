@@ -7,30 +7,30 @@ import java.util.Objects;
  * Immutable, platform-neutral bundle of the required group-placement parameters.
  *
  * <p>Supplied on every {@link GroupPlacementRequest}. Carries only primitives, so no implementation
- * types cross this boundary. {@code distribution} is a case-insensitive name (e.g. {@code CLUSTER},
- * {@code OPPOSING_POLES}, {@code RING}, {@code GRID}); unrecognized values fall back to the
- * implementation's default.
+ * types cross this boundary. {@code distribution} is the case-insensitive name of a registered
+ * placement shape (e.g. {@code circle}, {@code square}) that governs how participants are laid out
+ * within the subspace; an unrecognized name falls back to the implementation's default shape.
  *
- * <p><b>Units.</b> {@code subspaceChunkRadius} is in chunks (footprint half-width);
- * {@code minSeparation} and {@code elevationTolerance} are in blocks.
+ * <p><b>Units.</b> {@code radius}, {@code minSeparation}, and {@code elevationTolerance} are all in
+ * blocks. {@code radius} is the subspace footprint half-width.
  */
 @PublicApi
 public final class GroupProfileSpec {
 
   private final String distribution;
-  private final int subspaceChunkRadius;
+  private final int radius;
   private final int minSeparation;
   private final int elevationTolerance;
   private final int maxGroupSize;
 
   private GroupProfileSpec(
       String distribution,
-      int subspaceChunkRadius,
+      int radius,
       int minSeparation,
       int elevationTolerance,
       int maxGroupSize) {
     this.distribution = distribution;
-    this.subspaceChunkRadius = subspaceChunkRadius;
+    this.radius = radius;
     this.minSeparation = minSeparation;
     this.elevationTolerance = elevationTolerance;
     this.maxGroupSize = maxGroupSize;
@@ -40,7 +40,7 @@ public final class GroupProfileSpec {
    * Builds an inline profile specification.
    *
    * @param distribution case-insensitive distribution name; must not be {@code null} or blank
-   * @param subspaceChunkRadius footprint half-width in chunks (clamped to {@code >= 0})
+   * @param radius footprint half-width in blocks (clamped to {@code >= 0})
    * @param minSeparation minimum block distance between participants (clamped to {@code >= 1})
    * @param elevationTolerance maximum block Y delta between participants (clamped to {@code >= 0})
    * @param maxGroupSize maximum participant count (clamped to {@code >= 1})
@@ -49,7 +49,7 @@ public final class GroupProfileSpec {
    */
   public static GroupProfileSpec of(
       String distribution,
-      int subspaceChunkRadius,
+      int radius,
       int minSeparation,
       int elevationTolerance,
       int maxGroupSize) {
@@ -58,7 +58,7 @@ public final class GroupProfileSpec {
     }
     return new GroupProfileSpec(
         distribution,
-        Math.max(0, subspaceChunkRadius),
+        Math.max(0, radius),
         Math.max(1, minSeparation),
         Math.max(0, elevationTolerance),
         Math.max(1, maxGroupSize));
@@ -72,10 +72,10 @@ public final class GroupProfileSpec {
   }
 
   /**
-   * @return the Stage 1 footprint half-width in chunks
+   * @return the subspace footprint half-width in blocks
    */
-  public int subspaceChunkRadius() {
-    return subspaceChunkRadius;
+  public int radius() {
+    return radius;
   }
 
   /**
@@ -104,7 +104,7 @@ public final class GroupProfileSpec {
     if (this == o) return true;
     if (!(o instanceof GroupProfileSpec)) return false;
     GroupProfileSpec that = (GroupProfileSpec) o;
-    return subspaceChunkRadius == that.subspaceChunkRadius
+    return radius == that.radius
         && minSeparation == that.minSeparation
         && elevationTolerance == that.elevationTolerance
         && maxGroupSize == that.maxGroupSize
@@ -115,7 +115,7 @@ public final class GroupProfileSpec {
   public int hashCode() {
     return Objects.hash(
         distribution.toLowerCase(),
-        subspaceChunkRadius,
+            radius,
         minSeparation,
         elevationTolerance,
         maxGroupSize);
@@ -124,7 +124,7 @@ public final class GroupProfileSpec {
   @Override
   public String toString() {
     return "GroupProfileSpec[" + distribution
-        + ", chunkR=" + subspaceChunkRadius
+        + ", radius=" + radius
         + ", minSep=" + minSeparation
         + ", elevTol=" + elevationTolerance
         + ", maxGroup=" + maxGroupSize + ']';

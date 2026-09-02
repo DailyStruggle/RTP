@@ -1,10 +1,10 @@
 version: 1.0
 
 # Squad vs squad team skirmish.
-# Wide chunk footprint to host two separated team clusters.
-distribution: GRID
+# Wide block footprint hosting a full square lattice for separated team clusters.
+shape:
+  name: "SQUARE"
+  radius: 100
+  spatialResolution: 4
 
-subspaceChunkRadius: 6
-minSeparation: 4
-elevationTolerance: 5
 maxGroupSize: 16

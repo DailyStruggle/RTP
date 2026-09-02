@@ -1,18 +1,12 @@
 version: 1.0
 
-# Placement distribution pattern: CLUSTER, OPPOSING_POLES, RING, GRID
-distribution: CLUSTER
+# Baseline group profile.
+# The shape block carries everything spatial (mirrors a region's shape declaration):
+#   radius            - subspace footprint half-width in BLOCKS
+#   spatialResolution - selection stride (participant spacing) in this group context
+shape:
+  name: "SQUARE"
+  radius: 40
+  spatialResolution: 3
 
-# Subspace footprint half-width in CHUNKS (Stage 1 chunk-granularity pre-filter).
-# The footprint spans (2*n + 1)^2 chunks around the anchor chunk. 1 = 3x3 chunks = 48x48 blocks.
-subspaceChunkRadius: 2
-
-# Minimum separation in BLOCKS between any two placed participants.
-# This also drives the internal Stage 2 block sampling stride (derived from minSeparation).
-minSeparation: 3
-
-# Maximum allowed vertical elevation variance in BLOCKS across participants.
-elevationTolerance: 4
-
-# Maximum participants supported by this profile.
 maxGroupSize: 8
