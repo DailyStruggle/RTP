@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.metrics;
 
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
-import io.github.dailystruggle.metrics.api.Metrics;
 import io.github.dailystruggle.metrics.api.MetricsExtension;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 

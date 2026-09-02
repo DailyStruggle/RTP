@@ -1,9 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
-import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.common.commands.admin.AdminCmd;
-import io.github.dailystruggle.rtp.common.commands.prefab.PrefabCommand;
 
 
 /**
