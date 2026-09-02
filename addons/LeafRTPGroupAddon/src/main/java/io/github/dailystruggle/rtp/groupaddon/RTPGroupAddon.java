@@ -10,14 +10,31 @@ import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
  *
  * <p>Discovered by {@code rtp-core} through {@link java.util.ServiceLoader}.
  * Profiles are configured as separate {@code .yml} files under {@code definitions/groups/}
- * and managed by {@link MultiConfigParser}.
+ * and managed by {@link MultiConfigParser}. Maintains a 3-tiered group subspace cache (L1/L2/L3).
  */
 public final class RTPGroupAddon implements RTPAddon {
+  private static GroupSubspaceCache cache;
+  private static GroupCacheWorker worker;
+  private static Object scheduledTaskHandle;
+
+  public static GroupSubspaceCache getCache() {
+    return cache;
+  }
+
+  public static GroupCacheWorker getWorker() {
+    return worker;
+  }
 
   @Override
   public void onLoad() {
     registerGroupProfiles();
     Configs.onReload(this::registerGroupProfiles);
+
+    cache = new GroupSubspaceCache();
+    worker = new GroupCacheWorker(cache);
+    if (RTP.scheduler != null) {
+      scheduledTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(worker, 20L, 20L);
+    }
   }
 
   /**
@@ -38,6 +55,18 @@ public final class RTPGroupAddon implements RTPAddon {
 
   @Override
   public void onUnload() {
+    if (scheduledTaskHandle != null && RTP.scheduler != null) {
+      try {
+        RTP.scheduler.cancelTask(scheduledTaskHandle);
+      } catch (Throwable ignored) {
+      }
+      scheduledTaskHandle = null;
+    }
+    if (cache != null) {
+      cache.clear();
+      cache = null;
+    }
+    worker = null;
     RTP.configs.multiConfigParserMap.remove(GroupKeys.class);
   }
 }
