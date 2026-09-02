@@ -1,40 +1,77 @@
 package io.github.dailystruggle.rtp.groupaddon;
 
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
  * Declarative profile descriptor for group subspace placement, instantiated dynamically from configuration.
  *
- * <p><b>Units.</b> {@code subspaceChunkRadius} is the chunk-granularity Stage 1 footprint;
- * {@code minSeparation} and {@code elevationTolerance} are in blocks. The Stage 2 block sampling
- * stride is derived internally from {@code minSeparation} (see {@code SubspaceShape}) rather than
- * being a separate config knob, since a distinct stride only duplicates the separation constraint.
- * Keeping chunk and block units distinct is deliberate - see {@code SubspaceShape}.
+ * <p><b>Thin by design.</b> Everything spatial lives in the region-style {@code shape} block and
+ * reuses the shape's own parameters - {@code radius}/{@code centerRadius} for the subspace footprint
+ * (in blocks), {@code spatialResolution} for the selection stride (participant spacing),
+ * {@code uniquePlacements} for non-repeating selection. The only group-specific knob is
+ * {@code maxGroupSize}. Shape resolution lives in {@link GroupShapes}.
  *
  * @param name profile name (filename without .yml)
- * @param distribution geometric distribution pattern
- * @param subspaceChunkRadius footprint half-width in chunks (Stage 1 pre-filter bound)
- * @param minSeparation minimum distance in blocks between placed participants (also drives the
- *     internal Stage 2 sampling stride)
- * @param elevationTolerance maximum allowable Y delta in blocks between participants
+ * @param shape shape block ({@code name} + shape parameters); may be empty, never {@code null}
  * @param maxGroupSize maximum participant count supported by this profile
  */
-public record GroupProfile(
-    String name,
-    GroupDistribution distribution,
-    int subspaceChunkRadius,
-    int minSeparation,
-    int elevationTolerance,
-    int maxGroupSize) {
+public record GroupProfile(String name, Map<String, Object> shape, int maxGroupSize) {
 
   public GroupProfile {
     Objects.requireNonNull(name, "name cannot be null");
-    Objects.requireNonNull(distribution, "distribution cannot be null");
-    if (subspaceChunkRadius < 0) subspaceChunkRadius = 0;
-    if (minSeparation < 1) minSeparation = 1;
-    if (elevationTolerance < 0) elevationTolerance = 0;
+    shape =
+        (shape == null)
+            ? Collections.emptyMap()
+            : Collections.unmodifiableMap(new LinkedHashMap<>(shape));
     if (maxGroupSize < 1) maxGroupSize = 1;
+  }
+
+  /**
+   * @return the configured shape name (from the shape block's {@code name}), or {@code "square"}
+   *     when unspecified - the full-lattice default.
+   */
+  public String shapeName() {
+    return String.valueOf(shapeParam("name", "square"));
+  }
+
+  /**
+   * @return the subspace footprint half-width in blocks, from the shape block's {@code radius}
+   *     (default {@code 16}).
+   */
+  public int radiusBlocks() {
+    return (int) longParam("radius", 16L);
+  }
+
+  /**
+   * @return the selection stride (participant spacing), from the shape block's
+   *     {@code spatialResolution} (default {@code 1}); clamped to {@code >= 1}.
+   */
+  public int spacing() {
+    return (int) Math.max(1L, longParam("spatialResolution", 1L));
+  }
+
+  private Object shapeParam(String key, Object def) {
+    for (Map.Entry<String, Object> e : shape.entrySet()) {
+      if (key.equalsIgnoreCase(e.getKey()) && e.getValue() != null) return e.getValue();
+    }
+    return def;
+  }
+
+  private long longParam(String key, long def) {
+    Object v = shapeParam(key, null);
+    if (v instanceof Number n) return n.longValue();
+    if (v != null) {
+      try {
+        return Long.parseLong(v.toString().trim());
+      } catch (NumberFormatException ignored) {
+        // fall through to default
+      }
+    }
+    return def;
   }
 
   /**
@@ -46,19 +83,19 @@ public record GroupProfile(
    */
   public static GroupProfile fromConfig(String name, ConfigParser<GroupKeys> parser) {
     Objects.requireNonNull(parser, "parser cannot be null");
-    String distStr = (String) parser.getConfigValue(GroupKeys.distribution, "CLUSTER");
-    GroupDistribution dist;
-    try {
-      dist = GroupDistribution.valueOf(distStr.toUpperCase());
-    } catch (Exception e) {
-      dist = GroupDistribution.CLUSTER;
+
+    // getMap resolves a nested block (RtpYamlSection) into a plain Map, mirroring region shape reads.
+    Map<String, Object> shapeBlock = Collections.emptyMap();
+    Map<String, Object> raw = parser.getMap(GroupKeys.shape);
+    if (raw != null && !raw.isEmpty()) {
+      Map<String, Object> collected = new LinkedHashMap<>();
+      for (Map.Entry<String, Object> e : raw.entrySet()) {
+        if (e.getKey() != null) collected.put(e.getKey(), e.getValue());
+      }
+      shapeBlock = collected;
     }
 
-    int chunkRadius = ((Number) parser.getNumber(GroupKeys.subspaceChunkRadius, 1)).intValue();
-    int minSep = ((Number) parser.getNumber(GroupKeys.minSeparation, 3)).intValue();
-    int elevTol = ((Number) parser.getNumber(GroupKeys.elevationTolerance, 4)).intValue();
     int maxGroup = ((Number) parser.getNumber(GroupKeys.maxGroupSize, 8)).intValue();
-
-    return new GroupProfile(name, dist, chunkRadius, minSep, elevTol, maxGroup);
+    return new GroupProfile(name, shapeBlock, maxGroup);
   }
 }

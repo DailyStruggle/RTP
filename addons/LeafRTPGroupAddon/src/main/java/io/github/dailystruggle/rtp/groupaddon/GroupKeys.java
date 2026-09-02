@@ -6,32 +6,26 @@ package io.github.dailystruggle.rtp.groupaddon;
  * <p>Enum constants are matched against YAML keys by RTP's
  * {@link io.github.dailystruggle.rtp.common.configuration.ConfigParser}.
  *
- * <p><b>Units.</b> The subspace footprint is expressed in <em>chunks</em> because the inherited
- * parent {@code MemoryShape} stores validity at chunk granularity; placement spacing and elevation
- * are expressed in <em>blocks</em> because participants stand on individual columns. See
- * {@code SubspaceShape} for why the two must not be conflated.
+ * <p>The profile is intentionally thin: everything spatial is delegated to the {@code shape} block,
+ * reusing the same parameters regions use ({@code radius}/{@code centerRadius} for the footprint,
+ * {@code spatialResolution} for the selection stride, {@code uniquePlacements} for non-repeating
+ * selection). Only {@code maxGroupSize} is group-specific.
  */
 public enum GroupKeys {
   /**
-   * Geometric distribution pattern (CLUSTER, OPPOSING_POLES, RING, GRID).
+   * Placement shape as a nested block, mirroring how regions declare their shape: a {@code name}
+   * plus that shape's parameters. Reused parameters:
+   * <ul>
+   *   <li>{@code radius} / {@code centerRadius} - subspace footprint half-width in CHUNKS (Stage 1
+   *       chunk-granularity pre-filter bound).</li>
+   *   <li>{@code spatialResolution} - the selection stride. NOTE: in group placement this field is
+   *       reused as the placement stride (participant spacing); this second meaning is local to the
+   *       group code and does not change its region/scan meaning elsewhere.</li>
+   *   <li>{@code uniquePlacements} - non-repeating selection so no two participants share a slot.</li>
+   * </ul>
+   * Any registered {@code Shape} may be named; resolution lives in {@code GroupShapes}.
    */
-  distribution,
-  /**
-   * Subspace footprint half-width in CHUNKS. The footprint spans {@code (2*n + 1)^2} chunks around
-   * the anchor chunk (e.g. {@code 1} = 3x3 chunks = 48x48 blocks). This is the chunk-granularity
-   * Stage 1 pre-filter bound, not a block radius.
-   */
-  subspaceChunkRadius,
-  /**
-   * Minimum separation in BLOCKS between any two placed participants within the subspace. This is
-   * the single spacing knob: the Stage 2 block sampling stride is derived internally from it, so
-   * there is no separate {@code blockStep} key to conflict with it.
-   */
-  minSeparation,
-  /**
-   * Maximum allowed elevation delta (Y-variance) in BLOCKS between participants in the subspace.
-   */
-  elevationTolerance,
+  shape,
   /**
    * Maximum members teleported in a single group operation using this profile.
    */

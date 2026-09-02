@@ -77,10 +77,11 @@ public class SubspaceShapeTest {
     @Override public boolean contains(int x, int z) { return true; }
   }
 
-  /** Every column standable at a flat Y=64 (permissive block validator). */
-  private static final SubspaceShape.BlockValidator FLAT_GROUND = (x, z) -> 64;
-  /** No column standable (all invalid). */
-  private static final SubspaceShape.BlockValidator VOID = (x, z) -> SubspaceShape.BlockValidator.INVALID;
+  /** Every column standable at a flat Y=64 (permissive candidate validator). */
+  private static final CandidateValidator FLAT_GROUND =
+      (x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1);
+  /** No column standable (all reject). */
+  private static final CandidateValidator VOID = (x, z) -> null;
 
   private Region createDummyRegion(DummyMemoryShape shape) {
     MockRTPWorld world = new MockRTPWorld("world");
@@ -142,10 +143,10 @@ public class SubspaceShapeTest {
     DummyMemoryShape memShape = new DummyMemoryShape();
     Region region = createDummyRegion(memShape);
     RTPLocation anchor = new RTPLocation(new RTPCoords("world", 100, 64, 200), 1);
-    SubspaceShape subspace = new SubspaceShape(anchor, 1, region);
+    SubspaceShape subspace = new SubspaceShape(anchor, 48, region);
 
     // Chunks survive stage 1, but block-level validation finds nothing standable.
-    List<RTPLocation> slots = subspace.selectSafeSlots(4, 2, VOID);
+    List<RTPLocation> slots = subspace.selectSafeSlots(4, 2, -1, null, VOID);
     assertTrue(slots.isEmpty(), "Subspace with no standable columns must deny allocation fail-closed");
   }
 
@@ -164,7 +165,7 @@ public class SubspaceShapeTest {
     SubspaceShape subspace = new SubspaceShape(anchor, 1, region);
 
     assertTrue(subspace.survivingChunks().isEmpty(), "all footprint chunks bad => no survivors");
-    List<RTPLocation> slots = subspace.selectSafeSlots(4, 2, FLAT_GROUND);
+    List<RTPLocation> slots = subspace.selectSafeSlots(4, 2, -1, null, FLAT_GROUND);
     assertTrue(slots.isEmpty(), "no surviving chunks must deny allocation fail-closed");
   }
 
@@ -174,11 +175,12 @@ public class SubspaceShapeTest {
     DummyMemoryShape memShape = new DummyMemoryShape();
     Region region = createDummyRegion(memShape);
     RTPLocation anchor = new RTPLocation(new RTPCoords("world", 100, 64, 200), 1);
-    SubspaceShape subspace = new SubspaceShape(anchor, 1, region);
+    SubspaceShape subspace = new SubspaceShape(anchor, 48, region);
 
     int memberCount = 4;
     int minSeparation = 3;
-    List<RTPLocation> slots = subspace.selectSafeSlots(memberCount, minSeparation, FLAT_GROUND);
+    List<RTPLocation> slots =
+        subspace.selectSafeSlots(memberCount, minSeparation, -1, null, FLAT_GROUND);
 
     assertEquals(memberCount, slots.size());
     for (RTPLocation slot : slots) {
@@ -200,7 +202,7 @@ public class SubspaceShapeTest {
     DummyMemoryShape memShape = new DummyMemoryShape();
     Region region = createDummyRegion(memShape);
     RTPLocation anchor = new RTPLocation(new RTPCoords("world", 100, 64, 200), 1);
-    SubspaceShape subspace = new SubspaceShape(anchor, 1, region);
+    SubspaceShape subspace = new SubspaceShape(anchor, 48, region);
 
     // A shared-style validator that resolves a real standable Y and returns a full RTPLocation.
     CandidateValidator validator =
@@ -208,7 +210,8 @@ public class SubspaceShapeTest {
 
     int memberCount = 3;
     int minSeparation = 3;
-    List<RTPLocation> slots = subspace.selectSafeSlots(memberCount, minSeparation, validator);
+    List<RTPLocation> slots =
+        subspace.selectSafeSlots(memberCount, minSeparation, -1, null, validator);
 
     assertEquals(memberCount, slots.size());
     for (RTPLocation slot : slots) {
@@ -226,7 +229,7 @@ public class SubspaceShapeTest {
 
     CandidateValidator rejectAll = (worldX, worldZ) -> null;
 
-    List<RTPLocation> slots = subspace.selectSafeSlots(4, 2, rejectAll);
+    List<RTPLocation> slots = subspace.selectSafeSlots(4, 2, -1, null, rejectAll);
     assertTrue(slots.isEmpty(), "validator rejecting all columns must deny allocation fail-closed");
   }
 }

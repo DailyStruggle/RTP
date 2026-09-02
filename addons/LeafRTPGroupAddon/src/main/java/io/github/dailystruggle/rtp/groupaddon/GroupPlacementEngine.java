@@ -14,47 +14,10 @@ public final class GroupPlacementEngine {
   private GroupPlacementEngine() {}
 
   /**
-   * Allocates safe destinations for a group of participants using an anchor from the parent region.
-   *
-   * <p>Selection is two-stage (see {@link SubspaceShape}): a chunk-granularity Stage 1 pre-filter
-   * over the profile's {@code subspaceChunkRadius} footprint, then block-granularity Stage 2 bin
-   * screening via {@code validator}. Capacity denial is measured against block-validated slots, not
-   * chunk bits, so the count reflects real standable positions.
-   *
-   * @param anchor primary anchor location drawn from region queue
-   * @param parentRegion owning region
-   * @param profile placement profile configuration
-   * @param participantCount number of players to place
-   * @param validator block-level standability resolver (never {@code null})
-   * @return allocation result (either SUCCESS with locations, or fail-closed failure status)
-   */
-  public static SubspaceAllocationResult allocate(
-      RTPLocation anchor,
-      Region parentRegion,
-      GroupProfile profile,
-      int participantCount,
-      SubspaceShape.BlockValidator validator) {
-
-    if (anchor == null || parentRegion == null) {
-      return SubspaceAllocationResult.failure(
-          SubspaceAllocationResult.Status.INVALID_ANCHOR,
-          "Anchor location or parent region was null.");
-    }
-
-    SubspaceAllocationResult pre = precheck(anchor, parentRegion, profile, participantCount);
-    if (pre != null) return pre;
-
-    SubspaceShape subspace = new SubspaceShape(anchor, profile.subspaceChunkRadius(), parentRegion);
-    List<RTPLocation> slots =
-        subspace.selectSafeSlots(participantCount, profile.minSeparation(), validator);
-    return toResult(slots, participantCount);
-  }
-
-  /**
    * Production allocation using the parent region's shared {@link CandidateValidator}
    * ({@code Region.candidateValidator()}) - the single validation path (vert -> shared safety scan
    * -> claim/global checks). Must be called off-tick (S-005). This is the entry point real group
-   * teleports should use; the {@code BlockValidator} overload above exists for deterministic tests.
+   * teleports should use.
    *
    * @param anchor primary anchor location drawn from region queue
    * @param parentRegion owning region (supplies the shared validator)
@@ -101,9 +64,16 @@ public final class GroupPlacementEngine {
     SubspaceAllocationResult pre = precheck(anchor, parentRegion, profile, participantCount);
     if (pre != null) return pre;
 
-    SubspaceShape subspace = new SubspaceShape(anchor, profile.subspaceChunkRadius(), parentRegion);
+    // Footprint from the shape block's radius (blocks); selection stride reuses spatialResolution.
+    int spacing = profile.spacing();
+    SubspaceShape subspace = new SubspaceShape(anchor, profile.radiusBlocks(), parentRegion);
+    // Resolve the shape mask (null = full square lattice). Elevation is not a group knob: the
+    // region VerticalAdjustor bounds landing Y per column (a windowed-vert clone is a later refinement).
+    int latticeUnits = (subspace.getFootprintBlocks() / 2) / Math.max(1, spacing);
+    io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape =
+        GroupShapes.resolve(profile.shape(), latticeUnits);
     List<RTPLocation> slots =
-        subspace.selectSafeSlots(participantCount, profile.minSeparation(), validator);
+        subspace.selectSafeSlots(participantCount, spacing, -1, shape, validator);
     return toResult(slots, participantCount);
   }
 

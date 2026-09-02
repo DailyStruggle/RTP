@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.region.CandidateValidator;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -76,11 +77,11 @@ public class GroupPlacementEngineTest {
     @Override public boolean contains(int x, int z) { return true; }
   }
 
-  /** Every column standable at a flat Y=70 (permissive block validator). */
-  private static final SubspaceShape.BlockValidator FLAT_GROUND = (x, z) -> 70;
-  /** No column standable (all invalid). */
-  private static final SubspaceShape.BlockValidator VOID =
-      (x, z) -> SubspaceShape.BlockValidator.INVALID;
+  /** Every column standable at a flat Y=70 (permissive candidate validator). */
+  private static final CandidateValidator FLAT_GROUND =
+      (x, z) -> new RTPLocation(new RTPCoords("world", x, 70, z), 1);
+  /** No column standable (all reject). */
+  private static final CandidateValidator VOID = (x, z) -> null;
 
   private Region createDummyRegion(DummyMemoryShape shape) {
     MockRTPWorld world = new MockRTPWorld("world");
@@ -111,7 +112,7 @@ public class GroupPlacementEngineTest {
     RTPLocation anchor = new RTPLocation(new RTPCoords("world", 500, 70, 500), 1);
 
     GroupProfile profile =
-        new GroupProfile("party", GroupDistribution.CLUSTER, 1, 2, 4, 8);
+        new GroupProfile("party", Map.of("name", "SQUARE", "radius", 24L, "spatialResolution", 2L), 8);
     SubspaceAllocationResult result =
         GroupPlacementEngine.allocate(anchor, region, profile, 4, FLAT_GROUND);
 
@@ -128,7 +129,10 @@ public class GroupPlacementEngineTest {
     RTPLocation anchor = new RTPLocation(new RTPCoords("world", 500, 70, 500), 1);
 
     GroupProfile profile =
-        new GroupProfile("duel", GroupDistribution.OPPOSING_POLES, 4, 50, 4, 2);
+        new GroupProfile(
+            "duel",
+            Map.of("name", "CIRCLE", "radius", 100L, "centerRadius", 6L, "spatialResolution", 50L),
+            2);
     SubspaceAllocationResult result =
         GroupPlacementEngine.allocate(anchor, region, profile, 5, FLAT_GROUND);
 
@@ -145,7 +149,7 @@ public class GroupPlacementEngineTest {
     RTPLocation anchor = new RTPLocation(new RTPCoords("world", 500, 70, 500), 1);
 
     GroupProfile profile =
-        new GroupProfile("party", GroupDistribution.CLUSTER, 1, 2, 4, 8);
+        new GroupProfile("party", Map.of("name", "SQUARE", "radius", 24L, "spatialResolution", 2L), 8);
     // Chunks survive Stage 1, but block-level validation finds nothing standable => fail-closed.
     SubspaceAllocationResult result =
         GroupPlacementEngine.allocate(anchor, region, profile, 3, VOID);
