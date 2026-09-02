@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.CandidateValidator;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,11 +28,11 @@ import java.util.concurrent.ThreadLocalRandom;
  *       are known bad in the inherited {@link MemoryShape} are discarded. This is a <em>necessary,
  *       not sufficient</em> screen: an unmarked chunk is "not known bad" (unexplored), never
  *       "verified good".</li>
- *   <li><b>Stage 2 - block bin (bounded, block units).</b> Block candidates are generated inside the
- *       surviving chunks and screened by a {@link BlockValidator} that resolves a real standable
- *       {@code Y} per column (mirroring the L3 {@code BacklogLocationBuffer} bin-screening model).
- *       The number of {@code VALIDATED} block candidates is the true slot count; capacity denial and
- *       separation are enforced against these, not against chunk bits.</li>
+ *   <li><b>Stage 2 - shape lattice (bounded, block units).</b> A unit-scaled lattice (unit =
+ *       placement distance) is masked by a distribution {@link Shape} and each surviving cell is
+ *       screened by a {@link CandidateValidator} that resolves a real standable {@code Y} per column
+ *       (the region vertical adjustor). The number of {@code VALIDATED} cells is the true slot
+ *       count; capacity denial is enforced against these, not against chunk bits.</li>
  * </ol>
  *
  * <p><b>Invariant (Capacity Denial):</b> When selecting destinations for {@code N} participants, if
@@ -44,61 +44,41 @@ public class SubspaceShape {
   /** Blocks per chunk edge (Minecraft chunk = 16x16 columns). */
   private static final int CHUNK_SIZE = 16;
 
-  /**
-   * Resolves whether a world column {@code (worldX, worldZ)} holds a standable landing block and, if
-   * so, at what {@code Y}.
-   *
-   * <p>This is now primarily a <b>test seam</b>: it lets unit tests inject a deterministic
-   * Y-resolver without a live world. Production callers should use the shared
-   * {@link io.github.dailystruggle.rtp.common.selection.region.CandidateValidator} overload of
-   * {@link #selectSafeSlots(int, int,
-   * io.github.dailystruggle.rtp.common.selection.region.CandidateValidator)} (obtained via
-   * {@code Region.candidateValidator()}), which chains the region's real vertical resolver, the
-   * shared {@code SafetyScan} block-clearance verdict, and claim/global checks - rather than
-   * re-deriving safety here. Implementations must never load chunks synchronously on the main
-   * thread (S-005).
-   */
-  @FunctionalInterface
-  public interface BlockValidator {
-    /** Sentinel {@code Y} meaning "no standable block in this column". */
-    int INVALID = Integer.MIN_VALUE;
-
-    /**
-     * @param worldX absolute world block X
-     * @param worldZ absolute world block Z
-     * @return the standable block {@code Y}, or {@link #INVALID} if the column has no safe landing
-     */
-    int standableY(int worldX, int worldZ);
-  }
-
   private final RTPLocation anchor;
   private final int anchorX;
   private final int anchorZ;
   private final int anchorCX;
   private final int anchorCZ;
+  private final int blockRadius;
   private final int chunkRadius;
   private final Region parentRegion;
   private final MemoryShape<?> parentShape;
 
   /**
-   * Constructs a new SubspaceShape bounded to an {@code NxN} chunk footprint around an anchor.
+   * Constructs a new SubspaceShape bounded to a block-radius footprint around an anchor.
+   *
+   * <p>The footprint is expressed in <em>blocks</em> (participant placement is block-level). The
+   * chunk footprint used for the Stage 1 region-level exclusion is derived by covering the block
+   * extent ({@code ceil(blockRadius / 16)}), so chunks invalidated at the region level are still
+   * discarded.
    *
    * @param anchor the central anchor location (never {@code null})
-   * @param chunkRadius footprint half-width in chunks; the footprint spans
-   *     {@code (2 * chunkRadius + 1)^2} chunks (e.g. {@code 1} = 3x3 chunks = 48x48 blocks). Must be
-   *     {@code >= 0}.
+   * @param blockRadius footprint half-width in blocks; the footprint spans {@code 2*blockRadius}
+   *     blocks per side. Must be {@code >= 0}.
    * @param parentRegion the owning parent Region (never {@code null})
    */
-  public SubspaceShape(RTPLocation anchor, int chunkRadius, Region parentRegion) {
+  public SubspaceShape(RTPLocation anchor, int blockRadius, Region parentRegion) {
     this.anchor = Objects.requireNonNull(anchor, "anchor cannot be null");
-    if (chunkRadius < 0) {
-      throw new IllegalArgumentException("Subspace chunkRadius must be >= 0, got: " + chunkRadius);
+    if (blockRadius < 0) {
+      throw new IllegalArgumentException("Subspace blockRadius must be >= 0, got: " + blockRadius);
     }
     this.anchorX = anchor.coords().x();
     this.anchorZ = anchor.coords().z();
     this.anchorCX = anchorX >> 4;
     this.anchorCZ = anchorZ >> 4;
-    this.chunkRadius = chunkRadius;
+    this.blockRadius = blockRadius;
+    // Cover the block extent in chunks for the region-level chunk exclusion (Stage 1).
+    this.chunkRadius = (blockRadius + CHUNK_SIZE - 1) / CHUNK_SIZE;
     this.parentRegion = Objects.requireNonNull(parentRegion, "parentRegion cannot be null");
     if (parentRegion.getShape() instanceof MemoryShape<?> memShape) {
       this.parentShape = memShape;
@@ -111,14 +91,19 @@ public class SubspaceShape {
     return anchor;
   }
 
-  /** @return footprint half-width in chunks. */
+  /** @return footprint half-width in blocks. */
+  public int getBlockRadius() {
+    return blockRadius;
+  }
+
+  /** @return chunk footprint half-width derived from the block radius ({@code ceil(blockRadius/16)}). */
   public int getChunkRadius() {
     return chunkRadius;
   }
 
-  /** @return footprint edge length in blocks ({@code (2 * chunkRadius + 1) * 16}). */
+  /** @return footprint edge length in blocks ({@code 2 * blockRadius}). */
   public int getFootprintBlocks() {
-    return (2 * chunkRadius + 1) * CHUNK_SIZE;
+    return 2 * blockRadius;
   }
 
   public Region getParentRegion() {
@@ -192,100 +177,91 @@ public class SubspaceShape {
    * @return resolved global locations for all members, or empty list if capacity is insufficient
    */
   public List<RTPLocation> selectSafeSlots(
-      int memberCount, int minSeparation, BlockValidator validator) {
-    Objects.requireNonNull(validator, "validator cannot be null");
-    final String worldName = anchor.coords().worldName();
-    // Adapt the test-seam BlockValidator (Y-only) to the shared CandidateValidator contract so
-    // there is a single Stage 2 selection code path. Production callers pass the region's real
-    // CandidateValidator directly (see the overload below).
-    CandidateValidator adapter =
-        (worldX, worldZ) -> {
-          int y = validator.standableY(worldX, worldZ);
-          if (y == BlockValidator.INVALID) return null;
-          return new RTPLocation(
-              new RTPCoords(worldName, worldX, y, worldZ),
-              anchor.attempts(),
-              anchor.reservation());
-        };
-    return selectSafeSlots(memberCount, minSeparation, adapter);
+      int memberCount, int minSeparation, int elevationTolerance, CandidateValidator validator) {
+    return selectSafeSlots(memberCount, minSeparation, elevationTolerance, null, validator);
   }
 
   /**
-   * Two-stage selection of safe landing slots using the shared {@link CandidateValidator}.
+   * Unit-scaled, shape-masked lattice selection of safe landing slots.
    *
-   * <p>This is the production selection path: Stage 1 discards known-bad chunks, Stage 2 screens
-   * block columns inside the survivors with {@code validator} (which resolves a real standable
-   * {@code Y} and applies block-clearance + claim checks). If fewer than {@code memberCount}
-   * sufficiently separated validated slots exist, an empty list is returned (fail-closed capacity
-   * denial, S-004).
+   * <p>The placement distance {@code d = max(1, minSeparation)} is the lattice unit: cell
+   * {@code (i, j)} maps to the world column {@code anchor + (i*d, j*d)}, so any two distinct cells
+   * are already at least {@code d} apart - separation is guaranteed by construction (no greedy
+   * dedup). {@code distributionShape} masks the lattice: a cell is a candidate iff
+   * {@code shape.contains(i, j)}; {@code null} means the full square lattice.
    *
-   * <p>The Stage 2 sampling stride is derived from {@code minSeparation} rather than being a
-   * separate knob: sampling coarser than the separation you enforce is wasteful, and sampling finer
-   * than it is pointless. A slight oversampling ({@code minSeparation / 2}) gives the greedy
-   * separation pass enough distinct columns to actually reach {@code memberCount} in jagged terrain
-   * where some grid cells have no standable {@code Y}.
+   * <p><b>Arithmetic capacity pre-check (S-004).</b> Before validating any column, cells whose chunk
+   * is known bad in the inherited {@link MemoryShape} are subtracted from the masked cell count; if
+   * that upper bound is below {@code memberCount} the selection is denied fail-closed with no column
+   * work. This is an upper bound (chunk-granular), so per-cell {@code validator} confirmation still
+   * runs - no unproven slot is ever used.
+   *
+   * <p>Each surviving cell is validated at most once (uniqueness is intrinsic to the lattice), the
+   * landing {@code Y} being resolved by {@code validator} (the region vertical adjustor). A cell is
+   * kept only if {@code |Y - anchorY| <= elevationTolerance}. The walk stops at {@code memberCount};
+   * if it ends short, an empty list is returned (fail-closed capacity denial).
    *
    * @param memberCount number of required landing positions
-   * @param minSeparation minimum block clearance between any two placed points; also drives the
-   *     internal Stage 2 sampling stride
+   * @param minSeparation placement distance in blocks; also the lattice unit
+   * @param elevationTolerance maximum block {@code |Y - anchorY|} for a kept slot ({@code < 0}
+   *     disables the elevation filter)
+   * @param distributionShape lattice mask ({@code null} = full square lattice)
    * @param validator shared per-candidate validator (never {@code null})
    * @return resolved global locations for all members, or empty list if capacity is insufficient
    */
   public List<RTPLocation> selectSafeSlots(
-      int memberCount, int minSeparation, CandidateValidator validator) {
+      int memberCount,
+      int minSeparation,
+      int elevationTolerance,
+      Shape<?> distributionShape,
+      CandidateValidator validator) {
     Objects.requireNonNull(validator, "validator cannot be null");
     if (memberCount <= 0) return Collections.emptyList();
 
-    final int sep = Math.max(1, minSeparation);
-    final int sepSq = sep * sep;
-    // Derive the sampling stride from the enforced separation (with 2x oversampling so the
-    // greedy separation pass has room to fill in terrain with unstandable columns).
-    final int step = Math.max(1, sep / 2);
+    final int d = Math.max(1, minSeparation);
+    final int anchorY = anchor.coords().y();
+    // Lattice half-extent in units: how many d-steps fit within the footprint half-width.
+    final int m = (getFootprintBlocks() / 2) / d;
 
-    // Stage 2: bin validated candidates from surviving chunks (block units, real Y, claim-clear).
-    List<RTPLocation> bin = new ArrayList<>();
-    for (int[] chunk : survivingChunks()) {
-      int baseX = chunk[0] << 4;
-      int baseZ = chunk[1] << 4;
-      for (int lx = 0; lx < CHUNK_SIZE; lx += step) {
-        for (int lz = 0; lz < CHUNK_SIZE; lz += step) {
-          RTPLocation validated = validator.validate(baseX + lx, baseZ + lz);
-          if (validated != null && validated.coords() != null) {
-            bin.add(validated);
-          }
-        }
+    // Enumerate masked lattice cells and run the arithmetic capacity pre-check in one pass.
+    List<int[]> cells = new ArrayList<>();
+    int badCells = 0;
+    for (int i = -m; i <= m; i++) {
+      for (int j = -m; j <= m; j++) {
+        if (distributionShape != null && !distributionShape.contains(i, j)) continue;
+        int worldX = projectX(i * d);
+        int worldZ = projectZ(j * d);
+        int cdx = (worldX >> 4) - anchorCX;
+        int cdz = (worldZ >> 4) - anchorCZ;
+        // Clamp the lattice to the chunk footprint: a cell whose chunk lies outside the
+        // (2*chunkRadius+1)^2 Stage-1 footprint is not part of this subspace.
+        if (Math.abs(cdx) > chunkRadius || Math.abs(cdz) > chunkRadius) continue;
+        cells.add(new int[] {worldX, worldZ});
+        if (isChunkKnownBad(cdx, cdz)) badCells++;
       }
     }
-
-    if (bin.size() < memberCount) {
-      // Fail-closed: not even enough validated columns before separation. INSUFFICIENT_SAFE_SLOTS.
+    if (cells.size() - badCells < memberCount) {
+      // Upper bound below required: deny fail-closed (INSUFFICIENT_SAFE_SLOTS) with no column work.
       return Collections.emptyList();
     }
 
-    // Greedy separated selection over the validated bin (block units, real Y).
-    Collections.shuffle(bin, ThreadLocalRandom.current());
+    // Seeded spread order: shuffle so early picks do not cluster before validation fills in.
+    Collections.shuffle(cells, ThreadLocalRandom.current());
+
     List<RTPLocation> selected = new ArrayList<>(memberCount);
-    for (RTPLocation cand : bin) {
-      boolean tooClose = false;
-      for (RTPLocation prev : selected) {
-        int ddx = cand.coords().x() - prev.coords().x();
-        int ddz = cand.coords().z() - prev.coords().z();
-        if (ddx * ddx + ddz * ddz < sepSq) {
-          tooClose = true;
-          break;
-        }
-      }
-      if (!tooClose) {
-        selected.add(cand);
-        if (selected.size() == memberCount) break;
-      }
+    for (int[] cell : cells) {
+      int worldX = cell[0];
+      int worldZ = cell[1];
+      if (isChunkKnownBad((worldX >> 4) - anchorCX, (worldZ >> 4) - anchorCZ)) continue;
+      RTPLocation validated = validator.validate(worldX, worldZ);
+      if (validated == null || validated.coords() == null) continue;
+      if (elevationTolerance >= 0
+          && Math.abs(validated.coords().y() - anchorY) > elevationTolerance) continue;
+      selected.add(validated);
+      if (selected.size() == memberCount) break;
     }
 
-    if (selected.size() < memberCount) {
-      // Enough validated columns, but separation constraint cannot be met. Deny fail-closed.
-      return Collections.emptyList();
-    }
-
+    if (selected.size() < memberCount) return Collections.emptyList();
     return new ArrayList<>(selected);
   }
 }

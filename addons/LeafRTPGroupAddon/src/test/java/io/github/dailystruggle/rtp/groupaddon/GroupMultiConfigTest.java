@@ -46,17 +46,17 @@ public class GroupMultiConfigTest {
     assertNotNull(partyParser);
     GroupProfile partyProfile = GroupProfile.fromConfig("party", partyParser);
     assertEquals("party", partyProfile.name());
-    assertEquals(GroupDistribution.CLUSTER, partyProfile.distribution());
-    assertEquals(1, partyProfile.subspaceChunkRadius());
-    assertEquals(2, partyProfile.minSeparation());
+    assertEquals("SQUARE", partyProfile.shapeName());
+    assertEquals(24, partyProfile.radiusBlocks());
+    assertEquals(2, partyProfile.spacing());
 
     ConfigParser<GroupKeys> duelParser = parser.getParser("duel");
     assertNotNull(duelParser);
     GroupProfile duelProfile = GroupProfile.fromConfig("duel", duelParser);
     assertEquals("duel", duelProfile.name());
-    assertEquals(GroupDistribution.OPPOSING_POLES, duelProfile.distribution());
-    assertEquals(4, duelProfile.subspaceChunkRadius());
-    assertEquals(50, duelProfile.minSeparation());
+    assertEquals("CIRCLE", duelProfile.shapeName());
+    assertEquals(100, duelProfile.radiusBlocks());
+    assertEquals(50, duelProfile.spacing());
     assertEquals(2, duelProfile.maxGroupSize());
   }
 }

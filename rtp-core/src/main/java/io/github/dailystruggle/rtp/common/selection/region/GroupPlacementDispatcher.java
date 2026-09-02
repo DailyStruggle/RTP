@@ -126,8 +126,16 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     // 5. Build the subspace and select safe slots (fail-closed capacity check, S-004).
     final List<RTPLocation> slots;
     try {
-      SubspaceShape subspace = new SubspaceShape(anchor, spec.subspaceChunkRadius(), region);
-      slots = subspace.selectSafeSlots(n, spec.minSeparation(), region.candidateValidator());
+      SubspaceShape subspace = new SubspaceShape(anchor, spec.radius(), region);
+      // Stage 1: default (square) lattice; the preset-configured distribution shape is wired in a
+      // later stage. Elevation tolerance is applied against the anchor Y by the selector.
+      slots =
+          subspace.selectSafeSlots(
+              n,
+              spec.minSeparation(),
+              spec.elevationTolerance(),
+              null,
+              region.candidateValidator());
     } catch (Throwable t) {
       releaseReservation(genResult);
       RTP.log(Level.WARNING, "[group] subspace selection failed for region '" + region.name + "'", t);
