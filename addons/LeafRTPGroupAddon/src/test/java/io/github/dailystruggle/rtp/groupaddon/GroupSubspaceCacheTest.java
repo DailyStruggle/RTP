@@ -24,7 +24,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("GroupSubspaceCache L1/L2/L3 Pipeline Tests")
+@DisplayName("GroupSubspaceCache hot/cold/backlog Pipeline Tests")
 public class GroupSubspaceCacheTest {
 
   @TempDir
@@ -136,7 +136,7 @@ public class GroupSubspaceCacheTest {
   }
 
   @Test
-  @DisplayName("GroupSubspaceCache tier operations (L3 backlog, L2 cold, L1 hot)")
+  @DisplayName("GroupSubspaceCache tier operations (backlog, cold, hot)")
   void testGroupSubspaceCacheTierProgression() {
     MockRTPWorld world = new MockRTPWorld("world");
     GroupSubspaceCache cache = new GroupSubspaceCache(2, 5, 10);
@@ -146,36 +146,36 @@ public class GroupSubspaceCacheTest {
         new GroupProfile("party", Map.of("name", "SQUARE", "radius", 24L, "spatialResolution", 2L), 4);
     RTPCoords anchorCoords = new RTPCoords("world", 100, 64, 100);
 
-    // L3 offer and poll
+    // Backlog offer and poll
     GroupBacklogEntry entry = new GroupBacklogEntry(anchorCoords, 24, profile, List.of(anchorCoords));
     assertTrue(cache.offerBacklog(key, entry));
-    assertEquals(1, cache.sizeL3(key));
+    assertEquals(1, cache.sizeBacklog(key));
     assertSame(entry, cache.pollBacklog(key));
-    assertEquals(0, cache.sizeL3(key));
+    assertEquals(0, cache.sizeBacklog(key));
 
-    // L2 offer and poll
+    // Cold offer and poll
     RTPLocation anchorLoc = new RTPLocation(anchorCoords, 1);
     GroupSubspace cold = new GroupSubspace(anchorLoc, 24, List.of(anchorLoc), Collections.emptyList());
     assertTrue(cache.offerCold(key, cold));
-    assertEquals(1, cache.sizeL2(key));
+    assertEquals(1, cache.sizeCold(key));
     assertSame(cold, cache.pollCold(key));
-    assertEquals(0, cache.sizeL2(key));
+    assertEquals(0, cache.sizeCold(key));
 
-    // L1 offer and poll
+    // Hot offer and poll
     ChunkReservation res = createReservation(world, 6, 6);
     GroupSubspace hot = new GroupSubspace(anchorLoc, 24, List.of(anchorLoc), List.of(res));
     assertTrue(cache.offerHot(key, hot));
-    assertEquals(1, cache.sizeL1(key));
+    assertEquals(1, cache.sizeHot(key));
     assertSame(hot, cache.pollHot(key));
-    assertEquals(0, cache.sizeL1(key));
+    assertEquals(0, cache.sizeHot(key));
     assertEquals(1, world.activeChunkTickets.get());
     hot.close();
     assertEquals(0, world.activeChunkTickets.get());
   }
 
   @Test
-  @DisplayName("GroupSubspaceCache L1 capacity enforcement closes rejected over-capacity subspace")
-  void testGroupSubspaceCacheL1CapacityRejectionClosesTickets() {
+  @DisplayName("GroupSubspaceCache hot capacity enforcement closes rejected over-capacity subspace")
+  void testGroupSubspaceCacheHotCapacityRejectionClosesTickets() {
     MockRTPWorld world = new MockRTPWorld("world");
     GroupSubspaceCache cache = new GroupSubspaceCache(1, 5, 10);
     String key = "testRegion:party";
@@ -188,23 +188,23 @@ public class GroupSubspaceCacheTest {
     GroupSubspace hot2 = new GroupSubspace(anchor, 16, List.of(anchor), List.of(res2));
 
     assertTrue(cache.offerHot(key, hot1));
-    assertEquals(1, cache.sizeL1(key));
+    assertEquals(1, cache.sizeHot(key));
     assertEquals(2, world.activeChunkTickets.get()); // res1 and res2 both opened
 
     // Second hot subspace exceeds capacity (cap = 1) -> must be rejected and closed immediately
     assertFalse(cache.offerHot(key, hot2));
     assertEquals(1, world.activeChunkTickets.get()); // res2 closed
-    assertEquals(1, cache.sizeL1(key));
+    assertEquals(1, cache.sizeHot(key));
 
     // Clearing cache closes remaining hot subspace
     cache.clear();
     assertEquals(0, world.activeChunkTickets.get()); // res1 closed
-    assertEquals(0, cache.sizeL1(key));
+    assertEquals(0, cache.sizeHot(key));
   }
 
   @Test
-  @DisplayName("GroupCacheWorker pulse moves L3 backlog to L2 cold")
-  void testGroupCacheWorkerPulseL3ToL2() {
+  @DisplayName("GroupCacheWorker pulse moves backlog to cold")
+  void testGroupCacheWorkerPulseBacklogToCold() {
     CandidateValidator flatGround = (x, z) -> new RTPLocation(new RTPCoords("world", x, 70, z), 1);
     GroupSubspaceCache cache = new GroupSubspaceCache(2, 5, 10);
     GroupCacheWorker worker = new GroupCacheWorker(cache);
@@ -215,17 +215,36 @@ public class GroupSubspaceCacheTest {
         new GroupProfile("party", Map.of("name", "SQUARE", "radius", 24L, "spatialResolution", 2L), 4);
     String key = region.name + ":" + profile.name();
 
-    // Pulse 1: fills backlog (L3)
+    // Pulse 1: fills the backlog
     worker.pulse(region, profile, flatGround);
-    assertTrue(cache.sizeL3(key) > 0);
+    assertTrue(cache.sizeBacklog(key) > 0);
 
-    // Pulse 2: screens L3 and promotes to L2 cold
+    // Pulse 2: screens the backlog and promotes to cold, which the same pulse may immediately
+    // promote onward to hot. That last hop completes on the chunk-reservation future's async
+    // continuation, so poll rather than assume the promotion has already landed.
     worker.pulse(region, profile, flatGround);
-    assertTrue(cache.sizeL2(key) > 0 || cache.sizeL1(key) > 0);
+    assertTrue(
+        awaitPromotion(cache, key),
+        "backlog must be promoted into the cold or hot tier");
+  }
+
+  /** Waits up to ~2s for a screened backlog entry to reach the cold or hot tier. */
+  private static boolean awaitPromotion(GroupSubspaceCache cache, String key) {
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+    while (System.nanoTime() < deadline) {
+      if (cache.sizeCold(key) > 0 || cache.sizeHot(key) > 0) return true;
+      try {
+        Thread.sleep(20);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+    return cache.sizeCold(key) > 0 || cache.sizeHot(key) > 0;
   }
 
   @Test
-  @DisplayName("GroupPlacementEngine allocateWithCache prefers L1 hot, falls back to L2 and live")
+  @DisplayName("GroupPlacementEngine allocateWithCache prefers hot, falls back to cold and live")
   void testAllocateWithCacheFallbackHierarchy() {
     GroupSubspaceCache cache = new GroupSubspaceCache(2, 5, 10);
     DummyMemoryShape memShape = new DummyMemoryShape();
@@ -237,7 +256,7 @@ public class GroupSubspaceCacheTest {
     RTPLocation p1 = new RTPLocation(new RTPCoords("world", 10, 70, 10), 1);
     RTPLocation p2 = new RTPLocation(new RTPCoords("world", 12, 70, 10), 1);
 
-    // Case 1: Populated L1
+    // Case 1: Populated hot
     MockRTPWorld world = new MockRTPWorld("world");
     ChunkReservation res = createReservation(world, 0, 0);
     GroupSubspace hot = new GroupSubspace(p1, 24, List.of(p1, p2), List.of(res));
@@ -247,9 +266,9 @@ public class GroupSubspaceCacheTest {
         GroupPlacementEngine.allocateWithCache(cache, p1, region, profile, 2);
     assertTrue(r1.isSuccess());
     assertEquals(2, r1.destinations().size());
-    assertEquals(0, cache.sizeL1(key)); // consumed
+    assertEquals(0, cache.sizeHot(key)); // consumed
 
-    // Case 2: Populated L2 (L1 empty)
+    // Case 2: Populated cold (hot empty)
     GroupSubspace cold = new GroupSubspace(p1, 24, List.of(p1, p2), Collections.emptyList());
     cache.offerCold(key, cold);
 
@@ -257,7 +276,7 @@ public class GroupSubspaceCacheTest {
         GroupPlacementEngine.allocateWithCache(cache, p1, region, profile, 2);
     assertTrue(r2.isSuccess());
     assertEquals(2, r2.destinations().size());
-    assertEquals(0, cache.sizeL2(key)); // consumed
+    assertEquals(0, cache.sizeCold(key)); // consumed
 
     // Case 3: Cache empty -> falls back to live allocation
     SubspaceAllocationResult r3 =

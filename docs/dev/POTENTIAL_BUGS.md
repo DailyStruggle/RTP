@@ -55,6 +55,15 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Operator confusion / config that silently does not take effect until a full restart. No safety regression (a stale-active verifier still rejects claimed land; a never-registered one only fails to add protection the operator just enabled).
 - **Suggested next step:** Either (a) document the `rerollX` keys as restart-only in the `integrations.yml` comments and the docs, or (b) add a targeted unregister/re-register path. Option (b) is non-trivial: a blanket `clearGlobalRegionVerifiers()` + re-register on reload would also drop any third-party verifiers registered via `RTPAPI.hooks().verifiers()`, so it needs a token/handle-based remove API on `GlobalRegionVerifiers` (and the `RegionVerifierRegistry` facade) so each `*Checker` removes only its own registration.
 
+### 2026-09-02 - `GroupCacheWorker` second pulse often does not promote backlog to cold (addon test fails intermittently)
+
+- **Discovered during:** the `releaseToNetworkKept` ticket-hygiene fix in `rtp-core` (unrelated module; the group addon references none of the changed symbols).
+- **Location:** `addons/LeafRTPGroupAddon/src/main/java/io/github/dailystruggle/rtp/groupaddon/GroupCacheWorker.java` (`pulse` screening/promotion step); asserted by `GroupSubspaceCacheTest#testGroupCacheWorkerPulseBacklogToCold`.
+- **Symptom / hypothesis:** Pulse 1 fills the backlog (`sizeBacklog > 0`), but after pulse 2 both `sizeCold` and `sizeHot` are often still 0, so backlog screening promotes nothing. Reproduced at roughly 50% across 4 isolated `--rerun-tasks` runs (2026-09-02), so the promotion depends on which bin the randomized candidate lands in rather than failing outright.
+- **Impact:** Group placements would never warm their cold cache from the backlog, forcing every group teleport onto live allocation. Addon-only; core `/rtp` unaffected. Currently red in `./gradlew build`.
+- **Suggested next step:** Step through `GroupCacheWorker.pulse` with the test's `DummyMemoryShape`; likely the screening branch rejects every backlog candidate (bin selection or validator contract) rather than a capacity issue, since caps are 2/5/10.
+
+
 ### 2026-05-23 - multi-config entry editor renders differently from built-in `default` (shape/vert stored as section vs FactoryValue)
 
 - **Discovered during:** menu nested-config editing fix (this session, route A). Resolved the nested-row editability symptom (clickable dotted `OpenConfigKey` + dotted-param registration in `SubConfigCmd`) but left the visual/UX divergence between built-in `default` and runtime-added entries (e.g. `default1234`) untouched.

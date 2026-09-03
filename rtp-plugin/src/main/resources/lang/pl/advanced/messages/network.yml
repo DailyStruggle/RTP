@@ -5,7 +5,7 @@
 # --- Komunikaty trybu sieciowego miedzy serwerami ---
 # Wysylane tylko gdy `network.enabled: true`, a `/rtp` gracza jest kierowane
 # przez miedzyserwerowa kolejke oczekiwania (zob. network.yml `routing.mode`).
-# Wszystkie klucze sa opcjonalne z perspektywy gracza - bazowy cykl L2
+# Wszystkie klucze sa opcjonalne z perspektywy gracza - bazowy cykl
 # `delayMessage` / `teleportMessage` nadal steruje widocznym przeplywem.
 # Wysylane, gdy zadanie zostalo przyjete do miedzyserwerowej kolejki oczekiwania
 # i czeka na przejecie przez backend. Zmienna: [position] - pozycja liczona

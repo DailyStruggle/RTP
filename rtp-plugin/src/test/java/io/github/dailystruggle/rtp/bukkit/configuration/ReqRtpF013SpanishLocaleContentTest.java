@@ -25,11 +25,12 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * REQ-RTP-F-013 / ADR-020 - content-parity regression tests for the shipped
- * Spanish {@code messages.yml}. Per-locale {@code messages.lang.yml} maps enum
+ * Spanish messages under {@code lang/es/advanced/messages/}. Per-locale
+ * co-located {@code .<file>.lang.yml} maps enum
  * key → translated key name; baseline + identity fallback. Catches: missing
  * keys, unresolvable keys, wrong YAML type for typed keys (list/int/bool),
  * dropped placeholders, and YAML 1.1 "Norway problem" (no/off → boolean).
- * Spanish is the canonical example; new locales parameterise {@link #SPANISH_PATH}.
+ * Spanish is the canonical example; new locales parameterise {@link #SPANISH_DIR}.
  */
 @DisplayName("REQ-RTP-F-013 / ADR-020 — Spanish locale content parity with English baseline")
 public class ReqRtpF013SpanishLocaleContentTest {
@@ -49,10 +50,15 @@ public class ReqRtpF013SpanishLocaleContentTest {
      * effective map is the union of those members.
      */
     private static final Path BASELINE_LANG_MAP_DIR = BASELINE_DIR;
-    private static final Path SPANISH_PATH =
-            Paths.get("src", "main", "resources", "lang", "es", "messages.yml");
-    private static final Path SPANISH_LANG_MAP_DIR =
+    /**
+     * The Spanish values mirror the split baseline layout: one member file per
+     * concern under {@code lang/es/advanced/messages/}. The effective Spanish
+     * key set is the union of those members, exactly as {@link #loadBaseline()}
+     * unions the English ones.
+     */
+    private static final Path SPANISH_DIR =
             Paths.get("src", "main", "resources", "lang", "es", "advanced", "messages");
+    private static final Path SPANISH_LANG_MAP_DIR = SPANISH_DIR;
 
     /** Bracket placeholders like {@code [P0]}, {@code [arg]}, {@code [scan_regions]}. */
     private static final Pattern PLACEHOLDER = Pattern.compile("\\[[A-Za-z0-9_]+]");
@@ -84,16 +90,26 @@ public class ReqRtpF013SpanishLocaleContentTest {
     }
     /** English baseline as the union of every {@code messages/*.yml} member file. */
     private static Map<String, Object> loadBaseline() throws IOException {
-        assertTrue(Files.isDirectory(BASELINE_DIR),
-                "Expected baseline messages directory to exist: " + BASELINE_DIR.toAbsolutePath());
+        return loadMessagesDir(BASELINE_DIR);
+    }
+
+    /** Spanish values as the union of every {@code lang/es/advanced/messages/*.yml} member file. */
+    private static Map<String, Object> loadSpanish() throws IOException {
+        return loadMessagesDir(SPANISH_DIR);
+    }
+
+    /** Union of every non-dotfile {@code *.yml} member of a split messages directory. */
+    private static Map<String, Object> loadMessagesDir(Path messagesDir) throws IOException {
+        assertTrue(Files.isDirectory(messagesDir),
+                "Expected messages directory to exist: " + messagesDir.toAbsolutePath());
         Map<String, Object> merged = new LinkedHashMap<>();
         // The glob "*.yml" also matches the co-located rename-map dotfiles
         // (".commands.lang.yml", ".placeholders.lang.yml", ...) whose identity
         // "key: key" string values would otherwise clobber the real typed
-        // baseline values. Iteration order is filesystem-dependent, so this
+        // values. Iteration order is filesystem-dependent, so this
         // silently passes on some platforms and fails on others; skip them.
         try (java.nio.file.DirectoryStream<Path> ymls =
-                     Files.newDirectoryStream(BASELINE_DIR, "*.yml")) {
+                     Files.newDirectoryStream(messagesDir, "*.yml")) {
             for (Path p : ymls) {
                 if (p.getFileName().toString().endsWith(".lang.yml")) continue;
                 merged.putAll(load(p));
@@ -161,10 +177,10 @@ public class ReqRtpF013SpanishLocaleContentTest {
     }
 
     @Test
-    @DisplayName("lang/es/messages.yml has no fewer entries than the English baseline (full key parity, ADR-020)")
+    @DisplayName("lang/es messages ship no fewer entries than the English baseline (full key parity, ADR-020)")
     void spanishLocaleHasNoMissingEntries() throws IOException {
         Map<String, Object> en = loadBaseline();
-        Map<String, Object> es = load(SPANISH_PATH);
+        Map<String, Object> es = loadSpanish();
         Map<String, String> esLangMap = mergedLangMap(SPANISH_LANG_MAP_DIR);
         Map<String, String> enLangMap = mergedLangMap(BASELINE_LANG_MAP_DIR);
         Map<Enum<?>, String> resolved = effectiveKeyMap(esLangMap, enLangMap);
@@ -193,9 +209,9 @@ public class ReqRtpF013SpanishLocaleContentTest {
     }
 
     @Test
-    @DisplayName("every key in lang/es/messages.yml resolves back to a Enum<?> via messages.lang.yml")
+    @DisplayName("every key in the lang/es messages tree resolves back to a Enum<?> via its .lang.yml maps")
     void spanishLocaleHasNoUnknownKeys() throws IOException {
-        Map<String, Object> es = load(SPANISH_PATH);
+        Map<String, Object> es = loadSpanish();
         Map<String, String> esLangMap = mergedLangMap(SPANISH_LANG_MAP_DIR);
         Map<String, String> enLangMap = mergedLangMap(BASELINE_LANG_MAP_DIR);
         Map<Enum<?>, String> resolved = effectiveKeyMap(esLangMap, enLangMap);
@@ -241,7 +257,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
     @DisplayName("Spanish values parse to the same YAML type as the English baseline")
     void spanishValueTypesMatchBaseline() throws IOException {
         Map<String, Object> en = loadBaseline();
-        Map<String, Object> es = load(SPANISH_PATH);
+        Map<String, Object> es = loadSpanish();
         Map<Enum<?>, String> resolved = effectiveKeyMap(
                 mergedLangMap(SPANISH_LANG_MAP_DIR), mergedLangMap(BASELINE_LANG_MAP_DIR));
 
@@ -266,7 +282,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
     @DisplayName("every [placeholder] token in a baseline string survives translation")
     void spanishPlaceholdersArePreserved() throws IOException {
         Map<String, Object> en = loadBaseline();
-        Map<String, Object> es = load(SPANISH_PATH);
+        Map<String, Object> es = loadSpanish();
         Map<Enum<?>, String> resolved = effectiveKeyMap(
                 mergedLangMap(SPANISH_LANG_MAP_DIR), mergedLangMap(BASELINE_LANG_MAP_DIR));
 
@@ -296,7 +312,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
     @DisplayName("no Spanish value silently parsed as Boolean where baseline was a String (YAML 1.1 Norway-problem guard)")
     void spanishValuesAvoidNorwayProblem() throws IOException {
         Map<String, Object> en = loadBaseline();
-        Map<String, Object> es = load(SPANISH_PATH);
+        Map<String, Object> es = loadSpanish();
         Map<Enum<?>, String> resolved = effectiveKeyMap(
                 mergedLangMap(SPANISH_LANG_MAP_DIR), mergedLangMap(BASELINE_LANG_MAP_DIR));
 
@@ -323,7 +339,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
     @DisplayName("known-typed keys keep their expected YAML types in both files")
     void declaredTypedKeysAreConsistent() throws IOException {
         Map<String, Object> en = loadBaseline();
-        Map<String, Object> es = load(SPANISH_PATH);
+        Map<String, Object> es = loadSpanish();
         Map<Enum<?>, String> resolved = effectiveKeyMap(
                 mergedLangMap(SPANISH_LANG_MAP_DIR), mergedLangMap(BASELINE_LANG_MAP_DIR));
 

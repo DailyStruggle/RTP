@@ -16,7 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link BacklogLocationBuffer}, the L3 backlog cache primitive
+ * Unit tests for {@link BacklogLocationBuffer}, the backlog cache primitive
  * specified by ADR-028. Covers the contract documented in the class javadoc:
  * order preservation, head-blocking on {@link Validity#UNVERIFIED}, head-drop
  * on {@link Validity#INVALIDATED}, and bounded capacity.
@@ -213,7 +213,7 @@ class BacklogLocationBufferTest {
     // Regression guard: ArrayDeque is not internally synchronized, so a
     // concurrent drain could leave isEmpty()==false while peekFirst()==null,
     // which previously dereferenced null and threw an NPE (notably on lite,
-    // where the L3 backlog is unsupported but the drain path is still pulsed).
+    // where the backlog is unsupported but the drain path is still pulsed).
     final java.util.concurrent.atomic.AtomicReference<Throwable> failure =
         new java.util.concurrent.atomic.AtomicReference<>();
     for (int iter = 0; iter < 200 && failure.get() == null; iter++) {

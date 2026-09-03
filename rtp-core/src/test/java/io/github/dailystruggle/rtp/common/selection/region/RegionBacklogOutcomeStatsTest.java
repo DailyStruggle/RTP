@@ -39,8 +39,8 @@ class RegionBacklogOutcomeStatsTest {
     }
 
     @Test
-    @DisplayName("L3 backlog prefilter rejection records failure and L2 promotion records success")
-    void l3BacklogRecordsRejectionsAndPromotions() {
+    @DisplayName("Backlog prefilter rejection records failure and cold promotion records success")
+    void backlogRecordsRejectionsAndPromotions() {
         RegionSettings settings = new RegionSettings(
                 "test_region",
                 world,
@@ -48,8 +48,8 @@ class RegionBacklogOutcomeStatsTest {
                 null,
                 false, // worldBorderOverride
                 false, // requirePermission
-                5,     // cacheCap (L2)
-                5,     // backlogCacheCap (L3)
+                5,     // cacheCap (cold)
+                5,     // backlogCacheCap
                 0L,    // networkReserveSize
                 10,    // activeChunkCap
                 0.0,   // price
@@ -71,7 +71,7 @@ class RegionBacklogOutcomeStatsTest {
         long initialFailures = RtpOutcomeStats.GLOBAL.failureCount(LocationGenerator.FailTypes.biome);
         long initialSuccesses = RtpOutcomeStats.GLOBAL.successCount();
 
-        // Execute pulse to fill L3 and classify
+        // Execute pulse to fill the backlog and classify
         region.execute(TimeUnit.MILLISECONDS.toNanos(50));
 
         // Process another pulse to verify promotion after classification
@@ -81,6 +81,6 @@ class RegionBacklogOutcomeStatsTest {
         long deltaSuccesses = RtpOutcomeStats.GLOBAL.successCount() - initialSuccesses;
 
         assertTrue(deltaFailures > 0, "failures must be recorded for Anvil rejections");
-        assertTrue(deltaSuccesses > 0, "successes must be recorded for L2 promotions");
+        assertTrue(deltaSuccesses > 0, "successes must be recorded for cold promotions");
     }
 }

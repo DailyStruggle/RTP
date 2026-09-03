@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Encapsulates a prepared group-capable subspace holding an anchor location, footprint radius,
  * verified standable candidate slot locations, and optional active {@link ChunkReservation}
- * tickets for its loaded footprint chunks (Group L1 hot queue).
+ * tickets for its loaded footprint chunks (group hot queue).
  *
  * <p>Implements {@link AutoCloseable} to guarantee deterministic chunk ticket release
  * on drain, eviction, or disposal (S-002).

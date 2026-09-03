@@ -1051,7 +1051,7 @@ final class PregenTask implements Runnable {
                             + "Per-cause tally=" + causeTally
                             + " (enable verbose for per-location detail). A dominant"
                             + " safety/nullChunk/ungenerated cause here is the same chunk-read"
-                            + " failure that leaves the L1 kept cache empty.");
+                            + " failure that leaves the hot kept cache empty.");
         }
         result.complete(new GenerationResult(null, reported, null));
     }

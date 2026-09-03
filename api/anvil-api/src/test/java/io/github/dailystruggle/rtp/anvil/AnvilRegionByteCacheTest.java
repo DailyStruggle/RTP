@@ -66,4 +66,40 @@ class AnvilRegionByteCacheTest {
     assertTrue(AnvilRegionByteCache.size() <= 16,
         "cache must cap at 16 entries, saw " + AnvilRegionByteCache.size());
   }
+
+  @Test
+  void bufferPool_reusesEvictedBuffers(@TempDir Path tmp) throws Exception {
+    AnvilRegionByteCache.resetAll();
+    // Create 20 region files of standard size (8 KiB)
+    Path[] files = new Path[20];
+    byte[] payload = new byte[8192];
+    for (int i = 0; i < files.length; i++) {
+      files[i] = tmp.resolve("r." + i + ".0.mca");
+      payload[0] = (byte) i;
+      Files.write(files[i], payload);
+    }
+    // Read first 16: fills cache up to capacity
+    for (int i = 0; i < 16; i++) {
+      assertNotNull(AnvilRegionByteCache.get(files[i]));
+    }
+    assertEquals(16, AnvilRegionByteCache.size());
+
+    // Reading 17th file evicts the eldest, which is recycled into BUFFER_POOL
+    assertNotNull(AnvilRegionByteCache.get(files[16]));
+    // The evicted buffer should be recycled or reused
+    // Read remaining files: evicted buffers are continuously recycled and reused
+    for (int i = 17; i < 20; i++) {
+      assertNotNull(AnvilRegionByteCache.get(files[i]));
+    }
+    assertEquals(16, AnvilRegionByteCache.size());
+
+    // Invalidate all puts cached buffers into the pool
+    AnvilRegionByteCache.invalidateAll();
+    assertEquals(0, AnvilRegionByteCache.size());
+    assertTrue(AnvilRegionByteCache.bufferPoolSize() > 0, "buffer pool should contain recycled buffers");
+
+    // Re-reading a file reuses an existing pooled buffer instance
+    byte[] reused = AnvilRegionByteCache.get(files[0]);
+    assertNotNull(reused);
+  }
 }

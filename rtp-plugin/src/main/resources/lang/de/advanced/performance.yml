@@ -78,7 +78,7 @@ nachTeleportEinreihung: false
 # @default: true
 beiChunkLadenPruefen: true
 
-# Anteil der L3-Backlog-Kapazität, bei dem das Nachfüllen wieder einsetzt (Hysterese).
+# Anteil der Backlog-Kapazität, bei dem das Nachfüllen wieder einsetzt (Hysterese).
 # 0.5 = Nachfüllen nach Leeren auf 50%; 1.0 = kontinuierlich nachfüllen.
 # @type: number
 # @range: [0.0, 1.0]

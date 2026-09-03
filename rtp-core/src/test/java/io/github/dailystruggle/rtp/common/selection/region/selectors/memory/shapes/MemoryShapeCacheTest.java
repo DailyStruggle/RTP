@@ -38,7 +38,7 @@ public class MemoryShapeCacheTest {
 
     @Test
     void addBadLocation_marksCacheDirty() {
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         assertFalse(shape.badLocationsDirty, "Cache should be clean after flushAndRebuild");
 
         shape.addBadLocation(100L);
@@ -51,7 +51,7 @@ public class MemoryShapeCacheTest {
         shape.addBadLocation(20L);
         assertTrue(shape.badLocationsDirty);
 
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         assertFalse(shape.badLocationsDirty, "Cache should be clean after rebuild");
         assertEquals(2, shape.getEffectiveBadCount(),
@@ -65,13 +65,13 @@ public class MemoryShapeCacheTest {
     @Test
     void flushAndRebuild_whenClean_doesNotChangeCacheContents() {
         shape.addBadLocation(50L);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         long countAfterFirstBuild = shape.getEffectiveBadCount();
         assertFalse(shape.badLocationsDirty);
 
         // Call again without adding anything - should be a no-op
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         assertEquals(countAfterFirstBuild, shape.getEffectiveBadCount(),
                 "Second flushAndRebuild on clean cache must not change effective bad count");
@@ -85,13 +85,13 @@ public class MemoryShapeCacheTest {
     void clear_resetsAllCaches() {
         shape.addBadLocation(10L);
         shape.addBadLocation(20L);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         assertEquals(2, shape.getEffectiveBadCount());
 
         shape.clear();
         // clear() marks dirty and clears the underlying maps; rebuild to get fresh counts
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         assertEquals(0, shape.getEffectiveBadCount(),
                 "clear() must reset effective bad count to 0");
@@ -103,11 +103,11 @@ public class MemoryShapeCacheTest {
     void clear_thenRebuild_startsFromEmpty() {
         shape.addBadLocation(10L);
         shape.addBadLocation(20L);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         shape.clear();
 
         // Rebuild after clear - should be empty
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         assertEquals(0, shape.getEffectiveBadCount(),
                 "After clear+rebuild, bad count must be 0");
         assertFalse(shape.badLocationsDirty,
@@ -120,7 +120,7 @@ public class MemoryShapeCacheTest {
 
     @Test
     void addBiomeLocation_marksCacheDirty() {
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         assertFalse(shape.biomeLocationsDirty, "Biome cache should be clean after flushAndRebuild");
 
         shape.addBiomeLocation(30L, 1L, "plains");
@@ -132,7 +132,7 @@ public class MemoryShapeCacheTest {
     void biomeCache_afterRebuild_reflectsAddedLocations() {
         shape.addBiomeLocation(10L, 1L, "ocean");
         shape.addBiomeLocation(20L, 1L, "forest");
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         assertEquals(2, shape.getEffectiveGoodCount(),
                 "Biome cache should reflect 2 good locations after rebuild");
@@ -143,12 +143,12 @@ public class MemoryShapeCacheTest {
     void biomeCache_clear_resetsGoodCount() {
         shape.addBiomeLocation(10L, 1L, "ocean");
         shape.addBiomeLocation(20L, 1L, "forest");
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         assertEquals(2, shape.getEffectiveGoodCount());
 
         shape.clear();
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         assertEquals(0, shape.getEffectiveGoodCount(),
                 "clear() must reset effective good count to 0 after rebuild");
     }
@@ -160,7 +160,7 @@ public class MemoryShapeCacheTest {
     @Test
     void isKnownBad_returnsTrueForAddedLocation() {
         shape.addBadLocation(42L);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         assertTrue(shape.isKnownBad(42L),
                 "isKnownBad must return true for a location added via addBadLocation");
     }
@@ -168,7 +168,7 @@ public class MemoryShapeCacheTest {
     @Test
     void isKnownBad_returnsFalseForUnaddedLocation() {
         shape.addBadLocation(42L);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         assertFalse(shape.isKnownBad(99L),
                 "isKnownBad must return false for a location not added as bad");
     }
@@ -176,9 +176,9 @@ public class MemoryShapeCacheTest {
     @Test
     void isKnownBad_afterClear_returnsFalse() {
         shape.addBadLocation(42L);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         shape.clear();
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         assertFalse(shape.isKnownBad(42L),
                 "isKnownBad must return false after clear()");
     }
@@ -214,7 +214,7 @@ public class MemoryShapeCacheTest {
     void rand_afterCacheRebuild_doesNotReturnBadLocation() {
         shape.set(GenericMemoryShapeParams.mode, "ACCUMULATE");
         for (long i = 0; i < 500; i++) shape.addBadLocation(i);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         for (int i = 0; i < 100; i++) {
             long loc = shape.rand();

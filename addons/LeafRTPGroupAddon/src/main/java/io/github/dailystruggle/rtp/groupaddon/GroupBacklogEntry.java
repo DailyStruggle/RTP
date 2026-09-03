@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * An unverified candidate subspace entry in the Group L3 backlog buffer.
+ * An unverified candidate subspace entry in the group backlog buffer.
  * Holds candidate anchor coordinates, profile, footprint, and candidate slots
  * to be screened off-tick against region file data or candidate validators.
  */

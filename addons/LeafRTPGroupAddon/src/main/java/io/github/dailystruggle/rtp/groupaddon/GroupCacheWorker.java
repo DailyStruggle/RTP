@@ -24,9 +24,9 @@ import java.util.logging.Level;
 /**
  * Asynchronous background worker maintaining the 3-tiered group cache pipeline:
  * <ul>
- *   <li><b>L3 Refill:</b> Generates candidate anchor points from region shapes into L3 backlog.</li>
- *   <li><b>L3 -> L2 Promotion:</b> Off-tick screening via {@link CandidateValidator} / Anvil pre-filter.</li>
- *   <li><b>L2 -> L1 Promotion:</b> Asynchronous chunk reservation acquisition for full subspace footprints.</li>
+ *   <li><b>Backlog Refill:</b> Generates candidate anchor points from region shapes into the backlog.</li>
+ *   <li><b>Backlog -> Cold Promotion:</b> Off-tick screening via {@link CandidateValidator} / Anvil pre-filter.</li>
+ *   <li><b>Cold -> Hot Promotion:</b> Asynchronous chunk reservation acquisition for full subspace footprints.</li>
  * </ul>
  */
 public final class GroupCacheWorker implements Runnable {
@@ -91,18 +91,18 @@ public final class GroupCacheWorker implements Runnable {
     String profileKey = region.name + ":" + profile.name();
     CandidateValidator v = (validator != null) ? validator : region.candidateValidator();
 
-    // 1. L3 Backlog Refill
-    while (cache.sizeL3(profileKey) < cache.getL3BacklogCap()) {
+    // 1. Backlog Refill
+    while (cache.sizeBacklog(profileKey) < cache.getBacklogCap()) {
       fillBacklog(region, profile, profileKey);
     }
 
-    // 2. L3 -> L2 Promotion (Off-tick screening)
-    if (cache.sizeL2(profileKey) < cache.getL2ColdCap()) {
+    // 2. Backlog -> Cold Promotion (Off-tick screening)
+    if (cache.sizeCold(profileKey) < cache.getColdCap()) {
       promoteBacklogToCold(region, profile, profileKey, v);
     }
 
-    // 3. L2 -> L1 Promotion (Async chunk reservation)
-    if (cache.sizeL1(profileKey) < cache.getL1KeptCap()) {
+    // 3. Cold -> Hot Promotion (Async chunk reservation)
+    if (cache.sizeHot(profileKey) < cache.getHotCap()) {
       promoteColdToHot(region, profile, profileKey);
     }
   }
@@ -190,7 +190,7 @@ public final class GroupCacheWorker implements Runnable {
                       reservations);
 
               if (!cache.offerHot(profileKey, hotSubspace)) {
-                // If L1 is full, reservations are closed by offerHot
+                // If the hot stage is full, reservations are closed by offerHot
               }
             })
         .exceptionally(

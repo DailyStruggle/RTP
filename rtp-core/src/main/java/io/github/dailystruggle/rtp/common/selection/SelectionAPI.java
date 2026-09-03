@@ -183,7 +183,7 @@ public class SelectionAPI {
       }
       if (biome == null || biome.isEmpty()) continue;
 
-      memoryShape.addBiomeLocation(location, memoryShape.spatialResolution, biome);
+      memoryShape.addBiomeLocation(location, memoryShape.spatialResolution(), biome);
     }
   }
 

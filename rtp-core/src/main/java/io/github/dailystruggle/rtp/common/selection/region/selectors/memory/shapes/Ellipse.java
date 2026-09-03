@@ -218,108 +218,14 @@ public class Ellipse extends MemoryShape<EllipseMemoryShapeParams> {
     return keys;
   }
 
+  /**
+   * An ellipse is inscribed in the circle its 1D range describes, so the range bounds more space
+   * than the shape itself. Expanding past the learned bad runs would push samples into the
+   * corners {@link #contains(int, int)} rejects, so the knob is forced off (as on Polygon).
+   */
   @Override
-  public int[] select() {
-    return locationToXZ(rand());
-  }
-
-  @Override
-  public long rand() {
-    flushAndRebuild(spatialResolution);
-    long[] sums = badPrefixSumsCache;
-    long[] keysSnap = badKeysCache;
-    if (keysSnap.length != sums.length) {
-      int common = Math.min(keysSnap.length, sums.length);
-      if (keysSnap.length != common) keysSnap = Arrays.copyOf(keysSnap, common);
-      if (sums.length != common) sums = Arrays.copyOf(sums, common);
-    }
-    long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
-
-    double range = getRange();
-    boolean expand = (boolean) data.getOrDefault(EllipseMemoryShapeParams.expand, false);
-    String mode =
-        data.getOrDefault(EllipseMemoryShapeParams.mode, "ACCUMULATE").toString().toUpperCase();
-
-    if ((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badSum;
-    else if (expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badSum;
-
-    double weight = getNumber(EllipseMemoryShapeParams.weight, 1.0).doubleValue();
-    double res = (range) * Math.pow(rng().nextDouble(), weight);
-
-    long location;
-    if (mode.equalsIgnoreCase("ACCUMULATE")) {
-      long target = (long) res;
-      long currentBadSum = 0;
-
-      while (true) {
-        int index = Arrays.binarySearch(keysSnap, target + currentBadSum);
-
-        if (index < 0) {
-          index = -index - 1;
-        } else {
-          index = index + 1;
-        }
-
-        if (index > sums.length) index = sums.length;
-
-        long newBadSum = (index > 0) ? sums[index - 1] : 0;
-
-        if (newBadSum == currentBadSum) break;
-        currentBadSum = newBadSum;
-      }
-      location = target + currentBadSum;
-    } else {
-      location = (long) res;
-    }
-
-    switch (mode) {
-      case "ACCUMULATE":
-        {
-          break;
-        }
-      case "NEAREST":
-        {
-          if (isKnownBad(location)) {
-            long[] keysArr = keysSnap;
-            int idx = Arrays.binarySearch(keysArr, location);
-            int floorIdx = (idx >= 0) ? idx : -(idx + 1) - 1;
-            if (floorIdx < 0 || floorIdx >= sums.length) {
-              return location;
-            }
-
-            long key = keysArr[floorIdx];
-            long sum = sums[floorIdx];
-            long prevSum = (floorIdx > 0) ? sums[floorIdx - 1] : 0L;
-            long val = sum - prevSum;
-
-            long lowerGood = key - 1;
-            long upperGood = key + val;
-
-            if (lowerGood < 0) location = upperGood;
-            else if (upperGood >= range) location = lowerGood;
-            else {
-              if (location - lowerGood < upperGood - location) location = lowerGood;
-              else location = upperGood;
-            }
-          }
-          return location;
-        }
-      case "REROLL":
-        {
-          if (isKnownBad(location)) {
-            return -1;
-          }
-        }
-      default:
-        {
-        }
-    }
-
-    int uniqueRadius =
-        uniquePlacementsRadius(data.getOrDefault(EllipseMemoryShapeParams.uniquePlacements, 0));
-    if (uniqueRadius > 0) addBadChunkRadius(location, uniqueRadius);
-
-    return location;
+  protected boolean supportsExpand() {
+    return false;
   }
 
   @Override

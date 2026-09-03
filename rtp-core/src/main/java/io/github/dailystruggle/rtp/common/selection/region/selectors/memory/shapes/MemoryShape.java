@@ -23,7 +23,23 @@ import java.util.logging.Level;
  * @param <E> enum type for configuration values
  */
 public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
-  public long spatialResolution = 1L;
+  /**
+   * Coalescing distance applied when new marks are folded into the learned bad-run array.
+   *
+   * <p>Sourced from the owning region's {@code spatialResolution} setting: it describes how
+   * compactly that region stores its learned state, not the shape's geometry - it has no effect on
+   * {@link #xzToLocation(long, long)}, {@link #locationToXZ(long)} or {@link #getRange()}. It is
+   * therefore deliberately absent from the region cache key (see
+   * {@code RegionCacheKey}): a run array coalesced at a coarser resolution stays a valid, merely
+   * conservative, superset when read back under a finer one, so changing the setting does not
+   * invalidate persisted data.
+   *
+   * <p>Encapsulated rather than public because the value has exactly one source (region config)
+   * and several consumers; write it through {@link #setSpatialResolution(long)} so the assignment
+   * sites stay auditable.
+   */
+  private volatile long spatialResolution = 1L;
+
   protected volatile long[] badKeysCache = new long[0];
   protected volatile long[] badPrefixSumsCache = new long[0];
   /**
@@ -124,6 +140,27 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     super(eClass, name, data);
   }
 
+  /**
+   * @return the active coalescing distance for learned bad runs; always the value last applied
+   *     from the owning region's configuration, defaulting to {@code 1}
+   */
+  public long spatialResolution() {
+    return spatialResolution;
+  }
+
+  /**
+   * Apply the owning region's configured resolution.
+   *
+   * <p>Does not rewrite already-coalesced runs: a lower value only makes subsequent marks merge
+   * less aggressively, and a higher one only makes them merge more. Operators wanting the finer
+   * precision retroactively have to rescan.
+   *
+   * @param spatialResolution the configured value; clamped to at least {@code 1}
+   */
+  public void setSpatialResolution(long spatialResolution) {
+    this.spatialResolution = Math.max(1L, spatialResolution);
+  }
+
 
   /**
    * Get the range of the shape
@@ -204,14 +241,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     long[] keys = badKeysCache;
     if (keys.length == 0) return false;
 
-    int floorIdx = -1;
-    for (int k = 0; k < keys.length; k++) {
-      if (keys[k] <= location) {
-        floorIdx = k;
-      } else {
-        break;
-      }
-    }
+    int floorIdx = floorRunIndex(keys, location);
 
     if (floorIdx >= 0 && floorIdx < sums.length) {
       long key = keys[floorIdx];
@@ -254,14 +284,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     byte[] causes = badCauseCache;
     if (keys.length == 0) return -1;
 
-    int floorIdx = -1;
-    for (int k = 0; k < keys.length; k++) {
-      if (keys[k] <= location) {
-        floorIdx = k;
-      } else {
-        break;
-      }
-    }
+    int floorIdx = floorRunIndex(keys, location);
 
     if (floorIdx >= 0 && floorIdx < sums.length) {
       long key = keys[floorIdx];
@@ -272,6 +295,25 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       return (floorIdx < causes.length) ? (causes[floorIdx] & 0xFF) : (MISC_CAUSE & 0xFF);
     }
     return -1;
+  }
+
+  /**
+   * Index of the last run whose start key is {@code <= location}, or {@code -1} when every run
+   * starts after it.
+   *
+   * <p>{@code badKeysCache} is produced sorted by the merge in {@link #flushAndRebuild}, so this
+   * is a binary search. It used to be a forward linear scan, which made every {@link #isKnownBad}
+   * and {@link #causeAt} call O(runs) - and {@link #addBadChunkRadius} calls {@code isKnownBad}
+   * once per probed cell on the selection path.
+   *
+   * @param keys sorted run start keys (snapshot)
+   * @param location the 1D index to locate
+   * @return floor index, or {@code -1}
+   */
+  private static int floorRunIndex(long[] keys, long location) {
+    int idx = Arrays.binarySearch(keys, location);
+    if (idx >= 0) return idx;
+    return -(idx + 1) - 1;
   }
 
   /**
@@ -617,9 +659,70 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param cause    the rejection reason; {@code null} is treated as {@link LocationGenerator.FailTypes#misc}
    */
   public void addBadLocation(long location, LocationGenerator.FailTypes cause) {
+    if (absorbIntoAdjacentRun(location)) return;
     long ord = (cause == null) ? MISC_CAUSE : cause.ordinal();
     pendingBadLocations.get().put(location, ord);
     badLocationsDirty = true;
+  }
+
+  /**
+   * Extend an existing bad run in place when {@code location} sits within {@code
+   * spatialResolution} of its end, instead of queueing a pending entry.
+   *
+   * <p>A genuinely new run has to flow through {@code pendingBadLocations} and the dirty flag,
+   * because inserting a key changes the array length. But a mark that the merge in
+   * {@link #flushAndRebuild} would coalesce into the preceding run only changes that run's
+   * length, which is representable in place - so it costs a suffix add rather than a full
+   * re-merge, and it does not dirty the state at all.
+   *
+   * <p>Concurrency: prefix sums are updated back-to-front, so a lock-free reader mid-update sees
+   * either the old or the new value at each index and the array stays non-decreasing either way;
+   * {@code keys} is not touched, so a concurrent {@link #floorRunIndex} binary search stays
+   * valid. Serialized against {@link #flushAndRebuild} through {@code isRebuilding}, and skipped
+   * (falling back to the pending path) whenever a rebuild holds that flag.
+   *
+   * @param location the 1D index being marked bad
+   * @return true when the mark was absorbed and no pending entry is needed
+   */
+  private boolean absorbIntoAdjacentRun(long location) {
+    if (location < 0L) return false;
+    if (!isRebuilding.compareAndSet(false, true)) return false;
+    try {
+      long[] keys = badKeysCache;
+      long[] sums = badPrefixSumsCache;
+      int n = Math.min(keys.length, sums.length);
+      if (n == 0) return false;
+
+      int idx = floorRunIndex(keys, location);
+      if (idx < 0 || idx >= n) return false;
+
+      long key = keys[idx];
+      long prevSum = (idx > 0) ? sums[idx - 1] : 0L;
+      long end = key + (sums[idx] - prevSum); // exclusive
+
+      if (location < end) return true; // already covered: nothing to record
+      if (location > end + spatialResolution) return false; // genuinely new run
+
+      long newEnd = location + 1L;
+      // A mark that would also bridge to the next run changes the array length; leave that
+      // coalescing to the merge.
+      if (idx + 1 < keys.length && keys[idx + 1] <= newEnd + spatialResolution) return false;
+
+      long delta = newEnd - end;
+      // writeLock excludes the snapshot readers that require a coherent view (save, load,
+      // learnedStateSummary); the lock-free readers are safe by the monotonic-suffix argument
+      // above.
+      writeLock.lock();
+      try {
+        for (int k = n - 1; k >= idx; k--) sums[k] += delta;
+      } finally {
+        writeLock.unlock();
+      }
+      totalBadCount.addAndGet(delta);
+      return true;
+    } finally {
+      isRebuilding.set(false);
+    }
   }
 
   /** Shared empty result for {@link #chunkToLocations(int, int)} when a chunk has no preimage. */
@@ -1037,7 +1140,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public void flushAndRebuild(long spatialResolution) {
-    this.spatialResolution = spatialResolution;
+    setSpatialResolution(spatialResolution);
     if (!badLocationsDirty && !biomeLocationsDirty) return;
     if (isRebuilding.compareAndSet(false, true)) {
       try {
@@ -1424,12 +1527,372 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     }
   }
 
+  /** Canonical {@code mode} values. {@link #mode()} upper-cases before comparing. */
+  protected static final String MODE_ACCUMULATE = "ACCUMULATE";
+
+  protected static final String MODE_NEAREST = "NEAREST";
+  protected static final String MODE_REROLL = "REROLL";
+
+  private volatile Knobs<E> knobs;
+  private volatile boolean expandWarningLogged = false;
+
   /**
-   * Get a random location value within the shape
-   *
-   * @return the random location value
+   * The four knobs the shared selection path reads, resolved to enum constants. Shapes expose
+   * four different params enums, so the template cannot name constants directly - but it also
+   * must not look them up by string per call: the {@link #data} {@code EnumMap} exists precisely
+   * to make a knob read an ordinal array index, and a name index in front of it reinstates the
+   * hashing the {@code EnumMap} was chosen to avoid. Resolved once per shape instance instead,
+   * so {@link #rand()} pays only the {@code EnumMap} reads it paid before the unification.
    */
-  public abstract long rand();
+  private static final class Knobs<E extends Enum<E>> {
+    private final E mode;
+    private final E expand;
+    private final E weight;
+    private final E uniquePlacements;
+
+    private Knobs(Class<E> myClass) {
+      E m = null;
+      E e = null;
+      E w = null;
+      E u = null;
+      // One pass at resolution time. getEnumConstants() clones its array, so it is touched here
+      // and nowhere on the selection path.
+      for (E value : myClass.getEnumConstants()) {
+        switch (value.name().toLowerCase(Locale.ROOT)) {
+          case "mode" -> {
+            if (m == null) m = value;
+          }
+          case "expand" -> {
+            if (e == null) e = value;
+          }
+          case "weight" -> {
+            if (w == null) w = value;
+          }
+          case "uniqueplacements" -> {
+            if (u == null) u = value;
+          }
+          default -> {}
+        }
+      }
+      this.mode = m;
+      this.expand = e;
+      this.weight = w;
+      this.uniquePlacements = u;
+    }
+  }
+
+  /** Benign race: construction is idempotent, and publication is via the volatile field. */
+  private Knobs<E> knobs() {
+    Knobs<E> cached = knobs;
+    if (cached == null) {
+      cached = new Knobs<>(myClass);
+      knobs = cached;
+    }
+    return cached;
+  }
+
+  /**
+   * Resolve a parameter by name rather than by enum constant. Init-time only: the selection path
+   * uses {@link #knobs()}. Scans the params enum, so do not call it per selection.
+   *
+   * @param name parameter name, matched case-insensitively
+   * @return the matching constant, or {@code null} if this shape does not expose it
+   */
+  protected final E keyByName(String name) {
+    for (E value : myClass.getEnumConstants()) {
+      if (value.name().equalsIgnoreCase(name)) return value;
+    }
+    return null;
+  }
+
+  /**
+   * Read a parameter by resolved key.
+   *
+   * @param key the parameter constant, or {@code null} when the shape does not expose it
+   * @param def returned when {@code key} is {@code null} or holds no value
+   * @return the configured value, or {@code def}
+   */
+  private Object paramByKey(E key, Object def) {
+    if (key == null) return def;
+    EnumMap<E, Object> snapshot = data;
+    synchronized (snapshot) {
+      Object value = snapshot.get(key);
+      return value != null ? value : def;
+    }
+  }
+
+  /**
+   * Read a parameter by name. Init-time convenience; see {@link #keyByName(String)}.
+   *
+   * @param name parameter name
+   * @param def returned when the shape does not expose the parameter or holds no value
+   * @return the configured value, or {@code def}
+   */
+  protected final Object paramByName(String name, Object def) {
+    return paramByKey(keyByName(name), def);
+  }
+
+  /**
+   * @return the configured selection mode, upper-cased. Case normalization is not optional: the
+   *     dispatch in {@link #resolve} matches exact strings, so a lower-case {@code mode: nearest}
+   *     would otherwise silently degrade to "no repair, no reroll".
+   */
+  protected final String mode() {
+    return paramByKey(knobs().mode, MODE_ACCUMULATE).toString().toUpperCase(Locale.ROOT);
+  }
+
+  /** @return true if this shape exposes an {@code expand} knob at all. */
+  protected final boolean declaresExpand() {
+    return knobs().expand != null;
+  }
+
+  /** @return the configured {@code expand} flag, tolerating a string-typed YAML value. */
+  protected final boolean expand() {
+    Object raw = paramByKey(knobs().expand, Boolean.FALSE);
+    if (raw instanceof Boolean b) return b;
+    return raw != null && Boolean.parseBoolean(raw.toString());
+  }
+
+  /**
+   * Whether {@code expand} is meaningful for this shape. Shapes whose 1D range bounds a larger
+   * construction than the shape itself (the polygon mask, the ellipse inscribed in its bounding
+   * circle) must return {@code false}: expanding past the learned bad runs pushes samples into
+   * space {@link #contains(int, int)} rejects, so the knob can only hurt.
+   *
+   * @return true unless the shape is bounded smaller than its range
+   */
+  protected boolean supportsExpand() {
+    return true;
+  }
+
+  /**
+   * Force {@code expand} off for shapes that cannot honor it, warning once. Written back into
+   * {@code data} rather than merely ignored so {@link #contains(int, int)}, which reads the same
+   * knob, stays consistent with the sampling path.
+   */
+  private void coerceUnsupportedExpand() {
+    if (supportsExpand() || !declaresExpand() || !expand()) return;
+    E key = knobs().expand;
+    if (key != null) set(key, Boolean.FALSE);
+    if (!expandWarningLogged) {
+      expandWarningLogged = true;
+      RTP.log(
+          Level.WARNING,
+          "["
+              + getClass().getSimpleName()
+              + "] expand=true is not supported on "
+              + getClass().getSimpleName()
+              + " shapes; forcing expand=false");
+    }
+  }
+
+  /**
+   * Adjust the sampling range for the learned bad area.
+   *
+   * <p>Applied only when the shape exposes an {@code expand} knob. Shapes without one (notably
+   * {@code Rectangle}) sample their raw range on a plain uniform curve, and introducing the
+   * adjustment here would silently change their distribution.
+   *
+   * @param range the geometric range from {@link #getRange()}
+   * @param badSum total learned bad area
+   * @param mode the normalized selection mode
+   * @return the range to sample against
+   */
+  protected double adjustRange(double range, long badSum, String mode) {
+    if (!declaresExpand()) return range;
+    boolean expand = expand();
+    boolean accumulate = MODE_ACCUMULATE.equals(mode);
+    if (!expand && accumulate) return range - badSum;
+    if (expand && !accumulate) return range + badSum;
+    return range;
+  }
+
+  /**
+   * Draw a raw 1D sample in {@code [0, range)}. This is the shape's distribution model and the
+   * only part of selection that is expected to differ between shapes.
+   *
+   * <p>The default is a power curve biased by the {@code weight} knob. Shapes that expose no
+   * {@code weight} get {@code weight == 1.0}, i.e. a plain uniform draw.
+   *
+   * @param range the adjusted range
+   * @return the sampled scalar
+   */
+  protected double sample(double range) {
+    E weightKey = knobs().weight;
+    double weight = (weightKey == null) ? 1.0 : getNumber(weightKey, 1.0).doubleValue();
+    return range * Math.pow(rng().nextDouble(), weight);
+  }
+
+  /**
+   * Post-selection hook, applied to the resolved location before it is returned. Lets a shape
+   * reject a sample its range cannot express (e.g. a polygon mask) without re-implementing
+   * {@link #rand()}.
+   *
+   * @param location the resolved location, or {@code -1} if already rejected
+   * @return the location to return, or {@code -1} to request a re-roll
+   */
+  protected long postProcess(long location) {
+    return location;
+  }
+
+  /**
+   * Get a random location value within the shape.
+   *
+   * <p>Template method: the shared steps (bad-run snapshot, accumulate resolution, mode dispatch,
+   * unique-placement marking) live here, and shapes contribute only {@link #getRange()},
+   * {@link #adjustRange}, {@link #sample} and {@link #postProcess}. Deliberately not {@code final}
+   * - {@code ChunkyRTPShape} and test doubles substitute their own selection wholesale.
+   *
+   * @return the random location value, or {@code -1} to request a re-roll
+   */
+  public long rand() {
+    maybeFlushAndRebuild();
+    coerceUnsupportedExpand();
+
+    // Snapshot both arrays together to avoid races with concurrent rebuilds where
+    // badKeysCache and badPrefixSumsCache may be observed at different lengths.
+    long[] keys = badKeysCache;
+    long[] sums = badPrefixSumsCache;
+    if (keys.length != sums.length) {
+      // Length mismatch indicates a concurrent rebuild was observed mid-update.
+      // Clamp to the shorter common length to keep indexing safe.
+      int common = Math.min(keys.length, sums.length);
+      if (keys.length != common) keys = Arrays.copyOf(keys, common);
+      if (sums.length != common) sums = Arrays.copyOf(sums, common);
+    }
+    long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
+
+    String mode = mode();
+    double range = adjustRange(getRange(), badSum, mode);
+    double res = sample(range);
+    return postProcess(resolve(res, range, mode, keys, sums));
+  }
+
+  /**
+   * Upper bound on how many pending marks {@link #rand()} lets accumulate before rebuilding.
+   * Caps the staleness of the learned-state snapshot on shapes that are never pulsed.
+   */
+  private static final int MAX_PENDING_BEFORE_REBUILD = 256;
+
+  /**
+   * Rebuild the learned-state arrays only when the pending batch is large enough to amortize the
+   * cost.
+   *
+   * <p>{@link #flushAndRebuild} is a full merge of the whole run array, so calling it per
+   * selection makes bulk selection quadratic once anything marks locations bad on the selection
+   * path (see {@code uniquePlacements}). The pulse-level callers - {@code ScanTask},
+   * {@code PregenTask}, {@code Region} - already rebuild on their own cadence; this only stops
+   * {@code rand()} from forcing one per call.
+   *
+   * <p>The batch size scales with the existing run count, so a small learned state still
+   * rebuilds eagerly (the merge is cheap there) while a large one amortizes the O(runs) merge
+   * over proportionally many marks. Correctness does not depend on the timing:
+   * {@link #isKnownBad} consults {@code pendingBadLocations} directly, so a pending mark is
+   * honored immediately; only the ACCUMULATE bad-area subtraction lags, and it already reads a
+   * possibly-stale snapshot by design.
+   */
+  private void maybeFlushAndRebuild() {
+    if (!badLocationsDirty && !biomeLocationsDirty) return;
+    int pending = pendingBadLocations.get().size();
+    if (badLocationsDirty && !biomeLocationsDirty && pending > 0) {
+      int batch = Math.min(MAX_PENDING_BEFORE_REBUILD, Math.max(1, badKeysCache.length / 8));
+      if (pending < batch) return;
+    }
+    flushAndRebuild(spatialResolution);
+  }
+
+  /**
+   * Turn a raw sample into a concrete location, applying the mode's bad-location policy.
+   *
+   * @param res the raw sample
+   * @param range the adjusted range
+   * @param mode the normalized selection mode
+   * @param keys bad-run start keys (snapshot)
+   * @param sums bad-run prefix sums (snapshot)
+   * @return the resolved location, or {@code -1} to request a re-roll
+   */
+  private long resolve(double res, double range, String mode, long[] keys, long[] sums) {
+    long location;
+    if (MODE_ACCUMULATE.equals(mode)) {
+      long target = (long) res;
+      long currentBadSum = 0;
+
+      // Iterate until the number of bad spots preceding our physical guess stabilizes.
+      while (true) {
+        // Search physical keys using a physical guess (target + current shift).
+        int index = Arrays.binarySearch(keys, target + currentBadSum);
+
+        if (index < 0) {
+          // Point is between keys (or after all keys). Invert insertion point.
+          index = -index - 1;
+        } else {
+          // Exact match: the coordinate sits exactly on the start of a bad interval.
+          // Force the index forward to include this interval's bad sum.
+          index = index + 1;
+        }
+
+        // Clamp defensively against the prefix-sums length to avoid AIOOBE if a
+        // concurrent rebuild slipped a longer keys snapshot past us.
+        if (index > sums.length) index = sums.length;
+
+        long newBadSum = (index > 0) ? sums[index - 1] : 0;
+
+        if (newBadSum == currentBadSum) break;
+        currentBadSum = newBadSum;
+      }
+      location = target + currentBadSum;
+    } else {
+      location = (long) res;
+    }
+
+    if (MODE_NEAREST.equals(mode) && isKnownBad(location)) {
+      location = nearestGood(location, range, keys, sums);
+    }
+
+    // NEAREST falls through to the REROLL check on purpose: if the nearest-good search
+    // could not repair the sample, handing back a known-bad location wastes a full
+    // pipeline attempt, so re-roll instead.
+    if ((MODE_NEAREST.equals(mode) || MODE_REROLL.equals(mode)) && isKnownBad(location)) {
+      return -1;
+    }
+
+    int uniqueRadius = uniquePlacementsRadius(paramByKey(knobs().uniquePlacements, 0));
+    // addBadChunkRadius: chunk-uniform (uniqueplacements knob) - within a chunk the per-column
+    // selection order is deterministic, so re-rolling onto the same chunk produces the
+    // same effective placement. Marking the landing chunk (radius 1) prevents that chunk-level
+    // re-roll; a larger radius additionally clears the surrounding chunks so placements spread out.
+    if (uniqueRadius > 0) addBadChunkRadius(location, uniqueRadius);
+
+    return location;
+  }
+
+  /**
+   * Snap a known-bad location to whichever end of its bad run is nearer.
+   *
+   * @return the repaired location, or {@code location} unchanged when the containing run cannot
+   *     be identified (the caller then re-rolls)
+   */
+  private long nearestGood(long location, double range, long[] keys, long[] sums) {
+    int idx = Arrays.binarySearch(keys, location);
+    int floorIdx = (idx >= 0) ? idx : -(idx + 1) - 1;
+    if (floorIdx < 0 || floorIdx >= sums.length) return location;
+
+    long key = keys[floorIdx];
+    long prevSum = (floorIdx > 0) ? sums[floorIdx - 1] : 0L;
+    long val = sums[floorIdx] - prevSum;
+
+    long lowerGood = key - 1;
+    long upperGood = key + val;
+
+    if (lowerGood < 0) return upperGood;
+    if (upperGood >= range) return lowerGood;
+    return (location - lowerGood < upperGood - location) ? lowerGood : upperGood;
+  }
+
+  @Override
+  public int[] select() {
+    return locationToXZ(rand());
+  }
 
   private void sortParallelArrays(long[] keys, long[] lengths, int left, int right) {
     if (left >= right) return;
@@ -1459,17 +1922,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     long l = xzToLocation(x, z);
     long range = (long) getRange();
 
-    boolean expand = false;
-    for (Map.Entry<E, Object> entry : data.entrySet()) {
-      if (entry.getKey().name().equalsIgnoreCase("expand")) {
-        Object val = entry.getValue();
-        if (val instanceof Boolean) expand = (Boolean) val;
-        else if (val != null) expand = Boolean.parseBoolean(val.toString());
-        break;
-      }
-    }
-
-    if (expand) {
+    if (supportsExpand() && expand()) {
       long[] sums = badPrefixSumsCache;
       long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
       range += badSum;

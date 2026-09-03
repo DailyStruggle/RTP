@@ -235,7 +235,7 @@ public class MemoryTracker {
         RegionSettings settings = region.getSettings();
         totalCacheCap += settings.cacheCap();
         totalCacheCap += settings.activeChunkCap();
-        // Account for L3 backlog capacity in the global cache budget (ADR-028).
+        // Account for backlog capacity in the global cache budget (ADR-028).
         totalCacheCap += settings.backlogCacheCap();
         totalActiveChunkCap += settings.activeChunkCap();
 

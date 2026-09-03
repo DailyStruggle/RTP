@@ -19,7 +19,7 @@
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "Сканирование [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% земли) ETA [scan_eta]"
 
 # ###############################################################################
 # Section 7: Info Command
@@ -111,9 +111,9 @@ infoBiomeActivityEmpty: "&8--- &7заполнение биомов ещё не �
   - "#58CCED  - требуемое право: [requirePermission]"
   - "#58CCED  - переопределение границы мира: [worldBorderOverride]"
   - "#58CCED  - лимит кэша: [cacheCap]"
-  - "#58CCED  - удерживаемый кэш (L1): [keptCache]"
-  - "#58CCED  - освобождённый кэш (L2): [unkeptCache]"
-  - "#58CCED  - кэш очереди (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - удерживаемый кэш (hot): [keptCache]"
+  - "#58CCED  - освобождённый кэш (cold): [unkeptCache]"
+  - "#58CCED  - кэш очереди (backlog): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - в кэше: [cached]"
   - "#58CCED  - изученное покрытие: [memCoveragePct] (плохих: [memBadPct], [memBadCount] ячеек)"
   - "#58CCED  - основная причина отказа: [memTopCause] ([memTopCausePct])"
@@ -159,7 +159,7 @@ menuRootHint: "&7нажмите на опцию ниже, чтобы начат�
 menuPagePrev: "&7« предыдущая страница ([page])"
 menuPageNext: "&7следующая страница ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+menuFrontPageSectionTeleport: "&8--- &7телепортация &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
@@ -174,16 +174,16 @@ menuFrontPageRowAdmin: "#9D7CD8▶ панель администратора &7-
 menuFrontPageHoverAdmin: "&7инструменты оператора: настройки, сканы, диагностика, перезагрузка"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ панель администратора"
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
 # Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7конфигурация &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7диагностика &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7жизненный цикл &8---"
+menuAdminPanelSectionBrowse: "&8--- &7обзор &8---"
 # Admin-panel rows + hovers. No placeholders.
-menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelRowConfig: "&b▶ редактор конфигурации"
 menuAdminPanelHoverConfig: "&7открыть подобранный селектор настроек"
 menuAdminPanelRowRegions: "#5FB3B3▶ регионы"
 menuAdminPanelHoverRegions: "&7добавить, удалить или изменить настройки по регионам"
@@ -191,17 +191,17 @@ menuAdminPanelRowWorlds: "#5FB3B3▶ миры"
 menuAdminPanelHoverWorlds: "&7добавить, удалить или изменить настройки по мирам"
 menuAdminPanelRowEffects: "#5FB3B3▶ эффекты"
 menuAdminPanelHoverEffects: "&7добавить, удалить или изменить эффекты телепортации по группам"
-menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelRowInfo: "&b▶ информация о сервере"
 menuAdminPanelHoverInfo: "&7показать версию плагина, число регионов и состояние очередей"
 menuAdminPanelRowDiagnostics: "&c▶ полная диагностика"
 menuAdminPanelHoverDiagnostics: "&7запускает полный набор диагностики; может быть затратной"
-menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelRowMemory: "&b▶ снимок трекера памяти"
 menuAdminPanelHoverMemory: "&7вывести активные тикеты чанков и выделения конвейера"
-menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelRowScan: "&b▶ управление сканированием"
 menuAdminPanelHoverScan: "&7открыть подменю сканирования (старт / пауза / отмена)"
 menuAdminPanelRowReload: "&c▶ перезагрузка"
 menuAdminPanelHoverReload: "&7перезагружает все файлы настроек; текущие телепортации могут пострадать"
-menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelRowBrowse: "&b▶ просмотреть все команды"
 menuAdminPanelHoverBrowse: "&7открыть отражённое дерево команд /rtp"
 menuAdminPanelRowBack: "&7« назад"
 # --- Visualizations submenu (admin map of bad locations per region) ---
@@ -273,7 +273,7 @@ configSelectorTitle: "#5FB3B3&l⚙ файлы настроек"
 configSelectorBackRow: "&7« назад в меню"
 # Non-clickable title row at the top of a single config-file page.
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
+configFileTitle: "#5FB3B3&l⚙ конфигурация: &7[file]"
 # Label for the "back to config selector" navigation row on a single config-file page.
 configFileBackRow: "&7« назад к файлам настроек"
 # Non-clickable hint row shown when a config file has no editable keys.
@@ -283,13 +283,13 @@ configFileEmptyHint: "&7(в этом файле нет редактируемы�
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
-configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+configKeyHoverFormat: "&7нажмите для редактирования &7[key] &7(тип: [type])"
 # Non-clickable title row at the top of a shape/vert type-picker page.
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+configTypePickerTitle: "#5FB3B3&l⚙ выберите тип [param] &7(текущий: &7[current]&7)"
 # Non-clickable title row at the top of a shape/vert sub-parameter page.
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7подпараметры"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] просмотр в книге недоступен; откат к сырому дампу."

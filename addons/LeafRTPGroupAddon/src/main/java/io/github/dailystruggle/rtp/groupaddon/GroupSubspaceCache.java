@@ -7,20 +7,20 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * Manages the three-tier caching pipeline for group subspaces (Stage 4, leafrtp-group-addon-ADR-002):
  * <ul>
- *   <li><b>Group L1 (Hot / Kept):</b> Pre-verified subspaces with active {@link io.github.dailystruggle.rtp.api.world.ChunkReservation}
+ *   <li><b>Group Hot (Kept):</b> Pre-verified subspaces with active {@link io.github.dailystruggle.rtp.api.world.ChunkReservation}
  *       tickets held for immediate teleport dispatch.</li>
- *   <li><b>Group L2 (Cold / Unkept):</b> Pre-verified subspace coordinates with chunk tickets released.</li>
- *   <li><b>Group L3 (Backlog Buffer):</b> FIFO queue of unverified candidate subspaces screened off-tick.</li>
+ *   <li><b>Group Cold (Unkept):</b> Pre-verified subspace coordinates with chunk tickets released.</li>
+ *   <li><b>Group Backlog:</b> FIFO queue of unverified candidate subspaces screened off-tick.</li>
  * </ul>
  */
 public final class GroupSubspaceCache {
-  public static final int DEFAULT_L1_KEPT_CAP = 2;
-  public static final int DEFAULT_L2_COLD_CAP = 5;
-  public static final int DEFAULT_L3_BACKLOG_CAP = 10;
+  public static final int DEFAULT_HOT_CAP = 2;
+  public static final int DEFAULT_COLD_CAP = 5;
+  public static final int DEFAULT_BACKLOG_CAP = 10;
 
-  private final int l1KeptCap;
-  private final int l2ColdCap;
-  private final int l3BacklogCap;
+  private final int hotCap;
+  private final int coldCap;
+  private final int backlogCap;
 
   public static final class ProfileQueues {
     private final ConcurrentLinkedQueue<GroupSubspace> kept = new ConcurrentLinkedQueue<>();
@@ -43,29 +43,29 @@ public final class GroupSubspaceCache {
   private final Map<String, ProfileQueues> queuesByProfile = new ConcurrentHashMap<>();
 
   public GroupSubspaceCache() {
-    this(DEFAULT_L1_KEPT_CAP, DEFAULT_L2_COLD_CAP, DEFAULT_L3_BACKLOG_CAP);
+    this(DEFAULT_HOT_CAP, DEFAULT_COLD_CAP, DEFAULT_BACKLOG_CAP);
   }
 
-  public GroupSubspaceCache(int l1KeptCap, int l2ColdCap, int l3BacklogCap) {
-    this.l1KeptCap = Math.max(1, l1KeptCap);
-    this.l2ColdCap = Math.max(0, l2ColdCap);
-    this.l3BacklogCap = Math.max(0, l3BacklogCap);
+  public GroupSubspaceCache(int hotCap, int coldCap, int backlogCap) {
+    this.hotCap = Math.max(1, hotCap);
+    this.coldCap = Math.max(0, coldCap);
+    this.backlogCap = Math.max(0, backlogCap);
   }
 
   private ProfileQueues getQueues(String profileKey) {
     return queuesByProfile.computeIfAbsent(profileKey, k -> new ProfileQueues());
   }
 
-  public int getL1KeptCap() {
-    return l1KeptCap;
+  public int getHotCap() {
+    return hotCap;
   }
 
-  public int getL2ColdCap() {
-    return l2ColdCap;
+  public int getColdCap() {
+    return coldCap;
   }
 
-  public int getL3BacklogCap() {
-    return l3BacklogCap;
+  public int getBacklogCap() {
+    return backlogCap;
   }
 
   /**
@@ -79,17 +79,17 @@ public final class GroupSubspaceCache {
   }
 
   /**
-   * Offers a hot subspace with active chunk reservations into L1.
+   * Offers a hot subspace with active chunk reservations into the hot stage.
    * If the queue is at or above capacity, the subspace is closed immediately to prevent ticket leaks (S-002).
    *
    * @param profileKey region or profile identifier
    * @param subspace the subspace to store
-   * @return {@code true} if accepted into L1, {@code false} if closed due to capacity
+   * @return {@code true} if accepted into the hot stage, {@code false} if closed due to capacity
    */
   public boolean offerHot(String profileKey, GroupSubspace subspace) {
     if (subspace == null) return false;
     ProfileQueues queues = getQueues(profileKey);
-    if (queues.kept.size() >= l1KeptCap) {
+    if (queues.kept.size() >= hotCap) {
       subspace.close();
       return false;
     }
@@ -98,7 +98,7 @@ public final class GroupSubspaceCache {
   }
 
   /**
-   * Polls a cold pre-verified subspace from L2.
+   * Polls a cold pre-verified subspace.
    *
    * @param profileKey region or profile identifier
    * @return a cold {@link GroupSubspace}, or {@code null} if empty
@@ -108,7 +108,7 @@ public final class GroupSubspaceCache {
   }
 
   /**
-   * Offers a cold pre-verified subspace into L2.
+   * Offers a cold pre-verified subspace into the cold stage.
    *
    * @param profileKey region or profile identifier
    * @param subspace the cold subspace
@@ -117,7 +117,7 @@ public final class GroupSubspaceCache {
   public boolean offerCold(String profileKey, GroupSubspace subspace) {
     if (subspace == null) return false;
     ProfileQueues queues = getQueues(profileKey);
-    if (queues.unkept.size() >= l2ColdCap) {
+    if (queues.unkept.size() >= coldCap) {
       return false;
     }
     queues.unkept.offer(subspace);
@@ -125,7 +125,7 @@ public final class GroupSubspaceCache {
   }
 
   /**
-   * Polls an unverified backlog entry from L3.
+   * Polls an unverified backlog entry.
    *
    * @param profileKey region or profile identifier
    * @return unverified {@link GroupBacklogEntry}, or {@code null} if empty
@@ -135,7 +135,7 @@ public final class GroupSubspaceCache {
   }
 
   /**
-   * Offers an unverified candidate entry into L3 backlog.
+   * Offers an unverified candidate entry into the backlog.
    *
    * @param profileKey region or profile identifier
    * @param entry the candidate entry
@@ -144,28 +144,28 @@ public final class GroupSubspaceCache {
   public boolean offerBacklog(String profileKey, GroupBacklogEntry entry) {
     if (entry == null) return false;
     ProfileQueues queues = getQueues(profileKey);
-    if (queues.backlog.size() >= l3BacklogCap) {
+    if (queues.backlog.size() >= backlogCap) {
       return false;
     }
     queues.backlog.offer(entry);
     return true;
   }
 
-  public int sizeL1(String profileKey) {
+  public int sizeHot(String profileKey) {
     return getQueues(profileKey).kept.size();
   }
 
-  public int sizeL2(String profileKey) {
+  public int sizeCold(String profileKey) {
     return getQueues(profileKey).unkept.size();
   }
 
-  public int sizeL3(String profileKey) {
+  public int sizeBacklog(String profileKey) {
     return getQueues(profileKey).backlog.size();
   }
 
   /**
    * Drains and clears all queue tiers across all profiles, deterministically closing
-   * all active chunk reservations in L1 (S-002).
+   * all active chunk reservations in the hot stage (S-002).
    */
   public void clear() {
     for (ProfileQueues queues : queuesByProfile.values()) {

@@ -130,7 +130,7 @@ public class ShapeEdgeCaseTest {
         shape.setRng(new Random(SEED));
 
         for (long i = 0; i < 1000; i++) shape.addBadLocation(i);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         long loc = shape.rand();
         assertTrue(loc >= 0 || loc == -1, "NEAREST mode should return valid location or -1");
@@ -151,7 +151,7 @@ public class ShapeEdgeCaseTest {
 
         long range = shape.getRange();
         for (long i = 0; i < range; i++) shape.addBadLocation(i);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         long loc = shape.rand();
         assertEquals(-1L, loc, "REROLL mode should return -1 when selected location is bad");
@@ -171,7 +171,7 @@ public class ShapeEdgeCaseTest {
         shape.setRng(new Random(SEED));
 
         for (long i = 0; i < 50; i++) shape.addBadLocation(i);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         long range = shape.getRange();
         for (int i = 0; i < 50; i++) {
@@ -228,7 +228,7 @@ public class ShapeEdgeCaseTest {
         shape.setRng(new Random(SEED));
 
         for (long i = 0; i < 100; i++) shape.addBadLocation(i);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         assertDoesNotThrow(shape::rand);
         shape.setRng(null);
