@@ -93,7 +93,7 @@ test_description: "tester les fonctions RTP"
 # ###############################################################################
 # status placeholders for players
 PLAYER_AVAILABLE: "&aDISPONIBLE"
-PLAYER_COOLDOWN: "&7ON COOLDOWN"
+PLAYER_COOLDOWN: "&7EN RÉCUPÉRATION"
 PLAYER_SETUP: "&bCHOIX D'UN EMPLACEMENT"
 PLAYER_LOADING: "&bCHARGEMENT DES CHUNKS"
 PLAYER_TELEPORTING: "&bTÉLÉPORTATION"

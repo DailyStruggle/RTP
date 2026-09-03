@@ -70,8 +70,8 @@ public class ScanResetCmd extends ScanSubCmd {
       if (multiConfigParser != null) {
         ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser(region.name);
         if (regionConfig != null) {
-          shape.spatialResolution =
-              regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue();
+          shape.setSpatialResolution(
+              regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue());
         }
       }
 

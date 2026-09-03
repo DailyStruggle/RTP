@@ -219,7 +219,7 @@ public class LocaleParityTest {
         }
 
         @Test
-        @DisplayName("Each locale's messages.yml preserves baseline placeholder tokens")
+        @DisplayName("Each locale's advanced/messages tree preserves baseline placeholder tokens")
         void messagePlaceholdersArePreserved() throws IOException {
             if (!Files.isDirectory(LANG_ROOT)) return;
             if (!Files.isDirectory(MESSAGES_DIR)) return;
@@ -231,10 +231,10 @@ public class LocaleParityTest {
                 for (Path localeDir : locales) {
                     String localeName = localeDir.getFileName().toString();
                     if (NON_LOCALE_DIRS.contains(localeName)) continue;
-                    Path messages = localeDir.resolve("messages.yml");
-                    if (!Files.exists(messages)) continue;
+                    Path messagesDir = localeDir.resolve("advanced").resolve("messages");
+                    if (!Files.isDirectory(messagesDir)) continue;
 
-                    Set<String> seen = collectPlaceholders(loadYaml(messages));
+                    Set<String> seen = collectPlaceholders(mergedMessages(messagesDir));
                     Set<String> missing = new TreeSet<>(baselinePlaceholders);
                     missing.removeAll(seen);
                     if (!missing.isEmpty()) {
@@ -242,7 +242,7 @@ public class LocaleParityTest {
                         extras.removeAll(baselinePlaceholders);
                         if (!extras.isEmpty()) {
                             failures.add(String.format(
-                                    "%s/messages.yml introduces non-baseline placeholders %s; "
+                                    "%s/advanced/messages introduces non-baseline placeholders %s; "
                                             + "expected only %s. Likely an accidentally translated "
                                             + "placeholder token.",
                                     localeName, extras, baselinePlaceholders));
@@ -258,7 +258,7 @@ public class LocaleParityTest {
 
         /**
          * Catches user-facing message values that were never translated: a
-         * non-English locale's {@code messages.yml} value that, after stripping
+         * non-English locale's {@code advanced/messages} value that, after stripping
          * color codes ({@code &a}, {@code #RRGGBB}, {@code section x}) and
          * {@code [placeholder]} tokens, is byte-for-byte identical to the
          * English baseline value for the same key and still contains real words.
@@ -275,7 +275,7 @@ public class LocaleParityTest {
          * {@link #UNTRANSLATED_ALLOW}.
          */
         @Test
-        @DisplayName("No locale messages.yml value is left as the untranslated English baseline string")
+        @DisplayName("No locale message value is left as the untranslated English baseline string")
         void noUntranslatedBaselineValues() throws IOException {
             if (!Files.isDirectory(LANG_ROOT)) return;
             if (!Files.isDirectory(MESSAGES_DIR)) return;
@@ -295,8 +295,8 @@ public class LocaleParityTest {
             List<String> failures = new ArrayList<>();
             for (Path localeDir : discoverLocaleDirs()) {
                 String localeName = localeDir.getFileName().toString();
-                Path messages = localeDir.resolve("messages.yml");
-                if (!Files.exists(messages)) continue;
+                Path messagesDir = localeDir.resolve("advanced").resolve("messages");
+                if (!Files.isDirectory(messagesDir)) continue;
 
                 // A locale that does not even parse is a separate defect owned
                 // by noCsvEscapingCorruption / the parse-level coverage tests;
@@ -304,7 +304,7 @@ public class LocaleParityTest {
                 Map<String, Object> localeValues;
                 Map<String, String> localeLangMap;
                 try {
-                    localeValues = loadYaml(messages);
+                    localeValues = mergedMessages(messagesDir);
                     // ADR-076: per-locale rename map is the union of the per-file
                     // co-located dotfile maps under lang/<locale>/advanced/messages/.
                     localeLangMap = mergedMessagesLangMap(
@@ -597,13 +597,22 @@ public class LocaleParityTest {
 
     /**
      * Union of every {@code advanced/messages/*.yml} member file - the effective
-     * baseline key set for the split messages tree, used by the placeholder /
-     * untranslated value scans that operate on the flat per-locale value file.
+     * baseline key set for the split messages tree, compared against the same
+     * union taken over each locale's {@code advanced/messages} mirror.
      */
     private static Map<String, Object> mergedMessagesBaseline() throws IOException {
+        return mergedMessages(MESSAGES_DIR);
+    }
+
+    /**
+     * Union of every {@code *.yml} member of an {@code advanced/messages}
+     * directory (baseline or a locale mirror). The co-located {@code .<file>.lang.yml}
+     * rename maps are dotfiles and are excluded by the glob.
+     */
+    private static Map<String, Object> mergedMessages(Path messagesDir) throws IOException {
         Map<String, Object> merged = new LinkedHashMap<>();
-        if (Files.isDirectory(MESSAGES_DIR)) {
-            try (DirectoryStream<Path> ymls = Files.newDirectoryStream(MESSAGES_DIR, "*.yml")) {
+        if (Files.isDirectory(messagesDir)) {
+            try (DirectoryStream<Path> ymls = Files.newDirectoryStream(messagesDir, "*.yml")) {
                 for (Path p : ymls) merged.putAll(loadYaml(p));
             }
         }

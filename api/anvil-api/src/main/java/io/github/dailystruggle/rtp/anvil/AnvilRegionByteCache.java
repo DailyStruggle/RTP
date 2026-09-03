@@ -1,12 +1,16 @@
 package io.github.dailystruggle.rtp.anvil;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -38,15 +42,43 @@ public final class AnvilRegionByteCache {
    */
   private static final int CAPACITY = 16;
 
+  /** Reusable buffer pool avoiding byte-array reallocations on every cache miss or eviction. */
+  private static final ConcurrentLinkedQueue<byte[]> BUFFER_POOL = new ConcurrentLinkedQueue<>();
+
   private AnvilRegionByteCache() {}
 
   private static final LinkedHashMap<Path, Entry> CACHE =
       new LinkedHashMap<>(CAPACITY * 2, 0.75f, /* accessOrder = */ true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Path, Entry> eldest) {
-          return size() > CAPACITY;
+          if (size() > CAPACITY) {
+            recycleBuffer(eldest.getValue().bytes);
+            return true;
+          }
+          return false;
         }
       };
+
+  private static void recycleBuffer(byte[] bytes) {
+    if (bytes != null && BUFFER_POOL.size() < CAPACITY) {
+      BUFFER_POOL.offer(bytes);
+    }
+  }
+
+  private static byte[] pollOrAllocateBuffer(int len) {
+    byte[] candidate;
+    while ((candidate = BUFFER_POOL.poll()) != null) {
+      if (len < 4096) {
+        if (candidate.length == len) return candidate;
+        BUFFER_POOL.offer(candidate);
+        break;
+      } else if (candidate.length >= len) {
+        return candidate;
+      }
+    }
+    int allocSize = (len < 4096) ? len : Math.max(len, 4 * 1024 * 1024);
+    return new byte[allocSize];
+  }
 
   private record Entry(byte[] bytes, long mtime) {}
 
@@ -110,8 +142,18 @@ public final class AnvilRegionByteCache {
     MISSES.incrementAndGet();
     byte[] bytes;
     long readStart = System.nanoTime();
-    try {
-      bytes = Files.readAllBytes(regionFile);
+    try (FileChannel channel = FileChannel.open(regionFile, StandardOpenOption.READ)) {
+      long fileSize = channel.size();
+      if (fileSize > Integer.MAX_VALUE || fileSize < 0) {
+        bytes = null;
+      } else {
+        int len = (int) fileSize;
+        bytes = pollOrAllocateBuffer(len);
+        ByteBuffer bb = ByteBuffer.wrap(bytes, 0, len);
+        while (bb.hasRemaining()) {
+          if (channel.read(bb) < 0) break;
+        }
+      }
     } catch (IOException e) {
       bytes = null;
     }
@@ -129,8 +171,24 @@ public final class AnvilRegionByteCache {
   /** Clears the cache. Test hook. */
   public static void invalidateAll() {
     synchronized (CACHE) {
+      for (Entry e : CACHE.values()) {
+        recycleBuffer(e.bytes);
+      }
       CACHE.clear();
     }
+  }
+
+  /** Clears both the cache and the reusable buffer pool. Test hook. */
+  public static void resetAll() {
+    synchronized (CACHE) {
+      CACHE.clear();
+      BUFFER_POOL.clear();
+    }
+  }
+
+  /** Current reusable buffer pool size. Diagnostic/test hook. */
+  public static int bufferPoolSize() {
+    return BUFFER_POOL.size();
   }
 
   /** Snapshot of hit/miss/stale/coalesced/coldReadNanos counters. Diagnostic metrics. */

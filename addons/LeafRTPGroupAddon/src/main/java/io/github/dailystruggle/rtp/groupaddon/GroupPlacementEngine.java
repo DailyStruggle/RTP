@@ -14,7 +14,7 @@ public final class GroupPlacementEngine {
   private GroupPlacementEngine() {}
 
   /**
-   * Allocation attempting cache retrieval (L1 Hot -> L2 Cold) before falling back
+   * Allocation attempting cache retrieval (Hot -> Cold) before falling back
    * to live dynamic allocation.
    *
    * @param cache group subspace cache
@@ -41,7 +41,7 @@ public final class GroupPlacementEngine {
 
     String profileKey = parentRegion.name + ":" + profile.name();
     if (cache != null) {
-      // 1. Try Group L1 (Hot / Kept)
+      // 1. Try Group Hot (Kept)
       GroupSubspace hot = cache.pollHot(profileKey);
       if (hot != null) {
         if (hot.slotLocations().size() >= participantCount) {
@@ -52,7 +52,7 @@ public final class GroupPlacementEngine {
         }
       }
 
-      // 2. Try Group L2 (Cold / Unkept)
+      // 2. Try Group Cold (Unkept)
       GroupSubspace cold = cache.pollCold(profileKey);
       if (cold != null) {
         if (cold.slotLocations().size() >= participantCount) {

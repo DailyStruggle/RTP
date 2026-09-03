@@ -5,6 +5,8 @@
 - **Supersedes**: —
 - **Related**: ADR-006 (async queue pre-generation), ADR-015 (stale-chunk guard / count-bound pipes), ADR-016 (anvil subsystem), ADR-023 (login reserve cache), `REQ-RTP-S-005` (no chunk loading on the main thread)
 
+> **Nomenclature note.** This ADR keeps its `L1` / `L2` / `L3` title and body as the historical record of the decision. The vocabulary itself is retired by [ADR-078](ADR-078-composable-cache-pipeline-stages.md) phase 2: production code, javadoc, and canonical documentation say **hot** (`keptLocations`), **cold** (`unkeptLocations`), and **backlog** (`backlogLocations`). Public config keys and database column names are unchanged.
+
 ## Context
 
 The plugin currently maintains two general-purpose location buffers per region:

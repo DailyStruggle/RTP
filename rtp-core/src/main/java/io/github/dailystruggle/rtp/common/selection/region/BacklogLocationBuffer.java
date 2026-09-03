@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Lock-free bounded FIFO buffer of pre-selected candidate locations for L3 backlog cache (ADR-028).
+ * Lock-free bounded FIFO buffer of pre-selected candidate locations for the backlog cache (ADR-028).
  * Preserves insertion order and supports head-blocking promotion of validated entries using
  * lock-free copy-then-swap state transitions.
  *
@@ -32,7 +32,7 @@ public final class BacklogLocationBuffer {
   }
 
   /**
-   * One unverified-or-verified entry in the L3 backlog. Identity-equal
+   * One unverified-or-verified entry in the backlog. Identity-equal
    * (intentional): the same entry instance is shared between the owning
    * {@link BacklogLocationBuffer} and the world-level cross-region bin index, so
    * a single validity write is observable from both readers.

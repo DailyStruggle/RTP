@@ -5,7 +5,7 @@
 # --- Nachrichten für den serverübergreifenden Netzwerkmodus ---
 # Wird nur gesendet, wenn `network.enabled: true` ist und das `/rtp` des Spielers über
 # die serverübergreifende Warteschlange geleitet wird (siehe network.yml `routing.mode`).
-# Aus Sicht des Spielers sind alle Schlüssel optional - der L2-Basiszyklus aus
+# Aus Sicht des Spielers sind alle Schlüssel optional - der Basiszyklus aus
 # `delayMessage` / `teleportMessage` steuert weiterhin den sichtbaren Ablauf.
 # Wird gesendet, wenn die Anfrage in die serverübergreifende Warteschlange aufgenommen wurde
 # und auf eine Backend-Reservierung wartet. Platzhalter: [position] - 0-basierte

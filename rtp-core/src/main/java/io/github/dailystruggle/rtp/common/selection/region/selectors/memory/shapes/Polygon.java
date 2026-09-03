@@ -26,9 +26,6 @@ public class Polygon extends Square {
   private volatile int minZ = 0;
   private volatile int maxZ = 0;
 
-  /** Set true once the {@code expand=true} misconfiguration warning has been emitted. */
-  private volatile boolean expandWarningLogged = false;
-
   /** Set true when the async curve-walker has been scheduled at least once. */
   private volatile boolean walkerScheduled = false;
 
@@ -227,31 +224,17 @@ public class Polygon extends Square {
     return pointInPolygon(x, z);
   }
 
+  /**
+   * The boundary is admin-authored and the segmented bad-locations store contains the polygon
+   * mask, which the expand path would happily push past.
+   */
   @Override
-  public long rand() {
-    // Force expand=false defensively on every call: the boundary is admin-authored
-    // and the segmented bad-locations store contains the polygon mask, which the
-    // expand path would happily push past.
-    Object existing = data.get(GenericMemoryShapeParams.expand);
-    if (existing instanceof Boolean && (Boolean) existing) {
-      if (!expandWarningLogged) {
-        expandWarningLogged = true;
-        RTP.log(Level.WARNING,
-            "[Polygon] expand=true is not supported on Polygon shapes; forcing expand=false");
-      }
-      data.put(GenericMemoryShapeParams.expand, false);
-    } else if (existing != null && !(existing instanceof Boolean)
-        && Boolean.parseBoolean(existing.toString())) {
-      if (!expandWarningLogged) {
-        expandWarningLogged = true;
-        RTP.log(Level.WARNING,
-            "[Polygon] expand=true is not supported on Polygon shapes; forcing expand=false");
-      }
-      data.put(GenericMemoryShapeParams.expand, false);
-    }
+  protected boolean supportsExpand() {
+    return false;
+  }
 
-    long location = super.rand();
-
+  @Override
+  protected long postProcess(long location) {
     // Warmup-window predicate: until the async walker has fully populated the
     // segmented store, the sampling path tie-breaks via the point-in-polygon
     // predicate so admins never see an outside-polygon sample.

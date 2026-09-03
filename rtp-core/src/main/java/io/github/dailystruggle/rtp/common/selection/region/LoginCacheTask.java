@@ -84,7 +84,7 @@ public final class LoginCacheTask implements Runnable {
                     try {
                         // Re-resolve Y via the region's vertical adjustor against the
                         // loaded chunk. Mirrors Region.execute() unkept->kept promotion:
-                        // the stored coords.y may be an L3 placeholder (ADR-028), and a
+                        // the stored coords.y may be a backlog placeholder (ADR-028), and a
                         // single-block isSafe at a mid-air placeholder Y passes trivially
                         // (S-001 mid-air placement bug). vert.adjust(chunk) performs the
                         // ground+headroom sweep every adjustor already implements on the

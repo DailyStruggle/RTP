@@ -5,7 +5,7 @@
 # --- Cross-server network mode messages ---
 # Sent only when `network.enabled: true` and the player's `/rtp` is routed
 # across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the L2 baseline
+# All keys are optional from the player's perspective - the baseline
 # `delayMessage` / `teleportMessage` cycle still drives the visible flow.
 # Sent when the request has been accepted into the cross-server wait queue
 # and is awaiting a backend claim. Placeholder: [position] - 0-indexed

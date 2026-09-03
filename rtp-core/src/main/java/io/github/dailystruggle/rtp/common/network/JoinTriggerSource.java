@@ -304,7 +304,7 @@ public final class JoinTriggerSource {
             }
         }
         // Whether or not the coord was pinned, the local /rtp dispatch is
-        // the L2 baseline behaviour and must always run on a REDEEMED outcome.
+        // the join-redeem baseline behaviour and must always run on a REDEEMED outcome.
         RTP.log(Level.FINE,
                 "[RTP][trace] JoinTriggerSource.onRedeemed: dispatching /rtp for " + id
                         + (token.regionKey().isPresent()

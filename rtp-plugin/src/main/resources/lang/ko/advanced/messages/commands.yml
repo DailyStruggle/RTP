@@ -17,7 +17,7 @@
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "스캔 중 [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% 육지) ETA [scan_eta]"
 
 # ###############################################################################
 # 섹션 7: 정보 명령어
@@ -108,9 +108,9 @@ infoBiomeActivityEmpty: "&8--- &7아직 바이옴 점유가 샘플링되지 않�
   - "#58CCED  - 필요 권한: [requirePermission]"
   - "#58CCED  - 월드 경계 재정의: [worldBorderOverride]"
   - "#58CCED  - 캐시 한도: [cacheCap]"
-  - "#58CCED  - 유지 캐시 (L1): [keptCache]"
-  - "#58CCED  - 해제 캐시 (L2): [unkeptCache]"
-  - "#58CCED  - 백로그 캐시 (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - 유지 캐시 (hot): [keptCache]"
+  - "#58CCED  - 해제 캐시 (cold): [unkeptCache]"
+  - "#58CCED  - 백로그 캐시 (backlog): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - 캐시됨: [cached]"
   - "#58CCED  - 학습된 커버리지: [memCoveragePct] (불량: [memBadPct], [memBadCount] 셀)"
   - "#58CCED  - 주요 거부 원인: [memTopCause] ([memTopCausePct])"
@@ -156,7 +156,7 @@ menuRootHint: "&7아래 옵션을 클릭하여 시작하세요"
 menuPagePrev: "&7« 이전 페이지 ([page])"
 menuPageNext: "&7다음 페이지 ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+menuFrontPageSectionTeleport: "&8--- &7텔레포트 &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
@@ -171,16 +171,16 @@ menuFrontPageRowAdmin: "#9D7CD8▶ 관리자 패널 &7- 운영자 도구"
 menuFrontPageHoverAdmin: "&7운영자 도구: 설정, 스캔, 진단, 리로드"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ 관리자 패널"
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
 # Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7설정 &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7진단 &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7수명 주기 &8---"
+menuAdminPanelSectionBrowse: "&8--- &7탐색 &8---"
 # Admin-panel rows + hovers. No placeholders.
-menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelRowConfig: "&b▶ 설정 편집기"
 menuAdminPanelHoverConfig: "&7선별된 설정 선택기를 엽니다"
 menuAdminPanelRowRegions: "#5FB3B3▶ 리전"
 menuAdminPanelHoverRegions: "&7리전별 설정 추가, 제거 또는 편집"
@@ -188,17 +188,17 @@ menuAdminPanelRowWorlds: "#5FB3B3▶ 월드"
 menuAdminPanelHoverWorlds: "&7월드별 설정 추가, 제거 또는 편집"
 menuAdminPanelRowEffects: "#5FB3B3▶ 효과"
 menuAdminPanelHoverEffects: "&7그룹별 텔레포트 효과 추가, 제거 또는 편집"
-menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelRowInfo: "&b▶ 서버 정보"
 menuAdminPanelHoverInfo: "&7플러그인 버전, 리전 수, 대기열 상태 표시"
 menuAdminPanelRowDiagnostics: "&c▶ 전체 진단"
 menuAdminPanelHoverDiagnostics: "&7전체 진단 모음을 실행합니다. 비용이 클 수 있습니다"
-menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelRowMemory: "&b▶ 메모리 추적기 스냅샷"
 menuAdminPanelHoverMemory: "&7활성 청크 티켓 및 파이프라인 할당을 덤프"
-menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelRowScan: "&b▶ 스캔 제어"
 menuAdminPanelHoverScan: "&7스캔 하위 메뉴 열기 (시작 / 일시정지 / 취소)"
 menuAdminPanelRowReload: "&c▶ 리로드"
 menuAdminPanelHoverReload: "&7모든 설정 파일을 리로드합니다. 진행 중인 텔레포트가 영향받을 수 있습니다"
-menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelRowBrowse: "&b▶ 모든 명령어 탐색"
 menuAdminPanelHoverBrowse: "&7반영된 /rtp 명령어 트리를 엽니다"
 menuAdminPanelRowBack: "&7« 뒤로"
 # --- Visualizations submenu (admin map of bad locations per region) ---
@@ -270,7 +270,7 @@ configSelectorTitle: "#5FB3B3&l⚙ 설정 파일"
 configSelectorBackRow: "&7« 메뉴로 돌아가기"
 # Non-clickable title row at the top of a single config-file page.
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
+configFileTitle: "#5FB3B3&l⚙ 설정: &7[file]"
 # Label for the "back to config selector" navigation row on a single config-file page.
 configFileBackRow: "&7« 설정 파일로 돌아가기"
 # Non-clickable hint row shown when a config file has no editable keys.
@@ -280,13 +280,13 @@ configFileEmptyHint: "&7(이 파일에 편집 가능한 키가 없습니다)"
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
-configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+configKeyHoverFormat: "&7클릭하여 편집 &7[key] &7(유형: [type])"
 # Non-clickable title row at the top of a shape/vert type-picker page.
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+configTypePickerTitle: "#5FB3B3&l⚙ [param] 유형 선택 &7(현재: &7[current]&7)"
 # Non-clickable title row at the top of a shape/vert sub-parameter page.
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7하위 매개변수"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] 책 보기를 사용할 수 없습니다. 원시 덤프로 대체합니다."

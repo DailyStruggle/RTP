@@ -568,7 +568,7 @@ public final class NetworkModeBootstrap {
     }
 
     /**
-     * Register the L2 join-time redeem listener with Bukkit. No-op when
+     * Register the join-time redeem listener with Bukkit. No-op when
      * network mode is disabled or {@link #boot(File)} did not complete
      * successfully. Idempotent within a single lifecycle: re-registering
      * the same listener via Bukkit's PluginManager would duplicate the

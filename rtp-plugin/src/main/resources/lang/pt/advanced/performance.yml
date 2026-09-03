@@ -92,7 +92,7 @@ enfileirarPosTeletransporte: false
 # @default: true
 verificarNoCarregamentoChunk: true
 
-# Fração da capacidade do backlog L3 na qual o reabastecimento recomeça (histerese).
+# Fração da capacidade do backlog na qual o reabastecimento recomeça (histerese).
 # 0.5 = reabastecer após esvaziar a 50%; 1.0 = reabastecer continuamente.
 # @type: number
 # @range: [0.0, 1.0]

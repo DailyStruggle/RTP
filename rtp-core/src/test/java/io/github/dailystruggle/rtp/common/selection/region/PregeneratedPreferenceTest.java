@@ -76,7 +76,7 @@ class PregeneratedPreferenceTest {
     }
 
     /**
-     * Mirrors the L3 refill loop's bounded-rejection pattern: a maximum
+     * Mirrors the backlog refill loop's bounded-rejection pattern: a maximum
      * number of <em>consecutive</em> rejections per call, after which the
      * caller breaks out. Asserts that at weight {@code 1.0} with an
      * all-ungenerated world we exit deterministically after the cap rather

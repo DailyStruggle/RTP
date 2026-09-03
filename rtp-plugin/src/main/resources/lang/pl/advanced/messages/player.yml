@@ -94,7 +94,7 @@ testOpis: "testuj funkcje RTP"
 # ###############################################################################
 # symbole statusu dla graczy
 GRACZ_DOSTEPNY: "&aDOSTĘPNY"
-GRACZ_ODNOWIENIE: "&7ON COOLDOWN"
+GRACZ_ODNOWIENIE: "&7ODNOWIENIE"
 GRACZ_KONFIGURACJA: "&bWYBIERANIE LOKALIZACJI"
 GRACZ_LADOWANIE: "&bWCZYTYWANIE CHUNKÓW"
 GRACZ_TELEPORTACJA: "&bTELEPORTACJA"

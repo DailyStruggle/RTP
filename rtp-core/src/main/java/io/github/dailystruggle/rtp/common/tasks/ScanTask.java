@@ -313,7 +313,7 @@ public class ScanTask extends RTPRunnable {
               + " scanIncrement=" + scanIncrement.get());
       if (pause.get() || isCancelled()) {
         if (region.getShape() instanceof MemoryShape<?> ms) {
-          ms.flushAndRebuild(ms.spatialResolution);
+          ms.flushAndRebuild(ms.spatialResolution());
           ms.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         }
         save();
@@ -389,7 +389,7 @@ public class ScanTask extends RTPRunnable {
     long range = Double.valueOf(shape.getRange()).longValue();
     long pos;
     long limit = scanIncrement.get();
-    long stride = Math.max(1L, shape.spatialResolution);
+    long stride = Math.max(1L, shape.spatialResolution());
     long currentStart = scanIter.get();
     if (currentStart == 0) {
       currentStart = currentOffset;
@@ -591,7 +591,7 @@ public class ScanTask extends RTPRunnable {
       }
       // ------------------------------------
 
-      this.latestAbsolutePos = ((currentOffset * range) + finalPos1) / Math.max(1L, shape.spatialResolution);
+      this.latestAbsolutePos = ((currentOffset * range) + finalPos1) / Math.max(1L, shape.spatialResolution());
       this.latestAbsoluteTotal = range;
       this.latestCps = cps_local;
       this.latestEtaSeconds = etaSeconds;
@@ -630,7 +630,7 @@ public class ScanTask extends RTPRunnable {
           RTP.serverAccessor.announce(msg, "rtp.scan", "");
         }
 
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         save();
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         // Persist generator-loaded chunks. On Spigot the platform RTPWorld
@@ -652,10 +652,10 @@ public class ScanTask extends RTPRunnable {
     scanIter.set(finalPos1);
 
     if (finalPos1 >= range) {
-      if (currentOffset < Math.max(1L, shape.spatialResolution) - 1) {
+      if (currentOffset < Math.max(1L, shape.spatialResolution()) - 1) {
         currentOffset++;
         scanIter.set(0);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         save();
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         shape.exportDebugJson(region.name, region.getWorld().name());
@@ -673,7 +673,7 @@ public class ScanTask extends RTPRunnable {
         scanPhase.set(nextPhase);
         currentOffset = 0L;
         scanIter.set(0);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         save();
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         shape.exportDebugJson(region.name, region.getWorld().name());
@@ -699,7 +699,7 @@ public class ScanTask extends RTPRunnable {
         scanPhase.set(PHASE_FULLSCAN);
         currentOffset = 0L;
         scanIter.set(0);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         save();
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         shape.exportDebugJson(region.name, region.getWorld().name());
@@ -714,12 +714,12 @@ public class ScanTask extends RTPRunnable {
 
       RTP.log(Level.FINE, "[ScanTask] scan complete region=" + region.name
               + " finalPos=" + finalPos1 + " range=" + range);
-      shape.flushAndRebuild(shape.spatialResolution);
+      shape.flushAndRebuild(shape.spatialResolution());
       shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
       save(); // Ensure final pass is securely flushed before deletion
       RTP.getInstance().scanTasks.remove(region.name, this);
       delete();
-      // Mark the region as sufficiently pre-generated. This unlocks the L3
+      // Mark the region as sufficiently pre-generated. This unlocks the
       // backlog cache pulse (Region.processBacklog), which is gated on
       // scanCompleted to avoid driving live-load chunk traffic while the
       // pre-generation crawler is still consuming tick-thread budget.
@@ -731,7 +731,7 @@ public class ScanTask extends RTPRunnable {
       if (RTP.getInstance().scanTasks.get(region.name) == this) {
         RTP.log(Level.FINER, "[ScanTask] yielding to scheduler for next batch region=" + region.name
                 + " nextScanIter=" + finalPos1);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         isRunning.set(false);
         // Yield to the main thread between batches to allow pending chunk tickets to drain.
         // If main thread is backlogged, a delayed async fallback ensures progress continues.
@@ -925,7 +925,7 @@ public class ScanTask extends RTPRunnable {
   }
 
   private long getEtaSeconds(long range, long finalPos1, MemoryShape<?> shape, long cpsLocal) {
-    long totalRemainingPoints = (range - finalPos1) + (Math.max(0, shape.spatialResolution - 1 - currentOffset) * range);
+    long totalRemainingPoints = (range - finalPos1) + (Math.max(0, shape.spatialResolution() - 1 - currentOffset) * range);
     if (totalRemainingPoints < 0) totalRemainingPoints = 0;
     long effectiveBad = shape.getEffectiveBadCount();
     long totalEvaluated = shape.getEffectiveGoodCount() + effectiveBad;
@@ -968,7 +968,7 @@ public class ScanTask extends RTPRunnable {
       ByteBuffer buf = ByteBuffer.allocate(26).order(ByteOrder.BIG_ENDIAN);
       buf.putLong(scanIter.get());
       Shape<?> shape = region.getShape();
-      if (shape instanceof MemoryShape<?> memoryShape) {buf.putLong(memoryShape.spatialResolution);}
+      if (shape instanceof MemoryShape<?> memoryShape) {buf.putLong(memoryShape.spatialResolution());}
       buf.putLong(currentOffset);
       buf.put((byte) 0);
       // GENSCAN is transient - collapse to PRESCAN on disk so a resumed scan
@@ -1673,7 +1673,7 @@ public class ScanTask extends RTPRunnable {
     // Drain in-flight chunk futures before saving to prevent ghost callbacks.
     drainInFlight("pause", DRAIN_TIMEOUT_MS);
     MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-    shape.flushAndRebuild(shape.spatialResolution);
+    shape.flushAndRebuild(shape.spatialResolution());
     save();
     shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
   }
@@ -1692,7 +1692,7 @@ public class ScanTask extends RTPRunnable {
       drainInFlight("cancel", DRAIN_TIMEOUT_MS);
       MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
       if (shape != null) {
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
       }
       save();
