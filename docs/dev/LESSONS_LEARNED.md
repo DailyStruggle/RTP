@@ -224,6 +224,17 @@ When `language.yml` is edited from `en` → another locale and the server reload
 
 When adding a new translatable file or locale, see `TRANSLATION_GUIDE.md`. The `LocaleResourceParityTest` enforces the on-disk shape contract that this migration depends on.
 
+### A locale parity test pointed at a file the runtime does not load proves nothing (2026-09-02)
+
+The ADR-076 messages split left every locale with two copies of its strings: the pre-split `lang/<locale>/messages.yml` monolith, and the `lang/<locale>/advanced/messages/*.yml` mirror. `Configs.reloadConfigs` only builds parsers for the mirror; the monolith was archived as legacy and never read. Both `LocaleParityTest` and `ReqRtpF013SpanishLocaleContentTest` were reading the **monolith**, so every locale suite was green while the shipped mirror was still English for any key added after the split. Repointing the tests at the mirror surfaced 179 untranslated values across all 12 locales on the first run (Spanish shipped `"&b▶ config editor"` where the monolith had `"&b▶ editor de configuración"`).
+
+Two durable lessons:
+
+- **Assert against the artifact the runtime loads.** A resource-parity test is only as good as its path. When a config layout is split or moved, repoint the tests in the same change - a still-passing suite after a layout migration is a warning sign, not reassurance.
+- **A duplicated resource with no consistency check will diverge, and the copy nobody tests is the one that ships.** The monoliths were deleted after `scripts/propagate-locale-monolith-values.py` copied their values into the mirror; the mirror is now the single source and `CacheNomenclatureGuardTest` plus the repointed parity suites guard it.
+
+The migration script is line-based on purpose (a YAML round-trip would strip the operator-facing comments) and skips block sequences (`regionInfo` / `worldInfo` / `placeholders`), which were reconciled by hand.
+
 ---
 
 ## Pre-Generation & Shutdown
@@ -655,6 +666,32 @@ Active tags (do not rename without updating this entry; saved Spark report URLs 
 - `rtp_active_gc_sweep` - `MemoryTracker.runDiagnostics` (diagram 04; static method, wraps body directly rather than going through `RTPRunnable` since `MemoryTracker` is not a task)
 
 The convention is `rtp_<stage>` snake_case. Adding a new tag requires three coordinated edits: a new bridge method on `RTPRunnable`, a new `case` in `RTPRunnable.runTagged`, and a row in this list. Diagram 03 (chunk-ticket lifecycle) intentionally has no dedicated tag - its work happens inside `TeleportPipelineTask` and `RegionCacheTask`, both already tagged. Cost: one extra (cheap) bridge stack frame per tagged task run. The takeaway: when you need profiler observability for a hot path, you do not need to add Spark as a dependency - a named method on the call stack is the entire contract.
+
+---
+
+## 2026-09-02 - Seven hand-written copies of one selection invariant; the copies had silently diverged
+
+`MemoryShape.rand()` was `abstract`, and all seven memory shapes (`Circle`, `Circle_Normal`, `Ellipse`, `Polygon` via `Square`, `Rectangle`, `Square`, `Square_Normal`) each carried their own ~100-160 line implementation of the *same* invariant: snapshot `badKeysCache`/`badPrefixSumsCache` with a length clamp, run the ACCUMULATE fixed-point bad-sum search, dispatch on `mode`, then apply the `uniquePlacements` tail. Only the distribution curve was ever meant to differ. Four latent defects were found purely by diffing the copies against each other:
+
+| Divergence | Copies affected | Effect |
+|---|---|---|
+| `switch (mode)` without `.toUpperCase()` | `Square`, `Rectangle` | lower-case `mode: nearest` passed the `equalsIgnoreCase` ACCUMULATE test, then matched no `case` - silently no repair and no re-roll |
+| `NEAREST` `break`s out of the repair `if` with no `case` break | `Square`, `Rectangle`, `Circle_Normal`, `Square_Normal` | falls through into `REROLL`; conversely `Circle`/`Ellipse` `return`ed early and so **skipped the `uniquePlacements` tail entirely in `NEAREST` mode** |
+| `uniquePlacements` read as a boolean | `Square_Normal` only | `Boolean.parseBoolean("4")` == `false`, so the knob was inert *and* the coerced `false` was written back over the operator's configured value - while the same class's own tab-completion offered `0,1,2,4,8` |
+| unconditional `if (!expand) range -= badSum` (no mode condition) | `Circle_Normal`, `Square_Normal` | a third, undocumented range-adjustment rule versus the mode-conditional form the other five used |
+
+Resolution: `rand()` became a concrete template on `MemoryShape` with four hooks - `adjustRange`, `sample`, `postProcess`, `supportsExpand` - and a shared `NormalMemoryShape` parent for the two gaussian variants (which differed only in `range = (radius-cr)*(radius+cr)*Math.PI` vs `*4`, both already identical to their own `getRange()`).
+
+Durable consequences:
+
+- **`rand()` must stay non-`final`.** `ChunkyRTPShape` and five test doubles substitute their own selection wholesale; making the template `final` breaks them.
+- **Do not unify the sampling curve or the range adjustment.** These differences are deliberate and load-bearing: `Rectangle` exposes neither `weight` nor `expand` (so its draw must stay uniform over the raw range), and `Ellipse`/`Polygon` are bounded *smaller* than the 1D range their spiral describes, so `expand` pushes samples into space `contains()` rejects. Gate range adjustment on whether the shape actually declares an `expand` knob rather than applying it by default, or you will silently re-bias `Rectangle`.
+- **Shapes expose four different parameter enums**, so shared code cannot name enum constants. Use name-based lookup (`keyByName` / `paramByName`), mirroring the pre-existing name-based `expand` scan in `MemoryShape.contains()`. Cache `getEnumConstants()` - it clones its array on every call, which matters on the hot selection path.
+- **Diffing sibling copies against each other is a productive bug-finding technique** in this codebase, independent of any refactor: every one of the four defects above was invisible when reading a single file and obvious when reading two side by side.
+
+### Async tier promotion in `GroupCacheWorker.pulse` is not observable on return
+
+`GroupSubspaceCacheTest.testGroupCacheWorkerPulseL3ToL2` asserted `sizeCold(key) > 0 || sizeHot(key) > 0` immediately after `worker.pulse(...)`. `pulse` step 3 (`promoteColdToHot`) polls the freshly-promoted cold entry and completes the hop on the chunk-reservation future's `thenAcceptAsync` continuation, so on return **all three tiers can legitimately read 0** while the promotion is in flight (measured: hot goes 0 → 2 roughly 200 ms later). The assertion was a latent race that passed only by timing accident; any unrelated change to `rtp-core` class-loading timing can flip it. Assertions after `pulse` must poll with a bounded deadline, not read once.
 
 ---
 

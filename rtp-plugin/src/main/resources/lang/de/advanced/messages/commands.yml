@@ -19,7 +19,7 @@ scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunk
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "Scanne [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% Land) ETA [scan_eta]"
 
 # ###############################################################################
 # Abschnitt 7: Info-Befehl
@@ -111,9 +111,9 @@ regionInfo:
   - "#58CCED  - BerechtingungErforderlich: [requirePermission]"
   - "#58CCED  - WeltgrenzeUeberschreiben: [worldBorderOverride]"
   - "#58CCED  - Cache-Kapazitaet: [cacheCap]"
-  - "#58CCED  - GehaltenerCache (L1): [keptCache]"
-  - "#58CCED  - UngehaltenerCache (L2): [unkeptCache]"
-  - "#58CCED  - RueckstauCache (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - GehaltenerCache (hot): [keptCache]"
+  - "#58CCED  - UngehaltenerCache (cold): [unkeptCache]"
+  - "#58CCED  - RueckstauCache (backlog): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - ImCache: [cached]"
   - "#58CCED  - erlernte Abdeckung: [memCoveragePct] (schlecht: [memBadPct], [memBadCount] Zellen)"
   - "#58CCED  - häufigste Ablehnungsursache: [memTopCause] ([memTopCausePct])"
@@ -159,7 +159,7 @@ menueHauptHinweis: "&7klicke unten auf eine Option, um zu beginnen"
 menueSeiteZurueck: "&7« vorherige Seite ([page])"
 menueSeiteVor: "&7nächste Seite ([page]) »"
 # Abschnittstrenner auf der Startseite über den Teleport-Zeilen (Spieleransicht).
-menueStartseiteAbschnittTeleport: "&8--- &7teleport &8---"
+menueStartseiteAbschnittTeleport: "&8--- &7Teleportation &8---"
 # Startseitenzeilen. Keine Platzhalter.
 menueStartseiteZeileTeleport: "&2▶ /rtp &7- zu einem zufälligen Ort teleportieren"
 menueStartseiteZeileRegion: "&2▶ /rtp region:&7... &7- eine Region wählen"
@@ -174,7 +174,7 @@ menueStartseiteZeileAdmin: "#9D7CD8▶ Admin-Panel &7- Operator-Werkzeuge"
 menueStartseiteHoverAdmin: "&7Operator-Werkzeuge: Konfiguration, Scans, Diagnose, Neuladen"
 # --- Admin-Panel-Buchseite ---
 # Nicht anklickbare Titelzeile oben im Admin-Panel. Keine Platzhalter.
-menueAdminPanelTitel: "#5FB3B3&l⚙ Admin-Panel"
+menueAdminPanelTitel: "#5FB3B3&l⚙ Verwaltungspanel"
 # Nicht anklickbare Hinweiszeile unterhalb von menuAdminPanelTitle. Keine Platzhalter.
 menueAdminPanelHinweis: "&7klicke eine Option; destruktive Aktionen zeigen einen Warnhinweis"
 # Abschnittstrenner im Admin-Panel. Keine Platzhalter.
@@ -191,7 +191,7 @@ menueAdminPanelZeileWelten: "#5FB3B3▶ Welten"
 menueAdminPanelHoverWelten: "&7weltbezogene Konfigurationen hinzufügen, entfernen oder bearbeiten"
 menueAdminPanelZeileEffekte: "#5FB3B3▶ Effekte"
 menueAdminPanelHoverEffekte: "&7gruppenbezogene Teleport-Effekte hinzufügen, entfernen oder bearbeiten"
-menueAdminPanelZeileInfo: "&b▶ Server-Info"
+menueAdminPanelZeileInfo: "&b▶ Server-Informationen"
 menueAdminPanelHoverInfo: "&7Plugin-Version, Regionsanzahl und Warteschlangenstatus anzeigen"
 menueAdminPanelZeileDiagnose: "&c▶ vollständige Diagnose"
 menueAdminPanelHoverDiagnose: "&7führt die vollständige Diagnose-Suite aus; kann aufwendig sein"

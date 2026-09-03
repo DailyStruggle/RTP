@@ -4,9 +4,9 @@ package io.github.dailystruggle.rtp.common.api;
  * Read-only snapshot of a region's cache and queue depths sampled via {@link RtpCoreIntrospection}.
  *
  * @param regionName       canonical region name
- * @param kept             hot L1 buffer depth (chunks loaded)
- * @param unkept           cold L2 buffer depth (verified, chunks released)
- * @param backlog          L3 unverified backlog depth
+ * @param kept             hot buffer depth (chunks loaded)
+ * @param unkept           cold buffer depth (verified, chunks released)
+ * @param backlog          unverified backlog depth
  * @param login            join-time login-reserve depth
  * @param networkKept      cross-server kept sibling-pool depth
  * @param networkReserved  in-flight cross-server pinned reservations

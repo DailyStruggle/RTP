@@ -152,7 +152,8 @@ public final class LinearRegionReader implements RegionFileReader {
 
         // Decompress the target chunk from ZStandard stream
         byte[] nbtBytes = new byte[targetUncompressedLength];
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(regionBytes, zstdStreamOffset, regionBytes.length - zstdStreamOffset);
+        int zstdLength = Math.min(regionBytes.length - zstdStreamOffset, dataPayloadLength);
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(regionBytes, zstdStreamOffset, zstdLength);
              ZstdInputStream zis = new ZstdInputStream(bais);
              DataInputStream dis = new DataInputStream(zis)) {
 

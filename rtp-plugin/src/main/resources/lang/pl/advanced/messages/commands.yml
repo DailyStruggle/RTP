@@ -19,7 +19,7 @@ scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunk
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "Skanowanie [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% ląd) ETA [scan_eta]"
 
 # ###############################################################################
 # Sekcja 7: Komenda info
@@ -111,9 +111,9 @@ regionInfo:
   - "#58CCED  - wymagane uprawnienie: [requirePermission]"
   - "#58CCED  - nadpisanie granicy świata: [worldBorderOverride]"
   - "#58CCED  - limit pamięci podręcznej: [cacheCap]"
-  - "#58CCED  - pamięć utrzymywana (L1): [keptCache]"
-  - "#58CCED  - pamięć zwolniona (L2): [unkeptCache]"
-  - "#58CCED  - pamięć zaległości (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - pamięć utrzymywana (hot): [keptCache]"
+  - "#58CCED  - pamięć zwolniona (cold): [unkeptCache]"
+  - "#58CCED  - pamięć zaległości (backlog): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - w pamięci: [cached]"
   - "#58CCED  - poznane pokrycie: [memCoveragePct] (złe: [memBadPct], [memBadCount] komórek)"
   - "#58CCED  - główna przyczyna odrzucenia: [memTopCause] ([memTopCausePct])"
@@ -161,7 +161,7 @@ menuGlownaWskazowka: "&7kliknij opcję poniżej, aby zacząć"
 menuStronaPoprzednia: "&7« poprzednia strona ([page])"
 menuStronaNastepna: "&7następna strona ([page]) »"
 # Separator sekcji na stronie glownej nad wierszami teleportacji (widok gracza).
-menuStronaGlownaSekcjaTeleport: "&8--- &7teleport &8---"
+menuStronaGlownaSekcjaTeleport: "&8--- &7teleportacja &8---"
 # Front-page rows. No placeholders.
 menuStronaGlownaWierszTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuStronaGlownaWierszRegion: "&2▶ /rtp region:&7... &7- pick a region"
@@ -176,16 +176,16 @@ menuStronaGlownaWierszAdmin: "#9D7CD8▶ panel administratora &7- narzędzia ope
 menuStronaGlownaHoverAdmin: "&7narzędzia operatora: konfiguracja, skany, diagnostyka, przeładowanie"
 # --- Strona ksiazki panelu admina ---
 # Nieklikalny wiersz tytulu na gorze panelu admina. Brak zmiennych.
-menuPanelAdminaTytul: "#5FB3B3&l⚙ admin panel"
+menuPanelAdminaTytul: "#5FB3B3&l⚙ panel administracyjny"
 # Nieklikalny wiersz podpowiedzi pod menuAdminPanelTitle. Brak zmiennych.
 menuPanelAdminaWskazowka: "&7click an option; destructive actions show a warning hover"
 # Separatory sekcji w panelu admina. Brak zmiennych.
-menuPanelAdminaSekcjaKonfig: "&8--- &7configuration &8---"
-menuPanelAdminaSekcjaDiagnostyka: "&8--- &7diagnostics &8---"
-menuPanelAdminaSekcjaCyklZycia: "&8--- &7lifecycle &8---"
-menuPanelAdminaSekcjaPrzegladaj: "&8--- &7browse &8---"
+menuPanelAdminaSekcjaKonfig: "&8--- &7konfiguracja &8---"
+menuPanelAdminaSekcjaDiagnostyka: "&8--- &7diagnostyka &8---"
+menuPanelAdminaSekcjaCyklZycia: "&8--- &7cykl życia &8---"
+menuPanelAdminaSekcjaPrzegladaj: "&8--- &7przeglądaj &8---"
 # Admin-panel rows + hovers. No placeholders.
-menuPanelAdminaWierszKonfig: "&b▶ config editor"
+menuPanelAdminaWierszKonfig: "&b▶ edytor konfiguracji"
 menuPanelAdminaHoverKonfig: "&7otwórz wyselekcjonowany selektor konfiguracji"
 menuPanelAdminaWierszRegiony: "#5FB3B3▶ regiony"
 menuPanelAdminaHoverRegiony: "&7dodaj, usuń lub edytuj konfiguracje poszczególnych regionów"
@@ -193,17 +193,17 @@ menuPanelAdminaWierszSwiaty: "#5FB3B3▶ światy"
 menuPanelAdminaHoverSwiaty: "&7dodaj, usuń lub edytuj konfiguracje poszczególnych światów"
 menuPanelAdminaWierszEfekty: "#5FB3B3▶ efekty"
 menuPanelAdminaHoverEfekty: "&7dodaj, usuń lub edytuj efekty teleportacji dla grup"
-menuPanelAdminaWierszInfo: "&b▶ server info"
+menuPanelAdminaWierszInfo: "&b▶ informacje o serwerze"
 menuPanelAdminaHoverInfo: "&7pokaż wersję pluginu, liczbę regionów i stan kolejki"
 menuPanelAdminaWierszDiagnostyka: "&c▶ pełna diagnostyka"
 menuPanelAdminaHoverDiagnostyka: "&7uruchamia pełny zestaw diagnostyczny; może być kosztowne"
-menuPanelAdminaWierszPamiec: "&b▶ memory tracker snapshot"
+menuPanelAdminaWierszPamiec: "&b▶ migawka monitora pamięci"
 menuPanelAdminaHoverPamiec: "&7zrzuć aktywne bilety chunków i alokacje potoku"
-menuPanelAdminaWierszSkan: "&b▶ scan control"
+menuPanelAdminaWierszSkan: "&b▶ sterowanie skanowaniem"
 menuPanelAdminaHoverSkan: "&7otwórz podmenu skanowania (start / pauza / anuluj)"
 menuPanelAdminaWierszPrzeladuj: "&c▶ przeładuj"
 menuPanelAdminaHoverPrzeladuj: "&7przeładowuje wszystkie pliki konfiguracyjne; trwające teleportacje mogą zostać zakłócone"
-menuPanelAdminaWierszPrzegladaj: "&b▶ browse all commands"
+menuPanelAdminaWierszPrzegladaj: "&b▶ przeglądaj wszystkie komendy"
 menuPanelAdminaHoverPrzegladaj: "&7otwórz odwzorowane drzewo poleceń /rtp"
 menuPanelAdminaWierszWstecz: "&7« wstecz"
 # --- Visualizations submenu (admin map of bad locations per region) ---
@@ -275,7 +275,7 @@ konfigSelektorTytul: "#5FB3B3&l⚙ pliki konfiguracji"
 konfigSelektorWsteczWiersz: "&7« powrót do menu"
 # Nieklikalny wiersz tytulu na gorze strony pojedynczego pliku konfiguracji.
 # Zmienna: [file] - nazwa pliku konfiguracji (np. "performance", "safety").
-konfigPlikTytul: "#5FB3B3&l⚙ config: &7[file]"
+konfigPlikTytul: "#5FB3B3&l⚙ konfiguracja: &7[file]"
 # Etykieta wiersza nawigacji "powrot do wyboru konfiguracji" na stronie pojedynczego pliku konfiguracji.
 konfigPlikWsteczWiersz: "&7« powrót do plików konfiguracji"
 # Nieklikalny wiersz podpowiedzi pokazywany, gdy plik konfiguracji nie ma edytowalnych kluczy.
@@ -285,13 +285,13 @@ konfigPlikPustyWskazowka: "&7(brak edytowalnych kluczy w tym pliku)"
 konfigKluczWierszFormat: "&7[key]&7: #7E9CC8[value]"
 # Tekst podpowiedzi dla wiersza per-klucz na stronie pliku konfiguracji. Zmienne:
 #   [key], [value], [type] - nazwa klucza, biezaca wartosc i zadeklarowany typ.
-konfigKluczHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+konfigKluczHoverFormat: "&7kliknij, aby edytować &7[key] &7(typ: [type])"
 # Nieklikalny wiersz tytulu na gorze strony wyboru typu shape/vert.
 # Zmienne: [param] - "shape" lub "vert"; [current] - nazwa aktualnie aktywnego typu.
-konfigTypWyborTytul: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+konfigTypWyborTytul: "#5FB3B3&l⚙ wybierz typ [param] &7(obecny: &7[current]&7)"
 # Nieklikalny wiersz tytulu na gorze strony podparametru shape/vert.
 # Zmienne: [param] - "shape" lub "vert"; [type] - nazwa aktywnego typu.
-konfigPodparametrStronaTytul: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+konfigPodparametrStronaTytul: "#5FB3B3&l⚙ [param] &7- &7[type] &7podparametry"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 konfigPodgladSurowyWskazowka: "&7[P0] widok książki niedostępny; powrót do surowego zrzutu."

@@ -23,6 +23,28 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **All region shapes now share one selection routine, so a shape's only difference is its own distribution.** Each of the seven memory shapes carried its own hand-written copy of the same location-selection logic (bad-area accounting, `mode` handling, `uniqueplacements` marking), and the copies had drifted apart. That logic now lives once in `MemoryShape`, and a shape contributes only its geometry and its sampling curve. Deliberate differences are preserved exactly: `RECTANGLE` keeps its plain uniform draw over its raw range (it exposes neither `weight` nor `expand`), and `CIRCLE_NORMAL` / `SQUARE_NORMAL` keep their normal-distribution draw, now defined in one place instead of two near-identical copies.
+
+- **`ELLIPSE` now refuses `expand: true` and warns, matching `POLYGON`.** An ellipse is inscribed inside the circle its internal range describes, so expanding past known-bad land pushed selections into the corners outside the ellipse - land the shape itself then rejected. If you had `expand: true` on an ellipse region, it is now forced off with a one-time console warning. `CIRCLE`, `SQUARE`, and the normal variants are exactly bounded by their range and still honor `expand`.
+
+### Fixed
+
+- **`mode` in a region's shape settings is no longer case-sensitive.** On `SQUARE` and `RECTANGLE` regions, writing `mode: nearest` or `mode: reroll` in lower case silently disabled the setting entirely - no nearest-good snapping and no re-rolling, so `/rtp` could hand back a location it already knew was unusable. Any capitalization now works on every shape.
+
+- **`NEAREST` mode no longer returns a location it knows is bad.** On `CIRCLE` and `ELLIPSE` regions, when the nearest-good search could not find a usable neighbour it returned the known-bad location anyway, wasting a full teleport attempt. It now re-rolls instead, matching what the square and rectangle shapes already did.
+
+- **`uniqueplacements` now works on `SQUARE_NORMAL` regions and no longer overwrites your configured value.** The setting is a chunk radius (`0` = off, `1` = the landing chunk), but this one shape read it as a yes/no flag, so a value like `uniqueplacements: 4` was interpreted as "off" - and then written back into the config as `false`, destroying the setting. It is now read as a radius on every shape, consistent with the values the in-game editor offers.
+
+- **`NEAREST` mode now honors `uniqueplacements`.** On `CIRCLE` and `ELLIPSE` regions the placement-spreading marker was skipped whenever `mode` was `NEAREST`, so repeated teleports could land in the same chunk despite the setting.
+
+- **Regions with `uniqueplacements` enabled no longer get slower and slower as they learn.** Every selection re-collapsed the region's entire bad-location memory, so the cost of picking a location grew in step with how much the region had learned - filling a cache of 40,000 candidates took about 6 seconds and kept degrading from there. Nearby marks are now folded into the existing record directly, the collapse happens in batches instead of on every pick, and the "is this spot already known bad?" lookup uses a binary search instead of walking the whole list. The same 40,000-candidate fill now takes about 0.2 seconds, and per-pick cost stays flat as a region learns. Regions with `uniqueplacements` off (the default) are unaffected.
+
+---
+
 ## [3.2.1] - 2026-08-15
 
 ### Added

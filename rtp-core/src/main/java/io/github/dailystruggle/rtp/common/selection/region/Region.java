@@ -44,7 +44,7 @@ public class Region extends FactoryValue<RegionKeys> {
   // assigned. A field initializer here would run before this.settings is set,
   // making RegionQueueManager observe settings==null and fall into its
   // fallback branch - which (per ADR-028) leaves backlogLocations null,
-  // permanently disabling the L3 cache regardless of backlogCacheCap.
+  // permanently disabling the backlog cache regardless of backlogCacheCap.
   public RegionQueueManager queueManager;
   public AtomicInteger inFlightCalculations =
       new AtomicInteger(0);
@@ -74,12 +74,12 @@ public class Region extends FactoryValue<RegionKeys> {
 
   /**
    * Set true once this region's {@link ScanTask} has finished its full-load
-   * verification pass. Used to gate L3 backlog drain.
+   * verification pass. Used to gate backlog drain.
    */
   public volatile boolean scanCompleted = false;
 
   /**
-   * Hysteresis latch for the L3 backlog refill loop.
+   * Hysteresis latch for the backlog refill loop.
    */
   private volatile boolean backlogRefillActive = true;
 
@@ -151,7 +151,7 @@ public class Region extends FactoryValue<RegionKeys> {
       settings = this.settings;
     }
 
-    if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
+    if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.setSpatialResolution(settings.spatialResolution());
 
     // Lobby backends never serve teleports to local coords -
     // peers see regions=[] / acceptingRequests=false (BukkitBackendStateSampler)
@@ -271,7 +271,7 @@ public class Region extends FactoryValue<RegionKeys> {
     this.settings = settings;
     this.shape = settings.shape();
     this.set(RegionKeys.spatialResolution, settings.spatialResolution());
-    if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
+    if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.setSpatialResolution(settings.spatialResolution());
 
     String newCacheKey = cacheKey();
     if (!oldCacheKey.equals(newCacheKey)) {
@@ -360,7 +360,7 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
-   * Diagnostic for cold->hot (L2->L1) promotion drop path.
+   * Diagnostic for cold->hot promotion drop path.
    */
   private void logPromotionDropDiag(
       RTPLocation coldLoc,
@@ -477,7 +477,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
 //    System.out.println("[RTP-DEBUG] Region '" + name + "' execute() STARTED. Initial budget: " + availableTime + "ns");
 
-    // ADR-028 - L3 backlog cache pulse. Three inline steps (no producer/consumer
+    // ADR-028 - backlog cache pulse. Three inline steps (no producer/consumer
     // split), in order: refill the per-region buffer with shape-only picks
     // (S-005 safe - no chunk I/O), verify exactly one Anvil-region-file bin via
     // the bound AnvilPrefilter provider (cross-RTP-region amortization through
@@ -608,7 +608,7 @@ public class Region extends FactoryValue<RegionKeys> {
               if (resolved == null) {
                 // [PROMOTE_DIAG] Cold->hot promotion rejected this candidate
                 // because the vertical adjustor found no safe standing column in
-                // the (re)loaded chunk. This is the silent drop that leaves L1
+                // the (re)loaded chunk. This is the silent drop that leaves the hot stage
                 // (keptLocations) empty when every promotion fails. Log the
                 // chunk's backing mode + a sample of its block/biome reads so a
                 // broken platform chunk read (everything air / wrong block ids /
@@ -882,8 +882,8 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
-   * L3 backlog cache pulse (ADR-028).
-   * Refills unverified buffer, validates one anvil bin, and drains validated head to L2.
+   * Backlog cache pulse (ADR-028).
+   * Refills unverified buffer, validates one anvil bin, and drains validated head to cold.
    *
    * @param availableTime original pulse budget (ns)
    * @param startNanos    {@code System.nanoTime()} captured at pulse start
@@ -899,7 +899,7 @@ public class Region extends FactoryValue<RegionKeys> {
     Shape<?> currentShape = this.shape;
     int verticalY;
     {
-      // Placeholder Y clamped to adjustor min/world bounds until L2->L1 promotion verifies ground.
+      // Placeholder Y clamped to adjustor min/world bounds until cold->hot promotion verifies ground.
       VerticalAdjustor<?> v = getVert();
       if (v != null) {
         int wMin = world.getMinHeight();
@@ -1015,16 +1015,16 @@ public class Region extends FactoryValue<RegionKeys> {
         }
         e.setValidity(next);
       }
-      // Clean invalidated entries if heuristic is met to free L3 capacity.
+      // Clean invalidated entries if heuristic is met to free backlog capacity.
       backlog.cleanIfHeuristicMet();
     }
 
-    // Drain validated head into unkeptLocations up to L2 capacity.
-    long l2Cap = settings.cacheCap();
-    long l2Free = Math.max(0L, l2Cap - queueManager.unkeptLocations.size());
-    if (l2Free > 0L) {
+    // Drain validated head into unkeptLocations up to cold capacity.
+    long coldCap = settings.cacheCap();
+    long coldFree = Math.max(0L, coldCap - queueManager.unkeptLocations.size());
+    if (coldFree > 0L) {
       List<BacklogLocationBuffer.BacklogEntry> drained =
-          backlog.pollContiguousValidatedHead((int) Math.min(l2Free, Integer.MAX_VALUE));
+          backlog.pollContiguousValidatedHead((int) Math.min(coldFree, Integer.MAX_VALUE));
       for (BacklogLocationBuffer.BacklogEntry e : drained) {
         if (!queueManager.unkeptLocations.offer(e.location())) {
           break;
@@ -1137,7 +1137,7 @@ public class Region extends FactoryValue<RegionKeys> {
     if (world == null) return;
 
     if (shape instanceof MemoryShape<?>) {
-      ((MemoryShape<?>) shape).flushAndRebuild(((MemoryShape<?>) shape).spatialResolution);
+      ((MemoryShape<?>) shape).flushAndRebuild(((MemoryShape<?>) shape).spatialResolution());
       ((MemoryShape<?>) shape).save(this.name + "_" + cacheKey() + ".bin", world.name());
       ((MemoryShape<?>) shape).exportDebugJson(this.name, world.name());
     }

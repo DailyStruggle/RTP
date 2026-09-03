@@ -135,7 +135,7 @@ public class RegionConfigLoader {
         double price = getNumber(resolveScalar(regionParser, RegionKeys.price, 0.0)).doubleValue();
         long spatialResolution = getNumber(resolveScalar(regionParser, RegionKeys.spatialResolution, 1L)).longValue();
 
-        if (shape != null && shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = spatialResolution;
+        if (shape != null && shape instanceof MemoryShape<?> memoryShape) memoryShape.setSpatialResolution(spatialResolution);
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
 
         if (shape instanceof MemoryShape<?> && world != null) {

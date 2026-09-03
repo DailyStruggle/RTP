@@ -17,7 +17,7 @@ estadoEscaneamento: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_to
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "Varrendo [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% terra) ETA [scan_eta]"
 
 # ###############################################################################
 # Seção 7: Comando Info
@@ -110,9 +110,9 @@ dadosRegiao:
   - "#58CCED  - permissão exigida: [requirePermission]"
   - "#58CCED  - substituição da borda do mundo: [worldBorderOverride]"
   - "#58CCED  - limite de cache: [cacheCap]"
-  - "#58CCED  - cache mantido (L1): [keptCache]"
-  - "#58CCED  - cache liberado (L2): [unkeptCache]"
-  - "#58CCED  - cache de backlog (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - cache mantido (hot): [keptCache]"
+  - "#58CCED  - cache liberado (cold): [unkeptCache]"
+  - "#58CCED  - cache de backlog (backlog): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - em cache: [cached]"
   - "#58CCED  - cobertura aprendida: [memCoveragePct] (ruins: [memBadPct], [memBadCount] células)"
   - "#58CCED  - principal causa de rejeição: [memTopCause] ([memTopCausePct])"
@@ -152,7 +152,7 @@ menuRootHint: "&7clique em uma opção abaixo para começar"
 menuPagePrev: "&7« página anterior ([page])"
 menuPageNext: "&7próxima página ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+menuFrontPageSectionTeleport: "&8--- &7teletransporte &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
@@ -167,16 +167,16 @@ menuFrontPageRowAdmin: "#9D7CD8▶ painel de administração &7- ferramentas de 
 menuFrontPageHoverAdmin: "&7ferramentas de operador: config, varreduras, diagnósticos, recarga"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ painel de administração"
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
 # Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7configuração &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7diagnósticos &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7ciclo de vida &8---"
+menuAdminPanelSectionBrowse: "&8--- &7navegar &8---"
 # Admin-panel rows + hovers. No placeholders.
-menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelRowConfig: "&b▶ editor de configuração"
 menuAdminPanelHoverConfig: "&7abrir o seletor de configuração curado"
 menuAdminPanelRowRegions: "#5FB3B3▶ regiões"
 menuAdminPanelHoverRegions: "&7adicionar, remover ou editar configurações por região"
@@ -184,17 +184,17 @@ menuAdminPanelRowWorlds: "#5FB3B3▶ mundos"
 menuAdminPanelHoverWorlds: "&7adicionar, remover ou editar configurações por mundo"
 menuAdminPanelRowEffects: "#5FB3B3▶ efeitos"
 menuAdminPanelHoverEffects: "&7adicionar, remover ou editar efeitos de teletransporte por grupo"
-menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelRowInfo: "&b▶ info do servidor"
 menuAdminPanelHoverInfo: "&7mostrar a versão do plugin, contagem de regiões e estado das filas"
 menuAdminPanelRowDiagnostics: "&c▶ diagnósticos completos"
 menuAdminPanelHoverDiagnostics: "&7executa a suíte completa de diagnósticos; pode ser custoso"
-menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelRowMemory: "&b▶ instantâneo do rastreador de memória"
 menuAdminPanelHoverMemory: "&7despeja as alocações ativas de tickets de chunk e pipeline"
-menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelRowScan: "&b▶ controle de varredura"
 menuAdminPanelHoverScan: "&7abrir o submenu de varredura (iniciar / pausar / cancelar)"
 menuAdminPanelRowReload: "&c▶ recarregar"
 menuAdminPanelHoverReload: "&7recarrega todos os arquivos de configuração; teletransportes em andamento podem ser afetados"
-menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelRowBrowse: "&b▶ navegar por todos os comandos"
 menuAdminPanelHoverBrowse: "&7abrir a árvore espelhada de comandos /rtp"
 menuAdminPanelRowBack: "&7« voltar"
 # --- Visualizations submenu (admin map of bad locations per region) ---
@@ -266,7 +266,7 @@ configSelectorTitle: "#5FB3B3&l⚙ arquivos de configuração"
 configSelectorBackRow: "&7« voltar ao menu"
 # Non-clickable title row at the top of a single config-file page.
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
+configFileTitle: "#5FB3B3&l⚙ configuração: &7[file]"
 # Label for the "back to config selector" navigation row on a single config-file page.
 configFileBackRow: "&7« voltar aos arquivos de configuração"
 # Non-clickable hint row shown when a config file has no editable keys.
@@ -276,13 +276,13 @@ configFileEmptyHint: "&7(nenhuma chave editável neste arquivo)"
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
-configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+configKeyHoverFormat: "&7clique para editar &7[key] &7(tipo: [type])"
 # Non-clickable title row at the top of a shape/vert type-picker page.
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+configTypePickerTitle: "#5FB3B3&l⚙ escolher tipo de [param] &7(atual: &7[current]&7)"
 # Non-clickable title row at the top of a shape/vert sub-parameter page.
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7subparâmetros"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] visualização em livro indisponível; recorrendo ao despejo bruto."

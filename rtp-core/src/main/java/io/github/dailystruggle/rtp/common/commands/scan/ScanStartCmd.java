@@ -68,7 +68,7 @@ public class ScanStartCmd extends ScanSubCmd {
       MultiConfigParser<RegionKeys> multiConfigParser = (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
       if (multiConfigParser != null) {
         ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser(region.name);
-        shape.spatialResolution = regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue();
+        shape.setSpatialResolution(regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue());
       }
 
       ScanTask task = new ScanTask(region, 0L);

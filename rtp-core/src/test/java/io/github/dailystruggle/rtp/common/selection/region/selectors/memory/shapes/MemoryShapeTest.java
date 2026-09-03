@@ -103,7 +103,7 @@ public class MemoryShapeTest {
         shape.addBadLocation(10);
         assertTrue(shape.badLocationsDirty);
 
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         assertEquals(1, shape.getEffectiveBadCount());
 
         assertEquals(1, shape.getBadSum());
@@ -118,7 +118,7 @@ public class MemoryShapeTest {
         shape.addBadLocation(10);
         shape.addBadLocation(30);
 
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         assertEquals(2, shape.getBadSum());
         assertEquals(2, shape.getBadKeysCache().length);
@@ -135,7 +135,7 @@ public class MemoryShapeTest {
         shape.addBadLocation(14);
         shape.addBadLocation(12);
 
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         assertEquals(5, shape.getBadSum());
         assertEquals(1, shape.getBadKeysCache().length);
@@ -149,7 +149,7 @@ public class MemoryShapeTest {
         shape.addBadLocation(10);
         shape.addBadLocation(12);
 
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         // [10, 15) and [12, 17) -> [10, 17) length 7
         assertEquals(3, shape.getBadSum());
@@ -164,7 +164,7 @@ public class MemoryShapeTest {
         shape.addBadLocation(10);
         shape.addBadLocation(15);
 
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         assertEquals(2, shape.getBadSum());
         assertEquals(2, shape.getBadKeysCache().length);
@@ -176,7 +176,7 @@ public class MemoryShapeTest {
     public void testClear() {
         TestShape shape = new TestShape();
         shape.addBadLocation(10);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         shape.clear();
 
@@ -198,7 +198,7 @@ public class MemoryShapeTest {
         shape.addBiomeLocation(20L, 1L, "forest");
         shape.addBiomeLocation(21L, 1L, "forest");
 
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         // Biome mapped should be union of all.
         // Assuming default resolution 1.
@@ -227,7 +227,7 @@ public class MemoryShapeTest {
         shape.addBiomeLocation(10L, 1L, "ocean"); // ocean: [10, 11)
         shape.addBiomeLocation(10L, 1L, "forest"); // forest: [10, 11)
 
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         long[] mappedKeys = shape.getBiomeMappedKeysCache();
         assertEquals(1, mappedKeys.length);

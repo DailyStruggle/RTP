@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.ChunkReservation;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
@@ -7,6 +9,7 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -199,6 +203,137 @@ class RegionQueueManagerNetworkReservedLifecycleTest {
         assertEquals(0L, qm.networkKeptCount("net_region"),
                 "pool must be drained");
         assertEquals((long) seedCount, qm.networkReservedCount());
+    }
+
+    /**
+     * Counting spy: records {@code close()} calls without touching the
+     * underlying ticket, so ticket hygiene is observable in-process.
+     */
+    private static final class CountingReservation extends ChunkReservation {
+        final AtomicInteger closes = new AtomicInteger();
+
+        CountingReservation(MockRTPWorld w, int cx, int cz) {
+            super(new ChunkSet(w, cx, cz,
+                    List.of(CompletableFuture.completedFuture(((long) cx << 32) | (cz & 0xFFFFFFFFL))),
+                    new CompletableFuture<>()), w);
+        }
+
+        @Override
+        public void close() {
+            closes.incrementAndGet();
+        }
+    }
+
+    private RTPLocation reservedLoc(int x, int z, CountingReservation res) {
+        return new RTPLocation(new RTPCoords(world.name(), x, 64, z), 1L, res);
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    @DisplayName("REQ-RTP-S-002: kept-to-kept release keeps the chunk reservation open")
+    void release_toNetworkKept_doesNotCloseReservation() {
+        CountingReservation res = new CountingReservation(world, 4, 4);
+        qm.networkKeptLocations.offer(reservedLoc(60, 60, res));
+
+        UUID tok = UUID.randomUUID();
+        RTPLocation reserved = qm.reserveFromNetworkKept(tok, "net_region");
+        assertNotNull(reserved);
+        assertTrue(qm.releaseToNetworkKept(tok));
+
+        assertEquals(1L, qm.networkKeptCount("net_region"),
+                "coord must return to the kept pool");
+        assertEquals(0, res.closes.get(),
+                "the coord stays hot, so the ticket must not be dropped");
+        RTPLocation back = qm.networkKeptLocations.poll();
+        assertNotNull(back);
+        assertSame(res, back.reservation(),
+                "the reservation must remain attached to the kept entry");
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    @DisplayName("REQ-RTP-S-002: demotion to unkept on a full kept pool closes the reservation")
+    void release_whenNetworkKeptFull_demotesAndClosesReservation() {
+        CountingReservation res = new CountingReservation(world, 5, 5);
+        qm.networkKeptLocations.offer(reservedLoc(70, 70, res));
+
+        UUID tok = UUID.randomUUID();
+        assertNotNull(qm.reserveFromNetworkKept(tok, "net_region"));
+
+        // Saturate the sibling pool (capacity 8) so the release offer is rejected.
+        for (int i = 0; i < 8; i++) {
+            assertTrue(qm.networkKeptLocations.offer(loc(world, 200 + i, 200 + i)));
+        }
+        long unkeptBefore = qm.unkeptLocations.size();
+
+        assertTrue(qm.releaseToNetworkKept(tok));
+
+        assertEquals(1, res.closes.get(),
+                "an entry demoted to unkept must have its ticket closed exactly once (S-002)");
+        assertEquals(unkeptBefore + 1L, qm.unkeptLocations.size(),
+                "the bare coordinate must not be silently lost (S-004)");
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    @DisplayName("REQ-RTP-S-002: release without a network pool closes the reservation")
+    void release_withoutNetworkPool_demotesAndClosesReservation() {
+        RegionSettings noNetwork = new RegionSettings(
+                "no_net_region", world,
+                new Circle(), new LinearAdjustor(new ArrayList<>()),
+                false, false,
+                16L, 1000L, 0L, 8,
+                0.0, 1L, "", false);
+        Region plain = new Region("no_net_region", noNetwork);
+        RegionQueueManager plainQm = plain.queueManager;
+        assertNull(plainQm.networkKeptLocations,
+                "networkReserveSize=0 must leave the sibling pool unallocated");
+
+        CountingReservation res = new CountingReservation(world, 6, 6);
+        UUID tok = UUID.randomUUID();
+        plainQm.networkReservedLocations.put(tok, reservedLoc(80, 80, res));
+        long unkeptBefore = plainQm.unkeptLocations.size();
+
+        assertTrue(plainQm.releaseToNetworkKept(tok));
+
+        assertEquals(1, res.closes.get(),
+                "with no kept pool the entry demotes to unkept, so the ticket must be closed");
+        assertEquals(unkeptBefore + 1L, plainQm.unkeptLocations.size());
+        assertEquals(0L, plainQm.networkReservedCount());
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    @DisplayName("REQ-RTP-S-002: disabling the login reserve closes every ticket it held")
+    void disableLoginCache_closesReservations() {
+        qm.enableLoginCache(4);
+        CountingReservation a = new CountingReservation(world, 7, 7);
+        CountingReservation b = new CountingReservation(world, 8, 8);
+        assertTrue(qm.loginLocations.offer(reservedLoc(90, 90, a)));
+        assertTrue(qm.loginLocations.offer(reservedLoc(91, 91, b)));
+        long unkeptBefore = qm.unkeptLocations.size();
+
+        qm.disableLoginCache();
+
+        assertEquals(1, a.closes.get());
+        assertEquals(1, b.closes.get());
+        assertEquals(unkeptBefore + 2L, qm.unkeptLocations.size());
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    @DisplayName("REQ-RTP-S-002: closing a personal bucket closes every ticket it held")
+    void closePersonalQueue_closesReservations() {
+        UUID player = UUID.randomUUID();
+        qm.perPlayerLocationQueue.put(player, new java.util.concurrent.ConcurrentLinkedQueue<>());
+        CountingReservation res = new CountingReservation(world, 9, 9);
+        qm.perPlayerLocationQueue.get(player).add(reservedLoc(95, 95, res));
+        long unkeptBefore = qm.unkeptLocations.size();
+
+        qm.closePersonalQueue(player);
+
+        assertEquals(1, res.closes.get());
+        assertEquals(unkeptBefore + 1L, qm.unkeptLocations.size());
     }
 
     @Test

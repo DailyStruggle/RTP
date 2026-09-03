@@ -75,7 +75,7 @@ miseEnFilePostTeleport: false
 # @default: true
 verifierAuChargementChunk: true
 
-# Fraction de la capacité du backlog L3 à laquelle le remplissage reprend (hystérésis).
+# Fraction de la capacité du backlog à laquelle le remplissage reprend (hystérésis).
 # 0.5 = remplir après être tombé à 50% ; 1.0 = remplir en continu.
 # @type: number
 # @range: [0.0, 1.0]

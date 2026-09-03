@@ -42,7 +42,7 @@ public class RegionQueueManager {
             new ConcurrentHashMap<>();
 
     /**
-     * L3 backlog cache (ADR-028): shape-only candidate FIFO prior to chunk I/O (S-005).
+     * Backlog cache (ADR-028): shape-only candidate FIFO prior to chunk I/O (S-005).
      *
      * <p>Anvil bins are verified per {@link Region#execute(long)} pulse, and validated
      * entries are promoted to {@link #unkeptLocations}. Null when {@code backlogCacheCap <= 0}.
@@ -215,16 +215,40 @@ public class RegionQueueManager {
         RTPLocation loc = networkReservedLocations.remove(networkTokenId);
         if (loc == null) return false;
         if (this.networkKeptLocations != null) {
+            // Kept -> kept hand-back: the reservation stays attached, since the
+            // coordinate remains hot and the next reserve hands it straight out.
             // offer is bounded; if the sibling pool happens to be full (capacity
-            // shrunk by reload, or operator manually drained), drop to unkept so
+            // shrunk by reload, or operator manually drained), demote to unkept so
             // the coordinate is not silently lost (S-004 attribution rule).
             if (!this.networkKeptLocations.offer(loc)) {
-                this.unkeptLocations.offer(new RTPLocation(loc.coords(), loc.attempts(), null));
+                demoteToUnkept(loc);
             }
         } else {
-            this.unkeptLocations.offer(new RTPLocation(loc.coords(), loc.attempts(), null));
+            demoteToUnkept(loc);
         }
         return true;
+    }
+
+    /**
+     * Demotes a hot entry to {@link #unkeptLocations}: closes the chunk
+     * reservation, then offers the bare coordinate. The ticket follows the tier,
+     * so an unkept entry never carries a reservation and none is left unclosed
+     * (S-002). Sole disposal path for hot-to-cold transfers.
+     *
+     * @param loc hot entry being demoted; may carry a {@code null} reservation
+     */
+    private void demoteToUnkept(RTPLocation loc) {
+        if (loc == null) return;
+        if (loc.reservation() != null) {
+            try {
+                loc.reservation().close();
+            } catch (Throwable t) {
+                RTP.log(java.util.logging.Level.WARNING,
+                        "[RTP] demoteToUnkept: reservation close failed at "
+                                + loc.coords() + ": " + t, t);
+            }
+        }
+        unkeptLocations.offer(new RTPLocation(loc.coords(), loc.attempts(), null));
     }
 
     /**
@@ -289,10 +313,9 @@ public class RegionQueueManager {
         this.loginLocations = null;
         RTPLocation loc;
         while ((loc = login.poll()) != null) {
-            if (loc.reservation() != null) loc.reservation().close();
             // Re-offer to unkept so the location persists (without reservation)
             // for the next startup burst.
-            unkeptLocations.offer(new RTPLocation(loc.coords(), loc.attempts(), null));
+            demoteToUnkept(loc);
         }
         login.clear();
     }
@@ -355,14 +378,7 @@ public class RegionQueueManager {
         if (bucket != null) {
             RTPLocation loc;
             while ((loc = bucket.poll()) != null) {
-                if (loc.reservation() != null) {
-                    try {
-                        loc.reservation().close();
-                    } catch (Throwable ignored) {
-                        // best-effort close
-                    }
-                }
-                unkeptLocations.offer(new RTPLocation(loc.coords(), loc.attempts(), null));
+                demoteToUnkept(loc);
             }
         }
         perPlayerInFlight.remove(uuid);
@@ -462,7 +478,7 @@ public class RegionQueueManager {
     }
 
     /**
-     * Clear the L1 (kept), L2 (unkept), and L3 (backlog) caches for this region,
+     * Clear the hot (kept), cold (unkept), and backlog caches for this region,
      * releasing any held chunk reservations and dropping persisted rows via the
      * buffers' configured callbacks. Unlike {@link #shutDown()} this keeps the
      * region live: callbacks are left attached so the on-disk cache is purged in
@@ -481,7 +497,7 @@ public class RegionQueueManager {
         unkeptLocations.setCallbacks(null, null);
         keptLocations.clear();
         unkeptLocations.clear();
-        // ADR-028: drop L3 backlog on shutdown. Entries are unverified candidate
+        // ADR-028: drop the backlog on shutdown. Entries are unverified candidate
         // locations with no chunk tickets and no DB rows, so a clear() is sufficient.
         // The world-level WorldBacklogBinIndex holds only weak references to per-bin lists
         // and becomes GC-eligible automatically once the BacklogEntry strong-pins are gone.

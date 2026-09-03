@@ -78,7 +78,7 @@ accodamentoPostTeletrasporto: false
 # @default: true
 controlloCaricamentoChunk: true
 
-# Frazione della capacità del backlog L3 alla quale riprende il riempimento (isteresi).
+# Frazione della capacità del backlog alla quale riprende il riempimento (isteresi).
 # 0.5 = riempi dopo lo svuotamento al 50%; 1.0 = riempi di continuo.
 # @type: number
 # @range: [0.0, 1.0]

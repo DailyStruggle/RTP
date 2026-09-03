@@ -68,7 +68,7 @@ class MemoryShapeShutdownTest {
         shape.addBadLocation(loc3);
 
         // Flush pending bad locations into the prefix-sum caches (as ScanTask does)
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
 
         // Simulate shutdown: save() enqueues a binary file write
         shape.save("shutdown_test", "test_world");
@@ -108,7 +108,7 @@ class MemoryShapeShutdownTest {
         Circle shape = new Circle();
         long loc = 99L;
         shape.addBadLocation(loc);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         shape.save("shutdown_stop_before_test", "test_world");
 
         // Set stop=true BEFORE flushing (simulates the old broken ordering)
@@ -134,7 +134,7 @@ class MemoryShapeShutdownTest {
         Circle shape = new Circle();
         long loc = 42L;
         shape.addBadLocation(loc);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         shape.save("shutdown_race_test", "test_world");
 
         // Simulate the correct shutdown ordering: stop is set AFTER processQueries runs

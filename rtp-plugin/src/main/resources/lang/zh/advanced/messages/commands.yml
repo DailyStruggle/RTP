@@ -17,7 +17,7 @@
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "正在扫描 [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% 陆地) ETA [scan_eta]"
 
 # ###############################################################################
 # 第 7 节: 信息命令
@@ -107,9 +107,9 @@ infoBiomeActivityEmpty: "&8--- &7暂无生物群系占用数据 &8---"
   - "#58CCED  - 需要权限: [requirePermission]"
   - "#58CCED  - 覆盖世界边界: [worldBorderOverride]"
   - "#58CCED  - 缓存上限: [cacheCap]"
-  - "#58CCED  - 已保留缓存 (L1): [keptCache]"
-  - "#58CCED  - 已释放缓存 (L2): [unkeptCache]"
-  - "#58CCED  - 积压缓存 (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - 已保留缓存 (hot): [keptCache]"
+  - "#58CCED  - 已释放缓存 (cold): [unkeptCache]"
+  - "#58CCED  - 积压缓存 (backlog): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - 已缓存: [cached]"
   - "#58CCED  - 已学习覆盖率: [memCoveragePct] (坏点: [memBadPct], [memBadCount] 格)"
   - "#58CCED  - 主要拒绝原因: [memTopCause] ([memTopCausePct])"
@@ -152,7 +152,7 @@ infoBiomeActivityEmpty: "&8--- &7暂无生物群系占用数据 &8---"
 菜单_上一页: "&7« 上一页 ([page])"
 菜单_下一页: "&7下一页 ([page]) »"
 # 首页传送行上方的分区分隔符（玩家视图）。
-菜单_首页_传送分区: "&8--- &7teleport &8---"
+菜单_首页_传送分区: "&8--- &7传送 &8---"
 # 首页行。无占位符。
 菜单_首页_传送行: "&2» /rtp &7- 随机传送到一个位置"
 菜单_首页_区域行: "&2» /rtp region:&7... &7- 选择区域"
@@ -167,16 +167,16 @@ menuFrontPageRowAdmin: "#9D7CD8» 管理面板 &7- 管理员工具"
 menuFrontPageHoverAdmin: "&7管理员工具: 配置、扫描、诊断、重载"
 # --- 管理面板书本页面 ---
 # 管理面板顶部的不可点击标题行。无占位符。
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ 管理面板"
 # menuAdminPanelTitle 下方的不可点击提示行。无占位符。
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
 # 管理面板上的分区分隔符。无占位符。
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7配置 &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7诊断 &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7生命周期 &8---"
+menuAdminPanelSectionBrowse: "&8--- &7浏览 &8---"
 # 管理面板行 + 悬停文字。无占位符。
-menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelRowConfig: "&b▶ 配置编辑器"
 menuAdminPanelHoverConfig: "&7打开精选配置选择器"
 menuAdminPanelRowRegions: "#5FB3B3» 区域"
 menuAdminPanelHoverRegions: "&7添加、删除或编辑每区域配置"
@@ -184,17 +184,17 @@ menuAdminPanelRowWorlds: "#5FB3B3▶ 世界"
 menuAdminPanelHoverWorlds: "&7添加、删除或编辑每世界配置"
 menuAdminPanelRowEffects: "#5FB3B3» 效果"
 menuAdminPanelHoverEffects: "&7添加、删除或编辑每组传送效果"
-menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelRowInfo: "&b▶ 服务器信息"
 menuAdminPanelHoverInfo: "&7显示插件版本、区域数量和队列状态"
 menuAdminPanelRowDiagnostics: "&c» 完整诊断"
 menuAdminPanelHoverDiagnostics: "&7运行完整诊断套件; 可能较耗时"
-menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelRowMemory: "&b▶ 内存追踪器快照"
 menuAdminPanelHoverMemory: "&7转储活跃的区块票据和管道分配"
-menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelRowScan: "&b▶ 扫描控制"
 menuAdminPanelHoverScan: "&7打开扫描子菜单 (开始 / 暂停 / 取消)"
 menuAdminPanelRowReload: "&c» 重载"
 menuAdminPanelHoverReload: "&7重载所有配置文件; 进行中的传送可能受影响"
-menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelRowBrowse: "&b▶ 浏览所有命令"
 menuAdminPanelHoverBrowse: "&7打开反射式 /rtp 命令树"
 menuAdminPanelRowBack: "&7« 返回"
 # --- 可视化子菜单（每区域坏点管理员地图）---
@@ -265,7 +265,7 @@ configSelectorTitle: "#5FB3B3&l» 配置文件"
 configSelectorBackRow: "&7« 返回菜单"
 # 单个配置文件页面顶部的不可点击标题行。
 # 占位符: [file] - 配置文件名（如 performance、safety）。
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
+configFileTitle: "#5FB3B3&l⚙ 配置: &7[file]"
 # 单个配置文件页面上「返回配置文件列表」导航行的标签。
 configFileBackRow: "&7« 返回配置文件列表"
 # 配置文件中没有可编辑键时显示的不可点击提示行。
@@ -275,13 +275,13 @@ configFileEmptyHint: "&7(此文件中没有可编辑的键)"
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # 配置文件页面上每个键行的悬停文字。占位符:
 #   [key], [value], [type] - 配置键名、当前值和声明类型。
-configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+configKeyHoverFormat: "&7点击编辑 &7[key] &7(类型: [type])"
 # 形状/vert 类型选择页面顶部的不可点击标题行。
 # 占位符: [param] - shape 或 vert; [current] - 当前激活的类型名称。
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+configTypePickerTitle: "#5FB3B3&l⚙ 选择 [param] 类型 &7(当前: &7[current]&7)"
 # 形状/vert 子参数页面顶部的不可点击标题行。
 # 占位符: [param] - shape 或 vert; [type] - 激活的类型名称。
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7子参数"
 # 书本视图回退到旧版原始 YAML 聊天转储时发送的提示
 #（此平台上没有可用的书本渲染器）。
 configViewRawHint: "&7[P0] 书本视图不可用; 回退到原始转储。"
