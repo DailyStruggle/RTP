@@ -4,7 +4,7 @@ Kept in sync with the BBCode source by hand; update both when changing copy.
 
 Marketplace listing metadata (current, for SEO reference):
   Title:   "LeafRTP"
-  Tagline: "Deterministic Random Teleportation engine"
+  Tagline: "Deterministic, off-tick random teleport engine with spatial memory"
 -->
 
 <div align="center">
@@ -213,7 +213,7 @@ A: NeoForge is a first-class supported platform on Minecraft 1.21.x / 26.x - jus
 A: Run **Arclight** or **Mohist** (officially supported) and use this jar. A native Forge adapter is not planned.
 
 **Q: Memory and MSPT - should I worry?**
-A: LeafRTP trades a bounded amount of RAM (the queue, bounded by `cacheCap`) for speed. TPS should not drop below ~19 from LeafRTP alone on a healthy server; MSPT spikes during new-area generation are expected - that's the cost of generating chunks, not RTP.
+A: MSPT, no. Memory, know what you are buying: LeafRTP trades heap for tick time, on purpose. It is a cache, so it does *not* use less RAM than a plugin that rerolls and keeps nothing. What it does do is stay bounded: every cache tier is capacity-limited, and the per-entry cost is small and measured against the current code - about 68 bytes per cached location in the hot buffers (`cacheCap`), and about 26 bytes per known-bad chunk in the compressed 1D spatial segments, so 8 192 cached locations cost well under a megabyte. An active `MemoryTracker` sweep prevents ticket leaks and chunk bloat, and background chunk generation pauses automatically under heap pressure (`maxHeapPercent`). On a healthy server TPS holds near 20.00. If you are tight on RAM, lower `cacheCap` - you trade queue depth for heap directly. I am deliberately not publishing a cross-plugin heap comparison: my last whole-JVM heap run predates the current allocation and cache-expiry work here, and competitor versions have moved on too, so any figure from it would describe neither this plugin nor the current version of anyone else's.
 
 **Q: How do I report a bug?**
 A: GitHub issue with server version, LeafRTP version, platform, relevant config files, and the error log section. See the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/) for the full reproduction template.

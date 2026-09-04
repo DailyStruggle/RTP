@@ -17,6 +17,9 @@ class AnvilRegionByteCacheTest {
   @BeforeEach
   void reset() {
     AnvilRegionByteCache.invalidateAll();
+    AnvilRegionByteCache.resetStats();
+    // Deterministic staleness for tests that rewrite files within one window.
+    AnvilRegionByteCache.setRevalidateIntervalMillis(0L);
   }
 
   @Test
@@ -50,6 +53,26 @@ class AnvilRegionByteCacheTest {
     assertNotNull(second);
     assertEquals(5, second.length, "rewritten file should be re-read");
     assertEquals(9, second[0]);
+  }
+
+  @Test
+  void get_skipsStatWithinRevalidationWindow(@TempDir Path tmp) throws Exception {
+    AnvilRegionByteCache.setRevalidateIntervalMillis(60_000L);
+    Path f = tmp.resolve("r.0.0.mca");
+    Files.write(f, new byte[] {1, 2, 3, 4});
+    assertNotNull(AnvilRegionByteCache.get(f));
+    AnvilRegionByteCache.resetStats();
+    for (int i = 0; i < 100; i++) {
+      assertNotNull(AnvilRegionByteCache.get(f));
+    }
+    assertEquals(100, AnvilRegionByteCache.stats().statSkips(),
+        "warm hits inside the window must not stat the region file");
+    // Zeroing the window restores stat-on-every-get, so a rewrite is observed immediately.
+    AnvilRegionByteCache.setRevalidateIntervalMillis(0L);
+    Files.write(f, new byte[] {9, 9, 9, 9, 9});
+    Files.setLastModifiedTime(f, java.nio.file.attribute.FileTime.fromMillis(
+        Files.getLastModifiedTime(f).toMillis() + 5_000L));
+    assertEquals(5, AnvilRegionByteCache.get(f).length);
   }
 
   @Test
@@ -101,5 +124,30 @@ class AnvilRegionByteCacheTest {
     // Re-reading a file reuses an existing pooled buffer instance
     byte[] reused = AnvilRegionByteCache.get(files[0]);
     assertNotNull(reused);
+    assertEquals(8192, reused.length, "pooled reuse must stay exact-length");
+  }
+
+  @Test
+  void get_smallFileAfterLargeFile_reportsExactFileLength(@TempDir Path tmp) throws Exception {
+    AnvilRegionByteCache.resetAll();
+    // A large region file first, so its buffer lands in the pool on eviction/invalidation.
+    Path large = tmp.resolve("r.0.0.mca");
+    Files.write(large, new byte[512 * 1024]);
+    assertNotNull(AnvilRegionByteCache.get(large));
+    AnvilRegionByteCache.invalidateAll();
+    assertTrue(AnvilRegionByteCache.bufferPoolSize() > 0, "large buffer should have been pooled");
+
+    // A smaller region file must never be served on the oversized pooled buffer: its array
+    // length is the corruption guard's fileLen in AnvilReader, and the stale tail would
+    // otherwise belong to the large region file.
+    Path small = tmp.resolve("r.1.0.mca");
+    byte[] smallPayload = new byte[8192];
+    smallPayload[0] = 7;
+    Files.write(small, smallPayload);
+    byte[] bytes = AnvilRegionByteCache.get(small);
+    assertNotNull(bytes);
+    assertEquals(Files.size(small), bytes.length, "cached array length must equal the real file length");
+    assertEquals(Files.size(small), AnvilRegionByteCache.cachedLength(small));
+    assertEquals(7, bytes[0]);
   }
 }

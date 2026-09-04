@@ -1,7 +1,7 @@
 # ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
 
-**Status:** Proposed
-**Date:** 2026-09-03
+**Status:** Accepted
+**Date:** 2026-09-03 (Accepted 2026-09-03)
 
 ## Context
 

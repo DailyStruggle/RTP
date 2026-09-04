@@ -132,4 +132,64 @@ class CommandEffectTest {
         String perm = effect.toPermission();
         assertEquals("console.say\\ hello\\ world", perm);
     }
+
+    @Test
+    void testAllPlaceholdersWithLocation() {
+        LocationHandle locHandle = new LocationHandle() {
+            @Override public int x() { return 100; }
+            @Override public int y() { return 64; }
+            @Override public int z() { return -200; }
+            @Override public double doubleX() { return 100.5; }
+            @Override public double doubleY() { return 64.0; }
+            @Override public double doubleZ() { return -200.5; }
+            @Override public @NotNull String worldName() { return "world_nether"; }
+            @Override public @NotNull Object platformLocation() { return this; }
+            @Override public void playSound(Object type, float volume, float pitch) {}
+            @Override public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {}
+            @Override public void spawnFirework(Map<String, Object> data) {}
+            @Override public void playNote(Object instrument, int tone) {}
+        };
+
+        HandleRegistry.setProvider(new HandleProvider() {
+            @Override
+            public @Nullable PlayerHandle wrapPlayer(@NotNull Object player) {
+                if (player instanceof PlayerHandle ph) return ph;
+                return null;
+            }
+
+            @Override
+            public @Nullable LocationHandle wrapLocation(@NotNull Object location) {
+                if (location instanceof LocationHandle lh) return lh;
+                return locHandle;
+            }
+
+            @Override
+            public void dispatchConsoleCommand(@NotNull String command) {
+                consoleCommandsRun.add(command);
+            }
+
+            @Override
+            public void dispatchPlayerCommand(@NotNull PlayerHandle player, @NotNull String command) {
+                player.performCommand(command);
+            }
+        });
+
+        CommandEffect effect = new CommandEffect();
+        effect.setData("CONSOLE", "say", "Player", "[player]", "{uuid}", "at", "[world]", "[x]", "[y]", "[z]");
+        effect.setTarget(testPlayer);
+        effect.run();
+
+        assertEquals(1, consoleCommandsRun.size());
+        assertEquals("say Player TestPlayer " + testUuid + " at world_nether 100 64 -200", consoleCommandsRun.get(0));
+
+        // Test curly bracket variants
+        consoleCommandsRun.clear();
+        CommandEffect effect2 = new CommandEffect();
+        effect2.setData("CONSOLE", "msg", "{player}", "Welcome to {world} ({x}, {y}, {z})");
+        effect2.setTarget(testPlayer);
+        effect2.run();
+
+        assertEquals(1, consoleCommandsRun.size());
+        assertEquals("msg TestPlayer Welcome to world_nether (100, 64, -200)", consoleCommandsRun.get(0));
+    }
 }

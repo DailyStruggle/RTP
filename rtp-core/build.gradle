@@ -76,8 +76,50 @@ dependencies {
 tasks.withType(JavaCompile) {
 }
 
+// The opt-in behavioural-simulation / allocation benchmark tier (ADR-080) lives in
+// io.github.dailystruggle.rtp.common.benchmark.  Excluded here so `./gradlew build` never
+// pays for it; the `simulationBenchmark` task below is the only way it runs.
+//
+// Class-file include/exclude patterns rather than JUnit tag filters: the root build applies
+// `tasks.withType(Test).configureEach { useJUnitPlatform() }`, which is realized after this
+// script and resets any tag filter set via the useJUnitPlatform DSL.  Test.exclude is a
+// separate, surviving mechanism.  The classes also carry @Tag('simulation') so IDE run
+// configurations and any future tag-based tooling agree with the build.
 test {
-    useJUnitPlatform()
+    exclude '**/benchmark/**'
+}
+
+// Opt-in benchmark tier (ADR-080).
+//
+// Heap and collector are deliberately NOT overridden here.  The root build already pins
+// every Test task to `maxHeapSize = 1024m` and `-XX:+UseG1GC`, and its
+// `tasks.withType(Test).configureEach` block is realized after this script, so any
+// collector flag set here would be *appended* to the root's rather than replacing it --
+// HotSpot rejects two collectors on one command line.  Inheriting the root's pinned args
+// gives the same run-to-run comparability with none of the ordering fragility; the report
+// records the JVM's actual input arguments (ManagementFactory) rather than a value this
+// script asserts, so a published figure always carries the args that really produced it.
+tasks.register('simulationBenchmark', Test) {
+    group = 'verification'
+    description = 'Runs the opt-in competitor-behaviour simulation and allocation benchmarks (ADR-080).'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    // Mirror image of the `test` exclusion above, and for the same reason: tag filters set
+    // through the useJUnitPlatform DSL do not survive the root build's reset.
+    include '**/benchmark/**'
+
+    systemProperty 'rtp.simulation.reportDir',
+            layout.buildDirectory.dir('reports/rtp-simulation').get().asFile.absolutePath
+
+    // The root build wires `finalizedBy jacocoTestReport`, and jacocoTestReport dependsOn
+    // test -- which would drag the entire unit-test suite into every benchmark run.
+    // Coverage of a benchmark tier is meaningless anyway.
+    setFinalizedBy([])
+
+    // Never cache or skip: the point is to re-measure on the current machine.
+    outputs.upToDateWhen { false }
 }
 
 // Enforce a minimum instruction-coverage floor so that coverage regressions
