@@ -14,7 +14,8 @@
 #   advanced/     - tuning you usually do not need (performance, database, logging, metrics, network, biomes, blocks)
 #   lang/         - bundled translations
 #   addons/       - config for optional add-ons (countdown, GUI menu, claim integrations)
-# Seconds to wait before teleporting. 0 = right away.
+
+# Seconds to wait before teleporting. 0 = right away. Supports duration units (e.g. 2s, 40t, 1500ms).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -28,7 +29,7 @@ teleportDelay: 2
 # @default: 2
 cancelDistance: 2
 
-# Wait time between /rtp uses. Skipped by rtp.nocooldown.
+# Wait time between /rtp uses. Skipped by rtp.nocooldown. Supports duration units (e.g. 5m, 300s, 1h).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -41,7 +42,7 @@ teleportCooldown: 300
 # @default: 0
 lockAfterUses: 0
 
-# Seconds until the use count resets. 0 = never resets.
+# Seconds until the use count resets. 0 = never resets. Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -75,35 +76,33 @@ menu:
 # so you change a setting once here instead of in every region file.
 defaults:
   # Default area shape and size, used by every region whose shape is "@config".
-  #
-  # SIZES HERE ARE IN CHUNKS, NOT BLOCKS. 1 chunk = 16 blocks, so multiply by 16:
-  #   radius: 64   ->  1,024 blocks from the center
-  #   radius: 256  ->  4,096 blocks from the center   (the default below)
-  #   radius: 625  -> 10,000 blocks from the center
-  # radius       = outer edge. Nobody lands farther out than this.
-  # centerRadius = inner edge / donut hole. Nobody lands closer in than this.
-  #                Must stay below radius, or there is no land left to pick from.
-  # Players land somewhere between centerRadius and radius, so raise both together
-  # if you want to push people away from spawn without shrinking the usable area.
-  # Full explanation: plugins/RTP/docs/admin/configuration/REGIONS.md
+  # Sizes default to chunks (1 chunk = 16 blocks), e.g. 256 chunks = 4,096 blocks.
+  # Suffixes: b (blocks), c (chunks), r (regions), km (kilometers). See REGIONS.md.
+  # radius: outer bound. centerRadius: inner donut hole. centerRadius must stay below radius.
   shape:
     # Landing area shape algorithm.
     # @type: enum
     # @source: shape
     name: "CIRCLE"
     mode: "ACCUMULATE"
+
     # Outer edge, in chunks (256 chunks = 4,096 blocks).
     radius: 256
+
     # Inner edge / donut hole, in chunks (64 chunks = 1,024 blocks). 0 = no hole.
     centerRadius: 64
+
     # Center of the area, in CHUNK coordinates (chunk 0,0 covers blocks 0-15).
     centerX: 0
     centerZ: 0
+
     # Bias inside the centerRadius-to-radius band: >1.0 favors the center, <1.0 the edge.
     weight: 1.0
+
     # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
     uniquePlacements: 0
     expand: false
+
   # Default high/low landing window.
   vert:
     # Vertical placement algorithm.
@@ -112,17 +111,23 @@ defaults:
     name: "LINEAR"
     minY: 32
     maxY: 255
+
     # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
     direction: 2
     requireSkyLight: true
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
+
   # Extra unverified spots kept ready. 0 = off.
   backlogCacheCap: 1000
+
   # Max chunks kept loaded for instant teleports.
   activeChunkCap: 10
+
   # Bad-spot tracking precision (1-5).
   spatialResolution: 3
+
   # Whether regions/worlds need permission.
   requirePermission: false
 

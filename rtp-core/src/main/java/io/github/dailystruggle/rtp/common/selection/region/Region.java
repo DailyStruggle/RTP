@@ -263,6 +263,32 @@ public class Region extends FactoryValue<RegionKeys> {
     return settings;
   }
 
+  @Override
+  public void set(RegionKeys key, Object value) {
+    super.set(key, value);
+    if (key == RegionKeys.shape && value instanceof Shape<?> newShape) {
+      this.shape = newShape;
+      if (this.settings != null) {
+        this.settings = new RegionSettings(
+            settings.name(),
+            settings.world(),
+            newShape,
+            settings.vert(),
+            settings.worldBorderOverride(),
+            settings.requirePermission(),
+            settings.cacheCap(),
+            settings.backlogCacheCap(),
+            settings.networkReserveSize(),
+            settings.activeChunkCap(),
+            settings.price(),
+            settings.spatialResolution(),
+            settings.override(),
+            settings.detailedRegionInit()
+        );
+      }
+    }
+  }
+
   public void setSettings(RegionSettings settings) {
     // Capture the old cache key BEFORE we replace shape/settings - this is what the
     // (about-to-be-orphaned) on-disk .bin and .scan files are keyed by.

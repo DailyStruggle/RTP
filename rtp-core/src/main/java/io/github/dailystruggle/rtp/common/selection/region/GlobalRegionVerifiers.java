@@ -16,8 +16,26 @@ import java.util.logging.Level;
  * their own safety checks, such as claim protection or custom area restrictions.
  */
 public class GlobalRegionVerifiers {
-    private static final List<Predicate<RTPCoords>> regionVerifiers = new CopyOnWriteArrayList<>();
-    private static final List<Function<RTPCoords, CompletableFuture<Boolean>>> asyncRegionVerifiers = new CopyOnWriteArrayList<>();
+    public record RegisteredSyncVerifier(Class<?> source, Predicate<RTPCoords> check) {}
+    public record RegisteredAsyncVerifier(Class<?> source, Function<RTPCoords, CompletableFuture<Boolean>> check) {}
+
+    public record VerifierCheckResult(boolean passed, Class<?> failedVerifierClass) {
+        public static final VerifierCheckResult PASS = new VerifierCheckResult(true, null);
+    }
+
+    private static final List<RegisteredSyncVerifier> regionVerifiers = new CopyOnWriteArrayList<>();
+    private static final List<RegisteredAsyncVerifier> asyncRegionVerifiers = new CopyOnWriteArrayList<>();
+
+    /**
+     * Adds a synchronous global region verifier with source class attribution (ADR-079).
+     *
+     * @param source        The class registering the verifier.
+     * @param locationCheck A predicate that returns {@code true} for a valid location,
+     *                      or {@code false} for an invalid one.
+     */
+    public static void addGlobalRegionVerifier(Class<?> source, Predicate<RTPCoords> locationCheck) {
+        regionVerifiers.add(new RegisteredSyncVerifier(source != null ? source : locationCheck.getClass(), locationCheck));
+    }
 
     /**
      * Adds a synchronous global region verifier. This verifier will be executed
@@ -27,7 +45,19 @@ public class GlobalRegionVerifiers {
      *                      or {@code false} for an invalid one.
      */
     public static void addGlobalRegionVerifier(Predicate<RTPCoords> locationCheck) {
-        regionVerifiers.add(locationCheck);
+        addGlobalRegionVerifier(locationCheck.getClass(), locationCheck);
+    }
+
+    /**
+     * Adds an asynchronous global region verifier with source class attribution (ADR-079).
+     *
+     * @param source        The class registering the verifier.
+     * @param locationCheck A function that returns a {@link CompletableFuture<Boolean>}
+     *                      which completes with {@code true} for a valid location,
+     *                      or {@code false} for an invalid one.
+     */
+    public static void addGlobalRegionVerifierAsync(Class<?> source, Function<RTPCoords, CompletableFuture<Boolean>> locationCheck) {
+        asyncRegionVerifiers.add(new RegisteredAsyncVerifier(source != null ? source : locationCheck.getClass(), locationCheck));
     }
 
     /**
@@ -39,7 +69,7 @@ public class GlobalRegionVerifiers {
      *                      or {@code false} for an invalid one.
      */
     public static void addGlobalRegionVerifierAsync(Function<RTPCoords, CompletableFuture<Boolean>> locationCheck) {
-        asyncRegionVerifiers.add(locationCheck);
+        addGlobalRegionVerifierAsync(locationCheck.getClass(), locationCheck);
     }
 
     /**
@@ -62,45 +92,63 @@ public class GlobalRegionVerifiers {
 
     /**
      * Checks a given location against all registered synchronous and asynchronous
-     * global verifiers.
+     * global verifiers, returning detailed verification outcome and the vetoing verifier class.
+     *
+     * @param location The location to check.
+     * @return A {@link CompletableFuture<VerifierCheckResult>} completing with verification details.
+     */
+    public static CompletableFuture<VerifierCheckResult> checkGlobalRegionVerifiersDetailed(RTPCoords location) {
+        for (RegisteredSyncVerifier verifier : regionVerifiers) {
+            try {
+                if (!verifier.check().test(location)) {
+                    return CompletableFuture.completedFuture(new VerifierCheckResult(false, verifier.source()));
+                }
+            } catch (Throwable throwable) {
+                // Fail safe: a throwing verifier is logged at WARNING and the location is
+                // rejected (treated as false), never silently accepted (REQ-RTP-S-004).
+                RTP.log(Level.WARNING, "Global region verifier threw an exception", throwable);
+                return CompletableFuture.completedFuture(new VerifierCheckResult(false, verifier.source()));
+            }
+        }
+
+        if (asyncRegionVerifiers.isEmpty()) {
+            return CompletableFuture.completedFuture(VerifierCheckResult.PASS);
+        }
+
+        CompletableFuture<VerifierCheckResult> result = CompletableFuture.completedFuture(VerifierCheckResult.PASS);
+        for (RegisteredAsyncVerifier verifier : asyncRegionVerifiers) {
+            result = result.thenCompose(res -> {
+                if (!res.passed()) return CompletableFuture.completedFuture(res);
+                try {
+                    return verifier.check().apply(location).handle((pass, ex) -> {
+                        if (ex != null) {
+                            RTP.log(Level.WARNING, "Async global region verifier threw an exception", ex);
+                            return new VerifierCheckResult(false, verifier.source());
+                        }
+                        if (!Boolean.TRUE.equals(pass)) {
+                            return new VerifierCheckResult(false, verifier.source());
+                        }
+                        return VerifierCheckResult.PASS;
+                    });
+                } catch (Throwable throwable) {
+                    RTP.log(Level.WARNING, "Async global region verifier threw an exception", throwable);
+                    return CompletableFuture.completedFuture(new VerifierCheckResult(false, verifier.source()));
+                }
+            });
+        }
+        return result;
+    }
+
+    /**
+     * Checks a given location against all registered synchronous and asynchronous
+     * global verifiers. Retained for backwards compatibility across call sites.
      *
      * @param location The location to check.
      * @return A {@link CompletableFuture<Boolean>} that completes with {@code true}
      *         if the location is valid according to all verifiers, otherwise {@code false}.
      */
     public static CompletableFuture<Boolean> checkGlobalRegionVerifiers(RTPCoords location) {
-        for (Predicate<RTPCoords> verifier : regionVerifiers) {
-            try {
-                if (!verifier.test(location)) {
-                    return CompletableFuture.completedFuture(false);
-                }
-            } catch (Throwable throwable) {
-                // Fail safe: a throwing verifier is logged at WARNING and the location is
-                // rejected (treated as false), never silently accepted (REQ-RTP-S-004).
-                // This mirrors the async-verifier path below and the documented contract
-                // in docs/dev/EXTERNAL_HOOKS.md.
-                RTP.log(Level.WARNING, "Global region verifier threw an exception", throwable);
-                return CompletableFuture.completedFuture(false);
-            }
-        }
-
-        if (asyncRegionVerifiers.isEmpty()) {
-            return CompletableFuture.completedFuture(true);
-        }
-
-        CompletableFuture<Boolean> result = CompletableFuture.completedFuture(true);
-        for (Function<RTPCoords, CompletableFuture<Boolean>> verifier : asyncRegionVerifiers) {
-            result = result.thenCompose(pass -> {
-                if (!pass) return CompletableFuture.completedFuture(false);
-                try {
-                    return verifier.apply(location);
-                } catch (Throwable throwable) {
-                    RTP.log(Level.WARNING, "Async global region verifier threw an exception", throwable);
-                    return CompletableFuture.completedFuture(false); // Fail safe
-                }
-            });
-        }
-        return result;
+        return checkGlobalRegionVerifiersDetailed(location).thenApply(VerifierCheckResult::passed);
     }
 
     /**

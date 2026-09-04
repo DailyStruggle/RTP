@@ -187,5 +187,6 @@ maxHeap百分比: 85.0
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
+
 # 请勿修改版本号
 version: 1.0

@@ -3,10 +3,10 @@
 # Copie generee automatiquement des messages anglais; ne pas editer a la main (sera ecrase).
 
 # ###############################################################################
-# Section 4: System & Management
+# Section 4 : Système et gestion
 # ###############################################################################
-# a configuration file 'version' is lower than the latest
-# placeholder: [filename] - name of file, including file extension
+# la 'version' d'un fichier de configuration est antérieure à la plus récente
+# espace réservé : [filename] - nom du fichier, extension comprise
 oldFile: "&b[P0] ancien [filename] détecté. Mise à jour"
 
 # monde bukkit détecté qui n'est pas dans le fichier de configuration
@@ -21,11 +21,11 @@ updating: "&a[P0] mise à jour de [filename]..."
 updated: "&a[P0] [filename] mis à jour avec succès."
 
 # ###############################################################################
-# Section 5: Administrative Logs
+# Section 5 : Journaux administratifs
 # ###############################################################################
-# logged when locations are saved/loaded from database
-# placeholder: [amount] - number of locations
-# placeholder: [region] - name of region
+# consigné lorsque des emplacements sont enregistrés/chargés depuis la base de données
+# espace réservé : [amount] - nombre d'emplacements
+# espace réservé : [region] - nom de la région
 locationSaved: "&7[P0] [amount] emplacements enregistrés avec succès pour [region]"
 locationLoaded: "&7[P0] [amount] emplacements chargés avec succès pour [region]"
 
@@ -35,7 +35,7 @@ locationLoaded: "&7[P0] [amount] emplacements chargés avec succès pour [region
 version: 1.0
 
 # ###############################################################################
-# Section 12: Developer Options
+# Section 12 : Options de développement
 # ###############################################################################
-# set to true to append a dev tag (e.g. §8(RTP:ClassName)) to every message
+# définir sur true pour ajouter un tag de dév (ex. §8(RTP:ClassName)) à chaque message
 showDevTag: false

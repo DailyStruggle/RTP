@@ -1,4 +1,4 @@
-# Teletransportvertraging (seconden)
+# Teletransportvertraging. 0 = direct. Ondersteunt tijdseenheden (bijv. 2s, 40t, 1500ms).
 # Tijd die de speler moet wachten voordat het teletransport plaatsvindt.
 # Geeft de server soms tijd om bestemmingschunks voor te laden.
 # @type: integer
@@ -16,7 +16,7 @@ teletransportVertraging: 2
 # @default: 2
 annuleerAfstand: 2
 
-# Wachttijd tussen teletransports (seconden)
+# Wachttijd tussen teletransports. Omzeild door rtp.nocooldown. Ondersteunt tijdseenheden (bijv. 5m, 300s, 1h).
 # Tijd die de speler moet wachten tussen succesvolle RTP-gebruiken.
 # @type: integer
 # @range: [0, null]
@@ -34,7 +34,7 @@ lockAfterUses: 0
 
 # Lengte van het voortschrijdende gebruikslimietvenster voor lockAfterUses. De teller wordt zoveel
 # seconden na het eerste gebruik van het venster gereset. 0 betekent dat de limiet nooit wordt
-# gereset (een harde levenslange limiet).
+# gereset (een harde levenslange limiet). Ondersteunt tijdseenheden (bijv. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -86,7 +86,23 @@ menu:
 
 # Globale standaardwaarden die via het "@config"-token worden overgenomen door regio-/wereldbestanden.
 defaults:
-  # Standaardvorm en -grootte van het gebied. radius/centerRadius = hoe ver weg je landt, gemeten in chunks.
+  # Standaardvorm en -grootte van het gebied, gebruikt door elke regio waarvan de vorm "@config" is.
+  #
+  # GROOTTES ZIJN HIER STANDAARD IN CHUNKS (1 chunk = 16 blokken):
+  #   radius: 64   ->  1.024 blokken vanaf het midden
+  #   radius: 256  ->  4.096 blokken vanaf het midden   (de standaardwaarde hieronder)
+  #   radius: 625  -> 10.000 blokken vanaf het midden
+  #
+  # RUIMTELIJKE EENHEIDSSUFFIXEN:
+  # Je kunt ook expliciete eenheden rechtstreeks gebruiken op radius, centerRadius, enz.:
+  #   radius: 4096b   (of 4096 blocks, 4096m)
+  #   radius: 256c    (chunks)
+  #   radius: 4r      (Anvil-regiobestanden = 32 chunks = 512 blokken)
+  #   radius: 5km     (kilometer = 5000 blokken)
+  #
+  # radius       = buitenrand. Niemand landt verder weg dan dit.
+  # centerRadius = binnenrand / donutgat. Niemand landt dichterbij dan dit.
+  #                Moet onder radius blijven, anders blijft er geen land over om te kiezen.
   shape:
     # Landing area shape algorithm.
     # @type: enum
@@ -98,9 +114,11 @@ defaults:
     centerX: 0
     centerZ: 0
     weight: 1.0
+
     # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
     uniquePlacements: 0
     expand: false
+
   # Default high/low landing window.
   vert:
     # Vertical placement algorithm.
@@ -109,17 +127,23 @@ defaults:
     name: "LINEAR"
     minY: 32
     maxY: 255
+
     # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
     direction: 2
     requireSkyLight: true
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
+
   # Extra unverified spots kept ready. 0 = off.
   backlogCacheCap: 1000
+
   # Max chunks kept loaded for instant teleports.
   activeChunkCap: 10
+
   # Bad-spot tracking precision (1-5).
   spatialResolution: 3
+
   # Whether regions/worlds need permission.
   requirePermission: false
 

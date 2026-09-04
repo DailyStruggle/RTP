@@ -1,0 +1,27 @@
+# --- RTP 공간 메모리 TTL 설정 ---
+# 문서: plugins/RTP/docs/admin/configuration/TTL.md
+
+# 공간 메모리에서 거부된 좌표 실행의 기본 보존 기간.
+# 지원 기간 형식: 예 14d, 12h, 30m, 3600s, 40t, 2500ms 또는 복합 형식 1d12h.
+# 영구 보존(정적 지형)의 경우 -1 또는 "infinite" 로 설정합니다.
+causes:
+  # 자연 지형 및 지하/공중 기하 구조 (영구)
+  biome: -1
+  worldBorder: -1
+  vert: -1
+  safety: -1
+  prefilterBiome: -1
+  prefilterBlock: -1
+
+  # 동적 플레이어 및 서버 상태
+  uniquePlacement: 30d
+  safetyExternal: 14d
+
+# 검사기 클래스 이름(예: GriefPreventionChecker, WorldGuardChecker)별 검증기 오버라이드.
+# 생략되거나 목록에 없으면 외부 검사기는 causes.safetyExternal 을 상속합니다.
+verifiers:
+  # WorldGuardChecker: -1
+  # GriefPreventionChecker: 14d
+
+# 버전 번호를 변경하지 마십시오
+version: 1.0

@@ -57,7 +57,7 @@ After saving, run `/rtp reload`.
 
 ### Players are landing too close to spawn / inside the exclusion zone.
 
-Check the `centerRadius` value in the region's `shape:` block. This is measured in **chunks**, not blocks. A `centerRadius: 64` means players cannot land within 64 × 16 = 1 024 blocks of the centre. Increase it if needed.
+Check the `centerRadius` value in the region's `shape:` block. By default, raw numbers are measured in **chunks** (not blocks). A `centerRadius: 64` means players cannot land within 64 × 16 = 1 024 blocks of the centre. You can also specify units explicitly (e.g. `centerRadius: 1000b` or `64c`). Increase it if needed.
 
 ### Players are always landing in the same area.
 

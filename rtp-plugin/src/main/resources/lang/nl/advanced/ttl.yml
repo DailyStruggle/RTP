@@ -1,0 +1,27 @@
+# --- RTP Ruimtelijk Geheugen TTL-instellingen ---
+# Documentatie: plugins/RTP/docs/admin/configuration/TTL.md
+
+# Basis bewaartermijn voor afgewezen coördinaatpogingen in het ruimtelijk geheugen.
+# Ondersteunde tijdsindelingen: bijv. 14d, 12h, 30m, 3600s, 40t, 2500ms of samengesteld 1d12h.
+# Stel in op -1 of "infinite" voor permanente retentie (statisch terrein).
+causes:
+  # Natuurlijk terrein en geometrie (permanent)
+  biome: -1
+  worldBorder: -1
+  vert: -1
+  safety: -1
+  prefilterBiome: -1
+  prefilterBlock: -1
+
+  # Dynamische speler- en serverstatus
+  uniquePlacement: 30d
+  safetyExternal: 14d
+
+# Overschrijvingen per verificator op basis van checker-klassenaam (bijv. GriefPreventionChecker, WorldGuardChecker).
+# Indien weggelaten of niet vermeld, erven externe checkers causes.safetyExternal.
+verifiers:
+  # WorldGuardChecker: -1
+  # GriefPreventionChecker: 14d
+
+# VERSIENUMMER NIET WIJZIGEN
+version: 1.0

@@ -160,5 +160,6 @@ vorlage:
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
+
 # ÄNDERE NICHT DIE VERSIONSNUMMER
 version: 1.0

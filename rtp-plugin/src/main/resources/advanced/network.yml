@@ -6,10 +6,12 @@ network:
   # @type: boolean
   # @default: false
   enabled: false
+
   # This server's unique name. Needed when enabled. Don't reuse it.
   # @type: string
   # @default: ""
   serverId: ""
+
   # Env var that holds the shared secret. Needed for redis.
   # @type: string
   # @default: "RTP_NET_SECRET"
@@ -32,10 +34,12 @@ transport:
     # @type: string
     # @default: "localhost"
     host: "localhost"
+
     # Redis port.
     # @type: integer
     # @default: 6379
     port: 6379
+
     # Redis password. Empty = none.
     # @type: string
     # @default: ""
@@ -47,6 +51,7 @@ heartbeat:
   # @type: integer
   # @default: 1000
   intervalMs: 1000
+
   # How long a server is trusted after its last report (ms). Keep above intervalMs.
   # @type: integer
   # @default: 5000
@@ -59,6 +64,7 @@ routing:
   # @options: ["local", "auto", "always"]
   # @default: "local"
   mode: "local"
+
   # true = this server only sends players to other servers.
   # @type: boolean
   # @default: false
@@ -70,26 +76,32 @@ queue:
   # @type: integer
   # @default: 50
   maxDepth: 50
+
   # How often to send updates (ms).
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
+
   # How often to refresh each player's progress (ms).
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
+
   # Auto-clean old entries after this long (ms). 0 = off.
   # @type: integer
   # @default: 0
   entryTtlMs: 0
+
   # Max cross-server /rtp per second.
   # @type: number
   # @default: 5
   crossServerRequestsPerSecond: 5
+
   # Short burst allowance on top of the rate above.
   # @type: number
   # @default: 10
   crossServerRequestsBurst: 10
+
   # Proxy worker threads. Raise only if one is too busy.
   # @type: integer
   # @default: 1
@@ -101,6 +113,7 @@ reservation:
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
+
   # How long a held spot lasts before it's freed (ms).
   # @type: integer
   # @default: 60000
@@ -115,7 +128,7 @@ regionCollision:
   policy: "warn"
 
 # Optional per-server rules (matched by serverId). Leave commented for most setups.
-#servers:
+# servers:
 #  example-backend:
 #    # Permission required to target this destination (empty = none).
 #    # @type: string
@@ -139,6 +152,7 @@ loadBalancer:
   # @type: number
   # @default: 0
   regionScarcityWeight: 0
+
   # One scoring rule per metric (input + weight + curve).
   terms:
     # Tick pressure; sigmoid knee at 0.6.
@@ -148,6 +162,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "mspt"
       input: "mspt"
+
       # Term weight.
       # @type: number
       # @default: 1.0
@@ -158,16 +173,19 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "sigmoid"
         type: "sigmoid"
+
         # Steepness.
         # @type: number
         # @range: [0.1, 20]
         # @default: 8.0
         k: 8.0
+
         # Midpoint.
         # @type: number
         # @range: [0, 1]
         # @default: 0.6
         x0: 0.6
+
     # Queue depth; small queues silent, large ones explode.
     queue:
       # Metric input.
@@ -175,6 +193,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "queueDepth"
       input: "queueDepth"
+
       # Term weight.
       # @type: number
       # @default: 1.0
@@ -185,11 +204,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "exponential"
         type: "exponential"
+
         # Steepness.
         # @type: number
         # @range: [0.1, 20]
         # @default: 3.0
         k: 3.0
+
     # Heap gate; fires at >= 85% used.
     heap:
       # Metric input.
@@ -197,6 +218,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "heapUsed"
       input: "heapUsed"
+
       # Term weight.
       # @type: number
       # @default: 5.0
@@ -207,11 +229,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # Step threshold.
         # @type: number
         # @range: [0, 1]
         # @default: 0.85
         threshold: 0.85
+
     # Region gate; fires when the kept pool is >= 95% full.
     region:
       # Metric input.
@@ -219,6 +243,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptRegion"
       input: "keptRegion"
+
       # Term weight.
       # @type: number
       # @default: 5.0
@@ -229,11 +254,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # Step threshold.
         # @type: number
         # @range: [0, 1]
         # @default: 0.95
         threshold: 0.95
+
     # Gentle tie-breaker on kept count.
     kept:
       # Metric input.
@@ -241,6 +268,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptCount"
       input: "keptCount"
+
       # Term weight.
       # @type: number
       # @default: 0.25
@@ -251,6 +279,7 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "logarithmic"
         type: "logarithmic"
+
         # Steepness.
         # @type: number
         # @range: [0.1, 20]

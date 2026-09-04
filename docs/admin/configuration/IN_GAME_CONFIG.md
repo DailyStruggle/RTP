@@ -41,6 +41,7 @@ The panel is organized into five operational sections:
       - **`performance.yml`**: Cache sizes, pipeline limits, and task scheduling ([`PERFORMANCE.md`](PERFORMANCE.md)).
       - **`logging.yml`**: Logger categories and debug verbosity levels ([`LOGGING.md`](LOGGING.md)).
       - **`metrics.yml`**: Runtime TPS/MSPT monitoring and health metrics ([`METRICS.md`](METRICS.md)).
+      - **`ttl.yml`**: Spatial memory expiration tiers and retention durations ([`TTL.md`](TTL.md)).
       - **`database.yml`**: SQL storage and connection pooling settings ([`CONFIGURATION.md#database-persistence-advanceddatabaseyml`](CONFIGURATION.md#database-persistence-advanceddatabaseyml)).
       - **`network.yml`**: Cross-server proxy and transport configuration ([`../proxies/CONFIGURATION.md`](../proxies/CONFIGURATION.md)).
       - **`blocks.yml` / `biomes.yml`**: Block safety checks and biome whitelists/blacklists ([`SAFETY.md`](SAFETY.md)).

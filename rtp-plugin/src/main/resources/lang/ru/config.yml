@@ -1,4 +1,4 @@
-# Отсрочка телепорта (секунды)
+# Отсрочка телепорта (секунды). 0 = сразу. Поддерживает единицы времени (например, 2s, 40t, 1500ms).
 # Время, которое игрок должен ждать перед выполнением телепорта.
 # Иногда даёт серверу время предзагрузить целевые чанки.
 # @type: integer
@@ -16,7 +16,7 @@
 # @default: 2
 дистанцияОтмены: 2
 
-# Перезарядка между телепортами (секунды)
+# Перезарядка между телепортами. Пропускается с rtp.nocooldown. Поддерживает единицы времени (например, 5m, 300s, 1h).
 # Время, которое игрок должен ждать между успешными использованиями RTP.
 # @type: integer
 # @range: [0, null]
@@ -34,7 +34,7 @@ lockAfterUses: 0
 
 # Длина скользящего окна ограничения использований для lockAfterUses. Счётчик сбрасывается
 # через столько секунд после первого использования в окне. 0 означает, что ограничение
-# никогда не сбрасывается (жёсткий пожизненный лимит).
+# никогда не сбрасывается (жёсткий пожизненный лимит). Поддерживает единицы времени (например, 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -86,7 +86,23 @@ menu:
 
 # Глобальные значения по умолчанию, наследуемые файлами регионов/миров через токен "@config".
 defaults:
-  # Форма и размер области по умолчанию. radius/centerRadius = как далеко вы приземляетесь, измеряется в чанках.
+  # Форма и размер области по умолчанию, используемые каждым регионом с формой "@config".
+  #
+  # РАЗМЕРЫ ЗДЕСЬ ПО УМОЛЧАНИЮ В ЧАНКАХ (1 чанк = 16 блоков):
+  #   radius: 64   ->  1 024 блока от центра
+  #   radius: 256  ->  4 096 блоков от центра   (значение по умолчанию ниже)
+  #   radius: 625  -> 10 000 блоков от центра
+  #
+  # СУФФИКСЫ ПРОСТРАНСТВЕННЫХ ЕДИНИЦ:
+  # Вы также можете указывать явные единицы прямо в radius, centerRadius и т. д.:
+  #   radius: 4096b   (или 4096 blocks, 4096m)
+  #   radius: 256c    (чанки)
+  #   radius: 4r      (файлы регионов Anvil = 32 чанка = 512 блоков)
+  #   radius: 5km     (километры = 5000 блоков)
+  #
+  # radius       = внешний край. Никто не приземлится дальше этого расстояния.
+  # centerRadius = внутренний край / «дырка от бублика». Никто не приземлится ближе этого расстояния.
+  #                Должен оставаться меньше radius, иначе не останется территории для выбора.
   shape:
     # Landing area shape algorithm.
     # @type: enum
@@ -98,9 +114,11 @@ defaults:
     centerX: 0
     centerZ: 0
     weight: 1.0
+
     # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
     uniquePlacements: 0
     expand: false
+
   # Default high/low landing window.
   vert:
     # Vertical placement algorithm.
@@ -109,17 +127,23 @@ defaults:
     name: "LINEAR"
     minY: 32
     maxY: 255
+
     # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
     direction: 2
     requireSkyLight: true
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
+
   # Extra unverified spots kept ready. 0 = off.
   backlogCacheCap: 1000
+
   # Max chunks kept loaded for instant teleports.
   activeChunkCap: 10
+
   # Bad-spot tracking precision (1-5).
   spatialResolution: 3
+
   # Whether regions/worlds need permission.
   requirePermission: false
 

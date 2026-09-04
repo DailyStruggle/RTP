@@ -919,21 +919,25 @@ final class PregenTask implements Runnable {
 
         // --- GlobalRegionVerifiers (non-blocking) ---
         RTPCoords resCoords = new RTPCoords(state.world.name(), finalX, finalY, finalZ);
-        GlobalRegionVerifiers.checkGlobalRegionVerifiers(resCoords)
-                .whenComplete((verPass, verEx) -> {
-                    if (verEx != null || !Boolean.TRUE.equals(verPass)) {
+        GlobalRegionVerifiers.checkGlobalRegionVerifiersDetailed(resCoords)
+                .whenComplete((verResult, verEx) -> {
+                    if (verEx != null || verResult == null || !verResult.passed()) {
+                        Class<?> failedClass = (verResult != null) ? verResult.failedVerifierClass() : null;
+                        String className = (failedClass != null) ? failedClass.getSimpleName() : "verifier";
                         if (state.verbose) {
                             final int fx = finalX, fy = finalY, fz = finalZ;
                             state.failMap.get(LocationGenerator.FailTypes.safetyExternal)
-                                    .compute("location=(" + fx + "," + fy + "," + fz + ")",
+                                    .compute("location=(" + fx + "," + fy + "," + fz + ")[verifier=" + className + "]",
                                             (s, a) -> (a == null) ? 1L : ++a);
                         }
-                        recordOutcome("safetyExternal/verifier ex=" + (verEx == null ? "null" : verEx.getClass().getSimpleName()));
+                        recordOutcome("safetyExternal[" + className + "] ex=" + (verEx == null ? "null" : verEx.getClass().getSimpleName()));
                         if (state.shape instanceof MemoryShape) {
                             // addBadChunk: chunk-uniform - within a chunk the per-column
                             // selection order is deterministic, so the twin spiral index picks
                             // the same column and the verifier rejects it identically.
-                            ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safetyExternal);
+                            long effectiveTtl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(
+                                    LocationGenerator.FailTypes.safetyExternal, failedClass);
+                            ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
                         }
                         closeIfPresent(reservation);
                         continueInline(this::rescheduleNextAttempt);

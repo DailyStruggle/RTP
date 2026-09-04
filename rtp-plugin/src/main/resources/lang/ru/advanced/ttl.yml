@@ -1,0 +1,27 @@
+# --- Настройки TTL Пространственной Памяти RTP ---
+# Документация: plugins/RTP/docs/admin/configuration/TTL.md
+
+# Базовое время хранения отклоненных координат в пространственной памяти.
+# Поддерживаемые форматы длительности: например, 14d, 12h, 30m, 3600s, 40t, 2500ms или составной 1d12h.
+# Установите -1 или "infinite" для постоянного хранения (статический ландшафт).
+causes:
+  # Естественный ландшафт и геометрия (постоянно)
+  biome: -1
+  worldBorder: -1
+  vert: -1
+  safety: -1
+  prefilterBiome: -1
+  prefilterBlock: -1
+
+  # Динамическое состояние игрока и сервера
+  uniquePlacement: 30d
+  safetyExternal: 14d
+
+# Переопределения для каждого верификатора по имени класса (например, GriefPreventionChecker, WorldGuardChecker).
+# Если пропущено или не указано, внешние проверки наследуют causes.safetyExternal.
+verifiers:
+  # WorldGuardChecker: -1
+  # GriefPreventionChecker: 14d
+
+# НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
+version: 1.0

@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import io.github.dailystruggle.rtp.effects.EffectsResolver;
 import io.github.dailystruggle.rtp.neoforge.effects.local.NeoForgeEffectsInitializer;
+import io.github.dailystruggle.rtp.neoforge.effects.local.NeoForgeHandles;
 import io.github.dailystruggle.rtp.neoforge.player.NeoForgeRTPPlayer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -79,6 +80,7 @@ public final class NeoForgeEffectsHandler {
     public static void setupEffects(MinecraftServer server) {
         FabricEffectRuntime.setLogSink((lvl, msg, t) -> RTP.log(lvl, msg, t));
         FabricEffectRuntime.bindServer(server);
+        NeoForgeHandles.setServer(server);
         NeoForgeEffectsInitializer.registerAll();
 
         if (!AlreadyHooked.flip()) return; // already attached on a previous start
@@ -139,6 +141,21 @@ public final class NeoForgeEffectsHandler {
         // values internally so a partially-configured messages.yml works.
         // ----------------------------------------------------------------
         TeleportPipelineTask.teleportPostActions.add(NeoForgeEffectsHandler::sendConfiguredTitle);
+    }
+
+    public static void onPlayerDeath(ServerPlayer player) {
+        if (player == null) return;
+        Configs configs = RTP.configs;
+        if (configs == null) return;
+        FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
+        if (!effectParsingEnabled(parser)) return;
+
+        if (RTP.serverAccessor == null) return;
+        RTPPlayer rp = RTP.serverAccessor.getPlayer(player.getUUID());
+        if (rp == null) return;
+
+        FabricEffectRuntime runtime = new FabricEffectRuntime();
+        dispatch("rtp.effect.death", rp, runtime);
     }
 
     private static void sendConfiguredTitle(TeleportPipelineTask task) {

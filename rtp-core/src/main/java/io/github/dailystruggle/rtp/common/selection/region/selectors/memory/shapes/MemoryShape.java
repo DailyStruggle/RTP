@@ -50,6 +50,21 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * Legacy {@code .bin} files and untagged callers default to {@code misc}.
    */
   protected volatile byte[] badCauseCache = new byte[0];
+  /**
+   * Per-run expiration timestamp in unix epoch seconds, aligned 1:1 with {@link #badKeysCache}.
+   * Values <= 0 indicate static / permanent retention (infinite TTL).
+   */
+  protected volatile long[] badExpiryCache = new long[0];
+
+  /**
+   * Sorted dual-arrays for the probationary tier (ADR-079). Holds expired segments
+   * where {@code 1 * TTL <= now < 2 * TTL}. Bypasses active candidate avoidance,
+   * but restored in O(log M) if candidate verification re-rejects them.
+   */
+  protected volatile long[] probationKeysCache = new long[0];
+  protected volatile long[] probationPrefixSumsCache = new long[0];
+  protected volatile byte[] probationCauseCache = new byte[0];
+  protected volatile long[] probationExpiryCache = new long[0];
 
   /** {@code FailTypes.misc} ordinal as a byte: the default / unknown cause. */
   protected static final byte MISC_CAUSE = (byte) LocationGenerator.FailTypes.misc.ordinal();
@@ -60,8 +75,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * world-name byte length. Spells "RTP1" big-endian.
    */
   private static final int BIN_MAGIC = 0x52545031;
-  /** Current cause-tagged {@code .bin} format version (1 == legacy, no magic). */
-  private static final int BIN_VERSION = 2;
+  /** Current cause-tagged {@code .bin} format version (1 == legacy, 2 == cause-tagged, 3 == ttl/epoch-tagged). */
+  private static final int BIN_VERSION = 3;
   protected volatile ConcurrentHashMap<String, long[]> biomeKeysCache = new ConcurrentHashMap<>();
   protected volatile ConcurrentHashMap<String, long[]> biomePrefixSumsCache =
       new ConcurrentHashMap<>();
@@ -340,6 +355,31 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     return Arrays.copyOf(causes, causes.length);
   }
 
+  public long[] badExpiriesSnapshot() {
+    long[] expiries = badExpiryCache;
+    return Arrays.copyOf(expiries, expiries.length);
+  }
+
+  public long[] probationKeysSnapshot() {
+    long[] keys = probationKeysCache;
+    return Arrays.copyOf(keys, keys.length);
+  }
+
+  public long[] probationPrefixSumsSnapshot() {
+    long[] sums = probationPrefixSumsCache;
+    return Arrays.copyOf(sums, sums.length);
+  }
+
+  public byte[] probationCausesSnapshot() {
+    byte[] causes = probationCauseCache;
+    return Arrays.copyOf(causes, causes.length);
+  }
+
+  public long[] probationExpiriesSnapshot() {
+    long[] expiries = probationExpiryCache;
+    return Arrays.copyOf(expiries, expiries.length);
+  }
+
   public void save(String fileName, String worldName) {
     if (!fileName.endsWith(".bin")) fileName = fileName + ".bin";
 
@@ -352,6 +392,16 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     long[] sBadKeys;
     long[] sBadSums;
     byte[] sBadCauses;
+    long[] sBadExpiries;
+    long[] sProbKeys;
+    long[] sProbSums;
+    byte[] sProbCauses;
+    long[] sProbExpiries;
+    int totalRuns;
+    long[] allKeys;
+    long[] allDeltas;
+    byte[] allCauses;
+    long[] allExpiries;
     Map<String, long[]> sBiomeKeys;
     Map<String, long[]> sBiomeSums;
 
@@ -360,6 +410,57 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       sBadKeys = Arrays.copyOf(badKeysCache, badKeysCache.length);
       sBadSums = Arrays.copyOf(badPrefixSumsCache, badPrefixSumsCache.length);
       sBadCauses = Arrays.copyOf(badCauseCache, badCauseCache.length);
+      sBadExpiries = Arrays.copyOf(badExpiryCache, badExpiryCache.length);
+
+      sProbKeys = Arrays.copyOf(probationKeysCache, probationKeysCache.length);
+      sProbSums = Arrays.copyOf(probationPrefixSumsCache, probationPrefixSumsCache.length);
+      sProbCauses = Arrays.copyOf(probationCauseCache, probationCauseCache.length);
+      sProbExpiries = Arrays.copyOf(probationExpiryCache, probationExpiryCache.length);
+
+      // Merge active and probation non-overlapping runs into a single sorted stream for disk
+      totalRuns = sBadKeys.length + sProbKeys.length;
+      allKeys = new long[totalRuns];
+      allDeltas = new long[totalRuns];
+      allCauses = new byte[totalRuns];
+      allExpiries = new long[totalRuns];
+      int runIdx = 0;
+      int aIdx = 0, pIdx = 0;
+      long aPrev = 0L, pPrev = 0L;
+      while (aIdx < sBadKeys.length || pIdx < sProbKeys.length) {
+        if (aIdx < sBadKeys.length && pIdx < sProbKeys.length) {
+          if (sBadKeys[aIdx] <= sProbKeys[pIdx]) {
+            allKeys[runIdx] = sBadKeys[aIdx];
+            allDeltas[runIdx] = sBadSums[aIdx] - aPrev;
+            allCauses[runIdx] = (aIdx < sBadCauses.length) ? sBadCauses[aIdx] : MISC_CAUSE;
+            allExpiries[runIdx] = (aIdx < sBadExpiries.length) ? sBadExpiries[aIdx] : 0L;
+            aPrev = sBadSums[aIdx];
+            aIdx++;
+          } else {
+            allKeys[runIdx] = sProbKeys[pIdx];
+            allDeltas[runIdx] = sProbSums[pIdx] - pPrev;
+            allCauses[runIdx] = (pIdx < sProbCauses.length) ? sProbCauses[pIdx] : MISC_CAUSE;
+            allExpiries[runIdx] = (pIdx < sProbExpiries.length) ? sProbExpiries[pIdx] : 0L;
+            pPrev = sProbSums[pIdx];
+            pIdx++;
+          }
+        } else if (aIdx < sBadKeys.length) {
+          allKeys[runIdx] = sBadKeys[aIdx];
+          allDeltas[runIdx] = sBadSums[aIdx] - aPrev;
+          allCauses[runIdx] = (aIdx < sBadCauses.length) ? sBadCauses[aIdx] : MISC_CAUSE;
+          allExpiries[runIdx] = (aIdx < sBadExpiries.length) ? sBadExpiries[aIdx] : 0L;
+          aPrev = sBadSums[aIdx];
+          aIdx++;
+        } else {
+          allKeys[runIdx] = sProbKeys[pIdx];
+          allDeltas[runIdx] = sProbSums[pIdx] - pPrev;
+          allCauses[runIdx] = (pIdx < sProbCauses.length) ? sProbCauses[pIdx] : MISC_CAUSE;
+          allExpiries[runIdx] = (pIdx < sProbExpiries.length) ? sProbExpiries[pIdx] : 0L;
+          pPrev = sProbSums[pIdx];
+          pIdx++;
+        }
+        runIdx++;
+      }
+
       sBiomeKeys = new HashMap<>(biomeKeysCache.size());
       sBiomeSums = new HashMap<>(biomePrefixSumsCache.size());
       for (Map.Entry<String, long[]> e : biomeKeysCache.entrySet()) {
@@ -373,15 +474,15 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     }
 
     // Build a binary payload (big-endian) without any synchronous disk I/O here.
-    // Cause-tagged format (BIN_VERSION 2): a magic+version header precedes the
-    // legacy layout, and each bad-run carries a trailing cause byte.
+    // BIN_VERSION 3: magic(4) + version(4) + world(4+len) + stride(8) + badSize(4) +
+    // entries * 25 bytes (key 8 + delta 8 + cause 1 + expiresAt 8).
     byte[] worldBytes = worldName.getBytes(StandardCharsets.UTF_8);
     int size = 0;
     size += 8; // BIN_MAGIC + BIN_VERSION
     size += 4 + worldBytes.length; // world name length + bytes
     size += 8; // scanStride
     size += 4; // bad array length
-    size += sBadKeys.length * 17; // key + delta + cause byte per entry
+    size += totalRuns * 25; // key + delta + cause + expiresAt per entry
     size += 4; // biome map size
     for (Map.Entry<String, long[]> e : sBiomeKeys.entrySet()) {
       byte[] bName = e.getKey().getBytes(StandardCharsets.UTF_8);
@@ -397,14 +498,12 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     buf.putInt(worldBytes.length).put(worldBytes);
     buf.putLong(scanStride.get());
 
-    buf.putInt(sBadKeys.length);
-    long prev = 0L;
-    for (int i = 0; i < sBadKeys.length; i++) {
-      buf.putLong(sBadKeys[i]);
-      long delta = sBadSums[i] - prev;
-      buf.putLong(delta);
-      buf.put(i < sBadCauses.length ? sBadCauses[i] : MISC_CAUSE);
-      prev = sBadSums[i];
+    buf.putInt(totalRuns);
+    for (int i = 0; i < totalRuns; i++) {
+      buf.putLong(allKeys[i]);
+      buf.putLong(allDeltas[i]);
+      buf.put(allCauses[i]);
+      buf.putLong(allExpiries[i]);
     }
 
     buf.putInt(sBiomeKeys.size());
@@ -582,22 +681,86 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 }
 
                 // Per-bad-run on-disk width: legacy = key(8) + delta(8); v2 adds a
-                // trailing cause byte. Legacy runs load with cause `misc`.
-                int badEntryWidth = (version >= 2) ? 17 : 16;
+                // trailing cause byte; v3 adds expiresAt epoch seconds (8 bytes).
+                int badEntryWidth = (version >= 3) ? 25 : ((version >= 2) ? 17 : 16);
                 int badSize = buf.getInt();
                 if (badSize < 0 || badSize > (buf.remaining() / badEntryWidth)) return;
-                long[] newBadKeys = new long[badSize];
-                long[] newBadSums = new long[badSize];
-                byte[] newBadCauses = new byte[badSize];
-                long running = 0L;
+
+                long now = java.time.Instant.now().getEpochSecond();
+                long[] rawKeys = new long[badSize];
+                long[] rawDeltas = new long[badSize];
+                byte[] rawCauses = new byte[badSize];
+                long[] rawExpiries = new long[badSize];
+
+                int activeCount = 0;
+                int probCount = 0;
+
                 for (int i = 0; i < badSize; i++) {
                   long k = buf.getLong();
                   long d = buf.getLong();
                   byte cause = (version >= 2) ? buf.get() : MISC_CAUSE;
-                  newBadKeys[i] = k;
-                  running += d;
-                  newBadSums[i] = running;
-                  newBadCauses[i] = cause;
+                  long exp = (version >= 3) ? buf.getLong() : 0L;
+                  rawKeys[i] = k;
+                  rawDeltas[i] = d;
+                  rawCauses[i] = cause;
+                  rawExpiries[i] = exp;
+
+                  if (exp <= 0L || now < exp) {
+                    activeCount++;
+                  } else {
+                    // Check if within probation window (1x TTL to 2x TTL)
+                    LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
+                    LocationGenerator.FailTypes ft = (cause >= 0 && cause < values.length)
+                        ? values[cause] : LocationGenerator.FailTypes.misc;
+                    long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(ft, null);
+                    long window = (ttl > 0L) ? ttl : 14L * 86400L;
+                    if (now < exp + window) {
+                      probCount++;
+                    }
+                  }
+                }
+
+                long[] newBadKeys = new long[activeCount];
+                long[] newBadSums = new long[activeCount];
+                byte[] newBadCauses = new byte[activeCount];
+                long[] newBadExpiries = new long[activeCount];
+
+                long[] newProbKeys = new long[probCount];
+                long[] newProbSums = new long[probCount];
+                byte[] newProbCauses = new byte[probCount];
+                long[] newProbExpiries = new long[probCount];
+
+                int aIdx = 0, pIdx = 0;
+                long aRunning = 0L, pRunning = 0L;
+
+                for (int i = 0; i < badSize; i++) {
+                  long k = rawKeys[i];
+                  long d = rawDeltas[i];
+                  byte cause = rawCauses[i];
+                  long exp = rawExpiries[i];
+
+                  if (exp <= 0L || now < exp) {
+                    newBadKeys[aIdx] = k;
+                    aRunning += d;
+                    newBadSums[aIdx] = aRunning;
+                    newBadCauses[aIdx] = cause;
+                    newBadExpiries[aIdx] = exp;
+                    aIdx++;
+                  } else {
+                    LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
+                    LocationGenerator.FailTypes ft = (cause >= 0 && cause < values.length)
+                        ? values[cause] : LocationGenerator.FailTypes.misc;
+                    long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(ft, null);
+                    long window = (ttl > 0L) ? ttl : 14L * 86400L;
+                    if (now < exp + window) {
+                      newProbKeys[pIdx] = k;
+                      pRunning += d;
+                      newProbSums[pIdx] = pRunning;
+                      newProbCauses[pIdx] = cause;
+                      newProbExpiries[pIdx] = exp;
+                      pIdx++;
+                    }
+                  }
                 }
 
                 int biomeSize = buf.getInt();
@@ -632,6 +795,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                   badKeysCache = newBadKeys;
                   badPrefixSumsCache = newBadSums;
                   badCauseCache = newBadCauses;
+                  badExpiryCache = newBadExpiries;
+                  probationKeysCache = newProbKeys;
+                  probationPrefixSumsCache = newProbSums;
+                  probationCauseCache = newProbCauses;
+                  probationExpiryCache = newProbExpiries;
                   biomeKeysCache = newBiomeKeysCache;
                   biomePrefixSumsCache = newBiomePrefixSumsCache;
                   badLocationsDirty = true;
@@ -651,6 +819,62 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
+   * Marks a single 1D index bad with cause and custom retention TTL in seconds (ADR-079).
+   *
+   * @param location   the 1D spiral index to mark bad
+   * @param cause      the rejection reason; {@code null} is treated as {@link LocationGenerator.FailTypes#misc}
+   * @param ttlSeconds retention duration in seconds; {@code <= 0} indicates infinite retention
+   */
+  public void addBadLocation(long location, LocationGenerator.FailTypes cause, long ttlSeconds) {
+    checkAndRestoreFromProbation(location);
+    if (absorbIntoAdjacentRun(location)) return;
+    long ord = (cause == null) ? MISC_CAUSE : cause.ordinal();
+    long epochSec = (ttlSeconds <= 0) ? 0L : (java.time.Instant.now().getEpochSecond() + ttlSeconds);
+    // Combine cause (low 8 bits) and epochSec (shifted 8 bits) into pending value
+    long pendingVal = (ord & 0xFFL) | (epochSec << 8);
+    pendingBadLocations.get().put(location, pendingVal);
+    badLocationsDirty = true;
+  }
+
+  /**
+   * Checks if {@code location} falls within an existing probationary run. If so, immediately
+   * re-promotes that entire run back into {@code pendingBadLocations} with refreshed TTL.
+   *
+   * @param location candidate spiral index
+   * @return true if a probationary run was restored
+   */
+  public boolean checkAndRestoreFromProbation(long location) {
+    long[] pKeys = probationKeysCache;
+    long[] pSums = probationPrefixSumsCache;
+    byte[] pCauses = probationCauseCache;
+    int m = Math.min(pKeys.length, pSums.length);
+    if (m == 0 || location < 0L) return false;
+
+    int idx = floorRunIndex(pKeys, location);
+    if (idx < 0 || idx >= m) return false;
+
+    long start = pKeys[idx];
+    long prevSum = (idx > 0) ? pSums[idx - 1] : 0L;
+    long len = pSums[idx] - prevSum;
+    if (location >= start && location < start + len) {
+      // Re-promote the whole run
+      byte causeByte = (idx < pCauses.length) ? pCauses[idx] : MISC_CAUSE;
+      LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
+      LocationGenerator.FailTypes cause = (causeByte >= 0 && causeByte < values.length)
+          ? values[causeByte] : LocationGenerator.FailTypes.misc;
+      long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(cause, null);
+      long epochSec = (ttl <= 0) ? 0L : (java.time.Instant.now().getEpochSecond() + ttl);
+      long pendingVal = (causeByte & 0xFFL) | (epochSec << 8);
+      for (long k = start; k < start + len; k++) {
+        pendingBadLocations.get().put(k, pendingVal);
+      }
+      badLocationsDirty = true;
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Marks a single 1D index bad and records the rejection {@code cause}. The cause
    * is carried on the pending entry's value (its {@link LocationGenerator.FailTypes}
    * ordinal) and surfaces as the per-run cause after the next rebuild.
@@ -659,10 +883,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param cause    the rejection reason; {@code null} is treated as {@link LocationGenerator.FailTypes#misc}
    */
   public void addBadLocation(long location, LocationGenerator.FailTypes cause) {
-    if (absorbIntoAdjacentRun(location)) return;
-    long ord = (cause == null) ? MISC_CAUSE : cause.ordinal();
-    pendingBadLocations.get().put(location, ord);
-    badLocationsDirty = true;
+    long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(cause, null);
+    addBadLocation(location, cause, ttl);
   }
 
   /**
@@ -856,13 +1078,24 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return count of newly marked indices (0, 1, or 2)
    */
   public int addBadChunk(long location, LocationGenerator.FailTypes cause) {
+    long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(cause, null);
+    return addBadChunk(location, cause, ttl);
+  }
+
+  /**
+   * Cause- and TTL-tagged variant of {@link #addBadChunk(long)} (ADR-079).
+   *
+   * @param location   1D index decoding to target chunk
+   * @param cause      rejection cause attributed to marked indices
+   * @param ttlSeconds retention duration in seconds; {@code <= 0} indicates infinite retention
+   * @return count of newly marked indices (0, 1, or 2)
+   */
+  public int addBadChunk(long location, LocationGenerator.FailTypes cause, long ttlSeconds) {
     int[] xz = locationToXZ(location);
     long[] preimage = chunkToLocations(xz[0], xz[1]);
     if (preimage.length == 0) {
-      // FP slop at the boundary, or chunk outside shape: fall back to the
-      // single-index mark so the original rejection is at least recorded.
       if (!isKnownBad(location)) {
-        addBadLocation(location, cause);
+        addBadLocation(location, cause, ttlSeconds);
         return 1;
       }
       return 0;
@@ -870,7 +1103,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     int marked = 0;
     for (long p : preimage) {
       if (!isKnownBad(p)) {
-        addBadLocation(p, cause);
+        addBadLocation(p, cause, ttlSeconds);
         marked++;
       }
     }
@@ -945,6 +1178,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     badKeysCache = new long[0];
     badPrefixSumsCache = new long[0];
     badCauseCache = new byte[0];
+    badExpiryCache = new long[0];
+    probationKeysCache = new long[0];
+    probationPrefixSumsCache = new long[0];
+    probationCauseCache = new byte[0];
+    probationExpiryCache = new long[0];
     biomeKeysCache = new ConcurrentHashMap<>();
     biomePrefixSumsCache = new ConcurrentHashMap<>();
     biomeMappedKeysCache = new long[0];
@@ -1406,65 +1644,126 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         long[] currentBadKeys = badKeysCache;
         long[] currentBadSums = badPrefixSumsCache;
         byte[] currentBadCauses = badCauseCache;
+        long[] currentBadExpiries = badExpiryCache;
+
+        long[] currentProbKeys = probationKeysCache;
+        long[] currentProbSums = probationPrefixSumsCache;
+        byte[] currentProbCauses = probationCauseCache;
+        long[] currentProbExpiries = probationExpiryCache;
+
+        // Merge active and probation runs into a single sorted stream of existing runs
+        int existingTotal = currentBadKeys.length + currentProbKeys.length;
+        long[] existingKeys = new long[existingTotal];
+        long[] existingLengths = new long[existingTotal];
+        byte[] existingCauses = new byte[existingTotal];
+        long[] existingExpiries = new long[existingTotal];
+        int exIdx = 0;
+        int curA = 0, curP = 0;
+        long prevA = 0L, prevP = 0L;
+        while (curA < currentBadKeys.length || curP < currentProbKeys.length) {
+          if (curA < currentBadKeys.length && curP < currentProbKeys.length) {
+            if (currentBadKeys[curA] <= currentProbKeys[curP]) {
+              existingKeys[exIdx] = currentBadKeys[curA];
+              long s = currentBadSums[curA];
+              existingLengths[exIdx] = s - prevA;
+              prevA = s;
+              existingCauses[exIdx] = (curA < currentBadCauses.length) ? currentBadCauses[curA] : MISC_CAUSE;
+              existingExpiries[exIdx] = (curA < currentBadExpiries.length) ? currentBadExpiries[curA] : 0L;
+              curA++;
+            } else {
+              existingKeys[exIdx] = currentProbKeys[curP];
+              long s = currentProbSums[curP];
+              existingLengths[exIdx] = s - prevP;
+              prevP = s;
+              existingCauses[exIdx] = (curP < currentProbCauses.length) ? currentProbCauses[curP] : MISC_CAUSE;
+              existingExpiries[exIdx] = (curP < currentProbExpiries.length) ? currentProbExpiries[curP] : 0L;
+              curP++;
+            }
+          } else if (curA < currentBadKeys.length) {
+            existingKeys[exIdx] = currentBadKeys[curA];
+            long s = currentBadSums[curA];
+            existingLengths[exIdx] = s - prevA;
+            prevA = s;
+            existingCauses[exIdx] = (curA < currentBadCauses.length) ? currentBadCauses[curA] : MISC_CAUSE;
+            existingExpiries[exIdx] = (curA < currentBadExpiries.length) ? currentBadExpiries[curA] : 0L;
+            curA++;
+          } else {
+            existingKeys[exIdx] = currentProbKeys[curP];
+            long s = currentProbSums[curP];
+            existingLengths[exIdx] = s - prevP;
+            prevP = s;
+            existingCauses[exIdx] = (curP < currentProbCauses.length) ? currentProbCauses[curP] : MISC_CAUSE;
+            existingExpiries[exIdx] = (curP < currentProbExpiries.length) ? currentProbExpiries[curP] : 0L;
+            curP++;
+          }
+          exIdx++;
+        }
 
         // 5. Merge values from capturedBad into local data with RLE compression.
-        //    Each pending entry's map value carries the FailTypes ordinal (cause)
-        //    of the rejection that marked it (default `misc`). One cause is kept
-        //    per coalesced run (first-cause-wins; small-scale info loss accepted).
+        //    Each pending entry's map value carries: (causeByte & 0xFF) | (epochSec << 8).
         long[] pendingKeys = new long[localPendingBad.size()];
         long[] pendingCauses = new long[localPendingBad.size()];
+        long[] pendingExpiries = new long[localPendingBad.size()];
         {
           int pk = 0;
           for (java.util.Map.Entry<Long, Long> e : localPendingBad.entrySet()) {
             pendingKeys[pk] = e.getKey();
             Long v = e.getValue();
-            pendingCauses[pk] = (v == null) ? MISC_CAUSE : v;
+            long val = (v == null) ? MISC_CAUSE : v;
+            pendingCauses[pk] = val & 0xFFL;
+            pendingExpiries[pk] = val >>> 8;
             pk++;
           }
         }
-        // Sort keys while keeping the parallel cause column aligned.
-        sortParallelArrays(pendingKeys, pendingCauses, 0, pendingKeys.length - 1);
+        // Sort keys while keeping the parallel cause and expiry columns aligned.
+        sortParallelThreeArrays(pendingKeys, pendingCauses, pendingExpiries, 0, pendingKeys.length - 1);
 
-        long[] mergedKeys = new long[currentBadKeys.length + pendingKeys.length];
-        long[] mergedLengths = new long[currentBadKeys.length + pendingKeys.length];
-        byte[] mergedCauses = new byte[currentBadKeys.length + pendingKeys.length];
+        int maxMerged = existingKeys.length + pendingKeys.length;
+        long[] mergedKeys = new long[maxMerged];
+        long[] mergedLengths = new long[maxMerged];
+        byte[] mergedCauses = new byte[maxMerged];
+        long[] mergedExpiries = new long[maxMerged];
         int mergeIndex = 0;
 
-        int i = 0; // currentBadKeys index
+        int i = 0; // existingKeys index
         int j = 0; // pendingKeys index
 
         long currentStart = -1;
         long currentLength = -1;
         byte currentCause = MISC_CAUSE;
+        long currentExpiry = 0L;
 
-        while (i < currentBadKeys.length || j < pendingKeys.length) {
+        while (i < existingKeys.length || j < pendingKeys.length) {
           long nextKey;
           long nextLength;
           byte nextCause;
+          long nextExpiry;
 
-          if (i < currentBadKeys.length && j < pendingKeys.length) {
-            if (currentBadKeys[i] <= pendingKeys[j]) {
-              nextKey = currentBadKeys[i];
-              long prevSum = (i > 0) ? currentBadSums[i - 1] : 0L;
-              nextLength = currentBadSums[i] - prevSum;
-              nextCause = (i < currentBadCauses.length) ? currentBadCauses[i] : MISC_CAUSE;
+          if (i < existingKeys.length && j < pendingKeys.length) {
+            if (existingKeys[i] <= pendingKeys[j]) {
+              nextKey = existingKeys[i];
+              nextLength = existingLengths[i];
+              nextCause = existingCauses[i];
+              nextExpiry = existingExpiries[i];
               i++;
             } else {
               nextKey = pendingKeys[j];
               nextLength = 1L;
               nextCause = (byte) pendingCauses[j];
+              nextExpiry = pendingExpiries[j];
               j++;
             }
-          } else if (i < currentBadKeys.length) {
-            nextKey = currentBadKeys[i];
-            long prevSum = (i > 0) ? currentBadSums[i - 1] : 0L;
-            nextLength = currentBadSums[i] - prevSum;
-            nextCause = (i < currentBadCauses.length) ? currentBadCauses[i] : MISC_CAUSE;
+          } else if (i < existingKeys.length) {
+            nextKey = existingKeys[i];
+            nextLength = existingLengths[i];
+            nextCause = existingCauses[i];
+            nextExpiry = existingExpiries[i];
             i++;
           } else {
             nextKey = pendingKeys[j];
             nextLength = 1L;
             nextCause = (byte) pendingCauses[j];
+            nextExpiry = pendingExpiries[j];
             j++;
           }
 
@@ -1474,49 +1773,117 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             currentStart = nextKey;
             currentLength = nextLength;
             currentCause = nextCause;
+            currentExpiry = nextExpiry;
           } else {
-            if (nextKey <= currentStart + currentLength + spatialResolution) {
+            boolean adjacent = (nextKey <= currentStart + currentLength + spatialResolution);
+            boolean bothStatic = (currentExpiry <= 0L && nextExpiry <= 0L);
+            boolean bothDynamic = (currentExpiry > 0L && nextExpiry > 0L);
+            boolean sameTier = bothStatic || bothDynamic;
+
+            if (adjacent && sameTier) {
               currentLength = Math.max(currentLength, nextKey + nextLength - currentStart);
-              // first-cause-wins: keep currentCause when runs coalesce.
+              if (bothDynamic) {
+                currentExpiry = Math.max(currentExpiry, nextExpiry);
+              }
+              // first-cause-wins: keep currentCause when runs coalesce (ADR-052).
             } else {
               mergedKeys[mergeIndex] = currentStart;
               mergedLengths[mergeIndex] = currentLength;
               mergedCauses[mergeIndex] = currentCause;
-              currentBadSum += currentLength;
+              mergedExpiries[mergeIndex] = currentExpiry;
               mergeIndex++;
               currentStart = nextKey;
               currentLength = nextLength;
               currentCause = nextCause;
+              currentExpiry = nextExpiry;
             }
           }
         }
 
         if (currentStart != -1) {
-            mergedKeys[mergeIndex] = currentStart;
-            mergedLengths[mergeIndex] = currentLength;
-            mergedCauses[mergeIndex] = currentCause;
-            currentBadSum += currentLength;
-            mergeIndex++;
+          mergedKeys[mergeIndex] = currentStart;
+          mergedLengths[mergeIndex] = currentLength;
+          mergedCauses[mergeIndex] = currentCause;
+          mergedExpiries[mergeIndex] = currentExpiry;
+          mergeIndex++;
         }
 
-        // Build newKeys and newSums local arrays
-        long[] newKeys = new long[mergeIndex];
-        long[] newSums = new long[mergeIndex];
-        byte[] newCauses = new byte[mergeIndex];
-        long runningSum = 0;
+        // 6. Partition merged runs into Active vs Probation vs Evicted based on wall-clock time
+        long now = java.time.Instant.now().getEpochSecond();
+        int activeCount = 0;
+        int probCount = 0;
+
         for (int k = 0; k < mergeIndex; k++) {
-          newKeys[k] = mergedKeys[k];
-          runningSum += mergedLengths[k];
-          newSums[k] = runningSum;
-          newCauses[k] = mergedCauses[k];
+          long exp = mergedExpiries[k];
+          if (exp <= 0L || now < exp) {
+            activeCount++;
+          } else {
+            LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
+            byte c = mergedCauses[k];
+            LocationGenerator.FailTypes ft = (c >= 0 && c < values.length) ? values[c] : LocationGenerator.FailTypes.misc;
+            long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(ft, null);
+            long window = (ttl > 0L) ? ttl : 14L * 86400L;
+            if (now < exp + window) {
+              probCount++;
+            }
+          }
         }
 
+        long[] newKeys = new long[activeCount];
+        long[] newSums = new long[activeCount];
+        byte[] newCauses = new byte[activeCount];
+        long[] newExpiries = new long[activeCount];
+
+        long[] newProbKeys = new long[probCount];
+        long[] newProbSums = new long[probCount];
+        byte[] newProbCauses = new byte[probCount];
+        long[] newProbExpiries = new long[probCount];
+
+        int aK = 0, pK = 0;
+        long runningSum = 0L, runningProbSum = 0L;
+
+        for (int k = 0; k < mergeIndex; k++) {
+          long exp = mergedExpiries[k];
+          long len = mergedLengths[k];
+          byte c = mergedCauses[k];
+          long start = mergedKeys[k];
+
+          if (exp <= 0L || now < exp) {
+            newKeys[aK] = start;
+            runningSum += len;
+            newSums[aK] = runningSum;
+            newCauses[aK] = c;
+            newExpiries[aK] = exp;
+            aK++;
+          } else {
+            LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
+            LocationGenerator.FailTypes ft = (c >= 0 && c < values.length) ? values[c] : LocationGenerator.FailTypes.misc;
+            long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(ft, null);
+            long window = (ttl > 0L) ? ttl : 14L * 86400L;
+            if (now < exp + window) {
+              newProbKeys[pK] = start;
+              runningProbSum += len;
+              newProbSums[pK] = runningProbSum;
+              newProbCauses[pK] = c;
+              newProbExpiries[pK] = exp;
+              pK++;
+            }
+          }
+        }
+
+        currentBadSum = runningSum;
 
         this.badKeysCache = newKeys;
         this.badPrefixSumsCache = newSums;
         this.badCauseCache = newCauses;
-        this.rebuildingBadLocations = null; // Clear the reference only after the arrays update
+        this.badExpiryCache = newExpiries;
 
+        this.probationKeysCache = newProbKeys;
+        this.probationPrefixSumsCache = newProbSums;
+        this.probationCauseCache = newProbCauses;
+        this.probationExpiryCache = newProbExpiries;
+
+        this.rebuildingBadLocations = null; // Clear the reference only after the arrays update
         this.badLocationsDirty = !pendingBadLocations.get().isEmpty();
 
         totalBadCount.set(currentBadSum);
@@ -1917,6 +2284,32 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (i < right) sortParallelArrays(keys, lengths, i, right);
   }
 
+  private void sortParallelThreeArrays(long[] keys, long[] b, long[] c, int left, int right) {
+    if (left >= right) return;
+    int pivotIdx = left + (right - left) / 2;
+    long pivot = keys[pivotIdx];
+    int i = left, j = right;
+    while (i <= j) {
+      while (keys[i] < pivot) i++;
+      while (keys[j] > pivot) j--;
+      if (i <= j) {
+        long tempKey = keys[i];
+        keys[i] = keys[j];
+        keys[j] = tempKey;
+        long tempB = b[i];
+        b[i] = b[j];
+        b[j] = tempB;
+        long tempC = c[i];
+        c[i] = c[j];
+        c[j] = tempC;
+        i++;
+        j--;
+      }
+    }
+    if (left < j) sortParallelThreeArrays(keys, b, c, left, j);
+    if (i < right) sortParallelThreeArrays(keys, b, c, i, right);
+  }
+
   @Override
   public boolean contains(int x, int z) {
     long l = xzToLocation(x, z);
@@ -1937,6 +2330,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     shape.badKeysCache = new long[0];
     shape.badPrefixSumsCache = new long[0];
     shape.badCauseCache = new byte[0];
+    shape.badExpiryCache = new long[0];
+    shape.probationKeysCache = new long[0];
+    shape.probationPrefixSumsCache = new long[0];
+    shape.probationCauseCache = new byte[0];
+    shape.probationExpiryCache = new long[0];
     shape.biomeKeysCache = new ConcurrentHashMap<>();
     shape.biomePrefixSumsCache = new ConcurrentHashMap<>();
     shape.biomeMappedKeysCache = new long[0];

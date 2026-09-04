@@ -11,37 +11,47 @@
 # i czeka na przejecie przez backend. Zmienna: [position] - pozycja liczona
 # od 0 z `pollStatus`; moze byc pusta, jesli transport nie zwroci pozycji.
 siecWKolejce: "&7[P0] w kolejce na cel na innym serwerze (pozycja [position])..."
+
 # Wysylane, gdy gracz uruchamia /rtp*, podczas gdy ma juz nieterminalne
 # miedzyserwerowe zgloszenie. Zmienna:
 # [position] - pozycja FIFO, gdy znana; pusta, gdy proxy jeszcze jej
 # nie przydzielilo.
 juzWKolejce: "&cJuż czekasz w kolejce międzyserwerowej (pozycja [position]). Proszę czekać."
+
 # Wysylane, gdy wpis miedzyserwerowej listy oczekujacych zostaje usuniety po przekroczeniu
 # skonfigurowanego TTL. Brak zmiennych.
 siecPrzekroczonoCzas: "&c[P0] teleportacja międzyserwerowa przekroczyła limit czasu podczas oczekiwania na backend."
+
 # Wysylane, gdy zgloszenie do miedzyserwerowej listy oczekujacych jest odrzucone, poniewaz wspolna
 # lista oczekujacych osiagnela skonfigurowany maksymalny rozmiar ( REJECTED_FULL).
 # Brak zmiennych.
 listaOczekujacychPelna: "&c[P0] kolejka międzyserwerowa jest pełna; spróbuj ponownie za chwilę."
+
 # Wysylane, gdy kolejka przekazala zadanie do routera proxy i
 # trwa wybor backendu.
 siecKierowanie: "&7[P0] kierowanie do backendu..."
+
 # Wysylane, gdy backend zarezerwowal koordynaty dla tego gracza, a
 # proxy zaraz zainicjuje skok miedzy serwerami. Zmienna: [server]
 # - serverId docelowego backendu.
 siecZarezerwowano: "&a[P0] współrzędna zarezerwowana na [server]. Przenoszenie..."
+
 # Wysylane, gdy proxy jest w trakcie skoku. Zmienna: [server] - cel.
 siecPrzenoszenie: "&a[P0] przenoszenie na [server]..."
+
 # Wysylane, gdy sciezka miedzyserwerowa poddala sie i zadanie wrocilo do
 # lokalnego serwera. Zmienna: [reason] - powod powrotu.
 siecAwaryjny: "&e[P0] tryb międzyserwerowy niedostępny ([reason]); powrót do lokalnego."
+
 # Wysylane, gdy miedzyserwerowe zadanie zakonczylo sie niepowodzeniem i powrot
 # nie byl mozliwy. Zmienna: [reason] - powod niepowodzenia.
 siecNieudane: "&c[P0] teleportacja międzyserwerowa nie powiodła się: [reason]."
+
 # Wysylane, gdy gracz poprosil o konkretny region (`/rtp <region>`), ale
 # zaden backend w sieci aktualnie go nie obsluguje. Zmienna:
 # [region] - zadana nazwa regionu.
 siecRegionNiedostepny: "&c[P0] żaden backend nie obsługuje obecnie regionu '[region]'."
+
 # Wysylane, gdy zadana nazwa regionu odpowiada dwom lub wiecej backendom, a
 # polityka skonfigurowana przez operatora nie potrafi wybrac jednego (uruchamia sie
 # tylko przy silniejszych politykach niz `warn`). Zmienna: [region].

@@ -5,10 +5,12 @@ network:
   # @type: boolean
   # @default: false
   enabled: false
+
   # Identidad estable del backend, obligatoria cuando esta activado; dos backends con el mismo serverId sobrescriben su latido mutuamente.
   # @type: string
   # @default: ""
   serverId: ""
+
   # Variable de entorno con el secreto HMAC compartido; obligatoria cuando esta activado con transport.type redis.
   # @type: string
   # @default: "RTP_NET_SECRET"
@@ -31,10 +33,12 @@ transport:
     # @type: string
     # @default: "localhost"
     host: "localhost"
+
     # Puerto de Redis; cambialo para despliegues no estandar.
     # @type: integer
     # @default: 6379
     port: 6379
+
     # Contrasena de Redis; dejala vacia para Redis sin autenticacion, definela cuando se configure ACL/requirepass.
     # @type: string
     # @default: ""
@@ -46,6 +50,7 @@ heartbeat:
   # @type: integer
   # @default: 1000
   intervalMs: 1000
+
   # Cuanto tiempo se confia en el ultimo estado visto de un par antes de tratarlo como desconocido (ms); mantenlo por encima de intervalMs.
   # @type: integer
   # @default: 5000
@@ -58,6 +63,7 @@ routing:
   # @options: ["local", "auto", "always"]
   # @default: "local"
   mode: "local"
+
   # Modo lobby: convierte este backend en un nodo de despacho puro que enruta automaticamente /rtp simple a la region par con mas reservas.
   # @type: boolean
   # @default: false
@@ -69,26 +75,32 @@ queue:
   # @type: integer
   # @default: 50
   maxDepth: 50
+
   # Cadencia de vaciado de escrituras pendientes del backend (ms); menor = menos latencia, mayor = menos viajes al transporte.
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
+
   # Cadencia de sondeo de la cache de estado del backend (ms); con que frecuencia se actualiza el progreso por jugador.
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
+
   # Caducidad pasiva opcional por TTL de los HASH de sobre (ms); 0 lo desactiva.
   # @type: integer
   # @default: 0
   entryTtlMs: 0
+
   # Limite de tasa de inscripciones /rtp entre servidores (cubo de tokens): solicitudes sostenidas por segundo.
   # @type: number
   # @default: 5
   crossServerRequestsPerSecond: 5
+
   # Limite de tasa de inscripciones /rtp entre servidores: tamano de rafaga.
   # @type: number
   # @default: 10
   crossServerRequestsBurst: 10
+
   # Numero de trabajadores BLPOP del lado del proxy; aumentalo solo cuando un unico trabajador se sature.
   # @type: integer
   # @default: 1
@@ -100,6 +112,7 @@ reservation:
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
+
   # TTL por token (ms); una reserva reclamada pero no consumida mas antigua que esto se libera como abandonada.
   # @type: integer
   # @default: 60000
@@ -114,7 +127,7 @@ regionCollision:
   policy: "warn"
 
 # Superposicion opcional de politica por destino (emparejada por serverId); dejala comentada para el caso comun.
-#servers:
+# servers:
 #  example-backend:
 #    # Permiso requerido para apuntar a este destino (vacio = ninguno).
 #    # @type: string
@@ -138,6 +151,7 @@ loadBalancer:
   # @type: number
   # @default: 0
   regionScarcityWeight: 0
+
   # Terminos de puntuacion, uno por metrica.
   terms:
     # Presion de tick; codo sigmoide en 0.6.
@@ -147,6 +161,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "mspt"
       input: "mspt"
+
       # Peso del termino.
       # @type: number
       # @default: 1.0
@@ -157,16 +172,19 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "sigmoid"
         type: "sigmoid"
+
         # Pendiente.
         # @type: number
         # @range: [0.1, 20]
         # @default: 8.0
         k: 8.0
+
         # Punto medio.
         # @type: number
         # @range: [0, 1]
         # @default: 0.6
         x0: 0.6
+
     # Profundidad de cola; las colas pequenas silenciosas, las grandes explotan.
     queue:
       # Entrada de metrica.
@@ -174,6 +192,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "queueDepth"
       input: "queueDepth"
+
       # Peso del termino.
       # @type: number
       # @default: 1.0
@@ -184,11 +203,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "exponential"
         type: "exponential"
+
         # Pendiente.
         # @type: number
         # @range: [0.1, 20]
         # @default: 3.0
         k: 3.0
+
     # Compuerta de heap; se activa a >= 85% usado.
     heap:
       # Entrada de metrica.
@@ -196,6 +217,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "heapUsed"
       input: "heapUsed"
+
       # Peso del termino.
       # @type: number
       # @default: 5.0
@@ -206,11 +228,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # Umbral del escalon.
         # @type: number
         # @range: [0, 1]
         # @default: 0.85
         threshold: 0.85
+
     # Compuerta de region; se activa cuando el pool conservado esta >= 95% lleno.
     region:
       # Entrada de metrica.
@@ -218,6 +242,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptRegion"
       input: "keptRegion"
+
       # Peso del termino.
       # @type: number
       # @default: 5.0
@@ -228,11 +253,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # Umbral del escalon.
         # @type: number
         # @range: [0, 1]
         # @default: 0.95
         threshold: 0.95
+
     # Desempate suave sobre el conteo conservado.
     kept:
       # Entrada de metrica.
@@ -240,6 +267,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptCount"
       input: "keptCount"
+
       # Peso del termino.
       # @type: number
       # @default: 0.25
@@ -250,6 +278,7 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "logarithmic"
         type: "logarithmic"
+
         # Pendiente.
         # @type: number
         # @range: [0.1, 20]

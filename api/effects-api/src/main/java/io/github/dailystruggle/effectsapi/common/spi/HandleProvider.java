@@ -28,4 +28,21 @@ public interface HandleProvider {
     default @Nullable PlayerHandle playerAt(@NotNull LocationHandle location) {
         return null;
     }
+
+    /**
+     * Dispatch a console command platform-neutrally (effects-api-ADR-007).
+     *
+     * @param command command string to run
+     */
+    default void dispatchConsoleCommand(@NotNull String command) {}
+
+    /**
+     * Dispatch a player command platform-neutrally (effects-api-ADR-007).
+     *
+     * @param player player to run command as
+     * @param command command string to run
+     */
+    default void dispatchPlayerCommand(@NotNull PlayerHandle player, @NotNull String command) {
+        player.performCommand(command);
+    }
 }

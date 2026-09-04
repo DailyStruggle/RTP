@@ -117,6 +117,41 @@ public final class FabricEffectsHandler {
             if (!effectParsingEnabled(parser) || uuid == null) return;
             dispatchByUuid("rtp.effect.queuepop", uuid, runtime);
         });
+
+        registerDeathHook(runtime);
+    }
+
+    private static void registerDeathHook(FabricEffectRuntime runtime) {
+        try {
+            Class<?> sleeCls = Class.forName("net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents");
+            Class<?> eventCls = Class.forName("net.fabricmc.fabric.api.event.Event");
+            java.lang.reflect.Method register = eventCls.getMethod("register", Object.class);
+
+            Class<?> afterDeathCallback = Class.forName(
+                    "net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents$AfterDeath");
+            Object afterDeathEvent = sleeCls.getField("AFTER_DEATH").get(null);
+
+            Object proxy = java.lang.reflect.Proxy.newProxyInstance(
+                    afterDeathCallback.getClassLoader(),
+                    new Class<?>[]{afterDeathCallback},
+                    (p, method, args) -> {
+                        // args[0] = LivingEntity entity, args[1] = DamageSource damageSource
+                        if (args != null && args.length >= 1 && args[0] instanceof ServerPlayer sp) {
+                            try {
+                                if (RTP.serverAccessor != null) {
+                                    RTPPlayer rp = RTP.serverAccessor.getPlayer(sp.getUUID());
+                                    if (rp != null) {
+                                        dispatch("rtp.effect.death", rp, runtime);
+                                    }
+                                }
+                            } catch (Throwable ignored) {}
+                        }
+                        return null;
+                    });
+            register.invoke(afterDeathEvent, proxy);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE, "[RTP][Fabric] ServerLivingEntityEvents.AFTER_DEATH not available for effects");
+        }
     }
 
     private static boolean effectParsingEnabled(FactoryValue<PerformanceKeys> parser) {

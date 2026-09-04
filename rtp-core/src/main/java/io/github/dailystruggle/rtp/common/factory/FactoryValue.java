@@ -250,13 +250,19 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       res = b ? 1 : 0;
     } else if (resObj instanceof String s) {
       String coerced = s.replaceAll(",", ".");
-      try {
-        res = Double.parseDouble(coerced);
-      } catch (NumberFormatException e) {
-        RTP.log(
-            Level.SEVERE,
-            "expected floating point value for " + key.name() + ", received - " + coerced, e);
-        res = def;
+      io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance parsedDist =
+          io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.parse(coerced, null);
+      if (parsedDist != null && parsedDist.explicitUnit()) {
+        res = parsedDist.toChunks();
+      } else {
+        try {
+          res = Double.parseDouble(coerced);
+        } catch (NumberFormatException e) {
+          RTP.log(
+              Level.SEVERE,
+              "expected floating point value for " + key.name() + ", received - " + coerced, e);
+          res = def;
+        }
       }
     } else if (resObj instanceof Character c) {
       try {

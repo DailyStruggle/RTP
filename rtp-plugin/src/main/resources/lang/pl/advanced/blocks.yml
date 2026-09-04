@@ -16,6 +16,7 @@ airBlocks:
   - "LIGHT"
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
+
   # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
   # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
   # #minecraft:flowers above.
