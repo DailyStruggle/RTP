@@ -826,6 +826,14 @@ public class ScanTask extends RTPRunnable {
       } catch (NoSuchMethodException ignored) {
         // older rtp-anvil without cold-read timing
       }
+      // statSkips - warm hits served without an mtime stat syscall. Near-parity with
+      // anvilCacheHits means the revalidation window is absorbing the per-probe stat cost.
+      long statSkips = 0L;
+      try {
+        statSkips = (long) stats.getClass().getMethod("statSkips").invoke(stats);
+      } catch (NoSuchMethodException ignored) {
+        // older rtp-anvil without the stat-skip counter
+      }
       long total = hits + misses + coalesced;
       if (total == 0) return " anvilCache=idle";
       double rate = (double) (hits + coalesced) / (double) total;
@@ -833,6 +841,7 @@ public class ScanTask extends RTPRunnable {
       return " anvilCacheHits=" + hits + " anvilCacheMisses=" + misses + " anvilCacheStale=" + stale
           + " anvilCacheCoalesced=" + coalesced
           + " anvilCacheHitRate=" + String.format(java.util.Locale.ROOT, "%.3f", rate)
+          + " anvilCacheStatSkips=" + statSkips
           + " avgColdMissMs=" + String.format(java.util.Locale.ROOT, "%.2f", avgColdMissMs);
     } catch (Throwable t) {
       return "";

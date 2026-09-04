@@ -1,23 +1,19 @@
 package io.github.dailystruggle.rtp.groupaddon;
 
-import io.github.dailystruggle.rtp.api.world.ChunkReservation;
-import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.selection.region.CandidateValidator;
-import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.cache.RejectionReason;
+import io.github.dailystruggle.rtp.common.selection.region.cache.StageTransition;
+import io.github.dailystruggle.rtp.common.selection.region.cache.TransitionOutcome;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
@@ -88,23 +84,64 @@ public final class GroupCacheWorker implements Runnable {
    */
   public void pulse(Region region, GroupProfile profile, CandidateValidator validator) {
     if (region == null || profile == null) return;
-    String profileKey = region.name + ":" + profile.name();
     CandidateValidator v = (validator != null) ? validator : region.candidateValidator();
+    pulse(
+        region,
+        profile,
+        v,
+        createBacklogToColdTransition(region, profile, v),
+        createColdToHotTransition(region, profile));
+  }
+
+  /**
+   * Executes a single off-tick pulse cycle for a region and profile using specified
+   * candidate validator and stage transitions.
+   *
+   * @param region target region
+   * @param profile target group profile
+   * @param validator candidate validator
+   * @param backlogTransition transition driving backlog -> cold screening
+   * @param coldToHotTransition transition driving cold -> hot chunk reservation acquisition
+   */
+  public void pulse(
+      Region region,
+      GroupProfile profile,
+      CandidateValidator validator,
+      StageTransition<GroupBacklogEntry, GroupSubspace> backlogTransition,
+      StageTransition<GroupSubspace, GroupSubspace> coldToHotTransition) {
+    if (region == null || profile == null) return;
+    String profileKey = region.name + ":" + profile.name();
 
     // 1. Backlog Refill
     while (cache.sizeBacklog(profileKey) < cache.getBacklogCap()) {
       fillBacklog(region, profile, profileKey);
     }
 
-    // 2. Backlog -> Cold Promotion (Off-tick screening)
-    if (cache.sizeCold(profileKey) < cache.getColdCap()) {
-      promoteBacklogToCold(region, profile, profileKey, v);
+    // 2. Backlog -> Cold Promotion (Off-tick screening via StageTransition)
+    if (cache.sizeCold(profileKey) < cache.getColdCap() && backlogTransition != null) {
+      promoteBacklogToCold(profileKey, backlogTransition);
     }
 
-    // 3. Cold -> Hot Promotion (Async chunk reservation)
-    if (cache.sizeHot(profileKey) < cache.getHotCap()) {
-      promoteColdToHot(region, profile, profileKey);
+    // 3. Cold -> Hot Promotion (Async chunk reservation via StageTransition)
+    if (cache.sizeHot(profileKey) < cache.getHotCap() && coldToHotTransition != null) {
+      promoteColdToHot(profileKey, coldToHotTransition);
     }
+  }
+
+  /**
+   * Creates a {@link StageTransition} for screening unverified backlog candidates into cold subspaces.
+   */
+  public StageTransition<GroupBacklogEntry, GroupSubspace> createBacklogToColdTransition(
+      Region region, GroupProfile profile, CandidateValidator validator) {
+    return new GroupBacklogToColdTransition(region, profile, validator);
+  }
+
+  /**
+   * Creates a {@link StageTransition} for acquiring async chunk reservations to promote cold subspaces to hot.
+   */
+  public StageTransition<GroupSubspace, GroupSubspace> createColdToHotTransition(
+      Region region, GroupProfile profile) {
+    return new GroupColdToHotTransition(region, profile);
   }
 
   private void fillBacklog(Region region, GroupProfile profile, String profileKey) {
@@ -125,77 +162,81 @@ public final class GroupCacheWorker implements Runnable {
   }
 
   private void promoteBacklogToCold(
-      Region region, GroupProfile profile, String profileKey, CandidateValidator validator) {
+      String profileKey, StageTransition<GroupBacklogEntry, GroupSubspace> transition) {
     GroupBacklogEntry entry = cache.pollBacklog(profileKey);
     if (entry == null) return;
 
-    RTPLocation anchor = new RTPLocation(entry.anchor(), 1);
-    CandidateValidator v = (validator != null) ? validator : region.candidateValidator();
-    SubspaceAllocationResult result =
-        GroupPlacementEngine.allocate(anchor, region, profile, profile.maxGroupSize(), v);
+    CompletableFuture<TransitionOutcome<GroupSubspace>> future = transition.promote(entry);
+    if (future == null) return;
 
-    if (result.isSuccess() && !result.destinations().isEmpty()) {
-      entry.setValidity(GroupBacklogEntry.Validity.VALIDATED);
-      GroupSubspace coldSubspace =
-          new GroupSubspace(
-              anchor,
-              profile.radiusBlocks(),
-              result.destinations(),
-              Collections.emptyList());
-      cache.offerCold(profileKey, coldSubspace);
-    } else {
-      entry.setValidity(GroupBacklogEntry.Validity.INVALIDATED);
-    }
-  }
-
-  private void promoteColdToHot(Region region, GroupProfile profile, String profileKey) {
-    GroupSubspace cold = cache.pollCold(profileKey);
-    if (cold == null) return;
-
-    RTPWorld<?> world = (region.getSettings() != null) ? region.getSettings().world() : null;
-    if (world == null) {
-      // Re-offer back to cold if world is unavailable
-      cache.offerCold(profileKey, cold);
-      return;
-    }
-
-    int anchorCX = cold.anchor().coords().x() >> 4;
-    int anchorCZ = cold.anchor().coords().z() >> 4;
-    int chunkRadius = (cold.blockRadius() + 15) / 16;
-
-    Set<CompletableFuture<ChunkSet>> chunkFutures = new HashSet<>();
-    for (int cx = anchorCX - chunkRadius; cx <= anchorCX + chunkRadius; cx++) {
-      for (int cz = anchorCZ - chunkRadius; cz <= anchorCZ + chunkRadius; cz++) {
-        chunkFutures.add(world.getChunkAtAsync(cx, cz));
-      }
-    }
-
-    CompletableFuture.allOf(chunkFutures.toArray(new CompletableFuture[0]))
-        .thenAcceptAsync(
-            v -> {
-              List<ChunkReservation> reservations = new ArrayList<>();
-              for (CompletableFuture<ChunkSet> f : chunkFutures) {
-                ChunkSet chunkSet = f.getNow(null);
-                if (chunkSet != null) {
-                  ChunkReservation reservation = new ChunkReservation(chunkSet, world);
-                  reservations.add(reservation);
+    future
+        .thenAccept(
+            outcome -> {
+              if (outcome != null && outcome.isPromoted()) {
+                GroupSubspace coldSubspace = outcome.value().orElse(null);
+                if (coldSubspace != null) {
+                  cache.offerCold(profileKey, coldSubspace);
                 }
-              }
-
-              GroupSubspace hotSubspace =
-                  new GroupSubspace(
-                      cold.anchor(),
-                      cold.blockRadius(),
-                      cold.slotLocations(),
-                      reservations);
-
-              if (!cache.offerHot(profileKey, hotSubspace)) {
-                // If the hot stage is full, reservations are closed by offerHot
+              } else if (outcome instanceof TransitionOutcome.Rejected<GroupSubspace> rejected) {
+                RTP.log(
+                    Level.FINER,
+                    "[LeafRTPGroupAddon] backlog->cold promotion rejected: reason="
+                        + rejected.reason()
+                        + ", detail="
+                        + rejected.detail());
               }
             })
         .exceptionally(
             ex -> {
-              RTP.log(Level.FINE, "[LeafRTPGroupAddon] failed to promote subspace to hot queue", ex);
+              RTP.log(
+                  Level.WARNING,
+                  "[LeafRTPGroupAddon] unhandled error in backlog->cold promotion callback",
+                  ex);
+              return null;
+            });
+  }
+
+  private void promoteColdToHot(
+      String profileKey, StageTransition<GroupSubspace, GroupSubspace> transition) {
+    GroupSubspace cold = cache.pollCold(profileKey);
+    if (cold == null) return;
+
+    CompletableFuture<TransitionOutcome<GroupSubspace>> future = transition.promote(cold);
+    if (future == null) {
+      cache.offerCold(profileKey, cold);
+      return;
+    }
+
+    future
+        .thenAccept(
+            outcome -> {
+              if (outcome != null && outcome.isPromoted()) {
+                GroupSubspace hotSubspace = outcome.value().orElse(null);
+                if (hotSubspace != null) {
+                  if (!cache.offerHot(profileKey, hotSubspace)) {
+                    // Hot stage overflow: offerHot triggers onDispose (GroupSubspace::close), releasing tickets (S-002)
+                  }
+                }
+              } else if (outcome instanceof TransitionOutcome.Rejected<GroupSubspace> rejected) {
+                RTP.log(
+                    Level.FINE,
+                    "[LeafRTPGroupAddon] cold->hot promotion rejected: reason="
+                        + rejected.reason()
+                        + ", detail="
+                        + rejected.detail());
+                // Return bare coordinates to cold stage on temporary reservation failures (ADR-078)
+                if (rejected.reason() == RejectionReason.RESERVATION_FAILED) {
+                  cache.offerCold(profileKey, cold);
+                }
+              }
+            })
+        .exceptionally(
+            ex -> {
+              RTP.log(
+                  Level.WARNING,
+                  "[LeafRTPGroupAddon] unhandled error in cold->hot promotion callback",
+                  ex);
+              cache.offerCold(profileKey, cold);
               return null;
             });
   }

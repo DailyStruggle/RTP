@@ -1,7 +1,7 @@
 # ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
 
-**Status:** Proposed
-**Date:** 2026-09-02
+**Status:** Accepted
+**Date:** 2026-09-02 (Accepted 2026-09-03)
 **Extends:** [ADR-006](ADR-006-async-queue-pre-generation.md) (Async Queue Pre-Generation), [ADR-023](ADR-023-login-reserve-cache.md) (Login Reserve Cache), [ADR-028](ADR-028-l3-backlog-cache.md) (L3 Backlog Cache)
 **Related:** [ADR-036](ADR-036-network-mode-multi-server-multi-proxy.md) (Network Mode), [ADR-043](ADR-043-personal-queue-permission-semantics.md) (Personal Queue Permission Semantics), `leafrtp-group-addon-ADR-002` (Group Placement Cache Pipeline)
 
@@ -184,14 +184,14 @@ An entry passing rule 0 is still uncertified until rule 1 or rule 2 certifies it
 
 `accepts(T)` is defined only for entries holding a live reservation, since its block and biome checks read the resident chunk. It shall **fail closed**: an entry whose reservation is `null` (a `Cold` coordinate) or already closed shall be rejected rather than inspected, and the implementation shall neither dereference the absent reservation nor fall back to loading the chunk. Cold entries reach a hot sink only through the promotion transition, which performs full verification with I/O off the main thread; they are never certified by recheck.
 
-### Budget Allocation
+### Need-Based Zero-I/O Transferring vs. Aggregate Pooling
 
-- The operator configures a single global ceiling of resident cached chunks per region (`max-cached-chunks`), replacing independent per-sink caps as the primary tuning knob. Existing per-sink caps remain honored as upper bounds.
-- On each region compute pulse `HotBudgetAllocator` computes each sink's target as proportional to `demandWeight() / chunkCostPerEntry()`, normalized to the ceiling, with a configurable floor per sink so a rarely used sink still resolves from `Cold` promptly.
-- Floors are honored before proportional shares and are bounded by `sum(floors) <= max-cached-chunks`; a sink below its floor is topped up by transfer of a transfer-eligible entry from a sibling above its share, never by opening a new reservation while the budget is saturated.
-- A refill-rate knob caps how many `Cold` -> `Hot` promotions may be in flight per pulse, bounding I/O churn. It is a churn bound and a description of post-burst recovery speed, not a latency control: its ceiling is set by storage throughput, so it is not an actionable remedy on slow storage.
-- Applying targets: transfer-eligible entries move directly between sinks (`O(1)` queue transfer, zero chunk I/O); everything else receives changed promotion gates only. No active reservation is closed to satisfy a quota.
-- Because `RingCacheStage.resizeCapacity` rounds up to a power of two, per-sink applied capacities may sum above `max-cached-chunks`. Capacity is a promotion gate, not an allocation: the allocator shall bound residency by the global ceiling when admitting promotions, so rounding slack stays unfilled rather than becoming resident chunks.
+Two distinct concepts are disentangled here: **pooling** and **transferring/allocating**.
+
+1. **Pooling (Monolithic Shared Pool / Global Aggregate Limit):** Collecting all hot chunks into a single monolithic pool or enforcing an aggregate ceiling (`max-cached-chunks`) across heterogeneous sinks is explicitly **rejected/deferred**. Attempting to enforce a single aggregate ceiling across disparate sinks (general `/rtp`, auto-sized login reserve, proxy reservations, group subspaces) creates complex accounting and risks cross-sink starvation. Instead, each sink retains its natural sizing and clear boundaries: general hot cache is configured via `activeChunkCap`, and the login reserve is automatically sized to server online player capacity (`maxPlayers` / `playerCap`) per ADR-023 without an artificial manual knob.
+2. **Automatic Need-Based Zero-I/O Transferring:** Rather than merging sinks into a single pool, each sink maintains its own stage while the engine supports automatic zero-I/O entry transfers between transfer-eligible siblings. When a sink experiences an immediate deficit while an eligible sibling holds surplus entries, verified entries are transferred directly (`pollSilently()` -> `offerSilently()`) in $O(1)$ with **zero chunk I/O** (REQ-RTP-S-005), preserving chunk tickets and avoiding reload churn.
+3. A refill-rate knob caps how many `Cold` -> `Hot` promotions may be in flight per pulse, bounding I/O churn. It is a churn bound and a description of post-burst recovery speed, not a latency control: its ceiling is set by storage throughput, so it is not an actionable remedy on slow storage.
+4. Applying reallocations: transfer-eligible entries move directly between sinks (`O(1)` queue transfer, zero chunk I/O); non-transferable sinks adjust their promotion gates. No active reservation is closed during rebalancing.
 
 ### Open Question: Shared Pool with Floor vs. Per-Access-Method Reservation
 
@@ -250,7 +250,7 @@ Behavior-preserving, one phase per change set, each independently buildable and 
 2. **Nomenclature pass.** Rename internal identifiers, javadoc, and config comments from `L1`/`L2`/`L3` to `hot`/`cold`/`backlog`. The pass covers the canonical documentation that carries the retired vocabulary as well as source: the tier table in `DESIGN.md`, the alias rows in `GLOSSARY.md` and `AGENTS.md`, the group addon's `GroupSubspaceCache(int l1KeptCap, int l2ColdCap, int l3BacklogCap)` parameters and its test `@DisplayName`s. ADR-028 keeps its title and number as the historical record and gains a nomenclature note pointing here rather than being retitled. Public config keys and database column names are not renamed in this phase; operator-facing renames follow the standard migration/version-bump rules.
 3. **Wrap existing buffers.** Back `keptLocations`, `unkeptLocations`, and `backlogLocations` with `RingCacheStage` over the existing `LockFreeLocationBuffer` storage and database callbacks, mapping the buffer's existing silent operations onto `pollSilently` / `offerSilently`. Field names and public accessors are preserved.
 4. **Centralize sink lifecycle.** Re-express `loginLocations`, `networkKeptLocations`, and `perPlayerLocationQueue` as `HotSink` registrations sharing the region's `Cold` stage. Delete the duplicated drain routines in favor of `CacheStage.close()` plus the single demotion transition, the shape already established by `RegionQueueManager.demoteToUnkept`. ADR-023, ADR-036, and ADR-043 observable behavior is unchanged.
-5. **Introduce the allocator.** `HotBudgetAllocator` on the region compute pulse, defaulting to the current static caps so existing deployments see no change until `max-cached-chunks` is set. Sink topology is unchanged: the allocator adjusts promotion gates and moves transfer-eligible entries, and never pools distinct sinks.
+5. **Introduce need-based transferring.** `HotBudgetAllocator` on the region compute pulse, evaluating zero-I/O entry transfers between transfer-eligible sinks in deficit and surplus. Sink topology is unchanged: distinct sinks are never pooled into a monolithic collection, and login reserve remains auto-bounded by `maxPlayers` (ADR-023).
 6. **Port the group addon.** `GroupSubspaceCache` and `GroupCacheWorker` are re-expressed on `CacheStage` / `KeyedCacheStage` / `StageTransition`, deleting the addon's duplicated queue plumbing.
 
 ### Verification Plan
@@ -303,11 +303,8 @@ Behavior-preserving, one phase per change set, each independently buildable and 
   - Eligibility is decided per entry rather than once per sink pair, so the allocator does bounded per-entry work on each pulse instead of a single cached comparison. Bounded by hot capacity, and it buys the removal of an entire equivalence-proving apparatus.
   - Sinks carrying an extrinsic verifier (claim-plugin lookups, S-003) are only ever transfer-eligible under common provenance, so they rebalance more slowly through promotion gating.
   - `CacheStage` carries a silent and a persistence-visible variant of each movement operation, so an implementer choosing the wrong pair either deletes a live row or leaves an orphan. That is contract surface a single `poll`/`offer` pair would not have; it is covered by dedicated tests rather than by convention.
-  - `RingCacheStage.resizeCapacity` allocates and migrates rather than resizing in place, so a resize is O(n) and rounds up to a power of two; the allocator therefore treats capacity targets as approximate and resizes on the pulse rather than per request.
-  - Floors are a new operator concept alongside caps and the global budget, and an over-set floor reintroduces idle residency.
-  - Dynamic quota allocation requires lightweight per-sink demand counters and hysteresis timestamps.
+  - Dynamic zero-I/O transferring between sinks requires lightweight per-sink demand counters and transfer-eligibility checks.
   - Staleness after a config reload remains unaddressed: entries verified under superseded criteria are not identified as such. Deferred with the epoch-stamping follow-up in decision item 4.
-  - Operator-facing config gains `max-cached-chunks` as the primary knob while legacy per-sink caps remain as upper bounds, so documentation and migration notes must explain both.
 
 ## References
 
