@@ -23,12 +23,33 @@ Language selection is configured in [`language.yml`](LANGUAGE.md). See [LANGUAGE
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `teleportDelay` | Integer | `2` | Wait time (seconds) before teleport occurs. `0` teleports immediately (skips the cancel-on-move window). |
+| `teleportDelay` | Integer / Duration | `2` | Wait time before teleport occurs. Accepts raw seconds (`2`) or duration units (e.g. `2s`, `40t`, `1500ms`). `0` teleports immediately (skips the cancel-on-move window). |
 | `cancelDistance` | Integer | `2` | Max distance (blocks) a player can move during the delay before cancellation. |
-| `teleportCooldown` | Integer | `300` | Wait time (seconds) between successful RTP uses. Bypassed by `rtp.nocooldown`. |
+| `teleportCooldown` | Integer / Duration | `300` | Wait time between successful RTP uses. Accepts raw seconds (`300`) or duration units (e.g. `5m`, `300s`, `1h`). Bypassed by `rtp.nocooldown`. |
 | `lockAfterUses` | Integer | `0` | Max successful `/rtp` uses within the `lockAfterResetSeconds` window before lockout (BetterRTP `LockAfter` parity). `0` disables. Bypassed by `rtp.nolock`. |
-| `lockAfterResetSeconds` | Integer | `0` | Length (seconds) of the rolling usage-cap window for `lockAfterUses`. `0` means the cap never resets (a hard lifetime cap). |
+| `lockAfterResetSeconds` | Integer / Duration | `0` | Length of the rolling usage-cap window for `lockAfterUses`. Accepts raw seconds or duration units (e.g. `24h`, `1d`). `0` means the cap never resets (a hard lifetime cap). |
 | `setRespawnOnTeleport` | Boolean | `false` | When `true`, a successful `/rtp` sets the landed location as the player's persistent spawn anchor (BetterRTP `SetAsRespawn` parity). |
+
+### Duration Unit Suffixes & Parsing
+
+Any duration setting (such as `teleportCooldown`, `teleportDelay`, `lockAfterResetSeconds`, cache TTLs in `advanced/ttl.yml`, and queue intervals in `advanced/performance.yml`) accepts human-readable **temporal unit suffixes** as well as composite strings:
+
+- **Game Ticks:**
+  - `t`, `tick`, `ticks`: Minecraft game ticks (1 tick = 50ms = 0.05s, 20 ticks = 1s). E.g. `teleportDelay: 40t` (2 seconds).
+- **Metric & Standard Units:**
+  - `ms`, `milli`, `millis`, `millisecond`, `milliseconds`: Milliseconds (1,000 ms = 1s). E.g. `teleportDelay: 2500ms` (2.5 seconds).
+  - `s`, `sec`, `second`, `seconds`: Seconds. E.g. `teleportCooldown: 300s`.
+  - `m`, `min`, `minute`, `minutes`: Minutes (60s). E.g. `teleportCooldown: 5m`.
+  - `h`, `hr`, `hour`, `hours`: Hours (3,600s). E.g. `teleportCooldown: 1h`.
+  - `d`, `day`, `days`: Days (86,400s). E.g. `lockAfterResetSeconds: 1d`.
+  - `w`, `week`, `weeks`: Weeks (604,800s). E.g. `uniquePlacement: 4w`.
+- **Composite Durations:**
+  - You can combine multiple units without punctuation: e.g. `teleportCooldown: 2h30m`, `1d12h`, `1m30s`, `45s500ms`.
+- **Special Values:**
+  - `-1`, `infinite`, `permanent`: Infinite / no expiration (used in TTL configs).
+- **Auto-Interpretation of Dimensionless Values:**
+  - Plain numeric values (e.g. `300`) maintain 100% backward compatibility with their historical unit defaults (seconds for cooldowns/delays, ticks for queue intervals).
+  - Unusually large dimensionless numbers entered where seconds or ticks are expected (such as entering `5000` assuming milliseconds) are auto-detected and safely interpreted with a helpful console notice. Explicit suffixes (e.g. `5000ms` or `5s`) are always recommended.
 
 ## Commands
 
@@ -61,7 +82,7 @@ Nested under the `defaults:` block. Holds global default templates and values th
 
 > The type-bearing `shape`/`vert` settings inherit as a **whole named block**, while type-free scalars inherit individually. Other source files own their own defaults: e.g. a region's `price` can reference `@economy` to inherit from [economy.yml](ECONOMY.md).
 
-> **Teleport distance lives here.** On a single-world server, `defaults.shape.radius` is the one place to set how far `/rtp` throws players, because the bundled `regions/default.yml` ships `shape: "@config"`. Sizes are in **chunks** (1 chunk = 16 blocks), so `radius: 256` is 4,096 blocks and `radius: 625` is 10,000 blocks; `centerRadius` is the matching minimum distance. Full reference, including per-region and per-command overrides: [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius).
+> **Teleport distance lives here.** On a single-world server, `defaults.shape.radius` is the one place to set how far `/rtp` throws players, because the bundled `regions/default.yml` ships `shape: "@config"`. Sizes default to **chunks** (1 chunk = 16 blocks), so `radius: 256` is 4,096 blocks and `radius: 625` is 10,000 blocks; `centerRadius` is the matching minimum distance. You can also specify spatial unit suffixes directly, such as `4096b` (or `4096m`), `256c`, `4r`, or `5km`. Full reference, including unit suffixes, auto-interpretation, and per-region and per-command overrides: [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius).
 
 ---
 

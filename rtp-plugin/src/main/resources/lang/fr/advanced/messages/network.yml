@@ -2,47 +2,57 @@
 # Textes des messages destines aux joueurs et aux operateurs dans cette langue, groupes par theme.
 # Copie generee automatiquement des messages anglais; ne pas editer a la main (sera ecrase).
 
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
+# --- Messages du mode réseau inter-serveurs ---
+# Envoyés uniquement lorsque `network.enabled: true` et que le `/rtp` du joueur est routé
+# à travers la file d'attente inter-serveurs (voir network.yml `routing.mode`).
+# Toutes les clés sont facultatives du point de vue du joueur - le cycle de base
+# `delayMessage` / `teleportMessage` pilote toujours le flux visible.
+# Envoyé lorsque la demande a été acceptée dans la file d'attente inter-serveurs
+# et attend une prise en charge par un serveur backend. Espace réservé : [position] - position
+# avec index 0 depuis `pollStatus` ; peut être vide si le transport ne renvoie aucune
 # position.
 networkQueued: "&7[P0] en file pour une destination inter-serveurs (position [position])..."
-# Sent when a player runs /rtp while already waiting in the cross-server queue.
-# Placeholder: [position] - position in line; may be empty.
+
+# Envoyé lorsqu'un joueur exécute /rtp alors qu'il attend déjà dans la file inter-serveurs.
+# Espace réservé : [position] - position dans la file ; peut être vide.
 alreadyQueued: "&cVous attendez déjà dans la file inter-serveurs (position [position]). Veuillez patienter."
-# Sent when a cross-server queue entry waited too long and was dropped.
-# No placeholders.
+
+# Envoyé lorsqu'une entrée de la file inter-serveurs a attendu trop longtemps et a été abandonnée.
+# Aucun espace réservé.
 networkTimedOut: "&c[P0] la téléportation inter-serveurs a expiré en attendant un serveur."
-# Sent when the cross-server queue is full and the request is rejected.
-# No placeholders.
+
+# Envoyé lorsque la file inter-serveurs est pleine et que la demande est rejetée.
+# Aucun espace réservé.
 waitlistFull: "&c[P0] la file inter-serveurs est pleine ; réessayez bientôt."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
+
+# Envoyé lorsque la file a transmis la demande au routeur proxy et
+# qu'une sélection de backend est en cours.
 networkRouting: "&7[P0] routage vers un serveur..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
+
+# Envoyé lorsqu'un backend a réservé une coordonnée pour ce joueur et que le
+# proxy est sur le point d'initier le saut inter-serveurs. Espace réservé : [server]
+# - le serverId du backend de destination.
 networkReserved: "&a[P0] coordonnée réservée sur [server]. Transfert..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+
+# Envoyé lorsque le proxy est en cours de transfert. Espace réservé : [server] - destination.
 networkTransferring: "&a[P0] transfert vers [server]..."
-# Sent when the cross-server path gave up and fell back to the local server.
-# Placeholder: [reason] - the reason for falling back.
+
+# Envoyé lorsque le chemin inter-serveurs a échoué et bascule sur le serveur local.
+# Espace réservé : [reason] - la raison du repli.
 networkFallback: "&e[P0] inter-serveurs indisponible ([reason]) ; retour au serveur local."
-# Sent when the cross-server request failed and no fallback was possible.
-# Placeholder: [reason] - the failure reason.
+
+# Envoyé lorsque la demande inter-serveurs a échoué et qu'aucun repli n'était possible.
+# Espace réservé : [reason] - la raison de l'échec.
 networkFailed: "&c[P0] la téléportation inter-serveurs a échoué : [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
+
+# Envoyé lorsque le joueur demande une région spécifique (`/rtp <region>`) mais
+# qu'aucun backend du réseau ne la dessert actuellement. Espace réservé :
+# [region] - le nom de la région demandée.
 networkRegionUnavailable: "&c[P0] aucun serveur ne dessert actuellement la région '[region]'."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
+
+# Envoyé lorsque le nom de région demandé correspond à au moins deux backends et
+# que la politique configurée par l'opérateur ne peut pas en choisir un (ne se déclenche
+# qu'avec des politiques plus strictes que l'avertissement par défaut `warn`). Espace réservé : [region].
 networkRegionAmbiguous: "&c[P0] la région '[region]' est ambiguë entre serveurs ; veuillez fixer un serveur."
 
 # DO NOT TOUCH VERSION NUMBER

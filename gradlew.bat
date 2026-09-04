@@ -70,7 +70,12 @@ echo location of your Java installation. 1>&2
 :execute
 @rem Setup the command line
 
-
+@rem Transparent concurrency serialization: delegate through PowerShell mutex if not already holding lock
+if not "%RTP_GRADLE_LOCKED%"=="1" (
+    set RTP_GRADLE_LOCKED=1
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$mutex = [System.Threading.Mutex]::new($false, 'Global\RTP_Gradle_Build_Mutex'); $hasLock = $false; try { $waited = 0; while (-not $hasLock) { try { $hasLock = $mutex.WaitOne(5000) } catch [System.Threading.AbandonedMutexException] { $hasLock = $true }; if ($hasLock) { break }; $waited += 5; [Console]::Out.WriteLine('[gradlew] Waiting for build lock... (' + $waited + 's)'); if ($waited -ge 600) { Write-Error '[gradlew] Timed out waiting for Gradle build lock.'; exit 1 } }; & cmd.exe /c \"\"%~f0\" %*\"; exit $LASTEXITCODE } finally { if ($hasLock) { try { $mutex.ReleaseMutex() } catch {} }; $mutex.Dispose() }"
+    goto exitWithErrorLevel
+)
 
 @rem Execute Gradle
 @rem endlocal doesn't take effect until after the line is parsed and variables are expanded

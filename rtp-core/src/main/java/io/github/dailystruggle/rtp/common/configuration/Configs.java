@@ -24,7 +24,6 @@ import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
-import org.jetbrains.annotations.Nullable;
 
 /** Main configuration manager for RTP */
 public class Configs {
@@ -517,7 +516,6 @@ public class Configs {
    * @param worldName the name of the world
    * @return the configuration parser, or null if the world is not registered
    */
-  @Nullable
   public ConfigParser<WorldKeys> getWorldParser(String worldName) {
     if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
       return null;
@@ -702,6 +700,13 @@ public class Configs {
             new ConfigParser<>(MetricsKeys.class, "advanced/metrics.yml", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(MetricsKeys.class, metrics);
     migrateLegacyRootConfig(metrics, "metrics.yml");
+
+    // ADR-079: ttl.yml defines cause-based and per-verifier spatial retention
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/ttl.yml");
+    ConfigParser<TtlKeys> ttl =
+            new ConfigParser<>(TtlKeys.class, "advanced/ttl.yml", "1.0", pluginDirectory, fileDatabase, locale);
+    newConfigParserMap.put(TtlKeys.class, ttl);
+    io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.loadFromConfig(ttl);
 
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser safety.yml");
     ConfigParser<SafetyKeys> safety =

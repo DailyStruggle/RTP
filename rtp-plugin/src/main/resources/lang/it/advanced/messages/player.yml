@@ -25,7 +25,10 @@ nonSicuro: "&7[P0] ⌖ impossibile trovare una posizione sicura entro [attempts]
 # segnaposto: [remainingCooldown] - il tempo rimanente
 messaggioRaffreddamento: "&7[P0] ⚡ Non puoi teletrasportarti di nuovo per [remainingCooldown]"
 
-# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+# quando il giocatore ha raggiunto il limite di lockAfterUses ed è bloccato (parità con BetterRTP LockAfter)
+# segnaposto: [remainingLockTime] - tempo rimanente prima del ripristino della finestra lockAfterResetSeconds.
+# Si risolve in vuoto quando non è configurata alcuna finestra di ripristino (un limite assoluto); se si imposta
+# un limite assoluto, riformulare senza il segnaposto (es. "Riprova più tardi.").
 lockedAfterUses: "&7[P0] ⌖ Hai raggiunto il limite di teletrasporto casuale. Riprova tra [remainingLockTime]."
 
 # se la regione non ha posizioni in coda e il giocatore non ha il permesso rtp.unqueued
@@ -63,7 +66,7 @@ comandoConsoleNonPermesso: "&c[P0] Devi essere un giocatore in gioco per eseguir
 # il plugin è occupato a ricaricare
 busy: "&c[P0] occupato"
 
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+# Inviato quando il controllo facoltativo di combattimento PvP rifiuta /rtp perché il giocatore è in combattimento
 pvpInCombat: "&c[P0] Non puoi teletrasportarti casualmente mentre sei in combattimento."
 
 # il plugin non ha il sottocomando o parametro richiesto dall'utente

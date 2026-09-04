@@ -3,6 +3,7 @@
 # La selezione della lingua ora risiede in language.yml (caricato prima di config.yml).
 # Tempo di attesa prima che un teletrasporto in coda venga eseguito.
 # 0 teletrasporta immediatamente (salta la finestra di annullamento per movimento).
+# Supporta unità di durata (es. 2s, 40t, 1500ms).
 # Interagisce con cancelDistance qui sotto.
 # @type: integer
 # @range: [0, null]
@@ -19,7 +20,7 @@ ritardoTeletrasporto: 2
 distanzaAnnullamento: 2
 
 # Tempo di attesa tra usi riusciti di /rtp dallo stesso giocatore.
-# Aggirato da rtp.nocooldown.
+# Aggirato da rtp.nocooldown. Supporta unità di durata (es. 5m, 300s, 1h).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -36,7 +37,7 @@ lockAfterUses: 0
 
 # Durata della finestra mobile del limite d'uso per lockAfterUses. Il contatore si azzera
 # dopo questo numero di secondi dal primo uso della finestra. 0 significa che il limite non
-# si azzera mai (un limite a vita).
+# si azzera mai (un limite a vita). Supporta unità di durata (es. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -77,7 +78,23 @@ menu:
 
 # Valori predefiniti globali ereditati dai file di regione/mondo tramite il token "@config".
 defaults:
-  # Forma e dimensione predefinite dell'area. radius/centerRadius = quanto lontano atterri, misurato in chunk.
+  # Forma e dimensione predefinite dell'area, utilizzate da ogni regione la cui forma è "@config".
+  #
+  # LE DIMENSIONI QUI SONO PREDEFINITE IN CHUNK (1 chunk = 16 blocchi):
+  #   radius: 64   ->  1.024 blocchi dal centro
+  #   radius: 256  ->  4.096 blocchi dal centro   (il valore predefinito qui sotto)
+  #   radius: 625  -> 10.000 blocchi dal centro
+  #
+  # SUFFISSI DELLE UNITÀ SPAZIALI:
+  # Puoi anche usare unità esplicite direttamente su radius, centerRadius, ecc.:
+  #   radius: 4096b   (o 4096 blocks, 4096m)
+  #   radius: 256c    (chunk)
+  #   radius: 4r      (file di regione Anvil = 32 chunk = 512 blocchi)
+  #   radius: 5km     (chilometri = 5000 blocchi)
+  #
+  # radius       = bordo esterno. Nessuno atterra più lontano di così.
+  # centerRadius = bordo interno / foro a ciambella. Nessuno atterra più vicino di così.
+  #                Deve rimanere inferiore a radius, altrimenti non rimane terra tra cui scegliere.
   shape:
     # Landing area shape algorithm.
     # @type: enum
@@ -89,9 +106,11 @@ defaults:
     centerX: 0
     centerZ: 0
     weight: 1.0
+
     # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
     uniquePlacements: 0
     expand: false
+
   # Default high/low landing window.
   vert:
     # Vertical placement algorithm.
@@ -100,17 +119,23 @@ defaults:
     name: "LINEAR"
     minY: 32
     maxY: 255
+
     # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
     direction: 2
     requireSkyLight: true
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
+
   # Extra unverified spots kept ready. 0 = off.
   backlogCacheCap: 1000
+
   # Max chunks kept loaded for instant teleports.
   activeChunkCap: 10
+
   # Bad-spot tracking precision (1-5).
   spatialResolution: 3
+
   # Whether regions/worlds need permission.
   requirePermission: false
 

@@ -410,5 +410,26 @@ public class BukkitEffectsHandler {
                                         dispatchEffects(plugin, "rtp.effect.queuepop", player);
                                     });
                 });
+
+        if (plugin != null) {
+            Bukkit.getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+                @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
+                public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
+                    Player player = event.getEntity();
+                    if (player == null) return;
+                    RTP.getInstance()
+                            .miscAsyncTasks
+                            .add(
+                                    () -> {
+                                        if (!Boolean.parseBoolean(
+                                                parser
+                                                        .getData()
+                                                        .getOrDefault(PerformanceKeys.effectParsing, false)
+                                                        .toString())) return;
+                                        dispatchEffects(plugin, "rtp.effect.death", player);
+                                    });
+                }
+            }, plugin);
+        }
     }
 }

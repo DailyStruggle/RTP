@@ -193,5 +193,6 @@ prefabricado:
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
+
 # NO TOQUES EL NÚMERO DE VERSIÓN
 version: 1.0

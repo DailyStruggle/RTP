@@ -1,0 +1,27 @@
+# --- RTP Spatial Memory TTL Settings ---
+# Documentation: plugins/RTP/docs/admin/configuration/TTL.md
+
+# Base retention durations for rejected coordinate runs in spatial memory.
+# Supported duration formats: e.g. 14d, 12h, 30m, 3600s, 40t, 2500ms, or composite 1d12h.
+# Set to -1 or "infinite" for permanent retention (static terrain).
+causes:
+  # Natural terrain & geometry (permanent)
+  biome: -1
+  worldBorder: -1
+  vert: -1
+  safety: -1
+  prefilterBiome: -1
+  prefilterBlock: -1
+
+  # Dynamic player and server state
+  uniquePlacement: 30d
+  safetyExternal: 14d
+
+# Per-verifier overrides keyed by checker class name (e.g. GriefPreventionChecker, WorldGuardChecker).
+# If omitted or unlisted, external checkers inherit causes.safetyExternal.
+verifiers:
+  # WorldGuardChecker: -1
+  # GriefPreventionChecker: 14d
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

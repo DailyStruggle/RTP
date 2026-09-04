@@ -13,7 +13,7 @@
 チャンクロード中: "&7[P0] ⚙ チャンクを読み込み中です。お待ちください.."
 テレポートメッセージ: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ [attempts] 回の試行でテレポートしました ([processingTime])</gradient>"
 
-# if teleport is cancelled
+# テレポートがキャンセルされたとき
 テレポート取消: "&7[P0] ⚡ テレポートをキャンセルしました！"
 
 # 最大試行回数に達しても安全な場所が見つからなかったとき
@@ -24,7 +24,7 @@
 # プレースホルダー: [remainingCooldown] - 残り時間
 クールダウンメッセージ: "&7[P0] ⚡ 再びテレポートするには [remainingCooldown] 待つ必要があります"
 
-# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+# プレイヤーが lockAfterUses の上限に達してロックアウトされたとき (BetterRTP LockAfter パリティ)
 lockedAfterUses: "&7[P0] ⌖ ランダムテレポートの上限に達しました。[remainingLockTime] 後にもう一度お試しください。"
 
 # リージョンに位置のキューがなく、プレイヤーが rtp.unqueued 権限を持っていないとき
@@ -61,11 +61,11 @@ lockedAfterUses: "&7[P0] ⌖ ランダムテレポートの上限に達しまし
 # busy と invalidCommand は messages.lang.yml で翻訳されていない -> 英語キー名 (英語ベースラインへフォールバック)。
 busy: "&c[P0] 取り込み中"
 
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+# プレイヤーが戦闘中であるためオプションの PvP 戦闘チェックが /rtp を拒否したときに送信されます
 pvpInCombat: "&c[P0] 戦闘中はランダムテレポートできません。"
 
-# plugin doesn't have the subcommand or parameter the user requested
-# placeholder: [arg] - the argument attempted
+# ユーザーが要求したサブコマンドまたはパラメータがプラグインに存在しません
+# プレースホルダー: [arg] - 試行された引数
 invalidCommand: "&c[P0] 無効なコマンド - [arg]"
 
 # ユーザーに要求されたコマンドの権限がありません
@@ -104,8 +104,8 @@ rtp_説明: "ランダムな場所にテレポートする"
 表示時間: 20
 フェードアウト: 20
 
-# actionbar setting
+# アクションバー設定
 アクションバー: ""
 
-# DO NOT TOUCH VERSION NUMBER
+# バージョン番号は変更しないでください
 version: 1.0

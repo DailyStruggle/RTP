@@ -25,7 +25,7 @@ spooky: "&7[P0] ⌖ could not find a safe paw-spot within [attempts] attempts"
 # placeholder: [remainingCooldown] - the remaining time
 nap_message: "&7[P0] ⚡ you can't pounce again for [remainingCooldown]. nap first."
 
-# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+# when the kitty has reached the zoomies cap and is locked out (BetterRTP LockAfter parity)
 lockedAfterUses: "&7[P0] ⌖ Out of zoomies! Nap [remainingLockTime] and pounce again."
 
 # no warm spots ready
@@ -63,7 +63,7 @@ tall_human_forbidden: "&c[P0] only an in-game kitty can do that, tall human."
 # kitty is grooming and busy
 busy: "&c[P0] busy grooming"
 
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+# Mewed when the optional PvP fight check refuses /rtp because the kitty is in a scrap
 pvpInCombat: "&c[P0] no pouncing away while you're scrapping, kitty."
 
 # unknown subcommand
@@ -114,5 +114,5 @@ slow_blink_out: 20
 # tummy_strip (actionbar) setting
 tummy_strip: ""
 
-# DO NOT TOUCH VERSION NUMBER
+# Do not bite the version number, sacred catnip
 version: 1.0

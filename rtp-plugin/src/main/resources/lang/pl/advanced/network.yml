@@ -5,10 +5,12 @@ network:
   # @type: boolean
   # @default: false
   enabled: false
+
   # Stabilna tozsamosc backendu, wymagana gdy wlaczone; dwa backendy z tym samym serverId nadpisuja sobie nawzajem heartbeat.
   # @type: string
   # @default: ""
   serverId: ""
+
   # Zmienna srodowiskowa przechowujaca wspoldzielony sekret HMAC; wymagana gdy wlaczone z transport.type redis.
   # @type: string
   # @default: "RTP_NET_SECRET"
@@ -31,10 +33,12 @@ transport:
     # @type: string
     # @default: "localhost"
     host: "localhost"
+
     # Port Redis; zmien dla niestandardowych wdrozen.
     # @type: integer
     # @default: 6379
     port: 6379
+
     # Haslo Redis; pozostaw puste dla Redis bez uwierzytelniania, ustaw gdy skonfigurowano ACL/requirepass.
     # @type: string
     # @default: ""
@@ -46,6 +50,7 @@ heartbeat:
   # @type: integer
   # @default: 1000
   intervalMs: 1000
+
   # Jak dlugo ostatnio widziany stan rownorzednego wezla pozostaje zaufany, zanim zostanie uznany za nieznany (ms); utrzymuj powyzej intervalMs.
   # @type: integer
   # @default: 5000
@@ -58,6 +63,7 @@ routing:
   # @options: ["local", "auto", "always"]
   # @default: "local"
   mode: "local"
+
   # Tryb lobby: czyni ten backend czystym wezlem rozdzielajacym, ktory automatycznie kieruje samo /rtp do regionu rownorzednego z najwieksza rezerwa.
   # @type: boolean
   # @default: false
@@ -69,26 +75,32 @@ queue:
   # @type: integer
   # @default: 50
   maxDepth: 50
+
   # Czestotliwosc oprozniania oczekujacych zapisow backendu (ms); nizej = mniejsze opoznienie, wyzej = mniej podrozy do transportu.
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
+
   # Czestotliwosc odpytywania pamieci podrecznej stanu backendu (ms); jak czesto odswiezany jest postep na gracza.
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
+
   # Opcjonalne pasywne starzenie TTL HASH-y kopert (ms); 0 wylacza.
   # @type: integer
   # @default: 0
   entryTtlMs: 0
+
   # Limit tempa zapisow /rtp miedzy serwerami (token bucket): trwale zadania na sekunde.
   # @type: number
   # @default: 5
   crossServerRequestsPerSecond: 5
+
   # Limit tempa zapisow /rtp miedzy serwerami: rozmiar serii.
   # @type: number
   # @default: 10
   crossServerRequestsBurst: 10
+
   # Liczba workerow BLPOP po stronie proxy; zwieksz tylko gdy pojedynczy worker sie nasyca.
   # @type: integer
   # @default: 1
@@ -100,6 +112,7 @@ reservation:
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
+
   # TTL na token (ms); zarezerwowana, ale niewykorzystana rezerwacja starsza niz to jest zwalniana jako porzucona.
   # @type: integer
   # @default: 60000
@@ -114,7 +127,7 @@ regionCollision:
   policy: "warn"
 
 # Optional per-destination policy overlay (matched by serverId); leave commented for the common case.
-#servers:
+# servers:
 #  example-backend:
 #    # Permission required to target this destination (empty = none).
 #    # @type: string
@@ -138,6 +151,7 @@ loadBalancer:
   # @type: number
   # @default: 0
   regionScarcityWeight: 0
+
   # Scoring terms, one per metric.
   terms:
     # Tick pressure; sigmoid knee at 0.6.
@@ -147,6 +161,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "mspt"
       input: "mspt"
+
       # Waga czlonu.
       # @type: number
       # @default: 1.0
@@ -157,16 +172,19 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "sigmoid"
         type: "sigmoid"
+
         # Stromosc.
         # @type: number
         # @range: [0.1, 20]
         # @default: 8.0
         k: 8.0
+
         # Punkt srodkowy.
         # @type: number
         # @range: [0, 1]
         # @default: 0.6
         x0: 0.6
+
     # Queue depth; small queues silent, large ones explode.
     queue:
       # Wejscie metryki.
@@ -174,6 +192,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "queueDepth"
       input: "queueDepth"
+
       # Waga czlonu.
       # @type: number
       # @default: 1.0
@@ -184,11 +203,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "exponential"
         type: "exponential"
+
         # Stromosc.
         # @type: number
         # @range: [0.1, 20]
         # @default: 3.0
         k: 3.0
+
     # Heap gate; fires at >= 85% used.
     heap:
       # Wejscie metryki.
@@ -196,6 +217,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "heapUsed"
       input: "heapUsed"
+
       # Waga czlonu.
       # @type: number
       # @default: 5.0
@@ -206,11 +228,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # Prog skoku.
         # @type: number
         # @range: [0, 1]
         # @default: 0.85
         threshold: 0.85
+
     # Region gate; fires when the kept pool is >= 95% full.
     region:
       # Wejscie metryki.
@@ -218,6 +242,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptRegion"
       input: "keptRegion"
+
       # Waga czlonu.
       # @type: number
       # @default: 5.0
@@ -228,11 +253,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # Prog skoku.
         # @type: number
         # @range: [0, 1]
         # @default: 0.95
         threshold: 0.95
+
     # Gentle tie-breaker on kept count.
     kept:
       # Wejscie metryki.
@@ -240,6 +267,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptCount"
       input: "keptCount"
+
       # Waga czlonu.
       # @type: number
       # @default: 0.25
@@ -250,6 +278,7 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "logarithmic"
         type: "logarithmic"
+
         # Stromosc.
         # @type: number
         # @range: [0.1, 20]

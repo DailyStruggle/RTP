@@ -375,6 +375,25 @@ public class EffectsResolverTest {
                 "config-derived token must be added by the union");
     }
 
+    // ---- 11. Death stage and CommandEffect tokens (effects-api-ADR-007) ----
+
+    @Test
+    void deathStageResolvesCommandEffect() throws IOException {
+        writeGroup("death.yml",
+                "when: death\n" +
+                "effects:\n" +
+                "  - COMMAND.CONSOLE.say [player] has perished\n" +
+                "version: \"1.0\"\n");
+        rebuildParser();
+
+        RTPPlayer p = player("leo", UUID.randomUUID(), Collections.emptySet());
+        List<String> tokens = EffectsResolver.resolveTokens(
+                "death", p, "rtp.effect.death");
+        assertNotNull(tokens);
+        assertEquals(1, tokens.size());
+        assertEquals("rtp.effect.death.COMMAND.CONSOLE.say [player] has perished", tokens.get(0));
+    }
+
     // ---- minimal RTPPlayer stub for the resolver's call sites ----
 
     private static final class StubPlayer implements RTPPlayer {

@@ -35,8 +35,8 @@ shape:
 
 Then point the overworld at that region ([Worlds](../admin/configuration/WORLDS.md)), optionally pre-scan it with `/rtp scan start region=overworld` (watch `/rtp scan info`) to map known-bad spots in advance, and you are done. A player typing `/rtp` gets a pre-verified coordinate from the active queue.
 
-!!! note "`radius`, `centerX`, and `centerZ` are measured in chunks"
-    They live *inside* the `shape:` block (not at the top level), and their unit is **chunks**, not blocks - 1 chunk is 16 blocks. A `radius` of `625` therefore reaches 10,000 blocks. See [Regions](../admin/configuration/REGIONS.md) for the full field reference.
+!!! note "`radius`, `centerX`, and `centerZ` units"
+    They live *inside* the `shape:` block (not at the top level). By default, raw numbers are in **chunks** (1 chunk = 16 blocks), so `radius: 625` reaches 10,000 blocks. You can also specify spatial unit suffixes directly (e.g. `10000b`, `10km`, `625c`, `20r`). See [Regions](../admin/configuration/REGIONS.md) for the full field and unit reference.
 
 !!! note "That is the whole loop"
     Configure a region -> point a world at it -> pre-scan safety -> players run plain `/rtp`. The rest of this page explains *why*.

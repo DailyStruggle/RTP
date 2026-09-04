@@ -1,4 +1,4 @@
-# Retraso del teletransporte (segundos)
+# Retraso del teletransporte. 0 = de inmediato. Admite unidades de duración (p. ej. 2s, 40t, 1500ms).
 # Tiempo que el jugador debe esperar antes de que se realice el teletransporte.
 # A veces le da tiempo al servidor para precargar los chunks de destino.
 # @type: integer
@@ -16,7 +16,7 @@ retrasoTeletransporte: 2
 # @default: 2
 distanciaCancelar: 2
 
-# Tiempo de espera entre teletransportes (segundos)
+# Tiempo de espera entre teletransportes. Se omite con rtp.nocooldown. Admite unidades de duración (p. ej. 5m, 300s, 1h).
 # Tiempo que el jugador debe esperar entre usos exitosos de RTP.
 # @type: integer
 # @range: [0, null]
@@ -34,7 +34,7 @@ lockAfterUses: 0
 
 # Duración de la ventana móvil del límite de usos para lockAfterUses. El contador se reinicia
 # tantos segundos después del primer uso de la ventana. 0 significa que el límite nunca se
-# reinicia (un límite permanente).
+# reinicia (un límite permanente). Admite unidades de duración (p. ej. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -86,7 +86,23 @@ menu:
 
 # Valores predeterminados globales heredados por los archivos de región/mundo mediante el token "@config".
 defaults:
-  # Forma y tamaño del área por defecto. radius/centerRadius = qué tan lejos aterrizas, medido en chunks.
+  # Forma y tamaño del área por defecto, utilizada por cada región cuya forma sea "@config".
+  #
+  # LOS TAMAÑOS AQUÍ ESTÁN POR DEFECTO EN CHUNKS (1 chunk = 16 bloques):
+  #   radius: 64   ->  1,024 bloques desde el centro
+  #   radius: 256  ->  4,096 bloques desde el centro   (el valor predeterminado abajo)
+  #   radius: 625  -> 10,000 bloques desde el centro
+  #
+  # SUFIJOS DE UNIDAD ESPACIAL:
+  # También puedes usar unidades explícitas directamente en radius, centerRadius, etc.:
+  #   radius: 4096b   (o 4096 blocks, 4096m)
+  #   radius: 256c    (chunks)
+  #   radius: 4r      (archivos de región de Anvil = 32 chunks = 512 bloques)
+  #   radius: 5km     (kilómetros = 5000 bloques)
+  #
+  # radius       = borde exterior. Nadie aterriza más lejos que esto.
+  # centerRadius = borde interior / agujero de donut. Nadie aterriza más cerca que esto.
+  #                Debe mantenerse por debajo de radius, o no quedará tierra para elegir.
   shape:
     # Landing area shape algorithm.
     # @type: enum
@@ -98,9 +114,11 @@ defaults:
     centerX: 0
     centerZ: 0
     weight: 1.0
+
     # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
     uniquePlacements: 0
     expand: false
+
   # Default high/low landing window.
   vert:
     # Vertical placement algorithm.
@@ -109,17 +127,23 @@ defaults:
     name: "LINEAR"
     minY: 32
     maxY: 255
+
     # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
     direction: 2
     requireSkyLight: true
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
+
   # Extra unverified spots kept ready. 0 = off.
   backlogCacheCap: 1000
+
   # Max chunks kept loaded for instant teleports.
   activeChunkCap: 10
+
   # Bad-spot tracking precision (1-5).
   spatialResolution: 3
+
   # Whether regions/worlds need permission.
   requirePermission: false
 

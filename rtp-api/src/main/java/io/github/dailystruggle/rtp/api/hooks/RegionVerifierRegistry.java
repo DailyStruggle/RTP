@@ -23,7 +23,17 @@ public interface RegionVerifierRegistry {
    *
    * @param verifier non-null predicate over candidate coordinates
    */
-  void register(Predicate<RTPCoords> verifier);
+  default void register(Predicate<RTPCoords> verifier) {
+    register(verifier.getClass(), verifier);
+  }
+
+  /**
+   * Register a synchronous verifier with an explicit source class attribution (ADR-079).
+   *
+   * @param source   source class responsible for this verifier (e.g. checker class)
+   * @param verifier non-null predicate over candidate coordinates
+   */
+  void register(Class<?> source, Predicate<RTPCoords> verifier);
 
   /**
    * Register an asynchronous verifier whose result completes with the same
@@ -31,7 +41,17 @@ public interface RegionVerifierRegistry {
    *
    * @param verifier non-null function returning a non-null future
    */
-  void registerAsync(Function<RTPCoords, CompletableFuture<Boolean>> verifier);
+  default void registerAsync(Function<RTPCoords, CompletableFuture<Boolean>> verifier) {
+    registerAsync(verifier.getClass(), verifier);
+  }
+
+  /**
+   * Register an asynchronous verifier with an explicit source class attribution (ADR-079).
+   *
+   * @param source   source class responsible for this verifier
+   * @param verifier non-null function returning a non-null future
+   */
+  void registerAsync(Class<?> source, Function<RTPCoords, CompletableFuture<Boolean>> verifier);
 
   /**
    * Remove every registered verifier (sync and async). Intended for test harnesses

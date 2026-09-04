@@ -12,20 +12,24 @@
 network:
   enabled: false
   schemaVersion: 1
+
   # Stable proxy identity. Required when `enabled: true`. No default - the
   # operator MUST supply one; two proxies sharing a proxyId will overwrite
   # each other's heartbeat row. Must be non-empty.
   proxyId: ""
+
   # Proxy role. `auto` lets the adapter take part as a participant proxy
   # (the only role shipped in Phase 2). `proxy` is reserved for future
   # multi-role topologies. Backends use `role: backend` in their own
   # network.yml; do not set that value here.
   role: auto
+
   # Environment variable holding the shared HMAC secret. Required when
   # `enabled: true` AND `transport.type: redis`; SQL binding currently
   # treats the env var as optional (DB connection auth + TLS is the
   # security boundary - rtp-proxy-ADR-011 Q1).
   secretEnv: RTP_NET_SECRET
+
   # ADR-015 / REQ-RTP-NET-015: shared cross-proxy wait-list. When enabled,
   # /rtp requests that cannot be placed on any backend right now (every
   # peer kill-switched, no `networkKeptCount`, etc.) are parked on a shared
@@ -37,24 +41,30 @@ network:
     # Master switch. Set to false to use the path where
     # no-backend resolves as terminal FAILED.
     enabled: true
+
     # Hard cap on the shared waitlist. Over-cap enrolments reject as
     # REJECTED_FULL rather than silently consuming proxy memory during an
     # extended outage.
     maxSize: 1024
+
     # Drainer pulse cadence in millis. Should track `heartbeat.intervalMs`
     # since BackendHeartbeat.networkKeptCount is the per-backend cap input.
     drainIntervalMs: 1000
+
     # Backoff window after a total-failure pulse (every drained envelope
     # failed dispatch). The drainer refreshes every entry's TTL so the
     # reaper does not chew through valid entries during a network outage.
     drainPauseMs: 2000
+
     # Redis-backed leader lease TTL. Lease is re-acquired on every pulse.
     # On `transport.type: in-memory` (or sql) the lease is always-leader,
     # which is safe only on single-proxy installs.
     leaderLeaseHoldMs: 5000
+
     # Reaper pulse cadence in millis. Catches orphan entries from crashed
     # proxies; see ADR-015 "stale-entry concern" section.
     reapIntervalMs: 10000
+
     # Maximum age before an entry is reaped on quit-event miss. Longer than
     # any reasonable network blip but short enough to free up the slot when
     # a proxy genuinely crashed mid-request.
@@ -75,8 +85,10 @@ transport:
     # Required when `type: redis`. Hostname or IP of the Redis instance
     # shared by every backend and proxy in the network.
     host: localhost
+
     # Default Redis port. Override if your deployment uses a non-standard one.
     port: 6379
+
     # Optional. Leave empty / omitted for unauthenticated Redis (dev/test);
     # set when Redis ACL or `requirepass` is configured.
     password: ""
@@ -86,6 +98,7 @@ heartbeat:
   # observe rows within `staleAfterMs` to consider them live.
   intervalMs: 1000
   staleAfterMs: 5000
+
 # Proxy-cache availability store (DB-free tier). When a backend selects
 # `transport.type: proxy-cache` (or `auto` with this proxy companion present)
 # this proxy answers each backend's snapshot request with the merged view of:
@@ -96,7 +109,7 @@ heartbeat:
 # player-empty (and therefore not pushing a live heartbeat). A fresh live
 # heartbeat always supersedes the declared entry for the same server.
 # Optional: omit the whole block to rely on live heartbeats only.
-#servers:
+# servers:
 #  backend-a:
 #    regions: [default]
 #  backend-b:
@@ -171,6 +184,7 @@ loadBalancer:
       curve:
         type: logarithmic
         k: 9.0
+
 #  backends:
 #    backend-a:
 #      weight: 1.0

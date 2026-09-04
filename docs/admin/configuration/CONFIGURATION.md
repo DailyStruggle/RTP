@@ -14,7 +14,7 @@ RTP provides multiple ways to view and update settings:
 
 > 📎 **Detailed Admin Guide:** See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full instructions on navigating the `/rtp admin` menu and using `/rtp config` subcommands.
 
-> **Folder layout:** the everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) sit at the top level. The named definitions you author (`regions/`, `worlds/`, `effects/`, plus the shared `shape/` and `vert/` catalogs) live under `definitions/`. The rarely-hand-edited tuning and text files (`performance.yml`, `logging.yml`, `metrics.yml`, `network.yml`, `database.yml`, `biomes.yml`, `blocks.yml`, the `messages/` tree, and the `schematics/` folder) live under `advanced/`. The per-locale translation mirror stays at `lang/`. Each rename map is a co-located hidden dotfile (`.<name>.lang.yml`) beside the file it describes. On upgrade from an older layout, RTP relocates your authored files automatically and archives the old folders as `<name>.migrated`.
+> **Folder layout:** the everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) sit at the top level. The named definitions you author (`regions/`, `worlds/`, `effects/`, plus the shared `shape/` and `vert/` catalogs) live under `definitions/`. The rarely-hand-edited tuning and text files (`performance.yml`, `logging.yml`, `metrics.yml`, `ttl.yml`, `network.yml`, `database.yml`, `biomes.yml`, `blocks.yml`, the `messages/` tree, and the `schematics/` folder) live under `advanced/`. The per-locale translation mirror stays at `lang/`. Each rename map is a co-located hidden dotfile (`.<name>.lang.yml`) beside the file it describes. On upgrade from an older layout, RTP relocates your authored files automatically and archives the old folders as `<name>.migrated`.
 
 > **Inheritance:** to avoid repeating the same value across many region/world files, a region/world setting can inherit a global default with an `@<file>` token (e.g. `@config`, `@economy`). See [CORE_CONFIG.md → Defaults (inheritance)](CORE_CONFIG.md#defaults-inheritance).
 
@@ -37,6 +37,7 @@ RTP provides multiple ways to view and update settings:
 | `advanced/messages/*.yml` | All player-facing message strings (split by concern) | [MESSAGES.md](MESSAGES.md) |
 | `advanced/logging.yml` | Console logging verbosity | [LOGGING.md](LOGGING.md) |
 | `advanced/metrics.yml` | Runtime-health metrics SPI reporting knobs | [METRICS.md](METRICS.md) |
+| `advanced/ttl.yml` | Spatial memory expiration and cause-based TTL tiers | [TTL.md](TTL.md) |
 | `advanced/network.yml` | Multi-server / multi-proxy network mode | [proxies/CONFIGURATION.md](../proxies/CONFIGURATION.md) |
 | `advanced/database.yml` | Database backend and connection settings | [CORE_CONFIG.md](CORE_CONFIG.md) |
 | `advanced/biomes.yml`, `advanced/blocks.yml` | Biome / block tag catalogs used by safety filters | [SAFETY.md](SAFETY.md) |
@@ -94,8 +95,8 @@ The `shape` block defines how horizontal coordinates are selected. The `name` ke
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `radius` | Integer | `256` | Maximum distance from the centre in **chunks**. |
-| `centerRadius` | Integer | `64` | Minimum distance from the centre (donut hole) in **chunks**. Players won't land inside this radius. |
+| `radius` | Integer / Distance | `256` | Maximum distance from the centre in **chunks** (supports spatial suffixes, e.g. `4096b`, `256c`, `4r`, `5km`). |
+| `centerRadius` | Integer / Distance | `64` | Minimum distance from the centre (donut hole) in **chunks** (supports spatial suffixes, e.g. `1024b`, `64c`). Players won't land inside this radius. |
 | `weight` | Double | `1.0` | Distribution weight. `> 1.0` shifts landings toward the centre; `< 1.0` shifts toward the edge. |
 | `expand` | Boolean | `false` | If `true`, the radius grows automatically as locations are consumed. |
 
@@ -105,8 +106,8 @@ Normal-distribution variants replace `weight` with explicit statistical paramete
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `radius` | Integer | `256` | Maximum distance from the centre in **chunks**. |
-| `centerRadius` | Integer | `64` | Minimum distance from the centre in **chunks** (donut hole). |
+| `radius` | Integer / Distance | `256` | Maximum distance from the centre in **chunks** (supports spatial suffixes, e.g. `4096b`, `256c`, `4r`, `5km`). |
+| `centerRadius` | Integer / Distance | `64` | Minimum distance from the centre in **chunks** (donut hole, supports spatial suffixes). |
 | `mean` | Double | — | Mean of the normal distribution (0.0 = centre, 1.0 = edge). |
 | `deviation` | Double | — | Standard deviation. Smaller = tighter cluster; larger = wider spread. |
 | `expand` | Boolean | `false` | If `true`, the radius grows automatically as locations are consumed. |
@@ -115,8 +116,8 @@ Normal-distribution variants replace `weight` with explicit statistical paramete
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `width` | Integer | — | Full width of the rectangle (total X-axis extent, centred on the region). |
-| `height` | Integer | — | Full height of the rectangle (total Z-axis extent, centred on the region). |
+| `width` | Integer / Distance | — | Full width of the rectangle (total X-axis extent, centred on the region; supports spatial suffixes). |
+| `height` / `length` | Integer / Distance | — | Full height / length of the rectangle (total Z-axis extent, centred on the region; supports spatial suffixes). |
 | `rotation` | Double | `0.0` | Rotation of the rectangle in degrees around the centre. |
 
 ---

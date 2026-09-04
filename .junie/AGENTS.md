@@ -11,7 +11,7 @@ Operational guide for AI agents and human contributors working in the RTP reposi
 1. Run the **Pre-Flight Checklist** before every code or terminal action.
 2. Never perform synchronous chunk I/O on the main thread (S-005).
 3. Never silently swallow a teleport failure (S-004).
-4. Run Gradle via the wrapper (`.\gradlew.bat` on Windows, `./gradlew` on POSIX); one command per line.
+4. Run Gradle via the wrapper (`.\gradlew.bat` on Windows, `./gradlew` on POSIX); one command per line. Serialization locking is built transparently into both wrapper scripts to prevent concurrent lock collisions.
 5. Use the `search_project` tool - not `grep`/`find` - to search the codebase.
 6. Java 21+ is required (REQ-RTP-SYS-001).
 7. Before modifying an uncommitted **code** file, create a `.bak` copy beside it. Skip for git-clean files and docs/markdown.
@@ -267,6 +267,7 @@ User strings live in `rtp-plugin/src/main/resources/<file>.yml` (English baselin
 ## Environment & Execution
 
 - **Gradle execution:** Always use the wrapper (`.\gradlew.bat` on Windows/PowerShell, `./gradlew` on Linux/POSIX). Run one command per line without chaining.
+  - Transparent mutex/file-locking serialization is built directly into `gradlew` and `gradlew.bat` so concurrent LLM agent tasks and scripts can execute standard wrapper commands without race conditions or cache lock timeouts.
 - **Build & test commands:**
   - Full build: `.\gradlew.bat build` (or `./gradlew build`)
   - Module build: `.\gradlew.bat :<module>:build` (e.g. `.\gradlew.bat :rtp-core:build`)

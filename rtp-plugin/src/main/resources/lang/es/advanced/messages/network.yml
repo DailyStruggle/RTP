@@ -2,48 +2,58 @@
 # Textos de mensajes para jugadores y operadores en este idioma, agrupados por tema.
 # Copia generada automaticamente de los mensajes en ingles; no editar a mano (se sobrescribe).
 
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
+# --- Mensajes de modo de red entre servidores ---
+# Se envían únicamente cuando `network.enabled: true` y el `/rtp` del jugador se enruta
+# a través de la cola de espera entre servidores (ver network.yml `routing.mode`).
+# Todas las claves son opcionales desde la perspectiva del jugador: el ciclo base
+# `mensajeRetraso` / `mensajeTeletransporte` sigue controlando el flujo visible.
+# Enviado cuando la solicitud ha sido aceptada en la cola de espera entre servidores
+# y está esperando una asignación de backend. Marcador: [position] - posición
+# indexada en 0 desde `pollStatus`; puede estar vacía si el transporte no devuelve
+# ninguna posición.
 networkQueued: "&7[P0] en cola para un destino entre servidores (posición [position])..."
-# Sent when a player runs /rtp while already waiting in the cross-server queue.
-# Placeholder: [position] - position in line; may be empty.
+
+# Enviado cuando un jugador ejecuta /rtp mientras ya está esperando en la cola entre servidores.
+# Marcador: [position] - posición en la fila; puede estar vacío.
 alreadyQueued: "&cYa estás esperando en la cola entre servidores (posición [position]). Espera por favor."
-# Sent when a cross-server queue entry waited too long and was dropped.
-# No placeholders.
+
+# Enviado cuando una entrada en la cola entre servidores esperó demasiado tiempo y se descartó.
+# Sin marcadores.
 networkTimedOut: "&c[P0] el teletransporte entre servidores expiró esperando un servidor."
-# Sent when the cross-server queue is full and the request is rejected.
-# No placeholders.
+
+# Enviado cuando la cola entre servidores está llena y la solicitud es rechazada.
+# Sin marcadores.
 waitlistFull: "&c[P0] la cola entre servidores está llena; inténtalo de nuevo en breve."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
+
+# Enviado cuando la cola ha transferido la solicitud al enrutador proxy y
+# se está seleccionando un backend.
 networkRouting: "&7[P0] enrutando a un servidor..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
+
+# Enviado cuando un backend ha reservado una coordenada para este jugador y el
+# proxy está a punto de iniciar el salto entre servidores. Marcador: [server]
+# - el serverId del backend de destino.
 networkReserved: "&a[P0] coordenada reservada en [server]. Transfiriendo..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+
+# Enviado cuando el proxy está en medio del salto. Marcador: [server] - destino.
 networkTransferring: "&a[P0] transfiriendo a [server]..."
-# Sent when the cross-server path gave up and fell back to the local server.
-# Placeholder: [reason] - the reason for falling back.
+
+# Enviado cuando la ruta entre servidores se rindió y recurrió al servidor local.
+# Marcador: [reason] - el motivo por el cual se recurrió al servidor local.
 networkFallback: "&e[P0] entre servidores no disponible ([reason]); volviendo a local."
-# Sent when the cross-server request failed and no fallback was possible.
-# Placeholder: [reason] - the failure reason.
+
+# Enviado cuando la solicitud entre servidores falló y no fue posible recurrir a una alternativa.
+# Marcador: [reason] - el motivo del fallo.
 networkFailed: "&c[P0] el teletransporte entre servidores falló: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
+
+# Enviado cuando el jugador solicitó una región específica (`/rtp <region>`) pero
+# ningún backend en la red la está atendiendo actualmente. Marcador:
+# [region] - el nombre de la región solicitada.
 networkRegionUnavailable: "&c[P0] ningún servidor está sirviendo la región '[region]' actualmente."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
+
+# Enviado cuando el nombre de la región solicitada coincide con dos o más backends y
+# la directiva configurada por el operador no puede elegir uno (solo se activa
+# con directivas más estrictas que el `warn` predeterminado). Marcador: [region].
 networkRegionAmbiguous: "&c[P0] la región '[region]' es ambigua entre servidores; fija un servidor."
 
-# DO NOT TOUCH VERSION NUMBER
+# NO MODIFICAR EL NÚMERO DE VERSIÓN
 version: 1.0

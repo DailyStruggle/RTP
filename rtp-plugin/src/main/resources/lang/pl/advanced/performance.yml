@@ -160,5 +160,6 @@ prefabrykat:
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
+
 # NIE ZMIENIAJ NUMERU WERSJI
 version: 1.0

@@ -156,5 +156,6 @@ prefab_blanket:
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
+
 # Do not bite the version number, sacred catnip
 meowsion: 1.0

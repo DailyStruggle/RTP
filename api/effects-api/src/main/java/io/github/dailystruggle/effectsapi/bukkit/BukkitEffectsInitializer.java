@@ -88,6 +88,7 @@ public final class BukkitEffectsInitializer {
         EffectFactory.addEffect("SOUND", new SoundEffect(Sound.valueOf("ENTITY_PLAYER_LEVELUP")));
         // Glide requires elytra (1.9+); register conditionally to keep older servers happy.
         if (EffectsAPI.getServerIntVersion() >= 9) EffectFactory.addEffect("GLIDE", new GlideEffect());
+        EffectFactory.addEffect("COMMAND", new io.github.dailystruggle.effectsapi.common.effects.CommandEffect());
     }
 
     /**
