@@ -12,10 +12,12 @@ scanPauze: "#A020F0[P0] scantaak gepauzeerd voor regio's: [scan_regions]"
 scanHervatten: "#10A5F5[P0] scantaak hervat voor regio's: [scan_regions]"
 scanActief: "&c[P0] er is al een scantaak actief voor regio's: [scan_regions]"
 scanNietActief: "&c[P0] er is geen scantaak actief voor regio's: [scan_regions]"
+
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 land &8| &7ETA #7E9CC8[scan_eta]"
-# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
-# Set to empty string to disable the boss-bar.
+
+# Baasbalktitel getoond aan spelers met rtp.scan-toestemming terwijl een wereldscan actief is.
+# Stel in op een lege string om de baasbalk uit te schakelen.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanBossBar: "Scannen van [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
@@ -29,41 +31,54 @@ infoMSPT: "&7Huidige plugin MSPT: #7E9CC8[mspt]"
 infoTotaalLadingen: "&7Levenslange geladen chunks: #7E9CC8[loads]"
 infoLoadsByOrigin: "&7Laadbeurten per oorsprong: #7E9CC8[loadsByOrigin]"
 infoLekSnelheid: "&7Huidige chunk-leksnelheid: #7E9CC8[leakRate]"
-# --- Health metrics block ---
+
+# --- Blok met statusstatistieken ---
 infoQueueDepth: "&7Spelers in wachtrij van regio's: #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7Wachtende teleportpijplijnen: #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7Gemiddelde pijplijnlatentie: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
+
+# Pijplijnlatentie-percentielen. Plaatshouders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Pijplijnlatentie (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
+
+# Controle op trage teleports (alleen onmiddellijke/niet-gewachtrijde teleports). Plaatshouders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Trage teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+
+# Controle op wachtrijgroei. Plaatshouders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Waarschuwingen wachtrijgroei (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7JVM-heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
+
 # Koptekstregel voor het Health-pipeline-blok in /rtp info.
 infoHealthPipelineHeader: "&7--- Status: pijplijn ---"
+
 # TPS-uitlezing voor de 1m / 5m / 15m-vensters. Placeholders: [tps1m] [tps5m] [tps15m].
 infoTps: "&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
+
 # Live server-MSPT en tick-budgetbenutting. Placeholders: [mspt] [tickBudgetUtilisation].
 infoMSPTLive: "&7Server-MSPT: #7E9CC8[mspt] ms (&7tickbudget: #7E9CC8[tickBudgetUtilisation]&7)"
-# Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
+
+# Geconfigureerde spelers-softcap vs huidig online aantal. Plaatshouders: [softCap] [playerCount].
 infoSoftCap: "&7Spelers: #7E9CC8[playerCount] / [softCap]"
+
 # Meest recente database round-trip-latentie in ms. Placeholder: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7Databaselatentie: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics.
-# Success/failure rate over all recorded generation attempts. Placeholders:
+
+# Generatie-uitkomststatistieken.
+# Succes-/faalpercentage over alle geregistreerde generatiepogingen. Plaatshouders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Generatiesucces: #7E9CC8[genSuccessRate]&7 (mislukt #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
-# Single most common rejection cause and its share of all failures. Placeholders:
+
+# Meest voorkomende afwijzingsoorzaak en het aandeel van alle mislukkingen. Plaatshouders:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Voornaamste afwijzingsoorzaak: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Per-cause rejection breakdown.
-# Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
+
+# Afwijzingenoverzicht per oorzaak.
+# Plaatshouder: [genFailureBreakdown] - door komma's gescheiden lijst van oorzaak=N, drukste eerst.
 infoFailureBreakdown: "&7Afwijzingen per oorzaak: #7E9CC8[genFailureBreakdown]"
-# Health colour-band thresholds. Used to colour the coloured-variant
-# placeholders (e.g. [tps1mColoured]) green/yellow/red.
+
+# Drempelwaarden voor statuskleuren. Gebruikt om de gekleurde varianten
+# van plaatshouders (bijv. [tps1mColoured]) groen/geel/rood te kleuren.
 infoThresholdTpsGreen: 19.5
 infoThresholdTpsYellow: 18.0
 infoThresholdMsptGreen: 30.0
@@ -71,9 +86,11 @@ infoThresholdMsptYellow: 45.0
 infoThresholdCacheFillGreen: 0.5
 infoThresholdCacheFillYellow: 0.25
 infoThresholdNetworkAgeYellow: 5.0
-# Header line introducing the per-Folia-region table (Folia runtime only).
+
+# Koptekstregel ter introductie van de Folia-regiotabel (alleen Folia-runtime).
 infoFoliaRegionsHeader: "&7--- Folia-regio's ---"
-# Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
+
+# Rijtemplate voor een enkele Folia-regio. Plaatshouders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
 infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 infoDisclaimerKoptekst: "&7--- Diagnostische opmerking ---"
@@ -84,17 +101,20 @@ infoWereld: "#21ADA8[world]"
 infoRegioKoptekst: "#63C5DARegio's:"
 infoConsoleRegioKoptekst: "&7--- Regio's ---"
 infoRegio: "#52B2BF[region]"
-# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
-# players spend their time in, sampled over the server's uptime.
-# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+
+# Ranglijst van bioombezetting getoond door /rtp info biomes - in welke biomen online
+# spelers hun tijd doorbrengen, bemonsterd over de uptime van de server.
+# Koptekst-plaatshouders: [biomeTotalSamples] [biomeDistinctCount].
 infoBiomeActivityHeader: "&8--- &3Bioombezetting &8(&3[biomeTotalSamples]&8 monsters, &3[biomeDistinctCount]&8 biomen) ---"
-# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+
+# Rij per bioom. Plaatshouders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
 infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
-# Shown when no occupancy has been sampled yet.
+
+# Getoond wanneer er nog geen bezetting is bemonsterd.
 infoBiomeActivityEmpty: "&8--- &7nog geen bioombezetting bemonsterd &8---"
 
-# sub-info listings
-# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
+# deel-infolijsten
+# plaatshouders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
 wereldGegevens:
   - "#21ADA8[world]:"
   - "#99EEBB  - regio: [region]"
@@ -116,70 +136,89 @@ regioGegevens:
   - "#58CCED  - voornaamste afwijzingsoorzaak: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
-# Section 8b: Generalized Menu Framework
+# Sectie 8b: Algemeen menuraamwerk
 # ###############################################################################
-# Sent when a menu token is unknown, malformed, or belongs to another player.
+# Verzonden wanneer een menutoken onbekend of misvormd is, of van een andere speler is.
 menuInvalid: "&c[P0] that menu link is invalid."
+
 # Verzonden wanneer een menu-inwisseling de UUID van de aanroepende speler niet kan vinden.
 menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
-# Hover-fallback template used by the menu reflector when no YAML block-comment
-# is available for a parameter. Placeholder: [type] - the declared parameter type.
+
+# Hover-terugvaltemplate gebruikt door de menureflector wanneer er geen YAML-blokcommentaar
+# beschikbaar is voor een parameter. Plaatshouder: [type] - het gedeclareerde parametertype.
 menuHoverFallbackType: "type: [type]"
-# Hover-fallback template used by the menu reflector when a parameter exposes a
-# small curated value set. Placeholder: [values] - comma-joined accepted values.
+
+# Hover-terugvaltemplate gebruikt door de menureflector wanneer een parameter een
+# kleine samengestelde waardeverzameling biedt. Plaatshouder: [values] - door komma's gescheiden geaccepteerde waarden.
 menuHoverFallbackBounds: "geaccepteerd: [values]"
-# Label for the "go back one level" navigation row prepended to every non-root menu page.
+
+# Label voor de navigatierij "één niveau terug" vooraan elke niet-hoofdmenupagina.
 menuBack: "&7« terug"
-# Label template for the "execute the assembled command" row prepended to every
-# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
+
+# Labelsjabloon voor de rij "het samengestelde commando uitvoeren" vooraan elke
+# uitvoerbare niet-hoofdmenupagina. Plaatshouder: [command] - de samengestelde /rtp ... aanroep.
 menuExecute: "&2▶ voer [command] uit"
-# Header row at the top of a parameter-value picker sub-page.
-# Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
+
+# Koptekstrij bovenaan een subpagina voor het kiezen van een parameterwaarde.
+# Plaatshouders: [param] - parameternaam; [command] - samengestelde /rtp ... aanroep.
 menuPickValue: "&7kies een waarde voor [param] (voert uit: /rtp [command] [param]:<value>)"
-# Label for the "type a custom value" fallback row on a parameter-value picker page.
-# Clicking it prefills chat with the assembled command up to '<param>:' so the player
-# can type any value, including ones not in the suggestion list.
+
+# Label voor de terugvalrij "typ een aangepaste waarde" op een parameterwaarde-kiespagina.
+# Als erop wordt geklikt, wordt de chat vooraf ingevuld met het samengestelde commando tot '<param>:' zodat de speler
+# elke waarde kan typen, inclusief waarden die niet in de suggestielijst staan.
 menuTypeValue: "&7✎ typ een aangepaste waarde..."
-# Non-clickable header row at the top of every non-root menu page.
-# Surfaces the currently-constructed /rtp invocation including any staged
-# parameter assignments (name:value). Placeholder: [command] - assembled args.
+
+# Niet-klikbare koptekstrij bovenaan elke niet-hoofdmenupagina.
+# Toont de momenteel geconstrueerde /rtp-aanroep inclusief klaargezette
+# parametertoewijzingen (naam:waarde). Plaatshouder: [command] - samengestelde argumenten.
 menuConstructed: "&7bezig met bouwen: #7E9CC8/rtp [command]"
-# Non-clickable title row prepended to the root /rtp menu page.
-# Provides a welcoming header before the player descends into any subcommand.
+
+# Niet-klikbare titelrij vooraan de hoofd- /rtp menupagina.
+# Biedt een welkomstkoptekst voordat de speler afdaalt in een subcommando.
 menuRootTitle: "#5FB3B3&l⚡ RTP-menu"
-# Non-clickable subtitle/hint row prepended to the root /rtp menu page below
-# menuRootTitle. Short orientation text for first-time users.
+
+# Niet-klikbare ondertitel-/hintrij vooraan de hoofd- /rtp menupagina onder
+# menuRootTitle. Korte oriëntatietekst voor nieuwe gebruikers.
 menuRootHint: "&7klik hieronder op een optie om te beginnen"
-# Navigation rows appended to paginated menu pages — clicking
-# them moves to the previous/next page of the same model. Placeholder:
-# [page] - the 1-based human-readable target page number.
+
+# Navigatierijen toegevoegd aan gepagineerde menupagina's — erop klikken
+# gaat naar de vorige/volgende pagina van hetzelfde model. Plaatshouder:
+# [page] - het voor mensen leesbare 1-gebaseerde doelpaginanummer.
 menuPagePrev: "&7« vorige pagina ([page])"
 menuPageNext: "&7volgende pagina ([page]) »"
-# Section divider on the front page above teleport rows (player view).
+
+# Sectiescheider op de voorpagina boven teleportatierijen (spelersweergave).
 menuFrontPageSectionTeleport: "&8--- &7teleportatie &8---"
-# Front-page rows. No placeholders.
+
+# Voorpaginarijen. Geen plaatshouders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- kies een wereld"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- kies een biome"
 menuFrontPageRowHelp: "#7A4FB8❓ commando's tonen &7- /rtp help"
-# Front-page admin entry row: the only inline admin-visible row on the
-# front page; click descends into the admin panel. Hidden when the viewer
-# lacks rtp.menu.admin.
+
+# Beheerdersinvoersoort op de voorpagina: de enige inline beheerders-zichtbare rij op de
+# voorpagina; klikken leidt naar het beheerpaneel. Verborgen wanneer de kijker
+# rtp.menu.admin mist.
 menuFrontPageRowAdmin: "#9D7CD8▶ beheerderspaneel &7- operatorgereedschap"
-# Hover text for the admin-panel entry row. No placeholders.
+
+# Hovertekst voor de invoerrij van het beheerpaneel. Geen plaatshouders.
 menuFrontPageHoverAdmin: "&7operatorgereedschap: config, scans, diagnostiek, herladen"
-# --- Admin panel book page ---
-# Non-clickable title row at the top of the admin panel. No placeholders.
+
+# --- Boekpagina beheerpaneel ---
+# Niet-klikbare titelrij bovenaan het beheerpaneel. Geen plaatshouders.
 menuAdminPanelTitle: "#5FB3B3&l⚙ beheerpaneel"
-# Non-clickable hint row below menuAdminPanelTitle. No placeholders.
+
+# Niet-klikbare hintrij onder menuAdminPanelTitle. Geen plaatshouders.
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
-# Section dividers on the admin panel. No placeholders.
+
+# Sectiescheiders op het beheerpaneel. Geen plaatshouders.
 menuAdminPanelSectionConfig: "&8--- &7configuratie &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7diagnostiek &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7levenscyclus &8---"
 menuAdminPanelSectionBrowse: "&8--- &7bladeren &8---"
-# Admin-panel rows + hovers. No placeholders.
+
+# Rijen + hovers van het beheerpaneel. Geen plaatshouders.
 menuAdminPanelRowConfig: "&b▶ configuratie-editor"
 menuAdminPanelHoverConfig: "&7open de samengestelde configuratiekiezer"
 menuAdminPanelRowRegions: "#5FB3B3▶ regio's"
@@ -201,177 +240,241 @@ menuAdminPanelHoverReload: "&7herlaadt alle configuratiebestanden; lopende telep
 menuAdminPanelRowBrowse: "&b▶ alle commando's bekijken"
 menuAdminPanelHoverBrowse: "&7open de gespiegelde /rtp-commandoboom"
 menuAdminPanelRowBack: "&7« terug"
-# --- Visualizations submenu (admin map of bad locations per region) ---
-# Admin-panel row: open the Visualizations submenu. No placeholders.
+
+# --- Submenu visualisaties (beheerderskaart van slechte locaties per regio) ---
+# Beheerpaneelrij: open het submenu Visualisaties. Geen plaatshouders.
 menuAdminPanelRowVisualizations: "#5FB3B3▶ visualisaties"
-# Hover text for the admin-panel Visualizations row. No placeholders.
+
+# Hovertekst voor de Visualisaties-rij op het beheerpaneel. Geen plaatshouders.
 menuAdminPanelHoverVisualizations: "&7open kaarten en andere visualisaties voor de operator"
-# Section divider above the Visualizations block on the admin panel.
+
+# Sectiescheider boven het visualisatieblok op het beheerpaneel.
 menuAdminPanelSectionVisualizations: "&8» &7visualisaties"
-# Non-clickable title row at the top of the Visualizations submenu.
+
+# Niet-klikbare titelrij bovenaan het submenu Visualisaties.
 menuVisualizationsTitle: "#9D7CD8&l⌖ visualisaties"
-# Non-clickable hint row below the title.
+
+# Niet-klikbare hintrij onder de titel.
 menuVisualizationsHint: "&7kies een regio om de kaart met onveilige locaties te bekijken"
-# Visualizations row template; [region] - region name.
+
+# Sjabloon voor visualisatierij; [region] - regionaam.
 menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- vormkaart van regio"
-# Hover text for a Visualizations region row; [region] - region name.
+
+# Hovertekst voor een visualisatieregio-rij; [region] - regionaam.
 menuVisualizationsHoverRegion: "&7open een kaart met onveilige locaties in &b[region]"
-# Non-clickable hint row shown when no regions are configured.
+
+# Niet-klikbare hintrij getoond wanneer er geen regio's zijn geconfigureerd.
 menuVisualizationsEmpty: "&7(geen regio's geconfigureerd)"
-# Visualizations submenu back row (returns to the admin panel).
+
+# Terugrij voor submenu Visualisaties (keert terug naar het beheerpaneel).
 menuVisualizationsRowBack: "&7« terug"
-# --- Admin panel Setup section: curated prefabs ---
-# Section divider above the Setup (quick start) block on the admin panel.
+
+# --- Sectie Installatie op het beheerpaneel: samengestelde presets ---
+# Sectiescheider boven het blok Installatie (snelstart) op het beheerpaneel.
 menuAdminPanelSectionSetup: "&8» &7installatie (snelstart)"
-# Setup row + hover: survival-default identity overlay (reset to shipped defaults).
+
+# Installatierij + hover: survival-default identiteitsoverlay (terugzetten naar meegeleverde standaardwaarden).
 menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
 menuPrefabSurvivalDefaultHover: "&7zet terug naar de meegeleverde standaardwaarden (identiteitsoverlay)"
-# Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
+
+# Installatierij + hover: low-performance (langere puls, kleinere caches, login-cache uit).
 menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
 menuPrefabLowPerformanceHover: "&7zwakke hosts / VPS met gedeelde CPU: langere puls, kleinere caches, login-cache uit"
-# Setup row + hover: high-performance (short pulse, large caches, login cache on).
+
+# Installatierij + hover: high-performance (korte puls, grote caches, login-cache aan).
 menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
 menuPrefabHighPerformanceHover: "&7dedicated hardware / grote spelersaantallen: korte puls, grote caches, login-cache aan"
-# Setup row + hover: folia-tuned (regional scheduler tuning).
+
+# Installatierij + hover: folia-tuned (afstemming regionale planner).
 menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
 menuPrefabFoliaTunedHover: "&7folia regionale planner: snellere pulsen per regio, minder gelijktijdige chunk-tickets"
-# Setup row + hover: multi-world (one region per world from current default).
+
+# Installatierij + hover: multi-world (één regio per wereld vanuit huidige standaard).
 menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
 menuPrefabMultiWorldHover: "&7synthetiseert één regio per wereld vanuit de huidige standaard"
-# Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
+
+# Titel bevestigingsmenu. Plaatshouder: [prefab] - prefab-id of weergavenaam.
 menuPrefabConfirmTitle: "#9D7CD8&l⚙ preset bevestigen: #5FB3B3[prefab]"
-# Confirmation menu non-clickable hint row below the title. No placeholders.
+
+# Niet-klikbare hintrij onder de titel in het bevestigingsmenu. Geen plaatshouders.
 menuPrefabConfirmHint: "&7bekijk de wijzigingen hieronder en klik dan op bevestigen of annuleren"
-# Confirmation menu footer row: confirm and write the prefab to disk.
+
+# Voettekstrij bevestigingsmenu: bevestig en schrijf de prefab naar schijf.
 menuPrefabConfirmRow: "&2&l[confirm]"
-# Confirmation menu footer row: cancel and return to the admin panel.
+
+# Voettekstrij bevestigingsmenu: annuleer en ga terug naar het beheerpaneel.
 menuPrefabCancelRow: "&c&l[cancel]"
-# Clickable row label for the Refresh affordance at the bottom of the /rtp info
-# book. Re-renders the current scope against a fresh metrics snapshot.
+
+# Klikbaar rijlabel voor de Vernieuwen-actie onderaan het /rtp info
+# boek. Rendert het huidige bereik opnieuw met een verse metriekmomentopname.
 infoBookRefreshRow: "&2[Refresh]"
-# Hover text for the info-book refresh row.
+
+# Hovertekst voor de vernieuwingsrij in het infoboek.
 infoBookRefreshHover: "&7Geef deze pagina opnieuw weer met een verse metriekmomentopname."
-# Clickable row label for the Switch-to-chat affordance at the bottom of the
-# /rtp info book. Re-runs the same scope through the legacy chat path.
+
+# Klikbaar rijlabel voor de Overschakelen-naar-chat-actie onderaan het
+# /rtp infoboek. Voert hetzelfde bereik opnieuw uit via het klassieke chatpad.
 infoBookSwitchToTextRow: "&7[Switch to chat]"
-# Hover text for the info-book switch-to-chat row.
+
+# Hovertekst voor de overschakelen-naar-chat-rij in het infoboek.
 infoBookSwitchToTextHover: "&7Voer /rtp info opnieuw uit in chat in plaats van het boek."
-# Footer row rendered when the /rtp info book content exceeds the book page
-# cap. Clicking re-runs the same scope in chat mode so no data is lost.
+
+# Voettekstrij gerenderd wanneer de pagina-inhoud van het /rtp infoboek de paginalimiet
+# overschrijdt. Klikken voert hetzelfde bereik opnieuw uit in chatmodus zodat er geen gegevens verloren gaan.
 infoBookOverflowFooter: "&7(inhoud afgekapt - klik om de volledige uitvoer in chat te bekijken)"
-# Non-clickable note row indicating that periodic auto-refresh for the info
-# book is not currently supported on this build (deferred to a later
-# milestone). Users may click the Refresh row to refresh manually.
+
+# Niet-klikbare notitierij die aangeeft dat periodieke automatische verversing voor het infoboek
+# momenteel niet wordt ondersteund in deze build (uitgesteld naar een latere
+# mijlpaal). Gebruikers kunnen op de Vernieuwen-rij klikken om handmatig te verversen.
 infoBookAutoRefreshDeferredNote: "&8(automatisch verversen nog niet ondersteund; klik op Verversen)"
-# Non-clickable title row at the top of the config-file selector page.
-# Shown when an admin clicks "/rtp config" from the front page.
+
+# Niet-klikbare titelrij bovenaan de configuratiebestand-kiespagina.
+# Getoond wanneer een beheerder op "/rtp config" klikt vanaf de voorpagina.
 configSelectorTitle: "#5FB3B3&l⚙ configuratiebestanden"
-# Label for the "back to /rtp menu root" navigation row on the config selector page.
+
+# Label voor de navigatierij "terug naar /rtp menuhoofd" op de configuratiekiezerpagina.
 configSelectorBackRow: "&7« terug naar menu"
-# Non-clickable title row at the top of a single config-file page.
-# Placeholder: [file] - the config file name (e.g. "performance", "safety").
+
+# Niet-klikbare titelrij bovenaan een individuele configuratiebestandpagina.
+# Plaatshouder: [file] - de configuratiebestandsnaam (bijv. "performance", "safety").
 configFileTitle: "#5FB3B3&l⚙ configuratie: &7[file]"
-# Label for the "back to config selector" navigation row on a single config-file page.
+
+# Label voor de navigatierij "terug naar configuratiekiezer" op een configuratiebestandpagina.
 configFileBackRow: "&7« terug naar configuratiebestanden"
-# Non-clickable hint row shown when a config file has no editable keys.
+
+# Niet-klikbare hintrij getoond wanneer een configuratiebestand geen bewerkbare sleutels heeft.
 configFileEmptyHint: "&7(geen bewerkbare sleutels in dit bestand)"
-# Per-key row label on a config-file page. Placeholders:
-#   [key]   - the config key name; [value] - the currently-stored value.
+
+# Label per sleutelrij op een configuratiebestandpagina. Plaatshouders:
+#   [key]   - de configuratiesleutelnaam; [value] - de momenteel opgeslagen waarde.
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
-# Hover text for a per-key row on a config-file page. Placeholders:
-#   [key], [value], [type] - the config key name, current value, and declared type.
+
+# Hovertekst voor een rij per sleutel op een configuratiebestandpagina. Plaatshouders:
+#   [key], [value], [type] - de configuratiesleutelnaam, huidige waarde en gedeclareerd type.
 configKeyHoverFormat: "&7klik om te bewerken &7[key] &7(type: [type])"
-# Non-clickable title row at the top of a shape/vert type-picker page.
-# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
+
+# Niet-klikbare titelrij bovenaan een vorm/vert-typekiezerpagina.
+# Plaatshouders: [param] - "shape" of "vert"; [current] - momenteel actieve typenaam.
 configTypePickerTitle: "#5FB3B3&l⚙ kies [param]-type &7(huidig: &7[current]&7)"
-# Non-clickable title row at the top of a shape/vert sub-parameter page.
-# Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
+
+# Niet-klikbare titelrij bovenaan een vorm/vert-deelparameterpagina.
+# Plaatshouders: [param] - "shape" of "vert"; [type] - de actieve typenaam.
 configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7deelparameters"
-# Hint sent when the book view falls back to the legacy raw-YAML chat dump
-# (no book renderer available on this platform).
+
+# Hint verzonden wanneer de boekweergave terugvalt op de klassieke ruwe-YAML chatdump
+# (geen boekrenderer beschikbaar op dit platform).
 configViewRawHint: "&7[P0] boekweergave niet beschikbaar; terugvallen op ruwe dump."
-# Placeholder text rendered in place of a config value that has not been set.
+
+# Plaatshoudertekst gerenderd in plaats van een configuratiewaarde die niet is ingesteld.
 configValueUnsetPlaceholder: "&8(niet ingesteld)"
-# Non-clickable header row separating the "Changeable" list from the "Pending"
-# staging-cart list on a config-file page when the viewer has staged one or
-# more uncommitted edits. No placeholders.
+
+# Niet-klikbare koptekstrij die de lijst "Wijzigbaar" scheidt van de lijst "In afwachting"
+# (winkelmandje) op een configuratiebestandpagina wanneer de kijker een of
+# meer niet-doorgevoerde bewerkingen heeft klaargezet. Geen plaatshouders.
 configPendingHeader: "&6&l-- pending changes --"
-# Per-row label for a staged (pending) key=value entry on a config-file page.
-# Clicking the row removes it from the cart. Placeholders: [key], [value].
+
+# Rijlabel voor een klaargezette (in afwachting zijnde) sleutel=waarde-invoer op een configuratiebestandpagina.
+# Klikken op de rij verwijdert deze uit het mandje. Plaatshouders: [key], [value].
 configPendingRowFormat: "&9[key]&8 = &0[value]"
-# Hover text shown when the viewer hovers a pending (staged) row on a
-# config-file page. No placeholders.
+
+# Hovertekst getoond wanneer de kijker over een klaargezette rij beweegt op een
+# configuratiebestandpagina. Geen plaatshouders.
 configPendingRowHover: "klik om te annuleren"
-# Clickable label for the "apply staged changes" row on a config-file page.
-# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
+
+# Klikbaar label voor de rij "klaargezette wijzigingen toepassen" op een configuratiebestandpagina.
+# Voert het samengestelde commando /rtp config <file> k1=v1 ... uit en wist het mandje.
 configApplyRow: "&2&l[apply]"
-# Clickable label for the "discard staged changes" row on a config-file page.
-# Clears the cart without applying.
+
+# Klikbaar label voor de rij "klaargezette wijzigingen verwerpen" op een configuratiebestandpagina.
+# Wist het mandje zonder toe te passen.
 configDiscardRow: "&c&l[discard]"
 
-# --- Map / chart rendering ---
-# Sent when a map row is clicked but map rendering is not available on this
-# server (e.g. the Lite assembly, or no map provider installed).
+# --- Kaart- / grafiekweergave ---
+# Verzonden wanneer op een kaartrij wordt geklikt maar kaartweergave niet beschikbaar is op deze
+# server (bijv. de Lite-variant, of geen kaartprovider geïnstalleerd).
 mapBindingMissing: "&c[P0] kaartweergave is niet beschikbaar op deze server."
-# Sent when a chart is requested but no renderer is registered for that
-# chart type.
+
+# Verzonden wanneer een grafiek wordt aangevraagd maar er geen renderer is geregistreerd voor dat
+# grafiektype.
 mapResolverMissing: "&c[P0] geen grafiekresolver geregistreerd voor dit verzoek."
-# Sent when a resolver runs but the underlying data source is unavailable
-# for the requested target (unknown region, no data yet, world unloaded).
-# Placeholder: [region] - the requested region name (may be empty).
+
+# Verzonden wanneer een resolver wordt uitgevoerd maar de onderliggende gegevensbron niet beschikbaar is
+# voor het gevraagde doel (onbekende regio, nog geen gegevens, wereld ontladen).
+# Plaatshouder: [region] - de gevraagde regionaam (kan leeg zijn).
 mapUnavailable: "&e[P1] grafiekgegevens zijn op dit moment niet beschikbaar."
-# Sent when the map service cannot allocate a map right now (e.g. a
-# per-viewer cap has been reached).
+
+# Verzonden wanneer de kaartdienst op dit moment geen kaart kan toewijzen (bijv. een
+# limiet per kijker is bereikt).
 mapBusy: "&e[P1] de kaartdienst is bezig; probeer het zo dadelijk opnieuw."
-# Label for the clickable "/rtp info" menu row that renders a heatmap of
-# the current region's known bad locations. Hidden when map rendering is
-# not available on this server.
+
+# Label voor de klikbare menurij in "/rtp info" die een heatmap rendert van
+# de bekende onveilige locaties van de huidige regio. Verborgen wanneer kaartweergave
+# niet beschikbaar is op deze server.
 menuInfoBadPointsLabel: "#9D7CD8&l# kaart met onveilige punten"
 
-# --- MultiConfig submenu ---
-# Header row fallback used when no per-kind header key is registered.
-# Placeholder: [parserKind] - the raw multi-config kind name.
+# --- MultiConfig-submenu ---
+# Terugval voor koptekstrij wanneer er geen kopsleutel per soort is geregistreerd.
+# Plaatshouder: [parserKind] - de ruwe multiconfig-soortnaam.
 multiconfigHeaderDefault: "#5FB3B3&l[parserKind]"
-# Header row label for the regions multi-config selector page. No placeholders.
+
+# Koptekstrijlabel voor de selectiepagina van de regio-multiconfig. Geen plaatshouders.
 multiconfigHeaderRegions: "#5FB3B3&l regio's"
-# Header row label for the worlds multi-config selector page. No placeholders.
+
+# Koptekstrijlabel voor de selectiepagina van de werelden-multiconfig. Geen plaatshouders.
 multiconfigHeaderWorlds: "#5FB3B3&l werelden"
-# Toggle-row label when remove-mode is OFF. No placeholders.
+
+# Schakelrijlabel wanneer verwijdermodus UIT staat. Geen plaatshouders.
 multiconfigToggleRemoveModeOff: "&8[ ] verwijdermodus"
-# Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
+
+# Schakelrijlabel wanneer verwijdermodus AAN staat. Klikken op invoerrijen verwijdert.
 multiconfigToggleRemoveModeOn: "&c[x] verwijdermodus (klik op een item om te verwijderen)"
-# Selector row label for the "+ Add new..." entry. No placeholders.
+
+# Keuzerijlabel voor de invoer "+ Nieuw toevoegen...". Geen plaatshouders.
 multiconfigRowAdd: "&2+ nieuw toevoegen..."
-# Hover text for the Add row. Placeholder: [name] - prefilled default name.
+
+# Hovertekst voor de Toevoegen-rij. Plaatshouder: [name] - vooraf ingevulde standaardnaam.
 multiconfigRowAddHover: "&7typ een naam in de aambeeldprompt; vooringevuld: &f[name]"
-# Hover text for an entry row in normal mode. Placeholder: [name].
+
+# Hovertekst voor een itemrij in normale modus. Plaatshouder: [name].
 multiconfigRowEditHover: "&7bewerk &f[name]"
-# Hover text for an entry row in remove-mode. Placeholder: [name].
+
+# Hovertekst voor een itemrij in verwijdermodus. Plaatshouder: [name].
 multiconfigRowRemoveHover: "&cverwijder &f[name]"
-# Confirm-delete page title row. Placeholder: [name].
+
+# Titelrij pagina verwijdering bevestigen. Plaatshouder: [name].
 multiconfigConfirmTitle: "&c&l[name] verwijderen?"
-# Confirm-delete page Yes-row label. No placeholders.
+
+# Label van Ja-rij op pagina verwijdering bevestigen. Geen plaatshouders.
 multiconfigConfirmYes: "&c&l[confirm delete]"
-# Confirm-delete page Cancel-row label. No placeholders.
+
+# Label van Annuleren-rij op pagina verwijdering bevestigen. Geen plaatshouders.
 multiconfigConfirmNo: "&2&l[cancel]"
-# Hover text on a locked (grayed) default-region row. No placeholders.
+
+# Hovertekst op een vergrendelde (grijs gemaakte) standaardregiorij. Geen plaatshouders.
 multiconfigLockRegionDefault: "&7de standaardregio kan niet worden verwijderd"
-# Hover text on a locked (grayed) world row. Placeholder: [name].
+
+# Hovertekst op een vergrendelde (grijs gemaakte) wereldrij. Plaatshouder: [name].
 multiconfigLockWorldLoaded: "&7wereld '[name]' is geladen op de server; ontlaad deze voordat je de configuratie verwijdert"
-# Result message after a successful ADD. Placeholder: [name].
+
+# Resultaatbericht na een succesvolle TOEVOEGING. Plaatshouder: [name].
 multiconfigResultAdded: "&a'[name]' toegevoegd."
-# Result message after a successful REMOVE. Placeholder: [name].
+
+# Resultaatbericht na een succesvolle VERWIJDERING. Plaatshouder: [name].
 multiconfigResultRemoved: "&a'[name]' verwijderd."
-# Result message when ADD failed. Placeholders: [name], [reason].
+
+# Resultaatbericht wanneer TOEVOEGEN mislukt. Plaatshouders: [name], [reason].
 multiconfigResultAddFailed: "&ckon '[name]' niet toevoegen: [reason]"
-# Result message when REMOVE failed. Placeholders: [name], [reason].
+
+# Resultaatbericht wanneer VERWIJDEREN mislukt. Plaatshouders: [name], [reason].
 multiconfigResultRemoveFailed: "&ckon '[name]' niet verwijderen: [reason]"
-# Result message when the proposed entry name is rejected by the sanitiser.
-# Placeholder: [name].
+
+# Resultaatbericht wanneer de voorgestelde itemnaam wordt afgewezen door het filter.
+# Plaatshouder: [name].
 multiconfigResultNameInvalid: "&cnaam '[name]' is niet toegestaan; gebruik letters, cijfers, '_', '-', '.'"
-# Result message when an ADD collides with an existing entry name.
-# Placeholder: [name].
+
+# Resultaatbericht wanneer een TOEVOEGING botst met een bestaande itemnaam.
+# Plaatshouder: [name].
 multiconfigResultNameTaken: "&cer bestaat al een item met de naam '[name]'."
 
-# DO NOT TOUCH VERSION NUMBER
+# RAAK HET VERSIENUMMER NIET AAN
 version: 1.0

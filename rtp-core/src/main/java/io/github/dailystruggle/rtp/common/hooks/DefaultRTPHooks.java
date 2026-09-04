@@ -31,8 +31,14 @@ public final class DefaultRTPHooks implements RTPHooks {
   public DefaultRTPHooks() {}
 
   private final RegionVerifierRegistry verifierRegistry = new RegionVerifierRegistry() {
+    @Override public void register(Class<?> source, Predicate<RTPCoords> verifier) {
+      GlobalRegionVerifiers.addGlobalRegionVerifier(source, verifier);
+    }
     @Override public void register(Predicate<RTPCoords> verifier) {
       GlobalRegionVerifiers.addGlobalRegionVerifier(verifier);
+    }
+    @Override public void registerAsync(Class<?> source, Function<RTPCoords, CompletableFuture<Boolean>> verifier) {
+      GlobalRegionVerifiers.addGlobalRegionVerifierAsync(source, verifier);
     }
     @Override public void registerAsync(Function<RTPCoords, CompletableFuture<Boolean>> verifier) {
       GlobalRegionVerifiers.addGlobalRegionVerifierAsync(verifier);

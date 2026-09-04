@@ -2,11 +2,11 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
-import io.github.dailystruggle.commandsapi.common.parameters.CoordinateParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.FloatParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
+import io.github.dailystruggle.rtp.common.commands.parameters.DistanceParameter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
 
@@ -43,14 +43,14 @@ public class Circle_Normal extends NormalMemoryShape {
     // Mirrors V2 sub-parameter UX so users see the format and scale.
     subParameters.put("mode", new EnumParameter<>(
         "rtp.params", "x-z position adjustment method", (sender, s) -> true, Mode.class));
-    subParameters.put("radius", new IntegerParameter(
+    subParameters.put("radius", new DistanceParameter(
         "rtp.params", "outer radius of region", (sender, s) -> true, 64, 128, 256, 512, 1024));
-    subParameters.put("centerradius", new IntegerParameter(
+    subParameters.put("centerradius", new DistanceParameter(
         "rtp.params", "inner radius of region", (sender, s) -> true, 16, 32, 64, 128, 256));
-    subParameters.put("centerx", new CoordinateParameter(
-        "rtp.params", "center point x", (sender, s) -> true));
-    subParameters.put("centerz", new CoordinateParameter(
-        "rtp.params", "center point z", (sender, s) -> true));
+    subParameters.put("centerx", new DistanceParameter(
+        "rtp.params", "center point x", (sender, s) -> true, "~", "-~", "0"));
+    subParameters.put("centerz", new DistanceParameter(
+        "rtp.params", "center point z", (sender, s) -> true, "~", "-~", "0"));
     subParameters.put("mean", new FloatParameter(
         "rtp.params", "distribution mean (0.0 = centerRadius, 1.0 = radius)", (sender, s) -> true, 0.0, 0.25, 0.5, 0.75, 1.0));
     subParameters.put("deviation", new FloatParameter(

@@ -2,12 +2,12 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
-import io.github.dailystruggle.commandsapi.common.parameters.CoordinateParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.FloatParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.parameters.DistanceParameter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.EllipseMemoryShapeParams;
 
@@ -49,20 +49,20 @@ public class Ellipse extends MemoryShape<EllipseMemoryShapeParams> {
 
       subParameters.put("mode", new EnumParameter<>(
           "rtp.params", "x-z position adjustment method", (sender, s) -> true, Mode.class));
-      subParameters.put("radius", new IntegerParameter(
+      subParameters.put("radius", new DistanceParameter(
           "rtp.params", "first axis radius of region", (sender, s) -> true, 64, 128, 256, 512, 1024));
-      subParameters.put("radius2", new IntegerParameter(
+      subParameters.put("radius2", new DistanceParameter(
           "rtp.params", "second axis radius of region", (sender, s) -> true, 64, 128, 256, 512, 1024));
-      subParameters.put("centerradius", new IntegerParameter(
+      subParameters.put("centerradius", new DistanceParameter(
           "rtp.params", "inner radius of region", (sender, s) -> true, 16, 32, 64, 128, 256));
-      subParameters.put("centerradius2", new IntegerParameter(
+      subParameters.put("centerradius2", new DistanceParameter(
           "rtp.params", "second axis of inner exclusion region", (sender, s) -> true, 16, 32, 64, 128, 256));
       subParameters.put("rotation", new IntegerParameter(
           "rtp.params", "rotation in degrees", (sender, s) -> true, 0, 30, 45, 60, 90));
-      subParameters.put("centerx", new CoordinateParameter(
-          "rtp.params", "center point x", (sender, s) -> true));
-      subParameters.put("centerz", new CoordinateParameter(
-          "rtp.params", "center point z", (sender, s) -> true));
+      subParameters.put("centerx", new DistanceParameter(
+          "rtp.params", "center point x", (sender, s) -> true, "~", "-~", "0"));
+      subParameters.put("centerz", new DistanceParameter(
+          "rtp.params", "center point z", (sender, s) -> true, "~", "-~", "0"));
       subParameters.put("weight", new FloatParameter(
           "rtp.params", "weigh towards or away from center", (sender, s) -> true, 0.1, 1.0, 10.0));
       subParameters.put("expand", new BooleanParameter(

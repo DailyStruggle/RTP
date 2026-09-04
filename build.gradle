@@ -57,7 +57,7 @@ subprojects {
         // sources/javadoc variant as a result.
     }
 
-    tasks.withType(JavaCompile) {
+    tasks.withType(JavaCompile).configureEach {
         options.encoding = 'UTF-8'
     }
 
@@ -90,13 +90,20 @@ subprojects {
         testRuntimeOnly libs.junit.platform.launcher
     }
 
-    test {
+    tasks.withType(Test).configureEach {
         useJUnitPlatform()
+        maxHeapSize = '1024m'
+        jvmArgs '-XX:+UseG1GC', '-XX:MaxMetaspaceSize=384m'
+        testLogging {
+            events 'started', 'passed', 'skipped', 'failed'
+            showStandardStreams = true
+            exceptionFormat = 'full'
+        }
     }
 
     apply plugin: 'jacoco'
     jacoco { toolVersion = libs.versions.jacoco.get() }
-    tasks.withType(Test) { finalizedBy jacocoTestReport }
+    tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
     jacocoTestReport {
         dependsOn test
         reports { html.required = true; xml.required = true }

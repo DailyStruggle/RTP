@@ -2,48 +2,57 @@
 # この言語でのプレイヤーおよび運営者向けメッセージ文。テーマごとに分類されています。
 # 英語版メッセージから自動生成された複製です。手動で編集しないでください (上書きされます)。
 
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
+# --- クロスサーバーネットワークモードのメッセージ ---
+# `network.enabled: true` であり、プレイヤーの `/rtp` がクロスサーバー待機キュー経由で
+# ルーティングされる場合にのみ送信されます (network.yml の `routing.mode` を参照)。
+# プレイヤーの観点からはすべてのキーが任意です - ベースラインの
+# `delayMessage` / `teleportMessage` サイクルが引き続き表示フローを制御します。
+# リクエストがクロスサーバー待機キューに受理され、
+# バックエンドの要求を待機しているときに送信されます。プレースホルダー: [position] - `pollStatus` による
+# 0始まりの位置。トランスポートが位置を返さない場合は空になることがあります。
 networkQueued: "&7[P0] サーバー間の目的地を待機中です (順番 [position])..."
-# Sent when a player runs /rtp while already waiting in the cross-server queue.
-# Placeholder: [position] - position in line; may be empty.
+
+# プレイヤーがすでにクロスサーバーキューで待機中に /rtp を実行したときに送信されます。
+# プレースホルダー: [position] - 列の順番。空の場合もあります。
 alreadyQueued: "&cすでにサーバー間キューで待機中です (順番 [position])。お待ちください。"
-# Sent when a cross-server queue entry waited too long and was dropped.
-# No placeholders.
+
+# クロスサーバーキューのエントリの待機時間が長すぎて破棄されたときに送信されます。
+# プレースホルダーなし。
 networkTimedOut: "&c[P0] バックエンドの待機中にサーバー間テレポートがタイムアウトしました。"
-# Sent when the cross-server queue is full and the request is rejected.
-# No placeholders.
+
+# クロスサーバーキューが満杯でリクエストが拒否されたときに送信されます。
+# プレースホルダーなし。
 waitlistFull: "&c[P0] サーバー間キューが満杯です。しばらくしてからもう一度お試しください。"
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
+
+# キューがリクエストをプロキシのルーターに引き渡し、
+# バックエンドの選択が進行中のときに送信されます。
 networkRouting: "&7[P0] バックエンドへルーティング中..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
+
+# バックエンドがこのプレイヤー用の座標を予約し、プロキシが
+# クロスサーバーのホップを開始しようとしているときに送信されます。プレースホルダー: [server]
+# - 移動先バックエンドの serverId。
 networkReserved: "&a[P0] [server] に座標を予約しました。転送中..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+
+# プロキシがホップ中のときに送信されます。プレースホルダー: [server] - 移動先。
 networkTransferring: "&a[P0] [server] へ転送中..."
-# Sent when the cross-server path gave up and fell back to the local server.
-# Placeholder: [reason] - the reason for falling back.
+
+# クロスサーバー経路を断念し、ローカルサーバーにフォールバックしたときに送信されます。
+# プレースホルダー: [reason] - フォールバックした理由。
 networkFallback: "&e[P0] サーバー間が利用できません ([reason])。ローカルに切り替えます。"
-# Sent when the cross-server request failed and no fallback was possible.
-# Placeholder: [reason] - the failure reason.
+
+# クロスサーバーリクエストが失敗し、フォールバックもできなかったときに送信されます。
+# プレースホルダー: [reason] - 失敗の理由。
 networkFailed: "&c[P0] サーバー間テレポートに失敗しました: [reason]。"
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
+
+# プレイヤーが特定のリージョンを要求した (`/rtp <region>`) ものの、
+# ネットワーク内のどのバックエンドも現在それを提供していないときに送信されます。プレースホルダー:
+# [region] - 要求されたリージョン名。
 networkRegionUnavailable: "&c[P0] 現在リージョン '[region]' を提供しているバックエンドはありません。"
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
+
+# 要求されたリージョン名が2つ以上のバックエンドに解決され、
+# 運営者が設定したポリシーで1つを選択できないときに送信されます (デフォルトの `warn` よりも
+# 厳密なポリシーの下でのみ発生します)。プレースホルダー: [region]。
 networkRegionAmbiguous: "&c[P0] リージョン '[region]' は複数のバックエンドで曖昧です。サーバーを指定してください。"
 
-# DO NOT TOUCH VERSION NUMBER
+# バージョン番号は変更しないでください
 version: 1.0

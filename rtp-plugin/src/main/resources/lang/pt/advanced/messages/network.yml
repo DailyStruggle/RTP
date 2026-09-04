@@ -2,47 +2,57 @@
 # Textos de mensagens para jogadores e operadores neste idioma, agrupados por tema.
 # Copia gerada automaticamente das mensagens em ingles; nao editar a mao (sera sobrescrito).
 
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
+# --- Mensagens do modo de rede entre servidores ---
+# Enviadas apenas quando `network.enabled: true` e o `/rtp` do jogador é roteado
+# pela fila de espera entre servidores (consulte network.yml `routing.mode`).
+# Todas as chaves são opcionais da perspectiva do jogador - o ciclo básico
+# de `delayMessage` / `teleportMessage` ainda conduz o fluxo visível.
+# Enviado quando a solicitação foi aceita na fila de espera entre servidores
+# e aguarda a reivindicação de um backend. Espaço reservado: [position] - posição
+# indexada em 0 de `pollStatus`; pode estar vazio se o transporte não retornar
+# nenhuma posição.
 networkQueued: "&7[P0] na fila para um destino entre servidores (posição [position])..."
-# Sent when a player runs /rtp while already waiting in the cross-server queue.
-# Placeholder: [position] - position in line; may be empty.
+
+# Enviado quando um jogador executa /rtp enquanto já aguarda na fila entre servidores.
+# Espaço reservado: [position] - posição na fila; pode estar vazio.
 alreadyQueued: "&cVocê já está esperando na fila entre servidores (posição [position]). Aguarde."
-# Sent when a cross-server queue entry waited too long and was dropped.
-# No placeholders.
+
+# Enviado quando uma entrada na fila entre servidores esperou muito tempo e foi descartada.
+# Sem espaços reservados.
 networkTimedOut: "&c[P0] o teleporte entre servidores expirou enquanto aguardava um backend."
-# Sent when the cross-server queue is full and the request is rejected.
-# No placeholders.
+
+# Enviado quando a fila entre servidores está cheia e a solicitação é rejeitada.
+# Sem espaços reservados.
 waitlistFull: "&c[P0] a fila entre servidores está cheia; tente novamente em breve."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
+
+# Enviado quando a fila transferiu a solicitação para o roteador do proxy e
+# a seleção de um backend está em andamento.
 networkRouting: "&7[P0] roteando para um backend..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
+
+# Enviado quando um backend reservou uma coordenada para este jogador e o
+# proxy está prestes a iniciar o salto entre servidores. Espaço reservado: [server]
+# - o serverId do backend de destino.
 networkReserved: "&a[P0] coordenada reservada em [server]. Transferindo..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+
+# Enviado quando o proxy está no meio do salto. Espaço reservado: [server] - destino.
 networkTransferring: "&a[P0] transferindo para [server]..."
-# Sent when the cross-server path gave up and fell back to the local server.
-# Placeholder: [reason] - the reason for falling back.
+
+# Enviado quando a rota entre servidores desistiu e recorreu ao servidor local.
+# Espaço reservado: [reason] - o motivo do fallback.
 networkFallback: "&e[P0] entre servidores indisponível ([reason]); voltando ao local."
-# Sent when the cross-server request failed and no fallback was possible.
-# Placeholder: [reason] - the failure reason.
+
+# Enviado quando a solicitação entre servidores falhou e nenhum fallback foi possível.
+# Espaço reservado: [reason] - o motivo da falha.
 networkFailed: "&c[P0] o teleporte entre servidores falhou: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
+
+# Enviado quando o jogador solicitou uma região específica (`/rtp <region>`), mas
+# nenhum backend na rede a está atendendo no momento. Espaço reservado:
+# [region] - o nome da região solicitada.
 networkRegionUnavailable: "&c[P0] nenhum backend está servindo a região '[region]' no momento."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
+
+# Enviado quando o nome da região solicitada resolve para dois ou mais backends e
+# a política configurada pelo operador não pode escolher um (só dispara
+# sob políticas mais rigorosas que o padrão `warn`). Espaço reservado: [region].
 networkRegionAmbiguous: "&c[P0] a região '[region]' é ambígua entre backends; fixe um servidor."
 
 # DO NOT TOUCH VERSION NUMBER

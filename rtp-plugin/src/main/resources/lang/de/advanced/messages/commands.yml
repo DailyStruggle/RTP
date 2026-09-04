@@ -14,11 +14,13 @@ scanPause: "#A020F0[P0] Scan-Aufgabe pausiert für Regionen: [scan_regions]"
 scanFortsetzen: "#10A5F5[P0] Scan-Aufgabe fortgesetzt für Regionen: [scan_regions]"
 scanLaeuft: "&c[P0] Scan-Aufgabe läuft bereits für Regionen: [scan_regions]"
 scanLaeuftNicht: "&c[P0] Scan-Aufgabe läuft nicht für Regionen: [scan_regions]"
+
 # Platzhalter: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 Land &8| &7ETA #7E9CC8[scan_eta]"
-# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
-# Set to empty string to disable the boss-bar.
-# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+
+# Boss-Bar-Titel, der Spielern mit der Berechtigung rtp.scan angezeigt wird, während ein Welt-Scan läuft.
+# Auf leere Zeichenkette setzen, um die Boss-Bar zu deaktivieren.
+# Platzhalter: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanBossBar: "Scanne [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% Land) ETA [scan_eta]"
 
 # ###############################################################################
@@ -32,39 +34,52 @@ infoMSPT: "&7Aktuelles Plugin-MSPT: #7E9CC8[mspt]"
 infoLadevorgaengeGesamt: "&7Insgesamt geladene Chunks: #7E9CC8[loads]"
 infoLadevorgaengeNachUrsprung: "&7Ladevorgänge nach Ursprung: #7E9CC8[loadsByOrigin]"
 infoLeckRate: "&7Aktuelle Chunk-Leak-Rate: #7E9CC8[leakRate]"
+
 # --- Zustands-Metrikblock ---
 infoWarteschlangenTiefe: "&7Spieler in Regions-Warteschlangen: #7E9CC8[queueDepth]"
 infoAusstehendeTeleports: "&7Ausstehende Teleport-Pipelines: #7E9CC8[pendingTeleports]"
 infoDurchschnittPipelineMs: "&7Durchschnittliche Pipeline-Latenz: #7E9CC8[avgPipelineMs] ms"
+
 # Perzentile der Pipeline-Latenz. Platzhalter: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Pipeline-Latenz (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
+
 # Prüfung langsamer Teleports (nur sofortige/nicht eingereihte Teleports). Platzhalter:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Langsame Teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
+
 # Prüfung des Warteschlangen-Wachstums. Platzhalter: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Warteschlangen-Wachstumswarnungen (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7JVM-Heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
+
 # Kopfzeile für den als Pipeline gekennzeichneten Block in /rtp info.
 infoZustandPipelineKopf: "&7--- Zustand: Pipeline ---"
+
 # TPS-Anzeige für die Fenster 1m / 5m / 15m. Platzhalter: [tps1m] [tps5m] [tps15m].
 infoTps: "&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
+
 # Live-Server-MSPT und Tick-Budget-Auslastung. Platzhalter: [mspt] [tickBudgetUtilisation].
 infoMSPTLive: "&7Server-MSPT: #7E9CC8[mspt] ms (&7Tick-Budget: #7E9CC8[tickBudgetUtilisation]&7)"
+
 # Konfigurierte weiche Spielerobergrenze gegenüber der aktuellen Online-Anzahl. Platzhalter: [softCap] [playerCount].
 infoSoftLimit: "&7Spieler: #7E9CC8[playerCount] / [softCap]"
+
 # Aktuelle Round-Trip-Latenz der Datenbank in ms. Platzhalter: [databaseLatencyMs].
 infoDatenbankLatenzMs: "&7Datenbank-Latenz: #7E9CC8[databaseLatencyMs] ms"
+
 # Metriken zum Generierungsergebnis.
 # Erfolgs-/Fehlerrate über alle erfassten Generierungsversuche. Platzhalter:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Generierungserfolg: #7E9CC8[genSuccessRate]&7 (Fehler #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
+
 # Häufigste einzelne Ablehnungsursache und ihr Anteil an allen Fehlern. Platzhalter:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Häufigste Ablehnungsursache: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
+
 # Aufschlüsselung der Ablehnungen nach Ursache.
 # Platzhalter: [genFailureBreakdown] - kommagetrennte Liste Ursache=N, häufigste zuerst.
 infoFailureBreakdown: "&7Ablehnungen nach Ursache: #7E9CC8[genFailureBreakdown]"
+
 # Schwellenwerte der Zustands-Farbbänder. Werden verwendet, um farbige Platzhalter-
 # Varianten (z. B. [tps1mColoured]) grün/gelb/rot einzufärben.
 infoSchwelleTpsGruen: 19.5
@@ -74,8 +89,10 @@ infoSchwelleMsptGelb: 45.0
 infoSchwelleCacheFuellungGruen: 0.5
 infoSchwelleCacheFuellungGelb: 0.25
 infoSchwelleNetzwerkAlterGelb: 5.0
+
 # Kopfzeile, die die Tabelle pro Folia-Region einleitet (nur Folia-Laufzeit).
 infoFoliaRegionenKopf: "&7--- Folia-Regionen ---"
+
 # Zeilenvorlage für eine einzelne Folia-Region. Platzhalter: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
 infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
@@ -87,13 +104,16 @@ infoWelt: "#21ADA8[world]"
 infoRegionKopf: "#63C5DARegionen:"
 infoKonsoleRegionKopf: "&7--- Regionen ---"
 infoRegion: "#52B2BF[region]"
-# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
-# players spend their time in, sampled over the server's uptime.
-# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+
+# Bestenliste der Biom-Belegung, die von /rtp info biomes angezeigt wird - in welchen Biomen Online-
+# Spieler ihre Zeit verbringen, stichprobenartig über die Betriebszeit des Servers erfasst.
+# Kopfzeilen-Platzhalter: [biomeTotalSamples] [biomeDistinctCount].
 infoBiomeActivityHeader: "&8--- &3Biom-Belegung &8(&3[biomeTotalSamples]&8 Proben, &3[biomeDistinctCount]&8 Biome) ---"
-# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+
+# Zeile pro Biom. Platzhalter: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
 infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
-# Shown when no occupancy has been sampled yet.
+
+# Wird angezeigt, wenn noch keine Belegung erfasst wurde.
 infoBiomeActivityEmpty: "&8--- &7noch keine Biom-Belegung erfasst &8---"
 
 # Unter-Info-Auflistungen
@@ -123,65 +143,84 @@ regionInfo:
 # ###############################################################################
 # Wird gesendet, wenn ein Menü-Token unbekannt oder fehlerhaft ist oder einem anderen Spieler gehört.
 menueUngueltig: "&c[P0] dieser Menü-Link ist ungültig."
+
 # Wird gesendet, wenn ein Menü-Einlöseversuch die UUID des aufrufenden Spielers nicht auflösen kann.
 menueUnbekannterSpieler: "&c[P0] Menü-Links können nur von Spielern im Spiel verwendet werden."
+
 # Hover-Ersatzvorlage, die der Menü-Reflektor verwendet, wenn für einen Parameter kein
 # YAML-Blockkommentar verfügbar ist. Platzhalter: [type] - der deklarierte Parametertyp.
 menueHoverTypFallback: "Typ: [type]"
+
 # Hover-Ersatzvorlage, die der Menü-Reflektor verwendet, wenn ein Parameter eine kleine
 # kuratierte Wertemenge bereitstellt. Platzhalter: [values] - kommagetrennte zulässige Werte.
 menueHoverGrenzenFallback: "akzeptiert: [values]"
+
 # Bezeichnung der "eine Ebene zurück"-Navigationszeile, die jeder Nicht-Wurzel-Menüseite vorangestellt wird.
 menueZurueck: "&7« zurück"
+
 # Bezeichnungsvorlage für die Zeile "zusammengebauten Befehl ausführen", die jeder
 # ausführbaren Nicht-Wurzel-Menüseite vorangestellt wird. Platzhalter: [command] - der zusammengebaute /rtp ...-Aufruf.
 menueAusfuehren: "&2▶ [command] ausführen"
+
 # Kopfzeile oben auf einer Unterseite zur Parameterwertauswahl.
 # Platzhalter: [param] - Parametername; [command] - zusammengebauter /rtp ...-Aufruf.
 menueWertWaehlen: "&7wähle einen Wert für [param] (führt aus: /rtp [command] [param]:<value>)"
+
 # Bezeichnung der Ersatzzeile "eigenen Wert eingeben" auf einer Parameterwert-Auswahlseite.
 # Ein Klick füllt den Chat mit dem zusammengebauten Befehl bis '<param>:' vor, sodass der Spieler
 # einen beliebigen Wert eingeben kann, auch solche, die nicht in der Vorschlagsliste stehen.
 menueWertEingeben: "&7✎ eigenen Wert eingeben..."
+
 # Nicht anklickbare Kopfzeile oben auf jeder Nicht-Wurzel-Menüseite.
 # Zeigt den aktuell zusammengebauten /rtp-Aufruf einschließlich aller vorgemerkten
 # Parameterzuweisungen (name:value). Platzhalter: [command] - zusammengebaute Argumente.
 menueZusammengebaut: "&7baue zusammen: #7E9CC8/rtp [command]"
+
 # Nicht anklickbare Titelzeile, die der Wurzel-/rtp-Menüseite vorangestellt wird.
 # Bietet eine einladende Kopfzeile, bevor der Spieler in einen Unterbefehl absteigt.
 menueHauptTitel: "#5FB3B3&l⚡ RTP-Menü"
+
 # Nicht anklickbare Untertitel-/Hinweiszeile, die der Wurzel-/rtp-Menüseite unterhalb von
 # menuRootTitle vorangestellt wird. Kurzer Orientierungstext für Erstnutzer.
 menueHauptHinweis: "&7klicke unten auf eine Option, um zu beginnen"
+
 # Navigationszeilen, die paginierten Menüseiten angehängt werden - ein Klick
 # wechselt zur vorherigen/nächsten Seite desselben Modells. Platzhalter:
 # [page] - die 1-basierte, menschenlesbare Zielseitennummer.
 menueSeiteZurueck: "&7« vorherige Seite ([page])"
 menueSeiteVor: "&7nächste Seite ([page]) »"
+
 # Abschnittstrenner auf der Startseite über den Teleport-Zeilen (Spieleransicht).
 menueStartseiteAbschnittTeleport: "&8--- &7Teleportation &8---"
+
 # Startseitenzeilen. Keine Platzhalter.
 menueStartseiteZeileTeleport: "&2▶ /rtp &7- zu einem zufälligen Ort teleportieren"
 menueStartseiteZeileRegion: "&2▶ /rtp region:&7... &7- eine Region wählen"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- eine Welt wählen"
 menueStartseiteZeileBiom: "&2▶ /rtp biome:&7... &7- ein Biom wählen"
 menueStartseiteZeileHilfe: "&2▶ /rtp help &7- Befehle auflisten"
+
 # Admin-Einstiegszeile der Startseite: die einzige inline admin-sichtbare Zeile
 # auf der Startseite; ein Klick steigt in das Admin-Panel ab. Ausgeblendet, wenn
 # dem Betrachter rtp.menu.admin fehlt.
 menueStartseiteZeileAdmin: "#9D7CD8▶ Admin-Panel &7- Operator-Werkzeuge"
+
 # Hover-Text für die Admin-Panel-Einstiegszeile. Keine Platzhalter.
 menueStartseiteHoverAdmin: "&7Operator-Werkzeuge: Konfiguration, Scans, Diagnose, Neuladen"
+
 # --- Admin-Panel-Buchseite ---
 # Nicht anklickbare Titelzeile oben im Admin-Panel. Keine Platzhalter.
 menueAdminPanelTitel: "#5FB3B3&l⚙ Verwaltungspanel"
+
 # Nicht anklickbare Hinweiszeile unterhalb von menuAdminPanelTitle. Keine Platzhalter.
 menueAdminPanelHinweis: "&7klicke eine Option; destruktive Aktionen zeigen einen Warnhinweis"
+
 # Abschnittstrenner im Admin-Panel. Keine Platzhalter.
 menueAdminPanelAbschnittKonfig: "&8--- &7Konfiguration &8---"
 menueAdminPanelAbschnittDiagnose: "&8--- &7Diagnose &8---"
 menueAdminPanelAbschnittLebenszyklus: "&8--- &7Lebenszyklus &8---"
 menueAdminPanelAbschnittDurchsuchen: "&8--- &7Durchsuchen &8---"
+
 # Admin-Panel-Zeilen + Hover-Texte. Keine Platzhalter.
 menueAdminPanelZeileKonfig: "&b▶ Konfigurationseditor"
 menueAdminPanelHoverKonfig: "&7den kuratierten Konfigurations-Selektor öffnen"
@@ -204,110 +243,151 @@ menueAdminPanelHoverNeuladen: "&7lädt alle Konfigurationsdateien neu; laufende 
 menueAdminPanelZeileDurchsuchen: "&b▶ alle Befehle durchsuchen"
 menueAdminPanelHoverDurchsuchen: "&7den gespiegelten /rtp-Befehlsbaum öffnen"
 menueAdminPanelZeileZurueck: "&7« zurück"
+
 # --- Untermenü Visualisierungen (Admin-Karte schlechter Orte pro Region) ---
 # Admin-Panel-Zeile: das Untermenü Visualisierungen öffnen. Keine Platzhalter.
 menueAdminPanelZeileVisualisierungen: "#5FB3B3▶ Visualisierungen"
+
 # Hover-Text für die Visualisierungen-Zeile im Admin-Panel. Keine Platzhalter.
 menueAdminPanelHoverVisualisierungen: "&7Karten und andere operatorseitige Visualisierungen öffnen"
+
 # Abschnittstrenner über dem Visualisierungen-Block im Admin-Panel.
 menueAdminPanelAbschnittVisualisierungen: "&8» &7Visualisierungen"
+
 # Nicht anklickbare Titelzeile oben im Untermenü Visualisierungen.
 menueVisualisierungenTitel: "#9D7CD8&l⌖ Visualisierungen"
+
 # Nicht anklickbare Hinweiszeile unterhalb des Titels.
 menueVisualisierungenHinweis: "&7wähle eine Region, um ihre Karte schlechter Orte anzuzeigen"
+
 # Zeilenvorlage für Visualisierungen; [region] - Regionsname.
 menueVisualisierungenZeileRegion: "#5FB3B3▶ [region] &7- Regionsform-Karte"
+
 # Hover-Text für eine Visualisierungen-Regionszeile; [region] - Regionsname.
 menueVisualisierungenHoverRegion: "&7eine Karte öffnen, die schlechte Orte in &b[region] anzeigt"
+
 # Nicht anklickbare Hinweiszeile, die angezeigt wird, wenn keine Regionen konfiguriert sind.
 menueVisualisierungenLeer: "&7(keine Regionen konfiguriert)"
+
 # Zurück-Zeile des Untermenüs Visualisierungen (kehrt zum Admin-Panel zurück).
 menueVisualisierungenZeileZurueck: "&7« zurück"
+
 # --- Admin-Panel-Bereich Einrichtung: kuratierte Vorlagen ---
 # Abschnittstrenner über dem Einrichtungs-Block (Schnellstart) im Admin-Panel.
 menueAdminPanelAbschnittEinrichtung: "&8» &7Einrichtung (Schnellstart)"
+
 # Einrichtungszeile + Hover: survival-default-Identitätsüberlagerung (auf ausgelieferte Standardwerte zurücksetzen).
 menueVorlageSurvivalStandardZeile: "#5FB3B3▶ survival-default"
 menueVorlageSurvivalStandardHover: "&7auf die ausgelieferten Standardwerte zurücksetzen (identische Überlagerung)"
+
 # Einrichtungszeile + Hover: low-performance (längerer Puls, kleinere Caches, Login-Cache aus).
 menueVorlageNiedrigeLeistungZeile: "#5FB3B3▶ low-performance"
 menueVorlageNiedrigeLeistungHover: "&7schwache Hosts / Shared-CPU-VPSes: längerer Puls, kleinere Caches, Login-Cache aus"
+
 # Einrichtungszeile + Hover: high-performance (kurzer Puls, große Caches, Login-Cache an).
 menueVorlageHoheLeistungZeile: "#5FB3B3▶ high-performance"
 menueVorlageHoheLeistungHover: "&7dedizierte Hardware / hohe Spielerzahlen: kurzer Puls, große Caches, Login-Cache an"
+
 # Einrichtungszeile + Hover: folia-tuned (Abstimmung des Regions-Schedulers).
 menueVorlageFoliaOptimiertZeile: "#5FB3B3▶ folia-tuned"
 menueVorlageFoliaOptimiertHover: "&7Folia-Regionsscheduler: schnellere Pulse pro Region, weniger gleichzeitige Chunk-Tickets"
+
 # Einrichtungszeile + Hover: multi-world (eine Region pro Welt aus dem aktuellen Standard).
 menueVorlageMehrweltZeile: "#5FB3B3▶ multi-world"
 menueVorlageMehrweltHover: "&7aus dem aktuellen Standard eine Region pro Welt erzeugen"
+
 # Titel des Bestätigungsmenüs. Platzhalter: [prefab] - Vorlagen-ID oder Anzeigename.
 menueVorlageBestaetigenTitel: "#9D7CD8&l⚙ Vorlage bestätigen: #5FB3B3[prefab]"
+
 # Nicht anklickbare Hinweiszeile des Bestätigungsmenüs unterhalb des Titels. Keine Platzhalter.
 menueVorlageBestaetigenHinweis: "&7prüfe die Änderungen unten, dann klicke auf Bestätigen oder Abbrechen"
+
 # Fußzeile des Bestätigungsmenüs: bestätigen und die Vorlage auf die Festplatte schreiben.
 menueVorlageBestaetigenZeile: "&2&l[confirm]"
+
 # Fußzeile des Bestätigungsmenüs: abbrechen und zum Admin-Panel zurückkehren.
 menueVorlageAbbrechenZeile: "&c&l[cancel]"
+
 # Anklickbare Zeilenbezeichnung für die Aktualisieren-Schaltfläche unten im /rtp-info-
 # Buch. Rendert den aktuellen Bereich anhand einer frischen Metrik-Momentaufnahme neu.
 infoBuchAktualisierenZeile: "&2[Refresh]"
+
 # Hover-Text für die Aktualisieren-Zeile des Info-Buchs.
 infoBuchAktualisierenHover: "&7Diese Seite mit einer frischen Metrik-Momentaufnahme neu rendern."
+
 # Anklickbare Zeilenbezeichnung für die Zum-Chat-wechseln-Schaltfläche unten im
 # /rtp-info-Buch. Führt denselben Bereich über den alten Chat-Pfad erneut aus.
 infoBuchZuChatWechselnZeile: "&7[Switch to chat]"
+
 # Hover-Text für die Zum-Chat-wechseln-Zeile des Info-Buchs.
 infoBuchZuChatWechselnHover: "&7/rtp info stattdessen im Chat ausführen."
+
 # Fußzeile, die gerendert wird, wenn der /rtp-info-Buchinhalt die Buchseiten-
 # Obergrenze überschreitet. Ein Klick führt denselben Bereich im Chat-Modus erneut aus, damit keine Daten verloren gehen.
 infoBuchUeberlaufFusszeile: "&7(Inhalt gekürzt - klicke, um die vollständige Ausgabe im Chat zu sehen)"
+
 # Nicht anklickbare Hinweiszeile, die angibt, dass die periodische Auto-Aktualisierung des Info-
 # Buchs in diesem Build derzeit nicht unterstützt wird (auf einen späteren
 # Meilenstein verschoben). Nutzer können die Aktualisieren-Zeile anklicken, um manuell zu aktualisieren.
 infoBuchAutoAktualisierenHinweis: "&8(automatisches Aktualisieren noch nicht unterstützt; klicke auf Aktualisieren)"
+
 # Nicht anklickbare Titelzeile oben auf der Auswahlseite der Konfigurationsdateien.
 # Wird angezeigt, wenn ein Admin auf der Startseite "/rtp config" anklickt.
 konfigSelektorTitel: "#5FB3B3&l⚙ Konfigurationsdateien"
+
 # Bezeichnung der Navigationszeile "zurück zur /rtp-Menüwurzel" auf der Konfigurationsauswahlseite.
 konfigSelektorZurueckZeile: "&7« zurück zum Menü"
+
 # Nicht anklickbare Titelzeile oben auf einer einzelnen Konfigurationsdateiseite.
 # Platzhalter: [file] - der Name der Konfigurationsdatei (z. B. "performance", "safety").
 konfigDateiTitel: "#5FB3B3&l⚙ Konfiguration: &7[file]"
+
 # Bezeichnung der Navigationszeile "zurück zur Konfigurationsauswahl" auf einer einzelnen Konfigurationsdateiseite.
 konfigDateiZurueckZeile: "&7« zurück zu Konfigurationsdateien"
+
 # Nicht anklickbare Hinweiszeile, die angezeigt wird, wenn eine Konfigurationsdatei keine bearbeitbaren Schlüssel hat.
 konfigDateiLeerHinweis: "&7(keine bearbeitbaren Schlüssel in dieser Datei)"
+
 # Zeilenbezeichnung pro Schlüssel auf einer Konfigurationsdateiseite. Platzhalter:
 #   [key]   - der Konfigurationsschlüsselname; [value] - der aktuell gespeicherte Wert.
 konfigSchluesselZeilenFormat: "&7[key]&7: #7E9CC8[value]"
+
 # Hover-Text für eine Zeile pro Schlüssel auf einer Konfigurationsdateiseite. Platzhalter:
 #   [key], [value], [type] - der Konfigurationsschlüsselname, aktueller Wert und deklarierter Typ.
 konfigSchluesselHoverFormat: "&7zum Bearbeiten klicken &7[key] &7(Typ: [type])"
+
 # Nicht anklickbare Titelzeile oben auf einer shape/vert-Typauswahlseite.
 # Platzhalter: [param] - "shape" oder "vert"; [current] - aktuell aktiver Typname.
 konfigTypAuswahlTitel: "#5FB3B3&l⚙ [param]-Typ wählen &7(aktuell: &7[current]&7)"
+
 # Nicht anklickbare Titelzeile oben auf einer shape/vert-Unterparameterseite.
 # Platzhalter: [param] - "shape" oder "vert"; [type] - der aktive Typname.
 konfigUnterparameterSeitenTitel: "#5FB3B3&l⚙ [param] &7- &7[type] &7Unterparameter"
+
 # Hinweis, der gesendet wird, wenn die Buchansicht auf den alten Roh-YAML-Chat-Auszug zurückgreift
 # (auf dieser Plattform ist kein Buch-Renderer verfügbar).
 konfigRohansichtHinweis: "&7[P0] Buchansicht nicht verfügbar; greife auf Rohausgabe zurück."
+
 # Platzhaltertext, der anstelle eines nicht gesetzten Konfigurationswerts gerendert wird.
 konfigWertNichtGesetztPlatzhalter: "&8(nicht gesetzt)"
+
 # Nicht anklickbare Kopfzeile, die die "Änderbar"-Liste von der "Ausstehend"-
 # Vormerkliste auf einer Konfigurationsdateiseite trennt, wenn der Betrachter eine oder
 # mehrere nicht übernommene Änderungen vorgemerkt hat. Keine Platzhalter.
 konfigAusstehendKopf: "&6&l-- pending changes --"
+
 # Zeilenbezeichnung für einen vorgemerkten (ausstehenden) key=value-Eintrag auf einer Konfigurationsdateiseite.
 # Ein Klick auf die Zeile entfernt sie aus dem Warenkorb. Platzhalter: [key], [value].
 konfigAusstehendZeilenFormat: "&9[key]&8 = &0[value]"
+
 # Hover-Text, der angezeigt wird, wenn der Betrachter eine ausstehende (vorgemerkte) Zeile auf einer
 # Konfigurationsdateiseite überfährt. Keine Platzhalter.
 konfigAusstehendZeileHover: "klicke, um zu verwerfen"
+
 # Anklickbare Bezeichnung der Zeile "vorgemerkte Änderungen übernehmen" auf einer Konfigurationsdateiseite.
 # Führt den zusammengebauten Befehl /rtp config <file> k1=v1 ... aus und leert den Warenkorb.
 konfigAnwendenZeile: "&2&l[apply]"
+
 # Anklickbare Bezeichnung der Zeile "vorgemerkte Änderungen verwerfen" auf einer Konfigurationsdateiseite.
 # Leert den Warenkorb, ohne zu übernehmen.
 konfigVerwerfenZeile: "&c&l[discard]"
@@ -316,16 +396,20 @@ konfigVerwerfenZeile: "&c&l[discard]"
 # Wird gesendet, wenn eine Kartenzeile angeklickt wird, aber die Kartendarstellung
 # auf diesem Server nicht verfügbar ist (z. B. bei der Lite-Assembly oder ohne Kartenanbieter).
 karteBindungFehlt: "&c[P0] Kartendarstellung ist auf diesem Server nicht verfügbar."
+
 # Wird gesendet, wenn ein Diagramm angefordert wird, aber kein Renderer für
 # diesen Diagrammtyp registriert ist.
 karteResolverFehlt: "&c[P0] für diese Anfrage ist kein Karten-Resolver registriert."
+
 # Wird gesendet, wenn ein Resolver läuft, aber die zugrunde liegende Datenquelle für
 # das angeforderte Ziel nicht verfügbar ist (unbekannte Region, noch keine Daten, Welt entladen).
 # Platzhalter: [region] - der angeforderte Regionsname (kann leer sein).
 karteNichtVerfuegbar: "&e[P1] Kartendaten sind derzeit nicht verfügbar."
+
 # Wird gesendet, wenn der Kartendienst derzeit keine Karte zuweisen kann
 # (z. B. Obergrenze pro Betrachter erreicht).
 karteBeschaeftigt: "&e[P1] der Kartendienst ist beschäftigt; bitte versuche es gleich erneut."
+
 # Bezeichnung der anklickbaren "/rtp info"-Menüzeile, die eine Heatmap der
 # bekannten schlechten Orte der aktuellen Region rendert. Ausgeblendet, wenn die
 # Kartendarstellung auf diesem Server nicht verfügbar ist.
@@ -335,43 +419,62 @@ menueInfoSchlechteOrteBezeichnung: "#9D7CD8&l# Karte schlechter Orte"
 # Ersatz-Kopfzeile, die verwendet wird, wenn kein Kopfzeilenschlüssel pro Art registriert ist.
 # Platzhalter: [parserKind] - der rohe Multi-Config-Artname.
 multikonfigKopfStandard: "#5FB3B3&l[parserKind]"
+
 # Kopfzeilenbezeichnung der Multi-Config-Auswahlseite für Regionen. Keine Platzhalter.
 multikonfigKopfRegionen: "#5FB3B3&l Regionen"
+
 # Kopfzeilenbezeichnung der Multi-Config-Auswahlseite für Welten. Keine Platzhalter.
 multikonfigKopfWelten: "#5FB3B3&l Welten"
+
 # Umschaltzeilenbezeichnung, wenn der Entfernen-Modus AUS ist. Keine Platzhalter.
 multikonfigEntfernenModusAus: "&8[ ] Entfernen-Modus"
+
 # Umschaltzeilenbezeichnung, wenn der Entfernen-Modus AN ist. Klicks auf Eintragszeilen löschen.
 multikonfigEntfernenModusAn: "&c[x] Entfernen-Modus (klicke einen Eintrag zum Löschen)"
+
 # Auswahlzeilenbezeichnung für den Eintrag "+ neu hinzufügen...". Keine Platzhalter.
 multikonfigZeileHinzufuegen: "&2+ neu hinzufügen..."
+
 # Hover-Text für die Hinzufügen-Zeile. Platzhalter: [name] - vorausgefüllter Standardname.
 multikonfigZeileHinzufuegenHover: "&7gib einen Namen im Amboss-Dialog ein; vorausgefüllt: &f[name]"
+
 # Hover-Text für eine Eintragszeile im Normalmodus. Platzhalter: [name].
 multikonfigZeileBearbeitenHover: "&7&f[name] bearbeiten"
+
 # Hover-Text für eine Eintragszeile im Entfernen-Modus. Platzhalter: [name].
 multikonfigZeileEntfernenHover: "&c&f[name] löschen"
+
 # Titelzeile der Löschbestätigungsseite. Platzhalter: [name].
 multikonfigBestaetigenTitel: "&c&l[name] löschen?"
+
 # Ja-Zeilenbezeichnung der Löschbestätigungsseite. Keine Platzhalter.
 multikonfigBestaetigenJa: "&c&l[confirm delete]"
+
 # Abbrechen-Zeilenbezeichnung der Löschbestätigungsseite. Keine Platzhalter.
 multikonfigBestaetigenNein: "&2&l[cancel]"
+
 # Hover-Text auf einer gesperrten (ausgegrauten) Standardregionszeile. Keine Platzhalter.
 multikonfigSperreRegionStandard: "&7die Standardregion kann nicht entfernt werden"
+
 # Hover-Text auf einer gesperrten (ausgegrauten) Weltzeile. Platzhalter: [name].
 multikonfigSperreWeltGeladen: "&7Welt '[name]' ist auf dem Server geladen; entlade sie, bevor du ihre Konfiguration entfernst"
+
 # Ergebnisnachricht nach einem erfolgreichen HINZUFÜGEN. Platzhalter: [name].
 multikonfigErgebnisHinzugefuegt: "&a'[name]' hinzugefügt."
+
 # Ergebnisnachricht nach einem erfolgreichen ENTFERNEN. Platzhalter: [name].
 multikonfigErgebnisEntfernt: "&a'[name]' entfernt."
+
 # Ergebnisnachricht, wenn das HINZUFÜGEN fehlgeschlagen ist. Platzhalter: [name], [reason].
 multikonfigErgebnisHinzufuegenFehlgeschlagen: "&c'[name]' konnte nicht hinzugefügt werden: [reason]"
+
 # Ergebnisnachricht, wenn das ENTFERNEN fehlgeschlagen ist. Platzhalter: [name], [reason].
 multikonfigErgebnisEntfernenFehlgeschlagen: "&c'[name]' konnte nicht entfernt werden: [reason]"
+
 # Ergebnisnachricht, wenn der vorgeschlagene Eintragsname vom Bereiniger abgelehnt wird.
 # Platzhalter: [name].
 multikonfigErgebnisNameUngueltig: "&cName '[name]' ist nicht erlaubt; verwende Buchstaben, Ziffern, '_', '-', '.'"
+
 # Ergebnisnachricht, wenn ein HINZUFÜGEN mit einem bestehenden Eintragsnamen kollidiert.
 # Platzhalter: [name].
 multikonfigErgebnisNameVergeben: "&cein Eintrag mit dem Namen '[name]' existiert bereits."

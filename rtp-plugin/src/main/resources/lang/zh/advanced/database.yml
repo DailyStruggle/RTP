@@ -9,19 +9,24 @@ database:
   # @options: ["yaml", "sqlite", "mysql", "postgresql"]
   # @default: "sqlite
   type: "sqlite"
+
   # Database host. Used by mysql/postgresql only.
   # @type: string
   host: "127.0.0.1"
+
   # Database port. Used by mysql/postgresql only.
   # @type: integer
   # @range: [1, 65535]
   port: 3306
+
   # Database / schema name. Used by mysql/postgresql only.
   # @type: string
   name: "rtp"
+
   # Database username. Used by mysql/postgresql only.
   # @type: string
   username: "root"
+
   # Database password. Used by mysql/postgresql only.
   # @type: string
   password: "password"

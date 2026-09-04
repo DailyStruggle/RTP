@@ -13,7 +13,7 @@ mensagemAtraso: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teletransportando em [delay]
 carregamentoChunk: "&7[P0] ⚙ Carregando chunks, por favor aguarde..."
 mensagemTeletransporte: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teletransportado em [attempts] tentativas, em [processingTime]</gradient>"
 
-# if teleport is cancelled
+# se o teleporte for cancelado
 cancelarTeletransporte: "&7[P0] ⚡ Teletransporte cancelado!"
 
 # se não houver lugares seguros após atingir o máximo de tentativas
@@ -24,7 +24,7 @@ inseguro: "&7[P0] ⌖ nenhuma localização segura encontrada em [attempts] tent
 # espaço reservado: [remainingCooldown] - o tempo restante
 mensagemEspera: "&7[P0] ⚡ Você não pode teletransportar-se novamente por [remainingCooldown]"
 
-# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+# quando o jogador atingiu o limite lockAfterUses e está bloqueado (paridade com BetterRTP LockAfter)
 lockedAfterUses: "&7[P0] ⌖ Você atingiu seu limite de teletransporte aleatório. Tente novamente em [remainingLockTime]."
 
 # se a região não tem locais na fila e o jogador não tem a permissão rtp.unqueued
@@ -61,11 +61,11 @@ comandoConsoleNaoPermitido: "&c[P0] Você precisa ser um jogador no jogo para ex
 # busy e invalidCommand não são traduzidos em messages.lang.yml -> usam-se as chaves em inglês (fallback ao baseline).
 busy: "&c[P0] ocupado"
 
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+# Enviado quando a verificação opcional de combate PvP recusa o /rtp porque o jogador está em combate
 pvpInCombat: "&c[P0] Você não pode se teleportar aleatoriamente durante o combate."
 
-# plugin doesn't have the subcommand or parameter the user requested
-# placeholder: [arg] - the argument attempted
+# o plugin não possui o subcomando ou parâmetro que o usuário solicitou
+# espaço reservado: [arg] - o argumento tentado
 invalidCommand: "&c[P0] comando inválido - [arg]"
 
 # o usuário não tem permissão para o comando solicitado
@@ -98,13 +98,16 @@ JOGADOR_TELETRANSPORTANDO: "&bTELETRANSPORTANDO"
 # ###############################################################################
 # Seção 10: Elementos visuais
 # ###############################################################################
+# configurações de título
+# remova ou defina o título como "" para desativar
+# PlaceholderAPI é recomendado para coordenadas
 titulo: "<rainbow>Teletransportado!</rainbow>"
 subtitulo: "<gradient:#A78BFA:#E876A0>divirta-se!</gradient>"
 aparecer: 20
 permanecer: 20
 desaparecer: 20
 
-# actionbar setting
+# configuração da actionbar
 barraAcao: ""
 
 # DO NOT TOUCH VERSION NUMBER

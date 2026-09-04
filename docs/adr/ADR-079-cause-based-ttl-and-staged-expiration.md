@@ -12,48 +12,81 @@ Currently, all bad-location runs in `MemoryShape` are treated as monotonic and p
 In a live production environment, this permanence creates significant operational problems:
 1. **Dynamic Rejection Causes:** While natural terrain properties (`biome`, `worldBorder`, `vert`, `safety`) are static or semi-permanent, external restrictions (`safetyExternal` via claim plugins like GriefPrevention, Towny, Lands, WorldGuard) and player placement dispersion (`uniquePlacement`) are dynamic.
 2. **Permanent Land Lockout:** If a player claims a plot of land, RTP marks the candidate chunk bad under `safetyExternal`. If the player later unclaims or abandons the land, the area remains permanently blacklisted in spatial memory. Server operators are forced to discard entire regional caches (`/rtp scan reset`)—losing hours of expensive off-tick terrain scanning—just to refresh dynamic claims.
-3. **Opaque External Verifier Contract:** The `RegionVerifierRegistry` API ([ADR-026](ADR-026-external-hook-api-surface.md)) currently accepts only untyped `Predicate<RTPCoords>` or async functions without an identifier or mutability contract. RTP cannot distinguish whether a verifier represents a permanent server spawn or a transient player claim.
+3. **Opaque External Verifier Contract:** The `RegionVerifierRegistry` API ([ADR-026](ADR-026-external-hook-api-surface.md)) currently accepts untyped `Predicate<RTPCoords>` or async functions without identifying the backing verifier. RTP cannot distinguish whether a verifier represents a permanent server spawn or a transient player claim, making uniform or per-checker expiration configuration difficult.
 4. **Re-generation Churn on Expiration:** A naive hard deletion of expired segments causes immediate tick spikes: if an expired segment is hit on the next selection pass and the claim is still active (which is typical for weeks-long claims), the server must re-execute chunk loads, vertical raycasts, and verifier invocations from scratch.
 
 ## Decision
 
-1. **Volatility Tiers & Baseline Defaults:**
-   Classify rejection causes into three persistence and expiration tiers:
-   - **Static Tier (TTL = $\infty$):** Natural terrain and geometric limits (`biome`, `worldBorder`, `prefilterBiome`, `prefilterRange`). Persisted permanently to `.bin` cache files. Reset only on world configuration or seed changes.
-   - **Dynamic Tier (TTL = Finite, e.g. 7–30 days):** Dynamic player and administrative state (`safetyExternal`, `uniquePlacement`, `safety`/`vert` long-tail decay). Tracked with an expiration epoch.
+1. **Volatility Tiers & Core Cause Defaults:**
+   Classify rejection causes directly using pre-existing `LocationGenerator.FailTypes` categories into three persistence and expiration tiers:
+   - **Static Tier (TTL = $\infty$):** Natural terrain and geometric limits (`biome`, `worldBorder`, `vert`, `safety`, `prefilterBiome`, `prefilterRange`). Persisted permanently to `.bin` cache files. Reset only on world configuration or seed changes.
+   - **Dynamic Tier (TTL = Finite, e.g. 7–30 days):** Dynamic player and administrative state (`safetyExternal`, `uniquePlacement`). Tracked with an expiration epoch. By default, all external verifiers inherit the `causes.safetyExternal` TTL baseline.
    - **Transient Tier (TTL = 0):** Ephemeral operational failures (`timeout`, `nullChunk`, `ungenerated`). Discarded immediately without entering persistent spatial memory.
 
 2. **Selective Coalescing Rule (Refining ADR-052):**
    - Adjacent bad-location runs in `MemoryShape` shall **only** coalesce if both runs belong to the same volatility tier (Static vs. Dynamic).
    - A static run ($\text{TTL} = \infty$) shall **never** coalesce with a dynamic run ($\text{TTL} < \infty$). This prevents permanent natural terrain from expiring prematurely and prevents temporary player claims from becoming immortalized.
    - When two dynamic runs coalesce, the merged run inherits $\max(\text{TTL}_A, \text{TTL}_B)$ to prioritize CPU and chunk I/O stability over high-churn fragmentation, while retaining the first cause byte under ADR-052's first-cause-wins rule.
-   - In `MemoryShape`, run expiration epochs are maintained in an aligned `int[] badExpiryEpochCache` (storing expiration time in coarse minutes since server epoch, where `<= 0` indicates infinite/static retention), matching the indexing of `badKeysCache` and `badCauseCache`.
+   - In `MemoryShape`, run expiration epochs are maintained in an aligned `long[] badExpiryCache` (storing expiration unix epoch seconds, where `<= 0` indicates infinite/static retention), matching the indexing of `badKeysCache` and `badCauseCache`.
 
-3. **Staged Segment Deletion ("Probation / Side Space"):**
-   Implement a two-phase lazy expiration lifecycle rather than hard instant deletion:
-   - **Active Phase ($0 \le t < 1\times \text{TTL}$):** The segment resides in `badKeysCache` and is bypassed by candidate selection in $O(\log N)$ time.
-   - **Probation Phase ($1\times \text{TTL} \le t < 2\times \text{TTL}$):**
-     - During the off-tick `flushAndRebuild()` or periodic pulse, expired segments are omitted from the rebuilt `badKeysCache` and transferred to a bounded probation buffer (`ConcurrentHashMap<Long, ProbationRecord>` keyed by `chunkKey` or spiral index, capped at 8,192 entries with FIFO eviction on overflow).
-     - Coordinates in this segment become selectable again by candidate generation.
-     - **Re-Hit & Re-Rejected (Still Claimed):** When candidate verification in `PregenTask` fails and `shape.addBadLocation()` / `addBadChunk()` is called, if the key matches an entry in the probation buffer, the segment is **immediately restored** into `pendingBadLocations` / active spatial memory with a refreshed TTL, bypassing full terrain re-mapping.
-     - **Re-Hit & Succeeded (Now Safe):** If candidate verification succeeds, the entry is dropped from the probation buffer; the sector is confirmed valid.
-   - **Eviction Phase ($t \ge 2\times \text{TTL}$):** If no candidate touches the segment during the probation window, the record is silently pruned during the next rebuild pass.
+3. **Dual-Array Rebuild & Staged Probation Buffer:**
+   Implement a two-phase lazy expiration lifecycle computed in a single off-tick rebuild pass without dynamic object allocation or FIFO queues:
+   - **Dual Sorted Arrays in `flushAndRebuild()`:**
+     During the rebuild pass, candidate runs are partitioned simultaneously into two parallel, compact, sorted 1D RLE structures:
+     1. **Active Tier (`badKeysCache`, `badPrefixSumsCache`, `badCauseCache`, `badExpiryCache`):** Contains runs where $t < 1\times \text{TTL}$ (or $\text{TTL} \le 0$). Bypassed by candidate selection in $O(\log N)$ time.
+     2. **Probation Tier (`probationKeysCache`, `probationPrefixSumsCache`, `probationCauseCache`, `probationExpiryCache`):** Contains runs where $1\times \text{TTL} \le t < 2\times \text{TTL}$. Omitted from active candidate avoidance, so candidate coordinates become selectable again.
+     3. **Eviction:** Runs where $t \ge 2\times \text{TTL}$ are silently dropped during rebuild without requiring secondary cleanup tasks.
+   - **Fast $O(\log M)$ Probation Search & Restoration:**
+     - When candidate verification in `PregenTask` fails and `shape.addBadLocation(key, cause)` / `addBadChunk(key, cause)` is called, a binary search on `probationKeysCache` checks if the key falls within an existing probation run.
+     - **Re-Hit & Re-Rejected (Still Claimed):** If matched, the entire probationary run is immediately restored to `pendingBadLocations` / active spatial memory with a refreshed TTL, bypassing full terrain re-mapping with zero heap allocation.
+     - **Re-Hit & Succeeded (Now Safe):** If candidate selection succeeds, the sector naturally remains in circulation; the probationary entry drops out on the next rebuild.
 
-4. **Backward-Compatible Verifier API & Pipeline Contract:**
-   - Extend `RegionVerifierRegistry` in `rtp-api` with overloads accepting an identifier and default TTL:
+4. **Class-Based Verifier Attribution & Zero Addon-Directory Coupling:**
+   - Instead of inventing arbitrary string keys or scanning addon jar files to discover TTL options, verifier identity is derived directly from the verifier's class type.
+   - Extend `RegionVerifierRegistry` in `rtp-api` with overloads accepting the verifier class/source:
      ```java
-     void register(String name, Duration defaultTtl, Predicate<RTPCoords> verifier);
-     void registerAsync(String name, Duration defaultTtl, Function<RTPCoords, CompletableFuture<Boolean>> verifier);
+     void register(Class<?> source, Predicate<RTPCoords> verifier);
+     void registerAsync(Class<?> source, Function<RTPCoords, CompletableFuture<Boolean>> verifier);
      ```
-     Legacy methods (`register(Predicate<RTPCoords>)`) remain fully supported, defaulting to `name = "verifier"` and `defaultTtl = null` (or negative duration), representing $\infty$ (permanent) and guaranteeing zero breakage for existing or un-migrated addons.
-   - Internal verifier evaluation in `GlobalRegionVerifiers` returns a structured result:
+     Existing methods (`register(Predicate<RTPCoords>)`) remain supported as default methods delegating to `register(verifier.getClass(), verifier)`.
+   - Internal verifier evaluation in `GlobalRegionVerifiers` captures the registering class, returning a structured result:
      ```java
-     public record VerifierCheckResult(boolean passed, @Nullable String verifierName, @Nullable Duration ttl)
+     public record VerifierCheckResult(boolean passed, @Nullable Class<?> verifierClass)
      ```
-     allowing `PregenTask` to attribute rejections (`safetyExternal[<verifierName>]`) and pass the resolved duration into `MemoryShape.addBadChunk()`.
+   - This allows `PregenTask` to attribute rejections in stats and logs (`safetyExternal[GriefPreventionChecker]`) and resolve the applicable TTL dynamically without requiring the addon to parse configuration or declare custom duration objects.
 
-5. **Configuration Overrides (`advanced/ttl.yml`):**
-   Provide an optional operator configuration under `advanced/ttl.yml` to define global cause baselines and allow per-verifier overrides (`external-verifiers.<name>`) without requiring addon updates.
+5. **Configuration Hierarchy (`advanced/ttl.yml`):**
+   Provide an operator configuration under `advanced/ttl.yml` driven by core `FailTypes` with optional class-name overrides:
+   ```yaml
+   # Causes map directly to LocationGenerator.FailTypes
+   causes:
+     biome: -1
+     worldBorder: -1
+     vert: -1
+     safety: -1
+     uniquePlacement: 30d
+     safetyExternal: 14d   # Base default for all external claim checkers
+
+   # Optional overrides keyed by verifier class name (simple name or FQN)
+   verifiers:
+     WorldGuardChecker: -1       # Permanent retention for server regions/spawns
+     GriefPreventionChecker: 14d # Custom retention for player claims
+   ```
+   - **Resolution Order:** `verifiers.<ClassName>` -> `causes.safetyExternal` -> default dynamic tier (14d).
+   - Server operators have immediate, granular control over any claim plugin without requiring addon directory scans, addon restarts, or custom code updates in addon modules.
+
+6. **Unified Disk Storage (`BIN_VERSION 3`):**
+   - Because active and probation segments have inherently zero spatial overlap, all retained segments are serialized to disk in a single continuous 1D sorted stream.
+   - Increment `BIN_VERSION` from `2` to `3`. Each bad-run entry on disk stores 25 bytes:
+     - `startKey` (`long`, 8 bytes)
+     - `delta` / `length` (`long`, 8 bytes)
+     - `cause` (`byte`, 1 byte)
+     - `expiresAtEpochSeconds` (`long`, 8 bytes; `<= 0` indicates static/infinite retention)
+   - On load, segments are partitioned based on current wall-clock epoch:
+     - $t < \text{expiresAt} \implies$ placed in active array (`badKeysCache`).
+     - $\text{expiresAt} \le t < \text{expiresAt} + \text{TTL} \implies$ placed in probation array (`probationKeysCache`).
+     - $t \ge \text{expiresAt} + \text{TTL} \implies$ pruned on load (offline decay during server downtime).
+   - Reading legacy files (`BIN_VERSION <= 2`) treats `expiresAt` as `<= 0` (permanent), guaranteeing full backward compatibility.
 
 ## Alternatives Considered
 
@@ -62,18 +95,19 @@ In a live production environment, this permanence creates significant operationa
 | Instant hard deletion of expired segments | Triggers heavy chunk loading and pipeline re-checks when claims are still valid. Staged probation allows $O(1)$ restoration of still-bad sectors. |
 | Coalescing dynamic runs with $\min(\text{TTL})$ | Causes large, long-lived claim segments to expire rapidly when bordered by a short-lived claim, increasing scan churn. |
 | Allowing static and dynamic runs to coalesce | Causes static ocean/mountain runs to inherit finite TTLs and re-verify periodically, or causes dynamic claims to become permanent. |
-| Forcing addons to read RTP config files | Violates addon encapsulation; third-party addons should declare programmatic domain defaults and let RTP core handle configuration overrides. |
+| Requiring string registration keys and scanning addon jars | Forces RTP core to scan the filesystem/JARs to discover config options; using pre-existing `FailTypes` with verifier class names eliminates addon-directory probing. |
+| Forcing addons to read RTP config files | Violates addon encapsulation; third-party addons should focus on claim checking while RTP core handles configuration hierarchy. |
 | Per-location 64-bit expiration timestamps | Destroys the memory compactness of the RLE interval structure; storing coarse epoch buckets per coalesced run preserves zero-heap efficiency. |
 
 ## Maintainability & Operational Factors
 
 1. **Subsystem Cohesion & Domain Modeling:**
    - Decouples geometric coordinate mapping (`MemoryShape` Archimedean spiral bijection) from assumptions of static immutability.
-   - Places volatility and lifecycle attribution at the integration boundary (`RegionVerifierRegistry`), where domain knowledge naturally resides.
+   - Leverages core-side `LocationGenerator.FailTypes` directly, ensuring full alignment with `badCauseCache` (ADR-052) and `/rtp stats` outcome metrics.
 
 2. **Loose Coupling & API Compatibility:**
-   - Additive overloads with default methods prevent breaking binary and source compatibility for third-party or legacy claim addons (S-006, ADR-026).
-   - Addon code remains decoupled from RTP configuration parsing: addons declare domain defaults in Java, while core manages administrative overrides via `advanced/ttl.yml`.
+   - Additive overloads taking `Class<?> source` with default methods prevent breaking binary and source compatibility for third-party or legacy claim addons (S-006, ADR-026).
+   - Zero coupling to the addon filesystem or JAR manifests: `rtp-core` does not need to scan addon directories to discover configurable verifiers. Addons register naturally with their checker class.
 
 3. **Performance & Concurrency Guardrails:**
    - **Zero-Allocation Hot Path:** The selection path (`MemoryShape.rand()` and binary search on `badKeysCache`) remains lock-free and zero-allocation. All segment aging, probation transitions, and evictions are executed off-tick during periodic pulses or rebuild passes (`flushAndRebuild()`).
@@ -85,7 +119,7 @@ In a live production environment, this permanence creates significant operationa
    - Visualizing active vs. probationary segments is supported through existing debug shape JSON exports.
 
 5. **Persistence & Migration Safety:**
-   - Restricting disk serialization (`.bin`) to the Static Tier ($\text{TTL} = \infty$) preserves full binary format compatibility (`BIN_VERSION 2`, ADR-052) with zero schema migrations required.
+   - Unified single-stream disk serialization (`BIN_VERSION 3`) stores expiration epoch seconds per run, enabling smooth offline decay across server restarts while maintaining backward compatibility for legacy `BIN_VERSION <= 2` caches.
 
 ## Consequences
 

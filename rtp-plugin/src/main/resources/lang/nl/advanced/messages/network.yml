@@ -2,48 +2,57 @@
 # Berichtteksten voor spelers en operators in deze taal, gegroepeerd per onderwerp.
 # Automatisch gegenereerde kopie van de Engelse berichten; niet met de hand bewerken (wordt overschreven).
 
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
+# --- Berichten voor cross-server netwerkmodus ---
+# Alleen verzonden wanneer `network.enabled: true` en de `/rtp` van de speler wordt gerouteerd
+# via de cross-server wachtrij (zie network.yml `routing.mode`).
+# Alle sleutels zijn optioneel vanuit het perspectief van de speler - de basiscyclus
+# van `delayMessage` / `teleportMessage` stuurt nog steeds de zichtbare stroom aan.
+# Verzonden wanneer het verzoek is geaccepteerd in de cross-server wachtrij
+# en wacht op toewijzing door een backend. Plaatshouder: [position] - 0-geïndexeerde
+# positie van `pollStatus`; kan leeg zijn als het transport geen positie retourneert.
 networkQueued: "&7[P0] in de wachtrij voor een cross-server bestemming (positie [position])..."
-# Sent when a player runs /rtp while already waiting in the cross-server queue.
-# Placeholder: [position] - position in line; may be empty.
+
+# Verzonden wanneer een speler /rtp uitvoert terwijl deze al in de cross-server wachtrij staat.
+# Plaatshouder: [position] - positie in de rij; kan leeg zijn.
 alreadyQueued: "&cJe wacht al in de cross-server wachtrij (positie [position]). Even geduld."
-# Sent when a cross-server queue entry waited too long and was dropped.
-# No placeholders.
+
+# Verzonden wanneer een item in de cross-server wachtrij te lang wachtte en werd verwijderd.
+# Geen plaatshouders.
 networkTimedOut: "&c[P0] cross-server teleport verliep terwijl er op een backend werd gewacht."
-# Sent when the cross-server queue is full and the request is rejected.
-# No placeholders.
+
+# Verzonden wanneer de cross-server wachtrij vol is en het verzoek wordt afgewezen.
+# Geen plaatshouders.
 waitlistFull: "&c[P0] cross-server wachtrij is vol; probeer het zo opnieuw."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
+
+# Verzonden wanneer de wachtrij het verzoek heeft overgedragen aan de proxy-router en
+# een backendselectie bezig is.
 networkRouting: "&7[P0] routeren naar een backend..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
+
+# Verzonden wanneer een backend een coördinaat heeft gereserveerd voor deze speler en de
+# proxy op het punt staat de overstap tussen servers te starten. Plaatshouder: [server]
+# - de serverId van de bestemmingsbackend.
 networkReserved: "&a[P0] coördinaat gereserveerd op [server]. Overdragen..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+
+# Verzonden wanneer de proxy bezig is met de overstap. Plaatshouder: [server] - bestemming.
 networkTransferring: "&a[P0] overdragen naar [server]..."
-# Sent when the cross-server path gave up and fell back to the local server.
-# Placeholder: [reason] - the reason for falling back.
+
+# Verzonden wanneer het cross-server pad het opgaf en terugviel op de lokale server.
+# Plaatshouder: [reason] - de reden voor terugvallen.
 networkFallback: "&e[P0] cross-server niet beschikbaar ([reason]); terugvallen op lokaal."
-# Sent when the cross-server request failed and no fallback was possible.
-# Placeholder: [reason] - the failure reason.
+
+# Verzonden wanneer het cross-server verzoek is mislukt en er geen terugval mogelijk was.
+# Plaatshouder: [reason] - de reden van mislukking.
 networkFailed: "&c[P0] cross-server teleport mislukt: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
+
+# Verzonden wanneer de speler vroeg om een specifieke regio (`/rtp <region>`) maar
+# geen enkele backend in het netwerk deze momenteel bedient. Plaatshouder:
+# [region] - de gevraagde regionaam.
 networkRegionUnavailable: "&c[P0] geen backend bedient regio '[region]' op dit moment."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
+
+# Verzonden wanneer de gevraagde regionaam verwijst naar twee of meer backends en
+# het door de beheerder geconfigureerde beleid er geen kan kiezen (wordt alleen geactiveerd
+# bij strenger beleid dan het standaard `warn`). Plaatshouder: [region].
 networkRegionAmbiguous: "&c[P0] regio '[region]' is dubbelzinnig over backends; kies een server."
 
-# DO NOT TOUCH VERSION NUMBER
+# RAAK HET VERSIENUMMER NIET AAN
 version: 1.0

@@ -1,0 +1,27 @@
+# --- RTP Räumlicher Speicher TTL-Einstellungen ---
+# Dokumentation: plugins/RTP/docs/admin/configuration/TTL.md
+
+# Basis-Aufbewahrungsdauer für abgelehnte Koordinatenläufe im räumlichen Speicher.
+# Unterstützte Zeitformate: z. B. 14d, 12h, 30m, 3600s, 40t, 2500ms oder zusammengesetzt 1d12h.
+# Auf -1 oder "infinite" setzen für dauerhafte Speicherung (statisches Terrain).
+causes:
+  # Natürliches Terrain & Geometrie (dauerhaft)
+  biome: -1
+  worldBorder: -1
+  vert: -1
+  safety: -1
+  prefilterBiome: -1
+  prefilterBlock: -1
+
+  # Dynamischer Spieler- und Serverstatus
+  uniquePlacement: 30d
+  safetyExternal: 14d
+
+# Überschreibungen je Verifizierer nach Checker-Klassennamen (z. B. GriefPreventionChecker, WorldGuardChecker).
+# Falls weggelassen oder nicht aufgeführt, erben externe Prüfer causes.safetyExternal.
+verifiers:
+  # WorldGuardChecker: -1
+  # GriefPreventionChecker: 14d
+
+# VERSIONSNUMMER NICHT ÄNDERN
+version: 1.0

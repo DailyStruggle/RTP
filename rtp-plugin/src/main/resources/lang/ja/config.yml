@@ -1,4 +1,4 @@
-# テレポート遅延（秒）
+# テレポート遅延（秒）。0 = 即時。時間単位に対応（例: 2s, 40t, 1500ms）。
 # 実際にテレポートが発動するまでにプレイヤーが待つ時間。
 # サーバーが目的地のチャンクを事前にロードする時間を確保できます。
 # @type: integer
@@ -16,7 +16,7 @@
 # @default: 2
 キャンセル距離: 2
 
-# テレポート間隔（秒）
+# テレポート間隔。rtp.nocooldown でスキップ。時間単位に対応（例: 5m, 300s, 1h）。
 # プレイヤーが連続して RTP を使うまでに待つ時間。
 # @type: integer
 # @range: [0, null]
@@ -34,7 +34,7 @@ lockAfterUses: 0
 
 # lockAfterUses 用のローリング使用回数ウィンドウの長さです。カウンターはウィンドウの
 # 最初の使用からこの秒数が経過すると初期化されます。0 は上限が決して初期化されない
-# (恒久的な上限) ことを意味します。
+# (恒久的な上限) ことを意味します。時間単位に対応（例: 24h, 1d）。
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -86,7 +86,23 @@ menu:
 
 # "@config" トークンを介してリージョン/ワールドのファイルに継承されるグローバルな既定値です。
 defaults:
-  # デフォルトのエリアの形状とサイズ。radius/centerRadius = どれだけ遠くに着地するか（チャンク単位）。
+  # デフォルトのエリアの形状とサイズ。shape が "@config" のすべてのリージョンで使用されます。
+  #
+  # ここでのサイズはデフォルトでチャンク単位です（1チャンク = 16ブロック）:
+  #   radius: 64   ->  中心から1,024ブロック
+  #   radius: 256  ->  中心から4,096ブロック   （以下のデフォルト値）
+  #   radius: 625  ->  中心から10,000ブロック
+  #
+  # 空間単位の接尾辞:
+  # radius や centerRadius などに明示的な単位を直接指定することもできます:
+  #   radius: 4096b   (または 4096 blocks, 4096m)
+  #   radius: 256c    (チャンク)
+  #   radius: 4r      (Anvil リージョンファイル = 32チャンク = 512ブロック)
+  #   radius: 5km     (キロメートル = 5000ブロック)
+  #
+  # radius       = 外枠。これより遠くに着地することはありません。
+  # centerRadius = 内枠 / ドーナツの穴。これより近くに着地することはありません。
+  #                radius 未満にする必要があります。さもないと着地候補地がなくなります。
   shape:
     # Landing area shape algorithm.
     # @type: enum
@@ -98,9 +114,11 @@ defaults:
     centerX: 0
     centerZ: 0
     weight: 1.0
+
     # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
     uniquePlacements: 0
     expand: false
+
   # Default high/low landing window.
   vert:
     # Vertical placement algorithm.
@@ -109,17 +127,23 @@ defaults:
     name: "LINEAR"
     minY: 32
     maxY: 255
+
     # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
     direction: 2
     requireSkyLight: true
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
+
   # Extra unverified spots kept ready. 0 = off.
   backlogCacheCap: 1000
+
   # Max chunks kept loaded for instant teleports.
   activeChunkCap: 10
+
   # Bad-spot tracking precision (1-5).
   spatialResolution: 3
+
   # Whether regions/worlds need permission.
   requirePermission: false
 
