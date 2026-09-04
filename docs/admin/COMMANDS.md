@@ -30,10 +30,19 @@ Initiates a random teleportation sequence for the executing player (or a named t
 | `world=<name>` | String (loaded world name) | `rtp.use` | Derive the target region from this world's configuration rather than the sender's current world. Ignored when `region` is also supplied. |
 | `region=<name>` | String (region name) | `rtp.use` | Teleport into a specific, named region. Takes priority over `world`. Repeat for multiple values; one is chosen at random each time. |
 | `biome=<name>` | String (Minecraft biome key, upper-case) | `rtp.use` | Restrict the destination to locations inside the specified biome. Repeat to allow multiple biomes. Forces a fresh async search — pre-cached locations are not used. |
-| `shape=<name>` | String (factory key) | `rtp.params` | Override the region's default shape for this single teleport. The region is cloned; its permanent definition is not changed. Sub-keys for the chosen shape type (e.g. `radius`, `weight`) may follow immediately. |
+| `shape=<name>` | String (factory key) | `rtp.params` | Override the region's default shape for this single teleport. The region is cloned; its permanent definition is not changed. Sub-keys for the chosen shape type (e.g. `radius`, `centerRadius`, `centerx`, `centerz`, `weight`) may follow immediately. Distance arguments accept spatial units (e.g. `radius=256c`, `radius=4096b`, `radius=4r`, `radius=5km`) or unitless numbers with automatic interpretation. |
 | `vert=<name>` | String (factory key) | `rtp.params` | Override the region's vertical adjustor for this single teleport. Sub-keys for the chosen vert type may follow. |
 | `worldBorderOverride=<bool>` | Boolean | `rtp.params` | When `true`, replaces the region shape with the server's current world-border shape for this teleport. Incurs the `paramsPrice` economy charge. |
 | `toggletargetperms=<bool>` | Boolean | `rtp.params` | When `true`, cooldown, delay, and economy checks are evaluated against each *target* player's attributes rather than the sender's. |
+
+### Distance & Spatial Units in Command Parameters
+
+When passing shape dimension or coordinate override parameters (`radius=`, `centerRadius=`, `centerx=`, `centerz=`, `width=`, `length=`) on `/rtp` or via `/rtp config regions <region> shape.<key>=<val>`, parameters accept explicit unit suffixes:
+
+- **Minecraft Units:** `c` / `chunk` / `chunks` (16 blocks), `b` / `block` / `blocks` (1 block / meter), `nb` / `netherblock` (8 blocks), `r` / `region` / `regions` (32 chunks / 512 blocks).
+- **Metric Units:** `m` / `meters`, `km` / `k` / `kilometers`.
+- **Imperial Units:** `mi` / `miles`, `yd` / `yards`, `ft` / `feet` / `'`, `in` / `inches` / `"`.
+- **Auto-Interpretation & World Border Safety:** If no unit suffix is supplied, plain integers default contextually (typically chunks for shapes, or blocks if an input would exceed the world border or create a sub-chunk region). Configured and command-override shapes are audited against the world border to prevent attempts outside reachable space. Relative coordinate offsets (`~`) are also supported for centers.
 
 **Examples**
 ```
@@ -43,6 +52,8 @@ Initiates a random teleportation sequence for the executing player (or a named t
 /rtp region=mining
 /rtp region=default biome=BADLANDS
 /rtp region=default shape=SQUARE radius=256
+/rtp region=default shape=CIRCLE radius=4096b centerRadius=256b
+/rtp region=default shape=CIRCLE radius=5km
 /rtp player=Steve toggletargetperms=true
 /rtp worldBorderOverride=true
 ```

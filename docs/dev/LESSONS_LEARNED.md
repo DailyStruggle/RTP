@@ -202,6 +202,14 @@ Fix: hop RTP's first continuation off the completing thread. `requestChunkFuture
 
 Rule for any non-Bukkit adapter that talks to the chunk system directly: never let RTP's own pipeline run as an *inline* dependent of a vanilla chunk future. Always force the first continuation onto an RTP-owned executor (`*Async` with `RTP.scheduler`), because vanilla may complete that future synchronously from inside `DistanceManager.runAllUpdates` where any further ticket/`getChunkFuture` call (including an inline same-thread `MinecraftServer.submit`) corrupts the live iteration.
 
+### A per-call `stat` freshness check can cost more than the cache it guards (2026-09-04)
+
+`AnvilRegionByteCache.get` validated freshness with `Files.isRegularFile` + `Files.getLastModifiedTime` on **every** call, before the LRU lookup. The ADR-080 benchmark (`:rtp-core:simulationBenchmark`) measured a warm hit at 65 491 ns and the two stat calls alone at 66 977 ns - 1.02x the entire hit cost, i.e. the `LinkedHashMap` lookup was free and the freshness check *was* the hot path. The original rationale ("stat-on-every-get is cheap relative to the read it saves") held against one ~2.9 ms cold read, but not against the real access pattern: 1024 sibling-chunk probes over one `r.X.Z.mca` paid ~68 ms of syscalls per region screened. Windows stat cost is high relative to Linux, so the effect is platform-skewed but not platform-specific.
+
+Fix: throttle the check to at most one stat per region file per revalidation window (default 1 s; `AnvilRegionByteCache.setRevalidateIntervalMillis(0)` restores stat-on-every-get). The window is ~1/30th of the default chunk-save cadence, so bounded staleness cannot hide a save for a meaningful period. Warm-hit p50 dropped to 153 ns (~428x) on the same rig, and a `statSkips` counter (`anvilCacheStatSkips=` on the `ScanTask` gauge line) reports how many hits avoided the syscall.
+
+Durable rule: price the *validation* of a cache entry, not just the work it avoids. A guard that runs per access must be compared against the per-access cost of a hit, not against the cost of a miss - and if it is a syscall, amortize it over a time window or a caller-scoped token.
+
 ### Paper 26.1 scan throughput parity with Spigot/Folia (2026-04-21)
 
 Paper 26.1 with the non-blocking `LocationGenerator` state machine (ADR-015 post-refactor) achieves roughly **300 cps effective scan throughput**, on parity with the Spigot/Folia Anvil-based scan path. This confirms that ADR-016 section 1.1 (the adapter-internal `[RTP] Anvil gate skipped reason=chunk-already-loaded` gate firing on essentially every candidate on Paper chunk-system-v2) is **not** a performance regression relative to the pure-Anvil path — Paper's live-chunk `getBiome` on an already-loaded chunk is cheap enough to close the gap.
@@ -692,6 +700,47 @@ Durable consequences:
 ### Async tier promotion in `GroupCacheWorker.pulse` is not observable on return
 
 `GroupSubspaceCacheTest.testGroupCacheWorkerPulseL3ToL2` asserted `sizeCold(key) > 0 || sizeHot(key) > 0` immediately after `worker.pulse(...)`. `pulse` step 3 (`promoteColdToHot`) polls the freshly-promoted cold entry and completes the hop on the chunk-reservation future's `thenAcceptAsync` continuation, so on return **all three tiers can legitimately read 0** while the promotion is in flight (measured: hot goes 0 → 2 roughly 200 ms later). The assertion was a latent race that passed only by timing accident; any unrelated change to `rtp-core` class-loading timing can flip it. Assertions after `pulse` must poll with a bounded deadline, not read once.
+
+---
+
+## 2026-09-04 - Two `MemoryShape` call-site traps, and why a benchmark needs a serve-rate row
+
+Building the allocation benchmark (ADR-080) against the shipped `MemoryShape` hit two API traps in a row. Both compiled, neither threw, and both silently produced a spatial memory that considered essentially the whole region bad - which read as a *spectacularly good* result until the serve rate was inspected.
+
+| Trap | Wrong call | Effect |
+|---|---|---|
+| `flushAndRebuild(long)` takes a **run-merge tolerance in cells**, not a timestamp | `flushAndRebuild(nowMillis)` | `setSpatialResolution(nowMillis)` - a merge tolerance of millions, so every learned cell coalesced into one giant run and `isKnownBad` returned true for ~99.7 % of candidates |
+| `xzToLocation` / `addBadLocation` / `isKnownBad` index **region cells (chunks)**, not blocks | `xzToLocation(cx * 16 + 8, cz * 16 + 8)` | keys land on the wrong spiral ring, so learning and querying disagree about which ground was rejected |
+
+Durable consequences:
+
+- **`flushAndRebuild`'s parameter is a resolution, and the method name does not say so.** Any new call site should pass the owning region's configured `spatialResolution` (or `1L` for cell-exact behaviour) and never a clock value. `MemoryShapeSelectionThroughputTest` and `RetainedFootprintBenchmarkTest` both pass `1L`, which is the pattern to copy.
+- **`MemoryShape` is chunk-indexed throughout.** `neighbourRingOffset(int cx, int cz)` and the `radius` default of 256 are the tell. Feeding it block coordinates does not fail loudly; it just puts keys on rings a factor of 16 out.
+- **A cost benchmark must report its serve rate.** A starved cache is the cheapest possible implementation. The first run of the memory-model benchmark posted the best allocation figure in the table while serving 0.3 % of requests, and the *only* thing that exposed it was an unserved-request counter added on general principle before any result was read. Any benchmark that reports cost per unit of work must also report how much work actually got done - otherwise a fidelity bug is indistinguishable from a win. This is now a publication rule in ADR-080.
+- **A simulated model's own instrumentation can dominate the figure it produces, and it will look like a property of the design.** Modelling `MemoryShape`'s dirtiness gate needed a run count, and the obvious source is `badKeysSnapshot()` - which *copies the whole run array*. Evaluated on every declined rebuild deadline (62 000 of them at a 60 s cadence) it made the harness the dominant allocator: 32 865 bytes per teleport, against 1 383 once the check was changed to a primitive counter. A 24x inflation, entirely apparatus, and it presented as "durable memory allocates enormously at tight rebuild cadences". Rule: anything evaluated per request or per deadline inside a measured window must be primitive-only; if a guard needs state the shipped code reads from a snapshot, mirror it with a counter and justify the equivalence (run count and learned-cell count agree to ~1.0 here, per `RetainedFootprintBenchmarkTest`).
+- **Model a subject's recomputation *trigger*, not its period.** `MemoryShape.maybeFlushAndRebuild` returns unless a mark is pending and additionally requires `min(256, runs/8)` pending marks, so a converged memory performs no merge however often the cadence fires. A model that rebuilt unconditionally on the clock charged a bulk-allocation cost production does not pay. Cadences in this codebase are generally ceilings on staleness rather than schedules - check for a dirty flag before assuming periodic work is periodic.
+
+---
+
+## 2026-09-04 - Ask what an arm is doing before asking what it costs, and benchmark the configuration the design targets
+
+Two corrections to the ADR-080 allocation tier, both prompted by the same maintainer question - "are we doing *more* because this repo supplies more tools and information?"
+
+- **When a benchmark arm looks expensive, add the arm that falsifies the confound.** The durable-memory arm was the second-highest allocator in the table, and there were two candidate explanations: it does more work, or it was configured with a deeper hot cache than its comparators (1024 slots against their 20). A depth-20 parity arm settled it in one run - 483.9 bytes per teleport against 485.4, a 0.3 % difference - so hot-tier depth is free at steady state and the gap is genuinely the two jobs no memoryless arm performs: admitting 1.005 real `RTPLocation`/`RTPCoords` objects per teleport, and recording 0.357 learning marks per teleport. A parity arm is cheap and it converts an argument into a row. Generalised into an ADR-080 rule: an arm whose figure differs from a comparator must report the operation counts that explain the difference.
+- **Measure the configuration the design is actually meant to run in.** The whole table had been taken on an unscanned world, which is the worst case for a design whose spatial memory is meant to be pre-populated off-tick. Re-running with the memory seeded the way `/rtp scan` seeds it moved the durable arm from second-worst to cheapest in every load class: class-3 burst 364.7 -> 1.2 bytes per teleport, burstiness 45.5x -> 1.17x, steady transient 124.8 -> 107.0 bytes, chunk materialisations 1.362 -> 1.005 (the floor of one chunk per teleport), and zero span-array rebuilds because a converged memory is never dirty - all 200 004 cadence deadlines declined. The learning cost is not a property of the representation; it is the cost of learning, and an operator can pay it once off-tick instead. Charge the crawl as one-time (15.5 MB for a 262 144-cell region, amortising to 77.4 bytes per teleport over the run) and never compare a pre-scanned row against another design's cold-start row.
+
+---
+
+## 2026-09-04 - A latency model is a queue, and four of its bugs read as results
+
+Rewriting the ADR-080 latency tier from summed operation counts to a discrete-event queue. The count model spanned ~1.9x between designs where the rig measures ~417x on mean latency; the missing factor was contention, not a cost constant. Four bugs found along the way, every one of which produced a plausible-looking number rather than an obvious failure:
+
+- **Background refill and player requests must not share one FIFO.** With both on the same tick queue every cached serve waited behind the refill backlog: modelled p50 103 ms against a measured 1 ms. Scheduled background work occupies the tick (so it belongs in MSPT) but does not enqueue a player behind it. Give it its own capacity track.
+- **Pace by credits, not by a cursor.** A pulse cursor advanced one whole period per request drifts ahead of the clock as soon as requests arrive faster than the period, which starved refill entirely and made a cache design read as memoryless. Credits that accrue with elapsed time neither lose nor manufacture budget.
+- **A sequential refiller is not a refiller.** Waiting out each location's own async chunk load in turn capped production at ~8/s against 18/s demand and pinned the modelled cache-hit rate near 0.5 no matter how large the budget. Timestamp completions and let many be in flight - and use a priority queue, because completion order is not submission order once work spreads across a pool.
+- **Pulse width matters as much as pulse rate.** The same 40 locations per second delivered as one burst per second over-predicted p50 by 19x, because any request arriving inside the burst queued behind all of it.
+- **Derive the dominant term, do not fit it.** Foreground chunk cost follows from measured main-thread CPU, chunks per attempt and async share by arithmetic: `17.97 / (1.58 x 0.15)` = 75.8 ms. An independent search that included it chose 73.8 ms - a 3 % agreement between a fit and a derivation sharing no inputs, and the strongest available evidence that the queue structure is right. A fitted dominant term would make every downstream figure a restatement of the fit.
+- **Signed residuals, and stop when the discipline says stop.** The tier now over-states competitor cost (mean signed residual +1.55), which flatters this plugin, so the gate fails and no latency figure may be published. Closing the last residual would require fitting a parameter to a competitor row, which the calibrate-one/validate-rest split forbids. The correct response to a failing gate is a new measurement, not a new knob.
 
 ---
 

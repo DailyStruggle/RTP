@@ -76,5 +76,7 @@ class ReqRtpObs001CoreMetricsTest {
         RTPMetricsExtension ext = m.snapshot().extension(RTPMetricsExtension.class);
         assertNotNull(ext);
         assertEquals(0, ext.queueDepth);
+        assertNotNull(ext.regionQueueStatus);
+        assertTrue(ext.regionQueueStatus.isEmpty());
     }
 }
