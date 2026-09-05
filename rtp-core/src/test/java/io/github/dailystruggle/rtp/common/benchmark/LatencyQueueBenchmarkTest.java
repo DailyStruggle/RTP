@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
@@ -119,11 +120,31 @@ class LatencyQueueBenchmarkTest {
     return new CandidateStream(1 << 20, CHUNK_RADIUS, CHUNKS_PER_BLOB, UNSAFE_FRACTION, 20260904L);
   }
 
+  /**
+   * Cold region-file read: the harness measurement when a run supplied it, this tier's own anvil
+   * figure otherwise.
+   *
+   * <p>The fallback is not a placeholder - it is a real measurement from the same tier - but it is
+   * one machine's figure with no recorded device class, which is why the harness column supersedes
+   * it the moment it exists. The substitution happens here and nowhere else, so the two can never
+   * both be in play.
+   */
+  private static double regionReadColdUs() {
+    return MeasuredAnchors.orModelled(
+        MeasuredAnchors.PAPER_CALIBRATION.storageReadColdP50Us(), REGION_READ_COLD_US);
+  }
+
+  /** Candidates per binned batch: measured occupancy when available, the assumed 64 otherwise. */
+  private static double binnedBatch() {
+    return MeasuredAnchors.orModelled(
+        MeasuredAnchors.PAPER_CALIBRATION.binCandidatesPerBatch(), BINNED_BATCH);
+  }
+
   private static QueueSim.Costs costs(double chunkLoadUs, double servePathUs) {
     return new QueueSim.Costs(
         chunkLoadUs,
-        REGION_READ_COLD_US,
-        REGION_READ_COLD_US / BINNED_BATCH,
+        regionReadColdUs(),
+        regionReadColdUs() / binnedBatch(),
         LIVE_BLOCK_CHECK_US,
         servePathUs,
         MEMORY_LOOKUP_US,
@@ -237,12 +258,19 @@ class LatencyQueueBenchmarkTest {
         Integer.toString(bestBudget), Provenance.DERIVED);
     REPORT.add(SECTION, "calibration", "objective (sum of squared log ratios)", bestScore,
         Provenance.DERIVED);
-    REPORT.add(SECTION, "calibration", "region-file cold read (us)", REGION_READ_COLD_US,
+    REPORT.add(SECTION, "calibration", "region-file cold read (us)", regionReadColdUs(),
         Provenance.MEASURED);
     REPORT.add(SECTION, "calibration", "binned read per candidate (us)",
-        REGION_READ_COLD_US / BINNED_BATCH, Provenance.DERIVED);
-    REPORT.add(SECTION, "calibration", "candidates per binned batch", BINNED_BATCH,
-        Provenance.MODELED);
+        regionReadColdUs() / binnedBatch(), Provenance.DERIVED);
+    REPORT.add(SECTION, "calibration", "candidates per binned batch", binnedBatch(),
+        MeasuredAnchors.provenanceOf(MeasuredAnchors.PAPER_CALIBRATION.binCandidatesPerBatch()));
+    // Empty is the string sentinel. A read cost without a device class is machine-relative, so the
+    // label rides in the same table as the cost rather than in a caption.
+    REPORT.add(SECTION, "calibration", "storage class (empty = not measured)",
+        MeasuredAnchors.PAPER_CALIBRATION.storageClass(),
+        MeasuredAnchors.hasLabel(MeasuredAnchors.PAPER_CALIBRATION.storageClass())
+            ? Provenance.MEASURED
+            : Provenance.MODELED);
     REPORT.add(SECTION, "calibration", "live block check (us)", LIVE_BLOCK_CHECK_US,
         Provenance.MODELED);
     REPORT.add(SECTION, "calibration", "region hop (us)", REGION_HOP_US, Provenance.MODELED);
@@ -340,9 +368,17 @@ class LatencyQueueBenchmarkTest {
           r.inFlight(),
           MeasuredAnchors.inFlight(a.throughputPerSecond(), a.meanMillis()));
 
-      // Bimodality: a mean describes neither mode, so the mode split is reported next to it.
-      REPORT.add(SECTION, subject, "served from cache (fraction)", r.cacheHitFraction(),
-          Provenance.MODELED);
+      // Bimodality: a mean describes neither mode, so the mode split is reported next to it. When
+      // the harness supplies its own mode split this becomes a residual - the measurement the
+      // accuracy gate is blocked on - and until then it stays a bare model output.
+      emit(subject, "served from cache (fraction)", r.cacheHitFraction(),
+          a.servedFromCacheFraction());
+      emit(subject, "foreground chunk share", 1.0 - arm.asyncChunkShare(),
+          a.foregroundChunkShare());
+      if (arm.folia()) {
+        emit(subject, "region contexts per request", r.attemptsPerRequest(),
+            a.regionContextAcquisitionsPerAttempt());
+      }
       REPORT.add(SECTION, subject, "candidates evaluated per request", r.attemptsPerRequest(),
           Provenance.MODELED);
       REPORT.add(SECTION, subject, "chunk materialisations per request (input)",
@@ -393,6 +429,28 @@ class LatencyQueueBenchmarkTest {
     REPORT.add(GATE, "gate", "verdict: bias",
         Math.abs(bias) <= 0.50 ? "PASS" : "FAIL", Provenance.DERIVED);
 
+    // Input completeness, fixed in advance alongside the other two thresholds. An absent input is
+    // not a smaller failure than a numeric one: the accuracy rows above fall back to modelled
+    // constants wherever a harness column is missing, so accuracy passing over absent inputs would
+    // be the model agreeing with itself.
+    List<String> absent = MeasuredAnchors.absentInputs();
+    int expectedInputs = MeasuredAnchors.EXPECTED_INPUTS.size();
+    boolean complete = absent.isEmpty();
+    REPORT.add(GATE, "gate", "harness inputs present",
+        (expectedInputs - absent.size()) + " of " + expectedInputs, Provenance.DERIVED);
+    REPORT.add(GATE, "gate", "harness inputs absent",
+        complete ? MeasuredAnchors.NO_LABEL : String.join(" ", absent), Provenance.DERIVED);
+    REPORT.add(GATE, "gate", "verdict: input completeness", complete ? "PASS" : "FAIL",
+        Provenance.DERIVED);
+    REPORT.add(
+        GATE,
+        "gate",
+        "verdict: publishable",
+        !complete
+            ? "FAIL (INPUTS ABSENT)"
+            : (withinFraction >= 0.80 && Math.abs(bias) <= 0.50 ? "PASS" : "FAIL"),
+        Provenance.DERIVED);
+
     REPORT.note(
         "Chunk materialisations per request is an input on the competitor arms, matched in one step "
             + "to the measured chunk attribution, and is therefore not evidence of anything. The "
@@ -416,13 +474,23 @@ class LatencyQueueBenchmarkTest {
             + "65 ms against a 30 ms p50 says the real distribution straddles the same boundary. "
             + "Closing that residual would require fitting a parameter to a competitor row, which "
             + "the calibration split forbids. It needs a measurement, not a knob: cache-hit rate "
-            + "per plugin, which the harness does not currently record.");
+            + "per plugin. The harness is now instrumented for it and the residual row is wired, "
+            + "but no run has emitted the column, so the slot holds its no-data sentinel.");
     REPORT.note(
         "The bias verdict failing while individual arms improve is the gate working as intended. "
             + "Residuals are now predominantly positive, meaning the model over-states competitor "
             + "cost - which flatters this plugin. That is exactly the direction a published figure "
             + "must not be wrong in, so no latency or throughput figure from this tier may be "
             + "published until the bias row passes.");
+    REPORT.note(
+        "Input completeness is a gate in its own right, and it fails. The harness has been "
+            + "instrumented for a per-attempt cache-served flag, a foreground/async chunk split, "
+            + "region-file read counts with measured bin occupancy, a device class for the read "
+            + "cost and Folia region-context acquisitions, but no run has yet emitted any of "
+            + "them, so every slot carries its no-data sentinel and the model falls back to its "
+            + "own constants. Nothing was relabelled MEASURED for that reason: a provenance label "
+            + "with no measurement behind it is worse than a missing row, because it reads as "
+            + "evidence.");
     REPORT.note(
         "Every omission runs one way. World generation, chunk unload and save, entity and "
             + "view-distance aftershock, host GC pauses and the platform-owned chunk payload are "

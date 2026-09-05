@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.common.benchmark;
 
+import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -50,6 +53,23 @@ final class MeasuredAnchors {
    *     what keeps the model's tail an output rather than a tuned parameter.
    * @param regionFreezes Folia region freeze events observed over the phase, or {@code -1} when not
    *     applicable to the platform
+   * @param servedFromCacheFraction fraction of attempts the harness classified as served without
+   *     selection chunk work, or {@link #NO_VALUE}. This is the measurement the latency gate is
+   *     blocked on: a p50 sitting on the boundary between the cached and cold modes cannot be
+   *     validated without knowing which side of it the real distribution mostly falls on.
+   * @param foregroundChunkShare measured fraction of chunk loads that landed on a tick thread, or
+   *     {@link #NO_VALUE}. Independent of {@link #asyncChunkShare()}, which is an aggregate of a
+   *     different run; the two are reported side by side and never averaged.
+   * @param regionFileReadsPerAttempt distinct 32x32 bins touched per attempt, or {@link #NO_VALUE}
+   * @param binCandidatesPerBatch measured candidates per binned batch, or {@link #NO_VALUE}. The
+   *     model currently assumes 64; batching is worth up to four orders of magnitude on the read
+   *     term, so an assumed occupancy is an assumed order of magnitude.
+   * @param storageReadColdP50Us first-touch region-file read p50 on the rig, or {@link #NO_VALUE}
+   * @param storageClass device verdict, or {@link #NO_LABEL}. Without it a read-cost figure is
+   *     machine-relative and non-portable, so the label travels with the number or the number is
+   *     not used.
+   * @param regionContextAcquisitionsPerAttempt measured Folia region-context acquisitions per
+   *     attempt, or {@link #NO_VALUE}
    */
   record Anchor(
       String name,
@@ -67,13 +87,58 @@ final class MeasuredAnchors {
       double chunksPerAttempt,
       double asyncChunkShare,
       double mainCpuPerAttemptMillis,
-      int regionFreezes) {}
+      int regionFreezes,
+      double servedFromCacheFraction,
+      double foregroundChunkShare,
+      double regionFileReadsPerAttempt,
+      double binCandidatesPerBatch,
+      double storageReadColdP50Us,
+      String storageClass,
+      double regionContextAcquisitionsPerAttempt) {}
 
-  /** The arm the model is calibrated on. Exactly one, by construction. */
+  /**
+   * No-data sentinel for every real-valued harness quantity.
+   *
+   * <p>{@code NaN} rather than {@code 0} or {@code -1} on purpose: it propagates through arithmetic
+   * instead of silently producing a plausible product, so an absent input cannot become a quiet
+   * zero somewhere downstream. Counts are still written as {@code -1} in the harness CSV; they are
+   * translated to this sentinel on transcription.
+   */
+  static final double NO_VALUE = Double.NaN;
+
+  /** No-data sentinel for string-valued harness quantities. Empty, never {@code "UNKNOWN"}. */
+  static final String NO_LABEL = "";
+
+  /**
+   * The harness-supplied quantities this tier would consume, in the order they are reported.
+   *
+   * <p>Named here so the completeness gate enumerates them from one place rather than from whatever
+   * the report happened to emit. Adding an instrumented quantity to the harness and forgetting to
+   * add it here would make the gate pass by omission.
+   */
+  static final List<String> EXPECTED_INPUTS =
+      List.of(
+          "servedFromCacheFraction",
+          "foregroundChunkShare",
+          "regionFileReadsPerAttempt",
+          "binCandidatesPerBatch",
+          "storageReadColdP50Us",
+          "storageClass",
+          "regionContextAcquisitionsPerAttempt");
+
+  /**
+   * The arm the model is calibrated on. Exactly one, by construction.
+   *
+   * <p>The seven trailing fields are the newly instrumented harness quantities. Every one of them
+   * carries the no-data sentinel because no run has been executed under any of the instrumentation
+   * tracks - see the checklist statuses M7 / S7 / F7 / N7 / F-FG9. They are transcribed the moment
+   * an archived run supplies them, and no other change is then needed.
+   */
   static final Anchor PAPER_CALIBRATION =
       new Anchor(
           "this plugin (paper)", "paper", true,
-          18.7, 1.0, 2.0, 46.0, 518.0, 687.0, 2.79, 85.8, 98.4, 1.58, 0.85, 17.97, -1);
+          18.7, 1.0, 2.0, 46.0, 518.0, 687.0, 2.79, 85.8, 98.4, 1.58, 0.85, 17.97, -1,
+          NO_VALUE, NO_VALUE, NO_VALUE, NO_VALUE, NO_VALUE, NO_LABEL, NO_VALUE);
 
   /** Untouched validation arms. No parameter is permitted to be fitted to any of these. */
   static Map<String, Anchor> validation() {
@@ -83,25 +148,29 @@ final class MeasuredAnchors {
         new Anchor(
             "clustered live-verify (paper)", "paper", false,
             13.1, 30.0, 189.0, 322.0, 1936.0, 2172.0, 65.0, 156.8, 292.0, 3.38, 0.47, 19.06,
-            -1));
+            -1,
+            NO_VALUE, NO_VALUE, NO_VALUE, NO_VALUE, NO_VALUE, NO_LABEL, NO_VALUE));
     m.put(
         "uniform live-verify (paper)",
         new Anchor(
             "uniform live-verify (paper)", "paper", false,
             6.0, 480.0, 3217.0, 4402.0, 6229.0, 6383.0, 1163.0, 859.0, 3663.0, 5.86, 0.08, 25.57,
-            -1));
+            -1,
+            NO_VALUE, NO_VALUE, NO_VALUE, NO_VALUE, NO_VALUE, NO_LABEL, NO_VALUE));
     m.put(
         "this plugin (folia)",
         new Anchor(
             "this plugin (folia)", "folia", false,
             14.6, 100.0, 150.0, 183.0, 268.0, 501.0, Double.NaN, 51.0, 341.0,
-            Double.NaN, Double.NaN, 2.87, 0));
+            Double.NaN, Double.NaN, 2.87, 0,
+            NO_VALUE, NO_VALUE, NO_VALUE, NO_VALUE, NO_VALUE, NO_LABEL, NO_VALUE));
     m.put(
         "clustered live-verify (folia)",
         new Anchor(
             "clustered live-verify (folia)", "folia", false,
             7.68, 225.0, 494.0, 704.0, 1399.0, 4598.0, Double.NaN, 51.0, 307.0,
-            Double.NaN, Double.NaN, 6.26, 7));
+            Double.NaN, Double.NaN, 6.26, 7,
+            NO_VALUE, NO_VALUE, NO_VALUE, NO_VALUE, NO_VALUE, NO_LABEL, NO_VALUE));
     return m;
   }
 
@@ -136,5 +205,53 @@ final class MeasuredAnchors {
    */
   static double inFlight(double throughputPerSecond, double meanMillis) {
     return throughputPerSecond * meanMillis / 1_000.0;
+  }
+
+  /** True when a real-valued harness quantity is present. A zero is present; a sentinel is not. */
+  static boolean hasValue(double v) {
+    return !Double.isNaN(v);
+  }
+
+  /** True when a string-valued harness quantity is present. */
+  static boolean hasLabel(String v) {
+    return v != null && !v.isBlank();
+  }
+
+  /**
+   * Provenance computed from the sentinel rather than asserted by hand.
+   *
+   * <p>The label and the data therefore cannot drift apart: a quantity is MEASURED exactly when a
+   * run supplied it, and the modelled fallback keeps its MODELED label automatically. Hand-written
+   * provenance is how a placeholder gets published as a measurement.
+   */
+  static Provenance provenanceOf(double harnessValue) {
+    return hasValue(harnessValue) ? Provenance.MEASURED : Provenance.MODELED;
+  }
+
+  /** The value when the harness supplied it, otherwise the model's own constant. */
+  static double orModelled(double harnessValue, double modelled) {
+    return hasValue(harnessValue) ? harnessValue : modelled;
+  }
+
+  /**
+   * Names of the expected harness inputs that no anchor supplies.
+   *
+   * <p>Scanned across every arm, calibration included: an input present on one arm only cannot
+   * validate a between-arm comparison, so "present" means present somewhere is deliberately
+   * <em>not</em> the test - a name is reported absent unless the calibration arm carries it.
+   */
+  static List<String> absentInputs() {
+    Anchor a = PAPER_CALIBRATION;
+    List<String> absent = new ArrayList<>();
+    if (!hasValue(a.servedFromCacheFraction())) absent.add("servedFromCacheFraction");
+    if (!hasValue(a.foregroundChunkShare())) absent.add("foregroundChunkShare");
+    if (!hasValue(a.regionFileReadsPerAttempt())) absent.add("regionFileReadsPerAttempt");
+    if (!hasValue(a.binCandidatesPerBatch())) absent.add("binCandidatesPerBatch");
+    if (!hasValue(a.storageReadColdP50Us())) absent.add("storageReadColdP50Us");
+    if (!hasLabel(a.storageClass())) absent.add("storageClass");
+    if (!hasValue(a.regionContextAcquisitionsPerAttempt())) {
+      absent.add("regionContextAcquisitionsPerAttempt");
+    }
+    return absent;
   }
 }

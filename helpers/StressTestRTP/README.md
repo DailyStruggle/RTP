@@ -253,6 +253,76 @@ are simply omitted — no breakage.
 
 ---
 
+## Ticket-footprint calibration (setup phase)
+
+Every retained-memory figure the harness reports is quoted per cached
+location, and a cached location is one `addPluginChunkTicket` call.
+Turning that into bytes needs one more number: how many chunks the
+server actually makes resident in response to a single ticket.
+
+That number is a **platform decision, not a plugin one**. Vanilla
+propagates ticket levels outward, so a ticket below the `FULL` threshold
+pins a neighbourhood rather than one chunk. Paper and Folia each
+reimplemented that subsystem and need not agree with vanilla or with
+each other. Assume it and every bytes-per-cached-location inference is
+off by exactly the factor assumed - in the flattering direction if you
+guess low.
+
+So it is measured, once, at plugin enable, before any teleport is
+recorded:
+
+1. Pick a chunk ~20k blocks from origin (well outside the run's
+   origin-centred teleport radius, so the probe never warms ground the
+   run then measures) that reports `isChunkLoaded() == false`.
+2. Apply exactly one `addPluginChunkTicket` on the thread owning that
+   chunk, and count `ChunkLoadEvent`s within 7 chunks of it.
+3. Release the ticket and count the unloads.
+
+Counting events rather than diffing `World#getLoadedChunks()` is
+deliberate: the array form allocates a reference to every loaded chunk
+on the server, and it is not region-safe to walk on Folia. Events are
+already delivered on the owning thread, so the probe reports the same
+quantity on Spigot, Paper, and Folia.
+
+Results land in `ticket-footprint.txt` and in seven phase columns:
+
+| Column | Meaning |
+|---|---|
+| `ticket_footprint_chunks` | chunks made resident by one ticket |
+| `ticket_footprint_shape` | `1x1` / `3x3` / `5x5`, or `IRREGULAR` / `NONE` |
+| `ticket_footprint_released` | chunks unloaded when the ticket was removed |
+| `ticket_probe_noise_loads` | loads outside the attribution radius |
+| `ticket_footprint_heap_bytes` | used-heap delta across the window |
+| `ticket_footprint_bytes_per_chunk` | that delta per chunk |
+| `ticket_footprint_heap_label` | `UNCOLLECTED_ALLOCATION_INCLUSIVE` |
+
+Reading them:
+
+- **`ticket_footprint_chunks` is the multiplier.** Multiply by the
+  cached-location cap under test to get the resident-chunk cost of a
+  full hot cache.
+- **`ticket_probe_noise_loads` decides whether you can trust it.** `0`
+  means the window was quiet and the footprint is attributable to the
+  ticket. Non-zero means unrelated chunk traffic overlapped the window,
+  and the footprint is an **upper bound**. Probe an empty server.
+- **`ticket_footprint_released` is the retention check.** Equal to
+  `ticket_footprint_chunks` means retention is bounded and symmetric. A
+  shortfall means the ticket did not fully release, and every residency
+  figure in the run should be read as accumulating.
+- **The heap figures are upper bounds, not retained sets.** No
+  collection is forced - a `System.gc()` on a server under measurement
+  would corrupt the GC columns recorded in the same run - so both
+  include transient allocation. The label says so in every row.
+
+`-1` and empty mean NOT MEASURED. In particular, `-1` here never means
+a one-chunk footprint.
+
+Tunable under `ticket-footprint-probe` in `config.yml`
+(`enabled`, `origin-distance-blocks`, `settle-ticks`). Raise
+`settle-ticks` on a slow disk if the count looks truncated.
+
+---
+
 ## Methodology notes
 
 - **Don't trust a single run.** Fire `/rtpstress start` at least three
