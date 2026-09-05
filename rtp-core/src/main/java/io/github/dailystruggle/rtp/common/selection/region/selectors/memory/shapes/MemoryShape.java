@@ -75,13 +75,537 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * world-name byte length. Spells "RTP1" big-endian.
    */
   private static final int BIN_MAGIC = 0x52545031;
-  /** Current cause-tagged {@code .bin} format version (1 == legacy, 2 == cause-tagged, 3 == ttl/epoch-tagged). */
-  private static final int BIN_VERSION = 3;
-  protected volatile ConcurrentHashMap<String, long[]> biomeKeysCache = new ConcurrentHashMap<>();
-  protected volatile ConcurrentHashMap<String, long[]> biomePrefixSumsCache =
-      new ConcurrentHashMap<>();
-  protected volatile long[] biomeMappedKeysCache = new long[0];
-  protected volatile long[] biomeMappedPrefixSumsCache = new long[0];
+  /**
+   * Current cause-tagged {@code .bin} format version (1 == legacy, 2 == cause-tagged, 3 ==
+   * ttl/epoch-tagged, 4 == unified biome run stream).
+   *
+   * <p>Version 4 replaces the per-biome biome sections - one {@code key} + {@code width delta} pair
+   * per run under a repeated name header - with a single name table plus one ascending run stream
+   * of {@code (key delta, width, biome id)}, each LEB128. That is the on-disk form of the blocked
+   * union held in memory, so a load builds {@link #biomeUnion} directly and no per-biome run table
+   * has to exist to receive it. Deltas shrink with run spacing rather than with the key domain, so
+   * the encoding does not degrade as the world radius grows.
+   */
+  private static final int BIN_VERSION = 4;
+  /**
+   * Cross-biome union of the recorded biome runs, blocked so that a run costs 10 bytes resident
+   * instead of the 24 a flat {@code long} key + {@code long} prefix sum + {@code short} id would.
+   *
+   * <p>Published as a single immutable holder: the columns are only consistent with each other,
+   * so six independent volatiles would let a reader mix generations.
+   *
+   * @see BiomeUnionTable
+   */
+  protected volatile BiomeUnionTable biomeUnion = BiomeUnionTable.EMPTY;
+
+
+  /**
+   * Immutable blocked run table: the cross-biome union of recorded biome runs.
+   *
+   * <p>Runs are grouped into blocks of at most {@link #BLOCK_SIZE}. Each block keeps one absolute
+   * {@code long} key and one absolute {@code long} prefix sum; every run inside it is an
+   * {@code int} offset from those bases. The absolute magnitude that forces a {@code long} is
+   * therefore paid once per block instead of once per run: 10 bytes per run against 24, with the
+   * bases amortizing to 0.02 bytes per run.
+   *
+   * <p>Overflow is structurally impossible rather than bounded by a radius assumption: a block is
+   * closed early whenever the next run's offset from either base would exceed
+   * {@link Integer#MAX_VALUE}, so no world border or {@code spatialResolution} can make it wrap.
+   * A side effect is that no column is ever a G1 humongous allocation - each block array is at
+   * most 4 KiB - which a flat {@code long[]} past 131,072 runs was on every rebuild.
+   *
+   * <p>Lookup stays {@code log2(n)}: one search over the block bases plus one inside the located
+   * block ({@code log2(n / BLOCK_SIZE) + log2(BLOCK_SIZE)}).
+   */
+  public static final class BiomeUnionTable {
+    /** Runs per block. Keeps each block's {@code int[]} at 4 KiB. */
+    private static final int BLOCK_SIZE = 1024;
+
+    /** The empty table, published before the first rebuild. */
+    static final BiomeUnionTable EMPTY =
+        new BiomeUnionTable(
+            new long[0], new long[0], new int[0][], new int[0][], new short[0][], new int[0], 0,
+            new String[0]);
+
+    /** Absolute run key of each block's first run; ascending. */
+    private final long[] blockBaseKey;
+
+    /** Absolute prefix sum of each block's first run; ascending. */
+    private final long[] blockBaseSum;
+
+    private final int[][] keyOffsets;
+    private final int[][] sumOffsets;
+    private final short[][] ids;
+
+    /** Global run index of each block's first run. */
+    private final int[] blockStart;
+
+    private final int runCount;
+
+    /** Canonical biome names, indexed by the values in {@link #ids}. */
+    private final String[] names;
+
+    /** Blocks this build had to allocate; the rest were shared with the previous table. */
+    private int freshBlocks;
+
+    /** Lazily built per-biome index views, one slot per id in {@link #names}. */
+    private volatile BiomeView[] views;
+
+    private BiomeUnionTable(
+        long[] blockBaseKey,
+        long[] blockBaseSum,
+        int[][] keyOffsets,
+        int[][] sumOffsets,
+        short[][] ids,
+        int[] blockStart,
+        int runCount,
+        String[] names) {
+      this.blockBaseKey = blockBaseKey;
+      this.blockBaseSum = blockBaseSum;
+      this.keyOffsets = keyOffsets;
+      this.sumOffsets = sumOffsets;
+      this.ids = ids;
+      this.blockStart = blockStart;
+      this.runCount = runCount;
+      this.names = names;
+    }
+
+    /**
+     * Builds a table from the merge's key/width/id columns.
+     *
+     * @param keys run start keys, ascending
+     * @param widths run widths, parallel to {@code keys}
+     * @param runIds biome slot of each run, parallel to {@code keys}
+     * @param count number of live entries in the columns
+     * @param names canonical biome names indexed by {@code runIds}
+     * @param prev previously published table to share unchanged blocks with, or {@code null}
+     * @return an immutable blocked table
+     */
+    static BiomeUnionTable build(
+        long[] keys, long[] widths, short[] runIds, int count, String[] names,
+        BiomeUnionTable prev) {
+      if (count <= 0) return EMPTY;
+
+      // An early close on offset overflow can produce more blocks than count / BLOCK_SIZE, so the
+      // block-indexed arrays grow rather than being sized from the run count alone.
+      int maxBlocks = count / BLOCK_SIZE + 2;
+      long[] baseKeys = new long[maxBlocks];
+      long[] baseSums = new long[maxBlocks];
+      int[] starts = new int[maxBlocks + 1];
+      int[][] keyCols = new int[maxBlocks][];
+      int[][] sumCols = new int[maxBlocks][];
+      short[][] idCols = new short[maxBlocks][];
+
+      int[] keyScratch = new int[BLOCK_SIZE];
+      int[] sumScratch = new int[BLOCK_SIZE];
+      short[] idScratch = new short[BLOCK_SIZE];
+
+      int blocks = 0;
+      int inBlock = 0;
+      int fresh = 0;
+      long runningSum = 0L;
+      long baseKey = 0L;
+      long baseSum = 0L;
+
+      for (int i = 0; i < count; i++) {
+        runningSum += widths[i];
+        if (inBlock > 0) {
+          // Close the block early rather than let an offset wrap. A pathological gap costs one
+          // extra block, never a wrong key.
+          boolean overflow =
+              inBlock == BLOCK_SIZE
+                  || keys[i] - baseKey > Integer.MAX_VALUE
+                  || runningSum - baseSum > Integer.MAX_VALUE;
+          if (overflow) {
+            if (blocks == baseKeys.length) {
+              int grown = blocks << 1;
+              baseKeys = Arrays.copyOf(baseKeys, grown);
+              baseSums = Arrays.copyOf(baseSums, grown);
+              starts = Arrays.copyOf(starts, grown + 1);
+              keyCols = Arrays.copyOf(keyCols, grown);
+              sumCols = Arrays.copyOf(sumCols, grown);
+              idCols = Arrays.copyOf(idCols, grown);
+            }
+            boolean shared =
+                unchanged(
+                    prev, blocks, starts[blocks], inBlock, baseKey, baseSum, keyScratch, sumScratch,
+                    idScratch);
+            if (shared) {
+              keyCols[blocks] = prev.keyOffsets[blocks];
+              sumCols[blocks] = prev.sumOffsets[blocks];
+              idCols[blocks] = prev.ids[blocks];
+            } else {
+              keyCols[blocks] = Arrays.copyOf(keyScratch, inBlock);
+              sumCols[blocks] = Arrays.copyOf(sumScratch, inBlock);
+              idCols[blocks] = Arrays.copyOf(idScratch, inBlock);
+              fresh++;
+            }
+            baseKeys[blocks] = baseKey;
+            baseSums[blocks] = baseSum;
+            blocks++;
+            inBlock = 0;
+          }
+        }
+        if (inBlock == 0) {
+          baseKey = keys[i];
+          baseSum = runningSum;
+          starts[blocks] = i;
+        }
+        keyScratch[inBlock] = (int) (keys[i] - baseKey);
+        sumScratch[inBlock] = (int) (runningSum - baseSum);
+        idScratch[inBlock] = runIds[i];
+        inBlock++;
+      }
+      if (blocks == baseKeys.length) {
+        int grown = blocks + 1;
+        baseKeys = Arrays.copyOf(baseKeys, grown);
+        baseSums = Arrays.copyOf(baseSums, grown);
+        starts = Arrays.copyOf(starts, grown + 1);
+        keyCols = Arrays.copyOf(keyCols, grown);
+        sumCols = Arrays.copyOf(sumCols, grown);
+        idCols = Arrays.copyOf(idCols, grown);
+      }
+      if (unchanged(
+          prev, blocks, starts[blocks], inBlock, baseKey, baseSum, keyScratch, sumScratch,
+          idScratch)) {
+        keyCols[blocks] = prev.keyOffsets[blocks];
+        sumCols[blocks] = prev.sumOffsets[blocks];
+        idCols[blocks] = prev.ids[blocks];
+      } else {
+        keyCols[blocks] = Arrays.copyOf(keyScratch, inBlock);
+        sumCols[blocks] = Arrays.copyOf(sumScratch, inBlock);
+        idCols[blocks] = Arrays.copyOf(idScratch, inBlock);
+        fresh++;
+      }
+      baseKeys[blocks] = baseKey;
+      baseSums[blocks] = baseSum;
+      blocks++;
+      starts[blocks] = count;
+
+      BiomeUnionTable built =
+          new BiomeUnionTable(
+              Arrays.copyOf(baseKeys, blocks),
+              Arrays.copyOf(baseSums, blocks),
+              Arrays.copyOf(keyCols, blocks),
+              Arrays.copyOf(sumCols, blocks),
+              Arrays.copyOf(idCols, blocks),
+              Arrays.copyOf(starts, blocks + 1),
+              count,
+              (prev != null && Arrays.equals(prev.names, names)) ? prev.names : names);
+      built.freshBlocks = fresh;
+      return built;
+    }
+
+    /**
+     * Whether a block being closed is byte-identical to the same block of the previous table.
+     *
+     * <p>This is what makes the rebuild copy-on-write per block: closed blocks are immutable and
+     * already published, so an unchanged one is shared by reference instead of reallocated. Under
+     * the radius-append growth of ADR-001 only the tail block changes, so a rebuild allocates a
+     * bounded number of columns rather than one pair per recorded run.
+     *
+     * @param prev previously published table, or {@code null}
+     * @param block block index being closed
+     * @param start global run index of the block's first run
+     * @param len runs in the block
+     * @param baseKey the block's absolute base key
+     * @param baseSum the block's absolute base prefix sum
+     * @param keyScratch staged key offsets
+     * @param sumScratch staged prefix-sum offsets
+     * @param idScratch staged biome ids
+     * @return {@code true} when the previous block's arrays may be reused verbatim
+     */
+    private static boolean unchanged(
+        BiomeUnionTable prev,
+        int block,
+        int start,
+        int len,
+        long baseKey,
+        long baseSum,
+        int[] keyScratch,
+        int[] sumScratch,
+        short[] idScratch) {
+      if (prev == null || block >= prev.blockBaseKey.length) return false;
+      if (prev.blockStart[block] != start || prev.blockStart[block + 1] - start != len) return false;
+      if (prev.blockBaseKey[block] != baseKey || prev.blockBaseSum[block] != baseSum) return false;
+      return Arrays.equals(prev.keyOffsets[block], 0, len, keyScratch, 0, len)
+          && Arrays.equals(prev.sumOffsets[block], 0, len, sumScratch, 0, len)
+          && Arrays.equals(prev.ids[block], 0, len, idScratch, 0, len);
+    }
+
+    /**
+     * @return blocks allocated by the build that produced this table; the remainder are shared by
+     *     reference with the table it superseded
+     */
+    int freshBlockCount() {
+      return freshBlocks;
+    }
+
+    /**
+     * @return number of blocks in the table
+     */
+    int blockCount() {
+      return blockBaseKey.length;
+    }
+
+    /**
+     * @param block block index
+     * @return the block's key-offset column, by reference, for identity assertions
+     */
+    int[] keyBlock(int block) {
+      return keyOffsets[block];
+    }
+
+    /**
+     * @return number of union runs
+     */
+    int runCount() {
+      return runCount;
+    }
+
+    /**
+     * @param canonical canonical biome name
+     * @return the biome's id, or {@code -1} when the table holds no run for it
+     */
+    int idOf(String canonical) {
+      for (int i = 0; i < names.length; i++) {
+        if (names[i].equals(canonical)) return i;
+      }
+      return -1;
+    }
+
+    /**
+     * Per-biome index view, built on first request and cached for this table's lifetime.
+     *
+     * <p>This is what lets the union serve per-biome extents, so a second un-clipped per-biome run
+     * table is not needed to answer {@code biomeWidth} / {@code biomeDensity}. A view is
+     * {@code int[]} run indices plus that biome's own cumulative widths - 12 bytes per run, and
+     * only for biomes actually queried - against 16 bytes per run held eagerly for every biome.
+     *
+     * <p>Extents are those of the union, i.e. after the merge's last-observation-wins clipping, so
+     * a cell claimed by two biomes counts towards exactly the one {@link #biomeAt} reports.
+     */
+    public static final class BiomeView {
+      private final BiomeUnionTable table;
+      private final int[] runs;
+      private final long[] cum;
+
+      private BiomeView(BiomeUnionTable table, int[] runs, long[] cum) {
+        this.table = table;
+        this.runs = runs;
+        this.cum = cum;
+      }
+
+      /**
+       * @return runs attributed to the biome
+       */
+      public int length() {
+        return runs.length;
+      }
+
+      /**
+       * @param k index within the view
+       * @return absolute run start key
+       */
+      public long keyAt(int k) {
+        return table.keyAt(runs[k]);
+      }
+
+      /**
+       * @param k index within the view
+       * @return cumulative width of the biome's runs through {@code k}
+       */
+      public long sumAt(int k) {
+        return cum[k];
+      }
+
+      /**
+       * @param k index within the view
+       * @return width of the run at {@code k}
+       */
+      public long widthAt(int k) {
+        return cum[k] - ((k > 0) ? cum[k - 1] : 0L);
+      }
+
+      /**
+       * @return total width attributed to the biome, in cells
+       */
+      public long totalWidth() {
+        return (runs.length == 0) ? 0L : cum[runs.length - 1];
+      }
+
+      /**
+       * @param location exclusive upper bound in the 1D domain
+       * @return attributed width at 1D indices strictly below {@code location}
+       */
+      public long widthBefore(long location) {
+        if (location <= 0L || runs.length == 0) return 0L;
+        int floor = floorRun(location);
+        if (floor < 0) return 0L;
+        long before = (floor > 0) ? cum[floor - 1] : 0L;
+        // Partial overlap: count only the head of the run that straddles the bound.
+        long overlap = Math.min(widthAt(floor), location - keyAt(floor));
+        return before + Math.max(0L, overlap);
+      }
+
+      /** Last view run whose key is {@code <= location}, or {@code -1}. */
+      private int floorRun(long location) {
+        int lo = 0;
+        int hi = runs.length - 1;
+        int res = -1;
+        while (lo <= hi) {
+          int mid = (lo + hi) >>> 1;
+          if (keyAt(mid) <= location) {
+            res = mid;
+            lo = mid + 1;
+          } else {
+            hi = mid - 1;
+          }
+        }
+        return res;
+      }
+    }
+
+    /**
+     * View for one biome, built once per table and then cached. The table is immutable, so a lost
+     * race only rebuilds an identical view.
+     *
+     * @param id biome id, as returned by {@link #idOf(String)}
+     * @return the view, or {@code null} for an unknown id
+     */
+    BiomeView viewOf(int id) {
+      if (id < 0 || id >= names.length) return null;
+      BiomeView[] local = views;
+      if (local != null && local[id] != null) return local[id];
+      synchronized (this) {
+        local = views;
+        if (local == null) local = new BiomeView[names.length];
+        if (local[id] == null) local[id] = buildView(id);
+        views = local;
+        return local[id];
+      }
+    }
+
+    /** One pass over the union, collecting the runs of a single biome. */
+    private BiomeView buildView(int id) {
+      int n = 0;
+      for (int i = 0; i < runCount; i++) {
+        if (idAt(i) == id) n++;
+      }
+      int[] viewRuns = new int[n];
+      long[] cum = new long[n];
+      long acc = 0L;
+      int at = 0;
+      for (int i = 0; i < runCount; i++) {
+        if (idAt(i) != id) continue;
+        acc += sumAt(i) - ((i > 0) ? sumAt(i - 1) : 0L);
+        viewRuns[at] = i;
+        cum[at] = acc;
+        at++;
+      }
+      return new BiomeView(this, viewRuns, cum);
+    }
+
+    /**
+     * @return canonical biome names indexed by {@link #idAt(int)}
+     */
+    String[] names() {
+      return names;
+    }
+
+    /**
+     * @param run global run index
+     * @return absolute run start key
+     */
+    long keyAt(int run) {
+      int b = blockOf(run);
+      return blockBaseKey[b] + keyOffsets[b][run - blockStart[b]];
+    }
+
+    /**
+     * @param run global run index
+     * @return absolute prefix sum of run widths through {@code run}
+     */
+    long sumAt(int run) {
+      int b = blockOf(run);
+      return blockBaseSum[b] + sumOffsets[b][run - blockStart[b]];
+    }
+
+    /**
+     * @param run global run index
+     * @return biome slot owning the run
+     */
+    int idAt(int run) {
+      int b = blockOf(run);
+      return ids[b][run - blockStart[b]];
+    }
+
+    /**
+     * @return total recorded width, in cells
+     */
+    long totalWidth() {
+      return runCount == 0 ? 0L : sumAt(runCount - 1);
+    }
+
+    /**
+     * Index of the run containing {@code location}, or {@code -1} for a gap or out-of-range value.
+     *
+     * @param location the 1D index to locate
+     * @return containing run index, or {@code -1}
+     */
+    int runContaining(long location) {
+      if (runCount == 0) return -1;
+      int b = floorBlock(location);
+      if (b < 0) return -1;
+      int[] offsets = keyOffsets[b];
+      long diff = location - blockBaseKey[b];
+      int local =
+          (diff > Integer.MAX_VALUE) ? offsets.length - 1 : floorOffset(offsets, (int) diff);
+      if (local < 0) return -1;
+      int run = blockStart[b] + local;
+      long key = keyAt(run);
+      if (key == location) return run;
+      long width = sumAt(run) - (run > 0 ? sumAt(run - 1) : 0L);
+      return (location < key + width) ? run : -1;
+    }
+
+    /** Block owning a global run index; blocks are variable-length, so this is a search. */
+    private int blockOf(int run) {
+      int lo = 0;
+      int hi = blockStart.length - 2;
+      while (lo < hi) {
+        int mid = (lo + hi + 1) >>> 1;
+        if (blockStart[mid] <= run) lo = mid;
+        else hi = mid - 1;
+      }
+      return lo;
+    }
+
+    /** Last block whose base key is {@code <= location}, or {@code -1}. */
+    private int floorBlock(long location) {
+      int idx = Arrays.binarySearch(blockBaseKey, location);
+      if (idx >= 0) return idx;
+      return -(idx + 1) - 1;
+    }
+
+    /** Last offset {@code <= target} within a block, or {@code -1}. */
+    private static int floorOffset(int[] offsets, int target) {
+      int idx = Arrays.binarySearch(offsets, target);
+      if (idx >= 0) return idx;
+      return -(idx + 1) - 1;
+    }
+  }
+
+  /**
+   * Monotone counter bumped every time {@link #biomeUnion} is replaced. Lets a caller that gathers
+   * per-biome run views (the selection-path draw in {@code PregenTask}) hold them across attempts
+   * and re-gather only when they actually changed, instead of re-reading and re-deriving them once
+   * per attempt.
+   *
+   * <p>Not final: {@link #clone} hands the copy a fresh counter, because the clone starts with
+   * empty tables and must not appear unchanged to a cache gathered against the original.
+   */
+  private AtomicLong biomeTableVersion = new AtomicLong();
 
   protected volatile boolean badLocationsDirty = true;
   protected volatile boolean biomeLocationsDirty = true;
@@ -402,8 +926,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     long[] allDeltas;
     byte[] allCauses;
     long[] allExpiries;
-    Map<String, long[]> sBiomeKeys;
-    Map<String, long[]> sBiomeSums;
+    // The union is immutable and published by a single volatile write, so it needs no copy and no
+    // lock: whichever generation is read is internally consistent.
+    BiomeUnionTable sUnion = biomeUnion;
 
     writeLock.lock();
     try {
@@ -461,36 +986,30 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         runIdx++;
       }
 
-      sBiomeKeys = new HashMap<>(biomeKeysCache.size());
-      sBiomeSums = new HashMap<>(biomePrefixSumsCache.size());
-      for (Map.Entry<String, long[]> e : biomeKeysCache.entrySet()) {
-        sBiomeKeys.put(e.getKey(), Arrays.copyOf(e.getValue(), e.getValue().length));
-      }
-      for (Map.Entry<String, long[]> e : biomePrefixSumsCache.entrySet()) {
-        sBiomeSums.put(e.getKey(), Arrays.copyOf(e.getValue(), e.getValue().length));
-      }
     } finally {
       writeLock.unlock();
     }
 
     // Build a binary payload (big-endian) without any synchronous disk I/O here.
-    // BIN_VERSION 3: magic(4) + version(4) + world(4+len) + stride(8) + badSize(4) +
-    // entries * 25 bytes (key 8 + delta 8 + cause 1 + expiresAt 8).
+    // BIN_VERSION 4: magic(4) + version(4) + world(4+len) + stride(8) + badSize(4) +
+    // entries * 25 bytes (key 8 + delta 8 + cause 1 + expiresAt 8), then the biome section:
+    // nameCount(4) + [nameLen(4) + bytes] * nameCount + runCount(4) +
+    // [varint keyDelta + varint width + varint biomeId] * runCount.
     byte[] worldBytes = worldName.getBytes(StandardCharsets.UTF_8);
+    String[] unionNames = sUnion.names();
+    int unionRuns = sUnion.runCount();
     int size = 0;
     size += 8; // BIN_MAGIC + BIN_VERSION
     size += 4 + worldBytes.length; // world name length + bytes
     size += 8; // scanStride
     size += 4; // bad array length
     size += totalRuns * 25; // key + delta + cause + expiresAt per entry
-    size += 4; // biome map size
-    for (Map.Entry<String, long[]> e : sBiomeKeys.entrySet()) {
-      byte[] bName = e.getKey().getBytes(StandardCharsets.UTF_8);
-      long[] keys = e.getValue();
-      size += 4 + bName.length; // biome name length + bytes
-      size += 4; // inner size
-      size += keys.length * 16; // key + delta
+    size += 4; // biome name table size
+    for (String name : unionNames) {
+      size += 4 + name.getBytes(StandardCharsets.UTF_8).length;
     }
+    size += 4; // biome run count
+    size += unionRuns * 30; // worst case: three 10-byte LEB128 values per run
 
     ByteBuffer buf = ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN);
     buf.putInt(BIN_MAGIC);
@@ -506,31 +1025,262 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       buf.putLong(allExpiries[i]);
     }
 
-    buf.putInt(sBiomeKeys.size());
-    for (Map.Entry<String, long[]> e : sBiomeKeys.entrySet()) {
-      String biome = e.getKey();
-      byte[] bName = biome.getBytes(StandardCharsets.UTF_8);
+    buf.putInt(unionNames.length);
+    for (String name : unionNames) {
+      byte[] bName = name.getBytes(StandardCharsets.UTF_8);
       buf.putInt(bName.length).put(bName);
-      long[] keys = e.getValue();
-      long[] sums = sBiomeSums.getOrDefault(biome, new long[0]);
-      buf.putInt(keys.length);
-      long p = 0L;
-      for (int i = 0; i < keys.length; i++) {
-        buf.putLong(keys[i]);
-        long d = (i < sums.length ? sums[i] : p) - p;
-        buf.putLong(d);
-        p = (i < sums.length ? sums[i] : p);
-      }
+    }
+    buf.putInt(unionRuns);
+    long prevKey = 0L;
+    long prevSum = 0L;
+    for (int i = 0; i < unionRuns; i++) {
+      long key = sUnion.keyAt(i);
+      long sum = sUnion.sumAt(i);
+      // Keys ascend and widths are non-negative, so no value here needs zigzagging.
+      putVarLong(buf, key - prevKey);
+      putVarLong(buf, sum - prevSum);
+      putVarLong(buf, sUnion.idAt(i));
+      prevKey = key;
+      prevSum = sum;
     }
 
     // Write directly to disk (async-safe: called from async scan/shutdown threads)
     try {
       java.nio.file.Path p = java.nio.file.Paths.get(filePath);
       java.nio.file.Files.createDirectories(p.getParent());
-      java.nio.file.Files.write(p, buf.array());
+      // The buffer is sized for worst-case varints, so only the written prefix is emitted.
+      java.nio.file.Files.write(p, Arrays.copyOf(buf.array(), buf.position()));
     } catch (Exception e) {
       RTP.log(Level.WARNING, "[MemoryShape] Failed to write binary file: " + filePath + " - " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Writes {@code value} as unsigned LEB128 (seven bits per byte, high bit as continuation).
+   *
+   * <p>Used for the biome run stream, where every value is a non-negative delta between adjacent
+   * runs. Delta magnitude tracks run spacing rather than the key domain, so the encoding does not
+   * widen as the world radius grows - which a fixed-width {@code int} field would both fail to do
+   * and cap.
+   *
+   * @param buf destination, positioned at the write point
+   * @param value non-negative value to encode
+   */
+  private static void putVarLong(ByteBuffer buf, long value) {
+    long v = value;
+    while ((v & ~0x7FL) != 0L) {
+      buf.put((byte) ((v & 0x7FL) | 0x80L));
+      v >>>= 7;
+    }
+    buf.put((byte) v);
+  }
+
+  /**
+   * Reads one unsigned LEB128 value written by {@link #putVarLong}.
+   *
+   * @param buf source, positioned at the value
+   * @return the decoded value
+   * @throws java.nio.BufferUnderflowException when the payload is truncated
+   */
+  private static long getVarLong(ByteBuffer buf) {
+    long result = 0L;
+    int shift = 0;
+    while (true) {
+      byte b = buf.get();
+      result |= ((long) (b & 0x7F)) << shift;
+      if ((b & 0x80) == 0) return result;
+      shift += 7;
+      if (shift > 63) throw new java.nio.BufferUnderflowException();
+    }
+  }
+
+  /**
+   * Reads a BIN_VERSION 4 biome section: name table plus one ascending run stream.
+   *
+   * <p>The stream is the union's own published order, already identity-merged and clipped, so it
+   * is handed to the builder verbatim rather than re-merged - a load therefore reproduces the
+   * saved table exactly.
+   *
+   * @param buf payload positioned at the biome section
+   * @return the table, or {@code null} when the section is malformed
+   */
+  private static BiomeUnionTable readUnionSection(ByteBuffer buf) {
+    int nameCount = buf.getInt();
+    if (nameCount < 0 || nameCount > buf.remaining()) return null;
+    String[] names = new String[nameCount];
+    for (int i = 0; i < nameCount; i++) {
+      int nLen = buf.getInt();
+      if (nLen < 0 || nLen > buf.remaining()) return null;
+      byte[] nb = new byte[nLen];
+      buf.get(nb);
+      names[i] = new String(nb, StandardCharsets.UTF_8);
+    }
+    int runCount = buf.getInt();
+    // One byte per varint is the floor, so three per run bounds a sane run count.
+    if (runCount < 0 || runCount > buf.remaining() / 3) return null;
+    long[] keys = new long[runCount];
+    long[] widths = new long[runCount];
+    short[] ids = new short[runCount];
+    long key = 0L;
+    for (int i = 0; i < runCount; i++) {
+      key += getVarLong(buf);
+      long width = getVarLong(buf);
+      long id = getVarLong(buf);
+      keys[i] = key;
+      widths[i] = width;
+      ids[i] = (short) id;
+    }
+    return BiomeUnionTable.build(keys, widths, ids, runCount, names, null);
+  }
+
+  /**
+   * Reads the pre-version-4 biome sections - one {@code key} + {@code width delta} table per biome
+   * name - and folds them into a union.
+   *
+   * <p>Those sections are exactly the builder's input once interned, so this is an ingest rather
+   * than a migration: the runs are staged, sorted key-ascending, and passed through the same
+   * identity-merge-with-clipping used by a rebuild, which is what makes the resulting table a
+   * partition.
+   *
+   * @param buf payload positioned at the biome section
+   * @return the table, or {@code null} when the section is malformed
+   */
+  private BiomeUnionTable readLegacyBiomeSections(ByteBuffer buf) {
+    int biomeSize = buf.getInt();
+    if (biomeSize < 0) return null;
+    String[] names = new String[biomeSize];
+    long[] stagedKeys = new long[0];
+    long[] stagedWidths = new long[0];
+    short[] stagedIds = new short[0];
+    int staged = 0;
+    for (int i = 0; i < biomeSize; i++) {
+      int nLen = buf.getInt();
+      if (nLen < 0 || nLen > buf.remaining()) return null;
+      byte[] nb = new byte[nLen];
+      buf.get(nb);
+      names[i] = new String(nb, StandardCharsets.UTF_8);
+      int inner = buf.getInt();
+      if (inner < 0 || inner > (buf.remaining() / 16)) return null;
+      if (staged + inner > stagedKeys.length) {
+        int grown = Math.max(16, Math.max(staged + inner, stagedKeys.length << 1));
+        stagedKeys = Arrays.copyOf(stagedKeys, grown);
+        stagedWidths = Arrays.copyOf(stagedWidths, grown);
+        stagedIds = Arrays.copyOf(stagedIds, grown);
+      }
+      for (int j = 0; j < inner; j++) {
+        long k = buf.getLong();
+        long d = buf.getLong();
+        stagedKeys[staged] = k;
+        stagedWidths[staged] = d;
+        stagedIds[staged] = (short) i;
+        staged++;
+      }
+    }
+    if (staged == 0) return BiomeUnionTable.EMPTY;
+
+    // Sort key-ascending, equal keys resolved in favour of the later biome slot, matching the
+    // rebuild's tie-break so a load and a rebuild of the same observations agree.
+    Integer[] order = new Integer[staged];
+    for (int i = 0; i < staged; i++) order[i] = i;
+    final long[] sk = stagedKeys;
+    final short[] si = stagedIds;
+    Arrays.sort(
+        order,
+        (a, b) -> (sk[a] != sk[b]) ? Long.compare(sk[a], sk[b]) : Short.compare(si[b], si[a]));
+    long[] sortedKeys = new long[staged];
+    long[] sortedWidths = new long[staged];
+    short[] sortedIds = new short[staged];
+    for (int i = 0; i < staged; i++) {
+      int at = order[i];
+      sortedKeys[i] = stagedKeys[at];
+      sortedWidths[i] = stagedWidths[at];
+      sortedIds[i] = stagedIds[at];
+    }
+
+    long[] outKeys = new long[staged];
+    long[] outWidths = new long[staged];
+    short[] outIds = new short[staged];
+    int count =
+        coalesceRuns(
+            sortedKeys, sortedWidths, sortedIds, staged, spatialResolution, outKeys, outWidths,
+            outIds);
+    return BiomeUnionTable.build(outKeys, outWidths, outIds, count, names, null);
+  }
+
+  /**
+   * Folds a key-ascending run stream into the union's partition form.
+   *
+   * <p>Two rules, and they are the only place either is expressed: runs of the <em>same</em> biome
+   * coalesce across a gap of up to {@code spatialResolution}; runs of <em>different</em> biomes
+   * never merge, and an incoming run overlapping an already-placed one is clipped past it
+   * (dropped when fully covered). Clipping rather than tagging is what keeps every cell in exactly
+   * one run, so {@code getEffectiveGoodCount()} cannot double-count a cell claimed by two biomes.
+   *
+   * @param inKeys run start keys, ascending
+   * @param inWidths run widths, parallel to {@code inKeys}
+   * @param inIds biome id of each run, parallel to {@code inKeys}
+   * @param count live entries in the input columns
+   * @param spatialResolution same-biome bridging gap, in cells
+   * @param outKeys destination keys; capacity {@code >= count}
+   * @param outWidths destination widths; capacity {@code >= count}
+   * @param outIds destination ids; capacity {@code >= count}
+   * @return number of runs written
+   */
+  private static int coalesceRuns(
+      long[] inKeys,
+      long[] inWidths,
+      short[] inIds,
+      int count,
+      long spatialResolution,
+      long[] outKeys,
+      long[] outWidths,
+      short[] outIds) {
+    int out = 0;
+    long curStart = -1L;
+    long curLength = -1L;
+    short curId = -1;
+    for (int i = 0; i < count; i++) {
+      long nextKey = inKeys[i];
+      long nextLength = inWidths[i];
+      short nextId = inIds[i];
+      if (nextKey < 0L) continue;
+
+      if (curStart == -1L) {
+        curStart = nextKey;
+        curLength = nextLength;
+        curId = nextId;
+        continue;
+      }
+
+      long curEnd = curStart + curLength;
+      if (nextId == curId) {
+        if (nextKey <= curEnd + spatialResolution) {
+          curLength = Math.max(curLength, nextKey + nextLength - curStart);
+          continue;
+        }
+      } else {
+        if (nextKey + nextLength <= curEnd) continue;
+        if (nextKey < curEnd) {
+          nextLength = nextKey + nextLength - curEnd;
+          nextKey = curEnd;
+        }
+      }
+
+      outKeys[out] = curStart;
+      outWidths[out] = curLength;
+      outIds[out] = curId;
+      out++;
+      curStart = nextKey;
+      curLength = nextLength;
+      curId = nextId;
+    }
+    if (curStart != -1L) {
+      outKeys[out] = curStart;
+      outWidths[out] = curLength;
+      outIds[out] = curId;
+      out++;
+    }
+    return out;
   }
 
   public void exportDebugJson(String fileName, String worldName) {
@@ -540,22 +1290,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     long[] sBadKeys;
     long[] sBadSums;
     byte[] sBadCauses;
-    java.util.Map<String, long[]> sBiomeKeys;
-    java.util.Map<String, long[]> sBiomeSums;
+    BiomeUnionTable sUnion = biomeUnion;
 
     writeLock.lock();
     try {
       sBadKeys = java.util.Arrays.copyOf(badKeysCache, badKeysCache.length);
       sBadSums = java.util.Arrays.copyOf(badPrefixSumsCache, badPrefixSumsCache.length);
       sBadCauses = java.util.Arrays.copyOf(badCauseCache, badCauseCache.length);
-      sBiomeKeys = new java.util.HashMap<>(biomeKeysCache.size());
-      sBiomeSums = new java.util.HashMap<>(biomePrefixSumsCache.size());
-      for (java.util.Map.Entry<String, long[]> e : biomeKeysCache.entrySet()) {
-        sBiomeKeys.put(e.getKey(), java.util.Arrays.copyOf(e.getValue(), e.getValue().length));
-      }
-      for (java.util.Map.Entry<String, long[]> e : biomePrefixSumsCache.entrySet()) {
-        sBiomeSums.put(e.getKey(), java.util.Arrays.copyOf(e.getValue(), e.getValue().length));
-      }
     } finally {
       writeLock.unlock();
     }
@@ -578,24 +1319,21 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       prev = sBadSums[i];
     }
 
-    // 3. Convert Biome Location prefix sums back to discrete lengths
+    // 3. Emit the union's runs grouped by owning biome. Extents are attributed, so a cell claimed
+    //    by two biomes appears under exactly the one biomeAt() reports.
     java.util.Map<String, java.util.List<java.util.Map<String, Long>>> biomeMap = new java.util.LinkedHashMap<>();
-    for (java.util.Map.Entry<String, long[]> e : sBiomeKeys.entrySet()) {
-      String biome = e.getKey();
-      long[] keys = e.getValue();
-      long[] sums = sBiomeSums.getOrDefault(biome, new long[0]);
-
+    String[] unionNames = sUnion.names();
+    for (int id = 0; id < unionNames.length; id++) {
+      BiomeUnionTable.BiomeView view = sUnion.viewOf(id);
+      if (view == null) continue;
       java.util.List<java.util.Map<String, Long>> bList = new java.util.ArrayList<>();
-      long p = 0L;
-      for (int i = 0; i < keys.length; i++) {
+      for (int i = 0; i < view.length(); i++) {
         java.util.Map<String, Long> entry = new java.util.LinkedHashMap<>();
-        entry.put("start", keys[i]);
-        long currentSum = (i < sums.length ? sums[i] : p);
-        entry.put("length", currentSum - p);
+        entry.put("start", view.keyAt(i));
+        entry.put("length", view.widthAt(i));
         bList.add(entry);
-        p = currentSum;
       }
-      biomeMap.put(biome, bList);
+      biomeMap.put(unionNames[id], bList);
     }
 
     // 4. Construct Root JSON Object
@@ -763,31 +1501,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                   }
                 }
 
-                int biomeSize = buf.getInt();
-                if (biomeSize < 0) return;
-                ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>();
-                ConcurrentHashMap<String, long[]> newBiomePrefixSumsCache = new ConcurrentHashMap<>();
-                for (int i = 0; i < biomeSize; i++) {
-                  int nLen = buf.getInt();
-                  if (nLen < 0 || nLen > buf.remaining()) return;
-                  byte[] nb = new byte[nLen];
-                  buf.get(nb);
-                  String biome = new String(nb, StandardCharsets.UTF_8);
-                  int inner = buf.getInt();
-                  if (inner < 0 || inner > (buf.remaining() / 16)) return;
-                  long[] keys = new long[inner];
-                  long[] sums = new long[inner];
-                  long r = 0L;
-                  for (int j = 0; j < inner; j++) {
-                    long k = buf.getLong();
-                    long d = buf.getLong();
-                    keys[j] = k;
-                    r += d;
-                    sums[j] = r;
-                  }
-                  newBiomeKeysCache.put(biome, keys);
-                  newBiomePrefixSumsCache.put(biome, sums);
-                }
+                BiomeUnionTable newUnion =
+                    (version >= 4) ? readUnionSection(buf) : readLegacyBiomeSections(buf);
+                if (newUnion == null) return;
 
                 // Apply under write lock
                 writeLock.lock();
@@ -800,10 +1516,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                   probationPrefixSumsCache = newProbSums;
                   probationCauseCache = newProbCauses;
                   probationExpiryCache = newProbExpiries;
-                  biomeKeysCache = newBiomeKeysCache;
-                  biomePrefixSumsCache = newBiomePrefixSumsCache;
+                  // The biome table now loads into its published form directly, so no rebuild is
+                  // needed before a union-backed read works. The recorded total therefore has to
+                  // be set here too - previously only a rebuild ever computed it.
+                  biomeUnion = newUnion;
+                  totalBiomeCount.set(newUnion.totalWidth());
+                  biomeTableVersion.incrementAndGet();
                   badLocationsDirty = true;
-                  biomeLocationsDirty = true;
+                  biomeLocationsDirty = false;
                 } finally {
                   writeLock.unlock();
                 }
@@ -1183,22 +1903,74 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     probationPrefixSumsCache = new long[0];
     probationCauseCache = new byte[0];
     probationExpiryCache = new long[0];
-    biomeKeysCache = new ConcurrentHashMap<>();
-    biomePrefixSumsCache = new ConcurrentHashMap<>();
-    biomeMappedKeysCache = new long[0];
-    biomeMappedPrefixSumsCache = new long[0];
+    biomeTableVersion.incrementAndGet();
+    biomeUnion = BiomeUnionTable.EMPTY;
     badLocationsDirty = true;
     biomeLocationsDirty = true;
   }
 
-  public long[] getBiomeKeys(String biome) {
-    return biomeKeysCache.get(
-        io.github.dailystruggle.rtp.common.selection.region.BiomeNames.canonical(biome));
+  /**
+   * Current version of the per-biome run tables. Changes whenever the tables are rebuilt, reloaded
+   * or cleared, so a cached gather of {@link #getBiomeKeys} / {@link #getBiomePrefixSums} stays
+   * valid exactly while this value is unchanged.
+   *
+   * @return monotone table version
+   */
+  public long biomeTableVersion() {
+    return biomeTableVersion.get();
   }
 
+  /**
+   * Owning biome of each union run, as an index into {@link #getBiomeMappedNamesCache()}.
+   *
+   * @return the id column, parallel to the mapped key/prefix-sum arrays; never {@code null}
+   */
+  public short[] getBiomeMappedIdsCache() {
+    BiomeUnionTable union = biomeUnion;
+    short[] out = new short[union.runCount()];
+    for (int i = 0; i < out.length; i++) out[i] = (short) union.idAt(i);
+    return out;
+  }
+
+  /**
+   * Interning table for {@link #getBiomeMappedIdsCache()}.
+   *
+   * @return canonical biome names indexed by id; never {@code null}
+   */
+  public String[] getBiomeMappedNamesCache() {
+    return biomeUnion.names().clone();
+  }
+
+  /**
+   * Run start keys recorded for {@code biome}, materialized from the union's per-biome view.
+   *
+   * <p>Kept as a convenience for callers that want a plain array (the biome menu); the selection
+   * path reads {@link #biomeRunView} instead, so nothing on it copies a run table.
+   *
+   * @param biome the biome name (canonicalised internally)
+   * @return a fresh array, or {@code null} when nothing is recorded for {@code biome}
+   */
+  public long[] getBiomeKeys(String biome) {
+    BiomeUnionTable.BiomeView view = biomeRunView(biome);
+    if (view == null) return null;
+    long[] out = new long[view.length()];
+    for (int i = 0; i < out.length; i++) out[i] = view.keyAt(i);
+    return out;
+  }
+
+  /**
+   * Prefix sums of the run widths recorded for {@code biome}, aligned 1:1 with
+   * {@link #getBiomeKeys}.
+   *
+   * @param biome the biome name (canonicalised internally)
+   * @return a fresh array, or {@code null} when nothing is recorded for {@code biome}
+   */
   public long[] getBiomePrefixSums(String biome) {
-    return biomePrefixSumsCache.get(
-        io.github.dailystruggle.rtp.common.selection.region.BiomeNames.canonical(biome));
+    BiomeUnionTable.BiomeView view = biomeRunView(biome);
+    if (view == null) return null;
+    long[] out = new long[view.length()];
+    for (int i = 0; i < out.length; i++) out[i] = view.sumAt(i);
+    return out;
   }
 
   /**
@@ -1215,47 +1987,107 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
   /**
    * Returns saved biome identifier for location run containing {@code location}, or {@code null}.
-   * Scans in-memory per-biome run tables without chunk I/O.
+   * Reads in-memory run tables without chunk I/O.
+   *
+   * <p>Resolved from the union table, which the identity-based merge makes a partition of the
+   * recorded space: one binary search plus one id index, so the cost is independent of biome
+   * count.
    *
    * @param location the location value
    * @return canonical biome name, or {@code null}
    */
   public String biomeAt(long location) {
-    for (Map.Entry<String, long[]> e : biomeKeysCache.entrySet()) {
-      long[] keys = e.getValue();
-      if (keys == null || keys.length == 0) continue;
-      long[] sums = biomePrefixSumsCache.get(e.getKey());
-      if (sums == null || sums.length != keys.length) continue;
-
-      int floorIdx = -1;
-      for (int k = 0; k < keys.length; k++) {
-        if (keys[k] <= location) {
-          floorIdx = k;
-        } else {
-          break;
-        }
-      }
-
-      if (floorIdx >= 0) {
-        long key = keys[floorIdx];
-        long sum = sums[floorIdx];
-        long prevSum = (floorIdx > 0) ? sums[floorIdx - 1] : 0L;
-        if (key == location || location < (key + (sum - prevSum))) {
-          return e.getKey();
-        }
-      }
+    BiomeUnionTable union = biomeUnion;
+    if (union.runCount() > 0) {
+      int idx = union.runContaining(location);
+      if (idx < 0) return null;
+      int id = union.idAt(idx);
+      String[] unionNames = union.names();
+      return (id >= 0 && id < unionNames.length) ? unionNames[id] : null;
     }
     return null;
   }
 
+
   /**
-   * Returns union of biome identifiers observed producing at least one candidate.
-   * Unmodifiable view of {@link #biomePrefixSumsCache} keys, populated via Anvil observations.
+   * Total recorded width for {@code biome} across the whole shape, in cells. Reads the last prefix
+   * sum, so it is O(1) and triggers no scan or chunk I/O. Use as the normalizer when turning
+   * recorded coverage into a per-biome weight.
+   *
+   * <p>Read from the union's per-biome view, so extents are <em>attributed</em>: a cell claimed by
+   * two biomes counts towards exactly the one {@link #biomeAt} reports, per the merge's
+   * last-observation-wins rule. Widths across all biomes therefore sum to
+   * {@link #getEffectiveGoodCount()} rather than over-counting contested cells, which are an
+   * artifact of coarse {@code spatialResolution} aggregation.
+   *
+   * @param biome the biome name (canonicalised internally)
+   * @return recorded cell count, or {@code 0} when the biome has never been observed
+   */
+  public long biomeWidth(String biome) {
+    BiomeUnionTable.BiomeView view = biomeRunView(biome);
+    return (view == null) ? 0L : view.totalWidth();
+  }
+
+  /**
+   * Run view for {@code biome} - start keys plus prefix sums of run width - as the single read
+   * surface for the biome-recall draw and the extent queries.
+   *
+   * <p>Backed by the blocked union's per-biome index view, which is built on first request and
+   * cached for the immutable table's lifetime, so a queried biome costs 12 bytes per run instead
+   * of the 16 bytes per run a separate per-biome table would hold for every biome. The union is
+   * the only stored form - a load builds it directly - so there is no fallback path.
+   *
+   * @param biome the biome name (canonicalised internally)
+   * @return the view, or {@code null} when nothing is recorded for {@code biome}
+   */
+  public BiomeUnionTable.BiomeView biomeRunView(String biome) {
+    String canonical =
+        io.github.dailystruggle.rtp.common.selection.region.BiomeNames.canonical(biome);
+    BiomeUnionTable union = biomeUnion;
+    int id = union.idOf(canonical);
+    return (id < 0) ? null : union.viewOf(id);
+  }
+
+  /**
+   * Recorded width for {@code biome} at 1D indices strictly below {@code location}, in cells.
+   * Costs one binary search plus one prefix-sum read. Attributed, as {@link #biomeWidth}.
+   *
+   * @param biome the biome name (canonicalised internally)
+   * @param location exclusive upper bound in the 1D domain
+   * @return recorded cell count below {@code location}
+   */
+  public long biomeWidthBefore(String biome, long location) {
+    if (location <= 0L) return 0L;
+    BiomeUnionTable.BiomeView view = biomeRunView(biome);
+    return (view == null) ? 0L : view.widthBefore(location);
+  }
+
+  /**
+   * Recorded width for {@code biome} within the half-open 1D range {@code [from, to)}, in cells.
+   *
+   * <p>The spiral's 1D index is monotone in radius (ADR-001), so a contiguous 1D range is an
+   * annulus and this doubles as a spatial density query. Two binary searches, no scan, no chunk
+   * I/O. Divide by {@code to - from} for a density fraction.
+   *
+   * @param biome the biome name (canonicalised internally)
+   * @param from inclusive lower bound in the 1D domain
+   * @param to exclusive upper bound in the 1D domain
+   * @return recorded cell count in range; {@code 0} when the range is empty or inverted
+   */
+  public long biomeDensity(String biome, long from, long to) {
+    if (to <= from) return 0L;
+    return biomeWidthBefore(biome, to) - biomeWidthBefore(biome, Math.max(0L, from));
+  }
+
+  /**
+   * Returns union of biome identifiers observed producing at least one candidate. Reads the
+   * union's interning table, populated via Anvil observations.
    *
    * @return unmodifiable set of observed biome identifiers
    */
   public Set<String> getObservedBiomes() {
-    return Collections.unmodifiableSet(biomePrefixSumsCache.keySet());
+    return Collections.unmodifiableSet(
+        new java.util.LinkedHashSet<>(Arrays.asList(biomeUnion.names())));
   }
 
   /**
@@ -1377,6 +2209,135 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         range, badCount, goodCount, coveragePercent, badPercent, topCause, topCausePercent);
   }
 
+  /**
+   * Sift the frontier heap entry at {@code root} down into place.
+   *
+   * <p>The heap holds biome slot indices ordered by each slot's current run key, i.e. the
+   * multi-way merge frontier. Unboxed by design: the merge runs once per rebuild over every
+   * recorded run, so a {@code PriorityQueue<Integer>} allocated an {@code Integer} per run.
+   *
+   * @param heap biome slot indices
+   * @param size live heap length
+   * @param root index to sift from
+   * @param allKeys per-slot run keys, by reference
+   * @param indices per-slot cursor into its key array
+   */
+  private static void siftDownFrontier(
+      int[] heap, int size, int root, long[][] allKeys, int[] indices) {
+    int node = root;
+    while (true) {
+      int left = (node << 1) + 1;
+      if (left >= size) break;
+      int child = left;
+      int right = left + 1;
+      if (right < size && frontierPrecedes(heap[right], heap[left], allKeys, indices)) {
+        child = right;
+      }
+      if (!frontierPrecedes(heap[child], heap[node], allKeys, indices)) {
+        break;
+      }
+      int swap = heap[node];
+      heap[node] = heap[child];
+      heap[child] = swap;
+      node = child;
+    }
+  }
+
+  /**
+   * Reusable, thread-confined scratch for {@link #flushAndRebuild}.
+   *
+   * <p>The merge writes several arrays sized to {@code existing + pending} runs and then copies
+   * only the live prefix into the exact-fit arrays it publishes. Those intermediates are never
+   * published, so they need not be freshly allocated: at one rebuild per attempt they were the
+   * bulk of the per-rebuild churn, and past 131072 {@code long} entries each one is a G1
+   * humongous allocation straight into old gen.
+   *
+   * <p>Safe to hold per shape because {@code flushAndRebuild} is serialized by the
+   * {@code isRebuilding} CAS - a second thread returns rather than entering the merge - and no
+   * reader ever sees these arrays. Capacity only grows, so the tables' own growth amortizes it.
+   */
+  private static final class RebuildScratch {
+    private long[] biomeKeys = new long[0];
+    private long[] biomeLengths = new long[0];
+    private long[] biomeCutKeys = new long[0];
+    private long[] biomeCutLengths = new long[0];
+    private long[] unionKeys = new long[0];
+    private long[] unionLengths = new long[0];
+    private short[] unionIds = new short[0];
+    private long[] stageKeys = new long[0];
+    private long[] stageLengths = new long[0];
+    private short[] stageIds = new short[0];
+    private long[] existingKeys = new long[0];
+    private long[] existingLengths = new long[0];
+    private byte[] existingCauses = new byte[0];
+    private long[] existingExpiries = new long[0];
+    private long[] mergedKeys = new long[0];
+    private long[] mergedLengths = new long[0];
+    private byte[] mergedCauses = new byte[0];
+    private long[] mergedExpiries = new long[0];
+  }
+
+  /** Never published, never read concurrently - see {@link RebuildScratch}. */
+  private transient RebuildScratch scratch = new RebuildScratch();
+
+  /**
+   * Grow-only capacity check. Doubles rather than exact-fits so a steadily growing table does not
+   * reallocate on every rebuild.
+   *
+   * @param array the current buffer
+   * @param capacity required length
+   * @return a buffer of at least {@code capacity}; contents beyond the caller's own write index
+   *     are undefined
+   */
+  private static long[] ensureCapacity(long[] array, int capacity) {
+    if (array.length >= capacity) return array;
+    return new long[Math.max(capacity, array.length << 1)];
+  }
+
+  /**
+   * Grow-only capacity check for the cause column.
+   *
+   * @param array the current buffer
+   * @param capacity required length
+   * @return a buffer of at least {@code capacity}
+   */
+  private static byte[] ensureCapacity(byte[] array, int capacity) {
+    if (array.length >= capacity) return array;
+    return new byte[Math.max(capacity, array.length << 1)];
+  }
+
+  /**
+   * Grow-only capacity check for the union's biome-id column.
+   *
+   * @param array the current buffer
+   * @param capacity required length
+   * @return a buffer of at least {@code capacity}
+   */
+  private static short[] ensureCapacity(short[] array, int capacity) {
+    if (array.length >= capacity) return array;
+    return new short[Math.max(capacity, array.length << 1)];
+  }
+
+  /**
+   * Frontier order: ascending run key, and on an equal key the later biome slot first.
+   *
+   * <p>The tie-break decides which biome keeps a cell claimed by two biomes at the same key, since
+   * the union clips whichever run is placed second. Slots are name-sorted, so this is stable
+   * across rebuilds.
+   *
+   * @param a candidate biome slot
+   * @param b incumbent biome slot
+   * @param allKeys per-slot run keys, by reference
+   * @param indices per-slot cursor into its key array
+   * @return {@code true} when {@code a} should be popped before {@code b}
+   */
+  private static boolean frontierPrecedes(int a, int b, long[][] allKeys, int[] indices) {
+    long keyA = allKeys[a][indices[a]];
+    long keyB = allKeys[b][indices[b]];
+    if (keyA != keyB) return keyA < keyB;
+    return a > b;
+  }
+
   public void flushAndRebuild(long spatialResolution) {
     setSpatialResolution(spatialResolution);
     if (!badLocationsDirty && !biomeLocationsDirty) return;
@@ -1393,18 +2354,36 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         this.rebuildingBadLocations = localPendingBad;
 
-        // Biome logic (similar to bad locations but per biome)
+        // Biome logic (similar to bad locations but per biome).
+        // The union is the only stored form of the biome table, so the merge sources come from the
+        // previously published union rather than from a second per-biome copy: these maps are
+        // local working state for this rebuild, not retained fields.
         if (!localPendingBiome.isEmpty() || !localPendingBiomeRemovals.isEmpty()) {
-          ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>(biomeKeysCache);
-          ConcurrentHashMap<String, long[]> newBiomePrefixSumsCache = new ConcurrentHashMap<>(biomePrefixSumsCache);
+          BiomeUnionTable sourceUnion = this.biomeUnion;
+          String[] sourceNames = sourceUnion.names();
+          java.util.HashMap<String, long[]> newBiomeKeysCache = new java.util.HashMap<>();
+          java.util.HashMap<String, long[]> newBiomePrefixSumsCache = new java.util.HashMap<>();
+          for (int id = 0; id < sourceNames.length; id++) {
+            BiomeUnionTable.BiomeView view = sourceUnion.viewOf(id);
+            if (view == null || view.length() == 0) continue;
+            long[] vKeys = new long[view.length()];
+            long[] vSums = new long[view.length()];
+            for (int i = 0; i < vKeys.length; i++) {
+              vKeys[i] = view.keyAt(i);
+              vSums[i] = view.sumAt(i);
+            }
+            newBiomeKeysCache.put(sourceNames[id], vKeys);
+            newBiomePrefixSumsCache.put(sourceNames[id], vSums);
+          }
 
           Set<String> affectedBiomes = new HashSet<>();
           affectedBiomes.addAll(localPendingBiome.keySet());
           affectedBiomes.addAll(localPendingBiomeRemovals.keySet());
 
           for (String biome : affectedBiomes) {
-            long[] currentBiomeKeys = biomeKeysCache.getOrDefault(biome, new long[0]);
-            long[] currentBiomePrefixSums = biomePrefixSumsCache.getOrDefault(biome, new long[0]);
+            long[] currentBiomeKeys = newBiomeKeysCache.getOrDefault(biome, new long[0]);
+            long[] currentBiomePrefixSums =
+                newBiomePrefixSumsCache.getOrDefault(biome, new long[0]);
 
             ConcurrentHashMap<Long, Long> additions = localPendingBiome.getOrDefault(biome, new ConcurrentHashMap<>());
             ConcurrentHashMap<Long, Boolean> removals = localPendingBiomeRemovals.getOrDefault(biome, new ConcurrentHashMap<>());
@@ -1425,8 +2404,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             // Sort keys while maintaining length mappings
             sortParallelArrays(pendingBiomeKeys, pendingBiomeLengths, 0, pendingBiomeKeys.length - 1);
 
-            long[] mKeys = new long[currentBiomeKeys.length + pendingBiomeKeys.length];
-            long[] mLengths = new long[currentBiomeKeys.length + pendingBiomeKeys.length];
+            int biomeMergeCapacity = currentBiomeKeys.length + pendingBiomeKeys.length;
+            scratch.biomeKeys = ensureCapacity(scratch.biomeKeys, biomeMergeCapacity);
+            scratch.biomeLengths = ensureCapacity(scratch.biomeLengths, biomeMergeCapacity);
+            long[] mKeys = scratch.biomeKeys;
+            long[] mLengths = scratch.biomeLengths;
             int mIdx = 0;
 
             int bi = 0;
@@ -1495,8 +2477,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
               }
               Arrays.sort(sortedRemovals);
 
-              long[] postRemovalKeys = new long[mIdx + sortedRemovals.length];
-              long[] postRemovalLengths = new long[mIdx + sortedRemovals.length];
+              int cutCapacity = mIdx + sortedRemovals.length;
+              scratch.biomeCutKeys = ensureCapacity(scratch.biomeCutKeys, cutCapacity);
+              scratch.biomeCutLengths = ensureCapacity(scratch.biomeCutLengths, cutCapacity);
+              long[] postRemovalKeys = scratch.biomeCutKeys;
+              long[] postRemovalLengths = scratch.biomeCutLengths;
               int prIdx = 0;
 
               int currentSpanIdx = 0;
@@ -1545,98 +2530,159 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             newBiomePrefixSumsCache.put(biome, nbSums);
           }
 
-          // 1. Collect all intervals from every biome entry into a temporary list of primitive arrays.
-          List<long[]> allKeysList = new ArrayList<>();
-          List<long[]> allLengthsList = new ArrayList<>();
-          for (Map.Entry<String, long[]> entry : newBiomeKeysCache.entrySet()) {
-            long[] keys = entry.getValue();
-            if (keys.length == 0) continue;
-            long[] sums = newBiomePrefixSumsCache.get(entry.getKey());
-            long[] lengths = new long[keys.length];
-            for (int k = 0; k < keys.length; k++) {
-              long prev = (k > 0) ? sums[k - 1] : 0L;
-              lengths[k] = sums[k] - prev;
-            }
-            allKeysList.add(keys);
-            allLengthsList.add(lengths);
+          // 1. Gather every biome's runs by reference. Lengths are derived from the prefix sums
+          //    inline during the merge, so no per-biome length array is materialized: that alone
+          //    was one O(recorded runs) allocation per rebuild.
+          //    Slots are ordered by biome name so the merge's tie-break is deterministic across
+          //    runs, which a ConcurrentHashMap iteration order would not be.
+          String[] allNames = newBiomeKeysCache.keySet().toArray(new String[0]);
+          Arrays.sort(allNames);
+          long[][] allKeys = new long[allNames.length][];
+          long[][] allSums = new long[allNames.length][];
+          String[] slotNames = new String[allNames.length];
+          int numBiomes = 0;
+          int totalPotentialIntervals = 0;
+          for (String biomeName : allNames) {
+            long[] keys = newBiomeKeysCache.get(biomeName);
+            if (keys == null || keys.length == 0) continue;
+            long[] sums = newBiomePrefixSumsCache.get(biomeName);
+            if (sums == null || sums.length < keys.length) continue;
+            allKeys[numBiomes] = keys;
+            allSums[numBiomes] = sums;
+            slotNames[numBiomes] = biomeName;
+            numBiomes++;
+            totalPotentialIntervals += keys.length;
           }
 
-          // 2. Perform a multi-way primitive merge
-          int numBiomes = allKeysList.size();
+          // 1b. Map each merge slot to a stable id. Slots are dense and name-sorted, so a newly
+          //     observed biome would renumber every existing run's id and defeat per-block reuse.
+          //     Ids therefore keep the previously published table's numbering and only append.
+          BiomeUnionTable prevUnion = this.biomeUnion;
+          String[] prevNames = prevUnion.names();
+          short[] slotToId = new short[numBiomes];
+          String[] unionNames = prevNames;
+          int idCount = prevNames.length;
+          for (int k = 0; k < numBiomes; k++) {
+            int id = -1;
+            for (int n = 0; n < idCount; n++) {
+              if (unionNames[n].equals(slotNames[k])) {
+                id = n;
+                break;
+              }
+            }
+            if (id < 0) {
+              if (idCount == unionNames.length) {
+                unionNames = Arrays.copyOf(unionNames, Math.max(4, idCount + numBiomes));
+              }
+              unionNames[idCount] = slotNames[k];
+              id = idCount++;
+            }
+            slotToId[k] = (short) id;
+          }
+          if (unionNames.length != idCount) unionNames = Arrays.copyOf(unionNames, idCount);
+
+          // 2. Perform a multi-way primitive merge. The frontier is an int-keyed binary heap
+          //    rather than a PriorityQueue<Integer>, so the merge boxes nothing.
           if (numBiomes > 0) {
             int[] indices = new int[numBiomes];
-            PriorityQueue<Integer> pq = new PriorityQueue<>(Comparator.comparingLong(idx -> allKeysList.get(idx)[indices[idx]]));
-
-            int totalPotentialIntervals = 0;
-            for (int k = 0; k < numBiomes; k++) {
-              pq.add(k);
-              totalPotentialIntervals += allKeysList.get(k).length;
+            int[] heap = new int[numBiomes];
+            int heapSize = numBiomes;
+            for (int k = 0; k < numBiomes; k++) heap[k] = k;
+            for (int k = (heapSize >> 1) - 1; k >= 0; k--) {
+              siftDownFrontier(heap, heapSize, k, allKeys, indices);
             }
 
-            long[] mergedMappedKeys = new long[totalPotentialIntervals];
-            long[] mergedMappedLengths = new long[totalPotentialIntervals];
+            scratch.unionKeys = ensureCapacity(scratch.unionKeys, totalPotentialIntervals);
+            scratch.unionLengths = ensureCapacity(scratch.unionLengths, totalPotentialIntervals);
+            scratch.unionIds = ensureCapacity(scratch.unionIds, totalPotentialIntervals);
+            long[] mergedMappedKeys = scratch.unionKeys;
+            long[] mergedMappedLengths = scratch.unionLengths;
+            short[] mergedMappedIds = scratch.unionIds;
             int mappedIdx = 0;
 
             long currentStartMapped = -1;
             long currentLengthMapped = -1;
+            int currentIdMapped = -1;
 
-            while (!pq.isEmpty()) {
-              int bIdx = pq.poll();
+            while (heapSize > 0) {
+              int bIdx = heap[0];
               int iIdx = indices[bIdx];
 
-              long nextKey = allKeysList.get(bIdx)[iIdx];
-              long nextLength = allLengthsList.get(bIdx)[iIdx];
+              long nextKey = allKeys[bIdx][iIdx];
+              long[] bSums = allSums[bIdx];
+              long nextLength = bSums[iIdx] - ((iIdx > 0) ? bSums[iIdx - 1] : 0L);
 
-              indices[bIdx]++;
-              if (indices[bIdx] < allKeysList.get(bIdx).length) {
-                pq.add(bIdx);
+              indices[bIdx] = ++iIdx;
+              if (iIdx >= allKeys[bIdx].length) {
+                heap[0] = heap[--heapSize];
               }
+              if (heapSize > 0) siftDownFrontier(heap, heapSize, 0, allKeys, indices);
 
-              // 3. Use the same interval union math
+              // 3. Union on biome identity, not on proximity alone. Runs of the same biome still
+              //    coalesce across a gap of up to spatialResolution; runs of different biomes
+              //    never merge, so every union run carries exactly one biome id.
               if (currentStartMapped == -1) {
                 currentStartMapped = nextKey;
                 currentLengthMapped = nextLength;
+                currentIdMapped = bIdx;
+                continue;
+              }
+
+              long currentEnd = currentStartMapped + currentLengthMapped;
+              if (bIdx == currentIdMapped) {
+                if (nextKey <= currentEnd + spatialResolution) {
+                  currentLengthMapped =
+                      Math.max(currentLengthMapped, nextKey + nextLength - currentStartMapped);
+                  continue;
+                }
               } else {
-                if (nextKey <= currentStartMapped + currentLengthMapped + spatialResolution) {
-                  currentLengthMapped = Math.max(currentLengthMapped, nextKey + nextLength - currentStartMapped);
-                } else {
-                  mergedMappedKeys[mappedIdx] = currentStartMapped;
-                  mergedMappedLengths[mappedIdx] = currentLengthMapped;
-                  currentBiomeSum += currentLengthMapped;
-                  mappedIdx++;
-                  currentStartMapped = nextKey;
-                  currentLengthMapped = nextLength;
+                // Overlap between different biomes: the run already placed keeps the contested
+                // cells and the incoming run is clipped past them. The union therefore stays a
+                // partition, so a cell claimed by two biomes is counted once and
+                // getEffectiveGoodCount() is unaffected by the identity split. Placement order is
+                // key-ascending, with equal keys resolved in favour of the later biome slot.
+                if (nextKey + nextLength <= currentEnd) continue;
+                if (nextKey < currentEnd) {
+                  nextLength = nextKey + nextLength - currentEnd;
+                  nextKey = currentEnd;
                 }
               }
+
+              mergedMappedKeys[mappedIdx] = currentStartMapped;
+              mergedMappedLengths[mappedIdx] = currentLengthMapped;
+              mergedMappedIds[mappedIdx] = slotToId[currentIdMapped];
+              currentBiomeSum += currentLengthMapped;
+              mappedIdx++;
+              currentStartMapped = nextKey;
+              currentLengthMapped = nextLength;
+              currentIdMapped = bIdx;
             }
 
             if (currentStartMapped != -1) {
               mergedMappedKeys[mappedIdx] = currentStartMapped;
               mergedMappedLengths[mappedIdx] = currentLengthMapped;
+              mergedMappedIds[mappedIdx] = slotToId[currentIdMapped];
               currentBiomeSum += currentLengthMapped;
               mappedIdx++;
             }
 
-            // 4. Build the final biomeMappedKeysCache and biomeMappedPrefixSumsCache
-            long[] finalMappedKeys = new long[mappedIdx];
-            long[] finalMappedPrefixSums = new long[mappedIdx];
-            long runningSumMapped = 0;
-            for (int k = 0; k < mappedIdx; k++) {
-              finalMappedKeys[k] = mergedMappedKeys[k];
-              runningSumMapped += mergedMappedLengths[k];
-              finalMappedPrefixSums[k] = runningSumMapped;
-            }
-            this.biomeMappedKeysCache = finalMappedKeys;
-            this.biomeMappedPrefixSumsCache = finalMappedPrefixSums;
+            // 4. Publish the union as one blocked table. Widths are turned into prefix sums by
+            //    the builder, so no exact-fit long[] pair is materialized here any more.
+            this.biomeUnion =
+                BiomeUnionTable.build(
+                    mergedMappedKeys,
+                    mergedMappedLengths,
+                    mergedMappedIds,
+                    mappedIdx,
+                    unionNames,
+                    prevUnion);
           } else {
-            this.biomeMappedKeysCache = new long[0];
-            this.biomeMappedPrefixSumsCache = new long[0];
+            this.biomeUnion = BiomeUnionTable.EMPTY;
           }
 
-          this.biomeKeysCache = newBiomeKeysCache;
-          this.biomePrefixSumsCache = newBiomePrefixSumsCache;
+          this.biomeTableVersion.incrementAndGet();
         } else {
-          currentBiomeSum = (biomeMappedPrefixSumsCache.length > 0) ? biomeMappedPrefixSumsCache[biomeMappedPrefixSumsCache.length-1] : 0L;
+          currentBiomeSum = biomeUnion.totalWidth();
         }
         this.biomeLocationsDirty = (!pendingBiomeLocations.get().isEmpty() || !pendingBiomeRemovals.get().isEmpty());
 
@@ -1653,10 +2699,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         // Merge active and probation runs into a single sorted stream of existing runs
         int existingTotal = currentBadKeys.length + currentProbKeys.length;
-        long[] existingKeys = new long[existingTotal];
-        long[] existingLengths = new long[existingTotal];
-        byte[] existingCauses = new byte[existingTotal];
-        long[] existingExpiries = new long[existingTotal];
+        scratch.existingKeys = ensureCapacity(scratch.existingKeys, existingTotal);
+        scratch.existingLengths = ensureCapacity(scratch.existingLengths, existingTotal);
+        scratch.existingCauses = ensureCapacity(scratch.existingCauses, existingTotal);
+        scratch.existingExpiries = ensureCapacity(scratch.existingExpiries, existingTotal);
+        long[] existingKeys = scratch.existingKeys;
+        long[] existingLengths = scratch.existingLengths;
+        byte[] existingCauses = scratch.existingCauses;
+        long[] existingExpiries = scratch.existingExpiries;
         int exIdx = 0;
         int curA = 0, curP = 0;
         long prevA = 0L, prevP = 0L;
@@ -1718,11 +2768,18 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         // Sort keys while keeping the parallel cause and expiry columns aligned.
         sortParallelThreeArrays(pendingKeys, pendingCauses, pendingExpiries, 0, pendingKeys.length - 1);
 
-        int maxMerged = existingKeys.length + pendingKeys.length;
-        long[] mergedKeys = new long[maxMerged];
-        long[] mergedLengths = new long[maxMerged];
-        byte[] mergedCauses = new byte[maxMerged];
-        long[] mergedExpiries = new long[maxMerged];
+        // Buffers are reused and therefore oversized: bound the merge by the live run count, not
+        // by array length.
+        int existingCount = exIdx;
+        int maxMerged = existingCount + pendingKeys.length;
+        scratch.mergedKeys = ensureCapacity(scratch.mergedKeys, maxMerged);
+        scratch.mergedLengths = ensureCapacity(scratch.mergedLengths, maxMerged);
+        scratch.mergedCauses = ensureCapacity(scratch.mergedCauses, maxMerged);
+        scratch.mergedExpiries = ensureCapacity(scratch.mergedExpiries, maxMerged);
+        long[] mergedKeys = scratch.mergedKeys;
+        long[] mergedLengths = scratch.mergedLengths;
+        byte[] mergedCauses = scratch.mergedCauses;
+        long[] mergedExpiries = scratch.mergedExpiries;
         int mergeIndex = 0;
 
         int i = 0; // existingKeys index
@@ -1733,13 +2790,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         byte currentCause = MISC_CAUSE;
         long currentExpiry = 0L;
 
-        while (i < existingKeys.length || j < pendingKeys.length) {
+        while (i < existingCount || j < pendingKeys.length) {
           long nextKey;
           long nextLength;
           byte nextCause;
           long nextExpiry;
 
-          if (i < existingKeys.length && j < pendingKeys.length) {
+          if (i < existingCount && j < pendingKeys.length) {
             if (existingKeys[i] <= pendingKeys[j]) {
               nextKey = existingKeys[i];
               nextLength = existingLengths[i];
@@ -1753,7 +2810,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
               nextExpiry = pendingExpiries[j];
               j++;
             }
-          } else if (i < existingKeys.length) {
+          } else if (i < existingCount) {
             nextKey = existingKeys[i];
             nextLength = existingLengths[i];
             nextCause = existingCauses[i];
@@ -2160,12 +3217,60 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   private void maybeFlushAndRebuild() {
     if (!badLocationsDirty && !biomeLocationsDirty) return;
-    int pending = pendingBadLocations.get().size();
-    if (badLocationsDirty && !biomeLocationsDirty && pending > 0) {
+
+    boolean badReady = false;
+    if (badLocationsDirty) {
+      int pending = pendingBadLocations.get().size();
       int batch = Math.min(MAX_PENDING_BEFORE_REBUILD, Math.max(1, badKeysCache.length / 8));
-      if (pending < batch) return;
+      badReady = pending == 0 || pending >= batch;
     }
+
+    boolean biomeReady = false;
+    if (biomeLocationsDirty) {
+      int pending = pendingBiomeMarkCount();
+      int batch =
+          Math.min(MAX_PENDING_BEFORE_REBUILD, Math.max(1, biomeUnion.runCount() / 8));
+      biomeReady = pending == 0 || pending >= batch;
+    }
+
+    if (!badReady && !biomeReady) return;
     flushAndRebuild(spatialResolution);
+  }
+
+  /**
+   * Pending biome marks awaiting a merge, additions and removals together.
+   *
+   * <p>Biome pendings are nested per biome name, so this sums the inner maps rather than reading
+   * one size. The map is small (one entry per observed biome), so the walk is bounded by biome
+   * count, not by recorded run count.
+   *
+   * @return total pending biome additions plus removals
+   */
+  private int pendingBiomeMarkCount() {
+    int pending = 0;
+    for (ConcurrentHashMap<Long, Long> perBiome : pendingBiomeLocations.get().values()) {
+      pending += perBiome.size();
+    }
+    for (ConcurrentHashMap<Long, Boolean> perBiome : pendingBiomeRemovals.get().values()) {
+      pending += perBiome.size();
+    }
+    return pending;
+  }
+
+  /**
+   * Rebuild only when the pending batch justifies the O(runs) merge.
+   *
+   * <p>Callers on a per-attempt path want the learned-state arrays current but cannot afford a
+   * full copy-on-write merge for every single observation, because the merge cost tracks the whole
+   * existing table rather than the pending set. Staleness is safe: {@link #isKnownBad} consults
+   * the pending maps directly, and a biome observation not yet merged only means the recall draw
+   * cannot pick it yet.
+   *
+   * @param spatialResolution the owning region's configured resolution
+   */
+  public void flushAndRebuildIfNeeded(long spatialResolution) {
+    setSpatialResolution(spatialResolution);
+    maybeFlushAndRebuild();
   }
 
   /**
@@ -2335,10 +3440,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     shape.probationPrefixSumsCache = new long[0];
     shape.probationCauseCache = new byte[0];
     shape.probationExpiryCache = new long[0];
-    shape.biomeKeysCache = new ConcurrentHashMap<>();
-    shape.biomePrefixSumsCache = new ConcurrentHashMap<>();
-    shape.biomeMappedKeysCache = new long[0];
-    shape.biomeMappedPrefixSumsCache = new long[0];
+    shape.biomeTableVersion = new AtomicLong();
+    shape.biomeUnion = BiomeUnionTable.EMPTY;
+    // Scratch is per-instance and mutated during rebuild; sharing it with the clone would let two
+    // shapes merge into the same buffers.
+    shape.scratch = new RebuildScratch();
     shape.badLocationsDirty = true;
     shape.biomeLocationsDirty = true;
     return shape;

@@ -744,6 +744,79 @@ Rewriting the ADR-080 latency tier from summed operation counts to a discrete-ev
 
 ---
 
+## 2026-09-04 - The biome run table grows with area, so bytes-per-run is the only encoding lever
+
+Measuring `MemoryShape`'s biome table before proposing a denser format (`scripts/analyze_memoryshape_bin.py`; `--simulate` walks the real `Square` ring order over a jittered-Voronoi biome field, `--project` extrapolates from the measured constants).
+
+- **Every `.bin` on disk in this repo is a test fixture.** All 40+ files under `devstack/` and `rtp-core/target/test-data/` are toy sizes - the largest holds 10 biomes and 13 runs. No empirical radius-scaling comparison can be taken from the working tree; anyone asking "how big does this get" has to simulate or run a real scan.
+- **Run count tracks area, not biome boundary length.** `Square.xzToLocation` maps to concentric square rings (`location = 4*(R^2 - cr^2) + perimeterStep`), so 1D-adjacent cells are neighbours *along one ring perimeter*, and the rings sum to the area. A biome patch spanning many rings therefore yields one run per ring rather than one run total. Measured growth exponent 1.99-2.02 over four radii (128 -> 1024 cells), with `runs/cell` flat at 0.072-0.074. The intuition that coalescing makes run count perimeter-bound is wrong for any 2D->1D ring or spiral order.
+- **Average run width is ~0.85 x the biome patch width in cells**, radius-independent. So `runs = 4*radius^2 / (0.852 * patch * res)`: quadratic in radius but only **linear** in resolution. Coarsening the grid is a weaker lever than it looks.
+- **Consequence for encoding:** because run count is quadratic and irreducible, bytes-per-run is a constant factor on a growing term - it matters *more* as the world grows, not less. A unified sorted run table with a parallel biome id, varint delta encoded, measures a flat **3.00 B/run against the current 16 B/run** (key 8 + width delta 8), i.e. 5.3x. Projected at radius 16384: 4.69 MiB -> 0.88 MiB on disk and 9.39 MiB -> 5.28 MiB resident at 16-block resolution; 75 MiB -> 14 MiB on disk at 1-block resolution.
+- **Varint is also the only scaling-proof choice.** Absolute keys grow with `radius^2` and overflow `int32` once `radius/res > 23170` - only 1.4x headroom at the 16384 radius, and it fails by wrapping rather than throwing. Consecutive *deltas* do not grow with radius at all, so a varint field needs no ceiling while a narrowed fixed-width field would re-introduce the radius cap that ADR-001's centre-parameterised keys exist to avoid.
+- **The heap duplication is larger than the disk cost.** Every biome run is stored twice in memory: once in its own `biomeKeysCache`/`biomePrefixSumsCache` entry and again in the coalesced `biomeMappedKeysCache`/`biomeMappedPrefixSumsCache` union, at 16 B each. Two blockers before a unified table can replace both: the union coalesces adjacent runs of *different* biomes on proximity (not identity), and a cell can be claimed by two biomes (`MemoryShapeTest.testOverlappingBiomes`), so one id per run is lossy without a deliberate last-observation-wins decision.
+
+---
+
+## 2026-09-05 - The biome union merged on proximity, not identity, and the fix has to clip rather than tag
+
+Resolving the two blockers recorded in the 2026-09-04 entry above. Both are now settled in `MemoryShape.flushAndRebuild`.
+
+- **Proximity coalescing across biomes was a defect, not an optimization.** The cross-biome union merged any two runs within `spatialResolution` regardless of biome, so a forest run and an ocean run could become one run. That is unrepresentable once a run carries a single biome id, and it also meant the union could not answer "which biome is here" at all. The merge now coalesces only when the biome id matches; same-biome runs still bridge a `spatialResolution` gap.
+- **Last-observation-wins must be implemented as clipping, not as tagging.** `currentBiomeSum` - the value behind `getEffectiveGoodCount()` - is accumulated from the union, so if the identity split merely stopped merging, a cell claimed by two biomes would be counted twice and the selector's good/bad ratio would inflate. Instead the incoming run is clipped to start past the already-placed run's end (dropped if fully covered), which keeps the union a **partition** of the recorded space and makes the good count invariant by construction. That invariance, not the byte layout, is the property worth asserting in a test.
+- **"Last observation" means merge order, which is key-ascending - not observation time.** For runs at an equal key the order is otherwise arbitrary, so the frontier heap needs an explicit tie-break. Slots are sorted by biome name at gather time (a `ConcurrentHashMap` iteration order is not stable across rebuilds) and equal keys resolve in favour of the later slot, so the outcome is deterministic and reproducible.
+- **The id column gave `biomeAt` a biome-count-independent path.** Because the union is now a partition, a point lookup is one binary search over the union plus one id index, replacing a per-biome search over every biome's table. The per-biome fallback is retained only for a table loaded before the first rebuild.
+- **What this does *not* change:** per-biome tables keep each biome's full extent, so `biomeWidth` / `biomeDensity` still see the un-clipped truth; clipping affects only the union's answer for contested cells, which is a `spatialResolution` aggregation artifact.
+
+---
+
+## 2026-09-05 - The biome union is stored blocked, and the block count is not derivable from the run count
+
+Storage half of the same rework: the union's four flat arrays are replaced by one immutable `MemoryShape.BiomeUnionTable` holding `long` per-block key/sum bases, `int` in-block offsets and a `short` biome id.
+
+- **Publish the columns as one object, not as six volatiles.** The columns are only meaningful together, so independent volatile fields would let a reader mix generations. A single immutable holder swapped by one volatile write keeps readers lock-free with no epoch tracking, because no published array is ever written after publication.
+- **The `int` narrowing has to be blocked, not region-relative.** With chunk scaling and a vanilla border the key domain is still ~3.5e12 cells at `spatialResolution` 1, so a flat `int[]` key array needs `res >= 41 chunks` to be safe - close enough to a real setting to be a wrapping bug waiting to ship. Blocking on *run index* keys off the spread between neighbouring runs instead, and a block is closed early whenever the next key or sum offset would exceed `Integer.MAX_VALUE`, so overflow is impossible by construction at any border size or resolution.
+- **Sizing the block arrays from `count / BLOCK_SIZE` is wrong.** An early close on offset overflow produces more blocks than the run count implies - in the worst case one block per run - which showed up immediately as an `ArrayIndexOutOfBoundsException` on the first table containing a gap wider than `Integer.MAX_VALUE`. The block-indexed arrays must grow on demand.
+- **Blocks are variable-length, so a run index maps to a block by search, not by shift.** `i >> 10` only works for fixed-size blocks; with early closes the table needs an explicit `blockStart[]` and a branchless floor search over it.
+- **Measured effect:** rebuild allocation at 65,536 recorded runs fell 1.24 MB -> 852 kB per rebuild, because the merge publishes the blocked table directly and no exact-fit `long[]` key/prefix-sum pair is materialized. `biomeAt` across a 64x table went 142.7 -> 314.3 ns (pre-union) to 48.8 -> 117.6 ns. Resident cost is 10 B/run against 24 for a flat `long` key + `long` sum + `short` id.
+- **Side effect worth keeping in mind:** no column is ever a G1 humongous allocation any more - each block array is at most 4 KiB, where a flat `long[]` past 131,072 entries went straight to old gen on every rebuild.
+
+---
+
+## 2026-09-05 - Per-block copy-on-write is worthless until the biome ids stop being renumbered
+
+Making the blocked union rebuild share unchanged blocks with the table it supersedes, instead of reallocating every column.
+
+- **The mechanism is a byte comparison, not a diff.** A block being closed is compared against the same block of the previous table - start index, length, both bases, then the staged key/sum/id offsets - and on a match the previous arrays are reused by reference. Closed blocks are immutable and already published, so sharing needs no epoch tracking; the comparison is a few thousand `int` reads and allocates nothing, against three array allocations it avoids.
+- **Dense, name-sorted biome slots defeat it entirely.** Slot indices were assigned by sorting the biomes present at rebuild time, so the first observation of a new biome renumbered every existing run's id and invalidated all blocks - the first version of the test measured zero reuse for exactly this reason. Ids now keep the previously published name table's numbering and only ever append. A name table that retains a biome no longer present is the intended cost.
+- **Measured effect at 65,536 recorded runs applying 16 pending observations:** allocation 852 kB -> 183 kB per rebuild, and allocation growth over a 128x table 12.83x -> 3.61x. Per-attempt allocation on the amortized cadence fell 96 kB -> 18 kB.
+- **Time is still table-proportional (~5x over a 128x table)** because the per-biome `long[]` key/prefix-sum tables are still rebuilt in full and the merge still walks every recorded run. Only the union's storage is copy-on-write; replacing the per-biome tables with `int[]` index views into the union is the remaining step, and it is blocked on the union being clipped for contested cells while `biomeWidth`/`biomeDensity` must report un-clipped extents.
+- **Assert reuse by array identity, not by an allocation figure.** `MemoryShapeTest.testUnionRebuildSharesUnchangedBlocks` appends one run at the high end and requires every block but the tail to be the same object, plus `freshBlockCount() == 1`. An allocation-delta assertion would have passed on noise; the identity assertion is what caught the id renumbering.
+
+---
+
+## 2026-09-05 - A loaded shape needs an explicit "union unpublished" signal
+
+Closing the last prerequisite for the biome-recall draw to read the blocked union instead of the per-biome `long[]` tables.
+
+- **The whole union build sat inside `if (!localPendingBiome.isEmpty() || !localPendingBiomeRemovals.isEmpty())`.** A shape loaded from disk arrives with populated per-biome tables and *zero* pendings, so no cadence and no rebuild would ever publish its union - every union-backed read (`biomeAt`, extents, the draw) would sit on the fallback path for the process lifetime.
+- **Signal on a flag, not on `runCount() == 0`.** An empty-union test looks equivalent but re-fires forever if a rebuild legitimately produces an empty union (all tables empty-array), turning the amortizing cadence back into a per-attempt full merge. `biomeUnionPublished` is false only on a fresh, cleared, cloned or freshly loaded shape, and is set once by the rebuild that publishes.
+- **`load` must also drop the stale union.** It replaces the per-biome tables wholesale, so any previously published union describes different data; it is reset to `EMPTY` alongside the flag.
+- **One read surface beats two call paths.** `biomeRunView(biome)` returns a union-backed view when one exists and a view over the biome's own table otherwise, so `PregenTask` and the extent queries have no fallback branch of their own.
+
+---
+
+## 2026-09-05 - The union can serve per-biome extents; "un-clipped" was the wrong requirement
+
+Unblocking the replacement of `MemoryShape`'s eager per-biome `long[]` run tables with index views into the blocked union.
+
+- **The stated blocker was a definition, not a constraint.** The union is clipped for contested cells (last-observation-wins), so per-biome tables were kept to report un-clipped extents for `biomeWidth` / `biomeWidthBefore` / `biomeDensity`. Those three have **no production callers** - the only production reader of the per-biome tables is the biome-recall draw in `PregenTask` - so the extents were free to be redefined.
+- **Attributed extents are the more defensible definition.** A cell claimed by two biomes now counts towards exactly the biome `biomeAt` reports, so per-biome widths sum to `getEffectiveGoodCount()` instead of over-counting. Un-clipped extents disagreed with the point lookup on precisely the cells where it matters.
+- **Do not "fix" this by leaving the union un-clipped instead.** Overlapping union runs break `runContaining`: a floor-by-key search lands on a short run starting later and misses the longer run that actually covers the location, so `biomeAt` would return `null` on contested cells. Clipping is what makes the union a partition and the point lookup correct.
+- **A view is `int[]` run indices plus that biome's own cumulative widths**, built in one pass on first request and cached for the immutable table's lifetime - 12 bytes per run, and only for biomes actually queried, against 16 bytes per run held eagerly for every biome. Lookup stays `O(log n)`: binary search over the view, one indirection into the union's blocked columns.
+- **The draw was deliberately not switched over yet.** A shape loaded from disk sets the biome dirty flag with zero pending observations, so the amortizing cadence can legitimately never rebuild and the union stays empty; the per-biome tables remain the draw's source until that path is made to build a union on load. Until then the extent queries fall back to the per-biome tables when the union is empty.
+
+---
+
 ## Git & Workspace Safety
 
 ### Working tree protection and destructive git operations (2026-06-14)
