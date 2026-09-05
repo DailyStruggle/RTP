@@ -82,12 +82,12 @@ class SelectionAPIObserveChunkLoadTest {
   void registersBiomeWhenEnabled() {
     setCheckOnChunkLoads(true);
     MemoryShape<?> shape = shape();
-    shape.flushAndRebuild(shape.spatialResolution);
+    shape.flushAndRebuild(shape.spatialResolution());
     assertEquals(0, shape.getEffectiveGoodCount(), "precondition: no biome recorded yet");
 
     RTP.selectionAPI.observeChunkLoad(world, 10, 10);
 
-    shape.flushAndRebuild(shape.spatialResolution);
+    shape.flushAndRebuild(shape.spatialResolution());
     assertTrue(shape.getEffectiveGoodCount() > 0,
         "the loaded chunk's biome must be recorded into the region's spatial memory");
   }
@@ -100,7 +100,7 @@ class SelectionAPIObserveChunkLoadTest {
 
     RTP.selectionAPI.observeChunkLoad(world, 10, 10);
 
-    shape.flushAndRebuild(shape.spatialResolution);
+    shape.flushAndRebuild(shape.spatialResolution());
     assertEquals(0, shape.getEffectiveGoodCount(),
         "no biome should be recorded while the flag is off");
   }
@@ -115,7 +115,7 @@ class SelectionAPIObserveChunkLoadTest {
 
     RTP.selectionAPI.observeChunkLoad(other, 10, 10);
 
-    shape.flushAndRebuild(shape.spatialResolution);
+    shape.flushAndRebuild(shape.spatialResolution());
     assertEquals(0, shape.getEffectiveGoodCount(),
         "a chunk in an untargeted world must not touch the region's memory");
   }

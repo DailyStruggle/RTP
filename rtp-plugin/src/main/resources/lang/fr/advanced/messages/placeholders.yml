@@ -2,22 +2,22 @@
 # Textes des messages destines aux joueurs et aux operateurs dans cette langue, groupes par theme.
 # Copie generee automatiquement des messages anglais; ne pas editer a la main (sera ecrase).
 
-# --- RTP User-Facing Messages ---
-# All player- and console-visible strings.
-# Formatting:
-# - Bukkit legacy color codes (e.g. &a, &7, &c)
-# - Hex color codes (e.g. #2636ef)
-# - PlaceholderAPI placeholders (when PAPI is installed)
-# Placeholders:
-# - Shared "[Pn]" placeholders are defined in the `placeholders` list below.
-# [P0] is the RTP prefix by default.
-# - Per-message placeholders (e.g. [attempts], [world]) are documented inline
-# above each message that uses them.
+# --- Messages RTP visibles par l'utilisateur ---
+# Toutes les chaînes visibles par les joueurs et la console.
+# Formatage :
+# - Codes de couleur Bukkit hérités (ex. &a, &7, &c)
+# - Codes de couleur hexadécimaux (ex. #2636ef)
+# - Espaces réservés PlaceholderAPI (lorsque PAPI est installé)
+# Espaces réservés :
+# - Les espaces réservés partagés "[Pn]" sont définis dans la liste `placeholders` ci-dessous.
+# [P0] est le préfixe RTP par défaut.
+# - Les espaces réservés propres à chaque message (ex. [attempts], [world]) sont documentés
+# en commentaire au-dessus de chaque message qui les utilise.
 # ###############################################################################
-# Section 1: General Configuration
+# Section 1 : Configuration générale
 # ###############################################################################
-# list of additional placeholders
-# format: Pn - where n is the index in this list
+# liste d'espaces réservés supplémentaires
+# format : Pn - où n est l'index dans cette liste
 placeholders:
   # P0
   - "[RTP]"

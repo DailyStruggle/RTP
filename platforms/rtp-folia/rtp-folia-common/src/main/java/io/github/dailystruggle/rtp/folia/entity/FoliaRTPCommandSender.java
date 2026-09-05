@@ -56,7 +56,8 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
     if (cooldown < 0) {
       ConfigParser<ConfigKeys> configParser =
           (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
-      cooldown = configParser.getNumber(ConfigKeys.teleportCooldown, 0).intValue();
+      Object val = (configParser != null) ? configParser.getConfigValue(ConfigKeys.teleportCooldown, 0) : 0;
+      return ConfigParser.parseDurationMillis(val, 0L);
     }
     return TimeUnit.SECONDS.toMillis(cooldown);
   }
@@ -71,7 +72,8 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
     if (delay < 0) {
       ConfigParser<ConfigKeys> configParser =
           (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
-      delay = configParser.getNumber(ConfigKeys.teleportDelay, 0).intValue();
+      Object val = (configParser != null) ? configParser.getConfigValue(ConfigKeys.teleportDelay, 0) : 0;
+      return ConfigParser.parseDurationMillis(val, 0L);
     }
     return TimeUnit.SECONDS.toMillis(delay);
   }

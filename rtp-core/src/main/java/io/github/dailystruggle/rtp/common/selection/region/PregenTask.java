@@ -36,6 +36,21 @@ final class PregenTask implements Runnable {
     private volatile boolean inRunAttempt = false;
     private volatile boolean needsReschedule = false;
 
+    // Biome-recall draw tables, gathered from the shape's per-biome run tables and held for as
+    // long as MemoryShape.biomeTableVersion() is unchanged. The tables themselves are the shape's
+    // own arrays (never copied), so a gather costs one map lookup per requested biome; without
+    // this the whole gather - plus a derived widths array and a boxed entry per recorded run -
+    // was rebuilt on every attempt of every request.
+    private long biomeTablesVersion = Long.MIN_VALUE;
+    private MemoryShape.BiomeUnionTable.BiomeView[] biomeDrawViews = null;
+    private double[] biomeDrawWeights = null;
+    private int biomeDrawCount = 0;
+    private double biomeDrawPGray = 0.0d;
+    // Flattened (key, width) run list for the legacy uniform-over-runs draw. Built only when
+    // biomeWeighted is off, since the weighted path never reads it.
+    private long[] flatDrawKeys = null;
+    private long[] flatDrawWidths = null;
+
     PregenTask(PregenState state, CompletableFuture<GenerationResult> result, long initialAttempt) {
         this.state = state;
         this.result = result;
@@ -140,19 +155,53 @@ final class PregenTask implements Runnable {
      * @return drawn 1D location index.
      */
     static long drawWeightedBiome(List<long[][]> perBiome, double @org.jetbrains.annotations.Nullable [] biomeWeights) {
+        int count = perBiome.size();
+        long[][] keys = new long[count][];
+        long[][] sums = new long[count][];
+        for (int b = 0; b < count; b++) {
+            long[][] pair = perBiome.get(b);
+            long[] widths = pair[1];
+            long[] prefix = new long[widths.length];
+            long acc = 0L;
+            for (int k = 0; k < widths.length; k++) {
+                acc += Math.max(0L, widths[k]);
+                prefix[k] = acc;
+            }
+            keys[b] = pair[0];
+            sums[b] = prefix;
+        }
+        return drawWeightedBiome(keys, sums, count, biomeWeights);
+    }
+
+    /**
+     * ADR-062 weighted-biome draw over the run tables as {@link MemoryShape} already stores them:
+     * start keys plus prefix sums of run width. Allocation-free, and the within-biome run pick is
+     * a binary search over the prefix sums rather than a running sum over per-run widths.
+     *
+     * @param perBiomeKeys run start keys per biome; first {@code count} entries are used.
+     * @param perBiomeSums prefix sums of run width per biome, aligned 1:1 with the keys.
+     * @param count number of populated biome entries.
+     * @param biomeWeights optional per-biome weights; equal pick when null, wrong-length or sum <= 0.
+     * @return drawn 1D location index.
+     */
+    static long drawWeightedBiome(
+            long[][] perBiomeKeys,
+            long[][] perBiomeSums,
+            int count,
+            double @org.jetbrains.annotations.Nullable [] biomeWeights) {
         int chosenIdx;
-        if (biomeWeights == null || biomeWeights.length != perBiome.size()) {
-            chosenIdx = LocationGenerator.rng().nextInt(perBiome.size());
+        if (biomeWeights == null || biomeWeights.length < count) {
+            chosenIdx = LocationGenerator.rng().nextInt(count);
         } else {
             double totalW = 0.0d;
-            for (double w : biomeWeights) totalW += Math.max(0.0d, w);
+            for (int idx = 0; idx < count; idx++) totalW += Math.max(0.0d, biomeWeights[idx]);
             if (totalW <= 0.0d) {
-                chosenIdx = LocationGenerator.rng().nextInt(perBiome.size());
+                chosenIdx = LocationGenerator.rng().nextInt(count);
             } else {
                 double pick = LocationGenerator.rng().nextDouble() * totalW;
                 double acc = 0.0d;
-                chosenIdx = perBiome.size() - 1;
-                for (int idx = 0; idx < biomeWeights.length; idx++) {
+                chosenIdx = count - 1;
+                for (int idx = 0; idx < count; idx++) {
                     acc += Math.max(0.0d, biomeWeights[idx]);
                     if (pick < acc) {
                         chosenIdx = idx;
@@ -161,33 +210,208 @@ final class PregenTask implements Runnable {
                 }
             }
         }
-        long[][] chosen = perBiome.get(chosenIdx);
-        long[] keys = chosen[0];
-        long[] widths = chosen[1];
+        long[] keys = perBiomeKeys[chosenIdx];
+        long[] sums = perBiomeSums[chosenIdx];
 
-        long total = 0L;
-        for (long w : widths) total += Math.max(0L, w);
-
+        long total = sums[sums.length - 1];
         int k;
         if (total <= 0L) {
             // Degenerate: all runs are zero-width. Fall back to a uniform run pick.
             k = LocationGenerator.rng().nextInt(keys.length);
         } else {
             long pick = (long) (LocationGenerator.rng().nextDouble() * total);
-            long acc = 0L;
-            k = keys.length - 1;
-            for (int idx = 0; idx < widths.length; idx++) {
-                acc += Math.max(0L, widths[idx]);
-                if (pick < acc) {
-                    k = idx;
-                    break;
-                }
-            }
+            k = firstRunAbove(sums, pick);
         }
 
-        long key = keys[k];
-        long width = widths[k];
-        return key + (width > 0L ? (long) (LocationGenerator.rng().nextDouble() * width) : 0L);
+        long width = sums[k] - ((k > 0) ? sums[k - 1] : 0L);
+        return keys[k] + (width > 0L ? (long) (LocationGenerator.rng().nextDouble() * width) : 0L);
+    }
+
+    /**
+     * ADR-062 weighted-biome draw over {@link MemoryShape} run views. Identical semantics to the
+     * {@code long[][]} form - the views read the shape's blocked union rather than a per-biome
+     * {@code long[]} pair, so no run table is duplicated to serve the draw.
+     *
+     * @param views per-biome run views; first {@code count} entries are used.
+     * @param count number of populated entries.
+     * @param biomeWeights optional per-biome weights; equal pick when null, wrong-length or sum &lt;= 0.
+     * @return drawn 1D location index.
+     */
+    static long drawWeightedBiome(
+            MemoryShape.BiomeUnionTable.BiomeView[] views,
+            int count,
+            double @org.jetbrains.annotations.Nullable [] biomeWeights) {
+        MemoryShape.BiomeUnionTable.BiomeView view = views[chooseBiome(count, biomeWeights)];
+        int runs = view.length();
+        long total = view.sumAt(runs - 1);
+        int k;
+        if (total <= 0L) {
+            // Degenerate: all runs are zero-width. Fall back to a uniform run pick.
+            k = LocationGenerator.rng().nextInt(runs);
+        } else {
+            long pick = (long) (LocationGenerator.rng().nextDouble() * total);
+            k = firstRunAbove(view, runs, pick);
+        }
+
+        long width = view.widthAt(k);
+        return view.keyAt(k)
+                + (width > 0L ? (long) (LocationGenerator.rng().nextDouble() * width) : 0L);
+    }
+
+    /**
+     * ADR-062 biome pick: proportional to {@code biomeWeights}, equal otherwise.
+     *
+     * @param count number of candidate biomes.
+     * @param biomeWeights optional weights; equal pick when null, wrong-length or sum &lt;= 0.
+     * @return chosen index in {@code [0, count)}.
+     */
+    private static int chooseBiome(int count, double @org.jetbrains.annotations.Nullable [] biomeWeights) {
+        if (biomeWeights == null || biomeWeights.length < count) {
+            return LocationGenerator.rng().nextInt(count);
+        }
+        double totalW = 0.0d;
+        for (int idx = 0; idx < count; idx++) totalW += Math.max(0.0d, biomeWeights[idx]);
+        if (totalW <= 0.0d) return LocationGenerator.rng().nextInt(count);
+        double pick = LocationGenerator.rng().nextDouble() * totalW;
+        double acc = 0.0d;
+        for (int idx = 0; idx < count; idx++) {
+            acc += Math.max(0.0d, biomeWeights[idx]);
+            if (pick < acc) return idx;
+        }
+        return count - 1;
+    }
+
+    /**
+     * {@link #firstRunAbove(long[], long)} over a run view.
+     *
+     * @param view the biome's run view.
+     * @param runs the view's run count.
+     * @param pick draw value in {@code [0, totalWidth)}.
+     * @return run index in {@code [0, runs)}.
+     */
+    private static int firstRunAbove(
+            MemoryShape.BiomeUnionTable.BiomeView view, int runs, long pick) {
+        int lo = 0;
+        int hi = runs - 1;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (view.sumAt(mid) > pick) {
+                hi = mid;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        return lo;
+    }
+
+    /**
+     * Index of the first run whose prefix sum is strictly greater than {@code pick} - i.e. the run
+     * a width-weighted draw of {@code pick} lands in.
+     *
+     * <p>Explicit binary search rather than {@link java.util.Arrays#binarySearch}: zero-width runs
+     * make the prefix sums non-strictly increasing, and duplicates have to resolve to the first
+     * such index for the draw to stay width-proportional.
+     *
+     * @param sums prefix sums of run width, non-decreasing.
+     * @param pick draw value in {@code [0, sums[last])}.
+     * @return run index in {@code [0, sums.length)}.
+     */
+    private static int firstRunAbove(long[] sums, long pick) {
+        int lo = 0;
+        int hi = sums.length - 1;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (sums[mid] > pick) {
+                hi = mid;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        return lo;
+    }
+
+    /**
+     * Gather the requested biomes' run tables for the recall draw, reusing the previous gather
+     * while the shape's tables are unchanged ({@link MemoryShape#biomeTableVersion()}).
+     *
+     * <p>The gather references the shape's own {@code long[]} arrays, so nothing is copied and the
+     * ADR-062 weights and gray-space probability - which depend only on the tables and on config -
+     * are computed once per table version instead of once per attempt.
+     *
+     * @param memoryShape the region's spatial memory
+     * @return {@code true} when at least one requested biome has recorded runs to draw from
+     */
+    private boolean refreshBiomeDrawTables(MemoryShape<?> memoryShape) {
+        long version = memoryShape.biomeTableVersion();
+        if (version == biomeTablesVersion) return biomeDrawCount > 0;
+        biomeTablesVersion = version;
+
+        int requested = state.biomeNames.size();
+        MemoryShape.BiomeUnionTable.BiomeView[] viewsOut =
+                new MemoryShape.BiomeUnionTable.BiomeView[requested];
+        double[] weightsOut = new double[requested];
+        boolean[] recorded = new boolean[requested];
+        int count = 0;
+        int flatRuns = 0;
+        double recordedWeight = 0.0d;
+        double grayWeight = 0.0d;
+
+        int at = 0;
+        for (String biomeName : state.biomeNames) {
+            int slot = at++;
+            MemoryShape.BiomeUnionTable.BiomeView view = memoryShape.biomeRunView(biomeName);
+            if (view == null || view.length() == 0) continue;
+            recorded[slot] = true;
+            double cfg = state.biomeWeights.getOrDefault(
+                    biomeName.toUpperCase(java.util.Locale.ROOT), 1.0d);
+            double gf = grayFraction(view.length(), GRAY_SPACE_MIN_RUNS);
+            viewsOut[count] = view;
+            weightsOut[count] = cfg * (1.0d - gf);
+            recordedWeight += weightsOut[count];
+            grayWeight += cfg * gf;
+            count++;
+            flatRuns += view.length();
+        }
+
+        // Requested biomes with no recorded runs defer their whole weight to spiral exploration,
+        // but only when the world can actually produce them.
+        at = 0;
+        for (String biomeName : state.biomeNames) {
+            if (recorded[at++]) continue;
+            String up = biomeName.toUpperCase(java.util.Locale.ROOT);
+            boolean registered = state.worldBiomeRegistry.isEmpty()
+                    || state.worldBiomeRegistry.contains(up)
+                    || state.worldBiomeRegistry.contains("MINECRAFT:" + up);
+            if (!registered) continue; // true 0: world cannot produce it
+            double cfg = state.biomeWeights.getOrDefault(up, 1.0d);
+            if (cfg <= 0.0d) continue; // explicitly suppressed
+            grayWeight += cfg;
+        }
+
+        biomeDrawViews = viewsOut;
+        biomeDrawWeights = weightsOut;
+        biomeDrawCount = count;
+        biomeDrawPGray = graySpaceProbability(recordedWeight, grayWeight);
+
+        if (count > 0 && !state.biomeWeighted) {
+            long[] fk = new long[flatRuns];
+            long[] fw = new long[flatRuns];
+            int at2 = 0;
+            for (int b = 0; b < count; b++) {
+                MemoryShape.BiomeUnionTable.BiomeView view = viewsOut[b];
+                for (int k = 0; k < view.length(); k++) {
+                    fk[at2] = view.keyAt(k);
+                    fw[at2] = view.widthAt(k);
+                    at2++;
+                }
+            }
+            flatDrawKeys = fk;
+            flatDrawWidths = fw;
+        } else {
+            flatDrawKeys = null;
+            flatDrawWidths = null;
+        }
+        return count > 0;
     }
 
     /**
@@ -270,79 +494,31 @@ final class PregenTask implements Runnable {
         long l = -1;
         int[] select;
         if (state.shape instanceof MemoryShape<?> memoryShape) {
-            memoryShape.flushAndRebuild(state.resolution);
+            // Amortized: the attempt loop dirties the same flags it reads (every rejection marks
+            // a bad chunk, every success records a biome), so an unconditional rebuild here cost
+            // a full O(recorded runs) copy-on-write merge per attempt. Staleness is safe -
+            // isKnownBad reads the pending marks directly.
+            memoryShape.flushAndRebuildIfNeeded(state.resolution);
             if (state.biomeRecall && !state.defaultBiomes) {
-                // Flattened run list (all runs across requested biomes) and a
-                // per-biome grouping. The flattened list drives the legacy
-                // uniform-over-runs draw; the grouping drives the ADR-062
-                // equal-probability-per-biome weighted draw.
-                List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
-                List<long[][]> perBiome = new ArrayList<>();
-                // ADR-062: relative selection weight per perBiome entry,
-                // looked up by biome name (biomes not configured default to 1.0).
-                List<Double> perBiomeWeights = new ArrayList<>();
-                // ADR-062: distinct recorded-run count per perBiome entry
-                // (drives the gray-space deferral ramp) and the set of recorded
-                // requested biome names (so the unrecorded-but-registered set can
-                // be derived below).
-                List<Long> perBiomeRuns = new ArrayList<>();
-                Set<String> recordedNames = new HashSet<>();
-                for (String biomeName : state.biomeNames) {
-                    long[] keys = memoryShape.getBiomeKeys(biomeName);
-                    long[] sums = memoryShape.getBiomePrefixSums(biomeName);
-                    if (keys != null && sums != null && keys.length > 0) {
-                        long[] widths = new long[keys.length];
-                        for (int k = 0; k < keys.length; k++) {
-                            long prevSum = (k > 0) ? sums[k - 1] : 0L;
-                            widths[k] = sums[k] - prevSum;
-                            biomes.add(new AbstractMap.SimpleEntry<>(keys[k], widths[k]));
-                        }
-                        perBiome.add(new long[][] {keys, widths});
-                        perBiomeWeights.add(state.biomeWeights.getOrDefault(
-                                biomeName.toUpperCase(java.util.Locale.ROOT), 1.0d));
-                        perBiomeRuns.add((long) keys.length);
-                        recordedNames.add(biomeName.toUpperCase(java.util.Locale.ROOT));
-                    }
-                }
-                if (!biomes.isEmpty()) {
+                if (refreshBiomeDrawTables(memoryShape)) {
                     if (state.biomeWeighted) {
-                        // ADR-062: pick biome weighted by perBiomeWeights and width.
+                        // ADR-062: pick biome weighted by config weight and run width.
                         // Thinly-recorded biomes defer weight (grayFraction) to spiral
                         // exploration, and unrecorded biomes contribute to grayWeight.
-                        double recordedWeight = 0.0d;
-                        double grayWeight = 0.0d;
-                        double[] weights = new double[perBiome.size()];
-                        for (int wi = 0; wi < weights.length; wi++) {
-                            double cfg = perBiomeWeights.get(wi);
-                            double gf = grayFraction(perBiomeRuns.get(wi), GRAY_SPACE_MIN_RUNS);
-                            weights[wi] = cfg * (1.0d - gf);
-                            recordedWeight += weights[wi];
-                            grayWeight += cfg * gf;
-                        }
-                        for (String biomeName : state.biomeNames) {
-                            String up = biomeName.toUpperCase(java.util.Locale.ROOT);
-                            if (recordedNames.contains(up)) continue;
-                            boolean registered = state.worldBiomeRegistry.isEmpty()
-                                    || state.worldBiomeRegistry.contains(up)
-                                    || state.worldBiomeRegistry.contains(
-                                            "MINECRAFT:" + up);
-                            if (!registered) continue; // true 0: world cannot produce it
-                            double cfg = state.biomeWeights.getOrDefault(up, 1.0d);
-                            if (cfg <= 0.0d) continue; // explicitly suppressed
-                            grayWeight += cfg;
-                        }
-                        double pGray = graySpaceProbability(recordedWeight, grayWeight);
+                        double pGray = biomeDrawPGray;
                         if (!state.biomeRecallForced
                                 && pGray > 0.0d
                                 && LocationGenerator.rng().nextDouble() < pGray) {
                             l = memoryShape.rand();
                         } else {
-                            l = drawWeightedBiome(perBiome, weights);
+                            l = drawWeightedBiome(
+                                    biomeDrawViews, biomeDrawCount, biomeDrawWeights);
                         }
                     } else {
-                        int nextInt = LocationGenerator.rng().nextInt(biomes.size());
-                        Map.Entry<Long, Long> entry = biomes.get(nextInt);
-                        l = entry.getKey() + (long) (LocationGenerator.rng().nextDouble() * entry.getValue());
+                        int nextInt = LocationGenerator.rng().nextInt(flatDrawKeys.length);
+                        long width = flatDrawWidths[nextInt];
+                        l = flatDrawKeys[nextInt]
+                                + (long) (LocationGenerator.rng().nextDouble() * width);
                     }
                 } else if (state.biomeRecallForced) {
                     RTP.log(Level.WARNING,
@@ -919,21 +1095,25 @@ final class PregenTask implements Runnable {
 
         // --- GlobalRegionVerifiers (non-blocking) ---
         RTPCoords resCoords = new RTPCoords(state.world.name(), finalX, finalY, finalZ);
-        GlobalRegionVerifiers.checkGlobalRegionVerifiers(resCoords)
-                .whenComplete((verPass, verEx) -> {
-                    if (verEx != null || !Boolean.TRUE.equals(verPass)) {
+        GlobalRegionVerifiers.checkGlobalRegionVerifiersDetailed(resCoords)
+                .whenComplete((verResult, verEx) -> {
+                    if (verEx != null || verResult == null || !verResult.passed()) {
+                        Class<?> failedClass = (verResult != null) ? verResult.failedVerifierClass() : null;
+                        String className = (failedClass != null) ? failedClass.getSimpleName() : "verifier";
                         if (state.verbose) {
                             final int fx = finalX, fy = finalY, fz = finalZ;
                             state.failMap.get(LocationGenerator.FailTypes.safetyExternal)
-                                    .compute("location=(" + fx + "," + fy + "," + fz + ")",
+                                    .compute("location=(" + fx + "," + fy + "," + fz + ")[verifier=" + className + "]",
                                             (s, a) -> (a == null) ? 1L : ++a);
                         }
-                        recordOutcome("safetyExternal/verifier ex=" + (verEx == null ? "null" : verEx.getClass().getSimpleName()));
+                        recordOutcome("safetyExternal[" + className + "] ex=" + (verEx == null ? "null" : verEx.getClass().getSimpleName()));
                         if (state.shape instanceof MemoryShape) {
                             // addBadChunk: chunk-uniform - within a chunk the per-column
                             // selection order is deterministic, so the twin spiral index picks
                             // the same column and the verifier rejects it identically.
-                            ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safetyExternal);
+                            long effectiveTtl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(
+                                    LocationGenerator.FailTypes.safetyExternal, failedClass);
+                            ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
                         }
                         closeIfPresent(reservation);
                         continueInline(this::rescheduleNextAttempt);
@@ -1051,7 +1231,7 @@ final class PregenTask implements Runnable {
                             + "Per-cause tally=" + causeTally
                             + " (enable verbose for per-location detail). A dominant"
                             + " safety/nullChunk/ungenerated cause here is the same chunk-read"
-                            + " failure that leaves the L1 kept cache empty.");
+                            + " failure that leaves the hot kept cache empty.");
         }
         result.complete(new GenerationResult(null, reported, null));
     }

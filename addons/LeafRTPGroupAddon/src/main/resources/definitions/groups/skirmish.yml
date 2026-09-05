@@ -1,0 +1,10 @@
+version: 1.0
+
+# Squad vs squad team skirmish.
+# Wide block footprint hosting a full square lattice for separated team clusters.
+shape:
+  name: "SQUARE"
+  radius: 100
+  spatialResolution: 4
+
+maxGroupSize: 16

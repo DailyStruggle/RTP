@@ -1,4 +1,4 @@
-# 传送延迟（秒）
+# 传送延迟（秒）。0 = 立即。支持持续时间单位（例如 2s, 40t, 1500ms）。
 # 玩家在实际执行传送之前必须等待的时间。
 # 有时会让服务器有时间预加载目标区块。
 # @type: integer
@@ -15,7 +15,7 @@
 # @default: 2
 取消距离: 2
 
-# 传送之间的等待时间（秒）
+# 传送冷却。rtp.nocooldown 权限可绕过。支持持续时间单位（例如 5m, 300s, 1h）。
 # 玩家两次成功使用 RTP 之间必须等待的时间。
 # @type: integer
 # @range: [0, null]
@@ -31,7 +31,7 @@
 lockAfterUses: 0
 
 # lockAfterUses 滚动使用上限窗口的长度。计数器在窗口首次使用后经过此秒数重置。
-# 0 表示上限永不重置（硬性终身上限）。
+# 0 表示上限永不重置（硬性终身上限）。支持持续时间单位（例如 24h, 1d）。
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -79,7 +79,23 @@ menu:
 
 # 通过 "@config" 令牌由区域/世界文件继承的全局默认值。
 defaults:
-  # 默认区域的形状和大小。radius/centerRadius = 你落地的距离，以区块为单位。
+  # 默认区域形状和大小，被形状为 "@config" 的每个区域使用。
+  #
+  # 此处尺寸默认以区块为单位（1 区块 = 16 方块）:
+  #   radius: 64   ->  距中心 1,024 方块
+  #   radius: 256  ->  距中心 4,096 方块   （下方的默认值）
+  #   radius: 625  ->  距中心 10,000 方块
+  #
+  # 空间单位后缀:
+  # 您还可以在 radius、centerRadius 等参数上直接使用明确的单位:
+  #   radius: 4096b   (或 4096 blocks, 4096m)
+  #   radius: 256c    (区块)
+  #   radius: 4r      (Anvil 区域文件 = 32 区块 = 512 方块)
+  #   radius: 5km     (千米 = 5000 方块)
+  #
+  # radius       = 外边界。没有人会降落在此范围之外。
+  # centerRadius = 内边界 / 甜甜圈孔。没有人会降落在此范围之内。
+  #                必须小于 radius，否则没有土地可选。
   shape:
     # Landing area shape algorithm.
     # @type: enum
@@ -91,9 +107,11 @@ defaults:
     centerX: 0
     centerZ: 0
     weight: 1.0
+
     # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
     uniquePlacements: 0
     expand: false
+
   # Default high/low landing window.
   vert:
     # Vertical placement algorithm.
@@ -102,17 +120,23 @@ defaults:
     name: "LINEAR"
     minY: 32
     maxY: 255
+
     # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
     direction: 2
     requireSkyLight: true
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
+
   # Extra unverified spots kept ready. 0 = off.
   backlogCacheCap: 1000
+
   # Max chunks kept loaded for instant teleports.
   activeChunkCap: 10
+
   # Bad-spot tracking precision (1-5).
   spatialResolution: 3
+
   # Whether regions/worlds need permission.
   requirePermission: false
 

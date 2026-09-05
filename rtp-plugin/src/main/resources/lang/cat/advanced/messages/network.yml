@@ -2,48 +2,58 @@
 # Player- and staff-facing mews for this language, grouped by what they're for.
 # Auto-copied from the baseline mews; do not paw-edit (it gets overwritten).
 
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the L2 baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
+# --- Cross-box neighbour mews ---
+# Mowed only when `network.enabled: true` and the kitty's `/rtp` is routed
+# across the neighbour wait line (see network.yml `routing.mode`).
+# All mews are optional from the kitty's perspective - the baseline
+# `delayMessage` / `teleportMessage` purr cycle still drives the visible flow.
+# Mewed when the request haz been accepted into the neighbour wait line
+# and is waiting for a neighbour box claim. Placeholder: [position] - 0-indexed
+# spot from `pollStatus`; may be empty if the transport returns no
+# spot.
 lined_up_for_a_neighbour_box: "&7[P0] lined up for a warm spot in a neighbour box (position [position])..."
-# Sent when a player runs /rtp while already waiting in the cross-server queue.
-# Placeholder: [position] - position in line; may be empty.
+
+# Mewed when a kitty runs /rtp while already sitting in the neighbour line.
+# Placeholder: [position] - spot in line; may be empty.
 already_in_neighbour_line: "&cyou're already sitting in the line for a neighbour box (position [position]). sit and wait, kitty."
-# Sent when a cross-server queue entry waited too long and was dropped.
+
+# Mewed when a neighbour line entry napped too long and was dropped.
 # No placeholders.
 neighbour_nap_too_long: "&c[P0] napped too long waiting for a neighbour box - the pounce timed out."
-# Sent when the cross-server queue is full and the request is rejected.
+
+# Mewed when the neighbour line is packed and the request is hissed away.
 # No placeholders.
 neighbour_line_too_crowded: "&c[P0] the neighbour-box line is packed with kitties; try again in a moment."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
+
+# Mewed when the line handed the request off to the proxy router and
+# sniffing for a neighbour box is in progress.
 sniffing_for_a_neighbour: "&7[P0] sniffing out a neighbour box..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
+
+# Mewed when a neighbour box reserved a spot for this kitty and the
+# proxy is about to leap over the fence. Placeholder: [server]
+# - the destination neighbour's serverId.
 warm_spot_claimed_next_door: "&a[P0] warm spot claimed on [server]. leaping over the fence..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+
+# Mewed when the proxy is mid-leap. Placeholder: [server] - destination.
 leaping_to_neighbour: "&a[P0] leaping over to [server]..."
-# Sent when the cross-server path gave up and fell back to the local server.
-# Placeholder: [reason] - the reason for falling back.
+
+# Mewed when the neighbour path gave up and pounced back to the home box.
+# Placeholder: [reason] - the reason for pouncing home.
 no_neighbour_pouncing_home: "&e[P0] no neighbour boxes available ([reason]); pouncing back to the home box."
-# Sent when the cross-server request failed and no fallback was possible.
-# Placeholder: [reason] - the failure reason.
+
+# Mewed when the neighbour request flopped and no fallback pounce was possible.
+# Placeholder: [reason] - why it flopped.
 neighbour_pounce_flopped: "&c[P0] the neighbour-box pounce flopped: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
+
+# Mewed when the kitty asked for a specific territory (`/rtp <region>`) but
+# no neighbour box is currently serving it. Placeholder:
+# [region] - the requested territory name.
 networkRegionUnavailable: "&c[P0] no neighbour box is currently serving territory '[region]'."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
+
+# Mewed when the requested territory name resolves to two or more neighbour boxes and
+# human-staff rules cannot pick one (only hisses
+# under stricter rules than default `warn`). Placeholder: [region].
 networkRegionAmbiguous: "&c[P0] territory '[region]' is ambiguous across neighbour boxes; please pin a box."
 
-# DO NOT TOUCH VERSION NUMBER
+# Do not bite the version number, sacred catnip
 version: 1.0

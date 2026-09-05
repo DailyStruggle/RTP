@@ -528,6 +528,52 @@ The only potential future `rtp-api` addition is an `RTPPermissionProvider` inter
 | `MemoryTracker` leaks on disconnect mid-pipeline | `ServerPlayConnectionEvents.DISCONNECT` releases all tickets owned by the player, mirroring Bukkit `PlayerQuitEvent` cleanup. Step H audit. |
 | Scope creep into Forge | Explicitly out of scope until Phase 4. |
 
+## Carrier Retirement & Deprecation Policy
+
+Every supported Minecraft version adds a per-version carrier to each platform
+family (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, `rtp-neoforge`),
+so the `<platform>-vXX_YY_R1` matrix grows without bound unless old carriers are
+retired deliberately. This policy bounds that growth so cross-cutting changes
+stay cheap to apply (a long-term maintainability guardrail, not a feature).
+
+**Support window.** RTP maintains carriers for:
+
+1. The three most recent `1.21.x` (or successor "current stable" line) revisions
+   plus the current experimental line (`26.x`), and
+2. Any older revision that still holds a non-trivial share of live servers.
+
+Carriers outside this window are candidates for retirement. The window is a
+guideline, not a hard cap; a low-maintenance carrier that still builds cleanly
+may be kept, and a high-maintenance one may be dropped early.
+
+**Retirement triggers (any one is sufficient).**
+
+- The carrier's Minecraft revision has negligible remaining server share and no
+  active user reports for at least one minor RTP release cycle.
+- The carrier requires a toolchain (Loom / ModDevGradle / JDK) that conflicts
+  with the versions the in-window carriers need, forcing a dual-classloader or
+  dual-JDK split solely to keep it alive.
+- The carrier repeatedly breaks under otherwise-mechanical cross-cutting changes
+  (a signal its abstraction seam has drifted from the current SPI contract).
+
+**Retirement procedure.**
+
+1. Announce the deprecation in `CHANGELOG.md` (one minor release ahead of
+   removal) and mark the carrier `**(deprecated)**` in the front-page/README
+   support matrix.
+2. On removal: delete the `<platform>-vXX_YY_R1` module directory, drop its
+   `include` + `projectDir` lines from `settings.gradle`, remove any
+   `rtp-plugin` merge wiring, and delete its `TRACEABILITY.md` rows.
+3. Record the removal in `CHANGELOG.md` (absolute phrasing) and, if it changes a
+   platform's supported-version contract, in the relevant ADR (or a new one for
+   a whole-platform drop).
+
+**Non-negotiable invariant.** New carriers integrate **only** through the
+project-owned handle records ([rtp-fabric-ADR-007](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md):
+`RTPLevelHandle` / `RTPBlockHandle` / etc.), never raw `net.minecraft.*` types.
+This is what keeps Mojmap drift confined to a single carrier and lets an
+out-of-window carrier be deleted without touching `rtp-core` / `rtp-api`.
+
 ## Ownership
 
 Per ADR-022, a named maintainer owns Fabric end-to-end (build, mappings, CI toolchain, S-00x proofs, ongoing maintenance). **Owner: @leaf_26** (project lead; recorded 2026-04-30). Phase 3 (public beta release) gate is satisfied; Phase 1 and Phase 2 work proceeds against this ownership.

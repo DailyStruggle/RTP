@@ -12,12 +12,14 @@
 스캔재개: "#10A5F5[P0] 다음 리전의 스캔 작업을 재개했습니다: [scan_regions]"
 스캔실행중: "&c[P0] 다음 리전에서는 이미 스캔 작업이 실행 중입니다: [scan_regions]"
 스캔미실행: "&c[P0] 다음 리전에는 현재 스캔 작업이 없습니다: [scan_regions]"
-# placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+
+# 자리표시자: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 스캔상태: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 육지 &8| &7ETA #7E9CC8[scan_eta]"
-# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
-# Set to empty string to disable the boss-bar.
-# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+
+# 월드 스캔이 실행되는 동안 rtp.scan 권한을 가진 플레이어에게 표시되는 보스바 제목.
+# 보스바를 비활성화하려면 빈 문자열로 설정하세요.
+# 자리표시자: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanBossBar: "스캔 중 [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% 육지) ETA [scan_eta]"
 
 # ###############################################################################
 # 섹션 7: 정보 명령어
@@ -29,41 +31,54 @@ scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_l
 정보_총로드수: "&7누적 로드된 청크 수: #7E9CC8[loads]"
 infoLoadsByOrigin: "&7출처별 로드: #7E9CC8[loadsByOrigin]"
 정보_누수율: "&7현재 청크 누수율: #7E9CC8[leakRate]"
-# --- Health metrics block ---
+
+# --- 상태 지표 블록 ---
 infoQueueDepth: "&7리전 대기열에서 대기 중인 플레이어: #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7대기 중인 텔레포트 파이프라인: #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7평균 파이프라인 지연: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
+
+# 파이프라인 지연 백분위수. 자리표시자: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7파이프라인 지연 (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
+
+# 느린 텔레포트 감사 (즉시/비대기열 텔레포트 전용). 자리표시자:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7느린 텔레포트 (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+
+# 대기열 증가 감사. 자리표시자: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7대기열 증가 경고 (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7JVM 힙: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
+
 # /rtp info 의 Health pipeline 라벨 블록 헤더 줄.
 infoHealthPipelineHeader: "&7--- 상태: 파이프라인 ---"
+
 # 1m / 5m / 15m 윈도우의 TPS 표시. 자리표시자: [tps1m] [tps5m] [tps15m].
 infoTps: "&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
+
 # 서버 실시간 MSPT 및 tick 예산 사용률. 자리표시자: [mspt] [tickBudgetUtilisation].
 infoMSPTLive: "&7서버 MSPT: #7E9CC8[mspt] ms (&7틱 예산: #7E9CC8[tickBudgetUtilisation]&7)"
-# Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
+
+# 설정된 플레이어 소프트 상한 vs 현재 온라인 수. 자리표시자: [softCap] [playerCount].
 infoSoftCap: "&7플레이어: #7E9CC8[playerCount] / [softCap]"
+
 # 데이터베이스의 최근 왕복 지연 시간 (ms). 자리표시자: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7데이터베이스 지연: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics.
-# Success/failure rate over all recorded generation attempts. Placeholders:
+
+# 생성 결과 지표.
+# 기록된 모든 생성 시도의 성공/실패율. 자리표시자:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7생성 성공률: #7E9CC8[genSuccessRate]&7 (실패 #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
-# Single most common rejection cause and its share of all failures. Placeholders:
+
+# 가장 흔한 단일 거부 원인 및 전체 실패 중 비율. 자리표시자:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7주요 거부 원인: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Per-cause rejection breakdown.
-# Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
+
+# 원인별 거부 내역.
+# 자리표시자: [genFailureBreakdown] - 쉼표로 구분된 cause=N 목록 (빈도순).
 infoFailureBreakdown: "&7원인별 거부: #7E9CC8[genFailureBreakdown]"
-# Health colour-band thresholds. Used to colour the coloured-variant
-# placeholders (e.g. [tps1mColoured]) green/yellow/red.
+
+# 상태 색상 밴드 임계값. 색상이 적용된 변형 자리표시자
+# (예: [tps1mColoured]) 를 녹색/노란색/빨간색으로 표시하는 데 사용됩니다.
 infoThresholdTpsGreen: 19.5
 infoThresholdTpsYellow: 18.0
 infoThresholdMsptGreen: 30.0
@@ -71,9 +86,11 @@ infoThresholdMsptYellow: 45.0
 infoThresholdCacheFillGreen: 0.5
 infoThresholdCacheFillYellow: 0.25
 infoThresholdNetworkAgeYellow: 5.0
-# Header line introducing the per-Folia-region table (Folia runtime only).
+
+# Folia 리전별 테이블을 소개하는 헤더 줄 (Folia 런타임 전용).
 infoFoliaRegionsHeader: "&7--- Folia 리전 ---"
-# Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
+
+# 단일 Folia 리전의 행 템플릿. 자리표시자: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
 infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 정보_면책_헤더: "&7--- 진단 노트 ---"
@@ -84,17 +101,20 @@ infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7
 정보_리전헤더: "#63C5DA리전:"
 정보_콘솔_리전헤더: "&7--- 리전 ---"
 정보리전: "#52B2BF[region]"
-# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
-# players spend their time in, sampled over the server's uptime.
-# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+
+# /rtp info biomes 에 표시되는 바이옴 점유 순위표 - 온라인 플레이어가
+# 서버 가동 시간 동안 머문 바이옴을 샘플링한 결과입니다.
+# 헤더 자리표시자: [biomeTotalSamples] [biomeDistinctCount].
 infoBiomeActivityHeader: "&8--- &3바이옴 점유 &8(&3[biomeTotalSamples]&8 샘플, &3[biomeDistinctCount]&8 바이옴) ---"
-# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+
+# 바이옴별 행. 자리표시자: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
 infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
-# Shown when no occupancy has been sampled yet.
+
+# 아직 바이옴 점유가 샘플링되지 않았을 때 표시됩니다.
 infoBiomeActivityEmpty: "&8--- &7아직 바이옴 점유가 샘플링되지 않았습니다 &8---"
 
-# sub-info listings
-# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
+# 하위 정보 목록
+# 자리표시자: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
 월드정보:
   - "#21ADA8[world]:"
   - "#99EEBB  - 리전: [region]"
@@ -108,79 +128,91 @@ infoBiomeActivityEmpty: "&8--- &7아직 바이옴 점유가 샘플링되지 않�
   - "#58CCED  - 필요 권한: [requirePermission]"
   - "#58CCED  - 월드 경계 재정의: [worldBorderOverride]"
   - "#58CCED  - 캐시 한도: [cacheCap]"
-  - "#58CCED  - 유지 캐시 (L1): [keptCache]"
-  - "#58CCED  - 해제 캐시 (L2): [unkeptCache]"
-  - "#58CCED  - 백로그 캐시 (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - 유지 캐시 (hot): [keptCache]"
+  - "#58CCED  - 해제 캐시 (cold): [unkeptCache]"
+  - "#58CCED  - 백로그 캐시 (backlog): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - 캐시됨: [cached]"
   - "#58CCED  - 학습된 커버리지: [memCoveragePct] (불량: [memBadPct], [memBadCount] 셀)"
   - "#58CCED  - 주요 거부 원인: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
-# Section 8b: Generalized Menu Framework
+# 섹션 8b: 범용 메뉴 프레임워크
 # ###############################################################################
-# Sent when a menu token is unknown, malformed, or belongs to another player.
+# 메뉴 토큰을 알 수 없거나, 형식이 잘못되었거나, 다른 플레이어의 소유일 때 전송됩니다.
 menuInvalid: "&c[P0] that menu link is invalid."
+
 # 메뉴 사용 시 호출 플레이어의 UUID 를 확인할 수 없을 때 전송됩니다.
 menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
-# Hover-fallback template used by the menu reflector when no YAML block-comment
-# is available for a parameter. Placeholder: [type] - the declared parameter type.
+
+# 매개변수에 대한 YAML 블록 주석이 없을 때 메뉴 리플렉터가 사용하는 마우스 오버 폴백 템플릿. 자리표시자: [type] - 선언된 매개변수 유형.
 menuHoverFallbackType: "유형: [type]"
-# Hover-fallback template used by the menu reflector when a parameter exposes a
-# small curated value set. Placeholder: [values] - comma-joined accepted values.
+
+# 매개변수가 선별된 작은 값 세트를 노출할 때 메뉴 리플렉터가 사용하는 마우스 오버 폴백 템플릿. 자리표시자: [values] - 쉼표로 연결된 허용 값.
 menuHoverFallbackBounds: "허용: [values]"
-# Label for the "go back one level" navigation row prepended to every non-root menu page.
+
+# 루트가 아닌 모든 메뉴 페이지의 상단에 추가되는 '한 단계 뒤로' 탐색 행의 라벨.
 menuBack: "&7« 뒤로"
-# Label template for the "execute the assembled command" row prepended to every
-# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
+
+# 실행 가능한 루트가 아닌 모든 메뉴 페이지의 상단에 추가되는 '조립된 명령어 실행' 행의 라벨 템플릿. 자리표시자: [command] - 조립된 /rtp ... 호출.
 menuExecute: "&2▶ [command] 실행"
-# Header row at the top of a parameter-value picker sub-page.
-# Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
+
+# 매개변수 값 선택기 하위 페이지 상단의 헤더 행.
+# 자리표시자: [param] - 매개변수 이름; [command] - 조립된 /rtp ... 호출.
 menuPickValue: "&7[param] 의 값을 선택 (실행: /rtp [command] [param]:<value>)"
-# Label for the "type a custom value" fallback row on a parameter-value picker page.
-# Clicking it prefills chat with the assembled command up to '<param>:' so the player
-# can type any value, including ones not in the suggestion list.
+
+# 매개변수 값 선택기 페이지의 '사용자 지정 값 입력' 폴백 행의 라벨.
+# 클릭하면 채팅창에 '<param>:' 까지 조립된 명령어가 미리 채워져 플레이어가 추천 목록에 없는 값을 포함하여 원하는 값을 입력할 수 있습니다.
 menuTypeValue: "&7✎ 사용자 지정 값 입력..."
-# Non-clickable header row at the top of every non-root menu page.
-# Surfaces the currently-constructed /rtp invocation including any staged
-# parameter assignments (name:value). Placeholder: [command] - assembled args.
+
+# 루트가 아닌 모든 메뉴 페이지 상단의 클릭할 수 없는 헤더 행.
+# 단계별 매개변수 할당(name:value)을 포함하여 현재 구성 중인 /rtp 호출을 표시합니다. 자리표시자: [command] - 조립된 인수.
 menuConstructed: "&7구성 중: #7E9CC8/rtp [command]"
-# Non-clickable title row prepended to the root /rtp menu page.
-# Provides a welcoming header before the player descends into any subcommand.
+
+# 루트 /rtp 메뉴 페이지 상단에 추가되는 클릭할 수 없는 제목 행.
+# 플레이어가 하위 명령어로 들어가기 전에 환영 헤더를 제공합니다.
 menuRootTitle: "#5FB3B3&l⚡ RTP 메뉴"
-# Non-clickable subtitle/hint row prepended to the root /rtp menu page below
-# menuRootTitle. Short orientation text for first-time users.
+
+# menuRootTitle 아래, 루트 /rtp 메뉴 페이지 상단에 추가되는 클릭할 수 없는 부제목/안내 행. 처음 사용하는 사용자를 위한 간단한 안내 텍스트.
 menuRootHint: "&7아래 옵션을 클릭하여 시작하세요"
-# Navigation rows appended to paginated menu pages — clicking
-# them moves to the previous/next page of the same model. Placeholder:
-# [page] - the 1-based human-readable target page number.
+
+# 페이지가 나뉜 메뉴 페이지에 추가되는 탐색 행 — 클릭하면
+# 동일 모델의 이전/다음 페이지로 이동합니다. 자리표시자:
+# [page] - 1부터 시작하는 사람이 읽을 수 있는 대상 페이지 번호.
 menuPagePrev: "&7« 이전 페이지 ([page])"
 menuPageNext: "&7다음 페이지 ([page]) »"
-# Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
-# Front-page rows. No placeholders.
+
+# 텔레포트 행 위의 첫 페이지 섹션 구분선 (플레이어 보기).
+menuFrontPageSectionTeleport: "&8--- &7텔레포트 &8---"
+
+# 첫 페이지 행. 자리표시자 없음.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- 월드 선택"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- 바이오타 선택"
 menuFrontPageRowHelp: "#7A4FB8❓ 명령어 목록 &7- /rtp help"
-# Front-page admin entry row: the only inline admin-visible row on the
-# front page; click descends into the admin panel. Hidden when the viewer
-# lacks rtp.menu.admin.
+
+# 첫 페이지 관리자 진입 행: 첫 페이지에서 관리자에게만 인라인으로 표시되는 유일한 행.
+# 클릭 시 관리자 패널로 들어갑니다. 보는 사람에게 rtp.menu.admin 권한이 없으면 숨겨집니다.
 menuFrontPageRowAdmin: "#9D7CD8▶ 관리자 패널 &7- 운영자 도구"
-# Hover text for the admin-panel entry row. No placeholders.
+
+# 관리자 패널 진입 행의 마우스 오버 텍스트. 자리표시자 없음.
 menuFrontPageHoverAdmin: "&7운영자 도구: 설정, 스캔, 진단, 리로드"
-# --- Admin panel book page ---
-# Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
-# Non-clickable hint row below menuAdminPanelTitle. No placeholders.
+
+# --- 관리자 패널 책 페이지 ---
+# 관리자 패널 상단의 클릭할 수 없는 제목 행. 자리표시자 없음.
+menuAdminPanelTitle: "#5FB3B3&l⚙ 관리자 패널"
+
+# menuAdminPanelTitle 아래의 클릭할 수 없는 안내 행. 자리표시자 없음.
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
-# Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
-# Admin-panel rows + hovers. No placeholders.
-menuAdminPanelRowConfig: "&b▶ config editor"
+
+# 관리자 패널의 섹션 구분선. 자리표시자 없음.
+menuAdminPanelSectionConfig: "&8--- &7설정 &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7진단 &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7수명 주기 &8---"
+menuAdminPanelSectionBrowse: "&8--- &7탐색 &8---"
+
+# 관리자 패널 행 + 마우스 오버. 자리표시자 없음.
+menuAdminPanelRowConfig: "&b▶ 설정 편집기"
 menuAdminPanelHoverConfig: "&7선별된 설정 선택기를 엽니다"
 menuAdminPanelRowRegions: "#5FB3B3▶ 리전"
 menuAdminPanelHoverRegions: "&7리전별 설정 추가, 제거 또는 편집"
@@ -188,190 +220,248 @@ menuAdminPanelRowWorlds: "#5FB3B3▶ 월드"
 menuAdminPanelHoverWorlds: "&7월드별 설정 추가, 제거 또는 편집"
 menuAdminPanelRowEffects: "#5FB3B3▶ 효과"
 menuAdminPanelHoverEffects: "&7그룹별 텔레포트 효과 추가, 제거 또는 편집"
-menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelRowInfo: "&b▶ 서버 정보"
 menuAdminPanelHoverInfo: "&7플러그인 버전, 리전 수, 대기열 상태 표시"
 menuAdminPanelRowDiagnostics: "&c▶ 전체 진단"
 menuAdminPanelHoverDiagnostics: "&7전체 진단 모음을 실행합니다. 비용이 클 수 있습니다"
-menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelRowMemory: "&b▶ 메모리 추적기 스냅샷"
 menuAdminPanelHoverMemory: "&7활성 청크 티켓 및 파이프라인 할당을 덤프"
-menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelRowScan: "&b▶ 스캔 제어"
 menuAdminPanelHoverScan: "&7스캔 하위 메뉴 열기 (시작 / 일시정지 / 취소)"
 menuAdminPanelRowReload: "&c▶ 리로드"
 menuAdminPanelHoverReload: "&7모든 설정 파일을 리로드합니다. 진행 중인 텔레포트가 영향받을 수 있습니다"
-menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelRowBrowse: "&b▶ 모든 명령어 탐색"
 menuAdminPanelHoverBrowse: "&7반영된 /rtp 명령어 트리를 엽니다"
 menuAdminPanelRowBack: "&7« 뒤로"
-# --- Visualizations submenu (admin map of bad locations per region) ---
-# Admin-panel row: open the Visualizations submenu. No placeholders.
+
+# --- 시각화 하위 메뉴 (리전별 부적합 위치 관리자 맵) ---
+# 관리자 패널 행: 시각화 하위 메뉴 열기. 자리표시자 없음.
 menuAdminPanelRowVisualizations: "#5FB3B3▶ 시각화"
-# Hover text for the admin-panel Visualizations row. No placeholders.
+
+# 관리자 패널 시각화 행의 마우스 오버 텍스트. 자리표시자 없음.
 menuAdminPanelHoverVisualizations: "&7맵 및 기타 운영자용 시각화를 엽니다"
-# Section divider above the Visualizations block on the admin panel.
+
+# 관리자 패널의 시각화 블록 위의 섹션 구분선.
 menuAdminPanelSectionVisualizations: "&8» &7시각화"
-# Non-clickable title row at the top of the Visualizations submenu.
+
+# 시각화 하위 메뉴 상단의 클릭할 수 없는 제목 행.
 menuVisualizationsTitle: "#9D7CD8&l⌖ 시각화"
-# Non-clickable hint row below the title.
+
+# 제목 아래의 클릭할 수 없는 안내 행.
 menuVisualizationsHint: "&7리전을 선택하여 부적합 위치 맵을 봅니다"
-# Visualizations row template; [region] - region name.
+
+# 시각화 행 템플릿; [region] - 리전 이름.
 menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- 리전 모양 맵"
-# Hover text for a Visualizations region row; [region] - region name.
+
+# 시각화 리전 행의 마우스 오버 텍스트; [region] - 리전 이름.
 menuVisualizationsHoverRegion: "&7&b[region] 의 부적합 위치를 보여주는 맵을 엽니다"
-# Non-clickable hint row shown when no regions are configured.
+
+# 구성된 리전이 없을 때 표시되는 클릭할 수 없는 안내 행.
 menuVisualizationsEmpty: "&7(구성된 리전 없음)"
-# Visualizations submenu back row (returns to the admin panel).
+
+# 시각화 하위 메뉴 뒤로 가기 행 (관리자 패널로 복귀).
 menuVisualizationsRowBack: "&7« 뒤로"
-# --- Admin panel Setup section: curated prefabs ---
-# Section divider above the Setup (quick start) block on the admin panel.
+
+# --- 관리자 패널 설정 섹션: 선별된 프리팹 ---
+# 관리자 패널의 설정 (빠른 시작) 블록 위의 섹션 구분선.
 menuAdminPanelSectionSetup: "&8» &7설정 (빠른 시작)"
-# Setup row + hover: survival-default identity overlay (reset to shipped defaults).
+
+# 설정 행 + 마우스 오버: survival-default (출고 시 기본값으로 재설정).
 menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
 menuPrefabSurvivalDefaultHover: "&7출고 시 기본값으로 재설정 (항등 오버레이)"
-# Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
+
+# 설정 행 + 마우스 오버: low-performance (긴 펄스, 작은 캐시, 로그인 캐시 끄기).
 menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
 menuPrefabLowPerformanceHover: "&7저사양 호스트 / 공유 CPU VPS: 긴 펄스, 작은 캐시, 로그인 캐시 끄기"
-# Setup row + hover: high-performance (short pulse, large caches, login cache on).
+
+# 설정 행 + 마우스 오버: high-performance (짧은 펄스, 큰 캐시, 로그인 캐시 켜기).
 menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
 menuPrefabHighPerformanceHover: "&7전용 하드웨어 / 많은 플레이어 수: 짧은 펄스, 큰 캐시, 로그인 캐시 켜기"
-# Setup row + hover: folia-tuned (regional scheduler tuning).
+
+# 설정 행 + 마우스 오버: folia-tuned (리전 스케줄러 튜닝).
 menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
 menuPrefabFoliaTunedHover: "&7folia 리전 스케줄러: 리전별 빠른 펄스, 동시 청크 티켓 감소"
-# Setup row + hover: multi-world (one region per world from current default).
+
+# 설정 행 + 마우스 오버: multi-world (현재 기본값에서 월드당 하나의 리전).
 menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
 menuPrefabMultiWorldHover: "&7현재 기본값에서 월드당 하나의 리전을 합성"
-# Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
+
+# 확인 메뉴 제목. 자리표시자: [prefab] - 프리팹 ID 또는 표시 이름.
 menuPrefabConfirmTitle: "#9D7CD8&l⚙ 프리셋 확인: #5FB3B3[prefab]"
-# Confirmation menu non-clickable hint row below the title. No placeholders.
+
+# 확인 메뉴 제목 아래의 클릭할 수 없는 안내 행. 자리표시자 없음.
 menuPrefabConfirmHint: "&7아래 변경 사항을 확인한 후 확인 또는 취소를 클릭하세요"
-# Confirmation menu footer row: confirm and write the prefab to disk.
+
+# 확인 메뉴 바닥글 행: 프리팹을 확인하고 디스크에 씁니다.
 menuPrefabConfirmRow: "&2&l[confirm]"
-# Confirmation menu footer row: cancel and return to the admin panel.
+
+# 확인 메뉴 바닥글 행: 취소하고 관리자 패널로 돌아갑니다.
 menuPrefabCancelRow: "&c&l[cancel]"
-# Clickable row label for the Refresh affordance at the bottom of the /rtp info
-# book. Re-renders the current scope against a fresh metrics snapshot.
+
+# /rtp info 책 하단의 새로고침 기능을 위한 클릭 가능한 행 라벨.
+# 최신 메트릭 스냅샷을 기준으로 현재 범위를 다시 렌더링합니다.
 infoBookRefreshRow: "&2[Refresh]"
-# Hover text for the info-book refresh row.
+
+# info 책 새로고침 행의 마우스 오버 텍스트.
 infoBookRefreshHover: "&7최신 지표 스냅샷으로 이 페이지를 다시 렌더링합니다."
-# Clickable row label for the Switch-to-chat affordance at the bottom of the
-# /rtp info book. Re-runs the same scope through the legacy chat path.
+
+# /rtp info 책 하단의 채팅으로 전환하기 위한 클릭 가능한 행 라벨.
+# 기존 채팅 경로를 통해 동일한 범위를 다시 실행합니다.
 infoBookSwitchToTextRow: "&7[Switch to chat]"
-# Hover text for the info-book switch-to-chat row.
+
+# info 책 채팅 전환 행의 마우스 오버 텍스트.
 infoBookSwitchToTextHover: "&7책 대신 채팅에서 /rtp info 를 다시 실행합니다."
-# Footer row rendered when the /rtp info book content exceeds the book page
-# cap. Clicking re-runs the same scope in chat mode so no data is lost.
+
+# /rtp info 책 내용이 책 페이지 상한을 초과할 때 렌더링되는 바닥글 행.
+# 클릭하면 데이터가 손실되지 않도록 채팅 모드에서 동일한 범위를 다시 실행합니다.
 infoBookOverflowFooter: "&7(내용이 잘렸습니다 - 클릭하여 전체 출력을 채팅에서 봅니다)"
-# Non-clickable note row indicating that periodic auto-refresh for the info
-# book is not currently supported on this build (deferred to a later
-# milestone). Users may click the Refresh row to refresh manually.
+
+# info 책에 대한 주기적 자동 새로고침이 현재 이 빌드에서 지원되지 않음을 나타내는
+# 클릭할 수 없는 메모 행 (이후 마일스톤으로 연기됨). 사용자는 새로고침 행을 클릭하여 수동으로 새로고침할 수 있습니다.
 infoBookAutoRefreshDeferredNote: "&8(자동 새로고침은 아직 지원되지 않습니다. 새로고침을 클릭하세요)"
-# Non-clickable title row at the top of the config-file selector page.
-# Shown when an admin clicks "/rtp config" from the front page.
+
+# 설정 파일 선택기 페이지 상단의 클릭할 수 없는 제목 행.
+# 관리자가 첫 페이지에서 "/rtp config"를 클릭할 때 표시됩니다.
 configSelectorTitle: "#5FB3B3&l⚙ 설정 파일"
-# Label for the "back to /rtp menu root" navigation row on the config selector page.
+
+# 설정 파일 선택기 페이지의 "/rtp 메뉴 루트로 돌아가기" 탐색 행 라벨.
 configSelectorBackRow: "&7« 메뉴로 돌아가기"
-# Non-clickable title row at the top of a single config-file page.
-# Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
-# Label for the "back to config selector" navigation row on a single config-file page.
+
+# 단일 설정 파일 페이지 상단의 클릭할 수 없는 제목 행.
+# 자리표시자: [file] - 설정 파일 이름 (예: "performance", "safety").
+configFileTitle: "#5FB3B3&l⚙ 설정: &7[file]"
+
+# 단일 설정 파일 페이지의 "설정 파일 선택기로 돌아가기" 탐색 행 라벨.
 configFileBackRow: "&7« 설정 파일로 돌아가기"
-# Non-clickable hint row shown when a config file has no editable keys.
+
+# 설정 파일에 편집 가능한 키가 없을 때 표시되는 클릭할 수 없는 안내 행.
 configFileEmptyHint: "&7(이 파일에 편집 가능한 키가 없습니다)"
-# Per-key row label on a config-file page. Placeholders:
-#   [key]   - the config key name; [value] - the currently-stored value.
+
+# 설정 파일 페이지의 키별 행 라벨. 자리표시자:
+#   [key]   - 설정 키 이름; [value] - 현재 저장된 값.
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
-# Hover text for a per-key row on a config-file page. Placeholders:
-#   [key], [value], [type] - the config key name, current value, and declared type.
-configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
-# Non-clickable title row at the top of a shape/vert type-picker page.
-# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
-# Non-clickable title row at the top of a shape/vert sub-parameter page.
-# Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
-# Hint sent when the book view falls back to the legacy raw-YAML chat dump
-# (no book renderer available on this platform).
+
+# 설정 파일 페이지의 키별 행 마우스 오버 텍스트. 자리표시자:
+#   [key], [value], [type] - 설정 키 이름, 현재 값 및 선언된 유형.
+configKeyHoverFormat: "&7클릭하여 편집 &7[key] &7(유형: [type])"
+
+# 모양/수직 유형 선택기 페이지 상단의 클릭할 수 없는 제목 행.
+# 자리표시자: [param] - "shape" 또는 "vert"; [current] - 현재 활성화된 유형 이름.
+configTypePickerTitle: "#5FB3B3&l⚙ [param] 유형 선택 &7(현재: &7[current]&7)"
+
+# 모양/수직 하위 매개변수 페이지 상단의 클릭할 수 없는 제목 행.
+# 자리표시자: [param] - "shape" 또는 "vert"; [type] - 활성 유형 이름.
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7하위 매개변수"
+
+# 책 보기를 사용할 수 없어 기존 원시 YAML 채팅 덤프로 대체될 때 전송되는 힌트
+# (이 플랫폼에서 책 렌더러를 사용할 수 없는 경우).
 configViewRawHint: "&7[P0] 책 보기를 사용할 수 없습니다. 원시 덤프로 대체합니다."
-# Placeholder text rendered in place of a config value that has not been set.
+
+# 설정되지 않은 구성 값 대신 렌더링되는 자리표시자 텍스트.
 configValueUnsetPlaceholder: "&8(설정 안 됨)"
-# Non-clickable header row separating the "Changeable" list from the "Pending"
-# staging-cart list on a config-file page when the viewer has staged one or
-# more uncommitted edits. No placeholders.
+
+# 보는 사람이 커밋되지 않은 수정을 하나 이상 스테이징했을 때 설정 파일 페이지에서
+# "변경 가능" 목록과 "대기 중" 스테이징 카트 목록을 구분하는 클릭할 수 없는 헤더 행. 자리표시자 없음.
 configPendingHeader: "&6&l-- pending changes --"
-# Per-row label for a staged (pending) key=value entry on a config-file page.
-# Clicking the row removes it from the cart. Placeholders: [key], [value].
+
+# 설정 파일 페이지의 스테이징된 (대기 중) key=value 항목에 대한 행 라벨.
+# 행을 클릭하면 카트에서 제거됩니다. 자리표시자: [key], [value].
 configPendingRowFormat: "&9[key]&8 = &0[value]"
-# Hover text shown when the viewer hovers a pending (staged) row on a
-# config-file page. No placeholders.
+
+# 보는 사람이 설정 파일 페이지의 대기 중 (스테이징된) 행 위에 마우스를 올렸을 때 표시되는 마우스 오버 텍스트. 자리표시자 없음.
 configPendingRowHover: "클릭하여 취소"
-# Clickable label for the "apply staged changes" row on a config-file page.
-# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
+
+# 설정 파일 페이지의 "스테이징된 변경 사항 적용" 행에 대한 클릭 가능한 라벨.
+# 조립된 /rtp config <file> k1=v1 ... 명령을 실행하고 카트를 비웁니다.
 configApplyRow: "&2&l[apply]"
-# Clickable label for the "discard staged changes" row on a config-file page.
-# Clears the cart without applying.
+
+# 설정 파일 페이지의 "스테이징된 변경 사항 취소" 행에 대한 클릭 가능한 라벨.
+# 적용하지 않고 카트를 비웁니다.
 configDiscardRow: "&c&l[discard]"
 
-# --- Map / chart rendering ---
-# Sent when a map row is clicked but map rendering is not available on this
-# server (e.g. the Lite assembly, or no map provider installed).
+# --- 맵 / 차트 렌더링 ---
+# 맵 행을 클릭했지만 이 서버에서 맵 렌더링을 사용할 수 없을 때 전송됩니다
+# (예: Lite 어셈블리이거나 맵 공급자가 설치되지 않은 경우).
 mapBindingMissing: "&c[P0] 이 서버에서는 맵 렌더링을 사용할 수 없습니다."
-# Sent when a chart is requested but no renderer is registered for that
-# chart type.
+
+# 차트가 요청되었지만 해당 차트 유형에 등록된 렌더러가 없을 때 전송됩니다.
 mapResolverMissing: "&c[P0] 이 요청에 등록된 차트 리졸버가 없습니다."
-# Sent when a resolver runs but the underlying data source is unavailable
-# for the requested target (unknown region, no data yet, world unloaded).
-# Placeholder: [region] - the requested region name (may be empty).
+
+# 리졸버가 실행되었지만 요청된 대상에 대한 기본 데이터 소스를 사용할 수 없을 때 전송됩니다
+# (알 수 없는 리전, 아직 데이터 없음, 월드 언로드됨).
+# 자리표시자: [region] - 요청된 리전 이름 (비어 있을 수 있음).
 mapUnavailable: "&e[P1] 현재 차트 데이터를 사용할 수 없습니다."
-# Sent when the map service cannot allocate a map right now (e.g. a
-# per-viewer cap has been reached).
+
+# 맵 서비스가 지금 맵을 할당할 수 없을 때 전송됩니다 (예: 뷰어당 한도에 도달함).
 mapBusy: "&e[P1] 맵 서비스가 사용 중입니다. 잠시 후 다시 시도하세요."
-# Label for the clickable "/rtp info" menu row that renders a heatmap of
-# the current region's known bad locations. Hidden when map rendering is
-# not available on this server.
+
+# 현재 리전의 알려진 부적합 위치의 히트맵을 렌더링하는 클릭 가능한 "/rtp info" 메뉴 행의 라벨.
+# 이 서버에서 맵 렌더링을 사용할 수 없는 경우 숨겨집니다.
 menuInfoBadPointsLabel: "#9D7CD8&l# 부적합 위치 맵"
 
-# --- MultiConfig submenu ---
-# Header row fallback used when no per-kind header key is registered.
-# Placeholder: [parserKind] - the raw multi-config kind name.
+# --- MultiConfig 하위 메뉴 ---
+# 종류별 헤더 키가 등록되지 않았을 때 사용되는 헤더 행 폴백.
+# 자리표시자: [parserKind] - 원시 다중 설정 종류 이름.
 multiconfigHeaderDefault: "#5FB3B3&l[parserKind]"
-# Header row label for the regions multi-config selector page. No placeholders.
+
+# 리전 다중 설정 선택기 페이지의 헤더 행 라벨. 자리표시자 없음.
 multiconfigHeaderRegions: "#5FB3B3&l 리전"
-# Header row label for the worlds multi-config selector page. No placeholders.
+
+# 월드 다중 설정 선택기 페이지의 헤더 행 라벨. 자리표시자 없음.
 multiconfigHeaderWorlds: "#5FB3B3&l 월드"
-# Toggle-row label when remove-mode is OFF. No placeholders.
+
+# 제거 모드가 OFF일 때의 토글 행 라벨. 자리표시자 없음.
 multiconfigToggleRemoveModeOff: "&8[ ] 제거 모드"
-# Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
+
+# 제거 모드가 ON일 때의 토글 행 라벨. 항목 행을 클릭하면 삭제됩니다.
 multiconfigToggleRemoveModeOn: "&c[x] 제거 모드 (항목을 클릭하여 삭제)"
-# Selector row label for the "+ Add new..." entry. No placeholders.
+
+# "+ 새로 추가..." 항목의 선택기 행 라벨. 자리표시자 없음.
 multiconfigRowAdd: "&2+ 새로 추가..."
-# Hover text for the Add row. Placeholder: [name] - prefilled default name.
+
+# 추가 행의 마우스 오버 텍스트. 자리표시자: [name] - 미리 채워진 기본 이름.
 multiconfigRowAddHover: "&7모루 프롬프트에 이름을 입력하세요. 미리 채워짐: &f[name]"
-# Hover text for an entry row in normal mode. Placeholder: [name].
+
+# 일반 모드에서 항목 행의 마우스 오버 텍스트. 자리표시자: [name].
 multiconfigRowEditHover: "&7&f[name] 편집"
-# Hover text for an entry row in remove-mode. Placeholder: [name].
+
+# 제거 모드에서 항목 행의 마우스 오버 텍스트. 자리표시자: [name].
 multiconfigRowRemoveHover: "&c&f[name] 삭제"
-# Confirm-delete page title row. Placeholder: [name].
+
+# 삭제 확인 페이지 제목 행. 자리표시자: [name].
 multiconfigConfirmTitle: "&c&l[name] 을(를) 삭제하시겠습니까?"
-# Confirm-delete page Yes-row label. No placeholders.
+
+# 삭제 확인 페이지 '예' 행 라벨. 자리표시자 없음.
 multiconfigConfirmYes: "&c&l[confirm delete]"
-# Confirm-delete page Cancel-row label. No placeholders.
+
+# 삭제 확인 페이지 '취소' 행 라벨. 자리표시자 없음.
 multiconfigConfirmNo: "&2&l[cancel]"
-# Hover text on a locked (grayed) default-region row. No placeholders.
+
+# 잠긴 (회색으로 표시된) 기본 리전 행의 마우스 오버 텍스트. 자리표시자 없음.
 multiconfigLockRegionDefault: "&7기본 리전은 제거할 수 없습니다"
-# Hover text on a locked (grayed) world row. Placeholder: [name].
+
+# 잠긴 (회색으로 표시된) 월드 행의 마우스 오버 텍스트. 자리표시자: [name].
 multiconfigLockWorldLoaded: "&7월드 '[name]' 이(가) 서버에 로드되어 있습니다. 설정을 제거하기 전에 언로드하세요"
-# Result message after a successful ADD. Placeholder: [name].
+
+# 성공적인 추가 후 결과 메시지. 자리표시자: [name].
 multiconfigResultAdded: "&a'[name]' 을(를) 추가했습니다."
-# Result message after a successful REMOVE. Placeholder: [name].
+
+# 성공적인 제거 후 결과 메시지. 자리표시자: [name].
 multiconfigResultRemoved: "&a'[name]' 을(를) 제거했습니다."
-# Result message when ADD failed. Placeholders: [name], [reason].
+
+# 추가 실패 시 결과 메시지. 자리표시자: [name], [reason].
 multiconfigResultAddFailed: "&c'[name]' 을(를) 추가할 수 없습니다: [reason]"
-# Result message when REMOVE failed. Placeholders: [name], [reason].
+
+# 제거 실패 시 결과 메시지. 자리표시자: [name], [reason].
 multiconfigResultRemoveFailed: "&c'[name]' 을(를) 제거할 수 없습니다: [reason]"
-# Result message when the proposed entry name is rejected by the sanitiser.
-# Placeholder: [name].
+
+# 제안된 항목 이름이 정제기에 의해 거부되었을 때의 결과 메시지.
+# 자리표시자: [name].
 multiconfigResultNameInvalid: "&c이름 '[name]' 은(는) 허용되지 않습니다. 문자, 숫자, '_', '-', '.' 를 사용하세요"
-# Result message when an ADD collides with an existing entry name.
-# Placeholder: [name].
+
+# 추가 시 기존 항목 이름과 충돌할 때의 결과 메시지.
+# 자리표시자: [name].
 multiconfigResultNameTaken: "&c'[name]' (이)라는 이름의 항목이 이미 존재합니다."
 
-# DO NOT TOUCH VERSION NUMBER
+# 버전 번호는 변경하지 마세요
 version: 1.0

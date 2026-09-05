@@ -5,6 +5,8 @@
 - **Supersedes**: —
 - **Related**: ADR-006 (async queue pre-generation), ADR-015 (stale-chunk guard / count-bound pipes), ADR-016 (anvil subsystem), ADR-023 (login reserve cache), `REQ-RTP-S-005` (no chunk loading on the main thread)
 
+> **Nomenclature note.** This ADR keeps its `L1` / `L2` / `L3` title and body as the historical record of the decision. The vocabulary itself is retired by [ADR-078](ADR-078-composable-cache-pipeline-stages.md) phase 2: production code, javadoc, and canonical documentation say **hot** (`keptLocations`), **cold** (`unkeptLocations`), and **backlog** (`backlogLocations`). Public config keys and database column names are unchanged.
+
 ## Context
 
 The plugin currently maintains two general-purpose location buffers per region:
@@ -253,3 +255,12 @@ change. Anticipated touch points:
   separately-managed third buffer in `RegionQueueManager`).
 - `REQ-RTP-S-005` — No chunk loading on the main thread.
 - `.junie/AGENTS.md` — Domain Analogies & Aliases table (L1/L2/L3 nicknames).
+
+## Amendment — Optional Memory Limits and Memory Cost Models
+
+Cap settings (`activeChunkCap`, `cacheCap`, `backlogCacheCap`) support memory limits as an alternate bounding expression alongside basic counts:
+- **Hot cache (`activeChunkCap`)**: Cost model is ~1 MiB per entry (active chunk ticket keeping the chunk loaded in memory). A limit of `64MiB` resolves to 64 chunks.
+- **Cold cache (`cacheCap`)**: Cost model is ~128 bytes per entry (pre-verified `RTPLocation` POJO). A limit of `1MiB` resolves to 8,192 entries.
+- **Backlog cache (`backlogCacheCap`)**: Cost model is ~128 bytes per entry (`BacklogEntry` candidate POJO). A limit of `2MiB` resolves to 16,384 entries.
+
+When a data size unit (e.g. `64MB`, `256KiB`, `1GiB`) is specified, capacity is derived from `floor(memoryBytes / bytesPerEntry)`. Numeric values without data size units fall back to basic count.

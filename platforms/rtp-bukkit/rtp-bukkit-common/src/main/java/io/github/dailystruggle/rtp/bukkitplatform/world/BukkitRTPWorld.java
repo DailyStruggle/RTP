@@ -40,19 +40,17 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         }
       };
 
+  public static @NotNull Set<String> defaultBiomes() {
+    Set<String> out = new java.util.HashSet<>();
+    for (Biome b : Biome.values()) {
+      out.add(b.name().toUpperCase());
+      out.add("minecraft:" + b.name().toLowerCase(java.util.Locale.ROOT));
+    }
+    return out;
+  }
+
   private static @NotNull Function<RTPWorld<?>, Set<String>> getBiomes =
-      (rtpWorld) -> {
-        // Emit both bare upper-cased enum names (`BADLANDS`) and the raw
-        // namespaced ids (`minecraft:badlands`); Brigadier tab-completion on
-        // modern Paper advertises the namespaced form, so /rtp's biome
-        // parameter validator must accept it as well.
-        Set<String> out = new java.util.HashSet<>();
-        for (Biome b : Biome.values()) {
-          out.add(b.name().toUpperCase());
-          out.add("minecraft:" + b.name().toLowerCase(java.util.Locale.ROOT));
-        }
-        return out;
-      };
+      (rtpWorld) -> defaultBiomes();
 
   private final UUID id;
   private final String name;
@@ -171,7 +169,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // a fallback used only before the region has observed its first candidate. The
     // scanner remains available in `rtp-anvil` as a diagnostic tool for admin commands.
     Set<String> pre = getBiomes.apply(world);
-    return (pre == null) ? new java.util.HashSet<>() : new java.util.HashSet<>(pre);
+    return (pre == null || pre.isEmpty()) ? defaultBiomes() : new java.util.HashSet<>(pre);
   }
 
   public void cacheChunk(int x, int z, org.bukkit.Chunk chunk) {

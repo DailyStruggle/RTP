@@ -128,14 +128,23 @@ public class RegionConfigLoader {
 
         boolean worldBorderOverride = getBoolean(resolveScalar(regionParser, RegionKeys.worldBorderOverride, false));
         boolean requirePermission = getBoolean(resolveScalar(regionParser, RegionKeys.requirePermission, false));
-        long cacheCap = getNumber(resolveScalar(regionParser, RegionKeys.cacheCap, 10L)).longValue();
-        long backlogCacheCap = getNumber(resolveScalar(regionParser, RegionKeys.backlogCacheCap, 0L)).longValue();
+        long cacheCap = io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.resolveCapacity(
+                resolveScalar(regionParser, RegionKeys.cacheCap, 10L),
+                10L,
+                io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.COLD_CACHE_BYTES_PER_ENTRY);
+        long backlogCacheCap = io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.resolveCapacity(
+                resolveScalar(regionParser, RegionKeys.backlogCacheCap, 0L),
+                0L,
+                io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.BACKLOG_CACHE_BYTES_PER_ENTRY);
         long networkReserveSize = getNumber(resolveScalar(regionParser, RegionKeys.networkReserveSize, 0L)).longValue();
-        int activeChunkCap = getNumber(resolveScalar(regionParser, RegionKeys.activeChunkCap, 3)).intValue();
+        int activeChunkCap = io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.resolveCapacityInt(
+                resolveScalar(regionParser, RegionKeys.activeChunkCap, 3),
+                3,
+                io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.HOT_CACHE_BYTES_PER_ENTRY);
         double price = getNumber(resolveScalar(regionParser, RegionKeys.price, 0.0)).doubleValue();
         long spatialResolution = getNumber(resolveScalar(regionParser, RegionKeys.spatialResolution, 1L)).longValue();
 
-        if (shape != null && shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = spatialResolution;
+        if (shape != null && shape instanceof MemoryShape<?> memoryShape) memoryShape.setSpatialResolution(spatialResolution);
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
 
         if (shape instanceof MemoryShape<?> && world != null) {
@@ -145,6 +154,16 @@ public class RegionConfigLoader {
         }
         // If world is null here, the region is dormant; the MemoryShape (if any) is loaded
         // later via OnWorldLoadUnload -> RegionConfigLoader.load(...) at rebind time.
+
+        // Auto-interpret dimensionless shape parameters vs world border
+        if (!worldBorderOverride) {
+            io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor.autoInterpretShape(
+                name, world, shape);
+        }
+
+        // Audit world border vs configured shape bounds
+        io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor.checkRegionWorldBorder(
+            name, world, shape, worldBorderOverride);
 
         return new RegionSettings(
                 name,
@@ -256,6 +275,10 @@ public class RegionConfigLoader {
         try {
             return Double.parseDouble(o.toString());
         } catch (NumberFormatException e) {
+            long parsedSize = io.github.dailystruggle.rtp.common.selection.region.util.DataSizeParser.parseBytes(o, Long.MIN_VALUE);
+            if (parsedSize != Long.MIN_VALUE) {
+                return parsedSize;
+            }
             return 0;
         }
     }

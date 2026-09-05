@@ -92,7 +92,7 @@ encolarPostTeletransporte: false
 # @default: true
 verificarEnCargaChunk: true
 
-# Fracción de la capacidad del backlog L3 a la que se reanuda el llenado (histéresis).
+# Fracción de la capacidad del backlog a la que se reanuda el llenado (histéresis).
 # 0.5 = rellenar tras vaciarse al 50%; 1.0 = rellenar continuamente.
 # @type: number
 # @range: [0.0, 1.0]
@@ -193,5 +193,6 @@ prefabricado:
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
+
 # NO TOQUES EL NÚMERO DE VERSIÓN
 version: 1.0

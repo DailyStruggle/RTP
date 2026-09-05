@@ -48,13 +48,56 @@ The `shape` block defines the horizontal area where players can land.
 
 ### Region Size: `radius` and `centerRadius`
 
-**Every distance in the `shape` block is measured in chunks, not blocks.** A chunk is 16x16 blocks, so multiply by 16 to get blocks. This is the single most common configuration mistake: `radius: 5000` is not a 5,000-block region, it is an 80,000-block one.
+**By default, numeric distances in the `shape` block are measured in chunks (1 chunk = 16 blocks).**
+However, RTP supports **spatial unit suffixes** on any distance parameter, as well as automatic interpretation of ambiguous numbers and world-border overflow checking.
 
-| Key | Meaning | In blocks |
+#### Spatial Unit Suffixes
+
+You can explicitly specify distance units in config files or command parameters:
+
+- **Minecraft Native Units:**
+  - `c`, `chunk`, `chunks`: Chunks (1 chunk = 16 blocks). E.g. `radius: 256c` (4,096 blocks).
+  - `b`, `block`, `blocks`: Minecraft blocks (1 block = 1 meter). E.g. `radius: 4096b` (256 chunks).
+  - `nb`, `netherblock`, `netherblocks`: Nether coordinate blocks (8 Overworld blocks). E.g. `radius: 500nb` (4,000 blocks).
+  - `r`, `region`, `regions`: Anvil / Linear region files (1 region = 32 chunks = 512 blocks). E.g. `radius: 4r` (128 chunks = 2,048 blocks).
+- **Metric Units (1 block = 1 meter):**
+  - `m`, `meter`, `meters`, `metre`, `metres`: Meters (1 meter = 1 block). E.g. `radius: 5000m`.
+  - `km`, `k`, `kilo`, `kilos`, `kilometer`, `kilometers`, `kilometre`, `kilometres`: Kilometers. E.g. `radius: 5km` (5,000 blocks = 312.5 chunks).
+- **Imperial & Survey Units:**
+  - `mi`, `mile`, `miles`: Statute miles (1,609.344 blocks). E.g. `radius: 3mi`.
+  - `yd`, `yard`, `yards`: Yards (0.9144 blocks).
+  - `ft`, `foot`, `feet`, `'`: Feet (0.3048 blocks). E.g. `radius: 1000ft` or `radius: 1000'`.
+  - `in`, `inch`, `inches`, `"`: Inches (0.0254 blocks).
+  - `nmi`, `nm`, `nauticalmile`, `nauticalmiles`: Nautical miles (1,852 blocks).
+  - `furlong`, `furlongs` (201.168 blocks), `chain`, `chains` (20.1168 blocks), `rod`, `rods`, `pole`, `perch` (5.0292 blocks).
+- **Easter Egg Units:**
+  - `smoot`, `smoots`: Smoots (1.7018 blocks).
+  - `fathom`, `fathoms`: Fathoms (1.8288 blocks).
+  - `league`, `leagues`: Leagues (~4,828.032 blocks).
+  - `cubit`, `cubits`: Royal Cubits (0.4572 blocks).
+  - `au`, `aus`, `astronomicalunit`: Astronomical Units (149,597,870,700 blocks).
+  - `ly`, `lightyear`, `lightyears`: Light-years.
+  - `pc`, `parsec`, `parsecs`: Parsecs.
+
+*Note: Group-placement sub-regions (`SubspaceShape`) use unitless lattice cell coordinates and do not use spatial units.*
+
+#### Auto-Interpretation of Dimensionless Numbers
+
+If you omit the unit suffix and provide a plain number (e.g. `radius: 16` or `radius: 5000`):
+- Plain numbers historically defaulted to chunks.
+- If a value is unusually small (e.g. `4`, `8`, or `16`), treating it as single blocks would yield an area barely 1 chunk wide. RTP detects this against the world border and auto-interprets it as chunks or regions, outputting an informative log notice explaining the conversion and how to make it explicit with `c` or `b`.
+- If a value is unusually large (e.g. `5000`) and interpreting it as chunks would overshoot the world border or world limits, RTP auto-interprets it as blocks.
+
+#### World Border Overflow Warning & Chunk Snapping
+
+- **Border Overflow Audit:** On startup and reload, RTP audits configured region extents against the world border (`/worldborder`). If a region's outer radius extends beyond the border, RTP logs a warning alerting operators so selection attempts are not wasted on unreachable coordinates outside the border.
+- **Chunk-Inscribed Bounding:** To guarantee that all blocks within selectable chunks stay strictly within bounds (and never leak past a block radius or world border), chunk inscription scales block radii down to the largest whole chunk grid completely contained within the boundary (`(R - 15) / 16`).
+
+| Key | Meaning | In blocks (default chunk units) |
 |---|---|---|
-| `radius` | **Outer** bound. Players never land farther than this from the center. | `radius x 16` |
-| `centerRadius` | **Inner** bound (the donut hole). Players never land closer than this to the center. `0` means the center itself is fair game. | `centerRadius x 16` |
-| `centerX` / `centerZ` | Center of the region, in chunk coordinates. `0, 0` is the chunk containing blocks `0..15`. | `centerX x 16` |
+| `radius` | **Outer** bound. Players never land farther than this from the center. Supports suffixes (e.g. `4096b`, `256c`, `4r`, `5km`). | `radius x 16` (if no suffix) |
+| `centerRadius` | **Inner** bound (donut hole). Players never land closer than this to the center. Supports suffixes (e.g. `1000b`, `64c`). | `centerRadius x 16` (if no suffix) |
+| `centerX` / `centerZ` | Center of the region in chunks (or with explicit unit suffixes). | `centerX x 16` (if no suffix) |
 
 Handy conversions:
 
@@ -71,7 +114,7 @@ Rules and gotchas:
 - `centerRadius` must be **smaller** than `radius`. If the two are equal, or `centerRadius` is larger, there is no band left to pick from and the region cannot produce locations.
 - The pickable band is `radius - centerRadius` chunks wide. Raising `centerRadius` to push players away from spawn without raising `radius` shrinks the usable land, so raise both together.
 - Total selectable area is roughly `pi x (radius^2 - centerRadius^2)` chunks for `CIRCLE`, and `(2 x radius)^2 - (2 x centerRadius)^2` chunks for `SQUARE`.
-- Radius is **not** clamped to the vanilla world border unless you ask for it. A `radius` that reaches past the border wastes selection attempts on unreachable land; either shrink it or set `worldBorderOverride: true`.
+- Radius is **not** clamped to the vanilla world border unless you ask for it. A `radius` that reaches past the border triggers a startup/reload audit warning and wastes selection attempts on unreachable land; either shrink it, use chunk-inscribed bounding, or set `worldBorderOverride: true`.
 - `worldBorderOverride: true` **replaces the whole `shape` block** with a square derived from the world's `/worldborder` (chunk radius = border size / 32). Your `radius`, `centerRadius`, `centerX`, and `centerZ` are ignored while it is on.
 - Large radii cost pre-calculation time, not memory: see *Massive Radii* under [Tips for Customization](#tips-for-customization) and the *Backlog Cache (L3)* section below.
 
@@ -171,7 +214,7 @@ The backlog cache (controlled by `backlogCacheCap`) is an optional **unverified*
 ### How it works
 
 - The spiral selector drops unverified candidates straight into the backlog — **no chunk load, no database write**.
-- Each region tick pulses the backlog: the oldest unverified entry is picked, the `.mca` file (32×32 chunk bin) it falls in is identified, and *every* unverified entry that shares that bin is classified in one pass via the anvil pre-filter. This amortises the per-bin cost over many candidates.
+- Each region tick pulses the backlog: the oldest unverified entry is picked, the region file (32×32 chunk bin: `.mca` Anvil or `.linear` Linear) it falls in is identified, and *every* unverified entry that shares that bin is classified in one pass via the region pre-filter. This amortises the per-bin cost over many candidates.
 - Entries are promoted into the verified queue **in insertion order**. An unverified head blocks promotion; an invalidated head is dropped silently and the next entry is considered. This preserves spiral order without stalling on failed candidates.
 - The backlog is **not** persisted across restarts by design — entries are re-selected fresh on startup, so the cost of dropping them is bounded.
 

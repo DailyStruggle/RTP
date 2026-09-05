@@ -160,6 +160,95 @@ class BiomeWeightedDrawTest {
     assertEquals(4242L, PregenTask.drawWeightedBiome(perBiome));
   }
 
+  // --- prefix-sum draw: same distribution as the widths form, without the per-draw scan ---
+
+  /** Prefix sums of {@code widths}, i.e. the form {@code MemoryShape} already stores. */
+  private static long[] prefix(long[] widths) {
+    long[] sums = new long[widths.length];
+    long acc = 0L;
+    for (int k = 0; k < widths.length; k++) {
+      acc += widths[k];
+      sums[k] = acc;
+    }
+    return sums;
+  }
+
+  @Test
+  @DisplayName("prefix-sum draw is width-proportional and covers every run")
+  void prefixSumDrawMatchesWidthWeighting() {
+    // Three runs of width 1, 4 and 5 -> expected shares 0.1 / 0.4 / 0.5.
+    long[] keys = {0L, 100L, 200L};
+    long[] widths = {1L, 4L, 5L};
+    long[][] perBiomeKeys = {keys};
+    long[][] perBiomeSums = {prefix(widths)};
+
+    int trials = 60_000;
+    int[] hits = new int[3];
+    for (int t = 0; t < trials; t++) {
+      long l = PregenTask.drawWeightedBiome(perBiomeKeys, perBiomeSums, 1, null);
+      if (l >= 200L) {
+        assertTrue(l < 205L, "draw must stay inside its run, was " + l);
+        hits[2]++;
+      } else if (l >= 100L) {
+        assertTrue(l < 104L, "draw must stay inside its run, was " + l);
+        hits[1]++;
+      } else {
+        assertTrue(l < 1L, "draw must stay inside its run, was " + l);
+        hits[0]++;
+      }
+    }
+    assertTrue(Math.abs(hits[0] / (double) trials - 0.1) < 0.02, "run 0 share " + hits[0]);
+    assertTrue(Math.abs(hits[1] / (double) trials - 0.4) < 0.02, "run 1 share " + hits[1]);
+    assertTrue(Math.abs(hits[2] / (double) trials - 0.5) < 0.02, "run 2 share " + hits[2]);
+  }
+
+  @Test
+  @DisplayName("prefix-sum draw skips zero-width runs but still resolves an all-zero table")
+  void prefixSumDrawHandlesZeroWidthRuns() {
+    // Zero-width runs make the prefix sums non-strictly increasing; a draw must never land on
+    // one while a positive-width run exists.
+    long[] keys = {0L, 10L, 20L, 30L};
+    long[] widths = {0L, 0L, 3L, 0L};
+    long[][] perBiomeKeys = {keys};
+    long[][] perBiomeSums = {prefix(widths)};
+    for (int t = 0; t < 5_000; t++) {
+      long l = PregenTask.drawWeightedBiome(perBiomeKeys, perBiomeSums, 1, null);
+      assertTrue(l >= 20L && l < 23L, "must land in the only non-empty run, was " + l);
+    }
+
+    // All-zero widths: degenerate fallback resolves to a run key.
+    long[] zeroKeys = {4242L};
+    long[][] zk = {zeroKeys};
+    long[][] zs = {prefix(new long[] {0L})};
+    assertEquals(4242L, PregenTask.drawWeightedBiome(zk, zs, 1, null));
+  }
+
+  @Test
+  @DisplayName("prefix-sum draw honours per-biome weights over a partially-filled table")
+  void prefixSumDrawUsesCountNotArrayLength() {
+    // The gather over-allocates to the requested-biome count and reports how many slots are
+    // populated, so the draw must read only the first `count` entries.
+    long[][] perBiomeKeys = new long[4][];
+    long[][] perBiomeSums = new long[4][];
+    perBiomeKeys[0] = new long[] {0L};
+    perBiomeSums[0] = prefix(new long[] {1L});
+    perBiomeKeys[1] = new long[] {1_000_000L};
+    perBiomeSums[1] = prefix(new long[] {1L});
+    double[] weights = {1.0d, 3.0d, 0.0d, 0.0d};
+
+    int trials = 20_000;
+    int b = 0;
+    for (int t = 0; t < trials; t++) {
+      if (PregenTask.drawWeightedBiome(perBiomeKeys, perBiomeSums, 2, weights) >= 1_000_000L) {
+        b++;
+      }
+    }
+    double bFraction = b / (double) trials;
+    assertTrue(
+        bFraction > 0.70 && bFraction < 0.80,
+        "weight-3 biome should be picked ~0.75 of the time, was " + bFraction);
+  }
+
   // --- ADR-062: gray-space deferral / exploration probability ---
 
   @Test

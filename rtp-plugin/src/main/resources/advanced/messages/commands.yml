@@ -17,8 +17,10 @@ scanPause: "#A020F0[P0] scan task paused for regions: [scan_regions]"
 scanResume: "#10A5F5[P0] scan task resumed for regions: [scan_regions]"
 scanRunning: "&c[P0] scan task already running for regions: [scan_regions]"
 scanNotRunning: "&c[P0] scan task not running for regions: [scan_regions]"
+
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 land &8| &7ETA #7E9CC8[scan_eta]"
+
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # The bar's color is taken from the first legacy color code in this value:
@@ -38,39 +40,52 @@ infoMSPT: "&7Current Plugin MSPT: #7E9CC8[mspt]"
 infoTotalLoads: "&7Lifetime Chunks Loaded: #7E9CC8[loads]"
 infoLoadsByOrigin: "&7Loads by Origin: #7E9CC8[loadsByOrigin]"
 infoLeakRate: "&7Current Chunk Leak Rate: #7E9CC8[leakRate]"
+
 # --- Health metrics block ---
 infoQueueDepth: "&7Players Waiting In Region Queues: #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7Pending Teleport Pipelines: #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7Avg Pipeline Latency: #7E9CC8[avgPipelineMs] ms"
+
 # Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Pipeline Latency (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
+
 # Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Slow Teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
+
 # Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Queue-Growth Warnings (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7JVM Heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
+
 # Header line for the Health pipeline labelled block in /rtp info.
 infoHealthPipelineHeader: "&7--- Health: pipeline ---"
+
 # TPS readout for the 1m / 5m / 15m windows. Placeholders: [tps1m] [tps5m] [tps15m].
 infoTps: "&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
+
 # Live server MSPT and tick-budget utilisation. Placeholders: [mspt] [tickBudgetUtilisation].
 infoMSPTLive: "&7Server MSPT: #7E9CC8[mspt] ms (&7tick budget: #7E9CC8[tickBudgetUtilisation]&7)"
+
 # Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
 infoSoftCap: "&7Players: #7E9CC8[playerCount] / [softCap]"
+
 # Most recent database round-trip latency in ms. Placeholder: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7Database Latency: #7E9CC8[databaseLatencyMs] ms"
+
 # Generation outcome metrics.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Generation Success: #7E9CC8[genSuccessRate]&7 (fail #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
+
 # Single most common rejection cause and its share of all failures. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Top Rejection Cause: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
+
 # Per-cause rejection breakdown.
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Rejections by Cause: #7E9CC8[genFailureBreakdown]"
+
 # Health colour-band thresholds. Used to colour the coloured-variant
 # placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoThresholdTpsGreen: 19.5
@@ -80,8 +95,10 @@ infoThresholdMsptYellow: 45.0
 infoThresholdCacheFillGreen: 0.5
 infoThresholdCacheFillYellow: 0.25
 infoThresholdNetworkAgeYellow: 5.0
+
 # Header line introducing the per-Folia-region table (Folia runtime only).
 infoFoliaRegionsHeader: "&7--- Folia regions ---"
+
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
 infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
@@ -93,12 +110,15 @@ infoWorld: "  #21ADA8[world]"
 infoRegionHeader: "#63C5DARegions:"
 infoConsoleRegionHeader: "&7--- Regions ---"
 infoRegion: "  #52B2BF[region]"
+
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
 infoBiomeActivityHeader: "&8--- &3Biome occupancy &8(&3[biomeTotalSamples]&8 samples, &3[biomeDistinctCount]&8 biomes) ---"
+
 # Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
 infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
+
 # Shown when no occupancy has been sampled yet.
 infoBiomeActivityEmpty: "&8--- &7no biome occupancy sampled yet &8---"
 
@@ -118,9 +138,9 @@ regionInfo:
   - "#58CCED  - requirePermission: [requirePermission]"
   - "#58CCED  - worldBorderOverride: [worldBorderOverride]"
   - "#58CCED  - cacheCap: [cacheCap]"
-  - "#58CCED  - keptCache (L1): [keptCache]"
-  - "#58CCED  - unkeptCache (L2): [unkeptCache]"
-  - "#58CCED  - backlogCache (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - keptCache (hot): [keptCache]"
+  - "#58CCED  - unkeptCache (cold): [unkeptCache]"
+  - "#58CCED  - backlogCache (backlog): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - cached: [cached]"
   - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
   - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
@@ -131,65 +151,84 @@ regionInfo:
 # Sent when a /rtp menu command is malformed, points at an unknown
 # path/parameter, or fails its permission check.
 menuInvalid: "&c[P0] that menu command is invalid."
+
 # Sent when a menu command cannot resolve the calling player UUID.
 menuUnknownPlayer: "&c[P0] menu commands can only be used by in-game players."
+
 # Hover-fallback template used by the menu reflector when no YAML block-comment
 # is available for a parameter. Placeholder: [type] - the declared parameter type.
 menuHoverFallbackType: "type: [type]"
+
 # Hover-fallback template used by the menu reflector when a parameter exposes a
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
 menuHoverFallbackBounds: "accepted: [values]"
+
 # Label for the "go back one level" navigation row prepended to every non-root menu page.
 menuBack: "&7« back"
+
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
 menuExecute: "&2▶ run [command]"
+
 # Header row at the top of a parameter-value picker sub-page.
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 menuPickValue: "&7pick a value for [param] (will run: /rtp [command] [param]:<value>)"
+
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
 menuTypeValue: "&7✎ type a custom value..."
+
 # Non-clickable header row at the top of every non-root menu page.
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
 menuConstructed: "&7building: #7E9CC8/rtp [command]"
+
 # Non-clickable title row prepended to the root /rtp menu page.
 # Provides a welcoming header before the player descends into any subcommand.
 menuRootTitle: "#5FB3B3&l⚡ RTP menu"
+
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
 # menuRootTitle. Short orientation text for first-time users.
 menuRootHint: "&7click an option below to begin"
+
 # Navigation rows appended to paginated menu pages - clicking them moves
 # to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
 menuPagePrev: "&7« previous page ([page])"
 menuPageNext: "&7next page ([page]) »"
+
 # Section divider on the front page above teleport rows (player view).
 menuFrontPageSectionTeleport: "&8» #3E6B45 teleport"
+
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "#1B7A33🎲 teleport &7- /rtp"
 menuFrontPageRowRegion: "#1F6FB2🌍 pick a region &7- /rtp region:..."
 menuFrontPageRowWorld: "#1F6FB2🌐 pick a world &7- /rtp world:..."
 menuFrontPageRowBiome: "#1F8A40🌳 pick a biome &7- /rtp biome:..."
 menuFrontPageRowHelp: "#7A4FB8❓ list commands &7- /rtp help"
+
 # Front-page admin entry row: the only inline admin-visible row on the
 # front page; click descends into the admin panel. Hidden when the viewer
 # lacks rtp.menu.admin.
 menuFrontPageRowAdmin: "#9D7CD8▶ admin panel &7- operator tools"
+
 # Hover text for the admin-panel entry row. No placeholders.
 menuFrontPageHoverAdmin: "&7operator tools: config, scans, diagnostics, reload"
+
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
 menuAdminPanelTitle: "#9D7CD8&l⚙ admin panel"
+
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7click an option below"
+
 # Section dividers on the admin panel. No placeholders.
 menuAdminPanelSectionConfig: "&8» &7configuration"
 menuAdminPanelSectionDiagnostics: "&8» &7diagnostics"
 menuAdminPanelSectionLifecycle: "&8» &7lifecycle"
 menuAdminPanelSectionBrowse: "&8» &7browse"
+
 # Admin-panel rows + hovers. No placeholders.
 menuAdminPanelRowConfig: "#5FB3B3▶ config editor"
 menuAdminPanelHoverConfig: "&7open the curated config selector"
@@ -212,112 +251,153 @@ menuAdminPanelHoverReload: "&7reloads all config files; in-flight teleports may 
 menuAdminPanelRowBrowse: "#5FB3B3▶ browse all commands"
 menuAdminPanelHoverBrowse: "&7open the reflected /rtp command tree"
 menuAdminPanelRowBack: "&7« back"
+
 # --- Visualizations submenu (admin map of bad locations per region) ---
 # Admin-panel row: open the Visualizations submenu. No placeholders.
 menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
+
 # Hover text for the admin-panel Visualizations row. No placeholders.
 menuAdminPanelHoverVisualizations: "&7open maps and other operator-facing visualizations"
+
 # Section divider above the Visualizations block on the admin panel.
 menuAdminPanelSectionVisualizations: "&8» &7visualizations"
+
 # Non-clickable title row at the top of the Visualizations submenu.
 menuVisualizationsTitle: "#9D7CD8&l⌖ visualizations"
+
 # Non-clickable hint row below the title.
 menuVisualizationsHint: "&7pick a region to view its bad-locations map"
+
 # Visualizations row template; [region] - region name.
 menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
+
 # Hover text for a Visualizations region row; [region] - region name.
 menuVisualizationsHoverRegion: "&7open a map showing bad locations in &b[region]"
+
 # Non-clickable hint row shown when no regions are configured.
 menuVisualizationsEmpty: "&7(no regions configured)"
+
 # Visualizations submenu back row (returns to the admin panel).
 menuVisualizationsRowBack: "&7« back"
+
 # --- Admin panel Setup section: curated prefabs ---
 # Section divider above the Setup (quick start) block on the admin panel.
 menuAdminPanelSectionSetup: "&8» &7setup (quick start)"
+
 # Setup row + hover: survival-default identity overlay (reset to shipped defaults).
 menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
 menuPrefabSurvivalDefaultHover: "&7reset to the shipped defaults (identity overlay)"
+
 # Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
 menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
 menuPrefabLowPerformanceHover: "&7underpowered hosts / shared-CPU VPSes: longer pulse, smaller caches, login cache off"
+
 # Setup row + hover: high-performance (short pulse, large caches, login cache on).
 menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
 menuPrefabHighPerformanceHover: "&7dedicated hardware / large player counts: short pulse, large caches, login cache on"
+
 # Setup row + hover: folia-tuned (regional scheduler tuning).
 menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
 menuPrefabFoliaTunedHover: "&7folia regional scheduler: faster per-region pulses, fewer concurrent chunk tickets"
+
 # Setup row + hover: multi-world (one region per world from current default).
 menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
 menuPrefabMultiWorldHover: "&7synthesise one region per world from the current default"
+
 # Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
 menuPrefabConfirmTitle: "#9D7CD8&l⚙ confirm prefab: #5FB3B3[prefab]"
+
 # Confirmation menu non-clickable hint row below the title. No placeholders.
 menuPrefabConfirmHint: "&7review the changes below, then click confirm or cancel"
+
 # Confirmation menu footer row: confirm and write the prefab to disk.
 menuPrefabConfirmRow: "&2&l[confirm]"
+
 # Confirmation menu footer row: cancel and return to the admin panel.
 menuPrefabCancelRow: "&c&l[cancel]"
+
 # Clickable row label for the Refresh affordance at the bottom of the /rtp info
 # book. Re-renders the current scope against a fresh metrics snapshot.
 infoBookRefreshRow: "&2[Refresh]"
+
 # Hover text for the info-book refresh row.
 infoBookRefreshHover: "&7Re-render this page against a fresh metrics snapshot."
+
 # Clickable row label for the Switch-to-chat affordance at the bottom of the
 # /rtp info book. Re-runs the same scope through the legacy chat path.
 infoBookSwitchToTextRow: "&7[Switch to chat]"
+
 # Hover text for the info-book switch-to-chat row.
 infoBookSwitchToTextHover: "&7Re-run /rtp info in chat instead of the book."
+
 # Footer row rendered when the /rtp info book content exceeds the book page
 # cap. Clicking re-runs the same scope in chat mode so no data is lost.
 infoBookOverflowFooter: "&7(content truncated - click to view full output in chat)"
+
 # Non-clickable note row indicating that periodic auto-refresh for the info
 # book is not currently supported on this build (deferred to a later
 # milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(auto-refresh not yet supported; click Refresh to update)"
+
 # Non-clickable title row at the top of the config-file selector page.
 # Shown when an admin clicks "/rtp config" from the front page.
 configSelectorTitle: "#5FB3B3&l⚙ config files"
+
 # Label for the "back to /rtp menu root" navigation row on the config selector page.
 configSelectorBackRow: "&7« back to menu"
+
 # Non-clickable title row at the top of a single config-file page.
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
 configFileTitle: "#5FB3B3&l⚙ config: #9D7CD8[file]"
+
 # Label for the "back to config selector" navigation row on a single config-file page.
 configFileBackRow: "&7« back to config files"
+
 # Non-clickable hint row shown when a config file has no editable keys.
 configFileEmptyHint: "&7(no editable keys in this file)"
+
 # Per-key row label on a config-file page. Placeholders:
 #   [key]   - the config key name; [value] - the currently-stored value.
 configKeyRowFormat: "#7E9CC8[key]&7: #B084DC[value]"
+
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
 configKeyHoverFormat: "&7click to edit #7E9CC8[key] &7(type: [type])"
+
 # Non-clickable title row at the top of a shape/vert type-picker page.
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
 configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: #9D7CD8[current]&7)"
+
 # Non-clickable title row at the top of a shape/vert sub-parameter page.
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
 configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- #9D7CD8[type] &7sub-parameters"
+
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] book view unavailable; falling back to raw dump."
+
 # Placeholder text rendered in place of a config value that has not been set.
 configValueUnsetPlaceholder: "&8(unset)"
+
 # Non-clickable header row separating the "Changeable" list from the "Pending"
 # staging-cart list on a config-file page when the viewer has staged one or
 # more uncommitted edits. No placeholders. Avoid yellow (&e/&6) and white
 # (&f): book parchment renders them washed out.
 configPendingHeader: "&1&l-- pending --"
+
 # Per-row label for a staged (pending) key=value entry on a config-file page.
 # Clicking the row removes it from the cart. Placeholders: [key], [value].
 # Avoid yellow/white on book parchment.
 configPendingRowFormat: "&9[key]&8 = &0[value]"
+
 # Hover text shown when the viewer hovers a pending (staged) row on a
 # config-file page. No placeholders.
 configPendingRowHover: "click to unstage"
+
 # Clickable label for the "apply staged changes" row on a config-file page.
 # Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
 configApplyRow: "&2&l[apply]"
+
 # Clickable label for the "discard staged changes" row on a config-file page.
 # Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
@@ -326,16 +406,20 @@ configDiscardRow: "&c&l[discard]"
 # Sent when a map row is clicked but map rendering is not available on this
 # server (e.g. the Lite assembly, or no map provider installed).
 mapBindingMissing: "&c[P0] map rendering is not available on this server."
+
 # Sent when a chart is requested but no renderer is registered for that
 # chart type.
 mapResolverMissing: "&c[P0] no chart resolver registered for this request."
+
 # Sent when chart data is unavailable for the requested target (unknown
 # region, no data yet, world unloaded).
 # Placeholder: [region] - the requested region name (may be empty).
 mapUnavailable: "&e[P1] chart data is not available right now."
+
 # Sent when the map service cannot allocate a map right now (e.g. a
 # per-viewer cap has been reached).
 mapBusy: "&e[P1] the map service is busy; please try again shortly."
+
 # Label for the clickable "/rtp info" menu row that renders a heatmap of
 # the current region's known bad locations. Hidden when map rendering is
 # not available on this server.
@@ -345,43 +429,62 @@ menuInfoBadPointsLabel: "#9D7CD8&l# bad-points map"
 # Header row fallback used when no per-kind header key is registered.
 # Placeholder: [parserKind] - the raw multi-config kind name.
 multiconfigHeaderDefault: "#5FB3B3&l[parserKind]"
+
 # Header row label for the regions multi-config selector page. No placeholders.
 multiconfigHeaderRegions: "#5FB3B3&l regions"
+
 # Header row label for the worlds multi-config selector page. No placeholders.
 multiconfigHeaderWorlds: "#5FB3B3&l worlds"
+
 # Toggle-row label when remove-mode is OFF. No placeholders.
 multiconfigToggleRemoveModeOff: "&8[ ] remove mode"
+
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] remove mode (click an entry to delete)"
+
 # Selector row label for the "+ Add new..." entry. No placeholders.
 multiconfigRowAdd: "&2+ add new..."
+
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7type a name in the anvil prompt; prefilled: &f[name]"
+
 # Hover text for an entry row in normal mode. Placeholder: [name].
 multiconfigRowEditHover: "&7edit &f[name]"
+
 # Hover text for an entry row in remove-mode. Placeholder: [name].
 multiconfigRowRemoveHover: "&cdelete &f[name]"
+
 # Confirm-delete page title row. Placeholder: [name].
 multiconfigConfirmTitle: "&c&ldelete [name]?"
+
 # Confirm-delete page Yes-row label. No placeholders.
 multiconfigConfirmYes: "&c&l[confirm delete]"
+
 # Confirm-delete page Cancel-row label. No placeholders.
 multiconfigConfirmNo: "&2&l[cancel]"
+
 # Hover text on a locked (grayed) default-region row. No placeholders.
 multiconfigLockRegionDefault: "&7the default region cannot be removed"
+
 # Hover text on a locked (grayed) world row. Placeholder: [name].
 multiconfigLockWorldLoaded: "&7world '[name]' is loaded on the server; unload it before removing its config"
+
 # Result message after a successful ADD. Placeholder: [name].
 multiconfigResultAdded: "&aadded '[name]'."
+
 # Result message after a successful REMOVE. Placeholder: [name].
 multiconfigResultRemoved: "&aremoved '[name]'."
+
 # Result message when ADD failed. Placeholders: [name], [reason].
 multiconfigResultAddFailed: "&ccould not add '[name]': [reason]"
+
 # Result message when REMOVE failed. Placeholders: [name], [reason].
 multiconfigResultRemoveFailed: "&ccould not remove '[name]': [reason]"
+
 # Result message when the proposed entry name is rejected by the sanitiser.
 # Placeholder: [name].
 multiconfigResultNameInvalid: "&cname '[name]' is not allowed; use letters, digits, '_', '-', '.'"
+
 # Result message when an ADD collides with an existing entry name.
 # Placeholder: [name].
 multiconfigResultNameTaken: "&can entry named '[name]' already exists."

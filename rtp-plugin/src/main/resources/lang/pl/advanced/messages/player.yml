@@ -25,7 +25,7 @@ niebezpieczny: "&7[P0] ⌖ nie udało się znaleźć bezpiecznego miejsca w cią
 # zmienna: [remainingCooldown] - pozostały czas
 wiadomoscOdnowienia: "&7[P0] ⚡ Nie możesz teleportować się ponownie przez [remainingCooldown]"
 
-# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+# gdy gracz osiagnol limit lockAfterUses i jest zablokowany (zgodnosc z BetterRTP LockAfter)
 lockedAfterUses: "&7[P0] ⌖ Osiągnąłeś limit losowych teleportacji. Spróbuj ponownie za [remainingLockTime]."
 
 # gdy region nie ma żadnych lokalizacji w kolejce, a gracz nie posiada uprawnienia rtp.unqueued
@@ -63,7 +63,7 @@ komendaKonsoliNiedozwolona: "&c[P0] Musisz być graczem w grze, aby wykonać to 
 # wtyczka jest zajeta przeladowywaniem
 zajety: "&c[P0] zajęty"
 
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+# Wysylane, gdy opcjonalne sprawdzanie walki PvP odrzuca /rtp, poniewaz gracz walczy
 pvpInCombat: "&c[P0] Nie możesz losowo się teleportować podczas walki."
 
 # wtyczka nie ma podkomendy lub parametru zadanego przez uzytkownika
@@ -94,7 +94,7 @@ testOpis: "testuj funkcje RTP"
 # ###############################################################################
 # symbole statusu dla graczy
 GRACZ_DOSTEPNY: "&aDOSTĘPNY"
-GRACZ_ODNOWIENIE: "&7ON COOLDOWN"
+GRACZ_ODNOWIENIE: "&7ODNOWIENIE"
 GRACZ_KONFIGURACJA: "&bWYBIERANIE LOKALIZACJI"
 GRACZ_LADOWANIE: "&bWCZYTYWANIE CHUNKÓW"
 GRACZ_TELEPORTACJA: "&bTELEPORTACJA"
@@ -111,7 +111,7 @@ pojawienie: 20
 pozostanie: 20
 zanik: 20
 
-# actionbar setting
+# ustawienia paska akcji (actionbar)
 pasekAkcji: ""
 
 # DO NOT TOUCH VERSION NUMBER

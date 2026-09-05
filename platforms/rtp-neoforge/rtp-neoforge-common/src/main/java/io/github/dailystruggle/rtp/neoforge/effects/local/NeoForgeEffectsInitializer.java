@@ -1,14 +1,15 @@
 package io.github.dailystruggle.rtp.neoforge.effects.local;
 
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
+import io.github.dailystruggle.effectsapi.common.effects.CommandEffect;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * NeoForge counterpart of {@code effectsapi.fabric.FabricEffectsInitializer}
- * (effects-api-ADR-003/004). Binds the NeoForge {@link NeoForgeValueCoercer}
+ * (effects-api-ADR-003/004/007). Binds the NeoForge {@link NeoForgeValueCoercer}
  * and registers the Phase-1 NeoForge concrete effects (SOUND / PARTICLE /
- * TITLE / POTION) with {@link EffectFactory}.
+ * TITLE / POTION / COMMAND) with {@link EffectFactory}.
  *
  * <p>Unlike the Fabric initializer, these prototypes are compiled Mojmap (no
  * Loom remap) in {@code rtp-neoforge-common}, so their static initializers do
@@ -30,10 +31,12 @@ public final class NeoForgeEffectsInitializer {
         if (!REGISTERED.compareAndSet(false, true)) return;
 
         EffectFactory.setCoercer(new NeoForgeValueCoercer());
+        NeoForgeHandles.register();
 
         EffectFactory.addEffect("SOUND",    new NeoForgeSoundEffect());
         EffectFactory.addEffect("PARTICLE", new NeoForgeParticleEffect());
         EffectFactory.addEffect("TITLE",    new NeoForgeTitleEffect());
         EffectFactory.addEffect("POTION",   new NeoForgePotionEffect());
+        EffectFactory.addEffect("COMMAND",  new CommandEffect());
     }
 }

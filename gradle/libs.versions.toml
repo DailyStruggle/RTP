@@ -1,0 +1,42 @@
+# Gradle Version Catalog — single source of truth for shared dependency and
+# plugin versions used across the RTP multi-module build.
+#
+# Rationale: with 50+ modules, ad-hoc per-module version strings drift and make
+# coordinated upgrades (security patches, Gradle bumps) error-prone. Centralize
+# the versions that are shared build-wide here; reference them from build files
+# via the generated `libs.*` accessors (e.g. `libs.junit.jupiter`,
+# `alias(libs.plugins.shadow)`).
+#
+# Scope note: platform-specific runtime coordinates that are pinned per
+# Minecraft-version carrier (Paper/Spigot/Fabric/NeoForge API artifacts) are
+# intentionally NOT centralized here — each carrier owns its own MC version pin
+# by design (see settings.gradle and the per-carrier build.gradle files). This
+# catalog covers the cross-cutting toolchain, test, and annotation stack that is
+# genuinely shared by every module.
+
+[versions]
+# Java toolchain applied to every JDK-21 module (subprojects block).
+javaToolchain = "21"
+
+# Test + annotation stack (shared by every module via the root subprojects block).
+junit = "5.10.0"
+mockito = "5.5.0"
+jetbrainsAnnotations = "24.1.0"
+checkerQual = "3.42.0"
+jacoco = "0.8.11"
+
+# Build plugins.
+shadow = "8.3.8"
+spotless = "6.25.0"
+
+[libraries]
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrainsAnnotations" }
+checker-qual = { module = "org.checkerframework:checker-qual", version.ref = "checkerQual" }
+
+[plugins]
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

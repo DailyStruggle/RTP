@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * {@code /rtp clear cache} child verb. Reuses the full clear-caches behaviour of
- * {@link ClearCacheCmd} (wipe the L1/L2/L3 location caches for every region),
+ * {@link ClearCacheCmd} (wipe the hot/cold/backlog location caches for every region),
  * only renaming the verb to {@code cache} so it reads naturally under the
  * {@code /rtp clear} parent.
  *

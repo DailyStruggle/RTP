@@ -1246,6 +1246,189 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
+   * Parses duration string or number into seconds.
+   * Supports standard units (s, m, h, d, w, ms, t), composite tokens (e.g. "1d12h", "2h30m"),
+   * raw numbers, and infinite sentinels ("-1", "infinite", "permanent").
+   *
+   * @param input string or object representation of duration
+   * @param defSeconds default fallback value in seconds if input is missing or unparseable
+   * @return duration in seconds, or {@code defSeconds} if unparseable
+   */
+  public static long parseDurationSeconds(Object input, long defSeconds) {
+    if (input == null) return defSeconds;
+    if (input instanceof Number num) {
+      long val = num.longValue();
+      return val <= 0 ? -1L : val;
+    }
+    String s = input.toString().trim().toLowerCase(java.util.Locale.ROOT);
+    if (s.isEmpty()) return defSeconds;
+    if (s.equals("-1") || s.equals("infinite") || s.equals("permanent")) {
+      return -1L;
+    }
+    try {
+      io.github.dailystruggle.rtp.common.selection.region.util.DurationParser.ParsedDuration parsed =
+          io.github.dailystruggle.rtp.common.selection.region.util.DurationParser.parse(
+              s, io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit.SECOND);
+      if (parsed == null) {
+        return defSeconds;
+      }
+      long totalSeconds = (long) Math.round(parsed.toSeconds());
+      return totalSeconds <= 0 ? -1L : totalSeconds;
+    } catch (Exception e) {
+      return defSeconds;
+    }
+  }
+
+  /**
+   * Parses duration string or number into game ticks (1 tick = 50ms = 0.05s).
+   *
+   * @param input string or object representation of duration
+   * @param defTicks default fallback value in ticks if input is missing or unparseable
+   * @return duration in game ticks, or {@code defTicks} if unparseable
+   */
+  public static long parseDurationTicks(Object input, long defTicks) {
+    if (input == null) return defTicks;
+    if (input instanceof Number num) {
+      long val = num.longValue();
+      return val <= 0 ? -1L : val;
+    }
+    String s = input.toString().trim().toLowerCase(java.util.Locale.ROOT);
+    if (s.isEmpty()) return defTicks;
+    if (s.equals("-1") || s.equals("infinite") || s.equals("permanent")) {
+      return -1L;
+    }
+    try {
+      io.github.dailystruggle.rtp.common.selection.region.util.DurationParser.ParsedDuration parsed =
+          io.github.dailystruggle.rtp.common.selection.region.util.DurationParser.parse(
+              s, io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit.TICK);
+      if (parsed == null) {
+        return defTicks;
+      }
+      long totalTicks = (long) Math.round(parsed.toTicks());
+      return totalTicks <= 0 ? -1L : totalTicks;
+    } catch (Exception e) {
+      return defTicks;
+    }
+  }
+
+  /**
+   * Parses duration string or number into milliseconds.
+   *
+   * @param input string or object representation of duration
+   * @param defMillis default fallback value in milliseconds if input is missing or unparseable
+   * @return duration in milliseconds, or {@code defMillis} if unparseable
+   */
+  public static long parseDurationMillis(Object input, long defMillis) {
+    if (input == null) return defMillis;
+    if (input instanceof Number num) {
+      long val = num.longValue();
+      return val <= 0 ? -1L : val;
+    }
+    String s = input.toString().trim().toLowerCase(java.util.Locale.ROOT);
+    if (s.isEmpty()) return defMillis;
+    if (s.equals("-1") || s.equals("infinite") || s.equals("permanent")) {
+      return -1L;
+    }
+    try {
+      io.github.dailystruggle.rtp.common.selection.region.util.DurationParser.ParsedDuration parsed =
+          io.github.dailystruggle.rtp.common.selection.region.util.DurationParser.parse(
+              s, io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit.MILLISECOND);
+      if (parsed == null) {
+        return defMillis;
+      }
+      long totalMillis = (long) Math.round(parsed.toMillis());
+      return totalMillis <= 0 ? -1L : totalMillis;
+    } catch (Exception e) {
+      return defMillis;
+    }
+  }
+
+  /**
+   * Parses duration string or number into seconds with -1L (infinite) fallback.
+   *
+   * @param input string or object representation of duration
+   * @return duration in seconds, or {@code -1L} if invalid or infinite
+   */
+  public static long parseDurationSeconds(Object input) {
+    return parseDurationSeconds(input, -1L);
+  }
+
+  /**
+   * Retrieves the configured duration for {@code key} converted to seconds.
+   *
+   * @param key the configuration key
+   * @param defSeconds default fallback value in seconds
+   * @return duration in seconds
+   */
+  public long getTime(E key, long defSeconds) {
+    Object val = getConfigValue(key, defSeconds);
+    return parseDurationSeconds(val, defSeconds);
+  }
+
+  /**
+   * Retrieves the configured duration for {@code key} converted to seconds,
+   * parsing the given string default if key is absent.
+   *
+   * @param key the configuration key
+   * @param defDuration default duration string (e.g. "14d", "10m")
+   * @return duration in seconds
+   */
+  public long getTime(E key, String defDuration) {
+    long fallback = parseDurationSeconds(defDuration, -1L);
+    Object val = getConfigValue(key, defDuration);
+    return parseDurationSeconds(val, fallback);
+  }
+
+  /**
+   * Parses data size string or number into bytes.
+   * Supports standard units (b, byte, bytes, kb, kib, mb, mib, gb, gib),
+   * raw numbers, and infinite/unlimited sentinels ("-1", "infinite", "unlimited").
+   *
+   * @param input string or object representation of data size
+   * @param defBytes default fallback value in bytes if input is missing or unparseable
+   * @return data size in bytes, or {@code defBytes} if unparseable
+   */
+  public static long parseDataSizeBytes(Object input, long defBytes) {
+    return io.github.dailystruggle.rtp.common.selection.region.util.DataSizeParser.parseBytes(input, defBytes);
+  }
+
+  /**
+   * Parses data size string or number into bytes with -1L fallback.
+   *
+   * @param input string or object representation of data size
+   * @return data size in bytes, or -1L if invalid or infinite
+   */
+  public static long parseDataSizeBytes(Object input) {
+    return parseDataSizeBytes(input, -1L);
+  }
+
+  /**
+   * Retrieves the configured data size for {@code key} converted to bytes.
+   *
+   * @param key the configuration key
+   * @param defBytes default fallback value in bytes
+   * @return data size in bytes
+   */
+  public long getDataSize(E key, long defBytes) {
+    Object val = getConfigValue(key, defBytes);
+    return parseDataSizeBytes(val, defBytes);
+  }
+
+  /**
+   * Retrieves the configured data size for {@code key} converted to bytes,
+   * parsing the given string default if key is absent.
+   *
+   * @param key the configuration key
+   * @param defDataSize default data size string (e.g. "256MB", "1GiB")
+   * @return data size in bytes
+   */
+  public long getDataSize(E key, String defDataSize) {
+    long fallback = parseDataSizeBytes(defDataSize, -1L);
+    Object val = getConfigValue(key, defDataSize);
+    return parseDataSizeBytes(val, fallback);
+  }
+
+  /**
    * Returns the loaded YAML document root, or null if uncached.
    * Preserves block comments for {@link RtpYamlSection#getComment(String)}.
    *
@@ -1349,24 +1532,24 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
             }
           }
         }
-
-        // 2. Overlay values from oldYaml to preserve user settings
-        for (String key : oldYaml.getKeys(true)) {
-          if (key.equalsIgnoreCase("version")) continue;
-          if (!oldYaml.isConfigurationSection(key)) {
-            RtpYamlConfig.set(key, oldYaml.get(key));
-          }
-        }
-
-        // Stamp the file with the version this code targets so the next load
-        // sees a match and does not re-trigger update()/renameFiles(). Without
-        // this, any drift between the bundled resource's version (or a missing
-        // version key) and the code's required version rotates a fresh
-        // <name>.oldN backup on every single load.
-        RtpYamlConfig.set("version", version);
-
-        RtpYamlConfig.save();
       }
+
+      // 2. Overlay values from oldYaml to preserve user settings
+      for (String key : oldYaml.getKeys(true)) {
+        if (key.equalsIgnoreCase("version")) continue;
+        if (!oldYaml.isConfigurationSection(key)) {
+          RtpYamlConfig.set(key, oldYaml.get(key));
+        }
+      }
+
+      // Stamp the file with the version this code targets so the next load
+      // sees a match and does not re-trigger update()/renameFiles(). Without
+      // this, any drift between the bundled resource's version (or a missing
+      // version key) and the code's required version rotates a fresh
+      // <name>.oldN backup on every single load.
+      RtpYamlConfig.set("version", version);
+
+      RtpYamlConfig.save();
     } catch (IOException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
     }

@@ -1,0 +1,27 @@
+# --- Configuración de TTL de Memoria Espacial de RTP ---
+# Documentación: plugins/RTP/docs/admin/configuration/TTL.md
+
+# Duración base de retención para ejecuciones de coordenadas rechazadas en la memoria espacial.
+# Formatos de duración admitidos: p. ej. 14d, 12h, 30m, 3600s, 40t, 2500ms o compuesto 1d12h.
+# Establece en -1 o "infinite" para retención permanente (terreno estático).
+causes:
+  # Terreno natural y geometría (permanente)
+  biome: -1
+  worldBorder: -1
+  vert: -1
+  safety: -1
+  prefilterBiome: -1
+  prefilterBlock: -1
+
+  # Estado dinámico del jugador y del servidor
+  uniquePlacement: 30d
+  safetyExternal: 14d
+
+# Anulaciones por verificador identificadas por el nombre de clase del comprobador (p. ej. GriefPreventionChecker, WorldGuardChecker).
+# Si se omite o no aparece en la lista, los comprobadores externos heredan causes.safetyExternal.
+verifiers:
+  # WorldGuardChecker: -1
+  # GriefPreventionChecker: 14d
+
+# NO TOQUES EL NÚMERO DE VERSIÓN
+version: 1.0

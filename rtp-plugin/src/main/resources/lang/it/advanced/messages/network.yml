@@ -2,48 +2,58 @@
 # Testi dei messaggi per giocatori e operatori in questa lingua, raggruppati per argomento.
 # Copia generata automaticamente dai messaggi inglesi; non modificare a mano (viene sovrascritto).
 
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the L2 baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
+# --- Messaggi di modalità di rete tra server ---
+# Inviati solo quando `network.enabled: true` e il `/rtp` del giocatore viene instradato
+# attraverso la coda di attesa tra server (vedere network.yml `routing.mode`).
+# Tutte le chiavi sono facoltative dal punto di vista del giocatore: il ciclo di base
+# `delayMessage` / `teleportMessage` gestisce comunque il flusso visibile.
+# Inviato quando la richiesta è stata accettata nella coda di attesa tra server
+# ed è in attesa di assegnazione a un backend. Segnaposto: [position] - posizione
+# indicizzata da 0 da `pollStatus`; può essere vuota se il trasporto non restituisce
+# alcuna posizione.
 networkQueued: "&7[P0] in coda per una destinazione tra server (posizione [position])..."
-# Sent when a player runs /rtp while already waiting in the cross-server queue.
-# Placeholder: [position] - position in line; may be empty.
+
+# Inviato quando un giocatore esegue /rtp mentre è già in attesa nella coda tra server.
+# Segnaposto: [position] - posizione in fila; può essere vuoto.
 alreadyQueued: "&cSei già in attesa nella coda tra server (posizione [position]). Attendi."
-# Sent when a cross-server queue entry waited too long and was dropped.
-# No placeholders.
+
+# Inviato quando una voce della coda tra server ha atteso troppo a lungo ed è stata rimossa.
+# Nessun segnaposto.
 networkTimedOut: "&c[P0] il teletrasporto tra server è scaduto in attesa di un backend."
-# Sent when the cross-server queue is full and the request is rejected.
-# No placeholders.
+
+# Inviato quando la coda tra server è piena e la richiesta viene rifiutata.
+# Nessun segnaposto.
 waitlistFull: "&c[P0] la coda tra server è piena; riprova a breve."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
+
+# Inviato quando la coda ha passato la richiesta al router proxy ed
+# è in corso la selezione di un backend.
 networkRouting: "&7[P0] instradamento verso un backend..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
+
+# Inviato quando un backend ha riservato una coordinata per questo giocatore e il
+# proxy sta per avviare il passaggio tra server. Segnaposto: [server]
+# - il serverId del backend di destinazione.
 networkReserved: "&a[P0] coordinata riservata su [server]. Trasferimento..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+
+# Inviato mentre il proxy sta effettuando il passaggio. Segnaposto: [server] - destinazione.
 networkTransferring: "&a[P0] trasferimento a [server]..."
-# Sent when the cross-server path gave up and fell back to the local server.
-# Placeholder: [reason] - the reason for falling back.
+
+# Inviato quando il percorso tra server ha fallito e si è ripiegato sul server locale.
+# Segnaposto: [reason] - il motivo del ripiego.
 networkFallback: "&e[P0] tra server non disponibile ([reason]); ritorno al locale."
-# Sent when the cross-server request failed and no fallback was possible.
-# Placeholder: [reason] - the failure reason.
+
+# Inviato quando la richiesta tra server è fallita e non è stato possibile alcun ripiego.
+# Segnaposto: [reason] - il motivo del fallimento.
 networkFailed: "&c[P0] teletrasporto tra server fallito: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
+
+# Inviato quando il giocatore ha richiesto una regione specifica (`/rtp <region>`) ma
+# nessun backend nella rete la sta attualmente servendo. Segnaposto:
+# [region] - il nome della regione richiesta.
 networkRegionUnavailable: "&c[P0] nessun backend sta servendo la regione '[region]' al momento."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
+
+# Inviato quando il nome della regione richiesta corrisponde a due o più backend e
+# i criteri configurati dall'operatore non possono sceglierne uno (si attiva solo
+# con criteri più restrittivi rispetto al `warn` predefinito). Segnaposto: [region].
 networkRegionAmbiguous: "&c[P0] la regione '[region]' è ambigua tra i backend; fissa un server."
 
-# DO NOT TOUCH VERSION NUMBER
+# NON MODIFICARE IL NUMERO DI VERSIONE
 version: 1.0

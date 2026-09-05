@@ -2,11 +2,11 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
-import io.github.dailystruggle.commandsapi.common.parameters.CoordinateParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.FloatParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
+import io.github.dailystruggle.rtp.common.commands.parameters.DistanceParameter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 
@@ -37,14 +37,14 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
     // Mirrors V2 sub-parameter UX so users see the format and scale.
     subParameters.put("mode", new EnumParameter<>(
         "rtp.params", "x-z position adjustment method", (sender, s) -> true, Mode.class));
-    subParameters.put("radius", new IntegerParameter(
+    subParameters.put("radius", new DistanceParameter(
         "rtp.params", "outer radius of region", (sender, s) -> true, 64, 128, 256, 512, 1024));
-    subParameters.put("centerradius", new IntegerParameter(
+    subParameters.put("centerradius", new DistanceParameter(
         "rtp.params", "inner radius of region", (sender, s) -> true, 16, 32, 64, 128, 256));
-    subParameters.put("centerx", new CoordinateParameter(
-        "rtp.params", "center point x", (sender, s) -> true));
-    subParameters.put("centerz", new CoordinateParameter(
-        "rtp.params", "center point z", (sender, s) -> true));
+    subParameters.put("centerx", new DistanceParameter(
+        "rtp.params", "center point x", (sender, s) -> true, "~", "-~", "0"));
+    subParameters.put("centerz", new DistanceParameter(
+        "rtp.params", "center point z", (sender, s) -> true, "~", "-~", "0"));
     subParameters.put("weight", new FloatParameter(
         "rtp.params", "weigh towards or away from center", (sender, s) -> true, 0.1, 1.0, 10.0));
     subParameters.put("expand", new BooleanParameter(
@@ -317,123 +317,8 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
     output.setXZ(output.x + (int) cx, output.z + (int) cz);
   }
 
-  @Override
-  public int[] select() {
-    long location = rand();
-    return locationToXZ(location);
-  }
-
-  @Override
-  public long rand() {
-    flushAndRebuild(spatialResolution);
-    // Snapshot both arrays together to avoid races with concurrent rebuilds where
-    // badKeysCache and badPrefixSumsCache may be observed at different lengths.
-    long[] sums = badPrefixSumsCache;
-    long[] keysSnap = badKeysCache;
-    if (keysSnap.length != sums.length) {
-      int common = Math.min(keysSnap.length, sums.length);
-      if (keysSnap.length != common) keysSnap = Arrays.copyOf(keysSnap, common);
-      if (sums.length != common) sums = Arrays.copyOf(sums, common);
-    }
-    long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
-
-    boolean expand = (boolean) data.getOrDefault(GenericMemoryShapeParams.expand, false);
-    String mode = data.getOrDefault(GenericMemoryShapeParams.mode, "ACCUMULATE").toString();
-
-    double range = getRange();
-    if ((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badSum;
-    else if (expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badSum;
-
-    double weight = getNumber(GenericMemoryShapeParams.weight, 1.0).doubleValue();
-    double res = (range) * Math.pow(rng().nextDouble(), weight);
-
-    long location;
-    if (mode.equalsIgnoreCase("ACCUMULATE")) {
-      long target = (long) res;
-      long currentBadSum = 0;
-
-      // We iterate until the number of bad spots preceding our physical guess stabilizes.
-      while (true) {
-        // Search Physical Keys using a Physical Guess (Target + Current Shift)
-        int index = java.util.Arrays.binarySearch(keysSnap, target + currentBadSum);
-
-        if (index < 0) {
-          // Point is between keys (or after all keys). Invert insertion point.
-          index = -index - 1;
-        } else {
-          // Exact match: the coordinate sits exactly on the start of a bad interval.
-          // Force the index forward to include this interval's bad sum.
-          index = index + 1;
-        }
-
-        // Clamp index defensively against the prefix-sums length to avoid AIOOBE
-        // if a concurrent rebuild slipped a longer keys snapshot past us.
-        if (index > sums.length) index = sums.length;
-
-        // Find the total bad area before this physical point
-        long newBadSum = (index > 0) ? sums[index - 1] : 0;
-
-        // If the bad count is stable, we have found the correct Physical Coordinate
-        if (newBadSum == currentBadSum) break;
-        currentBadSum = newBadSum;
-      }
-      location = target + currentBadSum;
-    } else {
-      location = (long) res;
-    }
-
-    switch (mode) {
-      case "ACCUMULATE":
-        {
-          break;
-        }
-      case "NEAREST":
-        {
-          if (isKnownBad(location)) {
-            long[] keys = keysSnap;
-            int idx = Arrays.binarySearch(keys, location);
-            int floorIdx = (idx >= 0) ? idx : -(idx + 1) - 1;
-            if (floorIdx < 0 || floorIdx >= sums.length) {
-              break;
-            }
-
-            long key = keys[floorIdx];
-            long sum = sums[floorIdx];
-            long prevSum = (floorIdx > 0) ? sums[floorIdx - 1] : 0L;
-            long val = sum - prevSum;
-
-            long lowerGood = key - 1;
-            long upperGood = key + val;
-
-            if (lowerGood < 0) location = upperGood;
-            else if (upperGood >= range) location = lowerGood;
-            else {
-              if (location - lowerGood < upperGood - location) location = lowerGood;
-              else location = upperGood;
-            }
-          }
-        }
-      case "REROLL":
-        {
-          if (isKnownBad(location)) {
-            return -1;
-          }
-        }
-      default:
-        {
-        }
-    }
-
-    int uniqueRadius =
-        uniquePlacementsRadius(data.getOrDefault(GenericMemoryShapeParams.uniquePlacements, 0));
-    // addBadChunkRadius: chunk-uniform (uniqueplacements knob) - within a chunk the per-column
-    // selection order is deterministic, so re-rolling onto the same chunk produces the
-    // same effective placement. Marking the landing chunk (radius 1) prevents that chunk-level
-    // re-roll; a larger radius additionally clears the surrounding chunks so placements spread out.
-    if (uniqueRadius > 0) addBadChunkRadius(location, uniqueRadius);
-
-    return location;
-  }
+  // Selection (rand / select) is inherited from MemoryShape: Square contributes only its
+  // range and the default weighted power curve, which is the base sampling model.
 
   @Override
   public Map<String, CommandParameter> getParameters() {

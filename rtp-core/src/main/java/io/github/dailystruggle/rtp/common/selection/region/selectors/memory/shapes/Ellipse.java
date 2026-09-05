@@ -2,12 +2,12 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
-import io.github.dailystruggle.commandsapi.common.parameters.CoordinateParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.FloatParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.parameters.DistanceParameter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.EllipseMemoryShapeParams;
 
@@ -49,20 +49,20 @@ public class Ellipse extends MemoryShape<EllipseMemoryShapeParams> {
 
       subParameters.put("mode", new EnumParameter<>(
           "rtp.params", "x-z position adjustment method", (sender, s) -> true, Mode.class));
-      subParameters.put("radius", new IntegerParameter(
+      subParameters.put("radius", new DistanceParameter(
           "rtp.params", "first axis radius of region", (sender, s) -> true, 64, 128, 256, 512, 1024));
-      subParameters.put("radius2", new IntegerParameter(
+      subParameters.put("radius2", new DistanceParameter(
           "rtp.params", "second axis radius of region", (sender, s) -> true, 64, 128, 256, 512, 1024));
-      subParameters.put("centerradius", new IntegerParameter(
+      subParameters.put("centerradius", new DistanceParameter(
           "rtp.params", "inner radius of region", (sender, s) -> true, 16, 32, 64, 128, 256));
-      subParameters.put("centerradius2", new IntegerParameter(
+      subParameters.put("centerradius2", new DistanceParameter(
           "rtp.params", "second axis of inner exclusion region", (sender, s) -> true, 16, 32, 64, 128, 256));
       subParameters.put("rotation", new IntegerParameter(
           "rtp.params", "rotation in degrees", (sender, s) -> true, 0, 30, 45, 60, 90));
-      subParameters.put("centerx", new CoordinateParameter(
-          "rtp.params", "center point x", (sender, s) -> true));
-      subParameters.put("centerz", new CoordinateParameter(
-          "rtp.params", "center point z", (sender, s) -> true));
+      subParameters.put("centerx", new DistanceParameter(
+          "rtp.params", "center point x", (sender, s) -> true, "~", "-~", "0"));
+      subParameters.put("centerz", new DistanceParameter(
+          "rtp.params", "center point z", (sender, s) -> true, "~", "-~", "0"));
       subParameters.put("weight", new FloatParameter(
           "rtp.params", "weigh towards or away from center", (sender, s) -> true, 0.1, 1.0, 10.0));
       subParameters.put("expand", new BooleanParameter(
@@ -218,108 +218,14 @@ public class Ellipse extends MemoryShape<EllipseMemoryShapeParams> {
     return keys;
   }
 
+  /**
+   * An ellipse is inscribed in the circle its 1D range describes, so the range bounds more space
+   * than the shape itself. Expanding past the learned bad runs would push samples into the
+   * corners {@link #contains(int, int)} rejects, so the knob is forced off (as on Polygon).
+   */
   @Override
-  public int[] select() {
-    return locationToXZ(rand());
-  }
-
-  @Override
-  public long rand() {
-    flushAndRebuild(spatialResolution);
-    long[] sums = badPrefixSumsCache;
-    long[] keysSnap = badKeysCache;
-    if (keysSnap.length != sums.length) {
-      int common = Math.min(keysSnap.length, sums.length);
-      if (keysSnap.length != common) keysSnap = Arrays.copyOf(keysSnap, common);
-      if (sums.length != common) sums = Arrays.copyOf(sums, common);
-    }
-    long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
-
-    double range = getRange();
-    boolean expand = (boolean) data.getOrDefault(EllipseMemoryShapeParams.expand, false);
-    String mode =
-        data.getOrDefault(EllipseMemoryShapeParams.mode, "ACCUMULATE").toString().toUpperCase();
-
-    if ((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badSum;
-    else if (expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badSum;
-
-    double weight = getNumber(EllipseMemoryShapeParams.weight, 1.0).doubleValue();
-    double res = (range) * Math.pow(rng().nextDouble(), weight);
-
-    long location;
-    if (mode.equalsIgnoreCase("ACCUMULATE")) {
-      long target = (long) res;
-      long currentBadSum = 0;
-
-      while (true) {
-        int index = Arrays.binarySearch(keysSnap, target + currentBadSum);
-
-        if (index < 0) {
-          index = -index - 1;
-        } else {
-          index = index + 1;
-        }
-
-        if (index > sums.length) index = sums.length;
-
-        long newBadSum = (index > 0) ? sums[index - 1] : 0;
-
-        if (newBadSum == currentBadSum) break;
-        currentBadSum = newBadSum;
-      }
-      location = target + currentBadSum;
-    } else {
-      location = (long) res;
-    }
-
-    switch (mode) {
-      case "ACCUMULATE":
-        {
-          break;
-        }
-      case "NEAREST":
-        {
-          if (isKnownBad(location)) {
-            long[] keysArr = keysSnap;
-            int idx = Arrays.binarySearch(keysArr, location);
-            int floorIdx = (idx >= 0) ? idx : -(idx + 1) - 1;
-            if (floorIdx < 0 || floorIdx >= sums.length) {
-              return location;
-            }
-
-            long key = keysArr[floorIdx];
-            long sum = sums[floorIdx];
-            long prevSum = (floorIdx > 0) ? sums[floorIdx - 1] : 0L;
-            long val = sum - prevSum;
-
-            long lowerGood = key - 1;
-            long upperGood = key + val;
-
-            if (lowerGood < 0) location = upperGood;
-            else if (upperGood >= range) location = lowerGood;
-            else {
-              if (location - lowerGood < upperGood - location) location = lowerGood;
-              else location = upperGood;
-            }
-          }
-          return location;
-        }
-      case "REROLL":
-        {
-          if (isKnownBad(location)) {
-            return -1;
-          }
-        }
-      default:
-        {
-        }
-    }
-
-    int uniqueRadius =
-        uniquePlacementsRadius(data.getOrDefault(EllipseMemoryShapeParams.uniquePlacements, 0));
-    if (uniqueRadius > 0) addBadChunkRadius(location, uniqueRadius);
-
-    return location;
+  protected boolean supportsExpand() {
+    return false;
   }
 
   @Override

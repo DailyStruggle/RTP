@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.logging.Level;
 
 /**
@@ -82,12 +83,35 @@ public final class ChunkLoadCounter implements Listener {
     /** Sum of per-attempt <em>selection</em> loads (attributed minus the
      *  post-teleport arrival ring) finalised during the current phase. */
     private final AtomicLong phaseSelectionLoads = new AtomicLong();
+    /** Sum of per-attempt distinct region-file reads implied by selection
+     *  loads, finalised during the current phase. See
+     *  {@link #computeRegionAccounting}. */
+    private final AtomicLong phaseRegionReads = new AtomicLong();
+    /** Sum of per-attempt selection candidates that fell inside a counted
+     *  region bin, finalised during the current phase. Divided by
+     *  {@link #phaseRegionReads} this is the measured bin occupancy -
+     *  candidates per binned batch - which the model otherwise assumes. */
+    private final AtomicLong phaseBinCandidates = new AtomicLong();
+    /** Largest single-bin occupancy observed in the current phase, so the
+     *  mean is never published without its peak. */
+    private final AtomicLong phaseBinOccupancyMax = new AtomicLong();
+    /** Loads observed on a server tick thread during the current phase,
+     *  counted regardless of whether they were attributable to an attempt.
+     *  Foreground work: charged to the tick budget. */
+    private final AtomicLong phaseOnTickLoads = new AtomicLong();
+    /** Loads observed off every tick thread during the current phase.
+     *  Background work: costs wall time but not tick time. */
+    private final AtomicLong phaseOffTickLoads = new AtomicLong();
 
     /** Snapshots at the start of the current phase, for {@link #phaseTotal()}. */
     private volatile long phaseBaselineTotal = 0L;
     private volatile long phaseBaselineBackground = 0L;
     private volatile long phaseBaselineAttributed = 0L;
     private volatile long phaseBaselineSelection = 0L;
+    private volatile long phaseBaselineRegionReads = 0L;
+    private volatile long phaseBaselineBinCandidates = 0L;
+    private volatile long phaseBaselineOnTick = 0L;
+    private volatile long phaseBaselineOffTick = 0L;
 
     /** Effective render-distance (in chunks) used to size the post-teleport
      *  arrival ring that {@link #endAttempt} subtracts from the raw attributed
@@ -116,7 +140,30 @@ public final class ChunkLoadCounter implements Listener {
     private static final class Tally {
         final AtomicLong count = new AtomicLong(0L);
         final Queue<Long> chunks = new ConcurrentLinkedQueue<>();
+        /** Loads for this attempt that fired on a tick thread. Updated through
+         *  a static field updater rather than a per-attempt {@code AtomicLong}
+         *  so the split adds no allocation per attempt - this tier has already
+         *  had its own apparatus become the headline once, via a snapshot copy
+         *  that inflated allocation 24x. */
+        volatile long onTick = 0L;
+
+        static final AtomicLongFieldUpdater<Tally> ON_TICK =
+                AtomicLongFieldUpdater.newUpdater(Tally.class, "onTick");
+
+        /** Open on-tick burst: nanoTime of the first and most recent load in
+         *  the run of tick-thread loads currently being coalesced into one
+         *  occupancy interval. {@code 0} means no burst is open. Both fields
+         *  are only ever touched inside {@code synchronized (tally)}. */
+        long burstStartNs = 0L;
+        long burstLastNs = 0L;
     }
+
+    /** Two consecutive on-tick loads closer together than this are treated as
+     *  one occupancy interval; a longer gap closes the interval and opens a
+     *  new one. Set to a fraction of a 50 ms tick so work landing on two
+     *  different ticks can never be merged into one interval, which is the
+     *  whole point of recording intervals instead of a total. */
+    private static final long BURST_GAP_NS = 10_000_000L; // 10 ms
 
     private static long packKey(int x, int z) {
         return (((long) x) << 32) | (z & 0xFFFFFFFFL);
@@ -125,6 +172,16 @@ public final class ChunkLoadCounter implements Listener {
     private static int keyX(long k) { return (int) (k >> 32); }
 
     private static int keyZ(long k) { return (int) k; }
+
+    /** Chunk-to-region shift. A region file covers 32x32 chunks in both the
+     *  Anvil ({@code .mca}) and Linear ({@code .linear}) layouts, so this is
+     *  a format constant rather than a tuning. */
+    private static final int REGION_SHIFT = 5;
+
+    /** Region-grid key for a chunk coordinate. */
+    private static long regionKey(int chunkX, int chunkZ) {
+        return packKey(chunkX >> REGION_SHIFT, chunkZ >> REGION_SHIFT);
+    }
 
     /** Cached reflective lookup of {@code Chunk#getPluginChunkTickets()}.
      *  Resolved once at register-time. {@code null} on Spigot. */
@@ -174,20 +231,34 @@ public final class ChunkLoadCounter implements Listener {
         final int cx = event.getChunk().getX();
         final int cz = event.getChunk().getZ();
 
+        // Foreground / background classification, done once per event and
+        // reused for both the phase counters and the per-attempt split. This
+        // is the health discriminator: the same load costs wall time on a
+        // chunk-system thread and tick budget on a tick thread. On Folia the
+        // question is region-scoped - "is this the region thread that owns the
+        // chunk that just loaded" - which TickThreadDetector answers via
+        // runtime detection only.
+        final boolean onTick = TickThreadDetector.ownsChunk(event.getWorld(), cx, cz);
+        if (onTick) {
+            phaseOnTickLoads.incrementAndGet();
+        } else {
+            phaseOffTickLoads.incrementAndGet();
+        }
+
         // Plugin-ticket attribution (Paper only).
         if (pluginTicketsSupported) {
             MetricsRecorder.Attempt a = attributeByPluginTicket(event.getChunk());
             if (a != null) {
-                bump(a, cx, cz);
+                bump(a, cx, cz, onTick);
                 return;
             }
         }
 
         // Main-thread temporal attribution.
-        if (Bukkit.isPrimaryThread()) {
+        if (onTick) {
             MetricsRecorder.Attempt a = inFlight.peekLast();
             if (a != null) {
-                bump(a, cx, cz);
+                bump(a, cx, cz, onTick);
                 return;
             }
         }
@@ -236,7 +307,7 @@ public final class ChunkLoadCounter implements Listener {
         return null;
     }
 
-    private void bump(MetricsRecorder.Attempt a, int chunkX, int chunkZ) {
+    private void bump(MetricsRecorder.Attempt a, int chunkX, int chunkZ, boolean onTick) {
         Tally t = attemptCounts.get(a.attemptId);
         if (t == null) {
             // Race: attempt ended between inFlight.peekLast() and this lookup.
@@ -247,6 +318,37 @@ public final class ChunkLoadCounter implements Listener {
         t.count.incrementAndGet();
         t.chunks.add(packKey(chunkX, chunkZ));
         phaseAttributedLoads.incrementAndGet();
+        if (onTick) {
+            Tally.ON_TICK.incrementAndGet(t);
+            noteOnTickBurst(a, t, System.nanoTime());
+        }
+    }
+
+    /**
+     * Coalesces a run of on-tick loads into one tick-occupancy interval.
+     * Called on the tick thread, so it does no I/O, no allocation and takes
+     * only the per-attempt monitor - which no other tick thread contends for
+     * in practice, because a run's concurrency cap is 1-4 and each attempt is
+     * driven by one player-owning thread.
+     *
+     * <p>A gap longer than {@link #BURST_GAP_NS} closes the open interval and
+     * hands it to the attempt, then opens a new one. Recording bursts rather
+     * than a running total is deliberate: the tail is produced by when
+     * foreground work lands relative to the tick, and a total cannot
+     * distinguish one 8 ms stall from sixteen 0.5 ms ones.
+     */
+    private void noteOnTickBurst(MetricsRecorder.Attempt a, Tally t, long nowNs) {
+        synchronized (t) {
+            if (t.burstStartNs != 0L && nowNs - t.burstLastNs <= BURST_GAP_NS) {
+                t.burstLastNs = nowNs;
+                return;
+            }
+            if (t.burstStartNs != 0L) {
+                a.recordTickInterval(t.burstStartNs, t.burstLastNs);
+            }
+            t.burstStartNs = nowNs;
+            t.burstLastNs = nowNs;
+        }
     }
 
     /** Render distance (in chunks) used to size the arrival ring. */
@@ -287,6 +389,71 @@ public final class ChunkLoadCounter implements Listener {
         return sel < 0 ? 0 : sel;
     }
 
+    /**
+     * Region-file read accounting and bin occupancy for one finished attempt.
+     *
+     * <p><b>What is counted.</b> A region file covers a 32x32 chunk bin, and a
+     * chunk cannot be materialised without its region file being read, so the
+     * number of <em>distinct</em> region bins touched by an attempt's selection
+     * loads is the number of region-file reads that attempt required. Repeated
+     * chunks inside one bin are one read, which is exactly the batching effect
+     * the model needs to stop assuming: the read term is paid per bin, not per
+     * candidate.
+     *
+     * <p><b>Bin occupancy</b> is then selection candidates divided by distinct
+     * bins - the measured "candidates per binned batch". The model currently
+     * assumes 64; recording it means the assumption is replaced by an
+     * observation, and both the per-attempt numerator and denominator are
+     * written so reads-per-teleport can be regressed against occupancy offline
+     * rather than being asserted here.
+     *
+     * <p><b>What this is not.</b> This is a read count implied by observed
+     * chunk loads, not an intercepted syscall count. It cannot see a read the
+     * OS served from page cache without a chunk materialising, and it cannot
+     * see a plugin that reads region bytes without loading a chunk - which is
+     * precisely what this project's own prefilter does. It therefore
+     * <em>over</em>-counts nothing and <em>under</em>-counts a prefiltering
+     * design's avoided reads, i.e. it errs against this plugin's own case.
+     *
+     * <p>Runs once per attempt at completion over coordinates already
+     * collected, so it adds no per-event work and nothing on the load path.
+     * Only the selection subset is considered: the post-teleport arrival ring
+     * is server-owned and would swamp the plugin's own read count.
+     */
+    private void computeRegionAccounting(MetricsRecorder.Attempt a, Tally t) {
+        int destX = Integer.MIN_VALUE;
+        int destZ = Integer.MIN_VALUE;
+        int r = -1;
+        if (a.success && !(a.toX == 0.0 && a.toZ == 0.0)) {
+            destX = (int) Math.floor(a.toX / 16.0);
+            destZ = (int) Math.floor(a.toZ / 16.0);
+            r = viewDistanceChunks() + 1;
+        }
+        java.util.HashMap<Long, int[]> bins = new java.util.HashMap<>();
+        long candidates = 0L;
+        for (Long packed : t.chunks) {
+            int cx = keyX(packed);
+            int cz = keyZ(packed);
+            if (r >= 0) {
+                int cheb = Math.max(Math.abs(cx - destX), Math.abs(cz - destZ));
+                if (cheb != 0 && cheb <= r) continue; // arrival ring: server cost
+            }
+            candidates++;
+            bins.computeIfAbsent(regionKey(cx, cz), k -> new int[1])[0]++;
+        }
+        long reads = bins.size();
+        a.regionFileReads = reads;
+        a.binCandidates = candidates;
+        long maxOcc = 0L;
+        for (int[] occ : bins.values()) {
+            if (occ[0] > maxOcc) maxOcc = occ[0];
+        }
+        a.binOccupancyMax = maxOcc;
+        phaseRegionReads.addAndGet(reads);
+        phaseBinCandidates.addAndGet(candidates);
+        phaseBinOccupancyMax.accumulateAndGet(maxOcc, Math::max);
+    }
+
     /** Set the effective server render distance (chunks) for arrival-ring
      *  sizing. A value &lt;= 0 restores the live {@link Bukkit#getViewDistance()}
      *  lookup. */
@@ -317,6 +484,21 @@ public final class ChunkLoadCounter implements Listener {
             long selection = computeSelection(a, t, raw);
             a.selectionChunkLoads = selection;
             phaseSelectionLoads.addAndGet(selection);
+            computeRegionAccounting(a, t);
+            // Foreground/background split of this attempt's own loads. Both
+            // halves are written together so a row can never show one side
+            // measured and the other blank.
+            long onTick = t.onTick;
+            a.onTickChunkLoads = onTick;
+            a.offTickChunkLoads = Math.max(0L, raw - onTick);
+            // Close any still-open on-tick burst so its width is not lost.
+            synchronized (t) {
+                if (t.burstStartNs != 0L) {
+                    a.recordTickInterval(t.burstStartNs, t.burstLastNs);
+                    t.burstStartNs = 0L;
+                    t.burstLastNs = 0L;
+                }
+            }
         }
         inFlight.remove(a);
     }
@@ -335,6 +517,11 @@ public final class ChunkLoadCounter implements Listener {
         phaseBaselineBackground = phaseBackgroundLoads.get();
         phaseBaselineAttributed = phaseAttributedLoads.get();
         phaseBaselineSelection = phaseSelectionLoads.get();
+        phaseBaselineOnTick = phaseOnTickLoads.get();
+        phaseBaselineOffTick = phaseOffTickLoads.get();
+        phaseBaselineRegionReads = phaseRegionReads.get();
+        phaseBaselineBinCandidates = phaseBinCandidates.get();
+        phaseBinOccupancyMax.set(0L);
     }
 
     /** Number of chunk loads observed since the last {@link #resetPhase()}. */
@@ -365,5 +552,38 @@ public final class ChunkLoadCounter implements Listener {
      *  constant, plugin-independent arrival cost. */
     public long phaseSelection() {
         return Math.max(0L, phaseSelectionLoads.get() - phaseBaselineSelection);
+    }
+
+    /** Loads observed on a server tick thread since the last
+     *  {@link #resetPhase()} - the foreground half of the split, charged to
+     *  the tick budget. Counts every load, attributed or not, so
+     *  {@code phaseOnTick() + phaseOffTick()} reconciles against
+     *  {@link #phaseTotal()}. */
+    public long phaseOnTick() {
+        return Math.max(0L, phaseOnTickLoads.get() - phaseBaselineOnTick);
+    }
+
+    /** Loads observed off every tick thread since the last
+     *  {@link #resetPhase()} - the background half of the split. */
+    public long phaseOffTick() {
+        return Math.max(0L, phaseOffTickLoads.get() - phaseBaselineOffTick);
+    }
+
+    /** Distinct region-file reads implied by selection loads since the last
+     *  {@link #resetPhase()}. See {@link #computeRegionAccounting}. */
+    public long phaseRegionReads() {
+        return Math.max(0L, phaseRegionReads.get() - phaseBaselineRegionReads);
+    }
+
+    /** Selection candidates counted into region bins since the last
+     *  {@link #resetPhase()}. Numerator of measured bin occupancy. */
+    public long phaseBinCandidates() {
+        return Math.max(0L, phaseBinCandidates.get() - phaseBaselineBinCandidates);
+    }
+
+    /** Largest single-bin occupancy seen in the current phase, so the mean
+     *  occupancy is never published without its peak. */
+    public long phaseBinOccupancyMax() {
+        return phaseBinOccupancyMax.get();
     }
 }

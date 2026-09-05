@@ -524,69 +524,11 @@ final class QueueTask {
             Set<String> unsafeBlocks,
             ChunkReservation reservation) {
 
-        boolean pass = true;
-        try {
-            safetyCheck:
-            for (int x = left.x() - safe; x <= left.x() + safe; x++) {
-                int chunkX = x >> 4;
-                int xx = x & 15;
-                int dcX = chunkX - centerChunkX;
-                for (int z = left.z() - safe; z <= left.z() + safe; z++) {
-                    int chunkZ = z >> 4;
-                    int zz = z & 15;
-                    int dcZ = chunkZ - centerChunkZ;
-                    int index = (dcX + safe) * L + (dcZ + safe);
-                    RTPChunk<?> chunk1 = (index >= 0 && index < localChunks.length) ? localChunks[index] : null;
-                    if (chunk1 == null) {
-                        pass = false;
-                        break safetyCheck;
-                    }
-                    for (int y = left.y() - safe; y <= left.y() + safe; y++) {
-                        if (y > world.getMaxHeight() || y < world.getMinHeight()) continue;
-                        if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
-                            pass = false;
-                            break safetyCheck;
-                        }
-                    }
-                }
-            }
-
-            // Ground and head re-validation on the live center chunk, independent of safetyRadius.
-            if (pass) {
-                RTPChunk<?> centerLive = (L > 0)
-                        ? localChunks[safe * L + safe]
-                        : null;
-                if (centerLive == null) {
-                    pass = false;
-                } else {
-                    int xx = left.x() & 15;
-                    int zz = left.z() & 15;
-                    int feetY = left.y();
-                    int headY = feetY + 1;
-                    int minH = world.getMinHeight();
-                    int maxH = world.getMaxHeight();
-                    if (headY <= maxH && headY >= minH
-                            && !centerLive.isSafe(xx, headY, zz, unsafeBlocks)) {
-                        pass = false;
-                    }
-                    if (pass) {
-                        int depth = Math.max(
-                                1, LocationGenerator.platformDepthCache.get());
-                        for (int d = 1; d <= depth; d++) {
-                            int gy = feetY - d;
-                            if (gy < minH || gy > maxH) continue;
-                            if (!centerLive.isSafe(xx, gy, zz, unsafeBlocks)) {
-                                pass = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            pass = false;
-            RTP.log(Level.WARNING, e.getMessage(), e);
-        }
+        // Delegate the pure per-column safety verdict to the shared SafetyScan helper so this
+        // queue path and the SubspaceShape group path share one definition of "safe column"
+        // (S-001, no drift). Reservation/verifier orchestration stays here.
+        boolean pass = SafetyScan.isColumnSafe(
+                left, world, localChunks, L, centerChunkX, centerChunkZ, safe, unsafeBlocks);
 
         if (!pass) {
             finishRejected(reservation);

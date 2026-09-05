@@ -153,5 +153,6 @@ prefab:
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
+
 # DO NOT TOUCH VERSION NUMBER
 version: 1.1

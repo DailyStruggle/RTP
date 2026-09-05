@@ -92,7 +92,7 @@ wachtrij_naTeletransport: false
 # @default: true
 controleer_bijChunkLaden: true
 
-# Fractie van de L3-backlogcapaciteit waarbij het bijvullen hervat (hysterese).
+# Fractie van de backlogcapaciteit waarbij het bijvullen hervat (hysterese).
 # 0.5 = bijvullen na leeglopen tot 50%; 1.0 = continu bijvullen.
 # @type: number
 # @range: [0.0, 1.0]
@@ -192,5 +192,6 @@ voorgevormd:
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
+
 # RAAK HET VERSIENUMMER NIET AAN
 version: 1.0

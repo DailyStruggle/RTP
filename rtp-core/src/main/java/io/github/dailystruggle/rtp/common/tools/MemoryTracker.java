@@ -19,6 +19,9 @@ public class MemoryTracker {
   private static final ConcurrentHashMap<UUID, TrackedObject> trackedObjects =
           new ConcurrentHashMap<>();
 
+  /** Configurable memory ceiling / buffer quota in bytes. -1L indicates unlimited. */
+  private static volatile long memoryCeilingBytes = -1L;
+
   private static void log(Level level, String pattern, Object... args) {
     RTP.log(level, MessageFormat.format(pattern, args));
   }
@@ -135,6 +138,43 @@ public class MemoryTracker {
     return n;
   }
 
+  /**
+   * Sets the configured memory ceiling / buffer quota in bytes.
+   *
+   * @param bytes ceiling in bytes, or -1L for unlimited
+   */
+  public static void setMemoryCeiling(long bytes) {
+    memoryCeilingBytes = bytes;
+  }
+
+  /**
+   * Sets the configured memory ceiling / buffer quota using a data size string (e.g. "256MB", "1GiB").
+   *
+   * @param dataSizeString data size string
+   */
+  public static void setMemoryCeiling(String dataSizeString) {
+    memoryCeilingBytes = io.github.dailystruggle.rtp.common.selection.region.util.DataSizeParser.parseBytes(dataSizeString, -1L);
+  }
+
+  /**
+   * Returns the configured memory ceiling / buffer quota in bytes (-1L if unlimited).
+   */
+  public static long getMemoryCeiling() {
+    return memoryCeilingBytes;
+  }
+
+  /**
+   * Checks if an allocated byte amount exceeds the configured memory ceiling.
+   * Always returns false when memory ceiling is unlimited (&lt;= 0).
+   *
+   * @param allocatedBytes bytes to check
+   * @return true if exceeding memory ceiling
+   */
+  public static boolean isOverMemoryCeiling(long allocatedBytes) {
+    long ceiling = memoryCeilingBytes;
+    return ceiling > 0 && allocatedBytes > ceiling;
+  }
+
   public static void runDiagnostics() {
     // Spark-profiler tagged entry: dispatch through a method whose name matches the
     // documented allow-list tag so the async sampler attributes diagram-04 work
@@ -235,7 +275,7 @@ public class MemoryTracker {
         RegionSettings settings = region.getSettings();
         totalCacheCap += settings.cacheCap();
         totalCacheCap += settings.activeChunkCap();
-        // Account for L3 backlog capacity in the global cache budget (ADR-028).
+        // Account for backlog capacity in the global cache budget (ADR-028).
         totalCacheCap += settings.backlogCacheCap();
         totalActiveChunkCap += settings.activeChunkCap();
 

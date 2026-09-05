@@ -13,7 +13,7 @@
 청크로딩중: "&7[P0] ⚙ 청크 로딩 중. 잠시 기다려 주세요.."
 텔레포트메시지: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ [attempts] 번 시도 후 텔레포트 완료 ([processingTime])</gradient>"
 
-# if teleport is cancelled
+# 텔레포트가 취소되었을 때
 텔레포트취소: "&7[P0] ⚡ 텔레포트가 취소되었습니다!"
 
 # 최대 시도 횟수에 도달해도 안전한 장소를 찾지 못한 경우
@@ -24,7 +24,7 @@
 # 자리표시자: [remainingCooldown] - 남은 시간
 쿨다운메시지: "&7[P0] ⚡ 다시 텔레포트하려면 [remainingCooldown] 기다려야 합니다"
 
-# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+# 플레이어가 lockAfterUses 한도에 도달하여 잠겼을 때 (BetterRTP LockAfter 패리티)
 lockedAfterUses: "&7[P0] ⌖ 랜덤 텔레포트 한도에 도달했습니다. [remainingLockTime] 후에 다시 시도해 주세요."
 
 # 리전에 대기 중인 위치가 없고 플레이어가 rtp.unqueued 권한을 가지고 있지 않을 때
@@ -61,11 +61,11 @@ lockedAfterUses: "&7[P0] ⌖ 랜덤 텔레포트 한도에 도달했습니다. [
 # busy 와 invalidCommand 는 messages.lang.yml 에서 번역되지 않음 -> 영어 키 이름 (영어 기준선으로 폴백).
 busy: "&c[P0] 처리 중"
 
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+# 플레이어가 전투 중이어서 선택적 PvP 전투 확인이 /rtp 를 거부할 때 전송됩니다
 pvpInCombat: "&c[P0] 전투 중에는 무작위 텔레포트를 할 수 없습니다."
 
-# plugin doesn't have the subcommand or parameter the user requested
-# placeholder: [arg] - the argument attempted
+# 사용자가 요청한 하위 명령어 또는 매개변수가 플러그인에 없습니다
+# 자리표시자: [arg] - 시도된 인수
 invalidCommand: "&c[P0] 잘못된 명령어 - [arg]"
 
 # 사용자가 요청한 명령어에 대한 권한이 없습니다
@@ -99,14 +99,13 @@ rtp_설명: "무작위 위치로 텔레포트합니다"
 # 섹션 10: 시각 요소
 # ###############################################################################
 타이틀: "<rainbow>텔레포트됨!</rainbow>"
-# B77DF7?#BF76F5??!
 부제목: "<gradient:#A78BFA:#E876A0>즐겨봐요!</gradient>"
 페이드인: 20
 표시시간: 20
 페이드아웃: 20
 
-# actionbar setting
+# 액션바 설정
 액션바: ""
 
-# DO NOT TOUCH VERSION NUMBER
+# 버전 번호는 변경하지 마세요
 version: 1.0

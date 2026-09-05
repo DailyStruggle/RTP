@@ -166,11 +166,13 @@ attempt-timeout-ms: 5000
 # back to the most-recently dispatched player), recorded as a CSV failure
 # with reason `CONSOLE_FAIL:<truncated line>`, and the slot is freed.
 console-fail-enabled: true
+
 # Regex patterns (case-insensitive). Empty list = the built-in defaults
 # documented in ConsoleWatcher.java. Customise this list to add plugin-
 # specific rejection wording (e.g. EssentialsX `\\$d.* seconds remaining`).
 console-fail-patterns: []
-#console-fail-patterns:
+
+# console-fail-patterns:
 #  - "you're already teleporting"
 #  - "already teleporting"
 #  - "on cooldown"
@@ -263,6 +265,7 @@ sequence:
   # claims need a window long enough that JIT, queue-drain transients, and
   # the first GC cycle are all behind us before the publishable window.
   per-target-seconds: 600
+
   # Recovery gap between targets, in seconds. The harness stops dispatching,
   # waits for in-flight attempts to drain, then idles for this many seconds
   # before moving to the next target. Bumped from 30s to 60s after live runs
@@ -272,6 +275,7 @@ sequence:
   # phases, more chunks accumulate and need more time to age out under
   # Spigot's lazy-unload window before the next phase's cold start.
   gap-seconds: 120
+
   # JIT warm-up before the measurement sequence. With warmup-seconds > 0, the
   # harness cycles every configured target for `warmup-seconds / (N * cycles)`
   # ms each, BEFORE starting the actual measurement run. During warm-up:
@@ -285,6 +289,7 @@ sequence:
   # writing, listener dispatch, scheduler hops) on top of its own. Warm-up
   # equalises that across plugins. Set to 0 to disable.
   warmup-seconds: 30
+
   # Number of times to cycle through every target during warm-up. With 1, each
   # target gets `warmup-seconds / N` of contiguous warm-up. With 2+, the same
   # total warm-up time is split into shorter, repeated bursts per target,
@@ -338,12 +343,80 @@ sample-period-ms: 50
 # artifacts: <timestamp>.csv (per-attempt) and <timestamp>-summary.txt.
 output-subdir: "runs"
 
+# Sampling cadence (ms) for the plugin-chunk-ticket census that feeds
+# peak_plugin_tickets / peak_target_plugin_tickets. Peak residency is what
+# distinguishes a design that keeps coordinate tuples and releases its tickets
+# from one that keeps chunk neighbourhoods resident, so the census is a peak
+# tracker rather than an average. It is the only new instrumentation that runs
+# on a tick thread, so it deliberately runs on its own slow timer and never on
+# a dispatch or completion path: Paper's World#getPluginChunkTickets() walks
+# every ticketed chunk, which is far too expensive per attempt. Values below
+# 250ms are clamped. The census requires Paper; on Spigot and on Folia (where
+# the query is not region-safe) the ticket columns stay at -1 = NOT MEASURED.
+ticket-sample-period-ms: 1000
+
+# Setup-phase calibration of what ONE plugin chunk ticket actually costs.
+# peak_resident_chunks and peak_plugin_tickets are both recorded above, but
+# converting between them needs the platform's ticket footprint: vanilla
+# propagates ticket levels outward, so one ticket can pin a neighbourhood
+# rather than a single chunk, and Paper and Folia each reimplemented that
+# subsystem and need not agree. Assuming the factor would scale every
+# bytes-per-cached-location figure by the factor assumed, so it is measured
+# instead: once, on an idle server, before any teleport is recorded.
+#
+# Method: apply one ticket to an unloaded chunk far from origin, count the
+# ChunkLoadEvents it produces, then release it and count the unloads. Results
+# go to the ticket_footprint_* phase columns and to ticket-footprint.txt.
+# The probe touches ground far outside the benchmark's origin-centred
+# teleport radius, so it does not warm chunks the run then measures.
+ticket-footprint-probe:
+  enabled: true
+
+  # Distance from world origin (blocks) at which to look for an unloaded
+  # probe chunk. Must sit well outside the radius the run teleports within.
+  origin-distance-blocks: 20000
+
+  # Ticks awaited after applying the ticket before the load count is read,
+  # and again after releasing it before the unload count is read. Raise on a
+  # slow disk if ticket_footprint_chunks looks truncated; a value that is too
+  # low under-reports the footprint. Values below 5 are clamped.
+  settle-ticks: 40
+
+# Plugin name whose chunk tickets are broken out into
+# peak_target_plugin_tickets. Empty = infer it from `target-commands` when
+# exactly one target is configured, otherwise no breakout (the column stays
+# -1, and the server-wide peak_plugin_tickets column is unaffected).
+residency-target-plugin: ""
+
+# Heap-pressure control-loop evidence. Some RTP-style plugins govern their own
+# heap: under a configured limit they cut max attempts per request and serve
+# only from cache. That is a behaviour change, and a comparison drawn across
+# the boundary is not a comparison of like with like — so the harness records
+# the trigger. On a match it writes the log line and the heap-used level at
+# that instant to <stamp>-heap-triggers.csv, plus per-phase columns
+# (heap_pressure_events, heap_pressure_first_heap_used_mb,
+# heap_pressure_first_trigger). It records ONLY the trigger: no response is
+# inferred, modelled, or attributed from a match.
+heap-pressure-watch-enabled: true
+
+# Regexes (case-insensitive) matched against console output to detect the
+# above. Empty list = built-in defaults, which are deliberately narrow: a
+# false positive here becomes a claimed behavioural change that never
+# happened. Override to match the vocabulary of the plugin under test.
+heap-pressure-patterns: []
+
+# heap-pressure-patterns:
+#  - "heap limit"
+#  - "reducing max attempts"
+#  - "cache only"
+
 # When true, a best-effort `<target>-clear-cache` style command is dispatched
 # before each /rtpstress reset-cold run. Edit `cache-reset-commands` to match
 # the plugin under test. Empty list = no-op (and that's fine — most plugins
 # don't expose a cache reset).
 cache-reset-commands: []
-#cache-reset-commands:
+
+# cache-reset-commands:
 #  - "rtp queue clear"
 #  - "rtp reload"
 
@@ -355,16 +428,19 @@ cache-reset-commands: []
 # not present, mirroring ConsoleWatcher's posture (zero hard dependency).
 spark:
   enabled: true
+
   # Start a fresh profile per phase (recommended for sequence mode so each
   # target's profile is isolated). When false, a single profile spans the
   # whole run.
   profile-per-phase: true
+
   # Spark's own auto-stop timeout. Should be >= sequence.per-target-seconds
   # so the profile covers the full phase; the harness still calls `stop`
   # explicitly at phase end.
   # Must be >= per-target-seconds (600); set with headroom so spark's own
   # auto-stop never beats the harness's explicit stop.
   timeout-seconds: 660
+
   # Only sample ticks slower than this many ms. When > 0, spark filters
   # samples to only those captured during ticks that exceeded the
   # threshold; if no tick in a rotation slice crosses the threshold the
@@ -375,6 +451,7 @@ spark:
   # above 0 only when you need to isolate spike-only behaviour and
   # accept the risk of empty slices.
   only-ticks-over-ms: 0
+
   # When true (default), spark profiles are written to local files via
   # `spark profiler stop --save-to-file` instead of being uploaded to
   # bytebin (the default "live webpage" workflow). Files are written to
@@ -384,6 +461,7 @@ spark:
   # no live-webpage clutter, all artefacts on local disk). Set to false
   # to restore bytebin upload behaviour.
   save-to-file: true
+
   # Intra-phase profile rotation, in seconds. While a measurement phase is
   # active, the harness periodically stops the in-progress spark profile
   # (which writes a `.sparkprofile` file to disk via `--save-to-file`) and
@@ -401,6 +479,7 @@ spark:
   # saved to disk (no rotation effect). 60s pairs with the default
   # timeout-seconds: 90 and gives ~50 slices per 50-minute phase.
   rotate-seconds: 60
+
   # When true (default), every saved `.sparkprofile` (whether produced by a
   # phase-end stop or a rotation slice) is automatically decoded by the
   # harness and a `<name>.summary.json` sidecar is written next to it. The
@@ -413,6 +492,7 @@ spark:
   # false to skip the sidecar (e.g. when iterating quickly and you don't
   # need parsed output).
   auto-summary: true
+
   # Delay (in server ticks) between dispatching `spark profiler stop
   # --save-to-file` and scanning `plugins/spark/` for the newest
   # `.sparkprofile` to summarise. Spark writes the file asynchronously;
@@ -420,6 +500,7 @@ spark:
   # flush latency. Increase if your disk is slow or you see "no
   # .sparkprofile newer than stop" warnings in the log.
   auto-summary-delay-ticks: 60
+
   # Optional override for the spark plugin folder. By default the harness
   # uses spark's own getDataFolder() (or, as a fallback, `plugins/spark`
   # / `plugins/Spark` relative to the server CWD). Set this only if your

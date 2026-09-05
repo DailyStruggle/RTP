@@ -13,7 +13,7 @@ mensajeRetraso: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teletransportando en [delay]
 cargaDeChunk: "&7[P0] ⚙ Cargando chunks, por favor espera..."
 mensajeTeletransporte: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teletransportado en [attempts] intentos, en [processingTime]</gradient>"
 
-# if teleport is cancelled
+# si el teletransporte se cancela
 cancelarTeletransporte: "&7[P0] ⚡ ¡Teletransporte cancelado!"
 
 # si no hay lugares seguros tras alcanzar el máximo de intentos
@@ -24,7 +24,10 @@ inseguro: "&7[P0] ⌖ no se encontró una ubicación segura en [attempts] intent
 # marcador: [remainingCooldown] - el tiempo restante
 mensajeEnfriamiento: "&7[P0] ⚡ No puedes teletransportarte otra vez hasta dentro de [remainingCooldown]"
 
-# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+# cuando el jugador ha alcanzado el límite de lockAfterUses y se le bloquea el acceso (paridad con BetterRTP LockAfter)
+# marcador: [remainingLockTime] - tiempo restante hasta que la ventana lockAfterResetSeconds se reinicie.
+# Se resuelve en vacío cuando no hay ventana de reinicio configurada (un límite absoluto); si usas
+# un límite absoluto, reformula esto sin el marcador (p. ej. "Inténtalo de nuevo más tarde.").
 lockedAfterUses: "&7[P0] ⌖ Has alcanzado tu límite de teletransporte aleatorio. Inténtalo de nuevo en [remainingLockTime]."
 
 # si la región no tiene ubicaciones en cola y el jugador no tiene el permiso rtp.unqueued
@@ -61,11 +64,11 @@ comandoConsolaNoPermitido: "&c[P0] Debes ser un jugador en el juego para ejecuta
 # busy y invalidCommand no se traducen en messages.lang.yml -> se usan las claves en inglés (fallback al baseline).
 busy: "&c[P0] ocupado"
 
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+# Enviado cuando la comprobación opcional de combate PvP rechaza /rtp porque el jugador está en combate
 pvpInCombat: "&c[P0] No puedes teletransportarte al azar mientras estás en combate."
 
-# plugin doesn't have the subcommand or parameter the user requested
-# placeholder: [arg] - the argument attempted
+# el plugin no tiene el subcomando o parámetro solicitado por el usuario
+# marcador: [arg] - el argumento intentado
 invalidCommand: "&c[P0] comando no válido - [arg]"
 
 # el usuario no tiene permiso para el comando solicitado
@@ -104,8 +107,8 @@ aparecer: 20
 permanecer: 20
 desvanecer: 20
 
-# actionbar setting
+# ajuste de la barra de acción
 barraAccion: ""
 
-# DO NOT TOUCH VERSION NUMBER
+# NO MODIFICAR EL NÚMERO DE VERSIÓN
 version: 1.0

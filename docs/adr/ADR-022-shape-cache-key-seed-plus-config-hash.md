@@ -23,7 +23,7 @@ Cached `RTPLocation` rows in the H2/SQLite database (see [ADR-002](ADR-002-h2-sq
 
 The seed-only key correctly invalidates the cache when a world is regenerated under a different seed. It does **not** invalidate when an admin edits configuration values that change either:
 
-1. **The Archimedean spiral 1D→2D mapping** (see [ADR-001](ADR-001-archimedean-spiral-1d-mapping.md)) — i.e., which world chunk corresponds to cell index *N*. Examples: `centerX`, `centerZ`, `minRadius`, `maxRadius`, `spatialResolution`, the shape class itself (`Circle`, `Square`, `Rectangle`, `*_Normal`), and shape-specific parameters (rectangle width/length, normal sigma).
+1. **The Archimedean spiral 1D→2D mapping** (see [ADR-001](ADR-001-archimedean-spiral-1d-mapping.md)) — i.e., which world chunk corresponds to cell index *N*. Examples: `centerX`, `centerZ`, `minRadius`, `maxRadius`, the shape class itself (`Circle`, `Square`, `Rectangle`, `*_Normal`), and shape-specific parameters (rectangle width/length, normal sigma).
 2. **The validity predicate** that decided a cell was "bad" — i.e., whether a cell that was previously rejected would still be rejected today. Examples: biome whitelist/blacklist, `safety.yml` fields (`unsafeBlocks`, `platform`, `requireSkyLight`, etc.), the active vertical adjustor and its bounds, world-border respect.
 
 After such an edit the spiral marches over indices whose cached "bad" flags refer either to the wrong world chunk (geometry change) or to a stale validity rule (predicate change). The DB seed-mismatch guard at `Region.java:238` does not help here — it only protects cached `RTPLocation` rows, not the per-cell shape bitmap.
@@ -46,10 +46,12 @@ Replace the cache key with a composite of the world seed and a stable hash of ev
 
 1. `world.getSeed()`.
 2. The shape class FQCN.
-3. All numeric and enumerated shape parameters affecting the spiral mapping or bounds: `centerX`, `centerZ`, `minRadius`, `maxRadius`, `spatialResolution`, plus shape-specific extras (`Rectangle` width/length, `*_Normal` sigma, etc.).
+3. All numeric and enumerated shape parameters affecting the spiral mapping or bounds: `centerX`, `centerZ`, `minRadius`, `maxRadius`, plus shape-specific extras (`Rectangle` width/length, `*_Normal` sigma, etc.).
 4. The vertical adjustor FQCN and its parameters (e.g. `LinearAdjustor` min/max Y).
 5. Validity-defining configuration: biome whitelist/blacklist (sorted), the relevant `safety.yml` fields, world-border bounds when respected by the region.
 6. A `SCHEMA_VERSION` integer, bumped whenever a new validity-affecting field is added so that older caches auto-invalidate on upgrade.
+
+`spatialResolution` shall **not** be a hash input. It is the run-length coalescing distance applied when new marks are folded into the learned bad-run array; it does not participate in the cell-index→chunk function, so a stored run array remains addressed against the same geometry whichever value produced it. Reading data coalesced at a coarser resolution under a finer one yields a valid, merely conservative, superset — some cells inside a merged run were never individually rejected, which costs a little candidate area and nothing else — and the reverse direction only changes how subsequent marks merge. Neither direction can admit a cell the validity predicate would reject, so neither is a safety concern under the safety-first invalidation principle above. Operators wanting the finer precision retroactively may rescan; that is a precision choice, not an invalidation requirement.
 
 Canonicalization rules:
 
@@ -81,7 +83,7 @@ When `Region.setSettings(...)` (`Region.java:209`) detects a `cfgHash` change re
 
 - **Negative / Trade-offs:**
   - Every validity-affecting config edit now triggers a full re-scan. For regions with `maxRadius > 50000` this is non-trivial. A `--keep-shape` operator opt-out may be added later for advisedly cosmetic-only edits, but the default must be safety-first invalidation.
-  - The boundary between "validity-affecting" and "cosmetic" must be drawn explicitly and maintained. A unit test enumerating every config key and asserting whether it participates in the hash will keep this honest over time.
+  - The boundary between "validity-affecting" and "cosmetic" must be drawn explicitly and maintained. A unit test enumerating every config key and asserting whether it participates in the hash will keep this honest over time. `spatialResolution` is the instructive case: it is neither cosmetic nor validity-affecting, but a storage-precision knob over already-collected data, and hashing it would force a full re-scan for no correctness gain.
   - Database schema migration is required (`cached_locations` gains a `cfgHash` column). Old rows must be invalidated on first load post-upgrade.
   - Existing `<regionName>_<seed>.bin` files become orphans. Either delete on first load when no `<regionName>_<seed>_<cfgHash>.bin` exists, or ship a one-shot pruner. To be documented in `CHANGELOG.md`.
 

@@ -242,14 +242,14 @@ Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https:/
 - **Deterministic spiral selection.** Bounded math, uniform player distribution even on massive worlds; no unbounded re-roll loops.
 - **Platform-native performance.** Spigot, Paper, and Folia each get the threading model that fits them - not the lowest-common-denominator.
 - **Active resource watchdog.** Background sweep reclaims chunk tickets from abandoned teleports via WeakReferences; nothing stays force-loaded past its reservation window.
-- **Direct region I/O pre-filter.** `.mca` region files parsed off-tick on a background pool, including biomes (custom namespaced biomes like Iris included). Paper-grade safety evaluation on Spigot; skips per-candidate Region-Thread hops on Folia.
+- **Direct region I/O pre-filter.** `.mca` (Anvil) and `.linear` (Linear / Leaves / Gale) region files parsed off-tick on a background pool, including biomes (custom namespaced biomes like Iris included). Paper-grade safety evaluation on Spigot; skips per-candidate Region-Thread hops on Folia.
 - **Admin-driven background mapping.** `/rtp scan start|pause|resume|reset|cancel` walks the spiral during idle periods so spatial memory accumulates without player traffic. Fully-automatic self-warming is on the roadmap for `3.0.0` final.
 
 **Chunk loading, by platform:**
 
 - **Paper** - `World#getChunkAtAsync` used directly. No pre-filter, no main-thread fallback. Reference platform.
-- **Paper forks** (Leaf, Leaves, Purpur, Pufferfish, Airplane, DivineMC, ...) - inherit the Paper code path.
-- **Folia** - Anvil read-only pre-filter on `ForkJoinPool.commonPool()` *before* the Region Scheduler; rejected candidates never hop a thread. Confirmed candidates load through Folia's native async API; teleports dispatch through the Entity Scheduler.
+- **Paper forks** (Leaf, Leaves, Purpur, Pufferfish, Airplane, DivineMC, ...) - inherit the Paper code path. Servers using the Linear region format (`.linear`) benefit from off-tick ZSTD pre-filtering (ADR-077).
+- **Folia** - Region read-only pre-filter on `ForkJoinPool.commonPool()` *before* the Region Scheduler; rejected candidates never hop a thread. Confirmed candidates load through Folia's native async API; teleports dispatch through the Entity Scheduler.
 - **Spigot** - `.mca` region files parsed off-tick (`isAir`, `isSafe`, surface-height, sky-light, biome). Paper-class throughput on plain Spigot.
 - **Mohist / Arclight** - officially supported. Spigot code path applies.
 - **Fabric** - first-class, stable, in-tree adapter; supported and regularly tested, at feature parity with the Bukkit family. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x runtimes.

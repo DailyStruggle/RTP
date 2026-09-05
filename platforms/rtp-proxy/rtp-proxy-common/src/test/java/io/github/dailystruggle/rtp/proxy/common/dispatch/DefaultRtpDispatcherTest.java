@@ -232,6 +232,29 @@ class DefaultRtpDispatcherTest {
     }
 
     @Test
+    void player_disconnecting_during_snapshot_read_skips_claim() throws Exception {
+        UUID player = UUID.randomUUID();
+        FakeTransport transport = new FakeTransport(List.of(backend("b1")));
+        FakeSender sender = new FakeSender(player);
+        sender.connected = true;
+
+        BackendSelector picker = (req, snap) -> {
+            // Player disconnects right before continueAfterPick / claim
+            sender.connected = false;
+            return Optional.of("b1");
+        };
+        DefaultRtpDispatcher d = new DefaultRtpDispatcher(picker, transport, sender, Runnable::run);
+
+        DispatchOutcome outcome = d.dispatch(request(player)).get();
+
+        DispatchOutcome.Failed failed = assertInstanceOf(DispatchOutcome.Failed.class, outcome);
+        assertEquals(DispatchOutcome.Failed.Reason.PLAYER_GONE, failed.reason());
+        assertEquals(0, sender.sendToCalls.size());
+        assertEquals(0, transport.claimCount.get(),
+                "claim must not run when player disconnects prior to claim");
+    }
+
+    @Test
     void transfer_failure_releases_token_and_reports_INTERNAL() throws Exception {
         UUID player = UUID.randomUUID();
         FakeTransport transport = new FakeTransport(List.of(backend("b1")));

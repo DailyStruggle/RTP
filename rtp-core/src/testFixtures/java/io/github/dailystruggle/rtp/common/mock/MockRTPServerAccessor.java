@@ -320,13 +320,19 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     @Override
     public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) { }
 
+    private Function<String, ?> worldBorderFunction = null;
+
     /**
-     * Returns an always-inside world border so
+     * Returns configured world border or always-inside world border so
      * {@link io.github.dailystruggle.rtp.common.selection.region.LocationGenerator}
      * never rejects locations in tests.
      */
     @Override
     public Object getWorldBorder(String worldName) {
+        if (worldBorderFunction != null) {
+            Object res = worldBorderFunction.apply(worldName);
+            if (res != null) return res;
+        }
         return ALWAYS_INSIDE_BORDER;
     }
 
@@ -337,7 +343,8 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public boolean setWorldBorderFunction(Function<String, ?> function) {
-        return false;
+        this.worldBorderFunction = function;
+        return true;
     }
 
     @Override

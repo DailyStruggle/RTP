@@ -75,7 +75,7 @@ line_up_after_pounce: false
 # @default: true
 check_when_kibble_arrives: true
 
-# Fraction of the L3 backlog stash where refilling wakes back up (hysteresis).
+# Fraction of the backlog stash where refilling wakes back up (hysteresis).
 # 0.5 = refill after draining to 50%; 1.0 = refill nonstop.
 # @type: number
 # @range: [0.0, 1.0]
@@ -156,5 +156,6 @@ prefab_blanket:
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
+
 # Do not bite the version number, sacred catnip
 meowsion: 1.0

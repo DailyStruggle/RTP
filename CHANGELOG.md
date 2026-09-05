@@ -23,6 +23,57 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Multi-platform command execution and player death lifecycle stage in the effects engine (effects-api-ADR-007).** The effects framework introduces `CommandEffect` (`COMMAND`), enabling arbitrary console commands (`COMMAND CONSOLE ...`) and player-executed commands (`COMMAND PLAYER ...`) across all teleport stages, permission nodes (`rtp.effect.<stage>.command...`), and declarative groups in `effects/*.yml`. Command parsing supports human-readable strings with quotes, backslash escapes, and dynamic placeholders (`[player]`, `[uuid]`, `[world]`, `[x]`, `[y]`, `[z]`). A new `death` lifecycle stage triggers effects upon player death. Supported across Bukkit/Paper/Folia (with Folia global-region and entity-scheduler thread safety), Fabric (both intermediary and unobf carriers), and NeoForge (`LivingDeathEvent` and server-thread command execution).
+
+- **Multi-format region file support including Linear (`.linear` / ZSTD) and pluggable region readers (ADR-077).** Generalizes the off-tick region prefilter subsystem (`anvil-api`) with a pluggable `RegionFileReader` SPI supporting both Anvil (`.mca`) and Linear (`.linear`) region storage formats via `zstd-jni` stream decoding. Enables off-tick biome and safety prefiltering on servers using the Linear region format (such as Leaves, Gale, or modded environments) without triggering live server chunk loads.
+
+- **Multi-entity subspace teleportation addon (`LeafRTPGroupAddon`) supersedes party teleportation.** A new bundled addon (`LeafRTPGroupAddon`, leafrtp-group-addon-ADR-001/002) replaces the legacy `LeafRTPPartyAddon`, unifying all multi-player teleportation (co-op parties, 1v1 PvP duels, team skirmishes, and pursuit/bounty drops) into a single geometric primitive: a relative Subspace Shape capturing spatial memory from the parent region. Subspace candidate selection employs unit-scaled shape-masked lattice selection, an off-tick chunk pre-filter against inherited `MemoryShape` chunk data, candidate validation, and chunk-binned player delivery. Declarative profile presets under `definitions/groups/` (`default.yml`, `party.yml`, `duel.yml`, `skirmish.yml`, `pursuit.yml`) govern participant footprints and spacing, backed by a dedicated multi-tier subspace candidate cache (`GroupSubspaceCache`).
+
+- **Cause-based TTL and staged expiration on spatial memory segments (ADR-079).** Dynamic rejection causes (`safetyExternal` from claim plugins, `uniquePlacement` player spacing) now expire automatically using configurable time-to-live durations in `advanced/ttl.yml` rather than permanently locking candidate land in `badKeysCache`. Adjacent bad-location runs coalesce only within the same volatility tier (static terrain versus dynamic claims), preventing permanent land from expiring and transient claims from becoming immortalized. A two-phase off-tick rebuild pass partitions segments into active avoidance ($t < 1\times \text{TTL}$) and probation ($1\times \text{TTL} \le t < 2\times \text{TTL}$) buffers, allowing still-claimed land to be re-quarantined in $O(\log M)$ time without triggering full terrain raycasts or tick spikes. Region cache files use format `BIN_VERSION 3` with expiration epochs per segment and backward compatibility for older cache files.
+
+- **Composable cache pipeline stages and domain stage nomenclature (ADR-078).** Retires ambiguous hardware cache analogies (`L1`, `L2`, `L3`) in favor of domain-accurate terms across codebase and contracts: `Backlog` (unscreened candidates), `Cold` (pre-verified coordinates with chunk tickets released), and `Hot` (verified coordinates with active `keep(true)` reservations). Cache pipelines decompose into discrete, bounded `CacheStage<T>` buffers (`RingCacheStage`, `SimpleCacheStage`) connected by asynchronous transitions with explicit rejection outcomes and terminal disposal, protecting chunk ticket lifecycles (S-002).
+
+- **Unified unit parsing framework for spatial, temporal, and data size expressions across configurations and commands.** Configurations and command arguments now accept human-readable expressions with explicit unit suffixes and auto-interpretation:
+  - *Spatial units (`SpatialUnit`, `DistanceParser`, `DistanceParameter`):* Shape dimensions (`radius`, `centerRadius`, `radius2`, `centerRadius2`, `width`, `length`) and center coordinates (`centerx`, `centerz`) across all memory shapes accept blocks (`b`, `blocks`, `m`), chunks (`c`, `chunks`), region files (`r`, `regions`), kilometers (`km`), miles (`mi`), and feet (`ft`), with tab-completion and auto-conversion into internal chunk units. Subspace shapes remain strictly unitless lattice coordinates.
+  - *Temporal duration units (`TemporalUnit`, `DurationParser`):* Time-based settings across `config.yml` (`teleportCooldown`, `teleportDelay`, `lockAfterResetSeconds`), background sync timers (`periodTicks`, `syncTimer`), and spatial memory retention TTLs (`advanced/ttl.yml`) accept game ticks (`t`), milliseconds (`ms`), seconds (`s`), minutes (`m`), hours (`h`), days (`d`), weeks (`w`), and composite strings (e.g. `2h30m`, `1d12h`, `2s500ms`).
+  - *Data size units (`DataSizeUnit`, `DataSizeParser`):* Memory ceilings in `MemoryTracker` (`memoryCeiling`), off-tick region I/O budgets in `AnvilIoPool` (`memoryBudget`), and region cache limits (`activeChunkCap`, `cacheCap`, `backlogCacheCap`) accept binary and decimal suffixes (`b`, `kb`/`kib`, `mb`/`mib`, `gb`/`gib`) mapped to estimated tier memory footprints (~1 MiB/active chunk ticket, ~128 B/cold coordinate or candidate).
+  - All parsers preserve full backward compatibility for plain unitless numbers with contextual auto-interpretation, and documentation across all supported locale translations has been updated.
+
+- **World border overflow audit and chunk-inscribed bounding.** RTP now performs startup and reload validation checks comparing configured region shapes against the active world border (`WorldBorderAuditor`). Regions whose outer radius extends beyond the world border log an informative warning to alert server operators. Furthermore, chunk-inscribed bounding math ensures that block-specified radii scale to whole-chunk boundaries, guaranteeing that no candidate chunk or teleport destination crosses the border.
+
+- **Automated Maven Central publishing workflow.** A dedicated GitHub Actions workflow (`maven-central.yml`) automates publishing of signed API and platform artifacts to Maven Central.
+
+### Changed
+
+- **Off-tick Anvil and Linear region prefilter data structure reuse.** The Anvil and Linear region file prefilter (`AnvilChunkView`, `AnvilRegionByteCache`, and internal read buffers) now aggressively reuses chunk parsing data structures across off-tick scan pulses. This eliminates high-frequency byte array allocations during terrain prefiltering, significantly reducing JVM garbage collection churn on servers with large pre-generation pipelines.
+
+- **Region file freshness checks no longer dominate off-tick prefilter cost.** The cached region-byte lookup used to `stat` the `.mca` / `.linear` file on every probe to detect a chunk-save, which on Windows cost about as much as the entire cached lookup it was guarding - a 1024-probe sweep over one region file paid roughly 68 ms of syscalls. The check now runs at most once per region file per second, so a warm lookup measured 153 ns instead of ~65 us on the same machine. Chunk saves are still picked up promptly, since the default autosave cadence is ~30s.
+
+- **Monolithic `messages.yml` removed in favor of modular category messages.** The legacy flat `messages.yml` has been removed. All user-facing strings are organized under `advanced/messages/` (`commands.yml`, `network.yml`, `placeholders.yml`, `player.yml`, `system.yml`) with co-located dotfile rename maps across all 13 supported locales, ensuring cleaner structure and faster translation audits.
+
+- **Standardized configuration formatting and comment block hygiene across all modules and translations.** Sibling settings across all shipped YAML configurations (`config.yml`, `safety.yml`, `advanced/`, `definitions/`, proxy configs, and bundled add-on configs) now have blank-line separation preceding option comment blocks, guaranteeing clear visual boundaries and deterministic key association under the ADR-042 preservation engine across all 13 locales. Commented-out settings consistently use `# ` spacing to prevent indentation parse errors, and the `defaults.shape` comment in `config.yml` was shortened from 20 lines to a 4-line summary referencing `REGIONS.md` to keep in-game menu tooltips concise.
+
+- **Unified region shape selection routine in `MemoryShape`.** Each of the seven memory shapes previously duplicated location-selection logic (bad-area accounting, `mode` handling, and `uniqueplacements` marking), which had drifted apart across implementations. That logic now lives once in `MemoryShape`, with individual shapes contributing only their specific geometry and sampling curve. Deliberate shape characteristics are preserved: `RECTANGLE` retains uniform draw over its range (without `weight` or `expand`), and `CIRCLE_NORMAL` / `SQUARE_NORMAL` share a single normal-distribution implementation.
+
+- **`ELLIPSE` now refuses `expand: true` with a console warning.** Because an ellipse is inscribed within the circle describing its internal range, expanding past known-bad land pushed selections into outer corners outside the ellipse that the shape itself then rejected. Setting `expand: true` on an ellipse is now automatically forced off with a one-time console warning, matching `POLYGON` behavior. `CIRCLE`, `SQUARE`, and normal variants remain bounded by their range and continue to honor `expand`.
+
+### Fixed
+
+- **Region shape `mode` handling and bad-location recovery fixes across shapes.**
+  - `mode` settings (`nearest`, `reroll`) in shape configurations are now case-insensitive across all shapes (lowercase values on `SQUARE` and `RECTANGLE` previously disabled snapping and rerolling silently).
+  - In `NEAREST` mode, `CIRCLE` and `ELLIPSE` shapes now fall back to rerolling when no usable neighbor is found instead of returning a known-bad location.
+  - `NEAREST` mode on `CIRCLE` and `ELLIPSE` shapes now properly honors `uniqueplacements` spreading markers instead of skipping them on repeat teleports.
+
+- **`uniqueplacements` radius parsing and $O(\log M)$ binary search scaling.**
+  - `SQUARE_NORMAL` regions now parse `uniqueplacements` as a chunk radius instead of a boolean, preventing configured integer radii from being misinterpreted as "off" and subsequently overwritten as `false` in config saves.
+  - Selection performance on regions with `uniqueplacements` enabled no longer degrades as bad-location memory grows: nearby marks now fold directly into existing records, sorting and collapsing run in batches rather than on every pick, and known-bad checks use an $O(\log M)$ binary search instead of linear scans (reducing a 40,000-candidate fill from ~6s to ~0.2s).
+
+---
+
 ## [3.2.1] - 2026-08-15
 
 ### Added

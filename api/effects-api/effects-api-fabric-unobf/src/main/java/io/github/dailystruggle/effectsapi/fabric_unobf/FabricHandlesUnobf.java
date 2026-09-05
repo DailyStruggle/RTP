@@ -63,6 +63,25 @@ public final class FabricHandlesUnobf implements HandleProvider {
         return null;
     }
 
+    private static volatile net.minecraft.server.MinecraftServer cachedServer;
+
+    public static void setServer(net.minecraft.server.MinecraftServer server) {
+        cachedServer = server;
+    }
+
+    @Override
+    public void dispatchConsoleCommand(@NotNull String command) {
+        net.minecraft.server.MinecraftServer server = cachedServer;
+        if (server != null) {
+            server.execute(() -> server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command));
+        }
+    }
+
+    @Override
+    public void dispatchPlayerCommand(@NotNull PlayerHandle player, @NotNull String command) {
+        player.performCommand(command);
+    }
+
     public static PlayerHandle wrap(@NotNull ServerPlayer player) {
         return new PlayerWrapper(player);
     }
@@ -161,6 +180,14 @@ public final class FabricHandlesUnobf implements HandleProvider {
         public void setGliding(boolean gliding) {
             if (gliding) player.startFallFlying();
             else player.stopFallFlying();
+        }
+
+        @Override
+        public void performCommand(@NotNull String command) {
+            net.minecraft.server.MinecraftServer server = ((ServerLevel) player.level()).getServer();
+            if (server != null) {
+                server.execute(() -> server.getCommands().performPrefixedCommand(player.createCommandSourceStack(), command));
+            }
         }
 
         @Override

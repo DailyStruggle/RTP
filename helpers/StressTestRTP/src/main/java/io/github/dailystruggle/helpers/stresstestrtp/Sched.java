@@ -172,6 +172,55 @@ public final class Sched {
                 Bukkit.getScheduler().runTaskTimer(plugin, r, period, period).getTaskId());
     }
 
+    /**
+     * Run {@code r} on the thread that owns the given chunk. On Folia this is
+     * the {@code RegionScheduler}, which is the only thread permitted to touch
+     * that chunk's ticket state; on Spigot/Paper it is the main thread.
+     *
+     * <p>Required by {@link TicketFootprintProbe}: a chunk ticket may only be
+     * applied or released from the owning region, and a cross-region call is
+     * rejected rather than merely slow.
+     */
+    public static void runOnRegion(Plugin plugin, org.bukkit.World world, int cx, int cz, Runnable r) {
+        if (isFolia()) {
+            try {
+                Object regionSched = Bukkit.getServer().getClass()
+                        .getMethod("getRegionScheduler").invoke(Bukkit.getServer());
+                Method m = regionSched.getClass().getMethod(
+                        "execute", Plugin.class, org.bukkit.World.class,
+                        int.class, int.class, Runnable.class);
+                m.invoke(regionSched, plugin, world, cx, cz, r);
+                return;
+            } catch (ReflectiveOperationException ignored) {
+                // fall through
+            }
+        }
+        Bukkit.getScheduler().runTask(plugin, r);
+    }
+
+    /**
+     * One-shot delayed task on the global region (Folia) or main thread
+     * (Spigot/Paper), measured in ticks. Used to let a scheduled chunk
+     * operation settle before its effect is read.
+     */
+    public static void runGlobalLater(Plugin plugin, Runnable r, long delayTicks) {
+        long delay = Math.max(1L, delayTicks);
+        if (isFolia()) {
+            try {
+                Object globalSched = Bukkit.getServer().getClass()
+                        .getMethod("getGlobalRegionScheduler").invoke(Bukkit.getServer());
+                Method m = globalSched.getClass().getMethod(
+                        "runDelayed", Plugin.class, java.util.function.Consumer.class, long.class);
+                m.invoke(globalSched, plugin,
+                        (java.util.function.Consumer<Object>) task -> r.run(), delay);
+                return;
+            } catch (ReflectiveOperationException ignored) {
+                // fall through
+            }
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, r, delay);
+    }
+
     /** Cancel a handle previously returned by {@link #runAsyncTimer}. Null-safe. */
     public static void cancel(Object handle) {
         if (handle == null) return;

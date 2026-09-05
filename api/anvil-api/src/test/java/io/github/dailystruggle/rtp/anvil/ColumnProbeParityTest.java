@@ -114,7 +114,7 @@ class ColumnProbeParityTest {
         ColumnProbe absent = AnvilReader.readColumnProbe(regionBytes, 5, 5, 0, 16);
         // chunk (5,5) may or may not be present in the trimmed fixture. Guard by checking
         // the underlying readChunk first - if that's null, readColumnProbe must be too.
-        AnvilReader.ChunkEntry entry = AnvilReader.readChunk(regionBytes, 5, 5);
+        AnvilReader.ChunkEntry entry = AnvilReader.readChunkEntry(regionBytes, 5, 5);
         if (entry == null) {
             assertEquals(null, absent, "probe must return null when chunk slot is empty");
         }

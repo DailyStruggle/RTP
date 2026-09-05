@@ -254,8 +254,42 @@ class ConfigParserUpdateTest {
     }
 
     @Test
+    void update_preservesTopLevelScalarsWithoutJarDefaults() throws IOException {
+        // Test updating a file when getResourceFromJar returns null (e.g. dynamic region file)
+        File configFile = new File(pluginDir, "config.yml");
+        Files.writeString(configFile.toPath(),
+                "version: \"1.0\"\n" +
+                "shape: \"@config\"\n" +
+                "vert: \"@config\"\n" +
+                "teleportDelay: 42\n"
+        );
+
+        ConfigParser<TestKeys> parser = new ConfigParser<TestKeys>(
+                TestKeys.class,
+                "config",
+                "2.0",
+                pluginDir,
+                db
+        ) {
+            @Override
+            public java.io.InputStream getResourceFromJar(String filename) {
+                // No JAR default stream available
+                return null;
+            }
+        };
+
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig reloaded =
+                new io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig(configFile);
+        reloaded.load();
+
+        assertEquals("2.0", reloaded.getString("version"));
+        assertEquals("@config", reloaded.getString("shape"));
+        assertEquals("@config", reloaded.getString("vert"));
+        assertEquals(42, reloaded.getInt("teleportDelay"));
+    }
+
+    @Test
     void testAllConfigFiles() throws IOException {
-        // Test all core config files defined in Configs.java
         String[] configFiles = {"config.yml", "messages.yml", "economy.yml", "performance.yml", "logging.yml", "safety.yml"};
 
         for (String fileName : configFiles) {
