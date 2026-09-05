@@ -302,3 +302,245 @@ the remembered conclusion; see Consequences.
   permanent, dynamic claim state expires — the axis the behavioural tier models).
 - `helpers/StressTestRTP/RESULTS.md`, `helpers/StressTestRTP/PRE_WRITEUP.md` (measured ground truth).
 - `rtp-core/src/test/java/io/github/dailystruggle/rtp/common/benchmark/` (this tier).
+
+
+## Addendum: per-attempt teleport-mode classification in the measurement harness
+
+Latency populations produced by RTP-style plugins are bimodal: a request is either served from a
+pre-computed location or it selects and verifies a destination on demand. A p50 taken across a
+near-50/50 mixture sits on the mode boundary and is maximally unstable, and a mean over such a
+population describes neither mode.
+
+`StressTestRTP` therefore classifies each attempt and reports the two modes separately.
+
+- The classification uses **observable signals only**: the attempt latency and the attributed
+  selection chunk loads, both already columns in the per-attempt CSV. A competitor's internal
+  cache state is not observable from outside the plugin and shall not be reconstructed, guessed,
+  or published as if it were read.
+- The fast/cold boundary is **derived from the phase's own attempt population** (Otsu two-class
+  split over log10 latency) and written into the phases CSV as `mode_threshold_ms` alongside
+  `mode_threshold_method`, so any reader can re-derive every row. No millisecond constant is
+  hardcoded and no threshold is chosen after looking at a result.
+- This plugin's own serving mode is knowable directly; a competitor's is not. The direct reading
+  has its own columns (`served_mode_direct`, `direct_fast_mode_fraction`) and shall never feed the
+  inferred classifier's threshold or its per-mode percentiles. The two readings are reported side
+  by side and labelled, never merged.
+- Every new numeric column uses `-1` for "not measured" and every new string column uses empty.
+  A competitor arm's blanks shall never be readable as zeros. The sentinels are documented in the
+  run's `<stamp>-schema.txt` sidecar.
+- Phase rows publish `fast_mode_fraction` and p50/p95/p99 **within each mode**. A bare mean over
+  the combined population shall not be published.
+
+## Addendum: Folia region-context accounting and region-freeze detection in the measurement harness
+
+The strongest validation target in the measured dataset is not a percentile but a discrete integer:
+7 region freezes against 0, reproducing at exactly 7 across two independent 600 s runs, worst
+freeze 21.0 s. An integer that reproduces is a harder target than any tail statistic, and 21 s sits
+two orders of magnitude past every entry in the latency table - so it is a distinct mechanism
+(scheduler churn, region prepare / tick / GC), not the same distribution's tail, and it shall not
+be reported as one.
+
+`StressTestRTP` therefore accounts for Folia region context per attempt and detects region freezes
+per phase.
+
+- **The detection criterion is fixed before any run is read, and travels with the data.** A region
+  freeze is a wall-clock stall of at least a compile-time threshold (5000 ms) on a Folia region
+  thread. The threshold is 100x the nominal tick and two orders above the measured latency table,
+  so a freeze can be neither tick jitter nor a latency tail. It is written into every phase row as
+  `region_freeze_threshold_ms` so no reader has to assume it. A detector that fails to reproduce an
+  archived freeze count shall be reported as a broken detector; the threshold **shall not** be
+  adjusted until the result agrees.
+- **Exactly two channels, each reported separately.** Tick stall - the wall gap between consecutive
+  invocations of a 1-tick global-region-scheduler timer. Hop stall - the wall wait for a
+  player-owning region's entity scheduler to execute a dispatch. `region_freezes` is their union;
+  `region_freezes_tick_stall` and `region_freezes_hop_stall` keep the mechanism visible, because a
+  single fused count cannot distinguish "the region stopped ticking" from "the region stopped
+  draining its task queue".
+- **Runtime detection only.** The columns are gated on the existing `Sched.isFolia()` /
+  `Runner.isFoliaFamily()` probes. There is no build variant and no config toggle for something the
+  JVM can be asked directly.
+- **The schema is platform-independent.** Off Folia the columns are still emitted, carrying `-1`
+  for NOT MEASURED. A Folia phase that genuinely never froze writes `0`, which is a measurement.
+  A non-Folia arm's `-1` shall never be readable as "zero freezes".
+- **The apparatus stays off the measured path.** Primitive and `AtomicLong` state only, no
+  allocation per attempt or per tick, no snapshot copy, no blocking on a tick thread. This tier has
+  twice had its own instrumentation become the headline - a snapshot copy that inflated allocation
+  24x, and a shared FIFO that reported its own queue discipline as the design's latency - so a new
+  counter's cost is a design constraint, not an afterthought.
+- **No freeze figure is publishable until the detector is validated.** Until it reproduces the
+  archived 0-versus-7 split with its worst freeze, these columns carry data and no claim.
+
+
+## Addendum: GC and residency accounting in the measurement harness
+
+Heap-used sampled every 50 ms cannot distinguish memory that is **retained** from memory that is
+**churned**: two designs with identical heap curves can differ entirely in whether the bytes are
+live at the end of a teleport. That gap is why the cross-plugin heap claim is withheld from the
+front page under the currency rule, and restoring any such claim is gated on the accounting below
+being present for every phase compared.
+
+- GC is recorded as **per-phase deltas of `GarbageCollectorMXBean` collection count and collection
+  time**, split young/old by collector name, with beans whose generation cannot be identified
+  charged only to the totals and counted in their own column. Tick-thread allocation rate comes
+  from `getThreadAllocatedBytes` on the recorded tick thread, as a phase delta.
+- Residency is recorded as **peak resident chunks** and **peak plugin chunk tickets held** per
+  phase. This is the honest observable proxy for the platform-owned retained term the simulation
+  tier cannot weigh, and it is the row on which the designs actually differ: the axis is residency
+  policy - coordinate tuples plus tracked-and-released tickets against resident chunk
+  neighbourhoods - not the presence or absence of a cache. Peaks, not averages, because a peak is
+  what exposes retention.
+- Peak tickets depend on Paper's `World#getPluginChunkTickets()`. Where the platform does not
+  expose it the column is `-1` (not measured) and never `0`, per the no-data sentinel rule.
+- Heap-pressure control loops are **recorded, not modelled**. Where a plugin observably changes
+  behaviour under heap pressure (one competitor reduces max attempts and switches to a cache-only
+  mode under a heap limit), the harness captures the matching log line and the heap-used level at
+  which it fired. The trigger is evidence; no behavioural response is inferred, simulated, or
+  attributed from a match.
+- Instrumentation shall stay off the measured path: primitive counters, no per-attempt allocation,
+  no blocking call on a tick thread. This tier has twice had its own apparatus become the
+  headline - a snapshot copy that inflated allocation 24x, and a shared FIFO that reported its own
+  queue discipline as a design's latency - so a new counter that allocates or blocks is a
+  measurement error, not a cost.
+- Folia-specific interpretation is gated at **runtime** on Folia detection; there is no build
+  variant and no config toggle for a detectable property. Folia has no single tick thread, so the
+  allocation column carries a scope label identifying it as one region thread's share.
+- The output of this accounting is **columns**. No comparative heap or GC conclusion is written
+  from it here; an uninstrumented reading already produced one inverted published claim, and
+  interpretation is a later, separate decision under the currency rule.
+
+
+## Addendum: per-attempt foreground/async chunk split and tick occupancy as intervals
+
+The foreground share of chunk work is the single strongest health discriminator in the dataset -
+across four plugins the async share spread 85 / 47 / 8 / 1 %, and foreground chunk work either
+wrecks the tick tail or caps throughput. It was nonetheless only ever recorded **per phase**, as an
+average. An average cannot answer the question the queueing model actually asks, because the tail
+is produced by *when* foreground work lands relative to the tick, not by how much of it there is on
+aggregate.
+
+- The split is recorded **per attempt**: chunk loads attributed to a teleport are divided into
+  on-tick and off-tick counts. The decision is made once per `ChunkLoadEvent` from thread identity
+  and reused for both the per-attempt split and the per-phase counters, so the two can never
+  disagree with each other.
+- Thread identity is **runtime-detected**. On a single-tick-thread platform the primary-thread
+  check is exact. On Folia the question is region-scoped and is asked as "is this the region thread
+  that owns the chunk that just loaded", because Folia has no single tick thread and a
+  primary-thread check is not meaningful there. There is no build variant and no config toggle for
+  a detectable property, and each row records which oracle classified it so the columns are never
+  silently compared across platforms.
+- Tick-thread occupancy is recorded as **intervals**, summarised to count, total and max - never a
+  total alone. One 8 ms stall and sixteen 0.5 ms stalls have the same total and completely
+  different tick tails, so a total cannot validate queue discipline and an interval list can.
+  Only spans the harness can genuinely observe are recorded: the synchronous span inside the
+  dispatched command, and runs of on-tick loads for one attempt coalesced at a gap fixed well below
+  a tick so work on two different ticks can never merge into one interval.
+- The pre-existing per-phase aggregate columns are **left exactly as they are** and the new columns
+  are appended alongside. This is not tidiness: the derived foreground chunk-load cost is the
+  model's only unfitted dominant term, and moving or redefining a column it reads would break the
+  one term that was independently corroborated rather than fitted. Prior runs also stay comparable.
+- The measured async share is reported **alongside** the derived one, never in place of it. A
+  measurement and a derivation of the same quantity are kept in separate columns so neither can be
+  quietly substituted for the other, and agreement between them becomes checkable evidence instead
+  of an assumption.
+- Every new count and duration uses `-1` for "not measured". `-1` interval count means no interval
+  was ever observed and is explicitly **not** the claim that an arm consumed no tick time; a
+  competitor arm's blanks must never be readable as zeros.
+- The apparatus stays off the measured path: the per-attempt split reuses the existing per-attempt
+  tally through a static field updater, adding **zero** allocation per attempt, and the interval
+  accumulator is plain primitive fields under an uncontended per-attempt monitor. On a tick thread
+  the added work is two monotonic clock reads. This tier has twice had its own apparatus become the
+  headline, so a counter that allocates or blocks is a measurement error rather than a cost.
+- The output is **columns**. No foreground or async-share conclusion for any arm is written from
+  them here; interpretation is a later, separate decision under the currency rule.
+
+
+## Addendum: storage-class characterisation and region-file read accounting
+
+The leverage argument for answering safety from region bytes before materialising a chunk is a
+ratio between a cold region-file read and a warm in-memory hit. A ratio of that size is dominated
+by the medium it was measured on, so quoting it without the medium is quoting a property of one
+machine as a property of a design.
+
+- **A read-cost figure shall carry its device class.** Every run records the world directory's
+  storage class (`NVME | SATA_SSD | SPINNING | NETWORK | UNKNOWN`), the method that produced the
+  verdict, and a measured read-latency distribution (p50/p90/p99/max) taken from the actual
+  device, as a per-phase header block and as phase columns. A downstream model then selects a cost
+  distribution from a recorded histogram instead of assuming one. `UNKNOWN` is written literally
+  and never means "fast".
+- **The classification thresholds are fixed before any result is read.** They are compile-time
+  constants applied to the p50 of a random 4 KiB read, chosen as device-physics boundaries rather
+  than tuned to output. A network mount is decided by filesystem type and is never overridden by
+  latency, because latency on a network store describes the link rather than the medium.
+- **A probe that warms the pages it then measures shall say so.** No page-cache drop is portable
+  from a JVM, so the profiler does not pretend to one. It instead times only first touches of
+  distinct region files, never re-reads a file it has already probed, and selects probe files
+  farthest from the origin the benchmark radius is centred on - so no sample can measure pages the
+  profiler itself warmed. Prior warmth from the server or an earlier run remains uncontrolled and
+  indistinguishable, so the distribution is published under the label
+  `FIRST_TOUCH_UNKNOWN_PAGE_CACHE` and treated as a **lower bound**. A silent conflation would not
+  be acceptable; a labelled one is.
+- **An assumed batch size is an assumed order of magnitude, and shall be measured instead.**
+  Batching is worth up to the full read-term leverage, so a model that assumes 64 candidates per
+  binned batch has assumed the answer - and in this case understates the design it is defending,
+  which is the wrong direction for a published figure. Region-file reads are therefore counted per
+  distinct 32x32 bin, and both the candidate count and the read count are written per attempt and
+  per phase so reads-per-teleport is regressed against measured occupancy rather than asserted.
+  The mean occupancy never ships without its peak.
+- **The read count is chunk-load-implied, and its blind spot favours the competition.** It is not
+  an intercepted syscall count: it cannot see region bytes read without a chunk materialising,
+  which is precisely what this project's own prefilter does. It therefore under-states this
+  plugin's avoided reads and can only err against our own case.
+- **The apparatus stays off the measured path.** All probe I/O is asynchronous and never waited
+  on; bin and region accounting runs once per attempt at completion over coordinates already
+  collected, adding no per-event work and no snapshot copy. This tier has twice had its own
+  instrumentation become the headline, and the rule earned there applies here unchanged.
+
+
+## Addendum: reconciled instrumentation rules, and completeness as a gate
+
+Five instrumentation efforts landed against this tier independently - per-attempt teleport-mode
+classification, storage-class and region-read accounting, Folia region-context and freeze
+detection, GC and residency accounting, and the per-attempt foreground/async split. Each wrote its
+own rules; the rules agree, and the agreement is worth stating once rather than five times.
+
+- **No-data sentinel, uniformly.** Every instrumented quantity has an explicit "not available"
+  value: `-1` for counts and durations, empty for strings in the harness CSV, and `NaN` for the
+  real-valued anchors the model reads. `NaN` is chosen on the model side deliberately, because it
+  propagates through arithmetic instead of producing a plausible product. Sentinels are documented
+  in the run's schema sidecar rather than in a `#` comment line, which a dictionary reader would
+  not tolerate. A blank or a zero shall never be readable as a measurement, and a `-1` shall never
+  be readable as "this arm did none of that".
+- **Provenance is computed, not asserted.** A quantity's `MEASURED` / `MODELED` label is derived
+  from whether its slot holds a sentinel, at report time. A hand-written label is how a placeholder
+  eventually gets published as evidence; deriving it makes that failure unrepresentable.
+- **Completeness precedes accuracy, and its failure is not the lesser failure.** An accuracy gate
+  evaluated while inputs are absent is a model agreeing with its own fallback constants, so the
+  tier carries a third gate: every quantity the harness was instrumented to measure must actually
+  be present. When it is not, the tier verdict is `FAIL (INPUTS ABSENT)`, and it withholds
+  publication exactly as a numeric failure does. The expected-input list lives in one place, so
+  instrumenting a new quantity and forgetting to declare it cannot make the gate pass by omission.
+- **Thresholds are written down before results are read, and are not moved afterwards.** The
+  accuracy threshold (within-2x fraction `>= 0.80`) and the bias threshold (mean **signed**
+  residual within `+-0.50`) are carried forward unchanged. The signed test is retained precisely
+  because the observed bias is in the flattering direction: a model that is consistently
+  conservative about a competitor's cost is biased, not safe, and an absolute-error gate cannot
+  distinguish the two.
+- **Off-path instrumentation is a correctness requirement, not a preference.** Counters are
+  primitive fields, `AtomicLong` at worst, allocate nothing per attempt, take no snapshot copy and
+  never block a tick thread. This tier has twice had its own apparatus become the headline - a 24x
+  allocation inflation from a snapshot copy, and a shared FIFO reporting its own queue discipline
+  as the design's latency - so an allocating or blocking counter is a measurement error.
+- **Folia is detected at runtime, never configured.** Folia-only columns are gated on the existing
+  runtime detection. No build variant and no config toggle is introduced for something the process
+  can observe about itself. Off Folia the columns are still emitted carrying their sentinel, so the
+  schema is platform-independent and a reader cannot mistake a platform for a result.
+- **Fitting surface is unchanged.** A harness-supplied competitor quantity may be used as a
+  disclosed input or compared as a signed residual. It may never become a fitting target:
+  parameters are fitted against this plugin on Paper and against nothing else.
+
+**Consequence at the time of writing.** All five efforts are integrated and none has been run, so
+every new slot holds its sentinel, input completeness stands at 0 of 7, and the tier verdict is
+`FAIL (INPUTS ABSENT)` on top of the pre-existing accuracy (0.643 against 0.80) and bias (+1.554
+against +-0.50) failures. Nothing was relabelled `MEASURED` and no threshold was relaxed, so no
+latency or throughput figure from this tier publishes. The instrumentation becomes live on the
+first archived run with no further model change.
