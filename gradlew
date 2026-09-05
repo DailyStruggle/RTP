@@ -69,15 +69,16 @@ if [ "${RTP_GRADLE_LOCKED:-0}" != "1" ]; then
     export RTP_GRADLE_LOCKED=1
     LOCK_DIR="${TMPDIR:-/tmp}/rtp_gradle_build.lock"
 
+    # Note: POSIX shells (dash/ash) only support single-digit file descriptors,
+    # so the lock is taken via flock's command form instead of "exec 200>file".
     if command -v flock >/dev/null 2>&1; then
-        exec 200>"${TMPDIR:-/tmp}/rtp_gradle_build.flock"
-        if ! flock -n 200; then
-            echo "[gradlew] Waiting for build lock..." >&2
-            flock -w 600 200 || { echo "[gradlew] Timed out waiting for Gradle lock." >&2; exit 1; }
+        LOCK_FILE="${TMPDIR:-/tmp}/rtp_gradle_build.flock"
+        if [ -x "$0" ]; then
+            flock -w 600 "$LOCK_FILE" "$0" "$@"
+        else
+            flock -w 600 "$LOCK_FILE" sh "$0" "$@"
         fi
-        "$0" "$@"
         EXIT_CODE=$?
-        exec 200>&-
         exit $EXIT_CODE
     else
         WAIT_SECONDS=0
