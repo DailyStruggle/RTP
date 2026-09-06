@@ -617,6 +617,19 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   private final AtomicLong totalBadCount = new AtomicLong(0L);
   private final AtomicLong totalBiomeCount = new AtomicLong(0L);
 
+  /**
+   * Marks rejected by {@link #addBadLocation(long, LocationGenerator.FailTypes, long)} because
+   * their 1D index falls outside this shape's addressable domain.
+   *
+   * <p>A ring-based parameterisation offsets its index by the inner radius
+   * ({@code centerRadius}), so every cell inside that hole maps to a negative index - the whole
+   * origin-centred core of the shape. Those indices used to reach {@code pendingBadLocations} and
+   * then be dropped unannounced by the merge, i.e. a learned rejection vanished with no record.
+   * Counting and logging them keeps the discard observable (S-004) without re-admitting cells the
+   * selector can never draw.
+   */
+  private final AtomicLong outOfDomainMarks = new AtomicLong(0L);
+
   protected volatile ConcurrentHashMap<Long, Long> rebuildingBadLocations = null;
 
   protected final java.util.concurrent.atomic.AtomicReference<
@@ -1546,6 +1559,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param ttlSeconds retention duration in seconds; {@code <= 0} indicates infinite retention
    */
   public void addBadLocation(long location, LocationGenerator.FailTypes cause, long ttlSeconds) {
+    if (location < 0L) {
+      reportOutOfDomainMark(location, cause);
+      return;
+    }
     checkAndRestoreFromProbation(location);
     if (absorbIntoAdjacentRun(location)) return;
     long ord = (cause == null) ? MISC_CAUSE : cause.ordinal();
@@ -1554,6 +1571,46 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     long pendingVal = (ord & 0xFFL) | (epochSec << 8);
     pendingBadLocations.get().put(location, pendingVal);
     badLocationsDirty = true;
+  }
+
+  /**
+   * Number of marks refused so far because their 1D index lay outside the addressable domain.
+   *
+   * @return a monotone count; {@code 0} when every mark has been in range
+   */
+  public long getOutOfDomainMarkCount() {
+    return outOfDomainMarks.get();
+  }
+
+  /**
+   * Records an out-of-domain mark and logs it, throttled so a bulk sweep over the inner hole
+   * cannot flood the console: the first occurrence and then every power of ten.
+   *
+   * @param location the offending 1D index
+   * @param cause    the rejection reason being dropped, may be {@code null}
+   */
+  private void reportOutOfDomainMark(long location, LocationGenerator.FailTypes cause) {
+    long n = outOfDomainMarks.incrementAndGet();
+    boolean report = false;
+    for (long threshold = 1L; threshold <= n; threshold *= 10L) {
+      if (threshold == n) {
+        report = true;
+        break;
+      }
+    }
+    if (!report) return;
+    RTP.log(
+        Level.FINE,
+        "[plugin] shape "
+            + name
+            + ": refused bad-location mark "
+            + location
+            + " (cause "
+            + ((cause == null) ? LocationGenerator.FailTypes.misc : cause)
+            + ") - index is outside the addressable domain [0,"
+            + getRange()
+            + "); total refused: "
+            + n);
   }
 
   /**

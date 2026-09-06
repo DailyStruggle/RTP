@@ -51,12 +51,13 @@ public class SquareNormalTest {
     }
 
     @Test
-    void getRange_formula_is4TimesDiff() {
+    void getRange_isExactCellCount() {
         Square_Normal shape = new Square_Normal();
         shape.set(NormalDistributionParams.radius, 100L);
         shape.set(NormalDistributionParams.centerRadius, 0L);
         long range = shape.getRange();
-        assertEquals(100L * 100L * 4, range);
+        // one index per cell of the 199x199 block max(|x|,|z|) < 100
+        assertEquals(199L * 199L, range);
     }
 
     // -------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Polygon;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
@@ -221,9 +222,108 @@ public class RegionConfigLoader {
         if (prototype != null) {
             Shape<?> clone = prototype.clone();
             clone.setData(map);
+            applyPolygonVertices(clone, map);
             return clone;
         }
         return null;
+    }
+
+    /**
+     * ADR-034: {@code vertices} is a structured value, so {@code setData} cannot carry it into
+     * the shape. Parse it here and install it, or leave the shape as its bounding square with a
+     * warning - a silent degrade reads to an admin as "the polygon config did nothing".
+     */
+    static void applyPolygonVertices(Shape<?> shape, Map<String, Object> map) {
+        if (!(shape instanceof Polygon polygon)) return;
+
+        Object rawVertices = null;
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().trim().equalsIgnoreCase("vertices")) {
+                rawVertices = entry.getValue();
+                break;
+            }
+        }
+        if (rawVertices instanceof RtpYamlSection) {
+            rawVertices = ((RtpYamlSection) rawVertices).getMapValues(false);
+        }
+        if (rawVertices instanceof Map<?, ?> vertexMap) {
+            // Tolerate the mapping form (`0: [x, z]`), which some YAML writers emit.
+            rawVertices = new java.util.ArrayList<>(vertexMap.values());
+        }
+        if (!(rawVertices instanceof Iterable<?> iterable)) {
+            if (rawVertices != null) {
+                RTP.log(Level.WARNING, "[RTP] Shape " + shape.name
+                        + ": 'vertices' must be a list of [x, z] pairs; got "
+                        + rawVertices.getClass().getSimpleName()
+                        + ". Falling back to the bounding square.");
+            }
+            return;
+        }
+
+        List<int[]> vertices = new java.util.ArrayList<>();
+        for (Object entry : iterable) {
+            int[] vertex = parseVertex(entry);
+            if (vertex == null) {
+                RTP.log(Level.WARNING, "[RTP] Shape " + shape.name
+                        + ": vertex " + vertices.size() + " (" + entry
+                        + ") is not an [x, z] pair. Falling back to the bounding square.");
+                return;
+            }
+            vertices.add(vertex);
+        }
+
+        try {
+            polygon.setVertices(vertices);
+        } catch (IllegalArgumentException e) {
+            RTP.log(Level.WARNING, "[RTP] Shape " + shape.name + ": " + e.getMessage()
+                    + ". Falling back to the bounding square.");
+            return;
+        }
+
+        // ADR-034: expand is hard-off for a polygon. Say so instead of ignoring it silently.
+        Object rawExpand = map.get("expand");
+        if (rawExpand != null && getBoolean(rawExpand)) {
+            RTP.log(Level.WARNING, "[RTP] Shape " + shape.name
+                    + ": 'expand: true' is ignored for polygons - the boundary is the vertex list.");
+        }
+    }
+
+    /** Accepts {@code [x, z]}, a 2-element list, or the {@code "x,z"} scalar form. */
+    private static int[] parseVertex(Object entry) {
+        if (entry == null) return null;
+        List<Object> parts = new java.util.ArrayList<>(2);
+        if (entry instanceof int[] pair) {
+            return pair.length >= 2 ? new int[] {pair[0], pair[1]} : null;
+        } else if (entry instanceof Object[] array) {
+            java.util.Collections.addAll(parts, array);
+        } else if (entry instanceof Iterable<?> nested) {
+            for (Object part : nested) parts.add(part);
+        } else if (entry instanceof Map<?, ?> pairMap) {
+            Object x = pairMap.containsKey("x") ? pairMap.get("x") : pairMap.get("X");
+            Object z = pairMap.containsKey("z") ? pairMap.get("z") : pairMap.get("Z");
+            if (x == null || z == null) return null;
+            parts.add(x);
+            parts.add(z);
+        } else {
+            String s = entry.toString().trim();
+            if (s.startsWith("[") && s.endsWith("]")) s = s.substring(1, s.length() - 1);
+            if (s.startsWith("(") && s.endsWith(")")) s = s.substring(1, s.length() - 1);
+            for (String part : s.split("[,;\\s]+")) {
+                if (!part.isEmpty()) parts.add(part);
+            }
+        }
+        if (parts.size() != 2) return null;
+        try {
+            return new int[] {parseCoord(parts.get(0)), parseCoord(parts.get(1))};
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static int parseCoord(Object o) {
+        if (o instanceof Number number) return number.intValue();
+        if (o == null) throw new NumberFormatException("null");
+        return (int) Math.round(Double.parseDouble(o.toString().trim()));
     }
 
     private static VerticalAdjustor<?> deserializeVert(Map<String, Object> map) {

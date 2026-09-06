@@ -204,7 +204,11 @@ public final class AnvilRegionByteCache {
     } catch (IOException e) {
       bytes = null;
     }
-    COLD_READ_NANOS.addAndGet(System.nanoTime() - readStart);
+    long readNanos = System.nanoTime() - readStart;
+    COLD_READ_NANOS.addAndGet(readNanos);
+    // Only cold misses reach here, so this is the one place in the read path that observes the
+    // device rather than the cache. Feeds the memory-versus-storage cost model; adds no I/O.
+    StorageLatencyProbe.record(readNanos, bytes == null ? 0L : bytes.length);
     synchronized (CACHE) {
       if (bytes != null) {
         CACHE.put(regionFile, new Entry(bytes, bytes.length, mtime, System.nanoTime()));
