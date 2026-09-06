@@ -82,7 +82,7 @@ This document connects each requirement to the design decision that motivated it
 | REQ-CORE-F-002 | Bounded refill | DESIGN.md section 1 | RegionCacheTask | - |
 | REQ-CORE-F-003 | Uniform distribution | DESIGN.md section 3 | MemoryShape | MemoryShapeTest |
 | REQ-CORE-F-004 | Deterministic execution | DESIGN.md section 3 | MemoryShape | RegionPipelineTest |
-| REQ-CORE-F-005 | Spatial memory | DESIGN.md section 3 | MemoryShape | MemoryShapeTest |
+| REQ-CORE-F-005 | Spatial memory (a mark inside the shape's addressable annulus `[centerRadius, radius)` is retained exactly; one outside it is counted by `getOutOfDomainMarkCount()` and logged rather than dropped unrecorded, per REQ-RTP-S-004) | DESIGN.md section 3 | MemoryShape; `MemoryShape.addBadLocation` / `reportOutOfDomainMark`; `Square.xzToLocation` | MemoryShapeTest, `SquareRetentionTest` |
 | REQ-CORE-F-006 | DB integration | DESIGN.md section 4 | DatabaseAccessor | - |
 | REQ-CORE-F-007 | Task lifespan | DESIGN.md section 6 | MemoryTracker | - |
 | REQ-CORE-F-008 | Orphaned chunk recovery | DESIGN.md section 6 | ChunkUnloadProcessor | - |

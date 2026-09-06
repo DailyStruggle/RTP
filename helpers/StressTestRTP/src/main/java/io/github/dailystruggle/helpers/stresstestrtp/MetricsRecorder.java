@@ -349,6 +349,31 @@ public class MetricsRecorder {
             + "  recorded here, so both figures include transient allocation and are an" + System.lineSeparator()
             + "  UPPER BOUND on retained bytes rather than a settled retained set." + System.lineSeparator()
             + "  Full detail in the setup-phase sidecar ticket-footprint.txt." + System.lineSeparator()
+            + "ticket_footprint_heap_used_before_bytes / _after_load_bytes /" + System.lineSeparator()
+            + "_after_unload_bytes: absolute used heap at the three probe boundaries -" + System.lineSeparator()
+            + "  before the ticket, after the load settled, after the release settled." + System.lineSeparator()
+            + "  Recorded absolutely, not only as a delta, so the growth can be read" + System.lineSeparator()
+            + "  against the heap it happened on." + System.lineSeparator()
+            + "ticket_footprint_heap_retained_after_unload_bytes /" + System.lineSeparator()
+            + "ticket_footprint_heap_reclaimed_bytes / ticket_footprint_reclaim_label:" + System.lineSeparator()
+            + "  what became of the load-side growth once the ticket was released." + System.lineSeparator()
+            + "  Unloading a chunk drops the reference; it does not free the bytes, and" + System.lineSeparator()
+            + "  Paper keeps released chunk data resident until a collection has reason" + System.lineSeparator()
+            + "  to run. RETAINED_PENDING_COLLECTION is therefore the expected reading" + System.lineSeparator()
+            + "  and is NOT a leak; it is the OOM exposure, because a heap sized from" + System.lineSeparator()
+            + "  steady-state footprint alone has no room for released-but-uncollected" + System.lineSeparator()
+            + "  chunks when a burst demands memory faster than the collector reclaims" + System.lineSeparator()
+            + "  them. RECLAIMED_ON_UNLOAD means most growth came back unaided;" + System.lineSeparator()
+            + "  NO_NET_GROWTH means there was nothing to reclaim;" + System.lineSeparator()
+            + "  GC_DURING_WINDOW_UNATTRIBUTABLE means a collection ran inside the" + System.lineSeparator()
+            + "  window, so no heap figure from the probe is attributable to the ticket." + System.lineSeparator()
+            + "ticket_footprint_committed_delta_bytes: committed-heap change across the" + System.lineSeparator()
+            + "  probe. Non-zero means the JVM grew the heap for ONE ticket, so absolute" + System.lineSeparator()
+            + "  heap figures from the run describe heap-growth policy as much as the" + System.lineSeparator()
+            + "  plugin. Pin -Xms == -Xmx before quoting any of them." + System.lineSeparator()
+            + "ticket_probe_gc_collections: collections observed inside the probe" + System.lineSeparator()
+            + "  window. 0 is a measurement and is what makes the heap columns" + System.lineSeparator()
+            + "  attributable; -1 means no probe ran." + System.lineSeparator()
             + "heap_pressure_events / heap_pressure_first_heap_used_mb /" + System.lineSeparator()
             + "heap_pressure_first_trigger: RECORDED EVIDENCE of a plugin's own" + System.lineSeparator()
             + "  heap-pressure control loop - the matching log line and the heap-used" + System.lineSeparator()
@@ -417,6 +442,17 @@ public class MetricsRecorder {
                     + "ticket_footprint_released,ticket_probe_noise_loads,"
                     + "ticket_footprint_heap_bytes,ticket_footprint_bytes_per_chunk,"
                     + "ticket_footprint_heap_label,"
+                    // Heap lifecycle across the probe: growth, and what became
+                    // of it after release. An unload frees references, not
+                    // bytes, so the post-unload columns are what distinguish a
+                    // bounded footprint from deferred reclamation.
+                    + "ticket_footprint_heap_used_before_bytes,"
+                    + "ticket_footprint_heap_used_after_load_bytes,"
+                    + "ticket_footprint_heap_used_after_unload_bytes,"
+                    + "ticket_footprint_heap_retained_after_unload_bytes,"
+                    + "ticket_footprint_heap_reclaimed_bytes,"
+                    + "ticket_footprint_committed_delta_bytes,"
+                    + "ticket_probe_gc_collections,ticket_footprint_reclaim_label,"
                     // Heap-pressure control-loop evidence: the trigger only.
                     + "heap_pressure_events,heap_pressure_first_heap_used_mb,"
                     + "heap_pressure_first_trigger";
@@ -1091,6 +1127,14 @@ public class MetricsRecorder {
         long tfHeap = tfReady ? tfp.heapDeltaBytes() : -1L;
         long tfBytesPerChunk = tfReady ? tfp.bytesPerChunk() : -1L;
         String tfHeapLabel = tfReady ? TicketFootprintProbe.HEAP_LABEL : "";
+        long tfHeapBefore = tfReady ? tfp.heapUsedBeforeBytes() : -1L;
+        long tfHeapAfterLoad = tfReady ? tfp.heapUsedAfterLoadBytes() : -1L;
+        long tfHeapAfterUnload = tfReady ? tfp.heapUsedAfterUnloadBytes() : -1L;
+        long tfHeapRetained = tfReady ? tfp.heapRetainedAfterUnloadBytes() : -1L;
+        long tfHeapReclaimed = tfReady ? tfp.heapReclaimedBytes() : -1L;
+        long tfCommittedDelta = tfReady ? tfp.committedDeltaBytes() : -1L;
+        long tfWindowGc = tfReady ? tfp.windowCollections() : -1L;
+        String tfReclaimLabel = tfReady ? tfp.reclaimLabel() : "";
 
         String row = String.join(",",
                 csv(phaseLabel),
@@ -1198,6 +1242,15 @@ public class MetricsRecorder {
                 Long.toString(tfHeap),
                 Long.toString(tfBytesPerChunk),
                 tfHeapLabel,
+                // Heap lifecycle: growth, then whether release returned it.
+                Long.toString(tfHeapBefore),
+                Long.toString(tfHeapAfterLoad),
+                Long.toString(tfHeapAfterUnload),
+                Long.toString(tfHeapRetained),
+                Long.toString(tfHeapReclaimed),
+                Long.toString(tfCommittedDelta),
+                Long.toString(tfWindowGc),
+                tfReclaimLabel,
                 // Heap-pressure trigger evidence only - no modelled response.
                 Long.toString(heapEvents),
                 Long.toString(heapFirstMb),
