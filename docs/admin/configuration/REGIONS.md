@@ -153,6 +153,8 @@ Changing a radius invalidates cached locations for that region, so the first few
 
 ### Shape Engines and Parameters
 
+> **What is available on *your* server.** The engines documented below ship with RTP, but addons may register more. On every startup and `/rtp reload`, RTP writes the live catalog of registered shapes and their settings to `plugins/RTP/definitions/regions/SHAPES.md` (and vertical adjustors to `VERT.md`), in your configured language. Those files are generated from the running registry, so they are authoritative for your install - read them rather than guessing, and do not edit them (edits are overwritten on reload). The same catalog drives the type picker in the in-game menu.
+
 #### `CIRCLE` / `SQUARE`
 Standard shapes with uniform or weighted distribution.
 - `radius`: Outer radius in **chunks**. For `CIRCLE` it is the disk radius; for `SQUARE` it is the half-extent, so the square spans `2 x radius` chunks per side.
@@ -166,10 +168,24 @@ Gaussian distribution variants.
 - `mean`: Center of the bell curve, expressed as a fraction of the band (0.0 = at `centerRadius`, 1.0 = at `radius`).
 - `deviation`: Spread of the bell curve. Smaller = tighter clustering around `mean`.
 
+#### `ELLIPSE`
+A circle with independent X and Z semi-axes, so it can cover a non-square world border without wasting a corner.
+- `radius` / `radius2`: The two outer semi-axes in **chunks**. The wider of the two sets the bounding circle the spiral mapping walks; the ellipse predicate rejects everything outside the true ellipse.
+- `centerRadius` / `centerRadius2`: The two semi-axes of the inner exclusion ellipse, also in **chunks**. Both default to `0` (no hole).
+- `rotation`: Rotation of both the outer and inner ellipse in degrees around `centerX` / `centerZ`.
+- `weight`, `uniquePlacements`, `expand`, `mode`, `centerX`, `centerZ`: Same meaning as `CIRCLE`.
+
 #### `RECTANGLE`
 Uses explicit side lengths instead of a radius.
 - `width` / `height`: Full X-axis and Z-axis extent in **chunks**, centred on `centerX` / `centerZ` (so `width: 256` reaches 128 chunks / 2,048 blocks either side). There is no `centerRadius` hole for this shape.
 - `rotation`: Rotation in degrees around the center.
+
+#### `POLYGON`
+An arbitrary closed boundary, including concave ones, defined by a vertex list instead of a radius. It inherits the square sized to the polygon's bounding box for the spiral index and the spatial-memory store, then masks off everything outside the polygon.
+- `vertices`: List of `[x, z]` pairs in traversal order, same format Chunky uses for `/chunky shape polygon`. Needs at least 3 vertices, not all collinear, and no self-intersecting edges - any of those is rejected with a warning and falls back to the bounding square.
+- `centerX` / `centerZ`: Optional. Defaults to the center of the vertex bounding box.
+- `weight`, `uniquePlacements`, `mode`: Same meaning as `SQUARE`.
+- `expand` is not supported here and is ignored (with a warning if set) - the boundary is yours, and expanding it would push selections outside the polygon you authored.
 
 ---
 

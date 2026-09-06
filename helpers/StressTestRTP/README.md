@@ -278,13 +278,18 @@ recorded:
    chunk, and count `ChunkLoadEvent`s within 7 chunks of it.
 3. Release the ticket and count the unloads.
 
+Used heap and committed heap are sampled at all three boundaries -
+before the ticket, after the load settles, after the release settles -
+and collections inside the window are counted, so the reading covers
+the whole lifecycle instead of only the growth half.
+
 Counting events rather than diffing `World#getLoadedChunks()` is
 deliberate: the array form allocates a reference to every loaded chunk
 on the server, and it is not region-safe to walk on Folia. Events are
 already delivered on the owning thread, so the probe reports the same
 quantity on Spigot, Paper, and Folia.
 
-Results land in `ticket-footprint.txt` and in seven phase columns:
+Results land in `ticket-footprint.txt` and in these phase columns:
 
 | Column | Meaning |
 |---|---|
@@ -295,6 +300,14 @@ Results land in `ticket-footprint.txt` and in seven phase columns:
 | `ticket_footprint_heap_bytes` | used-heap delta across the window |
 | `ticket_footprint_bytes_per_chunk` | that delta per chunk |
 | `ticket_footprint_heap_label` | `UNCOLLECTED_ALLOCATION_INCLUSIVE` |
+| `ticket_footprint_heap_used_before_bytes` | used heap before the ticket |
+| `ticket_footprint_heap_used_after_load_bytes` | used heap once the load settled |
+| `ticket_footprint_heap_used_after_unload_bytes` | used heap once the release settled |
+| `ticket_footprint_heap_retained_after_unload_bytes` | growth still resident after release |
+| `ticket_footprint_heap_reclaimed_bytes` | growth that came back on release |
+| `ticket_footprint_committed_delta_bytes` | committed-heap change across the probe |
+| `ticket_probe_gc_collections` | collections inside the probe window |
+| `ticket_footprint_reclaim_label` | `RECLAIMED_ON_UNLOAD` / `RETAINED_PENDING_COLLECTION` / `NO_NET_GROWTH` / `GC_DURING_WINDOW_UNATTRIBUTABLE` |
 
 Reading them:
 
@@ -313,6 +326,26 @@ Reading them:
   collection is forced - a `System.gc()` on a server under measurement
   would corrupt the GC columns recorded in the same run - so both
   include transient allocation. The label says so in every row.
+- **`ticket_probe_gc_collections` gates the heap columns.** `0` means
+  no collection ran inside the window, so the growth and the
+  post-release reading are attributable to the ticket. Non-zero sets
+  the reclaim label to `GC_DURING_WINDOW_UNATTRIBUTABLE` and no heap
+  figure from that probe should be quoted.
+- **`ticket_footprint_reclaim_label` is the OOM-exposure reading, and
+  the interesting one.** An unload drops references; it does not free
+  bytes. `RETAINED_PENDING_COLLECTION` - growth still resident after
+  the ticket is gone, with no collection in the window - is the normal
+  Paper result and is **not** a leak, it is deferred reclamation. It is
+  also exactly why sizing a heap from steady-state footprint fails: a
+  burst that demands memory faster than the collector reclaims released
+  chunks can exhaust a heap the footprint figure called ample. Size
+  against headroom, not footprint. `RECLAIMED_ON_UNLOAD` means most
+  growth came back unaided; `NO_NET_GROWTH` means there was nothing to
+  reclaim.
+- **`ticket_footprint_committed_delta_bytes` invalidates absolute heap
+  numbers when non-zero.** The JVM grew the heap for one ticket, so the
+  run is describing heap-growth policy as much as the plugin. Pin
+  `-Xms == -Xmx` before quoting any absolute figure.
 
 `-1` and empty mean NOT MEASURED. In particular, `-1` here never means
 a one-chunk footprint.

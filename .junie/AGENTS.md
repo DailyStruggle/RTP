@@ -201,6 +201,8 @@ Do not fix incidental discoveries that are outside the current task. Append a 1-
 4. **Impact** - estimated user-visible effect.
 5. **Suggested next step** - minimal investigation or fix sketch.
 
+**Severity checkpoint:** If the incidental finding is high severity (runtime crash, data corruption, security hazard, silent data loss, or safety-prohibition violation S-001..S-007), pause and prompt the user via `ask_user` immediately after recording the entry, rather than silently continuing.
+
 **Exceptions:** In-line fixes are permitted only if directly causing the current issue symptom, violating S-001...S-007, or explicitly requested. Do not use `POTENTIAL_BUGS.md` for task worklogs, resolved bugs, test outputs, or permanent lore (use `LESSONS_LEARNED.md`).
 
 ---

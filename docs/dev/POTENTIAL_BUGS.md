@@ -41,6 +41,15 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 
 
+
+### 2026-09-05 - `Square.xzToLocation` aliases the two cells meeting at each octant seam
+
+- **Discovered during:** the origin-centred learned-state mark investigation; found while asserting inner-ring round-trip injectivity, and outside that task's scope.
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/selectors/memory/shapes/Square.java` `xzToLocation` (the `theta` octant dispatch, lines ~154-207) and its `MutableRTPCoords` twin.
+- **Symptom / hypothesis:** On every ring the octant boundaries are inclusive on both sides, so two distinct cells share one 1D index - e.g. with `centerRadius=64`, `(-64,0)` and `(-64,64)` both map to `192`, and `(64,64)` collides with `(0,64)`. `theta` is derived from `Math.atan(z/x)` and the exact boundary values (`0.125`, `0.375`, ...) fall to the higher octant, which restarts that octant's `perimeterStep` at the previous octant's last value.
+- **Impact:** Up to 8 cells per ring share learned state with a neighbour, so marking one also marks its twin. Fail-safe (over-marking never yields an unsafe destination) but it slightly over-rejects and makes per-cell learned state non-injective, which any per-cell accounting will mis-count.
+- **Suggested next step:** Re-derive `perimeterStep` from `ax`/`az` sign comparisons rather than a floating-point `atan` angle, so each ring maps bijectively onto `[0, 8R)`; assert injectivity per ring in `ShapeXzToLocationsRoundTripTest`. Note the change renumbers indices, so persisted `MemoryShape` state would need a version bump or a rescan.
+
 ### 2026-06-14 - claim `*Checker`s query third-party / Bukkit APIs from the async verification thread (Folia thread-safety caveat)
 
 - **Discovered during:** claim-plugin audit follow-up (this session).

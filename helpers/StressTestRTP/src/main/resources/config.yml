@@ -367,6 +367,16 @@ ticket-sample-period-ms: 1000
 # Method: apply one ticket to an unloaded chunk far from origin, count the
 # ChunkLoadEvents it produces, then release it and count the unloads. Results
 # go to the ticket_footprint_* phase columns and to ticket-footprint.txt.
+#
+# Used and committed heap are also sampled at all three boundaries - before
+# the ticket, after the load settles, after the release settles - and
+# collections inside the window are counted. That last pair is the point: an
+# unload drops references, it does not free bytes, so growth can stay resident
+# until the collector has a reason to run. A heap sized from steady-state
+# footprint alone has no room for released-but-uncollected chunk data, and a
+# burst that demands memory faster than it is reclaimed then fails on a heap
+# the footprint figure called ample. No collection is ever forced, since a
+# System.gc() would corrupt the GC columns recorded in the same run.
 # The probe touches ground far outside the benchmark's origin-centred
 # teleport radius, so it does not warm chunks the run then measures.
 ticket-footprint-probe:

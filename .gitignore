@@ -171,6 +171,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Local real-world save data used by the opt-in ADR-083 use-case measurement
+# (rtp-core/src/test/.../benchmark). Copied from an operator's own server; gigabytes
+# of .mca and never part of this repo. Absent -> the use-case test skips itself.
+/testdata-world/
+
 # MkDocs generated static site output (built from docs/ into ./site by `mkdocs build`).
 # This is the generated artifact, NOT the tracked narrative source under docs/site/.
 /site/

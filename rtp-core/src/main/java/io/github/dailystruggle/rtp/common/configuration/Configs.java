@@ -802,6 +802,10 @@ public class Configs {
     // carries the redundant network.redis block in config.yml (authoritative surface
     // is network.yml).
     warnLegacyNetworkRedisOnce();
+    // ADR-076: the shape/vert rename maps are hidden, so the registered type catalog
+    // is republished to visible generated markdown beside the region files. Derived
+    // from the factories, so it cannot drift from what the server actually accepts.
+    SelectorCatalogWriter.write(pluginDirectory);
     RTP.log(Level.FINE, "[RTP] reloadConfigs(): complete (in-flight tasks retain old snapshots)");
   }
 

@@ -9,7 +9,6 @@ import io.github.dailystruggle.rtp.common.commands.parameters.DistanceParameter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
 
-import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -53,6 +52,14 @@ public class Square_Normal extends NormalMemoryShape {
     subParameters.put("uniqueplacements", new BooleanParameter(
         "rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
   }
+
+  /**
+   * Returned for a cell inside {@code centerRadius}: not part of the region, so it has no index.
+   * Any negative value is refused by {@code MemoryShape.addBadLocation}; an explicit sentinel is
+   * needed because {@code centerRadius == 1} would otherwise map the excluded origin onto ring
+   * 1's first index.
+   */
+  private static final long OUT_OF_DOMAIN = -1L;
 
   public Square_Normal() {
     super(NormalDistributionParams.class, "SQUARE_NORMAL", defaults);
@@ -107,17 +114,78 @@ public class Square_Normal extends NormalMemoryShape {
     output.setXZ(x, z);
   }
 
+  /**
+   * Perimeter index of a ring cell, counted counter-clockwise from {@code (R,0)}.
+   *
+   * <p>Integer edge tests, not a floating-point angle: {@code atan(z/x)} folded into a quarter
+   * turn reflects quadrants 2 and 4 and collapses the axis cases, so the two cells meeting at
+   * every octant seam shared one index (e.g. {@code (-R,0)} and {@code (-R,R)}). Exact inverse of
+   * {@link #squareOct2Coords(long, double, MutableRTPCoords)}: the {@code 8R} cells of ring
+   * {@code R} map bijectively onto {@code [0, 8R)}. Corner ownership follows the test order -
+   * top edge, then left, then bottom, leaving the right edge with the wrap at {@code z < 0}.
+   *
+   * @param x      ring-relative x, with {@code max(|x|,|z|) == radius}
+   * @param z      ring-relative z
+   * @param radius Chebyshev radius of the ring
+   * @return perimeter index in {@code [0, 8 * radius)}, or {@code 0} for the centre cell
+   */
+  private static long perimeterStep(long x, long z, long radius) {
+    if (radius == 0L) return 0L;
+    if (z == radius) return (radius * 2L) - x;
+    if (x == -radius) return (radius * 4L) - z;
+    if (z == -radius) return (radius * 6L) + x;
+    return (z >= 0L) ? z : ((radius * 8L) + z);
+  }
+
   private static int[] squareOct2Coords(long radius, double perimeterStep) {
     MutableRTPCoords output = new MutableRTPCoords(0, 0);
     squareOct2Coords(radius, perimeterStep, output);
     return new int[] {output.x, output.z};
   }
 
+  /**
+   * First index of ring {@code r}, i.e. the index of {@code (r, 0)}.
+   *
+   * <p>Ring {@code r} holds exactly {@code 8r} cells, so allotting it exactly {@code 8r} indices
+   * makes the index space the cell count and the map a bijection. Summing that over
+   * {@code [cr, r)} telescopes to {@code 4(r(r-1) - cr(cr-1))}. The earlier allotment,
+   * {@code 4(r^2 - cr^2)}, gave each ring {@code 8r + 4} indices - 4 more than it has cells - so
+   * the reverse map had to alias 4 cells per ring.
+   *
+   * <p>With {@code cr == 0} the origin is a one-cell ring that owns index {@code 0}, hence the
+   * {@code +1} shift on every other ring.
+   */
+  private static long ringStart(long r, long cr) {
+    long base = ((r * (r - 1L)) - (cr * (cr - 1L))) * 4L;
+    return (cr == 0L) ? base + 1L : base;
+  }
+
+  /**
+   * Ring holding {@code location}, i.e. the largest {@code r} with {@code ringStart(r) <= location}.
+   *
+   * <p>{@code floor(location / 4) + cr(cr-1)} lies in {@code [r(r-1), r(r+1))} exactly, so the
+   * {@code sqrt} only seeds the answer; the correction steps remove double rounding at large radii,
+   * where a half-ulp error would otherwise place a cell on the wrong ring.
+   */
+  private static long ringOf(long location, long cr) {
+    if (cr == 0L) {
+      if (location <= 0L) return 0L;
+      location -= 1L;
+    }
+    long target = (location / 4L) + (cr * (cr - 1L));
+    long r = (long) ((1.0 + Math.sqrt(1.0 + (4.0 * (double) target))) / 2.0);
+    if (r < 1L) r = 1L;
+    while (r > 1L && (r * (r - 1L)) > target) r--;
+    while (((r + 1L) * r) <= target) r++;
+    return r;
+  }
+
   @Override
   public long getRange() {
     long radius = getNumber(NormalDistributionParams.radius, 256L).longValue();
     long cr = getNumber(NormalDistributionParams.centerRadius, 64L).longValue();
-    return (radius - cr) * (radius + cr) * 4;
+    if (radius <= cr) return 0L;
+    return ringStart(radius, cr);
   }
 
   @Override
@@ -129,65 +197,12 @@ public class Square_Normal extends NormalMemoryShape {
     x = x - cx;
     z = z - cz;
 
-    double theta = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
+    long radius = Math.max(Math.abs(x), Math.abs(z));
+    if (radius < cr) return OUT_OF_DOMAIN;
+    if (radius == 0L) return 0L;
 
-    if ((z < 0) && (x < 0)) {
-      theta += 0.5;
-    } else if (z < 0) {
-      theta += 0.75;
-    } else if (x < 0) {
-      theta += 0.25;
-    }
-
-    long radius;
-    long ax = Math.abs(x);
-    long az = Math.abs(z);
-    radius = Math.max(ax, az);
-
-    long perimeterStep = 0;
-    if (theta < 0.5) {
-      if (theta < 0.25) {
-        if (theta < 0.125) { // octant 1, from 0 to pi/4
-          perimeterStep += az;
-        } else { // octant 2, from pi/4 to pi/2
-          perimeterStep += radius;
-          perimeterStep += (radius - ax);
-        }
-      } else {
-        if (theta < 0.375) { // octant 3
-          perimeterStep += radius * 2;
-          perimeterStep += ax; // x is negative in this quadrant, so fix
-        } else { // octant 4
-          perimeterStep += radius * 3;
-          perimeterStep += (radius - az);
-        }
-      }
-    } else {
-      if (theta < 0.75) {
-        if (theta < 0.625) { // octant 5
-          perimeterStep += radius * 4;
-          perimeterStep += az;
-        } else { // octant 6
-          perimeterStep += radius * 5;
-          perimeterStep += (radius - ax);
-        }
-      } else {
-        if (theta < 0.875) { // octant 7
-          perimeterStep += radius * 6;
-          perimeterStep += ax;
-        } else { // octant 8
-          perimeterStep += radius * 7;
-          perimeterStep += (radius - az);
-        }
-      }
-    }
-
-    return ((radius * radius - cr * cr) * 4) + perimeterStep;
+    return ringStart(radius, cr) + perimeterStep(x, z, radius);
   }
-
-
-
-
 
   @Override
   public long xzToLocation(MutableRTPCoords coords) {
@@ -198,60 +213,11 @@ public class Square_Normal extends NormalMemoryShape {
     long x = coords.x - cx;
     long z = coords.z - cz;
 
-    double theta = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
+    long radius = Math.max(Math.abs(x), Math.abs(z));
+    if (radius < cr) return OUT_OF_DOMAIN;
+    if (radius == 0L) return 0L;
 
-    if ((z < 0) && (x < 0)) {
-      theta += 0.5;
-    } else if (z < 0) {
-      theta += 0.75;
-    } else if (x < 0) {
-      theta += 0.25;
-    }
-
-    long radius;
-    long ax = Math.abs(x);
-    long az = Math.abs(z);
-    radius = Math.max(ax, az);
-
-    long perimeterStep = 0;
-    if (theta < 0.5) {
-      if (theta < 0.25) {
-        if (theta < 0.125) { // octant 1, from 0 to pi/4
-          perimeterStep += az;
-        } else { // octant 2, from pi/4 to pi/2
-          perimeterStep += radius;
-          perimeterStep += (radius - ax);
-        }
-      } else {
-        if (theta < 0.375) { // octant 3
-          perimeterStep += radius * 2;
-          perimeterStep += ax; // x is negative in this quadrant, so fix
-        } else { // octant 4
-          perimeterStep += radius * 3;
-          perimeterStep += (radius - az);
-        }
-      }
-    } else {
-      if (theta < 0.75) {
-        if (theta < 0.625) { // octant 5
-          perimeterStep += radius * 4;
-          perimeterStep += az;
-        } else { // octant 6
-          perimeterStep += radius * 5;
-          perimeterStep += (radius - ax);
-        }
-      } else {
-        if (theta < 0.875) { // octant 7
-          perimeterStep += radius * 6;
-          perimeterStep += ax;
-        } else { // octant 8
-          perimeterStep += radius * 7;
-          perimeterStep += (radius - az);
-        }
-      }
-    }
-
-    return ((radius * radius - cr * cr) * 4) + perimeterStep;
+    return ringStart(radius, cr) + perimeterStep(x, z, radius);
   }
 
   @Override
@@ -267,31 +233,12 @@ public class Square_Normal extends NormalMemoryShape {
     long cx = getNumber(NormalDistributionParams.centerX, 0L).longValue();
     long cz = getNumber(NormalDistributionParams.centerZ, 0L).longValue();
 
-    // 1. Determine the integer Radius R
-    double preciseRadius = Math.sqrt(location + cr * cr * 4) / 2.0;
-    long R = (long) preciseRadius;
-
-    // 2. Calculate Start Location (x=R, z=0 -> perimeterStep = 0)
-    BigInteger bigR = BigInteger.valueOf(R);
-    BigInteger bigCR = BigInteger.valueOf(cr);
-
-    // StartLoc = (R^2 - CR^2) * 4
-    BigInteger startLoc = bigR.multiply(bigR).subtract(bigCR.multiply(bigCR)).shiftLeft(2);
-
-    // 3. Remaining Length and Ring Width (Perimeter growth in location units)
-    BigInteger currentLoc = BigInteger.valueOf(location);
-    BigInteger remainingLength = currentLoc.subtract(startLoc);
-    // Width = ((R+1)^2 - R^2) * 4 = 4 * (2R + 1)
-    BigInteger ringWidth = bigR.shiftLeft(1).add(BigInteger.ONE).shiftLeft(2);
-
-    // 4. Proportion around the current square ring
-    double theta = (remainingLength.doubleValue() / ringWidth.doubleValue()) + 0.000069;
-
-    // 5. Perimeter Step
-    double perimeterStep = 8.0 * (preciseRadius * (theta % 1.0));
-
-    // 6. Map to Cartesian
-    squareOct2Coords(R, perimeterStep, output);
+    long r = ringOf(location, cr);
+    if (r == 0L) {
+      output.setXZ((int) cx, (int) cz);
+      return;
+    }
+    squareOct2Coords(r, (double) (location - ringStart(r, cr)), output);
     output.setXZ(output.x + (int) cx, output.z + (int) cz);
   }
 
