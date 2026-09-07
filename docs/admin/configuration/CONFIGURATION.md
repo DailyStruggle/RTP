@@ -76,7 +76,7 @@ The `shape` block defines how horizontal coordinates are selected. The `name` ke
 
 | Key | Type | Description |
 |---|---|---|
-| `name` | String | Shape engine: `CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `ELLIPSE`, `RECTANGLE`, `POLYGON`. |
+| `name` | String | Shape engine: `CIRCLE`, `CIRCLE_NORMAL`, `CIRCLE_OPTIMIZED_DUAL_LAYER`, `CIRCLE_DEPRECATED_PURE_SPIRAL`, `SQUARE`, `SQUARE_NORMAL`, `SQUARE_OPTIMIZED_DUAL_LAYER`, `SQUARE_DEPRECATED_PURE_SPIRAL`, `ELLIPSE`, `RECTANGLE`, `POLYGON`. |
 | `mode` | String | Selection logic. See table below. |
 | `centerX` | Integer | Chunk X coordinate of the region centre (default `0`). |
 | `centerZ` | Integer | Chunk Z coordinate of the region centre (default `0`). |
@@ -239,7 +239,7 @@ For in-depth explanations and complete key tables of each configuration file:
 
 ## Custom Shapes and Addons
 
-The built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `ELLIPSE`, `RECTANGLE`, `POLYGON`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
+The built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `CIRCLE_OPTIMIZED_DUAL_LAYER`, `CIRCLE_DEPRECATED_PURE_SPIRAL`, `SQUARE`, `SQUARE_NORMAL`, `SQUARE_OPTIMIZED_DUAL_LAYER`, `SQUARE_DEPRECATED_PURE_SPIRAL`, `ELLIPSE`, `RECTANGLE`, `POLYGON`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
 
 That list is the set this build registers at startup. Addons can register more, so the authoritative list for your install is written to `plugins/RTP/definitions/regions/SHAPES.md` (and `VERT.md` for vertical adjustors) on every start and `/rtp reload`, generated from the live registry.
 

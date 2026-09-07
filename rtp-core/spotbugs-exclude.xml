@@ -104,4 +104,11 @@
         <Bug pattern="UC_USELESS_CONDITION"/>
     </Match>
 
+    <!-- DMI_RANDOM_USED_ONLY_ONCE: PointEdgeSelector.estimate takes a seed parameter for deterministic estimation -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.PointEdgeSelector"/>
+        <Method name="estimate"/>
+        <Bug pattern="DMI_RANDOM_USED_ONLY_ONCE"/>
+    </Match>
+
 </FindBugsFilter>

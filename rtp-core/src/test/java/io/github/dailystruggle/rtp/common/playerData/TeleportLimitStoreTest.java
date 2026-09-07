@@ -72,6 +72,18 @@ class TeleportLimitStoreTest {
   }
 
   @Test
+  void enforcement_usesReflectsTracker() {
+    LocalTeleportLimitStore store =
+        new LocalTeleportLimitStore(new UsageCapTracker(), false);
+    UUID id = UUID.randomUUID();
+    long now = 10_000L;
+
+    assertEquals(0L, store.uses(id, 5000L, now));
+    store.recordSuccess(id, 5, 5000L, now);
+    assertEquals(1L, store.uses(id, 5000L, now));
+  }
+
+  @Test
   void persistence_survivesAcrossFreshStore() {
     InMemoryAccessor db = new InMemoryAccessor();
     UUID id = UUID.randomUUID();

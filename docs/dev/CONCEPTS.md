@@ -74,7 +74,11 @@ The **shape** controls *where* in the region a location can be selected — it d
 |---|---|
 | `CIRCLE` | A ring between `centerRadius` and `radius`. Players land anywhere in the donut. |
 | `SQUARE` | Same idea but with a square boundary instead of circular. |
+| `CIRCLE_OPTIMIZED_DUAL_LAYER` / `SQUARE_OPTIMIZED_DUAL_LAYER` | Optimized shapes using the continuous spiral-addressed Hilbert curve (ADR-085), collapsing run fragmentation and speeding up selection. |
+| `CIRCLE_DEPRECATED_PURE_SPIRAL` / `SQUARE_DEPRECATED_PURE_SPIRAL` | Legacy 1D Archimedean spiral mapping shapes preserved for benchmarking and backward compatibility. |
 | `RECTANGLE` | A rectangular boundary, optionally rotated. Useful for corridor-shaped areas. |
+| `ELLIPSE` | An elliptical boundary with independent semi-axes and rotation. |
+| `POLYGON` | An arbitrary closed boundary defined by a vertex list (ADR-034). |
 | `CIRCLE_NORMAL` / `SQUARE_NORMAL` | Uses a normal (bell curve) distribution — players cluster toward the mean. |
 
 The **`weight`** parameter on `CIRCLE`/`SQUARE` skews the flat distribution:
