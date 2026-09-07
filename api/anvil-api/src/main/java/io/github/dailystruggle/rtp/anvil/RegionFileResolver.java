@@ -2,29 +2,27 @@ package io.github.dailystruggle.rtp.anvil;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 
 /**
  * Resolves region file paths and determines the appropriate {@link RegionFileReader}
  * format for a given coordinate (ADR-077).
  *
- * <p>Supported formats:
- * <ul>
- *   <li>Linear ({@code .linear}): ZStandard-compressed continuous region format used by Leaves, Gale, etc.</li>
- *   <li>Anvil ({@code .mca}): Standard 4 KiB sector-allocated Minecraft region format.</li>
- * </ul>
+ * <p>Supports registered format extensions from {@link RegionFormatRegistry} (such as
+ * {@code .linear} via {@code LeafRTPLinearAddon}) as well as standard Anvil ({@code .mca}).</p>
  */
 public final class RegionFileResolver {
 
     private RegionFileResolver() {}
 
     /**
-     * Target region file description holding its on-disk path and matching reader.
+     * Target region file description holding its on-disk path, matching reader, and format metadata.
      */
     public record ResolvedRegion(Path path, RegionFileReader reader, boolean isLinear) {}
 
     /**
      * Resolves the on-disk region file and matching reader for chunk {@code (cx, cz)}.
-     * Probes for {@code r.X.Z.linear} first, then {@code r.X.Z.mca}.
+     * Probes registered non-Anvil formats (e.g. {@code .linear}) first, then {@code .mca}.
      *
      * @param worldFolder      the root world directory
      * @param dimensionSubpath dimension subdirectory (e.g., {@code "DIM-1"}, {@code "DIM1"}, or {@code ""})
@@ -36,15 +34,32 @@ public final class RegionFileResolver {
         int regionX = cx >> 5;
         int regionZ = cz >> 5;
         Path dir = regionDirectoryFor(worldFolder, dimensionSubpath);
+        String baseName = "r." + regionX + "." + regionZ;
 
-        Path linearPath = dir.resolve("r." + regionX + "." + regionZ + ".linear");
-        if (Files.isRegularFile(linearPath)) {
-            return new ResolvedRegion(linearPath, LinearRegionReader.INSTANCE, true);
+        // Check registered non-default formats first (e.g. .linear)
+        Set<String> extensions = RegionFormatRegistry.getRegisteredExtensions();
+        for (String ext : extensions) {
+            if (".mca".equalsIgnoreCase(ext)) continue;
+            Path customPath = dir.resolve(baseName + ext);
+            if (Files.isRegularFile(customPath)) {
+                RegionFileReader reader = RegionFormatRegistry.getReader(ext);
+                if (reader != null) {
+                    boolean isLinear = ".linear".equalsIgnoreCase(ext);
+                    return new ResolvedRegion(customPath, reader, isLinear);
+                }
+            }
         }
 
-        Path mcaPath = dir.resolve("r." + regionX + "." + regionZ + ".mca");
+        // Check standard .mca
+        Path mcaPath = dir.resolve(baseName + ".mca");
         if (Files.isRegularFile(mcaPath)) {
             return new ResolvedRegion(mcaPath, AnvilReader.INSTANCE, false);
+        }
+
+        // Check any remaining registered formats on disk in case .linear exists even if not registered yet
+        Path linearFallback = dir.resolve(baseName + ".linear");
+        if (Files.isRegularFile(linearFallback) && RegionFormatRegistry.isRegistered(".linear")) {
+            return new ResolvedRegion(linearFallback, RegionFormatRegistry.getReader(".linear"), true);
         }
 
         // Neither exists on disk - default to .mca path and Anvil reader

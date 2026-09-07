@@ -1,0 +1,51 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow'
+}
+
+group = 'io.github.dailystruggle'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+base {
+    archivesName = 'LeafRTPLinearAddon'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly project(':rtp-api')
+    compileOnly project(':anvil-api')
+
+    // Bundles native zstd decompression off-tick (ADR-077)
+    implementation 'com.github.luben:zstd-jni:1.5.6-3'
+
+    testImplementation project(':rtp-api')
+    testImplementation project(':anvil-api')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+shadowJar {
+    archiveClassifier.set('')
+    // Relocate zstd-jni to avoid collision if server or other plugin loads it
+    relocate 'com.github.luben.zstd', 'io.github.dailystruggle.rtp.linearaddon.zstd'
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('shadowJar')
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('shadowJar')
+}
+
+test {
+    useJUnitPlatform()
+}

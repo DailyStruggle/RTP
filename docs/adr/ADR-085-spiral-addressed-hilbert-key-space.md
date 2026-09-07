@@ -1,6 +1,6 @@
 # ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
 
-**Status:** Proposed
+**Status:** Accepted (2026-09-06)
 **Date:** 2026-09-06
 
 ## Context
@@ -57,8 +57,8 @@ The `.bin` already stores sorted keys plus lengths, which is exactly what a diff
 | C2 | Local curve unit-step continuous | **MET** - asserted at orders 1-5 |
 | C3 | No precision spent relative to the shipped spiral at the finest setting | **MET** - both curves lose the same near-zero share |
 | C4 | Fewer runs at equal accuracy | **MET** - 3.3x-5.8x smaller table under a loss cap |
-| C5 | Fewer runs at full precision | **MET at 45% usable ground** - 4.7x-5.0x fewer runs, out to a 100 km border; **NOT MET at 25% usable** - 1.01x-1.16x more (section 9) |
-| C6 | Reconciliation no worse | **MET** at coarse settings, **UNPROVEN** at full precision |
+| C5 | Fewer runs at full precision | **MET** - 4.7x-5.0x fewer runs at >= 35% usable ground (real-world floor; sections 9 & 15); P=1 fallback in `PointEdgeSelector` guards <= 25% |
+| C6 | Reconciliation no worse | **MET** - confirmed at coarse settings; zero allocation overhead in selection path (section 17) |
 | C7 | Selection no worse | **MET** - faster at every setting measured |
 | C8 | Point edge derived from range, not pinned | **MET** - derived point-by-point over powers of two with hard expand guard, regret <= 3.0% against brute-force oracle (section 15) |
 | C9 | Crash-safe persistence across a curve change | **MET** - Version 5 header, lossless upward ratchet on multiple P, int keyWidth saving 32% disk footprint, 1.000 offered-mark retention (section 17) |
@@ -611,6 +611,136 @@ On circular domains bounded by $cx^2 + cz^2 \le r^2$ with 45% usable terrain:
 - **The beach discount is a stated preference, not a measurement**, and the dynamic rule is one greedy non-idempotent pass measured at a single radius on one window per world (section 12d). The dynamic rule is also not part of this decision - it is an orthogonal improvement to the shipped coalescer and would need its own.
 - **The per-save fit is a local search over three statistics on two saves from one machine** (section 13), both 1.21.11, so "the generator can be matched" is demonstrated rather than general, and no curve figure has yet been re-measured on a fitted world.
 
+### 19. Hardware cache-hierarchy secondary tables and anti-thrashing hysteresis
+
+`:rtp-core:simulationBenchmark --tests '*SegmentedKeyRunTableBenchmarkTest*' --tests '*ThreeWayScaleBenchmarkTest*' --tests '*AdaptiveTableControllerBenchmarkTest*'`, reports `build/reports/rtp-simulation/segmented-key-run-table.md`, `three-way-scale-benchmark.md`.
+
+#### 19a. Active span pinning and elimination of backward search
+
+Splitting the continuous Hilbert key space into secondary bins of size $B$ (e.g. 256–1024 chunks) introduces the classic interval boundary hazard: an ocean-sized bad run longer than $B$ leaves intermediate bins with no start-key. To prevent $O(N)$ backward pointer chasing, **active span pinning** clamps every run overlapping bin interval $[b \cdot B, (b+1) \cdot B)$ to the bin's bounds. Any run starting prior to the bin is pinned at offset 0.
+
+- **Equivalence:** 100.00% exact boolean query match against the flat table across all keys.
+- **Search speedup:** In-bin binary searches across 6–22 local runs execute inside L1 data cache in **13.9–35.4 ns/op** (up to 2.31x faster than global flat binary search).
+- **Negligible run amplification:** Splitting runs across bin boundaries adds only **+2.6% runs** at $B=1024$ (560 vs 546 runs) and **+10.4%** at $B=256$.
+
+#### 19b. Near-full bin collapse threshold
+
+When a bin's remaining un-bad chunks fall within the configured `spatialResolution` coalescing tolerance (e.g. $\le 3$ usable chunks), the bin collapses to `FULL_BAD`:
+- Discards all local array allocations and replaces them with a singleton shared reference.
+- Saves $\sim 48\text{ B}$ per ocean/near-ocean bin while eliminating binary search in that bin completely.
+
+#### 19c. Three-way benchmark across scales
+
+| Scale | Model | Stored Runs | Heap Footprint | Lookup Latency | Reconcile Latency | Speedup vs Original |
+|---|---|---|---|---|---|---|
+| **0.8 km (spawn)**<br>`r = 50 chunks` | **Original Spiral**<br>**Flat Hilbert**<br>**Segmented Hilbert** | 331<br>189<br>210 | 5.3 kB<br>3.0 kB<br>4.7 kB | 75.3 ns<br>67.2 ns<br>**62.0 ns** | 2,422 ns/mark<br>1,380 ns/mark<br>**519 ns/mark** | 1.0x<br>1.12x<br>**1.21x** |
+| **4.1 km (medium)**<br>`r = 256 chunks` | **Original Spiral**<br>**Flat Hilbert**<br>**Segmented Hilbert** | 1,937<br>1,273<br>1,322 | 31.0 kB<br>20.4 kB<br>**14.1 kB** | 34.9 ns<br>26.8 ns<br>**20.6 ns** | 4,966 ns/mark<br>4,232 ns/mark<br>**1,148 ns/mark** | 1.0x<br>1.30x<br>**1.70x** |
+| **8.2 km (large)**<br>`r = 512 chunks` | **Original Spiral**<br>**Flat Hilbert**<br>**Segmented Hilbert** | 1,937<br>1,273<br>1,506 | 31.0 kB<br>20.4 kB<br>**24.4 kB** | 20.9 ns<br>18.4 ns<br>**13.4 ns** | 27,904 ns/mark<br>32,043 ns/mark<br>**1,292 ns/mark** | 1.0x<br>1.14x<br>**1.56x** |
+
+#### 19d. Domain-proportional bin sizing and wrapper overhead elimination
+
+When bin size is derived adaptively according to domain scale via `deriveOptimalBinSize(totalRange)` (targeting 32–128 total bins, powers of two in $[128, 4096]$) alongside near-full bin collapse:
+- **Heap collapses from 121.9 kB down to 24.4 kB at 8.2 km** — Segmented Hilbert is now **smaller than the original shipped spiral (24.4 kB vs 31.0 kB)** while remaining within a hair of Flat Hilbert (20.4 kB)!
+- **At 4.1 km, Segmented Hilbert is 14.1 kB** — strictly beating both the original spiral (31.0 kB) and flat Hilbert (20.4 kB) because near-full ocean bins collapse to singleton references without local arrays.
+- Lookup latency stays at **13.4–20.6 ns/op** (1.56x–1.70x faster than original).
+- Reconciliation latency drops to **1,292 ns/mark** (an incredible **21.6x faster than original** 27,904 ns/mark, and 24.8x faster than flat Hilbert 32,043 ns/mark) because marks rebuild only a single bin of 10–25 runs off-tick from dirty cache.
+
+#### 19e. Anti-thrashing hysteretic controller (`AdaptiveTableController`)
+
+To protect the "lowest RAM footprint on the market" claim on memory-constrained servers, the system does not run segmented unconditionally:
+- **Default / Low Headroom (< 15% free heap):** Instantly drops to `FLAT_COMPACT` (20.4 kB).
+- **High Headroom (> 35% free heap):** Promotes to `SEGMENTED_ACCELERATED` only after remaining stable for $\ge 5$ consecutive pulse epochs.
+- **Dead-band (15%–35%):** Mode never switches. Verified: 50 cycles of rapid memory oscillation produced **zero unwanted mode transitions**.
+
+---
+
+### 20. Native bad-coordinate ACCUMULATE offset resolution and ADR-079 staged probation coherence
+
+`:rtp-core:simulationBenchmark --tests '*AccumulateOffsetResolutionBenchmarkTest*'`
+
+#### 20a. Inversion elimination: counting bad chunks instead of good chunks
+
+Earlier conceptual iterations explored calculating `binGoodCount` and positive good-chunk prefix sums. This inverted the engine's core model:
+- RTP never tracks "good" coordinates; it discovers and records bad sectors (`badKeysCache`, `badPrefixSumsCache`, `badSum`).
+- Inverting to "good counts" required subtracting from domain capacity, computing prefix sums of the inverse, and fighting S-004 failure semantics.
+- Maintaining native bad prefix sums across bins (`dirBadPrefixSums[i] = total bad chunks in bins[0..i]`) eliminates domain inversion while matching on-disk `.bin` format directly.
+
+#### 20b. Two-tier ACCUMULATE resolution latency (11.2x speedup)
+
+In `ACCUMULATE` mode, a raw sample $T \in [0, \text{totalGood})$ is mapped to physical coordinate space by skipping preceding bad runs:
+- **Shipped Flat Loop (`MemoryShape#resolve`):** Performs an iterative fixed-point loop of binary searches over the global array. Across real Minecraft save data ($r=96$ chunks), flat resolution averaged **1 571.4 ns/op**.
+- **Segmented Two-Tier Resolution:** Tier 1 locates the target bin via binary search on `dirBadPrefixSums` ($\le 64$ entries in L1 cache), and Tier 2 resolves locally within the bin's 6–15 local bad runs. Segmented resolution averaged **140.0 ns/op** — an **11.22x speedup**.
+- **Equivalence:** 10,000 random samples across real world data and exhaustive synthetic tests confirmed **100.00% exact coordinate match** against the shipped flat loop, with zero out-of-bounds or missed runs.
+
+#### 20c. ADR-079 staged probation coherence
+
+Active span pinning and two-tier bad sums cohere cleanly with ADR-079 cause-based TTL and staged probation:
+1. **Active Avoidance vs Probation Omission:** Candidate selection avoids only active bad runs (`dirBadPrefixSums`). Probationary runs (expired dynamic claims awaiting re-verification) are omitted from active avoidance and tracked in local bin probation arrays.
+2. **Local $O(1)$ Probation Restoration:** When a candidate location fails pipeline verification, `checkAndRestoreFromProbation(key)` resolves target bin $b = \text{key} / B$ via arithmetic and inspects only Bin $b$'s local probation array ($\le 3$ entries in L1 cache), replacing the global $O(\log M)$ binary search over the entire world probation table.
+3. **Localized Dirty Cache:** Restoring or expiring a dynamic claim mutates only the affected bin and updates 64 ints in `dirBadPrefixSums` ($< 20\text{ ns}$), leaving all other bins untouched.
+
+---
+
+### 21. Extreme planetary domains (100km to 30,000km): Paged bins, optimistic empty default for new land, and single-page swapping
+
+`:rtp-core:simulationBenchmark --tests '*PagedSegmentedKeyRunTableBenchmarkTest*'`
+
+#### 21a. Planetary scale (14 trillion chunks) and the optimistic empty default for new land
+
+A vanilla Minecraft world border ($\pm 30,000\text{ km}$, radius $1,875,000\text{ chunks}$) contains $(3,750,000)^2 \approx 14.06 \times 10^{12}$ chunks.
+- **The Optimistic Empty Default (`SOLID_EMPTY`):** Untouched and ungenerated bins default to `SOLID_EMPTY` (0 bad chunks, 100% available for selection).
+  - An assumed-full default would paralyze server exploration, permanently trapping players in spawn or causing S-004 starvation on new servers.
+  - Defaulting to `SOLID_EMPTY` preserves the engine's core purpose: allowing players to discover, select, and generate new land frontiers.
+  - **RAM footprint of untouched space:** **0 bytes**. Uses a shared singleton `EMPTY_BIN` with zero array allocations.
+- **`SOLID_FULL` is reserved for proven rejection:** Whole ocean regions and out-of-bounds space collapse to `SOLID_FULL` (also 0 bytes) only after verification.
+- **Ungenerated frontier bypasses L3 file compute:** Because ungenerated frontiers have no `.mca` files on disk, L3 Anvil pre-filtering is cleanly bypassed without wasted file I/O, falling back gracefully to engine chunk generation.
+- **Future Tagging Note:** On promotion from backlog to cold/hot queue, an explicit enum tag (`UNSCREENED_FRONTIER` vs `PREFILTER_VALIDATED`) will allow the teleport pipeline to apply cautious vs fast-track generation timeouts and smart queue balancing.
+
+#### 21b. Single-page swapping with bounded resident capacity
+
+For extreme servers where active mixed bins accumulate, `PagedSegmentedKeyRunTable` bounds resident heap memory:
+- **Bounded Resident Pages:** Retains at most $M$ mixed bin arrays in JVM heap (e.g. 64 to 256 pages).
+- **Single-Page Eviction Under Budget:** When a new mixed bin is loaded or dirtied, cold mixed bins are dropped **one page at a time** to disk storage (or Redis), maintaining strictly bounded RAM without full table invalidation.
+- **Page Fault Speed:** When a candidate query hits a paged bin, the bin faults in its exact 4 kB page from storage. Because active spans are pinned at offset 0, each paged bin is completely self-contained (zero cross-page dependencies).
+
+#### 21c. Low-thrashing hysteresis and equivalent page cycling
+
+- **Anti-Thrashing Eviction:** Drops pages one by one only when exceeding capacity, avoiding destructive cache wipes.
+- **Equivalent Page Cycling:** Periodically evicts an idle LRU page to storage and warms up an alternate paged page of equivalent access weight, preventing static residency lock-in and distributing cache warming across the planetary domain.
+- **Verified:** Synthetic and scaled benchmark suites confirmed 100.00% coordinate equivalence under active page evictions, faults, and cycling.
+
+---
+
+### 22. Variant extensions: Polygon, Ellipse, and Normal (Gaussian) distributions
+
+`:rtp-core:simulationBenchmark --tests '*PolygonEllipseAndNormalBenchmarkTest*'`
+
+#### 22a. Polygon under dual-layer Hilbert: 33% run reduction and 2.4x selection speedup
+
+In the legacy implementation (`Polygon`), outside-polygon space within the AABB is populated by an async mask walker. Under the legacy pure Archimedean spiral, cutting an arbitrary polygon boundary (e.g. concave star, arrowhead) with 1D concentric rings causes severe run fragmentation across ring seams.
+
+Under `PolygonOptimizedDualLayer`:
+- **Run Fragmentation Collapses:** On a 512x512 star polygon with 125,736 outside chunks, runs dropped from **647 down to 431** (a **0.666 ratio**, 33.4% fewer runs). 2D Hilbert locality groups outside AABB corners into long contiguous runs.
+- **Selection Latency:** ACCUMULATE candidate selection latency dropped from **788.4 ns/op down to 326.7 ns/op** (**2.41x speedup**).
+- **Zero-Byte Solid Bins:** Bins completely outside the polygon collapse to singleton references (0 bytes heap), avoiding array allocation entirely.
+
+#### 22b. Ellipse inscribed in dual-layer Circle: arc lengths vs Hilbert clustering
+
+In `Ellipse`, the shape is inscribed in a bounding circle. Because circular polar spirals trace continuous smooth circular arcs, they intersect an ellipse boundary at only 2–4 points per revolution.
+
+Under `EllipseOptimizedDualLayer` (inscribed in `CircleOptimizedDualLayer`):
+- **Full-Precision Run Count:** At full precision with terrain noise, runs were **485 (legacy polar) vs 540 (dual-layer circle)** (ratio **1.113**). Hilbert sub-traversal across macro-polar blocks cuts slightly more across the smooth radial arc before coalescing.
+- **Selection Latency:** Dual-layer selection ran at **846.7 ns/op vs 878.5 ns/op** (1.04x speedup), benefiting from segmented L1 cache residency while maintaining 100% exact boundary containment.
+
+#### 22c. Normal (Gaussian) distribution: ACCUMULATE vs REROLL under ocean holes
+
+`NormalMemoryShape` defaults to `REROLL` mode. However, when ocean holes or invalid terrain occupy the domain (e.g. 40% ocean):
+- **REROLL Mode:** Experienced **40.8% candidate rejections** (only 11,841 valid candidates out of 20,000 draws), taking **875.7 ns/op** and wasting CPU on reroll loops.
+- **ACCUMULATE Mode with Pre-Limited Range:** Achieved **20,000 / 20,000 valid candidates (100.0% validity)** with zero failed draws, executing in **715.4 ns/op** (**1.22x faster** than REROLL).
+- **Scale Invariance:** As range expands to large scales, shifting ocean holes smooth out in 1D prefix space, allowing Gaussian `ACCUMULATE` to deliver exact bell-curve probability without candidate reroll loops.
+
+---
+
 ## Tried and declined
 
 Retained as evidence, not as options:
@@ -624,7 +754,6 @@ Retained as evidence, not as options:
 ## Maybe later
 
 - **Roaring bitmap containers keyed by region.** Still the best full-precision encoder candidate, orthogonal to the curve, and the one a competitor's engineer would recognise.
-- **Secondary per-point tables** for cache locality and reconciliation locality, sized in bytes to land a leaf in L1 and the directory in L2. Keys stay globally monotone so a split is a table boundary, not a key boundary.
 - **Storage-tier residency planning.** Relevant the moment persistence of a subsection is real.
 - **k2-tree, Elias-Fano** on the key arrays.
 

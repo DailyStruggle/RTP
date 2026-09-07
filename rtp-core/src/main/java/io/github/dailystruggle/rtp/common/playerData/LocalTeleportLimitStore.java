@@ -60,6 +60,13 @@ public final class LocalTeleportLimitStore implements TeleportLimitStore {
   }
 
   @Override
+  public long uses(UUID id, long resetMillis, long now) {
+    if (id == null) return 0L;
+    ensureLoaded(id);
+    return tracker.uses(id, resetMillis, now);
+  }
+
+  @Override
   public void reset(UUID id) {
     if (id == null) return;
     tracker.reset(id);

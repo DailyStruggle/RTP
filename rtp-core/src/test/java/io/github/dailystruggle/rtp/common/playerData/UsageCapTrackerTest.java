@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.playerData;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -80,5 +81,19 @@ class UsageCapTrackerTest {
     assertTrue(t.isLocked(id, cap, 0, 1000L));
     t.reset(id);
     assertFalse(t.isLocked(id, cap, 0, 1000L), "reset cleared the counter");
+  }
+
+  @Test
+  @DisplayName("uses reports active window usage and expires properly")
+  void usesReportsCorrectly() {
+    UsageCapTracker t = new UsageCapTracker();
+    UUID id = UUID.randomUUID();
+    assertEquals(0L, t.uses(id, 5000L, 1000L), "no uses recorded yet");
+    t.recordSuccess(id, 5, 5000L, 1000L);
+    assertEquals(1L, t.uses(id, 5000L, 2000L));
+    t.recordSuccess(id, 5, 5000L, 3000L);
+    assertEquals(2L, t.uses(id, 5000L, 4000L));
+    // After window elapses, uses returns 0
+    assertEquals(0L, t.uses(id, 5000L, 6000L));
   }
 }

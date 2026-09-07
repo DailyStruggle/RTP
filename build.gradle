@@ -225,6 +225,7 @@ if (findProject(':rtp-plugin') != null) {
 def executableAddonHelperPaths = [
         ':addons:LeafRTPGuiAddon:rtp-gui',
         ':addons:LeafRTPCountdownAddon',
+        ':addons:LeafRTPLinearAddon',
         ':helpers:PeriodicWorldSaver',
         ':helpers:StressTestRTP',
 ].findAll { findProject(it) != null }
@@ -243,6 +244,9 @@ if (!executableAddonHelperPaths.isEmpty()) {
 
     executableAddonHelperPaths.each { path ->
         copyAddonAndHelperJars.dependsOn "${path}:assemble"
+        if (project(path).tasks.findByName('shadowJar') != null) {
+            copyAddonAndHelperJars.dependsOn "${path}:shadowJar"
+        }
     }
     tasks.named('assemble').configure { finalizedBy 'copyAddonAndHelperJars' }
 }

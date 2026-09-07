@@ -26,10 +26,11 @@ Under ADR-016, RTP's off-tick region pre-filter subsystem (`api/anvil-api`) hard
 2. **Format Resolution and Auto-Detection**:
    - `RegionFileResolver` shall probe for `r.X.Z.linear` first, falling back to `r.X.Z.mca`.
    - File format verification shall validate magic header bytes (`0xC370ACDE22013702` for Linear v1/v2 vs. Anvil sector structures).
-3. **Linear Decoder Implementation (`LinearRegionReader`)**:
-   - Integrate `com.github.luben:zstd-jni` into `anvil-api` to decompress Linear chunk frames.
-   - Read Linear v1/v2 headers, parse chunk entry index tables, and decompress the requested chunk's NBT payload.
-   - Reuse existing zero-dependency `Nbt.readRootCompound` to construct standard `AnvilChunkView` objects.
+3. **Linear Decoder Implementation (`LeafRTPLinearAddon`)**:
+   - Packaged in standalone `LeafRTPLinearAddon` (`addons/LeafRTPLinearAddon`) using `com.github.luben:zstd-jni` to decompress Linear chunk frames without inflating the core plugin JAR size.
+   - Registers `.linear` with `RegionFormatRegistry` (`RegionFileReaderProvider` SPI).
+   - Reads Linear v1/v2 headers, parses chunk entry index tables, and decompresses the requested chunk's NBT payload.
+   - Reuses existing zero-dependency `Nbt.readRootCompound` to construct standard `AnvilChunkView` objects.
 4. **Safety and Fallback Guarantees (S-004 and S-005)**:
    - All decompression and file reads shall remain asynchronous on `ForkJoinPool.commonPool()`.
    - If native `zstd-jni` libraries fail to link (e.g. strict security sandboxes), or if a region file is malformed, the probe shall catch the error, emit diagnostic logging, and return `Verdict.UNKNOWN` to safely fall through to runtime chunk loading.
@@ -43,16 +44,18 @@ Under ADR-016, RTP's off-tick region pre-filter subsystem (`api/anvil-api`) hard
 | Option A: Require operators to use `.mca` | Breaks compatibility with Leaves/Gale servers and forced conversion negates disk-saving benefits for server operators. |
 | Option B: Disable pre-filter on `.linear` worlds | Causes 100% fallback to live chunk loads, increasing server tick pressure and losing pre-scan acceleration. |
 | Option C: Inline Linear parsing into `AnvilReader` | Violates single-responsibility principle; mixing Anvil 4 KiB sector arithmetic with ZSTD stream decoding creates tight coupling and testing complexity. |
-| Option D: Pluggable SPI with dedicated `LinearRegionReader` (Selected) | Clean separation of concerns, enables unit testing with mock format fixtures, and allows future additions (e.g. Slime Region Format) without breaking Anvil code. |
+| Option D: Bundle zstd-jni into anvil-api directly | Bundles multi-platform native binaries into the core jar, increasing overall jar size by ~6.3 MiB for all users even though 98%+ use standard .mca Anvil. |
+| Option E: Pluggable SPI with dedicated `LeafRTPLinearAddon` (Selected) | Clean separation of concerns, keeps core RTP jar lightweight (~4.5-6 MB), and allows Linear servers to install `LeafRTPLinearAddon` or pluggable region format providers seamlessly. |
 
 ## Consequences
 
 - **Positive:**
-  - Leaves, Gale, and modded servers using `.linear` retain full off-tick biome and safety pre-filtering.
+  - Leaves, Gale, and modded servers using `.linear` retain full off-tick biome and safety pre-filtering via `LeafRTPLinearAddon`.
+  - Core plugin JAR remains lightweight (~4.5 MB Lite / ~6 MB Pro) with zero native binary bloat for standard .mca servers.
   - `/rtp scan` and L3 Backlog Cache (ADR-028) can inspect `.linear` files without triggering server chunk loads.
-  - Clean modular SPI architecture for future region formats.
+  - Clean modular SPI architecture (`RegionFormatRegistry` / `RegionFileReaderProvider`) for future region formats.
 - **Negative / Trade-offs:**
-  - Adds `zstd-jni` dependency (~1-5 MB native binary jar bundle) to `anvil-api`.
+  - Servers running `.linear` require `LeafRTPLinearAddon.jar` in `plugins/RTP/addons/` to enable off-tick prefiltering for `.linear` files.
   - Linear frame decompression may allocate slightly larger temporary byte buffers during initial decode compared to individual 4 KiB sector slices (buffered and bounded by `RegionByteCache`).
 
 ## References
