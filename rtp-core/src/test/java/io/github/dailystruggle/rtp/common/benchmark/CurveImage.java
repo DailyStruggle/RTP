@@ -94,8 +94,8 @@ final class CurveImage {
       int side = cells * scale;
       int pad = caption == null ? 0 : 12;
       int lineH = 15;
-      int headH =
-          caption == null ? 0 : pad + 22 + (caption.lines.size() * lineH) + pad / 2;
+      // Trailing 18 leaves room for the axis note drawn just above the raster.
+      int headH = caption == null ? 0 : pad + 22 + (caption.lines.size() * lineH) + 18;
       int footH = caption == null || caption.swatches.isEmpty() ? 0 : pad + 18 * caption.swatches.size();
       int width = Math.max(side + 2 * pad, caption == null ? side : 560);
       BufferedImage img =
@@ -160,11 +160,26 @@ final class CurveImage {
   }
 
   /**
+   * Flat colour per equal-sized band of key space, cycling through a small palette.
+   *
+   * <p>Preferred over {@link #rampArgb} for key-order images: a continuous hue ramp varies inside a
+   * band, so the eye reads the gradient rather than the band, and the first set of these images was
+   * unreadable for exactly that reason. A flat fill makes one band one visible shape, which is the
+   * only thing the picture is claiming - arcs on the spiral, squares on the hybrid.
+   */
+  static int bandArgb(double position, int bands) {
+    int[] palette = {
+      0xE53935, 0x1E88E5, 0xFDD835, 0x43A047, 0xF4511E, 0x8E24AA, 0x00ACC1, 0xC0CA33
+    };
+    int band = (int) Math.floor(Math.max(0.0d, Math.min(0.999999d, position)) * bands);
+    return palette[band % palette.length];
+  }
+
+  /**
    * Cyclic hue ramp over a normalised position along a curve.
    *
    * <p>Cyclic rather than monotone on purpose: a single dark-to-light ramp over a million keys is
-   * visually flat, whereas repeating the ramp makes each band one contiguous stretch of key space,
-   * so a curve's locality shows up directly as whether its bands are blobs or rings.
+   * visually flat, whereas repeating the ramp makes each band one contiguous stretch of key space.
    */
   static int rampArgb(double position, int cycles) {
     double h = (position * cycles) % 1.0d;

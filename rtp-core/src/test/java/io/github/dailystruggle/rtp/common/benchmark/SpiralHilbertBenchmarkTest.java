@@ -55,6 +55,34 @@ public class SpiralHilbertBenchmarkTest {
 
   private static final long SEED = 20260906L;
 
+  /**
+   * Bands the key space is cut into for the key-order images.
+   *
+   * <p>64 over a 256x256-chunk domain makes one band 1024 keys, which is exactly one 32x32 point -
+   * so the hybrid's bands are drawn at the granularity the design operates on, and the spiral's are
+   * drawn over the same number of keys for a like-for-like comparison.
+   */
+  private static final int KEY_BANDS = 64;
+
+  /**
+   * Unsafe chunk. Deliberately far from the canvas background.
+   *
+   * <p>The first set of images used a near-black slate for this, within a few units of the
+   * surrounding canvas, so bad land read as a hole in the picture rather than as data. It was
+   * always drawn - the rasters are opaque RGB with no alpha - but "drawn in the background colour"
+   * and "not drawn" are indistinguishable to a reader.
+   */
+  private static final int BAD_ARGB = 0x5C6BC0;
+
+  /** Usable chunk the table still offers. */
+  private static final int GOOD_ARGB = 0x2E7D32;
+
+  /** Usable chunk the table refuses after coalescing. */
+  private static final int LOST_ARGB = 0xD32F2F;
+
+  /** Cell the curve does not address at all, drawn as the canvas so it reads as absent. */
+  private static final int OUTSIDE_ARGB = 0x101821;
+
   /** Radii swept, in chunks. */
   private static final int[] RADII_CHUNKS = {128, 256, 512};
 
@@ -142,8 +170,8 @@ public class SpiralHilbertBenchmarkTest {
     }
   }
 
-  /** Marks every bad chunk in the domain, rebuilds, and measures the result. */
-  private static Row measure(MemoryShape<?> shape, int radiusChunks, long resolution) {
+  /** Marks every bad chunk in the domain and rebuilds, leaving the shape in its coalesced state. */
+  private static void markAndFlush(MemoryShape<?> shape, int radiusChunks, long resolution) {
     shape.setRng(new Random(SEED));
     shape.setSpatialResolution(resolution);
 
@@ -160,12 +188,17 @@ public class SpiralHilbertBenchmarkTest {
         0L,
         shape.getOutOfDomainMarkCount(),
         "shape refused in-domain marks at radius " + radiusChunks);
+  }
 
+  /** Entries in the rebuilt table, bad and probation both, since both are resident. */
+  private static int runCount(MemoryShape<?> shape) {
     long[] bad = shape.badKeysSnapshot();
     long[] probation = shape.probationKeysSnapshot();
-    int runs = (bad == null ? 0 : bad.length) + (probation == null ? 0 : probation.length);
+    return (bad == null ? 0 : bad.length) + (probation == null ? 0 : probation.length);
+  }
 
-    // Accuracy: a usable chunk the rebuilt table now refuses has been discarded by coalescing.
+  /** Accuracy: a usable chunk the rebuilt table now refuses has been discarded by coalescing. */
+  private static double usableGroundLost(MemoryShape<?> shape, int radiusChunks) {
     long good = 0L;
     long lost = 0L;
     for (int cx = -radiusChunks; cx < radiusChunks; cx++) {
@@ -175,7 +208,21 @@ public class SpiralHilbertBenchmarkTest {
         if (shape.isKnownBad(cx, cz)) lost++;
       }
     }
-    double goodLoss = good == 0L ? 0.0d : lost / (double) good;
+    return good == 0L ? 0.0d : lost / (double) good;
+  }
+
+  /**
+   * Marks, rebuilds and measures.
+   *
+   * <p>Leaves the shape <b>past</b> its coalesced state: the reconciliation timing below adds
+   * further marks, so a shape handed to {@link CurveImage} must be prepared with
+   * {@link #markAndFlush} instead, or the picture will show more loss than the row it is captioned
+   * with.
+   */
+  private static Row measure(MemoryShape<?> shape, int radiusChunks, long resolution) {
+    markAndFlush(shape, radiusChunks, resolution);
+    int runs = runCount(shape);
+    double goodLoss = usableGroundLost(shape, radiusChunks);
 
     for (int i = 0; i < SELECT_ITERATIONS / 4; i++) {
       shape.rand();
@@ -531,50 +578,68 @@ public class SpiralHilbertBenchmarkTest {
         (cx, cz) -> keyColour(spiral.xzToLocation(cx - radius, cz - radius), spiralRange),
         new CurveImage.Caption("Key order - shipped Archimedean spiral (ADR-001)")
             .line("Each chunk is coloured by where it sits along the 1D key space.")
-            .line("The hue ramp repeats 8 times, so one colour band = one contiguous run of keys.")
-            .line("Bands are rings: keys adjacent in 1D are far apart across the map.")
+            .line("The key space is cut into equal bands, each drawn as one flat colour.")
+            .line("One patch of colour = one contiguous stretch of keys, i.e. one possible run.")
+            .line("Patches are thin concentric rings: 1D-adjacent keys spread around the whole")
+            .line("perimeter, so any merge between them crosses unrelated terrain.")
+            .line("Hues themselves mean nothing - only the SHAPE of a band is meaningful.")
             .line(domain)
-            .swatch(0x1B2430, "outside the addressed domain")
-            .swatch(0xFF3030, "band boundary hues are arbitrary - only band SHAPE is meaningful"));
+            .swatch(OUTSIDE_ARGB, "not addressed by this curve - no key, never drawn on"));
     img.draw(
         "keyorder-hilbert",
         cells,
         (cx, cz) -> keyColour(hybrid.xzToLocation(cx - radius, cz - radius), hybridRange),
         new CurveImage.Caption("Key order - spiral-addressed Hilbert key space (ADR-085)")
-            .line("Same colouring rule and same 8 repeats as the spiral image.")
-            .line("Spiral orders " + point + "x" + point + " chunk points; inside a point the")
-            .line("keys follow that point's Hilbert traversal, so bands are compact blobs.")
+            .line("Identical colouring rule and band count to the spiral image.")
+            .line("The spiral orders " + point + "x" + point + " chunk points; within a point the")
+            .line("keys follow that point's Hilbert traversal, so a patch is a compact square.")
+            .line("Hues themselves mean nothing - only the SHAPE of a band is meaningful.")
             .line(domain)
-            .swatch(0x1B2430, "outside the addressed domain")
-            .swatch(0xFF3030, "band boundary hues are arbitrary - only band SHAPE is meaningful"));
+            .swatch(OUTSIDE_ARGB, "not addressed by this curve - no key, never drawn on"));
 
     // Occupancy truth, then what each curve refuses after coalescing at a shared setting.
     img.draw(
         "occupancy",
         cells,
-        (cx, cz) -> mask.isOccupied(cx - radius, cz - radius) ? 0x2E7D32 : 0x1B2430,
+        (cx, cz) -> mask.isOccupied(cx - radius, cz - radius) ? GOOD_ARGB : BAD_ARGB,
         new CurveImage.Caption("Ground truth - which chunks are usable")
             .line("Occupancy from the real save, tiled outward. Input to both curves below.")
+            .line("Indigo = chunk absent from the save (never generated), which stands in for")
+            .line("unsafe terrain: those are the chunks both curves are told to exclude.")
+            .line("Every cell in the square is drawn - there are no gaps and no transparency.")
+            .line("Usable share of this domain: " + String.format("%.3f", usableShare(radius)))
             .line(domain)
-            .swatch(0x2E7D32, "usable chunk")
-            .swatch(0x1B2430, "unsafe chunk (marked bad)"));
+            .swatch(GOOD_ARGB, "usable chunk - a candidate the table should keep offering")
+            .swatch(BAD_ARGB, "unsafe chunk - marked bad, correctly never offered"));
 
     // Sweep the lossy knob so the trade is visible rather than asserted at one point. The knob is
     // spatialResolution, unchanged in meaning: runs whose 1D gap is at most this value are merged,
     // and every usable chunk swallowed by a merge is refused thereafter.
     long[] resolutions = {1L, 16L, 64L, 256L, 1024L};
     for (long resolution : resolutions) {
+      // markAndFlush rather than measure: measure's reconciliation timing adds further marks, so a
+      // drawn shape would carry loss the caption does not report.
       Square coalescedSpiral = plainSpiral(radius);
-      Row spiralRow = measure(coalescedSpiral, radius, resolution);
+      markAndFlush(coalescedSpiral, radius, resolution);
+      double spiralLoss = usableGroundLost(coalescedSpiral, radius);
+      int spiralRuns = runCount(coalescedSpiral);
+
       SpiralHilbertSquare coalescedHybrid = new SpiralHilbertSquare(radius, point, true);
-      Row hybridRow = measure(coalescedHybrid, radius, resolution);
+      markAndFlush(coalescedHybrid, radius, resolution);
+      double hybridLoss = usableGroundLost(coalescedHybrid, radius);
+      int hybridRuns = runCount(coalescedHybrid);
 
       img.draw(
           "discarded-spiral-res" + resolution,
           cells,
           (cx, cz) -> lossColour(coalescedSpiral, cx - radius, cz - radius),
           lossCaption(
-              "Spiral (ADR-001)", resolution, spiralRow, domain, "arcs along the spiral's rings"));
+              "Spiral (ADR-001)",
+              resolution,
+              spiralRuns,
+              spiralLoss,
+              domain,
+              "arcs along the spiral's rings"));
       img.draw(
           "discarded-hilbert-res" + resolution,
           cells,
@@ -582,61 +647,87 @@ public class SpiralHilbertBenchmarkTest {
           lossCaption(
               "Spiral+Hilbert (ADR-085)",
               resolution,
-              hybridRow,
+              hybridRuns,
+              hybridLoss,
               domain,
               "blobs hugging the unsafe terrain"));
 
       REPORT.add(
-          "drawn", "res=" + resolution + " spiral", "usable ground discarded",
-          spiralRow.goodLoss(), Provenance.MEASURED);
+          "drawn",
+          "res=" + resolution + " spiral",
+          "usable ground discarded",
+          spiralLoss,
+          Provenance.MEASURED);
       REPORT.add(
-          "drawn", "res=" + resolution + " hilbert seam-matched", "usable ground discarded",
-          hybridRow.goodLoss(), Provenance.MEASURED);
-      assertTrue(
-          spiralRow.goodLoss() >= 0.0d && hybridRow.goodLoss() >= 0.0d, "loss must be a fraction");
+          "drawn",
+          "res=" + resolution + " hilbert seam-matched",
+          "usable ground discarded",
+          hybridLoss,
+          Provenance.MEASURED);
+      assertTrue(spiralLoss >= 0.0d && hybridLoss >= 0.0d, "loss must be a fraction");
     }
 
     REPORT.note(
         "Images are written to build/reports/rtp-simulation/img and carry their own titles and "
-            + "legends. keyorder-* colours each chunk by its position along that curve's key space "
-            + "in 8 repeating bands, so a band is one contiguous stretch of keys: rings on the "
-            + "spiral, blobs on the hybrid. occupancy is the ground truth from the save. "
+            + "legends. keyorder-* cuts the key space into "
+            + KEY_BANDS
+            + " equal bands drawn as flat colours, so one patch is one contiguous stretch of keys: "
+            + "thin concentric rings on the spiral, compact squares on the hybrid. occupancy is "
+            + "the ground truth from the save. "
             + "discarded-<curve>-res<N> marks in red the usable chunks that curve's table refuses "
             + "after coalescing at spatialResolution N, swept over 1/16/64/256/1024 key units so "
             + "the same knob is compared on both curves at every setting.");
   }
 
   private static CurveImage.Caption lossCaption(
-      String curve, long resolution, Row row, String domain, String shape) {
+      String curve, long resolution, int runs, double loss, String domain, String shape) {
     return new CurveImage.Caption("Usable ground lost to coalescing - " + curve)
         .line("spatialResolution = " + resolution + " key units (runs closer than this merge)")
         .line(
             "runs in table: "
-                + row.runs()
+                + runs
                 + "   usable ground discarded: "
-                + String.format("%.3f", row.goodLoss()))
+                + String.format("%.3f", loss))
         .line("Red is the cost of the merge: chunks that are safe but no longer offered.")
         .line("Expect the loss to appear as " + shape + ".")
         .line(domain)
-        .swatch(0x2E7D32, "usable and still offered")
-        .swatch(0xD32F2F, "usable but refused - lost to coalescing")
-        .swatch(0x1B2430, "unsafe chunk (correctly excluded)");
+        .swatch(GOOD_ARGB, "usable and still offered")
+        .swatch(LOST_ARGB, "usable but refused - lost to coalescing")
+        .swatch(BAD_ARGB, "unsafe chunk - correctly excluded, not a loss");
   }
 
   /** Bands along a curve's key space; out-of-domain cells are drawn as background. */
   private static int keyColour(long key, double range) {
-    if (key < 0L) return 0x1B2430;
-    // Few enough cycles that one band spans several points: at 24 the hybrid's bands were shorter
-    // than a point, which draws the Hilbert traversal's internal structure instead of its locality.
-    return CurveImage.rampArgb(key / range, 8);
+    // Two exclusions, not one. A negative key is refused outright, but a key at or beyond the
+    // range is also outside the addressed space: Square's range is ringStart(radius), so ring
+    // radius itself is not addressed even though xzToLocation still maps it. Drawing those cells
+    // clamped into the last band put a flat strip along the x = -radius column and z = -radius row
+    // that looked like a band and was not one.
+    if (key < 0L || key >= range) return OUTSIDE_ARGB;
+    // Flat fill per band rather than a hue ramp: a ramp varies inside a band, so the eye reads the
+    // gradient instead of the band, and the band's 2D shape is the only claim the picture makes.
+    return CurveImage.bandArgb(key / range, KEY_BANDS);
+  }
+
+  /** Share of the drawn domain the mask reports as usable, for the occupancy caption. */
+  private static double usableShare(int radiusChunks) {
+    long total = 0L;
+    long usable = 0L;
+    for (int cx = -radiusChunks; cx < radiusChunks; cx++) {
+      for (int cz = -radiusChunks; cz < radiusChunks; cz++) {
+        total++;
+        if (mask.isOccupied(cx, cz)) usable++;
+      }
+    }
+    return total == 0L ? 0.0d : usable / (double) total;
   }
 
   /** Green usable, dark bad, red usable-but-refused. */
   private static int lossColour(MemoryShape<?> shape, int cx, int cz) {
     boolean usable = mask.isOccupied(cx, cz);
     boolean refused = shape.isKnownBad(cx, cz);
-    if (!usable) return 0x1B2430;
-    return refused ? 0xD32F2F : 0x2E7D32;
+    if (!usable) return BAD_ARGB;
+    return refused ? LOST_ARGB : GOOD_ARGB;
   }
 
   /**

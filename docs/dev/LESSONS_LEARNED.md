@@ -771,6 +771,22 @@ One measurement worth keeping because it is counter-intuitive and cannot be re-d
 
 ---
 
+## 2026-09-06 - Geodesic blobbing vs. distance-bounded run-length merging for biome runs
+
+When attempting to optimize memory usage and lookup times in the modified space-filling curve (ADR-085 spiral-addressed Hilbert key space) at larger radii where spatial locality matters:
+
+An AI suggested replacing simple distance-bounded run-length merging with **geodesic blobbing**—attempting 2D morphological dilation/blob clustering across usable ground before run merging, rather than simply binding 1D run lengths by observable distance based on vanilla Minecraft chunk ticket mechanics (within 3 chunks, derived from max chunk ticket level / 5x5-7x7 ticking bounds; see `ADR-085` Section 14).
+
+Empirical results showed:
+- **Memory efficiency degraded by ~10-15%** compared to simple distance-bound merging.
+- **Compute time increased by >50%** due to the added multi-source geodesic traversal/clustering pass.
+
+**Durable takeaway:**
+- **Do not introduce 2D geodesic blobbing passes prior to run merging in the space-filling curve.** The Hilbert traversal inside coarse spiral points already projects 2D locality directly into the 1D key sequence. Simply bounding run lengths by observable distance (within 3 chunks / vanilla ticket window) aligns naturally with the curve's coalescing tolerance and player-perceptible bounds without paying for expensive morphological clustering.
+- **Hard complexity limit:** Spatial index representations in the memory shape pipeline have reached an empirical boundary where additional geometric pre-processing steps cost substantially more compute than any marginal compaction can save.
+
+---
+
 ## Git & Workspace Safety
 
 ### Working tree protection and destructive git operations (2026-06-14)
