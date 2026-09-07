@@ -177,4 +177,41 @@ public final class KeyRunTable {
   public double meanRunLength() {
     return count == 0 ? 0.0d : coveredCells() / (double) count;
   }
+
+  /**
+   * Resolves a target in [0, totalGood) in ACCUMULATE mode using the flat binary search fixed-point loop,
+   * exactly mirroring {@code MemoryShape#resolve}.
+   *
+   * @param target raw good-space index in [0, totalRange - coveredCells())
+   * @param totalRange maximum key range
+   * @return physical coordinate in [0, totalRange), or -1 if target is out of range
+   */
+  public long resolveAccumulate(long target, long totalRange) {
+    long totalGood = totalRange - coveredCells();
+    if (target < 0 || target >= totalGood) return -1L;
+
+    long[] prefixSums = new long[count];
+    long running = 0L;
+    for (int i = 0; i < count; i++) {
+      running += lengths[i];
+      prefixSums[i] = running;
+    }
+
+    long currentBadSum = 0L;
+    while (true) {
+      int index = Arrays.binarySearch(starts, 0, count, target + currentBadSum);
+      if (index < 0) {
+        index = -index - 1;
+      } else {
+        index = index + 1;
+      }
+      if (index > count) index = count;
+
+      long newBadSum = (index > 0) ? prefixSums[index - 1] : 0L;
+      if (newBadSum == currentBadSum) break;
+      currentBadSum = newBadSum;
+    }
+    long location = target + currentBadSum;
+    return (location < totalRange) ? location : -1L;
+  }
 }

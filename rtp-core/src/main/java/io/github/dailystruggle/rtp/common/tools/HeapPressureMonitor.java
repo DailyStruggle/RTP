@@ -3,12 +3,14 @@ package io.github.dailystruggle.rtp.common.tools;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.metrics.HeapSampler;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 /**
  * Heap-pressure gate for background cache generation and promotion tasks.
- * Samples {@link Runtime} memory usage against {@link PerformanceKeys#maxHeapPercent}.
+ * Samples generational tenured/old memory usage against {@link PerformanceKeys#maxHeapPercent},
+ * preventing false pauses caused by ephemeral young-generation allocation churn (e.g. prescan).
  */
 public final class HeapPressureMonitor {
   /** Minimum interval between fresh heap samples. */
@@ -17,6 +19,10 @@ public final class HeapPressureMonitor {
   private static final long WARN_INTERVAL_MS = 30_000L;
   /** Default threshold (percent of max heap) when the config knob is absent. */
   private static final double DEFAULT_MAX_HEAP_PERCENT = 85.0;
+
+  /** Minimum absolute free heap headroom (512 MiB). If available heap headroom exceeds this,
+   * the server is not under imminent OOM pressure regardless of percentage on large heaps. */
+  private static final long MIN_ABSOLUTE_HEADROOM_BYTES = 512L * 1024L * 1024L;
 
   private static final AtomicLong lastSampleMs = new AtomicLong(0L);
   private static final AtomicLong lastWarnMs = new AtomicLong(0L);
@@ -64,12 +70,34 @@ public final class HeapPressureMonitor {
         cachedUnderPressure = false;
         cachedUsedPercent = 0.0;
       } else {
+        // Prioritize tenured/old generation pool to isolate retained memory from young-gen churn
+        long tenuredUsed = HeapSampler.tenuredUsedBytes();
+        long tenuredMax = HeapSampler.tenuredMaxBytes();
+
+        // Also check total heap bounds
         Runtime runtime = Runtime.getRuntime();
-        long max = runtime.maxMemory();
-        long used = runtime.totalMemory() - runtime.freeMemory();
-        double usedFraction = (max <= 0L) ? 0.0 : ((double) used / (double) max);
-        cachedUsedPercent = usedFraction * 100.0;
-        cachedUnderPressure = usedFraction >= threshold;
+        long totalMax = runtime.maxMemory();
+        long totalUsed = runtime.totalMemory() - runtime.freeMemory();
+        long totalFree = (totalMax > totalUsed) ? (totalMax - totalUsed) : 0L;
+
+        // Ensure tenuredMax is at least totalMax if tenured pool max is unconstrained/undefined
+        long effectiveTenuredMax = Math.max(tenuredMax, totalMax);
+
+        // If overall JVM has ample absolute headroom (>= 512 MiB), do not flag as under pressure
+        if (totalFree >= MIN_ABSOLUTE_HEADROOM_BYTES && totalMax >= 2L * MIN_ABSOLUTE_HEADROOM_BYTES) {
+          double fraction = (effectiveTenuredMax > 0L) ? ((double) tenuredUsed / (double) effectiveTenuredMax) : 0.0;
+          cachedUsedPercent = fraction * 100.0;
+          // Only trip if tenured/old generation itself is critically saturated (> threshold)
+          cachedUnderPressure = fraction >= threshold;
+        } else {
+          // Constrained heap (< 512 MiB total free): evaluate both tenured and total heap
+          double tenuredFrac = (effectiveTenuredMax > 0L) ? ((double) tenuredUsed / (double) effectiveTenuredMax) : 0.0;
+          double totalFrac = (totalMax > 0L) ? ((double) totalUsed / (double) totalMax) : 0.0;
+          double effectiveFrac = Math.max(tenuredFrac, totalFrac);
+          cachedUsedPercent = effectiveFrac * 100.0;
+          cachedUnderPressure = effectiveFrac >= threshold;
+        }
+
         if (cachedUnderPressure) {
           long lastWarn = lastWarnMs.get();
           if (now - lastWarn >= WARN_INTERVAL_MS && lastWarnMs.compareAndSet(lastWarn, now)) {

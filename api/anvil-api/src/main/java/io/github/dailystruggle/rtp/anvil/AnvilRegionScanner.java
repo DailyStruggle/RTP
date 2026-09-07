@@ -168,9 +168,12 @@ public final class AnvilRegionScanner {
         }
         StorageLatencyProbe.record(System.nanoTime() - readStart, bytes.length);
         String fileName = regionFile.getFileName().toString();
-        RegionFileReader reader = fileName.endsWith(".linear")
-                ? LinearRegionReader.INSTANCE
-                : AnvilReader.INSTANCE;
+        int dotIdx = fileName.lastIndexOf('.');
+        String ext = dotIdx >= 0 ? fileName.substring(dotIdx) : "";
+        RegionFileReader reader = RegionFormatRegistry.getReader(ext);
+        if (reader == null) {
+            reader = AnvilReader.INSTANCE;
+        }
 
         // Walk all 1024 chunk slots; absent chunks return null from readChunk.
         for (int cz = 0; cz < 32; cz++) {

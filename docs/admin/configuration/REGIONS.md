@@ -162,6 +162,17 @@ Standard shapes with uniform or weighted distribution.
 - `weight`: `> 1.0` pulls landings toward center; `< 1.0` pushes toward edges. Applies within the `centerRadius`-to-`radius` band; it does not move the bounds themselves.
 - `expand`: If true, radius grows as locations are used.
 
+#### `CIRCLE_OPTIMIZED_DUAL_LAYER` / `SQUARE_OPTIMIZED_DUAL_LAYER`
+Optimized dual-layer shapes implementing the continuous spiral-addressed Hilbert key space (ADR-085).
+- Expands coarse spiral points into intra-point Hilbert traversals mapped to travel direction, eliminating run fragmentation across ring seams and drastically reducing memory footprint at one-chunk precision.
+- Backed by hardware-cache segmented secondary tables (`SegmentedKeyRunTable`), providing up to 2x-11x faster coordinate selection under `ACCUMULATE` mode.
+- Accepts the exact same parameters as `CIRCLE` and `SQUARE` (`radius`, `centerRadius`, `centerX`, `centerZ`, `weight`, `uniquePlacements`, `expand`, `mode`).
+
+#### `CIRCLE_DEPRECATED_PURE_SPIRAL` / `SQUARE_DEPRECATED_PURE_SPIRAL`
+Legacy pure 1D Archimedean spiral mapping shapes.
+- Preserved for backwards compatibility, regression testing, and side-by-side performance benchmarking against dual-layer Hilbert shapes.
+- Accepts identical parameters to `CIRCLE` and `SQUARE`.
+
 #### `CIRCLE_NORMAL` / `SQUARE_NORMAL`
 Gaussian distribution variants.
 - `radius` / `centerRadius`: Same as above - still chunks, still the hard outer and inner bounds.

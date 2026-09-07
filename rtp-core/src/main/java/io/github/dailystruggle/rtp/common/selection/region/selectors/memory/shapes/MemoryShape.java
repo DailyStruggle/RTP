@@ -77,16 +77,29 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   private static final int BIN_MAGIC = 0x52545031;
   /**
    * Current cause-tagged {@code .bin} format version (1 == legacy, 2 == cause-tagged, 3 ==
-   * ttl/epoch-tagged, 4 == unified biome run stream).
-   *
-   * <p>Version 4 replaces the per-biome biome sections - one {@code key} + {@code width delta} pair
-   * per run under a repeated name header - with a single name table plus one ascending run stream
-   * of {@code (key delta, width, biome id)}, each LEB128. That is the on-disk form of the blocked
-   * union held in memory, so a load builds {@link #biomeUnion} directly and no per-biome run table
-   * has to exist to receive it. Deltas shrink with run spacing rather than with the key domain, so
-   * the encoding does not degrade as the world radius grows.
+   * ttl/epoch-tagged, 4 == unified biome run stream, 5 == curve-tagged / dynamic key width ADR-085).
    */
-  private static final int BIN_VERSION = 4;
+  private static final int BIN_VERSION = 5;
+
+  /**
+   * Curve identifier for persistence header (ADR-085).
+   */
+  public static final String CURVE_SPIRAL = "SPIRAL";
+  public static final String CURVE_SPIRAL_HILBERT = "SPIRAL_HILBERT";
+
+  /**
+   * Returns the curve type name for this shape family (default "SPIRAL").
+   */
+  public String getCurveName() {
+    return CURVE_SPIRAL;
+  }
+
+  /**
+   * Returns the point edge P in chunks (default 1 for pure spiral curves).
+   */
+  public int getPointEdgeChunks() {
+    return 1;
+  }
   /**
    * Cross-biome union of the recorded biome runs, blocked so that a run costs 10 bytes resident
    * instead of the 24 a flat {@code long} key + {@code long} prefix sum + {@code short} id would.
@@ -1004,19 +1017,29 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     }
 
     // Build a binary payload (big-endian) without any synchronous disk I/O here.
-    // BIN_VERSION 4: magic(4) + version(4) + world(4+len) + stride(8) + badSize(4) +
-    // entries * 25 bytes (key 8 + delta 8 + cause 1 + expiresAt 8), then the biome section:
+    // BIN_VERSION 5: magic(4) + version(4) + curve(4+len) + P(4) + keyWidth(4) +
+    // world(4+len) + stride(8) + badSize(4) +
+    // entries * (2*keyWidth + 1 + 8) bytes (key + delta + cause 1 + expiresAt 8), then the biome section:
     // nameCount(4) + [nameLen(4) + bytes] * nameCount + runCount(4) +
     // [varint keyDelta + varint width + varint biomeId] * runCount.
+    String curveName = getCurveName();
+    byte[] curveBytes = curveName.getBytes(StandardCharsets.UTF_8);
+    int pVal = getPointEdgeChunks();
+    long maxRange = getRange();
+    int keyWidth = (maxRange <= Integer.MAX_VALUE && maxRange > 0) ? 4 : 8;
+
     byte[] worldBytes = worldName.getBytes(StandardCharsets.UTF_8);
     String[] unionNames = sUnion.names();
     int unionRuns = sUnion.runCount();
     int size = 0;
     size += 8; // BIN_MAGIC + BIN_VERSION
+    size += 4 + curveBytes.length; // curve name length + bytes
+    size += 4; // P
+    size += 4; // keyWidth
     size += 4 + worldBytes.length; // world name length + bytes
     size += 8; // scanStride
     size += 4; // bad array length
-    size += totalRuns * 25; // key + delta + cause + expiresAt per entry
+    size += totalRuns * (2 * keyWidth + 1 + 8); // key + delta + cause + expiresAt per entry
     size += 4; // biome name table size
     for (String name : unionNames) {
       size += 4 + name.getBytes(StandardCharsets.UTF_8).length;
@@ -1027,13 +1050,21 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     ByteBuffer buf = ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN);
     buf.putInt(BIN_MAGIC);
     buf.putInt(BIN_VERSION);
+    buf.putInt(curveBytes.length).put(curveBytes);
+    buf.putInt(pVal);
+    buf.putInt(keyWidth);
     buf.putInt(worldBytes.length).put(worldBytes);
     buf.putLong(scanStride.get());
 
     buf.putInt(totalRuns);
     for (int i = 0; i < totalRuns; i++) {
-      buf.putLong(allKeys[i]);
-      buf.putLong(allDeltas[i]);
+      if (keyWidth == 4) {
+        buf.putInt((int) allKeys[i]);
+        buf.putInt((int) allDeltas[i]);
+      } else {
+        buf.putLong(allKeys[i]);
+        buf.putLong(allDeltas[i]);
+      }
       buf.put(allCauses[i]);
       buf.putLong(allExpiries[i]);
     }
@@ -1411,9 +1442,22 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 // (small, positive) world-name byte length.
                 int first = buf.getInt();
                 int version;
+                String readCurve = CURVE_SPIRAL;
+                int readP = 1;
+                int keyWidth = 8;
                 int wLen;
                 if (first == BIN_MAGIC) {
                   version = buf.getInt();
+                  if (version >= 5) {
+                    int cLen = buf.getInt();
+                    if (cLen < 0 || cLen > buf.remaining()) return;
+                    byte[] cBytes = new byte[cLen];
+                    buf.get(cBytes);
+                    readCurve = new String(cBytes, StandardCharsets.UTF_8);
+                    readP = buf.getInt();
+                    keyWidth = buf.getInt();
+                    if (keyWidth != 4 && keyWidth != 8) keyWidth = 8;
+                  }
                   wLen = buf.getInt();
                 } else {
                   version = 1;
@@ -1431,9 +1475,26 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                   scanStride.set(-1L);
                 }
 
-                // Per-bad-run on-disk width: legacy = key(8) + delta(8); v2 adds a
-                // trailing cause byte; v3 adds expiresAt epoch seconds (8 bytes).
-                int badEntryWidth = (version >= 3) ? 25 : ((version >= 2) ? 17 : 16);
+                // Check curve compatibility (ADR-085 C9)
+                String myCurve = getCurveName();
+                int myP = getPointEdgeChunks();
+                boolean curveMatch = myCurve.equals(readCurve);
+                boolean losslessRatchet = false;
+                if (curveMatch) {
+                  if (myP == readP) {
+                    losslessRatchet = true;
+                  } else if (myP > readP && (myP % readP) == 0) {
+                    losslessRatchet = true; // target P is a multiple of stored P: fold upward
+                  }
+                }
+
+                // Per-bad-run on-disk width:
+                // v5 = 2*keyWidth + 1 + 8
+                // v3/v4 = 25 (key 8 + delta 8 + cause 1 + exp 8)
+                // v2 = 17 (key 8 + delta 8 + cause 1)
+                // v1 = 16 (key 8 + delta 8)
+                int badEntryWidth = (version >= 5) ? (2 * keyWidth + 1 + 8)
+                    : ((version >= 3) ? 25 : ((version >= 2) ? 17 : 16));
                 int badSize = buf.getInt();
                 if (badSize < 0 || badSize > (buf.remaining() / badEntryWidth)) return;
 
@@ -1443,18 +1504,31 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 byte[] rawCauses = new byte[badSize];
                 long[] rawExpiries = new long[badSize];
 
-                int activeCount = 0;
-                int probCount = 0;
-
                 for (int i = 0; i < badSize; i++) {
-                  long k = buf.getLong();
-                  long d = buf.getLong();
+                  long k = (version >= 5 && keyWidth == 4) ? (buf.getInt() & 0xFFFFFFFFL) : buf.getLong();
+                  long d = (version >= 5 && keyWidth == 4) ? (buf.getInt() & 0xFFFFFFFFL) : buf.getLong();
                   byte cause = (version >= 2) ? buf.get() : MISC_CAUSE;
                   long exp = (version >= 3) ? buf.getLong() : 0L;
                   rawKeys[i] = k;
                   rawDeltas[i] = d;
                   rawCauses[i] = cause;
                   rawExpiries[i] = exp;
+                }
+
+                // If curve or P changed incompatibly, discard learned bad runs safely
+                if (!curveMatch || !losslessRatchet) {
+                  RTP.log(Level.INFO, "[MemoryShape] Incompatible curve/P transition ("
+                      + readCurve + " P=" + readP + " -> " + myCurve + " P=" + myP
+                      + ") for world " + worldName + "; table discarded and will be relearned.");
+                  badSize = 0;
+                }
+
+                int activeCount = 0;
+                int probCount = 0;
+
+                for (int i = 0; i < badSize; i++) {
+                  long exp = rawExpiries[i];
+                  byte cause = rawCauses[i];
 
                   if (exp <= 0L || now < exp) {
                     activeCount++;

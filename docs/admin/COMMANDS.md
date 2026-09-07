@@ -345,6 +345,10 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `%rtp_remainingCooldown%` | Remaining cooldown time |
 | `%rtp_queueLocation%` | Whether a cached location is queued for the player |
 | `%rtp_teleports%` | Total teleports performed by this player |
+| `%rtp_lockUses%` | Current number of teleports used in the rolling lock-after window (alias: `%rtp_lock_uses%`) |
+| `%rtp_remainingLockUses%` | Remaining teleports allowed before lock-after lockout (alias: `%rtp_remaining_lock_uses%`) |
+| `%rtp_lockLimit%` | Configured `lockAfterUses` limit (aliases: `%rtp_lock_limit%`, `%rtp_lockAfterUses%`, `%rtp_lock_after_uses%`) |
+| `%rtp_remainingLockTime%` | Time remaining until rolling lock-after window resets (alias: `%rtp_remaining_lock_time%`) |
 | `%rtp_mspt%` | Current server MSPT |
 | `%rtp_attempts%` | Location-search attempts for the current teleport |
 | `%rtp_processingTime%` | Processing time for the current teleport |

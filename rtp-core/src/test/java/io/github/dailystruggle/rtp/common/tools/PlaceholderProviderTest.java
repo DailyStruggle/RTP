@@ -327,7 +327,10 @@ class PlaceholderProviderTest {
         "inFlightCalculations", "worldBorderOverride",
         "total_queue_length", "public_queue_length", "personal_queue_length",
         "teleport_world", "teleport_x", "teleport_y", "teleport_z", "teleport_biome",
-        "tickets", "plugin_forced", "server_forced", "loads", "leakRate"})
+        "tickets", "plugin_forced", "server_forced", "loads", "leakRate",
+        "remainingLockTime", "remaining_lock_time", "lockUses", "lock_uses",
+        "remainingLockUses", "remaining_lock_uses", "lockLimit", "lock_limit",
+        "lockAfterUses", "lock_after_uses"})
     void builtInPlaceholderIsRegistered(String key) {
         assertTrue(PlaceholderProvider.placeholders.containsKey(key),
                 "Expected built-in placeholder to be registered: " + key);

@@ -1,6 +1,14 @@
-package io.github.dailystruggle.rtp.anvil;
+package io.github.dailystruggle.rtp.linearaddon;
 
 import com.github.luben.zstd.Zstd;
+import io.github.dailystruggle.rtp.anvil.AnvilReader;
+import io.github.dailystruggle.rtp.anvil.CorruptRegionEntryException;
+import io.github.dailystruggle.rtp.anvil.DataVersionSupport;
+import io.github.dailystruggle.rtp.anvil.Nbt;
+import io.github.dailystruggle.rtp.anvil.RegionFileResolver;
+import io.github.dailystruggle.rtp.anvil.RegionFormatRegistry;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -15,7 +23,6 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -23,8 +30,18 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@DisplayName("ADR-077 - Linear (.linear / ZSTD) Region Reader")
+@DisplayName("ADR-077 - Linear (.linear / ZSTD) Region Reader Addon")
 class LinearRegionReaderTest {
+
+    @BeforeEach
+    void setUp() {
+        RegionFormatRegistry.register(".linear", LinearRegionReader.INSTANCE);
+    }
+
+    @AfterEach
+    void tearDown() {
+        RegionFormatRegistry.unregister(".linear");
+    }
 
     @Test
     @DisplayName("isZstdAvailable returns true when native library links")
@@ -57,14 +74,14 @@ class LinearRegionReaderTest {
 
         List<String> palette = Arrays.asList("minecraft:air", "minecraft:stone", "minecraft:grass_block");
         List<LinkedHashMap<String, Object>> sections = new ArrayList<>();
-        sections.add(AnvilTestFixtures.section((byte) -4, palette));
-        sections.add(AnvilTestFixtures.section((byte) 0, palette));
+        sections.add(createSection((byte) -4, palette));
+        sections.add(createSection((byte) 0, palette));
 
-        LinkedHashMap<String, Object> root0 = AnvilTestFixtures.chunkRoot(
+        LinkedHashMap<String, Object> root0 = createChunkRoot(
                 DataVersionSupport.MC_1_20_DATA_VERSION, heightmap, sections);
         byte[] chunk0Nbt = Nbt.writeNamedRoot("", root0);
 
-        LinkedHashMap<String, Object> root1 = AnvilTestFixtures.chunkRoot(
+        LinkedHashMap<String, Object> root1 = createChunkRoot(
                 DataVersionSupport.MC_1_21_DATA_VERSION, heightmap, sections);
         byte[] chunk1Nbt = Nbt.writeNamedRoot("", root1);
 
@@ -90,7 +107,7 @@ class LinearRegionReaderTest {
     }
 
     @Test
-    @DisplayName("RegionFileResolver prefers .linear over .mca when present")
+    @DisplayName("RegionFileResolver prefers registered .linear over .mca when present")
     void testRegionFileResolver(@TempDir Path tempDir) throws IOException {
         Path regionDir = tempDir.resolve("region");
         Files.createDirectories(regionDir);
@@ -117,6 +134,35 @@ class LinearRegionReaderTest {
         assertEquals(linearFile, resLinear.path());
         assertEquals(LinearRegionReader.INSTANCE, resLinear.reader());
         assertTrue(resLinear.isLinear());
+    }
+
+    private static LinkedHashMap<String, Object> createSection(byte yIndex, List<String> palette) {
+        LinkedHashMap<String, Object> sec = new LinkedHashMap<>();
+        sec.put("Y", yIndex);
+        LinkedHashMap<String, Object> blockStates = new LinkedHashMap<>();
+        List<Object> entries = new ArrayList<>(palette.size());
+        for (String id : palette) {
+            LinkedHashMap<String, Object> m = new LinkedHashMap<>();
+            m.put("Name", id);
+            entries.add(m);
+        }
+        blockStates.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, entries));
+        sec.put("block_states", blockStates);
+        return sec;
+    }
+
+    private static LinkedHashMap<String, Object> createChunkRoot(
+            int dataVersion,
+            long[] motionBlockingHeightmap,
+            List<LinkedHashMap<String, Object>> sections) {
+        LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+        root.put("DataVersion", dataVersion);
+        LinkedHashMap<String, Object> heightmaps = new LinkedHashMap<>();
+        heightmaps.put("MOTION_BLOCKING_NO_LEAVES", motionBlockingHeightmap);
+        root.put("Heightmaps", heightmaps);
+        List<Object> sectionList = new ArrayList<>(sections);
+        root.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND, sectionList));
+        return root;
     }
 
     /**

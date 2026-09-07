@@ -296,6 +296,63 @@ public class PlaceholderProvider {
                     return replacement.trim();
                 });
         placeholders.put(
+                "remaining_lock_time",
+                placeholders.get("remainingLockTime"));
+        placeholders.put(
+                "lockUses",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0";
+                    ConfigParser<ConfigKeys> cfg =
+                            (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                    if (cfg == null) return "0";
+                    long resetMillis =
+                            cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+                    long uses = RTP.getInstance().teleportLimitStore.uses(
+                            uuid, resetMillis, System.currentTimeMillis());
+                    return String.valueOf(uses);
+                });
+        placeholders.put(
+                "lock_uses",
+                placeholders.get("lockUses"));
+        placeholders.put(
+                "remainingLockUses",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0";
+                    ConfigParser<ConfigKeys> cfg =
+                            (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                    if (cfg == null) return "0";
+                    long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
+                    if (cap <= 0) return "0";
+                    long resetMillis =
+                            cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+                    long uses = RTP.getInstance().teleportLimitStore.uses(
+                            uuid, resetMillis, System.currentTimeMillis());
+                    long remaining = cap - uses;
+                    return String.valueOf(Math.max(0L, remaining));
+                });
+        placeholders.put(
+                "remaining_lock_uses",
+                placeholders.get("remainingLockUses"));
+        placeholders.put(
+                "lockLimit",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0";
+                    ConfigParser<ConfigKeys> cfg =
+                            (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                    if (cfg == null) return "0";
+                    long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
+                    return String.valueOf(Math.max(0L, cap));
+                });
+        placeholders.put(
+                "lock_limit",
+                placeholders.get("lockLimit"));
+        placeholders.put(
+                "lockAfterUses",
+                placeholders.get("lockLimit"));
+        placeholders.put(
+                "lock_after_uses",
+                placeholders.get("lockLimit"));
+        placeholders.put(
                 "queueLocation",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0";
