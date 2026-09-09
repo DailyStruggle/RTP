@@ -101,6 +101,25 @@ shape pick ──▶ L3 backlog ──(anvil-verified, in original order)──�
 - `backlogCacheCap = 0` disables L3 entirely (the buffer is `null`,
   selection feeds L2 directly as today).
 
+### Amendment: Configurable Bin Harvesting Density & Modulated PRP Selection (2026-09-08)
+
+To balance off-tick `.mca` Anvil I/O amortization against player spatial variety, the L3 generation and bin-screening pipeline is extended with configurable candidate harvesting proportions and modulated pseudorandom bin selection:
+
+1. **Configurable Locations-per-Bin Density (`locationsPerBin` / `binDensity`):**
+   - Expressed as an integer count of candidate locations selected per $32 \times 32$ chunk macro-bin ($1{,}024$ chunks per `.mca` region file).
+   - **Default: `2` to `4` locations per bin** (e.g. `locationsPerBin: 3`, or proportionally $\approx 3 / 1024 \approx 0.29\%$ sampling density).
+   - **`-1` (Unbinned Full-Random):** Disables bin-clustering entirely. L3 candidates are drawn across independent, unclustered random coordinates across the full shape domain without intra-bin reuse.
+   - **Intra-Bin Separation Guarantee:** When $C \in [2, 4]$ locations are harvested from a single $32 \times 32$ bin, candidates are placed along the local Hilbert curve separated by dyadic bisection offsets ($d_{\text{min}} \ge 20$ chunks / $320$ blocks). Even within the same region file, candidates are placed at opposite corners, preventing mutual line-of-sight collisions.
+   - **I/O Amortization:** Decompressing and inspecting a single `.mca` file off-tick verifies $2\text{--}4$ candidates at once, cutting background disk seeks and ZLIB decompression passes by $50\%\text{--}75\%$.
+
+2. **Modulated PRP Bin Selection for Macro-Dispersion:**
+   - Instead of picking bins sequentially or via memoryless random draws, the active working set of bins is selected via a **Modulated Keyed Pseudorandom Permutation (Feistel PRP)** across the world's macro-bin grid:
+     $$\text{binIndex} = \text{FeistelPermute}(t_{\text{bin}}, \text{totalWorldBins}, \text{secretSeed})$$
+   - Properties:
+     - **Unique Bin Rotation:** Bins are visited without replacement ($0.0\%$ repeat bins during a rotation cycle).
+     - **Cryptographic Unpredictability:** Macro-bins jump across non-linear, distant quadrants of the continent on successive refill pulses.
+     - **Player Suspicion Protection:** Maintaining an active working set of $24\text{--}32$ bins ensures that even if a player uses `/rtp` repeatedly, round-robin dispatching across active bins prevents any player from landing in the same $512 \times 512$ block region twice in a single session.
+
 ### Persistence
 
 L3 entries are **not persisted** to the database. The DB save / delete

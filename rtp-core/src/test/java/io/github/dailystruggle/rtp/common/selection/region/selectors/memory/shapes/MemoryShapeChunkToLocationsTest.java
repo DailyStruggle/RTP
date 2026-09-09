@@ -288,6 +288,59 @@ public class MemoryShapeChunkToLocationsTest {
         assertTrue(shape.isKnownBad(pickedLocation));
     }
 
+    @Test
+    @DisplayName("biomeAt(x, z) resolves when biome is recorded on any chunk preimage")
+    void biomeAt_resolvesAcrossChunkPreimages() {
+        Circle shape = new Circle();
+        shape.set(GenericMemoryShapeParams.radius, 64L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 16L);
+
+        int[] twoChunk = findChunkWithPreimageCount(shape, 2, -60, 60);
+        assertNotNull(twoChunk, "Could not find a 2-preimage chunk for the test setup");
+
+        long[] preimage = shape.chunkToLocations(twoChunk[0], twoChunk[1]);
+        assertEquals(2, preimage.length, "Setup precondition: chunk has 2 preimages");
+
+        long p1 = preimage[0];
+        long p2 = preimage[1];
+        long rep = shape.xzToLocation(twoChunk[0], twoChunk[1]);
+
+        // Record biome only on p1 (simulating legacy ScanTask recording only for current pos)
+        shape.addBiomeLocation(p1, 1L, "minecraft:plains");
+        shape.flushAndRebuild(1L);
+
+        // biomeAt(twoChunk[0], twoChunk[1]) should resolve "PLAINS" even if rep == p2
+        String biome = shape.biomeAt(twoChunk[0], twoChunk[1]);
+        assertNotNull(biome, "biomeAt(x, z) must resolve biome from twin preimage even if rep is the other index");
+        assertEquals("PLAINS", biome.toUpperCase());
+    }
+
+    @Test
+    @DisplayName("ScanTask.recordBiomeForChunk records biome on all preimages and representative")
+    void recordBiomeForChunk_recordsOnAllPreimages() {
+        Circle shape = new Circle();
+        shape.set(GenericMemoryShapeParams.radius, 64L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 16L);
+
+        int[] twoChunk = findChunkWithPreimageCount(shape, 2, -60, 60);
+        assertNotNull(twoChunk, "Could not find a 2-preimage chunk for the test setup");
+
+        long[] preimage = shape.chunkToLocations(twoChunk[0], twoChunk[1]);
+        assertEquals(2, preimage.length);
+
+        long p1 = preimage[0];
+        long p2 = preimage[1];
+        long rep = shape.xzToLocation(twoChunk[0], twoChunk[1]);
+
+        io.github.dailystruggle.rtp.common.tasks.ScanTask.recordBiomeForChunk(shape, p1, twoChunk[0], twoChunk[1], "minecraft:desert");
+        shape.flushAndRebuild(1L);
+
+        assertEquals("DESERT", shape.biomeAt(p1));
+        assertEquals("DESERT", shape.biomeAt(p2));
+        assertEquals("DESERT", shape.biomeAt(rep));
+        assertEquals("DESERT", shape.biomeAt(twoChunk[0], twoChunk[1]));
+    }
+
     // ------------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------------
