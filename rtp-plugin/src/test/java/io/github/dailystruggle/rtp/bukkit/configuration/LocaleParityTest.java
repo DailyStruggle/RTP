@@ -326,7 +326,7 @@ public class LocaleParityTest {
                     Object localeRaw = localeValues.get(translated);
                     if (!(localeRaw instanceof String s)) continue;
                     if (normalizeForTranslation(s).equals(baseResidual)) {
-                        failures.add(String.format("%s/messages.yml '%s' still English: \"%s\"",
+                        failures.add(String.format("%s/advanced/messages '%s' still English: \"%s\"",
                                 localeName, translated, s));
                     }
                 }
@@ -565,6 +565,7 @@ public class LocaleParityTest {
             try (DirectoryStream<Path> ymls = Files.newDirectoryStream(advancedDir, "*.yml")) {
                 for (Path yml : ymls) {
                     String name = yml.getFileName().toString();
+                    if (name.endsWith(".lang.yml")) continue;
                     String stem = name.substring(0, name.length() - ".yml".length());
                     // ADR-076: co-located dotfile map beside the advanced value file.
                     Path langSibling = advancedDir.resolve("." + stem + ".lang.yml");
@@ -579,6 +580,7 @@ public class LocaleParityTest {
             try (DirectoryStream<Path> ymls = Files.newDirectoryStream(MESSAGES_DIR, "*.yml")) {
                 for (Path yml : ymls) {
                     String name = yml.getFileName().toString();
+                    if (name.endsWith(".lang.yml")) continue;
                     String stem = name.substring(0, name.length() - ".yml".length());
                     Path langSibling = MESSAGES_DIR.resolve("." + stem + ".lang.yml");
                     String cat = "advanced/messages/" + stem;
@@ -607,13 +609,16 @@ public class LocaleParityTest {
     /**
      * Union of every {@code *.yml} member of an {@code advanced/messages}
      * directory (baseline or a locale mirror). The co-located {@code .<file>.lang.yml}
-     * rename maps are dotfiles and are excluded by the glob.
+     * rename maps are dotfiles and are excluded.
      */
     private static Map<String, Object> mergedMessages(Path messagesDir) throws IOException {
         Map<String, Object> merged = new LinkedHashMap<>();
         if (Files.isDirectory(messagesDir)) {
             try (DirectoryStream<Path> ymls = Files.newDirectoryStream(messagesDir, "*.yml")) {
-                for (Path p : ymls) merged.putAll(loadYaml(p));
+                for (Path p : ymls) {
+                    if (p.getFileName().toString().endsWith(".lang.yml")) continue;
+                    merged.putAll(loadYaml(p));
+                }
             }
         }
         return merged;

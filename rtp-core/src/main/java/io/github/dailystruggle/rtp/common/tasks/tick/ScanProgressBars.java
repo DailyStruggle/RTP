@@ -1,14 +1,13 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
-import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.server.ProgressBar;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Platform-neutral driver for the world-scan on-screen progress bar.
@@ -59,7 +58,7 @@ public final class ScanProgressBars {
       regionNames.append(entry.getKey());
     }
 
-    String etaStr = formatEta(maxEta);
+    String etaStr = PlaceholderProvider.formatEta(maxEta);
 
     double progressFraction = (totalChunks > 0)
         ? Math.min(1.0, (double) totalChunksDone / totalChunks)
@@ -89,20 +88,5 @@ public final class ScanProgressBars {
   /** Hides and discards every scan progress bar. */
   public static void clear() {
     if (RTP.serverAccessor != null) RTP.serverAccessor.clearProgressBars();
-  }
-
-  /** Format seconds into a human-readable ETA string, mirroring PlaceholderProvider. */
-  private static String formatEta(long totalSeconds) {
-    long days = TimeUnit.SECONDS.toDays(totalSeconds);
-    long hours = TimeUnit.SECONDS.toHours(totalSeconds) % 24;
-    long minutes = TimeUnit.SECONDS.toMinutes(totalSeconds) % 60;
-    long seconds = totalSeconds % 60;
-
-    StringBuilder sb = new StringBuilder();
-    if (days > 0) sb.append(days).append(RTP.configs.getConfigValue(PlayerMessages.days, "d")).append(" ");
-    if (hours > 0) sb.append(hours).append(RTP.configs.getConfigValue(PlayerMessages.hours, "h")).append(" ");
-    if (minutes > 0) sb.append(minutes).append(RTP.configs.getConfigValue(PlayerMessages.minutes, "m")).append(" ");
-    if (seconds > 0 || sb.length() == 0) sb.append(seconds).append(RTP.configs.getConfigValue(PlayerMessages.seconds, "s"));
-    return sb.toString().trim();
   }
 }

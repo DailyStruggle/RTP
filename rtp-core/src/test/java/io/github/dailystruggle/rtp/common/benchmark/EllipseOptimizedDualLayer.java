@@ -207,10 +207,8 @@ public class EllipseOptimizedDualLayer extends MemoryShape<EllipseMemoryShapePar
 
   @Override
   public long rand() {
-    Mode mode = (Mode) data.getOrDefault(EllipseMemoryShapeParams.mode, Mode.ACCUMULATE);
-    long range = getRange();
-
-    if (mode == Mode.ACCUMULATE) {
+    if (MODE_ACCUMULATE.equals(mode())) {
+      long range = getRange();
       SegmentedKeyRunTable table = getOrBuildSegmentedTable(range);
       long totalGood = range - table.totalCovered();
       if (totalGood <= 0) return -1L;

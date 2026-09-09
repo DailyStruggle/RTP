@@ -775,16 +775,42 @@ function Test-Heartbeat {
 }
 
 function Test-Roundtrip {
-  Write-Host '[roundtrip] manual checkpoint - a live Minecraft client is required.' -ForegroundColor Yellow
-  Write-Host '  1. Connect a 1.21.1 client to localhost:25577 (proxy-a).' -ForegroundColor Yellow
-  Write-Host '  2. The default backend is backend-a. Run `/server backend-b` then `/server backend-c` once each to seed all backends.' -ForegroundColor Yellow
-  Write-Host '  3. From the client, run `/rtp` and observe a cross-server teleport.' -ForegroundColor Yellow
-  Write-Host '  4. Press <Enter> AFTER the redeem completes to capture evidence.' -ForegroundColor Yellow
-  [void](Read-Host 'Press Enter to continue')
+  Write-Host '[roundtrip] executing automated headless client round-trip (ADR-091)...' -ForegroundColor Cyan
+  $botScript = Join-Path $PSScriptRoot 'clients\mineflayer-bot.js'
+  $clientsDir = Join-Path $PSScriptRoot 'clients'
+  $botSuccess = $false
+
+  $nodeCmd = Get-Command 'node' -ErrorAction SilentlyContinue
+  if ($nodeCmd -and (Test-Path $botScript)) {
+    Write-Host '[roundtrip] running Node/Mineflayer headless client...' -ForegroundColor Cyan
+    $nodeModules = Join-Path $clientsDir 'node_modules'
+    $npmCmd = Get-Command 'npm' -ErrorAction SilentlyContinue
+    if (-not (Test-Path $nodeModules) -and $npmCmd) {
+      Write-Host '[roundtrip] installing client dependencies...' -ForegroundColor Cyan
+      & npm --prefix $clientsDir install --silent --no-audit | Out-Null
+    }
+    $botOut = & node $botScript --host 127.0.0.1 --port 25577 --timeout 35 2>&1 | Out-String
+    Write-Host $botOut
+    if ($botOut -match '"status":"PASS"') {
+      Write-Host '[roundtrip] headless client completed teleport successfully.' -ForegroundColor Green
+      Write-Evidence 'roundtrip.bot' $botOut
+      $botSuccess = $true
+    }
+  }
+
+  if (-not $botSuccess) {
+    Write-Host '[roundtrip] headless bot unavailable or failed; falling back to manual checkpoint.' -ForegroundColor Yellow
+    Write-Host '  1. Connect a 1.21.1 client to localhost:25577 (proxy-a).' -ForegroundColor Yellow
+    Write-Host '  2. The default backend is backend-a. Run `/server backend-b` then `/server backend-c` once each to seed all backends.' -ForegroundColor Yellow
+    Write-Host '  3. From the client, run `/rtp` and observe a cross-server teleport.' -ForegroundColor Yellow
+    Write-Host '  4. Press <Enter> AFTER the redeem completes to capture evidence.' -ForegroundColor Yellow
+    [void](Read-Host 'Press Enter to continue')
+  }
+
   $tokens = Invoke-RedisCli KEYS 'rtp:net:reservation:*'
   $audit = & docker compose logs --tail=100 backend-a backend-b backend-c 2>&1 | Select-String -Pattern 'redeem|JoinTriggerSource' -SimpleMatch
   Write-Evidence 'roundtrip' "tokens at sample time:`n$tokens`naudit lines:`n$audit"
-  Write-Host '[roundtrip] EVIDENCE CAPTURED (operator must visually confirm)' -ForegroundColor Green
+  Write-Host '[roundtrip] EVIDENCE CAPTURED' -ForegroundColor Green
   return $true
 }
 

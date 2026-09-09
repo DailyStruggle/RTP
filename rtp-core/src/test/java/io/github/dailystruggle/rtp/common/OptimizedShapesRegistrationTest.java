@@ -61,6 +61,11 @@ class OptimizedShapesRegistrationTest {
     // Random selection returns coordinates within range
     long randLoc = shape.rand();
     assertTrue(randLoc >= 0 && randLoc < range, "Random location must be within range");
+
+    // When mode is set as String (e.g. from config YAML)
+    shape.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.mode, "ACCUMULATE");
+    long randLocStringMode = shape.rand();
+    assertTrue(randLocStringMode >= 0 && randLocStringMode < range, "Random location with string mode must be within range");
   }
 
   @Test
@@ -70,12 +75,17 @@ class OptimizedShapesRegistrationTest {
     long range = shape.getRange();
     assertTrue(range > 0, "Range must be positive");
 
-    MutableRTPCoords out = new MutableRTPCoords(0, 0);
-    shape.locationToXZ(0L, out);
-    long mapped = shape.xzToLocation(out.x, out.z);
-    assertEquals(0L, mapped, "Bijection at location 0 must round-trip");
-
     long randLoc = shape.rand();
     assertTrue(randLoc >= 0 && randLoc < range, "Random location must be within range");
+
+    MutableRTPCoords out = new MutableRTPCoords(0, 0);
+    shape.locationToXZ(randLoc, out);
+    long mapped = shape.xzToLocation(out.x, out.z);
+    assertEquals(randLoc, mapped, "Bijection for valid circle location must round-trip");
+
+    // When mode is set as String (e.g. from config YAML)
+    shape.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.mode, "ACCUMULATE");
+    long randLocStringMode = shape.rand();
+    assertTrue(randLocStringMode >= 0 && randLocStringMode < range, "Random location with string mode must be within range");
   }
 }

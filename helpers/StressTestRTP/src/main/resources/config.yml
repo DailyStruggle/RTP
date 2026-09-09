@@ -339,6 +339,13 @@ chunk-load-cost-us-folia: 0.0         # 0 = fall back to default
 # resulting peak-heap / p95-MSPT figures will be correspondingly coarser.
 sample-period-ms: 50
 
+# Polling cadence (ms) for the runner's async dispatch loop. Lower values allow
+# the harness to instantly re-dispatch a ready player the moment their prior attempt
+# completes. 50ms (20 Hz / 1 server tick) or sub-tick cadences like 20ms / 10ms
+# uncap high-frequency concurrent teleports across multiple players without waiting
+# for the legacy 100ms clock.
+runner-tick-ms: 20
+
 # Output directory (relative to the plugin's data folder) for per-run
 # artifacts: <timestamp>.csv (per-attempt) and <timestamp>-summary.txt.
 output-subdir: "runs"

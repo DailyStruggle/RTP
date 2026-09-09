@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable;
 
@@ -131,22 +130,96 @@ public class SquareOptimizedDualLayer extends Square {
     output.setXZ((int) cx, (int) cz);
   }
 
+  private final long secretKey = ThreadLocalRandom.current().nextLong();
+  private final java.util.concurrent.atomic.AtomicLong selectionCounter = new java.util.concurrent.atomic.AtomicLong(0);
+
   @Override
   public long rand() {
-    Mode mode = (Mode) data.getOrDefault(GenericMemoryShapeParams.mode, Mode.ACCUMULATE);
     long range = getRange();
+    if (range <= 0) return -1L;
 
-    if (mode == Mode.ACCUMULATE) {
+    long t = selectionCounter.getAndIncrement();
+
+    if (MODE_ACCUMULATE.equals(mode())) {
       SegmentedKeyRunTable table = getOrBuildSegmentedTable(range);
       long totalGood = range - table.totalCovered();
       if (totalGood <= 0) return -1L;
 
-      long target = ThreadLocalRandom.current().nextLong(totalGood);
-      long loc = table.resolveAccumulate(target);
-      return (loc >= 0 && loc < range) ? loc : -1L;
+      int stride = deriveAdaptiveStride(totalGood);
+      int bits = Integer.numberOfTrailingZeros(stride);
+      int subsetIdx = (int) (t % stride);
+      int phaseOffset = Integer.reverse(subsetIdx) >>> (32 - bits);
+
+      long subsetSize = phaseOffset < totalGood ? (totalGood - 1 - phaseOffset) / stride + 1 : 0;
+      if (subsetSize <= 0) {
+        return table.resolveAccumulate(t % totalGood);
+      }
+
+      long kCounter = t / stride;
+      long permutedK = feistelPermute(kCounter, subsetSize, secretKey ^ (phaseOffset * 0x9E3779B97F4A7C15L));
+      long virtualGoodIndex = permutedK * stride + phaseOffset;
+
+      return table.resolveAccumulate(virtualGoodIndex);
     }
 
-    return super.rand();
+    // Standard / Default mode: Adaptive dyadic stride
+    int stride = deriveAdaptiveStride(range);
+    int bits = Integer.numberOfTrailingZeros(stride);
+    int subsetIdx = (int) (t % stride);
+    int phaseOffset = Integer.reverse(subsetIdx) >>> (32 - bits);
+
+    long subsetSize = phaseOffset < range ? (range - 1 - phaseOffset) / stride + 1 : 0;
+    if (subsetSize <= 0) {
+      return t % range;
+    }
+
+    long kCounter = t / stride;
+    long permutedK = feistelPermute(kCounter, subsetSize, secretKey ^ (phaseOffset * 0x9E3779B97F4A7C15L));
+    return permutedK * stride + phaseOffset;
+  }
+
+  /**
+   * Adaptively scales dyadic stride S based on domain capacity.
+   * Prevents subset starvation in small shapes (e.g. radius 16 or 64).
+   * Range [4 .. 256].
+   */
+  public static int deriveAdaptiveStride(long domainSize) {
+    if (domainSize < 64) return 1;
+    if (domainSize < 256) return 4;
+    if (domainSize < 1024) return 16;
+    if (domainSize < 8192) return 64;
+    return 256;
+  }
+
+  private static long feistelPermute(long val, long domainSize, long seed) {
+    if (domainSize <= 1) return 0;
+    int bits = 64 - Long.numberOfLeadingZeros(domainSize - 1);
+    if ((bits & 1) != 0) bits++;
+    int halfBits = bits / 2;
+    long halfMask = (1L << halfBits) - 1L;
+
+    long candidate = val % domainSize;
+    do {
+      long l = (candidate >>> halfBits) & halfMask;
+      long r = candidate & halfMask;
+
+      for (int round = 0; round < 4; round++) {
+        long roundKey = seed ^ (0x9E3779B97F4A7C15L * (round + 1));
+        long f = (r ^ roundKey);
+        f ^= (f >>> 16);
+        f *= 0x85ebca6b;
+        f ^= (f >>> 13);
+        f *= 0xc2b2ae35;
+        f ^= (f >>> 16);
+        long newL = r;
+        long newR = (l ^ f) & halfMask;
+        l = newL;
+        r = newR;
+      }
+      candidate = (l << halfBits) | r;
+    } while (candidate >= domainSize);
+
+    return candidate;
   }
 
   private synchronized SegmentedKeyRunTable getOrBuildSegmentedTable(long range) {
@@ -207,7 +280,7 @@ public class SquareOptimizedDualLayer extends Square {
     for (int s = 1; s < n; s *= 2) {
       rx = 1 & (t / 2);
       ry = 1 & (t ^ rx);
-      int[] r = rot(s, x, y, rx, ry);
+      int[] r = rotFromD(s, x, y, rx, ry);
       x = r[0] + s * rx;
       y = r[1] + s * ry;
       t /= 4;
@@ -219,6 +292,17 @@ public class SquareOptimizedDualLayer extends Square {
   }
 
   private static int[] rot(int n, int x, int y, int rx, int ry) {
+    if (ry == 0) {
+      if (rx == 1) {
+        x = 2 * n - 1 - x;
+        y = n - 1 - y;
+      }
+      return new int[] {y, x};
+    }
+    return new int[] {x, y};
+  }
+
+  private static int[] rotFromD(int n, int x, int y, int rx, int ry) {
     if (ry == 0) {
       if (rx == 1) {
         x = n - 1 - x;

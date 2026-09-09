@@ -356,17 +356,40 @@ test_heartbeat() {
 }
 
 test_roundtrip() {
-  echo "[roundtrip] manual checkpoint - a live Minecraft client is required."
-  echo "  1. Connect a 1.21.1 client to localhost:25577 (proxy-a)."
-  echo "  2. Run '/server backend-b' then '/server backend-c' once each to seed all backends."
-  echo "  3. From the client, run '/rtp' and observe a cross-server teleport."
-  echo "  4. Press <Enter> AFTER the redeem completes to capture evidence."
-  read -r _ || true
+  echo "[roundtrip] executing automated headless client round-trip (ADR-091)..."
+  local botScript="$scriptDir/clients/mineflayer-bot.js"
+  local botSuccess=0
+
+  if command -v node >/dev/null 2>&1 && [ -f "$botScript" ]; then
+    echo "[roundtrip] running Node/Mineflayer headless client..."
+    if ( cd "$scriptDir/clients" && [ ! -d "node_modules" ] ) && command -v npm >/dev/null 2>&1; then
+      echo "[roundtrip] installing client dependencies..."
+      ( cd "$scriptDir/clients" && npm install --silent --no-audit ) >/dev/null 2>&1 || true
+    fi
+    local botOut
+    botOut="$(node "$botScript" --host 127.0.0.1 --port 25577 --timeout 35 2>&1)" || true
+    echo "$botOut"
+    if printf '%s' "$botOut" | grep -q '"status":"PASS"'; then
+      echo "[roundtrip] headless client completed teleport successfully."
+      write_evidence 'roundtrip.bot' "$botOut"
+      botSuccess=1
+    fi
+  fi
+
+  if [ "$botSuccess" -eq 0 ]; then
+    echo "[roundtrip] headless bot unavailable or failed; falling back to manual checkpoint."
+    echo "  1. Connect a 1.21.1 client to localhost:25577 (proxy-a)."
+    echo "  2. Run '/server backend-b' then '/server backend-c' once each to seed all backends."
+    echo "  3. From the client, run '/rtp' and observe a cross-server teleport."
+    echo "  4. Press <Enter> AFTER the redeem completes to capture evidence."
+    read -r _ || true
+  fi
+
   local tokens audit
   tokens="$(redis_cli KEYS 'rtp:net:reservation:*' 2>/dev/null)"
   audit="$(cd "$scriptDir" && docker compose logs --tail=100 backend-a backend-b backend-c 2>&1 | grep -F -e redeem -e JoinTriggerSource || true)"
   write_evidence 'roundtrip' "tokens at sample time:"$'\n'"$tokens"$'\n'"audit lines:"$'\n'"$audit"
-  echo "[roundtrip] EVIDENCE CAPTURED (operator must visually confirm)"; return 0
+  echo "[roundtrip] EVIDENCE CAPTURED"; return 0
 }
 
 test_killmidflight() {

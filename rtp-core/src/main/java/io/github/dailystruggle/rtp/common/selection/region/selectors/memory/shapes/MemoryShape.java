@@ -1252,19 +1252,48 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
+   * Computes the admissible bridging gap bounded between a minimum (1/4 resolution)
+   * and a maximum (resolution as-is), scaled by the evidence of adjacent run lengths.
+   *
+   * @param spatialResolution configured bridging resolution ceiling
+   * @param leftLength length of the left run
+   * @param rightLength length of the right run
+   * @return admissible gap in key units
+   */
+  public static long computeAdmissibleGap(long spatialResolution, long leftLength, long rightLength) {
+    if (spatialResolution <= 3L) return Math.max(1L, spatialResolution);
+    long minGap = spatialResolution / 4L;
+    long maxGap = spatialResolution;
+    long driver = Math.min(leftLength, rightLength);
+    return Math.max(minGap, Math.min(maxGap, driver));
+  }
+
+  /**
+   * Minimum stride between probed samples during prescan such that adjacent rejects
+   * are guaranteed to bridge under {@link #computeAdmissibleGap(long, long, long)}.
+   *
+   * @return minimum bridging stride in key units
+   */
+  public long minBridgingStride() {
+    if (spatialResolution <= 3L) return 1L;
+    return Math.max(1L, spatialResolution / 4L);
+  }
+
+  /**
    * Folds a key-ascending run stream into the union's partition form.
    *
    * <p>Two rules, and they are the only place either is expressed: runs of the <em>same</em> biome
-   * coalesce across a gap of up to {@code spatialResolution}; runs of <em>different</em> biomes
-   * never merge, and an incoming run overlapping an already-placed one is clipped past it
-   * (dropped when fully covered). Clipping rather than tagging is what keeps every cell in exactly
-   * one run, so {@code getEffectiveGoodCount()} cannot double-count a cell claimed by two biomes.
+   * coalesce across a gap bounded by {@link #computeAdmissibleGap(long, long, long)}; runs of
+   * <em>different</em> biomes never merge, and an incoming run overlapping an already-placed one
+   * is clipped past it (dropped when fully covered). Clipping rather than tagging is what keeps
+   * every cell in exactly one run, so {@code getEffectiveGoodCount()} cannot double-count a cell
+   * claimed by two biomes.
    *
    * @param inKeys run start keys, ascending
    * @param inWidths run widths, parallel to {@code inKeys}
    * @param inIds biome id of each run, parallel to {@code inKeys}
    * @param count live entries in the input columns
-   * @param spatialResolution same-biome bridging gap, in cells
+   * @param spatialResolution same-biome bridging gap ceiling, in cells
    * @param outKeys destination keys; capacity {@code >= count}
    * @param outWidths destination widths; capacity {@code >= count}
    * @param outIds destination ids; capacity {@code >= count}
@@ -1298,7 +1327,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
       long curEnd = curStart + curLength;
       if (nextId == curId) {
-        if (nextKey <= curEnd + spatialResolution) {
+        long admissible = computeAdmissibleGap(spatialResolution, curLength, nextLength);
+        if (nextKey <= curEnd + admissible) {
           curLength = Math.max(curLength, nextKey + nextLength - curStart);
           continue;
         }
@@ -1773,13 +1803,17 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       long prevSum = (idx > 0) ? sums[idx - 1] : 0L;
       long end = key + (sums[idx] - prevSum); // exclusive
 
+      long runLen = sums[idx] - prevSum;
+      long admissible = computeAdmissibleGap(spatialResolution, runLen, 1L);
       if (location < end) return true; // already covered: nothing to record
-      if (location > end + spatialResolution) return false; // genuinely new run
+      if (location > end + admissible) return false; // genuinely new run
 
       long newEnd = location + 1L;
       // A mark that would also bridge to the next run changes the array length; leave that
       // coalescing to the merge.
-      if (idx + 1 < keys.length && keys[idx + 1] <= newEnd + spatialResolution) return false;
+      long nextRunLen = (idx + 1 < n) ? (sums[idx + 1] - sums[idx]) : 1L;
+      long nextAdmissible = computeAdmissibleGap(spatialResolution, 1L, nextRunLen);
+      if (idx + 1 < keys.length && keys[idx + 1] <= newEnd + nextAdmissible) return false;
 
       long delta = newEnd - end;
       // writeLock excludes the snapshot readers that require a coherent view (save, load,
@@ -2113,7 +2147,19 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return canonical biome name, or {@code null}
    */
   public String biomeAt(int x, int z) {
-    return biomeAt((long) xzToLocation(x, z));
+    long loc = xzToLocation(x, z);
+    String b = biomeAt(loc);
+    if (b != null) return b;
+    long[] preimages = chunkToLocations(x, z);
+    if (preimages != null) {
+      for (long p : preimages) {
+        if (p != loc) {
+          b = biomeAt(p);
+          if (b != null) return b;
+        }
+      }
+    }
+    return null;
   }
 
   /**
@@ -2579,7 +2625,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 cStart = nKey;
                 cLength = nLength;
               } else {
-                if (nKey <= cStart + cLength + spatialResolution) {
+                long admissible = computeAdmissibleGap(spatialResolution, cLength, nLength);
+                if (nKey <= cStart + cLength + admissible) {
                   cLength = Math.max(cLength, nKey + nLength - cStart);
                 } else {
                   mKeys[mIdx] = cStart;
@@ -2963,7 +3010,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             currentCause = nextCause;
             currentExpiry = nextExpiry;
           } else {
-            boolean adjacent = (nextKey <= currentStart + currentLength + spatialResolution);
+            long admissible = computeAdmissibleGap(spatialResolution, currentLength, nextLength);
+            boolean adjacent = (nextKey <= currentStart + currentLength + admissible);
             boolean bothStatic = (currentExpiry <= 0L && nextExpiry <= 0L);
             boolean bothDynamic = (currentExpiry > 0L && nextExpiry > 0L);
             boolean sameTier = bothStatic || bothDynamic;

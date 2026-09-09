@@ -24,7 +24,7 @@ Concurrently, server operators require spatial visualization of their random tel
 
 ### The Problem with Existing Cartography Integration
 
-Existing `/rtp` plugins (e.g. EzRTP, JustRTP, BetterRTP) approach mapping in one of two flawed ways:
+External web-map integrations in the ecosystem typically approach mapping in one of two flawed ways:
 1. **Synchronous or Heavy Tile Rendering:** Attempting to render custom map tiles by querying the Minecraft server engine (`world.getChunkAt()` or `world.getHighestBlockAt()`), which violates safety prohibition **S-005** (no chunk loading on the main thread) and triggers catastrophic region-scheduler thrashing on Folia and multi-second MSPT spikes on Paper.
 2. **Primitive Marker Overlays:** Injecting simple vector outlines or single coordinate markers via map APIs. While lightweight, vector markers cannot depict pixel-level safety terrain, biome classifications, or continuous spatial densities without thousands of discrete DOM/marker objects overloading client browsers.
 

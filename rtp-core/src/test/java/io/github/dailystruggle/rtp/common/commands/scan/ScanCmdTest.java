@@ -794,4 +794,111 @@ public class ScanCmdTest {
         assertFalse(task1.pause.get(),
                 "no-param resume should default to 'default' region and unpause its task");
     }
+
+    @Test
+    void scanCancelCmd_substitutesCancelledRegionName() {
+        ScanTask task = makeFakeTask();
+        RTP.getInstance().scanTasks.put("default", task);
+
+        scanCancelCmd.onCommand(senderId, paramsWithRegion("default"), null);
+
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("default")),
+                "scanCancel announcement should contain the cancelled region name 'default'");
+    }
+
+    @Test
+    void scanPauseCmd_substitutesPausedRegionName() {
+        ScanTask task = makeFakeTask();
+        RTP.getInstance().scanTasks.put("default", task);
+
+        scanPauseCmd.onCommand(senderId, paramsWithRegion("default"), null);
+
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("default")),
+                "scanPause announcement should contain the paused region name 'default'");
+    }
+
+    @Test
+    void scanStartCmd_substitutesStartedRegionName() {
+        scanStartCmd.onCommand(senderId, paramsWithRegion("default"), null);
+
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("default")),
+                "scanStart announcement should contain the started region name 'default'");
+    }
+
+    @Test
+    void scanCommands_multiRegion_announcesEachSpecificRegionName() {
+        Square square2 = new Square();
+        LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
+        RegionSettings settings2 = new RegionSettings(
+                "region2", world, square2, vert2, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        Region region2 = new Region("region2", settings2);
+        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+
+        Map<String, List<String>> p = new HashMap<>();
+        p.put("region", Arrays.asList("default", "region2"));
+
+        accessor.announcedMessages.clear();
+        scanStartCmd.onCommand(senderId, p, null);
+
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("default")),
+                "scanStart should announce for 'default'");
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("region2")),
+                "scanStart should announce for 'region2'");
+    }
+
+    @Test
+    void scanTask_getEtaSeconds_atEndOfScan_returnsZero() {
+        ScanTask task = makeFakeTask();
+        Square shape = (Square) region.getShape();
+        long range = (long) shape.getRange();
+        long stride = Math.max(1L, shape.minBridgingStride());
+        task.currentOffset = stride - 1; // last pass
+        long eta = task.getEtaSeconds(range, range, shape, 1000L);
+        assertEquals(0L, eta, "ETA at the end of the final pass should be 0 seconds");
+    }
+
+    @Test
+    void scanTask_getEtaSeconds_calculatesAccurateTimeBasedOnRemainingPassesAndStride() {
+        ScanTask task = makeFakeTask();
+        Square shape = (Square) region.getShape();
+        long range = (long) shape.getRange();
+        long stride = Math.max(1L, shape.minBridgingStride());
+        task.currentOffset = 0;
+        // Total points across all passes = ((range + stride - 1) / stride) * stride ≈ range.
+        // At 1000 cpsLocal, ewma and cumulative are uninitialized so cps = 1000.
+        // But task cps field was initialized to cps.get() = cpu * 1000 / 32 / 5, etc.
+        // Let's test with a given cpsLocal.
+        long eta = task.getEtaSeconds(range, 0L, shape, 1000L);
+        assertTrue(eta > 0, "ETA should be positive");
+        // range is 1,000,000 for radius 10..1000.
+        // ETA should be <= range / 1000 + 60s if minCps is around 500-1000.
+        // Without the stride fix, it would be multiplied by spatialResolution (32), giving ~32,000s!
+        assertTrue(eta < 5000L, "ETA should not overcount by spatialResolution (32x): got " + eta);
+    }
+
+    @Test
+    void scanTask_doesNotSkipBiomeForKnownBadLocationWhenBiomeMissing() {
+        ScanTask task = makeFakeTask();
+        Square shape = (Square) region.getShape();
+        long pos = 50L;
+
+        // Mark pos as bad without recording biome
+        shape.addBadLocation(pos, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.misc);
+        assertTrue(shape.isKnownBad(pos));
+        assertNull(shape.biomeAt(pos));
+
+        // When pos is tested, since its biome is null, testPos should resolve its biome off-tick
+        int[] xz = shape.locationToXZ(pos);
+        int blockX = (xz[0] << 4) + 8;
+        int blockZ = (xz[1] << 4) + 8;
+        java.util.concurrent.CompletableFuture<Boolean> res = task.testPos(
+                region, pos, blockX, blockZ, 5, new HashSet<>(), new HashSet<>(), false, null);
+
+        assertNotNull(res);
+        assertFalse(res.join());
+        shape.flushAndRebuild(1L);
+
+        // Biome should now be recorded for pos (MockRTPWorld returns a mock probe with plains)
+        assertNotNull(shape.biomeAt(pos));
+    }
 }

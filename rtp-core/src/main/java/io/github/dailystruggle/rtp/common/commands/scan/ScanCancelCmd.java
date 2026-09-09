@@ -38,6 +38,8 @@ public class ScanCancelCmd extends ScanSubCmd {
         if (RTP.configs == null) continue;
         String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanNotRunning, ""));
         if (msg == null || msg.isEmpty()) continue;
+        msg = msg.replace("[scan_regions]", region.name);
+        msg = msg.replace("[scan_region]", region.name);
         msg = msg.replace("[region]", region.name);
         RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
         continue;
@@ -50,6 +52,8 @@ public class ScanCancelCmd extends ScanSubCmd {
       if (RTP.configs == null) continue;
       String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanCancel, ""));
       if (msg == null || msg.isEmpty()) continue;
+      msg = msg.replace("[scan_regions]", region.name);
+      msg = msg.replace("[scan_region]", region.name);
       msg = msg.replace("[region]", region.name);
       RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
     }
