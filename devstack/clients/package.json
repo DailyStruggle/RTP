@@ -1,0 +1,12 @@
+{
+  "name": "rtp-devstack-headless-client",
+  "version": "1.0.0",
+  "description": "Headless protocol client for automated cross-server devstack acceptance testing (ADR-091)",
+  "main": "mineflayer-bot.js",
+  "scripts": {
+    "test": "node mineflayer-bot.js"
+  },
+  "dependencies": {
+    "mineflayer": "^4.20.1"
+  }
+}

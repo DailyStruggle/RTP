@@ -188,7 +188,8 @@ public final class Runner {
         this.lastProgressEpochMs = System.currentTimeMillis();
         this.kickstartCount = 0;
         this.roundRobinTargets = Targets.load(config, plugin.getLogger());
-        this.taskId = Sched.runAsyncTimer(plugin, this::tick, 100L);
+        long timerPeriodMs = Math.max(5L, config.getLong("runner-tick-ms", 20L));
+        this.taskId = Sched.runAsyncTimer(plugin, this::tick, timerPeriodMs);
         spark.startPhase("timed");
         recorder.beginPhase("timed");
         return true;
@@ -266,7 +267,8 @@ public final class Runner {
             spark.startPhase(seqTargets.get(0).label);
             recorder.beginPhase(seqTargets.get(0).label);
         }
-        this.taskId = Sched.runAsyncTimer(plugin, this::tick, 100L);
+        long timerPeriodMs = Math.max(5L, config.getLong("runner-tick-ms", 20L));
+        this.taskId = Sched.runAsyncTimer(plugin, this::tick, timerPeriodMs);
         return true;
     }
 
@@ -306,7 +308,8 @@ public final class Runner {
         this.endEpochMs = System.currentTimeMillis() + Math.max(30000L,
                 config.getLong("attempt-timeout-ms", 30000L) + 5000L);
         this.roundRobinTargets = Targets.load(config, plugin.getLogger());
-        this.taskId = Sched.runAsyncTimer(plugin, this::tick, 100L);
+        long timerPeriodMs = Math.max(5L, config.getLong("runner-tick-ms", 20L));
+        this.taskId = Sched.runAsyncTimer(plugin, this::tick, timerPeriodMs);
         spark.startPhase("burst");
         recorder.beginPhase("burst");
         return true;

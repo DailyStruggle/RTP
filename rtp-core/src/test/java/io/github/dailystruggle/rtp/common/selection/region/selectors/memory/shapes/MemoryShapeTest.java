@@ -653,4 +653,88 @@ public class MemoryShapeTest {
         assertEquals("none", summary.topCause());
         assertTrue(Double.isNaN(summary.topCausePercent()));
     }
+
+    @Test
+    public void testComputeAdmissibleGapContract() {
+        // Small resolutions (<= 3) preserve identity/flat gap
+        assertEquals(1L, MemoryShape.computeAdmissibleGap(1L, 1L, 1L));
+        assertEquals(2L, MemoryShape.computeAdmissibleGap(2L, 1L, 1L));
+        assertEquals(3L, MemoryShape.computeAdmissibleGap(3L, 1L, 1L));
+        assertEquals(3L, MemoryShape.computeAdmissibleGap(3L, 100L, 100L));
+
+        // Resolution 4: minGap = 1, maxGap = 4
+        assertEquals(1L, MemoryShape.computeAdmissibleGap(4L, 1L, 1L));
+        assertEquals(2L, MemoryShape.computeAdmissibleGap(4L, 2L, 5L));
+        assertEquals(4L, MemoryShape.computeAdmissibleGap(4L, 10L, 10L));
+
+        // Resolution 32: minGap = 8, maxGap = 32
+        // Short runs (<= 8) get floor of 8
+        assertEquals(8L, MemoryShape.computeAdmissibleGap(32L, 1L, 1L));
+        assertEquals(8L, MemoryShape.computeAdmissibleGap(32L, 5L, 5L));
+        assertEquals(8L, MemoryShape.computeAdmissibleGap(32L, 8L, 8L));
+
+        // Intermediate runs scale proportionally to min(left, right)
+        assertEquals(16L, MemoryShape.computeAdmissibleGap(32L, 16L, 20L));
+        assertEquals(24L, MemoryShape.computeAdmissibleGap(32L, 50L, 24L));
+
+        // Large runs hit the maxGap ceiling of 32
+        assertEquals(32L, MemoryShape.computeAdmissibleGap(32L, 32L, 32L));
+        assertEquals(32L, MemoryShape.computeAdmissibleGap(32L, 100L, 200L));
+    }
+
+    @Test
+    public void testBoundedDynamicGapBridgingAtResolution32() {
+        TestShape shape = new TestShape();
+        // Place two isolated 1-cell runs separated by gap 7:
+        // [10, 11) and [18, 19). Gap = 18 - 11 = 7 <= minGap (8) -> must bridge
+        shape.addBadLocation(10L);
+        shape.addBadLocation(18L);
+
+        shape.flushAndRebuild(32L);
+        assertEquals(1, shape.getBadKeysCache().length);
+        assertEquals(10L, shape.getBadKeysCache()[0]);
+        assertEquals(9L, shape.getBadSum()); // [10, 19)
+
+        // Clear and test gap > minGap with single cells:
+        // [10, 11) and [25, 26). Gap = 25 - 11 = 14 > minGap (8).
+        // Since both runs have length 1, driver = 1 <= minGap -> gap 14 must NOT bridge!
+        shape.clear();
+        shape.addBadLocation(10L);
+        shape.addBadLocation(25L);
+
+        shape.flushAndRebuild(32L);
+        assertEquals(2, shape.getBadKeysCache().length);
+        assertEquals(10L, shape.getBadKeysCache()[0]);
+        assertEquals(25L, shape.getBadKeysCache()[1]);
+        assertEquals(2L, shape.getBadSum());
+
+        // Now expand the bounding runs to length 20 each:
+        // Run 1: [0, 20)
+        // Run 2: [35, 55). Gap = 35 - 20 = 15 <= driver (20) and <= maxGap (32) -> must bridge!
+        shape.clear();
+        for (long i = 0; i < 20; i++) shape.addBadLocation(i);
+        for (long i = 35; i < 55; i++) shape.addBadLocation(i);
+        shape.flushAndRebuild(1L); // establish runs of length 20
+        shape.badLocationsDirty = true;
+
+        shape.flushAndRebuild(32L);
+        assertEquals(1, shape.getBadKeysCache().length);
+        assertEquals(0L, shape.getBadKeysCache()[0]);
+        assertEquals(55L, shape.getBadSum()); // [0, 55)
+
+        // Now test gap > maxGap (32) even with massive runs:
+        // Run 1: [0, 100)
+        // Run 2: [140, 240). Gap = 140 - 100 = 40 > maxGap (32) -> must NOT bridge!
+        shape.clear();
+        for (long i = 0; i < 100; i++) shape.addBadLocation(i);
+        for (long i = 140; i < 240; i++) shape.addBadLocation(i);
+        shape.flushAndRebuild(1L); // establish runs of length 100
+        shape.badLocationsDirty = true;
+
+        shape.flushAndRebuild(32L);
+        assertEquals(2, shape.getBadKeysCache().length);
+        assertEquals(0L, shape.getBadKeysCache()[0]);
+        assertEquals(140L, shape.getBadKeysCache()[1]);
+        assertEquals(200L, shape.getBadSum());
+    }
 }

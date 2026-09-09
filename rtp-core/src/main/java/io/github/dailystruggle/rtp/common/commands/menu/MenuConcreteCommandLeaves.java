@@ -273,10 +273,19 @@ final class MenuConcreteCommandLeaves {
                             uuid,
                             io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_BIOMES,
                             msg)));
+            // Pipeline composite map (ADR-089)
+            addSubCommand(new VisualizationPipelineCmd(
+                    dispatch,
+                    (uuid, msg) -> owner.dispatchOpenVisualizationRegions(
+                            uuid,
+                            io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_COMPOSITE,
+                            msg)));
             // Sparkline is a global chart (no region), so it has no
             // kind-scoped region picker fallback - the leaf paints
             // directly when invoked with no parameters.
             addSubCommand(new VisualizationSparklineCmd(dispatch));
+            // Export image subcommand (ADR-089)
+            addSubCommand(new VisualizationExportCmd());
         }
 
         @Override
@@ -508,6 +517,98 @@ final class MenuConcreteCommandLeaves {
     }
 
     /**
+     * {@code /rtp visualization pipeline [region=<regionName>]} command (ADR-089).
+     * Draws composite map (desaturated biomes, red hazard wash, queue markers, and L1/L2/L3 health bars).
+     */
+    static final class VisualizationPipelineCmd
+            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+
+        private final VisualizationDispatch dispatch;
+        private final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener;
+
+        VisualizationPipelineCmd(
+                VisualizationDispatch dispatch,
+                java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener) {
+            super(null);
+            this.dispatch = java.util.Objects.requireNonNull(dispatch, "dispatch");
+            this.selectorOpener = java.util.Objects.requireNonNull(selectorOpener, "selectorOpener");
+            addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                    "region name (omit to open the visualizations selector)",
+                    (uuid, value) -> value != null && !value.isEmpty()) {
+                @Override
+                public Set<String> values() {
+                    return liveRegionNames();
+                }
+            });
+        }
+
+        @Override
+        public String name() {
+            return "pipeline";
+        }
+
+        @Override
+        public String permission() {
+            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand) {
+            return dispatch(callerId, parameterValues, null);
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand,
+                                 Consumer<String> messageMethod) {
+            return dispatch(callerId, parameterValues, messageMethod);
+        }
+
+        private boolean dispatch(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable Consumer<String> messageMethod) {
+            String regionName = firstValue(parameterValues, PARAM_REGION);
+            RTP.log(java.util.logging.Level.FINE,
+                    "[viz/pipeline] leaf reached: caller=" + callerId
+                            + " region=" + regionName
+                            + " hasMsg=" + (messageMethod != null));
+            if (regionName == null || regionName.isEmpty()) {
+                RTP.log(java.util.logging.Level.FINE,
+                        "[viz/pipeline] no region= -> opening selector");
+                Boolean ok = selectorOpener.apply(callerId, messageMethod);
+                return Boolean.TRUE.equals(ok);
+            }
+            boolean result = dispatch.paintPipeline(callerId, regionName, messageMethod);
+            RTP.log(java.util.logging.Level.FINE,
+                    "[viz/pipeline] leaf returning result=" + result);
+            return result;
+        }
+
+        private static @Nullable String firstValue(@Nullable Map<String, List<String>> values,
+                                                   String key) {
+            if (values == null) return null;
+            List<String> raw = values.get(key);
+            if (raw == null || raw.isEmpty()) return null;
+            String first = raw.get(0);
+            return (first == null || first.isEmpty()) ? null : first;
+        }
+
+        private static Set<String> liveRegionNames() {
+            try {
+                if (RTP.selectionAPI == null) return Collections.emptySet();
+                Set<String> names = RTP.selectionAPI.regionNames();
+                if (names == null || names.isEmpty()) return Collections.emptySet();
+                return new LinkedHashSet<>(names);
+            } catch (RuntimeException e) {
+                return Collections.emptySet();
+            }
+        }
+    }
+
+    /**
      * {@code /rtp visualization sparkline} - draw the global MSPT + heap
      * sparkline chart ({@link ChartSpec.Kind#METRIC_SPARKLINE}). No
      * parameters; the chart is server-global, with Folia regions
@@ -557,6 +658,158 @@ final class MenuConcreteCommandLeaves {
             RTP.log(java.util.logging.Level.FINE,
                     "[viz/sparkline] leaf returning result=" + result);
             return result;
+        }
+    }
+
+    /**
+     * {@code /rtp visualization export <type> [region=<name>] [format=png|bmp]} command (ADR-089).
+     * Renders and exports high-resolution image files to {@code plugins/RTP/charts/}.
+     */
+    static final class VisualizationExportCmd
+            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+
+        VisualizationExportCmd() {
+            super(null);
+            addSubCommand(new ExportTypeCmd("pipeline", io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_COMPOSITE));
+            addSubCommand(new ExportTypeCmd("biomes", io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_BIOMES));
+            addSubCommand(new ExportTypeCmd("bad-locations", io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE));
+            addSubCommand(new ExportTypeCmd("sparkline", io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.METRIC_SPARKLINE));
+        }
+
+        @Override
+        public String name() {
+            return "export";
+        }
+
+        @Override
+        public String permission() {
+            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand) {
+            return true;
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand,
+                                 Consumer<String> messageMethod) {
+            if (messageMethod != null) {
+                messageMethod.accept("Usage: /rtp visualization export <pipeline|biomes|bad-locations|sparkline> [region=<region>]");
+            }
+            return true;
+        }
+
+        static final class ExportTypeCmd
+                extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+
+            private final String typeName;
+            private final io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind kind;
+
+            ExportTypeCmd(String typeName, io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind kind) {
+                super(null);
+                this.typeName = typeName;
+                this.kind = kind;
+                addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                        "region name",
+                        (uuid, value) -> value != null && !value.isEmpty()) {
+                    @Override
+                    public Set<String> values() {
+                        try {
+                            return RTP.selectionAPI != null ? RTP.selectionAPI.regionNames() : Collections.emptySet();
+                        } catch (Exception e) {
+                            return Collections.emptySet();
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public String name() {
+                return typeName;
+            }
+
+            @Override
+            public String permission() {
+                return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+            }
+
+            @Override
+            public boolean onCommand(UUID callerId,
+                                     Map<String, List<String>> parameterValues,
+                                     @Nullable CommandsAPICommand nextCommand) {
+                return executeExport(callerId, parameterValues, null);
+            }
+
+            @Override
+            public boolean onCommand(UUID callerId,
+                                     Map<String, List<String>> parameterValues,
+                                     @Nullable CommandsAPICommand nextCommand,
+                                     Consumer<String> messageMethod) {
+                return executeExport(callerId, parameterValues, messageMethod);
+            }
+
+            private boolean executeExport(UUID callerId,
+                                          Map<String, List<String>> parameterValues,
+                                          @Nullable Consumer<String> messageMethod) {
+                List<String> regVals = parameterValues != null ? parameterValues.get(PARAM_REGION) : null;
+                String regionName = (regVals != null && !regVals.isEmpty()) ? regVals.get(0) : "default";
+
+                if (RTP.scheduler == null) return false;
+                RTP.scheduler.runTaskAsynchronously(() -> {
+                    long t0 = System.currentTimeMillis();
+                    try {
+                        io.github.dailystruggle.rtp.api.maps.ChartSpec spec =
+                                io.github.dailystruggle.rtp.api.maps.ChartSpec.of(kind, regionName);
+                        io.github.dailystruggle.rtp.common.commands.maps.ChartSpecResolver resolver =
+                                io.github.dailystruggle.rtp.common.commands.maps.ChartSpecResolvers.get(kind);
+                        if (resolver == null) {
+                            sendMsg(callerId, "No resolver registered for " + kind, messageMethod);
+                            return;
+                        }
+
+                        io.github.dailystruggle.rtp.common.commands.maps.ChartSpecResolver.Resolution resolution =
+                                resolver.resolve(spec);
+                        if (resolution == null) {
+                            sendMsg(callerId, "Failed to resolve chart data for " + regionName, messageMethod);
+                            return;
+                        }
+
+                        io.github.dailystruggle.mapsapi.image.ImageMapCanvas canvas =
+                                new io.github.dailystruggle.mapsapi.image.ImageMapCanvas(512, 512);
+                        @SuppressWarnings("unchecked")
+                        io.github.dailystruggle.mapsapi.render.ChartRenderer<io.github.dailystruggle.mapsapi.model.ChartModel> renderer =
+                                (io.github.dailystruggle.mapsapi.render.ChartRenderer<io.github.dailystruggle.mapsapi.model.ChartModel>) resolution.renderer();
+                        renderer.render(canvas, resolution.model());
+                        canvas.commit();
+
+                        java.io.File outDir = new java.io.File("plugins/RTP/charts");
+                        outDir.mkdirs();
+                        String fileName = regionName + "_" + typeName + ".png";
+                        java.io.File target = new java.io.File(outDir, fileName);
+                        canvas.writeToFile(target, "png");
+
+                        long elapsed = System.currentTimeMillis() - t0;
+                        sendMsg(callerId, "[RTP] Exported " + typeName + " chart to " + target.getPath() + " (" + elapsed + "ms)", messageMethod);
+                    } catch (Exception e) {
+                        RTP.log(java.util.logging.Level.WARNING, "Export failed for " + typeName + ": " + e.getMessage(), e);
+                        sendMsg(callerId, "[RTP] Export failed: " + e.getMessage(), messageMethod);
+                    }
+                });
+                return true;
+            }
+
+            private void sendMsg(UUID callerId, String msg, @Nullable Consumer<String> messageMethod) {
+                if (messageMethod != null) {
+                    messageMethod.accept(msg);
+                } else if (RTP.serverAccessor != null) {
+                    RTP.serverAccessor.sendMessage(io.github.dailystruggle.rtp.api.RTPAPI.serverId, callerId, msg, null);
+                }
+            }
         }
     }
 }
