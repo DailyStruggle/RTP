@@ -1,6 +1,6 @@
 # ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
 
-**Status:** Accepted (2026-09-06)
+**Status:** Accepted (2026-09-06), audited 2026-09-10 - see section 23
 **Date:** 2026-09-06
 
 ## Context
@@ -60,7 +60,7 @@ The `.bin` already stores sorted keys plus lengths, which is exactly what a diff
 | C5 | Fewer runs at full precision | **MET** - 4.7x-5.0x fewer runs at >= 35% usable ground (real-world floor; sections 9 & 15); P=1 fallback in `PointEdgeSelector` guards <= 25% |
 | C6 | Reconciliation no worse | **MET** - confirmed at coarse settings; zero allocation overhead in selection path (section 17) |
 | C7 | Selection no worse | **MET** - faster at every setting measured |
-| C8 | Point edge derived from range, not pinned | **MET** - derived point-by-point over powers of two with hard expand guard, regret <= 3.0% against brute-force oracle (section 15) |
+| C8 | Point edge derived from range, not pinned | **MET in test scope, NOT MET in shipped code** - derived point-by-point over powers of two with hard expand guard, regret <= 3.0% against brute-force oracle (section 15), but the shipped shapes pin `P = 32` (section 23b) |
 | C9 | Crash-safe persistence across a curve change | **MET** - Version 5 header, lossless upward ratchet on multiple P, int keyWidth saving 32% disk footprint, 1.000 offered-mark retention (section 17) |
 
 ## Measurements
@@ -69,7 +69,7 @@ Tiled real save (bad density 0.751), `:rtp-core:simulationBenchmark --tests '*Sp
 
 ### 8a. Side by side at identical settings, r = 256 chunks, P = 32 chunks
 
-Radius, mark set and coalescing gap held fixed; only the curve changes.
+Radius, mark set and coalescing gap held fixed; only the curve changes. These rows were taken before the dynamic gap reached shipped coalescing; every row at a gap above 1 has since moved, and section 23e carries the re-measurement.
 
 | gap | curve | runs | bytes | usable ground discarded | select ns/op |
 |---|---|---|---|---|---|
@@ -759,9 +759,104 @@ Retained as evidence, not as options:
 
 ## Status of the gate
 
-`CurveWorldComparisonBenchmarkTest` (section 11) and `ProximityWeightedLoss` / `KeyRunTable` / `ProximityWeightedLossBenchmarkTest` (section 12) are test scope on the same terms as everything else listed below. The dynamic gap rule in particular is **not** part of this decision: it lives in a test-scope coalescer, and adopting it would be a separate change to shipped coalescing with its own approval.
+Superseded by the audit below. The paragraphs that stood here described a closed gate - test scope only, nothing registered with the shape factory - which the shipped tree no longer matches. They are retained in git history rather than in the record, because a stale gate is worse than none: it tells a reader the opposite of what is running.
 
-D-005 remains closed. `SpiralHilbertSquare`, `SpiralHilbertBenchmarkTest`, `NoiseWorldMask`, `RealWorldVerdictMask` and `MockWorldFidelityBenchmarkTest` are test-scope only, ADR-080 opt-in tier, excluded from `build`; nothing is registered with the shape factory or referenced by shipped code. Approval would mean moving the bijection into a shipped shape variant, adding the `.bin` header fields with a version bump, deriving `P` from range, and adding `TRACEABILITY.md` rows.
+## 23. Audit against the shipped tree (2026-09-10)
+
+Re-run of the whole ADR-080 tier on the current tree: `:rtp-core:simulationBenchmark`, 120 tests, **2 failed**. Findings ordered by consequence.
+
+### 23a. The bijection shipped, and the gate text did not follow it
+
+`CircleOptimizedDualLayer` and `SquareOptimizedDualLayer` live in `rtp-core` main and are registered in `RTP.java` alongside `CIRCLE_DEPRECATED_PURE_SPIRAL` / `SQUARE_DEPRECATED_PURE_SPIRAL` aliases. They are advertised to operators in `docs/admin/configuration/CONFIGURATION.md`, `REGIONS.md`, `docs/dev/CONCEPTS.md` and `CHANGELOG.md`, catalogued in ADR-034, and carried by the REQ-RTP-F-002 row of `TRACEABILITY.md`. Of the four conditions the old gate set for approval:
+
+| Condition | State |
+|---|---|
+| Bijection in a shipped shape variant | **Done** - two registered shape engines |
+| `.bin` header fields plus version bump | **Done** - `BIN_VERSION = 5`, `curve` / `P` / `keyWidth` written by `MemoryShape` |
+| `P` derived from range | **Not done** - see 23b |
+| `TRACEABILITY.md` rows | **Done**, with one stale symbol - `PointEdgeSelector` is named there but is a benchmark-tier class, not shipped |
+
+### 23b. Criterion C8 is not met in shipped code
+
+C8 is recorded **MET** on the strength of section 15's `PointEdgeSelector` / `IndexConfigPlanner`, both of which are test scope. The shipped shapes pin `pointEdgeChunks = 32` in every constructor and expose no config key, so the point edge is a fixed quantum. That is the exact failure mode Context result 5 states as a constraint on the whole design - "any fixed quantum is simultaneously free at 100 km and fatal at 1 km" - and at a 1 km border (62 chunks) `P = 32` leaves a coarse grid two points wide. C8 shall read **MET in test scope, NOT MET in shipped code** until the derivation lands behind the shape constructor.
+
+### 23c. The dynamic gap: literal ceiling plus a run-length driver, measured on both coalescing paths (updated 2026-09-10)
+
+Section 12c's rule is now `MemoryShape.computeAdmissibleGap`, called from five shipped coalescing sites (biome union fold, in-place mark extension, merge, and the ADR-079 staged pass), unit-tested by `MemoryShapeTest`, and referenced by ADR-092. The shipped form is now:
+
+```
+if (spatialResolution <= 3) return max(1, spatialResolution);
+return max(1, min(spatialResolution, min(leftLength, rightLength)));
+```
+
+The earlier `res / 4` floor is gone and the ceiling is now literal: `spatialResolution: 16` caps the bridge at 16, not at 4. This is a deliberate operator-facing decision - the configured number is a clear upper bound rather than a square-root-style assumption about the 1D-to-2D relationship. The prior audit text flagged this rule as "not the measured winner" against section 12c's `alpha = 0.125`; that framing is retired, because it measured the wrong path. The correction:
+
+**The `min(leftLength, rightLength)` driver has two regimes, and section 12c only measured one.**
+
+1. **Unit-width mark stream (inert).** The shipped mark-and-flush rebuild feeds unit-width pending runs in ascending key order, so `rightLength` is always 1 and `min(accumulator, 1) = 1` on any terrain. Every no-floor alpha variant collapses onto the same curve here - `alpha = 0.125`, `0.5` and `1.0` produce byte-identical output - because there is nothing wider than one cell to bridge. Section 12c's `alpha` sweep and the `AdmissibleGapPolicyBenchmarkTest` chart both run on this path, which is why they read the driver as inert. That reading is correct for that path and says nothing about the other.
+
+2. **Variable-width re-coalesce (load-bearing).** `coalesceRuns` also runs on already-formed runs with real `nextLength` - the biome-union fold and the staged re-coalesce - where the driver carries the terrain's structure. `AdmissibleGapPolicyBenchmarkTest.minDriverOnVariableWidthRuns` forms exact runs first, then re-coalesces the variable-width runs, on the seeded noise mock and on a real on-disk save (`testdata-world` overworld, 256 region files, inscribed radius 192 chunks, usable share 0.624):
+
+   | terrain | res | fixed(res) runs / flat loss | shipped min-driven runs / flat loss |
+   |---|---|---|---|
+   | real r=128 | 8 | 451 / 0.378 | 878 / 0.217 |
+   | real r=128 | 16 | 150 / **0.661** | 818 / **0.266** |
+   | real r=128 | 32 | 28 / 0.892 | 818 / 0.266 |
+   | noise 45% | 16 | 554 / 0.320 | 1418 / 0.148 |
+   | noise 45% | 32 | 262 / 0.509 | 1407 / 0.154 |
+
+   On real terrain at `res = 16` a fixed gap discards 66% of usable ground; the min-driven rule holds discard to 27% and then **saturates** - past `res = 16` the loss does not grow, because a short shoreline run beside a long inland run caps the bridge at the short one no matter how high the ceiling rises. This is the "visible land from the selection point" objective stated directly: a bridge is licensed only up to the smaller neighbour, so coarse resolutions cannot eat the coast. Section 12c argued this from flat aggregate loss on the inert path; the objective it was reaching for is the variable-width behaviour measured here.
+
+**What still stands from the prior audit:** the rule remains unrecorded as an Accepted decision outside section 12 and ADR-092 (Proposed), and section 3's promise that `spatialResolution` keeps "its existing meaning" is no longer literally true - the number is now a bridging ceiling driven below by run length. That is a real semantics change and this section is the record of it.
+
+### 23d. Both failing tests are oracle-fidelity assertions, and they fail for the same reason
+
+- `BorderScaleFootprintBenchmarkTest.encoderAgreesWithShippedRebuild`: shipped rebuild 142 runs, `KeySpaceRunEncoder` 103, at spiral r = 128 ch, res = 64.
+- `ProximityWeightedLossBenchmarkTest.fixedCoalescerMatchesShipped`: shipped 1 523 runs, test-scope fixed coalescer 721, at gap 8.
+
+Both model coalescers still bridge on a static gap. Both fail in the direction the shipped dynamic rule predicts - fewer bridges, more runs - so these are not flaky measurements, they are the assertions that exist to catch precisely this fork, doing their job. They shall be fixed by porting the models onto `computeAdmissibleGap`, not by relaxing the tolerance.
+
+**Resolved (2026-09-10):** both models were ported onto `MemoryShape.computeAdmissibleGap` with the accumulator as the running length, and the benchmark-tier private copies were de-forked. The full ADR-080 tier is now green (0 failed), including these two oracle-fidelity assertions.
+
+### 23e. Section 8a's baseline predates the shipped coalescer
+
+Re-measured on the current tree, same settings (r = 256 chunks, P = 32, tiled real save, bad density 0.751), from `build/reports/rtp-simulation/spiral-hilbert.md`:
+
+| gap | curve | runs (8a) | runs (now) | loss (8a) | loss (now) |
+|---|---|---|---|---|---|
+| 1 | spiral | 1 164 | 1 164 | 0.000 | 0.000 |
+| 1 | hilbert seam-matched | 1 226 | 1 226 | 0.000 | 0.000 |
+| 16 | spiral | 1 102 | 1 149 | 0.002 | 0.000 |
+| 16 | hilbert seam-matched | 352 | 637 | 0.021 | 0.007 |
+| 256 | spiral | 255 | 686 | **0.368** | **0.064** |
+| 256 | hilbert seam-matched | 116 | 198 | **0.098** | **0.047** |
+| 4 096 | spiral | 1 | 15 | 0.989 | 0.880 |
+| 4 096 | hilbert seam-matched | 13 | 47 | 0.621 | 0.264 |
+
+Full precision is unmoved, which is the part of C3 that matters. Everything at a coalescing gap moved, both curves in the same direction - more runs, less loss - as the dynamic rule requires. Two published headlines do not survive:
+
+- **"2.2x fewer runs while discarding 3.8x less usable ground" at gap 256 is now 3.46x fewer runs at 1.36x less loss.** The run advantage grew; the accuracy advantage mostly evaporated, because the dynamic gap gives the *spiral* most of what the curve was buying (0.368 to 0.064).
+- **The gap = 4 096 row inverts.** The spiral now holds fewer runs than the hybrid (15 against 47), so "the spiral has destroyed the world while the hybrid still admits 37.9% of it" is no longer the trade being made at that setting.
+
+Iso-accuracy (8b) survives and improves: at a 0.05 loss cap the hybrid is 5.80x smaller (1 149 against 198), against 5.27x published; at 0.10, 3.46x against 3.28x. C4 and C7 hold on the re-run; C5's sign at r = 512 / P = 32 also holds (0.924).
+
+### 23f. A shipped class is measured through a benchmark-tier fork
+
+`SegmentedKeyRunTable` exists twice - shipped at `common/selection/region/selectors/memory/table/` and copied under `common/benchmark/`. `SegmentedKeyRunTableBenchmarkTest` and the section 19 rows measure the copy. That is the same fork that produced 23d, one step earlier: a section 19 figure no longer attests to the class an operator runs. `PagedSegmentedKeyRunTable` (section 21) has no shipped counterpart at all, which is fine as long as section 21 says so.
+
+### 23g. Drawn output is sound, and is the part that aged best
+
+Thirteen rasters regenerate from `SpiralHilbertBenchmarkTest`, and every caption agrees with its own report row - spiral res = 1 024 states 83 runs at 0.235, hybrid states 29 at 0.064, both matching the `drawn` rows. The mark-and-flush-only fix recorded in 8e holds. The geometric claim reads true at a glance on the current tree: the spiral's loss is concentric square arcs spanning open ground, the hybrid's is a red fringe hugging the unsafe body. The sections added since - 18 (circle and normal), 22 (polygon, ellipse, gaussian) - carry no rasters, which is a gap given 8e's own argument that the images exist because two earlier published errors were geometric claims a picture would have refused.
+
+### 23h. Not regression tested
+
+The tier is opt-in and no CI job runs it, so nothing above would have been caught automatically. Every one of 23b, 23c, 23d and 23f is a divergence between a published figure and the tree, and all four appeared inside one release line. The minimum guard is the two oracle-fidelity assertions of 23d running on every change to `MemoryShape` coalescing; they already encode the invariant, they are simply not scheduled.
+
+D-005 note: the shipped state described above went in without the before/after proposal this record's gate required. The audit does not retroactively approve it; it records what is running so the next change starts from the truth.
+
+### 23i. Container representation for L3 usage state (2026-09-10)
+
+An **exact** period-modulated bitmask ("period P, offset r, bit i set means position `r + i*P` is a hit" - one narrow bitmask per residue lane, lossless) was prototyped against the real L3 selection path (`selectL3Candidate`, dyadic stride + Feistel PRP) rather than terrain, and measured per 1024-chunk sub-bin from 1k to 500k non-repeating marks (`FrequencyContainerPrototypeBenchmarkTest`, ADR-080 tier). Result: the period encoding **never beats all three exact containers** (sole minimum in 0 of 4,096 bins at every density), and at saturation its per-lane headers even exceed a raw bitmask (532,470 vs 524,288 B). The cause is structural: the dyadic resonance spaces marks **between** bins, not within one - within a bin `key % 1024` ranges over all offsets, so a filling bin occupies every residue mod P and there is no single coarse sublattice to collapse onto. Exact **gap-coded / Elias-Fano keys dominate at every density** (2.7x under the bitmask cap even at 122 marks/bin); Elias-Fano's high-bit layer already *is* a period-P bitmask, keeping the within-lane offset in cheap low bits instead of splitting into separate lanes. The measured win for L3 usage state is therefore exact bit-packed-delta coding of the sparse key set, not a period container. Full numbers and the container-tier consequence are in the ADR-092 supplement.
 
 ## References
 

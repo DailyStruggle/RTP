@@ -24,6 +24,11 @@ mockito = "5.5.0"
 jetbrainsAnnotations = "24.1.0"
 checkerQual = "3.42.0"
 jacoco = "0.8.11"
+# PMD is the local, programmable static-analysis tool (clang-tidy analogue):
+# a curated starter ruleset lives at config/pmd/ruleset.xml and custom rules
+# (e.g. prefer-non-locking) are appended there. PMD 7.x parses Java 21+ and
+# needs Gradle 8.6+ (this build runs Gradle 9.5).
+pmd = "7.7.0"
 
 # Build plugins.
 shadow = "8.3.8"

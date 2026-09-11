@@ -31,7 +31,7 @@ You can create and update regions through:
 | `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum number of **unverified** candidate locations to stage upstream of `cacheCap`. See *Backlog Cache (L3)* below. Set to `0` to disable. |
 | `activeChunkCap` | Integer | `10` | Maximum number of chunks to keep loaded for zero-latency teleports. |
 | `price` | Double | `0.0` | Economy cost to use this specific region (overrides global `price`). |
-| `spatialResolution` | Integer | `3` | Precision for spatial memory (bad location tracking). 1 is coarse, 5 is extremely fine. |
+| `spatialResolution` | Integer | `3` | Precision for spatial memory (bad location tracking). 1 is coarse, 5 is extremely fine. Values > 1 in dual-layer shapes also dictate dyadic candidate downsampling grids (e.g. 4 -> 4x4 chunk macro-cells, 8 -> 8x8 macro-cells). |
 | `displayName` | String | (region name) | Optional cosmetic display name shown in menus and messages; does not change the region's identity or the permission node. |
 | `biomeWhitelist` / `biomes` | Boolean / List | (inherited from `safety.yml`) | Optional per-region override of the global biome filter. `biomeWhitelist: true` makes `biomes` an allow-list; `false` makes it a block-list. See [SAFETY.md](SAFETY.md). |
 | `version` | String | `"1.1"` | Internal config version. **Do not modify.** |
@@ -149,7 +149,7 @@ Changing a radius invalidates cached locations for that region, so the first few
   - `REROLL`: Simple random selection with retries. Even but unbounded.
   - `NONE`: No pre-check. Fastest but ignores pre-computed safety data.
 - `centerX` / `centerZ`: The center of the region in **chunks**.
-- `uniquePlacements`: Chunk radius cleared around a spot once a player lands there so it is never reused. `0` = off, `1` = the landing chunk only, `N` = an `(2N-1)x(2N-1)` chunk square. (Legacy `true`/`false` still work and map to `1`/`0`.)
+- `uniquePlacements`: Chunk radius cleared around a spot once a player lands there so it is never reused. `0` = off, `1` = the landing chunk only, `N` = an `(2N-1)x(2N-1)` chunk square. (Legacy `true`/`false` still work and map to `1`/`0`.) Setting `auto` automatically derives the radius from the server's effective view distance (lowest power of 2 at or under view distance, e.g. 10 -> 8 chunks). When paired with `expand: true` in dual-layer shapes, it enables zero-memory dyadic stride downsampling ($S = (2R_u-1)^2$), keeping concurrent players isolated by view distance while driving rapid outward frontier expansion.
 
 ### Shape Engines and Parameters
 

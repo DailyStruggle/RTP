@@ -26,9 +26,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Scale.</b> A 100 km border is a 6250-chunk radius: about 156 million addressed chunks, more
  * than half of them unusable. That mark set cannot be pushed through {@code addBadLocation} in a
- * test JVM, so the table is counted by {@link KeySpaceRunEncoder} - one ascending pass over the key
- * space, histogramming the gaps between consecutive bad keys, which reconstructs the coalesced table
- * at every {@code spatialResolution} at once in constant memory. That encoder is arithmetic rather
+ * test JVM, so the table is counted by {@link DynamicGapRunEncoder} - one ascending pass over the
+ * key space carrying one greedy accumulator per swept {@code spatialResolution}, which reconstructs
+ * every coalesced table at once in constant memory. That encoder is arithmetic rather
  * than shipped code, so {@link #encoderAgreesWithShippedRebuild()} pins it to a real {@code
  * flushAndRebuild} at radii where the shape can actually be built. Every border-scale figure here
  * rests on that check.
@@ -127,11 +127,13 @@ public class BorderScaleFootprintBenchmarkTest {
   @AfterAll
   public static void writeReport() {
     REPORT.note(
-        "Border-scale rows are counted by a gap histogram over one ascending pass of the key space, "
-            + "not by building the table: 156 million addressed chunks at a 100 km border cannot be "
-            + "marked through addBadLocation in a test JVM. The histogram reproduces the shipped "
-            + "merge test exactly - nextKey <= curEnd + resolution over unit-width runs - and the "
-            + "equivalence is asserted against a real flushAndRebuild at radii 128 and 256.");
+        "Border-scale rows are counted by one ascending pass of the key space, not by building the "
+            + "table: 156 million addressed chunks at a 100 km border cannot be marked through "
+            + "addBadLocation in a test JVM. The pass carries one accumulator per swept setting and "
+            + "applies the shipped merge test exactly - nextKey <= curEnd plus "
+            + "computeAdmissibleGap(resolution, accumulated length, 1) over unit-width runs, a gap "
+            + "that widens as the run grows - and the equivalence is asserted against a real "
+            + "flushAndRebuild at radii 128 and 256.");
     REPORT.note(
         "Usable share is an input here rather than whatever the source save happens to be. Run "
             + "count follows the boundary length between usable and unusable ground, so density "
@@ -153,7 +155,7 @@ public class BorderScaleFootprintBenchmarkTest {
     REPORT.write("border-scale-footprint");
   }
 
-  private static KeySpaceRunEncoder.Occupancy occupancy() {
+  private static DynamicGapRunEncoder.Occupancy occupancy() {
     return (cx, cz) -> mask.isOccupied(cx, cz);
   }
 
@@ -166,10 +168,142 @@ public class BorderScaleFootprintBenchmarkTest {
     return s;
   }
 
-  private static KeySpaceRunEncoder encode(MemoryShape<?> shape, int windowChunks) {
-    KeySpaceRunEncoder encoder = new KeySpaceRunEncoder();
+  private static DynamicGapRunEncoder encode(MemoryShape<?> shape, int windowChunks) {
+    DynamicGapRunEncoder encoder = new DynamicGapRunEncoder(RESOLUTIONS);
     encoder.encode(shape, windowChunks, occupancy());
     return encoder;
+  }
+
+  /**
+   * Counts the coalesced table a curve would hold, in one ascending pass of the key space, without
+   * building it: at border scale the mark set alone will not fit a test JVM.
+   *
+   * <p>The merge test is the shipped one - {@code nextKey <= curEnd +
+   * MemoryShape.computeAdmissibleGap(resolution, curLength, nextLength)} over unit-width pending
+   * runs, exactly what {@code flushAndRebuild} folds. That gap depends on the length of the run
+   * built so far, so it cannot be answered from a histogram of gap lengths: the rule is one greedy
+   * left-to-right pass, order-dependent and not idempotent. Every swept setting therefore carries
+   * its own accumulator, advanced side by side in the same pass, which keeps the pass single and
+   * the memory constant.
+   */
+  private static final class DynamicGapRunEncoder {
+
+    /** Is this chunk usable ground? */
+    interface Occupancy {
+      boolean usable(int cx, int cz);
+    }
+
+    private final long[] resolutions;
+    private final long[] runs;
+    private final long[] curStart;
+    private final long[] curLength;
+    private final long[] lost;
+
+    private long badKeys;
+    private long usableCells;
+    private long addressedCells;
+    private long keysWalked;
+
+    DynamicGapRunEncoder(long[] trackedResolutions) {
+      this.resolutions = trackedResolutions.clone();
+      int n = this.resolutions.length;
+      this.runs = new long[n];
+      this.curStart = new long[n];
+      this.curLength = new long[n];
+      this.lost = new long[n];
+      java.util.Arrays.fill(this.curStart, -1L);
+    }
+
+    /**
+     * Walks the whole key space of {@code shape} once.
+     *
+     * @param shape curve under test; only its {@code getRange} and {@code locationToXZ} are used
+     * @param windowChunks comparison window, in chunks: a cell counts when both coordinates lie in
+     *     {@code [-windowChunks, windowChunks)}. A key mapping outside it is unaddressed - it still
+     *     occupies key space, so it still lengthens gaps, but it is neither usable ground nor a mark
+     * @param occupancy ground truth
+     */
+    void encode(MemoryShape<?> shape, int windowChunks, Occupancy occupancy) {
+      long range = shape.getRange();
+      io.github.dailystruggle.rtp.api.world.MutableRTPCoords coords =
+          new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(0, 0);
+      long pendingUsable = 0L;
+
+      for (long key = 0L; key < range; key++) {
+        shape.locationToXZ(key, coords);
+        int cx = coords.x;
+        int cz = coords.z;
+        keysWalked++;
+        if (cx < -windowChunks || cx >= windowChunks || cz < -windowChunks || cz >= windowChunks) {
+          continue;
+        }
+        addressedCells++;
+        if (occupancy.usable(cx, cz)) {
+          usableCells++;
+          pendingUsable++;
+          continue;
+        }
+        badKeys++;
+        for (int r = 0; r < resolutions.length; r++) {
+          if (curStart[r] == -1L) {
+            curStart[r] = key;
+            curLength[r] = 1L;
+            runs[r] = 1L;
+            continue;
+          }
+          long curEnd = curStart[r] + curLength[r];
+          long admissible =
+              MemoryShape.computeAdmissibleGap(resolutions[r], curLength[r], 1L);
+          if (key <= curEnd + admissible) {
+            curLength[r] = Math.max(curLength[r], key + 1L - curStart[r]);
+            lost[r] += pendingUsable;
+            continue;
+          }
+          runs[r]++;
+          curStart[r] = key;
+          curLength[r] = 1L;
+        }
+        pendingUsable = 0L;
+      }
+    }
+
+    private int indexOf(long resolution) {
+      for (int r = 0; r < resolutions.length; r++) {
+        if (resolutions[r] == resolution) return r;
+      }
+      throw new IllegalArgumentException("resolution not tracked: " + resolution);
+    }
+
+    /** @return entries the coalesced table holds at this {@code spatialResolution} */
+    long runsAt(long resolution) {
+      return badKeys == 0L ? 0L : runs[indexOf(resolution)];
+    }
+
+    /** @return share of usable ground the coalesced table refuses at this setting */
+    double lossAt(long resolution) {
+      return usableCells == 0L ? 0.0d : lost[indexOf(resolution)] / (double) usableCells;
+    }
+
+    long badKeys() {
+      return badKeys;
+    }
+
+    long usableCells() {
+      return usableCells;
+    }
+
+    long addressedCells() {
+      return addressedCells;
+    }
+
+    long keysWalked() {
+      return keysWalked;
+    }
+
+    /** @return usable share of the addressed domain, realised rather than expected */
+    double usableShare() {
+      return addressedCells == 0L ? 0.0d : usableCells / (double) addressedCells;
+    }
   }
 
   /**
@@ -191,7 +325,7 @@ public class BorderScaleFootprintBenchmarkTest {
    * <p>Settings below {@link #MIN_RESOLUTION} are excluded, so neither curve is credited for a
    * table it only holds at a precision that is not an operating point.
    */
-  private static long smallestWithin(KeySpaceRunEncoder encoder, double cap) {
+  private static long smallestWithin(DynamicGapRunEncoder encoder, double cap) {
     long best = Long.MAX_VALUE;
     for (long resolution : RESOLUTIONS) {
       if (resolution < MIN_RESOLUTION) continue;
@@ -248,7 +382,7 @@ public class BorderScaleFootprintBenchmarkTest {
       for (boolean hybrid : new boolean[] {false, true}) {
         String curve = hybrid ? "hybrid" : "spiral";
         int window = commonWindow(radius);
-        KeySpaceRunEncoder encoder =
+        DynamicGapRunEncoder encoder =
             encode(
                 hybrid ? new SpiralHilbertSquare(radius, POINT_CHUNKS, true) : plainSpiral(radius),
                 window);
@@ -312,8 +446,8 @@ public class BorderScaleFootprintBenchmarkTest {
 
     for (int radius : RADII_CHUNKS) {
       int window = commonWindow(radius);
-      KeySpaceRunEncoder spiral = encode(plainSpiral(radius), window);
-      KeySpaceRunEncoder hybrid =
+      DynamicGapRunEncoder spiral = encode(plainSpiral(radius), window);
+      DynamicGapRunEncoder hybrid =
           encode(new SpiralHilbertSquare(radius, POINT_CHUNKS, true), window);
 
       String domain = "r=" + window + "ch (" + ((window * 16L) / 1000L) + " km)";
@@ -389,7 +523,7 @@ public class BorderScaleFootprintBenchmarkTest {
     }
   }
 
-  private static void emit(String domain, String curve, long resolution, KeySpaceRunEncoder e) {
+  private static void emit(String domain, String curve, long resolution, DynamicGapRunEncoder e) {
     long runs = e.runsAt(resolution);
     REPORT.add(
         domain, curve + " res=" + resolution, "runs", String.valueOf(runs), Provenance.MEASURED);

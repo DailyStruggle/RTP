@@ -214,4 +214,39 @@ public final class KeyRunTable {
     long location = target + currentBadSum;
     return (location < totalRange) ? location : -1L;
   }
+
+  /**
+   * Adapts this flat run table into the shipped {@link
+   * io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable}
+   * so benchmarks exercise the production backend rather than a forked test copy. Runs are handed
+   * verbatim to {@code fromRuns}, which partitions/pins identically to the retired {@code fromFlat}.
+   *
+   * @param totalRange maximum key range (domain chunk count)
+   * @param binSize keys per bin
+   * @param fullCollapseTolerance remaining usable chunks in a bin to collapse to FULL
+   * @return the shipped segmented table over these runs
+   */
+  public io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable
+      toSegmented(long totalRange, long binSize, long fullCollapseTolerance) {
+    long[] runStarts = new long[count];
+    long[] runLengths = new long[count];
+    for (int i = 0; i < count; i++) {
+      runStarts[i] = starts[i];
+      runLengths[i] = lengths[i];
+    }
+    return io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable
+        .fromRuns(runStarts, runLengths, count, totalRange, binSize, fullCollapseTolerance);
+  }
+
+  /**
+   * Convenience overload with no FULL-collapse tolerance.
+   *
+   * @param totalRange maximum key range (domain chunk count)
+   * @param binSize keys per bin
+   * @return the shipped segmented table over these runs
+   */
+  public io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable
+      toSegmented(long totalRange, long binSize) {
+    return toSegmented(totalRange, binSize, 0L);
+  }
 }

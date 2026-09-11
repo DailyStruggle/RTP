@@ -75,7 +75,10 @@ RTP exhausted its `maxAttempts` (set in `performance.yml`) without finding a val
 
 ### What does `spatialResolution` do?
 
-It controls how precisely the plugin stores spatial memory. Higher values result in a finer grid and more memory usage, while lower values create a coarser grid with less memory but more imprecision. The default (`3`) suits most servers. Increase it only if players are reporting they can't land in areas that should be valid.
+It controls how precisely the plugin stores spatial memory and samples candidate landing zones:
+- **Memory Coalescing:** Controls the distance (in chunks) across which bad-location runs merge in memory (`computeAdmissibleGap`). Higher values merge nearby hazard pockets more aggressively, shrinking database and RAM footprints.
+- **Dyadic Stride Downsampling:** In dual-layer PRP shapes (`SQUARE`, `CIRCLE`), values greater than `1` (e.g. `4`, `8`, `16`) coarsen the candidate sampling lattice into macro-cells ($4\times 4$, $8\times 8$, $16\times 16$ chunks). This speeds up world pre-scanning (`/rtp scan`) by up to 100× and spaces candidate arrivals across large maps.
+- **Default (`3`):** Suitable for most servers. When `spatialResolution: 1` and `expand: true` is configured with `uniquePlacements: auto` (or an integer radius), RTP automatically derives the optimal power-of-four dyadic stride from player view distance.
 
 ---
 
