@@ -6,8 +6,12 @@ import io.github.dailystruggle.rtp.api.menu.MenuConsumerProfile;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.Configs;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashSet;
@@ -26,6 +30,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * fallback row. Each value row carries a {@code &x} color prefix.
  */
 class PickerCleanListTest {
+
+    // The picker's "type a custom value..." label is resolved via
+    // CommandTreeMenuBuilder#lookupMsg, which returns the built-in fallback
+    // text only when the RTP.configs singleton is null. These tests assert on
+    // that fallback text, so they must not observe a config populated by an
+    // unrelated test running earlier in the same JVM. Under forked/parallel
+    // execution that ordering is non-deterministic, so pin RTP.configs to null
+    // for the duration of each test and restore whatever was there afterward.
+    private Configs savedConfigs;
+
+    @BeforeEach
+    void pinDefaultMessages() {
+        savedConfigs = RTP.configs;
+        RTP.configs = null;
+    }
+
+    @AfterEach
+    void restoreConfigs() {
+        RTP.configs = savedConfigs;
+    }
 
     @Test
     void regionAndWorldPickersOmitTypeValueRow_otherParamsKeepIt() {

@@ -385,20 +385,23 @@ include 'addons:LeafRTPRiftAddon'
 // verifiers. Single Bukkit-only module (every checker is org.bukkit.*-based);
 // self-gates on PlatformFamily.BUKKIT so it is a no-op on Fabric/NeoForge.
 include 'addons:LeafRTPClaimAddon'
-// LeafRTPGroupAddon - multi-entity subspace teleportation. Captures spatial
-// memory and bad-location bitsets from the parent region to calculate candidate
-// destinations in O(1) time across configurable profiles (party, duel, skirmish,
-// pursuit) without live search loops. Platform-neutral RTPAddon (ADR-057); config
-// + lifecycle only at present, specified in leafrtp-group-addon-ADR-001.
-include 'addons:LeafRTPGroupAddon'
+// LeafRTPGroupAddon - multi-entity subspace teleportation (supersedes the former
+// party addon). Excluded from the general build: not yet canonical and its module
+// build currently fails. Re-include once it is stabilized; a dedicated non-canonical
+// addon gating mechanism is planned to manage this and the retired party addon.
+// See leafrtp-group-addon-ADR-001.
+// include 'addons:LeafRTPGroupAddon'
 // LeafRTPTetherAddon - keep a player inside the RTP region they were teleported
 // into ("tether" = cross-platform region confinement). Uses RTP's own region
 // geometry + move signal instead of a WorldGuard trap, so it works on
 // Bukkit/Paper/Folia and Fabric/NeoForge with no third-party plugin.
 // Platform-neutral RTPAddon (ADR-057); config + lifecycle only at present -
 // enforcement depends on the proposed core move-event SPI (ADR-075, D-005
-// gated), so it loads as a safe no-op until that lands. See its REQUIREMENTS/ADR.
-include 'addons:LeafRTPTetherAddon'
+// gated), so it loads as a safe no-op until that lands. Excluded from the
+// general build for now (enforcement not yet canonical); re-include once the
+// core move-event SPI lands, via the planned non-canonical addon gating
+// mechanism (see LeafRTPGroupAddon above). See its REQUIREMENTS/ADR.
+// include 'addons:LeafRTPTetherAddon'
 // LeafRTPGuiAddon - DonutSMP-style destination picker, split on the project platform
 // model. rtp-gui-common is platform-neutral (menu model, config via RTP's
 // ConfigParser, the MenuRenderer render seam, and the teleport submit through

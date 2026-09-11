@@ -47,7 +47,7 @@ import java.util.List;
 public final class CurvePersistenceSeam {
 
   public static final int BIN_MAGIC = 0x52545031;
-  public static final int BIN_VERSION = 5;
+  public static final int BIN_VERSION = 3;
 
   public static final String CURVE_SPIRAL = "SPIRAL";
   public static final String CURVE_SPIRAL_HILBERT = "SPIRAL_HILBERT";
@@ -97,7 +97,7 @@ public final class CurvePersistenceSeam {
     return (range <= Integer.MAX_VALUE) ? 4 : 8;
   }
 
-  /** Serializes a table to bytes with Version 5 header. */
+  /** Serializes a table to bytes with the modern (Version 3) header. */
   public static byte[] serialize(
       String curve,
       int p,
@@ -177,9 +177,10 @@ public final class CurvePersistenceSeam {
     }
 
     int version = buf.getInt();
-    if (version < 5) {
-      // Legacy versions without curve/P header cannot be safely reinterpreted across curve change
-      return new DeserializationResult(null, List.of(), false, true, "pre-v5 legacy format discarded and relearned");
+    if (version != 3) {
+      // Legacy versions (1/2) lack the curve/P header and cannot be safely reinterpreted
+      // across a curve change; retired intermediate tags (4/5) never shipped.
+      return new DeserializationResult(null, List.of(), false, true, "non-v3 format discarded and relearned");
     }
 
     int curveLen = buf.getInt();
