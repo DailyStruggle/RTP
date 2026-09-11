@@ -265,6 +265,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
         .collect(Collectors.toSet());
   }
 
+  @SuppressWarnings("unchecked") // configParserFactory only ever holds ConfigParser<E> for this parser's E
   public ConfigParser<E> getParser(String name) {
     name = ConfigParser.sanitizeName(name).toUpperCase();
     if (!name.endsWith(".YML")) name = name + ".YML";
@@ -284,6 +285,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     }
   }
 
+  @SuppressWarnings("unchecked") // configParserFactory only ever constructs ConfigParser<E> for this parser's E
   public void addParser(String name) {
     String safe = ConfigParser.sanitizeName(name);
     ConfigParser<E> value = (ConfigParser<E>) configParserFactory.construct(safe);
@@ -297,6 +299,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
    * @param name     the new parser/file name
    * @param fromName originating parser/file name to clone from
    */
+  @SuppressWarnings("unchecked") // configParserFactory only ever constructs ConfigParser<E> for this parser's E
   public void addParser(String name, String fromName) {
     String safe = ConfigParser.sanitizeName(name);
     String from = (fromName == null) ? null : ConfigParser.sanitizeName(fromName);
@@ -304,6 +307,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     if (value != null) configParserFactory.add(safe, value);
   }
 
+  @SuppressWarnings("unchecked") // parser.myClass is verified to equal myClass before the cast
   public void addParser(ConfigParser<?> parser) {
     if (!parser.myClass.equals(myClass)) throw new IllegalStateException("mismatched parser class");
     ConfigParser<E> eConfigParser = (ConfigParser<E>) parser;

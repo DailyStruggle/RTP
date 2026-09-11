@@ -2876,6 +2876,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Best-effort post-ADD amendment for nether/the-end region name conventions.
      * Applies default vertical and skylight settings without overriding user values.
      */
+    @SuppressWarnings("unchecked") // NetherEndConfigAmender.amend invoked on the raw-typed parser (see local raw below)
     private static void tryAmendNetherEndSeed(
             io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser,
             String entry) {

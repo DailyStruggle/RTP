@@ -284,6 +284,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     return sb.toString();
   }
 
+  @SuppressWarnings("unchecked") // value is instanceof-checked to Map before the String-keyed section cast
   private static void setSection(RtpYamlSection section, Map<?, ?> map) {
     Map<String, Object> mapValues = section.getMapValues(false);
     Map<?, ?> inputClone = new HashMap<>(map);
@@ -1234,6 +1235,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    * @param key the configuration key
    * @return the value as a map; never {@code null}
    */
+  @SuppressWarnings("unchecked") // value is instanceof-checked to Map; YAML sections are String-keyed
   public Map<String, Object> getMap(E key) {
     Object o = getData(key);
     if (o instanceof RtpYamlSection) {
@@ -1570,6 +1572,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   @Override
+  @SuppressWarnings("unchecked") // value is instanceof-checked to Map before the String-keyed cast
   public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
     super.set(key, value);
 

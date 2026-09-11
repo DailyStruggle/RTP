@@ -49,7 +49,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
     subParameters.put("expand", new BooleanParameter(
         "rtp.params", "expand region to keep a constant amount of usable land", (sender, s) -> true));
     subParameters.put("uniqueplacements", new IntegerParameter(
-        "rtp.params", "chunk radius cleared around each selection (0 = off, 1 = landing chunk)", (sender, s) -> true, 0, 1, 2, 4, 8));
+        "rtp.params", "chunk radius cleared around each selection ('auto', 0 = off, 1 = landing chunk)", (sender, s) -> true, "auto", 0, 1, 2, 4, 8, 16));
   }
 
   /**

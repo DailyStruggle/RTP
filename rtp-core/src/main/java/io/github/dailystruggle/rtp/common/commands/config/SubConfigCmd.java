@@ -105,6 +105,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
   }
 
   @Override
+  @SuppressWarnings("unchecked") // parser casts are myClass-guarded; section values are instanceof-checked to Map
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     // If an intermediate node (nextCommand != null), do nothing and return true so

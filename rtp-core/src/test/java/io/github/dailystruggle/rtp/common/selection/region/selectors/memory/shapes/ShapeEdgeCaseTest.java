@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
@@ -249,6 +250,7 @@ public class ShapeEdgeCaseTest {
         assertEquals(0, MemoryShape.uniquePlacementsRadius("false"));
         assertEquals(1, MemoryShape.uniquePlacementsRadius("true"));
         assertEquals(4, MemoryShape.uniquePlacementsRadius("4"));
+        assertEquals(8, MemoryShape.uniquePlacementsRadius("auto")); // Default view distance 10 -> power-of-two 8
         assertEquals(0, MemoryShape.uniquePlacementsRadius("garbage"));
     }
 
@@ -399,6 +401,100 @@ public class ShapeEdgeCaseTest {
         assertFalse(shape.contains(0, 10));
     }
 
+    @Test
+    void circleOptimizedDualLayer_expandMode_walksPastDeclaredRadius() {
+        CircleOptimizedDualLayer shape = new CircleOptimizedDualLayer("EXPAND_CIRCLE", 32);
+        shape.set(GenericMemoryShapeParams.radius, 100L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 0L);
+        shape.set(GenericMemoryShapeParams.expand, true);
+        shape.set(GenericMemoryShapeParams.mode, "ACCUMULATE");
+        shape.setRng(new Random(SEED));
+
+        // Mark bad locations to simulate consumed territory
+        long range = shape.getRange();
+        for (long i = 0; i < range / 2; i++) {
+            shape.addBadLocation(i);
+        }
+        shape.flushAndRebuild(shape.spatialResolution());
+
+        long maxRadius = 0;
+        int samples = 500;
+        for (int i = 0; i < samples; i++) {
+            int[] xz = shape.select();
+            assertNotNull(xz);
+            long r = (long) Math.ceil(Math.sqrt((long) xz[0] * xz[0] + (long) xz[1] * xz[1]));
+            if (r > maxRadius) maxRadius = r;
+            assertTrue(shape.contains(xz[0], xz[1]), "Expanded coordinate (" + xz[0] + "," + xz[1] + ") must be contained by shape");
+        }
+
+        assertTrue(maxRadius > 100L, "When expand=true and locations are consumed, max radius reached ("
+                + maxRadius + ") should exceed declared radius (100)");
+        shape.setRng(null);
+    }
+
+    @Test
+    void squareOptimizedDualLayer_expandMode_walksPastDeclaredRadius() {
+        SquareOptimizedDualLayer shape = new SquareOptimizedDualLayer("EXPAND_SQUARE", 32);
+        shape.set(GenericMemoryShapeParams.radius, 100L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 0L);
+        shape.set(GenericMemoryShapeParams.expand, true);
+        shape.set(GenericMemoryShapeParams.mode, "ACCUMULATE");
+        shape.setRng(new Random(SEED));
+
+        // Mark bad locations to simulate consumed territory
+        long range = shape.getRange();
+        for (long i = 0; i < range / 2; i++) {
+            shape.addBadLocation(i);
+        }
+        shape.flushAndRebuild(shape.spatialResolution());
+
+        long maxRadius = 0;
+        int samples = 500;
+        for (int i = 0; i < samples; i++) {
+            int[] xz = shape.select();
+            assertNotNull(xz);
+            long chebyshev = Math.max(Math.abs(xz[0]), Math.abs(xz[1]));
+            if (chebyshev > maxRadius) maxRadius = chebyshev;
+            assertTrue(shape.contains(xz[0], xz[1]), "Expanded coordinate (" + xz[0] + "," + xz[1] + ") must be contained by shape");
+        }
+
+        assertTrue(maxRadius > 100L, "When expand=true and locations are consumed, max radius reached ("
+                + maxRadius + ") should exceed declared radius (100)");
+        shape.setRng(null);
+    }
+
+    @Test
+    void testVertexCenteredSquareOptimizedDualLayer() {
+        SquareOptimizedDualLayer shape = new SquareOptimizedDualLayer("TEST_SYMMETRIC", 32);
+        shape.set(GenericMemoryShapeParams.radius, 256L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 64L);
+        shape.set(GenericMemoryShapeParams.centerX, 0L);
+        shape.set(GenericMemoryShapeParams.centerZ, 0L);
+
+        long range = shape.getRange();
+        System.out.println("[DEBUG_LOG] Current shape.getRange() = " + range);
+
+        // Test bijection over thousands of points
+        MutableRTPCoords coords = new MutableRTPCoords(0, 0);
+        long minX = Long.MAX_VALUE, maxX = Long.MIN_VALUE;
+        long minZ = Long.MAX_VALUE, maxZ = Long.MIN_VALUE;
+
+        for (long loc = 0; loc < range; loc += 1) {
+            shape.locationToXZ(loc, coords);
+            if (coords.x < minX) minX = coords.x;
+            if (coords.x > maxX) maxX = coords.x;
+            if (coords.z < minZ) minZ = coords.z;
+            if (coords.z > maxZ) maxZ = coords.z;
+
+            if (loc % 17 == 0) {
+                long back = shape.xzToLocation(coords.x, coords.z);
+                assertEquals(loc, back, "Round-trip failure at loc=" + loc + " coords=(" + coords.x + "," + coords.z + ")");
+                assertTrue(shape.contains(coords.x, coords.z), "contains() must return true for valid location=" + loc);
+            }
+        }
+        System.out.println("[DEBUG_LOG] Full range sampled bounds: X in [" + minX + ", " + maxX + "], Z in [" + minZ + ", " + maxZ + "]");
+    }
+
     // -------------------------------------------------------------------------
     // contains() - Square
     // -------------------------------------------------------------------------
@@ -496,6 +592,186 @@ public class ShapeEdgeCaseTest {
         long[] first = sampleSquareNormal(SEED, 20);
         long[] second = sampleSquareNormal(SEED, 20);
         assertArrayEquals(first, second, "Square_Normal must be deterministic for same seed");
+    }
+
+    // -------------------------------------------------------------------------
+    // Optimized Dual Layer Shapes - minradius (centerRadius) and boundary tests
+    // -------------------------------------------------------------------------
+
+    @Test
+    void squareOptimized_zeroEffectiveRadius_rangeIsZero() {
+        SquareOptimizedDualLayer shape = new SquareOptimizedDualLayer("TEST_SQUARE_OPT", 32);
+        shape.set(GenericMemoryShapeParams.radius, 64L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 64L);
+        assertEquals(0L, shape.getRange(), "SquareOptimizedDualLayer range should be 0 when radius == centerRadius");
+
+        shape.set(GenericMemoryShapeParams.radius, 30L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 30L);
+        assertEquals(0L, shape.getRange(), "SquareOptimizedDualLayer range should be 0 when radius == centerRadius (sub-chunk)");
+
+        shape.set(GenericMemoryShapeParams.radius, 50L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 60L);
+        assertEquals(0L, shape.getRange(), "SquareOptimizedDualLayer range should be 0 when radius < centerRadius");
+    }
+
+    @Test
+    void circleOptimized_zeroEffectiveRadius_rangeIsZero() {
+        CircleOptimizedDualLayer shape = new CircleOptimizedDualLayer("TEST_CIRCLE_OPT", 32);
+        shape.set(GenericMemoryShapeParams.radius, 64L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 64L);
+        assertEquals(0L, shape.getRange(), "CircleOptimizedDualLayer range should be 0 when radius == centerRadius");
+
+        shape.set(GenericMemoryShapeParams.radius, 30L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 30L);
+        assertEquals(0L, shape.getRange(), "CircleOptimizedDualLayer range should be 0 when radius == centerRadius (sub-chunk)");
+
+        shape.set(GenericMemoryShapeParams.radius, 50L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 60L);
+        assertEquals(0L, shape.getRange(), "CircleOptimizedDualLayer range should be 0 when radius < centerRadius");
+    }
+
+    @Test
+    void squareOptimized_containsAndXzToLocation_respectCenterRadius() {
+        SquareOptimizedDualLayer shape = new SquareOptimizedDualLayer("TEST_SQUARE_OPT", 32);
+        shape.set(GenericMemoryShapeParams.radius, 256L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 64L);
+        shape.set(GenericMemoryShapeParams.centerX, 0L);
+        shape.set(GenericMemoryShapeParams.centerZ, 0L);
+
+        // Inside inner exclusion zone (Chebyshev < 64)
+        assertFalse(shape.contains(0, 0), "Center (0,0) must not be contained when centerRadius=64");
+        assertFalse(shape.contains(32, 0), "(32,0) must not be contained when centerRadius=64");
+        assertFalse(shape.contains(0, 63), "(0,63) must not be contained when centerRadius=64");
+        assertFalse(shape.contains(-63, -63), "(-63,-63) must not be contained when centerRadius=64");
+
+        assertEquals(-1L, shape.xzToLocation(0, 0), "xzToLocation must return -1 inside centerRadius");
+        assertEquals(-1L, shape.xzToLocation(32, 0), "xzToLocation must return -1 inside centerRadius");
+        assertEquals(-1L, shape.xzToLocation(0, 63), "xzToLocation must return -1 inside centerRadius");
+
+        // At or outside centerRadius
+        assertTrue(shape.contains(64, 0), "(64,0) must be contained when centerRadius=64");
+        assertTrue(shape.contains(-64, 0), "(-64,0) must be contained when centerRadius=64");
+        assertTrue(shape.contains(0, 64), "(0,64) must be contained when centerRadius=64");
+        assertTrue(shape.contains(0, -64), "(0,-64) must be contained when centerRadius=64");
+        assertTrue(shape.contains(100, 100), "(100,100) must be contained");
+
+        assertTrue(shape.xzToLocation(64, 0) >= 0, "xzToLocation must return valid location for (64,0)");
+        assertTrue(shape.xzToLocation(100, 100) >= 0, "xzToLocation must return valid location for (100,100)");
+
+        // Outside outer radius
+        assertFalse(shape.contains(300, 0), "(300,0) must not be contained when radius=256");
+        assertEquals(-1L, shape.xzToLocation(300, 0), "xzToLocation must return -1 outside radius");
+    }
+
+    @Test
+    void circleOptimized_containsAndXzToLocation_respectCenterRadius() {
+        CircleOptimizedDualLayer shape = new CircleOptimizedDualLayer("TEST_CIRCLE_OPT", 32);
+        shape.set(GenericMemoryShapeParams.radius, 256L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 64L);
+        shape.set(GenericMemoryShapeParams.centerX, 0L);
+        shape.set(GenericMemoryShapeParams.centerZ, 0L);
+
+        // Inside inner exclusion zone (Euclidean < 64)
+        assertFalse(shape.contains(0, 0), "Center (0,0) must not be contained when centerRadius=64");
+        assertFalse(shape.contains(32, 0), "(32,0) must not be contained when centerRadius=64");
+        assertFalse(shape.contains(0, 63), "(0,63) must not be contained when centerRadius=64");
+        assertFalse(shape.contains(40, 40), "(40,40) dist 56.5 must not be contained when centerRadius=64");
+
+        assertEquals(-1L, shape.xzToLocation(0, 0), "xzToLocation must return -1 inside centerRadius");
+        assertEquals(-1L, shape.xzToLocation(32, 0), "xzToLocation must return -1 inside centerRadius");
+        assertEquals(-1L, shape.xzToLocation(0, 63), "xzToLocation must return -1 inside centerRadius");
+
+        // At or outside centerRadius
+        assertTrue(shape.contains(64, 0), "(64,0) must be contained when centerRadius=64");
+        assertTrue(shape.contains(-64, 0), "(-64,0) must be contained when centerRadius=64");
+        assertTrue(shape.contains(0, 64), "(0,64) must be contained when centerRadius=64");
+        assertTrue(shape.contains(0, -64), "(0,-64) must be contained when centerRadius=64");
+
+        assertTrue(shape.xzToLocation(64, 0) >= 0, "xzToLocation must return valid location for (64,0)");
+        assertTrue(shape.xzToLocation(100, 100) >= 0, "xzToLocation must return valid location for (100,100)");
+
+        // Outside outer radius
+        assertFalse(shape.contains(300, 0), "(300,0) must not be contained when radius=256");
+        assertEquals(-1L, shape.xzToLocation(300, 0), "xzToLocation must return -1 outside radius");
+    }
+
+    @Test
+    void circleOptimized_select_respectsCenterRadius() {
+        CircleOptimizedDualLayer shape = new CircleOptimizedDualLayer("TEST_CIRCLE_OPT", 32);
+        long r = 256;
+        long cr = 64;
+        shape.set(GenericMemoryShapeParams.radius, r);
+        shape.set(GenericMemoryShapeParams.centerRadius, cr);
+        shape.set(GenericMemoryShapeParams.centerX, 0L);
+        shape.set(GenericMemoryShapeParams.centerZ, 0L);
+
+        for (int i = 0; i < 200; i++) {
+            int[] sel = shape.select();
+            assertNotNull(sel);
+            long distSq = (long) sel[0] * sel[0] + (long) sel[1] * sel[1];
+            assertTrue(distSq >= cr * cr, "Selected point (" + sel[0] + "," + sel[1] + ") has distSq " + distSq + " < crSq " + (cr * cr));
+            assertTrue(distSq <= r * r, "Selected point (" + sel[0] + "," + sel[1] + ") has distSq " + distSq + " > rSq " + (r * r));
+            assertTrue(shape.contains(sel[0], sel[1]), "shape.contains must return true for selected coordinate");
+        }
+    }
+
+    @Test
+    void squareOptimized_select_respectsCenterRadius() {
+        SquareOptimizedDualLayer shape = new SquareOptimizedDualLayer("TEST_SQUARE_OPT", 32);
+        long r = 256;
+        long cr = 64;
+        shape.set(GenericMemoryShapeParams.radius, r);
+        shape.set(GenericMemoryShapeParams.centerRadius, cr);
+        shape.set(GenericMemoryShapeParams.centerX, 0L);
+        shape.set(GenericMemoryShapeParams.centerZ, 0L);
+
+        for (int i = 0; i < 200; i++) {
+            int[] sel = shape.select();
+            assertNotNull(sel);
+            long chebyshev = Math.max(Math.abs((long) sel[0]), Math.abs((long) sel[1]));
+            assertTrue(chebyshev >= cr, "Selected point (" + sel[0] + "," + sel[1] + ") has chebyshev " + chebyshev + " < cr " + cr);
+            assertTrue(chebyshev <= r, "Selected point (" + sel[0] + "," + sel[1] + ") has chebyshev " + chebyshev + " > r " + r);
+            assertTrue(shape.contains(sel[0], sel[1]), "shape.contains must return true for selected coordinate");
+        }
+    }
+
+    @Test
+    void squareOptimized_noEmptyBarsOnBoundaries() {
+        SquareOptimizedDualLayer square = new SquareOptimizedDualLayer("SQUARE_R1024", 32);
+        square.set(GenericMemoryShapeParams.radius, 1024L);
+        square.set(GenericMemoryShapeParams.centerRadius, 0L);
+
+        java.util.BitSet activeBins = new java.util.BitSet(4096);
+        for (int i = 0; i < 15000; i++) {
+            int[] sel = square.select();
+            if (sel == null || sel.length < 2) continue;
+            int cx = sel[0];
+            int cz = sel[1];
+            int bx = (cx + 1024) / 32;
+            int bz = (cz + 1024) / 32;
+            if (bx >= 0 && bx < 64 && bz >= 0 && bz < 64) {
+                activeBins.set(bz * 64 + bx);
+            }
+        }
+
+        // Verify that all 4 outer border edges (left bx=0, right bx=63, top bz=0, bottom bz=63) have active bins
+        int countLeft = 0, countRight = 0, countTop = 0, countBottom = 0;
+        for (int bz = 0; bz < 64; bz++) {
+            if (activeBins.get(bz * 64 + 0)) countLeft++;
+            if (activeBins.get(bz * 64 + 63)) countRight++;
+        }
+        for (int bx = 0; bx < 64; bx++) {
+            if (activeBins.get(0 * 64 + bx)) countTop++;
+            if (activeBins.get(63 * 64 + bx)) countBottom++;
+        }
+
+        System.out.printf("[DEBUG_LOG] Active bins on borders: left(bx=0)=%d, right(bx=63)=%d, top(bz=0)=%d, bottom(bz=63)=%d%n",
+                countLeft, countRight, countTop, countBottom);
+
+        assertTrue(countLeft > 30, "Left boundary (bx=0) must not be empty, got " + countLeft);
+        assertTrue(countRight > 30, "Right boundary (bx=63) must not be empty, got " + countRight);
+        assertTrue(countTop > 30, "Top boundary (bz=0) must not be empty, got " + countTop);
+        assertTrue(countBottom > 30, "Bottom boundary (bz=63) must not be empty, got " + countBottom);
     }
 
     // -------------------------------------------------------------------------

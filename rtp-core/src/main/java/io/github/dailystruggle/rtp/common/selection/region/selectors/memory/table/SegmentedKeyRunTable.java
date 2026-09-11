@@ -9,7 +9,7 @@ import java.util.Arrays;
  * pinning straddling run spans at bin boundary offset 0. This guarantees:
  * <ul>
  *   <li><b>Zero backward pointer chasing:</b> queries landing in bin $b$ inspect only bin $b$'s local runs.
- *   <li><b>Cache locality:</b> local binary search inside a bin of 6–22 runs executes inside on-chip CPU cache ($< 15\text{ ns}$).
+ *   <li><b>Cache locality:</b> local binary search inside a bin of 6-22 runs executes inside on-chip CPU cache ({@code < 15 ns}).
  *   <li><b>O(1) Accumulate offset resolution:</b> Tier 1 bisection over {@code dirBadPrefixSums} ($\le 64$ ints in hardware cache)
  *       finds the target bin in 1–2 steps, and Tier 2 resolves locally inside the bin.
  *   <li><b>Reconciliation locality:</b> inserting a mark mutates only a single local bin.
@@ -239,18 +239,39 @@ public final class SegmentedKeyRunTable {
   }
 
   /**
+   * Domain scale below which the table devolves to a single flat bin.
+   *
+   * <p>Below this many chunks a directory of {@code totalRange / binSize} mostly-empty bins costs
+   * more (object headers, pointers, directory prefix array) than it saves: the domain is a
+   * near-perfect spiral with only a handful of holes, so one flat run array is both cheaper to
+   * retain and no slower to resolve. The value is the measured memory crossover from
+   * {@code DevolutionThresholdBenchmarkTest} (density 0.30, meanRun 12): segmented retained bytes
+   * first fall below the flat table at ~16K chunks.
+   */
+  public static final long DEVOLUTION_THRESHOLD = 16_384L;
+
+  /**
    * Derives an optimal bin size in powers of two according to domain scale,
-   * targeting between 32 and 128 total bins.
+   * targeting between 32 and 128 total bins, or a single whole-range bin below
+   * {@link #DEVOLUTION_THRESHOLD}.
    *
    * @param totalRange total chunks in domain
-   * @return derived bin size (power of two, in [128, 4096])
+   * @return derived bin size (power of two); {@code >= totalRange} when below the devolution
+   *     threshold so the resulting table holds exactly one bin
    */
   public static long deriveOptimalBinSize(long totalRange) {
     if (totalRange <= 0) return 256L;
+    long pow2 = 128L;
+    if (totalRange < DEVOLUTION_THRESHOLD) {
+      // Devolve to a single flat bin: pick the smallest power of two that spans the whole range.
+      while (pow2 < totalRange) {
+        pow2 <<= 1;
+      }
+      return pow2;
+    }
     long target = totalRange / 64L;
     if (target < 128L) target = 128L;
     if (target > 4096L) target = 4096L;
-    long pow2 = 128L;
     while (pow2 < target) {
       pow2 <<= 1;
     }

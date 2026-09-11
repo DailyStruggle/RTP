@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 
 public class ShapeParameter extends CommandParameter {
+  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public ShapeParameter(
       String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
     super(
@@ -26,6 +27,7 @@ public class ShapeParameter extends CommandParameter {
   }
 
   @Override
+  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public Set<String> values() {
     Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
     factory.map.forEach(

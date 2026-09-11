@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.text;
 
 /**
  * Platform-agnostic stripper for legacy Minecraft color and formatting codes.
- * Strips section codes (§a), ampersand codes (&a), Bukkit hex runs (§x§r§r...), and #RRGGBB.
+ * Strips section codes ({@code §a}), ampersand codes ({@code &a}), Bukkit hex runs ({@code §x§r§r...}), and {@code #RRGGBB}.
  */
 public final class LegacyColorStrip {
 

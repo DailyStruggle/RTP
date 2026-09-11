@@ -46,7 +46,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     subParameters.put("centerz", new DistanceParameter(
         "rtp.params", "center point z", (sender, s) -> true, "~", "-~", "0"));
     subParameters.put("uniqueplacements", new IntegerParameter(
-        "rtp.params", "chunk radius cleared around each selection (0 = off, 1 = landing chunk)", (sender, s) -> true, 0, 1, 2, 4, 8));
+        "rtp.params", "chunk radius cleared around each selection ('auto', 0 = off, 1 = landing chunk)", (sender, s) -> true, "auto", 0, 1, 2, 4, 8, 16));
   }
 
   /** Default constructor for Rectangle */
@@ -136,7 +136,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
 
   /**
    * Rectangle inverse mapping for {@code chunkToLocations(cx, cz)}.
-   * Unrotated case is a strict bijection (1 preimage); rotated case bounded by <= 2 preimages.
+   * Unrotated case is a strict bijection (1 preimage); rotated case bounded by {@code <= 2} preimages.
    *
    * @param cx chunk x in rectangle chunk-units
    * @param cz chunk z in rectangle chunk-units

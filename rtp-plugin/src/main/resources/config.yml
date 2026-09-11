@@ -99,8 +99,8 @@ defaults:
     # Bias inside the centerRadius-to-radius band: >1.0 favors the center, <1.0 the edge.
     weight: 1.0
 
-    # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
-    uniquePlacements: 0
+    # Keep spots from being reused. "auto" = view-distance radius (default), 0 = off, 1 = the landing chunk, N = bigger square.
+    uniquePlacements: "auto"
     expand: false
 
   # Default high/low landing window.

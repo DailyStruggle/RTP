@@ -38,6 +38,7 @@ public final class EffectsResolver {
    * @param prefix effect-prefix to prepend to every token (e.g. {@code "rtp.effect.postteleport"})
    * @return ordered, de-duplicated list of synthetic permission strings; never null
    */
+  @SuppressWarnings("unchecked") // multiConfigParserMap keyed by EffectsGroupKeys.class; ClassCastException is caught below
   public static List<String> resolveTokens(String stage, RTPPlayer player, String prefix) {
     Objects.requireNonNull(stage, "stage");
     Objects.requireNonNull(player, "player");

@@ -159,6 +159,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
    * single {@code y-1} check and the player would drop through on landing.
    * Returns {@code true} when every checked cell is safe.
    */
+  @SuppressWarnings("unchecked") // raw RTPChunk member calls; adjustor is type-erased over chunk backing
   private static boolean isGroundSafe(
       RTPChunk chunk, int x, int y, int z, Set<String> unsafeBlocks, int platformDepth) {
     int depth = Math.max(1, platformDepth);
@@ -183,6 +184,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
   }
 
   @Override
+  @SuppressWarnings("unchecked") // raw RTPChunk member calls; adjustor is type-erased over chunk backing
   public boolean adjust(@NotNull RTPChunk chunk, @NotNull MutableRTPCoords output) {
     if (chunk == null) return false;
 
@@ -368,6 +370,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
    * depth re-check. Identical to the inner test in {@link #adjust(RTPChunk, MutableRTPCoords)}
    * so the two paths share one definition of "safe cell" (S-001, no drift).
    */
+  @SuppressWarnings("unchecked") // raw RTPChunk member calls; adjustor is type-erased over chunk backing
   private static boolean acceptColumnY(
       RTPChunk chunk,
       int x,

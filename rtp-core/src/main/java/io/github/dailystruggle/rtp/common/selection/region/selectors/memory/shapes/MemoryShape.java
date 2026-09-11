@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.HybridHazardTable;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -52,7 +53,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected volatile byte[] badCauseCache = new byte[0];
   /**
    * Per-run expiration timestamp in unix epoch seconds, aligned 1:1 with {@link #badKeysCache}.
-   * Values <= 0 indicate static / permanent retention (infinite TTL).
+   * Values {@code <= 0} indicate static / permanent retention (infinite TTL).
    */
   protected volatile long[] badExpiryCache = new long[0];
 
@@ -76,10 +77,15 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   private static final int BIN_MAGIC = 0x52545031;
   /**
-   * Current cause-tagged {@code .bin} format version (1 == legacy, 2 == cause-tagged, 3 ==
-   * ttl/epoch-tagged, 4 == unified biome run stream, 5 == curve-tagged / dynamic key width ADR-085).
+   * Current {@code .bin} format version.
+   *
+   * <p>Only two released formats ever shipped: version 1 (legacy, no magic) and version 2
+   * (cause-tagged). Versions 3, 4 and 5 were unreleased dev iterations that were collapsed into
+   * a single modern unified format now tagged as version 3 (curve / P / dynamic key width header,
+   * cause + TTL epoch per bad run, unified biome run stream). Only versions 1, 2 and 3 load;
+   * anything else fails loudly.
    */
-  private static final int BIN_VERSION = 5;
+  private static final int BIN_VERSION = 3;
 
   /**
    * Curve identifier for persistence header (ADR-085).
@@ -92,6 +98,21 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   public String getCurveName() {
     return CURVE_SPIRAL;
+  }
+
+  /**
+   * Maximum point edge P in chunks for dual-layer Hilbert curves.
+   * P = 32 covers exactly 1024 chunks, which corresponds to one Anvil region file.
+   */
+  public static final int MAX_POINT_EDGE_CHUNKS = 32;
+  public static final int MIN_POINTS_PER_RADIUS = 32;
+
+  public static int derivePointEdgeChunks(long radiusChunks) {
+    if (radiusChunks <= 0) return 1;
+    long target = radiusChunks / MIN_POINTS_PER_RADIUS;
+    if (target < 1) return 1;
+    int p = Integer.highestOneBit((int) Math.min(target, MAX_POINT_EDGE_CHUNKS));
+    return Math.max(1, Math.min(p, MAX_POINT_EDGE_CHUNKS));
   }
 
   /**
@@ -625,6 +646,15 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected final java.util.concurrent.atomic.AtomicBoolean isRebuilding =
       new java.util.concurrent.atomic.AtomicBoolean(false);
   protected final java.util.concurrent.locks.ReentrantLock writeLock = new ReentrantLock();
+
+  /**
+   * Parallel hazard mirror table (Slice 1 foundation).
+   * Maintained in parallel with bad-run arrays without affecting production read paths.
+   */
+  private volatile HybridHazardTable hazardMirror = null;
+  private final java.util.concurrent.atomic.AtomicBoolean hazardMirrorLogWarned =
+      new java.util.concurrent.atomic.AtomicBoolean(false);
+
   protected final AtomicLong scanStride = new AtomicLong(-1L);
   private volatile CompletableFuture<Void> loadFuture = CompletableFuture.completedFuture(null);
   private final AtomicLong totalBadCount = new AtomicLong(0L);
@@ -726,6 +756,108 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     this.spatialResolution = Math.max(1L, spatialResolution);
   }
 
+  /**
+   * Returns the parallel hazard mirror table, if initialized and range fits int.
+   *
+   * @return active {@link HybridHazardTable} mirror, or {@code null}
+   */
+  public HybridHazardTable getHazardMirror() {
+    return ensureHazardMirror();
+  }
+
+  /**
+   * Lazily initializes and returns the hazard mirror table.
+   * Guard: only initialized when {@link #getRange()} fits in positive int (0 < range <= Integer.MAX_VALUE).
+   * If range does not fit int, leaves null, skips mirroring, and logs a one-time message.
+   *
+   * @return the hazard mirror instance, or {@code null} if out of int range bounds
+   */
+  private HybridHazardTable ensureHazardMirror() {
+    HybridHazardTable mirror = hazardMirror;
+    if (mirror != null) return mirror;
+    long range = getRange();
+    if (range <= 0L || range > Integer.MAX_VALUE) {
+      if (hazardMirrorLogWarned.compareAndSet(false, true)) {
+        RTP.log(
+            Level.FINE,
+            "[MemoryShape] Shape "
+                + name
+                + " range ("
+                + range
+                + ") does not fit positive int [1, "
+                + Integer.MAX_VALUE
+                + "]; skipping HybridHazardTable mirroring.");
+      }
+      return null;
+    }
+    writeLock.lock();
+    try {
+      if (hazardMirror == null) {
+        rebuildHazardMirror();
+      }
+      return hazardMirror;
+    } finally {
+      writeLock.unlock();
+    }
+  }
+
+  /**
+   * Rebuilds the hazard mirror from authoritative bad runs.
+   */
+  private void rebuildHazardMirror() {
+    long range = getRange();
+    if (range <= 0L || range > Integer.MAX_VALUE) {
+      hazardMirror = null;
+      return;
+    }
+    HybridHazardTable mirror = new HybridHazardTable(range);
+    long[] keys = badKeysCache;
+    long[] sums = badPrefixSumsCache;
+    int n = Math.min(keys.length, sums.length);
+    long prevSum = 0L;
+    for (int i = 0; i < n; i++) {
+      long start = keys[i];
+      long len = sums[i] - prevSum;
+      prevSum = sums[i];
+      for (long k = start; k < start + len; k++) {
+        mirror.markBad(k);
+      }
+    }
+    // Also include any pending bad locations currently buffered
+    for (Long p : pendingBadLocations.get().keySet()) {
+      mirror.markBad(p);
+    }
+    ConcurrentHashMap<Long, Long> rebuilding = rebuildingBadLocations;
+    if (rebuilding != null) {
+      for (Long p : rebuilding.keySet()) {
+        mirror.markBad(p);
+      }
+    }
+    this.hazardMirror = mirror;
+  }
+
+  /**
+   * Clears / drops / recreates the hazard mirror empty.
+   */
+  private void clearHazardMirror() {
+    long range = getRange();
+    if (range <= 0L || range > Integer.MAX_VALUE) {
+      hazardMirror = null;
+      return;
+    }
+    this.hazardMirror = new HybridHazardTable(range);
+  }
+
+  /**
+   * Rebuilds the affected span in hazard mirror when a probationary run is restored.
+   */
+  private void restoreHazardMirrorSpan(long start, long len) {
+    HybridHazardTable mirror = ensureHazardMirror();
+    if (mirror == null) return;
+    // Rebuild mirror to authoritative state (clearing probationary state)
+    rebuildHazardMirror();
+  }
+
 
   /**
    * Get the range of the shape
@@ -801,6 +933,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
     ConcurrentHashMap<Long, Long> rebuilding = rebuildingBadLocations;
     if (rebuilding != null && rebuilding.containsKey(location)) return true;
+
+    HybridHazardTable mirror = ensureHazardMirror();
+    if (mirror != null) {
+      return mirror.isBad(location);
+    }
 
     long[] sums = badPrefixSumsCache;
     long[] keys = badKeysCache;
@@ -893,6 +1030,16 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
+   * Returns an immutable snapshot of current bad-location prefix-sums array.
+   *
+   * @return fresh array copy; never {@code null}
+   */
+  public long[] badPrefixSumsSnapshot() {
+    long[] sums = badPrefixSumsCache;
+    return Arrays.copyOf(sums, sums.length);
+  }
+
+  /**
    * Returns an immutable snapshot of the per-run rejection-cause array, aligned
    * 1:1 with {@link #badKeysSnapshot()} (each element is a
    * {@link LocationGenerator.FailTypes} ordinal stored as a byte). Runs with no
@@ -968,6 +1115,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       sProbCauses = Arrays.copyOf(probationCauseCache, probationCauseCache.length);
       sProbExpiries = Arrays.copyOf(probationExpiryCache, probationExpiryCache.length);
 
+      boolean persistUnique = Boolean.parseBoolean(String.valueOf(paramByName("uniqueplacementspermanent", Boolean.FALSE)));
+      byte uniqueCauseByte = (byte) LocationGenerator.FailTypes.uniquePlacement.ordinal();
+
       // Merge active and probation non-overlapping runs into a single sorted stream for disk
       totalRuns = sBadKeys.length + sProbKeys.length;
       allKeys = new long[totalRuns];
@@ -980,44 +1130,60 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       while (aIdx < sBadKeys.length || pIdx < sProbKeys.length) {
         if (aIdx < sBadKeys.length && pIdx < sProbKeys.length) {
           if (sBadKeys[aIdx] <= sProbKeys[pIdx]) {
-            allKeys[runIdx] = sBadKeys[aIdx];
-            allDeltas[runIdx] = sBadSums[aIdx] - aPrev;
-            allCauses[runIdx] = (aIdx < sBadCauses.length) ? sBadCauses[aIdx] : MISC_CAUSE;
-            allExpiries[runIdx] = (aIdx < sBadExpiries.length) ? sBadExpiries[aIdx] : 0L;
+            byte c = (aIdx < sBadCauses.length) ? sBadCauses[aIdx] : MISC_CAUSE;
+            if (persistUnique || c != uniqueCauseByte) {
+              allKeys[runIdx] = sBadKeys[aIdx];
+              allDeltas[runIdx] = sBadSums[aIdx] - aPrev;
+              allCauses[runIdx] = c;
+              allExpiries[runIdx] = (aIdx < sBadExpiries.length) ? sBadExpiries[aIdx] : 0L;
+              runIdx++;
+            }
             aPrev = sBadSums[aIdx];
             aIdx++;
           } else {
-            allKeys[runIdx] = sProbKeys[pIdx];
-            allDeltas[runIdx] = sProbSums[pIdx] - pPrev;
-            allCauses[runIdx] = (pIdx < sProbCauses.length) ? sProbCauses[pIdx] : MISC_CAUSE;
-            allExpiries[runIdx] = (pIdx < sProbExpiries.length) ? sProbExpiries[pIdx] : 0L;
+            byte c = (pIdx < sProbCauses.length) ? sProbCauses[pIdx] : MISC_CAUSE;
+            if (persistUnique || c != uniqueCauseByte) {
+              allKeys[runIdx] = sProbKeys[pIdx];
+              allDeltas[runIdx] = sProbSums[pIdx] - pPrev;
+              allCauses[runIdx] = c;
+              allExpiries[runIdx] = (pIdx < sProbExpiries.length) ? sProbExpiries[pIdx] : 0L;
+              runIdx++;
+            }
             pPrev = sProbSums[pIdx];
             pIdx++;
           }
         } else if (aIdx < sBadKeys.length) {
-          allKeys[runIdx] = sBadKeys[aIdx];
-          allDeltas[runIdx] = sBadSums[aIdx] - aPrev;
-          allCauses[runIdx] = (aIdx < sBadCauses.length) ? sBadCauses[aIdx] : MISC_CAUSE;
-          allExpiries[runIdx] = (aIdx < sBadExpiries.length) ? sBadExpiries[aIdx] : 0L;
+          byte c = (aIdx < sBadCauses.length) ? sBadCauses[aIdx] : MISC_CAUSE;
+          if (persistUnique || c != uniqueCauseByte) {
+            allKeys[runIdx] = sBadKeys[aIdx];
+            allDeltas[runIdx] = sBadSums[aIdx] - aPrev;
+            allCauses[runIdx] = c;
+            allExpiries[runIdx] = (aIdx < sBadExpiries.length) ? sBadExpiries[aIdx] : 0L;
+            runIdx++;
+          }
           aPrev = sBadSums[aIdx];
           aIdx++;
         } else {
-          allKeys[runIdx] = sProbKeys[pIdx];
-          allDeltas[runIdx] = sProbSums[pIdx] - pPrev;
-          allCauses[runIdx] = (pIdx < sProbCauses.length) ? sProbCauses[pIdx] : MISC_CAUSE;
-          allExpiries[runIdx] = (pIdx < sProbExpiries.length) ? sProbExpiries[pIdx] : 0L;
+          byte c = (pIdx < sProbCauses.length) ? sProbCauses[pIdx] : MISC_CAUSE;
+          if (persistUnique || c != uniqueCauseByte) {
+            allKeys[runIdx] = sProbKeys[pIdx];
+            allDeltas[runIdx] = sProbSums[pIdx] - pPrev;
+            allCauses[runIdx] = c;
+            allExpiries[runIdx] = (pIdx < sProbExpiries.length) ? sProbExpiries[pIdx] : 0L;
+            runIdx++;
+          }
           pPrev = sProbSums[pIdx];
           pIdx++;
         }
-        runIdx++;
       }
+      totalRuns = runIdx;
 
     } finally {
       writeLock.unlock();
     }
 
     // Build a binary payload (big-endian) without any synchronous disk I/O here.
-    // BIN_VERSION 5: magic(4) + version(4) + curve(4+len) + P(4) + keyWidth(4) +
+    // BIN_VERSION 3: magic(4) + version(4) + curve(4+len) + P(4) + keyWidth(4) +
     // world(4+len) + stride(8) + badSize(4) +
     // entries * (2*keyWidth + 1 + 8) bytes (key + delta + cause 1 + expiresAt 8), then the biome section:
     // nameCount(4) + [nameLen(4) + bytes] * nameCount + runCount(4) +
@@ -1139,7 +1305,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Reads a BIN_VERSION 4 biome section: name table plus one ascending run stream.
+   * Reads the modern (BIN_VERSION 3) biome section: name table plus one ascending run stream.
    *
    * <p>The stream is the union's own published order, already identity-merged and clipped, so it
    * is handed to the builder verbatim rather than re-merged - a load therefore reproduces the
@@ -1178,8 +1344,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Reads the pre-version-4 biome sections - one {@code key} + {@code width delta} table per biome
-   * name - and folds them into a union.
+   * Reads the legacy (BIN_VERSION 1 / 2) biome sections - one {@code key} + {@code width delta}
+   * table per biome name - and folds them into a union.
    *
    * <p>Those sections are exactly the builder's input once interned, so this is an ingest rather
    * than a migration: the runs are staged, sorted key-ascending, and passed through the same
@@ -1252,20 +1418,21 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Computes the admissible bridging gap bounded between a minimum (1/4 resolution)
-   * and a maximum (resolution as-is), scaled by the evidence of adjacent run lengths.
+   * Computes the admissible bridging gap. The configured {@code spatialResolution} is a hard,
+   * literal ceiling on how far two runs may bridge - a resolution of 16 caps the gap at 16, with
+   * no square-root-style 1D/2D rescaling. Below that ceiling the gap tracks the shorter adjacent
+   * run ({@code min(leftLength, rightLength)}), so short runs - shorelines and other high-detail
+   * seams - under-merge and preserve fidelity, while long inland runs bridge up to the ceiling.
    *
-   * @param spatialResolution configured bridging resolution ceiling
+   * @param spatialResolution configured bridging gap ceiling, used literally
    * @param leftLength length of the left run
    * @param rightLength length of the right run
    * @return admissible gap in key units
    */
   public static long computeAdmissibleGap(long spatialResolution, long leftLength, long rightLength) {
     if (spatialResolution <= 3L) return Math.max(1L, spatialResolution);
-    long minGap = spatialResolution / 4L;
-    long maxGap = spatialResolution;
     long driver = Math.min(leftLength, rightLength);
-    return Math.max(minGap, Math.min(maxGap, driver));
+    return Math.max(1L, Math.min(spatialResolution, driver));
   }
 
   /**
@@ -1275,8 +1442,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return minimum bridging stride in key units
    */
   public long minBridgingStride() {
-    if (spatialResolution <= 3L) return 1L;
-    return Math.max(1L, spatialResolution / 4L);
+    return 1L;
   }
 
   /**
@@ -1467,9 +1633,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       }
       try {
                 ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN);
-                // Format detection: a cause-tagged payload (BIN_VERSION >= 2)
-                // begins with BIN_MAGIC; a legacy payload begins directly with the
-                // (small, positive) world-name byte length.
+                // Format detection: a cause-tagged payload (BIN_VERSION 2 or the
+                // modern 3) begins with BIN_MAGIC; a legacy version-1 payload begins
+                // directly with the (small, positive) world-name byte length.
                 int first = buf.getInt();
                 int version;
                 String readCurve = CURVE_SPIRAL;
@@ -1478,7 +1644,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 int wLen;
                 if (first == BIN_MAGIC) {
                   version = buf.getInt();
-                  if (version >= 5) {
+                  if (version == 3) {
+                    // Modern unified format (formerly the unreleased v5 layout):
+                    // curve / P / dynamic key-width header.
                     int cLen = buf.getInt();
                     if (cLen < 0 || cLen > buf.remaining()) return;
                     byte[] cBytes = new byte[cLen];
@@ -1487,6 +1655,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                     readP = buf.getInt();
                     keyWidth = buf.getInt();
                     if (keyWidth != 4 && keyWidth != 8) keyWidth = 8;
+                  } else if (version != 2) {
+                    // Version 1 never carries the magic; versions 4/5 and any newer tag are
+                    // retired or unknown. Fail loudly rather than risk silently misreading.
+                    throw new IllegalStateException("[MemoryShape] Unsupported .bin version "
+                        + version + " for world " + worldName + " (supported: 1, 2, 3)");
                   }
                   wLen = buf.getInt();
                 } else {
@@ -1519,12 +1692,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 }
 
                 // Per-bad-run on-disk width:
-                // v5 = 2*keyWidth + 1 + 8
-                // v3/v4 = 25 (key 8 + delta 8 + cause 1 + exp 8)
+                // v3 (modern) = 2*keyWidth + 1 + 8 (key + delta + cause 1 + expiresAt 8)
                 // v2 = 17 (key 8 + delta 8 + cause 1)
                 // v1 = 16 (key 8 + delta 8)
-                int badEntryWidth = (version >= 5) ? (2 * keyWidth + 1 + 8)
-                    : ((version >= 3) ? 25 : ((version >= 2) ? 17 : 16));
+                int badEntryWidth = (version == 3) ? (2 * keyWidth + 1 + 8)
+                    : ((version == 2) ? 17 : 16);
                 int badSize = buf.getInt();
                 if (badSize < 0 || badSize > (buf.remaining() / badEntryWidth)) return;
 
@@ -1535,10 +1707,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 long[] rawExpiries = new long[badSize];
 
                 for (int i = 0; i < badSize; i++) {
-                  long k = (version >= 5 && keyWidth == 4) ? (buf.getInt() & 0xFFFFFFFFL) : buf.getLong();
-                  long d = (version >= 5 && keyWidth == 4) ? (buf.getInt() & 0xFFFFFFFFL) : buf.getLong();
+                  long k = (version == 3 && keyWidth == 4) ? (buf.getInt() & 0xFFFFFFFFL) : buf.getLong();
+                  long d = (version == 3 && keyWidth == 4) ? (buf.getInt() & 0xFFFFFFFFL) : buf.getLong();
                   byte cause = (version >= 2) ? buf.get() : MISC_CAUSE;
-                  long exp = (version >= 3) ? buf.getLong() : 0L;
+                  long exp = (version == 3) ? buf.getLong() : 0L;
                   rawKeys[i] = k;
                   rawDeltas[i] = d;
                   rawCauses[i] = cause;
@@ -1619,7 +1791,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 }
 
                 BiomeUnionTable newUnion =
-                    (version >= 4) ? readUnionSection(buf) : readLegacyBiomeSections(buf);
+                    (version == 3) ? readUnionSection(buf) : readLegacyBiomeSections(buf);
                 if (newUnion == null) return;
 
                 // Apply under write lock
@@ -1641,6 +1813,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                   biomeTableVersion.incrementAndGet();
                   badLocationsDirty = true;
                   biomeLocationsDirty = false;
+                  rebuildHazardMirror();
                 } finally {
                   writeLock.unlock();
                 }
@@ -1675,6 +1848,15 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     long pendingVal = (ord & 0xFFL) | (epochSec << 8);
     pendingBadLocations.get().put(location, pendingVal);
     badLocationsDirty = true;
+    writeLock.lock();
+    try {
+      HybridHazardTable mirror = ensureHazardMirror();
+      if (mirror != null) {
+        mirror.markBad(location);
+      }
+    } finally {
+      writeLock.unlock();
+    }
   }
 
   /**
@@ -1746,10 +1928,16 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(cause, null);
       long epochSec = (ttl <= 0) ? 0L : (java.time.Instant.now().getEpochSecond() + ttl);
       long pendingVal = (causeByte & 0xFFL) | (epochSec << 8);
-      for (long k = start; k < start + len; k++) {
-        pendingBadLocations.get().put(k, pendingVal);
+      writeLock.lock();
+      try {
+        for (long k = start; k < start + len; k++) {
+          pendingBadLocations.get().put(k, pendingVal);
+        }
+        badLocationsDirty = true;
+        restoreHazardMirrorSpan(start, len);
+      } finally {
+        writeLock.unlock();
       }
-      badLocationsDirty = true;
       return true;
     }
     return false;
@@ -1822,6 +2010,12 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       writeLock.lock();
       try {
         for (int k = n - 1; k >= idx; k--) sums[k] += delta;
+        HybridHazardTable mirror = ensureHazardMirror();
+        if (mirror != null) {
+          for (long k = end; k < newEnd; k++) {
+            mirror.markBad(k);
+          }
+        }
       } finally {
         writeLock.unlock();
       }
@@ -1856,7 +2050,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   /**
    * Inverse of {@link #xzToLocation(long, long)} at chunk granularity. Returns every 1D index
    * in {@code [0, getRange())} where {@code locationToXZ(n)} decodes to chunk {@code (cx, cz)}.
-   * Bounded by <= 2 elements for Archimedean spirals (ADR-001).
+   * Bounded by {@code <= 2} elements for Archimedean spirals (ADR-001).
    *
    * @param cx chunk x in shape chunk-units
    * @param cz chunk z in shape chunk-units
@@ -1865,7 +2059,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public long[] chunkToLocations(int cx, int cz) {
     if (!contains(cx, cz)) return EMPTY_LONG_ARRAY;
 
-    final long range = getRange();
+    final long range = getEffectiveRange();
     if (range <= 0L) return EMPTY_LONG_ARRAY;
 
     final long representative = xzToLocation(cx, cz);
@@ -2009,6 +2203,23 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     String s = String.valueOf(raw).trim();
     if (s.equalsIgnoreCase("true")) return 1;
     if (s.equalsIgnoreCase("false") || s.isEmpty()) return 0;
+    if (s.equalsIgnoreCase("auto")) {
+      // Lowest power of 2 at or under standard server view distance (default 10 -> 8 chunks)
+      int viewDistance = 10;
+      if (io.github.dailystruggle.rtp.common.RTP.configs != null) {
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> parser =
+            (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+                io.github.dailystruggle.rtp.common.RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+        if (parser != null) {
+          Number n = parser.getNumber(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.viewDistanceSelect, 10L);
+          if (n != null && n.intValue() > 0) {
+            viewDistance = n.intValue();
+          }
+        }
+      }
+      int powerOfTwo = Integer.highestOneBit(viewDistance);
+      return Math.max(2, Math.min(32, powerOfTwo));
+    }
     try {
       return Math.max(0, Integer.parseInt(s));
     } catch (NumberFormatException e) {
@@ -2020,7 +2231,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * Marks chunks within Chebyshev radius {@code chunkRadius - 1} around {@code location} as bad.
    *
    * @param location center 1D index
-   * @param chunkRadius Chebyshev radius (<= 0 is no-op)
+   * @param chunkRadius Chebyshev radius ({@code <= 0} is no-op)
    * @return newly marked index count
    */
   public int addBadChunkRadius(long location, int chunkRadius) {
@@ -2059,19 +2270,31 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public void clear() {
-    scanStride.set(-1L);
-    badKeysCache = new long[0];
-    badPrefixSumsCache = new long[0];
-    badCauseCache = new byte[0];
-    badExpiryCache = new long[0];
-    probationKeysCache = new long[0];
-    probationPrefixSumsCache = new long[0];
-    probationCauseCache = new byte[0];
-    probationExpiryCache = new long[0];
-    biomeTableVersion.incrementAndGet();
-    biomeUnion = BiomeUnionTable.EMPTY;
-    badLocationsDirty = true;
-    biomeLocationsDirty = true;
+    writeLock.lock();
+    try {
+      scanStride.set(-1L);
+      badKeysCache = new long[0];
+      badPrefixSumsCache = new long[0];
+      badCauseCache = new byte[0];
+      badExpiryCache = new long[0];
+      probationKeysCache = new long[0];
+      probationPrefixSumsCache = new long[0];
+      probationCauseCache = new byte[0];
+      probationExpiryCache = new long[0];
+      pendingBadLocations.get().clear();
+      rebuildingBadLocations = null;
+      totalBadCount.set(0L);
+      biomeTableVersion.incrementAndGet();
+      biomeUnion = BiomeUnionTable.EMPTY;
+      pendingBiomeLocations.get().clear();
+      pendingBiomeRemovals.get().clear();
+      totalBiomeCount.set(0L);
+      badLocationsDirty = true;
+      biomeLocationsDirty = true;
+      clearHazardMirror();
+    } finally {
+      writeLock.unlock();
+    }
   }
 
   /**
@@ -3124,6 +3347,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         totalBadCount.set(currentBadSum);
         totalBiomeCount.set(currentBiomeSum);
+
+        rebuildHazardMirror();
       } finally {
         isRebuilding.set(false);
       }
@@ -3491,7 +3716,19 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         if (newBadSum == currentBadSum) break;
         currentBadSum = newBadSum;
       }
-      location = target + currentBadSum;
+      long arrayLocation = target + currentBadSum;
+
+      HybridHazardTable mirror = ensureHazardMirror();
+      if (mirror != null) {
+        long mirrorLoc = mirror.resolveAccumulate(target);
+        if (mirrorLoc >= 0) {
+          location = mirrorLoc;
+        } else {
+          location = arrayLocation;
+        }
+      } else {
+        location = arrayLocation;
+      }
     } else {
       location = (long) res;
     }
@@ -3507,12 +3744,15 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       return -1;
     }
 
-    int uniqueRadius = uniquePlacementsRadius(paramByKey(knobs().uniquePlacements, 0));
-    // addBadChunkRadius: chunk-uniform (uniqueplacements knob) - within a chunk the per-column
-    // selection order is deterministic, so re-rolling onto the same chunk produces the
-    // same effective placement. Marking the landing chunk (radius 1) prevents that chunk-level
-    // re-roll; a larger radius additionally clears the surrounding chunks so placements spread out.
-    if (uniqueRadius > 0) addBadChunkRadius(location, uniqueRadius);
+    Object rawUnique = paramByKey(knobs().uniquePlacements, 0);
+    int uniqueRadius = uniquePlacementsRadius(rawUnique);
+    if (uniqueRadius > 0) {
+      // addBadChunkRadius: chunk-uniform (uniqueplacements knob) - within a chunk the per-column
+      // selection order is deterministic, so re-rolling onto the same chunk produces the
+      // same effective placement. Marking the landing chunk (radius 1) prevents that chunk-level
+      // re-roll; a larger radius additionally clears the surrounding chunks so placements spread out.
+      addBadChunkRadius(location, uniqueRadius);
+    }
 
     return location;
   }
@@ -3594,18 +3834,87 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (i < right) sortParallelThreeArrays(keys, b, c, i, right);
   }
 
-  @Override
-  public boolean contains(int x, int z) {
-    long l = xzToLocation(x, z);
-    long range = (long) getRange();
-
+  /**
+   * Get the addressable range including accumulated bad space when expand is enabled.
+   * When expand is false, this is identical to {@link #getRange()}.
+   * When expand is true, this is {@code getRange() + badSum}, representing the maximum
+   * addressable 1D location index.
+   *
+   * @return total usable addressable range under current expansion state
+   */
+  public long getEffectiveRange() {
+    long range = getRange();
     if (supportsExpand() && expand()) {
       long[] sums = badPrefixSumsCache;
       long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
       range += badSum;
     }
+    return range;
+  }
 
+  @Override
+  public boolean contains(int x, int z) {
+    long l = xzToLocation(x, z);
+    long range = getEffectiveRange();
     return l >= 0 && l < range;
+  }
+
+  /**
+   * Dihedral orientation of the Hilbert tile at macro cell {@code (px, pz)} of the spiral.
+   *
+   * <p>An unoriented tile enters at local {@code (0,0)} and exits at {@code (n-1,0)} - both on the
+   * same edge. Keeping the exit corner adjacent to the next tile's entry corner therefore needs a
+   * reflection wherever the spiral changes direction, not just a rotation: the chain below is
+   * A-&gt;C on the +z side, D-&gt;C on the -x side, D-&gt;B on the -z side and A-&gt;B on the +x
+   * side, with the reflections {@code 1} and {@code 5} carrying the four ring corners. Corners are
+   * A=(0,0), B=(max,0), C=(0,max), D=(max,max).
+   *
+   * <p>Pure function of {@code (px, pz)}, applied symmetrically by both directions of the mapping,
+   * so the key space stays a bijection for any assignment. All eight dihedral values are legal.
+   */
+  protected static int orientationFor(long px, long pz) {
+    long kX = (px >= 0) ? (px + 1L) : -px;
+    long kZ = (pz >= 0) ? (pz + 1L) : -pz;
+    long K = Math.max(kX, kZ);
+    if (px == K - 1L && pz > -K) return 1; // east column, travelling +z
+    if (pz == K - 1L && px < K - 1L) {
+      // north row, travelling -x; its final tile turns into -z and needs the anti-transpose
+      return (px == -K) ? 5 : 4;
+    }
+    if (px == -K && pz < K - 1L) return 5; // west column, travelling -z (last tile turns into +x)
+    return 0; // south row, travelling +x
+  }
+
+  /** Maps tile-local coordinates into the canonical Hilbert frame. */
+  protected static int[] applyOrientation(int x, int y, int n, int o) {
+    int max = n - 1;
+    return switch (o % 8) {
+      case 0 -> new int[] {x, y};
+      case 1 -> new int[] {y, x};
+      case 2 -> new int[] {max - y, x};
+      case 3 -> new int[] {max - x, y};
+      case 4 -> new int[] {max - x, max - y};
+      case 5 -> new int[] {max - y, max - x};
+      case 6 -> new int[] {y, max - x};
+      case 7 -> new int[] {x, max - y};
+      default -> new int[] {x, y};
+    };
+  }
+
+  /** Exact inverse of {@link #applyOrientation(int, int, int, int)}. */
+  protected static int[] unapplyOrientation(int x, int y, int n, int o) {
+    int max = n - 1;
+    return switch (o % 8) {
+      case 0 -> new int[] {x, y};
+      case 1 -> new int[] {y, x};
+      case 2 -> new int[] {y, max - x};
+      case 3 -> new int[] {max - x, y};
+      case 4 -> new int[] {max - x, max - y};
+      case 5 -> new int[] {max - y, max - x};
+      case 6 -> new int[] {max - y, x};
+      case 7 -> new int[] {x, max - y};
+      default -> new int[] {x, y};
+    };
   }
 
   @Override
@@ -3619,6 +3928,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     shape.probationPrefixSumsCache = new long[0];
     shape.probationCauseCache = new byte[0];
     shape.probationExpiryCache = new long[0];
+    shape.hazardMirror = null;
     shape.biomeTableVersion = new AtomicLong();
     shape.biomeUnion = BiomeUnionTable.EMPTY;
     // Scratch is per-instance and mutated during rebuild; sharing it with the clone would let two

@@ -1002,6 +1002,7 @@ public class RTP {
     }
   }
 
+  @SuppressWarnings("unchecked") // untyped YAML map values narrowed to Map<String,Object> after instanceof
   public static void handleMigration(String previousState, String currentState) {
     if (previousState.equalsIgnoreCase("yaml") &&
         (currentState.equalsIgnoreCase("sqlite") ||
@@ -1106,10 +1107,12 @@ public class RTP {
     }
   }
 
+  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public static void addShape(Shape<?> shape) {
     ((Factory<Shape<?>>) factoryMap.get(factoryNames.shape)).add(shape.name, shape);
   }
 
+  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public static void addVerticalAdjustor(VerticalAdjustor<?> verticalAdjustor) {
     ((Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert))
         .add(verticalAdjustor.name, verticalAdjustor);
@@ -1219,6 +1222,7 @@ public class RTP {
     accessor.log(level, str, throwable);
   }
 
+  @SuppressWarnings("unchecked") // heterogeneous multiConfigParserMap keyed by enum class; WorldKeys parser cast is safe
   public static RTPWorld getWorld(RTPPlayer player) {
     // get region from world name, check for overrides
     Set<String> worldsAttempted = new HashSet<>();

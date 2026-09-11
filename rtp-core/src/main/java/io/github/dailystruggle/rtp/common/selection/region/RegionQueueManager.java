@@ -792,7 +792,7 @@ public class RegionQueueManager {
 
     /**
      * Returns an unmodifiable collection of all currently active hot sinks for this region
-     * for pulse budget allocation and zero-I/O rebalancing (ADR-078 Phase 4 & Phase 5).
+     * for pulse budget allocation and zero-I/O rebalancing (ADR-078 Phase 4 &amp; Phase 5).
      *
      * @return collection of registered {@link HotSink} instances
      */

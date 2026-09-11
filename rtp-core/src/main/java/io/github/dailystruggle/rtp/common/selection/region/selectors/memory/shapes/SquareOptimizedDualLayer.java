@@ -4,7 +4,6 @@ import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable;
 
-import java.util.EnumMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -15,18 +14,19 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class SquareOptimizedDualLayer extends Square {
 
-  private final int pointEdgeChunks;
-  private final int pointArea;
-  private final Square macroSquare;
+  private final boolean derived;
+  private volatile int cachedPointEdgeChunks;
 
   private volatile SegmentedKeyRunTable segmentedTable;
 
   public SquareOptimizedDualLayer() {
-    this("SQUARE_OPTIMIZED_DUAL_LAYER", 32);
+    this("SQUARE_OPTIMIZED_DUAL_LAYER");
   }
 
   public SquareOptimizedDualLayer(String name) {
-    this(name, 32);
+    super(name);
+    this.derived = true;
+    this.cachedPointEdgeChunks = 0;
   }
 
   public SquareOptimizedDualLayer(String name, int pointEdgeChunks) {
@@ -34,18 +34,8 @@ public class SquareOptimizedDualLayer extends Square {
     if (Integer.bitCount(pointEdgeChunks) != 1) {
       throw new IllegalArgumentException("pointEdgeChunks must be a power of two: " + pointEdgeChunks);
     }
-    this.pointEdgeChunks = pointEdgeChunks;
-    this.pointArea = pointEdgeChunks * pointEdgeChunks;
-    this.macroSquare = new Square("MACRO_" + name);
-  }
-
-  private void configureMacroSquare(long macroRadius, long macroCenter) {
-    EnumMap<GenericMemoryShapeParams, Object> map = new EnumMap<>(GenericMemoryShapeParams.class);
-    map.put(GenericMemoryShapeParams.radius, (Object) macroRadius);
-    map.put(GenericMemoryShapeParams.centerRadius, (Object) macroCenter);
-    map.put(GenericMemoryShapeParams.centerX, (Object) 0L);
-    map.put(GenericMemoryShapeParams.centerZ, (Object) 0L);
-    macroSquare.setData(map);
+    this.derived = false;
+    this.cachedPointEdgeChunks = pointEdgeChunks;
   }
 
   @Override
@@ -55,21 +45,41 @@ public class SquareOptimizedDualLayer extends Square {
 
   @Override
   public int getPointEdgeChunks() {
-    return pointEdgeChunks;
+    if (!derived) {
+      return cachedPointEdgeChunks;
+    }
+    long radius = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
+    int computed = derivePointEdgeChunks(radius);
+    int current = cachedPointEdgeChunks;
+    if (current == 0 || computed > current) {
+      synchronized (this) {
+        current = cachedPointEdgeChunks;
+        if (current == 0 || computed > current) {
+          cachedPointEdgeChunks = computed;
+          return computed;
+        }
+      }
+    }
+    return current;
   }
 
   @Override
   public long getRange() {
+    int p = getPointEdgeChunks();
+    int area = p * p;
     long r = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
-    long macroRadius = (r + pointEdgeChunks - 1) / pointEdgeChunks;
-    long macroCenter = cr / pointEdgeChunks;
-    configureMacroSquare(macroRadius, macroCenter);
-    return macroSquare.getRange() * pointArea;
+    if (r <= cr) return 0L;
+    long kOuter = Math.max(1L, (r + p - 1) / p);
+    long kInner = cr / p;
+    if (kOuter <= kInner) return 0L;
+    return (4L * kOuter * kOuter - 4L * kInner * kInner) * area;
   }
 
   @Override
   public long xzToLocation(long cx, long cz) {
+    int p = getPointEdgeChunks();
+    int area = p * p;
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
     long r = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
     long cenX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
@@ -78,22 +88,49 @@ public class SquareOptimizedDualLayer extends Square {
     long relX = cx - cenX;
     long relZ = cz - cenZ;
 
-    long macroRadius = (r + pointEdgeChunks - 1) / pointEdgeChunks;
-    long macroCenter = cr / pointEdgeChunks;
-    configureMacroSquare(macroRadius, macroCenter);
+    long chebyshev = Math.max(Math.abs(relX), Math.abs(relZ));
+    if (chebyshev < cr) return -1L;
+    if (!expand() && chebyshev > r) return -1L;
 
-    long px = Math.floorDiv(relX, pointEdgeChunks);
-    long pz = Math.floorDiv(relZ, pointEdgeChunks);
+    long px = Math.floorDiv(relX, p);
+    long pz = Math.floorDiv(relZ, p);
 
-    long macroLoc = macroSquare.xzToLocation(px, pz);
+    long kX = (px >= 0) ? (px + 1L) : -px;
+    long kZ = (pz >= 0) ? (pz + 1L) : -pz;
+    long K = Math.max(kX, kZ);
+
+    long kInner = cr / p;
+    long kOuter = Math.max(1L, (r + p - 1) / p);
+
+    if (K <= kInner) return -1L;
+    if (!expand() && K > kOuter) return -1L;
+
+    long side;
+    long sideStep;
+    if (px == K - 1L && pz > -K) {
+      side = 0L;
+      sideStep = pz + (K - 1L);
+    } else if (pz == K - 1L && px < K - 1L) {
+      side = 1L;
+      sideStep = (K - 2L) - px;
+    } else if (px == -K && pz < K - 1L) {
+      side = 2L;
+      sideStep = (K - 2L) - pz;
+    } else {
+      side = 3L;
+      sideStep = px - (-K + 1L);
+    }
+
+    long fullMacroIdx = 4L * (K - 1L) * (K - 1L) + side * (2L * K - 1L) + sideStep;
+    long macroLoc = fullMacroIdx - 4L * kInner * kInner;
     if (macroLoc < 0) return -1L;
 
-    int lx = (int) (relX - px * pointEdgeChunks);
-    int lz = (int) (relZ - pz * pointEdgeChunks);
+    int lx = (int) (relX - px * p);
+    int lz = (int) (relZ - pz * p);
 
     int orientation = orientationFor(px, pz);
-    long h = xyToHilbert(lx, lz, pointEdgeChunks, orientation);
-    return macroLoc * pointArea + h;
+    long h = xyToHilbert(lx, lz, p, orientation);
+    return macroLoc * area + h;
   }
 
   @Override
@@ -103,42 +140,232 @@ public class SquareOptimizedDualLayer extends Square {
       return;
     }
 
+    int p = getPointEdgeChunks();
+    int area = p * p;
+    long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
+    long cenX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
+    long cenZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
+
+    long kInner = cr / p;
+    long macroLoc = loc / area;
+    long h = loc % area;
+
+    long fullMacroIdx = macroLoc + 4L * kInner * kInner;
+
+    long target = fullMacroIdx / 4L;
+    long K = (long) Math.floor(Math.sqrt(target)) + 1L;
+    while ((K - 1L) * (K - 1L) > target) K--;
+    while (K * K <= target) K++;
+
+    long ringBase = 4L * (K - 1L) * (K - 1L);
+    long step = fullMacroIdx - ringBase;
+    long sideLen = 2L * K - 1L;
+    long side = step / sideLen;
+    long sideStep = step % sideLen;
+
+    long px, pz;
+    if (side == 0) {
+      px = K - 1L;
+      pz = -(K - 1L) + sideStep;
+    } else if (side == 1) {
+      pz = K - 1L;
+      px = (K - 2L) - sideStep;
+    } else if (side == 2) {
+      px = -K;
+      pz = (K - 2L) - sideStep;
+    } else {
+      pz = -K;
+      px = (-K + 1L) + sideStep;
+    }
+
+    int orientation = orientationFor(px, pz);
+    int[] local = hilbertToXY((int) h, p, orientation);
+
+    long cx = cenX + px * p + local[0];
+    long cz = cenZ + pz * p + local[1];
+
+    if (output != null) {
+      output.setXZ((int) cx, (int) cz);
+    }
+  }
+
+  @Override
+  public boolean contains(int x, int z) {
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
     long r = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
     long cenX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cenZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
 
-    long macroRadius = (r + pointEdgeChunks - 1) / pointEdgeChunks;
-    long macroCenter = cr / pointEdgeChunks;
-    configureMacroSquare(macroRadius, macroCenter);
+    long relX = Math.abs((long) x - cenX);
+    long relZ = Math.abs((long) z - cenZ);
+    long chebyshev = Math.max(relX, relZ);
+    if (chebyshev < cr) return false;
+    if (!expand() && chebyshev > r) return false;
 
-    long macroLoc = loc / pointArea;
-    long h = loc % pointArea;
+    if (expand()) {
+      long loc = xzToLocation(x, z);
+      if (loc < 0L || loc >= getEffectiveRange()) return false;
+    }
 
-    macroSquare.locationToXZ(macroLoc, output);
-    if (output == null) return;
+    return true;
+  }
 
-    long px = output.x;
-    long pz = output.z;
+  @Override
+  public long[] chunkToLocations(int cx, int cz) {
+    if (!contains(cx, cz)) return EMPTY_LONG_ARRAY;
+    long loc = xzToLocation(cx, cz);
+    if (loc < 0L) return EMPTY_LONG_ARRAY;
+    if (loc >= getEffectiveRange()) return EMPTY_LONG_ARRAY;
+    return new long[] {loc};
+  }
 
-    int orientation = orientationFor(px, pz);
-    int[] local = hilbertToXY((int) h, pointEdgeChunks, orientation);
+  @Override
+  public long rand() {
+    for (int attempts = 0; attempts < 100; attempts++) {
+      long loc = super.rand();
+      if (loc >= 0) {
+        return loc;
+      }
+    }
+    return -1L;
+  }
 
-    long cx = cenX + px * pointEdgeChunks + local[0];
-    long cz = cenZ + pz * pointEdgeChunks + local[1];
+  @Override
+  public int[] select() {
+    for (int attempts = 0; attempts < 100; attempts++) {
+      long loc = rand();
+      if (loc >= 0) {
+        return locationToXZ(loc);
+      }
+    }
+    return null;
+  }
 
-    output.setXZ((int) cx, (int) cz);
+  @Override
+  protected long postProcess(long location) {
+    if (location < 0) return location;
+    MutableRTPCoords coords = new MutableRTPCoords(0, 0);
+    locationToXZ(location, coords);
+    long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
+    long r = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
+    long cenX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
+    long cenZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
+    long relX = Math.abs((long) coords.x - cenX);
+    long relZ = Math.abs((long) coords.z - cenZ);
+    long chebyshev = Math.max(relX, relZ);
+    if (chebyshev < cr || (!expand() && chebyshev > r)) {
+      return -1L;
+    }
+    return location;
   }
 
   private final long secretKey = ThreadLocalRandom.current().nextLong();
   private final java.util.concurrent.atomic.AtomicLong selectionCounter = new java.util.concurrent.atomic.AtomicLong(0);
+  private final java.util.concurrent.atomic.AtomicLong backlogCounter = new java.util.concurrent.atomic.AtomicLong(0);
 
+  /**
+   * Optimized native candidate distribution model.
+   * Dynamically evaluates effective dyadic downsampling stride S based on
+   * {@code spatialResolution}, {@code uniquePlacements}, and {@code expand}.
+   * If {@code S <= 1} (e.g. fixed radius expand:false with default spatialResolution),
+   * uses unbinned Keyed Feistel Pseudorandom Permutation (PRP) across [0, range)
+   * for non-repeating sampling preserving all valid land.
+   * If S > 1, applies Dyadic Bit-Reversal Bisection Striding to space candidates
+   * and accelerate outward frontier expansion.
+   */
   @Override
-  public long rand() {
+  protected double sample(double range) {
+    if (range <= 1.0) return 0.0;
+    long total = (long) range;
+    int stride = deriveEffectiveStride(total);
+
+    if (stride <= 1) {
+      long t = selectionCounter.getAndIncrement();
+      long permuted = feistelPermute(t, total, secretKey);
+      return (double) Math.min(total - 1, Math.max(0L, permuted));
+    }
+
+    int bits = Integer.numberOfTrailingZeros(stride);
+    long t = selectionCounter.getAndIncrement();
+
+    // Epoch-based phase progression:
+    // Exhaust all candidate macro-tiles in the active phase across the world before rotating to the next phase offset.
+    // This strictly preserves the d >= sqrt(S) spacing between all active candidates within the epoch!
+    long subsetCapacity = (total + stride - 1) / stride;
+    if (subsetCapacity <= 0) {
+      return (double) (t % total);
+    }
+    long epoch = t / subsetCapacity;
+    int subsetIdx = (int) (epoch % stride);
+    int phaseOffset = Integer.reverse(subsetIdx) >>> (32 - bits);
+
+    long subsetSize = phaseOffset < total ? (total - 1 - phaseOffset) / stride + 1 : 0;
+    if (subsetSize <= 0) {
+      return (double) (t % total);
+    }
+
+    long kCounter = (t % subsetCapacity) % subsetSize;
+    long permutedK = feistelPermute(kCounter, subsetSize, secretKey ^ (phaseOffset * 0x9E3779B97F4A7C15L));
+    long candidate = permutedK * stride + phaseOffset;
+    return (double) Math.min(total - 1, Math.max(0L, candidate));
+  }
+
+  /**
+   * Derives effective dyadic stride S from {@code spatialResolution},
+   * {@code uniquePlacements}, and {@code expand}.
+   *
+   * @param domainSize available candidate count
+   * @return power-of-two dyadic stride in [1 .. 1024]
+   */
+  public int deriveEffectiveStride(long domainSize) {
+    long res = spatialResolution();
+    // 1. Explicit spatialResolution override: res > 1 directly dictates sampling cell area
+    if (res > 1L) {
+      long cellDim = 1L << (64 - Long.numberOfLeadingZeros(res - 1L));
+      long cellStride = cellDim * cellDim;
+      return (int) Math.max(1, Math.min(1024L, Math.min(domainSize / 4L, cellStride)));
+    }
+
+    // 2. Expand mode: derive from uniquePlacements exclusion radius (or view distance if auto)
+    if (expand()) {
+      Object raw = data.get(GenericMemoryShapeParams.uniquePlacements);
+      int ru = uniquePlacementsRadius(raw);
+      if (ru > 1) {
+        long footprint = (long) (2 * ru - 1) * (2 * ru - 1);
+        int shift = 64 - Long.numberOfLeadingZeros(footprint - 1L);
+        int derived = 1 << shift;
+        return (int) Math.max(1, Math.min(1024, Math.min(domainSize / 4L, (long) derived)));
+      }
+    }
+
+    // 3. Default (fixed-radius, spatialResolution=1): full 1:1 resolution (S = 1)
+    return 1;
+  }
+
+  /**
+   * Dedicated backlog harvest selection.
+   * Specifically uses Dyadic Stride and Keyed Feistel Pseudorandom Permutation (PRP)
+   * for Poisson-spaced candidate binning across the backlog queue.
+   */
+  public long selectBacklogCandidate() {
+    return selectL3Candidate();
+  }
+
+  public long currentSweepCounter() {
+    return backlogCounter.get();
+  }
+
+  public long selectL3Candidate() {
     long range = getRange();
     if (range <= 0) return -1L;
 
-    long t = selectionCounter.getAndIncrement();
+    long t = backlogCounter.getAndIncrement();
+    return keyForCounter(t);
+  }
+
+  long keyForCounter(long t) {
+    long range = getRange();
+    if (range <= 0) return -1L;
 
     if (MODE_ACCUMULATE.equals(mode())) {
       SegmentedKeyRunTable table = getOrBuildSegmentedTable(range);
@@ -162,7 +389,7 @@ public class SquareOptimizedDualLayer extends Square {
       return table.resolveAccumulate(virtualGoodIndex);
     }
 
-    // Standard / Default mode: Adaptive dyadic stride
+    // Standard / Default mode for backlog: Dyadic stride binning
     int stride = deriveAdaptiveStride(range);
     int bits = Integer.numberOfTrailingZeros(stride);
     int subsetIdx = (int) (t % stride);
@@ -176,6 +403,49 @@ public class SquareOptimizedDualLayer extends Square {
     long kCounter = t / stride;
     long permutedK = feistelPermute(kCounter, subsetSize, secretKey ^ (phaseOffset * 0x9E3779B97F4A7C15L));
     return permutedK * stride + phaseOffset;
+  }
+
+  public long predictNextKeyForBin(long binIndex, long fromCounter) {
+    long range = getRange();
+    if (range <= 0) return -1L;
+
+    long domainSize;
+    if (MODE_ACCUMULATE.equals(mode())) {
+      SegmentedKeyRunTable table = getOrBuildSegmentedTable(range);
+      domainSize = range - table.totalCovered();
+    } else {
+      domainSize = range;
+    }
+    if (domainSize <= 0) return -1L;
+
+    for (long i = 0; i < domainSize; i++) {
+      long c = fromCounter + i;
+      long key = keyForCounter(c);
+      if (key >= 0 && (key / 1024L) == binIndex) {
+        return c;
+      }
+    }
+    return -1L;
+  }
+
+  public long[] predictUpcomingBins(int lookahead) {
+    if (lookahead <= 0) {
+      return new long[0];
+    }
+    long startCounter = currentSweepCounter();
+    java.util.LinkedHashSet<Long> seen = new java.util.LinkedHashSet<>();
+    for (int i = 0; i < lookahead; i++) {
+      long key = keyForCounter(startCounter + i);
+      if (key >= 0) {
+        seen.add(key / 1024L);
+      }
+    }
+    long[] result = new long[seen.size()];
+    int idx = 0;
+    for (long b : seen) {
+      result[idx++] = b;
+    }
+    return result;
   }
 
   /**
@@ -243,14 +513,6 @@ public class SquareOptimizedDualLayer extends Square {
     return segmentedTable;
   }
 
-  private int orientationFor(long px, long pz) {
-    long maxCoord = Math.max(Math.abs(px), Math.abs(pz));
-    if (maxCoord == 0) return 0;
-    if (px == maxCoord && pz > -maxCoord) return 0;
-    if (pz == maxCoord && px < maxCoord) return 2;
-    if (px == -maxCoord && pz < maxCoord) return 4;
-    return 6;
-  }
 
   private static long xyToHilbert(int x, int y, int n, int orientation) {
     int rx, ry;
@@ -313,33 +575,4 @@ public class SquareOptimizedDualLayer extends Square {
     return new int[] {x, y};
   }
 
-  private static int[] applyOrientation(int x, int y, int n, int o) {
-    int max = n - 1;
-    return switch (o % 8) {
-      case 0 -> new int[] {x, y};
-      case 1 -> new int[] {y, x};
-      case 2 -> new int[] {max - y, x};
-      case 3 -> new int[] {max - x, y};
-      case 4 -> new int[] {max - x, max - y};
-      case 5 -> new int[] {max - y, max - x};
-      case 6 -> new int[] {y, max - x};
-      case 7 -> new int[] {x, max - y};
-      default -> new int[] {x, y};
-    };
-  }
-
-  private static int[] unapplyOrientation(int x, int y, int n, int o) {
-    int max = n - 1;
-    return switch (o % 8) {
-      case 0 -> new int[] {x, y};
-      case 1 -> new int[] {y, x};
-      case 2 -> new int[] {y, max - x};
-      case 3 -> new int[] {max - x, y};
-      case 4 -> new int[] {max - x, max - y};
-      case 5 -> new int[] {max - y, max - x};
-      case 6 -> new int[] {max - y, x};
-      case 7 -> new int[] {x, max - y};
-      default -> new int[] {x, y};
-    };
-  }
 }
