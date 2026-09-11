@@ -2,13 +2,22 @@
 
 > Updated: 2026-04-16 (rescanned from live JaCoCo run)
 > Scope: `rtp-core` only (rtp-folia-common has broken tests; rtp-bukkit-common is a server impl layer)
+>
+> **Baseline superseded 2026-09-10.** The repo-wide measured baseline, the
+> per-module targets, and the enforced-gate plan now live in
+> [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md). `rtp-core` measured
+> 59.6% instruction / 45.8% branch on 2026-09-10, and the target is 90/80,
+> not 80. The per-package tactics below remain valid; the numbers in the
+> snapshot table are historical.
 
 ## Current Baseline
 
 - **49% instructions / 35% branches** across 38,863 instructions (19,540 covered)
 - ~12,050 more instructions need coverage to reach 80% (target: 31,090 covered)
 - JaCoCo is already configured in `build.gradle` for all subprojects
-- CI uploads HTML reports as `jacoco-coverage` artifact but **no minimum threshold is enforced**
+- CI uploads HTML reports as `jacoco-coverage` artifact; a minimum threshold **is**
+  enforced on `rtp-core` as of 2026-09-10 (0.55 instruction / 0.42 branch,
+  ratcheted upward only)
 - 57 test files already exist in `rtp-core/src/test`
 
 ---

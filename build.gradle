@@ -12,7 +12,7 @@ version = providers.gradleProperty('version').get()
 ext.liteVersion = providers.gradleProperty('liteVersion').get()
 
 spotless {
-    lineEndings 'UNIX'
+    lineEndings = 'UNIX'
     java {
         target 'rtp-*/**/*.java', 'addons/**/*.java'
         targetExclude '**/build/**', '**/.gradle/**', '**/generated/**', '**/target/**'
@@ -91,23 +91,100 @@ subprojects {
         testRuntimeOnly libs.junit.platform.launcher
     }
 
+    // Verbose test output (per-test start/pass lines + full stdout/stderr streaming)
+    // is opt-in via `-PverboseTests`. The default run only reports skipped/failed
+    // tests, which removes the dominant console-I/O cost on large suites
+    // (rtp-core streams a lot of runtime logging). Failures still print full
+    // stack traces and exceptions so a red build stays diagnosable.
+    def verboseTests = project.hasProperty('verboseTests')
+    // Fork tests across JVMs so a single module's suite runs in parallel. Capped
+    // at half the available processors to leave headroom for Gradle's own
+    // module-level parallelism (`org.gradle.parallel=true`) and the 8g daemon
+    // heap shared with the Loom remap workers. `forkEvery` recycles a worker JVM
+    // periodically to bound leaked static state across test classes.
+    def testForks = Math.max(1, Runtime.runtime.availableProcessors().intdiv(2))
+    // Tiered test execution (JUnit 5 tags). Test categories, by purpose:
+    //   - "logic" (the DEFAULT / coverage tier): every UNTAGGED test. Fast,
+    //     deterministic unit/logic tests - this is the tier the changed-line
+    //     coverage gate (scripts/diff-coverage.py) measures, and the one new
+    //     tests join by default (per library, then core).
+    //   - `slow`    : long-running characterization / benchmark suites.
+    //   - `edge`    : environment-specific / edge-case suites.
+    //   - `simulation` / `drawing` / `demo` : non-logic suites (Monte-Carlo
+    //     simulations, image/map drawing, demonstrations). Excluded from the
+    //     default coverage-focused tier so it stays under budget.
+    // Default `.\gradlew.bat build` / `test` runs the logic tier only (all of
+    // the above tags are excluded). Pass `-PfullTests` to run EVERYTHING
+    // (release / nightly CI): `.\gradlew.bat build -PfullTests`.
+    // Untagged tests always run in both tiers, so the default stays a safe
+    // superset-minus-non-logic.
+    def fullTests = project.hasProperty('fullTests')
+    def nonLogicTags = ['slow', 'edge', 'simulation', 'drawing', 'demo'] as String[]
     tasks.withType(Test).configureEach {
-        useJUnitPlatform()
+        useJUnitPlatform {
+            if (!fullTests) {
+                excludeTags nonLogicTags
+            }
+        }
         maxHeapSize = '1024m'
-        jvmArgs '-XX:+UseG1GC', '-XX:MaxMetaspaceSize=384m'
+        // -XX:+EnableDynamicAgentLoading opts in to Mockito/ByteBuddy's dynamic
+        // agent attach, silencing the JDK "agent loaded dynamically ... will be
+        // disallowed by default in a future release" warning across the suite.
+        // -Xshare:off disables CDS so the test launcher's bootstrap-classpath
+        // append no longer prints "Sharing is only supported for boot loader
+        // classes ..." on every fork.
+        jvmArgs '-XX:+UseG1GC', '-XX:MaxMetaspaceSize=384m', '-XX:+EnableDynamicAgentLoading', '-Xshare:off'
+        maxParallelForks = testForks
+        forkEvery = 100
+        // Re-run when the tier toggle flips so cached results from the other
+        // tier are not silently reused.
+        inputs.property 'fullTests', fullTests
         testLogging {
-            events 'started', 'passed', 'skipped', 'failed'
-            showStandardStreams = true
+            events = (verboseTests ? ['started', 'passed', 'skipped', 'failed'] : ['skipped', 'failed'])
+            showStandardStreams = verboseTests
             exceptionFormat = 'full'
+            showStackTraces = true
         }
     }
 
+    // JaCoCo instrumentation + HTML/XML report generation is opt-in via
+    // `-Pcoverage`. A routine `.\gradlew.bat build` skips it entirely (the
+    // instrumentation agent and dual-format report are pure overhead for local
+    // dev); CI runs coverage with `-Pcoverage`.
     apply plugin: 'jacoco'
     jacoco { toolVersion = libs.versions.jacoco.get() }
-    tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
-    jacocoTestReport {
-        dependsOn test
-        reports { html.required = true; xml.required = true }
+    if (project.hasProperty('coverage')) {
+        tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
+        jacocoTestReport {
+            dependsOn test
+            reports { html.required = true; xml.required = true }
+        }
+    }
+
+    // Local, programmable static analysis (the clang-tidy analogue). PMD is the
+    // engine; the curated, appendable ruleset lives in config/pmd/ruleset.xml
+    // (starter known-issue detectors + project-specific rules such as
+    // PreferNonLockingExecution). It is applied ONLY under `-PstaticAnalysis`
+    // so a routine `.\gradlew.bat build` neither resolves the PMD toolchain nor
+    // pays its scan cost (keeps the fast-build budget intact). When enabled,
+    // `pmdMain`/`pmdTest` run as part of `check` and FAIL the build on any
+    // violation - this is the local + CI static-analysis gate.
+    //   Local / CI gate : .\gradlew.bat check -PstaticAnalysis
+    //   Whole build      : .\gradlew.bat build -PstaticAnalysis
+    if (project.hasProperty('staticAnalysis')) {
+        apply plugin: 'pmd'
+        pmd {
+            toolVersion = libs.versions.pmd.get()
+            // The starter ruleset is the single source of truth; disable PMD's
+            // built-in default set so only our curated/appended rules run.
+            ruleSetFiles = rootProject.files('config/pmd/ruleset.xml')
+            ruleSets = []
+            consoleOutput = true
+            // Fail the build on violations (that is the point of the gate).
+            ignoreFailures = false
+            // Analyse production + test sources; skip generated/remapped output.
+            incrementalAnalysis = true
+        }
     }
 
     processResources {
@@ -183,6 +260,11 @@ def executableJarsOnly = { spec ->
 }
 
 if (findProject(':rtp-plugin') != null) {
+    // Capture the empty root jar's name at configuration time. Reaching
+    // Task.project (via `project.version`) inside the doFirst below is
+    // deprecated in Gradle 9, fatal in Gradle 10, and incompatible with the
+    // configuration cache.
+    def rootJarName = "${rootProject.name}-${version}.jar"
     tasks.register('copyPluginJars', Copy) {
         group = 'build'
         description = 'Copies the shippable :rtp-plugin jars into the root build/libs.'
@@ -198,7 +280,7 @@ if (findProject(':rtp-plugin') != null) {
         // executables only.
         doFirst {
             delete fileTree(layout.buildDirectory.dir('libs')) {
-                include "${rootProject.name}-${project.version}.jar"
+                include rootJarName
                 include '*-dev.jar'
                 include '*-sources.jar'
                 include '*-javadoc.jar'

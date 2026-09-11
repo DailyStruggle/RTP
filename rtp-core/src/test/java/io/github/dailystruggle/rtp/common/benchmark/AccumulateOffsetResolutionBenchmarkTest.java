@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.benchmark;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,7 +48,7 @@ class AccumulateOffsetResolutionBenchmarkTest {
 
     long[] kArr = keys.stream().mapToLong(Long::longValue).sorted().distinct().toArray();
     KeyRunTable flat = KeyRunTable.exact(kArr, kArr.length);
-    SegmentedKeyRunTable segmented = SegmentedKeyRunTable.fromFlat(flat, totalRange, binSize);
+    SegmentedKeyRunTable segmented = flat.toSegmented(totalRange, binSize);
 
     long totalGood = totalRange - flat.coveredCells();
     assertEquals(totalGood, totalRange - segmented.totalCovered());
@@ -95,7 +96,7 @@ class AccumulateOffsetResolutionBenchmarkTest {
     KeyRunTable flat = KeyRunTable.exact(bArr, bArr.length).coalesceFixed(3L);
 
     long binSize = SegmentedKeyRunTable.deriveOptimalBinSize(totalRange);
-    SegmentedKeyRunTable segmented = SegmentedKeyRunTable.fromFlat(flat, totalRange, binSize, 3L);
+    SegmentedKeyRunTable segmented = flat.toSegmented(totalRange, binSize, 3L);
 
     long totalGood = totalRange - segmented.totalCovered();
     assertTrue(totalGood > 0, "Total good chunks must be > 0");
@@ -173,8 +174,8 @@ class AccumulateOffsetResolutionBenchmarkTest {
     KeyRunTable probFlat = KeyRunTable.exact(pArr, pArr.length);
 
     // Active table is partitioned into segmented bins
-    SegmentedKeyRunTable activeSeg = SegmentedKeyRunTable.fromFlat(activeFlat, totalRange, binSize);
-    SegmentedKeyRunTable probSeg = SegmentedKeyRunTable.fromFlat(probFlat, totalRange, binSize);
+    SegmentedKeyRunTable activeSeg = activeFlat.toSegmented(totalRange, binSize);
+    SegmentedKeyRunTable probSeg = probFlat.toSegmented(totalRange, binSize);
 
     // 1. Active avoidance check:
     // Key 150 (in static ocean) must be avoided

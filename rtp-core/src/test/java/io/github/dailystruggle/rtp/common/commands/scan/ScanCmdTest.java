@@ -13,10 +13,12 @@ import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -35,6 +37,15 @@ import static org.mockito.Mockito.*;
  * cancel cleanup, permission denial, and invalid argument lengths.
  */
 public class ScanCmdTest {
+
+    // The mock scheduler runs a ScanTask's self-dispatched batches synchronously
+    // to completion, so any test that starts a scan walks the entire region
+    // inline. The default region is therefore deliberately tiny: it is large
+    // enough to exercise the full start/pause/resume/cancel/reset pipeline but
+    // small enough that a whole scan finishes in milliseconds. Full-scale scan
+    // behaviour lives in the @Tag("edge") test below (runs only with -PfullTests).
+    private static final long SCAN_TEST_RADIUS = 24L;
+    private static final long SCAN_TEST_CENTER_RADIUS = 8L;
 
     @TempDir
     Path tempDir;
@@ -63,8 +74,8 @@ public class ScanCmdTest {
         world = new MockRTPWorld("scan_test_world");
         accessor.addWorld(world);
 
-        // Set up shape and region
-        square = new Square();
+        // Set up shape and region (small, fast-to-scan default; see class comment)
+        square = smallSquare();
         LinearAdjustor vert = new LinearAdjustor(new ArrayList<>());
 
         RegionSettings settings = new RegionSettings(
@@ -160,6 +171,30 @@ public class ScanCmdTest {
 
     private ScanTask makeFakeTask() {
         return new ScanTask(region, 0L);
+    }
+
+    /** A Square configured with an explicit radius / centerRadius. */
+    private Square scanSquare(long radius, long centerRadius) {
+        Square s = new Square();
+        s.set(GenericMemoryShapeParams.radius, radius);
+        s.set(GenericMemoryShapeParams.centerRadius, centerRadius);
+        return s;
+    }
+
+    /** The small default shape whose full scan completes near-instantly. */
+    private Square smallSquare() {
+        return scanSquare(SCAN_TEST_RADIUS, SCAN_TEST_CENTER_RADIUS);
+    }
+
+    /** Build and register a region backed by a Square of the given size. */
+    private Region makeScanRegion(String name, long radius, long centerRadius) {
+        LinearAdjustor vert = new LinearAdjustor(new ArrayList<>());
+        RegionSettings settings = new RegionSettings(
+                name, world, scanSquare(radius, centerRadius), vert,
+                false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        Region r = new Region(name, settings);
+        RTP.selectionAPI.permRegionLookup.put(name, r);
+        return r;
     }
 
     // -------------------------------------------------------------------------
@@ -317,7 +352,7 @@ public class ScanCmdTest {
 
     @Test
     void scanPauseCmd_onCommand_withRegionParam_onlyPausesSpecifiedRegion() {
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -431,7 +466,7 @@ public class ScanCmdTest {
 
     @Test
     void scanCancelCmd_onCommand_withRegionParam_onlyCancelsSpecifiedRegion() {
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -506,7 +541,7 @@ public class ScanCmdTest {
 
     @Test
     void scanResumeCmd_onCommand_withRegionParam_onlyResumesSpecifiedRegion() {
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -681,7 +716,7 @@ public class ScanCmdTest {
     @Test
     void scanStartCmd_withMultipleRegions_returnsTrue() {
         // Register a second region
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -698,7 +733,7 @@ public class ScanCmdTest {
     @Test
     void scanCancelCmd_withMultipleRegions_cancelsAll() {
         // Register a second region
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -758,7 +793,7 @@ public class ScanCmdTest {
 
     @Test
     void scanResumeCmd_withMixedTasks_resumesExistingAndStartsMissing() {
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -827,7 +862,7 @@ public class ScanCmdTest {
 
     @Test
     void scanCommands_multiRegion_announcesEachSpecificRegionName() {
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
@@ -859,8 +894,14 @@ public class ScanCmdTest {
 
     @Test
     void scanTask_getEtaSeconds_calculatesAccurateTimeBasedOnRemainingPassesAndStride() {
-        ScanTask task = makeFakeTask();
-        Square shape = (Square) region.getShape();
+        // This is the ETA overcount regression: without the stride fix the ETA
+        // is multiplied by spatialResolution (32x). The default region is shrunk
+        // for scan speed, but the buggy value only clears the 5000s assertion on
+        // a full-scale shape (real ETA must stay under 5000s while 32x exceeds it,
+        // so the range must land in ~[20k, 640k]), so build a large one here.
+        Region bigRegion = makeScanRegion("eta_scale", 256L, 64L);
+        ScanTask task = new ScanTask(bigRegion, 0L);
+        Square shape = (Square) bigRegion.getShape();
         long range = (long) shape.getRange();
         long stride = Math.max(1L, shape.minBridgingStride());
         task.currentOffset = 0;
@@ -874,6 +915,27 @@ public class ScanCmdTest {
         // ETA should be <= range / 1000 + 60s if minCps is around 500-1000.
         // Without the stride fix, it would be multiplied by spatialResolution (32), giving ~32,000s!
         assertTrue(eta < 5000L, "ETA should not overcount by spatialResolution (32x): got " + eta);
+    }
+
+    // -------------------------------------------------------------------------
+    // Full-scale scan coverage (edge tier: runs only under -PfullTests)
+    // -------------------------------------------------------------------------
+
+    @Test
+    @Tag("edge")
+    void scanStartCmd_fullScaleScan_runsToCompletionOnLargeRegion() {
+        // The default region is intentionally tiny so routine runs are fast. This
+        // edge-tier test exercises a realistic large region end-to-end: the mock
+        // scheduler runs the whole scan inline, so reaching the assertions at all
+        // proves a full-scale scan completed without error.
+        makeScanRegion("edge_fullscale", 512L, 64L);
+
+        boolean result = scanStartCmd.onCommand(
+                senderId, paramsWithRegion("edge_fullscale"), null);
+
+        assertTrue(result);
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("edge_fullscale")),
+                "a started full-scale scan should announce its region name");
     }
 
     @Test
