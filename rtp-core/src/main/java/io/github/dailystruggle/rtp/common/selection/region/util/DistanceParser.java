@@ -77,16 +77,16 @@ public final class DistanceParser {
    * <p>Heuristic:
    * <ul>
    *   <li>If an explicit unit was already provided, returns it unchanged.</li>
-   *   <li>If magnitude is unusually small (e.g. <= 32) and world border radius is substantial (e.g. >= 500 blocks),
+   *   <li>If magnitude is unusually small (e.g. {@code <= 32}) and world border radius is substantial (e.g. {@code >= 500} blocks),
    *       a dimensionless number like 4, 8, 16 was almost certainly intended in chunks or regions, not single blocks!
-   *       If magnitude * 512 <= worldBorderRadius: regions.
-   *       Else if magnitude * 16 <= worldBorderRadius: chunks.</li>
+   *       If {@code magnitude * 512 <= worldBorderRadius}: regions.
+   *       Else if {@code magnitude * 16 <= worldBorderRadius}: chunks.</li>
    *   <li>If magnitude is unusually large (e.g. > worldBorderRadius or > 50000) while default was chunks/regions,
    *       it was almost certainly intended in blocks.</li>
    * </ul>
    *
    * @param parsed the parsed distance
-   * @param worldBorderRadius radius of the world border in blocks (or <= 0 if unknown/infinite)
+   * @param worldBorderRadius radius of the world border in blocks (or {@code <= 0} if unknown/infinite)
    * @param contextName context identifier for logging (e.g. "region 'default' radius")
    * @return auto-interpreted distance (or the original if no re-interpretation occurred)
    */

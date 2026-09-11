@@ -54,9 +54,9 @@ class ADR085ProductionIntegrationTest {
   }
 
   @Test
-  @DisplayName("MemoryShape saves and loads Format Version 5 with curve metadata and keyWidth gating")
-  void testFormatVersion5SaveLoadRoundTrip() throws Exception {
-    java.io.File tempDir = java.nio.file.Files.createTempDirectory("rtp_v5_test").toFile();
+  @DisplayName("MemoryShape saves and loads Format Version 3 with curve metadata and keyWidth gating")
+  void testFormatVersion3SaveLoadRoundTrip() throws Exception {
+    java.io.File tempDir = java.nio.file.Files.createTempDirectory("rtp_v3_test").toFile();
     try {
       io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
           new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir);
@@ -76,7 +76,7 @@ class ADR085ProductionIntegrationTest {
       byte[] bytes = java.nio.file.Files.readAllBytes(savedFile.toPath());
       java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.BIG_ENDIAN);
       assertEquals(0x52545031, buf.getInt(), "BIN_MAGIC mismatch");
-      assertEquals(5, buf.getInt(), "BIN_VERSION mismatch");
+      assertEquals(3, buf.getInt(), "BIN_VERSION mismatch");
 
       int curveLen = buf.getInt();
       byte[] cBytes = new byte[curveLen];

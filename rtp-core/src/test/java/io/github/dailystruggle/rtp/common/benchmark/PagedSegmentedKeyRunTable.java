@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.benchmark;
 
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;

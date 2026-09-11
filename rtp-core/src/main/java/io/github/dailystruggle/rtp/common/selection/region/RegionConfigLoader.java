@@ -19,6 +19,7 @@ import java.util.logging.Level;
 
 public class RegionConfigLoader {
 
+    @SuppressWarnings("unchecked") // raw config values are instanceof-checked to Map before the String-keyed cast
     public static RegionSettings load(ConfigParser<RegionKeys> regionParser) {
         String name = regionParser.name.replace(".yml", "");
 //        System.out.println("[RTP-DEBUG] RegionLoader: --- Processing Region '" + name + "' ---");
@@ -214,6 +215,7 @@ public class RegionConfigLoader {
         return parser.getConfigValue(key, fallback);
     }
 
+    @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
     private static Shape<?> deserializeShape(Map<String, Object> map) {
         String shapeName = String.valueOf(map.getOrDefault("name", "CIRCLE")).toUpperCase();
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
@@ -326,6 +328,7 @@ public class RegionConfigLoader {
         return (int) Math.round(Double.parseDouble(o.toString().trim()));
     }
 
+    @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
     private static VerticalAdjustor<?> deserializeVert(Map<String, Object> map) {
         String vertName = String.valueOf(map.getOrDefault("name", "JUMP")).toUpperCase();
         Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);

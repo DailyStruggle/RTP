@@ -662,22 +662,21 @@ public class MemoryShapeTest {
         assertEquals(3L, MemoryShape.computeAdmissibleGap(3L, 1L, 1L));
         assertEquals(3L, MemoryShape.computeAdmissibleGap(3L, 100L, 100L));
 
-        // Resolution 4: minGap = 1, maxGap = 4
+        // Resolution 4: no floor, ceiling = 4, gap tracks min(left, right)
         assertEquals(1L, MemoryShape.computeAdmissibleGap(4L, 1L, 1L));
         assertEquals(2L, MemoryShape.computeAdmissibleGap(4L, 2L, 5L));
         assertEquals(4L, MemoryShape.computeAdmissibleGap(4L, 10L, 10L));
 
-        // Resolution 32: minGap = 8, maxGap = 32
-        // Short runs (<= 8) get floor of 8
-        assertEquals(8L, MemoryShape.computeAdmissibleGap(32L, 1L, 1L));
-        assertEquals(8L, MemoryShape.computeAdmissibleGap(32L, 5L, 5L));
+        // Resolution 32: literal ceiling of 32, no floor; short runs under-merge.
+        assertEquals(1L, MemoryShape.computeAdmissibleGap(32L, 1L, 1L));
+        assertEquals(5L, MemoryShape.computeAdmissibleGap(32L, 5L, 5L));
         assertEquals(8L, MemoryShape.computeAdmissibleGap(32L, 8L, 8L));
 
         // Intermediate runs scale proportionally to min(left, right)
         assertEquals(16L, MemoryShape.computeAdmissibleGap(32L, 16L, 20L));
         assertEquals(24L, MemoryShape.computeAdmissibleGap(32L, 50L, 24L));
 
-        // Large runs hit the maxGap ceiling of 32
+        // Large runs hit the literal ceiling of 32
         assertEquals(32L, MemoryShape.computeAdmissibleGap(32L, 32L, 32L));
         assertEquals(32L, MemoryShape.computeAdmissibleGap(32L, 100L, 200L));
     }
@@ -686,18 +685,20 @@ public class MemoryShapeTest {
     public void testBoundedDynamicGapBridgingAtResolution32() {
         TestShape shape = new TestShape();
         // Place two isolated 1-cell runs separated by gap 7:
-        // [10, 11) and [18, 19). Gap = 18 - 11 = 7 <= minGap (8) -> must bridge
+        // [10, 11) and [18, 19). Gap = 18 - 11 = 7. There is no floor: driver = min(1, 1) = 1,
+        // so the admissible gap is 1 and gap 7 must NOT bridge.
         shape.addBadLocation(10L);
         shape.addBadLocation(18L);
 
         shape.flushAndRebuild(32L);
-        assertEquals(1, shape.getBadKeysCache().length);
+        assertEquals(2, shape.getBadKeysCache().length);
         assertEquals(10L, shape.getBadKeysCache()[0]);
-        assertEquals(9L, shape.getBadSum()); // [10, 19)
+        assertEquals(18L, shape.getBadKeysCache()[1]);
+        assertEquals(2L, shape.getBadSum()); // [10, 11) + [18, 19)
 
-        // Clear and test gap > minGap with single cells:
-        // [10, 11) and [25, 26). Gap = 25 - 11 = 14 > minGap (8).
-        // Since both runs have length 1, driver = 1 <= minGap -> gap 14 must NOT bridge!
+        // Clear and test another gap with single cells:
+        // [10, 11) and [25, 26). Gap = 25 - 11 = 14.
+        // Since both runs have length 1, driver = 1 -> gap 14 must NOT bridge!
         shape.clear();
         shape.addBadLocation(10L);
         shape.addBadLocation(25L);

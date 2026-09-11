@@ -342,6 +342,94 @@ public class MemoryShapeChunkToLocationsTest {
     }
 
     // ------------------------------------------------------------------------
+    // Expand bounds tests
+    // ------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("chunkToLocations and contains respect effectiveRange (range + badSum) when expand is enabled")
+    void testEffectiveRangeBoundsWithExpand() {
+        SquareOptimizedDualLayer squareDual = new SquareOptimizedDualLayer("EXPAND_BOUNDS_SQUARE", 32);
+        squareDual.set(GenericMemoryShapeParams.radius, 128L);
+        squareDual.set(GenericMemoryShapeParams.centerRadius, 16L);
+        squareDual.set(GenericMemoryShapeParams.expand, true);
+        squareDual.set(GenericMemoryShapeParams.mode, "ACCUMULATE");
+
+        long baseRange = squareDual.getRange();
+        assertEquals(baseRange, squareDual.getEffectiveRange());
+
+        // In square dual layer, find coordinates near the outer radius
+        int[] outerXz = squareDual.locationToXZ(baseRange - 1);
+        assertTrue(squareDual.contains(outerXz[0], outerXz[1]));
+        long[] outerLocs = squareDual.chunkToLocations(outerXz[0], outerXz[1]);
+        assertEquals(1, outerLocs.length);
+        assertEquals(baseRange - 1, outerLocs[0]);
+
+        // Coordinates for baseRange itself (just outside the unexpanded manifold)
+        int[] nextXz = squareDual.locationToXZ(baseRange);
+        assertFalse(squareDual.contains(nextXz[0], nextXz[1]));
+        assertEquals(0, squareDual.chunkToLocations(nextXz[0], nextXz[1]).length);
+
+        // Now add bad locations to trigger expansion
+        for (long i = 0; i < 50; i++) {
+            squareDual.addBadLocation(i);
+        }
+        squareDual.flushAndRebuild(squareDual.spatialResolution());
+
+        long expandedRange = squareDual.getEffectiveRange();
+        assertEquals(baseRange + 50L, expandedRange);
+
+        // nextXz (loc = baseRange) is now inside the expanded manifold [0, baseRange + 50)
+        assertTrue(squareDual.contains(nextXz[0], nextXz[1]));
+        long[] expandedLocs = squareDual.chunkToLocations(nextXz[0], nextXz[1]);
+        assertEquals(1, expandedLocs.length);
+        assertEquals(baseRange, expandedLocs[0]);
+
+        // Test at the new frontier edge: loc = baseRange + 49
+        int[] frontierXz = squareDual.locationToXZ(baseRange + 49);
+        assertTrue(squareDual.contains(frontierXz[0], frontierXz[1]));
+        assertEquals(1, squareDual.chunkToLocations(frontierXz[0], frontierXz[1]).length);
+
+        // Beyond the new frontier: loc = baseRange + 50
+        int[] beyondXz = squareDual.locationToXZ(baseRange + 50);
+        assertFalse(squareDual.contains(beyondXz[0], beyondXz[1]));
+        assertEquals(0, squareDual.chunkToLocations(beyondXz[0], beyondXz[1]).length);
+    }
+
+    @Test
+    @DisplayName("CircleOptimizedDualLayer: chunkToLocations and contains respect effectiveRange when expand is enabled")
+    void testCircleOptimizedEffectiveRangeBoundsWithExpand() {
+        CircleOptimizedDualLayer circleDual = new CircleOptimizedDualLayer("EXPAND_BOUNDS_CIRCLE", 32);
+        circleDual.set(GenericMemoryShapeParams.radius, 128L);
+        circleDual.set(GenericMemoryShapeParams.centerRadius, 16L);
+        circleDual.set(GenericMemoryShapeParams.expand, true);
+        circleDual.set(GenericMemoryShapeParams.mode, "ACCUMULATE");
+
+        long baseRange = circleDual.getRange();
+        assertEquals(baseRange, circleDual.getEffectiveRange());
+
+        int[] nextXz = circleDual.locationToXZ(baseRange);
+        assertFalse(circleDual.contains(nextXz[0], nextXz[1]));
+        assertEquals(0, circleDual.chunkToLocations(nextXz[0], nextXz[1]).length);
+
+        for (long i = 0; i < 30; i++) {
+            circleDual.addBadLocation(i);
+        }
+        circleDual.flushAndRebuild(circleDual.spatialResolution());
+
+        long expandedRange = circleDual.getEffectiveRange();
+        assertEquals(baseRange + 30L, expandedRange);
+
+        assertTrue(circleDual.contains(nextXz[0], nextXz[1]));
+        long[] expandedLocs = circleDual.chunkToLocations(nextXz[0], nextXz[1]);
+        assertEquals(1, expandedLocs.length);
+        assertEquals(baseRange, expandedLocs[0]);
+
+        int[] beyondXz = circleDual.locationToXZ(baseRange + 30);
+        assertFalse(circleDual.contains(beyondXz[0], beyondXz[1]));
+        assertEquals(0, circleDual.chunkToLocations(beyondXz[0], beyondXz[1]).length);
+    }
+
+    // ------------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------------
 
