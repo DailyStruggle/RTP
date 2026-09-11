@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.Test;
  * from the declared array widths rather than from {@code Runtime}, which cannot attribute heap to
  * a single structure.
  */
+@Tag("slow")
 class BiomeTableLayoutComparisonTest {
 
   private static final int BLOCK_SHIFT = 10;

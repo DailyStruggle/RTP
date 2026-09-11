@@ -21,7 +21,7 @@ public final class WorldBorderAuditor {
    * every block in every selectable chunk is strictly within the radius.
    *
    * <p>A chunk at offset C spans blocks [16*C, 16*C + 15].
-   * For the positive boundary, 16*C + 15 <= R => C <= (R - 15) / 16.
+   * For the positive boundary, {@code 16*C + 15 <= R => C <= (R - 15) / 16}.
    *
    * @param blockRadius radius in blocks (>= 0)
    * @return inscribed chunk radius

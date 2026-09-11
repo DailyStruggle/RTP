@@ -31,6 +31,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
    * @param verifiers list of placement verifiers
    * @param def       default data values
    */
+  @SuppressWarnings("unchecked") // heterogeneous RTP.factoryMap holds the vert Factory under a raw value type
   protected VerticalAdjustor(
       Class<E> eClass,
       String name,
@@ -190,6 +191,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
   }
 
   @Override
+  @SuppressWarnings("unchecked") // o is class-checked to getClass() above, so the E-parameterized casts are safe
   public boolean equals(Object o) {
     if (!o.getClass().equals(getClass()) || !((VerticalAdjustor<?>) o).myClass.equals(myClass))
       return false;

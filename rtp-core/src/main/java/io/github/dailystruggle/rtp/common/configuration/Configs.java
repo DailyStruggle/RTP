@@ -69,6 +69,7 @@ public class Configs {
    *
    * @param instance the configuration parser instance
    */
+  @SuppressWarnings("unchecked") // instance is myClass-checked to LoggingKeys before the parameterized cast
   public void putParser(Object instance) {
     if (instance == null) throw new NullPointerException("instance is null");
 
@@ -128,6 +129,7 @@ public class Configs {
     return def;
   }
 
+  @SuppressWarnings("unchecked") // maps keyed by enum class guarantee the parser's E matches parserEnumClass
   public <T extends Enum<T>> FactoryValue<T> getParser(Class<T> parserEnumClass) {
     if (configParserMap.containsKey(parserEnumClass))
       return (FactoryValue<T>) configParserMap.get(parserEnumClass);
@@ -516,6 +518,7 @@ public class Configs {
    * @param worldName the name of the world
    * @return the configuration parser, or null if the world is not registered
    */
+  @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys.class guarantees the parser's E
   public ConfigParser<WorldKeys> getWorldParser(String worldName) {
     if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
       return null;
@@ -549,6 +552,7 @@ public class Configs {
    * @param key the configuration key
    * @return the configuration value
    */
+  @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys.class guarantees the parser's E
   public Object getWorldParserValue(String worldName, WorldKeys key) {
     if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
       return null;

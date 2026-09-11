@@ -4,6 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.FloatParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.commands.parameters.DistanceParameter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
@@ -29,7 +30,7 @@ public class Square_Normal extends NormalMemoryShape {
     defaults.put(NormalDistributionParams.mean, 0.5);
     defaults.put(NormalDistributionParams.deviation, 1.0);
     defaults.put(NormalDistributionParams.expand, false);
-    defaults.put(NormalDistributionParams.uniquePlacements, false);
+    defaults.put(NormalDistributionParams.uniquePlacements, 0);
 
     // Curated tab-completion suggestions for /rtp shape:square_normal <TAB>.
     // Mirrors V2 sub-parameter UX so users see the format and scale.
@@ -49,8 +50,8 @@ public class Square_Normal extends NormalMemoryShape {
         "rtp.params", "distribution standard deviation", (sender, s) -> true, 0.1, 0.5, 1.0, 2.0));
     subParameters.put("expand", new BooleanParameter(
         "rtp.params", "expand region to keep a constant amount of usable land", (sender, s) -> true));
-    subParameters.put("uniqueplacements", new BooleanParameter(
-        "rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
+    subParameters.put("uniqueplacements", new IntegerParameter(
+        "rtp.params", "chunk radius cleared around each selection ('auto', 0 = off, 1 = landing chunk)", (sender, s) -> true, "auto", 0, 1, 2, 4, 8, 16));
   }
 
   /**

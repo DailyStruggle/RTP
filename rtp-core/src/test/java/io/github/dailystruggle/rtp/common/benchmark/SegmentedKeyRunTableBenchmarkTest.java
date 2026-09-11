@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.benchmark;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +46,7 @@ class SegmentedKeyRunTableBenchmarkTest {
 
     long[] kArr = keys.stream().mapToLong(Long::longValue).sorted().distinct().toArray();
     KeyRunTable flat = KeyRunTable.exact(kArr, kArr.length);
-    SegmentedKeyRunTable segmented = SegmentedKeyRunTable.fromFlat(flat, totalRange, binSize);
+    SegmentedKeyRunTable segmented = flat.toSegmented(totalRange, binSize);
 
     assertEquals(flat.coveredCells(), segmented.totalCovered(), "Covered cells must match exactly");
 
@@ -79,7 +80,7 @@ class SegmentedKeyRunTableBenchmarkTest {
     long[] nfArr = nearFullKeys.stream().mapToLong(Long::longValue).toArray();
     KeyRunTable nfFlat = KeyRunTable.exact(nfArr, nfArr.length);
 
-    SegmentedKeyRunTable collapsedSeg = SegmentedKeyRunTable.fromFlat(nfFlat, 500L, 500L, 3L);
+    SegmentedKeyRunTable collapsedSeg = nfFlat.toSegmented(500L, 500L, 3L);
     assertTrue(collapsedSeg.bin(0).isFull(), "Near-full bin with remaining chunks <= tolerance must collapse to FULL");
     assertEquals(500L, collapsedSeg.totalCovered(), "Collapsed bin covers all 500 chunks");
 
@@ -128,7 +129,7 @@ class SegmentedKeyRunTableBenchmarkTest {
     SimulationReport report = new SimulationReport();
 
     for (long binSize : binSizes) {
-      SegmentedKeyRunTable seg = SegmentedKeyRunTable.fromFlat(flat, totalRange, binSize);
+      SegmentedKeyRunTable seg = flat.toSegmented(totalRange, binSize);
       assertEquals(flat.coveredCells(), seg.totalCovered(), "Covered cells must match exactly for binSize " + binSize);
 
       // Verify sample keys
@@ -186,7 +187,7 @@ class SegmentedKeyRunTableBenchmarkTest {
 
       // Segmented reconciliation: partition marks by bin, re-coalesce only touched bins
       long tReconSeg0 = System.nanoTime();
-      SegmentedKeyRunTable reconSeg = SegmentedKeyRunTable.fromFlat(reconFlat, totalRange, binSize);
+      SegmentedKeyRunTable reconSeg = reconFlat.toSegmented(totalRange, binSize);
       long segReconNanos = System.nanoTime() - tReconSeg0;
 
       double flatNsPerMark = (double) flatReconNanos / marks.length;

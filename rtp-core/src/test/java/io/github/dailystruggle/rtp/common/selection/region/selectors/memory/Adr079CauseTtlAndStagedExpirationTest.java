@@ -84,7 +84,7 @@ class Adr079CauseTtlAndStagedExpirationTest {
     String world = "probationWorld";
     long now = Instant.now().getEpochSecond();
 
-    // Create a BIN_VERSION 3 file with:
+    // Create a modern BIN_VERSION 3 file (curve/P/keyWidth header) with:
     // Run 1: key 100, length 5, cause safetyExternal, exp = now - 10 (expired, but within 14d probation)
     // Run 2: key 200, length 5, cause safetyExternal, exp = now - (30 * 86400) (past 2x TTL, evicted)
     // Run 3: key 300, length 5, cause safetyExternal, exp = now + 1000 (still active)
@@ -95,7 +95,12 @@ class Adr079CauseTtlAndStagedExpirationTest {
     try (FileOutputStream fos = new FileOutputStream(binFile)) {
       ByteBuffer buf = ByteBuffer.allocate(4096).order(ByteOrder.BIG_ENDIAN);
       buf.putInt(0x52545031); // BIN_MAGIC
-      buf.putInt(3);          // BIN_VERSION 3
+      buf.putInt(3);          // BIN_VERSION 3 (modern unified format)
+      byte[] curveBytes = "SPIRAL".getBytes(StandardCharsets.UTF_8);
+      buf.putInt(curveBytes.length);
+      buf.put(curveBytes); // curve name (Circle == SPIRAL)
+      buf.putInt(1);          // P == 1 (Circle default point edge)
+      buf.putInt(8);          // keyWidth == 8 (long keys/deltas)
       byte[] worldBytes = world.getBytes(StandardCharsets.UTF_8);
       buf.putInt(worldBytes.length);
       buf.put(worldBytes);
@@ -120,7 +125,8 @@ class Adr079CauseTtlAndStagedExpirationTest {
       buf.put((byte) LocationGenerator.FailTypes.safetyExternal.ordinal());
       buf.putLong(now + 1000L);
 
-      buf.putInt(0); // 0 biomes
+      buf.putInt(0); // union: 0 biome names
+      buf.putInt(0); // union: 0 biome runs
 
       buf.flip();
       byte[] data = new byte[buf.remaining()];

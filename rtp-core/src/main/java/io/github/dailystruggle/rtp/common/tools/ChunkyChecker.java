@@ -28,6 +28,7 @@ public class ChunkyChecker {
   }
 
   /** Load Chunky integration and register its shapes */
+  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public static void loadChunky() {
     // if I don't have a correct object reference, try to get one.
     getChunky();

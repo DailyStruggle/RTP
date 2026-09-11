@@ -12,7 +12,7 @@ import java.util.logging.Level;
 
 /**
  * Parses and resolves cause-based TTL and per-verifier retention durations (ADR-079).
- * Durations <= 0 indicate infinite / static retention.
+ * Durations {@code <= 0} indicate infinite / static retention.
  */
 public final class TtlConfig {
   private static final long INFINITE = -1L;

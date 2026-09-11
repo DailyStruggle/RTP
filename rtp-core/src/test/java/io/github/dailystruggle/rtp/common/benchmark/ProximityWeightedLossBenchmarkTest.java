@@ -166,7 +166,7 @@ public class ProximityWeightedLossBenchmarkTest {
       for (long key : keys) shipped.addBadLocation(key, FailTypes.biome);
       shipped.flushAndRebuild(gap);
       int shippedRuns = runCount(shipped);
-      int mineRuns = KeyRunTable.exact(keys, keys.length).coalesceFixed(gap).runs();
+      int mineRuns = shippedRuleRunCount(keys, gap);
       assertEquals(shippedRuns, mineRuns, "coalescer diverges from shipped at gap " + gap);
       REPORT.add(
           "coalescer pinning",
@@ -335,6 +335,43 @@ public class ProximityWeightedLossBenchmarkTest {
     shape.set(GenericMemoryShapeParams.centerX, 0L);
     shape.set(GenericMemoryShapeParams.centerZ, 0L);
     return shape;
+  }
+
+  /**
+   * Runs the shipped rule over the same input the shipped rebuild sees: unit-width pending runs in
+   * ascending key order, one greedy left-to-right pass, the admissible gap recomputed from the
+   * <b>accumulator's</b> current length rather than the left input run's original length.
+   *
+   * <p>Transcribed from {@code MemoryShape#coalesceRuns}. The accumulator is load-bearing: the rule
+   * is order-dependent and not idempotent, so feeding it pre-merge lengths yields a different count.
+   *
+   * @param keys bad keys, ascending
+   * @param gap {@code spatialResolution}, in key units
+   * @return runs the shipped coalescer would hold
+   */
+  private static int shippedRuleRunCount(long[] keys, long gap) {
+    int runs = 0;
+    long curStart = -1L;
+    long curLength = -1L;
+    for (long nextKey : keys) {
+      if (nextKey < 0L) continue;
+      if (curStart == -1L) {
+        curStart = nextKey;
+        curLength = 1L;
+        continue;
+      }
+      long curEnd = curStart + curLength;
+      long admissible = MemoryShape.computeAdmissibleGap(gap, curLength, 1L);
+      if (nextKey <= curEnd + admissible) {
+        curLength = Math.max(curLength, nextKey + 1L - curStart);
+        continue;
+      }
+      runs++;
+      curStart = nextKey;
+      curLength = 1L;
+    }
+    if (curStart != -1L) runs++;
+    return runs;
   }
 
   private static int runCount(MemoryShape<?> shape) {

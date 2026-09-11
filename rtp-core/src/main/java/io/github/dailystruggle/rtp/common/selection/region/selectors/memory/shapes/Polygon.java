@@ -46,7 +46,7 @@ public class Polygon extends Square {
    * Install vertex list, derive AABB, validate non-self-intersection, and schedule mask walker.
    *
    * @param newVertices vertex list (each entry {@code int[]{x, z}}); at least 3 vertices
-   * @throws IllegalArgumentException if vertices < 3, collinear, or self-intersecting
+   * @throws IllegalArgumentException if {@code vertices < 3}, collinear, or self-intersecting
    */
   public void setVertices(List<int[]> newVertices) {
     if (newVertices == null || newVertices.size() < 3) {

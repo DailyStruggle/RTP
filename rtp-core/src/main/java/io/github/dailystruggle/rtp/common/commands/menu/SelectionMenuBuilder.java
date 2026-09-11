@@ -26,7 +26,7 @@ public final class SelectionMenuBuilder {
      * @param paramName      parameter the selected value is staged under
      * @param displayName    label for header
      * @param entries        values to list
-     * @param colorSupplier  maps entry to color prefix (null defaults to &2)
+     * @param colorSupplier  maps entry to color prefix (null defaults to {@code &2})
      * @param executeOnClick when true, entry row dispatches command immediately
      * @return assembled {@link MenuModel}
      */

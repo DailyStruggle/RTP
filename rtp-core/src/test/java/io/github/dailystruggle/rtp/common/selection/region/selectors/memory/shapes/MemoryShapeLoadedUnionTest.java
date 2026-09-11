@@ -130,7 +130,8 @@ class MemoryShapeLoadedUnionTest {
     @Test
     void legacyPerBiomeSectionsStillIngest() throws Exception {
         YamlFileDatabase db = wireDatabaseAccessor();
-        // A version-3 payload: per-biome sections of fixed-width key + width delta, no run stream.
+        // A released version-2 payload: per-biome sections of fixed-width key + width delta,
+        // no unified run stream. Verifies the legacy reader still ingests shipped files.
         writeLegacyFile("legacy_biome_sections");
 
         Square fresh = new Square();
@@ -146,14 +147,14 @@ class MemoryShapeLoadedUnionTest {
         assertEquals("FOREST", fresh.biomeAt(5000L));
     }
 
-    /** Hand-builds a BIN_VERSION 3 file: no bad runs, two per-biome sections. */
+    /** Hand-builds a released BIN_VERSION 2 file: no bad runs, two legacy per-biome sections. */
     private static void writeLegacyFile(String name) throws Exception {
         byte[] world = "test_world".getBytes(StandardCharsets.UTF_8);
         byte[] ocean = "OCEAN".getBytes(StandardCharsets.UTF_8);
         byte[] forest = "FOREST".getBytes(StandardCharsets.UTF_8);
         ByteBuffer buf = ByteBuffer.allocate(256).order(ByteOrder.BIG_ENDIAN);
         buf.putInt(0x52545031);
-        buf.putInt(3);
+        buf.putInt(2);
         buf.putInt(world.length).put(world);
         buf.putLong(-1L);
         buf.putInt(0); // no bad runs
