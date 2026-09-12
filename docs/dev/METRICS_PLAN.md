@@ -197,6 +197,8 @@ The LB-input fields above are **host-level** scalars (one number per backend). F
 - `keptFill` / `keptCap` — current `keptLocations` (L1) size and configured cap.
 - `unkeptFill` / `unkeptCap` — current `unkeptLocations` (L2) size and configured cap.
 - `loginFill` / `loginCap` — current `loginLocations` size and cap, both null when no login reserve is configured for this region (ADR-023).
+- `stageOccupancy` — map of stage/sink identifier to entry count (`hot`, `cold`, `backlog`, `login`, `network`, etc.; ADR-078 Phase M2).
+- `reallocations` — cumulative count of zero-I/O entry transfers between stages/sinks (ADR-078 Phase M2).
 - `status` — derived enum:
   - `EMPTY` when `keptFill == 0 && unkeptFill == 0` (next teleport will pay full pipeline cost).
   - `LOW` when `keptFill < keptCap / 4` (about to fall through to L2).

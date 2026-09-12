@@ -156,6 +156,25 @@ only the on-disk/in-jar location of the map files changes. `ConfigParser`
 (`loadLangFile`), `MultiConfigParser`, and `LocaleParityTest` resolve the map as
 the dotfile sibling of the value file/folder instead of `lang/<name>.lang.yml`.
 
+### 8. Hidden means translator metadata only; operator catalogs are generated
+
+A leading dot marks a key-rename map and nothing else. No value file, definition
+set, or reference document is authored into a dotfile or dot-folder.
+
+Hiding the shape/vert map folders (`definitions/regions/.shape`, `.vert`) removed
+the only on-disk record of *which selector types the server accepts and what
+parameters each takes*. That catalog is therefore **generated**, not authored:
+`SelectorCatalogWriter` walks the shape/vert factories on every
+`Configs.reloadConfigs()` and writes `definitions/regions/SHAPES.md` and
+`VERT.md` - visible, marked generated, never read back. Setting labels come from
+each type's `language_mapping`, so the document is emitted in the active locale
+without a hand-authored per-locale copy and cannot drift from the registry.
+
+The document is markdown, not YAML: `MultiConfigParser` scans
+`definitions/regions/*.yml`, so a `.yml` reference file there would be loaded as a
+region. The `.md` extension also signals "documentation, not config" to an
+operator browsing the folder.
+
 ## Alternatives Considered
 
 | Alternative | Why Rejected |
@@ -188,6 +207,12 @@ the dotfile sibling of the value file/folder instead of `lang/<name>.lang.yml`.
   against ADR-071's everyday-tier placement of user-facing strings; accepted
   because the in-game menu and search surface message keys regardless of on-disk
   location, and folder count reduction is the priority.
+- **Positive:** Rule 8 keeps the dot convention unambiguous (translator metadata
+  only) while restoring an operator-visible, locale-correct selector catalog that
+  is derived from the registry rather than duplicated per language.
+- **Negative / Trade-offs:** Two generated documents now appear in
+  `definitions/regions/`; an operator may still try to edit them despite the
+  generated-file header, in which case their edit is overwritten on reload.
 - **Negative / Trade-offs:** Operators who learned the old paths (`regions/`,
   `messages/`, `schematics/`) must relearn them; the read-legacy relocation and a
   header comment in `config.yml` mitigate the transition. `lang/` stays at root,
@@ -201,3 +226,5 @@ the dotfile sibling of the value file/folder instead of `lang/<name>.lang.yml`.
 - [ADR-064](ADR-064-config-comment-format-summary-line-as-menu-hover.md) Config-comment format: summary line as menu hover.
 - *Locale Parity Maintenance* in `.junie/AGENTS.md`; `LocaleParityTest` in `rtp-plugin`. (The *Locale Config TSV Pipeline* is retired by this ADR, pending a replacement.)
 - `rtp-core/.../configuration/Configs.java` (parser construction + legacy migration); `NetworkModeBootstrap` (`advanced/network.yml` relocation precedent).
+- `rtp-core/.../configuration/SelectorCatalogWriter.java` (rule 8 generated shape/vert catalogs); `SelectorCatalogWriterTest`.
+- `docs/dev/TRANSLATION_GUIDE.md` (contributor-facing description of the co-located map layout).

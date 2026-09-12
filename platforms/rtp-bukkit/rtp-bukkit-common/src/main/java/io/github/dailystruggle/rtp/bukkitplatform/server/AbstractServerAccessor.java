@@ -350,7 +350,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     if (player != null) {
       io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(player, message);
     } else {
-      RTP.log(Level.WARNING, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage DROPPED (Bukkit.getPlayer returned null) target=" + target);
+      RTP.log(Level.FINE, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage DROPPED (Bukkit.getPlayer returned null) target=" + target);
     }
   }
 

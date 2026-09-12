@@ -68,6 +68,7 @@ Each stage scans a specific permission prefix (source of truth: `rtp-plugin/.../
 | Pre-teleport | `rtp.effect.preteleport.*` |
 | Post-teleport | `rtp.effect.postteleport.*` |
 | Teleport cancelled | `rtp.effect.cancel.*` |
+| Player death | `rtp.effect.death.*` |
 | Queue push (player enters region queue) | `rtp.effect.queuepush.*` |
 | Queue pop (player leaves region queue) | `rtp.effect.queuepop.*` |
 
@@ -86,7 +87,7 @@ rtp.effect.<stage>.<TYPE>[.<arg1>[.<arg2>[...]]]
 
 ### Built-in effect types
 
-Registered in `effects-api/.../EffectFactory.java`. All five are available on every supported server version (MC ≥ 1.20.1):
+Registered in `effects-api/.../EffectFactory.java`. Available on every supported server version (MC ≥ 1.20.1):
 
 | `<TYPE>` | Class | Safety / extras |
 |----------|-------|-----------------|
@@ -95,6 +96,7 @@ Registered in `effects-api/.../EffectFactory.java`. All five are available on ev
 | `PARTICLE` | `ParticleEffect` | Spawns particles at the player. |
 | `POTION` | `PotionEffect` | Applied to the teleporting player. |
 | `SOUND` | `SoundEffect` | Played at the player's location. |
+| `COMMAND` | `CommandEffect` | Executes a console or player command at the configured trigger stage (effects-api-ADR-007). |
 
 #### Positional arguments per type
 
@@ -153,6 +155,25 @@ Since 3.0.0-beta.2, the firework parser walks the canonical key order with a non
 | 4 | `DX` | x-offset from player |
 | 5 | `DY` | y-offset |
 | 6 | `DZ` | z-offset |
+
+**`COMMAND`** — `CommandEffect` (effects-api-ADR-007)
+
+Executes arbitrary commands at any trigger stage (`presetup`, `postteleport`, `cancel`, `death`, etc.):
+
+- **Format in `definitions/effects/*.yml`:**
+  - `COMMAND CONSOLE <command>`: Executes the command with server console privileges.
+  - `COMMAND PLAYER <command>`: Executes the command as the player.
+  - Supports quotes and backslash escapes for arguments.
+- **Format in permissions:**
+  - `rtp.effect.<stage>.command.console.<command>`
+  - `rtp.effect.<stage>.command.player.<command>`
+  - Whitespace and special characters in permissions can be escaped with backslashes (e.g. `rtp.effect.death.command.console.broadcast\ [player]\ died`).
+- **Dynamic placeholders:**
+  - `[player]` or `{player}`: Target player's username.
+  - `[uuid]` or `{uuid}`: Target player's UUID.
+  - `[world]` or `{world}`: Target location world name (if available).
+  - `[x]`, `[y]`, `[z]` or `{x}`, `{y}`, `{z}`: Target coordinate integers (if available).
+- **Concurrency & Platform Thread Safety:** Dispatched with full thread safety across platforms (scheduled on global region / player entity scheduler on Folia, main server thread on Bukkit/Paper, server thread on Fabric and NeoForge).
 
 Missing trailing arguments keep the effect's built-in defaults (see each `*Effect` class constructor).
 

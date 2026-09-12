@@ -243,4 +243,36 @@ public class ShapeXzToLocationsRoundTripTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("Square: per-ring injectivity and exact bijection round-trip")
+    void square_ringInjectivity_andRoundTrip() {
+        Square shape = new Square();
+        shape.set(GenericMemoryShapeParams.radius, 64L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 0L);
+
+        java.util.Set<Long> seenIndices = new java.util.HashSet<>();
+        // Test multiple rings, including ring 64 which previously aliased octant seams
+        for (long r = 1; r <= 64; r++) {
+            java.util.Set<Long> ringIndices = new java.util.HashSet<>();
+            long expectedCellCount = 8L * r;
+
+            // Traverse the perimeter of ring r
+            for (long x = -r; x <= r; x++) {
+                for (long z = -r; z <= r; z++) {
+                    if (Math.max(Math.abs(x), Math.abs(z)) != r) continue;
+
+                    long loc = shape.xzToLocation(x, z);
+                    assertTrue(loc >= 0, "Location on ring " + r + " must be non-negative: " + loc);
+                    assertTrue(ringIndices.add(loc), "Duplicate location " + loc + " on ring " + r + " at (" + x + "," + z + ")");
+                    assertTrue(seenIndices.add(loc), "Location " + loc + " already seen on an earlier ring");
+
+                    int[] decoded = shape.locationToXZ(loc);
+                    assertEquals((int) x, decoded[0], "Round-trip x mismatch for (" + x + "," + z + ") index " + loc);
+                    assertEquals((int) z, decoded[1], "Round-trip z mismatch for (" + x + "," + z + ") index " + loc);
+                }
+            }
+            assertEquals(expectedCellCount, ringIndices.size(), "Ring " + r + " must have exactly 8R indices");
+        }
+    }
 }

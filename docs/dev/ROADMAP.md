@@ -124,13 +124,13 @@ reproducible by readers".
 
 ## Tier 2 — Upcoming features (not caveat-driven)
 
-- [ ] **Party/group teleport addon (`LeafRTPPartyAddon`).** Module skeleton landed as a
-  platform-neutral `RTPAddon` (config + lifecycle only; loads as a safe no-op). Remaining work:
-  party detection, coordinate reservation, and grouped teleport dispatch (serve one prepared
-  coordinate to N members, or draw a small adjacent cluster) - all consuming the existing supply
-  pipeline rather than searching per member. Specified in
-  [`addons/LeafRTPPartyAddon/REQUIREMENTS.md`](../../addons/LeafRTPPartyAddon/REQUIREMENTS.md) and
-  [leafrtp-party-addon-ADR-001](../../addons/LeafRTPPartyAddon/docs/adr/leafrtp-party-addon-ADR-001-party-teleport-shared-destination.md)
+- [ ] **Multi-entity subspace teleport addon (`LeafRTPGroupAddon`).** Module skeleton landed as a
+  platform-neutral `RTPAddon` (config + lifecycle only; loads as a safe no-op). Replaces separate
+  search paths for party, duel, skirmish, and pursuit with a single relative subspace shape that
+  captures spatial memory from the parent region for O(1) candidate selection, denying locations with
+  insufficient safe slots fail-closed. Specified in
+  [`addons/LeafRTPGroupAddon/REQUIREMENTS.md`](../../addons/LeafRTPGroupAddon/REQUIREMENTS.md) and
+  [leafrtp-group-addon-ADR-001](../../addons/LeafRTPGroupAddon/docs/adr/leafrtp-group-addon-ADR-001-subspace-group-teleport.md)
   (Proposed).
 - [ ] **Region-confinement (tether) addon (`LeafRTPTetherAddon`).** Module skeleton landed as a
   platform-neutral `RTPAddon` (config + lifecycle only; loads as a safe no-op). Replaces the earlier

@@ -14,7 +14,7 @@ package io.github.dailystruggle.effectsapi.common;
  *   <li>{@link #version}    schema version (must match the on-disk default).</li>
  *   <li>{@link #when}       pipeline stage token (one of:
  *       {@code firstjoin / join / presetup / postsetup / preload / postload /
- *        preteleport / postteleport / cancel / queuepush / queuepop}).</li>
+ *        preteleport / postteleport / cancel / queuepush / queuepop / death}).</li>
  *   <li>{@link #permission} optional permission node gating membership.</li>
  *   <li>{@link #players}    optional explicit UUID/name allowlist (the
  *       permission-less path used on Fabric servers without a perms manager).</li>

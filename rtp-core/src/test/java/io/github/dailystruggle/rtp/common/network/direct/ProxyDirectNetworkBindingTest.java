@@ -198,4 +198,82 @@ class ProxyDirectNetworkBindingTest {
         assertEquals(0, binding.livePeerCount());
         binding.close();
     }
+
+    @Test
+    @DisplayName("constructor validation and lifecycle guards")
+    void constructorAndLifecycleGuards() {
+        org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class,
+                () -> new ProxyDirectNetworkBinding(null, null, 1, 5000L, 100, 100, null));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new ProxyDirectNetworkBinding(List.of(), null, 1, 5000L, 100, 100, null));
+
+        ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
+                List.of(InetSocketAddress.createUnresolved("127.0.0.1", 1)),
+                null, 1, 0L, 0, 0, null);
+
+        binding.close();
+
+        // Repeated close is idempotent
+        binding.close();
+
+        // Operations fail after close
+        assertTrue(binding.publishBackendHeartbeat(hb("backend-a", List.of())).isCompletedExceptionally());
+        assertFalse(binding.findReservation(java.util.UUID.randomUUID()).join().isPresent());
+        assertEquals(RedeemOutcome.NOT_FOUND, binding.redeem("tok", java.util.UUID.randomUUID(), "s").join());
+        assertTrue(binding.listActiveForServer("s").join().isEmpty());
+    }
+
+    @Test
+    @DisplayName("proxy-local operations return expected defaults or failures")
+    void proxyLocalOperations() {
+        ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
+                List.of(InetSocketAddress.createUnresolved("127.0.0.1", 1)),
+                null, 1, 5000L, 100, 100, null);
+
+        // claim is unsupported on backend
+        assertTrue(binding.claim("s", java.util.UUID.randomUUID(), java.time.Duration.ofSeconds(10)).isCompletedExceptionally());
+        // release is a no-op CompletableFuture
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> binding.release("tok", io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason.PLAYER_DISCONNECTED).join());
+        // publishProxyHeartbeat is a no-op CompletableFuture
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> binding.publishProxyHeartbeat(null).join());
+
+        // reapExpired returns empty list
+        assertTrue(binding.reapExpired(java.time.Instant.now()).join().isEmpty());
+
+        // parseProxies utility test
+        List<String> raw = List.of("127.0.0.1:25565", "example.com", "invalid:port:here", "  ");
+        List<InetSocketAddress> parsed = ProxyDirectNetworkBinding.parseProxies(raw, 35565);
+        assertEquals(3, parsed.size());
+        assertEquals(25565, parsed.get(0).getPort());
+        assertEquals(35565, parsed.get(1).getPort());
+
+        binding.close();
+    }
+
+    @Test
+    @DisplayName("subscriptions receive updates on heartbeat ingestion")
+    void subscriptionLifecycle() throws Exception {
+        server = new FakeProxyServer(null, 1);
+        ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
+                List.of(InetSocketAddress.createUnresolved("127.0.0.1", server.port())),
+                null, 1, 5000L, 1000, 2000, () -> 1000L);
+
+        java.util.List<BackendHeartbeat> received = new java.util.concurrent.CopyOnWriteArrayList<>();
+        io.github.dailystruggle.rtp.proxy.common.spi.Subscription sub = binding.subscribeBackendHeartbeats(received::add);
+
+        binding.publishBackendHeartbeat(hb("backend-sub", List.of("default"))).get();
+        assertEquals(1, received.size());
+        assertEquals("backend-sub", received.get(0).serverId());
+
+        // Unsubscribe
+        sub.close();
+        // Repeated close is safe
+        sub.close();
+
+        binding.publishBackendHeartbeat(hb("backend-sub2", List.of("default"))).get();
+        // Received count should not change after unregistering
+        assertEquals(1, received.size());
+
+        binding.close();
+    }
 }

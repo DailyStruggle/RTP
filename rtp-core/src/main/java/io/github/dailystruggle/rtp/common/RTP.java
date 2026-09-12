@@ -93,6 +93,16 @@ public class RTP {
   public static RTPEconomy economy = null;
 
   /**
+   * Process-wide entry point for multi-participant subspace group teleports.
+   * Eagerly constructed and stateless: it reads {@link #selectionAPI} at call time and fails
+   * closed (structured {@link io.github.dailystruggle.rtp.api.group.GroupPlacementResult.Reason})
+   * when the region/world is not resolvable, so it is safe to reference before core is fully wired.
+   */
+  public static final io.github.dailystruggle.rtp.api.group.GroupPlacementService
+      groupPlacementService =
+          new io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher();
+
+  /**
    * Pre-dispatch hook to decide whether {@code /rtp} is served locally,
    * enrolled on cross-server wait queue, or rejected.
    * Defaults to {@link io.github.dailystruggle.rtp.api.network.NetworkCommandHook#LOCAL_ONLY}.
@@ -840,8 +850,12 @@ public class RTP {
     instance = this;
 
     addShape(new Circle());
+    addShape(new Circle("CIRCLE_DEPRECATED_PURE_SPIRAL"));
+    addShape(new CircleOptimizedDualLayer());
     addShape(new Ellipse());
     addShape(new Square());
+    addShape(new Square("SQUARE_DEPRECATED_PURE_SPIRAL"));
+    addShape(new SquareOptimizedDualLayer());
     addShape(new Rectangle());
     addShape(new Circle_Normal());
     addShape(new Square_Normal());
@@ -988,6 +1002,7 @@ public class RTP {
     }
   }
 
+  @SuppressWarnings("unchecked") // untyped YAML map values narrowed to Map<String,Object> after instanceof
   public static void handleMigration(String previousState, String currentState) {
     if (previousState.equalsIgnoreCase("yaml") &&
         (currentState.equalsIgnoreCase("sqlite") ||
@@ -1092,10 +1107,12 @@ public class RTP {
     }
   }
 
+  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public static void addShape(Shape<?> shape) {
     ((Factory<Shape<?>>) factoryMap.get(factoryNames.shape)).add(shape.name, shape);
   }
 
+  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public static void addVerticalAdjustor(VerticalAdjustor<?> verticalAdjustor) {
     ((Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert))
         .add(verticalAdjustor.name, verticalAdjustor);
@@ -1205,6 +1222,7 @@ public class RTP {
     accessor.log(level, str, throwable);
   }
 
+  @SuppressWarnings("unchecked") // heterogeneous multiConfigParserMap keyed by enum class; WorldKeys parser cast is safe
   public static RTPWorld getWorld(RTPPlayer player) {
     // get region from world name, check for overrides
     Set<String> worldsAttempted = new HashSet<>();

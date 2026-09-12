@@ -22,9 +22,12 @@ public final class RTPTeleportCancel extends RTPRunnable {
     this.playerId = playerId;
   }
 
+  @SuppressWarnings("unchecked") // configParserMap keyed by EconomyKeys.class guarantees the parser's E
   public static void refund(UUID playerId) {
+    if (RTP.configs == null || RTP.configs.configParserMap == null) return;
     ConfigParser<EconomyKeys> eco =
         (ConfigParser<EconomyKeys>) RTP.configs.configParserMap.get(EconomyKeys.class);
+    if (eco == null) return;
     Object configValue = eco.getConfigValue(EconomyKeys.refundOnCancel, Boolean.TRUE);
 
     boolean refund;

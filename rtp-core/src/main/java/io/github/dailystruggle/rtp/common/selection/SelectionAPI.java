@@ -183,7 +183,7 @@ public class SelectionAPI {
       }
       if (biome == null || biome.isEmpty()) continue;
 
-      memoryShape.addBiomeLocation(location, memoryShape.spatialResolution, biome);
+      memoryShape.addBiomeLocation(location, memoryShape.spatialResolution(), biome);
     }
   }
 
@@ -374,6 +374,7 @@ public class SelectionAPI {
    * @return The determined {@link Region}.
    * @throws IllegalStateException if an infinite override loop is detected.
    */
+  @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys/RegionKeys class guarantees the parser's E
   public Region getRegion(RTPPlayer player) {
     Set<String> worldsAttempted = new HashSet<>();
     String worldName = player.getLocation().world().name();
@@ -440,6 +441,7 @@ public class SelectionAPI {
    * @param world The world to get the region for.
    * @return The determined {@link Region}.
    */
+  @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys.class guarantees the parser's E
   public Region getRegion(RTPWorld world) {
     String worldName = world.name();
     MultiConfigParser<WorldKeys> worldParsers =

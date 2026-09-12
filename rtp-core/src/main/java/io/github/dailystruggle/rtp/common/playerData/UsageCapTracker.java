@@ -81,6 +81,26 @@ public final class UsageCapTracker {
     return remaining > 0 ? remaining : 0L;
   }
 
+  /**
+   * Current number of teleports used by the player within the active rolling window.
+   *
+   * @param id          player id
+   * @param resetMillis the rolling window length in milliseconds ({@code <= 0}
+   *                    means the window never resets)
+   * @param now         current epoch milliseconds
+   * @return teleports used in current window, or {@code 0} if expired or unrecorded
+   */
+  public synchronized long uses(UUID id, long resetMillis, long now) {
+    if (id == null) return 0L;
+    Window w = windows.get(id);
+    if (w == null) return 0L;
+    if (resetMillis > 0 && now - w.start >= resetMillis) {
+      windows.remove(id);
+      return 0L;
+    }
+    return w.count;
+  }
+
   /** Clear the recorded usage for a single player (e.g. on an admin reset). */
   public synchronized void reset(UUID id) {
     if (id != null) windows.remove(id);

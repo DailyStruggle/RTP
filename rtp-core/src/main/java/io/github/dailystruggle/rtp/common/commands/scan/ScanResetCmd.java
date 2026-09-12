@@ -70,14 +70,16 @@ public class ScanResetCmd extends ScanSubCmd {
       if (multiConfigParser != null) {
         ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser(region.name);
         if (regionConfig != null) {
-          shape.spatialResolution =
-              regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue();
+          shape.setSpatialResolution(
+              regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue());
         }
       }
 
       if (RTP.configs == null) continue;
       String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanReset, ""));
       if (msg == null || msg.isEmpty()) continue;
+      msg = msg.replace("[scan_regions]", region.name);
+      msg = msg.replace("[scan_region]", region.name);
       msg = msg.replace("[region]", region.name);
       RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
     }

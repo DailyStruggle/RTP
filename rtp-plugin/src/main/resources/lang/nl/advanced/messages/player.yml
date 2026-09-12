@@ -13,7 +13,7 @@ vertragingsBericht: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teletransporteren over [
 chunkLaden: "&7[P0] ⚙ Chunks laden, even geduld..."
 teletransportBericht: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Geteletransporteerd in [attempts] pogingen, in [processingTime]</gradient>"
 
-# if teleport is cancelled
+# als de teleportatie wordt geannuleerd
 teletransportAnnuleren: "&7[P0] ⚡ Teletransport geannuleerd!"
 
 # als er na het maximum aantal pogingen geen veilige plek is
@@ -24,7 +24,7 @@ onveilig: "&7[P0] ⌖ geen veilige locatie gevonden in [attempts] pogingen"
 # placeholder: [remainingCooldown] - de resterende tijd
 wachttijdBericht: "&7[P0] ⚡ Je kunt pas weer teletransporteren over [remainingCooldown]"
 
-# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+# wanneer de speler de lockAfterUses-limiet heeft bereikt en is vergrendeld (BetterRTP LockAfter-pariteit)
 lockedAfterUses: "&7[P0] ⌖ Je hebt je limiet voor willekeurige teleportatie bereikt. Probeer het over [remainingLockTime] opnieuw."
 
 # als de regio geen locaties in de wachtrij heeft en de speler geen rtp.unqueued-permissie heeft
@@ -58,14 +58,14 @@ ongeldigArgument: "&c[P0] ongeldig opdrachtargument [arg]"
 # wanneer de console een spelers-only commando probeert uit te voeren
 consoleOpdrachNietToegestaan: "&c[P0] Je moet een speler in het spel zijn om dit commando uit te voeren."
 
-# plugin is busy reloading
+# plugin is bezig met herladen
 busy: "&c[P0] bezig"
 
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+# Verzonden wanneer de optionele PvP-gevechtscontrole /rtp weigert omdat de speler in gevecht is
 pvpInCombat: "&c[P0] Je kunt niet willekeurig teleporteren tijdens een gevecht."
 
-# plugin doesn't have the subcommand or parameter the user requested
-# placeholder: [arg] - the argument attempted
+# plugin heeft het door de gebruiker gevraagde subcommando of parameter niet
+# placeholder: [arg] - het geprobeerde argument
 invalidCommand: "&c[P0] ongeldig commando - [arg]"
 
 # gebruiker heeft geen permissie voor het gevraagde commando
@@ -104,8 +104,8 @@ infaden: 20
 blijven: 20
 uitfaden: 20
 
-# actionbar setting
+# instelling voor actiebalk
 actiebalk: ""
 
-# DO NOT TOUCH VERSION NUMBER
+# RAAK HET VERSIENUMMER NIET AAN
 version: 1.0

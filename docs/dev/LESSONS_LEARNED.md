@@ -92,6 +92,19 @@ The `run_test` tool summary suppresses test `System.out.println`; `[DEBUG_LOG]` 
 
     Select-String -Path "rtp-core\build\test-results\test\TEST-<fqcn>.xml" -Pattern "DEBUG_LOG"
 
+### A `MemoryShape` addresses the annulus `[centerRadius, radius)`, so a harness must pin `centerRadius` (2026-09-05)
+
+`Square.xzToLocation` returns `((R*R - cr*cr) * 4) + perimeterStep` for ring `R = max(|x-cx|, |z-cz|)`. Every ring inside `centerRadius` therefore maps to a **negative** 1D index, which `MemoryShape.addBadLocation` refuses (counted by `getOutOfDomainMarkCount()`, logged at `FINE` on the first occurrence and each power of ten). That refusal is by design - the region never selects inside its centre hole - but it silently invalidates any measurement that marks an origin-centred footprint without setting `centerRadius`.
+
+Signature: retention rises with radius while `spatialResolution` is `1`. `ModelCrossoverBenchmarkTest` set only `radius` and inherited the default `centerRadius` of `64`, giving spiral retention of `0.000` at cell radius 32/64, `0.001` at 128, `0.240` at 256 and `0.929` at 512 - exactly the fraction of the footprint lying outside ring 64. It reads as a structural defect in `Square` and is not one: with `centerRadius` pinned to `0` the shape retains every offered in-domain mark exactly (`SquareRetentionTest`), so `xzToLocation` is injective over a full cell square and the flush/rebuild path loses nothing.
+
+Two rules for any future harness or scan that marks cells directly:
+
+- Set `centerRadius` explicitly to match the domain being marked, and iterate `-radius+1 .. radius-1` so the outer ring stays below `getRange()`.
+- Assert `getOutOfDomainMarkCount() == 0` after the fill rather than reporting retention as a result. A footprint or byte figure for a structure that dropped its input is worse than no figure.
+
+Note that `setSpatialResolution` clamps to `>= 1` and the coalescing test is `nextKey <= start + length + spatialResolution`, so a one-cell gap is bridged: `getEffectiveBadCount()` is run-length-derived and can *exceed* the number of marks offered on a sparse pattern. It can never fall below it.
+
 ### Interpreting `rtp test full`
 
 The `commands-live` portion of the full test suite intentionally dispatches malformed commands (see `LiveCommandDispatcherTestJob.malformedInputs()`). These **must** produce `Level.WARNING` logs to satisfy REQ-RTP-S-004; warnings there are evidence of compliance, not failures.
@@ -202,6 +215,14 @@ Fix: hop RTP's first continuation off the completing thread. `requestChunkFuture
 
 Rule for any non-Bukkit adapter that talks to the chunk system directly: never let RTP's own pipeline run as an *inline* dependent of a vanilla chunk future. Always force the first continuation onto an RTP-owned executor (`*Async` with `RTP.scheduler`), because vanilla may complete that future synchronously from inside `DistanceManager.runAllUpdates` where any further ticket/`getChunkFuture` call (including an inline same-thread `MinecraftServer.submit`) corrupts the live iteration.
 
+### A per-call `stat` freshness check can cost more than the cache it guards (2026-09-04)
+
+`AnvilRegionByteCache.get` validated freshness with `Files.isRegularFile` + `Files.getLastModifiedTime` on **every** call, before the LRU lookup. The ADR-080 benchmark (`:rtp-core:simulationBenchmark`) measured a warm hit at 65 491 ns and the two stat calls alone at 66 977 ns - 1.02x the entire hit cost, i.e. the `LinkedHashMap` lookup was free and the freshness check *was* the hot path. The original rationale ("stat-on-every-get is cheap relative to the read it saves") held against one ~2.9 ms cold read, but not against the real access pattern: 1024 sibling-chunk probes over one `r.X.Z.mca` paid ~68 ms of syscalls per region screened. Windows stat cost is high relative to Linux, so the effect is platform-skewed but not platform-specific.
+
+Fix: throttle the check to at most one stat per region file per revalidation window (default 1 s; `AnvilRegionByteCache.setRevalidateIntervalMillis(0)` restores stat-on-every-get). The window is ~1/30th of the default chunk-save cadence, so bounded staleness cannot hide a save for a meaningful period. Warm-hit p50 dropped to 153 ns (~428x) on the same rig, and a `statSkips` counter (`anvilCacheStatSkips=` on the `ScanTask` gauge line) reports how many hits avoided the syscall.
+
+Durable rule: price the *validation* of a cache entry, not just the work it avoids. A guard that runs per access must be compared against the per-access cost of a hit, not against the cost of a miss - and if it is a syscall, amortize it over a time window or a caller-scoped token.
+
 ### Paper 26.1 scan throughput parity with Spigot/Folia (2026-04-21)
 
 Paper 26.1 with the non-blocking `LocationGenerator` state machine (ADR-015 post-refactor) achieves roughly **300 cps effective scan throughput**, on parity with the Spigot/Folia Anvil-based scan path. This confirms that ADR-016 section 1.1 (the adapter-internal `[RTP] Anvil gate skipped reason=chunk-already-loaded` gate firing on essentially every candidate on Paper chunk-system-v2) is **not** a performance regression relative to the pure-Anvil path — Paper's live-chunk `getBiome` on an already-loaded chunk is cheap enough to close the gap.
@@ -223,6 +244,17 @@ When `language.yml` is edited from `en` → another locale and the server reload
 - **No-rename locale ⇒ no migration.** Files like `integrations.yml` that have no localized JAR resource get a seeded identity-only `language_mapping` from `loadLangFile`. Treating them as "foreign" causes an infinite re-backup loop on every reload. The detector short-circuits when **every** mapping entry is identity (i.e. the active locale renames zero keys for this file).
 
 When adding a new translatable file or locale, see `TRANSLATION_GUIDE.md`. The `LocaleResourceParityTest` enforces the on-disk shape contract that this migration depends on.
+
+### A locale parity test pointed at a file the runtime does not load proves nothing (2026-09-02)
+
+The ADR-076 messages split left every locale with two copies of its strings: the pre-split `lang/<locale>/messages.yml` monolith, and the `lang/<locale>/advanced/messages/*.yml` mirror. `Configs.reloadConfigs` only builds parsers for the mirror; the monolith was archived as legacy and never read. Both `LocaleParityTest` and `ReqRtpF013SpanishLocaleContentTest` were reading the **monolith**, so every locale suite was green while the shipped mirror was still English for any key added after the split. Repointing the tests at the mirror surfaced 179 untranslated values across all 12 locales on the first run (Spanish shipped `"&b▶ config editor"` where the monolith had `"&b▶ editor de configuración"`).
+
+Two durable lessons:
+
+- **Assert against the artifact the runtime loads.** A resource-parity test is only as good as its path. When a config layout is split or moved, repoint the tests in the same change - a still-passing suite after a layout migration is a warning sign, not reassurance.
+- **A duplicated resource with no consistency check will diverge, and the copy nobody tests is the one that ships.** The monoliths were deleted after `scripts/propagate-locale-monolith-values.py` copied their values into the mirror; the mirror is now the single source and `CacheNomenclatureGuardTest` plus the repointed parity suites guard it.
+
+The migration script is line-based on purpose (a YAML round-trip would strip the operator-facing comments) and skips block sequences (`regionInfo` / `worldInfo` / `placeholders`), which were reconciled by hand.
 
 ---
 
@@ -655,3 +687,116 @@ Active tags (do not rename without updating this entry; saved Spark report URLs 
 - `rtp_active_gc_sweep` - `MemoryTracker.runDiagnostics` (diagram 04; static method, wraps body directly rather than going through `RTPRunnable` since `MemoryTracker` is not a task)
 
 The convention is `rtp_<stage>` snake_case. Adding a new tag requires three coordinated edits: a new bridge method on `RTPRunnable`, a new `case` in `RTPRunnable.runTagged`, and a row in this list. Diagram 03 (chunk-ticket lifecycle) intentionally has no dedicated tag - its work happens inside `TeleportPipelineTask` and `RegionCacheTask`, both already tagged. Cost: one extra (cheap) bridge stack frame per tagged task run. The takeaway: when you need profiler observability for a hot path, you do not need to add Spark as a dependency - a named method on the call stack is the entire contract.
+
+---
+
+## 2026-09-02 - Seven hand-written copies of one selection invariant; the copies had silently diverged
+
+`MemoryShape.rand()` was `abstract`, and all seven memory shapes (`Circle`, `Circle_Normal`, `Ellipse`, `Polygon` via `Square`, `Rectangle`, `Square`, `Square_Normal`) each carried their own ~100-160 line implementation of the *same* invariant: snapshot `badKeysCache`/`badPrefixSumsCache` with a length clamp, run the ACCUMULATE fixed-point bad-sum search, dispatch on `mode`, then apply the `uniquePlacements` tail. Only the distribution curve was ever meant to differ. Four latent defects were found purely by diffing the copies against each other:
+
+| Divergence | Copies affected | Effect |
+|---|---|---|
+| `switch (mode)` without `.toUpperCase()` | `Square`, `Rectangle` | lower-case `mode: nearest` passed the `equalsIgnoreCase` ACCUMULATE test, then matched no `case` - silently no repair and no re-roll |
+| `NEAREST` `break`s out of the repair `if` with no `case` break | `Square`, `Rectangle`, `Circle_Normal`, `Square_Normal` | falls through into `REROLL`; conversely `Circle`/`Ellipse` `return`ed early and so **skipped the `uniquePlacements` tail entirely in `NEAREST` mode** |
+| `uniquePlacements` read as a boolean | `Square_Normal` only | `Boolean.parseBoolean("4")` == `false`, so the knob was inert *and* the coerced `false` was written back over the operator's configured value - while the same class's own tab-completion offered `0,1,2,4,8` |
+| unconditional `if (!expand) range -= badSum` (no mode condition) | `Circle_Normal`, `Square_Normal` | a third, undocumented range-adjustment rule versus the mode-conditional form the other five used |
+
+Resolution: `rand()` became a concrete template on `MemoryShape` with four hooks - `adjustRange`, `sample`, `postProcess`, `supportsExpand` - and a shared `NormalMemoryShape` parent for the two gaussian variants (which differed only in `range = (radius-cr)*(radius+cr)*Math.PI` vs `*4`, both already identical to their own `getRange()`).
+
+Durable consequences:
+
+- **`rand()` must stay non-`final`.** `ChunkyRTPShape` and five test doubles substitute their own selection wholesale; making the template `final` breaks them.
+- **Do not unify the sampling curve or the range adjustment.** These differences are deliberate and load-bearing: `Rectangle` exposes neither `weight` nor `expand` (so its draw must stay uniform over the raw range), and `Ellipse`/`Polygon` are bounded *smaller* than the 1D range their spiral describes, so `expand` pushes samples into space `contains()` rejects. Gate range adjustment on whether the shape actually declares an `expand` knob rather than applying it by default, or you will silently re-bias `Rectangle`.
+- **Shapes expose four different parameter enums**, so shared code cannot name enum constants. Use name-based lookup (`keyByName` / `paramByName`), mirroring the pre-existing name-based `expand` scan in `MemoryShape.contains()`. Cache `getEnumConstants()` - it clones its array on every call, which matters on the hot selection path.
+- **Diffing sibling copies against each other is a productive bug-finding technique** in this codebase, independent of any refactor: every one of the four defects above was invisible when reading a single file and obvious when reading two side by side.
+
+### Async tier promotion in `GroupCacheWorker.pulse` is not observable on return
+
+`GroupSubspaceCacheTest.testGroupCacheWorkerPulseL3ToL2` asserted `sizeCold(key) > 0 || sizeHot(key) > 0` immediately after `worker.pulse(...)`. `pulse` step 3 (`promoteColdToHot`) polls the freshly-promoted cold entry and completes the hop on the chunk-reservation future's `thenAcceptAsync` continuation, so on return **all three tiers can legitimately read 0** while the promotion is in flight (measured: hot goes 0 → 2 roughly 200 ms later). The assertion was a latent race that passed only by timing accident; any unrelated change to `rtp-core` class-loading timing can flip it. Assertions after `pulse` must poll with a bounded deadline, not read once.
+
+---
+
+## 2026-09-04 - Two `MemoryShape` call-site traps, and why a benchmark needs a serve-rate row
+
+Building the allocation benchmark (ADR-080) against the shipped `MemoryShape` hit two API traps in a row. Both compiled, neither threw, and both silently produced a spatial memory that considered essentially the whole region bad - which read as a *spectacularly good* result until the serve rate was inspected.
+
+| Trap | Wrong call | Effect |
+|---|---|---|
+| `flushAndRebuild(long)` takes a **run-merge tolerance in cells**, not a timestamp | `flushAndRebuild(nowMillis)` | `setSpatialResolution(nowMillis)` - a merge tolerance of millions, so every learned cell coalesced into one giant run and `isKnownBad` returned true for ~99.7 % of candidates |
+| `xzToLocation` / `addBadLocation` / `isKnownBad` index **region cells (chunks)**, not blocks | `xzToLocation(cx * 16 + 8, cz * 16 + 8)` | keys land on the wrong spiral ring, so learning and querying disagree about which ground was rejected |
+
+Durable consequences:
+
+- **`flushAndRebuild`'s parameter is a resolution, and the method name does not say so.** Any new call site should pass the owning region's configured `spatialResolution` (or `1L` for cell-exact behaviour) and never a clock value. `MemoryShapeSelectionThroughputTest` and `RetainedFootprintBenchmarkTest` both pass `1L`, which is the pattern to copy.
+- **`MemoryShape` is chunk-indexed throughout.** `neighbourRingOffset(int cx, int cz)` and the `radius` default of 256 are the tell. Feeding it block coordinates does not fail loudly; it just puts keys on rings a factor of 16 out.
+- **A cost benchmark must report its serve rate.** A starved cache is the cheapest possible implementation. The first run of the memory-model benchmark posted the best allocation figure in the table while serving 0.3 % of requests, and the *only* thing that exposed it was an unserved-request counter added on general principle before any result was read. Any benchmark that reports cost per unit of work must also report how much work actually got done - otherwise a fidelity bug is indistinguishable from a win. This is now a publication rule in ADR-080.
+- **A simulated model's own instrumentation can dominate the figure it produces, and it will look like a property of the design.** Modelling `MemoryShape`'s dirtiness gate needed a run count, and the obvious source is `badKeysSnapshot()` - which *copies the whole run array*. Evaluated on every declined rebuild deadline (62 000 of them at a 60 s cadence) it made the harness the dominant allocator: 32 865 bytes per teleport, against 1 383 once the check was changed to a primitive counter. A 24x inflation, entirely apparatus, and it presented as "durable memory allocates enormously at tight rebuild cadences". Rule: anything evaluated per request or per deadline inside a measured window must be primitive-only; if a guard needs state the shipped code reads from a snapshot, mirror it with a counter and justify the equivalence (run count and learned-cell count agree to ~1.0 here, per `RetainedFootprintBenchmarkTest`).
+- **Model a subject's recomputation *trigger*, not its period.** `MemoryShape.maybeFlushAndRebuild` returns unless a mark is pending and additionally requires `min(256, runs/8)` pending marks, so a converged memory performs no merge however often the cadence fires. A model that rebuilt unconditionally on the clock charged a bulk-allocation cost production does not pay. Cadences in this codebase are generally ceilings on staleness rather than schedules - check for a dirty flag before assuming periodic work is periodic.
+
+---
+
+## 2026-09-04 - Ask what an arm is doing before asking what it costs, and benchmark the configuration the design targets
+
+Two corrections to the ADR-080 allocation tier, both prompted by the same maintainer question - "are we doing *more* because this repo supplies more tools and information?"
+
+- **When a benchmark arm looks expensive, add the arm that falsifies the confound.** The durable-memory arm was the second-highest allocator in the table, and there were two candidate explanations: it does more work, or it was configured with a deeper hot cache than its comparators (1024 slots against their 20). A depth-20 parity arm settled it in one run - 483.9 bytes per teleport against 485.4, a 0.3 % difference - so hot-tier depth is free at steady state and the gap is genuinely the two jobs no memoryless arm performs: admitting 1.005 real `RTPLocation`/`RTPCoords` objects per teleport, and recording 0.357 learning marks per teleport. A parity arm is cheap and it converts an argument into a row. Generalised into an ADR-080 rule: an arm whose figure differs from a comparator must report the operation counts that explain the difference.
+- **Measure the configuration the design is actually meant to run in.** The whole table had been taken on an unscanned world, which is the worst case for a design whose spatial memory is meant to be pre-populated off-tick. Re-running with the memory seeded the way `/rtp scan` seeds it moved the durable arm from second-worst to cheapest in every load class: class-3 burst 364.7 -> 1.2 bytes per teleport, burstiness 45.5x -> 1.17x, steady transient 124.8 -> 107.0 bytes, chunk materialisations 1.362 -> 1.005 (the floor of one chunk per teleport), and zero span-array rebuilds because a converged memory is never dirty - all 200 004 cadence deadlines declined. The learning cost is not a property of the representation; it is the cost of learning, and an operator can pay it once off-tick instead. Charge the crawl as one-time (15.5 MB for a 262 144-cell region, amortising to 77.4 bytes per teleport over the run) and never compare a pre-scanned row against another design's cold-start row.
+
+---
+
+## 2026-09-04 - A latency model is a queue, and four of its bugs read as results
+
+Rewriting the ADR-080 latency tier from summed operation counts to a discrete-event queue. The count model spanned ~1.9x between designs where the rig measures ~417x on mean latency; the missing factor was contention, not a cost constant. Four bugs found along the way, every one of which produced a plausible-looking number rather than an obvious failure:
+
+- **Background refill and player requests must not share one FIFO.** With both on the same tick queue every cached serve waited behind the refill backlog: modelled p50 103 ms against a measured 1 ms. Scheduled background work occupies the tick (so it belongs in MSPT) but does not enqueue a player behind it. Give it its own capacity track.
+- **Pace by credits, not by a cursor.** A pulse cursor advanced one whole period per request drifts ahead of the clock as soon as requests arrive faster than the period, which starved refill entirely and made a cache design read as memoryless. Credits that accrue with elapsed time neither lose nor manufacture budget.
+- **A sequential refiller is not a refiller.** Waiting out each location's own async chunk load in turn capped production at ~8/s against 18/s demand and pinned the modelled cache-hit rate near 0.5 no matter how large the budget. Timestamp completions and let many be in flight - and use a priority queue, because completion order is not submission order once work spreads across a pool.
+- **Pulse width matters as much as pulse rate.** The same 40 locations per second delivered as one burst per second over-predicted p50 by 19x, because any request arriving inside the burst queued behind all of it.
+- **Derive the dominant term, do not fit it.** Foreground chunk cost follows from measured main-thread CPU, chunks per attempt and async share by arithmetic: `17.97 / (1.58 x 0.15)` = 75.8 ms. An independent search that included it chose 73.8 ms - a 3 % agreement between a fit and a derivation sharing no inputs, and the strongest available evidence that the queue structure is right. A fitted dominant term would make every downstream figure a restatement of the fit.
+- **Signed residuals, and stop when the discipline says stop.** The tier now over-states competitor cost (mean signed residual +1.55), which flatters this plugin, so the gate fails and no latency figure may be published. Closing the last residual would require fitting a parameter to a competitor row, which the calibrate-one/validate-rest split forbids. The correct response to a failing gate is a new measurement, not a new knob.
+
+---
+
+## 2026-09-05 - `MemoryShape` biome table rework: the traps that actually cost time
+
+The biome table moved from per-biome `long[]` run tables to a single blocked union (`.bin` version 4). The design and its measurements live in [ADR-081](../adr/ADR-081-unified-blocked-biome-run-table.md); recorded here are only the failures that were silent, misleading, or cost a debugging loop.
+
+- **A second publication path must re-check every field the first one was the sole writer of.** Only a rebuild ever set `totalBiomeCount`, so publishing the union at load left `getEffectiveGoodCount()` at zero. No exception, no warning - just a silently wrong good/bad ratio in the selector.
+- **Sizing block-indexed arrays from `count / BLOCK_SIZE` is wrong.** A block closes early whenever the next key or sum offset would exceed `Integer.MAX_VALUE`, so a table can hold more blocks than its run count implies - worst case one per run. Immediate `ArrayIndexOutOfBoundsException` on the first table with a gap wider than 2^31; the block arrays must grow on demand, and a run maps to a block by search over `blockStart[]`, not by `i >> 10`.
+- **Do not "simplify" the union by leaving it un-clipped.** Contested cells are resolved last-observation-wins by clipping the incoming run, which is what makes the union a partition. Overlapping runs break `runContaining` - a floor-by-key search lands on a short run starting later and misses the longer one that covers the location - so `biomeAt` returns `null` on exactly the contested cells. Clipping also keeps `getEffectiveGoodCount()` from double-counting them.
+- **Dense, name-sorted biome ids silently defeat per-block copy-on-write.** Assigning slots by sorting the biomes present at rebuild time renumbers every existing run's id the first time a new biome is observed, invalidating all blocks. Ids must carry over from the previously published name table and only append. It measured as zero reuse with nothing failing; the identity assertion in `MemoryShapeTest.testUnionRebuildSharesUnchangedBlocks` is what caught it, where an allocation-delta assertion would have passed on noise.
+- **Test helpers that reflect into internals are format coupling.** `BiomeMenuSourceTest` seeded coverage via `biomePrefixSumsCache`, so deleting that field broke six tests unrelated to the change. Seed through `addBiomeLocation` + a rebuild.
+
+One measurement worth keeping because it is counter-intuitive and cannot be re-derived from the tree: **biome run count tracks area, not biome boundary length** (exponent 1.99-2.02), because `Square.xzToLocation` maps to concentric rings, so a patch spanning many rings yields one run *per ring*. Every `.bin` in this repo is a toy test fixture (largest: 10 biomes, 13 runs), so any sizing question needs `scripts/analyze_memoryshape_bin.py --simulate` or a real scan.
+
+---
+
+## 2026-09-06 - Geodesic blobbing vs. distance-bounded run-length merging for biome runs
+
+When attempting to optimize memory usage and lookup times in the modified space-filling curve (ADR-085 spiral-addressed Hilbert key space) at larger radii where spatial locality matters:
+
+An AI suggested replacing simple distance-bounded run-length merging with **geodesic blobbing**—attempting 2D morphological dilation/blob clustering across usable ground before run merging, rather than simply binding 1D run lengths by observable distance based on vanilla Minecraft chunk ticket mechanics (within 3 chunks, derived from max chunk ticket level / 5x5-7x7 ticking bounds; see `ADR-085` Section 14).
+
+Empirical results showed:
+- **Memory efficiency degraded by ~10-15%** compared to simple distance-bound merging.
+- **Compute time increased by >50%** due to the added multi-source geodesic traversal/clustering pass.
+
+**Durable takeaway:**
+- **Do not introduce 2D geodesic blobbing passes prior to run merging in the space-filling curve.** The Hilbert traversal inside coarse spiral points already projects 2D locality directly into the 1D key sequence. Simply bounding run lengths by observable distance (within 3 chunks / vanilla ticket window) aligns naturally with the curve's coalescing tolerance and player-perceptible bounds without paying for expensive morphological clustering.
+- **Hard complexity limit:** Spatial index representations in the memory shape pipeline have reached an empirical boundary where additional geometric pre-processing steps cost substantially more compute than any marginal compaction can save.
+
+---
+
+## Git & Workspace Safety
+
+### Working tree protection and destructive git operations (2026-06-14)
+
+The user's working tree often contains uncommitted in-progress work across multiple modules. An agent must never run destructive git operations (`git stash`, `git reset --hard`, `git restore`, `git checkout --`, `git clean -fd`, `git push --force`) without explicit written approval in the current session.
+
+**Real incident (2026-06-14):** An agent fixed failing `effects-api` tests, then ran `git commit` + `git push origin V3` without any user request. When asked to undo it, the agent ran `git reset --hard HEAD~1` (also without approval) and then attempted `git push --force-with-lease`, which was blocked by branch protection. The commit remained on `origin/V3` because force-push was unavailable. Root cause: the agent treated "fix is done" as implicit permission to commit and push, and treated "undo the commit" as implicit permission to run `git reset --hard`. Neither inference is valid. Commits/pushes require direct user instructions.
+
+### Blank-output trap on directory listings (2026-05-18)
+
+A directory listing command can return with no visible stdout rows even when the directory contains files (e.g. buffering / terminal drops). An agent must treat empty directory listings as "unknown", never as "the directory is empty".
+
+**Real incident:** Two blank listings led to the false conclusion that an existing, fully-implemented carrier module was an empty stub, and a follow-up copy operation clobbered a real committed source file. Always cross-check file existence via `git status`, `git ls-files`, or the `search_project` tool before overwriting or deleting files.

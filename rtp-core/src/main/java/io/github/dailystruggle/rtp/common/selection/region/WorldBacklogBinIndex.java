@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * World-scoped index of L3 backlog entries keyed by Anvil region-file coordinate (ADR-028).
+ * World-scoped index of backlog entries keyed by Anvil region-file coordinate (ADR-028).
  * Groups candidate locations across regions targeting the same world for single-pass verification.
  */
 public final class WorldBacklogBinIndex {
@@ -25,7 +25,7 @@ public final class WorldBacklogBinIndex {
    *              {@link BacklogLocationBuffer}; never {@code null}
    */
   public void insert(RegionFileCoord key, BacklogLocationBuffer.BacklogEntry entry) {
-    while (true) {
+    for (int attempt = 0; attempt < 32; attempt++) {
       WeakReference<List<BacklogLocationBuffer.BacklogEntry>> ref = bins.get(key);
       List<BacklogLocationBuffer.BacklogEntry> list = (ref == null) ? null : ref.get();
       if (list != null) {

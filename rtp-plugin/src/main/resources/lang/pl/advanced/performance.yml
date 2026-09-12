@@ -78,7 +78,7 @@ kolejkowaniePoTeleporcie: false
 # @default: true
 sprawdzPrzyZaladowaniuChunka: true
 
-# Ułamek pojemności backlogu L3, przy którym wznawiane jest uzupełnianie (histereza).
+# Ułamek pojemności backlogu, przy którym wznawiane jest uzupełnianie (histereza).
 # 0.5 = uzupełniaj po opróżnieniu do 50%; 1.0 = uzupełniaj ciągle.
 # @type: number
 # @range: [0.0, 1.0]
@@ -160,5 +160,6 @@ prefabrykat:
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
+
 # NIE ZMIENIAJ NUMERU WERSJI
 version: 1.0

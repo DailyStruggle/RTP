@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Backs the {@code /rtp clear cache} action (via {@link ClearCacheSubCmd}).
- * Clears the L1 (kept), L2 (unkept), and L3 (backlog) caches for every region
+ * Clears the hot (kept), cold (unkept), and backlog caches for every region
  * across the board, releasing any held chunk reservations and dropping the
  * associated persisted rows.
  *
@@ -48,7 +48,7 @@ public class ClearCacheCmd extends BaseRTPCmdImpl {
 
   @Override
   public String description() {
-    return "clear the L1/L2/L3 location caches for every region";
+    return "clear the hot/cold/backlog location caches for every region";
   }
 
   @Override
@@ -69,7 +69,7 @@ public class ClearCacheCmd extends BaseRTPCmdImpl {
       cleared++;
     }
 
-    String msg = "cleared L1/L2/L3 caches for " + cleared + " region(s)";
+    String msg = "cleared hot/cold/backlog caches for " + cleared + " region(s)";
     RTP.log(Level.INFO, "[RTP] clearcache: " + msg + " (by " + callerId + ")");
     if (callerId != null && RTP.serverAccessor != null) {
       try {

@@ -19,5 +19,5 @@ marcadores:
   # P0
   - "[RTP]"
 
-# DO NOT TOUCH VERSION NUMBER
+# NO MODIFICAR EL NÚMERO DE VERSIÓN
 version: 1.0

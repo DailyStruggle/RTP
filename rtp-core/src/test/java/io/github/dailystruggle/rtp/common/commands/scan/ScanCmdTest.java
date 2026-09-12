@@ -13,10 +13,12 @@ import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -35,6 +37,15 @@ import static org.mockito.Mockito.*;
  * cancel cleanup, permission denial, and invalid argument lengths.
  */
 public class ScanCmdTest {
+
+    // The mock scheduler runs a ScanTask's self-dispatched batches synchronously
+    // to completion, so any test that starts a scan walks the entire region
+    // inline. The default region is therefore deliberately tiny: it is large
+    // enough to exercise the full start/pause/resume/cancel/reset pipeline but
+    // small enough that a whole scan finishes in milliseconds. Full-scale scan
+    // behaviour lives in the @Tag("edge") test below (runs only with -PfullTests).
+    private static final long SCAN_TEST_RADIUS = 24L;
+    private static final long SCAN_TEST_CENTER_RADIUS = 8L;
 
     @TempDir
     Path tempDir;
@@ -63,8 +74,8 @@ public class ScanCmdTest {
         world = new MockRTPWorld("scan_test_world");
         accessor.addWorld(world);
 
-        // Set up shape and region
-        square = new Square();
+        // Set up shape and region (small, fast-to-scan default; see class comment)
+        square = smallSquare();
         LinearAdjustor vert = new LinearAdjustor(new ArrayList<>());
 
         RegionSettings settings = new RegionSettings(
@@ -160,6 +171,30 @@ public class ScanCmdTest {
 
     private ScanTask makeFakeTask() {
         return new ScanTask(region, 0L);
+    }
+
+    /** A Square configured with an explicit radius / centerRadius. */
+    private Square scanSquare(long radius, long centerRadius) {
+        Square s = new Square();
+        s.set(GenericMemoryShapeParams.radius, radius);
+        s.set(GenericMemoryShapeParams.centerRadius, centerRadius);
+        return s;
+    }
+
+    /** The small default shape whose full scan completes near-instantly. */
+    private Square smallSquare() {
+        return scanSquare(SCAN_TEST_RADIUS, SCAN_TEST_CENTER_RADIUS);
+    }
+
+    /** Build and register a region backed by a Square of the given size. */
+    private Region makeScanRegion(String name, long radius, long centerRadius) {
+        LinearAdjustor vert = new LinearAdjustor(new ArrayList<>());
+        RegionSettings settings = new RegionSettings(
+                name, world, scanSquare(radius, centerRadius), vert,
+                false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        Region r = new Region(name, settings);
+        RTP.selectionAPI.permRegionLookup.put(name, r);
+        return r;
     }
 
     // -------------------------------------------------------------------------
@@ -317,7 +352,7 @@ public class ScanCmdTest {
 
     @Test
     void scanPauseCmd_onCommand_withRegionParam_onlyPausesSpecifiedRegion() {
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -431,7 +466,7 @@ public class ScanCmdTest {
 
     @Test
     void scanCancelCmd_onCommand_withRegionParam_onlyCancelsSpecifiedRegion() {
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -506,7 +541,7 @@ public class ScanCmdTest {
 
     @Test
     void scanResumeCmd_onCommand_withRegionParam_onlyResumesSpecifiedRegion() {
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -681,7 +716,7 @@ public class ScanCmdTest {
     @Test
     void scanStartCmd_withMultipleRegions_returnsTrue() {
         // Register a second region
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -698,7 +733,7 @@ public class ScanCmdTest {
     @Test
     void scanCancelCmd_withMultipleRegions_cancelsAll() {
         // Register a second region
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -758,7 +793,7 @@ public class ScanCmdTest {
 
     @Test
     void scanResumeCmd_withMixedTasks_resumesExistingAndStartsMissing() {
-        Square square2 = new Square();
+        Square square2 = smallSquare();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
@@ -793,5 +828,139 @@ public class ScanCmdTest {
 
         assertFalse(task1.pause.get(),
                 "no-param resume should default to 'default' region and unpause its task");
+    }
+
+    @Test
+    void scanCancelCmd_substitutesCancelledRegionName() {
+        ScanTask task = makeFakeTask();
+        RTP.getInstance().scanTasks.put("default", task);
+
+        scanCancelCmd.onCommand(senderId, paramsWithRegion("default"), null);
+
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("default")),
+                "scanCancel announcement should contain the cancelled region name 'default'");
+    }
+
+    @Test
+    void scanPauseCmd_substitutesPausedRegionName() {
+        ScanTask task = makeFakeTask();
+        RTP.getInstance().scanTasks.put("default", task);
+
+        scanPauseCmd.onCommand(senderId, paramsWithRegion("default"), null);
+
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("default")),
+                "scanPause announcement should contain the paused region name 'default'");
+    }
+
+    @Test
+    void scanStartCmd_substitutesStartedRegionName() {
+        scanStartCmd.onCommand(senderId, paramsWithRegion("default"), null);
+
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("default")),
+                "scanStart announcement should contain the started region name 'default'");
+    }
+
+    @Test
+    void scanCommands_multiRegion_announcesEachSpecificRegionName() {
+        Square square2 = smallSquare();
+        LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
+        RegionSettings settings2 = new RegionSettings(
+                "region2", world, square2, vert2, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        Region region2 = new Region("region2", settings2);
+        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+
+        Map<String, List<String>> p = new HashMap<>();
+        p.put("region", Arrays.asList("default", "region2"));
+
+        accessor.announcedMessages.clear();
+        scanStartCmd.onCommand(senderId, p, null);
+
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("default")),
+                "scanStart should announce for 'default'");
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("region2")),
+                "scanStart should announce for 'region2'");
+    }
+
+    @Test
+    void scanTask_getEtaSeconds_atEndOfScan_returnsZero() {
+        ScanTask task = makeFakeTask();
+        Square shape = (Square) region.getShape();
+        long range = (long) shape.getRange();
+        long stride = Math.max(1L, shape.minBridgingStride());
+        task.currentOffset = stride - 1; // last pass
+        long eta = task.getEtaSeconds(range, range, shape, 1000L);
+        assertEquals(0L, eta, "ETA at the end of the final pass should be 0 seconds");
+    }
+
+    @Test
+    void scanTask_getEtaSeconds_calculatesAccurateTimeBasedOnRemainingPassesAndStride() {
+        // This is the ETA overcount regression: without the stride fix the ETA
+        // is multiplied by spatialResolution (32x). The default region is shrunk
+        // for scan speed, but the buggy value only clears the 5000s assertion on
+        // a full-scale shape (real ETA must stay under 5000s while 32x exceeds it,
+        // so the range must land in ~[20k, 640k]), so build a large one here.
+        Region bigRegion = makeScanRegion("eta_scale", 256L, 64L);
+        ScanTask task = new ScanTask(bigRegion, 0L);
+        Square shape = (Square) bigRegion.getShape();
+        long range = (long) shape.getRange();
+        long stride = Math.max(1L, shape.minBridgingStride());
+        task.currentOffset = 0;
+        // Total points across all passes = ((range + stride - 1) / stride) * stride ≈ range.
+        // At 1000 cpsLocal, ewma and cumulative are uninitialized so cps = 1000.
+        // But task cps field was initialized to cps.get() = cpu * 1000 / 32 / 5, etc.
+        // Let's test with a given cpsLocal.
+        long eta = task.getEtaSeconds(range, 0L, shape, 1000L);
+        assertTrue(eta > 0, "ETA should be positive");
+        // range is 1,000,000 for radius 10..1000.
+        // ETA should be <= range / 1000 + 60s if minCps is around 500-1000.
+        // Without the stride fix, it would be multiplied by spatialResolution (32), giving ~32,000s!
+        assertTrue(eta < 5000L, "ETA should not overcount by spatialResolution (32x): got " + eta);
+    }
+
+    // -------------------------------------------------------------------------
+    // Full-scale scan coverage (edge tier: runs only under -PfullTests)
+    // -------------------------------------------------------------------------
+
+    @Test
+    @Tag("edge")
+    void scanStartCmd_fullScaleScan_runsToCompletionOnLargeRegion() {
+        // The default region is intentionally tiny so routine runs are fast. This
+        // edge-tier test exercises a realistic large region end-to-end: the mock
+        // scheduler runs the whole scan inline, so reaching the assertions at all
+        // proves a full-scale scan completed without error.
+        makeScanRegion("edge_fullscale", 512L, 64L);
+
+        boolean result = scanStartCmd.onCommand(
+                senderId, paramsWithRegion("edge_fullscale"), null);
+
+        assertTrue(result);
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("edge_fullscale")),
+                "a started full-scale scan should announce its region name");
+    }
+
+    @Test
+    void scanTask_doesNotSkipBiomeForKnownBadLocationWhenBiomeMissing() {
+        ScanTask task = makeFakeTask();
+        Square shape = (Square) region.getShape();
+        long pos = 50L;
+
+        // Mark pos as bad without recording biome
+        shape.addBadLocation(pos, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.misc);
+        assertTrue(shape.isKnownBad(pos));
+        assertNull(shape.biomeAt(pos));
+
+        // When pos is tested, since its biome is null, testPos should resolve its biome off-tick
+        int[] xz = shape.locationToXZ(pos);
+        int blockX = (xz[0] << 4) + 8;
+        int blockZ = (xz[1] << 4) + 8;
+        java.util.concurrent.CompletableFuture<Boolean> res = task.testPos(
+                region, pos, blockX, blockZ, 5, new HashSet<>(), new HashSet<>(), false, null);
+
+        assertNotNull(res);
+        assertFalse(res.join());
+        shape.flushAndRebuild(1L);
+
+        // Biome should now be recorded for pos (MockRTPWorld returns a mock probe with plains)
+        assertNotNull(shape.biomeAt(pos));
     }
 }

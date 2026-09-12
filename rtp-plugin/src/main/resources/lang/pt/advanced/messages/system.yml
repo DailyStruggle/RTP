@@ -5,6 +5,8 @@
 # ###############################################################################
 # Seção 4: Sistema e administração
 # ###############################################################################
+# a 'versão' de um arquivo de configuração é inferior à mais recente
+# espaço reservado: [filename] - nome do arquivo, incluindo a extensão
 arquivoAntigo: "&b[P0] [filename] antigo detectado. Atualizando"
 
 # detectado um mundo bukkit que não está no arquivo de configuração
@@ -21,6 +23,9 @@ atualizado: "&a[P0] [filename] atualizado com sucesso."
 # ###############################################################################
 # Seção 5: Registros administrativos
 # ###############################################################################
+# registrado quando localizações são salvas/carregadas do banco de dados
+# espaço reservado: [amount] - número de localizações
+# espaço reservado: [region] - nome da região
 localizacaoSalva: "&7[P0] [amount] localizações salvas com sucesso para [region]"
 localizacaoCarregada: "&7[P0] [amount] localizações carregadas com sucesso para [region]"
 
@@ -32,4 +37,5 @@ version: 1.0
 # ###############################################################################
 # Seção 12: Opções para desenvolvedores
 # ###############################################################################
+# defina como true para anexar uma tag de desenvolvimento (ex. §8(RTP:ClassName)) a cada mensagem
 mostrarTagDev: false

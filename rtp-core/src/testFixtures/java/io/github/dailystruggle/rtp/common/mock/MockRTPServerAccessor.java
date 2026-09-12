@@ -289,7 +289,10 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public boolean isPrimaryThread() {
-        return true;
+        // In the synchronous model everything runs on the calling ("primary")
+        // thread. In the threaded server-topology model this reflects the mock
+        // main lane, so teleport sync-enforcement can be asserted.
+        return !scheduler.isThreaded() || scheduler.isOnMainLane();
     }
 
     @Override
@@ -320,13 +323,19 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     @Override
     public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) { }
 
+    private Function<String, ?> worldBorderFunction = null;
+
     /**
-     * Returns an always-inside world border so
+     * Returns configured world border or always-inside world border so
      * {@link io.github.dailystruggle.rtp.common.selection.region.LocationGenerator}
      * never rejects locations in tests.
      */
     @Override
     public Object getWorldBorder(String worldName) {
+        if (worldBorderFunction != null) {
+            Object res = worldBorderFunction.apply(worldName);
+            if (res != null) return res;
+        }
         return ALWAYS_INSIDE_BORDER;
     }
 
@@ -337,7 +346,8 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public boolean setWorldBorderFunction(Function<String, ?> function) {
-        return false;
+        this.worldBorderFunction = function;
+        return true;
     }
 
     @Override

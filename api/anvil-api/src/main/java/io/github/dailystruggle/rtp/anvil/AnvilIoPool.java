@@ -28,6 +28,9 @@ public final class AnvilIoPool {
 
     private static final ExecutorService INSTANCE = create();
 
+    /** Default memory budget: 64 MB (16 × ~4 MB avg region-file working set). */
+    private static volatile long memoryBudgetBytes = 64L * 1024L * 1024L;
+
     private AnvilIoPool() {}
 
     private static ExecutorService create() {
@@ -48,5 +51,21 @@ public final class AnvilIoPool {
     /** Returns the shared blocking-I/O executor for Anvil region-file reads. */
     public static ExecutorService get() {
         return INSTANCE;
+    }
+
+    /**
+     * Returns the memory budget in bytes allocated for Anvil I/O operations and buffers.
+     */
+    public static long getMemoryBudgetBytes() {
+        return memoryBudgetBytes;
+    }
+
+    /**
+     * Sets the memory budget in bytes allocated for Anvil I/O operations and buffers.
+     *
+     * @param bytes memory budget in bytes
+     */
+    public static void setMemoryBudgetBytes(long bytes) {
+        memoryBudgetBytes = bytes;
     }
 }

@@ -14,7 +14,7 @@ RTP provides multiple ways to view and update settings:
 
 > 📎 **Detailed Admin Guide:** See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full instructions on navigating the `/rtp admin` menu and using `/rtp config` subcommands.
 
-> **Folder layout:** the everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) sit at the top level. The named definitions you author (`regions/`, `worlds/`, `effects/`, plus the shared `shape/` and `vert/` catalogs) live under `definitions/`. The rarely-hand-edited tuning and text files (`performance.yml`, `logging.yml`, `metrics.yml`, `network.yml`, `database.yml`, `biomes.yml`, `blocks.yml`, the `messages/` tree, and the `schematics/` folder) live under `advanced/`. The per-locale translation mirror stays at `lang/`. Each rename map is a co-located hidden dotfile (`.<name>.lang.yml`) beside the file it describes. On upgrade from an older layout, RTP relocates your authored files automatically and archives the old folders as `<name>.migrated`.
+> **Folder layout:** the everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) sit at the top level. The named definitions you author (`regions/`, `worlds/`, `effects/`, plus the shared `shape/` and `vert/` catalogs) live under `definitions/`. The rarely-hand-edited tuning and text files (`performance.yml`, `logging.yml`, `metrics.yml`, `ttl.yml`, `network.yml`, `database.yml`, `biomes.yml`, `blocks.yml`, the `messages/` tree, and the `schematics/` folder) live under `advanced/`. The per-locale translation mirror stays at `lang/`. Each rename map is a co-located hidden dotfile (`.<name>.lang.yml`) beside the file it describes. On upgrade from an older layout, RTP relocates your authored files automatically and archives the old folders as `<name>.migrated`.
 
 > **Inheritance:** to avoid repeating the same value across many region/world files, a region/world setting can inherit a global default with an `@<file>` token (e.g. `@config`, `@economy`). See [CORE_CONFIG.md → Defaults (inheritance)](CORE_CONFIG.md#defaults-inheritance).
 
@@ -37,6 +37,7 @@ RTP provides multiple ways to view and update settings:
 | `advanced/messages/*.yml` | All player-facing message strings (split by concern) | [MESSAGES.md](MESSAGES.md) |
 | `advanced/logging.yml` | Console logging verbosity | [LOGGING.md](LOGGING.md) |
 | `advanced/metrics.yml` | Runtime-health metrics SPI reporting knobs | [METRICS.md](METRICS.md) |
+| `advanced/ttl.yml` | Spatial memory expiration and cause-based TTL tiers | [TTL.md](TTL.md) |
 | `advanced/network.yml` | Multi-server / multi-proxy network mode | [proxies/CONFIGURATION.md](../proxies/CONFIGURATION.md) |
 | `advanced/database.yml` | Database backend and connection settings | [CORE_CONFIG.md](CORE_CONFIG.md) |
 | `advanced/biomes.yml`, `advanced/blocks.yml` | Biome / block tag catalogs used by safety filters | [SAFETY.md](SAFETY.md) |
@@ -75,7 +76,7 @@ The `shape` block defines how horizontal coordinates are selected. The `name` ke
 
 | Key | Type | Description |
 |---|---|---|
-| `name` | String | Shape engine: `CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `RECTANGLE`. |
+| `name` | String | Shape engine: `CIRCLE`, `CIRCLE_NORMAL`, `CIRCLE_OPTIMIZED_DUAL_LAYER`, `CIRCLE_DEPRECATED_PURE_SPIRAL`, `SQUARE`, `SQUARE_NORMAL`, `SQUARE_OPTIMIZED_DUAL_LAYER`, `SQUARE_DEPRECATED_PURE_SPIRAL`, `ELLIPSE`, `RECTANGLE`, `POLYGON`. |
 | `mode` | String | Selection logic. See table below. |
 | `centerX` | Integer | Chunk X coordinate of the region centre (default `0`). |
 | `centerZ` | Integer | Chunk Z coordinate of the region centre (default `0`). |
@@ -94,8 +95,8 @@ The `shape` block defines how horizontal coordinates are selected. The `name` ke
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `radius` | Integer | `256` | Maximum distance from the centre in **chunks**. |
-| `centerRadius` | Integer | `64` | Minimum distance from the centre (donut hole) in **chunks**. Players won't land inside this radius. |
+| `radius` | Integer / Distance | `256` | Maximum distance from the centre in **chunks** (supports spatial suffixes, e.g. `4096b`, `256c`, `4r`, `5km`). |
+| `centerRadius` | Integer / Distance | `64` | Minimum distance from the centre (donut hole) in **chunks** (supports spatial suffixes, e.g. `1024b`, `64c`). Players won't land inside this radius. |
 | `weight` | Double | `1.0` | Distribution weight. `> 1.0` shifts landings toward the centre; `< 1.0` shifts toward the edge. |
 | `expand` | Boolean | `false` | If `true`, the radius grows automatically as locations are consumed. |
 
@@ -105,8 +106,8 @@ Normal-distribution variants replace `weight` with explicit statistical paramete
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `radius` | Integer | `256` | Maximum distance from the centre in **chunks**. |
-| `centerRadius` | Integer | `64` | Minimum distance from the centre in **chunks** (donut hole). |
+| `radius` | Integer / Distance | `256` | Maximum distance from the centre in **chunks** (supports spatial suffixes, e.g. `4096b`, `256c`, `4r`, `5km`). |
+| `centerRadius` | Integer / Distance | `64` | Minimum distance from the centre in **chunks** (donut hole, supports spatial suffixes). |
 | `mean` | Double | — | Mean of the normal distribution (0.0 = centre, 1.0 = edge). |
 | `deviation` | Double | — | Standard deviation. Smaller = tighter cluster; larger = wider spread. |
 | `expand` | Boolean | `false` | If `true`, the radius grows automatically as locations are consumed. |
@@ -115,9 +116,28 @@ Normal-distribution variants replace `weight` with explicit statistical paramete
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `width` | Integer | — | Full width of the rectangle (total X-axis extent, centred on the region). |
-| `height` | Integer | — | Full height of the rectangle (total Z-axis extent, centred on the region). |
+| `width` | Integer / Distance | — | Full width of the rectangle (total X-axis extent, centred on the region; supports spatial suffixes). |
+| `height` / `length` | Integer / Distance | — | Full height / length of the rectangle (total Z-axis extent, centred on the region; supports spatial suffixes). |
 | `rotation` | Double | `0.0` | Rotation of the rectangle in degrees around the centre. |
+
+#### `ELLIPSE` — additional keys
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `radius` / `radius2` | Integer / Distance | `256` | The two outer semi-axes in **chunks** (supports spatial suffixes). The wider of the two bounds the spiral mapping. |
+| `centerRadius` / `centerRadius2` | Integer / Distance | `0` | The two semi-axes of the inner exclusion ellipse, in **chunks**. |
+| `rotation` | Double | `0.0` | Rotation of both the outer and inner ellipse in degrees around the centre. |
+| `weight` | Double | `1.0` | Distribution weight, same meaning as `CIRCLE`. |
+| `expand` | Boolean | `false` | If `true`, the radii grow automatically as locations are consumed. |
+
+#### `POLYGON` — additional keys
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `vertices` | List of `[x, z]` pairs | — | Boundary vertices in traversal order, in the same format Chunky uses. At least 3, not all collinear, no self-intersections. Invalid or self-intersecting vertices trigger a warning and fall back to the bounding square. See [REGIONS.md](REGIONS.md#polygon). |
+| `weight` | Double | `1.0` | Distribution weight across the vertex bounding box. |
+
+`expand` is not part of the polygon surface and is ignored: the boundary is admin-authored, so growing it would push landings outside it.
 
 ---
 
@@ -129,7 +149,7 @@ The `vert` block controls how the Y coordinate (height) is chosen once a horizon
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `name` | String | `"JUMP"` | Vertical adjustor engine: `JUMP` or `LINEAR`. |
+| `name` | String | `"JUMP"` | Vertical adjustor engine: `JUMP`, `LINEAR`, or `FIXED`. |
 | `minY` | Integer | `32` | Minimum Y level a player can land at. |
 | `maxY` | Integer | `255` | Maximum Y level a player can land at. |
 | `requireSkyLight` | Boolean | `false` | If `true`, only accept locations with direct sky access (above-ground only). |
@@ -145,6 +165,12 @@ The `vert` block controls how the Y coordinate (height) is chosen once a horizon
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `direction` | Integer | `2` | Search direction: `0` = bottom-up (scan from `minY` to `maxY`), `1` = top-down (scan from `maxY` to `minY`), `2` = middle-out (default), `3` = edges-in, any other integer = randomized order. |
+
+#### `FIXED` — additional keys
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `y` | Integer | `64` | Exact Y level for mid-air placement. No terrain scan runs, so `minY`, `maxY`, `direction`, and `requireSkyLight` are ignored. Intended for skyblock-style worlds; pair it with a platform builder or the player falls through air. See [REGIONS.md](REGIONS.md). |
 
 ---
 
@@ -213,7 +239,9 @@ For in-depth explanations and complete key tables of each configuration file:
 
 ## Custom Shapes and Addons
 
-All five built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `RECTANGLE`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
+The built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `CIRCLE_OPTIMIZED_DUAL_LAYER`, `CIRCLE_DEPRECATED_PURE_SPIRAL`, `SQUARE`, `SQUARE_NORMAL`, `SQUARE_OPTIMIZED_DUAL_LAYER`, `SQUARE_DEPRECATED_PURE_SPIRAL`, `ELLIPSE`, `RECTANGLE`, `POLYGON`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
+
+That list is the set this build registers at startup. Addons can register more, so the authoritative list for your install is written to `plugins/RTP/definitions/regions/SHAPES.md` (and `VERT.md` for vertical adjustors) on every start and `/rtp reload`, generated from the live registry.
 
 Custom shapes can be registered at runtime via `rtp-api`. See [`addons/`](../../addons/) for examples. A registered custom shape appears as a valid `shape.name` value in any region config.
 

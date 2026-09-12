@@ -6,10 +6,9 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist.WaitEnvelope
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIf;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
 
 import java.time.Duration;
 import java.util.List;
@@ -29,29 +28,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * atomicity, FIFO drain, point-remove, position lookup, reap, and
  * refreshAllTtl that the no-Redis script-load smoke test cannot reach.
  *
- * <p>Gated by {@code RTP_REDIS_IT=true}; default builds skip this entire
- * class, same gating as the seven pre-existing Redis ITs. To run locally:
- * <pre>
- *   docker run --rm -p 6379:6379 redis:7-alpine
- *   $env:RTP_REDIS_IT = "true"
- *   .\gradlew :rtp-proxy:rtp-proxy-common:test --tests "*RedisNetworkWaitlistIT*"
- * </pre>
- *
- * <p>Connection target: {@code 127.0.0.1:6379} (override via
- * {@code RTP_REDIS_IT_HOST} / {@code RTP_REDIS_IT_PORT} /
- * {@code RTP_REDIS_IT_PASSWORD}). Cleanup scrubs only the
- * {@code rtp:net:waitlist:*} keyspace.</p>
+ * <p>Backed by a Testcontainers-managed {@code redis:7-alpine} (item 17 of
+ * ENTERPRISE_READINESS.md: use a real Redis, not mocks). Docker-gated via
+ * {@link RedisTestContainer#dockerAvailable()} so a Docker-less build skips the
+ * class cleanly. Cleanup scrubs only the {@code rtp:net:waitlist:*}
+ * keyspace.</p>
  */
-@EnabledIfEnvironmentVariable(named = "RTP_REDIS_IT", matches = "true")
+@EnabledIf("io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisTestContainer#dockerAvailable")
 class RedisNetworkWaitlistIT {
 
     private JedisPool pool;
     private RedisNetworkWaitlist waitlist;
-
-    private static String envOr(String name, String fallback) {
-        String v = System.getenv(name);
-        return (v == null || v.isEmpty()) ? fallback : v;
-    }
 
     private static void scrubKeyspace(JedisPool p) {
         try (Jedis j = p.getResource()) {
@@ -64,15 +51,7 @@ class RedisNetworkWaitlistIT {
 
     @BeforeEach
     void open() {
-        String host = envOr("RTP_REDIS_IT_HOST", "127.0.0.1");
-        int port = Integer.parseInt(envOr("RTP_REDIS_IT_PORT", "6379"));
-        String password = System.getenv("RTP_REDIS_IT_PASSWORD");
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(4);
-        cfg.setMaxIdle(2);
-        pool = (password == null || password.isEmpty())
-                ? new JedisPool(cfg, host, port, 2000)
-                : new JedisPool(cfg, host, port, 2000, password);
+        pool = RedisTestContainer.newPool();
         scrubKeyspace(pool);
         // maxSize = 16 keeps the FULL test deterministic.
         waitlist = new RedisNetworkWaitlist(pool, 16);

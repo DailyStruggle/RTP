@@ -5,7 +5,7 @@
 # ###############################################################################
 # Section 2: Teleportation
 # ###############################################################################
-# when teleporting, say this
+# lors de la téléportation, afficher ceci
 alreadyTeleporting: "&7[P0] ⚡ vous êtes déjà en téléportation !"
 
 # si le plugin est en cours de rechargement
@@ -14,7 +14,7 @@ delayMessage: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Téléportation dans [delay]. 
 chunkLoading: "&7[P0] ⚙ Chargement des chunks ! veuillez patienter..."
 teleportMessage: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Téléporté en [attempts] tentatives, en [processingTime]</gradient>"
 
-# if teleport is cancelled
+# si la téléportation est annulée
 teleportCancel: "&7[P0] ⚡ Téléportation annulée !"
 
 # s'il n'y a pas d'endroits sûrs après le nombre maximum de tentatives
@@ -25,7 +25,7 @@ unsafe: "&7[P0] ⌖ impossible de trouver un emplacement sûr en [attempts] tent
 # espace réservé : [remainingCooldown] - le temps restant
 cooldownMessage: "&7[P0] ⚡ Vous ne pouvez pas vous téléporter avant [remainingCooldown]"
 
-# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+# lorsque le joueur a atteint la limite lockAfterUses et est bloqué (parité BetterRTP LockAfter)
 lockedAfterUses: "&7[P0] ⌖ Vous avez atteint votre limite de téléportation aléatoire. Réessayez dans [remainingLockTime]."
 
 # si la région n'a aucun emplacement en file et que le joueur n'a pas la permission rtp.unqueued
@@ -42,7 +42,7 @@ notEnoughMoney: "&7[P0] il vous faut au moins $[money] pour cela."
 # ###############################################################################
 # Section 3: Time Formatting
 # ###############################################################################
-# for time placeholders, what to call days, hours, minutes, seconds, and milliseconds
+# pour les espaces réservés de temps, comment nommer les jours, heures, minutes, secondes et millisecondes
 days: "d"
 hours: "h"
 minutes: "min"
@@ -60,14 +60,14 @@ badArg: "&c[P0] argument de commande invalide [arg]"
 # lorsque la console tente d'exécuter une commande réservée aux joueurs
 consoleCmdNotAllowed: "&c[P0] Vous devez être un joueur en jeu pour exécuter cette commande."
 
-# plugin is busy reloading
+# le plugin est occupé à recharger
 busy: "&c[P0] occupé"
 
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+# Envoyé lorsque la vérification optionnelle de combat PvP refuse le /rtp car le joueur est en combat
 pvpInCombat: "&c[P0] Vous ne pouvez pas vous téléporter aléatoirement en combat."
 
-# plugin doesn't have the subcommand or parameter the user requested
-# placeholder: [arg] - the argument attempted
+# le plugin ne dispose pas de la sous-commande ou du paramètre demandé par l'utilisateur
+# espace réservé : [arg] - l'argument tenté
 invalidCommand: "&c[P0] commande invalide - [arg]"
 
 # l'utilisateur n'a pas la permission pour la commande demandée
@@ -89,28 +89,28 @@ info_description: "vérifier l'état actuel du plugin"
 test_description: "tester les fonctions RTP"
 
 # ###############################################################################
-# Section 9: PlaceholderAPI Support
+# Section 9 : Prise en charge de PlaceholderAPI
 # ###############################################################################
-# status placeholders for players
+# espaces réservés d'état pour les joueurs
 PLAYER_AVAILABLE: "&aDISPONIBLE"
-PLAYER_COOLDOWN: "&7ON COOLDOWN"
+PLAYER_COOLDOWN: "&7EN RÉCUPÉRATION"
 PLAYER_SETUP: "&bCHOIX D'UN EMPLACEMENT"
 PLAYER_LOADING: "&bCHARGEMENT DES CHUNKS"
 PLAYER_TELEPORTING: "&bTÉLÉPORTATION"
 
 # ###############################################################################
-# Section 10: Visuals
+# Section 10 : Éléments visuels
 # ###############################################################################
-# title settings
-# remove or set title to " to disable
-# PlaceholderAPI is recommended for coordinates
+# paramètres de titre
+# supprimer ou définir le titre sur "" pour le désactiver
+# PlaceholderAPI est recommandé pour les coordonnées
 title: "<rainbow>Teleporte!</rainbow>"
 subtitle: "<gradient:#A78BFA:#E876A0>amusez-vous!</gradient>"
 fadeIn: 20
 stay: 20
 fadeOut: 20
 
-# actionbar setting
+# paramètre d'actionbar
 actionbar: ""
 
 # DO NOT TOUCH VERSION NUMBER

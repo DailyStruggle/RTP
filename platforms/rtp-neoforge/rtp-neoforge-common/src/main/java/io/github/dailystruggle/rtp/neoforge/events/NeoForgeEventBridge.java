@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
@@ -142,6 +143,17 @@ public final class NeoForgeEventBridge {
             refillLoginReserveOnQuit();
         } catch (Throwable t) {
             RTP.log(Level.WARNING, "[RTP][NeoForge] PlayerLoggedOut handler failed", t);
+        }
+    }
+
+    @SubscribeEvent
+    public void onPlayerDeath(LivingDeathEvent event) {
+        try {
+            if (event.getEntity() instanceof ServerPlayer player) {
+                io.github.dailystruggle.rtp.neoforge.effects.NeoForgeEffectsHandler.onPlayerDeath(player);
+            }
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, "[RTP][NeoForge] LivingDeathEvent handler failed", t);
         }
     }
 

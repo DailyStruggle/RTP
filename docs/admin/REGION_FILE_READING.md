@@ -1,6 +1,6 @@
-# Reading Minecraft Region Files (the anvil pre-filter)
+# Reading Minecraft Region Files (the region pre-filter)
 
-To find safe teleport destinations without loading (and generating) chunks on the server thread, RTP reads Minecraft's region files (`.mca`, the "anvil" format) **directly from disk, read-only, off the main thread**. This page documents exactly which on-disk format RTP understands, and - just as importantly - what it does when it encounters data it does *not* understand. That pass-through behavior is what keeps RTP safe if a future Minecraft version changes its save format.
+To find safe teleport destinations without loading (and generating) chunks on the server thread, RTP reads Minecraft's region files (`.mca` Anvil or `.linear` Linear format) **directly from disk, read-only, off the main thread**. This page documents exactly which on-disk formats RTP understands, and - just as importantly - what it does when it encounters data it does *not* understand. That pass-through behavior is what keeps RTP safe if a future Minecraft version changes its save format.
 
 The feature is controlled by `anvilPrefilterEnabled` in [`safety.yml`](configuration/SAFETY.md) (default `true`). Turning it off makes every candidate skip the disk pre-filter and reach the live-load stage un-screened; it does not change safety, only speed.
 
@@ -8,38 +8,48 @@ The feature is controlled by `anvilPrefilterEnabled` in [`safety.yml`](configura
 
 ## Where this fits: the cache pipeline
 
-The anvil reader is a **screen**, not the teleport path itself. It never loads or generates a chunk, and it is **not** the stage that live-loads. Candidates flow through three cache tiers, and only the last one live-loads:
+The region reader is a **screen**, not the teleport path itself. It never loads or generates a chunk, and it is **not** the stage that live-loads. Candidates flow through three cache tiers, and only the last one live-loads:
 
-- **L3 (backlog).** Cheap shape-only picks are queued unverified. Each pulse, RTP reads **one** region file and screens the subset of queued picks that fall inside that `.mca`. A pick the reader **rejects** (a known-unsafe surface on disk) is dropped; a pick it **accepts** or cannot decide (`UNKNOWN`) is kept and flows down. The reader only ever *removes* known-bad candidates here - it does not live-load.
+- **L3 (backlog).** Cheap shape-only picks are queued unverified. Each pulse, RTP reads **one** region file and screens the subset of queued picks that fall inside that `.mca` or `.linear` file. A pick the reader **rejects** (a known-unsafe surface on disk) is dropped; a pick it **accepts** or cannot decide (`UNKNOWN`) is kept and flows down. The reader only ever *removes* known-bad candidates here - it does not live-load.
 - **L2 (cold).** Filled from L3's screened output, or by screening a single location against an already-read region file.
 - **L2 -> L1 (hot).** This is the only stage that **live-loads**: it loads (generating if necessary) the candidate's chunk, runs the full in-memory safety check on the real block data, and only then adds the location to L1, where it waits until `/rtp` consumes it.
 
-So "falls back to live loading" is a property of the **L2 -> L1 promotion**, not of the anvil reader. The reader's whole point is to keep known-unsafe candidates from ever reaching that live load.
+So "falls back to live loading" is a property of the **L2 -> L1 promotion**, not of the region reader. The reader's whole point is to keep known-unsafe candidates from ever reaching that live load.
 
 ---
 
 ## What RTP reads
 
-- **File type:** vanilla region files named `r.X.Z.mca`, in the world's region directory (`region/` for the overworld, `DIM-1/region/`, `DIM1/region/`, and custom-dimension subpaths for others).
+- **File types:**
+  - **Linear files (`r.X.Z.linear`):** ZStandard-compressed continuous region format used by high-performance forks (Leaves, Gale) and Fabric/NeoForge Linear mods. Probed first (ADR-077).
+  - **Anvil files (`r.X.Z.mca`):** Standard vanilla Minecraft 4 KiB sector-aligned region files.
+  - Files are located in the world's region directory (`region/` for the overworld, `DIM-1/region/`, `DIM1/region/`, and custom-dimension subpaths for others).
 - **Access mode:** **read-only**. RTP never writes, truncates, or rewrites a region file, and never loads or generates a chunk to read one. A region file that does not exist yet is simply treated as "not known" (see fallback below).
 - **What it extracts:** only the few fields the safety check needs - the chunk's `DataVersion`, the `MOTION_BLOCKING_NO_LEAVES` heightmap, the block `sections` palette, and biome data. It does no block-entity, tile-tick, or entity interpretation.
 
-### Region-file structure understood
+### Region-file structures understood
 
+#### 1. Anvil Format (`.mca`)
 - A 4 KiB (4096-byte) sector layout with the standard 8 KiB header (chunk location table + timestamp table).
 - Per-chunk location entries giving a sector offset + sector count; a zeroed entry means "chunk not present in this region" and is treated as unknown.
 - A per-chunk 5-byte payload header (4-byte big-endian length prefix + 1 compression-mode byte), followed by the compressed NBT chunk root.
 
+#### 2. Linear Format (`.linear`, ADR-077)
+- 8-byte magic header (`0xC370ACDE22013702` or `SUPER\0\0\0`), version byte (`1` or `2`), and header metadata.
+- 1024-entry uncompressed chunk length table and timestamp table.
+- Continuous ZStandard (`zstd`) stream decoded via native `zstd-jni` into the chunk's NBT root.
+
 ### Compression modes understood
 
-| Mode byte | Meaning | Supported |
+| Format / Mode | Compression Scheme | Supported |
 |---|---|---|
-| `1` | GZIP | Yes |
-| `2` | Zlib / Deflate (the vanilla default) | Yes |
-| `3` | Uncompressed | Yes |
-| `4` | LZ4 | Yes |
+| Linear | ZStandard (`zstd`) stream | Yes |
+| Anvil Mode `1` | GZIP | Yes |
+| Anvil Mode `2` | Zlib / Deflate (the vanilla default) | Yes |
+| Anvil Mode `3` | Uncompressed | Yes |
+| Anvil Mode `4` | LZ4 | Yes |
 | any other value | Unknown / future mode | No -> fallback |
-| the `0x80` "external file" flag (e.g. `130` = `0x82`) | Oversized chunk stored in a sidecar `.mcc` file | No -> fallback |
+| the `0x80` "external file" flag | Oversized chunk stored in a sidecar `.mcc` file | No -> fallback |
 
 ### Minecraft versions validated
 
@@ -63,7 +73,8 @@ The reader has exactly three outcomes: **ACCEPT** (every sampled column is safe 
 - **Empty location entry** - the chunk slot is unused in that region file.
 - **Region read failed** - the file vanished or could not be read.
 - **Unknown compression mode**, or the **external-file (`0x80`) flag** - a compression variant RTP has not validated.
-- **Corrupt / truncated region entry** - a length prefix or sector span that runs past the end of the file.
+- **Corrupt / truncated region entry** - a length prefix, sector span, or Linear header that runs past the end of the file.
+- **Linear native library unavailable** - `zstd-jni` failed to link native binaries (e.g. strict security sandboxes); falls through cleanly.
 - **Missing `MOTION_BLOCKING_NO_LEAVES` heightmap**, or **no block sections** - a chunk shape the safety check cannot read.
 
 In every one of these cases the outcome is the same: the reader neither accepts nor rejects from disk, so the candidate is passed through to be resolved by the live-load safety check. **A format RTP cannot read never produces an unsafe placement - it only means that candidate is confirmed the slow way instead of screened the fast way.**

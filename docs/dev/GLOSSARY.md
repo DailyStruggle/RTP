@@ -142,6 +142,9 @@ The Bukkit/Spigot entry-point class. RTP's entry point lives in `rtp-plugin` (`R
 **Land Protection Plugin**
 A third-party Minecraft plugin (e.g., GriefPrevention, WorldGuard, Towny) that marks areas of the world as claimed or restricted. RTP integrates with these via the claim-check hook in `rtp-api`.
 
+**Linear Region Format (`.linear`)**
+An alternative on-disk Minecraft region storage format introduced by high-performance server forks (such as Leaves and Gale) and modded environments. Replaces Mojang's 4 KiB sector-aligned Anvil layout with continuous ZStandard (`zstd`) streams to eliminate sector quantization padding, reduce world disk space by 30-60%, and accelerate sequential I/O. Decoded off-tick via `LinearRegionReader` under ADR-077.
+
 **Lock-Free Read**
 A concurrency pattern where shared data is read without acquiring a mutex, typically using `volatile` fields, `ConcurrentHashMap`, or `EnumMap`. RTP requires lock-free reads on configuration data to avoid synchronization bottlenecks under high teleport load.
 

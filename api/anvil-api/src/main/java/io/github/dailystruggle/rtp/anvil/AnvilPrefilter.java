@@ -173,7 +173,8 @@ public final class AnvilPrefilter {
     final UnaryOperator<String> r = (reconciler == null) ? DEFAULT_RECONCILER : reconciler;
     final Set<String> reconciledUnsafe = reconcileAll(rawUnsafeBlocks, r);
     try {
-      Path regionFile = regionFileFor(worldFolder, dimensionSubpath, cx, cz);
+      RegionFileResolver.ResolvedRegion resolved = RegionFileResolver.resolve(worldFolder, dimensionSubpath, cx, cz);
+      Path regionFile = resolved.path();
       if (!Files.isRegularFile(regionFile)) {
         // Chunk has never been generated and persisted; the live load path will generate
         // it if needed. The pre-filter cannot reject what does not exist on disk.
@@ -197,7 +198,7 @@ public final class AnvilPrefilter {
       int rx = Math.floorMod(cx, 32);
       int rz = Math.floorMod(cz, 32);
 
-      AnvilReader.ChunkEntry entry = AnvilReader.readChunk(regionBytes, rx, rz);
+      AnvilReader.ChunkEntry entry = resolved.reader().readChunk(regionBytes, rx, rz);
       if (entry == null) {
         // Location entry is zeroed - chunk slot unused in this region file.
         diagLog("UNKNOWN:empty-location-entry",

@@ -2,12 +2,32 @@ package io.github.dailystruggle.rtp.common.metrics;
 
 import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import io.github.dailystruggle.rtp.common.RTP;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ReqRtpObs001CoreMetricsTest {
+
+    /**
+     * Region status is derived from the process-global {@link RTP#selectionAPI}
+     * singleton, which earlier {@code RTPTestSetup}-based tests populate and never
+     * clear. Clear the region lookups before each metrics test so assertions are
+     * order-independent regardless of which classes ran first in the JVM.
+     */
+    @BeforeEach
+    void clearLeakedRegionState() {
+        if (RTP.selectionAPI != null) {
+            if (RTP.selectionAPI.permRegionLookup != null) {
+                RTP.selectionAPI.permRegionLookup.clear();
+            }
+            if (RTP.selectionAPI.tempRegions != null) {
+                RTP.selectionAPI.tempRegions.clear();
+            }
+        }
+    }
 
     @Test
     void snapshot_usesNoopBindingByDefault() {
@@ -76,5 +96,7 @@ class ReqRtpObs001CoreMetricsTest {
         RTPMetricsExtension ext = m.snapshot().extension(RTPMetricsExtension.class);
         assertNotNull(ext);
         assertEquals(0, ext.queueDepth);
+        assertNotNull(ext.regionQueueStatus);
+        assertTrue(ext.regionQueueStatus.isEmpty());
     }
 }

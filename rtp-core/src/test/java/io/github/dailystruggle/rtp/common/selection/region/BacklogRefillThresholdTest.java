@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests for {@code backlogRefillThreshold} performance knob governing L3 backlog cache refill hysteresis.
+ * Tests for {@code backlogRefillThreshold} performance knob governing backlog cache refill hysteresis.
  */
 class BacklogRefillThresholdTest {
 

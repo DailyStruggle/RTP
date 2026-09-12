@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="RTP static analysis (starter)"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>
+    RTP's local, clang-tidy-style static-analysis ruleset. This file is the
+    single place to CONFIGURE (turn rules on/off, tune priorities) and PROGRAM
+    (append custom XPath rules) the analyzer. It ships with a curated starter
+    set of known-issue detectors plus project-specific rules (e.g. the
+    "prefer non-locking execution" rule below, which encodes the RTP scheduler
+    contract from the project guidelines).
+
+    The analyzer is opt-in: run it locally with
+    `.\gradlew.bat pmdMain pmdTest -PstaticAnalysis` (per module, e.g.
+    `.\gradlew.bat :rtp-core:pmdMain -PstaticAnalysis`) or gate the whole build
+    with `.\gradlew.bat build -PstaticAnalysis` (see the root build.gradle
+    `subprojects` block). Priorities: 1 = highest. The build's
+    `rulesMinimumPriority` can raise the bar without editing this file.
+
+    TO APPEND A CHECK: add a &lt;rule&gt; element below. Reference a built-in
+    rule by its `ref` (see https://pmd.github.io/pmd/pmd_rules_java.html) or
+    write a custom XPath rule following the PreferNonLockingExecution example.
+  </description>
+
+  <!-- ==================================================================== -->
+  <!-- Curated starter set: high-signal built-in Java rules. Individual      -->
+  <!-- noisy sub-rules are excluded so the starter set stays actionable.     -->
+  <!-- ==================================================================== -->
+
+  <!-- Real bugs: null derefs, resource leaks, broken equals/compareTo, etc. -->
+  <rule ref="category/java/errorprone.xml">
+    <!-- Highly stylistic / opinionated members excluded from the starter set. -->
+    <exclude name="DataflowAnomalyAnalysis"/>
+    <exclude name="AvoidLiteralsInIfCondition"/>
+    <exclude name="AvoidFieldNameMatchingMethodName"/>
+    <exclude name="AvoidFieldNameMatchingTypeName"/>
+    <exclude name="AvoidDuplicateLiterals"/>
+    <exclude name="CompareObjectsWithEquals"/>
+  </rule>
+
+  <!-- Multithreading correctness: aligns with the RTP scheduler contract. -->
+  <rule ref="category/java/multithreading.xml">
+    <!-- DoNotUseThreads is superseded by our stricter custom rule below. -->
+    <exclude name="DoNotUseThreads"/>
+  </rule>
+
+  <!-- Resource-handling & performance foot-guns. -->
+  <rule ref="category/java/performance.xml">
+    <exclude name="AvoidInstantiatingObjectsInLoops"/>
+    <exclude name="RedundantFieldInitializer"/>
+  </rule>
+
+  <!-- A conservative slice of best-practices (leaks, missing overrides). -->
+  <rule ref="category/java/bestpractices.xml/AvoidUsingHardCodedIP"/>
+  <rule ref="category/java/bestpractices.xml/CheckResultSet"/>
+  <rule ref="category/java/bestpractices.xml/UnusedAssignment"/>
+  <rule ref="category/java/bestpractices.xml/PrimitiveWrapperInstantiation"/>
+
+  <!-- ==================================================================== -->
+  <!-- Project-specific programmable checks (append your own below).         -->
+  <!-- ==================================================================== -->
+
+  <!--
+    Prefer non-locking execution.
+
+    The RTP guidelines require periodic/async work to go through the
+    RTPScheduler SPI and forbid main-thread blocking; explicit intrinsic locks
+    (`synchronized` blocks) are a code smell in the hot selection/queue paths.
+    This flags `synchronized` blocks so a lock-free alternative (atomics,
+    concurrent collections, the scheduler's async chaining) is considered.
+
+    This is intentionally a starter heuristic: suppress a justified use with
+    `@SuppressWarnings("PMD.PreferNonLockingExecution")` on the enclosing
+    method, or refine the XPath here (e.g. scope it to specific packages).
+  -->
+  <rule name="PreferNonLockingExecution"
+        language="java"
+        message="Prefer non-locking execution: avoid `synchronized` blocks; use atomics, concurrent collections, or the RTPScheduler SPI instead."
+        class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+    <priority>3</priority>
+    <properties>
+      <property name="xpath">
+        <value>//SynchronizedStatement</value>
+      </property>
+    </properties>
+    <description>
+      Encodes the RTP "non-blocking, scheduler-driven" concurrency contract.
+      Prefer lock-free constructs over intrinsic monitor locks in backend code.
+    </description>
+    <example>
+      <![CDATA[
+// flagged:
+synchronized (lock) { counter++; }
+
+// preferred:
+counter.incrementAndGet(); // java.util.concurrent.atomic
+      ]]>
+    </example>
+  </rule>
+
+</ruleset>

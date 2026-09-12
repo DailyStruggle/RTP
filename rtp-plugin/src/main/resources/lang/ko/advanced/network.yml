@@ -5,10 +5,12 @@ network:
   # @type: boolean
   # @default: false
   enabled: false
+
   # 안정적인 백엔드 식별자. 활성화 시 필수이며, 같은 serverId를 공유하는 두 백엔드는 서로의 하트비트를 덮어씁니다.
   # @type: string
   # @default: ""
   serverId: ""
+
   # 공유 HMAC 비밀을 담는 환경 변수. transport.type redis로 활성화한 경우 필수입니다.
   # @type: string
   # @default: "RTP_NET_SECRET"
@@ -31,10 +33,12 @@ transport:
     # @type: string
     # @default: "localhost"
     host: "localhost"
+
     # Redis 포트. 비표준 배포에서는 변경하세요.
     # @type: integer
     # @default: 6379
     port: 6379
+
     # Redis 비밀번호. 인증 없는 Redis에서는 비워 두고, ACL/requirepass를 구성한 경우 설정하세요.
     # @type: string
     # @default: ""
@@ -46,6 +50,7 @@ heartbeat:
   # @type: integer
   # @default: 1000
   intervalMs: 1000
+
   # 피어의 마지막 확인 상태가 알 수 없음으로 처리되기 전까지 신뢰되는 시간(ms). intervalMs보다 크게 유지하세요.
   # @type: integer
   # @default: 5000
@@ -58,6 +63,7 @@ routing:
   # @options: ["local", "auto", "always"]
   # @default: "local"
   mode: "local"
+
   # 로비 모드: 이 백엔드를 순수 분배 노드로 만들어, 단순 /rtp를 비축량이 가장 많은 피어 지역으로 자동 라우팅합니다.
   # @type: boolean
   # @default: false
@@ -69,26 +75,32 @@ queue:
   # @type: integer
   # @default: 50
   maxDepth: 50
+
   # 백엔드 대기 쓰기 플러시 주기(ms). 낮을수록 지연이 줄고, 높을수록 전송 왕복이 줄어듭니다.
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
+
   # 백엔드 상태 캐시 폴링 주기(ms). 플레이어별 진행 상황을 새로 고치는 빈도.
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
+
   # 엔벨로프 HASH의 선택적 TTL 수동 만료(ms). 0이면 비활성화.
   # @type: integer
   # @default: 0
   entryTtlMs: 0
+
   # 서버 간 /rtp 등록 속도 제한(토큰 버킷): 초당 지속 요청 수.
   # @type: number
   # @default: 5
   crossServerRequestsPerSecond: 5
+
   # 서버 간 /rtp 등록 속도 제한: 버스트 크기.
   # @type: number
   # @default: 10
   crossServerRequestsBurst: 10
+
   # 프록시 측 BLPOP 워커 수. 단일 워커가 포화될 때만 늘리세요.
   # @type: integer
   # @default: 1
@@ -100,6 +112,7 @@ reservation:
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
+
   # 토큰별 TTL(ms). 요청되었으나 사용되지 않은 예약이 이보다 오래되면 버려진 것으로 해제됩니다.
   # @type: integer
   # @default: 60000
@@ -114,7 +127,7 @@ regionCollision:
   policy: "warn"
 
 # Optional per-destination policy overlay (matched by serverId); leave commented for the common case.
-#servers:
+# servers:
 #  example-backend:
 #    # Permission required to target this destination (empty = none).
 #    # @type: string
@@ -138,6 +151,7 @@ loadBalancer:
   # @type: number
   # @default: 0
   regionScarcityWeight: 0
+
   # Scoring terms, one per metric.
   terms:
     # Tick pressure; sigmoid knee at 0.6.
@@ -147,6 +161,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "mspt"
       input: "mspt"
+
       # 항 가중치.
       # @type: number
       # @default: 1.0
@@ -157,16 +172,19 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "sigmoid"
         type: "sigmoid"
+
         # 기울기.
         # @type: number
         # @range: [0.1, 20]
         # @default: 8.0
         k: 8.0
+
         # 중간점.
         # @type: number
         # @range: [0, 1]
         # @default: 0.6
         x0: 0.6
+
     # Queue depth; small queues silent, large ones explode.
     queue:
       # 지표 입력.
@@ -174,6 +192,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "queueDepth"
       input: "queueDepth"
+
       # 항 가중치.
       # @type: number
       # @default: 1.0
@@ -184,11 +203,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "exponential"
         type: "exponential"
+
         # 기울기.
         # @type: number
         # @range: [0.1, 20]
         # @default: 3.0
         k: 3.0
+
     # Heap gate; fires at >= 85% used.
     heap:
       # 지표 입력.
@@ -196,6 +217,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "heapUsed"
       input: "heapUsed"
+
       # 항 가중치.
       # @type: number
       # @default: 5.0
@@ -206,11 +228,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # 계단 임계값.
         # @type: number
         # @range: [0, 1]
         # @default: 0.85
         threshold: 0.85
+
     # Region gate; fires when the kept pool is >= 95% full.
     region:
       # 지표 입력.
@@ -218,6 +242,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptRegion"
       input: "keptRegion"
+
       # 항 가중치.
       # @type: number
       # @default: 5.0
@@ -228,11 +253,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # 계단 임계값.
         # @type: number
         # @range: [0, 1]
         # @default: 0.95
         threshold: 0.95
+
     # Gentle tie-breaker on kept count.
     kept:
       # 지표 입력.
@@ -240,6 +267,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptCount"
       input: "keptCount"
+
       # 항 가중치.
       # @type: number
       # @default: 0.25
@@ -250,6 +278,7 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "logarithmic"
         type: "logarithmic"
+
         # 기울기.
         # @type: number
         # @range: [0.1, 20]

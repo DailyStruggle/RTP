@@ -188,7 +188,8 @@ public final class Runner {
         this.lastProgressEpochMs = System.currentTimeMillis();
         this.kickstartCount = 0;
         this.roundRobinTargets = Targets.load(config, plugin.getLogger());
-        this.taskId = Sched.runAsyncTimer(plugin, this::tick, 100L);
+        long timerPeriodMs = Math.max(5L, config.getLong("runner-tick-ms", 20L));
+        this.taskId = Sched.runAsyncTimer(plugin, this::tick, timerPeriodMs);
         spark.startPhase("timed");
         recorder.beginPhase("timed");
         return true;
@@ -266,7 +267,8 @@ public final class Runner {
             spark.startPhase(seqTargets.get(0).label);
             recorder.beginPhase(seqTargets.get(0).label);
         }
-        this.taskId = Sched.runAsyncTimer(plugin, this::tick, 100L);
+        long timerPeriodMs = Math.max(5L, config.getLong("runner-tick-ms", 20L));
+        this.taskId = Sched.runAsyncTimer(plugin, this::tick, timerPeriodMs);
         return true;
     }
 
@@ -306,7 +308,8 @@ public final class Runner {
         this.endEpochMs = System.currentTimeMillis() + Math.max(30000L,
                 config.getLong("attempt-timeout-ms", 30000L) + 5000L);
         this.roundRobinTargets = Targets.load(config, plugin.getLogger());
-        this.taskId = Sched.runAsyncTimer(plugin, this::tick, 100L);
+        long timerPeriodMs = Math.max(5L, config.getLong("runner-tick-ms", 20L));
+        this.taskId = Sched.runAsyncTimer(plugin, this::tick, timerPeriodMs);
         spark.startPhase("burst");
         recorder.beginPhase("burst");
         return true;
@@ -831,15 +834,39 @@ public final class Runner {
         final boolean asPlayer = config.getBoolean("dispatch-as-player", true);
         Sched.runOnPlayer(plugin, target, () -> {
             attempt.commandDispatchedEpochMs = System.currentTimeMillis();
-            if (asPlayer) {
-                // Player#performCommand strips a leading slash if present and
-                // dispatches with the player as CommandSender. Returns false
-                // for unknown commands; we don't use the return value because
-                // the probe / console-watcher / timeout already cover the
-                // fail paths.
-                target.performCommand(cmd);
-            } else {
-                Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd);
+            // Folia only: this runnable is executing on the thread owning the
+            // player's region, so the hop itself is a region-context
+            // acquisition, and the wait it took to get here is the hop-stall
+            // freeze channel. No-op (and no columns measured) elsewhere.
+            FoliaRegionMonitor regionMonitor = recorder.regionMonitor();
+            if (regionMonitor != null) regionMonitor.noteDispatchHop(attempt);
+            // Tick-thread occupancy interval #1: the synchronous span the
+            // target plugin spends inside the command call. For a foreground
+            // plugin this is the whole pipeline and shows up directly in the
+            // MSPT tail; for a queue-served plugin it is microseconds and the
+            // rest of the work lands off-tick. Recorded as an interval, not
+            // folded into a total, because the discriminator is when the work
+            // lands relative to the tick. Only the two nanoTime reads are
+            // added to the measured path - no allocation, no blocking.
+            final boolean onTick = TickThreadDetector.onTickThread();
+            final long startNs = onTick ? System.nanoTime() : 0L;
+            try {
+                if (asPlayer) {
+                    // Player#performCommand strips a leading slash if present
+                    // and dispatches with the player as CommandSender. Returns
+                    // false for unknown commands; we don't use the return value
+                    // because the probe / console-watcher / timeout already
+                    // cover the fail paths.
+                    target.performCommand(cmd);
+                } else {
+                    Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd);
+                }
+            } finally {
+                // Recorded in a finally block so a target plugin that throws
+                // out of its own command handler still reports the tick time
+                // it consumed - a swallowed span would understate exactly the
+                // arms that behave worst.
+                if (onTick) attempt.recordTickInterval(startNs, System.nanoTime());
             }
         });
     }

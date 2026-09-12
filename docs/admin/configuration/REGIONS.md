@@ -31,7 +31,7 @@ You can create and update regions through:
 | `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum number of **unverified** candidate locations to stage upstream of `cacheCap`. See *Backlog Cache (L3)* below. Set to `0` to disable. |
 | `activeChunkCap` | Integer | `10` | Maximum number of chunks to keep loaded for zero-latency teleports. |
 | `price` | Double | `0.0` | Economy cost to use this specific region (overrides global `price`). |
-| `spatialResolution` | Integer | `3` | Precision for spatial memory (bad location tracking). 1 is coarse, 5 is extremely fine. |
+| `spatialResolution` | Integer | `3` | Precision for spatial memory (bad location tracking). 1 is coarse, 5 is extremely fine. Values > 1 in dual-layer shapes also dictate dyadic candidate downsampling grids (e.g. 4 -> 4x4 chunk macro-cells, 8 -> 8x8 macro-cells). |
 | `displayName` | String | (region name) | Optional cosmetic display name shown in menus and messages; does not change the region's identity or the permission node. |
 | `biomeWhitelist` / `biomes` | Boolean / List | (inherited from `safety.yml`) | Optional per-region override of the global biome filter. `biomeWhitelist: true` makes `biomes` an allow-list; `false` makes it a block-list. See [SAFETY.md](SAFETY.md). |
 | `version` | String | `"1.1"` | Internal config version. **Do not modify.** |
@@ -48,13 +48,56 @@ The `shape` block defines the horizontal area where players can land.
 
 ### Region Size: `radius` and `centerRadius`
 
-**Every distance in the `shape` block is measured in chunks, not blocks.** A chunk is 16x16 blocks, so multiply by 16 to get blocks. This is the single most common configuration mistake: `radius: 5000` is not a 5,000-block region, it is an 80,000-block one.
+**By default, numeric distances in the `shape` block are measured in chunks (1 chunk = 16 blocks).**
+However, RTP supports **spatial unit suffixes** on any distance parameter, as well as automatic interpretation of ambiguous numbers and world-border overflow checking.
 
-| Key | Meaning | In blocks |
+#### Spatial Unit Suffixes
+
+You can explicitly specify distance units in config files or command parameters:
+
+- **Minecraft Native Units:**
+  - `c`, `chunk`, `chunks`: Chunks (1 chunk = 16 blocks). E.g. `radius: 256c` (4,096 blocks).
+  - `b`, `block`, `blocks`: Minecraft blocks (1 block = 1 meter). E.g. `radius: 4096b` (256 chunks).
+  - `nb`, `netherblock`, `netherblocks`: Nether coordinate blocks (8 Overworld blocks). E.g. `radius: 500nb` (4,000 blocks).
+  - `r`, `region`, `regions`: Anvil / Linear region files (1 region = 32 chunks = 512 blocks). E.g. `radius: 4r` (128 chunks = 2,048 blocks).
+- **Metric Units (1 block = 1 meter):**
+  - `m`, `meter`, `meters`, `metre`, `metres`: Meters (1 meter = 1 block). E.g. `radius: 5000m`.
+  - `km`, `k`, `kilo`, `kilos`, `kilometer`, `kilometers`, `kilometre`, `kilometres`: Kilometers. E.g. `radius: 5km` (5,000 blocks = 312.5 chunks).
+- **Imperial & Survey Units:**
+  - `mi`, `mile`, `miles`: Statute miles (1,609.344 blocks). E.g. `radius: 3mi`.
+  - `yd`, `yard`, `yards`: Yards (0.9144 blocks).
+  - `ft`, `foot`, `feet`, `'`: Feet (0.3048 blocks). E.g. `radius: 1000ft` or `radius: 1000'`.
+  - `in`, `inch`, `inches`, `"`: Inches (0.0254 blocks).
+  - `nmi`, `nm`, `nauticalmile`, `nauticalmiles`: Nautical miles (1,852 blocks).
+  - `furlong`, `furlongs` (201.168 blocks), `chain`, `chains` (20.1168 blocks), `rod`, `rods`, `pole`, `perch` (5.0292 blocks).
+- **Easter Egg Units:**
+  - `smoot`, `smoots`: Smoots (1.7018 blocks).
+  - `fathom`, `fathoms`: Fathoms (1.8288 blocks).
+  - `league`, `leagues`: Leagues (~4,828.032 blocks).
+  - `cubit`, `cubits`: Royal Cubits (0.4572 blocks).
+  - `au`, `aus`, `astronomicalunit`: Astronomical Units (149,597,870,700 blocks).
+  - `ly`, `lightyear`, `lightyears`: Light-years.
+  - `pc`, `parsec`, `parsecs`: Parsecs.
+
+*Note: Group-placement sub-regions (`SubspaceShape`) use unitless lattice cell coordinates and do not use spatial units.*
+
+#### Auto-Interpretation of Dimensionless Numbers
+
+If you omit the unit suffix and provide a plain number (e.g. `radius: 16` or `radius: 5000`):
+- Plain numbers historically defaulted to chunks.
+- If a value is unusually small (e.g. `4`, `8`, or `16`), treating it as single blocks would yield an area barely 1 chunk wide. RTP detects this against the world border and auto-interprets it as chunks or regions, outputting an informative log notice explaining the conversion and how to make it explicit with `c` or `b`.
+- If a value is unusually large (e.g. `5000`) and interpreting it as chunks would overshoot the world border or world limits, RTP auto-interprets it as blocks.
+
+#### World Border Overflow Warning & Chunk Snapping
+
+- **Border Overflow Audit:** On startup and reload, RTP audits configured region extents against the world border (`/worldborder`). If a region's outer radius extends beyond the border, RTP logs a warning alerting operators so selection attempts are not wasted on unreachable coordinates outside the border.
+- **Chunk-Inscribed Bounding:** To guarantee that all blocks within selectable chunks stay strictly within bounds (and never leak past a block radius or world border), chunk inscription scales block radii down to the largest whole chunk grid completely contained within the boundary (`(R - 15) / 16`).
+
+| Key | Meaning | In blocks (default chunk units) |
 |---|---|---|
-| `radius` | **Outer** bound. Players never land farther than this from the center. | `radius x 16` |
-| `centerRadius` | **Inner** bound (the donut hole). Players never land closer than this to the center. `0` means the center itself is fair game. | `centerRadius x 16` |
-| `centerX` / `centerZ` | Center of the region, in chunk coordinates. `0, 0` is the chunk containing blocks `0..15`. | `centerX x 16` |
+| `radius` | **Outer** bound. Players never land farther than this from the center. Supports suffixes (e.g. `4096b`, `256c`, `4r`, `5km`). | `radius x 16` (if no suffix) |
+| `centerRadius` | **Inner** bound (donut hole). Players never land closer than this to the center. Supports suffixes (e.g. `1000b`, `64c`). | `centerRadius x 16` (if no suffix) |
+| `centerX` / `centerZ` | Center of the region in chunks (or with explicit unit suffixes). | `centerX x 16` (if no suffix) |
 
 Handy conversions:
 
@@ -71,7 +114,7 @@ Rules and gotchas:
 - `centerRadius` must be **smaller** than `radius`. If the two are equal, or `centerRadius` is larger, there is no band left to pick from and the region cannot produce locations.
 - The pickable band is `radius - centerRadius` chunks wide. Raising `centerRadius` to push players away from spawn without raising `radius` shrinks the usable land, so raise both together.
 - Total selectable area is roughly `pi x (radius^2 - centerRadius^2)` chunks for `CIRCLE`, and `(2 x radius)^2 - (2 x centerRadius)^2` chunks for `SQUARE`.
-- Radius is **not** clamped to the vanilla world border unless you ask for it. A `radius` that reaches past the border wastes selection attempts on unreachable land; either shrink it or set `worldBorderOverride: true`.
+- Radius is **not** clamped to the vanilla world border unless you ask for it. A `radius` that reaches past the border triggers a startup/reload audit warning and wastes selection attempts on unreachable land; either shrink it, use chunk-inscribed bounding, or set `worldBorderOverride: true`.
 - `worldBorderOverride: true` **replaces the whole `shape` block** with a square derived from the world's `/worldborder` (chunk radius = border size / 32). Your `radius`, `centerRadius`, `centerX`, and `centerZ` are ignored while it is on.
 - Large radii cost pre-calculation time, not memory: see *Massive Radii* under [Tips for Customization](#tips-for-customization) and the *Backlog Cache (L3)* section below.
 
@@ -106,9 +149,11 @@ Changing a radius invalidates cached locations for that region, so the first few
   - `REROLL`: Simple random selection with retries. Even but unbounded.
   - `NONE`: No pre-check. Fastest but ignores pre-computed safety data.
 - `centerX` / `centerZ`: The center of the region in **chunks**.
-- `uniquePlacements`: Chunk radius cleared around a spot once a player lands there so it is never reused. `0` = off, `1` = the landing chunk only, `N` = an `(2N-1)x(2N-1)` chunk square. (Legacy `true`/`false` still work and map to `1`/`0`.)
+- `uniquePlacements`: Chunk radius cleared around a spot once a player lands there so it is never reused. `0` = off, `1` = the landing chunk only, `N` = an `(2N-1)x(2N-1)` chunk square. (Legacy `true`/`false` still work and map to `1`/`0`.) Setting `auto` automatically derives the radius from the server's effective view distance (lowest power of 2 at or under view distance, e.g. 10 -> 8 chunks). When paired with `expand: true` in dual-layer shapes, it enables zero-memory dyadic stride downsampling ($S = (2R_u-1)^2$), keeping concurrent players isolated by view distance while driving rapid outward frontier expansion.
 
 ### Shape Engines and Parameters
+
+> **What is available on *your* server.** The engines documented below ship with RTP, but addons may register more. On every startup and `/rtp reload`, RTP writes the live catalog of registered shapes and their settings to `plugins/RTP/definitions/regions/SHAPES.md` (and vertical adjustors to `VERT.md`), in your configured language. Those files are generated from the running registry, so they are authoritative for your install - read them rather than guessing, and do not edit them (edits are overwritten on reload). The same catalog drives the type picker in the in-game menu.
 
 #### `CIRCLE` / `SQUARE`
 Standard shapes with uniform or weighted distribution.
@@ -117,16 +162,41 @@ Standard shapes with uniform or weighted distribution.
 - `weight`: `> 1.0` pulls landings toward center; `< 1.0` pushes toward edges. Applies within the `centerRadius`-to-`radius` band; it does not move the bounds themselves.
 - `expand`: If true, radius grows as locations are used.
 
+#### `CIRCLE_OPTIMIZED_DUAL_LAYER` / `SQUARE_OPTIMIZED_DUAL_LAYER`
+Optimized dual-layer shapes implementing the continuous spiral-addressed Hilbert key space (ADR-085).
+- Expands coarse spiral points into intra-point Hilbert traversals mapped to travel direction, eliminating run fragmentation across ring seams and drastically reducing memory footprint at one-chunk precision.
+- Backed by hardware-cache segmented secondary tables (`SegmentedKeyRunTable`), providing up to 2x-11x faster coordinate selection under `ACCUMULATE` mode.
+- Accepts the exact same parameters as `CIRCLE` and `SQUARE` (`radius`, `centerRadius`, `centerX`, `centerZ`, `weight`, `uniquePlacements`, `expand`, `mode`).
+
+#### `CIRCLE_DEPRECATED_PURE_SPIRAL` / `SQUARE_DEPRECATED_PURE_SPIRAL`
+Legacy pure 1D Archimedean spiral mapping shapes.
+- Preserved for backwards compatibility, regression testing, and side-by-side performance benchmarking against dual-layer Hilbert shapes.
+- Accepts identical parameters to `CIRCLE` and `SQUARE`.
+
 #### `CIRCLE_NORMAL` / `SQUARE_NORMAL`
 Gaussian distribution variants.
 - `radius` / `centerRadius`: Same as above - still chunks, still the hard outer and inner bounds.
 - `mean`: Center of the bell curve, expressed as a fraction of the band (0.0 = at `centerRadius`, 1.0 = at `radius`).
 - `deviation`: Spread of the bell curve. Smaller = tighter clustering around `mean`.
 
+#### `ELLIPSE`
+A circle with independent X and Z semi-axes, so it can cover a non-square world border without wasting a corner.
+- `radius` / `radius2`: The two outer semi-axes in **chunks**. The wider of the two sets the bounding circle the spiral mapping walks; the ellipse predicate rejects everything outside the true ellipse.
+- `centerRadius` / `centerRadius2`: The two semi-axes of the inner exclusion ellipse, also in **chunks**. Both default to `0` (no hole).
+- `rotation`: Rotation of both the outer and inner ellipse in degrees around `centerX` / `centerZ`.
+- `weight`, `uniquePlacements`, `expand`, `mode`, `centerX`, `centerZ`: Same meaning as `CIRCLE`.
+
 #### `RECTANGLE`
 Uses explicit side lengths instead of a radius.
 - `width` / `height`: Full X-axis and Z-axis extent in **chunks**, centred on `centerX` / `centerZ` (so `width: 256` reaches 128 chunks / 2,048 blocks either side). There is no `centerRadius` hole for this shape.
 - `rotation`: Rotation in degrees around the center.
+
+#### `POLYGON`
+An arbitrary closed boundary, including concave ones, defined by a vertex list instead of a radius. It inherits the square sized to the polygon's bounding box for the spiral index and the spatial-memory store, then masks off everything outside the polygon.
+- `vertices`: List of `[x, z]` pairs in traversal order, same format Chunky uses for `/chunky shape polygon`. Needs at least 3 vertices, not all collinear, and no self-intersecting edges - any of those is rejected with a warning and falls back to the bounding square.
+- `centerX` / `centerZ`: Optional. Defaults to the center of the vertex bounding box.
+- `weight`, `uniquePlacements`, `mode`: Same meaning as `SQUARE`.
+- `expand` is not supported here and is ignored (with a warning if set) - the boundary is yours, and expanding it would push selections outside the polygon you authored.
 
 ---
 
@@ -171,7 +241,7 @@ The backlog cache (controlled by `backlogCacheCap`) is an optional **unverified*
 ### How it works
 
 - The spiral selector drops unverified candidates straight into the backlog — **no chunk load, no database write**.
-- Each region tick pulses the backlog: the oldest unverified entry is picked, the `.mca` file (32×32 chunk bin) it falls in is identified, and *every* unverified entry that shares that bin is classified in one pass via the anvil pre-filter. This amortises the per-bin cost over many candidates.
+- Each region tick pulses the backlog: the oldest unverified entry is picked, the region file (32×32 chunk bin: `.mca` Anvil or `.linear` Linear) it falls in is identified, and *every* unverified entry that shares that bin is classified in one pass via the region pre-filter. This amortises the per-bin cost over many candidates.
 - Entries are promoted into the verified queue **in insertion order**. An unverified head blocks promotion; an invalidated head is dropped silently and the next entry is considered. This preserves spiral order without stalling on failed candidates.
 - The backlog is **not** persisted across restarts by design — entries are re-selected fresh on startup, so the cost of dropping them is bounded.
 

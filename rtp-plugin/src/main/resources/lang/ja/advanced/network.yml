@@ -5,10 +5,12 @@ network:
   # @type: boolean
   # @default: false
   enabled: false
+
   # 安定したバックエンド識別子。有効時は必須で、同じ serverId を共有する 2 つのバックエンドは互いのハートビートを上書きします。
   # @type: string
   # @default: ""
   serverId: ""
+
   # 共有 HMAC シークレットを保持する環境変数。transport.type redis で有効化した場合は必須です。
   # @type: string
   # @default: "RTP_NET_SECRET"
@@ -31,10 +33,12 @@ transport:
     # @type: string
     # @default: "localhost"
     host: "localhost"
+
     # Redis のポート。非標準のデプロイでは変更します。
     # @type: integer
     # @default: 6379
     port: 6379
+
     # Redis のパスワード。認証なしの Redis では空のままにし、ACL/requirepass を設定した場合に指定します。
     # @type: string
     # @default: ""
@@ -46,6 +50,7 @@ heartbeat:
   # @type: integer
   # @default: 1000
   intervalMs: 1000
+
   # ピアの最終確認状態が不明として扱われるまで信頼される期間（ms）。intervalMs より大きく保ってください。
   # @type: integer
   # @default: 5000
@@ -58,6 +63,7 @@ routing:
   # @options: ["local", "auto", "always"]
   # @default: "local"
   mode: "local"
+
   # ロビーモード: このバックエンドを純粋なディスパッチノードにし、素の /rtp を最も在庫の多いピアリージョンへ自動ルーティングします。
   # @type: boolean
   # @default: false
@@ -69,26 +75,32 @@ queue:
   # @type: integer
   # @default: 50
   maxDepth: 50
+
   # バックエンドの保留中書き込みのフラッシュ間隔（ms）。小さいほど低遅延、大きいほどトランスポートへの往復が減ります。
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
+
   # バックエンドの状態キャッシュのポーリング間隔（ms）。プレイヤーごとの進捗を更新する頻度。
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
+
   # エンベロープ HASH の任意の TTL による受動的な期限切れ（ms）。0 で無効。
   # @type: integer
   # @default: 0
   entryTtlMs: 0
+
   # サーバー間 /rtp 登録のレート制限（トークンバケット）: 毎秒の持続リクエスト数。
   # @type: number
   # @default: 5
   crossServerRequestsPerSecond: 5
+
   # サーバー間 /rtp 登録のレート制限: バーストサイズ。
   # @type: number
   # @default: 10
   crossServerRequestsBurst: 10
+
   # プロキシ側の BLPOP ワーカー数。単一のワーカーが飽和する場合のみ増やします。
   # @type: integer
   # @default: 1
@@ -100,6 +112,7 @@ reservation:
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
+
   # トークンごとの TTL（ms）。要求されたが消費されていない予約がこれより古い場合、放棄として解放されます。
   # @type: integer
   # @default: 60000
@@ -114,7 +127,7 @@ regionCollision:
   policy: "warn"
 
 # Optional per-destination policy overlay (matched by serverId); leave commented for the common case.
-#servers:
+# servers:
 #  example-backend:
 #    # Permission required to target this destination (empty = none).
 #    # @type: string
@@ -138,6 +151,7 @@ loadBalancer:
   # @type: number
   # @default: 0
   regionScarcityWeight: 0
+
   # Scoring terms, one per metric.
   terms:
     # Tick pressure; sigmoid knee at 0.6.
@@ -147,6 +161,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "mspt"
       input: "mspt"
+
       # 項の重み。
       # @type: number
       # @default: 1.0
@@ -157,16 +172,19 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "sigmoid"
         type: "sigmoid"
+
         # 急峻さ。
         # @type: number
         # @range: [0.1, 20]
         # @default: 8.0
         k: 8.0
+
         # 中点。
         # @type: number
         # @range: [0, 1]
         # @default: 0.6
         x0: 0.6
+
     # Queue depth; small queues silent, large ones explode.
     queue:
       # メトリクス入力。
@@ -174,6 +192,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "queueDepth"
       input: "queueDepth"
+
       # 項の重み。
       # @type: number
       # @default: 1.0
@@ -184,11 +203,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "exponential"
         type: "exponential"
+
         # 急峻さ。
         # @type: number
         # @range: [0.1, 20]
         # @default: 3.0
         k: 3.0
+
     # Heap gate; fires at >= 85% used.
     heap:
       # メトリクス入力。
@@ -196,6 +217,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "heapUsed"
       input: "heapUsed"
+
       # 項の重み。
       # @type: number
       # @default: 5.0
@@ -206,11 +228,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # ステップのしきい値。
         # @type: number
         # @range: [0, 1]
         # @default: 0.85
         threshold: 0.85
+
     # Region gate; fires when the kept pool is >= 95% full.
     region:
       # メトリクス入力。
@@ -218,6 +242,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptRegion"
       input: "keptRegion"
+
       # 項の重み。
       # @type: number
       # @default: 5.0
@@ -228,11 +253,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # ステップのしきい値。
         # @type: number
         # @range: [0, 1]
         # @default: 0.95
         threshold: 0.95
+
     # Gentle tie-breaker on kept count.
     kept:
       # メトリクス入力。
@@ -240,6 +267,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptCount"
       input: "keptCount"
+
       # 項の重み。
       # @type: number
       # @default: 0.25
@@ -250,6 +278,7 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "logarithmic"
         type: "logarithmic"
+
         # 急峻さ。
         # @type: number
         # @range: [0.1, 20]

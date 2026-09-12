@@ -205,6 +205,56 @@ final class VisualizationDispatch {
     }
 
     /**
+     * Dispatch for {@code /rtp visualization pipeline region=&lt;name&gt;}:
+     * paints the composite spatial pipeline visualization through {@link MapDispatch}.
+     */
+    boolean paintPipeline(UUID viewer,
+                          String regionName,
+                          @Nullable Consumer<String> messageMethod) {
+        RTP.log(Level.FINE,
+                "[viz/pipeline] dispatch entry: viewer=" + viewer
+                        + " region=" + regionName);
+        if (viewer == null) {
+            RTP.log(Level.WARNING, "visualization pipeline rejected: null viewer");
+            return false;
+        }
+        if (regionName == null || regionName.isEmpty()) {
+            reject(viewer, "visualization pipeline rejected: empty regionName",
+                    messageMethod);
+            return false;
+        }
+        if (!permissionGates.hasAdminMenu(viewer)) {
+            RTP.log(Level.WARNING,
+                    "visualization pipeline denied: " + viewer
+                            + " lacks " + MenuPermissionGates.ADMIN_MENU_PERMISSION);
+            reject(viewer, "visualization pipeline rejected: permission denied",
+                    messageMethod);
+            return false;
+        }
+        ChartSpec spec;
+        try {
+            spec = ChartSpec.of(ChartSpec.Kind.REGION_COMPOSITE, regionName);
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "visualization pipeline rejected: invalid ChartSpec for "
+                            + viewer + ": " + e.getMessage(), e);
+            reject(viewer, "visualization pipeline rejected: invalid ChartSpec",
+                    messageMethod);
+            return false;
+        }
+        try {
+            return MapDispatch.paint(spec, viewer);
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "visualization pipeline MapDispatch.paint threw for " + viewer
+                            + ": " + e.getMessage(), e);
+            reject(viewer, "visualization pipeline rejected: dispatch failure",
+                    messageMethod);
+            return false;
+        }
+    }
+
+    /**
      * S-004 reject through {@link CommandMessages#menuInvalid}. Logs WARN
      * unconditionally; the viewer-facing message goes through the supplied
      * {@code messageMethod} when present, falling back to

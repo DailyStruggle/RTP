@@ -38,6 +38,11 @@ public final class StressTestRTPPlugin extends JavaPlugin {
     private MetricsRecorder recorder; // recreated per run
     private CpuSampler cpuSampler;
     private ChunkLoadCounter chunkCounter;
+    private FoliaRegionMonitor regionMonitor;
+    private GcSampler gcSampler;
+    private ResidencySampler residencySampler;
+    private HeapPressureWatcher heapPressureWatcher;
+    private TicketFootprintProbe ticketFootprintProbe;
 
     @Override
     public void onEnable() {
@@ -53,7 +58,25 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         // - region threads aren't pinned, but the global scheduler runs on the
         // primary scheduler dispatch thread).
         cpuSampler = new CpuSampler();
-        Sched.runGlobal(this, () -> cpuSampler.recordCurrentThreadAsMain());
+        Sched.runGlobal(this, () -> {
+            cpuSampler.recordCurrentThreadAsMain();
+            // Same hop records the tick-thread identity used to split chunk
+            // loads into foreground (on-tick) and background (off-tick) and to
+            // bracket tick-thread occupancy intervals. On Folia the per-chunk
+            // region-ownership query is preferred at query time; this id is the
+            // fallback. Runtime detection only - no build variant, no toggle.
+            TickThreadDetector.captureTickThread();
+            // The GC sampler's allocation column must describe the same thread
+            // the CPU column describes, so it is bound from the same hop.
+            if (gcSampler != null) gcSampler.setTickThreadId(cpuSampler.mainThreadId());
+        });
+
+        // GC / tick-thread-allocation accounting. Heap-used is already sampled
+        // every 50 ms, but a heap curve cannot separate retained bytes from
+        // churned ones: collection count and time supply the churn term and
+        // getThreadAllocatedBytes supplies the rate producing it. Pure JMX
+        // counter reads at phase boundaries - nothing scheduled, no tick work.
+        gcSampler = new GcSampler();
 
         // Register the global chunk-load counter. It accumulates ChunkLoadEvents
         // for the lifetime of this plugin and is read by MetricsRecorder per
@@ -64,6 +87,43 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         // server-internal chunk-system threads to the calling plugin.
         chunkCounter = new ChunkLoadCounter(this);
         chunkCounter.register();
+
+        // Folia region-context accounting and freeze detection. Gated purely on
+        // runtime detection (Sched.isFolia()): off Folia the monitor stays
+        // inert and every region column writes the -1 not-measured sentinel,
+        // so the CSV schema is identical on every platform.
+        regionMonitor = new FoliaRegionMonitor();
+        regionMonitor.start(this);
+
+        // Residency accounting: peak resident chunks and peak plugin chunk
+        // tickets. This is the observable proxy for the platform-owned
+        // retained term no JVM counter attributes to a plugin, and the axis on
+        // which the designs actually differ (coordinate tuples plus released
+        // tickets against resident chunk neighbourhoods). Chunk residency is a
+        // load/unload delta over a one-time baseline; the ticket census runs on
+        // its own slow timer and never on an attempt path.
+        residencySampler = new ResidencySampler(this,
+                getConfig().getLong("ticket-sample-period-ms", 1000L));
+        residencySampler.setTargetLabel(resolveResidencyTargetLabel());
+        residencySampler.register();
+
+        // Setup-phase calibration of what one plugin chunk ticket actually
+        // costs. residencySampler reports resident chunks and held tickets,
+        // but converting between them needs the platform's ticket footprint,
+        // which vanilla, Paper and Folia each decide differently. Measured
+        // once here - on an idle server, before any teleport is recorded - so
+        // every run carries the multiplier its own numbers were produced
+        // under instead of inheriting an assumed one.
+        if (getConfig().getBoolean("ticket-footprint-probe.enabled", true)) {
+            ticketFootprintProbe = new TicketFootprintProbe(this,
+                    getConfig().getInt("ticket-footprint-probe.origin-distance-blocks", 20000),
+                    getConfig().getLong("ticket-footprint-probe.settle-ticks", 40L),
+                    getDataFolder().toPath().resolve("ticket-footprint.txt"));
+            ticketFootprintProbe.start();
+        } else {
+            getLogger().info("StressTestRTP: ticket-footprint probe disabled; "
+                    + "ticket_footprint_* columns stay -1.");
+        }
 
         // Probe + runner share a recorder *proxy* whose target is swapped
         // by beginRun() each /rtpstress start|burst. When no run is live
@@ -94,6 +154,13 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         consoleWatcher = new ConsoleWatcher(this, getConfig(), runner);
         consoleWatcher.start();
 
+        // Heap-pressure control-loop evidence. Records the trigger line and
+        // the heap level at which a plugin under test observably changes
+        // behaviour under heap pressure. Evidence only - no response is
+        // inferred, modelled, or attributed from a match.
+        heapPressureWatcher = new HeapPressureWatcher(this, getConfig(), sampler);
+        heapPressureWatcher.start();
+
         PluginCommand cmd = getCommand("rtpstress");
         if (cmd != null) {
             StressCommand sc = new StressCommand(this);
@@ -116,6 +183,10 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         if (consoleWatcher != null) consoleWatcher.stop();
         if (probe != null) probe.unregister();
         if (chunkCounter != null) chunkCounter.unregister();
+        if (regionMonitor != null) regionMonitor.stop();
+        if (residencySampler != null) residencySampler.unregister();
+        if (ticketFootprintProbe != null) ticketFootprintProbe.stop();
+        if (heapPressureWatcher != null) heapPressureWatcher.stop();
         if (sampler != null) { sampler.stopHeapSeries(); sampler.stop(); }
     }
 
@@ -127,6 +198,43 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         recorder = new MetricsRecorder(csv);
         if (cpuSampler != null) recorder.setCpuSampler(cpuSampler);
         if (chunkCounter != null) recorder.setChunkCounter(chunkCounter);
+        if (regionMonitor != null) recorder.setRegionMonitor(regionMonitor);
+        if (gcSampler != null) recorder.setGcSampler(gcSampler);
+        if (residencySampler != null) recorder.setResidencySampler(residencySampler);
+        if (ticketFootprintProbe != null) recorder.setTicketFootprintProbe(ticketFootprintProbe);
+        // Heap-pressure evidence: per-phase columns plus a per-run sidecar of
+        // every trigger (<stamp>-heap-triggers.csv). A missing sidecar does not
+        // disable the columns - the count is still a measurement.
+        if (heapPressureWatcher != null) {
+            recorder.setHeapPressureWatcher(heapPressureWatcher);
+            Path triggerCsv = dir.resolve(stamp + "-heap-triggers.csv");
+            try {
+                heapPressureWatcher.startSidecar(triggerCsv);
+                getLogger().info("StressTestRTP: rolled new heap-trigger sidecar \u2192 " + triggerCsv);
+            } catch (IOException e) {
+                getLogger().log(Level.WARNING,
+                        "StressTestRTP: could not open heap-trigger sidecar; "
+                                + "phase columns still recorded", e);
+            }
+        }
+        // Storage characterisation of the world the run teleports within. The
+        // cold-read-versus-warm-hit ratio that motivates answering safety from
+        // region bytes is device dependent, so the device is recorded rather
+        // than assumed. All probing is off-tick inside the profiler.
+        try {
+            java.util.List<org.bukkit.World> worlds = getServer().getWorlds();
+            if (!worlds.isEmpty()) {
+                Path worldDir = worlds.get(0).getWorldFolder().toPath();
+                recorder.setStorageProfiler(new StorageProfiler(this, worldDir));
+                getLogger().info("StressTestRTP: storage profile sidecar \u2192 "
+                        + recorder.storageProfilePath());
+            } else {
+                getLogger().warning("StressTestRTP: no world loaded; storage columns stay -1.");
+            }
+        } catch (Throwable t) {
+            getLogger().log(Level.WARNING,
+                    "StressTestRTP: could not wire storage profiler; storage columns stay -1", t);
+        }
         // Roll a per-run heap-pressure-over-time series next to the per-attempt
         // CSV (<stamp>-heap.csv). One row per sampler tick records heap
         // used/committed/max against the cumulative attempt count, so the
@@ -164,6 +272,23 @@ public final class StressTestRTPPlugin extends JavaPlugin {
             recorder.setAttemptLogger(getLogger(), logSucc, logFail);
         }
         getLogger().info("StressTestRTP: rolled new run CSV → " + csv);
+    }
+
+    /**
+     * Plugin name whose chunk tickets are broken out into
+     * {@code peak_target_plugin_tickets}. Explicit config wins; otherwise the
+     * label is inferred only when exactly one target is configured, because a
+     * guessed attribution across several arms would be a fabricated reading.
+     * An empty result leaves the breakout column at its -1 sentinel.
+     */
+    private String resolveResidencyTargetLabel() {
+        String explicit = getConfig().getString("residency-target-plugin", "");
+        if (explicit != null && !explicit.isBlank()) return explicit.trim();
+        org.bukkit.configuration.ConfigurationSection sec =
+                getConfig().getConfigurationSection("target-commands");
+        if (sec == null) return "";
+        java.util.Set<String> keys = sec.getKeys(false);
+        return keys.size() == 1 ? keys.iterator().next() : "";
     }
 
     public Runner runner() { return runner; }
@@ -205,6 +330,10 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         @Override public long chunkLoadsTotal() {
             MetricsRecorder r = plugin.recorder();
             return r != null ? r.chunkLoadsTotal() : -1L;
+        }
+        @Override public FoliaRegionMonitor regionMonitor() {
+            MetricsRecorder r = plugin.recorder();
+            return r != null ? r.regionMonitor() : null;
         }
     }
 

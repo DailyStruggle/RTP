@@ -6,7 +6,6 @@ import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
-import io.github.dailystruggle.rtp.api.menu.MenuConsumerProfile;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuOpenRequest;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
@@ -14,7 +13,6 @@ import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
-import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashMap;
@@ -2878,6 +2876,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Best-effort post-ADD amendment for nether/the-end region name conventions.
      * Applies default vertical and skylight settings without overriding user values.
      */
+    @SuppressWarnings("unchecked") // NetherEndConfigAmender.amend invoked on the raw-typed parser (see local raw below)
     private static void tryAmendNetherEndSeed(
             io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser,
             String entry) {

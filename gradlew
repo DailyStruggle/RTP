@@ -64,6 +64,43 @@
 #
 ##############################################################################
 
+# Transparent concurrency serialization for concurrent LLM tasks / processes
+if [ "${RTP_GRADLE_LOCKED:-0}" != "1" ]; then
+    export RTP_GRADLE_LOCKED=1
+    LOCK_DIR="${TMPDIR:-/tmp}/rtp_gradle_build.lock"
+
+    # Note: POSIX shells (dash/ash) only support single-digit file descriptors,
+    # so the lock is taken via flock's command form instead of "exec 200>file".
+    if command -v flock >/dev/null 2>&1; then
+        LOCK_FILE="${TMPDIR:-/tmp}/rtp_gradle_build.flock"
+        if [ -x "$0" ]; then
+            flock -w 600 "$LOCK_FILE" "$0" "$@"
+        else
+            flock -w 600 "$LOCK_FILE" sh "$0" "$@"
+        fi
+        EXIT_CODE=$?
+        exit $EXIT_CODE
+    else
+        WAIT_SECONDS=0
+        TIMEOUT=600
+        while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+            if [ "$WAIT_SECONDS" -ge "$TIMEOUT" ]; then
+                echo "[gradlew] Timed out waiting for Gradle lock directory ($LOCK_DIR)." >&2
+                exit 1
+            fi
+            WAIT_SECONDS=$((WAIT_SECONDS + 5))
+            echo "[gradlew] Waiting for build lock... (${WAIT_SECONDS}s)" >&2
+            sleep 5
+        done
+        trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT INT TERM HUP
+        "$0" "$@"
+        EXIT_CODE=$?
+        rmdir "$LOCK_DIR" 2>/dev/null
+        trap - EXIT INT TERM HUP
+        exit $EXIT_CODE
+    fi
+fi
+
 # Attempt to set APP_HOME
 
 # Resolve links: $0 may be a link

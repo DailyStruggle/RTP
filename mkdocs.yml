@@ -111,6 +111,7 @@ nav:
       - Language: admin/configuration/LANGUAGE.md
       - Logging: admin/configuration/LOGGING.md
       - Metrics: admin/configuration/METRICS.md
+      - Spatial memory TTL: admin/configuration/TTL.md
   - Proxy mode:
       - Overview: admin/proxies/INDEX.md
       - Configuration (network.yml): admin/proxies/CONFIGURATION.md

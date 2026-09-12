@@ -50,10 +50,10 @@ public class ScanTask extends RTPRunnable {
   public long latestCps = 0;
   public long latestEtaSeconds = 0;
 
-  private final Region region;
+  public final Region region;
   private final AtomicLong scanIter;
   private final CompletableFuture<Boolean> done = new CompletableFuture<>();
-  private long currentOffset = 0L;
+  public long currentOffset = 0L;
 
   /**
    * Scan phase constants:
@@ -313,7 +313,7 @@ public class ScanTask extends RTPRunnable {
               + " scanIncrement=" + scanIncrement.get());
       if (pause.get() || isCancelled()) {
         if (region.getShape() instanceof MemoryShape<?> ms) {
-          ms.flushAndRebuild(ms.spatialResolution);
+          ms.flushAndRebuild(ms.spatialResolution());
           ms.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         }
         save();
@@ -350,9 +350,8 @@ public class ScanTask extends RTPRunnable {
 
     o = biomesParser.getConfigValue(BiomesKeys.biomes, new ArrayList<String>());
     if (!(o instanceof List<?>)) {
-      new IllegalArgumentException(
-              "expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName())
-              .printStackTrace();
+      RTP.log(Level.WARNING, "expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName(),
+              new IllegalArgumentException("expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName()));
       biomesParser.set(BiomesKeys.biomes, new ArrayList<String>());
     }
 
@@ -389,7 +388,7 @@ public class ScanTask extends RTPRunnable {
     long range = Double.valueOf(shape.getRange()).longValue();
     long pos;
     long limit = scanIncrement.get();
-    long stride = Math.max(1L, shape.spatialResolution);
+    long stride = Math.max(1L, (shape instanceof MemoryShape<?> ms) ? ms.minBridgingStride() : shape.spatialResolution());
     long currentStart = scanIter.get();
     if (currentStart == 0) {
       currentStart = currentOffset;
@@ -415,7 +414,7 @@ public class ScanTask extends RTPRunnable {
       if (pause.get() || isCancelled()) {
         break;
       }
-      if (shape.isKnownBad(pos)) {
+      if (shape.isKnownBad(pos) && shape.biomeAt(pos) != null) {
         pos += stride;
         continue;
       }
@@ -591,13 +590,25 @@ public class ScanTask extends RTPRunnable {
       }
       // ------------------------------------
 
-      this.latestAbsolutePos = ((currentOffset * range) + finalPos1) / Math.max(1L, shape.spatialResolution);
+      long stride = Math.max(1L, (shape instanceof MemoryShape<?> ms) ? ms.minBridgingStride() : shape.spatialResolution());
+      this.latestAbsolutePos = ((currentOffset * range) + finalPos1) / stride;
       this.latestAbsoluteTotal = range;
       this.latestCps = cps_local;
       this.latestEtaSeconds = etaSeconds;
 
       long now = System.currentTimeMillis();
       if (now - lastSaveTime > 5000 || finalPos1 >= range || pause.get() || isCancelled()) {
+        shape.flushAndRebuild(shape.spatialResolution());
+
+        // Recalculate land percentage AFTER flushAndRebuild so that pending bad
+        // locations are fully coalesced into the table and in sync with finalPos1.
+        if (phaseNow != PHASE_GENSCAN) {
+          long bad = (region.shape instanceof MemoryShape<?> ms) ? ms.getEffectiveBadCount() : 0L;
+          long denom = (phaseNow == PHASE_FULLSCAN) ? Math.max(1L, range) : Math.max(1L, finalPos1);
+          long good = Math.max(0L, denom - bad);
+          landPercentage = (good * 100.0) / denom;
+        }
+
         RTP.log(Level.FINE, "[ScanTask] checkpoint region=" + region.name
                 + " pos=" + finalPos1 + "/" + range
                 + " cps=" + cps_local + " etaSec=" + etaSeconds
@@ -623,14 +634,17 @@ public class ScanTask extends RTPRunnable {
         String msg = RTP.configs.getConfigValue(CommandMessages.scanStatus, "").toString();
 
         if (msg != null && !msg.isEmpty()) {
-          // Replace the placeholder with the formatted number
-          if (msg.contains("[scan_landPercentage]")) {
-            msg = msg.replace("[scan_landPercentage]", String.format("%.2f", landPercentage));
-          }
+          msg = msg.replace("[scan_regions]", region.name);
+          msg = msg.replace("[scan_region]", region.name);
+          msg = msg.replace("[region]", region.name);
+          msg = msg.replace("[scan_chunks]", String.valueOf(this.latestAbsolutePos));
+          msg = msg.replace("[scan_totalChunks]", String.valueOf(this.latestAbsoluteTotal));
+          msg = msg.replace("[scan_cps]", String.valueOf(cps_local));
+          msg = msg.replace("[scan_landPercentage]", String.format(java.util.Locale.ROOT, "%.2f", landPercentage));
+          msg = msg.replace("[scan_eta]", io.github.dailystruggle.rtp.common.tools.PlaceholderProvider.formatEta(etaSeconds));
           RTP.serverAccessor.announce(msg, "rtp.scan", "");
         }
 
-        shape.flushAndRebuild(shape.spatialResolution);
         save();
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         // Persist generator-loaded chunks. On Spigot the platform RTPWorld
@@ -652,10 +666,11 @@ public class ScanTask extends RTPRunnable {
     scanIter.set(finalPos1);
 
     if (finalPos1 >= range) {
-      if (currentOffset < Math.max(1L, shape.spatialResolution) - 1) {
+      long strideLimit = Math.max(1L, (shape instanceof MemoryShape<?> ms) ? ms.minBridgingStride() : shape.spatialResolution());
+      if (currentOffset < strideLimit - 1) {
         currentOffset++;
         scanIter.set(0);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         save();
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         shape.exportDebugJson(region.name, region.getWorld().name());
@@ -673,7 +688,7 @@ public class ScanTask extends RTPRunnable {
         scanPhase.set(nextPhase);
         currentOffset = 0L;
         scanIter.set(0);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         save();
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         shape.exportDebugJson(region.name, region.getWorld().name());
@@ -699,7 +714,7 @@ public class ScanTask extends RTPRunnable {
         scanPhase.set(PHASE_FULLSCAN);
         currentOffset = 0L;
         scanIter.set(0);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         save();
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         shape.exportDebugJson(region.name, region.getWorld().name());
@@ -714,12 +729,12 @@ public class ScanTask extends RTPRunnable {
 
       RTP.log(Level.FINE, "[ScanTask] scan complete region=" + region.name
               + " finalPos=" + finalPos1 + " range=" + range);
-      shape.flushAndRebuild(shape.spatialResolution);
+      shape.flushAndRebuild(shape.spatialResolution());
       shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
       save(); // Ensure final pass is securely flushed before deletion
       RTP.getInstance().scanTasks.remove(region.name, this);
       delete();
-      // Mark the region as sufficiently pre-generated. This unlocks the L3
+      // Mark the region as sufficiently pre-generated. This unlocks the
       // backlog cache pulse (Region.processBacklog), which is gated on
       // scanCompleted to avoid driving live-load chunk traffic while the
       // pre-generation crawler is still consuming tick-thread budget.
@@ -731,7 +746,7 @@ public class ScanTask extends RTPRunnable {
       if (RTP.getInstance().scanTasks.get(region.name) == this) {
         RTP.log(Level.FINER, "[ScanTask] yielding to scheduler for next batch region=" + region.name
                 + " nextScanIter=" + finalPos1);
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         isRunning.set(false);
         // Yield to the main thread between batches to allow pending chunk tickets to drain.
         // If main thread is backlogged, a delayed async fallback ensures progress continues.
@@ -826,6 +841,14 @@ public class ScanTask extends RTPRunnable {
       } catch (NoSuchMethodException ignored) {
         // older rtp-anvil without cold-read timing
       }
+      // statSkips - warm hits served without an mtime stat syscall. Near-parity with
+      // anvilCacheHits means the revalidation window is absorbing the per-probe stat cost.
+      long statSkips = 0L;
+      try {
+        statSkips = (long) stats.getClass().getMethod("statSkips").invoke(stats);
+      } catch (NoSuchMethodException ignored) {
+        // older rtp-anvil without the stat-skip counter
+      }
       long total = hits + misses + coalesced;
       if (total == 0) return " anvilCache=idle";
       double rate = (double) (hits + coalesced) / (double) total;
@@ -833,6 +856,7 @@ public class ScanTask extends RTPRunnable {
       return " anvilCacheHits=" + hits + " anvilCacheMisses=" + misses + " anvilCacheStale=" + stale
           + " anvilCacheCoalesced=" + coalesced
           + " anvilCacheHitRate=" + String.format(java.util.Locale.ROOT, "%.3f", rate)
+          + " anvilCacheStatSkips=" + statSkips
           + " avgColdMissMs=" + String.format(java.util.Locale.ROOT, "%.2f", avgColdMissMs);
     } catch (Throwable t) {
       return "";
@@ -924,8 +948,12 @@ public class ScanTask extends RTPRunnable {
             + " crashed=" + flX;
   }
 
-  private long getEtaSeconds(long range, long finalPos1, MemoryShape<?> shape, long cpsLocal) {
-    long totalRemainingPoints = (range - finalPos1) + (Math.max(0, shape.spatialResolution - 1 - currentOffset) * range);
+  public long getEtaSeconds(long range, long finalPos1, MemoryShape<?> shape, long cpsLocal) {
+    long stride = Math.max(1L, shape.minBridgingStride());
+    long remainingThisPass = Math.max(0L, (range - finalPos1 + stride - 1) / stride);
+    long remainingPasses = Math.max(0L, stride - 1 - currentOffset);
+    long pointsPerPass = Math.max(0L, (range + stride - 1) / stride);
+    long totalRemainingPoints = remainingThisPass + (remainingPasses * pointsPerPass);
     if (totalRemainingPoints < 0) totalRemainingPoints = 0;
     long effectiveBad = shape.getEffectiveBadCount();
     long totalEvaluated = shape.getEffectiveGoodCount() + effectiveBad;
@@ -940,11 +968,13 @@ public class ScanTask extends RTPRunnable {
     //   - the just-finished batch's cps.
     // This guarantees ETA never under-predicts when throughput drops; it will
     // recover (shrink) once recent batches catch up to the cumulative average.
-    long cumulativeAvg = cps_all.divide(cps_divisor).longValue();
+    long cumulativeAvg = cps_divisor.signum() > 0 ? cps_all.divide(cps_divisor).longValue() : 0L;
     long ewma = cps.get();
     long batch = Math.max(1L, cpsLocal);
-    long currentPointsPerSecond = Math.min(batch, Math.min(Math.max(1L, cumulativeAvg), Math.max(1L, ewma)));
-    if (currentPointsPerSecond <= 0) currentPointsPerSecond = 1;
+    long minCps = batch;
+    if (cumulativeAvg > 0) minCps = Math.min(minCps, cumulativeAvg);
+    if (ewma > 0) minCps = Math.min(minCps, ewma);
+    long currentPointsPerSecond = Math.max(1L, minCps);
     return estimatedActivePointsRemaining / currentPointsPerSecond;
   }
 
@@ -968,7 +998,7 @@ public class ScanTask extends RTPRunnable {
       ByteBuffer buf = ByteBuffer.allocate(26).order(ByteOrder.BIG_ENDIAN);
       buf.putLong(scanIter.get());
       Shape<?> shape = region.getShape();
-      if (shape instanceof MemoryShape<?> memoryShape) {buf.putLong(memoryShape.spatialResolution);}
+      if (shape instanceof MemoryShape<?> memoryShape) {buf.putLong(memoryShape.spatialResolution());}
       buf.putLong(currentOffset);
       buf.put((byte) 0);
       // GENSCAN is transient - collapse to PRESCAN on disk so a resumed scan
@@ -1074,12 +1104,51 @@ public class ScanTask extends RTPRunnable {
       MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
       if (shape == null) return CompletableFuture.completedFuture(false);
 
-      if(shape.isKnownBad(pos)) { return CompletableFuture.completedFuture(false); }
-
       VerticalAdjustor<?> vert = region.getVert();
       if (vert == null) return CompletableFuture.completedFuture(false);
 
       RTPWorld<?> world = region.getWorld();
+
+      if(shape.isKnownBad(pos)) {
+        if (shape.biomeAt(pos) != null) {
+          return CompletableFuture.completedFuture(false);
+        }
+        // Known bad, but biome was not yet recorded. Resolve probe off-tick so map has no holes.
+        CompletableFuture<Boolean> res = new CompletableFuture<>();
+        int midY = (vert.maxY() + vert.minY()) / 2;
+        CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
+        try {
+          fut = world.probeChunkColumn(cx, cz, vert.minY() - 1, vert.maxY());
+        } catch (Throwable t) {
+          fut = null;
+        }
+        if (fut == null) {
+          res.complete(false);
+          return res;
+        }
+        fut.whenComplete((probe, ex) -> {
+          if (probe != null && ex == null) {
+            String b = resolveProbeBiome(probe, midY);
+            if (b != null) {
+              recordBiomeForChunk(shape, pos, cx, cz, b);
+            }
+          } else {
+            final long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+            RTPChunk<?> cached = world.getCachedChunk(chunkKey);
+            if (cached != null) {
+              try {
+                String b = cached.getBiome(blockX, midY, blockZ);
+                if (b != null) {
+                  recordBiomeForChunk(shape, pos, cx, cz, b);
+                }
+              } catch (Throwable ignored) {
+              }
+            }
+          }
+          res.complete(false);
+        });
+        return res;
+      }
 
       // Fast mathematical rejection ONLY for World Border.
       // Mathematical biome check is completely removed to force chunk generation.
@@ -1092,8 +1161,42 @@ public class ScanTask extends RTPRunnable {
         // addBadChunk: chunk-uniform - within a chunk the per-column selection order is
         // deterministic, so re-rolling onto the same chunk yields the same picked column,
         // which the border will reject again. Mark the twin spiral index too.
-        shape.addBadChunk(pos);
-        return CompletableFuture.completedFuture(false);
+        CompletableFuture<Boolean> res = new CompletableFuture<>();
+        int midY = (vert.maxY() + vert.minY()) / 2;
+        CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
+        try {
+          fut = world.probeChunkColumn(cx, cz, vert.minY() - 1, vert.maxY());
+        } catch (Throwable t) {
+          fut = null;
+        }
+        if (fut == null) {
+          shape.addBadChunk(pos);
+          res.complete(false);
+          return res;
+        }
+        fut.whenComplete((probe, ex) -> {
+          if (probe != null && ex == null) {
+            String b = resolveProbeBiome(probe, midY);
+            if (b != null) {
+              recordBiomeForChunk(shape, pos, cx, cz, b);
+            }
+          } else {
+            final long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+            RTPChunk<?> cached = world.getCachedChunk(chunkKey);
+            if (cached != null) {
+              try {
+                String b = cached.getBiome(blockX, midY, blockZ);
+                if (b != null) {
+                  recordBiomeForChunk(shape, pos, cx, cz, b);
+                }
+              } catch (Throwable ignored) {
+              }
+            }
+          }
+          shape.addBadChunk(pos);
+          res.complete(false);
+        });
+        return res;
       }
 
       if (isCancelled() || pause.get()) {
@@ -1322,9 +1425,9 @@ public class ScanTask extends RTPRunnable {
             // location, so the record stays idempotent.
             try {
               int midProbeY = (vert.maxY() + vert.minY()) / 2;
-              String scanMissBiome = probe.biomeAt(midProbeY);
+              String scanMissBiome = resolveProbeBiome(probe, midProbeY);
               if (scanMissBiome != null) {
-                shape.addBiomeLocation(pos, 1, scanMissBiome.toUpperCase());
+                recordBiomeForChunk(shape, pos, blockX >> 4, blockZ >> 4, scanMissBiome);
               }
             } catch (Throwable ignored) {
               // Biome read is best-effort; a failure must not change the verdict.
@@ -1348,16 +1451,19 @@ public class ScanTask extends RTPRunnable {
     }
     int py = picked.y();
 
+    int cx = blockX >> 4;
+    int cz = blockZ >> 4;
+
     // Center-column biome check. The biome of every readable point is recorded
     // below (accept or reject) so the shape always carries biome data.
-    String probeBiome = probe.biomeAt(py);
+    String probeBiome = resolveProbeBiome(probe, py, (vert.maxY() + vert.minY()) / 2);
     if (probeBiome != null) {
       String ub = probeBiome.toUpperCase();
       // Fill in biome data for every point whose biome we can read, regardless
       // of whether the point is ultimately accepted or rejected. The biome map
       // is keyed by location, so re-recording an already-known position is
       // idempotent ("if it doesn't already").
-      shape.addBiomeLocation(pos, 1, ub);
+      recordBiomeForChunk(shape, pos, cx, cz, ub);
       if (!BiomeNames.matches(defaultBiomes, ub)) {
         probeOutcomeBiomeReject.incrementAndGet();
         // addBadChunk: chunk-uniform - biome is a per-chunk property in the anvil probe;
@@ -1372,6 +1478,12 @@ public class ScanTask extends RTPRunnable {
     String probeBlock = probe.blockAt(py);
     if (probeBlock != null && MaterialNames.matches(unsafeBlocks, probeBlock.toUpperCase())) {
       probeOutcomeBlockReject.incrementAndGet();
+      if (probeBiome == null) {
+        String fallbackBiome = resolveProbeBiome(probe, (vert.maxY() + vert.minY()) / 2);
+        if (fallbackBiome != null) {
+          recordBiomeForChunk(shape, pos, cx, cz, fallbackBiome.toUpperCase());
+        }
+      }
       // addBadChunk: chunk-uniform - within a chunk the per-column selection order is
       // deterministic, so the twin spiral index resolves to the same picked column and the
       // same unsafe block.
@@ -1381,8 +1493,6 @@ public class ScanTask extends RTPRunnable {
     }
 
     // Probe accepted at center column. Now gate on cache residency.
-    int cx = blockX >> 4;
-    int cz = blockZ >> 4;
     final long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
     RTPChunk<?> cached = world.getCachedChunk(chunkKey);
 
@@ -1488,7 +1598,7 @@ public class ScanTask extends RTPRunnable {
                     // Fill in biome data for every point whose biome we can
                     // read, regardless of accept/reject. Keyed by location, so
                     // re-recording is idempotent ("if it doesn't already").
-                    shape.addBiomeLocation(pos, 1, midBiome);
+                    recordBiomeForChunk(shape, pos, blockX >> 4, blockZ >> 4, midBiome);
                     if (!BiomeNames.matches(defaultBiomes, midBiome)) {
                       // addBadChunk: chunk-uniform - mid-Y biome read from the resolved
                       // (anvil-backed self-contained) chunk; biome is per-chunk so the twin
@@ -1519,7 +1629,7 @@ public class ScanTask extends RTPRunnable {
                         try {
                           String midBiomeLive = chunk.getBiome(blockX, midY, blockZ);
                           if (midBiomeLive != null) {
-                            shape.addBiomeLocation(pos, 1, midBiomeLive.toUpperCase());
+                            recordBiomeForChunk(shape, pos, blockX >> 4, blockZ >> 4, midBiomeLive.toUpperCase());
                           }
                         } catch (Throwable ignored) {
                           // Biome read is best-effort; a failure here must not
@@ -1545,7 +1655,7 @@ public class ScanTask extends RTPRunnable {
                       // Fill in biome data for every point whose biome we can
                       // read, regardless of accept/reject. Keyed by location,
                       // so re-recording is idempotent ("if it doesn't already").
-                      shape.addBiomeLocation(pos, 1, actualBiome.toUpperCase());
+                      recordBiomeForChunk(shape, pos, blockX >> 4, blockZ >> 4, actualBiome.toUpperCase());
 
                       if (!BiomeNames.matches(defaultBiomes, actualBiome.toUpperCase())) {
                         // addBadChunk: chunk-uniform - authoritative biome read from the
@@ -1626,6 +1736,68 @@ public class ScanTask extends RTPRunnable {
               });
   }
 
+  /**
+   * Records a discovered biome for a chunk across all locations representing that chunk in
+   * {@code shape}: the tested {@code pos}, the canonical representative {@link MemoryShape#xzToLocation},
+   * and all preimages in {@link MemoryShape#chunkToLocations}.
+   *
+   * <p>This prevents skipped twin locations or bad-chunk marks from leaving unmapped holes (gray dots)
+   * on the biome map when {@link MemoryShape#biomeAt(int, int)} is queried.</p>
+   */
+  public static void recordBiomeForChunk(MemoryShape<?> shape, long pos, int cx, int cz, String biome) {
+    if (shape == null || biome == null || biome.isEmpty()) return;
+    String ub = biome.toUpperCase();
+    long range = shape.getRange();
+    if (pos >= 0 && pos < range) {
+      shape.addBiomeLocation(pos, 1, ub);
+    }
+    long rep = shape.xzToLocation(cx, cz);
+    if (rep >= 0 && rep < range && rep != pos) {
+      shape.addBiomeLocation(rep, 1, ub);
+    }
+    long[] preimages = shape.chunkToLocations(cx, cz);
+    if (preimages != null) {
+      for (long p : preimages) {
+        if (p >= 0 && p < range && p != pos && p != rep) {
+          shape.addBiomeLocation(p, 1, ub);
+        }
+      }
+    }
+  }
+
+  /**
+   * Resiliently extracts a biome identifier from a {@link ChunkColumnProbe}, testing preferred
+   * heights first, then the window midpoint, and finally stepping across all vertical sections.
+   */
+  private static String resolveProbeBiome(io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe, int... preferredYs) {
+    if (probe == null) return null;
+    if (preferredYs != null) {
+      for (int y : preferredYs) {
+        try {
+          String b = probe.biomeAt(y);
+          if (b != null && !b.isEmpty()) return b;
+        } catch (Throwable ignored) {
+        }
+      }
+    }
+    int minY = probe.minY();
+    int maxY = probe.maxY();
+    int midY = (minY + maxY) / 2;
+    try {
+      String b = probe.biomeAt(midY);
+      if (b != null && !b.isEmpty()) return b;
+    } catch (Throwable ignored) {
+    }
+    for (int y = minY + 8; y <= maxY; y += 16) {
+      try {
+        String b = probe.biomeAt(y);
+        if (b != null && !b.isEmpty()) return b;
+      } catch (Throwable ignored) {
+      }
+    }
+    return null;
+  }
+
   /** Unwraps {@link CompletionException}/{@link java.util.concurrent.ExecutionException} layers to the root cause. */
   private static Throwable unwrap(Throwable t) {
     while ((t instanceof CompletionException || t instanceof java.util.concurrent.ExecutionException)
@@ -1673,7 +1845,7 @@ public class ScanTask extends RTPRunnable {
     // Drain in-flight chunk futures before saving to prevent ghost callbacks.
     drainInFlight("pause", DRAIN_TIMEOUT_MS);
     MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-    shape.flushAndRebuild(shape.spatialResolution);
+    shape.flushAndRebuild(shape.spatialResolution());
     save();
     shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
   }
@@ -1692,7 +1864,7 @@ public class ScanTask extends RTPRunnable {
       drainInFlight("cancel", DRAIN_TIMEOUT_MS);
       MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
       if (shape != null) {
-        shape.flushAndRebuild(shape.spatialResolution);
+        shape.flushAndRebuild(shape.spatialResolution());
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
       }
       save();

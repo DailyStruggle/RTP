@@ -1,0 +1,27 @@
+# --- Ustawienia TTL Pamięci Przestrzennej RTP ---
+# Dokumentacja: plugins/RTP/docs/admin/configuration/TTL.md
+
+# Podstawowy czas przechowywania dla odrzuconych współrzędnych w pamięci przestrzennej.
+# Obsługiwane formaty czasu: np. 14d, 12h, 30m, 3600s, 40t, 2500ms lub złożony 1d12h.
+# Ustaw na -1 lub "infinite" dla trwałego przechowywania (statyczny teren).
+causes:
+  # Naturalny teren i geometria (na stałe)
+  biome: -1
+  worldBorder: -1
+  vert: -1
+  safety: -1
+  prefilterBiome: -1
+  prefilterBlock: -1
+
+  # Dynamiczny stan gracza i serwera
+  uniquePlacement: 30d
+  safetyExternal: 14d
+
+# Nadpisania dla poszczególnych weryfikatorów według nazwy klasy (np. GriefPreventionChecker, WorldGuardChecker).
+# Jeśli pominięte lub niewymienione, zewnętrzne mechanizmy sprawdzające dziedziczą causes.safetyExternal.
+verifiers:
+  # WorldGuardChecker: -1
+  # GriefPreventionChecker: 14d
+
+# NIE ZMIENIAJ NUMERU WERSJI
+version: 1.0

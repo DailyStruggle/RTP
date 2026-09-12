@@ -14,13 +14,21 @@ plugins {
     id 'fabric-loom'
 }
 repositories {
-    // jitpack hosts several soft-dep APIs RTP compiles against (VaultAPI, MockBukkit,
-    // CombatLogX). The claim-plugin integrations and their dedicated soft-dep repos
-    // moved out to the LeafRTPClaimAddon module (superseding ADR-019).
-    maven { url = 'https://jitpack.io' }
-    // Soft-dep repos for the bundled PvP / combat-tag integrations (ADR-055).
-    // CombatLogX API (SirBlobman public Nexus) and PvPManager API (CodeMC).
+    // SirBlobman public Nexus is listed BEFORE jitpack on purpose: the
+    // BlueSlimeCore (`api:core`) and CombatLogX (`combatlogx:api`) artifacts are
+    // GitHub-coordinate (`com.github.sirblobman.*`) dependencies, so jitpack.io
+    // would otherwise try to resolve them first. The `sirblobman/api` GitHub
+    // repo is private/unbuildable on jitpack, which returns HTTP 401 (not 404)
+    // for those coordinates -- and Gradle treats a 401 as a fatal repository
+    // error rather than "not found", so it aborts resolution instead of falling
+    // through to the Nexus. Ordering the Nexus first makes these resolve from the
+    // canonical publisher and avoids the 401 entirely.
     maven { url = 'https://nexus.sirblobman.xyz/public/' }
+    // jitpack hosts several soft-dep APIs RTP compiles against (VaultAPI, MockBukkit).
+    // The claim-plugin integrations and their dedicated soft-dep repos moved out to
+    // the LeafRTPClaimAddon module (superseding ADR-019).
+    maven { url = 'https://jitpack.io' }
+    // PvPManager API (CodeMC); bundled PvP / combat-tag integrations (ADR-055).
     maven { url = 'https://repo.codemc.org/repository/maven-public/' }
 }
 
@@ -277,13 +285,17 @@ dependencies {
     // has no published artifact and stays reflective in SimpleCombatLogChecker.
     // CombatLogX's ICombatLogX extends BlueSlimeCore framework interfaces (IMultiVersionPlugin /
     // IResourceHolder) that javac must resolve to verify the instanceof/cast, so the core artifact
-    // is left transitive (compileOnly -> never shaded). The api/core versions are intentionally
-    // pinned to the older (2023) SNAPSHOTs: the latest (core 2.9 / api 11.7) ship Java 25 bytecode
-    // (class file v69) which this Java-21 (`--release 21`, v65) compile rejects. The getCombatManager()
-    // and isInCombat(Player) signatures are stable across 11.x, and the installed plugin supplies the
-    // actual classes at runtime, so compiling against the older API is binary-compatible with 11.6+.
-    compileOnly 'com.github.sirblobman.api:core:2.8-SNAPSHOT'
-    compileOnly 'com.github.sirblobman.combatlogx:api:11.2-SNAPSHOT'
+    // is left transitive (compileOnly -> never shaded). Pinned to the current published SNAPSHOTs
+    // on the SirBlobman Nexus (the previously-pinned 2.8 / 11.2 SNAPSHOTs were pruned upstream and
+    // now 401 on jitpack / 404 on the Nexus). Java-version safety on a Java-21 build/server:
+    // `combatlogx:api:11.7` is entirely Java 8 bytecode (v52); `api:core:2.9` is Java 8 except six
+    // MC-26.1 NMS handlers (`*_26_1_R1`, v69). The CombatLogX adapter only references ICombatLogX /
+    // ICombatManager and the BlueSlimeCore framework interfaces above -- never those NMS handlers --
+    // so this `--release 21` compile never loads the v69 classes. Both deps are compileOnly (never
+    // shaded); the installed plugin supplies the real classes at runtime, and a Java-21 server never
+    // loads the MC-26.1 handler, so the version-conditional NMS bytecode is inert there.
+    compileOnly 'com.github.sirblobman.api:core:2.9-SNAPSHOT'
+    compileOnly 'com.github.sirblobman.combatlogx:api:11.7-SNAPSHOT'
     compileOnly('me.chancesd.pvpmanager:pvpmanager:4.0.8') { transitive = false }
 
     implementation 'org.bstats:bstats-bukkit:3.0.3'

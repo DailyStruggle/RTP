@@ -5,10 +5,12 @@ network:
   # @type: boolean
   # @default: false
   enabled: false
+
   # Стабильная идентичность бэкенда, обязательна при включении; два бэкенда с одинаковым serverId перезаписывают heartbeat друг друга.
   # @type: string
   # @default: ""
   serverId: ""
+
   # Переменная окружения с общим секретом HMAC; обязательна при включении с transport.type redis.
   # @type: string
   # @default: "RTP_NET_SECRET"
@@ -31,10 +33,12 @@ transport:
     # @type: string
     # @default: "localhost"
     host: "localhost"
+
     # Порт Redis; измените для нестандартных развёртываний.
     # @type: integer
     # @default: 6379
     port: 6379
+
     # Пароль Redis; оставьте пустым для Redis без аутентификации, задайте при настройке ACL/requirepass.
     # @type: string
     # @default: ""
@@ -46,6 +50,7 @@ heartbeat:
   # @type: integer
   # @default: 1000
   intervalMs: 1000
+
   # Как долго последнее известное состояние узла остаётся доверенным, прежде чем считаться неизвестным (мс); держите выше intervalMs.
   # @type: integer
   # @default: 5000
@@ -58,6 +63,7 @@ routing:
   # @options: ["local", "auto", "always"]
   # @default: "local"
   mode: "local"
+
   # Режим лобби: делает этот бэкенд чистым узлом диспетчеризации, который автоматически направляет простой /rtp в регион узла с наибольшим запасом.
   # @type: boolean
   # @default: false
@@ -69,26 +75,32 @@ queue:
   # @type: integer
   # @default: 50
   maxDepth: 50
+
   # Частота сброса отложенных записей бэкенда (мс); ниже = меньше задержка, выше = меньше обращений к транспорту.
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
+
   # Частота опроса кэша состояния бэкенда (мс); как часто обновляется прогресс по каждому игроку.
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
+
   # Необязательное пассивное устаревание по TTL для HASH-ей конвертов (мс); 0 отключает.
   # @type: integer
   # @default: 0
   entryTtlMs: 0
+
   # Ограничение скорости межсерверных записей /rtp (token bucket): устойчивые запросы в секунду.
   # @type: number
   # @default: 5
   crossServerRequestsPerSecond: 5
+
   # Ограничение скорости межсерверных записей /rtp: размер всплеска.
   # @type: number
   # @default: 10
   crossServerRequestsBurst: 10
+
   # Число обработчиков BLPOP на стороне прокси; увеличивайте только когда один обработчик перегружается.
   # @type: integer
   # @default: 1
@@ -100,6 +112,7 @@ reservation:
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
+
   # TTL на токен (мс); запрошенная, но не использованная бронь старше этого значения освобождается как брошенная.
   # @type: integer
   # @default: 60000
@@ -114,7 +127,7 @@ regionCollision:
   policy: "warn"
 
 # Optional per-destination policy overlay (matched by serverId); leave commented for the common case.
-#servers:
+# servers:
 #  example-backend:
 #    # Permission required to target this destination (empty = none).
 #    # @type: string
@@ -138,6 +151,7 @@ loadBalancer:
   # @type: number
   # @default: 0
   regionScarcityWeight: 0
+
   # Scoring terms, one per metric.
   terms:
     # Tick pressure; sigmoid knee at 0.6.
@@ -147,6 +161,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "mspt"
       input: "mspt"
+
       # Вес слагаемого.
       # @type: number
       # @default: 1.0
@@ -157,16 +172,19 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "sigmoid"
         type: "sigmoid"
+
         # Крутизна.
         # @type: number
         # @range: [0.1, 20]
         # @default: 8.0
         k: 8.0
+
         # Средняя точка.
         # @type: number
         # @range: [0, 1]
         # @default: 0.6
         x0: 0.6
+
     # Queue depth; small queues silent, large ones explode.
     queue:
       # Входная метрика.
@@ -174,6 +192,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "queueDepth"
       input: "queueDepth"
+
       # Вес слагаемого.
       # @type: number
       # @default: 1.0
@@ -184,11 +203,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "exponential"
         type: "exponential"
+
         # Крутизна.
         # @type: number
         # @range: [0.1, 20]
         # @default: 3.0
         k: 3.0
+
     # Heap gate; fires at >= 85% used.
     heap:
       # Входная метрика.
@@ -196,6 +217,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "heapUsed"
       input: "heapUsed"
+
       # Вес слагаемого.
       # @type: number
       # @default: 5.0
@@ -206,11 +228,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # Порог ступени.
         # @type: number
         # @range: [0, 1]
         # @default: 0.85
         threshold: 0.85
+
     # Region gate; fires when the kept pool is >= 95% full.
     region:
       # Входная метрика.
@@ -218,6 +242,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptRegion"
       input: "keptRegion"
+
       # Вес слагаемого.
       # @type: number
       # @default: 5.0
@@ -228,11 +253,13 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "step"
         type: "step"
+
         # Порог ступени.
         # @type: number
         # @range: [0, 1]
         # @default: 0.95
         threshold: 0.95
+
     # Gentle tie-breaker on kept count.
     kept:
       # Входная метрика.
@@ -240,6 +267,7 @@ loadBalancer:
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       # @default: "keptCount"
       input: "keptCount"
+
       # Вес слагаемого.
       # @type: number
       # @default: 0.25
@@ -250,6 +278,7 @@ loadBalancer:
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         # @default: "logarithmic"
         type: "logarithmic"
+
         # Крутизна.
         # @type: number
         # @range: [0.1, 20]

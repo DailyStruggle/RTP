@@ -37,7 +37,10 @@ public final class ClaimIntegrations {
       LandsChecker.landsSetup(host);
     }
 
-    Configs.onReload(() -> RTP.configs.putParser(buildParser(resourceLoader)));
+    Configs.onReload(() -> {
+      RTP.configs.putParser(buildParser(resourceLoader));
+      registerVerifiers();
+    });
 
     registerVerifiers();
   }
@@ -84,18 +87,32 @@ public final class ClaimIntegrations {
 
     RegionVerifierRegistry verifiers = RTPAPI.hooks().verifiers();
 
-    register(parser, verifiers, IntegrationsKeys.rerollSaberFactions, "Factions", () -> SaberFactionsChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollFactionsBridge, "FactionsBridge", () -> FactionsBridgeChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollGriefDefender, "GriefDefender", () -> GriefDefenderChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollGriefPrevention, "GriefPrevention", () -> GriefPreventionChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollLands, "Lands", () -> LandsChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollRedProtect, "RedProtect", () -> RedProtectChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollResidence, "Residence", () -> ResidenceChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollCrashClaim, "CrashClaim", () -> CrashClaimChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollHuskClaims, "HuskClaims", () -> HuskClaimsChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollKingdomsX, "Kingdoms", () -> KingdomsXChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollTownyAdvanced, "Towny", () -> TownyAdvancedChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollWorldGuard, "WorldGuard", () -> WorldGuardChecker::isInClaim);
+    // Unregister any previously registered verifiers from these checkers so reload dynamically updates toggles
+    verifiers.unregisterBySource(SaberFactionsChecker.class);
+    verifiers.unregisterBySource(FactionsBridgeChecker.class);
+    verifiers.unregisterBySource(GriefDefenderChecker.class);
+    verifiers.unregisterBySource(GriefPreventionChecker.class);
+    verifiers.unregisterBySource(LandsChecker.class);
+    verifiers.unregisterBySource(RedProtectChecker.class);
+    verifiers.unregisterBySource(ResidenceChecker.class);
+    verifiers.unregisterBySource(CrashClaimChecker.class);
+    verifiers.unregisterBySource(HuskClaimsChecker.class);
+    verifiers.unregisterBySource(KingdomsXChecker.class);
+    verifiers.unregisterBySource(TownyAdvancedChecker.class);
+    verifiers.unregisterBySource(WorldGuardChecker.class);
+
+    register(parser, verifiers, IntegrationsKeys.rerollSaberFactions, "Factions", SaberFactionsChecker.class, () -> SaberFactionsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollFactionsBridge, "FactionsBridge", FactionsBridgeChecker.class, () -> FactionsBridgeChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollGriefDefender, "GriefDefender", GriefDefenderChecker.class, () -> GriefDefenderChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollGriefPrevention, "GriefPrevention", GriefPreventionChecker.class, () -> GriefPreventionChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollLands, "Lands", LandsChecker.class, () -> LandsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollRedProtect, "RedProtect", RedProtectChecker.class, () -> RedProtectChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollResidence, "Residence", ResidenceChecker.class, () -> ResidenceChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollCrashClaim, "CrashClaim", CrashClaimChecker.class, () -> CrashClaimChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollHuskClaims, "HuskClaims", HuskClaimsChecker.class, () -> HuskClaimsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollKingdomsX, "Kingdoms", KingdomsXChecker.class, () -> KingdomsXChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollTownyAdvanced, "Towny", TownyAdvancedChecker.class, () -> TownyAdvancedChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollWorldGuard, "WorldGuard", WorldGuardChecker.class, () -> WorldGuardChecker::isInClaim);
   }
 
   /**
@@ -113,13 +130,14 @@ public final class ClaimIntegrations {
       RegionVerifierRegistry verifiers,
       IntegrationsKeys key,
       String pluginName,
+      Class<?> checkerClass,
       java.util.function.Supplier<ClaimCheck> checkSupplier) {
     if (!flag(parser, key) || !Bukkit.getPluginManager().isPluginEnabled(pluginName)) {
       return;
     }
     try {
       ClaimCheck check = checkSupplier.get();
-      verifiers.register(loc -> !check.isInClaim(loc));
+      verifiers.register(checkerClass, loc -> !check.isInClaim(loc));
     } catch (Throwable t) {
       RTP.log(
           java.util.logging.Level.WARNING,

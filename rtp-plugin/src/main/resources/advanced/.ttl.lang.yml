@@ -1,0 +1,8 @@
+# --- Language Mapping: advanced/ttl.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# advanced/ttl.yml (right). ttl.yml is language-neutral (retention durations), so
+# every row is identity; the file exists purely to mirror the value file
+# under lang/<locale>/advanced/ and keep the config loader's path uniform.
+causes: "causes"
+verifiers: "verifiers"
+version: "version"

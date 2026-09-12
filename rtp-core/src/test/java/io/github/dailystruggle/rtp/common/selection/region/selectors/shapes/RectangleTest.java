@@ -120,15 +120,15 @@ public class RectangleTest {
 
     @ParameterizedTest(name = "contains({0},{1}) width={2} height={3} => {4}")
     @CsvSource({
-        // Inside (chunk coords: width=256 >> 4 = 16 chunks, half = 8; so |x|,|z| <= 8)
+        // Inside (chunk coords: width=256, half = 128; so |x|,|z| <= 128)
         "  0,   0, 256, 256, true",
-        "  5,   5, 256, 256, true",
-        " -5,  -5, 256, 256, true",
-        // On boundary (chunk coords: half = 8)
-        "  8,   8, 256, 256, true",
+        " 50,  50, 256, 256, true",
+        "-50, -50, 256, 256, true",
+        // On boundary (chunk coords: half = 128)
+        "128, 128, 256, 256, true",
         // Outside
-        " 50,  50, 256, 256, false",
-        "-50,  50, 256, 256, false",
+        "150, 150, 256, 256, false",
+        "-150, 150, 256, 256, false",
         // Zero dimensions
         "  0,   0,   0, 256, false",
         "  0,   0, 256,   0, false",
@@ -295,6 +295,38 @@ public class RectangleTest {
     void getParameters_returnsNonNull() {
         Rectangle shape = new Rectangle();
         assertNotNull(shape.getParameters());
+    }
+
+    // -------------------------------------------------------------------------
+    // contains() tests
+    // -------------------------------------------------------------------------
+
+    @Test
+    void contains_respectsChunkCoordinatesMatchingGeneratedRange() {
+        Rectangle shape = new Rectangle();
+        shape.set(RectangleParams.width, 256L);
+        shape.set(RectangleParams.height, 256L);
+        shape.set(RectangleParams.centerX, 0L);
+        shape.set(RectangleParams.centerZ, 0L);
+        shape.set(RectangleParams.rotation, 0L);
+
+        // Center chunk (0,0) and boundary chunk (128, 128) should be contained
+        assertTrue(shape.contains(0, 0));
+        assertTrue(shape.contains(128, 128));
+        assertTrue(shape.contains(-128, -128));
+        assertTrue(shape.contains(100, 100));
+
+        // Outside boundary chunk (> 128)
+        assertFalse(shape.contains(129, 0));
+        assertFalse(shape.contains(0, 129));
+        assertFalse(shape.contains(-129, 0));
+        assertFalse(shape.contains(200, 200));
+
+        // Generated locations should all be contained
+        for (long loc = 0; loc < shape.getRange(); loc += 5000) {
+            int[] xz = shape.locationToXZ(loc);
+            assertTrue(shape.contains(xz[0], xz[1]), "Generated point (" + xz[0] + "," + xz[1] + ") should be contained");
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -156,15 +156,24 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private io.github.dailystruggle.rtp.api.platform.PlatformCreator platformCreator;
   private java.util.concurrent.CompletableFuture<?> platformPrepare;
 
+  private void initTracking() {
+    if (this.trackingId == null) {
+      this.trackingId = io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
+          this, "TeleportPipelineTask", 300000L);
+    }
+  }
+
   public TeleportPipelineTask(GenerationContext context) {
     this.context = context;
     this.immediateTeleport = true;
+    initTracking();
   }
 
   public TeleportPipelineTask(GenerationContext context, Region region) {
     this.context = context;
     this.region = region;
     this.immediateTeleport = true;
+    initTracking();
   }
 
   public TeleportPipelineTask(GenerationContext context, Region region, RTPCoords preSelectedCoords) {
@@ -173,6 +182,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     this.coords = preSelectedCoords;
     this.currentPhase = Phase.LOAD;
     this.immediateTeleport = true;
+    initTracking();
   }
 
   public TeleportPipelineTask(GenerationContext context, Region region, RTPCoords preSelectedCoords, ChunkReservation reservation) {
@@ -185,6 +195,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     // slow-teleport latency audit (ADR-053 section 2a) must NOT apply. Backpressure on this path is
     // covered separately by the queue-growth audit (section 2b).
     this.immediateTeleport = false;
+    initTracking();
   }
 
   /** Spark-profiler frame tag (diagram 01 / 08). See {@link RTPRunnable#sparkFrameName()}. */
@@ -197,6 +208,15 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   public void setPhase(Phase phase) {
     this.currentPhase = phase;
+  }
+
+  @Override
+  public void setCancelled(boolean cancel) {
+    super.setCancelled(cancel);
+    if (cancel && this.trackingId != null) {
+      io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(this.trackingId);
+      this.trackingId = null;
+    }
   }
 
   @Override
@@ -1035,6 +1055,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       // Add untracking for the pipeline task itself
       if (this.trackingId != null) {
         io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(this.trackingId);
+        this.trackingId = null;
       }
 
       if (player() != null) {
@@ -1042,17 +1063,14 @@ public final class TeleportPipelineTask extends RTPRunnable {
         TeleportData data = RTP.getInstance().latestTeleportData.get(pid);
 
         // Strict reference verification prevents overwriting subsequent requests
-        if (data == this.teleportData && !data.completed) {
+        if (data != null && data == this.teleportData && !data.completed) {
           RTP.getInstance().latestTeleportData.remove(pid);
         }
       }
-      if (region == null || coords == null) return;
-
-      // Absolute world resolution prevents multi-dimension cross-leakage
-      RTPWorld<?> rtpWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
-      if (rtpWorld == null) rtpWorld = region.getWorld();
 
       if (reservation != null) {
+        RTPWorld<?> rtpWorld = (coords != null) ? RTP.serverAccessor.getRTPWorld(coords.worldName()) : null;
+        if (rtpWorld == null && region != null) rtpWorld = region.getWorld();
         RTP.log(Level.FINER, "[PIPELINE_TRACE] runCleanup releasing reservation world=" + rtpWorld);
         reservation.close();
         reservation = null;

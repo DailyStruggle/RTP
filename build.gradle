@@ -1,7 +1,9 @@
 plugins {
     id 'java'
-    id 'com.gradleup.shadow' version '8.3.8' apply false
-    id 'com.diffplug.spotless' version '6.25.0'
+    // Shared plugin versions live in gradle/libs.versions.toml (version catalog).
+    alias(libs.plugins.shadow) apply false
+    alias(libs.plugins.spotless)
+    alias(libs.plugins.japicmp) apply false
 }
 
 group = 'io.github.dailystruggle'
@@ -11,6 +13,7 @@ version = providers.gradleProperty('version').get()
 ext.liteVersion = providers.gradleProperty('liteVersion').get()
 
 spotless {
+    lineEndings = 'UNIX'
     java {
         target 'rtp-*/**/*.java', 'addons/**/*.java'
         targetExclude '**/build/**', '**/.gradle/**', '**/generated/**', '**/target/**'
@@ -48,7 +51,7 @@ subprojects {
 
     java {
         toolchain {
-            languageVersion = JavaLanguageVersion.of(21)
+            languageVersion = JavaLanguageVersion.of(Integer.parseInt(libs.versions.javaToolchain.get()))
         }
         // `-sources` / `-javadoc` jars are intentionally NOT produced: the build
         // only ships the executable artifacts. The addon-API publish closure
@@ -56,7 +59,7 @@ subprojects {
         // sources/javadoc variant as a result.
     }
 
-    tasks.withType(JavaCompile) {
+    tasks.withType(JavaCompile).configureEach {
         options.encoding = 'UTF-8'
     }
 
@@ -75,29 +78,201 @@ subprojects {
     }
 
     dependencies {
-        compileOnly 'org.jetbrains:annotations:24.1.0'
+        // Shared versions are centralized in gradle/libs.versions.toml.
+        compileOnly libs.jetbrains.annotations
         // Checker Framework qualifier annotations (compile-time only; not shipped in JARs).
         // The Resource Leak Checker reads @MustCall, @Owning, and @EnsuresCalledMethods
         // from this artifact during annotation processing.
-        compileOnly 'org.checkerframework:checker-qual:3.42.0'
-        testCompileOnly 'org.checkerframework:checker-qual:3.42.0'
-        testImplementation platform('org.junit:junit-bom:5.10.0')
-        testImplementation 'org.junit.jupiter:junit-jupiter'
-        testImplementation 'org.mockito:mockito-core:5.5.0'
-        testImplementation 'org.jetbrains:annotations:24.1.0'
-        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+        compileOnly libs.checker.qual
+        testCompileOnly libs.checker.qual
+        testImplementation platform(libs.junit.bom)
+        testImplementation libs.junit.jupiter
+        testImplementation libs.mockito.core
+        testImplementation libs.jetbrains.annotations
+        testRuntimeOnly libs.junit.platform.launcher
     }
 
-    test {
-        useJUnitPlatform()
+    // Verbose test output (per-test start/pass lines + full stdout/stderr streaming)
+    // is opt-in via `-PverboseTests`. The default run only reports skipped/failed
+    // tests, which removes the dominant console-I/O cost on large suites
+    // (rtp-core streams a lot of runtime logging). Failures still print full
+    // stack traces and exceptions so a red build stays diagnosable.
+    def verboseTests = project.hasProperty('verboseTests')
+    // Fork tests across JVMs so a single module's suite runs in parallel. Capped
+    // at half the available processors to leave headroom for Gradle's own
+    // module-level parallelism (`org.gradle.parallel=true`) and the 8g daemon
+    // heap shared with the Loom remap workers. `forkEvery` recycles a worker JVM
+    // periodically to bound leaked static state across test classes.
+    def testForks = Math.max(1, Runtime.runtime.availableProcessors().intdiv(2))
+    // Tiered test execution (JUnit 5 tags). Test categories, by purpose:
+    //   - "logic" (the DEFAULT / coverage tier): every UNTAGGED test. Fast,
+    //     deterministic unit/logic tests - this is the tier the changed-line
+    //     coverage gate (scripts/diff-coverage.py) measures, and the one new
+    //     tests join by default (per library, then core).
+    //   - `slow`    : long-running characterization / benchmark suites.
+    //   - `edge`    : environment-specific / edge-case suites.
+    //   - `simulation` / `drawing` / `demo` : non-logic suites (Monte-Carlo
+    //     simulations, image/map drawing, demonstrations). Excluded from the
+    //     default coverage-focused tier so it stays under budget.
+    // Default `.\gradlew.bat build` / `test` runs the logic tier only (all of
+    // the above tags are excluded). Pass `-PfullTests` to run EVERYTHING
+    // (release / nightly CI): `.\gradlew.bat build -PfullTests`.
+    // Untagged tests always run in both tiers, so the default stays a safe
+    // superset-minus-non-logic.
+    def fullTests = project.hasProperty('fullTests')
+    def nonLogicTags = ['slow', 'edge', 'simulation', 'drawing', 'demo'] as String[]
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform {
+            if (!fullTests && name != 'simulationBenchmark') {
+                excludeTags nonLogicTags
+            }
+        }
+        maxHeapSize = '1024m'
+        // -XX:+EnableDynamicAgentLoading opts in to Mockito/ByteBuddy's dynamic
+        // agent attach, silencing the JDK "agent loaded dynamically ... will be
+        // disallowed by default in a future release" warning across the suite.
+        // -Xshare:off disables CDS so the test launcher's bootstrap-classpath
+        // append no longer prints "Sharing is only supported for boot loader
+        // classes ..." on every fork.
+        jvmArgs '-XX:+UseG1GC', '-XX:MaxMetaspaceSize=384m', '-XX:+EnableDynamicAgentLoading', '-Xshare:off'
+        maxParallelForks = testForks
+        forkEvery = 100
+        // Re-run when the tier toggle flips so cached results from the other
+        // tier are not silently reused.
+        inputs.property 'fullTests', fullTests
+        testLogging {
+            events = (verboseTests ? ['started', 'passed', 'skipped', 'failed'] : ['skipped', 'failed'])
+            showStandardStreams = verboseTests
+            exceptionFormat = 'full'
+            showStackTraces = true
+        }
     }
 
+    // JaCoCo instrumentation + HTML/XML report generation is opt-in via
+    // `-Pcoverage`. A routine `.\gradlew.bat build` skips it entirely (the
+    // instrumentation agent and dual-format report are pure overhead for local
+    // dev); CI runs coverage with `-Pcoverage`.
     apply plugin: 'jacoco'
-    jacoco { toolVersion = "0.8.11" }
-    tasks.withType(Test) { finalizedBy jacocoTestReport }
-    jacocoTestReport {
-        dependsOn test
-        reports { html.required = true; xml.required = true }
+    jacoco { toolVersion = libs.versions.jacoco.get() }
+    if (project.hasProperty('coverage')) {
+        tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
+        jacocoTestReport {
+            dependsOn test
+            reports { html.required = true; xml.required = true }
+        }
+    }
+
+    // Coverage floors, centralized (ENTERPRISE_READINESS.md section 4.1 item 3).
+    // Single source of truth for every module's jacocoTestCoverageVerification
+    // ratchet: floors live in one map here rather than scattered across per-module
+    // build scripts. Add a module's path with its measured-minus-margin floors to
+    // start gating it; raise the numbers as coverage grows -- never lower them.
+    // The verification runs off the JaCoCo exec data the jacoco plugin already
+    // attaches to every Test task, so it gates `check` regardless of `-Pcoverage`
+    // (which only controls report generation). Platform adapters stay uncapped
+    // until their realistic ceilings (section 2.2) are reached; add them here then.
+    def coverageFloors = [
+            // rtp-core measured 2026-09-11 via jacocoTestReport: 60.3% instruction /
+            // 46.4% branch. Floors carry margin under the baseline because a
+            // partially-recompiled tree makes JaCoCo discard stale execution data,
+            // which can read several points low. Target is 90/80 (section 3).
+            ':rtp-core': [
+                    instruction: 0.55,
+                    branch: 0.42,
+                    // Per-package rules for safety-critical packages (ENTERPRISE_READINESS.md 4.1 item 4).
+                    // Floors are higher than module baseline and gate critical pipelines.
+                    packages: [
+                            'io.github.dailystruggle.rtp.common.tasks.teleport': [instruction: 0.65, branch: 0.45],
+                            'io.github.dailystruggle.rtp.common.selection.region': [instruction: 0.52, branch: 0.40],
+                            'io.github.dailystruggle.rtp.common.selection.worldborder': [instruction: 0.85, branch: 0.60]
+                    ]
+            ],
+            // metrics-api measured 2026-09-11 via jacocoTestReport: 100%
+            // instruction / 94.6% branch (8 classes, pure SPI). Floors sit at the
+            // Stage A target (section 3) with margin under the measured branch
+            // figure. ENTERPRISE_READINESS.md section 4.2 item 13.
+            ':metrics-api': [instruction: 0.95, branch: 0.85],
+            // yaml-api measured 2026-09-11 via jacocoTestReport: 95.5%
+            // instruction / 86.9% branch (in-house zero-dependency YAML substrate,
+            // ADR-025). Floors carry margin under the baseline because the atomic
+            // save() rename retry/last-resort paths are environment-dependent and
+            // can read a few points low on some filesystems. Meets the section 4.2
+            // item 7 target (95%). ENTERPRISE_READINESS.md section 4.2 item 7.
+            ':yaml-api': [instruction: 0.92, branch: 0.80],
+    ]
+    def moduleFloors = coverageFloors[project.path]
+    if (moduleFloors != null) {
+        jacocoTestCoverageVerification {
+            // Read a fresh exec file, never a stale one. JaCoCo discards coverage
+            // for classes whose bytecode changed since the last run, so a
+            // verification off cached exec data can fail for reasons unrelated to
+            // tests (ENTERPRISE_READINESS.md section 2.4 caveat 1). Binding to the
+            // test task guarantees a same-invocation measurement.
+            dependsOn test
+            violationRules {
+                rule {
+                    limit {
+                        counter = 'INSTRUCTION'
+                        value   = 'COVEREDRATIO'
+                        minimum = moduleFloors.instruction
+                    }
+                    limit {
+                        counter = 'BRANCH'
+                        value   = 'COVEREDRATIO'
+                        minimum = moduleFloors.branch
+                    }
+                }
+                if (moduleFloors.packages) {
+                    moduleFloors.packages.each { pkgName, pkgLimits ->
+                        rule {
+                            element = 'PACKAGE'
+                            includes = [pkgName]
+                            if (pkgLimits.instruction != null) {
+                                limit {
+                                    counter = 'INSTRUCTION'
+                                    value   = 'COVEREDRATIO'
+                                    minimum = pkgLimits.instruction
+                                }
+                            }
+                            if (pkgLimits.branch != null) {
+                                limit {
+                                    counter = 'BRANCH'
+                                    value   = 'COVEREDRATIO'
+                                    minimum = pkgLimits.branch
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        tasks.named('check').configure { dependsOn jacocoTestCoverageVerification }
+    }
+
+    // Local, programmable static analysis (the clang-tidy analogue). PMD is the
+    // engine; the curated, appendable ruleset lives in config/pmd/ruleset.xml
+    // (starter known-issue detectors + project-specific rules such as
+    // PreferNonLockingExecution). It is applied ONLY under `-PstaticAnalysis`
+    // so a routine `.\gradlew.bat build` neither resolves the PMD toolchain nor
+    // pays its scan cost (keeps the fast-build budget intact). When enabled,
+    // `pmdMain`/`pmdTest` run as part of `check` and FAIL the build on any
+    // violation - this is the local + CI static-analysis gate.
+    //   Local / CI gate : .\gradlew.bat check -PstaticAnalysis
+    //   Whole build      : .\gradlew.bat build -PstaticAnalysis
+    if (project.hasProperty('staticAnalysis')) {
+        apply plugin: 'pmd'
+        pmd {
+            toolVersion = libs.versions.pmd.get()
+            // The starter ruleset is the single source of truth; disable PMD's
+            // built-in default set so only our curated/appended rules run.
+            ruleSetFiles = rootProject.files('config/pmd/ruleset.xml')
+            ruleSets = []
+            consoleOutput = true
+            // Fail the build on violations (that is the point of the gate).
+            ignoreFailures = false
+            // Analyse production + test sources; skip generated/remapped output.
+            incrementalAnalysis = true
+        }
     }
 
     processResources {
@@ -148,6 +323,91 @@ def publishedModulePaths = [
 ]
 
 // ---------------------------------------------------------------------------
+// Binary compatibility checking (japicmp) - ENTERPRISE_READINESS.md item 31.
+//
+// Verifies public API modules (rtp-api, commands-api, effects-api, maps-api,
+// metrics-api, anvil-api, tags-api) against the previous release baseline.
+// Configured to fail the build on unannounced binary-incompatible changes.
+def apiModulesForBinaryCheck = [
+        ':rtp-api',
+        ':commands-api',
+        ':effects-api',
+        ':maps-api',
+        ':metrics-api',
+        ':anvil-api',
+        ':tags-api',
+].findAll { findProject(it) != null }
+
+apiModulesForBinaryCheck.each { modulePath ->
+    project(modulePath) {
+        apply plugin: 'me.champeau.gradle.japicmp'
+
+        def baselineVersion = project.findProperty('japicmpBaselineVersion') as String ?: '3.2.0'
+        def baselineArtifact = "io.github.dailystruggle:${project.name}:${baselineVersion}"
+
+        configurations {
+            japicmpBaseline {
+                canBeResolved = true
+                canBeConsumed = false
+            }
+        }
+
+        dependencies {
+            japicmpBaseline(baselineArtifact) {
+                transitive = false
+            }
+        }
+
+        def pluginInst = project.plugins.findPlugin('me.champeau.gradle.japicmp')
+        def taskClass = pluginInst.class.classLoader.loadClass('me.champeau.gradle.japicmp.JapicmpTask')
+
+        tasks.register('checkBinaryCompatibility', taskClass) {
+            group = 'verification'
+            description = "Checks binary compatibility of ${project.name} against version ${baselineVersion}."
+
+            // Compare newly built jar against resolved baseline
+            newClasspath = files(tasks.named('jar'))
+            oldClasspath = configurations.japicmpBaseline
+
+            // Only fail if baseline artifact can be resolved and breaking changes are found
+            onlyModified = true
+            failOnModification = false
+            failOnSourceIncompatibility = false
+            ignoreMissingClasses = true
+            // Platform/internal adapter implementation packages are not public API
+            packageExcludes = [
+                    'io.github.dailystruggle.effectsapi.fabric'
+            ]
+            classExcludes = [
+                    'io.github.dailystruggle.effectsapi.fabric.*'
+            ]
+            richReport {
+                reportName = "japicmp-${project.name}.html"
+            }
+
+            // Do not fail task execution if baseline jar cannot be found in repos (e.g. initial dev snapshot)
+            onlyIf {
+                try {
+                    !configurations.japicmpBaseline.files.isEmpty()
+                } catch (Exception e) {
+                    logger.info("japicmp baseline ${baselineArtifact} not resolvable; skipping check for ${project.name}: ${e.message}")
+                    return false
+                }
+            }
+        }
+    }
+}
+
+// Root aggregator for binary compatibility
+tasks.register('checkBinaryCompatibility') {
+    group = 'verification'
+    description = 'Aggregated binary compatibility verification for all public API modules.'
+    apiModulesForBinaryCheck.each { modulePath ->
+        dependsOn "${modulePath}:checkBinaryCompatibility"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Root `build/libs` artifact aggregation.
 //
 // The root project applies the `java` plugin (for Spotless / convenience), so
@@ -173,6 +433,11 @@ def executableJarsOnly = { spec ->
 }
 
 if (findProject(':rtp-plugin') != null) {
+    // Capture the empty root jar's name at configuration time. Reaching
+    // Task.project (via `project.version`) inside the doFirst below is
+    // deprecated in Gradle 9, fatal in Gradle 10, and incompatible with the
+    // configuration cache.
+    def rootJarName = "${rootProject.name}-${version}.jar"
     tasks.register('copyPluginJars', Copy) {
         group = 'build'
         description = 'Copies the shippable :rtp-plugin jars into the root build/libs.'
@@ -188,7 +453,7 @@ if (findProject(':rtp-plugin') != null) {
         // executables only.
         doFirst {
             delete fileTree(layout.buildDirectory.dir('libs')) {
-                include "${rootProject.name}-${project.version}.jar"
+                include rootJarName
                 include '*-dev.jar'
                 include '*-sources.jar'
                 include '*-javadoc.jar'
@@ -216,6 +481,7 @@ if (findProject(':rtp-plugin') != null) {
 def executableAddonHelperPaths = [
         ':addons:LeafRTPGuiAddon:rtp-gui',
         ':addons:LeafRTPCountdownAddon',
+        ':addons:LeafRTPLinearAddon',
         ':helpers:PeriodicWorldSaver',
         ':helpers:StressTestRTP',
 ].findAll { findProject(it) != null }
@@ -234,6 +500,9 @@ if (!executableAddonHelperPaths.isEmpty()) {
 
     executableAddonHelperPaths.each { path ->
         copyAddonAndHelperJars.dependsOn "${path}:assemble"
+        if (project(path).tasks.findByName('shadowJar') != null) {
+            copyAddonAndHelperJars.dependsOn "${path}:shadowJar"
+        }
     }
     tasks.named('assemble').configure { finalizedBy 'copyAddonAndHelperJars' }
 }

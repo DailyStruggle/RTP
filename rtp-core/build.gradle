@@ -5,6 +5,10 @@ plugins {
     id 'java-library'
     id 'java-test-fixtures'
     id 'com.github.spotbugs' version '6.0.18'
+    // PIT mutation testing (ENTERPRISE_READINESS.md item 22). Declared but NOT
+    // applied here; the `-Pmutation` block below applies it on demand so a
+    // routine `.\gradlew.bat build` never resolves the PIT toolchain.
+    alias(libs.plugins.pitest) apply false
 }
 
 dependencies {
@@ -30,7 +34,7 @@ dependencies {
     // io.github.dailystruggle.rtp.common.configuration.yaml (ADR-025
     // 2026-05-15 revision; zero third-party dep). These declarations remain
     // only to satisfy compile-time references in tests and any residual
-    // Bukkit-side reflection probes â€” never to ship the library.
+    // Bukkit-side reflection probes - never to ship the library.
     compileOnly 'org.yaml:snakeyaml:2.3'
     testRuntimeOnly 'org.yaml:snakeyaml:2.3'
     api project(':commands-api')
@@ -64,6 +68,7 @@ dependencies {
     testRuntimeOnly 'org.postgresql:postgresql:42.7.2'
     testRuntimeOnly 'com.h2database:h2:2.2.224'
     compileOnly 'org.jetbrains:annotations:24.1.0'
+    testFixturesApi project(':rtp-core')
     testFixturesCompileOnly 'org.jetbrains:annotations:24.1.0'
     compileOnly 'org.popcraft:chunky-common:1.3.111'
     testImplementation 'org.popcraft:chunky-common:1.3.111'
@@ -71,41 +76,151 @@ dependencies {
     compileOnly 'org.xerial:sqlite-jdbc:3.45.1.0'
     testRuntimeOnly 'org.xerial:sqlite-jdbc:3.45.1.0'
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+    // ENTERPRISE_READINESS.md item 23: jqwik property-based testing framework
+    // for spiral math (ADR-001) and MemoryShape bin arithmetic invariants.
+    testImplementation libs.jqwik
+    // ENTERPRISE_READINESS.md item 18: the database/options package is exercised
+    // against real MySQL and PostgreSQL servers via Testcontainers (not copied
+    // Testable* subclasses), so coverage credits the shipped MySQLDatabaseAccessor
+    // and PostgreSQLDatabaseAccessor. The container-backed tests are Docker-gated
+    // (SqlTestContainers.dockerAvailable) so a routine build on a box without a
+    // Docker daemon skips them cleanly rather than failing.
+    testImplementation platform(libs.testcontainers.bom)
+    testImplementation libs.testcontainers.junit
+    testImplementation 'org.testcontainers:mysql'
+    testImplementation 'org.testcontainers:postgresql'
+    // JDBC drivers for the container-backed tier. PostgreSQL is already declared
+    // above (testRuntimeOnly); MySQL's driver is otherwise absent, so add it for
+    // the MySQLDatabaseAccessor Hikari pool to resolve jdbc:mysql:// at test time.
+    testRuntimeOnly 'com.mysql:mysql-connector-j:8.4.0'
 }
 
-tasks.withType(JavaCompile) {
+// Keep the main source tree free of unchecked-generics warnings. Every genuinely
+// unavoidable cast (heterogeneous factory/parser maps keyed by enum class, and the
+// type-erased RTPChunk<T> member calls in the vertical adjustors) carries a narrowly
+// scoped @SuppressWarnings("unchecked"); this flag is the regression guard that keeps
+// it that way. Scoped to compileJava only so test-source lint noise is not surfaced.
+compileJava {
+    options.compilerArgs += ['-Xlint:unchecked']
 }
 
+// The opt-in behavioural-simulation / allocation benchmark tier (ADR-080) lives in
+// io.github.dailystruggle.rtp.common.benchmark.  Excluded here so `./gradlew build` never
+// pays for it; the `simulationBenchmark` task below is the only way it runs.
+//
+// Class-file include/exclude patterns rather than JUnit tag filters: the root build applies
+// `tasks.withType(Test).configureEach { useJUnitPlatform() }`, which is realized after this
+// script and resets any tag filter set via the useJUnitPlatform DSL.  Test.exclude is a
+// separate, surviving mechanism.  The classes also carry @Tag('simulation') so IDE run
+// configurations and any future tag-based tooling agree with the build.
 test {
-    useJUnitPlatform()
-}
+    exclude '**/benchmark/**'
 
-// Enforce a minimum instruction-coverage floor so that coverage regressions
-// (e.g. deleting tests) are caught by CI.  The threshold is deliberately
-// conservative (10%) to match today's baseline; raise it incrementally as
-// the test suite grows.  Wire into the standard Gradle 'check' lifecycle so
-// ./gradlew check fails the build on regression.
-jacocoTestCoverageVerification {
-    violationRules {
-        rule {
-            limit {
-                counter = 'INSTRUCTION'
-                value   = 'COVEREDRATIO'
-                minimum = 0.10
-            }
-        }
+    // ENTERPRISE_READINESS.md item 18: the Docker-gated MySQL/PostgreSQL
+    // integration tier talks to the local Docker daemon through docker-java, which
+    // negotiates a default Docker Engine API version that recent daemons
+    // (Docker Engine 29+, minimum API 1.40) reject with HTTP 400. Pin a floor API
+    // version for the test workers unless the environment already supplies one, so
+    // the container tests connect on modern Docker without forcing every developer
+    // to export DOCKER_API_VERSION. Mirrors rtp-proxy-common's item-17 wiring.
+    if (System.getenv('DOCKER_API_VERSION') == null) {
+        environment 'DOCKER_API_VERSION', '1.44'
     }
 }
-check.dependsOn jacocoTestCoverageVerification
+
+// Opt-in benchmark tier (ADR-080).
+//
+// Heap and collector are deliberately NOT overridden here.  The root build already pins
+// every Test task to `maxHeapSize = 1024m` and `-XX:+UseG1GC`, and its
+// `tasks.withType(Test).configureEach` block is realized after this script, so any
+// collector flag set here would be *appended* to the root's rather than replacing it --
+// HotSpot rejects two collectors on one command line.  Inheriting the root's pinned args
+// gives the same run-to-run comparability with none of the ordering fragility; the report
+// records the JVM's actual input arguments (ManagementFactory) rather than a value this
+// script asserts, so a published figure always carries the args that really produced it.
+tasks.register('simulationBenchmark', Test) {
+    group = 'verification'
+    description = 'Runs the opt-in competitor-behaviour simulation and allocation benchmarks (ADR-080).'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    // Mirror image of the `test` exclusion above, and for the same reason: tag filters set
+    // through the useJUnitPlatform DSL do not survive the root build's reset.
+    include '**/benchmark/**'
+
+    systemProperty 'rtp.simulation.reportDir',
+            layout.buildDirectory.dir('reports/rtp-simulation').get().asFile.absolutePath
+
+    // Optional pass-through properties for baseline regression gating (ADR-080, item 26)
+    if (project.hasProperty('updateBaseline')) {
+        systemProperty 'rtp.simulation.updateBaseline', project.property('updateBaseline') ?: 'true'
+    }
+    if (project.hasProperty('failOnRegression')) {
+        systemProperty 'rtp.simulation.failOnRegression', project.property('failOnRegression') ?: 'true'
+    }
+    if (project.hasProperty('regressionTolerance')) {
+        systemProperty 'rtp.simulation.regressionTolerance', project.property('regressionTolerance')
+    }
+    if (project.hasProperty('baselinePath')) {
+        systemProperty 'rtp.simulation.baselinePath', project.property('baselinePath')
+    }
+
+    finalizedBy 'evaluateSimulationBaseline'
+
+    // The root build wires `finalizedBy jacocoTestReport`, and jacocoTestReport dependsOn
+    // test -- which would drag the entire unit-test suite into every benchmark run.
+    // Coverage of a benchmark tier is meaningless anyway.
+    // Notice: we replaced finalizedBy with evaluateSimulationBaseline above.
+
+    // Never cache or skip: the point is to re-measure on the current machine.
+    outputs.upToDateWhen { false }
+}
+
+tasks.register('evaluateSimulationBaseline') {
+    group = 'verification'
+    description = 'Evaluates simulation benchmark results against committed baseline JSON or updates baseline.'
+
+    doLast {
+        String reportDirPath = layout.buildDirectory.dir('reports/rtp-simulation').get().asFile.absolutePath
+        System.setProperty('rtp.simulation.reportDir', reportDirPath)
+        if (project.hasProperty('updateBaseline')) {
+            System.setProperty('rtp.simulation.updateBaseline', project.property('updateBaseline') ?: 'true')
+        }
+        if (project.hasProperty('failOnRegression')) {
+            System.setProperty('rtp.simulation.failOnRegression', project.property('failOnRegression') ?: 'true')
+        }
+        if (project.hasProperty('regressionTolerance')) {
+            System.setProperty('rtp.simulation.regressionTolerance', project.property('regressionTolerance').toString())
+        }
+        String resolvedBaseline = project.hasProperty('baselinePath') ?
+                project.property('baselinePath').toString() :
+                file('src/test/resources/benchmarks/simulation-baseline.json').absolutePath
+        System.setProperty('rtp.simulation.baselinePath', resolvedBaseline)
+
+        ClassLoader loader = new URLClassLoader(
+                (sourceSets.test.runtimeClasspath + files(sourceSets.test.output.classesDirs)).collect { it.toURI().toURL() } as URL[],
+                ClassLoader.systemClassLoader
+        )
+        Class<?> comparatorClass = loader.loadClass('io.github.dailystruggle.rtp.common.benchmark.SimulationBaselineRegressionComparator')
+        comparatorClass.getMethod('evaluateAndReport').invoke(null)
+    }
+}
+
+// Coverage ratchet.  The rtp-core floors (and every other module's) are now
+// defined centrally in the root build.gradle `subprojects` closure's
+// `coverageFloors` map and wired into `check` there
+// (docs/dev/ENTERPRISE_READINESS.md section 4.1 item 3).  Raise the numbers in
+// that map -- never lower them -- as coverage grows; target is 90/80 (section 3).
 
 // Static analysis: SpotBugs catches null-dereference, improper synchronisation,
-// and incorrect volatile/atomic usage â€” common failure modes in concurrent Java.
+// and incorrect volatile/atomic usage - common failure modes in concurrent Java.
 // effort='max' enables the deepest analysis pass.
-// reportLevel='high' makes only HIGH-priority bugs block the build;
-// MEDIUM/LOW findings still appear in the HTML report for review.
+// reportLevel='medium' (ENTERPRISE_READINESS.md item 29) ensures medium- and high-confidence
+// findings gate the build; suppressions require written justifications in spotbugs-exclude.xml.
 spotbugs {
     effort = Effort.valueOf('MAX')
-    reportLevel = Confidence.valueOf('HIGH')
+    reportLevel = Confidence.valueOf('MEDIUM')
     ignoreFailures = false
     excludeFilter = file('spotbugs-exclude.xml')
 }
@@ -124,3 +239,73 @@ spotbugsMain {
 // Don't run SpotBugs on test or testFixtures sources (avoids noise from test-only mock classes).
 spotbugsTest.enabled = false
 spotbugsTestFixtures.enabled = false
+
+// PIT mutation testing - depth, not just breadth (ENTERPRISE_READINESS.md item 22,
+// ADR-094 quality-engineering gates). Line/branch coverage only proves a line was
+// executed; mutation testing proves the tests would FAIL if that line were wrong.
+// It is the honest answer to "is your coverage real?".
+//
+// Scoped to the three safety-critical packages the item names -- the teleport
+// pipeline (tasks/teleport), region selection (selection/region and its
+// selectors/cache/util subpackages), and world-border clamping
+// (selection/worldborder) -- because those carry the S-001..S-005 prohibitions
+// where a surviving mutant is a genuine safety gap, not cosmetic.
+//
+// Opt-in ONLY via `-Pmutation`, matching the `-Pcoverage` / `-PstaticAnalysis`
+// pattern: a routine `.\gradlew.bat build` never resolves the PIT toolchain nor
+// pays its (large) run cost. When enabled, `pitest` runs the mutation analysis
+// and FAILS the build below the 60% score floor (the item's target).
+//   Run the gate : .\gradlew.bat :rtp-core:pitest -Pmutation
+if (project.hasProperty('mutation')) {
+    apply plugin: 'info.solidsoft.pitest'
+
+    // A glob list; PIT's '*' spans package separators, so each entry also
+    // covers the package's subpackages (region -> region.selectors, region.cache,
+    // region.util, region.selectors.verticalAdjustors, ...).
+    def defaultSafetyPackages = [
+            'io.github.dailystruggle.rtp.common.tasks.teleport.*',
+            'io.github.dailystruggle.rtp.common.selection.region.*',
+            'io.github.dailystruggle.rtp.common.selection.worldborder.*',
+    ]
+    // Optional narrowing override: `-PmutationPackages=<glob>[,<glob>...]`.
+    // A full run over all three packages is expensive (the teleport/region
+    // pipeline tests are scheduler/time-driven), so this lets an operator or CI
+    // shard the analysis one package at a time without editing the build.
+    def pkgOverride = project.findProperty('mutationPackages')
+    def safetyPackages = pkgOverride ?
+            pkgOverride.toString().split(',').collect { it.trim() }.findAll { !it.isEmpty() } :
+            defaultSafetyPackages
+
+    pitest {
+        // Pin the engine + JUnit 5 discovery plugin from the version catalog so
+        // the mutation floor is measured against a known, reproducible PIT.
+        pitestVersion = libs.versions.pitest.get()
+        junit5PluginVersion = libs.versions.pitestJunit5.get()
+
+        targetClasses = safetyPackages
+        // Restrict the driving tests to the same packages: mutating a teleport
+        // class and re-running the entire core suite would be needlessly slow.
+        targetTests = safetyPackages
+
+        // The non-logic tiers (simulation/drawing/demo/slow/edge) are excluded
+        // from the default suite and the benchmark tree is not a correctness
+        // oracle; keep PIT off both so a surviving mutant reflects a real
+        // logic-test gap rather than an intentionally out-of-scope suite.
+        excludedTestClasses = ['*benchmark*']
+        excludedClasses = ['*benchmark*']
+
+        // The item's target: fail the build below a 60% mutation score.
+        mutationThreshold = 60
+        // Don't fail merely because a package has no mutations yet (keeps the
+        // gate honest while coverage on these packages is still growing).
+        failWhenNoMutations = false
+
+        // Half the cores, mirroring the test-fork cap in the root build so PIT
+        // leaves headroom for Gradle's own module-level parallelism.
+        threads = Math.max(1, Runtime.runtime.availableProcessors().intdiv(2))
+
+        // Stable report path (no per-run timestamp dir) so CI can archive it.
+        timestampedReports = false
+        outputFormats = ['HTML', 'XML']
+    }
+}

@@ -58,5 +58,6 @@ public final class FabricEffectsInitializer {
         EffectFactory.addEffect("TITLE",    new TitleEffect());
         EffectFactory.addEffect("POTION",   new PotionEffect(MobEffects.BLINDNESS.value()));
         EffectFactory.addEffect("GLIDE",    new GlideEffect());
+        EffectFactory.addEffect("COMMAND",  new io.github.dailystruggle.effectsapi.common.effects.CommandEffect());
     }
 }

@@ -39,6 +39,18 @@ public interface TeleportLimitStore {
    */
   long millisUntilReset(UUID id, long cap, long resetMillis, long now);
 
+  /**
+   * Current number of teleports used by the player within the active rolling window.
+   *
+   * @param id player UUID
+   * @param resetMillis rolling window duration in ms
+   * @param now current epoch milliseconds
+   * @return teleports used in the current window, or {@code 0} if no window/expired
+   */
+  default long uses(UUID id, long resetMillis, long now) {
+    return 0L;
+  }
+
   /** Clear the recorded usage for a single player (e.g. on an admin reset). */
   void reset(UUID id);
 }

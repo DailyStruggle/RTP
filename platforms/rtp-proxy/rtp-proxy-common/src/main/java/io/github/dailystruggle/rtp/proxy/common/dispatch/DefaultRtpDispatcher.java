@@ -363,6 +363,16 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
                             DispatchOutcome.Failed.Reason.NO_BACKEND, MSG_NO_BACKEND.key())));
         }
         String serverId = picked.get();
+        if (!sender.isConnected(request.playerId())) {
+            LOG.log(Level.WARNING,
+                    "RTP dispatch: player {0} disconnected before claim on backend {1}; skipping claim.",
+                    new Object[]{request.playerId(), serverId});
+            emitStatus(request.playerId(), QueueState.CANCELLED, Optional.of(MSG_PLAYER_GONE.key()));
+            return CompletableFuture.completedFuture(
+                    DispatchAttempt.failed(new DispatchOutcome.Failed(
+                            DispatchOutcome.Failed.Reason.PLAYER_GONE, MSG_PLAYER_GONE.key())));
+        }
+
         // Carry the request's region constraint onto the reservation so the
         // destination backend's JoinTriggerSource can re-attach it as
         // `rtp region=<regionKey>` on arrival (cross-server

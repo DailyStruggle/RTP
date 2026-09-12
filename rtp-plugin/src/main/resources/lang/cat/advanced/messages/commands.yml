@@ -14,10 +14,12 @@ pause_sniffing: "#A020F0[P0] sniff paused for territories: [scan_regions]"
 resume_sniffing: "#10A5F5[P0] sniff resumed for territories: [scan_regions]"
 sniffing_now: "&c[P0] already sniffing territories: [scan_regions]"
 not_sniffing: "&c[P0] not sniffing territories: [scan_regions]"
+
 # placeholders: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 sniff_status: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 sniffs/s &8| #7E9CC8[scan_landPercentage]%&7 land smell &8| &7ETA #7E9CC8[scan_eta]"
-# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
-# Set to empty string to disable the boss-bar.
+
+# Boss-bar title shown to players with rtp.scan permission while a box sniff is running.
+# Set to empty string to turn off the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 sniff_bar: "Sniffing [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% warm-spots) ETA [scan_eta]"
 
@@ -32,39 +34,52 @@ meows_per_tick: "&7Current plugin meows-per-tick: #7E9CC8[mspt]"
 total_naps_disturbed: "&7Lifetime kibble loaded: #7E9CC8[loads]"
 kibble_loads_by_origin: "&7Kibble loads by paw: #7E9CC8[loadsByOrigin]"
 drool_rate: "&7Current drool (chunk leak) rate: #7E9CC8[leakRate]"
+
 # --- Health metrics block ---
 kitties_in_territory_lines: "&7Kitties waiting in territory lines: #7E9CC8[queueDepth]"
 pending_pounces: "&7Pending pounce pipelines: #7E9CC8[pendingTeleports]"
 average_pounce_lag: "&7Average pounce lag: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
+
+# Pounce-pipe lag percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Pounce-pipe lag (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
+
+# Slow-pounce audit (immediate/unqueued pounces only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Slow pounces (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+
+# Line-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Line-growth hisses (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 tall_human_brain_jar: "&7Tall-human brain-jar: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
+
 # Header line for the Health pipeline labelled block in /rtp info.
 pounce_pipeline_health_header: "&7--- Health: pounce pipeline ---"
+
 # TPS readout for the 1m / 5m / 15m windows. Placeholders: [tps1m] [tps5m] [tps15m].
 tail_flicks_per_sec: "&7Tail-flicks/sec (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
+
 # Live server MSPT and tick-budget purr-meter. Placeholders: [mspt] [tickBudgetUtilisation].
 box_purr_rate: "&7Box purr-rate (mspt): #7E9CC8[mspt] ms (&7whisker budget: #7E9CC8[tickBudgetUtilisation]&7)"
-# Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
+
+# Configured kitty soft-cap vs current online count. Placeholders: [softCap] [playerCount].
 kitties_in_the_box: "&7Kitties: #7E9CC8[playerCount] / [softCap]"
+
 # Latest kibble-stash round-trip latency in ms. Placeholder: [databaseLatencyMs].
 scratching_post_lag: "&7Scratching-post lag: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics.
-# Success/failure rate over all recorded generation attempts. Placeholders:
+
+# Pounce hunt outcome metrics.
+# Success/flop rate over all recorded hunt attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Hunt success: #7E9CC8[genSuccessRate]&7 (flop #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
-# Single most common rejection cause and its share of all failures. Placeholders:
+
+# Single most common hiss cause and its share of all flops. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Top hiss reason: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Per-cause rejection breakdown.
+
+# Per-cause hiss breakdown.
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Hisses by reason: #7E9CC8[genFailureBreakdown]"
+
 # Health colour-band thresholds. Used to colour the coloured-variant
 # placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoThresholdTpsGreen: 19.5
@@ -74,9 +89,11 @@ infoThresholdMsptYellow: 45.0
 infoThresholdCacheFillGreen: 0.5
 infoThresholdCacheFillYellow: 0.25
 infoThresholdNetworkAgeYellow: 5.0
-# Header line introducing the per-Folia-region table (Folia runtime only).
+
+# Header line introducing the per-Folia-den table (Folia runtime only).
 folia_dens_header: "&7--- Folia dens ---"
-# Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
+
+# Per-row template for a single Folia den. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
 folia_den_row: "#7E9CC8[regionId]&7: flicks=#7E9CC8[tps1m]&7 purr=#7E9CC8[mspt]&7 kitties=#7E9CC8[playerCount]&7 line=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 hairball_warning_header: "&7--- Hairball disclaimer ---"
@@ -87,12 +104,15 @@ box_info_meow: "#21ADA8[world]"
 territory_header: "#63C5DATerritories:"
 tall_human_territory_header: "&7--- Territories ---"
 territory_meow: "#52B2BF[region]"
+
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
 infoBiomeActivityHeader: "&8--- &3Flavour napping &8(&3[biomeTotalSamples]&8 sniffs, &3[biomeDistinctCount]&8 flavours) ---"
+
 # Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
 infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
+
 # Shown when no occupancy has been sampled yet.
 infoBiomeActivityEmpty: "&8--- &7no flavour naps sniffed yet &8---"
 
@@ -111,9 +131,9 @@ territory_info:
   - "#58CCED  - requires_pets: [requirePermission]"
   - "#58CCED  - fence_override: [worldBorderOverride]"
   - "#58CCED  - kibble_jar_lid: [cacheCap]"
-  - "#58CCED  - hot_pile (L1): [keptCache]"
-  - "#58CCED  - cold_pile (L2): [unkeptCache]"
-  - "#58CCED  - backlog_pile (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - hot_pile: [keptCache]"
+  - "#58CCED  - cold_pile: [unkeptCache]"
+  - "#58CCED  - backlog_pile: [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - warm_spots: [cached]"
   - "#58CCED  - sniffed coverage: [memCoveragePct] (stinky: [memBadPct], [memBadCount] boxes)"
   - "#58CCED  - top hiss reason: [memTopCause] ([memTopCausePct])"
@@ -123,65 +143,84 @@ territory_info:
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 scratching_slip_silly: "&c[P0] that scratching slip is all chewed up."
+
 # Sent when a menu redeem cannot resolve the calling player UUID.
 scratching_slip_kitties_only: "&c[P0] scratching slips only work for kitties in the world, not tall humans at the console."
+
 # Hover-fallback template used by the menu reflector when no YAML block-comment
 # is available for a parameter. Placeholder: [type] - the declared parameter type.
 paw_hint_type: "paw-flavour: [type]"
+
 # Hover-fallback template used by the menu reflector when a parameter exposes a
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
 menuHoverFallbackBounds: "accepted flavours: [values]"
+
 # Label for the "go back one level" navigation row prepended to every non-root menu page.
 menuBack: "&7« scamper back"
+
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
 menuExecute: "&2▶ pounce [command]"
+
 # Header row at the top of a parameter-value picker sub-page.
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 pick_a_flavour: "&7pick a flavour for [param] (will pounce: /rtp [command] [param]:<value>)"
+
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
 menuTypeValue: "&7✎ type a custom flavour..."
+
 # Non-clickable header row at the top of every non-root menu page.
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
 kneading: "&7kneading: #7E9CC8/rtp [command]"
+
 # Non-clickable title row prepended to the root /rtp menu page.
 # Provides a welcoming header before the player descends into any subcommand.
 menuRootTitle: "#5FB3B3&l⚡ RTP meow menu"
+
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
 # menuRootTitle. Short orientation text for first-time users.
 paw_an_option: "&7paw an option below to begin"
+
 # Navigation rows appended to paginated menu pages - clicking
 # them moves to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
 menuPagePrev: "&7« earlier page ([page])"
 menuPageNext: "&7onward page ([page]) »"
+
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+menuFrontPageSectionTeleport: "&8--- &7pounce &8---"
+
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- pounce to a random warm spot"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- sniff a territory"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- sniff a box"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- sniff a flavour of land"
 menuFrontPageRowHelp: "#7A4FB8❓ list meows &7- /rtp help"
+
 # Front-page admin entry row: the only inline admin-visible row on the
 # front page; click descends into the admin panel. Hidden when the viewer
 # lacks rtp.menu.admin.
 menuFrontPageRowAdmin: "#9D7CD8▶ head-kitty panel &7- staff tools"
+
 # Hover text for the admin-panel entry row. No placeholders.
 menuFrontPageHoverAdmin: "&7staff tools: setup, sniffing, hairball checks, grooming"
+
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ human-staff panel"
+
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7paw an option; chompy actions show a warning hover"
+
 # Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7purr-ferences &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7vet check &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7nine lives &8---"
+menuAdminPanelSectionBrowse: "&8--- &7sniff around &8---"
+
 # Admin-panel rows + hovers. No placeholders.
 menuAdminPanelRowConfig: "&b▶ setup editor"
 menuAdminPanelHoverConfig: "&7open the curated setup picker"
@@ -189,7 +228,7 @@ menuAdminPanelRowRegions: "#5FB3B3▶ territories"
 menuAdminPanelHoverRegions: "&7add, remove, or groom per-territory setups"
 menuAdminPanelRowWorlds: "#5FB3B3▶ boxes"
 menuAdminPanelHoverWorlds: "&7add, remove, or groom per-box setups"
-menuAdminPanelRowEffects: "#5FB3B3▶ effects"
+menuAdminPanelRowEffects: "#5FB3B3▶ sparkles"
 menuAdminPanelHoverEffects: "&7add, remove, or groom per-group pounce effects"
 menuAdminPanelRowInfo: "&b▶ box info"
 menuAdminPanelHoverInfo: "&7show plugin version, territory counts, and line state"
@@ -204,177 +243,241 @@ menuAdminPanelHoverReload: "&7grooms all setup files; mid-pounce kitties may be 
 menuAdminPanelRowBrowse: "&b▶ browse all meows"
 menuAdminPanelHoverBrowse: "&7open the reflected /rtp meow tree"
 menuAdminPanelRowBack: "&7« scamper back"
+
 # --- Visualizations submenu (admin map of bad locations per region) ---
 # Admin-panel row: open the Visualizations submenu. No placeholders.
-menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
+menuAdminPanelRowVisualizations: "#5FB3B3▶ shiny pictures"
+
 # Hover text for the admin-panel Visualizations row. No placeholders.
 menuAdminPanelHoverVisualizations: "&7open maps and other head-kitty visualizations"
+
 # Section divider above the Visualizations block on the admin panel.
-menuAdminPanelSectionVisualizations: "&8» &7visualizations"
+menuAdminPanelSectionVisualizations: "&8» &7shiny pictures"
+
 # Non-clickable title row at the top of the Visualizations submenu.
 menuVisualizationsTitle: "#9D7CD8&l⌖ map sniffs"
+
 # Non-clickable hint row below the title.
 menuVisualizationsHint: "&7pick a territory to view its stinky-spots map"
+
 # Visualizations row template; [region] - region name.
-menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- territory shape map"
+
 # Hover text for a Visualizations region row; [region] - region name.
 menuVisualizationsHoverRegion: "&7open a map showing stinky spots in &b[region]"
+
 # Non-clickable hint row shown when no regions are configured.
 menuVisualizationsEmpty: "&7(no territories configured)"
+
 # Visualizations submenu back row (returns to the admin panel).
-menuVisualizationsRowBack: "&7« back"
+menuVisualizationsRowBack: "&7« scurry back"
+
 # --- Admin panel Setup section: curated prefabs ---
 # Section divider above the Setup (quick start) block on the admin panel.
 menuAdminPanelSectionSetup: "&8» &7setup (quick paw start)"
+
 # Setup row + hover: survival-default identity overlay (reset to shipped defaults).
 menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
 menuPrefabSurvivalDefaultHover: "&7reset to the shipped defaults (plain-kibble overlay)"
+
 # Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
 menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
 menuPrefabLowPerformanceHover: "&7sleepy boxes / shared-CPU dens: longer pulse, smaller piles, login warm-spots off"
+
 # Setup row + hover: high-performance (short pulse, large caches, login cache on).
 menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
 menuPrefabHighPerformanceHover: "&7dedicated boxes / many kitties: short pulse, big piles, login warm-spots on"
+
 # Setup row + hover: folia-tuned (regional scheduler tuning).
 menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
 menuPrefabFoliaTunedHover: "&7folia regional scheduler: faster per-den pulses, fewer kibble tickets at once"
+
 # Setup row + hover: multi-world (one region per world from current default).
 menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
 menuPrefabMultiWorldHover: "&7synthesise one territory per box from the current default"
+
 # Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
 menuPrefabConfirmTitle: "#9D7CD8&l⚙ confirm flavour: #5FB3B3[prefab]"
+
 # Confirmation menu non-clickable hint row below the title. No placeholders.
 menuPrefabConfirmHint: "&7sniff the changes below, then paw confirm or cancel"
+
 # Confirmation menu footer row: confirm and write the prefab to disk.
 menuPrefabConfirmRow: "&2&l[paw to confirm]"
-# Confirmation menu footer row: cancel and return to the admin panel.
+
+# Confirmation menu footer row: cancel and return to the head-kitty panel.
 menuPrefabCancelRow: "&c&l[paw to cancel]"
+
 # Clickable row label for the Refresh affordance at the bottom of the /rtp info
 # book. Re-renders the current scope against a fresh metrics snapshot.
 infoBookRefreshRow: "&2[Refresh]"
+
 # Hover text for the info-book refresh row.
 infoBookRefreshHover: "&7Re-sniff this page against a fresh hairball snapshot."
+
 # Clickable row label for the Switch-to-chat affordance at the bottom of the
 # /rtp info book. Re-runs the same scope through the legacy chat path.
 infoBookSwitchToTextRow: "&7[switch to meow chat]"
+
 # Hover text for the info-book switch-to-chat row.
 infoBookSwitchToTextHover: "&7Re-meow /rtp info in chat instead of the booklet."
+
 # Footer row rendered when the /rtp info book content exceeds the book page
 # cap. Clicking re-runs the same scope in chat mode so no data is lost.
 infoBookOverflowFooter: "&7(too many meows for one page - paw to see the rest in chat)"
+
 # Non-clickable note row indicating that periodic auto-refresh for the info
 # book is not currently supported on this build (deferred to a later
 # milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(auto-grooming not yet supported; paw re-sniff to update)"
+
 # Non-clickable title row at the top of the config-file selector page.
 # Shown when an admin clicks "/rtp config" from the front page.
 configSelectorTitle: "#5FB3B3&l⚙ setup files"
+
 # Label for the "back to /rtp menu root" navigation row on the config selector page.
 configSelectorBackRow: "&7« back to the meow menu"
+
 # Non-clickable title row at the top of a single config-file page.
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
+configFileTitle: "#5FB3B3&l⚙ purr-ferences: &7[file]"
+
 # Label for the "back to config selector" navigation row on a single config-file page.
 configFileBackRow: "&7« back to setup files"
+
 # Non-clickable hint row shown when a config file has no editable keys.
 configFileEmptyHint: "&7(no groomable keys in this file)"
+
 # Per-key row label on a config-file page. Placeholders:
 #   [key]   - the config key name; [value] - the currently-stored value.
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
+
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
 configKeyHoverFormat: "&7paw to groom &7[key] &7(flavour: [type])"
+
 # Non-clickable title row at the top of a shape/vert type-picker page.
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+configTypePickerTitle: "#5FB3B3&l⚙ pick [param] kind &7(current: &7[current]&7)"
+
 # Non-clickable title row at the top of a shape/vert sub-parameter page.
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7tiny tweaks"
+
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] booklet view unavailable; falling back to raw dump."
+
 # Placeholder text rendered in place of a config value that has not been set.
 configValueUnsetPlaceholder: "&8(no scent)"
+
 # Non-clickable header row separating the "Changeable" list from the "Pending"
 # staging-cart list on a config-file page when the viewer has staged one or
 # more uncommitted edits. No placeholders.
 configPendingHeader: "&6&l-- pending changes --"
-# Per-row label for a staged (pending) key=value entry on a config-file page.
-# Clicking the row removes it from the cart. Placeholders: [key], [value].
+
+# Per-row label for a staged (pending) key=value entry on a purr-ferences page.
+# Tapping the row removes it from the cart. Placeholders: [key], [value].
 configPendingRowFormat: "&9[key]&8 = &0[value]"
+
 # Hover text shown when the viewer hovers a pending (staged) row on a
-# config-file page. No placeholders.
+# purr-ferences page. No placeholders.
 configPendingRowHover: "paw to unstage"
-# Clickable label for the "apply staged changes" row on a config-file page.
+
+# Clickable label for the "apply staged changes" row on a purr-ferences page.
 # Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
 configApplyRow: "&2&l[apply]"
-# Clickable label for the "discard staged changes" row on a config-file page.
+
+# Clickable label for the "discard staged changes" row on a purr-ferences page.
 # Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
 
 # --- Map / chart rendering ---
-# Sent when a map row is clicked but map rendering is not available on this
-# server (e.g. the Lite assembly, or no map provider installed).
+# Sent when a map row is tapped but map rendering is not available on this
+# box (e.g. the Lite assembly, or no map provider installed).
 mapBindingMissing: "&c[P0] map rendering is not available on this box."
-# Sent when a chart is requested but no renderer is registered for that
+
+# Sent when a chart is requested but no chart-sniffer is registered for that
 # chart type.
 mapResolverMissing: "&c[P0] no chart-sniffer registered for this request."
+
 # Sent when a resolver runs but the underlying data source is unavailable
-# for the requested target (unknown region, no data yet, world unloaded).
-# Placeholder: [region] - the requested region name (may be empty).
+# for the requested target (unknown territory, no kibble yet, box unloaded).
+# Placeholder: [region] - the requested territory name (may be empty).
 mapUnavailable: "&e[P1] chart kibble is not available right now."
+
 # Sent when the map service cannot allocate a map right now (e.g. a
 # per-viewer cap has been reached).
 mapBusy: "&e[P1] the map-sniffer is busy; try again in a few licks."
+
 # Label for the clickable "/rtp info" menu row that renders a heatmap of
-# the current region's known bad locations. Hidden when map rendering is
-# not available on this server.
+# the current territory's known bad locations. Hidden when map rendering is
+# not available on this box.
 menuInfoBadPointsLabel: "#9D7CD8&l# bad-spots map"
 
 # --- MultiConfig submenu ---
 # Header row fallback used when no per-kind header key is registered.
 # Placeholder: [parserKind] - the raw multi-config kind name.
 multiconfigHeaderDefault: "#5FB3B3&l[parserKind]"
-# Header row label for the regions multi-config selector page. No placeholders.
+
+# Header row label for the territories multi-config selector page. No placeholders.
 multiconfigHeaderRegions: "#5FB3B3&l territories"
-# Header row label for the worlds multi-config selector page. No placeholders.
+
+# Header row label for the boxes multi-config selector page. No placeholders.
 multiconfigHeaderWorlds: "#5FB3B3&l boxes"
-# Toggle-row label when remove-mode is OFF. No placeholders.
+
+# Toggle-row label when chompy-mode is OFF. No placeholders.
 multiconfigToggleRemoveModeOff: "&8[ ] chompy mode"
-# Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
+
+# Toggle-row label when chompy-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] chompy mode (paw an entry to chomp it)"
+
 # Selector row label for the "+ Add new..." entry. No placeholders.
 multiconfigRowAdd: "&2+ sniff out a new one..."
+
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7type a name in the scratching prompt; prefilled: &f[name]"
+
 # Hover text for an entry row in normal mode. Placeholder: [name].
 multiconfigRowEditHover: "&7groom &f[name]"
-# Hover text for an entry row in remove-mode. Placeholder: [name].
+
+# Hover text for an entry row in chompy-mode. Placeholder: [name].
 multiconfigRowRemoveHover: "&cchomp &f[name]"
+
 # Confirm-delete page title row. Placeholder: [name].
 multiconfigConfirmTitle: "&c&lchomp [name]?"
+
 # Confirm-delete page Yes-row label. No placeholders.
 multiconfigConfirmYes: "&c&l[paw to chomp]"
+
 # Confirm-delete page Cancel-row label. No placeholders.
 multiconfigConfirmNo: "&2&l[scamper away]"
-# Hover text on a locked (grayed) default-region row. No placeholders.
+
+# Hover text on a locked (grayed) default-territory row. No placeholders.
 multiconfigLockRegionDefault: "&7the default territory cannot be chomped"
-# Hover text on a locked (grayed) world row. Placeholder: [name].
+
+# Hover text on a locked (grayed) box row. Placeholder: [name].
 multiconfigLockWorldLoaded: "&7box '[name]' is loaded on the server; unload it before chomping its setup"
+
 # Result message after a successful ADD. Placeholder: [name].
 multiconfigResultAdded: "&adragged in '[name]'."
+
 # Result message after a successful REMOVE. Placeholder: [name].
 multiconfigResultRemoved: "&achomped '[name]'."
+
 # Result message when ADD failed. Placeholders: [name], [reason].
 multiconfigResultAddFailed: "&ccouldn't drag in '[name]': [reason]"
+
 # Result message when REMOVE failed. Placeholders: [name], [reason].
 multiconfigResultRemoveFailed: "&ccould not chomp '[name]': [reason]"
-# Result message when the proposed entry name is rejected by the sanitiser.
+
+# Result message when the proposed entry name is hissed away by the sanitiser.
 # Placeholder: [name].
 multiconfigResultNameInvalid: "&cname '[name]' is hiss-worthy; use letters, digits, '_', '-', '.'"
+
 # Result message when an ADD collides with an existing entry name.
 # Placeholder: [name].
 multiconfigResultNameTaken: "&can entry named '[name]' already lives here."
 
-# DO NOT TOUCH VERSION NUMBER
+# Do not bite the version number, sacred catnip
 version: 1.0

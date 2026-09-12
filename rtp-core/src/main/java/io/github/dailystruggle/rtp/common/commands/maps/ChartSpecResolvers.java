@@ -22,6 +22,7 @@ public final class ChartSpecResolvers {
         ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, new RegionBadLocationsShapeResolver());
     RESOLVERS.put(ChartSpec.Kind.REGION_BIOMES, new RegionBiomesResolver());
     RESOLVERS.put(ChartSpec.Kind.METRIC_SPARKLINE, new MetricSparklineResolver());
+    RESOLVERS.put(ChartSpec.Kind.REGION_COMPOSITE, new RegionCompositeResolver());
   }
 
   private ChartSpecResolvers() {}
@@ -58,5 +59,6 @@ public final class ChartSpecResolvers {
         ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, new RegionBadLocationsShapeResolver());
     RESOLVERS.put(ChartSpec.Kind.REGION_BIOMES, new RegionBiomesResolver());
     RESOLVERS.put(ChartSpec.Kind.METRIC_SPARKLINE, new MetricSparklineResolver());
+    RESOLVERS.put(ChartSpec.Kind.REGION_COMPOSITE, new RegionCompositeResolver());
   }
 }

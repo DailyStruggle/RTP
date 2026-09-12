@@ -10,7 +10,6 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-import org.jetbrains.annotations.NotNull;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implements ConfigLoader {
@@ -100,14 +99,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     this.langMap = dotLangMap(pluginDirectory, this.directory);
     if (!this.myDirectory.exists() && !myDirectory.mkdirs()) return;
 
-    File d = new File(myDirectory.getAbsolutePath() + File.separator + "default.yml");
-    if (!d.exists()) {
-      try {
-        saveResourceFromJar(this.directory + "/default.yml", true);
-      } catch (IllegalArgumentException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
-      }
-    }
+    extractBundledResources();
 
     File[] files = myDirectory.listFiles();
     if (files == null) return;
@@ -170,20 +162,13 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 //      System.out.println("[RTP-DEBUG] MultiConfig: Loaded " + files.length + " files for " + name);
 
     } catch (Throwable T) {
-      T.printStackTrace();
+      RTP.log(Level.WARNING, "Error scanning directory for multi config " + name, T);
     }
 
     this.langMap = dotLangMap(pluginDirectory, this.directory);
     if (!this.myDirectory.exists() && !myDirectory.mkdirs()) return;
 
-    File d = new File(myDirectory.getAbsolutePath() + File.separator + "default.yml");
-    if (!d.exists()) {
-      try {
-        saveResourceFromJar(this.directory + "/default.yml", true);
-      } catch (IllegalArgumentException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
-      }
-    }
+    extractBundledResources();
 
     File[] files = myDirectory.listFiles();
     if (files == null) return;
@@ -208,14 +193,79 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     }
   }
 
-  @NotNull
+  /**
+   * Discovers and extracts all bundled .yml resources from the jar/classpath for this directory.
+   */
+  private void extractBundledResources() {
+    boolean extractedAny = false;
+    try {
+      String dirPath = this.directory.replace('\\', '/');
+      if (dirPath.startsWith("/")) dirPath = dirPath.substring(1);
+      java.util.Enumeration<java.net.URL> urls = getClassLoader().getResources(dirPath);
+      while (urls.hasMoreElements()) {
+        java.net.URL url = urls.nextElement();
+        String protocol = url.getProtocol();
+        if ("jar".equals(protocol)) {
+          String path = url.getPath();
+          int bang = path.indexOf('!');
+          if (bang >= 0) {
+            String jarPath = path.substring("file:".length(), bang);
+            jarPath = java.net.URLDecoder.decode(jarPath, java.nio.charset.StandardCharsets.UTF_8);
+            try (java.util.jar.JarFile jar = new java.util.jar.JarFile(jarPath)) {
+              java.util.Enumeration<java.util.jar.JarEntry> entries = jar.entries();
+              String prefix = dirPath.endsWith("/") ? dirPath : dirPath + "/";
+              while (entries.hasMoreElements()) {
+                String entryName = entries.nextElement().getName();
+                if (entryName.startsWith(prefix) && entryName.endsWith(".yml") && !entryName.equals(prefix)) {
+                  String fileName = entryName.substring(prefix.length());
+                  if (!fileName.contains("/")) {
+                    File target = new File(myDirectory, fileName);
+                    if (!target.exists()) {
+                      saveResourceFromJar(entryName, true);
+                      extractedAny = true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } else if ("file".equals(protocol)) {
+          File dir = new File(url.toURI());
+          File[] list = dir.listFiles((d, f) -> f.endsWith(".yml"));
+          if (list != null) {
+            for (File f : list) {
+              File target = new File(myDirectory, f.getName());
+              if (!target.exists()) {
+                saveResourceFromJar(dirPath + "/" + f.getName(), true);
+                extractedAny = true;
+              }
+            }
+          }
+        }
+      }
+    } catch (Exception e) {
+      RTP.log(Level.FINE, "Could not enumerate jar resources for " + this.directory, e);
+    }
+
+    if (!extractedAny) {
+      File d = new File(myDirectory, "default.yml");
+      if (!d.exists()) {
+        try {
+          saveResourceFromJar(this.directory + "/default.yml", true);
+        } catch (IllegalArgumentException e) {
+          RTP.log(Level.WARNING, e.getMessage(), e);
+        }
+      }
+    }
+  }
+
   public Set<String> listParsers() {
     return configParserFactory.map.values().stream()
         .map(eConfigParser -> eConfigParser.name.replace(".yml", ""))
         .collect(Collectors.toSet());
   }
 
-  @NotNull
+  @SuppressWarnings("unchecked") // configParserFactory only ever holds ConfigParser<E> for this parser's E
   public ConfigParser<E> getParser(String name) {
     name = ConfigParser.sanitizeName(name).toUpperCase();
     if (!name.endsWith(".YML")) name = name + ".YML";
@@ -235,6 +285,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     }
   }
 
+  @SuppressWarnings("unchecked") // configParserFactory only ever constructs ConfigParser<E> for this parser's E
   public void addParser(String name) {
     String safe = ConfigParser.sanitizeName(name);
     ConfigParser<E> value = (ConfigParser<E>) configParserFactory.construct(safe);
@@ -248,6 +299,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
    * @param name     the new parser/file name
    * @param fromName originating parser/file name to clone from
    */
+  @SuppressWarnings("unchecked") // configParserFactory only ever constructs ConfigParser<E> for this parser's E
   public void addParser(String name, String fromName) {
     String safe = ConfigParser.sanitizeName(name);
     String from = (fromName == null) ? null : ConfigParser.sanitizeName(fromName);
@@ -255,6 +307,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     if (value != null) configParserFactory.add(safe, value);
   }
 
+  @SuppressWarnings("unchecked") // parser.myClass is verified to equal myClass before the cast
   public void addParser(ConfigParser<?> parser) {
     if (!parser.myClass.equals(myClass)) throw new IllegalStateException("mismatched parser class");
     ConfigParser<E> eConfigParser = (ConfigParser<E>) parser;

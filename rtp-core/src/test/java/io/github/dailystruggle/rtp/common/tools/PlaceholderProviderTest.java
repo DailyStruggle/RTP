@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.tools;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -320,16 +321,65 @@ class PlaceholderProviderTest {
     @ValueSource(strings = {"delay", "cooldown", "remainingCooldown", "queueLocation",
         "teleports", "mspt", "attempts", "processingTime", "spot",
         "player", "player_name", "player_status", "scan_chunks", "scan_totalChunks",
-        "scan_cps", "scan_regions", "scan_eta", "world", "name", "region",
+        "scan_cps", "scan_regions", "scan_landPercentage", "scan_eta", "world", "name", "region",
         "requirePermission", "override", "pluginForced", "serverForced",
         "shape", "cacheCap", "cached", "keptCache", "unkeptCache",
         "backlogCache", "backlogCacheCap", "locationQueue",
         "inFlightCalculations", "worldBorderOverride",
         "total_queue_length", "public_queue_length", "personal_queue_length",
         "teleport_world", "teleport_x", "teleport_y", "teleport_z", "teleport_biome",
-        "tickets", "plugin_forced", "server_forced", "loads", "leakRate"})
+        "tickets", "plugin_forced", "server_forced", "loads", "leakRate",
+        "remainingLockTime", "remaining_lock_time", "lockUses", "lock_uses",
+        "remainingLockUses", "remaining_lock_uses", "lockLimit", "lock_limit",
+        "lockAfterUses", "lock_after_uses"})
     void builtInPlaceholderIsRegistered(String key) {
         assertTrue(PlaceholderProvider.placeholders.containsKey(key),
                 "Expected built-in placeholder to be registered: " + key);
+    }
+
+    @Test
+    void formatEta_formatsZeroAndPositiveSeconds() {
+        assertEquals("0s", PlaceholderProvider.formatEta(0));
+        assertEquals("45s", PlaceholderProvider.formatEta(45));
+        assertEquals("1m 15s", PlaceholderProvider.formatEta(75));
+        assertEquals("2h 19m 28s", PlaceholderProvider.formatEta(2 * 3600 + 19 * 60 + 28));
+    }
+
+    @Test
+    void scanPlaceholders_withRegionContext_resolvesTargetRegionMetrics() {
+        RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("scan_ph_world");
+        io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square square =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square();
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor vert =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(java.util.Collections.emptyList());
+        io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings =
+                new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
+                        "regionA", world, square, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        io.github.dailystruggle.rtp.common.selection.region.Region regionA =
+                new io.github.dailystruggle.rtp.common.selection.region.Region("regionA", settings);
+        RTP.selectionAPI.permRegionLookup.put("regionA", regionA);
+
+        io.github.dailystruggle.rtp.common.tasks.ScanTask taskA =
+                new io.github.dailystruggle.rtp.common.tasks.ScanTask(regionA, 0L);
+        taskA.latestAbsolutePos = 500;
+        taskA.latestAbsoluteTotal = 1000;
+        taskA.latestCps = 250;
+        taskA.latestEtaSeconds = 60;
+        RTP.getInstance().scanTasks.put("regionA", taskA);
+
+        try {
+            RTP.regionContext.set(regionA);
+
+            assertEquals("regionA", PlaceholderProvider.fillPlaceholders("[scan_regions]", DUMMY_UUID));
+            assertEquals("500", PlaceholderProvider.fillPlaceholders("[scan_chunks]", DUMMY_UUID));
+            assertEquals("1000", PlaceholderProvider.fillPlaceholders("[scan_totalChunks]", DUMMY_UUID));
+            assertEquals("250", PlaceholderProvider.fillPlaceholders("[scan_cps]", DUMMY_UUID));
+            assertEquals("1m", PlaceholderProvider.fillPlaceholders("[scan_eta]", DUMMY_UUID));
+        } finally {
+            RTP.regionContext.remove();
+            RTP.getInstance().scanTasks.clear();
+        }
     }
 }

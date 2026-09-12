@@ -24,7 +24,7 @@ public class ChunkUnloadProcessor implements Runnable {
         }
       }
     } catch (Throwable t) {
-      t.printStackTrace();
+      RTP.log(java.util.logging.Level.WARNING, "Exception during ChunkUnloadProcessor execution", t);
     }
   }
 }

@@ -24,7 +24,6 @@ import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
-import org.jetbrains.annotations.Nullable;
 
 /** Main configuration manager for RTP */
 public class Configs {
@@ -70,6 +69,7 @@ public class Configs {
    *
    * @param instance the configuration parser instance
    */
+  @SuppressWarnings("unchecked") // instance is myClass-checked to LoggingKeys before the parameterized cast
   public void putParser(Object instance) {
     if (instance == null) throw new NullPointerException("instance is null");
 
@@ -129,6 +129,7 @@ public class Configs {
     return def;
   }
 
+  @SuppressWarnings("unchecked") // maps keyed by enum class guarantee the parser's E matches parserEnumClass
   public <T extends Enum<T>> FactoryValue<T> getParser(Class<T> parserEnumClass) {
     if (configParserMap.containsKey(parserEnumClass))
       return (FactoryValue<T>) configParserMap.get(parserEnumClass);
@@ -517,7 +518,7 @@ public class Configs {
    * @param worldName the name of the world
    * @return the configuration parser, or null if the world is not registered
    */
-  @Nullable
+  @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys.class guarantees the parser's E
   public ConfigParser<WorldKeys> getWorldParser(String worldName) {
     if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
       return null;
@@ -551,6 +552,7 @@ public class Configs {
    * @param key the configuration key
    * @return the configuration value
    */
+  @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys.class guarantees the parser's E
   public Object getWorldParserValue(String worldName, WorldKeys key) {
     if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
       return null;
@@ -703,6 +705,13 @@ public class Configs {
     newConfigParserMap.put(MetricsKeys.class, metrics);
     migrateLegacyRootConfig(metrics, "metrics.yml");
 
+    // ADR-079: ttl.yml defines cause-based and per-verifier spatial retention
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/ttl.yml");
+    ConfigParser<TtlKeys> ttl =
+            new ConfigParser<>(TtlKeys.class, "advanced/ttl.yml", "1.0", pluginDirectory, fileDatabase, locale);
+    newConfigParserMap.put(TtlKeys.class, ttl);
+    io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.loadFromConfig(ttl);
+
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser safety.yml");
     ConfigParser<SafetyKeys> safety =
             new ConfigParser<>(SafetyKeys.class, "safety", "1.1", pluginDirectory, fileDatabase, locale);
@@ -797,6 +806,10 @@ public class Configs {
     // carries the redundant network.redis block in config.yml (authoritative surface
     // is network.yml).
     warnLegacyNetworkRedisOnce();
+    // ADR-076: the shape/vert rename maps are hidden, so the registered type catalog
+    // is republished to visible generated markdown beside the region files. Derived
+    // from the factories, so it cannot drift from what the server actually accepts.
+    SelectorCatalogWriter.write(pluginDirectory);
     RTP.log(Level.FINE, "[RTP] reloadConfigs(): complete (in-flight tasks retain old snapshots)");
   }
 

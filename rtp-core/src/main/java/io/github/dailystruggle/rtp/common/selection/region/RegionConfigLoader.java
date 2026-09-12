@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Polygon;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
@@ -18,6 +19,7 @@ import java.util.logging.Level;
 
 public class RegionConfigLoader {
 
+    @SuppressWarnings("unchecked") // raw config values are instanceof-checked to Map before the String-keyed cast
     public static RegionSettings load(ConfigParser<RegionKeys> regionParser) {
         String name = regionParser.name.replace(".yml", "");
 //        System.out.println("[RTP-DEBUG] RegionLoader: --- Processing Region '" + name + "' ---");
@@ -128,14 +130,23 @@ public class RegionConfigLoader {
 
         boolean worldBorderOverride = getBoolean(resolveScalar(regionParser, RegionKeys.worldBorderOverride, false));
         boolean requirePermission = getBoolean(resolveScalar(regionParser, RegionKeys.requirePermission, false));
-        long cacheCap = getNumber(resolveScalar(regionParser, RegionKeys.cacheCap, 10L)).longValue();
-        long backlogCacheCap = getNumber(resolveScalar(regionParser, RegionKeys.backlogCacheCap, 0L)).longValue();
+        long cacheCap = io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.resolveCapacity(
+                resolveScalar(regionParser, RegionKeys.cacheCap, 10L),
+                10L,
+                io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.COLD_CACHE_BYTES_PER_ENTRY);
+        long backlogCacheCap = io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.resolveCapacity(
+                resolveScalar(regionParser, RegionKeys.backlogCacheCap, 0L),
+                0L,
+                io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.BACKLOG_CACHE_BYTES_PER_ENTRY);
         long networkReserveSize = getNumber(resolveScalar(regionParser, RegionKeys.networkReserveSize, 0L)).longValue();
-        int activeChunkCap = getNumber(resolveScalar(regionParser, RegionKeys.activeChunkCap, 3)).intValue();
+        int activeChunkCap = io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.resolveCapacityInt(
+                resolveScalar(regionParser, RegionKeys.activeChunkCap, 3),
+                3,
+                io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.HOT_CACHE_BYTES_PER_ENTRY);
         double price = getNumber(resolveScalar(regionParser, RegionKeys.price, 0.0)).doubleValue();
         long spatialResolution = getNumber(resolveScalar(regionParser, RegionKeys.spatialResolution, 1L)).longValue();
 
-        if (shape != null && shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = spatialResolution;
+        if (shape != null && shape instanceof MemoryShape<?> memoryShape) memoryShape.setSpatialResolution(spatialResolution);
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
 
         if (shape instanceof MemoryShape<?> && world != null) {
@@ -145,6 +156,16 @@ public class RegionConfigLoader {
         }
         // If world is null here, the region is dormant; the MemoryShape (if any) is loaded
         // later via OnWorldLoadUnload -> RegionConfigLoader.load(...) at rebind time.
+
+        // Auto-interpret dimensionless shape parameters vs world border
+        if (!worldBorderOverride) {
+            io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor.autoInterpretShape(
+                name, world, shape);
+        }
+
+        // Audit world border vs configured shape bounds
+        io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor.checkRegionWorldBorder(
+            name, world, shape, worldBorderOverride);
 
         return new RegionSettings(
                 name,
@@ -194,6 +215,7 @@ public class RegionConfigLoader {
         return parser.getConfigValue(key, fallback);
     }
 
+    @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
     private static Shape<?> deserializeShape(Map<String, Object> map) {
         String shapeName = String.valueOf(map.getOrDefault("name", "CIRCLE")).toUpperCase();
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
@@ -202,11 +224,111 @@ public class RegionConfigLoader {
         if (prototype != null) {
             Shape<?> clone = prototype.clone();
             clone.setData(map);
+            applyPolygonVertices(clone, map);
             return clone;
         }
         return null;
     }
 
+    /**
+     * ADR-034: {@code vertices} is a structured value, so {@code setData} cannot carry it into
+     * the shape. Parse it here and install it, or leave the shape as its bounding square with a
+     * warning - a silent degrade reads to an admin as "the polygon config did nothing".
+     */
+    static void applyPolygonVertices(Shape<?> shape, Map<String, Object> map) {
+        if (!(shape instanceof Polygon polygon)) return;
+
+        Object rawVertices = null;
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().trim().equalsIgnoreCase("vertices")) {
+                rawVertices = entry.getValue();
+                break;
+            }
+        }
+        if (rawVertices instanceof RtpYamlSection) {
+            rawVertices = ((RtpYamlSection) rawVertices).getMapValues(false);
+        }
+        if (rawVertices instanceof Map<?, ?> vertexMap) {
+            // Tolerate the mapping form (`0: [x, z]`), which some YAML writers emit.
+            rawVertices = new java.util.ArrayList<>(vertexMap.values());
+        }
+        if (!(rawVertices instanceof Iterable<?> iterable)) {
+            if (rawVertices != null) {
+                RTP.log(Level.WARNING, "[RTP] Shape " + shape.name
+                        + ": 'vertices' must be a list of [x, z] pairs; got "
+                        + rawVertices.getClass().getSimpleName()
+                        + ". Falling back to the bounding square.");
+            }
+            return;
+        }
+
+        List<int[]> vertices = new java.util.ArrayList<>();
+        for (Object entry : iterable) {
+            int[] vertex = parseVertex(entry);
+            if (vertex == null) {
+                RTP.log(Level.WARNING, "[RTP] Shape " + shape.name
+                        + ": vertex " + vertices.size() + " (" + entry
+                        + ") is not an [x, z] pair. Falling back to the bounding square.");
+                return;
+            }
+            vertices.add(vertex);
+        }
+
+        try {
+            polygon.setVertices(vertices);
+        } catch (IllegalArgumentException e) {
+            RTP.log(Level.WARNING, "[RTP] Shape " + shape.name + ": " + e.getMessage()
+                    + ". Falling back to the bounding square.");
+            return;
+        }
+
+        // ADR-034: expand is hard-off for a polygon. Say so instead of ignoring it silently.
+        Object rawExpand = map.get("expand");
+        if (rawExpand != null && getBoolean(rawExpand)) {
+            RTP.log(Level.WARNING, "[RTP] Shape " + shape.name
+                    + ": 'expand: true' is ignored for polygons - the boundary is the vertex list.");
+        }
+    }
+
+    /** Accepts {@code [x, z]}, a 2-element list, or the {@code "x,z"} scalar form. */
+    private static int[] parseVertex(Object entry) {
+        if (entry == null) return null;
+        List<Object> parts = new java.util.ArrayList<>(2);
+        if (entry instanceof int[] pair) {
+            return pair.length >= 2 ? new int[] {pair[0], pair[1]} : null;
+        } else if (entry instanceof Object[] array) {
+            java.util.Collections.addAll(parts, array);
+        } else if (entry instanceof Iterable<?> nested) {
+            for (Object part : nested) parts.add(part);
+        } else if (entry instanceof Map<?, ?> pairMap) {
+            Object x = pairMap.containsKey("x") ? pairMap.get("x") : pairMap.get("X");
+            Object z = pairMap.containsKey("z") ? pairMap.get("z") : pairMap.get("Z");
+            if (x == null || z == null) return null;
+            parts.add(x);
+            parts.add(z);
+        } else {
+            String s = entry.toString().trim();
+            if (s.startsWith("[") && s.endsWith("]")) s = s.substring(1, s.length() - 1);
+            if (s.startsWith("(") && s.endsWith(")")) s = s.substring(1, s.length() - 1);
+            for (String part : s.split("[,;\\s]+")) {
+                if (!part.isEmpty()) parts.add(part);
+            }
+        }
+        if (parts.size() != 2) return null;
+        try {
+            return new int[] {parseCoord(parts.get(0)), parseCoord(parts.get(1))};
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static int parseCoord(Object o) {
+        if (o instanceof Number number) return number.intValue();
+        if (o == null) throw new NumberFormatException("null");
+        return (int) Math.round(Double.parseDouble(o.toString().trim()));
+    }
+
+    @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
     private static VerticalAdjustor<?> deserializeVert(Map<String, Object> map) {
         String vertName = String.valueOf(map.getOrDefault("name", "JUMP")).toUpperCase();
         Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
@@ -256,6 +378,10 @@ public class RegionConfigLoader {
         try {
             return Double.parseDouble(o.toString());
         } catch (NumberFormatException e) {
+            long parsedSize = io.github.dailystruggle.rtp.common.selection.region.util.DataSizeParser.parseBytes(o, Long.MIN_VALUE);
+            if (parsedSize != Long.MIN_VALUE) {
+                return parsedSize;
+            }
             return 0;
         }
     }

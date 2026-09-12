@@ -42,18 +42,17 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
         }
       };
 
+  public static @NotNull Set<String> defaultBiomes() {
+    Set<String> out = new java.util.HashSet<>();
+    for (Biome b : Biome.values()) {
+      out.add(b.name().toUpperCase());
+      out.add("minecraft:" + b.name().toLowerCase(java.util.Locale.ROOT));
+    }
+    return out;
+  }
+
   private static @NotNull Function<RTPWorld<?>, Set<String>> getBiomes =
-      (rtpWorld) -> {
-        // Emit both bare upper-cased enum names (`BADLANDS`) and the raw
-        // namespaced ids (`minecraft:badlands`) so Brigadier-suggested
-        // namespaced tab-completion ids pass /rtp's biome param validator.
-        Set<String> out = new java.util.HashSet<>();
-        for (Biome b : Biome.values()) {
-          out.add(b.name().toUpperCase());
-          out.add("minecraft:" + b.name().toLowerCase(java.util.Locale.ROOT));
-        }
-        return out;
-      };
+      (rtpWorld) -> defaultBiomes();
 
   private final UUID id;
   private final String name;
@@ -156,7 +155,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     // without materialising a world-level biome enumeration, so this path is only used
     // by tab completion and diagnostics. The scanner remains available in `rtp-anvil`.
     Set<String> pre = getBiomes.apply(world);
-    return (pre == null) ? new java.util.HashSet<>() : new java.util.HashSet<>(pre);
+    return (pre == null || pre.isEmpty()) ? defaultBiomes() : new java.util.HashSet<>(pre);
   }
 
   @RegionThread

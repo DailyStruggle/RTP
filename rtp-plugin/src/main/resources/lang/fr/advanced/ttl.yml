@@ -1,0 +1,27 @@
+# --- Paramètres TTL de mémoire spatiale RTP ---
+# Documentation : plugins/RTP/docs/admin/configuration/TTL.md
+
+# Durées de rétention de base pour les séries de coordonnées rejetées dans la mémoire spatiale.
+# Formats de durée pris en charge : ex. 14d, 12h, 30m, 3600s, 40t, 2500ms ou composite 1d12h.
+# Définir sur -1 ou "infinite" pour une rétention permanente (terrain statique).
+causes:
+  # Terrain naturel & géométrie (permanent)
+  biome: -1
+  worldBorder: -1
+  vert: -1
+  safety: -1
+  prefilterBiome: -1
+  prefilterBlock: -1
+
+  # État dynamique du joueur et du serveur
+  uniquePlacement: 30d
+  safetyExternal: 14d
+
+# Remplacements par vérificateur indexés par le nom de classe du vérificateur (ex. GriefPreventionChecker, WorldGuardChecker).
+# Si omis ou non listé, les vérificateurs externes héritent de causes.safetyExternal.
+verifiers:
+  # WorldGuardChecker: -1
+  # GriefPreventionChecker: 14d
+
+# NE PAS MODIFIER LE NUMÉRO DE VERSION
+version: 1.0

@@ -77,7 +77,20 @@ Adopt the following catalog of memory shapes. New shapes added after this ADR mu
    - **`clear bad-locations` semantics.** Falls out of the inference rule: clearing the segmented store leaves it empty, which on the next `load()`-style check re-spawns the walker. Documented behavior; no special case needed in the admin command.
    - **World-border composition.** Unchanged. Border layering (Chunky-shaped borders) already composes with any `MemoryShape` by masking samples after the shape produces them; `Polygon` requires no new integration there.
 
-## Alternatives Considered
+ 8. **`CircleOptimizedDualLayer`** *(ADR-085)* — Circle implementing continuous spiral-addressed Hilbert key space with hardware-cache segmented secondary tables (`CIRCLE_OPTIMIZED_DUAL_LAYER`).
+    - Params: identical to `Circle` (`radius`, `centerRadius`, `centerX`, `centerZ`, `weight`, `uniquePlacements`, `expand`, `mode`).
+    - Distribution: uniform-by-area annular disk, with macro spiral points decomposed into intra-point Hilbert curves matched to ring travel orientation.
+    - Notes: backed by `SegmentedKeyRunTable`, significantly lowering run fragmentation and accelerating candidate selection under `ACCUMULATE` mode.
+
+ 9. **`SquareOptimizedDualLayer`** *(ADR-085)* — Square implementing continuous spiral-addressed Hilbert key space with hardware-cache segmented secondary tables (`SQUARE_OPTIMIZED_DUAL_LAYER`).
+    - Params: identical to `Square` (`radius`, `centerRadius`, `centerX`, `centerZ`, `weight`, `uniquePlacements`, `expand`, `mode`).
+    - Distribution: uniform-by-area axis-aligned square / square frame.
+    - Notes: backed by `SegmentedKeyRunTable` with intra-point Hilbert traversals.
+
+ 10. **`Circle` ("`CIRCLE_DEPRECATED_PURE_SPIRAL`") and `Square` ("`SQUARE_DEPRECATED_PURE_SPIRAL`")** *(ADR-085)* — Deprecated pure 1D Archimedean spiral mapping aliases.
+     - Preserved for backwards compatibility, benchmark baselines, and regression verification.
+
+ ## Alternatives Considered
 
 | Alternative | Why Rejected |
 |-------------|--------------|

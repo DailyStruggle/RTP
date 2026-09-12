@@ -101,11 +101,11 @@ public class RegionCacheTask extends RTPRunnable {
             long cacheCap = region.getSettings().cacheCap();
             boolean cacheFull = region.queueManager.unkeptLocations.size() >= cacheCap;
             if (observationalOnly) {
-                // Observational mode runs only when L2 is full - i.e. when the
+                // Observational mode runs only when the cold stage is full - i.e. when the
                 // default-mode deficit loop has nothing to do, the visitor walks
                 // LocationGenerator
                 // for its bad-location/biome side-effects and discards the
-                // candidate. Skip when L2 has headroom; the default-mode
+                // candidate. Skip when the cold stage has headroom; the default-mode
                 // deficit loop will fill that headroom on this pulse.
                 if (!cacheFull) {
                     MemoryTracker.untrack(this);

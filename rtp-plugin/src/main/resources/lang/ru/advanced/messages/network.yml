@@ -2,48 +2,58 @@
 # Тексты сообщений для игроков и операторов на этом языке, сгруппированные по темам.
 # Автоматически созданная копия английских сообщений; не редактировать вручную (будет перезаписано).
 
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the L2 baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
+# --- Межсерверные сообщения сетевого режима ---
+# Отправляются только когда `network.enabled: true` и команда `/rtp` игрока маршрутизируется
+# через межсерверную очередь ожидания (см. `routing.mode` в network.yml).
+# Все ключи опциональны с точки зрения игрока — базовый цикл
+# `delayMessage` / `teleportMessage` по-прежнему управляет видимым процессом.
+# Отправляется, когда запрос принят в межсерверную очередь ожидания
+# и ожидает выделения бэкендом. Плейсхолдер: [position] - позиция с
+# отсчётом от 0 из `pollStatus`; может быть пустым, если транспорт
+# не возвращает позицию.
 networkQueued: "&7[P0] в очереди на межсерверное назначение (позиция [position])..."
-# Sent when a player runs /rtp while already waiting in the cross-server queue.
-# Placeholder: [position] - position in line; may be empty.
+
+# Отправляется, когда игрок выполняет /rtp, уже находясь в межсерверной очереди.
+# Плейсхолдер: [position] - позиция в очереди; может быть пустым.
 alreadyQueued: "&cВы уже ожидаете в межсерверной очереди (позиция [position]). Пожалуйста, подождите."
-# Sent when a cross-server queue entry waited too long and was dropped.
-# No placeholders.
+
+# Отправляется, когда запись в межсерверной очереди слишком долго ожидала и была сброшена.
+# Без плейсхолдеров.
 networkTimedOut: "&c[P0] межсерверная телепортация истекла по времени в ожидании сервера."
-# Sent when the cross-server queue is full and the request is rejected.
-# No placeholders.
+
+# Отправляется, когда межсерверная очередь заполнена и запрос отклонён.
+# Без плейсхолдеров.
 waitlistFull: "&c[P0] межсерверная очередь заполнена; попробуйте снова чуть позже."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
+
+# Отправляется, когда очередь передала запрос прокси-маршрутизатору и
+# выполняется выбор бэкенда.
 networkRouting: "&7[P0] маршрутизация на сервер..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
+
+# Отправляется, когда бэкенд зарезервировал координату для этого игрока и
+# прокси готов начать межсерверный переход. Плейсхолдер: [server]
+# - serverId целевого бэкенда.
 networkReserved: "&a[P0] координата зарезервирована на [server]. Перенос..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+
+# Отправляется во время перехода через прокси. Плейсхолдер: [server] - назначение.
 networkTransferring: "&a[P0] перенос на [server]..."
-# Sent when the cross-server path gave up and fell back to the local server.
-# Placeholder: [reason] - the reason for falling back.
+
+# Отправляется, когда межсерверный путь был прерван и произошёл откат к локальному серверу.
+# Плейсхолдер: [reason] - причина отката.
 networkFallback: "&e[P0] межсерверный режим недоступен ([reason]); возврат к локальному."
-# Sent when the cross-server request failed and no fallback was possible.
-# Placeholder: [reason] - the failure reason.
+
+# Отправляется, когда межсерверный запрос не удался и откат невозможен.
+# Плейсхолдер: [reason] - причина сбоя.
 networkFailed: "&c[P0] межсерверная телепортация не удалась: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
+
+# Отправляется, когда игрок запросил конкретный регион (`/rtp <region>`), но
+# ни один бэкенд в сети сейчас его не обслуживает. Плейсхолдер:
+# [region] - имя запрошенного региона.
 networkRegionUnavailable: "&c[P0] сейчас ни один сервер не обслуживает регион '[region]'."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
+
+# Отправляется, когда имя запрошенного региона соответствует двум или более бэкендам и
+# политика, настроенная оператором, не может выбрать один из них (срабатывает
+# только при более строгих политиках, чем значение по умолчанию `warn`). Плейсхолдер: [region].
 networkRegionAmbiguous: "&c[P0] регион '[region]' неоднозначен среди серверов; укажите сервер."
 
-# DO NOT TOUCH VERSION NUMBER
+# НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
 version: 1.0

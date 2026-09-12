@@ -6,9 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle_Normal;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Rectangle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square_Normal;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
@@ -38,10 +40,35 @@ public class ShapeSubParameterTabCompleteTest {
     }
 
     @Test
+    @DisplayName("SquareOptimizedDualLayer exposes identical V2 curated sub-parameters as Square")
+    void squareOptimizedDualLayerSubParameters() {
+        Map<String, CommandParameter> p = new SquareOptimizedDualLayer().getParameters();
+        assertCommonShapeKeys(p, "SquareOptimizedDualLayer");
+        assertTrue(p.containsKey("radius"));
+        assertTrue(p.containsKey("centerradius"));
+        assertTrue(p.containsKey("weight"));
+        assertTrue(p.containsKey("expand"));
+        assertTrue(p.containsKey("uniqueplacements"));
+        assertTrue(p.get("radius").values().contains("256"),
+                "radius must offer the V2 curated 256 suggestion");
+    }
+
+    @Test
     @DisplayName("Circle exposes V2 curated sub-parameters")
     void circleSubParameters() {
         Map<String, CommandParameter> p = new Circle().getParameters();
         assertCommonShapeKeys(p, "Circle");
+        assertTrue(p.containsKey("radius"));
+        assertTrue(p.containsKey("centerradius"));
+        assertTrue(p.containsKey("weight"));
+        assertTrue(p.containsKey("expand"));
+    }
+
+    @Test
+    @DisplayName("CircleOptimizedDualLayer exposes identical V2 curated sub-parameters as Circle")
+    void circleOptimizedDualLayerSubParameters() {
+        Map<String, CommandParameter> p = new CircleOptimizedDualLayer().getParameters();
+        assertCommonShapeKeys(p, "CircleOptimizedDualLayer");
         assertTrue(p.containsKey("radius"));
         assertTrue(p.containsKey("centerradius"));
         assertTrue(p.containsKey("weight"));

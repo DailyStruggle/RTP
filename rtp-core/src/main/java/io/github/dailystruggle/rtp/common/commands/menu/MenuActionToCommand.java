@@ -220,6 +220,7 @@ public final class MenuActionToCommand {
             case FAIL_RATE_HEATMAP         -> "fail-rate";
             case CACHE_OCCUPANCY           -> "cache";
             case METRIC_SPARKLINE          -> "sparkline";
+            case REGION_COMPOSITE          -> "composite";
         };
     }
 }

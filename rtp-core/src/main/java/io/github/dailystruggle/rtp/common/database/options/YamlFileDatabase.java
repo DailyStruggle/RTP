@@ -42,6 +42,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
     this.directory = directory;
   }
 
+  @SuppressWarnings("unchecked") // value is instanceof-checked to Map before the String-keyed section cast
   private static void setSection(RtpYamlSection section, Map<String, Object> map) {
     Map<String, Object> mapValues = section.getMapValues(false);
 
@@ -146,6 +147,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
   }
 
   @Override
+  @SuppressWarnings("unchecked") // value is instanceof-checked to Map before the String-keyed section cast
   public void write(
       Map<String, RtpYamlConfig> database, String tableName, Map<TableObj, TableObj> keyValuePairs) {
     if (!tableName.endsWith(".yml")) tableName = tableName + ".yml";
@@ -394,6 +396,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
   }
 
   @Override
+  @SuppressWarnings("unchecked") // value is instanceof-checked to Map; persisted rows are String-keyed
   public void startup() {
     Map<String, RtpYamlConfig> lookup = connect();
 
@@ -484,7 +487,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
           }
         }
       } catch (IllegalArgumentException exception) {
-        exception.printStackTrace();
+        RTP.log(Level.WARNING, "Failed to parse teleportData referenceTime", exception);
       }
     }
   }

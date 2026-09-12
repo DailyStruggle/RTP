@@ -5,6 +5,8 @@
 - **Supersedes**: —
 - **Related**: ADR-006 (async queue pre-generation), ADR-015 (stale-chunk guard / count-bound pipes), ADR-016 (anvil subsystem), ADR-023 (login reserve cache), `REQ-RTP-S-005` (no chunk loading on the main thread)
 
+> **Nomenclature note.** This ADR keeps its `L1` / `L2` / `L3` title and body as the historical record of the decision. The vocabulary itself is retired by [ADR-078](ADR-078-composable-cache-pipeline-stages.md) phase 2: production code, javadoc, and canonical documentation say **hot** (`keptLocations`), **cold** (`unkeptLocations`), and **backlog** (`backlogLocations`). Public config keys and database column names are unchanged.
+
 ## Context
 
 The plugin currently maintains two general-purpose location buffers per region:
@@ -98,6 +100,25 @@ shape pick ──▶ L3 backlog ──(anvil-verified, in original order)──�
   but is not enforced as a ratio).
 - `backlogCacheCap = 0` disables L3 entirely (the buffer is `null`,
   selection feeds L2 directly as today).
+
+### Amendment: Configurable Bin Harvesting Density & Modulated PRP Selection (2026-09-08)
+
+To balance off-tick `.mca` Anvil I/O amortization against player spatial variety, the L3 generation and bin-screening pipeline is extended with configurable candidate harvesting proportions and modulated pseudorandom bin selection:
+
+1. **Configurable Locations-per-Bin Density (`locationsPerBin` / `binDensity`):**
+   - Expressed as an integer count of candidate locations selected per $32 \times 32$ chunk macro-bin ($1{,}024$ chunks per `.mca` region file).
+   - **Default: `2` to `4` locations per bin** (e.g. `locationsPerBin: 3`, or proportionally $\approx 3 / 1024 \approx 0.29\%$ sampling density).
+   - **`-1` (Unbinned Full-Random):** Disables bin-clustering entirely. L3 candidates are drawn across independent, unclustered random coordinates across the full shape domain without intra-bin reuse.
+   - **Intra-Bin Separation Guarantee:** When $C \in [2, 4]$ locations are harvested from a single $32 \times 32$ bin, candidates are placed along the local Hilbert curve separated by dyadic bisection offsets ($d_{\text{min}} \ge 20$ chunks / $320$ blocks). Even within the same region file, candidates are placed at opposite corners, preventing mutual line-of-sight collisions.
+   - **I/O Amortization:** Decompressing and inspecting a single `.mca` file off-tick verifies $2\text{--}4$ candidates at once, cutting background disk seeks and ZLIB decompression passes by $50\%\text{--}75\%$.
+
+2. **Modulated PRP Bin Selection for Macro-Dispersion:**
+   - Instead of picking bins sequentially or via memoryless random draws, the active working set of bins is selected via a **Modulated Keyed Pseudorandom Permutation (Feistel PRP)** across the world's macro-bin grid:
+     $$\text{binIndex} = \text{FeistelPermute}(t_{\text{bin}}, \text{totalWorldBins}, \text{secretSeed})$$
+   - Properties:
+     - **Unique Bin Rotation:** Bins are visited without replacement ($0.0\%$ repeat bins during a rotation cycle).
+     - **Cryptographic Unpredictability:** Macro-bins jump across non-linear, distant quadrants of the continent on successive refill pulses.
+     - **Player Suspicion Protection:** Maintaining an active working set of $24\text{--}32$ bins ensures that even if a player uses `/rtp` repeatedly, round-robin dispatching across active bins prevents any player from landing in the same $512 \times 512$ block region twice in a single session.
 
 ### Persistence
 
@@ -253,3 +274,12 @@ change. Anticipated touch points:
   separately-managed third buffer in `RegionQueueManager`).
 - `REQ-RTP-S-005` — No chunk loading on the main thread.
 - `.junie/AGENTS.md` — Domain Analogies & Aliases table (L1/L2/L3 nicknames).
+
+## Amendment — Optional Memory Limits and Memory Cost Models
+
+Cap settings (`activeChunkCap`, `cacheCap`, `backlogCacheCap`) support memory limits as an alternate bounding expression alongside basic counts:
+- **Hot cache (`activeChunkCap`)**: Cost model is ~1 MiB per entry (active chunk ticket keeping the chunk loaded in memory). A limit of `64MiB` resolves to 64 chunks.
+- **Cold cache (`cacheCap`)**: Cost model is ~128 bytes per entry (pre-verified `RTPLocation` POJO). A limit of `1MiB` resolves to 8,192 entries.
+- **Backlog cache (`backlogCacheCap`)**: Cost model is ~128 bytes per entry (`BacklogEntry` candidate POJO). A limit of `2MiB` resolves to 16,384 entries.
+
+When a data size unit (e.g. `64MB`, `256KiB`, `1GiB`) is specified, capacity is derived from `floor(memoryBytes / bytesPerEntry)`. Numeric values without data size units fall back to basic count.

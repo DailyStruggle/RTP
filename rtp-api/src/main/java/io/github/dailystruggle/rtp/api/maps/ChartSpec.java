@@ -75,6 +75,11 @@ public record ChartSpec(
         /** Reserved (Stage 3): L1 / L2 / L3 cache occupancy categories. */
         CACHE_OCCUPANCY,
         /** Reserved (Stage 3): TPS / MSPT / pipeline-latency sparkline. */
-        METRIC_SPARKLINE
+        METRIC_SPARKLINE,
+        /**
+         * Composite pipeline status map (ADR-089): desaturated biomes, red hazard wash,
+         * candidate markers & arrival trajectory, and L1/L2/L3 queue capacity health bars.
+         */
+        REGION_COMPOSITE
     }
 }

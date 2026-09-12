@@ -16,9 +16,9 @@ public final class ColourBands {
     public static final double DEFAULT_MSPT_GREEN = 30.0;
     /** Default upper bound (inclusive) for the yellow MSPT band, ms. */
     public static final double DEFAULT_MSPT_YELLOW = 45.0;
-    /** Default lower bound for the green L1 cache-fill band (fraction). */
+    /** Default lower bound for the green hot cache-fill band (fraction). */
     public static final double DEFAULT_CACHE_FILL_GREEN = 0.50;
-    /** Default lower bound for the yellow L1 cache-fill band (fraction). */
+    /** Default lower bound for the yellow hot cache-fill band (fraction). */
     public static final double DEFAULT_CACHE_FILL_YELLOW = 0.25;
     /** Default lower bound (inclusive) for the yellow network-age band, seconds. */
     public static final double DEFAULT_NETWORK_AGE_YELLOW = 5.0;
@@ -75,7 +75,7 @@ public final class ColourBands {
     }
 
     /**
-     * Pick the {@code &}-code prefix for an L1 cache-fill ratio (higher-is-better).
+     * Pick the {@code &}-code prefix for a hot cache-fill ratio (higher-is-better).
      *
      * @param fillRatio the raw fill value in {@code [0.0, 1.0]}; {@link Double#NaN}
      *                  renders as {@link #UNKNOWN}

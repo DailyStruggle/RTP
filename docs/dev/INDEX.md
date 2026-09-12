@@ -37,6 +37,9 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Anvil prefilter / biome / shared module | [`../adr/ADR-016-anvil-subsystem.md`](../adr/ADR-016-anvil-subsystem.md) |
 | Block tags / state predicates in safety lists | [`../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md`](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md) |
 | Coverage targets | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) |
+| Enterprise readiness (gates, evidence, compatibility matrix) | [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md) |
+| Platform support matrix (Spigot/Paper/Folia/Fabric/NeoForge/Velocity) | [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) |
+| Deprecation and API evolution policy | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) |
 | Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) ([CONFIGURATION.md](../admin/configuration/CONFIGURATION.md), [REGIONS.md](../admin/configuration/REGIONS.md), [CORE_CONFIG.md](../admin/configuration/CORE_CONFIG.md), [PERFORMANCE.md](../admin/configuration/PERFORMANCE.md), [ECONOMY.md](../admin/configuration/ECONOMY.md), [SAFETY.md](../admin/configuration/SAFETY.md)) |
 | Addon author docs | [`../FOR_ADDON_DEVELOPERS.md`](../FOR_ADDON_DEVELOPERS.md) |
 | Build a destination menu / GUI on `rtp-api` | [`ADDON_MENUS.md`](ADDON_MENUS.md) |
@@ -67,6 +70,9 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`CONCEPTS.md`](CONCEPTS.md) | Archimedean spiral math; see ADR-001 for the decision. |
 | [`TRACEABILITY.md`](TRACEABILITY.md) | REQ-* → class/method → test mapping. |
 | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) | JaCoCo baseline and targets. |
+| [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md) | Repo-wide plan to make the quality and compatibility claims externally verifiable: measured per-module coverage baseline, enforced gates, supply chain, support matrix. |
+| [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) | Platform family x Minecraft version x Java version support matrix. |
+| [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) | Deprecation lifecycle, notice window, and compiler annotation policy. |
 | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) | Active Fabric frontier status. |
 | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) | Proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated. |
 | [`METRICS_PLAN.md`](METRICS_PLAN.md) | Runtime metrics SPI (TPS/MSPT/heap/queue/pipeline); implementation eligible. |

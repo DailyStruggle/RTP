@@ -1,0 +1,13 @@
+version: 1.0
+
+# 1v1 PvP duel with polar opposition.
+# A circle (ring) places opponents on the perimeter; centerRadius carves out the middle so the two
+# combatants land far apart on opposite sides. radius is the footprint in BLOCKS; spatialResolution
+# is the selection stride (spacing) in this group context.
+shape:
+  name: "CIRCLE"
+  radius: 100
+  centerRadius: 6
+  spatialResolution: 50
+
+maxGroupSize: 2

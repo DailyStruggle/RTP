@@ -16,6 +16,10 @@ public final class HandleRegistry {
         PROVIDER.set(provider);
     }
 
+    public static boolean hasProvider() {
+        return PROVIDER.get() != null;
+    }
+
     @Nullable
     public static PlayerHandle wrapPlayer(@NotNull Object player) {
         if (player instanceof PlayerHandle) return (PlayerHandle) player;
@@ -34,5 +38,16 @@ public final class HandleRegistry {
     public static PlayerHandle playerAt(@NotNull LocationHandle location) {
         HandleProvider p = PROVIDER.get();
         return p != null ? p.playerAt(location) : null;
+    }
+
+    public static void dispatchConsoleCommand(@NotNull String command) {
+        HandleProvider p = PROVIDER.get();
+        if (p != null) p.dispatchConsoleCommand(command);
+    }
+
+    public static void dispatchPlayerCommand(@NotNull PlayerHandle player, @NotNull String command) {
+        HandleProvider p = PROVIDER.get();
+        if (p != null) p.dispatchPlayerCommand(player, command);
+        else player.performCommand(command);
     }
 }

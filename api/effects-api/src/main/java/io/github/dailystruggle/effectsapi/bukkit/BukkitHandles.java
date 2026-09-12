@@ -109,6 +109,33 @@ public final class BukkitHandles implements HandleProvider {
         return null;
     }
 
+    @Override
+    public void dispatchConsoleCommand(@NotNull String command) {
+        if (isFolia()) {
+            try {
+                Object globalRegionScheduler = org.bukkit.Bukkit.class
+                        .getMethod("getGlobalRegionScheduler").invoke(null);
+                org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+                globalRegionScheduler.getClass()
+                        .getMethod("run", org.bukkit.plugin.Plugin.class, java.util.function.Consumer.class)
+                        .invoke(globalRegionScheduler, caller,
+                                (java.util.function.Consumer<Object>) t -> org.bukkit.Bukkit.dispatchCommand(org.bukkit.Bukkit.getConsoleSender(), command));
+                return;
+            } catch (Throwable ignored) {}
+        }
+        if (!org.bukkit.Bukkit.isPrimaryThread()) {
+            org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+            org.bukkit.Bukkit.getScheduler().runTask(caller, () -> org.bukkit.Bukkit.dispatchCommand(org.bukkit.Bukkit.getConsoleSender(), command));
+            return;
+        }
+        org.bukkit.Bukkit.dispatchCommand(org.bukkit.Bukkit.getConsoleSender(), command);
+    }
+
+    @Override
+    public void dispatchPlayerCommand(@NotNull PlayerHandle player, @NotNull String command) {
+        player.performCommand(command);
+    }
+
     public static PlayerHandle wrap(@NotNull Player player) {
         return new PlayerWrapper(player);
     }
@@ -180,6 +207,25 @@ public final class BukkitHandles implements HandleProvider {
         @Override
         public void setGliding(boolean gliding) {
             player.setGliding(gliding);
+        }
+
+        @Override
+        public void performCommand(@NotNull String command) {
+            if (isFolia()) {
+                try {
+                    Object entityScheduler = player.getClass().getMethod("getScheduler").invoke(player);
+                    org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+                    entityScheduler.getClass().getMethod("run", org.bukkit.plugin.Plugin.class, java.util.function.Consumer.class, Runnable.class)
+                            .invoke(entityScheduler, caller, (java.util.function.Consumer<Object>) t -> player.performCommand(command), null);
+                    return;
+                } catch (Throwable ignored) {}
+            }
+            if (!org.bukkit.Bukkit.isPrimaryThread()) {
+                org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+                org.bukkit.Bukkit.getScheduler().runTask(caller, () -> player.performCommand(command));
+                return;
+            }
+            player.performCommand(command);
         }
 
         @Override

@@ -51,9 +51,16 @@ pluginManagement {
     // pin keeps every Loom-using subproject in one classloader and avoids
     // the LoomGradleExtension ClassCastException.
     plugins {
-        id 'fabric-loom'                       version '1.15-SNAPSHOT'
-        id 'net.fabricmc.fabric-loom'          version '1.15-SNAPSHOT'
-        id 'net.fabricmc.fabric-loom-remap'    version '1.15-SNAPSHOT'
+        // De-SNAPSHOTted to the released 1.15.x line for reproducible builds:
+        // a floating SNAPSHOT can move or be pruned, making old commits
+        // unbuildable. 1.15.5 is the latest published 1.15.x on maven.fabricmc.net
+        // and covers both the obfuscated-remap path (1.21.11 and older) and the
+        // unobfuscated deobf 26.x path (JDK 25). Bump within the 1.15.x line as
+        // needed; only advance to 1.16+/1.17+ after verifying the full JDK-25
+        // graph, since those lines change Gradle-compatibility guarantees.
+        id 'fabric-loom'                       version '1.15.5'
+        id 'net.fabricmc.fabric-loom'          version '1.15.5'
+        id 'net.fabricmc.fabric-loom-remap'    version '1.15.5'
         // NeoForge ModDevGradle: pin the version once here so the default
         // NeoForge carriers (rtp-neoforge-common + rtp-neoforge-v1_21_R1, the
         // JDK-21 1.21.x line that ships in the unified jar) share a single
@@ -361,6 +368,10 @@ if (!excludeNeoforge) {
 }
 
 include 'addons:LeafRTPCountdownAddon'
+// LeafRTPLinearAddon - provides .linear (ZStandard continuous region format) support
+// off-tick for servers running Leaves, Gale, or the Linear mod (ADR-077). Keeps zstd-jni
+// and its multi-platform native binaries out of the core jar to preserve lightweight footprint.
+include 'addons:LeafRTPLinearAddon'
 // LeafRTPRiftAddon - reference demo of effect registration. Registers a single
 // new effects-api prototype ("RIFT", a client-side "world deconstruction" warmup
 // animation) so it joins the built-in effects by name. Fully platform-neutral: the
@@ -374,20 +385,23 @@ include 'addons:LeafRTPRiftAddon'
 // verifiers. Single Bukkit-only module (every checker is org.bukkit.*-based);
 // self-gates on PlatformFamily.BUKKIT so it is a no-op on Fabric/NeoForge.
 include 'addons:LeafRTPClaimAddon'
-// LeafRTPPartyAddon - party/group teleport. Consumes destinations already
-// prepared by the core supply pipeline (serve one verified coordinate to N
-// members, or draw a small adjacent cluster) rather than searching per member.
-// Platform-neutral RTPAddon (ADR-057); config + lifecycle only at present, the
-// grouped-teleport orchestration is specified in its REQUIREMENTS/ADR.
-include 'addons:LeafRTPPartyAddon'
+// LeafRTPGroupAddon - multi-entity subspace teleportation (supersedes the former
+// party addon). Excluded from the general build: not yet canonical and its module
+// build currently fails. Re-include once it is stabilized; a dedicated non-canonical
+// addon gating mechanism is planned to manage this and the retired party addon.
+// See leafrtp-group-addon-ADR-001.
+// include 'addons:LeafRTPGroupAddon'
 // LeafRTPTetherAddon - keep a player inside the RTP region they were teleported
 // into ("tether" = cross-platform region confinement). Uses RTP's own region
 // geometry + move signal instead of a WorldGuard trap, so it works on
 // Bukkit/Paper/Folia and Fabric/NeoForge with no third-party plugin.
 // Platform-neutral RTPAddon (ADR-057); config + lifecycle only at present -
 // enforcement depends on the proposed core move-event SPI (ADR-075, D-005
-// gated), so it loads as a safe no-op until that lands. See its REQUIREMENTS/ADR.
-include 'addons:LeafRTPTetherAddon'
+// gated), so it loads as a safe no-op until that lands. Excluded from the
+// general build for now (enforcement not yet canonical); re-include once the
+// core move-event SPI lands, via the planned non-canonical addon gating
+// mechanism (see LeafRTPGroupAddon above). See its REQUIREMENTS/ADR.
+// include 'addons:LeafRTPTetherAddon'
 // LeafRTPGuiAddon - DonutSMP-style destination picker, split on the project platform
 // model. rtp-gui-common is platform-neutral (menu model, config via RTP's
 // ConfigParser, the MenuRenderer render seam, and the teleport submit through

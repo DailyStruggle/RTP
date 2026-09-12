@@ -1,0 +1,27 @@
+# --- RTP 空間メモリ TTL 設定 ---
+# ドキュメント: plugins/RTP/docs/admin/configuration/TTL.md
+
+# 空間メモリ内で拒否された座標試行の基本保持期間。
+# 対応期間形式: 例 14d, 12h, 30m, 3600s, 40t, 2500ms、または複合形式 1d12h。
+# 永続保持（静的地形）の場合は -1 または "infinite" に設定します。
+causes:
+  # 自然地形および幾何構造（永続）
+  biome: -1
+  worldBorder: -1
+  vert: -1
+  safety: -1
+  prefilterBiome: -1
+  prefilterBlock: -1
+
+  # 動的プレイヤーおよびサーバー状態
+  uniquePlacement: 30d
+  safetyExternal: 14d
+
+# チェッカークラス名（例: GriefPreventionChecker, WorldGuardChecker）ごとの検証個別上書き設定。
+# 省略または未記載の場合、外部チェッカーは causes.safetyExternal を継承します。
+verifiers:
+  # WorldGuardChecker: -1
+  # GriefPreventionChecker: 14d
+
+# バージョン番号を変更しないでください
+version: 1.0

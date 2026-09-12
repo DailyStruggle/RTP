@@ -1,0 +1,12 @@
+version: 1.0
+
+# Baseline group profile.
+# The shape block carries everything spatial (mirrors a region's shape declaration):
+#   radius            - subspace footprint half-width in BLOCKS
+#   spatialResolution - selection stride (participant spacing) in this group context
+shape:
+  name: "SQUARE"
+  radius: 40
+  spatialResolution: 3
+
+maxGroupSize: 8

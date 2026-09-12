@@ -1,0 +1,27 @@
+# --- RTP 空间内存 TTL 设置 ---
+# 文档: plugins/RTP/docs/admin/configuration/TTL.md
+
+# 空间内存中被拒绝坐标序列的基础保留时长。
+# 支持的时长格式: 例如 14d, 12h, 30m, 3600s, 40t, 2500ms 或复合格式 1d12h。
+# 设置为 -1 或 "infinite" 表示永久保留（静态地形）。
+causes:
+  # 自然地形与几何结构（永久）
+  biome: -1
+  worldBorder: -1
+  vert: -1
+  safety: -1
+  prefilterBiome: -1
+  prefilterBlock: -1
+
+  # 动态玩家与服务器状态
+  uniquePlacement: 30d
+  safetyExternal: 14d
+
+# 按检查器类名（例如 GriefPreventionChecker, WorldGuardChecker）配置的单个验证器覆盖项。
+# 如果省略或未列出，外部检查器继承 causes.safetyExternal。
+verifiers:
+  # WorldGuardChecker: -1
+  # GriefPreventionChecker: 14d
+
+# 请勿修改版本号
+version: 1.0

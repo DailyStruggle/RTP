@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -201,6 +202,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
         long slowThreshold = slowPipelineThresholdMs();
         long queueGrowthCount = queueGrowthWarnCount.get();
         int queueGrowthThreshold = queueGrowthWarnThreshold();
+        java.util.Map<String, io.github.dailystruggle.metrics.api.RegionQueueRow> regionQueueStatus =
+                computeRegionQueueStatus();
 
         io.github.dailystruggle.metrics.api.MetricsSnapshot snap = new io.github.dailystruggle.metrics.api.MetricsSnapshot(
                 b.tps1m(),
@@ -227,7 +230,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
                 slowCount,
                 slowThreshold,
                 queueGrowthCount,
-                queueGrowthThreshold
+                queueGrowthThreshold,
+                regionQueueStatus
         ));
         // Compose sibling-plugin extensions registered via Metrics.registerExtension(...).
         // Suppliers are evaluated in registration order; nulls are skipped; failures are swallowed.
@@ -264,5 +268,112 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
             // Defensive: snapshot() must never throw. Partial counts beat no snapshot.
         }
         return total;
+    }
+
+    private static java.util.Map<String, io.github.dailystruggle.metrics.api.RegionQueueRow> computeRegionQueueStatus() {
+        java.util.Map<String, io.github.dailystruggle.metrics.api.RegionQueueRow> result = new java.util.LinkedHashMap<>();
+        RTP rtp = RTP.getInstance();
+        if (rtp == null || RTP.selectionAPI == null) return result;
+
+        try {
+            java.util.Map<String, Region> allRegions = new java.util.LinkedHashMap<>();
+            if (RTP.selectionAPI.permRegionLookup != null) {
+                allRegions.putAll(RTP.selectionAPI.permRegionLookup);
+            }
+            if (RTP.selectionAPI.tempRegions != null) {
+                for (java.util.Map.Entry<java.util.UUID, Region> e : RTP.selectionAPI.tempRegions.entrySet()) {
+                    if (e.getKey() != null && e.getValue() != null) {
+                        allRegions.putIfAbsent(e.getKey().toString(), e.getValue());
+                    }
+                }
+            }
+
+            int count = 0;
+            int overflowQueue = 0;
+            int overflowKept = 0;
+            int overflowKeptCap = 0;
+            int overflowUnkept = 0;
+            int overflowUnkeptCap = 0;
+            io.github.dailystruggle.metrics.api.RegionQueueStatus worstStatus = io.github.dailystruggle.metrics.api.RegionQueueStatus.OK;
+
+            for (java.util.Map.Entry<String, Region> entry : allRegions.entrySet()) {
+                Region region = entry.getValue();
+                if (region == null) continue;
+                String name = entry.getKey();
+                RegionQueueManager qm = region.queueManager;
+                io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings = region.getSettings();
+
+                int qDepth = (qm != null) ? qm.playerQueue.size() : 0;
+                int kept = (qm != null && qm.keptLocations != null) ? qm.keptLocations.size() : 0;
+                int keptCap = (settings != null) ? settings.activeChunkCap() : 0;
+                int unkept = (qm != null && qm.unkeptLocations != null) ? qm.unkeptLocations.size() : 0;
+                int unkeptCap = (settings != null) ? (int) settings.cacheCap() : 0;
+
+                Integer login = (qm != null && qm.loginLocations != null) ? qm.loginLocations.size() : null;
+                Integer loginCap = (login != null && qm != null && qm.loginLocations != null)
+                        ? qm.loginLocations.capacity() : null;
+
+                io.github.dailystruggle.metrics.api.RegionQueueStatus status =
+                        io.github.dailystruggle.metrics.api.RegionQueueStatus.derive(qDepth, kept, keptCap, unkept);
+
+                if (count >= 64) {
+                    // Cardinality bound per METRICS_PLAN.md: summarize surplus under __overflow__
+                    overflowQueue += qDepth;
+                    overflowKept += kept;
+                    overflowKeptCap += keptCap;
+                    overflowUnkept += unkept;
+                    overflowUnkeptCap += unkeptCap;
+                    if (status.ordinal() > worstStatus.ordinal()) {
+                        worstStatus = status;
+                    }
+                } else {
+                    java.util.Map<String, Integer> stageOccupancy = new java.util.LinkedHashMap<>();
+                    stageOccupancy.put("hot", kept);
+                    stageOccupancy.put("cold", unkept);
+                    if (qm != null && qm.backlogLocations != null) {
+                        stageOccupancy.put("backlog", qm.backlogLocations.size());
+                    }
+                    if (login != null) {
+                        stageOccupancy.put("login", login);
+                    }
+                    if (qm != null && qm.networkKeptLocations != null) {
+                        stageOccupancy.put("network", qm.networkKeptLocations.size());
+                    }
+
+                    result.put(name, new io.github.dailystruggle.metrics.api.RegionQueueRow(
+                            qDepth,
+                            kept,
+                            keptCap,
+                            unkept,
+                            unkeptCap,
+                            login,
+                            loginCap,
+                            status,
+                            stageOccupancy,
+                            0
+                    ));
+                    count++;
+                }
+            }
+
+            if (count >= 64 && (overflowQueue > 0 || overflowKept > 0 || overflowUnkept > 0)) {
+                result.put("__overflow__", new io.github.dailystruggle.metrics.api.RegionQueueRow(
+                        overflowQueue,
+                        overflowKept,
+                        overflowKeptCap,
+                        overflowUnkept,
+                        overflowUnkeptCap,
+                        null,
+                        null,
+                        worstStatus,
+                        java.util.Collections.emptyMap(),
+                        0
+                ));
+            }
+        } catch (Throwable ignored) {
+            // Defensive: snapshot() must never throw.
+        }
+
+        return result;
     }
 }

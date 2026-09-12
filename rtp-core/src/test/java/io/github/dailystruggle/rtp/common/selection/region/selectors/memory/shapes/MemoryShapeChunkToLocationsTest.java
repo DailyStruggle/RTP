@@ -288,6 +288,161 @@ public class MemoryShapeChunkToLocationsTest {
         assertTrue(shape.isKnownBad(pickedLocation));
     }
 
+    @Test
+    @DisplayName("biomeAt(x, z) resolves when biome is recorded on any chunk preimage")
+    void biomeAt_resolvesAcrossChunkPreimages() {
+        Circle shape = new Circle();
+        shape.set(GenericMemoryShapeParams.radius, 64L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 16L);
+
+        int[] twoChunk = findChunkWithPreimageCount(shape, 2, -60, 60);
+        assertNotNull(twoChunk, "Could not find a 2-preimage chunk for the test setup");
+
+        long[] preimage = shape.chunkToLocations(twoChunk[0], twoChunk[1]);
+        assertEquals(2, preimage.length, "Setup precondition: chunk has 2 preimages");
+
+        long p1 = preimage[0];
+        long p2 = preimage[1];
+        long rep = shape.xzToLocation(twoChunk[0], twoChunk[1]);
+
+        // Record biome only on p1 (simulating legacy ScanTask recording only for current pos)
+        shape.addBiomeLocation(p1, 1L, "minecraft:plains");
+        shape.flushAndRebuild(1L);
+
+        // biomeAt(twoChunk[0], twoChunk[1]) should resolve "PLAINS" even if rep == p2
+        String biome = shape.biomeAt(twoChunk[0], twoChunk[1]);
+        assertNotNull(biome, "biomeAt(x, z) must resolve biome from twin preimage even if rep is the other index");
+        assertEquals("PLAINS", biome.toUpperCase());
+    }
+
+    @Test
+    @DisplayName("ScanTask.recordBiomeForChunk records biome on all preimages and representative")
+    void recordBiomeForChunk_recordsOnAllPreimages() {
+        Circle shape = new Circle();
+        shape.set(GenericMemoryShapeParams.radius, 64L);
+        shape.set(GenericMemoryShapeParams.centerRadius, 16L);
+
+        int[] twoChunk = findChunkWithPreimageCount(shape, 2, -60, 60);
+        assertNotNull(twoChunk, "Could not find a 2-preimage chunk for the test setup");
+
+        long[] preimage = shape.chunkToLocations(twoChunk[0], twoChunk[1]);
+        assertEquals(2, preimage.length);
+
+        long p1 = preimage[0];
+        long p2 = preimage[1];
+        long rep = shape.xzToLocation(twoChunk[0], twoChunk[1]);
+
+        io.github.dailystruggle.rtp.common.tasks.ScanTask.recordBiomeForChunk(shape, p1, twoChunk[0], twoChunk[1], "minecraft:desert");
+        shape.flushAndRebuild(1L);
+
+        assertEquals("DESERT", shape.biomeAt(p1));
+        assertEquals("DESERT", shape.biomeAt(p2));
+        assertEquals("DESERT", shape.biomeAt(rep));
+        assertEquals("DESERT", shape.biomeAt(twoChunk[0], twoChunk[1]));
+    }
+
+    // ------------------------------------------------------------------------
+    // Expand bounds tests
+    // ------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("chunkToLocations and contains respect effectiveRange (range + badSum) when expand is enabled")
+    void testEffectiveRangeBoundsWithExpand() {
+        SquareOptimizedDualLayer squareDual = new SquareOptimizedDualLayer("EXPAND_BOUNDS_SQUARE", 32);
+        squareDual.set(GenericMemoryShapeParams.radius, 128L);
+        squareDual.set(GenericMemoryShapeParams.centerRadius, 16L);
+        squareDual.set(GenericMemoryShapeParams.expand, true);
+        squareDual.set(GenericMemoryShapeParams.mode, "ACCUMULATE");
+
+        long baseRange = squareDual.getRange();
+        assertEquals(baseRange, squareDual.getEffectiveRange());
+
+        // In square dual layer, find coordinates near the outer radius
+        int[] outerXz = squareDual.locationToXZ(baseRange - 1);
+        assertTrue(squareDual.contains(outerXz[0], outerXz[1]));
+        long[] outerLocs = squareDual.chunkToLocations(outerXz[0], outerXz[1]);
+        assertEquals(1, outerLocs.length);
+        assertEquals(baseRange - 1, outerLocs[0]);
+
+        // Coordinates for baseRange itself (just outside the unexpanded manifold)
+        int[] nextXz = squareDual.locationToXZ(baseRange);
+        assertFalse(squareDual.contains(nextXz[0], nextXz[1]));
+        assertEquals(0, squareDual.chunkToLocations(nextXz[0], nextXz[1]).length);
+
+        // Now add bad locations to trigger expansion
+        for (long i = 0; i < 50; i++) {
+            squareDual.addBadLocation(i);
+        }
+        squareDual.flushAndRebuild(squareDual.spatialResolution());
+
+        long expandedRange = squareDual.getEffectiveRange();
+        assertEquals(baseRange + 50L, expandedRange);
+
+        // nextXz (loc = baseRange) is now inside the expanded manifold [0, baseRange + 50)
+        assertTrue(squareDual.contains(nextXz[0], nextXz[1]));
+        long[] expandedLocs = squareDual.chunkToLocations(nextXz[0], nextXz[1]);
+        assertEquals(1, expandedLocs.length);
+        assertEquals(baseRange, expandedLocs[0]);
+
+        // Test at the new frontier edge: loc = baseRange + 49
+        int[] frontierXz = squareDual.locationToXZ(baseRange + 49);
+        assertTrue(squareDual.contains(frontierXz[0], frontierXz[1]));
+        assertEquals(1, squareDual.chunkToLocations(frontierXz[0], frontierXz[1]).length);
+
+        // Beyond the new frontier: loc = baseRange + 50
+        int[] beyondXz = squareDual.locationToXZ(baseRange + 50);
+        assertFalse(squareDual.contains(beyondXz[0], beyondXz[1]));
+        assertEquals(0, squareDual.chunkToLocations(beyondXz[0], beyondXz[1]).length);
+    }
+
+    @Test
+    @DisplayName("CircleOptimizedDualLayer: chunkToLocations and contains respect effectiveRange and circular bounds when expand is enabled")
+    void testCircleOptimizedEffectiveRangeBoundsWithExpand() {
+        CircleOptimizedDualLayer circleDual = new CircleOptimizedDualLayer("EXPAND_BOUNDS_CIRCLE", 32);
+        circleDual.set(GenericMemoryShapeParams.radius, 128L);
+        circleDual.set(GenericMemoryShapeParams.centerRadius, 16L);
+        circleDual.set(GenericMemoryShapeParams.expand, true);
+        circleDual.set(GenericMemoryShapeParams.mode, "ACCUMULATE");
+
+        long baseRange = circleDual.getRange();
+        assertEquals(baseRange, circleDual.getEffectiveRange());
+        assertEquals(128L, circleDual.getEffectiveRadius());
+
+        // Point at (129, 0) is outside the base circle radius of 128
+        assertFalse(circleDual.contains(129, 0));
+        assertEquals(0, circleDual.chunkToLocations(129, 0).length);
+
+        // Add 5000 bad locations to expand the circle significantly
+        // r_eff = ceil(sqrt(128^2 + 5000 / pi)) = ceil(sqrt(16384 + 1591.55)) = ceil(134.07) = 135
+        for (long i = 0; i < 5000; i++) {
+            circleDual.addBadLocation(i);
+        }
+        circleDual.flushAndRebuild(circleDual.spatialResolution());
+
+        long expandedRange = circleDual.getEffectiveRange();
+        assertEquals(baseRange + 5000L, expandedRange);
+        long rEff = circleDual.getEffectiveRadius();
+        assertTrue(rEff > 128L);
+        assertEquals(135L, rEff);
+
+        // Point at (129, 0) is within the expanded circular boundary (dist = 129 <= 135)
+        assertTrue(circleDual.contains(129, 0));
+        assertEquals(1, circleDual.chunkToLocations(129, 0).length);
+
+        // Point at (135, 0) is at the expanded boundary
+        assertTrue(circleDual.contains(135, 0));
+        assertEquals(1, circleDual.chunkToLocations(135, 0).length);
+
+        // Point at (136, 0) is outside the expanded circular boundary (dist = 136 > 135)
+        assertFalse(circleDual.contains(136, 0));
+        assertEquals(0, circleDual.chunkToLocations(136, 0).length);
+
+        // Diagonal point at (110, 110): dist = sqrt(110^2 + 110^2) = sqrt(24200) ≈ 155.56 > 135
+        // Even if Chebyshev macro-square might reach (110, 110), circular bounds check rejects it!
+        assertFalse(circleDual.contains(110, 110));
+        assertEquals(0, circleDual.chunkToLocations(110, 110).length);
+    }
+
     // ------------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------------
