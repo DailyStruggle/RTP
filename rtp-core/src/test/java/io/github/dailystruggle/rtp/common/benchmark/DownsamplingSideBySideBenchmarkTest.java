@@ -64,7 +64,7 @@ public class DownsamplingSideBySideBenchmarkTest {
   @Test
   @DisplayName("Generate Side-by-Side Spatial Distribution and Memory Model Comparison Chart")
   public void testGenerateSideBySideComparison() throws Exception {
-    int R = 256;
+    int R = 1024;
     int pointEdgeP = 32;
     int testTeleports = 600;
     int uniqueRadiusRu = 8; // R_u = 8 chunks (128 blocks footprint)

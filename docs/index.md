@@ -1,5 +1,10 @@
 # LeafRTP
 
+[![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
+[![Coverage](assets/badges/coverage.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
+[![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
+[![Java](https://img.shields.io/badge/Java-21-blue)](https://adoptium.net/)
+
 A random-teleportation plugin built to fill operator needs still unmet by the more
 popular RTP plugins:
 

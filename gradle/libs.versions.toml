@@ -21,6 +21,11 @@ javaToolchain = "21"
 # Test + annotation stack (shared by every module via the root subprojects block).
 junit = "5.10.0"
 mockito = "5.5.0"
+# Testcontainers drives the opt-in, Docker-gated Redis integration tier for
+# rtp-proxy-common's transport/redis package (ENTERPRISE_READINESS.md item 17).
+# 1.21.x runs on the Java 21 toolchain, supports current Docker Engine API
+# versions, and skips gracefully without Docker.
+testcontainers = "1.21.3"
 jetbrainsAnnotations = "24.1.0"
 checkerQual = "3.42.0"
 jacoco = "0.8.11"
@@ -29,10 +34,21 @@ jacoco = "0.8.11"
 # (e.g. prefer-non-locking) are appended there. PMD 7.x parses Java 21+ and
 # needs Gradle 8.6+ (this build runs Gradle 9.5).
 pmd = "7.7.0"
+# PIT mutation testing (ENTERPRISE_READINESS.md item 22): the opt-in `-Pmutation`
+# gate on rtp-core's safety packages. `pitestPlugin` is the Gradle plugin (1.19.0
+# is the first stable line with Gradle 9 support - this build runs Gradle 9.5);
+# `pitest` pins the underlying PIT engine and `pitestJunit5` the JUnit 5 test
+# discovery plugin (the whole suite runs on the JUnit platform).
+pitestPlugin = "1.19.0"
+pitest = "1.19.6"
+pitestJunit5 = "1.2.2"
+# jqwik property-based testing (ENTERPRISE_READINESS.md item 23)
+jqwik = "1.9.2"
 
 # Build plugins.
 shadow = "8.3.8"
 spotless = "6.25.0"
+japicmp = "0.4.5"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -41,7 +57,12 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrainsAnnotations" }
 checker-qual = { module = "org.checkerframework:checker-qual", version.ref = "checkerQual" }
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }
+jqwik = { module = "net.jqwik:jqwik", version.ref = "jqwik" }
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+pitest = { id = "info.solidsoft.pitest", version.ref = "pitestPlugin" }
+japicmp = { id = "me.champeau.gradle.japicmp", version.ref = "japicmp" }

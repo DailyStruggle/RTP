@@ -28,6 +28,8 @@ Two forces push the claim-plugin checkers in the opposite direction:
 
 The claim-plugin third-party libs remain `compileOnly` in `rtp-plugin/build.gradle`; plugin.yml `softdepend` is extended to include them so Bukkit's classloader isolates them at runtime. REQ-RTP-S-003's behaviour is therefore unchanged — the verifiers still live behind `GlobalRegionVerifiers` and are gated per-plugin by `Bukkit.getPluginManager().isPluginEnabled(...)`.
 
+> **Folia Threading Caveat:** Synchronous claim checkers execute on the verification pipeline thread (`GlobalRegionVerifiers.checkGlobalRegionVerifiers`), calling third-party/Bukkit APIs off the main thread. While these calls are in-memory lookup queries that perform zero blocking chunk I/O (complying with REQ-RTP-S-005), they rely on the external plugin being thread-safe under concurrent/regional execution. Where a claim plugin exposes an async/region-safe query API, prefer registering via `registerAsync` (`addGlobalRegionVerifierAsync`) and dispatching through the appropriate scheduler.
+
 ## Consequences
 
 - **Positive:**

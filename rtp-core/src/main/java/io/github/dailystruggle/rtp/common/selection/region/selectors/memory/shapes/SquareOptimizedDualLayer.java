@@ -263,6 +263,16 @@ public class SquareOptimizedDualLayer extends Square {
   private final java.util.concurrent.atomic.AtomicLong selectionCounter = new java.util.concurrent.atomic.AtomicLong(0);
   private final java.util.concurrent.atomic.AtomicLong backlogCounter = new java.util.concurrent.atomic.AtomicLong(0);
 
+  @Override
+  protected void onExpansionEpochIncrement() {
+    selectionCounter.set(0);
+    backlogCounter.set(0);
+  }
+
+  private long getEpochKey(long epoch, long phaseOffset) {
+    return secretKey ^ (epoch * 0x517CC1B727220A95L) ^ (phaseOffset * 0x9E3779B97F4A7C15L);
+  }
+
   /**
    * Optimized native candidate distribution model.
    * Dynamically evaluates effective dyadic downsampling stride S based on
@@ -279,9 +289,10 @@ public class SquareOptimizedDualLayer extends Square {
     long total = (long) range;
     int stride = deriveEffectiveStride(total);
 
+    long curEpoch = getExpansionEpoch();
     if (stride <= 1) {
       long t = selectionCounter.getAndIncrement();
-      long permuted = feistelPermute(t, total, secretKey);
+      long permuted = feistelPermute(t, total, getEpochKey(curEpoch, 0L));
       return (double) Math.min(total - 1, Math.max(0L, permuted));
     }
 
@@ -305,7 +316,7 @@ public class SquareOptimizedDualLayer extends Square {
     }
 
     long kCounter = (t % subsetCapacity) % subsetSize;
-    long permutedK = feistelPermute(kCounter, subsetSize, secretKey ^ (phaseOffset * 0x9E3779B97F4A7C15L));
+    long permutedK = feistelPermute(kCounter, subsetSize, getEpochKey(curEpoch, phaseOffset));
     long candidate = permutedK * stride + phaseOffset;
     return (double) Math.min(total - 1, Math.max(0L, candidate));
   }
@@ -319,11 +330,15 @@ public class SquareOptimizedDualLayer extends Square {
    */
   public int deriveEffectiveStride(long domainSize) {
     long res = spatialResolution();
+    int p = getPointEdgeChunks();
+    long binArea = (long) p * p;
+    long maxStrideByBin = Math.max(1L, binArea / 2L);
+
     // 1. Explicit spatialResolution override: res > 1 directly dictates sampling cell area
     if (res > 1L) {
       long cellDim = 1L << (64 - Long.numberOfLeadingZeros(res - 1L));
       long cellStride = cellDim * cellDim;
-      return (int) Math.max(1, Math.min(1024L, Math.min(domainSize / 4L, cellStride)));
+      return (int) Math.max(1, Math.min(maxStrideByBin, Math.min(domainSize / 4L, cellStride)));
     }
 
     // 2. Expand mode: derive from uniquePlacements exclusion radius (or view distance if auto)
@@ -334,7 +349,7 @@ public class SquareOptimizedDualLayer extends Square {
         long footprint = (long) (2 * ru - 1) * (2 * ru - 1);
         int shift = 64 - Long.numberOfLeadingZeros(footprint - 1L);
         int derived = 1 << shift;
-        return (int) Math.max(1, Math.min(1024, Math.min(domainSize / 4L, (long) derived)));
+        return (int) Math.max(1, Math.min(maxStrideByBin, Math.min(domainSize / 4L, (long) derived)));
       }
     }
 
@@ -367,6 +382,7 @@ public class SquareOptimizedDualLayer extends Square {
     long range = getRange();
     if (range <= 0) return -1L;
 
+    long curEpoch = getExpansionEpoch();
     if (MODE_ACCUMULATE.equals(mode())) {
       SegmentedKeyRunTable table = getOrBuildSegmentedTable(range);
       long totalGood = range - table.totalCovered();
@@ -383,7 +399,7 @@ public class SquareOptimizedDualLayer extends Square {
       }
 
       long kCounter = t / stride;
-      long permutedK = feistelPermute(kCounter, subsetSize, secretKey ^ (phaseOffset * 0x9E3779B97F4A7C15L));
+      long permutedK = feistelPermute(kCounter, subsetSize, getEpochKey(curEpoch, phaseOffset));
       long virtualGoodIndex = permutedK * stride + phaseOffset;
 
       return table.resolveAccumulate(virtualGoodIndex);
@@ -401,7 +417,7 @@ public class SquareOptimizedDualLayer extends Square {
     }
 
     long kCounter = t / stride;
-    long permutedK = feistelPermute(kCounter, subsetSize, secretKey ^ (phaseOffset * 0x9E3779B97F4A7C15L));
+    long permutedK = feistelPermute(kCounter, subsetSize, getEpochKey(curEpoch, phaseOffset));
     return permutedK * stride + phaseOffset;
   }
 

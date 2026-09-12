@@ -212,4 +212,76 @@ class PeerRegionRegistryTest {
         registry.setTopologyPeerSupplier(() -> Set.of("backend-a"));
         assertFalse(registry.isReachableHardPin("backend-a", "missing"));
     }
+
+    @Test
+    void recordDispatch_and_pendingDecrementFor_tracksAndClearsOnHeartbeat() {
+        var peer = hb("backend-a", Set.of("default"), false);
+        long t1 = peer.lastSeenEpochMs();
+        java.util.concurrent.atomic.AtomicReference<NetworkSnapshot> ref =
+                new java.util.concurrent.atomic.AtomicReference<>(snap(peer));
+
+        var registry = new PeerRegionRegistry(ref::get, "lobby-a");
+        assertEquals(0, registry.pendingDecrementFor("backend-a", "default"));
+
+        // Dispatch 1
+        registry.recordDispatch("backend-a", "default");
+        assertEquals(1, registry.pendingDecrementFor("backend-a", "default"));
+
+        // Dispatch 2 stacks with same anchor
+        registry.recordDispatch("backend-a", "default");
+        assertEquals(2, registry.pendingDecrementFor("backend-a", "default"));
+
+        // Null/empty checks do nothing
+        registry.recordDispatch(null, "default");
+        registry.recordDispatch("backend-a", null);
+        registry.recordDispatch("", "default");
+        assertEquals(2, registry.pendingDecrementFor("backend-a", "default"));
+
+        // When a fresh heartbeat arrives with t2 > t1, pendingDecrement clears
+        var freshPeer = new BackendHeartbeat(
+                "backend-a", 1, BackendHeartbeat.PluginState.READY, true,
+                t1 + 5000L, 1.0, 0, 100, 0L, 0L, 0,
+                List.of("default"), List.of(), false, 0, 0, Set.of("default"), Map.of(), Map.of());
+        ref.set(snap(freshPeer));
+        assertEquals(0, registry.pendingDecrementFor("backend-a", "default"));
+    }
+
+    @Test
+    void peerRegionAttribute_returnsMetadataOrNull() {
+        var peer = new BackendHeartbeat(
+                "backend-a", 1, BackendHeartbeat.PluginState.READY, true,
+                System.currentTimeMillis(), 1.0, 0, 100, 0L, 0L, 0,
+                List.of("default"), List.of(), false, 0, 0, Set.of("default"),
+                Map.of(),
+                Map.of("default.env", "NORMAL", "default.block", "STONE"));
+
+        var registry = new PeerRegionRegistry(() -> snap(peer), "lobby-a");
+        assertEquals("NORMAL", registry.peerRegionAttribute("backend-a", "default", "env"));
+        assertEquals("STONE", registry.peerRegionAttribute("backend-a", "default", "block"));
+
+        // Missing attribute
+        org.junit.jupiter.api.Assertions.assertNull(registry.peerRegionAttribute("backend-a", "default", "missing"));
+        // Null / empty params
+        org.junit.jupiter.api.Assertions.assertNull(registry.peerRegionAttribute(null, "default", "env"));
+        org.junit.jupiter.api.Assertions.assertNull(registry.peerRegionAttribute("backend-a", null, "env"));
+        org.junit.jupiter.api.Assertions.assertNull(registry.peerRegionAttribute("backend-a", "default", null));
+        // Missing server or snapshot error
+        org.junit.jupiter.api.Assertions.assertNull(registry.peerRegionAttribute("unknown", "default", "env"));
+        var brokenRegistry = new PeerRegionRegistry(() -> { throw new RuntimeException("fail"); }, "lobby-a");
+        org.junit.jupiter.api.Assertions.assertNull(brokenRegistry.peerRegionAttribute("backend-a", "default", "env"));
+    }
+
+    @Test
+    void pickMostKept_withLocalDecrements_scoresAndSelects() {
+        var a = hb("backend-a", Set.of("default"), false);
+        var b = hb("backend-b", Set.of("default"), false);
+        var registry = new PeerRegionRegistry(() -> snap(a, b), "local-1");
+
+        java.util.Optional<io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion> picked = registry.pickMostKept();
+        assertTrue(picked.isPresent());
+
+        // Snapshot failure returns empty
+        var brokenRegistry = new PeerRegionRegistry(() -> { throw new RuntimeException("fail"); }, "local-1");
+        assertTrue(brokenRegistry.pickMostKept().isEmpty());
+    }
 }

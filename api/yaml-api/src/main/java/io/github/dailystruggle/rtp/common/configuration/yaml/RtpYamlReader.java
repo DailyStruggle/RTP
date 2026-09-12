@@ -106,24 +106,9 @@ public final class RtpYamlReader {
             root.trailingComments().addAll(r.pendingComments);
             r.pendingComments.clear();
         }
-        while (r.pos < r.lines.size()) {
-            RawLine ln = r.lines.get(r.pos);
-            if (ln.blank) {
-                if (!root.trailingComments().isEmpty()
-                        && !BLANK_LINE_SENTINEL.equals(root.trailingComments().get(root.trailingComments().size() - 1))) {
-                    root.trailingComments().add(BLANK_LINE_SENTINEL);
-                }
-                r.pos++;
-                continue;
-            }
-            if (ln.comment) {
-                root.trailingComments().add(stripCommentMarker(ln.content));
-                r.pos++;
-                continue;
-            }
-            throw new RtpYamlParseException("rtpYaml.syntax.trailingContent",
-                    "unexpected content after top-level mapping", ln.lineNo, ln.indent);
-        }
+        // parseMappingBody(root, 0) consumes every remaining line at indent 0
+        // (blank, comment, and content alike), so r.pos == lines.size() here by
+        // contract; no post-root drain loop is needed.
         trimSentinels(root.trailingComments());
         return root;
     }

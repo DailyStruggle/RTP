@@ -3,10 +3,9 @@ package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIf;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -25,30 +24,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * exclusion between two holders, compare-and-delete release semantics, and
  * TTL-expiry handover.
  *
- * <p>Gated by {@code RTP_REDIS_IT=true}; CI/local default builds skip this
- * class entirely. To run locally:</p>
- * <pre>
- *   docker run --rm -p 6379:6379 redis:7-alpine
- *   $env:RTP_REDIS_IT = "true"
- *   .\gradlew :rtp-proxy:rtp-proxy-common:test --tests "*RedisLeaderLeaseIT*"
- * </pre>
- *
- * <p>Connection target is {@code 127.0.0.1:6379} (override via
- * {@code RTP_REDIS_IT_HOST} / {@code RTP_REDIS_IT_PORT} /
- * {@code RTP_REDIS_IT_PASSWORD}). Cleanup scrubs only the test-scoped key so
- * the suite never touches unrelated data on a shared dev Redis.</p>
+ * <p>Backed by a Testcontainers-managed {@code redis:7-alpine} (item 17 of
+ * ENTERPRISE_READINESS.md: use a real Redis, not mocks). Docker-gated via
+ * {@link RedisTestContainer#dockerAvailable()} so a Docker-less build skips the
+ * class cleanly. Cleanup scrubs only the test-scoped key.</p>
  */
-@EnabledIfEnvironmentVariable(named = "RTP_REDIS_IT", matches = "true")
+@EnabledIf("io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisTestContainer#dockerAvailable")
 class RedisLeaderLeaseIT {
 
     private static final String TEST_KEY = "rtp:net:waitlist:leader:test:" + UUID.randomUUID();
 
     private JedisPool pool;
-
-    private static String envOr(String name, String fallback) {
-        String v = System.getenv(name);
-        return (v == null || v.isEmpty()) ? fallback : v;
-    }
 
     private void scrub() {
         try (Jedis j = pool.getResource()) {
@@ -58,15 +44,7 @@ class RedisLeaderLeaseIT {
 
     @BeforeEach
     void open() {
-        String host = envOr("RTP_REDIS_IT_HOST", "127.0.0.1");
-        int port = Integer.parseInt(envOr("RTP_REDIS_IT_PORT", "6379"));
-        String password = System.getenv("RTP_REDIS_IT_PASSWORD");
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(4);
-        cfg.setMaxIdle(2);
-        pool = (password == null || password.isEmpty())
-                ? new JedisPool(cfg, host, port, 2000)
-                : new JedisPool(cfg, host, port, 2000, password);
+        pool = RedisTestContainer.newPool();
         scrub();
     }
 
@@ -168,8 +146,8 @@ class RedisLeaderLeaseIT {
 
     @Test
     void distinctHolderIds_areGenerated_byPublicCtor() {
-        RedisLeaderLease one = new RedisLeaderLease("127.0.0.1", 6379, null);
-        RedisLeaderLease two = new RedisLeaderLease("127.0.0.1", 6379, null);
+        RedisLeaderLease one = new RedisLeaderLease(RedisTestContainer.host(), RedisTestContainer.port(), null);
+        RedisLeaderLease two = new RedisLeaderLease(RedisTestContainer.host(), RedisTestContainer.port(), null);
         try {
             assertNotEquals(one.holderId(), two.holderId());
             assertEquals(RedisLeaderLease.DEFAULT_KEY, one.key());

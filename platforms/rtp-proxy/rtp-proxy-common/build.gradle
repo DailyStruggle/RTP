@@ -24,4 +24,29 @@ dependencies {
     // pulled in by rtp-core for RedisManager); pinned to the same version
     // to avoid classpath conflicts when both modules ship in the unified jar.
     implementation 'redis.clients:jedis:5.1.2'
+    // ENTERPRISE_READINESS.md item 17: the transport/redis package is exercised
+    // against a real Redis via Testcontainers (not mocks). The container-backed
+    // tests are Docker-gated (RedisTestContainer.dockerAvailable) so a routine
+    // build on a box without Docker skips them cleanly rather than failing.
+    testImplementation platform(libs.testcontainers.bom)
+    testImplementation libs.testcontainers.junit
+}
+
+// The Testcontainers-backed transport/redis tier talks to the local Docker
+// daemon through docker-java. docker-java negotiates a default Docker Engine
+// API version that recent daemons (Docker Engine 29+, minimum API 1.40) reject
+// with HTTP 400. Pin a floor API version for the test workers unless the
+// environment already supplies one, so the Redis integration tests connect on
+// modern Docker without forcing every developer to export DOCKER_API_VERSION.
+tasks.withType(Test).configureEach {
+    if (System.getenv('DOCKER_API_VERSION') == null) {
+        environment 'DOCKER_API_VERSION', '1.44'
+    }
+    // The Redis integration tests share one Testcontainers Redis instance across
+    // classes and each scrubs the shared keyspace in setup/teardown
+    // (RedisNetworkStateBindingIT flushes the whole rtp:net:* namespace). Running
+    // test classes in parallel forks would let one class's scrub stomp another's
+    // in-flight state, so serialise this module's suite. It is small and the
+    // container-backed tier is I/O-bound, so the single fork is not a bottleneck.
+    maxParallelForks = 1
 }

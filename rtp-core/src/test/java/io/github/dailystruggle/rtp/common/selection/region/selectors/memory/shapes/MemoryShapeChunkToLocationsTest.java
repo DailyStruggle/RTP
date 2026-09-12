@@ -396,7 +396,7 @@ public class MemoryShapeChunkToLocationsTest {
     }
 
     @Test
-    @DisplayName("CircleOptimizedDualLayer: chunkToLocations and contains respect effectiveRange when expand is enabled")
+    @DisplayName("CircleOptimizedDualLayer: chunkToLocations and contains respect effectiveRange and circular bounds when expand is enabled")
     void testCircleOptimizedEffectiveRangeBoundsWithExpand() {
         CircleOptimizedDualLayer circleDual = new CircleOptimizedDualLayer("EXPAND_BOUNDS_CIRCLE", 32);
         circleDual.set(GenericMemoryShapeParams.radius, 128L);
@@ -406,27 +406,41 @@ public class MemoryShapeChunkToLocationsTest {
 
         long baseRange = circleDual.getRange();
         assertEquals(baseRange, circleDual.getEffectiveRange());
+        assertEquals(128L, circleDual.getEffectiveRadius());
 
-        int[] nextXz = circleDual.locationToXZ(baseRange);
-        assertFalse(circleDual.contains(nextXz[0], nextXz[1]));
-        assertEquals(0, circleDual.chunkToLocations(nextXz[0], nextXz[1]).length);
+        // Point at (129, 0) is outside the base circle radius of 128
+        assertFalse(circleDual.contains(129, 0));
+        assertEquals(0, circleDual.chunkToLocations(129, 0).length);
 
-        for (long i = 0; i < 30; i++) {
+        // Add 5000 bad locations to expand the circle significantly
+        // r_eff = ceil(sqrt(128^2 + 5000 / pi)) = ceil(sqrt(16384 + 1591.55)) = ceil(134.07) = 135
+        for (long i = 0; i < 5000; i++) {
             circleDual.addBadLocation(i);
         }
         circleDual.flushAndRebuild(circleDual.spatialResolution());
 
         long expandedRange = circleDual.getEffectiveRange();
-        assertEquals(baseRange + 30L, expandedRange);
+        assertEquals(baseRange + 5000L, expandedRange);
+        long rEff = circleDual.getEffectiveRadius();
+        assertTrue(rEff > 128L);
+        assertEquals(135L, rEff);
 
-        assertTrue(circleDual.contains(nextXz[0], nextXz[1]));
-        long[] expandedLocs = circleDual.chunkToLocations(nextXz[0], nextXz[1]);
-        assertEquals(1, expandedLocs.length);
-        assertEquals(baseRange, expandedLocs[0]);
+        // Point at (129, 0) is within the expanded circular boundary (dist = 129 <= 135)
+        assertTrue(circleDual.contains(129, 0));
+        assertEquals(1, circleDual.chunkToLocations(129, 0).length);
 
-        int[] beyondXz = circleDual.locationToXZ(baseRange + 30);
-        assertFalse(circleDual.contains(beyondXz[0], beyondXz[1]));
-        assertEquals(0, circleDual.chunkToLocations(beyondXz[0], beyondXz[1]).length);
+        // Point at (135, 0) is at the expanded boundary
+        assertTrue(circleDual.contains(135, 0));
+        assertEquals(1, circleDual.chunkToLocations(135, 0).length);
+
+        // Point at (136, 0) is outside the expanded circular boundary (dist = 136 > 135)
+        assertFalse(circleDual.contains(136, 0));
+        assertEquals(0, circleDual.chunkToLocations(136, 0).length);
+
+        // Diagonal point at (110, 110): dist = sqrt(110^2 + 110^2) = sqrt(24200) ≈ 155.56 > 135
+        // Even if Chebyshev macro-square might reach (110, 110), circular bounds check rejects it!
+        assertFalse(circleDual.contains(110, 110));
+        assertEquals(0, circleDual.chunkToLocations(110, 110).length);
     }
 
     // ------------------------------------------------------------------------

@@ -88,6 +88,10 @@ public class MemoryTracker {
   /** Forcefully deregisters an object from the leak tracker immediately */
   public static void untrack(Object target) {
     if (target == null) return;
+    if (target instanceof UUID uuid) {
+      untrack(uuid);
+      return;
+    }
     trackedObjects.entrySet().removeIf(entry -> {
       TrackedObject tracked = entry.getValue();
       boolean remove = tracked.isCollected() || tracked.matches(target);

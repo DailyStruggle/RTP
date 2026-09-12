@@ -141,4 +141,61 @@ class NetworkRegionAvailabilityTest {
         assertTrue(param.isRelevant.apply(sender, "anything:whatever"));
         assertFalse(param.isRelevant.apply(sender, "bad:"), "empty region key rejects");
     }
+
+    @Test
+    @DisplayName("provider: any-server query (null or empty serverId)")
+    void anyServerQuery() {
+        AtomicReference<NetworkSnapshot> snap = new AtomicReference<>(
+                snapshotOf(backend("backend-a", Set.of("default"), false),
+                           backend("backend-b", Set.of("nether"), false)));
+        SnapshotRegionAvailabilityProvider p = new SnapshotRegionAvailabilityProvider(snap::get);
+
+        assertEquals(RegionAvailabilityProvider.Availability.KNOWN_AVAILABLE,
+                p.availabilityOf(null, "default"));
+        assertEquals(RegionAvailabilityProvider.Availability.KNOWN_AVAILABLE,
+                p.availabilityOf("", "nether"));
+        assertEquals(RegionAvailabilityProvider.Availability.UNKNOWN,
+                p.availabilityOf(null, "missing"));
+
+        // Null or empty region key is UNKNOWN
+        assertEquals(RegionAvailabilityProvider.Availability.UNKNOWN,
+                p.availabilityOf("backend-a", null));
+        assertEquals(RegionAvailabilityProvider.Availability.UNKNOWN,
+                p.availabilityOf("backend-a", ""));
+
+        // isServerKnown on null/empty
+        assertFalse(p.isServerKnown(null));
+        assertFalse(p.isServerKnown(""));
+    }
+
+    @Test
+    @DisplayName("provider: defensive against throwing supplier and null elements")
+    void defensiveHandling() {
+        SnapshotRegionAvailabilityProvider throwingProvider =
+                new SnapshotRegionAvailabilityProvider(() -> { throw new RuntimeException("boom"); });
+        assertTrue(throwingProvider.availableEntries().isEmpty());
+        assertEquals(RegionAvailabilityProvider.Availability.UNKNOWN,
+                throwingProvider.availabilityOf("backend-a", "default"));
+        assertFalse(throwingProvider.isServerKnown("backend-a"));
+
+        // Null supplier
+        SnapshotRegionAvailabilityProvider nullSupplierProvider =
+                new SnapshotRegionAvailabilityProvider(null);
+        assertTrue(nullSupplierProvider.availableEntries().isEmpty());
+
+        // Snapshot with null entries and empty regions
+        BackendHeartbeat nullServer = new BackendHeartbeat(
+                "", 1, BackendHeartbeat.PluginState.READY, true,
+                System.currentTimeMillis(), 1.0, 0, 100, 0L, 0L, 0,
+                List.of(), List.of(), false, 0, 0, Set.of(), Map.of(), Map.of());
+        BackendHeartbeat fallbackLegacyList = new BackendHeartbeat(
+                "legacy-server", 1, BackendHeartbeat.PluginState.READY, true,
+                System.currentTimeMillis(), 1.0, 0, 100, 0L, 0L, 0,
+                List.of("legacy_region", ""), List.of(), false, 0, 0, Set.of(), Map.of(), Map.of());
+
+        SnapshotRegionAvailabilityProvider p = new SnapshotRegionAvailabilityProvider(
+                () -> snapshotOf(nullServer, fallbackLegacyList));
+
+        assertTrue(p.availableEntries().contains("legacy-server:legacy_region"));
+    }
 }

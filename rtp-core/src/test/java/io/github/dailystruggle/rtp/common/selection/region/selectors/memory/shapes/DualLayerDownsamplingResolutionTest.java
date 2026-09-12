@@ -91,6 +91,33 @@ public class DualLayerDownsamplingResolutionTest {
   }
 
   @Test
+  @DisplayName("Nyquist rule: Stride S is capped at half the bin capacity (binArea / 2)")
+  public void testNyquistSamplingCapAtHalfBin() {
+    // When pointEdgeChunks = 16 -> binArea = 256 -> max stride is 128
+    SquareOptimizedDualLayer square16 = new SquareOptimizedDualLayer("TEST_P16", 16);
+    square16.set(GenericMemoryShapeParams.radius, 1024L);
+    square16.set(GenericMemoryShapeParams.centerRadius, 64L);
+    square16.set(GenericMemoryShapeParams.expand, true);
+    square16.set(GenericMemoryShapeParams.uniquePlacements, 16); // Footprint 31x31=961 -> wants stride 1024
+    // But binArea = 256, so Nyquist cap is 128!
+    assertEquals(128, square16.deriveEffectiveStride(square16.getRange()));
+
+    // When pointEdgeChunks = 32 -> binArea = 1024 -> max stride is 512
+    SquareOptimizedDualLayer square32 = new SquareOptimizedDualLayer("TEST_P32", 32);
+    square32.set(GenericMemoryShapeParams.radius, 1024L);
+    square32.set(GenericMemoryShapeParams.centerRadius, 64L);
+    square32.set(GenericMemoryShapeParams.expand, true);
+    square32.set(GenericMemoryShapeParams.uniquePlacements, 32); // Footprint wants 4096
+    // But binArea = 1024, so Nyquist cap is 512!
+    assertEquals(512, square32.deriveEffectiveStride(square32.getRange()));
+
+    // DownsampledDualLayerSquare also respects the Nyquist cap
+    DownsampledDualLayerSquare downsampled16 = new DownsampledDualLayerSquare("DOWNSAMPLED_P16", 16);
+    downsampled16.set(GenericMemoryShapeParams.uniquePlacements, 16);
+    assertEquals(128, downsampled16.deriveStrideFromUniqueRadius());
+  }
+
+  @Test
   @DisplayName("Sample produces valid coordinates within bounds across downsampled strides")
   public void testSampleCoordinatesWithinBounds() {
     SquareOptimizedDualLayer square = new SquareOptimizedDualLayer("TEST_SQUARE", 32);
@@ -106,5 +133,36 @@ public class DualLayerDownsamplingResolutionTest {
       int chebyshev = Math.max(Math.abs(cx), Math.abs(cz));
       assertTrue(chebyshev >= 64, "Location must be outside center radius");
     }
+  }
+
+  @Test
+  @DisplayName("Expansion epoch ratchets on adjustRange with expand=true and guarantees zero intra-epoch duplicates")
+  public void testExpansionEpochRatchetAndIntraEpochZeroDuplicates() {
+    SquareOptimizedDualLayer square = new SquareOptimizedDualLayer("TEST_EXPAND_RATCHET", 32);
+    square.set(GenericMemoryShapeParams.radius, 64L);
+    square.set(GenericMemoryShapeParams.centerRadius, 0L);
+    square.set(GenericMemoryShapeParams.expand, true);
+
+    long initialEpoch = square.getExpansionEpoch();
+    assertEquals(0, initialEpoch);
+
+    // Initial adjustRange call sets lastAdjustedRange
+    double r1 = square.adjustRange(1000.0, 0L, MemoryShape.MODE_ACCUMULATE);
+    assertEquals(0, square.getExpansionEpoch());
+
+    // Expand: badSum increases -> adjustedRange increases -> expansionEpoch increments!
+    double r2 = square.adjustRange(1000.0, 500L, "NORMAL");
+    assertEquals(1, square.getExpansionEpoch());
+
+    // Within an epoch with S=1, Feistel permutation guarantees zero duplicates
+    square.set(GenericMemoryShapeParams.expand, false);
+    square.setSpatialResolution(1L);
+    java.util.Set<Double> seen = new java.util.HashSet<>();
+    double range = 128.0;
+    for (int i = 0; i < 128; i++) {
+      double s = square.sample(range);
+      assertTrue(seen.add(s), "Duplicate detected within single epoch at index " + i + ": " + s);
+    }
+    assertEquals(128, seen.size());
   }
 }

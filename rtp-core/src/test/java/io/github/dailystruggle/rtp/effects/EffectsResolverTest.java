@@ -28,12 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests for {@link EffectsResolver} (effects-api-ADR-005, checklist step 11f).
+ * Tests for {@link EffectsResolver} (effects-api-ADR-005).
  *
  * <p>Exercises the full {@code effects/<group>.yml} resolution pipeline against
  * a real {@link MultiConfigParser} backed by per-test {@code @TempDir} YAML
- * fixtures, matching the established
- * {@code MultiConfigParserIsolationTest} idiom.
+ * fixtures. The class under test is platform-neutral and lives in rtp-core, so
+ * its coverage is credited to rtp-core (ENTERPRISE_READINESS item 11).
  *
  * <p>Coverage:
  * <ul>
@@ -60,8 +60,6 @@ public class EffectsResolverTest {
     void setUp() throws IOException {
         RTPTestSetup.install(tempDir.toFile());
         RTP.configs = new Configs(tempDir.toFile());
-        // effects/ directory is created on first MultiConfigParser construction below;
-        // each test writes its own fixture YAMLs before constructing the parser.
         Files.createDirectories(tempDir.resolve("effects"));
     }
 
@@ -115,7 +113,6 @@ public class EffectsResolverTest {
                 "effects:\n" +
                 "  - SOUND.LEVELUP.1.0.1.0\n" +
                 "version: \"1.0\"\n");
-        // A non-default group that gates on a permission alice doesn't have.
         writeGroup("vip.yml",
                 "when: postteleport\n" +
                 "permission: rtp.vip\n" +
@@ -245,7 +242,6 @@ public class EffectsResolverTest {
                 "postteleport", p, "rtp.effect.postteleport");
 
         assertEquals(2, tokens.size());
-        // Parent tokens come first, then this group's own tokens.
         assertEquals("rtp.effect.postteleport.SOUND.D.1.0.1.0", tokens.get(0));
         assertEquals("rtp.effect.postteleport.SOUND.C.1.0.1.0", tokens.get(1));
     }
@@ -275,25 +271,19 @@ public class EffectsResolverTest {
         perms.add("rtp.a");
         RTPPlayer p = player("grace", UUID.randomUUID(), perms);
 
-        // Must not StackOverflow - resolver's visited-set guards the cycle.
         List<String> tokens = EffectsResolver.resolveTokens(
                 "postteleport", p, "rtp.effect.postteleport");
         assertNotNull(tokens, "cycle must not crash the resolver");
-        // Both groups' own tokens should still be emitted exactly once each.
         assertTrue(tokens.contains("rtp.effect.postteleport.SOUND.A.1.0.1.0"));
         assertTrue(tokens.contains("rtp.effect.postteleport.SOUND.B.1.0.1.0"));
         assertEquals(2, tokens.size(),
-                "cycle truncation must dedupe — each group emits its tokens at most once");
+                "cycle truncation must dedupe - each group emits its tokens at most once");
     }
 
     // ---- 7. Missing default: no NPE, no synthesis crash (S-006) ----
 
     @Test
     void noMatchingDefaultForStageYieldsEmpty() throws IOException {
-        // The shipped default.yml has when: postteleport. For an unrelated
-        // stage with no matching default-<stage> group, an ungated player
-        // should resolve to an empty token list (not the postteleport default).
-        // Verifies findDefaultForStage's stage-match guard.
         rebuildParser();
 
         RTPPlayer p = player("hank", UUID.randomUUID(), Collections.emptySet());
@@ -308,7 +298,6 @@ public class EffectsResolverTest {
 
     @Test
     void noEffectsParserYieldsEmpty() {
-        // setUp() did NOT register an EffectsGroupKeys parser this time.
         RTP.configs.multiConfigParserMap.remove(EffectsGroupKeys.class);
         RTPPlayer p = player("ivy", UUID.randomUUID(), Collections.emptySet());
         List<String> tokens = EffectsResolver.resolveTokens(
@@ -334,7 +323,6 @@ public class EffectsResolverTest {
         assertEquals(1, before.size());
         assertEquals("rtp.effect.postteleport.SOUND.OLD.1.0.1.0", before.get(0));
 
-        // Mutate disk + atomic-swap a fresh parser, mirroring /rtp reload.
         writeGroup("default.yml",
                 "when: postteleport\n" +
                 "effects:\n" +
@@ -392,6 +380,51 @@ public class EffectsResolverTest {
         assertNotNull(tokens);
         assertEquals(1, tokens.size());
         assertEquals("rtp.effect.death.COMMAND.CONSOLE.say [player] has perished", tokens.get(0));
+    }
+
+    // ---- 12. Null-argument contracts ----
+
+    @Test
+    void resolveUnionedToleratesNullPermissionNodes() throws IOException {
+        writeGroup("default.yml",
+                "when: postteleport\n" +
+                "effects:\n" +
+                "  - SOUND.D.1.0.1.0\n" +
+                "version: \"1.0\"\n");
+        rebuildParser();
+
+        RTPPlayer p = player("mia", UUID.randomUUID(), Collections.emptySet());
+        Collection<String> union = EffectsResolver.resolveUnioned(
+                "postteleport", p, "rtp.effect.postteleport", null);
+        assertTrue(union.contains("rtp.effect.postteleport.SOUND.D.1.0.1.0"),
+                "null permission nodes must not suppress config tokens");
+    }
+
+    @Test
+    void nullConfigsYieldsEmpty() {
+        RTP.configs = null;
+        RTPPlayer p = player("nate", UUID.randomUUID(), Collections.emptySet());
+        List<String> tokens = EffectsResolver.resolveTokens(
+                "postteleport", p, "rtp.effect.postteleport");
+        assertNotNull(tokens, "S-006: resolver must never return null");
+        assertTrue(tokens.isEmpty(), "null configs must yield empty");
+    }
+
+    @Test
+    void prefixWithTrailingDotIsNotDoubled() throws IOException {
+        writeGroup("default.yml",
+                "when: postteleport\n" +
+                "effects:\n" +
+                "  - SOUND.D.1.0.1.0\n" +
+                "version: \"1.0\"\n");
+        rebuildParser();
+
+        RTPPlayer p = player("olive", UUID.randomUUID(), Collections.emptySet());
+        List<String> tokens = EffectsResolver.resolveTokens(
+                "postteleport", p, "rtp.effect.postteleport.");
+        assertEquals(1, tokens.size());
+        assertEquals("rtp.effect.postteleport.SOUND.D.1.0.1.0", tokens.get(0),
+                "an already-dotted prefix must not produce a doubled '..'");
     }
 
     // ---- minimal RTPPlayer stub for the resolver's call sites ----

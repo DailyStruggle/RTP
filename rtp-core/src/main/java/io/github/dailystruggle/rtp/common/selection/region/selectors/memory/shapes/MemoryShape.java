@@ -104,15 +104,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * Maximum point edge P in chunks for dual-layer Hilbert curves.
    * P = 32 covers exactly 1024 chunks, which corresponds to one Anvil region file.
    */
-  public static final int MAX_POINT_EDGE_CHUNKS = 32;
-  public static final int MIN_POINTS_PER_RADIUS = 32;
+  public static final int MAX_POINT_EDGE_CHUNKS = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.PointEdgeSelector.DEFAULT_P;
+  public static final int MIN_POINTS_PER_RADIUS = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.PointEdgeSelector.MIN_CELLS_PER_EDGE / 2;
 
   public static int derivePointEdgeChunks(long radiusChunks) {
-    if (radiusChunks <= 0) return 1;
-    long target = radiusChunks / MIN_POINTS_PER_RADIUS;
-    if (target < 1) return 1;
-    int p = Integer.highestOneBit((int) Math.min(target, MAX_POINT_EDGE_CHUNKS));
-    return Math.max(1, Math.min(p, MAX_POINT_EDGE_CHUNKS));
+    return io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.PointEdgeSelector.derivePFromRadius(radiusChunks);
   }
 
   /**
@@ -3515,6 +3511,23 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
+   * Sequence counter for dynamic radial expansion epochs (ADR-088).
+   * Incremented whenever domain expansion increases totalGood or range,
+   * ratcheting the Feistel permutation key and resetting offset counters.
+   */
+  protected final java.util.concurrent.atomic.AtomicLong expansionEpoch = new java.util.concurrent.atomic.AtomicLong(0);
+  protected volatile double lastAdjustedRange = -1.0;
+
+  /**
+   * Returns the current expansion epoch.
+   *
+   * @return active expansion epoch
+   */
+  public long getExpansionEpoch() {
+    return expansionEpoch.get();
+  }
+
+  /**
    * Adjust the sampling range for the learned bad area.
    *
    * <p>Applied only when the shape exposes an {@code expand} knob. Shapes without one (notably
@@ -3530,9 +3543,23 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (!declaresExpand()) return range;
     boolean expand = expand();
     boolean accumulate = MODE_ACCUMULATE.equals(mode);
-    if (!expand && accumulate) return range - badSum;
-    if (expand && !accumulate) return range + badSum;
-    return range;
+    double adjusted = range;
+    if (!expand && accumulate) adjusted = range - badSum;
+    else if (expand && !accumulate) adjusted = range + badSum;
+
+    if (expand && adjusted > lastAdjustedRange && lastAdjustedRange >= 0.0) {
+      expansionEpoch.incrementAndGet();
+      onExpansionEpochIncrement();
+    }
+    lastAdjustedRange = adjusted;
+    return adjusted;
+  }
+
+  /**
+   * Callback invoked when the expansion epoch ratchets forward.
+   * Derived shapes override this to reset their selection counters and re-seed keys.
+   */
+  protected void onExpansionEpochIncrement() {
   }
 
   /**
