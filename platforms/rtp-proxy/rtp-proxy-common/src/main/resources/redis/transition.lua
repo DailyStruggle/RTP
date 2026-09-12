@@ -1,9 +1,12 @@
 -- rtp-proxy-common cross-server network wait queue: state transition.
 -- Atomically writes the next QueueState into the player's status HASH. On a
 -- terminal state (COMPLETED / FAILED / CANCELLED) the per-correlationId env
--- HASH is deleted and the seen-correlation entry is scrubbed so a fresh
--- enrolment under a new correlationId can run cleanly. Non-terminal
--- transitions only refresh the status row.
+-- HASH is deleted, the seen-correlation entry is scrubbed, and the status
+-- HASH itself is evicted (parity with InMemoryNetworkRequestQueue, which
+-- removes the status row on any terminal transition) so a subsequent
+-- pollStatus reports the player as absent. The pre-eviction status snapshot
+-- is still returned to the caller. Non-terminal transitions only refresh the
+-- status row.
 --
 -- KEYS[1] = rtp:net:wq:status:<playerId>     status HASH
 -- KEYS[2] = rtp:net:wq:seen                  correlation-id idempotency SET
@@ -44,6 +47,9 @@ if terminal then
         redis.call('DEL', 'rtp:net:wq:env:' .. cid)
         redis.call('SREM', KEYS[2], cid)
     end
+    local result = redis.call('HGETALL', statusKey)
+    redis.call('DEL', statusKey)
+    return result
 end
 if ttl > 0 then
     redis.call('EXPIRE', statusKey, ttl)

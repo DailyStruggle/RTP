@@ -37,7 +37,10 @@ public final class ClaimIntegrations {
       LandsChecker.landsSetup(host);
     }
 
-    Configs.onReload(() -> RTP.configs.putParser(buildParser(resourceLoader)));
+    Configs.onReload(() -> {
+      RTP.configs.putParser(buildParser(resourceLoader));
+      registerVerifiers();
+    });
 
     registerVerifiers();
   }
@@ -83,6 +86,20 @@ public final class ClaimIntegrations {
     if (parser == null) return;
 
     RegionVerifierRegistry verifiers = RTPAPI.hooks().verifiers();
+
+    // Unregister any previously registered verifiers from these checkers so reload dynamically updates toggles
+    verifiers.unregisterBySource(SaberFactionsChecker.class);
+    verifiers.unregisterBySource(FactionsBridgeChecker.class);
+    verifiers.unregisterBySource(GriefDefenderChecker.class);
+    verifiers.unregisterBySource(GriefPreventionChecker.class);
+    verifiers.unregisterBySource(LandsChecker.class);
+    verifiers.unregisterBySource(RedProtectChecker.class);
+    verifiers.unregisterBySource(ResidenceChecker.class);
+    verifiers.unregisterBySource(CrashClaimChecker.class);
+    verifiers.unregisterBySource(HuskClaimsChecker.class);
+    verifiers.unregisterBySource(KingdomsXChecker.class);
+    verifiers.unregisterBySource(TownyAdvancedChecker.class);
+    verifiers.unregisterBySource(WorldGuardChecker.class);
 
     register(parser, verifiers, IntegrationsKeys.rerollSaberFactions, "Factions", SaberFactionsChecker.class, () -> SaberFactionsChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollFactionsBridge, "FactionsBridge", FactionsBridgeChecker.class, () -> FactionsBridgeChecker::isInClaim);

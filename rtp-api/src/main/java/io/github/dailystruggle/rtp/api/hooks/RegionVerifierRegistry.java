@@ -22,9 +22,10 @@ public interface RegionVerifierRegistry {
    * location, {@code false} to veto.
    *
    * @param verifier non-null predicate over candidate coordinates
+   * @return a closeable handle that unregisters this verifier when closed
    */
-  default void register(Predicate<RTPCoords> verifier) {
-    register(verifier.getClass(), verifier);
+  default AutoCloseable register(Predicate<RTPCoords> verifier) {
+    return register(verifier.getClass(), verifier);
   }
 
   /**
@@ -32,17 +33,19 @@ public interface RegionVerifierRegistry {
    *
    * @param source   source class responsible for this verifier (e.g. checker class)
    * @param verifier non-null predicate over candidate coordinates
+   * @return a closeable handle that unregisters this verifier when closed
    */
-  void register(Class<?> source, Predicate<RTPCoords> verifier);
+  AutoCloseable register(Class<?> source, Predicate<RTPCoords> verifier);
 
   /**
    * Register an asynchronous verifier whose result completes with the same
    * "true = allow, false = veto" semantics.
    *
    * @param verifier non-null function returning a non-null future
+   * @return a closeable handle that unregisters this verifier when closed
    */
-  default void registerAsync(Function<RTPCoords, CompletableFuture<Boolean>> verifier) {
-    registerAsync(verifier.getClass(), verifier);
+  default AutoCloseable registerAsync(Function<RTPCoords, CompletableFuture<Boolean>> verifier) {
+    return registerAsync(verifier.getClass(), verifier);
   }
 
   /**
@@ -50,8 +53,17 @@ public interface RegionVerifierRegistry {
    *
    * @param source   source class responsible for this verifier
    * @param verifier non-null function returning a non-null future
+   * @return a closeable handle that unregisters this verifier when closed
    */
-  void registerAsync(Class<?> source, Function<RTPCoords, CompletableFuture<Boolean>> verifier);
+  AutoCloseable registerAsync(Class<?> source, Function<RTPCoords, CompletableFuture<Boolean>> verifier);
+
+  /**
+   * Remove every registered verifier (sync and async) attributed to the given source class.
+   *
+   * @param source the source class whose verifiers should be unregistered
+   * @return the number of verifiers removed
+   */
+  int unregisterBySource(Class<?> source);
 
   /**
    * Remove every registered verifier (sync and async). Intended for test harnesses

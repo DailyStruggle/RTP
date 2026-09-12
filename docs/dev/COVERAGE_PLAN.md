@@ -1,7 +1,7 @@
 # rtp-core Coverage Plan: 49% → 80%
 
 > Updated: 2026-04-16 (rescanned from live JaCoCo run)
-> Scope: `rtp-core` only (rtp-folia-common has broken tests; rtp-bukkit-common is a server impl layer)
+> Scope: `rtp-core` only (rtp-folia-common's suite is green as of 2026-09-11 but intentionally shallow at 8.7% instr - it is platform-coupled and exercised in-game via the `test` command against a live Folia server, not by JVM unit tests; its server-bound paths and owning `rtp test *` subcommands are inventoried in `platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md`; rtp-bukkit-common is a server impl layer)
 >
 > **Baseline superseded 2026-09-10.** The repo-wide measured baseline, the
 > per-module targets, and the enforced-gate plan now live in

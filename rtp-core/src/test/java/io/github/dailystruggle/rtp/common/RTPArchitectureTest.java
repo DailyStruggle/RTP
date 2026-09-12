@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 
 import java.util.concurrent.CompletableFuture;
 
-import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.JavaAccess.Predicates.target;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
 import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameMatching;
 import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
@@ -29,23 +29,25 @@ public class RTPArchitectureTest {
     private static final String API_PACKAGE = "io.github.dailystruggle.rtp.api..";
 
     /**
-     * Rule 1 - Platform Decoupling.
+     * Rule 1 - Platform Decoupling (core and api).
      *
-     * <p>Classes in the {@code rtp.common} core package must remain strictly
-     * platform-agnostic and must never import Bukkit, Paper, or Moonrise types.
+     * <p>Classes in {@code rtp-core} and {@code rtp-api} must remain strictly
+     * platform-agnostic and must never import Bukkit, Paper, Moonrise, Minecraft, or Fabric types.
      */
     @ArchTest
-    static final ArchRule core_must_not_depend_on_platform_apis =
+    static final ArchRule core_and_api_must_not_depend_on_platform_apis =
             noClasses()
-                    .that().resideInAPackage(CORE_PACKAGE)
+                    .that().resideInAnyPackage(CORE_PACKAGE, API_PACKAGE)
                     .should().dependOnClassesThat()
                     .resideInAnyPackage(
                             "org.bukkit..",
                             "io.papermc.paper..",
-                            "ca.spottedleaf.moonrise.."
+                            "ca.spottedleaf.moonrise..",
+                            "net.minecraft..",
+                            "net.fabricmc.."
                     )
-                    .because("The rtp-core module must remain platform-agnostic and may only "
-                            + "depend on rtp-api interfaces, never on Bukkit, Paper, or Moonrise.");
+                    .because("The rtp-core and rtp-api modules must remain platform-agnostic and may only "
+                            + "depend on rtp-api interfaces, never on Bukkit, Paper, Moonrise, Minecraft, or Fabric.");
 
     /**
      * Rule 2 - Non-Blocking Execution.
@@ -199,4 +201,85 @@ public class RTPArchitectureTest {
                     .because("setForceLoadedImpl is the raw addPluginChunkTicket call. "
                             + "Bypassing RTPWorld.setForceLoaded skips the reference-count "
                             + "guard and leaks chunk tickets permanently.");
+
+    /**
+     * Rule 7 - Thread Management / Carve-Outs.
+     *
+     * <p>Backend plugin JVMs must schedule all periodic, delayed, or async work through
+     * {@link RTPScheduler}. Raw threads and thread pools (e.g. {@code new Thread()},
+     * {@code Executors.new*}) must not be created outside documented carve-outs
+     * (e.g. {@code AnvilIoPool}, test harnesses).
+     */
+    @ArchTest
+    static final ArchRule no_thread_instantiation_or_executors_outside_carveouts =
+            noClasses()
+                    .that().resideInAnyPackage(CORE_PACKAGE, API_PACKAGE)
+                    .and().resideOutsideOfPackage("..mock..")
+                    .should().callConstructorWhere(
+                            target(owner(assignableTo(Thread.class)))
+                    )
+                    .orShould().callMethodWhere(
+                            target(owner(assignableTo(java.util.concurrent.Executors.class)))
+                                    .and(target(nameMatching("new.*ThreadPool|new.*Executor")))
+                    )
+                    .because("Backend plugin tasks must be scheduled through RTPScheduler. "
+                            + "Raw Thread construction and Executors thread-pool creation outside "
+                            + "documented carve-outs are prohibited.");
+
+    /**
+     * Rule 8 - Logging Discipline (No printStackTrace).
+     *
+     * <p>Stack traces must be routed through {@code RTP.log(Level.WARNING, ...)}
+     * and never dumped via {@link Throwable#printStackTrace()}.
+     */
+    @ArchTest
+    static final ArchRule no_print_stack_trace_in_core_or_api =
+            noClasses()
+                    .that().resideInAnyPackage(CORE_PACKAGE, API_PACKAGE)
+                    .should().callMethodWhere(
+                            target(owner(assignableTo(Throwable.class)))
+                                    .and(target(nameMatching("printStackTrace")))
+                    )
+                    .because("Zero printStackTrace() - all exceptions must be logged via "
+                            + "RTP.log(Level.WARNING, \"msg\", e).");
+
+    /**
+     * Rule 9 - Console and Platform Logger Isolation (No System.out / Bukkit.getLogger).
+     *
+     * <p>Logging must go through {@code RTP.log()} / {@code RTPServerAccessor.log()}.
+     * Direct stdout/stderr console writes and direct {@code Bukkit.getLogger()} calls are prohibited.
+     */
+    @ArchTest
+    static final ArchRule no_system_out_or_bukkit_getlogger_in_core_or_api =
+            noClasses()
+                    .that().resideInAnyPackage(CORE_PACKAGE, API_PACKAGE)
+                    .should().accessFieldWhere(
+                            target(owner(assignableTo(System.class)))
+                                    .and(target(nameMatching("out|err")))
+                    )
+                    .orShould().callMethodWhere(
+                            target(owner(assignableTo(System.class)))
+                                    .and(target(nameMatching("setOut|setErr")))
+                    )
+                    .because("Direct console output (System.out / System.err) and Bukkit.getLogger() "
+                            + "are forbidden in core and api; use RTP.log() instead.");
+
+    /**
+     * Rule 10 - Synchronous Chunk I/O (S-005).
+     *
+     * <p>Core and api code must never invoke synchronous chunk loading methods on native
+     * platform worlds (such as {@code org.bukkit.World#getChunkAt(int, int)}). All chunk
+     * retrieval must proceed asynchronously via {@link RTPWorld#getChunkAt(int, int)} or
+     * {@link RTPWorld#getChunkAtAsync(int, int)}.
+     */
+    @ArchTest
+    static final ArchRule no_synchronous_chunk_io_on_platform_world =
+            noClasses()
+                    .that().resideInAnyPackage(CORE_PACKAGE, API_PACKAGE)
+                    .should().callMethodWhere(
+                            target(nameMatching("getChunkAt"))
+                                    .and(target(owner(nameMatching(".*org\\.bukkit\\.World.*|.*net\\.minecraft.*"))))
+                    )
+                    .because("REQ-RTP-S-005: Zero synchronous chunk loading on main threads. "
+                            + "All chunk operations must go through RTPWorld's async methods.");
 }

@@ -350,9 +350,8 @@ public class ScanTask extends RTPRunnable {
 
     o = biomesParser.getConfigValue(BiomesKeys.biomes, new ArrayList<String>());
     if (!(o instanceof List<?>)) {
-      new IllegalArgumentException(
-              "expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName())
-              .printStackTrace();
+      RTP.log(Level.WARNING, "expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName(),
+              new IllegalArgumentException("expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName()));
       biomesParser.set(BiomesKeys.biomes, new ArrayList<String>());
     }
 

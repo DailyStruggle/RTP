@@ -60,7 +60,7 @@ The `.bin` already stores sorted keys plus lengths, which is exactly what a diff
 | C5 | Fewer runs at full precision | **MET** - 4.7x-5.0x fewer runs at >= 35% usable ground (real-world floor; sections 9 & 15); P=1 fallback in `PointEdgeSelector` guards <= 25% |
 | C6 | Reconciliation no worse | **MET** - confirmed at coarse settings; zero allocation overhead in selection path (section 17) |
 | C7 | Selection no worse | **MET** - faster at every setting measured |
-| C8 | Point edge derived from range, not pinned | **MET in test scope, NOT MET in shipped code** - derived point-by-point over powers of two with hard expand guard, regret <= 3.0% against brute-force oracle (section 15), but the shipped shapes pin `P = 32` (section 23b) |
+| C8 | Point edge derived from range, not pinned | **MET** - derived point-by-point over powers of two with hard expand guard, regret <= 3.0% against brute-force oracle (section 15); shipped in `PointEdgeSelector`, dynamically derived in `SquareOptimizedDualLayer` and `CircleOptimizedDualLayer` (sections 15 & 23b) |
 | C9 | Crash-safe persistence across a curve change | **MET** - Version 5 header, lossless upward ratchet on multiple P, int keyWidth saving 32% disk footprint, 1.000 offered-mark retention (section 17) |
 
 ## Measurements
@@ -773,12 +773,18 @@ Re-run of the whole ADR-080 tier on the current tree: `:rtp-core:simulationBench
 |---|---|
 | Bijection in a shipped shape variant | **Done** - two registered shape engines |
 | `.bin` header fields plus version bump | **Done** - `BIN_VERSION = 5`, `curve` / `P` / `keyWidth` written by `MemoryShape` |
-| `P` derived from range | **Not done** - see 23b |
-| `TRACEABILITY.md` rows | **Done**, with one stale symbol - `PointEdgeSelector` is named there but is a benchmark-tier class, not shipped |
+| `P` derived from range | **Done** - shipped `PointEdgeSelector`, dynamically derived in `SquareOptimizedDualLayer` and `CircleOptimizedDualLayer` (see 23b) |
+| `TRACEABILITY.md` rows | **Done** - `PointEdgeSelector` shipped in `rtp-core` main under REQ-RTP-F-002 |
 
-### 23b. Criterion C8 is not met in shipped code
+### 23b. Criterion C8 derivation in shipped code (updated 2026-09-12)
 
-C8 is recorded **MET** on the strength of section 15's `PointEdgeSelector` / `IndexConfigPlanner`, both of which are test scope. The shipped shapes pin `pointEdgeChunks = 32` in every constructor and expose no config key, so the point edge is a fixed quantum. That is the exact failure mode Context result 5 states as a constraint on the whole design - "any fixed quantum is simultaneously free at 100 km and fatal at 1 km" - and at a 1 km border (62 chunks) `P = 32` leaves a coarse grid two points wide. C8 shall read **MET in test scope, NOT MET in shipped code** until the derivation lands behind the shape constructor.
+Previously, C8 was recorded MET in test scope but NOT MET in shipped code because the shapes pinned `pointEdgeChunks = 32`.
+
+**Resolved (2026-09-12):**
+1. `PointEdgeSelector` is shipped in `rtp-core` main under `common/selection/region/selectors/memory/shapes/util/PointEdgeSelector.java`.
+2. `SquareOptimizedDualLayer` and `CircleOptimizedDualLayer` derive `P` dynamically when not explicitly configured, using `MemoryShape.derivePointEdgeChunks(radiusChunks)` which delegates directly to `PointEdgeSelector.derivePFromRadius(radiusChunks)`.
+3. If radius changes, $P$ is recalculated while maintaining the hard guard `(2 * radius) / P >= 64` (falling back to $P=1$ for sub-64 chunk domains).
+4. The benchmark-tier test copy was de-forked to delegate directly to production `PointEdgeSelector`, and `ADR085ProductionIntegrationTest` verifies derivation, guards, and transition ratchets in production. C8 is now **MET** in shipped code.
 
 ### 23c. The dynamic gap: literal ceiling plus a run-length driver, measured on both coalescing paths (updated 2026-09-10)
 

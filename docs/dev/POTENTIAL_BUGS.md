@@ -39,33 +39,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
-
-
-
-### 2026-09-05 - `Square.xzToLocation` aliases the two cells meeting at each octant seam
-
-- **Discovered during:** the origin-centred learned-state mark investigation; found while asserting inner-ring round-trip injectivity, and outside that task's scope.
-- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/selectors/memory/shapes/Square.java` `xzToLocation` (the `theta` octant dispatch, lines ~154-207) and its `MutableRTPCoords` twin.
-- **Symptom / hypothesis:** On every ring the octant boundaries are inclusive on both sides, so two distinct cells share one 1D index - e.g. with `centerRadius=64`, `(-64,0)` and `(-64,64)` both map to `192`, and `(64,64)` collides with `(0,64)`. `theta` is derived from `Math.atan(z/x)` and the exact boundary values (`0.125`, `0.375`, ...) fall to the higher octant, which restarts that octant's `perimeterStep` at the previous octant's last value.
-- **Impact:** Up to 8 cells per ring share learned state with a neighbour, so marking one also marks its twin. Fail-safe (over-marking never yields an unsafe destination) but it slightly over-rejects and makes per-cell learned state non-injective, which any per-cell accounting will mis-count.
-- **Suggested next step:** Re-derive `perimeterStep` from `ax`/`az` sign comparisons rather than a floating-point `atan` angle, so each ring maps bijectively onto `[0, 8R)`; assert injectivity per ring in `ShapeXzToLocationsRoundTripTest`. Note the change renumbers indices, so persisted `MemoryShape` state would need a version bump or a rescan.
-
-### 2026-06-14 - claim `*Checker`s query third-party / Bukkit APIs from the async verification thread (Folia thread-safety caveat)
-
-- **Discovered during:** claim-plugin audit follow-up (this session).
-- **Location:** `addons/LeafRTPClaimAddon/src/main/java/io/github/dailystruggle/rtp/claimaddon/*Checker.java` registered as *sync* verifiers via `ClaimIntegrations`; the verification chain executes on the async/region pipeline thread (`GlobalRegionVerifiers.checkGlobalRegionVerifiers`).
-- **Symptom / hypothesis:** Querying WorldGuard / GriefPrevention / `Bukkit.getWorld(...)` and similar off the main thread relies on each third-party plugin being thread-safe; most claim plugins are not Folia-aware. These are CPU/lookup calls (not blocking chunk I/O), so REQ-RTP-S-005 is not violated, but a non-thread-safe lookup could race on Folia.
-- **Impact:** Potential thread-safety races on Folia with claim plugins that mutate shared state during a lookup. No observed failure; functionally correct on Paper/Spigot today.
-- **Suggested next step:** Document the off-thread-lookup caveat in `EXTERNAL_HOOKS.md` (verifier threading row) and `ADR-019`; where a claim plugin exposes an async/region-safe query, prefer registering the checker via `addGlobalRegionVerifierAsync` and hop to the appropriate scheduler.
-
-### 2026-06-14 - claim-integration `integrations.yml` reroll toggles are startup-only; `/rtp reload` does not (un)register verifiers
-
-- **Discovered during:** claim-plugin audit follow-up (this session). High-severity items (WorldGuard inversion, legacy Factions removal) and the sync-verifier fail-safe (#4) were fixed; this reload-toggle finding was reported and deliberately left for a separate pass.
-- **Location:** `addons/LeafRTPClaimAddon/src/main/java/io/github/dailystruggle/rtp/claimaddon/ClaimIntegrations.java` (`setup` -> `registerVerifiers`, called once at startup); the `Configs.onReload` hook only rebuilds the `ConfigParser`. There is no per-verifier unregister path on `GlobalRegionVerifiers` (only `clearGlobalRegionVerifiers()`).
-- **Symptom / hypothesis:** `ClaimIntegrations.setup` registers each enabled claim verifier exactly once. Turning an integration off in `integrations.yml` and running `/rtp reload` leaves its verifier active; turning one on after startup never registers it. The live-reload hook implies the toggles are dynamic, but they are effectively restart-only.
-- **Impact:** Operator confusion / config that silently does not take effect until a full restart. No safety regression (a stale-active verifier still rejects claimed land; a never-registered one only fails to add protection the operator just enabled).
-- **Suggested next step:** Either (a) document the `rerollX` keys as restart-only in the `integrations.yml` comments and the docs, or (b) add a targeted unregister/re-register path. Option (b) is non-trivial: a blanket `clearGlobalRegionVerifiers()` + re-register on reload would also drop any third-party verifiers registered via `RTPAPI.hooks().verifiers()`, so it needs a token/handle-based remove API on `GlobalRegionVerifiers` (and the `RegionVerifierRegistry` facade) so each `*Checker` removes only its own registration.
-
 ### 2026-09-03 - spotless violations in uncommitted rtp-core files from concurrent track cause `./gradlew build` failure
 
 - **Discovered during:** [Track C - Agent 3] LeafRTPGroupAddon ADR-078 refactor verification.

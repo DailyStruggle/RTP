@@ -82,12 +82,41 @@ public class CircleOptimizedDualLayer extends Circle {
     return (4L * kOuter * kOuter - 4L * kInner * kInner) * area;
   }
 
+  /**
+   * Returns the dynamic effective circular radius. When expand is enabled, this expands
+   * to account for the learned bad area: r_eff = sqrt(r^2 + badSum / PI).
+   *
+   * @return the effective circular radius under current expansion state
+   */
+  public long getEffectiveRadius() {
+    long r = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
+    if (supportsExpand() && expand()) {
+      long[] sums = badPrefixSumsCache;
+      long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
+      if (badSum > 0L) {
+        return (long) Math.ceil(Math.sqrt((double) r * r + (double) badSum / Math.PI));
+      }
+    }
+    return r;
+  }
+
+  /**
+   * Returns the effective outer Chebyshev macro-ring index corresponding to the effective radius.
+   *
+   * @param rEff the effective radius
+   * @param p the point edge chunks
+   * @return the outer macro-ring index
+   */
+  public long getEffectiveKOuter(long rEff, int p) {
+    return Math.max(1L, (rEff + p - 1) / p);
+  }
+
   @Override
   public long xzToLocation(long cx, long cz) {
     int p = getPointEdgeChunks();
     int area = p * p;
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
-    long r = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
+    long rEff = getEffectiveRadius();
     long cenX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cenZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
 
@@ -98,7 +127,7 @@ public class CircleOptimizedDualLayer extends Circle {
     if (distSq < cr * cr) {
       return -1L;
     }
-    if (!expand() && distSq > r * r) {
+    if (distSq > rEff * rEff) {
       return -1L;
     }
 
@@ -110,10 +139,10 @@ public class CircleOptimizedDualLayer extends Circle {
     long K = Math.max(kX, kZ);
 
     long kInner = (cr <= 0) ? 0L : (long) Math.floor((cr / Math.sqrt(2.0)) / p);
-    long kOuter = Math.max(1L, (r + p - 1) / p);
+    long kOuterEff = getEffectiveKOuter(rEff, p);
 
     if (K <= kInner) return -1L;
-    if (!expand() && K > kOuter) return -1L;
+    if (K > kOuterEff) return -1L;
 
     long side;
     long sideStep;
@@ -224,7 +253,7 @@ public class CircleOptimizedDualLayer extends Circle {
   @Override
   public boolean contains(int x, int z) {
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
-    long r = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
+    long rEff = getEffectiveRadius();
     long cenX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cenZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
 
@@ -236,7 +265,7 @@ public class CircleOptimizedDualLayer extends Circle {
       return false;
     }
 
-    if (!expand() && distSq > r * r) {
+    if (distSq > rEff * rEff) {
       return false;
     }
 
@@ -263,13 +292,13 @@ public class CircleOptimizedDualLayer extends Circle {
     MutableRTPCoords coords = new MutableRTPCoords(0, 0);
     locationToXZ(location, coords);
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
-    long r = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
+    long rEff = getEffectiveRadius();
     long cenX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cenZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
     long relX = (long) coords.x - cenX;
     long relZ = (long) coords.z - cenZ;
     long distSq = relX * relX + relZ * relZ;
-    if (distSq < cr * cr || (!expand() && distSq > r * r)) {
+    if (distSq < cr * cr || distSq > rEff * rEff) {
       return -1L;
     }
     return location;
@@ -278,6 +307,16 @@ public class CircleOptimizedDualLayer extends Circle {
   private final long secretKey = ThreadLocalRandom.current().nextLong();
   private final java.util.concurrent.atomic.AtomicLong selectionCounter = new java.util.concurrent.atomic.AtomicLong(0);
   private final java.util.concurrent.atomic.AtomicLong backlogCounter = new java.util.concurrent.atomic.AtomicLong(0);
+
+  @Override
+  protected void onExpansionEpochIncrement() {
+    selectionCounter.set(0);
+    backlogCounter.set(0);
+  }
+
+  private long getEpochKey(long epoch, long phaseOffset) {
+    return secretKey ^ (epoch * 0x517CC1B727220A95L) ^ (phaseOffset * 0x9E3779B97F4A7C15L);
+  }
 
   /**
    * Optimized native candidate distribution model.
@@ -295,9 +334,10 @@ public class CircleOptimizedDualLayer extends Circle {
     long total = (long) range;
     int stride = deriveEffectiveStride(total);
 
+    long curEpoch = getExpansionEpoch();
     if (stride <= 1) {
       long t = selectionCounter.getAndIncrement();
-      long permuted = feistelPermute(t, total, secretKey);
+      long permuted = feistelPermute(t, total, getEpochKey(curEpoch, 0L));
       return (double) Math.min(total - 1, Math.max(0L, permuted));
     }
 
@@ -321,7 +361,7 @@ public class CircleOptimizedDualLayer extends Circle {
     }
 
     long kCounter = (t % subsetCapacity) % subsetSize;
-    long permutedK = feistelPermute(kCounter, subsetSize, secretKey ^ (phaseOffset * 0x9E3779B97F4A7C15L));
+    long permutedK = feistelPermute(kCounter, subsetSize, getEpochKey(curEpoch, phaseOffset));
     long candidate = permutedK * stride + phaseOffset;
     return (double) Math.min(total - 1, Math.max(0L, candidate));
   }
@@ -377,6 +417,7 @@ public class CircleOptimizedDualLayer extends Circle {
 
     MutableRTPCoords coords = new MutableRTPCoords(0, 0);
 
+    long curEpoch = getExpansionEpoch();
     if (MODE_ACCUMULATE.equals(mode())) {
       SegmentedKeyRunTable table = getOrBuildSegmentedTable(range);
       long totalGood = range - table.totalCovered();
@@ -396,7 +437,7 @@ public class CircleOptimizedDualLayer extends Circle {
         }
 
         long kCounter = t / stride;
-        long permutedK = feistelPermute(kCounter, subsetSize, secretKey ^ (phaseOffset * 0x9E3779B97F4A7C15L));
+        long permutedK = feistelPermute(kCounter, subsetSize, getEpochKey(curEpoch, phaseOffset));
         long virtualGoodIndex = permutedK * stride + phaseOffset;
 
         long loc = table.resolveAccumulate(virtualGoodIndex);
@@ -427,7 +468,7 @@ public class CircleOptimizedDualLayer extends Circle {
       if (subsetSize <= 0) continue;
 
       long kCounter = t / stride;
-      long permutedK = feistelPermute(kCounter, subsetSize, secretKey ^ (phaseOffset * 0x9E3779B97F4A7C15L));
+      long permutedK = feistelPermute(kCounter, subsetSize, getEpochKey(curEpoch, phaseOffset));
       long loc = permutedK * stride + phaseOffset;
 
       if (loc < 0 || loc >= range) continue;

@@ -162,7 +162,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 //      System.out.println("[RTP-DEBUG] MultiConfig: Loaded " + files.length + " files for " + name);
 
     } catch (Throwable T) {
-      T.printStackTrace();
+      RTP.log(Level.WARNING, "Error scanning directory for multi config " + name, T);
     }
 
     this.langMap = dotLangMap(pluginDirectory, this.directory);

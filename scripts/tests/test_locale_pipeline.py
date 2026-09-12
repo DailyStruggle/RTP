@@ -44,8 +44,15 @@ class StripQuotesTest(unittest.TestCase):
     def test_double_quotes_removed(self):
         self.assertEqual(to_csv.strip_quotes('"hello"'), "hello")
 
+    def test_double_quotes_escapes_restored(self):
+        self.assertEqual(to_csv.strip_quotes('"hello\\"world"'), 'hello"world')
+        self.assertEqual(to_csv.strip_quotes('"hello\\\\world"'), 'hello\\world')
+
     def test_single_quotes_removed(self):
         self.assertEqual(to_csv.strip_quotes("'hello'"), "hello")
+
+    def test_single_quotes_escapes_restored(self):
+        self.assertEqual(to_csv.strip_quotes("'it''s'"), "it's")
 
     def test_unquoted_trimmed(self):
         self.assertEqual(to_csv.strip_quotes("  hello  "), "hello")

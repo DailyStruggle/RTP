@@ -9,10 +9,9 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue.QueueSta
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIf;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -33,29 +32,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * idempotency, LPOS-derived position, and terminal-state cleanup that the
  * no-Redis {@code RedisNetworkRequestQueueTest} cannot reach.
  *
- * <p>Gated by {@code RTP_REDIS_IT=true}; CI/local default builds skip this
- * class entirely. To run locally:</p>
- * <pre>
- *   docker run --rm -p 6379:6379 redis:7-alpine
- *   $env:RTP_REDIS_IT = "true"
- *   .\gradlew :rtp-proxy:rtp-proxy-common:test --tests "*RedisNetworkRequestQueueIT*"
- * </pre>
- *
- * <p>Connection target is {@code 127.0.0.1:6379} (override via
- * {@code RTP_REDIS_IT_HOST} / {@code RTP_REDIS_IT_PORT} / {@code RTP_REDIS_IT_PASSWORD}).
- * Cleanup scrubs only the namespaced {@code rtp:net:wq:*} keyspace so the
- * test never touches unrelated data on a shared dev Redis.</p>
+ * <p>Backed by a Testcontainers-managed {@code redis:7-alpine} (item 17 of
+ * ENTERPRISE_READINESS.md: use a real Redis, not mocks). Docker-gated via
+ * {@link RedisTestContainer#dockerAvailable()} so a Docker-less build skips the
+ * class cleanly. Cleanup scrubs only the namespaced {@code rtp:net:wq:*}
+ * keyspace.</p>
  */
-@EnabledIfEnvironmentVariable(named = "RTP_REDIS_IT", matches = "true")
+@EnabledIf("io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisTestContainer#dockerAvailable")
 class RedisNetworkRequestQueueIT {
 
     private JedisPool pool;
     private RedisNetworkRequestQueue queue;
-
-    private static String envOr(String name, String fallback) {
-        String v = System.getenv(name);
-        return (v == null || v.isEmpty()) ? fallback : v;
-    }
 
     private static void scrubKeyspace(JedisPool p) {
         try (Jedis j = p.getResource()) {
@@ -68,15 +55,7 @@ class RedisNetworkRequestQueueIT {
 
     @BeforeEach
     void open() {
-        String host = envOr("RTP_REDIS_IT_HOST", "127.0.0.1");
-        int port = Integer.parseInt(envOr("RTP_REDIS_IT_PORT", "6379"));
-        String password = System.getenv("RTP_REDIS_IT_PASSWORD"); // null OK
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(4);
-        cfg.setMaxIdle(2);
-        pool = (password == null || password.isEmpty())
-                ? new JedisPool(cfg, host, port, 2000)
-                : new JedisPool(cfg, host, port, 2000, password);
+        pool = RedisTestContainer.newPool();
         scrubKeyspace(pool);
         queue = new RedisNetworkRequestQueue(pool, 0);
     }
@@ -155,11 +134,12 @@ class RedisNetworkRequestQueueIT {
                 queue.pollStatus(Arrays.asList(p1, p2, p3)).get(5, TimeUnit.SECONDS);
         assertNotNull(rows);
         assertEquals(3, rows.size(), "all three enrolled players should have status rows");
-        // FIFO order: p1 -> 0, p2 -> 1, p3 -> 2 (LPOS is 0-indexed).
+        // FIFO order: p1 -> 1, p2 -> 2, p3 -> 3. pollStatus.lua reports a 1-based
+        // position (LPOS + 1), so the head of the queue is position 1, not 0.
         for (QueueStatus s : rows) {
-            if (s.playerId().equals(p1)) assertEquals(0, s.positionInQueue());
-            else if (s.playerId().equals(p2)) assertEquals(1, s.positionInQueue());
-            else if (s.playerId().equals(p3)) assertEquals(2, s.positionInQueue());
+            if (s.playerId().equals(p1)) assertEquals(1, s.positionInQueue());
+            else if (s.playerId().equals(p2)) assertEquals(2, s.positionInQueue());
+            else if (s.playerId().equals(p3)) assertEquals(3, s.positionInQueue());
         }
     }
 

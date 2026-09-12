@@ -20,6 +20,9 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/TRACEABILITY.md`](dev/TRACEABILITY.md) — REQ ↔ class ↔ test.
 - [`dev/CONCEPTS.md`](dev/CONCEPTS.md) — spiral math and selection concepts.
 - [`dev/LESSONS_LEARNED.md`](dev/LESSONS_LEARNED.md) — dated pitfalls.
+- [`dev/ENTERPRISE_READINESS.md`](dev/ENTERPRISE_READINESS.md) — enterprise readiness roadmap and quality gates.
+- [`dev/SUPPORT_MATRIX.md`](dev/SUPPORT_MATRIX.md) — platform x Minecraft version x Java version support matrix.
+- [`dev/DEPRECATION_POLICY.md`](dev/DEPRECATION_POLICY.md) — API evolution and deprecation lifecycle.
 - [`dev/COVERAGE_PLAN.md`](dev/COVERAGE_PLAN.md) — JaCoCo targets.
 - [`dev/MULTI_PLATFORM_PLAN.md`](dev/MULTI_PLATFORM_PLAN.md) — Fabric frontier.
 - [`dev/MULTI_SERVER_PLAN.md`](dev/MULTI_SERVER_PLAN.md) — proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated.

@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.PointEdgeSelector;
 import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -85,12 +88,12 @@ public class PointEdgeScalingBenchmarkTest {
             "chosen P=" + chosenP + " violated hard guard: " + cellsPerEdge + " < 64 cells per edge");
 
         // 3. Brute-force ground truth oracle
-        PointEdgeSelector.Decision oracleDecision = PointEdgeSelector.exhaustiveArgmin(oracle, radius);
+        PointEdgeSelector.Decision oracleDecision = exhaustiveArgmin(oracle, radius);
         int oracleP = oracleDecision.chosenP();
         long oracleMinRuns = (long) oracleDecision.estimatedRuns();
 
         // Exact runs for the chosen P
-        long chosenExactRuns = PointEdgeSelector.countExhaustiveRuns(oracle, radius, chosenP);
+        long chosenExactRuns = countExhaustiveRuns(oracle, radius, chosenP);
 
         // Regret: difference / ratio between chosen exact runs and oracle minimum runs
         long runRegret = chosenExactRuns - oracleMinRuns;
@@ -116,23 +119,55 @@ public class PointEdgeScalingBenchmarkTest {
     }
   }
 
+  private static PointEdgeSelector.Decision exhaustiveArgmin(PointEdgeSelector.OccupancyOracle oracle, int radiusChunks) {
+    int bestP = 1;
+    long minRuns = Long.MAX_VALUE;
+
+    for (int p : PointEdgeSelector.CANDIDATES) {
+      if ((2 * radiusChunks) / p < PointEdgeSelector.MIN_CELLS_PER_EDGE) continue;
+
+      long runs = countExhaustiveRuns(oracle, radiusChunks, p);
+      if (runs < minRuns) {
+        minRuns = runs;
+        bestP = p;
+      }
+    }
+
+    return new PointEdgeSelector.Decision(bestP, minRuns, "brute force ground truth argmin");
+  }
+
+  private static long countExhaustiveRuns(PointEdgeSelector.OccupancyOracle oracle, int radiusChunks, int p) {
+    if (p == 1) {
+      Square spiral = new Square("TEST_SPIRAL");
+      spiral.set(GenericMemoryShapeParams.radius, (long) radiusChunks);
+      KeySpaceRunEncoder encoder = new KeySpaceRunEncoder();
+      encoder.encode(spiral, radiusChunks, (cx, cz) -> !oracle.isBad(cx, cz));
+      return encoder.runsAt(1L);
+    }
+
+    SpiralHilbertSquare hybrid = new SpiralHilbertSquare(radiusChunks, p, true);
+    KeySpaceRunEncoder encoder = new KeySpaceRunEncoder();
+    encoder.encode(hybrid, radiusChunks, (cx, cz) -> !oracle.isBad(cx, cz));
+    return encoder.runsAt(1L);
+  }
+
   @Test
   @DisplayName("lossless ratchet transition behavior")
   public void testLosslessRatchetTransitions() {
     // Case 1: multiple coarsening folds upward losslessly (e.g. 16 -> 32)
     PointEdgeSelector.Transition t1 =
-        PointEdgeSelector.transition(16, new PointEdgeSelector.Decision(32, 100.0, "optimal"));
+        PointEdgeSelector.decideTransition(16, 32);
     assertTrue(t1.losslessRatchet(), "16 -> 32 should fold losslessly");
     assertEquals(32, t1.p());
 
     // Case 2: non-multiple coarsening requires relearning (e.g. 16 -> 48 not candidate, or 16 -> 24)
     PointEdgeSelector.Transition t2 =
-        PointEdgeSelector.transition(16, new PointEdgeSelector.Decision(8, 150.0, "refinement"));
+        PointEdgeSelector.decideTransition(16, 8);
     assertTrue(!t2.losslessRatchet(), "refinement or non-multiple cannot fold losslessly");
 
     // Case 3: identical P retains state
     PointEdgeSelector.Transition t3 =
-        PointEdgeSelector.transition(32, new PointEdgeSelector.Decision(32, 100.0, "optimal"));
+        PointEdgeSelector.decideTransition(32, 32);
     assertTrue(t3.losslessRatchet(), "identical P retains state");
     assertEquals(32, t3.p());
 
