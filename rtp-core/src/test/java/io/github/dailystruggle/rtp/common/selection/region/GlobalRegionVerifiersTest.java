@@ -44,4 +44,39 @@ class GlobalRegionVerifiersTest {
         RTPCoords coords = new RTPCoords("world", 10, 64, 10);
         assertFalse(GlobalRegionVerifiers.checkGlobalRegionVerifiers(coords).get());
     }
+
+    @Test
+    void unregisterBySource_and_autoCloseable_removesOnlyTargetVerifiers() throws ExecutionException, InterruptedException {
+        class SourceA {}
+        class SourceB {}
+
+        AutoCloseable handleA1 = GlobalRegionVerifiers.addGlobalRegionVerifier(SourceA.class, coords -> coords.x() > 0);
+        GlobalRegionVerifiers.addGlobalRegionVerifier(SourceA.class, coords -> coords.x() > 5);
+        GlobalRegionVerifiers.addGlobalRegionVerifierAsync(SourceA.class, coords -> CompletableFuture.completedFuture(coords.y() > 0));
+
+        AutoCloseable handleB1 = GlobalRegionVerifiers.addGlobalRegionVerifier(SourceB.class, coords -> coords.z() > 0);
+        AutoCloseable handleB2 = GlobalRegionVerifiers.addGlobalRegionVerifierAsync(SourceB.class, coords -> CompletableFuture.completedFuture(coords.z() > 5));
+
+        assertEquals(5, GlobalRegionVerifiers.registeredCount());
+
+        // Close one handle of SourceB
+        assertDoesNotThrow(handleB1::close);
+        assertEquals(4, GlobalRegionVerifiers.registeredCount());
+
+        // Unregister all SourceA
+        int removedA = GlobalRegionVerifiers.removeGlobalRegionVerifiersBySource(SourceA.class);
+        assertEquals(3, removedA);
+        assertEquals(1, GlobalRegionVerifiers.registeredCount());
+
+        // Remaining verifier should be handleB2 (coords.z() > 5)
+        RTPCoords valid = new RTPCoords("world", -10, -10, 10);
+        assertTrue(GlobalRegionVerifiers.checkGlobalRegionVerifiers(valid).get());
+
+        RTPCoords invalidZ = new RTPCoords("world", 10, 10, 2);
+        assertFalse(GlobalRegionVerifiers.checkGlobalRegionVerifiers(invalidZ).get());
+
+        // Close handleB2
+        assertDoesNotThrow(handleB2::close);
+        assertEquals(0, GlobalRegionVerifiers.registeredCount());
+    }
 }

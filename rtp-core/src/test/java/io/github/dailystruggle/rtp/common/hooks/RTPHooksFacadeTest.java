@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.hooks;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -92,12 +93,22 @@ class RTPHooksFacadeTest {
     java.util.function.Predicate<RTPCoords> p = c -> { calls.incrementAndGet(); return true; };
 
     // Register through the new API; legacy size() reflects it.
-    hooks.verifiers().register(p);
+    AutoCloseable handle = hooks.verifiers().register(p);
     assertEquals(1, hooks.verifiers().size());
 
     // Register through the legacy static; new size() reflects it.
     GlobalRegionVerifiers.addGlobalRegionVerifier(c -> true);
     assertEquals(2, hooks.verifiers().size());
+
+    // Unregister via source or handle
+    class CustomSource {}
+    hooks.verifiers().register(CustomSource.class, c -> true);
+    assertEquals(3, hooks.verifiers().size());
+    assertEquals(1, hooks.verifiers().unregisterBySource(CustomSource.class));
+    assertEquals(2, hooks.verifiers().size());
+
+    assertDoesNotThrow(handle::close);
+    assertEquals(1, hooks.verifiers().size());
 
     // Clear via the new API; legacy state cleared.
     hooks.verifiers().clear();

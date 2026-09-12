@@ -200,6 +200,47 @@ public final class PointEdgeSelector {
   }
 
   /**
+   * Decides the optimal {@code P} that minimizes run count subject to the hard granularity guard.
+   *
+   * @param estimates candidate estimates from {@link #estimate}
+   * @param radiusChunks addressed half-edge in chunks
+   * @return decision
+   */
+  public static Decision decide(List<CandidateEstimate> estimates, int radiusChunks) {
+    int bestP = 1;
+    double bestRunsUpper = Double.MAX_VALUE;
+    String bestReason = "fallback to P=1";
+
+    for (CandidateEstimate est : estimates) {
+      if (!est.admissible()) continue;
+      // Hard guard: at least MIN_CELLS_PER_EDGE coarse cells per edge
+      if ((2L * radiusChunks) / est.p() < MIN_CELLS_PER_EDGE) continue;
+
+      if (est.runsUpper() < bestRunsUpper) {
+        bestRunsUpper = est.runsUpper();
+        bestP = est.p();
+        bestReason =
+            "argmin of conservative upper-bound runs ("
+                + String.format("%.1f", est.runsUpper())
+                + ") among admissible candidates";
+      }
+    }
+
+    return new Decision(bestP, bestRunsUpper, bestReason);
+  }
+
+  /**
+   * Handles transitions across reload or domain changes.
+   *
+   * @param storedP previously stored P
+   * @param targetDecision newly chosen decision
+   * @return transition
+   */
+  public static Transition transition(int storedP, Decision targetDecision) {
+    return decideTransition(storedP, targetDecision.chosenP());
+  }
+
+  /**
    * Decides how to transition on reload when the stored table had point edge {@code storedP}.
    */
   public static Transition decideTransition(int storedP, int targetP) {
@@ -219,21 +260,20 @@ public final class PointEdgeSelector {
   }
 
   private static long countRunsWithinBlock(boolean[] bad, int p) {
-    int pointsPerEdge = BLOCK / Math.min(BLOCK, Math.max(1, p));
-    int pointEdge = Math.min(BLOCK, Math.max(1, p));
-    int pointArea = pointEdge * pointEdge;
-
     long runs = 0;
-    boolean inRun = false;
+    int pointsPerEdge = Math.max(1, BLOCK / p);
+    int pActual = Math.min(p, BLOCK);
+    int order = Integer.numberOfTrailingZeros(pActual);
 
-    for (int pz = 0; pz < pointsPerEdge; pz++) {
-      for (int px = 0; px < pointsPerEdge; px++) {
-        for (int h = 0; h < pointArea; h++) {
-          int lx = h % pointEdge;
-          int lz = h / pointEdge;
-          int gx = px * pointEdge + lx;
-          int gz = pz * pointEdge + lz;
-          boolean isBad = bad[gz * BLOCK + gx];
+    for (int px = 0; px < pointsPerEdge; px++) {
+      for (int pz = 0; pz < pointsPerEdge; pz++) {
+        boolean inRun = false;
+        long cells = (long) pActual * pActual;
+        for (long k = 0; k < cells; k++) {
+          int[] d = hilbertCoords(k, order);
+          int lx = px * pActual + d[0];
+          int lz = pz * pActual + d[1];
+          boolean isBad = bad[lz * BLOCK + lx];
           if (isBad) {
             if (!inRun) {
               runs++;
@@ -249,32 +289,60 @@ public final class PointEdgeSelector {
   }
 
   private static long countLostGoodAtGap2(boolean[] bad, int p) {
-    int pointEdge = Math.min(BLOCK, Math.max(1, p));
-    int pointsPerEdge = BLOCK / pointEdge;
-    int pointArea = pointEdge * pointEdge;
+    long lost = 0;
+    int pointsPerEdge = Math.max(1, BLOCK / p);
+    int pActual = Math.min(p, BLOCK);
+    int order = Integer.numberOfTrailingZeros(pActual);
 
-    long lostGood = 0;
-    for (int pz = 0; pz < pointsPerEdge; pz++) {
-      for (int px = 0; px < pointsPerEdge; px++) {
-        int lastBadKey = -999;
-        for (int h = 0; h < pointArea; h++) {
-          int lx = h % pointEdge;
-          int lz = h / pointEdge;
-          int gx = px * pointEdge + lx;
-          int gz = pz * pointEdge + lz;
-          if (bad[gz * BLOCK + gx]) {
-            if (lastBadKey >= 0) {
-              int gap = h - lastBadKey - 1;
-              if (gap > 0 && gap <= 2) {
-                lostGood += gap;
+    for (int px = 0; px < pointsPerEdge; px++) {
+      for (int pz = 0; pz < pointsPerEdge; pz++) {
+        long cells = (long) pActual * pActual;
+        long lastBad = -1;
+        long usableInGap = 0;
+
+        for (long k = 0; k < cells; k++) {
+          int[] d = hilbertCoords(k, order);
+          int lx = px * pActual + d[0];
+          int lz = pz * pActual + d[1];
+          boolean isBad = bad[lz * BLOCK + lx];
+          if (!isBad) {
+            usableInGap++;
+          } else {
+            if (lastBad >= 0) {
+              long dist = k - lastBad;
+              if (dist <= 2 + 1) {
+                lost += usableInGap;
               }
             }
-            lastBadKey = h;
+            lastBad = k;
+            usableInGap = 0;
           }
         }
       }
     }
-    return lostGood;
+    return lost;
+  }
+
+  private static int[] hilbertCoords(long index, int n) {
+    int x = 0;
+    int z = 0;
+    for (int s = 1; s < (1 << n); s <<= 1) {
+      int rx = (int) ((index >> 1) & 1L);
+      int rz = (int) ((index ^ rx) & 1L);
+      if (rz == 0) {
+        if (rx == 1) {
+          x = s - 1 - x;
+          z = s - 1 - z;
+        }
+        int t = x;
+        x = z;
+        z = t;
+      }
+      x += s * rx;
+      z += s * rz;
+      index >>= 2;
+    }
+    return new int[] {x, z};
   }
 
   private static double mean(long[] values) {

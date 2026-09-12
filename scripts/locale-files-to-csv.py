@@ -35,8 +35,12 @@ def strip_quotes(s: str) -> str:
         return s
     t = s.strip()
     if len(t) >= 2:
-        if (t.startswith('"') and t.endswith('"')) or (t.startswith("'") and t.endswith("'")):
-            return t[1:-1]
+        if t.startswith('"') and t.endswith('"'):
+            inner = t[1:-1]
+            return inner.replace("\\\\", "\x01").replace('\\"', '"').replace("\x01", "\\")
+        if t.startswith("'") and t.endswith("'"):
+            inner = t[1:-1]
+            return inner.replace("''", "'")
     return t
 
 
