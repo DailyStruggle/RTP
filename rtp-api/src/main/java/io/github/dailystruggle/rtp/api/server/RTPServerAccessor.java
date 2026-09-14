@@ -732,4 +732,28 @@ public interface RTPServerAccessor {
   default String menuRegionDescriptor(UUID player) {
     return "";
   }
+
+  // ---------------------------------------------------------------------------
+  // Command registration & execution SPI
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Registers a platform-neutral command tree with the underlying server runtime.
+   *
+   * @param rootCommand the command tree root (TreeCommand / CommandsAPICommand)
+   * @param aliases     aliases to bind (e.g. "rtp", "wild")
+   */
+  default void registerCommands(Object rootCommand, String... aliases) {}
+
+  /**
+   * Dispatches a raw command line as if entered by the given sender.
+   * Useful for simulation runs and headless integration testing.
+   *
+   * @param senderId    the caller UUID (player UUID or RTPAPI.serverId for console)
+   * @param commandLine full command string (e.g. "rtp world world_nether")
+   * @return true if dispatched, false otherwise
+   */
+  default boolean executeCommand(UUID senderId, String commandLine) {
+    return false;
+  }
 }

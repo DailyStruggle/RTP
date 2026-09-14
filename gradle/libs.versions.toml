@@ -49,6 +49,7 @@ jqwik = "1.9.2"
 shadow = "8.3.8"
 spotless = "6.25.0"
 japicmp = "0.4.5"
+cyclonedx = "2.0.0"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -66,3 +67,4 @@ shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 pitest = { id = "info.solidsoft.pitest", version.ref = "pitestPlugin" }
 japicmp = { id = "me.champeau.gradle.japicmp", version.ref = "japicmp" }
+cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }

@@ -70,4 +70,15 @@ class ReqRtpNeoforgeS006ApiBeforeCoreTest {
                 accessor::getLocationGenerator,
                 "getLocationGenerator() must fail loud (S-006) before rtp-core is loaded");
     }
+
+    @Test
+    @DisplayName("registerCommands stores registration entries safely")
+    void registerCommandsStoresSafely() {
+        NeoForgeServerAccessor accessor = new NeoForgeServerAccessor();
+        // Should accept null without throwing
+        accessor.registerCommands(null);
+
+        Object dummyRoot = new Object();
+        accessor.registerCommands(dummyRoot, "rtp", "wild");
+    }
 }

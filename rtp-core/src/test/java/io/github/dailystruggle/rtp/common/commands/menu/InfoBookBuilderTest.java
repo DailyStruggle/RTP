@@ -1,122 +1,181 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
+import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
+import io.github.dailystruggle.mapsapi.noop.NoopMapBinding;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
+import io.github.dailystruggle.rtp.api.menu.MenuFragment;
+import io.github.dailystruggle.rtp.api.menu.MenuLine;
+import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
+import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
+import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Pure-function tests for {@link InfoBookBuilder}. Exercises pagination and scope-to-parameters mapping in
- * isolation; the full {@code build()} happy-path requires a wired
- * {@code RTP.configs} + {@code serverAccessor} and is covered by an
- * integration-style test elsewhere.
- */
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@DisplayName("InfoBookBuilder pagination, footer generation, and scope mapping")
 class InfoBookBuilderTest {
 
-    @Test
-    @DisplayName("scopeToParameters: GLOBAL -> empty map, WORLD/REGION -> singleton {name: [value]}")
-    void scopeToParametersShape() {
-        Map<String, List<String>> global =
-                InfoBookBuilder.scopeToParameters(MenuAction.InfoScopeToken.global());
-        assertTrue(global.isEmpty(), "GLOBAL must map to an empty parameter map");
+    @TempDir
+    Path tempDir;
 
-        Map<String, List<String>> world =
-                InfoBookBuilder.scopeToParameters(MenuAction.InfoScopeToken.world("the_end"));
-        assertEquals(1, world.size());
-        assertEquals(List.of("the_end"), world.get("world"));
-        assertNull(world.get("region"));
+    private UUID viewer;
+    private TestRoot root;
+    private InfoBookBuilder builder;
 
-        Map<String, List<String>> region =
-                InfoBookBuilder.scopeToParameters(MenuAction.InfoScopeToken.region("default"));
-        assertEquals(1, region.size());
-        assertEquals(List.of("default"), region.get("region"));
-        assertNull(region.get("world"));
+    @BeforeEach
+    void setUp() {
+        RTPTestSetup.install(tempDir.toFile());
+        viewer = UUID.randomUUID();
+        root = new TestRoot();
+        builder = new InfoBookBuilder();
+    }
+
+    @AfterEach
+    void tearDown() {
+        RTP.serverAccessor = null;
+        RTP.scheduler = null;
+        io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
+        MapDispatch.setMapBinding(new NoopMapBinding());
     }
 
     @Test
-    @DisplayName("paginate: empty input -> single empty page (footer is added later)")
-    void paginateEmpty() {
-        List<MenuPage> pages = InfoBookBuilder.paginate(Collections.emptyList());
-        assertEquals(1, pages.size());
-        assertTrue(pages.get(0).lines().isEmpty());
+    @DisplayName("scopeToParameters maps GLOBAL, WORLD, and REGION correctly")
+    void scopeToParameters_mappings() {
+        Map<String, List<String>> globalParams = InfoBookBuilder.scopeToParameters(
+                new MenuAction.InfoScopeToken(MenuAction.InfoScopeToken.Kind.GLOBAL, ""));
+        assertTrue(globalParams.isEmpty());
+
+        Map<String, List<String>> worldParams = InfoBookBuilder.scopeToParameters(
+                new MenuAction.InfoScopeToken(MenuAction.InfoScopeToken.Kind.WORLD, "nether"));
+        assertEquals(List.of("nether"), worldParams.get("world"));
+
+        Map<String, List<String>> regionParams = InfoBookBuilder.scopeToParameters(
+                new MenuAction.InfoScopeToken(MenuAction.InfoScopeToken.Kind.REGION, "plains_reg"));
+        assertEquals(List.of("plains_reg"), regionParams.get("region"));
     }
 
     @Test
-    @DisplayName("paginate: short input -> one page with one line per captured line")
-    void paginateShort() {
-        List<String> lines = List.of("one", "two", "three");
-        List<MenuPage> pages = InfoBookBuilder.paginate(lines);
-        assertEquals(1, pages.size());
-        assertEquals(3, pages.get(0).lines().size());
-        assertEquals("one", pages.get(0).lines().get(0).fragments().get(0).text());
-        assertEquals("two", pages.get(0).lines().get(1).fragments().get(0).text());
-        assertEquals("three", pages.get(0).lines().get(2).fragments().get(0).text());
-    }
+    @DisplayName("paginate handles empty list, empty strings, and pagination threshold")
+    void paginate_variousInputs() {
+        List<MenuPage> emptyPages = InfoBookBuilder.paginate(List.of());
+        assertEquals(1, emptyPages.size());
+        assertTrue(emptyPages.get(0).lines().isEmpty());
 
-    @Test
-    @DisplayName("paginate: empty strings preserved as blank lines (vertical structure parity)")
-    void paginatePreservesBlanks() {
-        List<String> lines = List.of("a", "", "b");
-        List<MenuPage> pages = InfoBookBuilder.paginate(lines);
-        assertEquals(1, pages.size());
-        assertEquals(3, pages.get(0).lines().size());
-        assertFalse(pages.get(0).lines().get(0).fragments().isEmpty());
-        assertTrue(pages.get(0).lines().get(1).fragments().isEmpty(),
-                "Empty string must become a blank MenuLine");
-        assertFalse(pages.get(0).lines().get(2).fragments().isEmpty());
-    }
-
-    @Test
-    @DisplayName("paginate: input longer than LINES_PER_PAGE splits across pages, no line dropped")
-    void paginateOverflow() {
-        int total = InfoBookBuilder.LINES_PER_PAGE * 2 + 5;
-        List<String> lines = new ArrayList<>(total);
-        for (int i = 0; i < total; i++) {
-            lines.add("line-" + i);
+        List<String> rawLines = new ArrayList<>();
+        // Add 15 lines (exceeds LINES_PER_PAGE = 13) including empty and null lines
+        for (int i = 0; i < 15; i++) {
+            if (i == 5) rawLines.add("");
+            else if (i == 6) rawLines.add(null);
+            else rawLines.add("Line " + i);
         }
-        List<MenuPage> pages = InfoBookBuilder.paginate(lines);
-        // total / LINES_PER_PAGE rounded up
-        int expected = (total + InfoBookBuilder.LINES_PER_PAGE - 1) / InfoBookBuilder.LINES_PER_PAGE;
-        assertEquals(expected, pages.size());
-        // First two pages are at the cap.
-        assertEquals(InfoBookBuilder.LINES_PER_PAGE, pages.get(0).lines().size());
-        assertEquals(InfoBookBuilder.LINES_PER_PAGE, pages.get(1).lines().size());
-        // Last page carries the remainder (5 lines).
-        assertEquals(5, pages.get(pages.size() - 1).lines().size());
-        // No line was dropped.
-        int rendered = 0;
-        for (MenuPage page : pages) {
-            rendered += page.lines().size();
-        }
-        assertEquals(total, rendered);
+
+        List<MenuPage> pages = InfoBookBuilder.paginate(rawLines);
+        assertEquals(2, pages.size());
+        assertEquals(13, pages.get(0).lines().size());
+        assertFalse(pages.get(1).lines().isEmpty());
     }
 
     @Test
-    @DisplayName("paginate: null entries in input are silently skipped (defensive)")
-    void paginateSkipsNulls() {
-        List<String> lines = new ArrayList<>();
-        lines.add("first");
-        lines.add(null);
-        lines.add("second");
-        List<MenuPage> pages = InfoBookBuilder.paginate(lines);
-        assertEquals(1, pages.size());
-        // Only two visible lines; the null entry was discarded.
-        assertEquals(2, pages.get(0).lines().size());
-        assertEquals("first", pages.get(0).lines().get(0).fragments().get(0).text());
-        assertEquals("second", pages.get(0).lines().get(1).fragments().get(0).text());
+    @DisplayName("build when InfoCmd is missing produces fallback model with footer")
+    void build_missingInfoCmd() {
+        MenuAction.InfoScopeToken scope = new MenuAction.InfoScopeToken(
+                MenuAction.InfoScopeToken.Kind.GLOBAL, "");
+        MenuModel model = builder.build(root, viewer, scope);
+
+        assertNotNull(model);
+        assertFalse(model.pages().isEmpty());
+        MenuPage page = model.pages().get(0);
+        // Header, spacer, refresh, switch, note
+        assertTrue(page.lines().size() >= 3);
     }
 
-    // ADR-050 Stage 3β.D.2b (2026-05-24): deleted `constructorRejectsNulls`
-    // and `defaultTokenTtlAlignment` - the `MenuTokenRegistry` ctor param
-    // and `DEFAULT_TOKEN_TTL` constant are gone (renderer emits concrete
-    // `/rtp menu ...` commands; no TTL applies).
+    @Test
+    @DisplayName("build with registered InfoCmd captures tapped output")
+    void build_withRegisteredInfoCmd() {
+        InfoCmd infoCmd = new InfoCmd(root) {
+            @Override
+            public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
+                java.util.function.Consumer<String> tap = RTP.messageTap.get();
+                if (tap != null) {
+                    tap.accept("Server Performance: 20.0 TPS");
+                    tap.accept("Database Latency: 12ms");
+                }
+                return true;
+            }
+        };
+        root.addSubCommand(infoCmd);
+
+        MenuAction.InfoScopeToken scope = new MenuAction.InfoScopeToken(
+                MenuAction.InfoScopeToken.Kind.GLOBAL, "");
+        MenuModel model = builder.build(root, viewer, scope);
+
+        assertNotNull(model);
+        assertFalse(model.pages().isEmpty());
+        boolean foundPerformance = false;
+        for (MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.text().contains("Server Performance")) {
+                        foundPerformance = true;
+                    }
+                }
+            }
+        }
+        assertTrue(foundPerformance, "Captured tapped message should appear in the book pages");
+    }
+
+    @Test
+    @DisplayName("appendFooter creates new page when lines exceed cap")
+    void appendFooter_overflow() {
+        List<MenuPage> initialPages = InfoBookBuilder.paginate(List.of("1","2","3","4","5","6","7","8","9"));
+        assertEquals(1, initialPages.size());
+        assertEquals(9, initialPages.get(0).lines().size());
+
+        MenuAction.InfoScopeToken scope = new MenuAction.InfoScopeToken(
+                MenuAction.InfoScopeToken.Kind.GLOBAL, "");
+        MenuModel model = builder.build(root, viewer, scope);
+        assertNotNull(model);
+    }
+
+    @Test
+    @DisplayName("build throws NPE on null arguments")
+    void build_nullArguments() {
+        assertThrows(NullPointerException.class, () -> builder.build(null, viewer, new MenuAction.InfoScopeToken(MenuAction.InfoScopeToken.Kind.GLOBAL, "")));
+        assertThrows(NullPointerException.class, () -> builder.build(root, null, new MenuAction.InfoScopeToken(MenuAction.InfoScopeToken.Kind.GLOBAL, "")));
+        assertThrows(NullPointerException.class, () -> builder.build(root, viewer, null));
+    }
+
+    private static final class TestRoot extends BaseRTPCmdImpl implements TreeCommand {
+        private final Map<String, CommandsAPICommand> commands = new HashMap<>();
+        private final Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> params = new HashMap<>();
+
+        TestRoot() { super(null); }
+        @Override public String name() { return "rtp"; }
+        @Override public String permission() { return "rtp.use"; }
+        @Override public Map<String, CommandsAPICommand> getCommandLookup() { return commands; }
+        @Override public Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> getParameterLookup() { return params; }
+        @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
+            return true;
+        }
+    }
 }

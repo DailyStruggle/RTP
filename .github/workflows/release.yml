@@ -8,8 +8,10 @@ name: Release rtp-lite to Modrinth
 # to be handled by the existing Jenkins pipeline (Jenkinsfile) and the
 # BuiltByBit distribution channel; they should not trigger this workflow.
 #
-# Required repo secret:
-#   MODRINTH_TOKEN -- Modrinth PAT with the `Create version` scope.
+# Required repo secrets:
+#   MODRINTH_TOKEN       -- Modrinth PAT with the `Create version` scope.
+#   SIGNING_KEY          -- (Optional) ASCII-armored PGP private key for signing release deliverables.
+#   SIGNING_PASSWORD     -- (Optional) Passphrase for SIGNING_KEY.
 #
 # Release notes are taken from CHANGELOG.md (the section matching the tag's
 # version string), with any bullet tagged `**(Pro)**` stripped out so the
@@ -33,11 +35,13 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # workflow_dispatch path: check out the requested tag explicitly.
           ref: ${{ github.event.inputs.tag || github.ref }}
@@ -54,7 +58,7 @@ jobs:
           echo "Releasing lite version: ${VERSION} (from tag ${RAW_TAG})"
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -67,10 +71,14 @@ jobs:
       # over a scoped `:rtp-plugin:remapLiteJar` so cross-module compile breaks
       # and downstream test regressions are caught before publication. The
       # lite jar is the artifact we ship; everything else is verification.
-      - name: Build (full multi-module + lite jar)
-        run: ./gradlew build :rtp-plugin:remapLiteJar
+      # Also generate CycloneDX SBOM, release checksums, and sign deliverables (ENTERPRISE_READINESS.md items 37, 39, 40).
+      - name: Build (full multi-module + lite jar + SBOM + checksums + signing)
+        env:
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: ./gradlew build :rtp-plugin:remapLiteJar :rtp-plugin:cyclonedxBom :rtp-plugin:generateChecksums :rtp-plugin:signDeliverables
 
-      - name: Locate lite jar
+      - name: Locate lite jar and release deliverables
         id: artifact
         run: |
           # ADR-024: the lite artifact is the unclassified `LeafRTP-<version>.jar`
@@ -87,6 +95,64 @@ jobs:
           fi
           echo "lite_jar=${LITE_JAR}" >> "$GITHUB_OUTPUT"
           echo "Found lite jar: ${LITE_JAR}"
+
+          # Locate SBOM (Item 37)
+          SBOM_FILE=$(find rtp-plugin/build/reports -maxdepth 2 -type f -name 'bom.json' | head -n 1)
+          if [ -n "$SBOM_FILE" ]; then
+            echo "sbom_file=${SBOM_FILE}" >> "$GITHUB_OUTPUT"
+            echo "Found SBOM: ${SBOM_FILE}"
+          fi
+
+          # Locate PGP signature (Item 39)
+          if [ -f "${LITE_JAR}.asc" ]; then
+            echo "lite_asc=${LITE_JAR}.asc" >> "$GITHUB_OUTPUT"
+            echo "Found PGP signature: ${LITE_JAR}.asc"
+          else
+            echo "No PGP signature found (signing credentials may not have been provided)."
+          fi
+
+      - name: Retrieve acceptance evidence log
+        id: evidence
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'devstack-acceptance.yml',
+                status: 'success',
+                per_page: 5
+              });
+              if (runs.data.workflow_runs.length > 0) {
+                const latestRun = runs.data.workflow_runs[0];
+                console.log(`Fetching acceptance artifacts from successful run ${latestRun.id} (${latestRun.head_sha})`);
+                const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: latestRun.id
+                });
+                const match = artifacts.data.artifacts.find(a => a.name.includes('acceptance') || a.name.includes('devstack'));
+                if (match) {
+                  const download = await github.rest.actions.downloadArtifact({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    artifact_id: match.id,
+                    archive_format: 'zip'
+                  });
+                  fs.writeFileSync('acceptance-evidence.zip', Buffer.from(download.data));
+                  console.log(`Downloaded acceptance evidence artifact ${match.name} to acceptance-evidence.zip`);
+                  core.setOutput('evidence_file', 'acceptance-evidence.zip');
+                } else {
+                  console.log('No matching acceptance artifact found in run.');
+                }
+              } else {
+                console.log('No successful devstack-acceptance runs found.');
+              }
+            } catch (err) {
+              console.log(`Could not fetch acceptance evidence: ${err.message}`);
+            }
 
       - name: Extract release notes from CHANGELOG.md
         id: notes
@@ -135,8 +201,28 @@ jobs:
           cat release-notes.md
           echo "--- end ---"
 
+      - name: Generate SLSA Build Provenance (Item 42)
+        uses: actions/attest-build-provenance@c074443f1a5cf70e7c5b0c9146f82725e2e8f5fb # v2.2.3
+        with:
+          subject-path: ${{ steps.artifact.outputs.lite_jar }}
+
+      - name: Publish GitHub Release (Items 37, 39, 42)
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d190 # v2.0.8
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: rtp-lite ${{ steps.version.outputs.version }}
+          body_path: release-notes.md
+          prerelease: ${{ contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha') }}
+          files: |
+            ${{ steps.artifact.outputs.lite_jar }}
+            ${{ steps.artifact.outputs.lite_jar }}.sha256
+            ${{ steps.artifact.outputs.lite_jar }}.sha512
+            ${{ steps.artifact.outputs.lite_asc }}
+            ${{ steps.evidence.outputs.evidence_file }}
+            rtp-plugin/build/reports/bom.json
+
       - name: Publish to Modrinth
-        uses: Kir-Antipov/mc-publish@v3.3
+        uses: Kir-Antipov/mc-publish@086e3926861ca1252119e0b1f2010874e4c2780e # v3.3
         with:
           modrinth-id: rtp-lite
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}

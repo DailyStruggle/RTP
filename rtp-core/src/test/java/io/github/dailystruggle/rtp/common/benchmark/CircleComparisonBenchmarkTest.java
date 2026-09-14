@@ -103,6 +103,14 @@ public class CircleComparisonBenchmarkTest {
     localDir.mkdirs();
     renderComparisonPNG(resTruth, resClassic, resOpt16, resOpt32, new File(localDir, "simulation_circle_comparison_side_by_side.png"));
 
+    File repoRoot = new File("../simulation_circle_comparison_side_by_side.png");
+    renderComparisonPNG(resTruth, resClassic, resOpt16, resOpt32, repoRoot);
+    File docsAsset = new File("../docs/assets/img/simulation_circle_comparison_side_by_side.png");
+    if (!docsAsset.getParentFile().exists()) docsAsset = new File("docs/assets/img/simulation_circle_comparison_side_by_side.png");
+    if (docsAsset.getParentFile().exists()) {
+      renderComparisonPNG(resTruth, resClassic, resOpt16, resOpt32, docsAsset);
+    }
+
     // Print Metrics
     System.out.println("\n=================================================================================================================================");
     System.out.println("METRICS SUMMARY");

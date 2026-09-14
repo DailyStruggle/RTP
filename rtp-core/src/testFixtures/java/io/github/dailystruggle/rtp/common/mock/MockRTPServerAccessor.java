@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.common.mock;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
+import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
@@ -34,6 +37,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     private final Map<UUID, MockRTPWorld> worldsById = new HashMap<>();
     private final Map<UUID, MockRTPPlayer> playersById = new HashMap<>();
     private final Map<String, MockRTPPlayer> playersByName = new HashMap<>();
+    private final Map<String, Object> registeredCommands = new HashMap<>();
 
     private final MockRTPPlayer consolePlayer = new MockRTPPlayer(RTP.serverId, "CONSOLE", null);
     private final MockRTPScheduler scheduler = new MockRTPScheduler();
@@ -211,7 +215,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     @Override
     public void sendMessage(UUID target, String message, String tag) {
         RTPCommandSender sender = getSender(target);
-        if (sender != null) {
+        if (sender != null && message != null) {
             sender.sendMessage(message);
         }
     }
@@ -395,6 +399,71 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     @Override
     public double getTPS(int ticks) {
         return 20.0;
+    }
+
+    // -------------------------------------------------------------------------
+    // Command registration & execution SPI
+    // -------------------------------------------------------------------------
+
+    @Override
+    public void registerCommands(Object rootCommand, String... aliases) {
+        if (rootCommand == null) return;
+        if (aliases != null) {
+            for (String alias : aliases) {
+                if (alias != null && !alias.isEmpty()) {
+                    registeredCommands.put(alias.toLowerCase(java.util.Locale.ROOT), rootCommand);
+                }
+            }
+        }
+        if (rootCommand instanceof CommandsAPICommand cmd) {
+            String name = cmd.name();
+            if (name != null && !name.isEmpty()) {
+                registeredCommands.put(name.toLowerCase(java.util.Locale.ROOT), rootCommand);
+            }
+        }
+    }
+
+    @Override
+    public boolean executeCommand(UUID senderId, String commandLine) {
+        if (senderId == null || commandLine == null || commandLine.trim().isEmpty()) {
+            return false;
+        }
+        String[] tokens = commandLine.trim().split("\\s+");
+        if (tokens.length == 0) {
+            return false;
+        }
+        String label = tokens[0].toLowerCase(java.util.Locale.ROOT);
+        Object cmdObj = registeredCommands.get(label);
+        if (cmdObj == null) {
+            return false;
+        }
+        String[] args = new String[tokens.length - 1];
+        System.arraycopy(tokens, 1, args, 0, args.length);
+
+        RTPCommandSender sender = getSender(senderId);
+        if (sender == null) {
+            return false;
+        }
+
+        if (cmdObj instanceof TreeCommand tree) {
+            tree.onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+            CommandsAPI.execute();
+            return true;
+        } else if (cmdObj instanceof CommandsAPICommand cmd) {
+            cmd.onCommand(senderId, sender::hasPermission, sender::sendMessage, args, 0, null);
+            CommandsAPI.execute();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Exposes an unmodifiable view of registered commands for test assertions.
+     *
+     * @return map of command labels/aliases to registered command objects
+     */
+    public Map<String, Object> getRegisteredCommands() {
+        return Collections.unmodifiableMap(registeredCommands);
     }
 
     // -------------------------------------------------------------------------

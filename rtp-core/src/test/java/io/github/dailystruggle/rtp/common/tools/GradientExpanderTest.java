@@ -1,10 +1,11 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for {@link GradientExpander} (ENTERPRISE_READINESS item 19, {@code tools} package).
@@ -259,5 +260,48 @@ public class GradientExpanderTest {
         // tag is left untouched entirely.
         String in = "<bogus:1>ABC</bogus>";
         assertEquals(in, GradientExpander.expand(in), "non-color tag is not a match => verbatim");
+    }
+
+    @Test
+    void gradientWithNegativePhaseWrapsCorrectly() {
+        String out = GradientExpander.expand("<gradient:#ff0000:#0000ff:-0.5>ABCD</gradient>");
+        assertTrue(out.indexOf(SECTION + "x") >= 0, out);
+        assertTrue(out.endsWith(SECTION + "r"), out);
+    }
+
+    @Test
+    void rainbowWithNegativePhaseWrapsCorrectly() {
+        String out = GradientExpander.expand("<rainbow:-90>ABC</rainbow>");
+        assertTrue(out.indexOf(SECTION + "x") >= 0, out);
+        assertTrue(out.endsWith(SECTION + "r"), out);
+    }
+
+    @Test
+    void gradientWithExistingHexMarkerIsPreserved() {
+        String hexRun = SECTION + "x" + SECTION + "1" + SECTION + "2" + SECTION + "3" + SECTION + "4" + SECTION + "5" + SECTION + "6";
+        String out = GradientExpander.expand("<gradient:#ff0000:#0000ff>A" + hexRun + "B</gradient>");
+        assertTrue(out.contains(hexRun), "hex marker must be preserved verbatim: " + out);
+    }
+
+    @Test
+    void transitionWithExistingHexMarkerIsPreserved() {
+        String hexRun = SECTION + "x" + SECTION + "a" + SECTION + "b" + SECTION + "c" + SECTION + "d" + SECTION + "e" + SECTION + "f";
+        String out = GradientExpander.expand("<transition:#ff0000:#0000ff:0.5>A" + hexRun + "B</transition>");
+        assertTrue(out.contains(hexRun), out);
+    }
+
+    @Test
+    void rainbowWithExistingHexMarkerIsPreserved() {
+        String hexRun = SECTION + "x" + SECTION + "0" + SECTION + "0" + SECTION + "0" + SECTION + "0" + SECTION + "0" + SECTION + "0";
+        String out = GradientExpander.expand("<rainbow>A" + hexRun + "B</rainbow>");
+        assertTrue(out.contains(hexRun), out);
+    }
+
+    @Test
+    void privateConstructorCanBeInvoked() throws Exception {
+        java.lang.reflect.Constructor<GradientExpander> ctor = GradientExpander.class.getDeclaredConstructor();
+        ctor.setAccessible(true);
+        GradientExpander instance = ctor.newInstance();
+        assertNotNull(instance);
     }
 }

@@ -10,14 +10,8 @@ This is **distinct from** multi-platform support (the plugin running on Paper, S
 
 ## Pages
 
-| Page | Topic | Status |
-|------|-------|--------|
-| [Configuration (network.yml)](CONFIGURATION.md) | The `network.yml` reference: transport, triggers, reservation, security | Available |
-| [Single-backend verification](SINGLE_BACKEND_VERIFICATION.md) | Single-backend operator smoke test (no proxy required) | Available |
-| [Cross-server verification](CROSS_SERVER_VERIFICATION.md) | Multi-proxy / multi-backend round-trip (claim → transfer → redeem) | Available |
-| Quick start | Minimal Velocity + 2× backend setup | Planned |
-| Load balancing | Weighted-average backend-selection heuristics | Planned |
-| Transports | `proxy-direct` (free) vs. Redis vs. SQL (Pro) | Planned |
-| Security | Shared-secret distribution, replay protection, kill switch | Planned |
-| Troubleshooting | Stale-backend symptoms, reservation expiry, version-skew | Planned |
-| Migration | Single-server to proxy-mode migration | Planned |
+| Page | Topic |
+|------|-------|
+| [Configuration (network.yml)](CONFIGURATION.md) | The `network.yml` reference: transport, triggers, reservation, security |
+| [Single-backend verification](SINGLE_BACKEND_VERIFICATION.md) | Single-backend operator smoke test (no proxy required) |
+| [Cross-server verification](CROSS_SERVER_VERIFICATION.md) | Multi-proxy / multi-backend round-trip (claim → transfer → redeem) |

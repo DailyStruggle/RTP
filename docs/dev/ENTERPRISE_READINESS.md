@@ -8,6 +8,12 @@
 > Decision record: [ADR-094](../adr/ADR-094-quality-engineering-gates.md) records the
 > gating architecture (tiered logic tests, opt-in PMD static analysis, server-less
 > changed-line coverage) that this plan executes.
+>
+> **Status (2026-09-12):** every work item in sections 4-7 is ticked, but a ticked
+> item means "the mechanism landed", not "the definition of done is met". The
+> authoritative state of the claim is the **scorecard in section 10**, graded
+> against section 9. Do not retire this file until section 10 reads all-MET; the
+> retirement criteria are recorded in ADR-094 ("Definition-of-done audit").
 
 ---
 
@@ -15,8 +21,8 @@
 
 The following gating *mechanisms* were built after this plan was written (decision:
 [ADR-094](../adr/ADR-094-quality-engineering-gates.md)). They are the scaffolding the
-TODO items below hang on; the items themselves (per-module targets, floors, ratchet)
-remain open.
+work items below hang on; the items are all ticked, but the definition-of-done
+criteria they serve are graded separately in section 10.
 
 - **Purpose-based test tiers** via JUnit 5 tags wired into the root `build.gradle`
   `subprojects` block: untagged = default **logic** tier; `slow` / `edge` /
@@ -71,8 +77,8 @@ graph. These are instruction / branch percentages, not estimates.
 |---|---|---|---|---|
 | `yaml-api` | **no tests at all** | - | - | Zero test sources (10 main classes). Pure parser - trivially testable. |
 | `metrics-api` | 18.8 | 18.9 | 506 | Pure SPI, 8 classes. Should be ~100%. |
-| `commands-api` | 30.9 | 23.0 | 2,362 | `common/localCommands` at 21%. Bukkit subpackage skews the number. |
-| `rtp-api` | 39.9 | 40.5 | 7,176 | `configuration/enums` at **0%**, `world` at 5.9%, `group` at 0%. |
+| `commands-api` | 93.5 | 80.1 | 163 | Decoupled from Bukkit, pure Java + Brigadier library. Strict 90/80 JaCoCo gate enforced. |
+| `rtp-api` | 95.7 | 81.3 | 422 | Fully tested public API models, facades, and delegates. Strict 90/80 JaCoCo gate enforced. |
 | `rtp-core` | 59.6 | 45.8 | 56,583 | The dominant mass. Detail in section 2.3. |
 | `rtp-proxy-common` | 59.0 | 44.1 | 7,508 | `transport/redis` at 4.4% is nearly the whole gap. |
 | `maps-api` | 67.6 | 48.6 | 1,505 | `render` 73.8%, `bukkit` binding drags it down. |
@@ -444,12 +450,22 @@ roughly 10% of the `rtp-core` gap.
       fails the build below the target; a routine `.\gradlew.bat build` never
       resolves the PIT toolchain (mirrors the `-Pcoverage` / `-PstaticAnalysis`
       opt-ins). Run it with `.\gradlew.bat :rtp-core:pitest -Pmutation`.
-      Verified end-to-end on `selection/worldborder`: 12 mutations, 10 killed
-      (**83%**, test strength 91%) - above the floor. The full teleport/region
-      run is CPU-heavy (the pipeline suites are scheduler/time-driven, so many
-      mutants are killed by timeout); shard it one package at a time with
-      `-PmutationPackages=<glob>` in CI. Remaining: run the full teleport/region
-      sweep and add tests where mutants survive to hold all three at >= 60%.
+      **Strengthened and audited (2026-09-12):**
+      - `selection/worldborder`: 125 mutations, 104 killed (**83%**, test strength 89%, line coverage 93%).
+      - `selection/region/cache`: 256 mutations, 180 killed (**70%**, test strength 83%).
+      - `selection/region/selectors/verticalAdjustors`: 633 mutations, 303 killed (**48%**, test strength 65%).
+      - `tasks/teleport`: increased from 26% (122 killed) to **50%** (216 of 436 killed, test strength 70%)
+        after adding dedicated unit tests:
+        * `RTPTeleportCancelTest`: pre/post actions, message dispatch, economy refund, noCancel permission gate.
+        * `ReqRtpAdr072ViewDistanceClampTest`: null/negative interval checks, throw tolerance on player methods.
+        * `TeleportPipelineTaskPhaseTest`: full setup-to-cleanup lifecycle, location generator transitions,
+          missing chunk set loading, arrival platform build triggers, custom `PlatformCreatorRegistry` hook
+          delegation, and schematic footprint clear verifiers.
+      - PIT tuning: configured `timeoutConstInMillis = 1500`, `timeoutFactor = 1.25`, and added exclusions for
+        benchmark/soak suites (`*StressTest*`, `*ComparisonTest*`, `*Throughput*`, `*Cost*`, `*RealWorld*`)
+        to prevent minion timeouts during line-coverage calculations.
+      - Sharded CI automation: wired `.github/workflows/mutation-testing.yml` to run sharded package checks
+        weekly and on workflow dispatch.
 - [x] 23\. Add property-based tests (jqwik) for the spiral math (ADR-001) and
       `MemoryShape` bin arithmetic - invariants, not examples.
       **Done (2026-09-12):** added `net.jqwik:jqwik` (1.9.2) to `gradle/libs.versions.toml`
@@ -560,6 +576,10 @@ roughly 10% of the `rtp-core` gap.
       across all platforms (REQ-RTP-SYS-001), covers server platforms (Paper + forks, Folia,
       Spigot, Fabric, NeoForge) across MC 1.19.4 through 26.x, proxies (Velocity 3.3.x+,
       BungeeCord/Waterfall), hybrid runtimes (Mohist, Arclight), and verification tiers.
+      Strictly aligned classifications to match CI re-verification: only platforms backed by
+      scheduled integration devstack suites (Paper, Folia, Fabric on modern MC; Velocity; Java 21 LTS
+      and Java 25+) are designated Tested; unmonitored runtime configurations (Spigot, NeoForge,
+      BungeeCord/Waterfall, non-LTS Java) are accurately marked Best-effort.
 - [x] 31\. Add `japicmp` or `revapi` against the previous release for `rtp-api`,
       `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `anvil-api`, `tags-api`.
       Fail the build on unannounced binary-incompatible change.
@@ -614,42 +634,111 @@ roughly 10% of the `rtp-core` gap.
 
 ---
 
-## 6. TODO - Supply chain
+## 6. Supply chain
 
-- [ ] 37\. CycloneDX SBOM generated per release, attached to the GitHub release.
-- [ ] 38\. Dependabot or Renovate enabled; OWASP dependency-check in CI.
+- [x] 37\. CycloneDX SBOM generated per release, attached to the GitHub release.
+      **Done (2026-09-12):** Integrated `org.cyclonedx.bom` (version 2.0.0) in
+      `gradle/libs.versions.toml` and `rtp-plugin/build.gradle`. Registered `:rtp-plugin:cyclonedxBom`
+      to produce CycloneDX-compliant `bom.json` specifications covering all shaded direct and
+      transitive runtime dependencies. Release workflow [`.github/workflows/release.yml`](../../.github/workflows/release.yml)
+      generates and attaches `bom.json` to every published GitHub release.
+- [x] 38\. Dependabot or Renovate enabled; OWASP dependency-check in CI.
       Shipped drivers: HikariCP, Jedis, H2, PostgreSQL, SQLite - all CVE surfaces.
-- [ ] 39\. Sign the shaded plugin jar and publish checksums alongside it
+      **Done (2026-09-12):**
+      - Verified Dependabot configuration in [`.github/dependabot.yml`](../../.github/dependabot.yml)
+        covering weekly automated updates for both Gradle dependencies and GitHub Actions.
+      - Added dedicated scheduled/push OWASP dependency-check workflow at
+        [`.github/workflows/dependency-check.yml`](../../.github/workflows/dependency-check.yml)
+        using `dependency-check/Dependency-Check_Action` scanning all project dependencies with
+        CVSS threshold gating (`--failOnCVSS 8`), suppression configuration at
+        `config/dependency-check-suppressions.xml`, and automated HTML/JSON report artifact archiving.
+- [x] 39\. Sign the shaded plugin jar and publish checksums alongside it
       (Maven Central signing already exists; extend to the deliverable).
-- [ ] 40\. Reproducible builds: `preserveFileTimestamps = false`,
+      **Done (2026-09-12):**
+      - Added `generateChecksums` task in `rtp-plugin/build.gradle` (automatically wired into `assemble`)
+        calculating deterministic SHA-256 and SHA-512 hashes (`.sha256`, `.sha512`) for all release
+        deliverables (`LeafRTP-*.jar` and `LeafRTP-Pro-*.jar`).
+      - Added `signDeliverables` task in `rtp-plugin/build.gradle` integrating Gradle's `signing`
+        plugin to sign shaded release deliverables via in-memory PGP private keys (`signingKey` /
+        `signingPassword`) or local GPG command (`-PsignWithGpgCmd`) when signing credentials are provided.
+      - Wired `signDeliverables` and credential secrets (`SIGNING_KEY`, `SIGNING_PASSWORD`) into the release
+        workflow [`.github/workflows/release.yml`](../../.github/workflows/release.yml).
+      - Configured release workflow to upload `.asc` signature alongside `.sha256`, `.sha512`, SBOM `bom.json`,
+        SLSA provenance, and automated acceptance test evidence (`acceptance-evidence.zip`).
+- [x] 40\. Reproducible builds: `preserveFileTimestamps = false`,
       `reproducibleFileOrder = true`, plus Gradle `dependencyLocking`.
-- [ ] 41\. Pin all GitHub Actions by commit SHA rather than tag.
-- [ ] 42\. Enable GitHub build provenance / SLSA attestation.
+      **Done (2026-09-12):** Configured `allprojects` in root `build.gradle` to enforce
+      `preserveFileTimestamps = false` and `reproducibleFileOrder = true` across all `AbstractArchiveTask`
+      instances (JAR, ZIP, Shadow JAR), guaranteeing deterministic byte-level archive output across
+      build environments. Enabled Gradle `dependencyLocking` support (`lockMode = LockMode.LENIENT`)
+      to allow generating and enforcing lockfiles via `--write-locks`.
+- [x] 41\. Pin all GitHub Actions by commit SHA rather than tag.
+      **Done (2026-09-12):** Audited and pinned all GitHub Actions across every workflow file
+      (`.github/workflows/gradle.yml`, `.github/workflows/release.yml`,
+      `.github/workflows/devstack-acceptance.yml`, `.github/workflows/docs.yml`,
+      `.github/workflows/maven-central.yml`, `.github/workflows/dependency-check.yml`) to immutable
+      full 40-character commit SHAs with inline semantic version comments.
+- [x] 42\. Enable GitHub build provenance / SLSA attestation.
+      **Done (2026-09-12):** Integrated `actions/attest-build-provenance` into the release workflow
+      (`.github/workflows/release.yml`) with required OIDC and attestation permissions
+      (`id-token: write`, `attestations: write`, `contents: write`), automatically generating
+      cryptographically verifiable SLSA build provenance attestations for released artifacts.
 
 ---
 
-## 7. TODO - Policy and presentation
+## 7. Policy and presentation
 
-- [ ] 43\. Explicit SemVer contract: what is public API vs internal.
-- [ ] 44\. Make `SUPPORT.md` specific: which versions get fixes, for how long,
+- [x] 43\. Explicit SemVer contract: what is public API vs internal.
+      **Done (2026-09-12):** Created canonical [`docs/dev/SEMVER.md`](SEMVER.md) defining the
+      SemVer 2.0.0 contract (`MAJOR.MINOR.PATCH`), explicitly delineating public API surfaces
+      (`rtp-api`, `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `anvil-api`, `tags-api`,
+      `yaml-api`) versus internal implementation modules (`rtp-core`, platform adapters, carrier shims,
+      `rtp-plugin`), backwards compatibility guarantees, and linked to `DEPRECATION_POLICY.md` and `docs/dev/INDEX.md`.
+- [x] 44\. Make `SUPPORT.md` specific: which versions get fixes, for how long,
       expected response window. "Best-effort, typically within N days" beats silence.
-- [ ] 45\. Make `SECURITY.md` specific: private disclosure channel, triage timeline,
+      **Done (2026-09-12):** Updated [`SUPPORT.md`](../../SUPPORT.md) with explicit support tiers
+      (Active 3.x, Maintenance 2.x, EOL 1.x), concrete maintenance windows, and expected response
+      windows (3-7 business days for initial triage, 2-4 weeks for patch delivery, 72 hours for security
+      acknowledgement), cross-referenced with `SUPPORT_MATRIX.md`.
+- [x] 45\. Make `SECURITY.md` specific: private disclosure channel, triage timeline,
       advisory history.
-- [ ] 46\. One-page licensing clarity across `LICENSE` / `LICENSE-MIT` and the
+      **Done (2026-09-12):** Updated [`SECURITY.md`](../../SECURITY.md) with explicit private disclosure
+      instructions, defined triage and resolution timelines (72h acknowledgement, 7d assessment, 30d patch),
+      comprehensive module scope inventory, out-of-scope criteria, and an auditable vulnerability disclosure
+      history table.
+- [x] 46\. One-page licensing clarity across `LICENSE` / `LICENSE-MIT` and the
       Pro / Lite split (ADR-024). Ambiguity blocks adoption more than bugs do.
-- [ ] 47\. Add severity + status columns to `POTENTIAL_BUGS.md` so it reads as a
+      **Done (2026-09-12):** Created [`docs/dev/LICENSING.md`](LICENSING.md) detailing the open-core
+      dual-licensing model (MIT vs PolyForm Noncommercial 1.0.0), per-module license mapping, Lite vs Pro
+      feature comparison matrix (ADR-024 / ADR-061), commercial usage guidelines, and build-time compliance auditing.
+- [x] 47\. Add severity + status columns to `POTENTIAL_BUGS.md` so it reads as a
       managed backlog rather than a pile of open defects.
-- [ ] 48\. Repository root hygiene: ~25 loose chart `.png` files, `gitstat.txt`,
+      **Done (2026-09-12):** Updated [`docs/dev/POTENTIAL_BUGS.md`](POTENTIAL_BUGS.md) adding explicit
+      `Severity` and `Status` fields across the issue template and all active backlog entries, maintaining
+      strict priority ordering.
+- [x] 48\. Repository root hygiene: ~25 loose chart `.png` files, `gitstat.txt`,
       `checkout_list.txt`, `test_2d_map.bmp`, `default_2d_map.bmp`, a generated
       `site/` directory, and a folder named `Python Test Scripts` (with a space).
       Move charts to `docs/assets/`, gitignore `site/`, rename the spaced folder.
-- [ ] 49\. Add a CI grep for the usual UTF-8-read-as-CP1252 mojibake markers (the
+      **Done (2026-09-12):**
+      - Relocated 29 loose root chart `.png` files and 2 test map `.bmp` files to `docs/assets/img/`.
+      - Removed untracked root scratch files (`gitstat.txt`, `checkout_list.txt`).
+      - Confirmed `site/` is ignored in `.gitignore`.
+      - Renamed `Python Test Scripts` to `python_test_scripts` via `git mv` and updated project references.
+- [x] 49\. Add a CI grep for the usual UTF-8-read-as-CP1252 mojibake markers (the
       three-byte em-dash and non-breaking-space corruptions) across tracked text
       files. There is live mojibake in shipped source comments today, e.g.
       `rtp-core/build.gradle` lines 33 and 144, where an em dash was corrupted.
-- [ ] 50\. Sweep the stray untracked `.bak` files out of the working tree
+      **Done (2026-09-12):**
+      - Created automated scanner/verification tool [`scripts/check-mojibake.py`](../../scripts/check-mojibake.py).
+      - Repaired all live mojibake sequences in `rtp-core/build.gradle`, `platforms/rtp-fabric/*/build.gradle`,
+        and `docs/dev/MULTI_SERVER_PLAN.md`.
+      - Wired `python3 scripts/check-mojibake.py` into both CI test jobs in `.github/workflows/gradle.yml`.
+- [x] 50\. Sweep the stray untracked `.bak` files out of the working tree
       (62 as of 2026-09-11; none are committed - local clutter only, but they leak
       into IDE search).
+      **Done (2026-09-12):** Swept all 61 stray untracked `.bak` files from the working tree. Verified zero
+      `.bak` files remain in the repository.
 
 ---
 
@@ -687,3 +776,31 @@ The claim is defensible when all of the following are true and **externally visi
 Until then, prefer the provable phrasing over the adjective: state the tested matrix,
 the coverage number, the signing and SBOM status. That language ages into the claim
 on its own, and it matches the evidence-over-adjectives voice the project already uses.
+
+---
+
+## 10. Definition-of-done scorecard (audited 2026-09-12)
+
+Graded against section 9 by reading the repository, not the checklist. Evidence
+column names the file an outside reviewer can open. Update this table (and the date)
+whenever a criterion changes state; never tick a section 4-7 item as a substitute.
+
+| # | Criterion (section 9) | Status | Evidence | Remaining work |
+|---|---|---|---|---|
+| 1 | Every platform-neutral module >= 90% instruction / 80% branch, build-gated | **PARTIAL** | `build.gradle` `coverageFloors`: all platform-neutral modules gated (`:metrics-api` 0.95/0.85 [100%/94.6%], `:tags-api` 0.95/0.85 [98.2%/90.9%], `:yaml-api` 0.92/0.80 [97.0%/88.1%], `:rtp-api` 0.90/0.80 [95.7%/81.3%], `:commands-api` 0.90/0.80 [93.5%/80.1%], `:maps-api` 0.90/0.78 [94.7%/82.1%], `:anvil-api` 0.86/0.75 [90.5%/80.5%], `:rtp-core` 0.62/0.47 [67.5%/52.8%], `:rtp-proxy:rtp-proxy-common` 0.55/0.40 [60.1%/45.5%]). | Ratchet upward with `scripts/ratchet-coverage.py` after each green `-Pcoverage` run until all modules reach 0.90/0.80. 7 of 9 platform-neutral modules (`metrics-api`, `tags-api`, `yaml-api`, `maps-api`, `anvil-api`, `commands-api`, `rtp-api`) meet the target today; `rtp-core` and `rtp-proxy-common` continue to advance. |
+| 2 | Mutation score >= 60% on the safety packages | **PARTIAL** | `rtp-core/build.gradle` `-Pmutation` gate, `mutationThreshold = 60`; `selection/worldborder` passed (83%), `selection/region/cache` passed (70%); `tasks/teleport` strengthened from 26% to 50%; `.github/workflows/mutation-testing.yml` wired. | Continue strengthening remaining `tasks/teleport` and `selection/region` classes to hold all safety subpackages at >= 60%. |
+| 3 | Every S-00x prohibition has an automated rule cited in `TRACEABILITY.md` | **MET** | `RTPArchitectureTest` rules 1-10; `TRACEABILITY.md` REQ-RTP-S-001..S-007 rows. | Keep the rows current when rules move. |
+| 4 | Support matrix distinguishes tested vs best-effort; tested cells re-verified by CI on a schedule | **MET** | `SUPPORT_MATRIX.md`; `.github/workflows/devstack-acceptance.yml` (nightly: Velocity + Paper + Folia + Fabric on modern MC; Java 21 LTS & 25+). | Tested cells in `SUPPORT_MATRIX.md` match automated CI / devstack suites; platforms without scheduled live CI suites (Spigot, NeoForge, BungeeCord, non-LTS Java) are categorized as Best-effort. |
+| 5 | Each release ships SBOM, signed artifacts, checksums, acceptance log | **MET** | `.github/workflows/release.yml`: `cyclonedxBom`, `generateChecksums`, `signDeliverables` (using `SIGNING_KEY` / `SIGNING_PASSWORD`), `attest-build-provenance` wired; `.asc`, `.sha256`, `.sha512`, `bom.json`, and `acceptance-evidence.zip` (retrieved from successful acceptance run) attached to GitHub releases. | Release workflow wires all required assets and attestation. |
+| 6 | API compatibility gated automatically; deprecation policy published | **MET** | `DEPRECATION_POLICY.md` published; `build.gradle` `checkBinaryCompatibility` enforces binary compatibility across all 7 public API modules against baseline release artifact (`japicmpBaselineVersion`, default `3.2.0`) with `richReport` rules and unannounced-break failure verified against `config/binary-compatibility-accepted-breaks.json`; wired into `.github/workflows/gradle.yml` for CI gating on push and pull requests. | Keep `config/binary-compatibility-accepted-breaks.json` updated with rationale whenever announced removals pass the mandatory 2-minor deprecation notice window. |
+| 7 | Zero known CVEs in shipped dependencies, checked automatically | **PARTIAL** | `.github/workflows/dependency-check.yml` weekly, `--failOnCVSS 8`; `config/dependency-check-suppressions.xml`. | Lower the threshold to fail on any unsuppressed CVE (or CVSS >= 4 with justified suppressions), and run it on pull requests that touch `gradle/libs.versions.toml`. |
+
+**Cross-cutting gap:** `.github/workflows/gradle.yml` runs plain `./gradlew build`, so
+the JaCoCo floors, SpotBugs, and ArchUnit rules do gate every push, but nothing in CI
+passes `-Pcoverage` (the `jacoco-coverage` artifact upload is therefore empty),
+`-PstaticAnalysis` (PMD, including `PreferNonLockingExecution`), `-PfullTests`, or
+runs `scripts/diff-coverage.py`. Those gates exist locally only until wired.
+
+**Claim language until all rows read MET:** state the numbers ("rtp-core 60% instruction,
+floors enforced at 0.55/0.42; SBOM + SHA-256/512 + SLSA provenance on every release;
+nightly Velocity/Paper/Folia/Fabric acceptance run"), not the adjective.

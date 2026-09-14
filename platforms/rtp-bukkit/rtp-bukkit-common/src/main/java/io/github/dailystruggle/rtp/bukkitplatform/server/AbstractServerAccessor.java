@@ -40,6 +40,7 @@ import org.bukkit.Tag;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -899,5 +900,41 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     } catch (Throwable t) {
       return "";
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Command registration & execution SPI
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void registerCommands(Object rootCommand, String... aliases) {
+    if (!(rootCommand instanceof io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand treeCommand)) {
+      return;
+    }
+    if (!(plugin instanceof Plugin bukkitPlugin)) {
+      return;
+    }
+    io.github.dailystruggle.rtp.bukkitplatform.commands.BukkitCommandRegistrar registrar;
+    if (treeCommand instanceof io.github.dailystruggle.rtp.common.commands.CoreRtpRoot coreRtpRoot) {
+      registrar = new io.github.dailystruggle.rtp.bukkitplatform.commands.BukkitCommandRegistrar(
+          bukkitPlugin, treeCommand, coreRtpRoot::dispatchString);
+    } else {
+      registrar = new io.github.dailystruggle.rtp.bukkitplatform.commands.BukkitCommandRegistrar(
+          bukkitPlugin, treeCommand, null);
+    }
+    registrar.register(aliases);
+  }
+
+  @Override
+  public boolean executeCommand(UUID senderId, String commandLine) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    CommandSender sender;
+    if (senderId == null || senderId.equals(RTPAPI.serverId)) {
+      sender = Bukkit.getConsoleSender();
+    } else {
+      sender = Bukkit.getPlayer(senderId);
+      if (sender == null) return false;
+    }
+    return Bukkit.dispatchCommand(sender, commandLine);
   }
 }
