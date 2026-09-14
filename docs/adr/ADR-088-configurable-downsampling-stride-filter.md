@@ -86,11 +86,22 @@ In `SquareOptimizedDualLayer`, every virtual good index maps bijectively to a va
 - Latency drops from $12.6\,\mu\text{s} \to 1.56\,\mu\text{s}$ per selection ($> 600{,}000$ coordinates/second).
 - 100% loop-free and retry-free.
 
-### 6. Adaptive Stride Scaling (`deriveAdaptiveStride`)
+### 6. Adaptive Stride Scaling (`deriveAdaptiveStride`) & Nyquist Bin Sampling Limit
 
 A static stride $S = 256$ on small shapes ($R = 16$, $1{,}024$ chunks) causes subset starvation (only 4 candidates per subset). Stride $S$ scales adaptively based on domain size:
 $$S = \begin{cases} 1 & \text{for } \text{domain} < 64 \\ 4 & \text{for } \text{domain} < 256 \quad (R \le 8) \\ 16 & \text{for } \text{domain} < 1024 \quad (R \le 16) \\ 64 & \text{for } \text{domain} < 8192 \quad (R \le 64) \\ 256 & \text{for } \text{domain} \ge 8192 \quad (R \ge 128) \end{cases}$$
 This guarantees that every subset maintains $\ge 64$ candidates while keeping inter-player physical spacing proportional across all world sizes.
+
+#### Signal Processing Hard Limit: Nyquist Bin Sampling Rule ($S \le \frac{\text{binArea}}{2}$)
+To prevent spatial aliasing, pattern degradation, and cross-phase boundary overlap across macro-tile / bin boundaries, stride $S$ is subject to a strict signal processing upper bound:
+$$S \le \max\left(1, \left\lfloor \frac{\text{binArea}}{2} \right\rfloor \right) \quad \text{where } \text{binArea} = P^2 = \text{pointEdgeChunks}^2$$
+
+- **Rule Rationale:** In digital signal processing and spatial sampling, sampling frequency must be at least twice the maximum spatial frequency ($f_s \ge 2 f_{\max}$). If stride step $S$ exceeds half the number of chunks in a macro-tile / bin ($S > \frac{\text{binArea}}{2}$), the sampling interval falls below the Nyquist rate for the bin partition. Under sub-Nyquist sampling, points alias across bin boundaries and cause adjacent-tile coordinate overlap without falling back on the presumption of the next phase (interstitial points).
+- **Enforced Caps:**
+  - For $P = 32$ ($\text{binArea} = 1{,}024\text{ chunks}$): $S \le 512$.
+  - For $P = 16$ ($\text{binArea} = 256\text{ chunks}$): $S \le 128$.
+  - Stride is additionally bounded by $S \le \frac{\text{domainSize}}{4}$.
+- **Resolution of Domain Saturation:** When benchmarking or operating at large strides ($S = 256$), the world radius must provide sufficient domain capacity ($R \ge 1{,}024\text{ chunks}$ for concurrent bursts $N \ge 500$) so that macro-tile occupancy remains below the packing threshold ($\le 10\%$), preventing seam boundary overlap between adjacent occupied bins.
 
 ### 7. Strict Separation of Ground Truth vs. Candidate Sampling
 
@@ -99,7 +110,22 @@ Safety ground truth shall never be degraded:
 2. **Downsampling at the Selection Tier:** Stride and dyadic subsets apply strictly inside `MemoryShape.rand()`.
 3. **Optional Scan Task Optimization:** Operators can optionally enable strided scanning in `ScanTask` (`scan.useSelectionStride: true`) to accelerate background pre-scans on massive worlds ($R \ge 10{,}000$).
 
-### 8. Configuration & Command Interface
+### 8. Dynamic Expansion Epoch Ratchet (Stability Under Range Expansion)
+
+While Section 4 defines range contraction under `MODE_ACCUMULATE`, `MemoryShape` also supports dynamic radial expansion (`expand: true`, `adjustRange`), which increases `totalGood` and domain range mid-lifecycle.
+
+Altering the permutation domain modulus mid-sequence changes the bijective cycle. To maintain deterministic uniqueness and prevent broken permutations:
+1. **Epoch Counter Tracking:** `MemoryShape` maintains an atomic sequence counter `expansionEpoch` (initialized to `0`).
+2. **Modulus & Key Ratchet on `adjustRange`:** When `adjustRange` increments the active range under `expand: true`:
+   - `expansionEpoch` increments atomically ($\text{expansionEpoch} \gets \text{expansionEpoch} + 1$).
+   - The Feistel round key is ratcheted with the new epoch:
+     $$K_{\text{epoch}} = \text{secretServerSeed} \oplus (\text{expansionEpoch} \cdot \text{0x517CC1B727220A95L}) \oplus (\phi \cdot \gamma)$$
+   - Candidate offset counters ($t$) reset to `0`.
+3. **Invariants:**
+   - Strict **$0.0\%$ collisions** are preserved within each expansion epoch.
+   - Cross-boundary duplicate probability across epochs is mathematically bounded by domain-wide uniform dispersion ($\le \text{visited} / \text{totalGood}_{\text{new}}$), eliminating clustering or persistent repeat landings.
+
+### 9. Configuration & Command Interface
 
 Configured in `regions.yml`:
 
@@ -125,7 +151,7 @@ regions:
 |---|---|---|
 | C1 | **Exact Coordinate Bijection:** Strided index maps bijectively to valid chunk coordinates without collisions or out-of-bounds leakage | **MET** |
 | C2 | **Full Safety Ground Truth:** Run tables retain 1-chunk resolution without loss of hazard identification | **MET** |
-| C3 | **Deterministic Spacing:** Distance between consecutive indices satisfies $d \ge \sqrt{S}$ chunks | **MET** |
+| C3 | **Deterministic Spacing & Nyquist Bound:** Distance between consecutive indices satisfies $d \ge \sqrt{S}$ chunks within Nyquist limit $S \le \text{binArea}/2$ | **MET** |
 | C4 | **Zero Dynamic Distance Queries:** Selection operates in $O(1)$ without runtime distance re-roll loops | **MET** |
 | C5 | **Full Ergodicity:** Rotating dyadic phase over $S$ offsets covers 100% of addressable chunk coordinates without coordinate starvation | **MET** |
 | C6 | **Zero Duplicate Selections:** Keyed Feistel permutation guarantees 0 duplicate chunk landings ($0.0\%$) across the domain | **MET** |

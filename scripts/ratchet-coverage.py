@@ -94,11 +94,14 @@ def discover_reports(root: Path) -> dict[str, Path]:
             rel_path = xml_path.relative_to(root)
             mod_dirs = rel_path.parts[:rel_path.parts.index("build")]
             mod_path = ":" + ":".join(mod_dirs) if mod_dirs else ":"
+            # Normalize :api:commands-api -> :commands-api, :api:anvil-api -> :anvil-api, etc.
+            # to match project paths used in root build.gradle coverageFloors
+            mod_path_norm = re.sub(r"^:api:", ":", mod_path)
             # If report is under a specific test task, prefer jacocoTestReport.xml
             if xml_path.name == "jacocoTestReport.xml":
-                reports[mod_path] = xml_path
-            elif mod_path not in reports:
-                reports[mod_path] = xml_path
+                reports[mod_path_norm] = xml_path
+            elif mod_path_norm not in reports:
+                reports[mod_path_norm] = xml_path
         except ValueError:
             continue
     return reports
@@ -159,6 +162,46 @@ def ratchet_build_gradle(
             if m_mod:
                 current_mod = m_mod.group(1)
                 current_pkg = None
+                inline_match = re.search(r"instruction\s*:\s*([0-9\.]+).*branch\s*:\s*([0-9\.]+)", line)
+                if inline_match and current_mod in module_data:
+                    mod_metrics, _ = module_data[current_mod]
+                    orig_inst = float(inline_match.group(1))
+                    orig_br = float(inline_match.group(2))
+                    new_inst = orig_inst
+                    new_br = orig_br
+
+                    measured_inst = mod_metrics.instruction.ratio
+                    ratchet_inst = calculate_ratchet_floor(measured_inst, margin)
+                    if ratchet_inst > orig_inst:
+                        new_inst = ratchet_inst
+                        log_messages.append(
+                            f"Ratcheted {current_mod} instruction floor: "
+                            f"{orig_inst:.2f} -> {new_inst:.2f} (measured {measured_inst:.1%})"
+                        )
+
+                    measured_br = mod_metrics.branch.ratio
+                    ratchet_br = calculate_ratchet_floor(measured_br, margin)
+                    if ratchet_br > orig_br:
+                        new_br = ratchet_br
+                        log_messages.append(
+                            f"Ratcheted {current_mod} branch floor: "
+                            f"{orig_br:.2f} -> {new_br:.2f} (measured {measured_br:.1%})"
+                        )
+
+                    if new_inst != orig_inst or new_br != orig_br:
+                        updated_line = re.sub(
+                            r"instruction\s*:\s*[0-9\.]+",
+                            f"instruction: {new_inst:.2f}",
+                            line,
+                        )
+                        updated_line = re.sub(
+                            r"branch\s*:\s*[0-9\.]+",
+                            f"branch: {new_br:.2f}",
+                            updated_line,
+                        )
+                        new_lines.append(updated_line)
+                        continue
+
                 new_lines.append(line)
                 continue
 

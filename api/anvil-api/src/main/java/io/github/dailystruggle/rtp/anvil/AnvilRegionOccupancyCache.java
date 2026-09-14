@@ -80,6 +80,16 @@ public final class AnvilRegionOccupancyCache {
     return (bitmap[index >>> 6] & (1L << (index & 63))) != 0L;
   }
 
+  /**
+   * Diagnostic / test hook returning whether {@code CACHE} currently holds an entry for {@code regionFile}.
+   */
+  public static boolean isCached(Path regionFile) {
+    if (regionFile == null) return false;
+    synchronized (CACHE) {
+      return CACHE.containsKey(regionFile);
+    }
+  }
+
   /** Test/diagnostic hook. */
   public static void invalidateAll() {
     synchronized (CACHE) {

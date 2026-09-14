@@ -40,6 +40,21 @@ public final class FabricCommandRegistrar {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static void registerRtpCommand(Object root, Object bridgeCtx) {
+        registerRtpCommand(root, bridgeCtx, (String[]) null);
+    }
+
+    /**
+     * Register a {@code CommandRegistrationCallback} that wires the supplied
+     * Brigadier root + bridge context along with any {@code aliases} into the dispatcher
+     * each time the server (re)builds its command tree.
+     *
+     * @param root      the {@link CommandsAPICommand} root (must be non-null).
+     * @param bridgeCtx the {@link BrigadierBridgeContext} (raw / Object source);
+     *                  must be non-null.
+     * @param aliases   optional command aliases (e.g. "wild")
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static void registerRtpCommand(Object root, Object bridgeCtx, String... aliases) {
         if (root == null || bridgeCtx == null) {
             RTP.log(Level.WARNING,
                     "[RTP][Fabric] registerRtpCommand skipped: null root or bridgeCtx.");
@@ -79,7 +94,8 @@ public final class FabricCommandRegistrar {
                             RTPCmdFabric.register(
                                     (com.mojang.brigadier.CommandDispatcher) dispatcher,
                                     rootCmd,
-                                    rawBridge);
+                                    rawBridge,
+                                    aliases);
                         } catch (Throwable inner) {
                             RTP.log(Level.WARNING,
                                     "[RTP][Fabric] /rtp Brigadier registration handler failed: "

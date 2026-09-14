@@ -96,3 +96,23 @@ As defined in `MULTI_PLATFORM_PLAN.md` (*Carrier Retirement & Deprecation Policy
    - The on-disk configuration is updated during automatic migration (`CONFIG_LIFECYCLE.md`), rotating the old file to `<file>.yml.old1` while overlaying customized values onto fresh defaults.
 2. **Notice Period:**
    - Deprecated configuration keys remain functional via backwards-compatible fallback mapping for at least one major or two minor version cycles before the fallback parser is retired.
+
+---
+
+## 5. Automated Binary Compatibility Gating & Accepted Breaks
+
+To guarantee that breaking changes cannot enter the codebase unannounced, public API binary compatibility is automatically verified during continuous integration:
+
+1. **Verification Mechanism:**
+   - Executed via `./gradlew checkBinaryCompatibility` across all public API modules (`rtp-api`, `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `anvil-api`, `tags-api`).
+   - Powered by `japicmp` comparing the current compiled JAR against the baseline release artifact (`japicmpBaselineVersion`, default `3.2.0`).
+   - Runs in CI (`.github/workflows/gradle.yml`) on every pull request and push to release branches.
+2. **Accepted Breaks Registry:**
+   - If a binary-incompatible change or removal has satisfied the mandatory notice window (>= 2 minor versions) and is ready for removal in an announced release, it must be explicitly recorded in:
+     `config/binary-compatibility-accepted-breaks.json`
+   - Each entry must contain:
+     - `module`: Target API module name (e.g. `rtp-api`).
+     - `className`: Fully qualified class name.
+     - `member`: Member signature or removed symbol identifier.
+     - `reason`: Rationale specifying the version when the element was deprecated and the notice cycle fulfilled.
+   - Any binary-incompatible modification not recorded in `config/binary-compatibility-accepted-breaks.json` will fail the build immediately.

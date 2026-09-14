@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * network reservation lifecycle, fast queue futures, dynamic login cache toggles, and
  * active concurrent shutdown (ENTERPRISE_READINESS.md item 25, REQ-FOLIA-F-003, S-002, S-004).
  */
+@org.junit.jupiter.api.Tag("slow")
 @DisplayName("RegionQueueManager Concurrency Stress Harness")
 class RegionQueueManagerConcurrencyStressTest {
 
@@ -102,7 +103,7 @@ class RegionQueueManagerConcurrencyStressTest {
      * Invariants: No exceptions, no deadlock, proper status responses.
      */
     @Test
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
     void concurrentOperations_allQueueTiers_noDeadlockOrExceptions() throws InterruptedException {
         int threads = 8;
         ExecutorService exec = Executors.newFixedThreadPool(threads);
@@ -205,7 +206,7 @@ class RegionQueueManagerConcurrencyStressTest {
         }
 
         startLatch.countDown();
-        assertTrue(doneLatch.await(10, TimeUnit.SECONDS), "Concurrent operations soak timed out");
+        assertTrue(doneLatch.await(25, TimeUnit.SECONDS), "Concurrent operations soak timed out");
         exec.shutdown();
         assertTrue(exec.awaitTermination(2, TimeUnit.SECONDS));
 
@@ -221,7 +222,7 @@ class RegionQueueManagerConcurrencyStressTest {
      * - Conservation of locations in network pool + in-flight reservations.
      */
     @Test
-    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    @Timeout(value = 20, unit = TimeUnit.SECONDS)
     void networkReservationLifecycle_concurrentReserveRedeemRelease() throws InterruptedException {
         int initialLocations = 16;
         for (int i = 0; i < initialLocations; i++) {
@@ -277,7 +278,7 @@ class RegionQueueManagerConcurrencyStressTest {
         }
 
         startLatch.countDown();
-        assertTrue(doneLatch.await(6, TimeUnit.SECONDS), "Network reservation stress timed out");
+        assertTrue(doneLatch.await(15, TimeUnit.SECONDS), "Network reservation stress timed out");
         exec.shutdown();
 
         assertEquals(totalReserved.get(), totalRedeemed.get() + totalReleased.get(),

@@ -97,7 +97,27 @@ Per **ADR-013**, **ADR-019**, and **ADR-057**, integrations with third-party plu
 
 ---
 
-## 5. References
+## 5. Hardware Prerequisite & Failure Domain Contract
+
+To preserve server performance and regional tick stability under multi-user web panning or automated scrapers:
+
+1. **Failure Domain Isolation (Bulkhead Pattern):**
+   - Web cartography rendering execution shall run strictly within the failure domain of the web worker thread pool.
+   - Any allocation spike, unhandled exception, or thread abort within raster generation shall never propagate to `rtp-core`, `RegionQueueManager`, or Folia/Paper regional ticking tasks.
+2. **Hardware Headroom Prerequisite:**
+   - Enabling on-demand web map raster layers requires an operator memory headroom allocation:
+     $$M_{\text{map\_headroom}} \ge C_{\text{max\_renderers}} \times \text{TileBufferSize} \times 2.5$$
+   - Under default concurrency limits ($C_{\text{max\_renderers}} = 4$) at $512 \times 512$ ARGB raster dimensions, required transient headroom is $\sim 16\text{ MB}$.
+3. **Concurrency Limiter & Fail-Closed Fast Path (`AsyncRenderLimiter`):**
+   - `maps-api` enforces a hard non-blocking concurrency limiter:
+     $$C_{\text{max\_renderers}} = \max\left(1, \min\left(4, \left\lfloor \frac{\text{availableProcessors}}{4} \right\rfloor\right)\right)$$
+   - When incoming web tile requests fail to acquire an execution permit within `500ms`, the pipeline fails closed: it immediately returns a static 1x1 transparent PNG or HTTP 503 response without allocating $512 \times 512$ ARGB raster buffers in JVM heap.
+4. **SPI Fail-Closed Isolation:**
+   - Web map addons interact with core exclusively through `rtp-api` and `maps-api` read-only primitives. They never hold chunk tickets or references to `TeleportPipelineTask`. Memory or CPU pressure on the web tier cannot stall regional ticking or candidate generation.
+
+---
+
+## 6. References
 - [ADR-016: Anvil Subsystem](ADR-016-anvil-subsystem.md)
 - [ADR-046: maps-api Module](ADR-046-maps-api-module.md)
 - [ADR-077: Multi-Format Region Support](ADR-077-multi-format-region-support.md)

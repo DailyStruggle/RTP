@@ -5,9 +5,7 @@ import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 
-import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.List;
 
 /**
  * Command execution effect (effects-api-ADR-007).

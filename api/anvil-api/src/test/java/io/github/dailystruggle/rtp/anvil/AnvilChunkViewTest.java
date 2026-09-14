@@ -64,6 +64,14 @@ class AnvilChunkViewTest {
     void decodeRejectsSingleEntryPalette() {
         assertThrows(IllegalArgumentException.class,
                 () -> PackedPaletteDecoder.decode(new long[]{0L}, 1, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> PackedPaletteDecoder.bitsPerEntry(0));
+        assertThrows(IndexOutOfBoundsException.class,
+                () -> PackedPaletteDecoder.entryIndex(-1, 0, 0));
+        assertThrows(IndexOutOfBoundsException.class,
+                () -> PackedPaletteDecoder.entryIndex(16, 0, 0));
+        assertThrows(IndexOutOfBoundsException.class,
+                () -> PackedPaletteDecoder.decode(new long[1], 16, 5000));
     }
 
     // --------------------------------------------------------------------- synthetic view round-trip

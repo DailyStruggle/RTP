@@ -59,6 +59,32 @@ class AbstractFileSchematicPasterCacheTest {
     assertNotSame(first, afterClear, "clearCache forces a fresh decode");
   }
 
+  @Test
+  void testSupportsAndLoadEdgeCases() throws Exception {
+    NoopPaster paster = new NoopPaster();
+
+    // supports
+    org.junit.jupiter.api.Assertions.assertFalse(paster.supports(null));
+    Path file = writeFixture();
+    SchematicSource schemSource = new SchematicSource("test", file, "schem");
+    SchematicSource schematicSource = new SchematicSource("test", file, "schematic");
+    SchematicSource emptyHintSource = new SchematicSource("test", file, "");
+    SchematicSource invalidHintSource = new SchematicSource("test", file, "nbt");
+    SchematicSource nonExistentSource = new SchematicSource("test", Path.of("does_not_exist.schem"), "schem");
+
+    org.junit.jupiter.api.Assertions.assertTrue(paster.supports(schemSource));
+    org.junit.jupiter.api.Assertions.assertTrue(paster.supports(schematicSource));
+    org.junit.jupiter.api.Assertions.assertTrue(paster.supports(emptyHintSource));
+    org.junit.jupiter.api.Assertions.assertFalse(paster.supports(invalidHintSource));
+    org.junit.jupiter.api.Assertions.assertFalse(paster.supports(nonExistentSource));
+
+    // load null
+    org.junit.jupiter.api.Assertions.assertNull(paster.load(null).get());
+
+    // load failing file
+    org.junit.jupiter.api.Assertions.assertNull(paster.load(nonExistentSource).get());
+  }
+
   private static LoadedSchematic load(AbstractFileSchematicPaster paster, SchematicSource source)
       throws InterruptedException, ExecutionException {
     return paster.load(source).get();

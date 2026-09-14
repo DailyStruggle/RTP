@@ -8,7 +8,6 @@ import io.github.dailystruggle.effectsapi.common.effects.SoundEffect;
 import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
-import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.potion.PotionEffectType;
 import org.junit.jupiter.api.AfterEach;
