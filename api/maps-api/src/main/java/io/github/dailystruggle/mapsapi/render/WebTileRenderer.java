@@ -2,11 +2,8 @@ package io.github.dailystruggle.mapsapi.render;
 
 import io.github.dailystruggle.mapsapi.image.ImageMapCanvas;
 import io.github.dailystruggle.mapsapi.model.ChartModel;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import javax.imageio.ImageIO;
 
 /**
  * Platform-neutral web map raster tile renderer (ADR-086).

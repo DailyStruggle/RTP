@@ -244,6 +244,7 @@ public class WorldBorderTest {
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void equals_null_returnsFalse() {
         WorldBorder wb = new WorldBorder(() -> new Circle(), l -> true);
+        assertFalse(wb.equals(null));
         assertNotEquals(null, wb);
     }
 
@@ -251,6 +252,7 @@ public class WorldBorderTest {
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void equals_differentType_returnsFalse() {
         WorldBorder wb = new WorldBorder(() -> new Circle(), l -> true);
+        assertFalse(wb.equals("not a WorldBorder"));
         assertNotEquals("not a WorldBorder", wb);
     }
 
@@ -266,6 +268,7 @@ public class WorldBorderTest {
         WorldBorder wb1 = new WorldBorder(s, f);
         WorldBorder wb2 = new WorldBorder(s, f);
         assertEquals(wb1.hashCode(), wb2.hashCode());
+        assertNotEquals(0, wb1.hashCode(), "hashCode should not be 0 for valid objects");
     }
 
     // -----------------------------------------------------------------------

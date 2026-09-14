@@ -140,7 +140,7 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 | `platforms/rtp-fabric/` | Fabric platform adapter and mod entry point. |
 | `platforms/rtp-neoforge/` | NeoForge platform adapter and mod entry point. |
 | `addons/` | Example addons: Iris integration, Glide. (Claim plugin integrations are folded into the core). |
-| `Python Test Scripts/` | Visualisation scripts for distribution math and geometry validation. |
+| `python_test_scripts/` | Visualisation scripts for distribution math and geometry validation. |
 
 ---
 

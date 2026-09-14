@@ -27,9 +27,12 @@ class PlayerMoveSamplerTest {
     private MockRTPServerAccessor accessor;
     private final List<AutoCloseable> handles = new ArrayList<>();
 
+    @org.junit.jupiter.api.io.TempDir
+    java.io.File tempDir;
+
     @BeforeEach
     void setUp() {
-        accessor = new MockRTPServerAccessor(new java.io.File("build/tmp/player-move-sampler-test"));
+        accessor = new MockRTPServerAccessor(tempDir);
         RTP.serverAccessor = accessor;
     }
 

@@ -144,7 +144,7 @@ The 1D-over-2D spatial-memory decision predates this repository and is documente
   the total before randomizing and shifting the random point by the missing area under the curve (probably
   by keeping running tabs on each 'bad sector' on the disc)".
 - r/admincraft, **"[info] testing different teleportation optimizations"** (`/comments/p0vu0d`) — follow-up.
-- [`Python Test Scripts/randomDonutFixed - Spatial Indexing.py`](../../Python%20Test%20Scripts/) — surviving
+- [`python_test_scripts/randomDonutFixed - Spatial Indexing.py`](../../python_test_scripts/) — surviving
   script from that period implementing the 1D-area to (radius, rotation) bijection and indexing a region
   into 1D occupancy spans; the direct ancestor of `MemoryShape`.
 

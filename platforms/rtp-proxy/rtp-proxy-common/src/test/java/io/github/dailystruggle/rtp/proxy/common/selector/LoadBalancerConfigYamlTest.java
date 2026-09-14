@@ -144,4 +144,34 @@ class LoadBalancerConfigYamlTest {
                 () -> LoadBalancerConfigYaml.fromMap(lb));
         assertTrue(ex.getMessage().contains("cpuLoad"));
     }
+
+    @Test
+    @DisplayName("List of terms and invalid structures throw")
+    void termsListAndInvalidStructures() {
+        // List of terms
+        Map<String, Object> term1 = Map.of("input", "mspt", "weight", 1.0);
+        Map<String, Object> term2 = Map.of("input", "tps", "weight", 2.0);
+        LoadBalancerConfig cfg = LoadBalancerConfigYaml.fromMap(Map.of("terms", List.of(term1, term2)));
+        assertEquals(2, cfg.terms().size());
+
+        // Invalid terms node (e.g. integer)
+        assertThrows(IllegalArgumentException.class,
+                () -> LoadBalancerConfigYaml.fromMap(Map.of("terms", 123)));
+
+        // Invalid term entry (e.g. integer instead of map)
+        assertThrows(IllegalArgumentException.class,
+                () -> LoadBalancerConfigYaml.fromMap(Map.of("terms", Map.of("bad", 456))));
+
+        // Missing input
+        assertThrows(IllegalArgumentException.class,
+                () -> LoadBalancerConfigYaml.fromMap(Map.of("terms", List.of(Map.of("weight", 1.0)))));
+
+        // Invalid curve node (e.g. integer)
+        assertThrows(IllegalArgumentException.class,
+                () -> LoadBalancerConfigYaml.fromMap(Map.of("terms", Map.of("t", Map.of("input", "mspt", "curve", 789)))));
+
+        // Invalid backends node
+        assertThrows(IllegalArgumentException.class,
+                () -> LoadBalancerConfigYaml.fromMap(Map.of("backends", "not-a-map")));
+    }
 }

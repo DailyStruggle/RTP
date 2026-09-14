@@ -125,25 +125,77 @@ public class LocationGenerator implements ILocationGenerator {
 
     // ==========================================================================
     // Deprecated static sync shims - retained for test + internal back-compat
+    // Per DEPRECATION_POLICY.md: synchronous blocking shims violate S-005.
+    // Use async getLocationFuture(...) or ILocationGenerator methods instead.
     // ==========================================================================
 
-    @Deprecated
+    /**
+     * Synchronous blocking shim.
+     *
+     * @param region region to generate from
+     * @param context generation context
+     * @return generation result
+     * @deprecated As of 3.1.0, forRemoval = true. Synchronous chunk I/O or waiting on
+     *             the main thread violates prohibition S-005. Use
+     *             {@link #getLocation(Object, GenerationContext)} or
+     *             {@link #getLocationFuture(Region, RTPCommandSender, RTPPlayer, Set)} instead.
+     *             Scheduled for removal in milestone 4.0.0.
+     */
+    @Deprecated(since = "3.1.0", forRemoval = true)
     public static GenerationResult getLocation(Region region, GenerationContext context) {
         return joinSafely(getLocationFuture(region, context.sender(), context.player(), context.biomeNames()));
     }
 
-    @Deprecated
+    /**
+     * Synchronous blocking shim.
+     *
+     * @param region region to generate from
+     * @param context generation context
+     * @return generation result
+     * @deprecated As of 3.1.0, forRemoval = true. Synchronous chunk I/O or waiting on
+     *             the main thread violates prohibition S-005. Use
+     *             {@link #generateLocation(Object, GenerationContext)} or
+     *             {@link #getLocationFuture(Region, Set)} instead.
+     *             Scheduled for removal in milestone 4.0.0.
+     */
+    @Deprecated(since = "3.1.0", forRemoval = true)
     public static GenerationResult generateLocation(Region region, GenerationContext context) {
         return joinSafely(getLocationFuture(region, context.biomeNames()));
     }
 
-    @Deprecated
+    /**
+     * Synchronous blocking shim.
+     *
+     * @param region region to generate from
+     * @param sender command sender
+     * @param player player to teleport
+     * @param biomeNames targeted biomes
+     * @return generation result
+     * @deprecated As of 3.1.0, forRemoval = true. Synchronous chunk I/O or waiting on
+     *             the main thread violates prohibition S-005. Use
+     *             {@link #getLocation(Object, RTPCommandSender, RTPPlayer, Set)} or
+     *             {@link #getLocationFuture(Region, RTPCommandSender, RTPPlayer, Set)} instead.
+     *             Scheduled for removal in milestone 4.0.0.
+     */
+    @Deprecated(since = "3.1.0", forRemoval = true)
     public static GenerationResult getLocation(
             Region region, RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
         return joinSafely(getLocationFuture(region, sender, player, biomeNames));
     }
 
-    @Deprecated
+    /**
+     * Synchronous blocking shim.
+     *
+     * @param region region to generate from
+     * @param biomeNames targeted biomes
+     * @return generation result
+     * @deprecated As of 3.1.0, forRemoval = true. Synchronous chunk I/O or waiting on
+     *             the main thread violates prohibition S-005. Use
+     *             {@link #getLocation(Object, Set)} or
+     *             {@link #getLocationFuture(Region, Set)} instead.
+     *             Scheduled for removal in milestone 4.0.0.
+     */
+    @Deprecated(since = "3.1.0", forRemoval = true)
     @Nullable
     public static GenerationResult getLocation(Region region, @Nullable Set<String> biomeNames) {
         return joinSafely(getLocationFuture(region, biomeNames));

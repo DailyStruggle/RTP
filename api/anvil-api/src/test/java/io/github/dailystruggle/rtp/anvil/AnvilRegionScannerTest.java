@@ -201,6 +201,13 @@ class AnvilRegionScannerTest {
     }
 
     @Test
+    @DisplayName("scanBiomes null worldFolder and edge case resolution")
+    void testScanBiomesNullWorld() {
+        assertTrue(AnvilRegionScanner.scanBiomes(null, "").isEmpty());
+        assertTrue(AnvilRegionScanner.scanBiomes(null, "DIM-1").isEmpty());
+    }
+
+    @Test
     @DisplayName("scanBiomesAsync completes with the same set the synchronous variant returns")
     void asyncVariantProducesSameResult() throws IOException, ExecutionException, InterruptedException {
         Path world = Files.createDirectory(tmp.resolve("world"));

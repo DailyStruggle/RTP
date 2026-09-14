@@ -297,7 +297,7 @@ public final class AnvilReader implements RegionFileReader {
      * {@code Y}/{@code block_states}/{@code biomes}. Everything else is skipped without
      * allocation. Sections outside the probe's Y window are dropped entirely.
      */
-    private static Nbt.SelectiveFilter.Decision columnProbeDecision(
+    static Nbt.SelectiveFilter.Decision columnProbeDecision(
             List<String> path, String name, byte type) {
         int depth = path.size();
         if (depth == 0) {
@@ -336,6 +336,12 @@ public final class AnvilReader implements RegionFileReader {
             }
         }
         return Nbt.SelectiveFilter.Decision.SKIP;
+    }
+
+    /** Package-private hook for testing columnProbeDecision branches. */
+    static Nbt.SelectiveFilter.Decision columnProbeDecisionForTest(
+            List<String> path, String name, byte type) {
+        return columnProbeDecision(path, name, type);
     }
 
     /**

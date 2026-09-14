@@ -1,5 +1,5 @@
 <!--
-Markdown mirror of FRONT_PAGE_LITE.bbcode (free LeafRTP front page).
+Markdown mirror of FRONT_PAGE_LITE.bbcode (free LeafRTP front page, located in scripts/release/FRONT_PAGE_LITE.bbcode).
 Kept in sync with the BBCode source by hand; update both when changing copy.
 
 Marketplace listing metadata (current, for SEO reference):
@@ -170,6 +170,30 @@ EzRTP's 7 watchdog stalls (one region unresponsive 20.4 s) are the server's own 
 **What this doesn't claim.** It doesn't claim the other plugins are bad - they're tested at their default queue configuration against LeafRTP at its recommended one, which is what most users actually get, and EzRTP cutting max attempts under heap pressure is a good catch on their part that I'd want to describe more precisely before drawing conclusions from it. It doesn't extrapolate past 2-3 concurrent clients. It doesn't measure correctness, safety, or claim-plugin compatibility - only dispatch-to-arrival latency, per-attempt cost, and success rate.
 
 Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP). Video benchmark of `/rtp` on a custom world generator: [youtu.be/V0NyNK9JydM](https://youtu.be/V0NyNK9JydM).
+
+#### Empirical Spatial Distribution & Candidate Selection Benchmarks
+
+Comparative benchmark runs evaluate player dispersion, collision avoidance, and downsampling models:
+
+<div align="center">
+
+##### Spatial Density & Overlap Simulation (Polar vs. Hilbert vs. Strided vs. Continuous Rotation)
+![Overlap Simulation Comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/overlap_simulation_comparison.png)
+*2D heatmaps showing spatial density and collision counts over repeated teleports: Classic Polar (1/r spiral) clumping vs. Uniform Random vs. Strided Hilbert lattice.*
+
+##### Player Journey & Macro Population Distribution (S=1 vs. S=64 vs. S=256)
+![Player Distribution Comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/player_distribution_comparison.png)
+*Macro arrival spread across 500 consecutive server teleports comparing sequential curve walks against strided candidate lattices.*
+
+##### Downsampling & Memory Model Comparison (Arrivals, Spacing & Memory Footprint)
+![Side-by-Side Downsampling Comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/side_by_side_downsampling_comparison_chart.png)
+*Empirical evaluation of candidate spacing, nearest-neighbor distribution, and memory reduction.*
+
+##### Dual-Layer Geometry & Circle Boundary Fidelity
+![Circle Comparison Side-by-Side](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/simulation_circle_comparison_side_by_side.png)
+*Side-by-side comparison of circle boundary coverage: ground truth vs. classic polar spiral vs. dual-layer square at varying resolutions.*
+
+</div>
 
 </details>
 

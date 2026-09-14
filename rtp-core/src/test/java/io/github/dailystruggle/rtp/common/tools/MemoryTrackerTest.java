@@ -137,4 +137,37 @@ public class MemoryTrackerTest {
         MemoryTracker.untrack(taskId);
         assertEquals(0, MemoryTracker.trackedCount());
     }
+
+    @Test
+    void runDiagnosticsWithChunkTicketsAndRunnableLifecycle() throws Exception {
+        // Track an expired RTPRunnable
+        java.util.concurrent.atomic.AtomicBoolean ran = new java.util.concurrent.atomic.AtomicBoolean(false);
+        RTPRunnable runnable = new RTPRunnable(() -> ran.set(true));
+        UUID runId = MemoryTracker.track(runnable, "runnable-leak", 0L);
+
+        // Track an expired TeleportPipelineTask wrapped in TrackedRTPTask
+        UUID playerId = UUID.randomUUID();
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(playerId, "MemPlayer", null);
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor).addPlayer(player);
+
+        io.github.dailystruggle.rtp.api.selection.GenerationContext ctx =
+                new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, java.util.Collections.emptySet());
+        io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pipelineTask =
+                new io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask(ctx);
+        TrackedRTPTask trackedTask = new TrackedRTPTask(pipelineTask, UUID.randomUUID());
+        UUID pipelineId = MemoryTracker.track(trackedTask, "pipeline-leak", 0L);
+
+        // Ensure isLeaking() evaluates to true by sleeping 5ms past 0L lifespan
+        Thread.sleep(5L);
+
+        // Run sweep diagnostics
+        MemoryTracker.runDiagnostics();
+
+        // The pipeline task should be cancelled and purged
+        assertTrue(pipelineTask.isCancelled());
+        MemoryTracker.untrack(runId);
+        MemoryTracker.untrack(pipelineId);
+        assertEquals(0, MemoryTracker.trackedCount());
+    }
 }

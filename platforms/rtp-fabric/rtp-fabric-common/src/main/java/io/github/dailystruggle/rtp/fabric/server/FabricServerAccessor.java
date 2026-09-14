@@ -2297,4 +2297,32 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
     @Override public RTPCommandSender clone() { return new FabricConsoleSender(server); }
   }
+
+  // ---------------------------------------------------------------------------
+  // Command registration SPI
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void registerCommands(Object rootCommand, String... aliases) {
+    if (rootCommand == null) return;
+    io.github.dailystruggle.commandsapi.brigadier.BrigadierBridgeContext<Object> bridgeCtx =
+        new io.github.dailystruggle.commandsapi.brigadier.BrigadierBridgeContext<>(
+            io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge::resolveSenderUuid,
+            io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge::checkPermission,
+            (src, msg) -> {
+              if (msg == null) return;
+              try {
+                UUID uuid = io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge.resolveSenderUuid(src);
+                if (uuid != null && !uuid.equals(RTPAPI.serverId)) {
+                  sendMessage(uuid, msg, null);
+                } else {
+                  log(Level.INFO, msg);
+                }
+              } catch (Throwable t) {
+                log(Level.WARNING, "[RTP][Fabric] Brigadier sendMessage failed: " + t.getMessage());
+              }
+            });
+    io.github.dailystruggle.rtp.fabric.commands.FabricCommandRegistrar
+        .registerRtpCommand(rootCommand, bridgeCtx, aliases);
+  }
 }

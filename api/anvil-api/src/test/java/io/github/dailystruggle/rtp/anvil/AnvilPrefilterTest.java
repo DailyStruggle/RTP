@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.anvil;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -174,6 +175,85 @@ class AnvilPrefilterTest {
     assertTrue(stats.hits() >= 1,
         "second probe of same region should register as a cache hit (proves "
             + "prefilter is not bypassing AnvilRegionByteCache); stats=" + stats);
+  }
+
+  @Test
+  @DisplayName("Prefilter probe handles corrupt or missing entries and edge cases")
+  void prefilterCorruptAndEdgeCases(@TempDir Path worldFolder) throws IOException {
+    // Missing region file returns UNKNOWN
+    Verdict missing = AnvilPrefilter.probeSync(worldFolder, "", 10, 10, Set.of());
+    assertEquals(Verdict.UNKNOWN, missing);
+
+    // Empty root / missing heightmap / missing sections returns UNKNOWN
+    LinkedHashMap<String, Object> emptyRoot = new LinkedHashMap<>();
+    emptyRoot.put("DataVersion", DataVersionSupport.MC_1_20_DATA_VERSION);
+    writeSyntheticRegion(worldFolder, 0, 0, emptyRoot);
+    Verdict emptyVerdict = AnvilPrefilter.probeSync(worldFolder, "", 0, 0, Set.of());
+    assertEquals(Verdict.UNKNOWN, emptyVerdict);
+
+    // Corrupt region file (truncated)
+    Path regionDir = worldFolder.resolve("region");
+    Files.createDirectories(regionDir);
+    Files.write(regionDir.resolve("r.1.1.mca"), new byte[100]); // < 8192
+    Verdict corrupt = AnvilPrefilter.probeSync(worldFolder, "", 32, 32, Set.of());
+    assertEquals(Verdict.UNKNOWN, corrupt);
+
+    // Additional branches:
+    // 1. worldFolder == null in probeDetailed
+    AnvilPrefilter.ProbeResult nullWorldRes = AnvilPrefilter.probeDetailed(null, null, 0, 0, Set.of(), null).join();
+    assertEquals(Verdict.UNKNOWN, nullWorldRes.verdict());
+
+    // 2. probeSyncDetailed with null unsafe set returns ACCEPT
+    Path cleanWorld = worldFolder.resolve("cleanWorld");
+    Files.createDirectories(cleanWorld);
+    LinkedHashMap<String, Object> stoneRoot = stoneAtOriginRoot();
+    writeSyntheticRegion(cleanWorld, 0, 0, stoneRoot);
+    AnvilPrefilter.ProbeResult nullUnsafeRes = AnvilPrefilter.probeSyncDetailed(cleanWorld, "", 0, 0, null);
+    assertEquals(Verdict.ACCEPT, nullUnsafeRes.verdict());
+    assertNotNull(nullUnsafeRes.view());
+
+    // 3. regionFileFor helper test with dimension subpath
+    Path overworldPath = AnvilPrefilter.regionFileFor(worldFolder, "", 0, 0);
+    assertTrue(overworldPath.toString().endsWith("r.0.0.mca"));
+    Path netherPath = AnvilPrefilter.regionFileFor(worldFolder, "DIM-1", 0, 0);
+    assertTrue(netherPath.toString().contains("DIM-1"));
+
+    // 4. Default reconciler edge cases
+    org.junit.jupiter.api.Assertions.assertNull(AnvilPrefilter.DEFAULT_RECONCILER.apply(null));
+    assertEquals("STONE", AnvilPrefilter.DEFAULT_RECONCILER.apply("minecraft:stone"));
+    assertEquals("LAVA", AnvilPrefilter.DEFAULT_RECONCILER.apply("lava"));
+
+    // 5. Unsafe block at groundY + 1 and groundY + 2
+    // Build root with stone at groundY=0 and lava at groundY+1=1
+    List<String> lavaAbovePalette = Arrays.asList("minecraft:air", "minecraft:stone", "minecraft:lava");
+    int[] indices = new int[4096];
+    indices[PackedPaletteDecoder.entryIndex(0, 0, 0)] = 1; // groundY=0 -> stone
+    indices[PackedPaletteDecoder.entryIndex(0, 1, 0)] = 2; // groundY+1=1 -> lava
+    long[] packed = AnvilTestFixtures.packIndices(4, indices);
+    LinkedHashMap<String, Object> sec = AnvilTestFixtures.section((byte) 0, lavaAbovePalette, packed);
+    long[] hm = new long[37];
+    hm[0] = 1L; // column 0,0 has ground at relative 0
+    LinkedHashMap<String, Object> customRoot = AnvilTestFixtures.chunkRoot(
+        DataVersionSupport.MC_1_20_DATA_VERSION, hm, List.of(sec));
+
+    Path customWorld = worldFolder.resolve("customWorld");
+    Files.createDirectories(customWorld);
+    writeSyntheticRegion(customWorld, 0, 0, customRoot);
+    Verdict customVerdict = AnvilPrefilter.probeSync(customWorld, "", 0, 0, Set.of("LAVA"));
+    assertEquals(Verdict.REJECT, customVerdict);
+
+    // 6. Unsafe block at groundY + 2
+    int[] indices2 = new int[4096];
+    indices2[PackedPaletteDecoder.entryIndex(0, 0, 0)] = 1; // groundY=0 -> stone
+    indices2[PackedPaletteDecoder.entryIndex(0, 2, 0)] = 2; // groundY+2=2 -> lava
+    long[] packed2 = AnvilTestFixtures.packIndices(4, indices2);
+    LinkedHashMap<String, Object> sec2 = AnvilTestFixtures.section((byte) 0, lavaAbovePalette, packed2);
+    LinkedHashMap<String, Object> customRoot2 = AnvilTestFixtures.chunkRoot(
+        DataVersionSupport.MC_1_20_DATA_VERSION, hm, List.of(sec2));
+    Path customWorld2 = worldFolder.resolve("customWorld2");
+    Files.createDirectories(customWorld2);
+    writeSyntheticRegion(customWorld2, 0, 0, customRoot2);
+    assertEquals(Verdict.REJECT, AnvilPrefilter.probeSync(customWorld2, "", 0, 0, Set.of("LAVA")));
   }
 
   // ---------------------------------------------------------------------------- helpers

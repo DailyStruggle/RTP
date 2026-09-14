@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
-import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.OnlinePlayerParameter;
+import io.github.dailystruggle.rtp.bukkitplatform.commands.parameters.OnlinePlayerParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;

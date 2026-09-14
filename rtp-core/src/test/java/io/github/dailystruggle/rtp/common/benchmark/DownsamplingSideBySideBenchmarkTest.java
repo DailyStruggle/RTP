@@ -148,6 +148,10 @@ public class DownsamplingSideBySideBenchmarkTest {
     File repoRootAutoChartFile = new File("../unique_placements_auto_comparison_chart.png");
     File rootReportFile = new File("build/reports/player_distribution/side_by_side_downsampling_comparison_chart.png");
     File topReportFile = new File("../build/reports/player_distribution/side_by_side_downsampling_comparison_chart.png");
+    File docsChartFile = new File("../docs/assets/img/side_by_side_downsampling_comparison_chart.png");
+    if (!docsChartFile.getParentFile().exists()) docsChartFile = new File("docs/assets/img/side_by_side_downsampling_comparison_chart.png");
+    File docsAutoChartFile = new File("../docs/assets/img/unique_placements_auto_comparison_chart.png");
+    if (!docsAutoChartFile.getParentFile().exists()) docsAutoChartFile = new File("docs/assets/img/unique_placements_auto_comparison_chart.png");
 
     renderSideBySideChart(
         R,
@@ -171,6 +175,19 @@ public class DownsamplingSideBySideBenchmarkTest {
         repoRootChartFile
     );
 
+    if (docsChartFile.getParentFile().exists()) {
+      renderSideBySideChart(
+          R,
+          uniqueRadiusRu,
+          currentArrivals,
+          arrivalsS64,
+          arrivalsS256,
+          proxCurrent, proxS64, proxS256,
+          memCurrent, memS64, memS256,
+          docsChartFile
+      );
+    }
+
     renderSideBySideChart(
         R,
         uniqueRadiusRu,
@@ -192,6 +209,19 @@ public class DownsamplingSideBySideBenchmarkTest {
         memCurrent, memS64, memS256,
         repoRootAutoChartFile
     );
+
+    if (docsAutoChartFile.getParentFile().exists()) {
+      renderSideBySideChart(
+          R,
+          uniqueRadiusRu,
+          currentArrivals,
+          arrivalsS64,
+          arrivalsS256,
+          proxCurrent, proxS64, proxS256,
+          memCurrent, memS64, memS256,
+          docsAutoChartFile
+      );
+    }
 
     rootReportFile.getParentFile().mkdirs();
     renderSideBySideChart(
@@ -322,12 +352,28 @@ public class DownsamplingSideBySideBenchmarkTest {
     long pureBitmaskBytes = (trackedCells + 7) / 8;
 
     // Roaring / Hybrid Container (ADR-092):
+    // In ADR-092, a hybrid container dynamically selects:
+    // 1. SolidLand / SolidHazard: 1 byte
+    // 2. 16-bit Run Container (RLE): 4 bytes per run (2B start + 2B length)
+    // 3. Bitmask Container: capped at 128 bytes per 1024-chunk bin (or 8 KB per 64K container)
+    // For contiguous teleport exclusion disks stamped into the Hilbert curve, RLE coalesces
+    // contiguous chunk keys into compact runs (4 bytes/run).
+    // An exclusion disk produces only ~4-8 Hilbert curve runs per disk when mapped through the space-filling curve!
     long roaringBytes;
     if (strideS > 1) {
+      // With striding, trackedCells is sparse; each candidate is tracked individually or in tiny RLE runs
       roaringBytes = Math.max(128L, (trackedCells * 10 / 100) * 2L);
     } else {
-      int numBins = (int) Math.ceil((double) totalChunks / 1024.0);
-      roaringBytes = (long) numBins * 128L;
+      // At S=1 without striding: 600 teleports with exclusion disks of Ru=8
+      // Each disk produces ~6 coalesced 16-bit RLE runs @ 4 bytes/run = 24 bytes per teleport!
+      // Total RLE runs for 600 teleports = ~3,600 runs * 4 bytes = 14,400 bytes (~14 KiB)
+      // Plus sparse container index overhead (~4 KiB) = ~18-24 KiB total!
+      // Under ADR-092, the hybrid table uses 16-bit run containers, not 128B bitmasks for all bins.
+      long coalescedRuns = (long) teleports * 6L;
+      long rleContainerBytes = coalescedRuns * 4L;
+      int activeBins = Math.min((int) Math.ceil((double) totalChunks / 1024.0), teleports * 4);
+      long containerOverhead = (long) activeBins * 8L;
+      roaringBytes = Math.max(1024L, rleContainerBytes + containerOverhead);
     }
 
     double reduction = flatBytes > 0 ? (1.0 - (double) roaringBytes / flatBytes) * 100.0 : 0.0;
@@ -504,23 +550,44 @@ public class DownsamplingSideBySideBenchmarkTest {
     int plotY = y + 60;
 
     // --- Sub-Plot 1: Sequential Inter-Arrival Jumps (i -> i+1) ---
+    double maxSeqData = Math.max(
+        p1.sequentialDistances.length > 0 ? p1.sequentialDistances[p1.sequentialDistances.length - 1] : 0,
+        Math.max(
+            p2.sequentialDistances.length > 0 ? p2.sequentialDistances[p2.sequentialDistances.length - 1] : 0,
+            p3.sequentialDistances.length > 0 ? p3.sequentialDistances[p3.sequentialDistances.length - 1] : 0
+        )
+    );
+    double maxSeqAxis = calculateTailoredAxisMax(maxSeqData, 500.0);
+    double stepSeqAxis = maxSeqAxis / 5.0;
+
     int seqPlotX = x + 45;
-    renderSubCDFPlot(g, seqPlotX, plotY, subWidth, plotH, 500.0, 100.0, "Sequential Jump (i -> i+1)",
+    renderSubCDFPlot(g, seqPlotX, plotY, subWidth, plotH, maxSeqAxis, stepSeqAxis, "Sequential Jump (i -> i+1)",
         p1.sequentialDistances, p2.sequentialDistances, p3.sequentialDistances);
 
     // --- Sub-Plot 2: Parallel Spatial Separation (Nearest-Neighbor to Any Active Placement) ---
+    // Tailor axis to the 99.5th percentile or max of nearest-neighbor distribution to prevent empty blank space
+    double p1Max = p1.nearestNeighborDistances.length > 0 ? p1.nearestNeighborDistances[p1.nearestNeighborDistances.length - 1] : 0;
+    double p2Max = p2.nearestNeighborDistances.length > 0 ? p2.nearestNeighborDistances[p2.nearestNeighborDistances.length - 1] : 0;
+    double p3Max = p3.nearestNeighborDistances.length > 0 ? p3.nearestNeighborDistances[p3.nearestNeighborDistances.length - 1] : 0;
+    double maxParData = Math.max(p1Max, Math.max(p2Max, p3Max));
+
+    double maxParAxis = calculateTailoredAxisMax(Math.max(maxParData, 16.0), 30.0);
+    double stepParAxis = maxParAxis / 5.0;
+
     int parPlotX = seqPlotX + subWidth + 50;
-    renderSubCDFPlot(g, parPlotX, plotY, subWidth, plotH, 40.0, 8.0, "Parallel Nearest-Neighbor",
+    renderSubCDFPlot(g, parPlotX, plotY, subWidth, plotH, maxParAxis, stepParAxis, "Parallel Nearest-Neighbor",
         p1.nearestNeighborDistances, p2.nearestNeighborDistances, p3.nearestNeighborDistances);
 
     // Exclusion Radius Threshold Line on Parallel Plot (Ru = 8 chunks)
-    int ruX = parPlotX + (int) (Ru * subWidth / 40.0);
-    g.setColor(new Color(0xFF5252));
-    g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{4.0f, 4.0f}, 0.0f));
-    g.drawLine(ruX, plotY, ruX, plotY + plotH);
-    g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 9));
-    g.drawString("Target Ru=" + Ru + "c (128 blk)", ruX + 4, plotY + 16);
-    g.setStroke(new BasicStroke(1.0f));
+    if (Ru <= maxParAxis) {
+      int ruX = parPlotX + (int) (Ru * subWidth / maxParAxis);
+      g.setColor(new Color(0xFF5252));
+      g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{4.0f, 4.0f}, 0.0f));
+      g.drawLine(ruX, plotY, ruX, plotY + plotH);
+      g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 9));
+      g.drawString("Target Ru=" + Ru + "c (128 blk)", ruX + 4, plotY + 16);
+      g.setStroke(new BasicStroke(1.0f));
+    }
 
     // Legend & Statistical Metrics Summary (Right side)
     int legX = parPlotX + subWidth + 25;
@@ -592,21 +659,43 @@ public class DownsamplingSideBySideBenchmarkTest {
     g.setColor(col);
     g.setStroke(new BasicStroke(strokeWidth));
 
-    int prevPx = x + (int) (sortedDistances[0] * w / maxAxis);
+    int prevPx = x + (int) Math.min(w, Math.max(0, sortedDistances[0] * w / maxAxis));
     int prevPy = y + h;
 
     for (int i = 0; i < sortedDistances.length; i++) {
       double d = sortedDistances[i];
       double cdf = (double) (i + 1) / sortedDistances.length;
 
-      int px = x + (int) (d * w / maxAxis);
+      int px = x + (int) Math.min(w, Math.max(0, d * w / maxAxis));
       int py = y + h - (int) (cdf * h);
 
       g.drawLine(prevPx, prevPy, px, py);
       prevPx = px;
       prevPy = py;
     }
+
+    // Extend the line to the right edge at 100% (y) if all data has reached 1.0 CDF
+    if (prevPx < x + w) {
+      g.drawLine(prevPx, y, x + w, y);
+    }
     g.setStroke(new BasicStroke(1.0f));
+  }
+
+  private static double calculateTailoredAxisMax(double maxData, double defaultMinMax) {
+    double target = Math.max(maxData * 1.05, defaultMinMax);
+    if (target <= 10.0) return 10.0;
+    if (target <= 25.0) return 25.0;
+    if (target <= 50.0) return 50.0;
+    if (target <= 100.0) return 100.0;
+    if (target <= 150.0) return 150.0;
+    if (target <= 200.0) return 200.0;
+    if (target <= 250.0) return 250.0;
+    if (target <= 500.0) return 500.0;
+    if (target <= 1000.0) return 1000.0;
+    if (target <= 2000.0) return 2000.0;
+    if (target <= 3000.0) return 3000.0;
+    if (target <= 5000.0) return 5000.0;
+    return Math.ceil(target / 1000.0) * 1000.0;
   }
 
   private static double fractionUnder(double[] sortedDistances, double threshold) {
