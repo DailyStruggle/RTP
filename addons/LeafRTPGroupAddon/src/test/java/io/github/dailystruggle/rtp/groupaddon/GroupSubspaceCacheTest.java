@@ -73,6 +73,8 @@ public class GroupSubspaceCacheTest {
     @Override public int[] select() { return new int[]{100, 100}; }
     @Override public long rand() { return 0; }
     @Override public boolean contains(int x, int z) { return true; }
+    @Override public boolean isKnownBad(int cx, int cz) { return false; }
+    @Override public boolean isKnownBad(long location) { return false; }
   }
 
   private Region createDummyRegion(DummyMemoryShape shape) {

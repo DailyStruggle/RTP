@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -39,15 +40,23 @@ class RegionCandidateValidatorTest {
     @TempDir
     File tempDir;
 
-    private Region region;
     private MockRTPWorld world;
+    private VerticalAdjustor<?> mockVert;
 
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir);
         MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
-        world = (MockRTPWorld) accessor.getRTPWorld("world");
-        region = (Region) RTP.selectionAPI.getRegion("default");
+        world = new MockRTPWorld("world");
+        accessor.addWorld(world);
+        mockVert = mock(VerticalAdjustor.class);
+
+        @SuppressWarnings("unchecked")
+        ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        if (safetyParser != null) {
+            safetyParser.set(SafetyKeys.safetyRadius, 0);
+            safetyParser.set(SafetyKeys.platformRadius, 0);
+        }
     }
 
     @AfterEach
@@ -67,7 +76,7 @@ class RegionCandidateValidatorTest {
     void validateNullWorld() {
         Region mockRegion = mock(Region.class);
         doReturn(null).when(mockRegion).getWorld();
-        doReturn(region.getVert()).when(mockRegion).getVert();
+        doReturn(mockVert).when(mockRegion).getVert();
 
         RegionCandidateValidator validator = new RegionCandidateValidator(mockRegion);
         assertNull(validator.validate(0, 0));
@@ -92,7 +101,7 @@ class RegionCandidateValidatorTest {
 
         Region mockRegion = mock(Region.class);
         doReturn(mockWorld).when(mockRegion).getWorld();
-        doReturn(region.getVert()).when(mockRegion).getVert();
+        doReturn(mockVert).when(mockRegion).getVert();
 
         RegionCandidateValidator validator = new RegionCandidateValidator(mockRegion);
         assertNull(validator.validate(100, 200));
@@ -107,7 +116,6 @@ class RegionCandidateValidatorTest {
         when(mockChunk.z()).thenReturn(0);
         when(mockWorld.getCachedChunk(anyLong())).thenReturn((RTPChunk) mockChunk);
 
-        VerticalAdjustor<?> mockVert = mock(VerticalAdjustor.class);
         when(mockVert.adjustColumn(any(), anyInt(), anyInt())).thenReturn(null);
 
         Region mockRegion = mock(Region.class);
@@ -131,11 +139,12 @@ class RegionCandidateValidatorTest {
         when(mockWorld.getCachedChunk(centerKey)).thenReturn((RTPChunk) centerChunk);
 
         // Configure a safety radius > 0 so neighbour chunks are queried
-        ConfigParser<SafetyKeys> safetyParser = mock(ConfigParser.class);
-        when(safetyParser.getNumber(eq(SafetyKeys.safetyRadius), any())).thenReturn(2);
-        when(RTP.configs.getParser(SafetyKeys.class)).thenReturn(safetyParser);
+        @SuppressWarnings("unchecked")
+        ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        if (safetyParser != null) {
+            safetyParser.set(SafetyKeys.safetyRadius, 2);
+        }
 
-        VerticalAdjustor<?> mockVert = mock(VerticalAdjustor.class);
         // Position at chunk edge (15, 15) so safety radius spills into neighbor chunk (1, 1)
         when(mockVert.adjustColumn(any(), eq(15), eq(15))).thenReturn(new RTPCoords("world", 15, 64, 15));
 
@@ -151,19 +160,27 @@ class RegionCandidateValidatorTest {
     @DisplayName("validate returns null when SafetyScan.isColumnSafe returns false")
     void validateUnsafeColumn() {
         RTPWorld<?> mockWorld = mock(RTPWorld.class);
+        when(mockWorld.name()).thenReturn("world");
+        when(mockWorld.getMinHeight()).thenReturn(-64);
+        when(mockWorld.getMaxHeight()).thenReturn(320);
+
         RTPChunk<?> mockChunk = mock(RTPChunk.class);
         when(mockChunk.x()).thenReturn(0);
         when(mockChunk.z()).thenReturn(0);
+        when(mockChunk.getWorld()).thenReturn((RTPWorld) mockWorld);
         when(mockWorld.getCachedChunk(anyLong())).thenReturn((RTPChunk) mockChunk);
 
         // Substanding block is unsafe -> chunk.isSafe returns false
         doReturn(false).when(mockChunk).isSafe(anyInt(), anyInt(), anyInt(), any(Set.class));
 
-        VerticalAdjustor<?> mockVert = mock(VerticalAdjustor.class);
         when(mockVert.adjustColumn(any(), anyInt(), anyInt())).thenReturn(new RTPCoords("world", 5, 64, 5));
 
         // Configure unsafeBlocks to include LAVA
-        when(RTP.configs.getConfigValue(eq(BlocksKeys.unsafeBlocks), any())).thenReturn(List.of("LAVA"));
+        @SuppressWarnings("unchecked")
+        ConfigParser<BlocksKeys> blocksParser = (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+        if (blocksParser != null) {
+            blocksParser.set(BlocksKeys.unsafeBlocks, List.of("LAVA"));
+        }
 
         Region mockRegion = mock(Region.class);
         doReturn(mockWorld).when(mockRegion).getWorld();
@@ -177,22 +194,25 @@ class RegionCandidateValidatorTest {
     @DisplayName("validate succeeds and returns location when column and neighbours are safe")
     void validateSuccessfulCandidate() {
         RTPWorld<?> mockWorld = mock(RTPWorld.class);
+        when(mockWorld.name()).thenReturn("world");
         when(mockWorld.getMinHeight()).thenReturn(-64);
         when(mockWorld.getMaxHeight()).thenReturn(320);
 
         RTPChunk<?> mockChunk = mock(RTPChunk.class);
         when(mockChunk.x()).thenReturn(0);
         when(mockChunk.z()).thenReturn(0);
+        when(mockChunk.getWorld()).thenReturn((RTPWorld) mockWorld);
         doReturn(true).when(mockChunk).isSafe(anyInt(), anyInt(), anyInt(), any(Set.class));
         when(mockWorld.getCachedChunk(anyLong())).thenReturn((RTPChunk) mockChunk);
 
-        VerticalAdjustor<?> mockVert = mock(VerticalAdjustor.class);
         when(mockVert.adjustColumn(any(), anyInt(), anyInt())).thenReturn(new RTPCoords("world", 5, 64, 5));
 
         // Safety radius 0 for minimal footprint
-        ConfigParser<SafetyKeys> safetyParser = mock(ConfigParser.class);
-        when(safetyParser.getNumber(eq(SafetyKeys.safetyRadius), any())).thenReturn(0);
-        when(RTP.configs.getParser(SafetyKeys.class)).thenReturn(safetyParser);
+        @SuppressWarnings("unchecked")
+        ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        if (safetyParser != null) {
+            safetyParser.set(SafetyKeys.safetyRadius, 0);
+        }
 
         Region mockRegion = mock(Region.class);
         doReturn(mockWorld).when(mockRegion).getWorld();
@@ -215,5 +235,31 @@ class RegionCandidateValidatorTest {
 
         RegionCandidateValidator validator = new RegionCandidateValidator(mockRegion);
         assertNull(validator.validate(0, 0));
+    }
+    @Test
+    @DisplayName("packChunkKey encodes and decodes correctly")
+    void packChunkKeyEncodesCorrectly() throws Exception {
+        java.lang.reflect.Method m = RegionCandidateValidator.class.getDeclaredMethod("packChunkKey", int.class, int.class);
+        m.setAccessible(true);
+        long key1 = (long) m.invoke(null, 5, -10);
+        assertEquals(5, (int) (key1 & 0xffffffffL));
+        assertEquals(-10, (int) (key1 >> 32));
+    }
+
+    @Test
+    @DisplayName("readSafetyRadius and readUnsafeBlocks boundary handling")
+    void readConfigMethods() throws Exception {
+        Region mockRegion = mock(Region.class);
+        RegionCandidateValidator validator = new RegionCandidateValidator(mockRegion);
+
+        java.lang.reflect.Method mSafe = RegionCandidateValidator.class.getDeclaredMethod("readSafetyRadius");
+        mSafe.setAccessible(true);
+        int safe = (int) mSafe.invoke(validator);
+        assertTrue(safe >= 0);
+
+        java.lang.reflect.Method mUnsafe = RegionCandidateValidator.class.getDeclaredMethod("readUnsafeBlocks");
+        mUnsafe.setAccessible(true);
+        Set<?> unsafe = (Set<?>) mUnsafe.invoke(validator);
+        assertNotNull(unsafe);
     }
 }

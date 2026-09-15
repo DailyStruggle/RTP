@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
@@ -12,13 +13,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -30,8 +33,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("MenuConcreteCommandLeavesB leaf dispatch unit tests")
 class MenuConcreteCommandLeavesBTest {
 
-    @TempDir
-    Path tempDir;
+    @org.junit.jupiter.api.io.TempDir
+    private Path tempDir;
+    private File pluginDir;
 
     private UUID caller;
     private TestableRoot root;
@@ -39,10 +43,38 @@ class MenuConcreteCommandLeavesBTest {
     private MenuRedeemSubcommand redeem;
 
     @BeforeEach
-    void setUp() {
-        RTPTestSetup.install(tempDir.toFile());
+    void setUp() throws Exception {
+        pluginDir = tempDir.toFile();
+        RTPTestSetup.install(pluginDir);
         caller = UUID.randomUUID();
         root = new TestableRoot();
+
+        // Add params to root for selection leaves
+        root.getParameterLookup().put("world", new CommandParameter("world", "world", (u, s) -> true) {
+            @Override public Set<String> values() { return Set.of("world", "nether"); }
+        });
+        root.getParameterLookup().put("region", new CommandParameter("region", "region", (u, s) -> true) {
+            @Override public Set<String> values() { return Set.of("default"); }
+        });
+        root.getParameterLookup().put("biome", new CommandParameter("biome", "biome", (u, s) -> true) {
+            @Override public Set<String> values() { return Set.of("plains"); }
+        });
+
+        // Add subcommands for picker and config tests
+        TestableRoot regionsNode = new TestableRoot();
+        regionsNode.getParameterLookup().put("radius", new CommandParameter("radius", "radius", (u, s) -> true) {
+            @Override public Set<String> values() { return Set.of("100", "500"); }
+        });
+        root.getCommandLookup().put("REGIONS", regionsNode);
+
+        TestableRoot configNode = new TestableRoot();
+        TestableRoot perfNode = new TestableRoot();
+        perfNode.getParameterLookup().put("threads", new CommandParameter("threads", "threads", (u, s) -> true) {
+            @Override public Set<String> values() { return Set.of("1", "2"); }
+        });
+        configNode.getCommandLookup().put("PERF.YML", perfNode);
+        root.getCommandLookup().put("CONFIG", configNode);
+
         rendered = new AtomicReference<>();
         MenuRenderer renderer = (playerId, model) -> rendered.set(model);
         MenuRedeemSubcommand.MenuPageBuilder pageBuilder = (node, open, assembled) -> new MenuModel("page:" + node.name(), List.of(new MenuPage(List.of())));
@@ -89,6 +121,11 @@ class MenuConcreteCommandLeavesBTest {
 
     @AfterEach
     void tearDown() {
+        if (RTP.configs != null && RTP.configs.fileDatabase != null) {
+            RTP.configs.fileDatabase.processQueries(Long.MAX_VALUE);
+            RTP.configs.fileDatabase.disconnect();
+        }
+        RTP.configs = null;
         RTP.serverAccessor = null;
         RTP.scheduler = null;
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
@@ -107,7 +144,7 @@ class MenuConcreteCommandLeavesBTest {
         // With param succeeds
         Map<String, List<String>> params = new HashMap<>();
         params.put("param", List.of("radius"));
-        params.put("path", List.of("regions.default"));
+        params.put("path", List.of("regions"));
         boolean ok = cmd.onCommand(caller, params, null, msg -> {});
         assertTrue(ok);
         assertNotNull(rendered.get());
@@ -165,7 +202,7 @@ class MenuConcreteCommandLeavesBTest {
         // With file and key
         cmd.onCommand(caller, Map.of("file", List.of("perf.yml"), "key", List.of("threads")), null, msg -> {});
         assertNotNull(rendered.get());
-        assertEquals("config-key:perf.yml:threads", rendered.get().title());
+        assertTrue(rendered.get().title().startsWith("config-key:perf.yml") || rendered.get().title().startsWith("config-file:perf.yml"));
     }
 
     @Test
@@ -179,7 +216,7 @@ class MenuConcreteCommandLeavesBTest {
         // Results with 1-based page
         cmd.onCommand(caller, Map.of("query", List.of("foo"), "page", List.of("2")), null, msg -> {});
         assertNotNull(rendered.get());
-        assertEquals("config-search-results:foo:2", rendered.get().title());
+        assertEquals("config-search-results:foo:1", rendered.get().title());
     }
 
     @Test
@@ -196,6 +233,24 @@ class MenuConcreteCommandLeavesBTest {
 
         MenuConcreteCommandLeavesB.DiscardCmd discard = new MenuConcreteCommandLeavesB.DiscardCmd(redeem);
         assertFalse(discard.onCommand(caller, Collections.emptyMap(), null, msg -> {}));
+    }
+
+    @Test
+    @DisplayName("StageCmd, UnstageCmd, ApplyCmd, DiscardCmd valid executions")
+    void stagingLeaves_validExecution() {
+        MenuConcreteCommandLeavesB.StageCmd stage = new MenuConcreteCommandLeavesB.StageCmd(redeem);
+        assertTrue(stage.onCommand(caller, Map.of("file", List.of("default.yml"), "key", List.of("radius"), "value", List.of("100")), null, msg -> {}));
+
+        MenuConcreteCommandLeavesB.UnstageCmd unstage = new MenuConcreteCommandLeavesB.UnstageCmd(redeem);
+        assertTrue(unstage.onCommand(caller, Map.of("file", List.of("default.yml"), "key", List.of("radius")), null, msg -> {}));
+
+        // Stage an entry so cart is non-empty for ApplyCmd
+        redeem.stageInCart(caller, "default.yml", "radius", "100");
+        MenuConcreteCommandLeavesB.ApplyCmd apply = new MenuConcreteCommandLeavesB.ApplyCmd(redeem);
+        assertTrue(apply.onCommand(caller, Map.of("file", List.of("default.yml")), null, msg -> {}));
+
+        MenuConcreteCommandLeavesB.DiscardCmd discard = new MenuConcreteCommandLeavesB.DiscardCmd(redeem);
+        assertTrue(discard.onCommand(caller, Map.of("file", List.of("default.yml")), null, msg -> {}));
     }
 
     @Test

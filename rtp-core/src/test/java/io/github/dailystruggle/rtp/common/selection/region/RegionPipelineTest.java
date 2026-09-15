@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -36,9 +37,30 @@ public class RegionPipelineTest {
     private Circle circle;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         accessor = RTPTestSetup.install(tempDir.toFile());
         accessor.setLocationGenerator(new LocationGenerator());
+        RTP.lobbyMode = false;
+        @SuppressWarnings("unchecked")
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
+                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+                        RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+        if (perf != null) {
+            perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.maxHeapPercent, 0.0);
+        }
+
+        // Reset HeapPressureMonitor static state to avoid contamination from previous tests
+        java.lang.reflect.Field lastSampleMs = io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.class.getDeclaredField("lastSampleMs");
+        lastSampleMs.setAccessible(true);
+        ((java.util.concurrent.atomic.AtomicLong) lastSampleMs.get(null)).set(0L);
+
+        java.lang.reflect.Field cachedUnderPressure = io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.class.getDeclaredField("cachedUnderPressure");
+        cachedUnderPressure.setAccessible(true);
+        cachedUnderPressure.set(null, false);
+
+        java.lang.reflect.Field cachedUsedPercent = io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.class.getDeclaredField("cachedUsedPercent");
+        cachedUsedPercent.setAccessible(true);
+        cachedUsedPercent.set(null, 0.0);
 
         world = new MockRTPWorld("pipeline_world");
         accessor.addWorld(world);

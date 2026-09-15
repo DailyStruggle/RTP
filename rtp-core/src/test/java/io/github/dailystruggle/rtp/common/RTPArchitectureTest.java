@@ -67,6 +67,8 @@ public class RTPArchitectureTest {
                     .and().haveSimpleNameNotContaining("PlaceholderProvider")
                     .and().haveSimpleNameNotContaining("ChunkReservation")
                     .and().haveSimpleNameNotContaining("TestSchedulerCmd")
+                    .and().haveSimpleNameNotContaining("TestChunkTicketCmd")
+                    .and().haveSimpleNameNotContaining("TestEventsCmd")
                     .and().haveSimpleNameNotContaining("NetworkModeBootstrap")
                     .should().callMethodWhere(
                             target(owner(assignableTo(CompletableFuture.class)))

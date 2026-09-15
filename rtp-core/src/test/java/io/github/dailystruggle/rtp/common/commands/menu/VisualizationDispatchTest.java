@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -74,7 +75,7 @@ class VisualizationDispatchTest {
         assertFalse(capturedMessages.isEmpty());
     }
 
-    private static final class FakeMapBinding implements MapBinding {
+    static final class FakeMapBinding implements MapBinding {
         @Override
         public io.github.dailystruggle.mapsapi.MapHandle allocate(io.github.dailystruggle.mapsapi.MapAllocationRequest request) {
             return new io.github.dailystruggle.mapsapi.MapHandle(request.chartId(), request.viewer(), 1);
@@ -115,6 +116,14 @@ class VisualizationDispatchTest {
 
         MapDispatch.setMapBinding(new FakeMapBinding());
         assertTrue(dispatch.paintBadLocations(adminViewer, "default", messageMethod));
+
+        // When MapDispatch throws RuntimeException
+        MapDispatch.setMapBinding(new io.github.dailystruggle.mapsapi.MapBinding() {
+            @Override public io.github.dailystruggle.mapsapi.MapHandle allocate(io.github.dailystruggle.mapsapi.MapAllocationRequest request) { throw new RuntimeException("alloc fail"); }
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> void renderEphemeral(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, M model) {}
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> io.github.dailystruggle.mapsapi.Cancellation bindLive(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, java.util.function.Supplier<M> modelSupplier) { return null; }
+        });
+        assertFalse(dispatch.paintBadLocations(adminViewer, "default", messageMethod));
     }
 
     @Test
@@ -126,6 +135,31 @@ class VisualizationDispatchTest {
 
         MapDispatch.setMapBinding(new FakeMapBinding());
         assertTrue(dispatch.paintBiomes(adminViewer, "default", messageMethod));
+
+        // Rejection paths for paintBiomes
+        assertFalse(dispatch.paintBiomes(null, "default", messageMethod));
+        assertFalse(dispatch.paintBiomes(adminViewer, null, messageMethod));
+        assertFalse(dispatch.paintBiomes(adminViewer, "", messageMethod));
+        assertFalse(dispatch.paintBiomes(normalViewer, "default", messageMethod));
+
+        // When MapDispatch throws RuntimeException in paintBiomes
+        MapDispatch.setMapBinding(new io.github.dailystruggle.mapsapi.MapBinding() {
+            @Override public io.github.dailystruggle.mapsapi.MapHandle allocate(io.github.dailystruggle.mapsapi.MapAllocationRequest request) { throw new RuntimeException("alloc fail"); }
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> void renderEphemeral(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, M model) {}
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> io.github.dailystruggle.mapsapi.Cancellation bindLive(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, java.util.function.Supplier<M> modelSupplier) { return null; }
+        });
+        assertFalse(dispatch.paintBiomes(adminViewer, "default", messageMethod));
+
+        // Rejection paths for paintBadLocations and paintPipeline
+        assertFalse(dispatch.paintBadLocations(null, "default", messageMethod));
+        assertFalse(dispatch.paintBadLocations(adminViewer, null, messageMethod));
+        assertFalse(dispatch.paintBadLocations(adminViewer, "", messageMethod));
+        assertFalse(dispatch.paintBadLocations(normalViewer, "default", messageMethod));
+
+        assertFalse(dispatch.paintPipeline(null, "default", messageMethod));
+        assertFalse(dispatch.paintPipeline(adminViewer, null, messageMethod));
+        assertFalse(dispatch.paintPipeline(adminViewer, "", messageMethod));
+        assertFalse(dispatch.paintPipeline(normalViewer, "default", messageMethod));
     }
 
     @Test
@@ -140,6 +174,14 @@ class VisualizationDispatchTest {
 
         MapDispatch.setMapBinding(new FakeMapBinding());
         assertTrue(dispatch.paintSparkline(adminViewer, messageMethod));
+
+        // When MapDispatch throws RuntimeException in paintSparkline
+        MapDispatch.setMapBinding(new io.github.dailystruggle.mapsapi.MapBinding() {
+            @Override public io.github.dailystruggle.mapsapi.MapHandle allocate(io.github.dailystruggle.mapsapi.MapAllocationRequest request) { throw new RuntimeException("alloc fail"); }
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> void renderEphemeral(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, M model) {}
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> io.github.dailystruggle.mapsapi.Cancellation bindLive(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, java.util.function.Supplier<M> modelSupplier) { return null; }
+        });
+        assertFalse(dispatch.paintSparkline(adminViewer, messageMethod));
     }
 
     @Test
@@ -149,6 +191,14 @@ class VisualizationDispatchTest {
         assertFalse(dispatch.paintPipeline(adminViewer, null, messageMethod));
         assertFalse(dispatch.paintPipeline(adminViewer, "", messageMethod));
         assertFalse(dispatch.paintPipeline(normalViewer, "default", messageMethod));
+
+        // When MapDispatch throws RuntimeException in paintPipeline
+        MapDispatch.setMapBinding(new io.github.dailystruggle.mapsapi.MapBinding() {
+            @Override public io.github.dailystruggle.mapsapi.MapHandle allocate(io.github.dailystruggle.mapsapi.MapAllocationRequest request) { throw new RuntimeException("alloc fail"); }
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> void renderEphemeral(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, M model) {}
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> io.github.dailystruggle.mapsapi.Cancellation bindLive(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, java.util.function.Supplier<M> modelSupplier) { return null; }
+        });
+        assertFalse(dispatch.paintPipeline(adminViewer, "default", messageMethod));
 
         io.github.dailystruggle.mapsapi.render.ChartRenderer renderer = mock(io.github.dailystruggle.mapsapi.render.ChartRenderer.class);
         ChartSpecResolver.Resolution resolution = new ChartSpecResolver.Resolution(renderer, dummyModel());
@@ -207,5 +257,70 @@ class VisualizationDispatchTest {
         boolean res = cmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod);
         assertTrue(res);
         assertTrue(selectorOpened.get());
+    }
+
+    @Test
+    @DisplayName("VisualizationSparklineCmd dispatches sparkline paint")
+    void sparklineCmd_lifecycle() {
+        MenuConcreteCommandLeaves.VisualizationSparklineCmd cmd =
+                new MenuConcreteCommandLeaves.VisualizationSparklineCmd(dispatch);
+
+        io.github.dailystruggle.mapsapi.render.ChartRenderer renderer = mock(io.github.dailystruggle.mapsapi.render.ChartRenderer.class);
+        ChartSpecResolver.Resolution resolution = new ChartSpecResolver.Resolution(renderer, dummyModel());
+        ChartSpecResolvers.register(ChartSpec.Kind.METRIC_SPARKLINE, spec -> resolution);
+        MapDispatch.setMapBinding(new FakeMapBinding());
+
+        assertTrue(cmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod));
+    }
+
+    @Test
+    @DisplayName("VisualizationExportCmd shows usage when invoked directly and ExportTypeCmd validates parameters")
+    void exportCmd_lifecycle() {
+        MenuConcreteCommandLeaves.VisualizationExportCmd cmd =
+                new MenuConcreteCommandLeaves.VisualizationExportCmd();
+
+        assertTrue(cmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod));
+        assertTrue(capturedMessages.stream().anyMatch(m -> m.contains("Usage: /rtp visualization export")));
+
+        // Test ExportTypeCmd without scheduler returns false
+        RTP.scheduler = null;
+        MenuConcreteCommandLeaves.VisualizationExportCmd.ExportTypeCmd typeCmd =
+                new MenuConcreteCommandLeaves.VisualizationExportCmd.ExportTypeCmd(
+                        "pipeline", ChartSpec.Kind.REGION_COMPOSITE);
+        assertFalse(typeCmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod));
+
+        // Test with synchronous scheduler execution
+        RTP.scheduler = ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).getMockScheduler();
+
+        // When no resolver is registered
+        capturedMessages.clear();
+        typeCmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod);
+
+        // Parameter values check
+        assertNotNull(typeCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION));
+        assertNotNull(typeCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values());
+
+        // Test with ChartSpecResolver registered to execute async export path
+        io.github.dailystruggle.mapsapi.render.ChartRenderer renderer = mock(io.github.dailystruggle.mapsapi.render.ChartRenderer.class);
+        io.github.dailystruggle.mapsapi.model.ChartModel dummyModel = new io.github.dailystruggle.mapsapi.model.Heatmap2D(4, 4, new double[16], 0.0, 1.0);
+        ChartSpecResolver.Resolution resolution = new ChartSpecResolver.Resolution(renderer, dummyModel);
+        ChartSpecResolvers.register(ChartSpec.Kind.REGION_COMPOSITE, spec -> resolution);
+    }
+
+    @Test
+    @DisplayName("VisualizationRootCmd steps aside if nextCommand is present, else opens selector")
+    void rootCommand_lifecycle() {
+        MenuRedeemSubcommand redeem = mock(MenuRedeemSubcommand.class);
+        org.mockito.Mockito.when(redeem.permissionProbeFactory()).thenReturn(uuid -> perm -> true);
+        org.mockito.Mockito.when(redeem.dispatchOpenVisualizations(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(true);
+
+        MenuConcreteCommandLeaves.VisualizationRootCmd root =
+                new MenuConcreteCommandLeaves.VisualizationRootCmd(null, redeem);
+
+        // With nextCommand
+        assertTrue(root.onCommand(adminViewer, java.util.Collections.emptyMap(), mock(io.github.dailystruggle.commandsapi.common.CommandsAPICommand.class), messageMethod));
+        // Without nextCommand
+        assertTrue(root.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod));
     }
 }
