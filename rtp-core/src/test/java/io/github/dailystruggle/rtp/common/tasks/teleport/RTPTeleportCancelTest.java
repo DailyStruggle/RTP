@@ -89,6 +89,33 @@ class RTPTeleportCancelTest {
     }
 
     @Test
+    void run_invokes_refund_and_message() {
+        UUID id = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(id, "CancelP2", new RTPLocation(world, 0, 64, 0));
+        player.setPermission("rtp.noCancel", false);
+        accessor.addPlayer(player);
+
+        TeleportData data = new TeleportData();
+        data.sender = player;
+        data.completed = false;
+        TeleportPipelineTask task = new TeleportPipelineTask(new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, null));
+        data.nextTask = task;
+        data.selectedCoords = new io.github.dailystruggle.rtp.api.world.RTPCoords(world.name(), 10, 64, 10);
+        RTP.getInstance().latestTeleportData.put(id, data);
+        RTP.getInstance().processingPlayers.add(id);
+
+        RTPTeleportCancel cancel = new RTPTeleportCancel(id);
+        cancel.run();
+
+        // 1. refund removes latestTeleportData and removes processingPlayers
+        assertFalse(RTP.getInstance().processingPlayers.contains(id), "refund should remove player from processingPlayers");
+        assertNull(RTP.getInstance().latestTeleportData.get(id), "refund should remove latestTeleportData");
+
+        // 2. message sends teleportCancel message to player
+        assertFalse(player.sentMessages.isEmpty(), "Player should receive cancel message during run");
+    }
+
+    @Test
     void message_delivers_configured_teleportCancel_message() {
         UUID id = UUID.randomUUID();
         MockRTPPlayer player = new MockRTPPlayer(id, "MsgP", new RTPLocation(world, 0, 64, 0));

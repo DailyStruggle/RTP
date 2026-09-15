@@ -8,7 +8,18 @@ import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
+import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
+import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
+import io.github.dailystruggle.rtp.bukkit.commands.BukkitCommandEvents;
+import org.bukkit.Bukkit;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.plugin.Plugin;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
+import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext;
+import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaSender;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -79,6 +90,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
               "disconnect-job",
               "safety-verifier",
               "network",
+              "events",
+              "world-ops",
+              "accessor",
               "stress"));
 
   /**
@@ -235,8 +249,63 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       }
 
       final int warnBefore = audit.warnCount;
+      final java.util.concurrent.atomic.AtomicBoolean successFired =
+          new java.util.concurrent.atomic.AtomicBoolean(false);
+      final java.util.concurrent.atomic.AtomicBoolean failFired =
+          new java.util.concurrent.atomic.AtomicBoolean(false);
+      final Listener[] tempListenerHolder = new Listener[1];
+      final boolean isEvents = "events".equals(subName);
+
+      if (isEvents) {
+        try {
+          if (Bukkit.getServer() != null && Bukkit.getPluginManager() != null) {
+            Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
+            if (plugin == null) {
+              Plugin[] plugins = Bukkit.getPluginManager().getPlugins();
+              if (plugins != null && plugins.length > 0) {
+                plugin = plugins[0];
+              }
+            }
+            if (plugin != null) {
+              BukkitCommandEvents.register();
+              Listener l =
+                  new Listener() {
+                    @EventHandler
+                    public void onSuccess(TeleportCommandSuccessEvent event) {
+                      successFired.set(true);
+                    }
+
+                    @EventHandler
+                    public void onFail(TeleportCommandFailEvent event) {
+                      failFired.set(true);
+                    }
+                  };
+              tempListenerHolder[0] = l;
+              Bukkit.getPluginManager().registerEvents(l, plugin);
+            }
+          }
+        } catch (Throwable t) {
+          // Bukkit environment not available or mock/headless
+        }
+      }
+
       dispatchSubcommand(callerId, subName, argsFor(subName, callerId));
       armAdvance(callerId, subName, () -> {
+        if (isEvents && tempListenerHolder[0] != null) {
+          try {
+            HandlerList.unregisterAll(tempListenerHolder[0]);
+          } catch (Throwable ignored) {
+          }
+          if (!successFired.get() || !failFired.get()) {
+            RTP.log(
+                Level.WARNING,
+                "[RTP test/full] events verification failed: TeleportCommandSuccessEvent="
+                    + successFired.get()
+                    + ", TeleportCommandFailEvent="
+                    + failFired.get());
+          }
+        }
+
         // Per-step pass/fail attribution: any audited warning that fired
         // between dispatch and step-drain completion is attributed to this
         // subcommand. Recorded here (in the advance hook) so the tally
@@ -420,16 +489,30 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    */
   private void finishSweep(UUID callerId, FullAudit audit) {
     try {
+      // Post-sweep MemoryTracker assertion: verify active tickets and active tasks are 0.
+      long activeTickets = MemoryTracker.activeTickets();
+      int activeTasks = MemoryTracker.activeTasks();
+      boolean leak = (activeTickets != 0 || activeTasks != 0);
+      if (leak) {
+        audit.stepWarnDeltas.put("memory-leak", (int) Math.max(1, activeTickets + activeTasks));
+        RTP.log(
+            Level.WARNING,
+            "[RTP test/full] post-sweep assertion FAILED: MemoryTracker leak detected (activeTickets="
+                + activeTickets + ", activeTasks=" + activeTasks + ")");
+      }
+
       // Build the per-step success-rate summary from the deltas captured
       // in runStep. Each entry was the delta in audit.warnCount across
       // one subcommand's dispatch + drain window; 0 delta == pass.
       int total = audit.stepWarnDeltas.size();
       int passed = 0;
       StringBuilder rows = new StringBuilder();
+      List<String> failed = new ArrayList<>();
       for (Map.Entry<String, Integer> e : audit.stepWarnDeltas.entrySet()) {
         int d = e.getValue();
         boolean ok = d == 0;
         if (ok) passed++;
+        else failed.add(e.getKey());
         rows.append("[RTP test/full]   ")
             .append(ok ? "PASS " : "FAIL ")
             .append(e.getKey())
@@ -439,8 +522,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       String pct = (total == 0)
           ? "n/a"
           : String.format("%.1f%%", 100.0 * passed / total);
+      String statusStr = (passed == total && !leak) ? "" : "FAILED ";
       String summaryHeader =
-          "[RTP test/full] summary: " + passed + "/" + total
+          "[RTP test/full] summary: " + statusStr + passed + "/" + total
               + " passed (" + pct + "), total-audited-warnings=" + audit.warnCount;
 
       // Snapshot server metrics once for inclusion in the diagnostic dump.
@@ -449,6 +533,10 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       String metricsLine = "[RTP test/full] metrics: " + snap;
 
       String footer = "[RTP test/full] end (total-audited-warnings=" + audit.warnCount + ")";
+
+      long leaks = activeTickets + activeTasks;
+      String resultLine =
+          formatResultLine(total, audit.warnCount, leaks, audit.elapsedMillis(), failed);
 
       // Emit to both the caller and the server log so console operators
       // and in-game admins see the same diagnostic block. Multi-line
@@ -466,9 +554,65 @@ public class TestFullCmd extends BaseRTPCmdImpl {
         }
         RTP.log(Level.INFO, line);
       }
+      if (!callerId.equals(RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, resultLine);
+      }
+      sender().log(resultLine);
     } finally {
       SendMessage.removeInterceptor((java.util.function.BiConsumer<Level, String>) audit);
       isProcessing.set(false);
+    }
+  }
+
+  /**
+   * Formats a clear, machine-readable summary line for console and automated test runners.
+   *
+   * @param count     total subcommand / check count
+   * @param warnings  total audited warning count
+   * @param leaks     total lingering tickets and tasks
+   * @param elapsedMs elapsed time in milliseconds
+   * @param failed    list of failed subcommand names
+   * @return formatted machine-readable summary line
+   */
+  static String formatResultLine(
+      int count, int warnings, long leaks, long elapsedMs, List<String> failed) {
+    if (failed.isEmpty() && leaks == 0) {
+      return String.format(
+          "[RTP test/full] RESULT: ALL_PASSED (count=%d, warnings=%d, leaks=0, elapsed_ms=%d)",
+          count, warnings, elapsedMs);
+    } else {
+      return String.format(
+          "[RTP test/full] RESULT: FAILED (count=%d, failed=%s, leaks=%d)",
+          count, failed, leaks);
+    }
+  }
+
+  private SenderHelper sender() {
+    return new SenderHelper();
+  }
+
+  private final class SenderHelper implements TestUmbrellaSender {
+    @Override
+    public void log(Level level, String message) {
+      TestUmbrellaContext ctx = RTP.testUmbrellaContext;
+      if (ctx != null && ctx.sender() != null) {
+        ctx.sender().log(level, message);
+      } else {
+        SendMessage.log(level, message);
+      }
+    }
+
+    public void log(String message) {
+      log(Level.INFO, message);
+    }
+
+    @Override
+    public String resolveCallerName(UUID callerId) {
+      TestUmbrellaContext ctx = RTP.testUmbrellaContext;
+      if (ctx != null && ctx.sender() != null) {
+        return ctx.sender().resolveCallerName(callerId);
+      }
+      return resolveName(callerId);
     }
   }
 
@@ -483,9 +627,16 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     boolean isConsole = callerId.equals(RTPAPI.serverId);
     switch (subName) {
       case "folia-ownership":
-        return RTP.serverAccessor.getPlatform().equalsIgnoreCase("Folia")
+        return (RTP.serverAccessor != null && RTP.serverAccessor.getPlatform().equalsIgnoreCase("Folia"))
             ? null
             : "only meaningful on Folia";
+      case "economy-isolation":
+        if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
+            || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC
+            || RTP.economy == null)) {
+          return "Vault is Bukkit-only";
+        }
+        return null;
       case "queue-starvation":
         return isConsole ? "console caller has no resolvable region" : null;
       case "async-reply":
@@ -634,6 +785,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    */
   private static final class FullAudit
       implements java.util.function.BiConsumer<java.util.logging.Level, String> {
+    final long startTimeNanos = System.nanoTime();
     volatile int warnCount = 0;
     /**
      * Per-subcommand audited-warning delta, captured in {@link #runStep}'s
@@ -643,6 +795,10 @@ public class TestFullCmd extends BaseRTPCmdImpl {
      * fail; the summary's denominator reflects what actually ran).
      */
     final Map<String, Integer> stepWarnDeltas = new LinkedHashMap<>();
+
+    long elapsedMillis() {
+      return Math.max(0L, (System.nanoTime() - startTimeNanos) / 1_000_000L);
+    }
 
     @Override
     public void accept(java.util.logging.Level level, String s) {

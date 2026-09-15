@@ -672,4 +672,146 @@ public class LinearAdjustorTest {
             assertNotEquals(7, result.x() & 15, "Should not place on center column with lava");
         }
     }
+
+    // -----------------------------------------------------------------------
+    // Boundary conditions: y >= minY vs y > minY, maxY ceiling, minY bedrock,
+    // direction flipping, and stride limits
+    // -----------------------------------------------------------------------
+
+    @Test
+    void boundary_bottomUp_exactMinYLanding() {
+        // Player feet at minY (e.g. 60), block below is minY-1 (59, solid safe).
+        // Head room at 60, 61.
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        chunk.setSolidSafe(59);
+
+        LinearAdjustor adj = buildAdjustor(0, 60, 80);
+        RTPCoords res = adj.adjust(chunk);
+        assertNotNull(res, "Landing exactly at minY should be found for dir=0");
+        assertEquals(60, res.y(), "Landing feet must be exactly at minY=60");
+
+        // Single column probe at minY
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe probe =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe(0, 0, 50, 100);
+        probe.setSolidRange(50, 59);
+        probe.setAirRange(60, 100);
+        RTPCoords probeRes = adj.adjustFromProbe(probe, "world");
+        assertNotNull(probeRes, "Probe landing at minY should be found");
+        assertEquals(60, probeRes.y());
+
+        // Column adjustment
+        RTPCoords colRes = adj.adjustColumn(chunk, 7, 7);
+        assertNotNull(colRes);
+        assertEquals(60, colRes.y());
+    }
+
+    @Test
+    void boundary_topDown_exactMinYPlusOne_and_maxYMinusOne() {
+        // Top-down scan tests y from maxY down to > minY.
+        // If landing is at minY: in `for (int i = maxY; i > minY; i--)`,
+        // if i == minY, the loop terminates! So i must be > minY (minimum i is minY + 1).
+        // Let's verify top down finds feet at minY + 1 when floor is at minY.
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        chunk.setSolidSafe(60); // floor at minY -> feet at minY + 1 = 61
+
+        LinearAdjustor adj = buildAdjustor(1, 60, 80);
+        RTPCoords res = adj.adjust(chunk);
+        assertNotNull(res, "Top-down should find landing at minY+1");
+        assertEquals(61, res.y());
+
+        // If floor is at maxY - 1, player feet at maxY:
+        // In dir=1: for (int i = maxY; i > minY; i--).
+        // If feet at maxY: y-1 is maxY-1 (solidSafe), y is maxY (air), y+1 is maxY+1 (air).
+        ConfigurableMockChunk chunkMax = new ConfigurableMockChunk(0, 0, world);
+        chunkMax.setSolidSafe(79); // floor at maxY - 1 = 79 -> feet at 80 = maxY
+        LinearAdjustor adjMax = buildAdjustor(1, 60, 80);
+        RTPCoords resMax = adjMax.adjust(chunkMax);
+        assertNotNull(resMax, "Top-down should test i=maxY and find landing at maxY");
+        assertEquals(80, resMax.y());
+
+        // In dir=0 (bottom-up): for (int i = minY; i < maxY; i++).
+        // i < maxY does NOT accept feet at maxY.
+        LinearAdjustor adjBottom = buildAdjustor(0, 60, 80);
+        RTPCoords resBottom = adjBottom.adjust(chunkMax);
+        assertNull(resBottom, "Bottom-up does not accept i=maxY because i < maxY");
+    }
+
+    @Test
+    void boundary_middleOut_and_edgesIn_boundaryFlips() {
+        // Range 60 to 80: maxDistance = 10, middle = 70.
+        // For middle-out: i=0..10. At i=10: yTop = 80 (maxY), yBot = 60 (minY).
+        // Test that middle-out finds landing at exact bottom (60)
+        ConfigurableMockChunk chunkBot = new ConfigurableMockChunk(0, 0, world);
+        chunkBot.setSolidSafe(59); // floor at 59 -> feet at 60
+        LinearAdjustor adjMid = buildAdjustor(2, 60, 80);
+        RTPCoords resBot = adjMid.adjust(chunkBot);
+        assertNotNull(resBot, "Middle-out should reach minY at i=maxDistance");
+        assertEquals(60, resBot.y());
+
+        // Test that middle-out finds landing at exact top (80)
+        ConfigurableMockChunk chunkTop = new ConfigurableMockChunk(0, 0, world);
+        chunkTop.setSolidSafe(79); // floor at 79 -> feet at 80
+        RTPCoords resTop = adjMid.adjust(chunkTop);
+        assertNotNull(resTop, "Middle-out should reach maxY at i=maxDistance");
+        assertEquals(80, resTop.y());
+
+        // Edges-in: i=maxDistance down to 0. At i=maxDistance (10), yTop=80 tested first, then yBot=60.
+        // Test edges-in prioritizes top (80) over bottom (60) when both are safe
+        ConfigurableMockChunk chunkBoth = new ConfigurableMockChunk(0, 0, world);
+        chunkBoth.setSolidSafe(59);
+        chunkBoth.setSolidSafe(79);
+        LinearAdjustor adjEdges = buildAdjustor(3, 60, 80);
+        RTPCoords resEdges = adjEdges.adjust(chunkBoth);
+        assertNotNull(resEdges);
+        assertEquals(80, resEdges.y(), "Edges-in should check top edge (80) before bottom edge (60) at maxDistance");
+
+        // Probe paths for middle-out and edges-in at boundaries
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe probe =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe(0, 0, 50, 100);
+        probe.setSolidRange(50, 59);
+        probe.setAirRange(60, 100);
+        RTPCoords probeMid = adjMid.adjustFromProbe(probe, "world");
+        assertNotNull(probeMid);
+        assertEquals(60, probeMid.y());
+
+        RTPCoords probeEdges = adjEdges.adjustFromProbe(probe, "world");
+        assertNotNull(probeEdges);
+        assertEquals(60, probeEdges.y());
+    }
+
+    @Test
+    void boundary_worldHeightLimits_clamping() {
+        // World maxHeight = 256, minHeight = 0.
+        // If adjustor maxY is set to 500, it should be clamped to chunk.getWorld().getMaxHeight() = 256.
+        LinearAdjustor adj = buildAdjustor(0, 60, 500);
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        // Floor at 255 -> feet at 256.
+        // But maxY is clamped to 256, and i < maxY, so 256 is not reached.
+        chunk.setSolidSafe(255);
+        assertNull(adj.adjust(chunk));
+
+        // Floor at 250 and 249 (to satisfy platformDepth=2 ground safety) -> feet at 251. Headroom 251, 252 are air (within 256).
+        chunk.setSolidSafe(249);
+        chunk.setSolidSafe(250);
+        RTPCoords res = adj.adjust(chunk);
+        assertNotNull(res);
+        assertEquals(251, res.y());
+    }
+
+    @Test
+    void adjustColumn_allDirections_boundaries() {
+        for (int dir = 0; dir <= 4; dir++) {
+            LinearAdjustor adj = buildAdjustor(dir, 60, 80);
+            adj.setRng(new Random(42));
+            ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+            chunk.setSolidSafe(69); // landing at 70 (middle)
+            RTPCoords res = adj.adjustColumn(chunk, 5, 5);
+            assertNotNull(res, "adjustColumn should succeed for dir=" + dir);
+            assertEquals(70, res.y());
+            assertEquals(5, res.x() & 15);
+            assertEquals(5, res.z() & 15);
+        }
+        LinearAdjustor adjNull = buildAdjustor(0, 60, 80);
+        assertNull(adjNull.adjustColumn(null, 0, 0));
+    }
 }

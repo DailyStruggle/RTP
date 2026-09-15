@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.region.cache.CacheStage;
 import io.github.dailystruggle.rtp.common.selection.region.cache.HotBudgetAllocator;
 import io.github.dailystruggle.rtp.common.selection.region.cache.HotSink;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
@@ -231,5 +232,63 @@ class RegionQueueManagerHotSinkLifecycleTest {
         assertEquals(0, qm.networkKeptStage.size());
         assertEquals(0, qm.perPlayerStage.size());
         assertEquals(0, qm.unkeptLocations.size(), "shutdown disposes rather than recycles into Cold");
+    }
+
+    @Test
+    @DisplayName("perPlayerStage partitions and personalAggregateStage branches")
+    void perPlayerStage_andPersonalAggregateStage() {
+        UUID player1 = UUID.randomUUID();
+        UUID player2 = UUID.randomUUID();
+
+        CacheStage<RTPLocation> p1Stage = qm.perPlayerStage.open(player1, 1);
+        assertEquals("perPlayerLocationQueue:" + player1, p1Stage.name());
+        assertEquals(1, p1Stage.capacity());
+        assertEquals(0, p1Stage.size());
+
+        // Null offer returns false
+        assertFalse(p1Stage.offer(null));
+        assertFalse(p1Stage.offerSilently(null));
+
+        RTPLocation loc1 = bareLoc(world, 10, 10);
+        RTPLocation loc2 = bareLoc(world, 20, 20);
+
+        assertTrue(p1Stage.offer(loc1));
+        assertEquals(1, p1Stage.size());
+
+        // Overflow offer
+        assertFalse(p1Stage.offer(loc2));
+
+        // Poll silently
+        assertEquals(Optional.of(loc1), p1Stage.pollSilently());
+        assertTrue(p1Stage.poll().isEmpty());
+
+        // Upsize capacity to 2
+        p1Stage.resizeCapacity(2);
+        assertEquals(2, p1Stage.capacity());
+        assertTrue(p1Stage.offer(loc1));
+        assertTrue(p1Stage.offerSilently(loc2));
+        assertEquals(2, p1Stage.size());
+
+        // Downsize capacity back to 1
+        p1Stage.resizeCapacity(1);
+        assertEquals(1, p1Stage.capacity());
+        assertEquals(1, p1Stage.size());
+
+        // Close stage
+        p1Stage.close();
+        assertEquals(0, p1Stage.size());
+
+        // Personal aggregate stage branches
+        HotSink<RTPLocation> personalSink = qm.hotSinks().stream()
+                .filter(s -> s.name().equals("perPlayerLocationQueue"))
+                .findFirst()
+                .orElseThrow();
+        CacheStage<RTPLocation> aggStage = personalSink.stage();
+        assertEquals("perPlayerLocationQueue", aggStage.name());
+        assertFalse(aggStage.offer(loc1));
+        assertFalse(aggStage.offerSilently(loc1));
+        assertTrue(aggStage.poll().isEmpty());
+        assertTrue(aggStage.pollSilently().isEmpty());
+        assertEquals(aggStage.capacity(), aggStage.resizeCapacity(10));
     }
 }

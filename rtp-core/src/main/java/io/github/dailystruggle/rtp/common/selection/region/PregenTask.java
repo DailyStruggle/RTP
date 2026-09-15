@@ -706,7 +706,7 @@ final class PregenTask implements Runnable {
         if (probeBiome != null) {
             String ub = probeBiome.toUpperCase();
             if (BiomeNames.matches(state.biomeNames, ub) != state.biomeWhitelist) {
-                state.maxAttempts++;
+                if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
                 if (state.verbose) {
                     state.failMap.get(LocationGenerator.FailTypes.prefilterBiome)
                             .compute("biome=" + ub, (s, a) -> (a == null) ? 1L : ++a);
@@ -723,7 +723,7 @@ final class PregenTask implements Runnable {
         if (probeBlock != null && state.unsafeBlocks != null) {
             String ub = probeBlock.toUpperCase();
             if (MaterialNames.matches(state.unsafeBlocks, ub)) {
-                state.maxAttempts++;
+                if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
                 if (state.verbose) {
                     state.failMap.get(LocationGenerator.FailTypes.prefilterBlock)
                             .compute("block=" + ub, (s, a) -> (a == null) ? 1L : ++a);

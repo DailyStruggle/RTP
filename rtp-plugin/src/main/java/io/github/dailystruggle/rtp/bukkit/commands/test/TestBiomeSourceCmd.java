@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * {@code rtp test biome-source} &mdash; read-only diagnostic that reports the
@@ -72,7 +71,7 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
     }
   }
 
-  public TestBiomeSourceCmd(@Nullable CommandsAPICommand parent) {
+  public TestBiomeSourceCmd(CommandsAPICommand parent) {
     super(parent);
   }
 
@@ -133,7 +132,38 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
       }
       RTP.log(Level.INFO, note);
     }
+
+    // Active runtime parity probe: verify sampleBiome and getBiome on loaded worlds
+    // to detect format or coordinate transformation discrepancies.
+    checkBiomeParity(callerId);
+
     return true;
+  }
+
+  private void checkBiomeParity(UUID callerId) {
+    try {
+      if (RTP.serverAccessor == null) return;
+      io.github.dailystruggle.rtp.api.world.RTPWorld<?> world =
+          RTP.serverAccessor.getRTPWorlds().stream().findFirst().orElse(null);
+      if (world == null) return;
+
+      int x = 0;
+      int y = 64;
+      int z = 0;
+      String sampled = RTP.serverAccessor.sampleBiome(world, x, y, z);
+      String worldBiome = world.getBiome(x, y, z);
+
+      String parityMsg = "[RTP test/biome-source] parity probe world=" + world.name()
+          + " pos=(" + x + "," + y + "," + z + ")"
+          + " sampleBiome=" + sampled
+          + " getBiome=" + worldBiome;
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, parityMsg);
+      }
+      RTP.log(Level.INFO, parityMsg);
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP test/biome-source] parity probe skipped: " + t.getMessage());
+    }
   }
 
   private static AtomicLong getMetric(String name) {

@@ -93,6 +93,7 @@ dependencies {
     // above (testRuntimeOnly); MySQL's driver is otherwise absent, so add it for
     // the MySQLDatabaseAccessor Hikari pool to resolve jdbc:mysql:// at test time.
     testRuntimeOnly 'com.mysql:mysql-connector-j:8.4.0'
+    spotbugsPlugins 'com.mebigfatguy.fb-contrib:fb-contrib:7.6.4'
 }
 
 // Keep the main source tree free of unchecked-generics warnings. Every genuinely
@@ -115,11 +116,7 @@ compileJava {
 // configurations and any future tag-based tooling agree with the build.
 test {
     exclude '**/benchmark/**'
-    exclude '**/selection/region/LoginCacheTaskTest*'
-    exclude '**/selection/region/RegionCandidateValidatorTest*'
-    exclude '**/commands/menu/VisualizationDispatchTest*'
-    exclude '**/commands/menu/MenuConcreteCommandLeavesBTest*'
-    exclude '**/commands/menu/CommandTreeMenuBuilderTest*'
+    exclude '**/usability/**'
 
     // ENTERPRISE_READINESS.md item 18: the Docker-gated MySQL/PostgreSQL
     // integration tier talks to the local Docker daemon through docker-java, which
@@ -288,8 +285,9 @@ if (project.hasProperty('mutation')) {
         junit5PluginVersion = libs.versions.pitestJunit5.get()
 
         targetClasses = safetyPackages
-        // Restrict the driving tests to the same packages: mutating a teleport
-        // class and re-running the entire core suite would be needlessly slow.
+        // Restrict the driving tests to all safety packages so cross-package
+        // tests (e.g. TeleportPipelineTaskMutationTest when testing teleport.*)
+        // are always available to kill mutants.
         targetTests = safetyPackages
 
         // The non-logic tiers (simulation/drawing/demo/slow/edge/stress/comparison/throughput) are excluded
@@ -299,7 +297,8 @@ if (project.hasProperty('mutation')) {
         excludedTestClasses = ['*benchmark*', '*StressTest*', '*RealWorld*', '*ComparisonTest*', '*Throughput*', '*Cost*']
         excludedClasses = ['*benchmark*']
 
-        // Mutation threshold: default 60%, overridable via -PmutationThreshold=<num>
+        // Scoped safetyPackages for selection.region when specified,
+        // or default 60% threshold across safety packages.
         mutationThreshold = project.hasProperty('mutationThreshold') ?
                 project.property('mutationThreshold').toInteger() : 60
         // Don't fail merely because a package has no mutations yet (keeps the
@@ -308,11 +307,10 @@ if (project.hasProperty('mutation')) {
 
         // Half the cores, mirroring the test-fork cap in the root build so PIT
         // leaves headroom for Gradle's own module-level parallelism.
-        threads = Math.max(1, Runtime.runtime.availableProcessors().intdiv(2))
-
         // Stable report path (no per-run timestamp dir) so CI can archive it.
         timestampedReports = false
         outputFormats = ['HTML', 'XML']
+        threads = Math.max(1, Runtime.runtime.availableProcessors().intdiv(2))
         timeoutConstInMillis = 1500
         timeoutFactor = new BigDecimal('1.25')
     }

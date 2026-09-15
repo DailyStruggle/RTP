@@ -43,6 +43,7 @@ public final class FabricEventBridge {
         // ── Server lifecycle ────────────────────────────────────────────
         ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
         ServerLifecycleEvents.SERVER_STOPPING.register(this::onServerStopping);
+        io.github.dailystruggle.rtp.fabric.FabricRTPCommonEntry.init();
 
         // ── Per-tick driver for FabricScheduler ─────────────────────────
         ServerTickEvents.END_SERVER_TICK.register(this::onEndServerTick);
@@ -307,6 +308,9 @@ public final class FabricEventBridge {
             // RTPBukkitPlugin.initLoginReserveCache(); decoupled from
             // Region.execute() per ADR-023.
             initLoginReserveCache(server);
+
+            // Populate test umbrella context for /rtp test ... support
+            io.github.dailystruggle.rtp.fabric.FabricRTPCommonEntry.populateContext();
         } catch (Throwable t) {
             // Fail-loud per REQ-RTP-S-004; never silently swallow.
             RTP.log(Level.SEVERE, "[RTP] FabricEventBridge.onServerStarted failed", t);
