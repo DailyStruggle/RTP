@@ -155,6 +155,17 @@ class InfoBookBuilderTest {
                 MenuAction.InfoScopeToken.Kind.GLOBAL, "");
         MenuModel model = builder.build(root, viewer, scope);
         assertNotNull(model);
+
+        // Test REGION scope with custom MapBinding active
+        MapDispatch.setMapBinding(new io.github.dailystruggle.mapsapi.MapBinding() {
+            @Override public io.github.dailystruggle.mapsapi.MapHandle allocate(io.github.dailystruggle.mapsapi.MapAllocationRequest request) { return null; }
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> void renderEphemeral(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, M model) {}
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> io.github.dailystruggle.mapsapi.Cancellation bindLive(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, java.util.function.Supplier<M> modelSupplier) { return null; }
+        });
+        MenuAction.InfoScopeToken regionScope = new MenuAction.InfoScopeToken(
+                MenuAction.InfoScopeToken.Kind.REGION, "default");
+        MenuModel regionModel = builder.build(root, viewer, regionScope);
+        assertNotNull(regionModel);
     }
 
     @Test

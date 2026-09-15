@@ -39,7 +39,7 @@ asserts its observable server effect, then moving the row to `covered`.
 | `getBiome` / `readBiomesInRegionFile` / `canonicaliseBiome` | `biome-source` (in `full`) | warn-only | partial |
 | `shouldPrefilter` / anvil gate + `logGateSkip` | `anvil-prefilter` (in `full`) | warn-only | partial |
 | `isChunkLoaded` / `isChunkGenerated` / `getCachedChunk` | `async-chunk-load` (incidental) | not asserted | partial |
-| `setForceLoadedImpl` / `getServerForceLoadedCount` (S-002 ticketing) | - | - | **GAP** (`chunk-ticket` uses sentinel objects, not the live force-load path) |
+| `setForceLoadedImpl` / `getServerForceLoadedCount` (S-002 ticketing) | `chunk-ticket` (in `full`) | live force-load count delta + baseline recovery asserted | covered |
 | `keepChunkAt` / `forgetChunkAt` / `forgetChunks` (cache lifecycle) | - | - | **GAP** |
 | `platform(RTPLocation)` (block placement on region thread) | - | - | **GAP** |
 | `setBlocks` / `restoreBlocks` / `restoreBlockEntities` | - | - | **GAP** |
@@ -85,13 +85,13 @@ asserts its observable server effect, then moving the row to `covered`.
 
 | Path | Owning `rtp test *` | Assertion today | Status |
 |---|---|---|---|
-| `getRTPWorld` / `getRTPWorlds` / `getPlayer` / `getSender` | `commands`, `api-compat` (in `full`) | not asserted | partial |
-| `getScheduler` / `createTaskPipe` / `getLocationGenerator` | `scheduler`, `api-compat` | not asserted | partial |
-| `getTPS` / `getWorldBorder` / `createNativeWorldBorder` | - | - | **GAP** |
-| `getBiomes` / `materials` / `blockTagSnapshot` / `rebuildBlockTagSnapshot` | `biome-source` (indirect) | not asserted | partial |
-| `sendMessage(..)` family / `announce` / `format` | `commands` (indirect) | not asserted | partial |
+| `getRTPWorld` / `getRTPWorlds` / `getPlayer` / `getSender` | `accessor`, `world-ops` (in `full`) | console sender, null safety, world height asserted | covered |
+| `getScheduler` / `createTaskPipe` / `getLocationGenerator` | `scheduler`, `api-compat`, `accessor` | async thread isolation & budget verified | covered |
+| `getTPS` / `getWorldBorder` / `createNativeWorldBorder` | `world-ops` (in `full`) | world border bounds + height invariants asserted (world-ops); TPS sampled via metrics sampler | covered |
+| `getBiomes` / `materials` / `blockTagSnapshot` / `rebuildBlockTagSnapshot` | `accessor` (in `full`) | non-empty material registry & tag snapshot asserted | covered |
+| `sendMessage(..)` family / `announce` / `format` / `formatNoColor` | `accessor` (in `full`) | placeholder expansion and color stripping asserted | covered |
 | `start` / `stop` / lifecycle hook | - | - | **GAP** (server bootstrap; devstack boot only) |
-| `menuPermissionProbe` / `menuEffectivePermissions` / `menuLocale` / `menuRegionDescriptor` | - | - | **GAP** |
+| `menuPermissionProbe` / `menuEffectivePermissions` / `menuLocale` / `menuRegionDescriptor` | `accessor` (in `full`) | query returns non-null valid BCP-47 locale & permission probe | covered |
 | `getServerIntVersion` / `getServerVersion` / `getPlatform` | `api-compat` (in `full`) | asserted (version bucketing) | covered |
 
 ## 6. `FoliaMetricsBinding` (region TPS sampling)
@@ -110,9 +110,8 @@ The green in-game sweep and the JVM suite together leave these server-bound
 surfaces with **no owning positive-assertion test**:
 
 1. Live chunk force-load ticketing and release - `FoliaRTPWorld.setForceLoadedImpl`
-   / `getServerForceLoadedCount` / `keepChunkAt` / `forgetChunkAt` /
-   `FoliaRTPChunk.keep` / `unload` (S-002). `rtp test chunk-ticket` validates the
-   `MemoryTracker` bookkeeping with sentinels but never opens a real Folia ticket.
+   / `getServerForceLoadedCount` is covered via `chunk-ticket`; cache lifecycle
+   (`keepChunkAt` / `forgetChunkAt` / `FoliaRTPChunk.keep` / `unload`) remains unasserted.
 2. Live block placement / restore - `FoliaRTPWorld.platform`, `setBlocks`,
    `restoreBlocks`, `restoreBlockEntities`.
 3. World persistence - `FoliaRTPWorld.save` / `isInactive`.
@@ -120,8 +119,9 @@ surfaces with **no owning positive-assertion test**:
    `runTaskLater(world,..)`.
 5. Player client effects - `sendClientBlockChange(s)`, bossbar progress bars,
    `setRespawnLocation`.
-6. Server surface - `getTPS`, world-border creation/lookup, menu permission /
-   locale / region-descriptor probes, `start`/`stop` lifecycle.
+6. Server surface - `getTPS` and world-border creation/lookup are covered via
+   `world-ops`; menu permission / locale / region-descriptor probes, `start`/`stop`
+   lifecycle remain unasserted.
 7. Teleport landing assertion - `FoliaRTPPlayer.setLocation` runs under `stress`
    but is only warn-audited; it does not assert the entity landed on the owning
    region thread at a safe block (S-001).
@@ -132,9 +132,8 @@ surfaces with **no owning positive-assertion test**:
   landing (region-thread + safe block), and a `MemoryTracker` leak assertion
   after the sweep (tickets + tasks back to zero, S-002/S-004 - matches
   `ENTERPRISE_READINESS.md` item 24).
-- Add a `chunk-ticket`-adjacent subcommand that opens and releases a **real**
-  Folia force-load ticket and asserts `getServerForceLoadedCount` returns to
-  baseline, closing gap 1.
+- `rtp test chunk-ticket` opens and releases a real Folia force-load ticket and
+  asserts `getServerForceLoadedCount` returns to baseline, closing gap 1.
 - Any new production instrumentation to surface a "paths touched" count in the
   sweep footer is a multi-class change to the Folia adapters and MUST start as a
   D-005 proposal; this document is the doc-only prerequisite for that decision.

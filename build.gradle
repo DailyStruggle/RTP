@@ -143,7 +143,7 @@ subprojects {
                 excludeTags nonLogicTags
             }
         }
-        maxHeapSize = '1024m'
+        maxHeapSize = '2048m'
         // -XX:+EnableDynamicAgentLoading opts in to Mockito/ByteBuddy's dynamic
         // agent attach, silencing the JDK "agent loaded dynamically ... will be
         // disallowed by default in a future release" warning across the suite.
@@ -152,7 +152,7 @@ subprojects {
         // classes ..." on every fork.
         jvmArgs '-XX:+UseG1GC', '-XX:MaxMetaspaceSize=384m', '-XX:+EnableDynamicAgentLoading', '-Xshare:off'
         maxParallelForks = testForks
-        forkEvery = 100
+        forkEvery = 20
         // Re-run when the tier toggle flips so cached results from the other
         // tier are not silently reused.
         inputs.property 'fullTests', fullTests
@@ -193,14 +193,14 @@ subprojects {
             // partially-recompiled tree makes JaCoCo discard stale execution data,
             // which can read several points low. Target is 90/80 (section 3).
             ':rtp-core': [
-                    instruction: 0.65,
-                    branch: 0.50,
+                    instruction: 0.69,
+                    branch: 0.54,
                     // Per-package rules for safety-critical packages (ENTERPRISE_READINESS.md 4.1 item 4).
                     // Floors are higher than module baseline and gate critical pipelines.
                     packages: [
-                            'io.github.dailystruggle.rtp.common.tasks.teleport': [instruction: 0.65, branch: 0.47],
-                            'io.github.dailystruggle.rtp.common.selection.region': [instruction: 0.52, branch: 0.40],
-                            'io.github.dailystruggle.rtp.common.selection.worldborder': [instruction: 0.92, branch: 0.65]
+                            'io.github.dailystruggle.rtp.common.tasks.teleport': [instruction: 0.82, branch: 0.69],
+                            'io.github.dailystruggle.rtp.common.selection.region': [instruction: 0.71, branch: 0.57],
+                            'io.github.dailystruggle.rtp.common.selection.worldborder': [instruction: 0.95, branch: 0.85]
                     ]
             ],
             // metrics-api measured: 100% instruction / 94.6% branch.
@@ -760,5 +760,49 @@ configure(publishedModulePaths.collect { project(it) }) {
                 sign publishing.publications.mavenJava
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Devstack / Live Server JaCoCo Report & Extraction tasks
+// ---------------------------------------------------------------------------
+apply plugin: 'jacoco'
+jacoco { toolVersion = libs.versions.jacoco.get() }
+
+tasks.register('extractJacocoAgent', Copy) {
+    description = 'Extracts the JaCoCo javaagent jar into devstack/jacoco/ for runtime server profiling.'
+    group = 'verification'
+    from {
+        zipTree(configurations.jacocoAgent.singleFile)
+    }
+    include '**/jacocoagent.jar'
+    into layout.projectDirectory.dir('devstack/jacoco')
+    eachFile { fcd ->
+        fcd.path = 'jacocoagent.jar'
+    }
+    includeEmptyDirs = false
+}
+
+tasks.register('jacocoServerReport', JacocoReport) {
+    description = 'Generates JaCoCo coverage report for live server/devstack test execution data.'
+    group = 'verification'
+
+    def execFiles = fileTree(dir: rootDir, includes: [
+            '**/devstack/jacoco/*.exec',
+            '**/build/jacoco/server*.exec',
+            '**/build/jacoco/backend*.exec'
+    ])
+    executionData.from = execFiles
+
+    sourceDirectories.from = files(subprojects.collect { it.sourceSets.main.allSource.srcDirs })
+    classDirectories.from = files(subprojects.collect {
+        it.fileTree(dir: it.buildDir, includes: ['classes/java/main/**', 'classes/kotlin/main/**'])
+    })
+
+    reports {
+        html.required = true
+        html.outputLocation = layout.buildDirectory.dir('reports/jacoco/server/html')
+        xml.required = true
+        xml.outputLocation = layout.buildDirectory.file('reports/jacoco/server/jacocoServerReport.xml')
     }
 }

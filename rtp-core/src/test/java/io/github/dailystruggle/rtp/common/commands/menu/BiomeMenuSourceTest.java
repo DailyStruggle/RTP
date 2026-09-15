@@ -147,6 +147,13 @@ class BiomeMenuSourceTest {
     assertEquals(Map.of("JUNGLE", 50L), wildWeights);
 
     assertTrue(BiomeMenuSource.biomeWeightsForWorld("nonexistent_world").isEmpty());
+
+    // Test biomeWeightsForRegion directly
+    Map<String, Long> defaultRegionWeights = BiomeMenuSource.biomeWeightsForRegion("default");
+    assertEquals(Map.of("FOREST", 100L), defaultRegionWeights);
+    assertTrue(BiomeMenuSource.biomeWeightsForRegion("nonexistent_region").isEmpty());
+    assertTrue(BiomeMenuSource.biomeWeightsForRegion(null).isEmpty());
+    assertTrue(BiomeMenuSource.biomeWeightsForRegion("").isEmpty());
   }
 
   @Test

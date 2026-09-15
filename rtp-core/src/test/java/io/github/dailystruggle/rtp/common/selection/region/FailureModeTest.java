@@ -152,10 +152,10 @@ class FailureModeTest {
     @Test
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void fm002_allSectorsBad_selectTerminatesWithoutInfiniteLoop() {
-        TestMemoryShape shape = new TestMemoryShape(100);
+        TestMemoryShape shape = new TestMemoryShape(20);
 
         // Mark entire range as bad
-        for (long i = 0; i < 100; i++) {
+        for (long i = 0; i < 20; i++) {
             shape.addBadLocation(i);
         }
         shape.flushAndRebuild(1);

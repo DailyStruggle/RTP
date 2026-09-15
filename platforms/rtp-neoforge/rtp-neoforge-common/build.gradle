@@ -65,4 +65,5 @@ dependencies {
     // ADR-016 â€” anvil pre-filter. Platform-neutral .mca decoder; same .mca
     // substrate as Fabric (NEOFORGE_NOTES.md section 3), reused unchanged.
     api project(':anvil-api')
+    testImplementation 'com.mojang:brigadier:1.2.9'
 }

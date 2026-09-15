@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.rtp.common.commands.test.TestAccessorCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestEventsCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestWorldOpsCmd;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -33,6 +36,9 @@ public class BukkitTestCmd extends TestCmd {
     addSubCommand(new TestStressCmd(this));
     addSubCommand(new TestChunkProbePerfCmd(this));
     addSubCommand(new AsyncReplyTestJob(this));
+    addSubCommand(new TestEventsCmd(this));
+    addSubCommand(new TestWorldOpsCmd(this));
+    addSubCommand(new TestAccessorCmd(this));
 
     // `full` is the umbrella entry point (see RUNTIME_TEST_SUITE_PLAN.md section 3.2).
     // It is wired in last so `findChild` in TestFullCmd can resolve every

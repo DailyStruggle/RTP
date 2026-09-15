@@ -234,6 +234,8 @@ public final class RTPFabricMod implements ModInitializer {
             final RTP rtpForStart = rtp;
             net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
                     .SERVER_STARTED.register(server -> {
+                        // Populate test umbrella context for /rtp test ... support
+                        io.github.dailystruggle.rtp.fabric.FabricRTPCommonEntry.populateContext();
                         // Database + Configs (incl. SafetyTokenExpander #tag
                         // flattening) deferred from onInitialize so it runs
                         // against a fully-populated BuiltInRegistries. See

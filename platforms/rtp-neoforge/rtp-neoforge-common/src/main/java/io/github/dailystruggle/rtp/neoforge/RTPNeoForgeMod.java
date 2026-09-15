@@ -1,9 +1,14 @@
 package io.github.dailystruggle.rtp.neoforge;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext;
 import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.neoforge.commands.NeoForgeCommandRegistrar;
+import io.github.dailystruggle.rtp.neoforge.commands.test.NeoForgeTestUmbrellaScheduler;
+import io.github.dailystruggle.rtp.neoforge.commands.test.NeoForgeTestUmbrellaSender;
 import io.github.dailystruggle.rtp.neoforge.database.NeoForgeDatabaseHandler;
 import io.github.dailystruggle.rtp.neoforge.events.NeoForgeEventBridge;
 import io.github.dailystruggle.rtp.neoforge.server.NeoForgePlayerLifecycleHook;
@@ -16,9 +21,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLDedicatedServerSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
@@ -109,8 +116,31 @@ public final class RTPNeoForgeMod {
     // Game-bus events (server lifecycle, tick, command registration) live on
     // the global NeoForge.EVENT_BUS rather than the mod bus.
     NeoForge.EVENT_BUS.register(this);
-    // modBus is retained for future setup-phase wiring (registries, config).
-    // Intentionally unused in the skeleton.
+    if (modBus != null) {
+      modBus.addListener(this::onDedicatedServerSetup);
+    }
+  }
+
+  public void onDedicatedServerSetup(FMLDedicatedServerSetupEvent event) {
+    wireTestUmbrellaContext();
+  }
+
+  @SubscribeEvent
+  public void onServerStarting(ServerStartingEvent event) {
+    wireTestUmbrellaContext();
+  }
+
+  /**
+   * Installs the NeoForge test umbrella context onto {@link RTP#testUmbrellaContext}.
+   * Idempotent; safe to call during mod lifecycle or server setup.
+   */
+  public static void wireTestUmbrellaContext() {
+    if (RTP.testUmbrellaContext == null) {
+      RTP.testUmbrellaContext = new TestUmbrellaContext(
+          new NeoForgeTestUmbrellaSender(),
+          new NeoForgeTestUmbrellaScheduler(),
+          null);
+    }
   }
 
   @SubscribeEvent
@@ -164,6 +194,7 @@ public final class RTPNeoForgeMod {
     }
     RTP.serverAccessor = acc;
     RTP.scheduler = acc.getScheduler();
+    wireTestUmbrellaContext();
     if (RTP.getInstance() == null) {
       new RTP();
     }
@@ -520,10 +551,24 @@ public final class RTPNeoForgeMod {
         accessor.registerCommands(root, "rtp", "wild");
       }
     }
+    registerTestCommand(event);
     if (accessor != null) {
       accessor.registerToDispatcher(event.getDispatcher());
     } else {
       NeoForgeCommandRegistrar.register(event.getDispatcher());
+    }
+  }
+
+  private void registerTestCommand(RegisterCommandsEvent event) {
+    if (event == null || event.getDispatcher() == null) return;
+    CommandsAPICommand testCmd = NeoForgeCommandRegistrar.resolveTestCmd(RTP.baseCommand);
+    if (testCmd != null) {
+      if (RTP.baseCommand instanceof TreeCommand treeCmd) {
+        if (!treeCmd.getCommandLookup().containsKey(testCmd.name().toUpperCase())) {
+          treeCmd.addSubCommand(testCmd);
+        }
+      }
+      NeoForgeCommandRegistrar.registerTestCmd(event.getDispatcher(), testCmd);
     }
   }
 }

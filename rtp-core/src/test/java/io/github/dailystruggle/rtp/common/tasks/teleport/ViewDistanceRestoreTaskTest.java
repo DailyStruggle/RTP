@@ -290,4 +290,20 @@ class ViewDistanceRestoreTaskTest {
         assertEquals(3, player.getViewDistance());
         assertEquals(-1, player.getSendViewDistance());
     }
+
+    @Test
+    void run_finish_sets_cancelled_preventing_future_runs() {
+        MockRTPPlayer player = new MockRTPPlayer();
+        player.setViewDistance(3);
+        ViewDistanceRestoreTask.clampAndSchedule(player, 2, 50L);
+
+        // When offline, run calls finish() which sets cancelled
+        player.setOnline(false);
+        scheduler.tick(100);
+
+        // Turn back online: task was cancelled so it should never run again
+        player.setOnline(true);
+        scheduler.tick(100);
+        assertEquals(2, player.getViewDistance());
+    }
 }

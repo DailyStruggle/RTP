@@ -217,6 +217,13 @@ public class MenuRedeemSubcommandDispatchTest {
     @Test
     void extractPageIndexTranslatesOneBasedWireToZeroBased() {
         assertEquals(0, MenuRedeemSubcommand.extractPageIndex(null));
+        assertEquals(0, MenuRedeemSubcommand.extractPageIndex(Map.of()));
+        assertEquals(0, MenuRedeemSubcommand.extractPageIndex(
+                Map.of(MenuRedeemSubcommand.PARAM_PAGE, List.of())));
+        assertEquals(0, MenuRedeemSubcommand.extractPageIndex(
+                Map.of(MenuRedeemSubcommand.PARAM_PAGE, List.of(""))));
+        assertEquals(0, MenuRedeemSubcommand.extractPageIndex(
+                Map.of(MenuRedeemSubcommand.PARAM_PAGE, List.of("-5"))));
         assertEquals(0, MenuRedeemSubcommand.extractPageIndex(
                 Map.of(MenuRedeemSubcommand.PARAM_PAGE, List.of("1"))));
         assertEquals(2, MenuRedeemSubcommand.extractPageIndex(

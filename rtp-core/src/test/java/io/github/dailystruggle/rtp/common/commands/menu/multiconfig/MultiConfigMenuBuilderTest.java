@@ -245,6 +245,26 @@ final class MultiConfigMenuBuilderTest {
         }
 
         @Test
+        @DisplayName("renders with wired CommandTreeMenuBuilder and cartSnapshot exercising rewritePagesForEntry")
+        void layout_withCommandTreeMenuBuilder() {
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
+            builder.setCommandTreeMenuBuilder(new io.github.dailystruggle.rtp.common.commands.menu.CommandTreeMenuBuilder());
+
+            java.util.LinkedHashMap<String, String> cart = new java.util.LinkedHashMap<>();
+            cart.put("radius", "500");
+
+            MenuModel model = builder.buildEntry(
+                    "regions", "default", regions, UUID.randomUUID(), cart);
+            assertNotNull(model);
+            assertFalse(model.pages().isEmpty());
+
+            // Back row exists
+            MenuAction.OpenMultiConfigSelector back = findFirstByType(
+                    model, MenuAction.OpenMultiConfigSelector.class);
+            assertNotNull(back);
+        }
+
+        @Test
         @DisplayName("locked entry: Remove row gray + non-clickable + hover reason")
         void lockedEntry_removeRowNonClickable() {
             MultiConfigRemovalGuards.register("regions", new MultiConfigRemovalGuard() {

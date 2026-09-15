@@ -53,8 +53,28 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
 
   @Override
   public boolean onCommand(
+      UUID callerId,
+      Map<String, List<String>> parameterValues,
+      CommandsAPICommand nextCommand,
+      java.util.function.Consumer<String> messageMethod) {
+    if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
+        || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
+      msgInvalidCommand(callerId, name(), messageMethod);
+      return true;
+    }
+    return onCommand(callerId, parameterValues, nextCommand);
+  }
+
+  @Override
+  public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
+
+    if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
+        || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
+      msgInvalidCommand(callerId, name());
+      return true;
+    }
 
     RTPScheduler scheduler = RTP.scheduler;
     if (scheduler == null) {

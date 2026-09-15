@@ -61,7 +61,7 @@ class CommandTreeMenuBuilderTest {
 
             @Override
             public YamlCommentLookup commentLookup() {
-                return (file, key) -> Optional.of("Helpful documentation for " + key);
+                return (YamlCommentLookup) (file, key) -> (key != null) ? Optional.of("Helpful documentation for " + key) : Optional.empty();
             }
         };
     }
@@ -192,6 +192,83 @@ class CommandTreeMenuBuilderTest {
         }
         assertTrue(foundHover);
     }
+
+    @Test
+    @DisplayName("predictVisualLines calculates wrapped line count correctly")
+    void predictVisualLines_calculation() {
+        assertEquals(1, CommandTreeMenuBuilder.predictVisualLines(null));
+        assertEquals(1, CommandTreeMenuBuilder.predictVisualLines(""));
+        assertEquals(1, CommandTreeMenuBuilder.predictVisualLines("&a&l&c"));
+        assertEquals(1, CommandTreeMenuBuilder.predictVisualLines("Short label"));
+        // 19 characters exactly
+        assertEquals(1, CommandTreeMenuBuilder.predictVisualLines("1234567890123456789"));
+        // 20 characters wraps to 2 lines
+        assertEquals(2, CommandTreeMenuBuilder.predictVisualLines("12345678901234567890"));
+        // 40 characters wraps to 3 lines
+        assertEquals(3, CommandTreeMenuBuilder.predictVisualLines("1234567890123456789012345678901234567890"));
+        // Color codes shouldn't count toward visible length
+        assertEquals(1, CommandTreeMenuBuilder.predictVisualLines("&11234567890&2123456789"));
+        assertEquals(1, CommandTreeMenuBuilder.predictVisualLines("§a§lShort label"));
+    }
+
+
+    @Test
+    @DisplayName("buildConfigSelector builds root and directory models")
+    void buildConfigSelector_directoriesAndFiles() {
+        // Root selector
+        MenuModel rootModel = builder.buildConfigSelector(caller, List.of("config.yml", "messages.yml"));
+        assertNotNull(rootModel);
+        assertEquals("config", rootModel.title());
+        assertFalse(rootModel.pages().isEmpty());
+
+        // Nested directory selector
+        MenuModel dirModel = builder.buildConfigSelector(caller, "messages", List.of("custom"), List.of("messages.yml"));
+        assertNotNull(dirModel);
+        assertEquals("messages", dirModel.title());
+    }
+
+    @Test
+    @DisplayName("buildOptionsPicker, buildShapeVertTypePicker, buildShapeVertSubParamPage")
+    void buildPickersAndSubPages() {
+        // Options picker
+        MenuModel options = builder.buildOptionsPicker(caller, "config.yml", "shape", "CIRCLE", List.of("CIRCLE", "SQUARE", "RECTANGLE"));
+        assertNotNull(options);
+        assertFalse(options.pages().isEmpty());
+
+        // Multi-page options picker (> 10 options)
+        List<String> manyOpts = new java.util.ArrayList<>();
+        for (int i = 0; i < 25; i++) {
+            manyOpts.add("opt" + i);
+        }
+        MenuModel pagedOptions = builder.buildOptionsPicker(caller, "config.yml", "shape", "opt0", manyOpts);
+        assertNotNull(pagedOptions);
+        assertTrue(pagedOptions.pages().size() > 1);
+
+        // Shape/Vert type picker
+        MenuModel typePicker = builder.buildShapeVertTypePicker(caller, "default.yml", "shape", "CIRCLE", List.of("CIRCLE", "SQUARE"), List.of("config", "regions", "default", "shape"));
+        assertNotNull(typePicker);
+        assertFalse(typePicker.pages().isEmpty());
+
+        // Shape/Vert sub-param page
+        Map<String, Object> subParams = Map.of("radius", 500, "weight", 1.0);
+        MenuModel subParamPage = builder.buildShapeVertSubParamPage(caller, "default.yml", "shape", "CIRCLE", subParams, List.of("config", "regions", "default", "shape"));
+        assertNotNull(subParamPage);
+        assertFalse(subParamPage.pages().isEmpty());
+
+        // Multi-page sub-param page (> 10 params)
+        Map<String, Object> manySubParams = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < 25; i++) {
+            manySubParams.put("param" + i, i);
+        }
+        MenuModel pagedSubParamPage = builder.buildShapeVertSubParamPage(caller, "default.yml", "shape", "CIRCLE", manySubParams, List.of("config", "regions", "default", "shape"));
+        assertNotNull(pagedSubParamPage);
+        assertFalse(pagedSubParamPage.pages().isEmpty());
+
+        // Empty subParams
+        MenuModel emptySub = builder.buildShapeVertSubParamPage(caller, "default.yml", "shape", "CIRCLE", Map.of(), List.of("config", "regions", "default", "shape"));
+        assertNotNull(emptySub);
+    }
+
 
     private static final class TestableTree extends BaseRTPCmdImpl implements TreeCommand {
         private final String name;

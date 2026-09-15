@@ -19,3 +19,14 @@
 //   docs/adr/ADR-033-neoforge-platform-in-scope.md
 //   platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md
 //   docs/dev/scratch/PROPOSAL-neoforge-bringup.md
+
+dependencies {
+    api project(':rtp-api')
+    api project(':rtp-core')
+    api project(':commands-api')
+    testImplementation 'com.mojang:brigadier:1.2.9'
+}
+
+tasks.named('test') {
+    dependsOn(subprojects.collect { it.tasks.matching { t -> t.name == 'test' } })
+}
