@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       scenario:
-        description: 'Acceptance scenario to run (all, boot, heartbeat, killswitch, roundtrip)'
+        description: 'Acceptance scenario to run (all, boot, heartbeat, killswitch, roundtrip, rtptest)'
         required: true
         default: 'all'
         type: choice
@@ -17,6 +17,7 @@ on:
           - heartbeat
           - killswitch
           - roundtrip
+          - rtptest
       wait_seconds:
         description: 'Wait timeout seconds for heartbeat / boot convergence'
         required: false

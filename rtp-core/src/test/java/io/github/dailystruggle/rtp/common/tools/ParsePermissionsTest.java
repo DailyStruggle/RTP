@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -167,5 +168,34 @@ public class ParsePermissionsTest {
         // addSender wraps a non-player sender without carrying its effective set,
         // so the resolved sender contributes no numeric grant.
         assertEquals(-1, ParsePermissions.getInt(id, "rtp.tp.amount."));
+    }
+
+    @Test
+    void nullSenderReturnsDefaults() {
+        UUID unknownId = UUID.randomUUID();
+        // Return null sender by overriding getSender for this ID or checking unknown
+        io.github.dailystruggle.rtp.api.server.RTPServerAccessor original = RTP.serverAccessor;
+        try {
+            RTP.serverAccessor = (io.github.dailystruggle.rtp.api.server.RTPServerAccessor)
+                    java.lang.reflect.Proxy.newProxyInstance(
+                            getClass().getClassLoader(),
+                            new Class<?>[]{io.github.dailystruggle.rtp.api.server.RTPServerAccessor.class},
+                            (proxy, method, args) -> {
+                                if ("getSender".equals(method.getName())) return null;
+                                return null;
+                            }
+                    );
+            assertFalse(ParsePermissions.hasPerm(unknownId, "rtp.tp.", "use"));
+            assertEquals(-1, ParsePermissions.getInt(unknownId, "rtp.tp.amount."));
+        } finally {
+            RTP.serverAccessor = original;
+        }
+    }
+
+    @Test
+    void getIntWithMultipleValidNumbersInOrder() {
+        PermSender s = new PermSender(UUID.randomUUID(), "ascending",
+                "rtp.tp.amount.10", "rtp.tp.amount.20", "rtp.tp.amount.5");
+        assertEquals(5, ParsePermissions.getInt(s, "rtp.tp.amount."));
     }
 }

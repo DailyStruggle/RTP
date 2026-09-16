@@ -6,7 +6,6 @@ import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.AfterEach;
@@ -15,7 +14,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,8 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("MenuConcreteCommandLeavesB leaf dispatch unit tests")
 class MenuConcreteCommandLeavesBTest {
 
-    @org.junit.jupiter.api.io.TempDir
-    private Path tempDir;
+    @org.junit.jupiter.api.io.TempDir(cleanup = org.junit.jupiter.api.io.CleanupMode.NEVER)
+    Path tempDir;
     private File pluginDir;
 
     private UUID caller;
@@ -121,14 +119,7 @@ class MenuConcreteCommandLeavesBTest {
 
     @AfterEach
     void tearDown() {
-        if (RTP.configs != null && RTP.configs.fileDatabase != null) {
-            RTP.configs.fileDatabase.processQueries(Long.MAX_VALUE);
-            RTP.configs.fileDatabase.disconnect();
-        }
-        RTP.configs = null;
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
-        io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
+        RTPTestSetup.cleanUp();
     }
 
     @Test
