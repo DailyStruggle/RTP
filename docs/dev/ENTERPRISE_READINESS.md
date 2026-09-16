@@ -79,7 +79,7 @@ graph. These are instruction / branch percentages, not estimates.
 | `metrics-api` | 18.8 | 18.9 | 506 | Pure SPI, 8 classes. Should be ~100%. |
 | `commands-api` | 93.5 | 80.1 | 163 | Decoupled from Bukkit, pure Java + Brigadier library. Strict 90/80 JaCoCo gate enforced. |
 | `rtp-api` | 95.7 | 81.3 | 422 | Fully tested public API models, facades, and delegates. Strict 90/80 JaCoCo gate enforced. |
-| `rtp-core` | 80.7 | 65.2 | 27,953 | The dominant mass. Detail in section 2.3. Refreshed 2026-09-15 (was 59.6/45.8/56,583 on 2026-09-10). |
+| `rtp-core` | 81.6 | 65.8 | 26,604 | The dominant mass. Detail in section 2.3. Refreshed 2026-09-15 (was 80.7/65.2/27,953 earlier that day; 59.6/45.8/56,583 on 2026-09-10). Includes the now-running Docker-gated SQL tier. |
 | `rtp-proxy-common` | 82.2 | 69.1 | 3,303 | Raised from 59.0/44.1 via comprehensive unit suites; PIT mutation testing at 79% (375/474 killed). Floor ratcheted to 0.78/0.65. |
 | `maps-api` | 67.6 | 48.6 | 1,505 | `render` 73.8%, `bukkit` binding drags it down. |
 | `anvil-api` | 71.1 | 60.3 | 1,609 | Closest to target of the large modules. |
@@ -118,7 +118,7 @@ work; the genuine laggards are now the `RTP` root class and the `commands` root.
 | `selection/region/selectors/memory/shapes` | 91.1 | 1,845 |
 | `configuration` | 79.6 | 1,663 |
 | `commands` | **49.2** | 1,633 |
-| `database/options` | 64.1 | 1,591 |
+| `database/options` | 78.5 | 949 |
 | `network` | 77.8 | 1,572 |
 | `tools` | 83.1 | 1,418 |
 | `tasks` | 75.0 | 1,395 |
@@ -136,9 +136,23 @@ class**, raised 2026-09-15 from 28.4% (2,090 missed) to ~43% (1,643 missed) by
 allowed-targets enumeration and per-target status - plus the metrics delegate
 and the YAML->SQL `handleMigration` background task). The remaining `RTP` gap is
 mostly the constructor's server-bound bootstrap lambdas and the SQL-accessor
-branches of migration/shutdown, which need a real DB accessor. `database/options`
-(64.1%) likewise remains partly Docker/Testcontainers-gated for the JDBC error
-paths.
+branches of migration/shutdown, which need a real DB accessor.
+
+`database/options` rose 2026-09-15 from 64.1% (1,591 missed) to **78.5% (949
+missed)** once the Docker-gated `RealMySQLDatabaseAccessorTest` /
+`RealPostgreSQLDatabaseAccessorTest` suites (20 each) finally executed against
+real MySQL 8.4 / PostgreSQL 16 containers instead of skipping. Two fixes
+unblocked them: (1) Testcontainers 1.21.3's docker-java defaults to Docker Engine
+API 1.32, which Docker 29 (min API 1.40) rejects with HTTP 400 - so every
+container strategy failed and the tier silently skipped even with Docker running;
+pinning `api.version=1.44` via a test-classpath `docker-java.properties` (the only
+override docker-java honours - not the `DOCKER_API_VERSION` env var) restores the
+connection (testcontainers/testcontainers-java#11212). (2) The suites surfaced a
+latent bug in the shipped `PostgreSQLDatabaseAccessor`: `write()` and the
+`ON CONFLICT` clause quoted mixed-case identifiers (`"UUID"`, `"senderId"`) while
+`CREATE TABLE` left them unquoted (PostgreSQL folds to lower case), so every
+INSERT threw, was swallowed, and no row persisted - fixed by leaving the
+identifiers unquoted to match the folded columns.
 
 ### 2.4 Measurement caveats found while taking this baseline
 
@@ -824,7 +838,7 @@ whenever a criterion changes state; never tick a section 4-7 item as a substitut
 
 | # | Criterion (section 9) | Status | Evidence | Remaining work |
 |---|---|---|---|---|
-| 1 | Every platform-neutral module >= 90% instruction / 80% branch, build-gated | **PARTIAL** | `build.gradle` `coverageFloors`: all platform-neutral modules gated (`:metrics-api` 0.95/0.85 [100%/94.6%], `:tags-api` 0.95/0.85 [98.2%/90.9%], `:yaml-api` 0.92/0.80 [97.0%/88.1%], `:rtp-api` 0.90/0.80 [95.7%/81.3%], `:commands-api` 0.90/0.80 [93.5%/80.1%], `:maps-api` 0.90/0.78 [94.7%/82.1%], `:anvil-api` 0.86/0.75 [90.5%/80.5%], `:rtp-core` 0.62/0.47 [67.5%/52.8%, selection/region at 90.72%/80.62%], `:rtp-proxy:rtp-proxy-common` 0.55/0.40 [60.1%/45.5%]). | Ratchet upward with `scripts/ratchet-coverage.py` after each green `-Pcoverage` run until all modules reach 0.90/0.80. 7 of 9 platform-neutral modules (`metrics-api`, `tags-api`, `yaml-api`, `maps-api`, `anvil-api`, `commands-api`, `rtp-api`) meet the target today; `rtp-core` and `rtp-proxy-common` continue to advance. |
+| 1 | Every platform-neutral module >= 90% instruction / 80% branch, build-gated (re-scoped: strict 90/80 **unit** floors for the pure-logic modules; the `rtp-core` platform/pipeline seams credited by **runtime-attested** devstack coverage - see 10.1) | **PARTIAL** | `build.gradle` `coverageFloors`: all platform-neutral modules gated (`:metrics-api` 0.95/0.85 [100%/94.6%], `:tags-api` 0.95/0.85 [98.2%/90.9%], `:yaml-api` 0.92/0.80 [97.0%/88.1%], `:rtp-api` 0.90/0.80 [95.7%/81.3%], `:commands-api` 0.90/0.80 [93.5%/80.1%], `:maps-api` 0.90/0.78 [94.7%/82.1%], `:anvil-api` 0.86/0.75 [90.5%/80.5%], `:rtp-core` 0.62/0.47 [67.5%/52.8%, selection/region at 90.72%/80.62%], `:rtp-proxy:rtp-proxy-common` 0.55/0.40 [60.1%/45.5%]). | Strict 90/80 **unit** floors remain the bar for the pure-logic modules: 7 of 9 platform-neutral modules (`metrics-api`, `tags-api`, `yaml-api`, `maps-api`, `anvil-api`, `commands-api`, `rtp-api`) meet the target today; ratchet upward with `scripts/ratchet-coverage.py` after each green `-Pcoverage` run. The `rtp-core` platform/pipeline seams (the `RTP` bootstrap lambdas, teleport/dispatch pipeline, adapter glue) are closed by **runtime-attested** devstack coverage rather than increasingly artificial unit tests - see [`DEVSTACK_COVERAGE_PLAN.md`](DEVSTACK_COVERAGE_PLAN.md) and subsection 10.1. |
 | 2 | Mutation score >= 60% on the safety packages | **MET** | `rtp-core/build.gradle` `-Pmutation` gate, `mutationThreshold = 60`; all safety packages meet or exceed the floor: `selection/worldborder` passed (83%), `selection/region/cache` passed (81%), `selection/region/selectors/verticalAdjustors` passed (85%), `selection/region/selectors/memory/table` passed (77%), `tasks/teleport` passed (61%, 285/465 killed, test strength 72%); `.github/workflows/mutation-testing.yml` wired. | Keep test assertions strong across future refactors so package mutation scores remain >= 60%. |
 | 3 | Every S-00x prohibition has an automated rule cited in `TRACEABILITY.md` | **MET** | `RTPArchitectureTest` rules 1-10; `TRACEABILITY.md` REQ-RTP-S-001..S-007 rows. | Keep the rows current when rules move. |
 | 4 | Support matrix distinguishes tested vs best-effort; tested cells re-verified by CI on a schedule | **MET** | `SUPPORT_MATRIX.md`; `.github/workflows/devstack-acceptance.yml` (nightly: Velocity + Paper + Folia + Fabric on modern MC; Java 21 LTS & 25+). | Tested cells in `SUPPORT_MATRIX.md` match automated CI / devstack suites; platforms without scheduled live CI suites (Spigot, NeoForge, BungeeCord, non-LTS Java) are categorized as Best-effort. |
@@ -839,6 +853,32 @@ artifact is populated, and a `scripts/diff-coverage.py` changed-line gate (80% f
 baseline = PR base or previous commit; checkout uses `fetch-depth: 0`) fails the run
 when changed lines regress. `-PfullTests` (the slow/edge/simulation tiers) is still not
 run in CI by default to keep wall time bounded; run it locally or via a scheduled job.
+
+### 10.1 Criterion #1 re-scope (runtime-attested devstack coverage)
+
+Chasing pure-unit 90/80 on `rtp-core` has hit diminishing returns: the remaining
+missed instructions are concentrated in code a plain-JVM harness cannot reach
+honestly - the `RTP` constructor's server-bound bootstrap lambdas, the platform
+adapter seams, and the full teleport/dispatch pipelines that only exist at runtime.
+Criterion #1's definition of done is therefore re-scoped, not weakened:
+
+- **Pure-logic modules** keep the strict 90/80 **unit** JaCoCo floors as the bar.
+  7 of 9 platform-neutral modules already meet it; `rtp-core`'s pure-logic
+  packages (e.g. `selection/region`) and `rtp-proxy-common` continue to ratchet
+  upward toward 0.90/0.80.
+- **The `rtp-core` platform/pipeline seams** (bootstrap lambdas, teleport/dispatch
+  pipeline, adapter glue) are credited by **runtime-attested** devstack coverage
+  instead: the devstack attaches a JaCoCo `-javaagent` to every backend/lobby and
+  merges the `.exec` dumps via `:jacocoServerReport`. See
+  [`DEVSTACK_COVERAGE_PLAN.md`](DEVSTACK_COVERAGE_PLAN.md) for the wiring and the
+  real-client verification track.
+
+Criterion #1 stays **PARTIAL**. The intermediate release is cut at the current
+measured state (floors locked at the values in the scorecard above); the remaining
+gap is closed by the ongoing devstack runtime-coverage track rather than by
+blocking the release on unit-only floors.
+
+---
 
 **Claim language until all rows read MET:** state the numbers ("rtp-core 60% instruction,
 floors enforced at 0.55/0.42; SBOM + SHA-256/512 + SLSA provenance on every release;

@@ -159,9 +159,13 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
 
   @Override
   protected String getInsertStatement() {
+    // Identifiers are left unquoted so PostgreSQL folds them to the same lower
+    // case used by the unquoted CREATE TABLE column definitions. A quoted mixed
+    // case identifier (e.g. "senderId") is case-sensitive and would not match the
+    // folded column/constraint name, silently breaking every upsert.
     return "INSERT INTO rtp_teleport_data (senderName, senderId, time, delay, selectedX, selectedY, selectedZ, selectedWorldName, selectedWorldId, originalX, originalY, originalZ, originalWorldName, originalWorldId, region, cost, attempts) " +
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
-        "ON CONFLICT (\"senderId\") DO NOTHING";
+        "ON CONFLICT (senderId) DO NOTHING";
   }
 
   @Override
@@ -176,9 +180,13 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
 
     for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
       String colName = entry.getKey().object.toString();
-      columns.append("\"").append(colName).append("\",");
+      // Unquoted identifiers so PostgreSQL folds them to the lower case used by the
+      // unquoted CREATE TABLE column definitions; quoting the mixed-case caller name
+      // (e.g. "UUID") would be case-sensitive, fail to match column "uuid", and make
+      // the INSERT throw -- which write() swallows, so the row would silently vanish.
+      columns.append(colName).append(",");
       values.append("?,");
-      updates.append("\"").append(colName).append("\" = EXCLUDED.\"").append(colName).append("\",");
+      updates.append(colName).append(" = EXCLUDED.").append(colName).append(",");
       parameters.add(entry.getValue().object);
     }
 
@@ -190,7 +198,7 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     String sql;
     if (tableName.equalsIgnoreCase("rtp_teleport_data")) {
       sql = "INSERT INTO " + tableName + " (" + columns + ") VALUES (" + values + ") " +
-          "ON CONFLICT (\"senderId\") DO UPDATE SET " + updates;
+          "ON CONFLICT (senderId) DO UPDATE SET " + updates;
     } else {
       sql = "INSERT INTO " + tableName + " (" + columns + ") VALUES (" + values + ")";
     }

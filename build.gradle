@@ -194,19 +194,19 @@ subprojects {
     // (which only controls report generation). Platform adapters stay uncapped
     // until their realistic ceilings (section 2.2) are reached; add them here then.
     def coverageFloors = [
-            // rtp-core measured via jacocoTestReport: 71.7% instruction /
-            // 56.8% branch. Floors carry margin under the baseline because a
+            // rtp-core measured via jacocoTestReport (2026-09-15): 81.6% instruction /
+            // 65.8% branch. Floors carry a ~1-2 pt margin under the baseline because a
             // partially-recompiled tree makes JaCoCo discard stale execution data,
             // which can read several points low. Target is 90/80 (section 3).
             ':rtp-core': [
-                    instruction: 0.69,
-                    branch: 0.54,
+                    instruction: 0.80,
+                    branch: 0.64,
                     // Per-package rules for safety-critical packages (ENTERPRISE_READINESS.md 4.1 item 4).
                     // Floors are higher than module baseline and gate critical pipelines.
                     packages: [
-                            'io.github.dailystruggle.rtp.common.tasks.teleport': [instruction: 0.82, branch: 0.69],
-                            'io.github.dailystruggle.rtp.common.selection.region': [instruction: 0.71, branch: 0.57],
-                            'io.github.dailystruggle.rtp.common.selection.worldborder': [instruction: 0.95, branch: 0.85]
+                            'io.github.dailystruggle.rtp.common.tasks.teleport': [instruction: 0.87, branch: 0.75],
+                            'io.github.dailystruggle.rtp.common.selection.region': [instruction: 0.82, branch: 0.68],
+                            'io.github.dailystruggle.rtp.common.selection.worldborder': [instruction: 0.99, branch: 0.89]
                     ]
             ],
             // metrics-api measured: 100% instruction / 94.6% branch.
@@ -225,9 +225,11 @@ subprojects {
             // rtp-api measured: 95.7% instruction / 81.3% branch.
             // Sits at Stage A strict 90/80 JaCoCo gate.
             ':rtp-api': [instruction: 0.90, branch: 0.80],
-            // rtp-proxy-common measured: 82.2% instruction / 69.1% branch (without Docker Redis IT).
-            // Sits at 0.78/0.65 floor with safety margin.
-            ':rtp-proxy:rtp-proxy-common': [instruction: 0.78, branch: 0.65],
+            // rtp-proxy-common measured via jacocoTestReport (2026-09-15): 87.0% instruction /
+            // 68.8% branch (without Docker Redis IT). Floors carry a ~1-2 pt margin under the
+            // baseline because a partially-recompiled tree makes JaCoCo discard stale execution
+            // data, which can read several points low.
+            ':rtp-proxy:rtp-proxy-common': [instruction: 0.85, branch: 0.67],
             // commands-api measured: 93.6% instruction / 80.3% branch.
             // Sits at Stage A strict 90/80 JaCoCo gate.
             ':commands-api': [instruction: 0.90, branch: 0.80],

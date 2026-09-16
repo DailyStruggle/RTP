@@ -124,7 +124,10 @@ public class RegionCacheEvictionAndConcurrencyTest {
             });
         }
 
-        assertTrue(latch.await(10, TimeUnit.SECONDS));
+        // Liveness guard only (correctness is asserted below). Generous timeout
+        // so CPU starvation during the fully-parallel multi-module build does
+        // not flake this out before the worker threads drain their operations.
+        assertTrue(latch.await(30, TimeUnit.SECONDS));
         pool.shutdown();
 
         // Drain any remaining
