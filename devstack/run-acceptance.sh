@@ -6,7 +6,7 @@
 # pass/fail line to stdout and a structured block to the per-run evidence log.
 #
 # Usage:
-#   ./run-acceptance.sh [--scenario all|boot|heartbeat|roundtrip|killmidflight|killswitch|down|logs]
+#   ./run-acceptance.sh [--scenario all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|down|logs]
 #                       [--wait-seconds N] [--skip-up] [--skip-build] [--no-logs]
 #                       [--purge] [--lite]
 #
@@ -38,7 +38,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 case "$Scenario" in
-  all|boot|heartbeat|roundtrip|killmidflight|killswitch|down|logs) ;;
+  all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|down|logs) ;;
   *) echo "invalid --scenario: $Scenario" >&2; exit 2 ;;
 esac
 
@@ -420,6 +420,38 @@ test_killmidflight() {
   return 1
 }
 
+test_rtptest() {
+  # Drives the in-game `/rtp test accessor` self-test on every backend and lobby
+  # via the itzg `rcon-cli` console, then polls each service log for the
+  # `[RTP test/accessor] pass=<bool>` verdict the probe always emits (even for a
+  # console caller). Ties the server-bound RTPServerAccessor contract checks to a
+  # live Paper/Folia runtime rather than a JVM mock, and (under the coverage
+  # overlay) flushes the JaCoCo agent so accessor paths credit server-bound
+  # coverage. See platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md.
+  echo "[rtptest] dispatching '/rtp test accessor' to backends + lobbies via rcon (per-service budget: 30s)..."
+  local services=(backend-a backend-b backend-c lobby-a lobby-b)
+  local anyFail=0 svc rconOut deadline verdict
+  for svc in "${services[@]}"; do
+    echo "[rtptest] -> $svc : rtp test accessor"
+    rconOut="$(cd "$scriptDir" && docker compose exec -T "$svc" rcon-cli rtp test accessor 2>&1)" || true
+    deadline=$(( $(date +%s) + 30 )); verdict=""
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+      verdict="$(cd "$scriptDir" && docker compose logs --tail=200 --no-log-prefix "$svc" 2>/dev/null | grep -F '[RTP test/accessor] pass=' | tail -n1)"
+      [ -n "$verdict" ] && break
+      sleep 2
+    done
+    write_evidence "rtptest.$svc" "rcon: $rconOut"$'\n'"verdict: ${verdict:-<none>}"
+    if printf '%s' "$verdict" | grep -q 'pass=true'; then
+      echo "[rtptest]    PASS ($svc)"
+    else
+      echo "[rtptest]    FAIL ($svc): ${verdict:-no verdict line in log}"
+      anyFail=1
+    fi
+  done
+  if [ "$anyFail" -eq 0 ]; then echo "[rtptest] PASS"; return 0; fi
+  echo "[rtptest] FAIL - one or more services failed the accessor self-test"; return 1
+}
+
 test_killswitch() {
   echo "[killswitch] asserting claim rejection via the kill-switch sentinel (typical: <1s)..."
   local tokenId playerId now result
@@ -492,7 +524,7 @@ fi
 
 declare -a plan=()
 if [ "$Scenario" = "all" ]; then
-  if [ "$Lite" -eq 1 ]; then plan=(boot roundtrip); else plan=(boot heartbeat roundtrip killmidflight killswitch); fi
+  if [ "$Lite" -eq 1 ]; then plan=(boot roundtrip); else plan=(boot heartbeat roundtrip killmidflight killswitch rtptest); fi
 else
   plan=("$Scenario")
 fi
@@ -506,6 +538,7 @@ for s in "${plan[@]}"; do
     roundtrip)     if test_roundtrip;     then results[$s]=PASS; else results[$s]=FAIL; anyFail=1; fi ;;
     killmidflight) if test_killmidflight; then results[$s]=PASS; else results[$s]=FAIL; anyFail=1; fi ;;
     killswitch)    if test_killswitch;    then results[$s]=PASS; else results[$s]=FAIL; anyFail=1; fi ;;
+    rtptest)       if test_rtptest;       then results[$s]=PASS; else results[$s]=FAIL; anyFail=1; fi ;;
   esac
 done
 

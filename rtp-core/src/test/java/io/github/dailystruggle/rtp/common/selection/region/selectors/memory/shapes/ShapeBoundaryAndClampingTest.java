@@ -3,19 +3,26 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.EllipseMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.PolygonMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -262,5 +269,307 @@ class ShapeBoundaryAndClampingTest {
         regionSquare.set(GenericMemoryShapeParams.centerZ, 0L);
 
         assertFalse(WorldBorderAuditor.checkRegionWorldBorder("collidingSquare", world, regionSquare, false));
+    }
+
+    // -------------------------------------------------------------------------
+    // flushAndRebuild, save/load, exportDebugJson, and orientation math
+    // -------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("flushAndRebuild: processes multiple known bad coordinates into cached runs")
+    void flushAndRebuild_multipleKnownBadCoordinates() {
+        Circle circle = new Circle();
+        circle.set(GenericMemoryShapeParams.radius, 1000L);
+        circle.set(GenericMemoryShapeParams.centerRadius, 0L);
+
+        // Before adding bad locations, cache is empty and dirty flag is default true
+        assertEquals(0, circle.badKeysSnapshot().length);
+
+        // Add multiple distinct bad locations with specific fail types
+        circle.addBadLocation(100L, LocationGenerator.FailTypes.safety);
+        circle.addBadLocation(101L, LocationGenerator.FailTypes.safety);
+        circle.addBadLocation(102L, LocationGenerator.FailTypes.safety);
+        circle.addBadLocation(500L, LocationGenerator.FailTypes.vert);
+        circle.addBadLocation(501L, LocationGenerator.FailTypes.vert);
+        circle.addBadLocation(1200L, LocationGenerator.FailTypes.biome);
+
+        // Verify isKnownBad checks pending locations even before rebuild
+        assertTrue(circle.isKnownBad(100L));
+        assertTrue(circle.isKnownBad(101L));
+        assertTrue(circle.isKnownBad(500L));
+        assertTrue(circle.isKnownBad(1200L));
+        assertFalse(circle.isKnownBad(200L));
+
+        // Trigger flushAndRebuild
+        circle.flushAndRebuild(circle.spatialResolution());
+
+        // Cache must now contain merged runs
+        long[] badKeys = circle.badKeysSnapshot();
+        long[] prefixSums = circle.badPrefixSumsSnapshot();
+        byte[] badCauses = circle.badCausesSnapshot();
+
+        assertTrue(badKeys.length >= 3, "Expected at least 3 distinct runs: [100..102], [500..501], [1200]");
+        // Verify contiguous keys 100, 101, 102 are coalesced into a single run at key 100 with delta length 3
+        assertEquals(100L, badKeys[0]);
+        assertEquals(3L, prefixSums[0]);
+        assertEquals((byte) LocationGenerator.FailTypes.safety.ordinal(), badCauses[0]);
+
+        // Key 500 with length 2
+        assertEquals(500L, badKeys[1]);
+        assertEquals(3L + 2L, prefixSums[1]);
+        assertEquals((byte) LocationGenerator.FailTypes.vert.ordinal(), badCauses[1]);
+
+        // Key 1200 with length 1
+        assertEquals(1200L, badKeys[2]);
+        assertEquals(5L + 1L, prefixSums[2]);
+        assertEquals((byte) LocationGenerator.FailTypes.biome.ordinal(), badCauses[2]);
+
+        // All points remain known bad post rebuild
+        assertTrue(circle.isKnownBad(100L));
+        assertTrue(circle.isKnownBad(101L));
+        assertTrue(circle.isKnownBad(102L));
+        assertTrue(circle.isKnownBad(500L));
+        assertTrue(circle.isKnownBad(501L));
+        assertTrue(circle.isKnownBad(1200L));
+        assertFalse(circle.isKnownBad(103L));
+    }
+
+    @Test
+    @DisplayName("save and load round-trip: serializes shape to binary file and restores runs accurately")
+    void saveAndLoad_roundTripBinaryFile(@TempDir Path tempDir) throws Exception {
+        // Wire a dedicated test directory and database accessor
+        File testDir = tempDir.toFile();
+        MockRTPServerAccessor accessor = RTPTestSetup.install(testDir);
+
+        YamlFileDatabase db = new YamlFileDatabase(testDir);
+        Field daField = RTP.class.getDeclaredField("databaseAccessor");
+        daField.setAccessible(true);
+        daField.set(RTP.getInstance(), db);
+
+        Square original = new Square();
+        original.set(GenericMemoryShapeParams.radius, 500L);
+        original.set(GenericMemoryShapeParams.centerRadius, 0L);
+
+        // Populate bad locations and biome locations
+        original.addBadLocation(50L, LocationGenerator.FailTypes.safety);
+        original.addBadLocation(51L, LocationGenerator.FailTypes.safety);
+        original.addBadLocation(200L, LocationGenerator.FailTypes.vert);
+        original.addBiomeLocation(300L, 10L, "PLAINS");
+        original.addBiomeLocation(400L, 5L, "FOREST");
+
+        original.flushAndRebuild(original.spatialResolution());
+
+        long[] originalBadKeys = original.badKeysSnapshot();
+        long[] originalBadSums = original.badPrefixSumsSnapshot();
+        byte[] originalBadCauses = originalBadCausesSnapshot(original);
+
+        String fileName = "shape_test_roundtrip.bin";
+        String worldName = "test_world";
+
+        // Save
+        original.save(fileName, worldName);
+        db.processQueries(Long.MAX_VALUE);
+
+        // Verify the binary file was written
+        File savedFile = new File(testDir, "database" + File.separator + "regionData" + File.separator + fileName);
+        assertTrue(savedFile.exists(), "Binary save file should exist on disk");
+        assertTrue(savedFile.length() > 0, "Binary save file should have content");
+
+        // Load into fresh shape
+        Square reloaded = new Square();
+        reloaded.set(GenericMemoryShapeParams.radius, 500L);
+        reloaded.set(GenericMemoryShapeParams.centerRadius, 0L);
+
+        CompletableFuture<Void> future = reloaded.load(fileName, worldName);
+        db.processQueries(Long.MAX_VALUE);
+        future.get(5, TimeUnit.SECONDS);
+
+        // Verify reloaded shape data matches original
+        long[] reloadedBadKeys = reloaded.badKeysSnapshot();
+        long[] reloadedBadSums = reloaded.badPrefixSumsSnapshot();
+        byte[] reloadedBadCauses = originalBadCausesSnapshot(reloaded);
+
+        assertArrayEquals(originalBadKeys, reloadedBadKeys, "Bad keys must match after roundtrip");
+        assertArrayEquals(originalBadSums, reloadedBadSums, "Bad prefix sums must match after roundtrip");
+        assertArrayEquals(originalBadCauses, reloadedBadCauses, "Bad causes must match after roundtrip");
+
+        assertTrue(reloaded.isKnownBad(50L));
+        assertTrue(reloaded.isKnownBad(51L));
+        assertTrue(reloaded.isKnownBad(200L));
+        assertFalse(reloaded.isKnownBad(100L));
+
+        assertEquals("PLAINS", reloaded.biomeAt(300L));
+        assertEquals("FOREST", reloaded.biomeAt(400L));
+    }
+
+    private static byte[] originalBadCausesSnapshot(MemoryShape<?> shape) {
+        return shape.badCausesSnapshot();
+    }
+
+    @Test
+    @DisplayName("exportDebugJson: generates valid JSON file structure")
+    void exportDebugJson_validStructure(@TempDir Path tempDir) throws Exception {
+        File testDir = tempDir.toFile();
+        MockRTPServerAccessor accessor = new MockRTPServerAccessor(testDir);
+        RTP.serverAccessor = accessor;
+        io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
+
+        Circle circle = new Circle();
+        circle.set(GenericMemoryShapeParams.radius, 800L);
+        circle.addBadLocation(42L, LocationGenerator.FailTypes.safety);
+        circle.addBadLocation(43L, LocationGenerator.FailTypes.safety);
+        circle.addBadLocation(100L, LocationGenerator.FailTypes.vert);
+        circle.addBiomeLocation(200L, 8L, "DESERT");
+        circle.flushAndRebuild(circle.spatialResolution());
+
+        String jsonName = "debug_export.json";
+        String worldName = "world_nether";
+        circle.exportDebugJson(jsonName, worldName);
+
+        File debugFile = new File(testDir, "database" + File.separator + "regionData" + File.separator + "debug" + File.separator + jsonName);
+        assertTrue(debugFile.exists(), "Debug JSON file must exist");
+        assertTrue(debugFile.length() > 0, "Debug JSON file must not be empty");
+
+        String content = Files.readString(debugFile.toPath());
+        com.google.gson.JsonObject root = com.google.gson.JsonParser.parseString(content).getAsJsonObject();
+
+        assertEquals(worldName, root.get("world").getAsString());
+        assertTrue(root.has("scanStride"));
+        assertTrue(root.has("spatialResolution"));
+        assertTrue(root.has("badLocations"));
+        assertTrue(root.has("biomeLocations"));
+
+        com.google.gson.JsonArray badLocations = root.getAsJsonArray("badLocations");
+        assertTrue(badLocations.size() >= 2);
+
+        com.google.gson.JsonObject firstBad = badLocations.get(0).getAsJsonObject();
+        assertEquals(42L, firstBad.get("start").getAsLong());
+        assertEquals(2L, firstBad.get("length").getAsLong());
+        assertEquals("safety", firstBad.get("cause").getAsString());
+
+        com.google.gson.JsonObject secondBad = badLocations.get(1).getAsJsonObject();
+        assertEquals(100L, secondBad.get("start").getAsLong());
+        assertEquals(1L, secondBad.get("length").getAsLong());
+        assertEquals("vert", secondBad.get("cause").getAsString());
+
+        com.google.gson.JsonObject biomes = root.getAsJsonObject("biomeLocations");
+        assertTrue(biomes.has("DESERT"));
+        com.google.gson.JsonArray desertRuns = biomes.getAsJsonArray("DESERT");
+        assertEquals(1, desertRuns.size());
+        assertEquals(200L, desertRuns.get(0).getAsJsonObject().get("start").getAsLong());
+        assertEquals(8L, desertRuns.get(0).getAsJsonObject().get("length").getAsLong());
+    }
+
+    @Test
+    @DisplayName("Orientation rotation math: applyOrientation and unapplyOrientation invert each other across all dihedral orientations")
+    void orientationMath_applyAndUnapplyInverse() {
+        int n = 16;
+        for (int o = 0; o < 8; o++) {
+            for (int x = 0; x < n; x++) {
+                for (int y = 0; y < n; y++) {
+                    int[] oriented = MemoryShape.applyOrientation(x, y, n, o);
+                    assertEquals(2, oriented.length);
+                    assertTrue(oriented[0] >= 0 && oriented[0] < n, "x in bounds for o=" + o);
+                    assertTrue(oriented[1] >= 0 && oriented[1] < n, "y in bounds for o=" + o);
+
+                    int[] restored = MemoryShape.unapplyOrientation(oriented[0], oriented[1], n, o);
+                    assertEquals(x, restored[0], "Restored x must match original for o=" + o);
+                    assertEquals(y, restored[1], "Restored y must match original for o=" + o);
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Orientation rotation math: applyOrientation mapping definitions across all 8 dihedral orientations")
+    void orientationMath_exactTransformations() {
+        int n = 10;
+        int max = n - 1; // 9
+        int x = 2;
+        int y = 7;
+
+        // o=0: identity (x, y)
+        assertArrayEquals(new int[]{2, 7}, MemoryShape.applyOrientation(x, y, n, 0));
+        // o=1: transpose (y, x)
+        assertArrayEquals(new int[]{7, 2}, MemoryShape.applyOrientation(x, y, n, 1));
+        // o=2: 90 deg clockwise (max - y, x)
+        assertArrayEquals(new int[]{max - 7, 2}, MemoryShape.applyOrientation(x, y, n, 2));
+        // o=3: horizontal flip (max - x, y)
+        assertArrayEquals(new int[]{max - 2, 7}, MemoryShape.applyOrientation(x, y, n, 3));
+        // o=4: 180 deg rotation (max - x, max - y)
+        assertArrayEquals(new int[]{max - 2, max - 7}, MemoryShape.applyOrientation(x, y, n, 4));
+        // o=5: anti-transpose (max - y, max - x)
+        assertArrayEquals(new int[]{max - 7, max - 2}, MemoryShape.applyOrientation(x, y, n, 5));
+        // o=6: 270 deg clockwise (y, max - x)
+        assertArrayEquals(new int[]{7, max - 2}, MemoryShape.applyOrientation(x, y, n, 6));
+        // o=7: vertical flip (x, max - y)
+        assertArrayEquals(new int[]{2, max - 7}, MemoryShape.applyOrientation(x, y, n, 7));
+
+        // Modulo 8 equivalence
+        assertArrayEquals(MemoryShape.applyOrientation(x, y, n, 1), MemoryShape.applyOrientation(x, y, n, 9));
+        assertArrayEquals(MemoryShape.unapplyOrientation(x, y, n, 2), MemoryShape.unapplyOrientation(x, y, n, 10));
+    }
+
+    @Test
+    @DisplayName("Rectangle and Ellipse with non-zero orientation / yaw rotation and coordinate transformation")
+    void shapes_orientationWithNonZeroYaw() {
+        Rectangle rect = new Rectangle();
+        rect.set(RectangleParams.width, 200L);
+        rect.set(RectangleParams.height, 100L);
+        rect.set(RectangleParams.centerX, 0L);
+        rect.set(RectangleParams.centerZ, 0L);
+        rect.set(RectangleParams.rotation, 45L);
+
+        // Rectangle with 45 degree rotation
+        assertEquals(200L * 100L, rect.getRange());
+        long loc0 = 500L;
+        int[] xz0 = rect.locationToXZ(loc0);
+        assertNotNull(xz0);
+        assertEquals(2, xz0.length);
+
+        // Rotating a coordinate changes xz compared to unrotated
+        Rectangle unrotatedRect = new Rectangle();
+        unrotatedRect.set(RectangleParams.width, 200L);
+        unrotatedRect.set(RectangleParams.height, 100L);
+        unrotatedRect.set(RectangleParams.centerX, 0L);
+        unrotatedRect.set(RectangleParams.centerZ, 0L);
+        unrotatedRect.set(RectangleParams.rotation, 0L);
+        int[] unrotatedXZ = unrotatedRect.locationToXZ(loc0);
+
+        assertFalse(xz0[0] == unrotatedXZ[0] && xz0[1] == unrotatedXZ[1],
+                "Rotated coordinates should differ from unrotated coordinates");
+
+        // Verify chunkToLocations inverts locationToXZ for rotated rectangle
+        long[] preimages = rect.chunkToLocations(xz0[0], xz0[1]);
+        assertNotNull(preimages);
+        assertTrue(preimages.length > 0, "chunkToLocations should recover rotated coordinate preimages");
+
+        // Ellipse with non-zero yaw (rotation)
+        Ellipse ellipse = new Ellipse();
+        ellipse.set(EllipseMemoryShapeParams.radius, 300L);
+        ellipse.set(EllipseMemoryShapeParams.radius2, 150L);
+        ellipse.set(EllipseMemoryShapeParams.centerRadius, 0L);
+        ellipse.set(EllipseMemoryShapeParams.centerRadius2, 0L);
+        ellipse.set(EllipseMemoryShapeParams.centerX, 0L);
+        ellipse.set(EllipseMemoryShapeParams.centerZ, 0L);
+        ellipse.set(EllipseMemoryShapeParams.rotation, 60L);
+
+        long locE = 1200L;
+        int[] xzE = ellipse.locationToXZ(locE);
+        assertNotNull(xzE);
+        assertEquals(2, xzE.length);
+
+        Ellipse unrotatedEllipse = new Ellipse();
+        unrotatedEllipse.set(EllipseMemoryShapeParams.radius, 300L);
+        unrotatedEllipse.set(EllipseMemoryShapeParams.radius2, 150L);
+        unrotatedEllipse.set(EllipseMemoryShapeParams.centerRadius, 0L);
+        unrotatedEllipse.set(EllipseMemoryShapeParams.centerRadius2, 0L);
+        unrotatedEllipse.set(EllipseMemoryShapeParams.centerX, 0L);
+        unrotatedEllipse.set(EllipseMemoryShapeParams.centerZ, 0L);
+        unrotatedEllipse.set(EllipseMemoryShapeParams.rotation, 0L);
+        int[] unrotatedXZE = unrotatedEllipse.locationToXZ(locE);
+
+        assertFalse(xzE[0] == unrotatedXZE[0] && xzE[1] == unrotatedXZE[1],
+                "Rotated ellipse coordinates should differ from unrotated");
     }
 }

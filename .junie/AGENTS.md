@@ -270,6 +270,7 @@ User strings live in `rtp-plugin/src/main/resources/<file>.yml` (English baselin
 
 - **Gradle execution:** Always use the wrapper (`.\gradlew.bat` on Windows/PowerShell, `./gradlew` on Linux/POSIX). Run one command per line without chaining.
   - Transparent mutex/file-locking serialization is built directly into `gradlew` and `gradlew.bat` so concurrent LLM agent tasks and scripts can execute standard wrapper commands without race conditions or cache lock timeouts.
+  - **Never attempt to stop another thread's or agent's Gradle task.** Never run `gradlew --stop`, kill Gradle daemon processes (`Stop-Process`, `kill`, `pkill`), or break Gradle locks when another command or thread is executing. Stopping daemons mid-run causes deadlock, lock corruption, and infinite wait loops across concurrent agents. Wait for the wrapper's built-in mutex to yield or let the active task complete.
 - **Build & test commands:**
   - Full build: `.\gradlew.bat build` (or `./gradlew build`)
   - Module build: `.\gradlew.bat :<module>:build` (e.g. `.\gradlew.bat :rtp-core:build`)

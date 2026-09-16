@@ -699,4 +699,84 @@ class PlaceholderProviderTest {
         assertEquals("5", PlaceholderProvider.fillPlaceholders("[remainingLockUses]", oldUser));
         assertEquals("", PlaceholderProvider.fillPlaceholders("[remainingLockTime]", oldUser));
     }
+
+    @Test
+    void metricsHelpers_withAndWithoutSnapshot() throws Exception {
+        // Without snapshot installed (defaults to RTP.metrics.snapshot())
+        assertDoesNotThrow(PlaceholderProvider::hasLiveTps);
+        assertDoesNotThrow(PlaceholderProvider::hasLiveMspt);
+        assertDoesNotThrow(PlaceholderProvider::hasDatabaseLatency);
+        assertDoesNotThrow(PlaceholderProvider::pipelineSampleCount);
+
+        // Install custom snapshot with live TPS and MSPT
+        io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension rtpExt =
+                new io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension(10, 5, 2, 1, 15.5, 42);
+        io.github.dailystruggle.metrics.api.MetricsSnapshot snap =
+                new io.github.dailystruggle.metrics.api.MetricsSnapshot(
+                        20.0, 19.5, 19.0, 12.5, 50, 100, 1024L, 2048L,
+                        System.currentTimeMillis(), java.util.Collections.emptyList()
+                ).withExtension(rtpExt);
+        PlaceholderProvider.pushSnapshot(snap);
+        try {
+            assertTrue(PlaceholderProvider.hasLiveTps());
+            assertTrue(PlaceholderProvider.hasLiveMspt());
+            assertTrue(PlaceholderProvider.hasDatabaseLatency());
+
+            // Test private formatPercentile via reflection
+            java.lang.reflect.Method formatMethod = PlaceholderProvider.class.getDeclaredMethod("formatPercentile", double.class);
+            formatMethod.setAccessible(true);
+            assertEquals("n/a", formatMethod.invoke(null, Double.NaN));
+            assertEquals("0.50", formatMethod.invoke(null, 0.5));
+            assertEquals("12.30", formatMethod.invoke(null, 12.3));
+        } finally {
+            PlaceholderProvider.popSnapshot();
+        }
+
+        // Install snapshot with NaN TPS, MSPT, and -1 database latency
+        io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension noDbExt =
+                new io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension(0, 0, 0, 0, Double.NaN, -1);
+        io.github.dailystruggle.metrics.api.MetricsSnapshot nanSnap =
+                new io.github.dailystruggle.metrics.api.MetricsSnapshot(
+                        Double.NaN, Double.NaN, Double.NaN, Double.NaN, 0, 0, 0L, 0L,
+                        System.currentTimeMillis(), java.util.Collections.emptyList()
+                ).withExtension(noDbExt);
+        PlaceholderProvider.pushSnapshot(nanSnap);
+        try {
+            assertFalse(PlaceholderProvider.hasLiveTps());
+            assertFalse(PlaceholderProvider.hasLiveMspt());
+            assertFalse(PlaceholderProvider.hasDatabaseLatency());
+        } finally {
+            PlaceholderProvider.popSnapshot();
+        }
+    }
+
+    @Test
+    void regionAndWorldPlaceholders_withAndWithoutContext() {
+        // Without region or world context
+        RTP.regionContext.remove();
+        RTP.worldContext.remove();
+
+        assertEquals("", PlaceholderProvider.fillPlaceholders("[displayName]", DUMMY_UUID));
+        assertEquals("false", PlaceholderProvider.fillPlaceholders("[requirePermission]", DUMMY_UUID));
+        assertEquals("0", PlaceholderProvider.fillPlaceholders("[override]", DUMMY_UUID));
+        assertEquals("0", PlaceholderProvider.fillPlaceholders("[pluginForced]", DUMMY_UUID));
+        assertEquals("0", PlaceholderProvider.fillPlaceholders("[serverForced]", DUMMY_UUID));
+        assertEquals("none", PlaceholderProvider.fillPlaceholders("[shape]", DUMMY_UUID));
+        assertEquals("0", PlaceholderProvider.fillPlaceholders("[cacheCap]", DUMMY_UUID));
+        assertEquals("0", PlaceholderProvider.fillPlaceholders("[cached]", DUMMY_UUID));
+        assertEquals("0", PlaceholderProvider.fillPlaceholders("[keptCache]", DUMMY_UUID));
+        assertEquals("0", PlaceholderProvider.fillPlaceholders("[unkeptCache]", DUMMY_UUID));
+        assertEquals("0", PlaceholderProvider.fillPlaceholders("[backlogCache]", DUMMY_UUID));
+        assertEquals("0", PlaceholderProvider.fillPlaceholders("[backlogCacheCap]", DUMMY_UUID));
+
+        // With mock world context
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = RTP.serverAccessor.getRTPWorlds().get(0);
+        RTP.worldContext.set(world);
+        try {
+            assertEquals("0", PlaceholderProvider.fillPlaceholders("[pluginForced]", DUMMY_UUID));
+            assertEquals("0", PlaceholderProvider.fillPlaceholders("[serverForced]", DUMMY_UUID));
+        } finally {
+            RTP.worldContext.remove();
+        }
+    }
 }

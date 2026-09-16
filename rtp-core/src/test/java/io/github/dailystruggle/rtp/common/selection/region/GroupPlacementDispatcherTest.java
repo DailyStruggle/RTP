@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -392,5 +393,51 @@ class GroupPlacementDispatcherTest {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();
             RTP.selectionAPI.permRegionLookup.remove("verifier_fail_region");
         }
+    }
+
+    @Test
+    @DisplayName("Returns INVALID_REGION when region lookup throws cyclic or lookup exception")
+    void testCyclicOrThrowingRegionLookup() throws Exception {
+        io.github.dailystruggle.rtp.common.selection.SelectionAPI originalSelectionAPI = RTP.selectionAPI;
+        io.github.dailystruggle.rtp.common.selection.SelectionAPI mockSelectionAPI = mock(io.github.dailystruggle.rtp.common.selection.SelectionAPI.class);
+        when(mockSelectionAPI.getRegion(org.mockito.ArgumentMatchers.eq("cyclic_region")))
+                .thenThrow(new IllegalStateException("infinite override loop detected at region - cyclic_region"));
+        RTP.selectionAPI = mockSelectionAPI;
+
+        try {
+            GroupProfileSpec spec = GroupProfileSpec.of("square", 32, 2, 5, 4);
+            GroupPlacementRequest request = GroupPlacementRequest.of(
+                    "cyclic_region",
+                    spec,
+                    new java.util.ArrayList<>(List.of(UUID.randomUUID()))
+            );
+
+            CompletableFuture<GroupPlacementResult> future = dispatcher.place(request);
+            GroupPlacementResult result = future.get(5, TimeUnit.SECONDS);
+            assertNotNull(result);
+            assertFalse(result.isSuccess());
+            assertEquals(GroupPlacementResult.Reason.INVALID_REGION, result.reason());
+            assertTrue(result.message().contains("infinite override loop detected"));
+        } finally {
+            RTP.selectionAPI = originalSelectionAPI;
+        }
+    }
+
+    @Test
+    @DisplayName("Returns INVALID_REGION when region mapping is empty or not in lookup")
+    void testEmptyOrMissingRegionMapping() throws Exception {
+        GroupProfileSpec spec = GroupProfileSpec.of("square", 32, 2, 5, 4);
+        GroupPlacementRequest request = GroupPlacementRequest.of(
+                "non_existent_empty_region",
+                spec,
+                new java.util.ArrayList<>(List.of(UUID.randomUUID()))
+        );
+
+        CompletableFuture<GroupPlacementResult> future = dispatcher.place(request);
+        GroupPlacementResult result = future.get(5, TimeUnit.SECONDS);
+        assertNotNull(result);
+        assertFalse(result.isSuccess());
+        assertEquals(GroupPlacementResult.Reason.INVALID_REGION, result.reason());
+        assertTrue(result.message().contains("unknown region"));
     }
 }
