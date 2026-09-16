@@ -277,4 +277,19 @@
         <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD,WMI_WRONG_MAP_ITERATOR,NM_CLASS_NAMING_CONVENTION,SS_SHOULD_BE_STATIC,IM_AVERAGE_COMPUTATION_COULD_OVERFLOW,DB_DUPLICATE_BRANCHES,DP_CREATE_CLASSLOADER_INSIDE_DO_PRIVILEGED"/>
     </Match>
 
+    <!-- sb-contrib idiom/style detectors (surfaced by the fb-contrib 7.6.4 -> sb-contrib 7.7.4 upgrade). -->
+    <!-- These are advisory code-idiom suggestions, not correctness or safety defects; none originate from -->
+    <!-- core SpotBugs. Justifications per pattern:                                                        -->
+    <!--   LSC_LITERAL_STRING_COMPARISON: recommends placing the literal on the left of .equals()/.equalsIgnoreCase() -->
+    <!--     for null-safety; the flagged call sites are already null-guarded (e.g. SubConfigCmd.execute), so this is  -->
+    <!--     stylistic only.                                                                                  -->
+    <!--   EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS: wrapping checked failures as unchecked at internal boundaries is    -->
+    <!--     the established error-handling idiom in rtp-core (fail-fast, logged via RTP.log).                -->
+    <!--   CC_CYCLOMATIC_COMPLEXITY: a complexity metric, not a defect.                                      -->
+    <!--   PRMC_POSSIBLY_REDUNDANT_METHOD_CALLS / CBC_CONTAINS_BASED_CONDITIONAL: micro-optimization hints with no -->
+    <!--     behavioural impact.                                                                             -->
+    <Match>
+        <Bug pattern="LSC_LITERAL_STRING_COMPARISON,EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS,CC_CYCLOMATIC_COMPLEXITY,PRMC_POSSIBLY_REDUNDANT_METHOD_CALLS,CBC_CONTAINS_BASED_CONDITIONAL"/>
+    </Match>
+
 </FindBugsFilter>

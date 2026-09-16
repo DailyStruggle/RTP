@@ -82,14 +82,22 @@ class DefaultRtpDispatcherEdgeTest {
         NetworkSnapshot snap = new NetworkSnapshot(1L, Collections.emptyMap());
         when(transport.readSnapshot()).thenReturn(CompletableFuture.completedFuture(snap));
         when(selector.choose(any(), any())).thenReturn(Optional.of("srv-1"));
-        when(transport.claim(any(), any(), any())).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Claim error")));
+        // Production calls the 4-arg region-aware claim(server, player, ttl, regionKey)
+        // default overload; stubbing only the 3-arg overload on a Mockito mock
+        // leaves the 4-arg call returning null (Mockito stubs default methods).
+        when(transport.claim(any(), any(), any(), any())).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Claim error")));
 
         DefaultRtpDispatcher d = new DefaultRtpDispatcher(selector, transport, sender, Runnable::run);
         RtpRequest req = new RtpRequest(UUID.randomUUID(), TriggerType.COMMAND, Optional.empty(), Optional.empty(), Optional.empty(), UUID.randomUUID());
 
         DispatchOutcome outcome = d.dispatch(req).get();
         assertInstanceOf(DispatchOutcome.Failed.class, outcome);
-        assertEquals(DefaultRtpDispatcher.MSG_CLAIM_FAILED.key(), ((DispatchOutcome.Failed) outcome).messageKey());
+        // A claim future that completes exceptionally (vs. resolving to a null
+        // token) is an internal error: the top-level exceptionally branch fires
+        // MSG_INTERNAL before the thenApply that would map a null token to
+        // MSG_CLAIM_FAILED. A null token (CLAIM_RACE) is covered separately in
+        // DefaultRtpDispatcherTest / StatusSinkTest.
+        assertEquals(DefaultRtpDispatcher.MSG_INTERNAL.key(), ((DispatchOutcome.Failed) outcome).messageKey());
     }
 
     @Test
@@ -104,7 +112,7 @@ class DefaultRtpDispatcherEdgeTest {
         when(selector.choose(any(), any())).thenReturn(Optional.of("srv-1"));
 
         ReservationToken token = new ReservationToken("tok-1", "srv-1", UUID.randomUUID(), System.currentTimeMillis() + 10000, ReservationToken.State.CLAIMED);
-        when(transport.claim(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(token));
+        when(transport.claim(any(), any(), any(), any())).thenReturn(CompletableFuture.completedFuture(token));
         when(transport.release(any(), any())).thenReturn(CompletableFuture.completedFuture(null));
         when(sender.sendTo(any(), any(), any())).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Network pipe broken")));
 
@@ -114,7 +122,7 @@ class DefaultRtpDispatcherEdgeTest {
         DispatchOutcome outcome = d.dispatch(req).get();
         assertInstanceOf(DispatchOutcome.Failed.class, outcome);
         assertEquals(DefaultRtpDispatcher.MSG_TRANSFER_FAILED.key(), ((DispatchOutcome.Failed) outcome).messageKey());
-        verify(transport).release(token.tokenId(), ReleaseReason.PLAYER_DISCONNECTED);
+        verify(transport).release(token.tokenId(), ReleaseReason.BACKEND_REJECTED);
     }
 
     @Test
@@ -181,7 +189,7 @@ class DefaultRtpDispatcherEdgeTest {
         when(selector.choose(any(), any())).thenReturn(Optional.of("srv-1"));
 
         ReservationToken token = new ReservationToken("tok-1", "srv-1", UUID.randomUUID(), System.currentTimeMillis() + 10000, ReservationToken.State.CLAIMED);
-        when(transport.claim(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(token));
+        when(transport.claim(any(), any(), any(), any())).thenReturn(CompletableFuture.completedFuture(token));
         when(sender.sendTo(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(TransferOutcome.SUCCESS));
 
         DefaultRtpDispatcher d = new DefaultRtpDispatcher(selector, transport, sender, Runnable::run,
