@@ -54,7 +54,13 @@ allprojects {
         maven { url = 'https://repo.papermc.io/repository/maven-public/' }
         maven { url = 'https://repo.papermc.io/repository/maven-snapshots/' }
         maven { url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/' }
-        maven { url = 'https://jitpack.io' }
+        maven { url = 'https://nexus.sirblobman.xyz/public/' }
+        maven {
+            url = 'https://jitpack.io'
+            content {
+                excludeGroupByRegex 'com\\.github\\.sirblobman.*'
+            }
+        }
         maven { url = 'https://repo.codemc.io/repository/maven-public/' }
         maven { url = 'https://maven.fabricmc.net/' }
     }
@@ -219,8 +225,9 @@ subprojects {
             // rtp-api measured: 95.7% instruction / 81.3% branch.
             // Sits at Stage A strict 90/80 JaCoCo gate.
             ':rtp-api': [instruction: 0.90, branch: 0.80],
-            // rtp-proxy-common measured: 60.1% instruction / 45.5% branch.
-            ':rtp-proxy:rtp-proxy-common': [instruction: 0.55, branch: 0.40],
+            // rtp-proxy-common measured: 82.2% instruction / 69.1% branch (without Docker Redis IT).
+            // Sits at 0.78/0.65 floor with safety margin.
+            ':rtp-proxy:rtp-proxy-common': [instruction: 0.78, branch: 0.65],
             // commands-api measured: 93.6% instruction / 80.3% branch.
             // Sits at Stage A strict 90/80 JaCoCo gate.
             ':commands-api': [instruction: 0.90, branch: 0.80],

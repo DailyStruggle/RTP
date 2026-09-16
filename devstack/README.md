@@ -91,7 +91,7 @@ path to a destination.
 
 ## Acceptance harness
 
-`run-acceptance.ps1` drives the five harness scenarios from the host:
+`run-acceptance.ps1` drives the harness scenarios from the host:
 
 ```powershell
 .\run-acceptance.ps1                       # full sweep
@@ -100,6 +100,7 @@ path to a destination.
 .\run-acceptance.ps1 -Scenario roundtrip
 .\run-acceptance.ps1 -Scenario killmidflight
 .\run-acceptance.ps1 -Scenario killswitch
+.\run-acceptance.ps1 -Scenario rtptest      # in-game `/rtp test accessor` per server
 ```
 
 Each scenario is described in `docs/admin/proxies/CROSS_SERVER_VERIFICATION.md`.
@@ -113,6 +114,7 @@ Each scenario is described in `docs/admin/proxies/CROSS_SERVER_VERIFICATION.md`.
 | roundtrip          | requires a manual MC client login (see admin doc)                |
 | killmidflight      | reservation row clears within `reservation.ttlMs + reapInterval` |
 | killswitch         | Lua claim returns `KILL_SWITCH`; harness asserts proxy log line  |
+| rtptest            | `/rtp test accessor` dispatched to every backend + lobby via `rcon-cli`; harness asserts the `[RTP test/accessor] pass=true` verdict per service |
 
 The roundtrip scenario requires a live Minecraft client by design: the cross-
 server `/rtp` pipeline is gated on `PlayerJoinEvent`, which a headless tool

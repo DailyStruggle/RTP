@@ -3062,4 +3062,195 @@ public class TeleportPipelineTaskMutationTest {
         assertTrue(res);
         assertTrue(unsafeChecked.get(), "unsafeBlocks from configuration must be passed to isSafe");
     }
+
+    @Test
+    @DisplayName("runLoad delay math kills division vs multiplication and negative clamping mutants")
+    void runLoad_delay_math_division_and_clamping() throws Exception {
+        SettablePlayer player = createPlayer("DelayMathP");
+        player.setDelay(2000L); // 2000 ms delay
+        GenerationContext ctx = new GenerationContext(player, player, null);
+        Region reg = createTestRegion("delay_math_reg");
+        RTPCoords coords = new RTPCoords(world.name(), 0, 64, 0);
+        TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords);
+
+        TeleportData data = new TeleportData();
+        data.sender = player;
+        data.nextTask = task;
+        // 0 ms elapsed -> remaining = 2000 ms -> toTicks = 2000 / 50 = 40.
+        // If mutated to 2000 * 50 = 100000 ticks.
+        data.time = System.currentTimeMillis();
+        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+
+        Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
+        tpDataField.setAccessible(true);
+        tpDataField.set(task, data);
+
+        ChunkSet set = new ChunkSet(world, 0, 0, List.of(), CompletableFuture.completedFuture(true));
+        Field chunkSetField = TeleportPipelineTask.class.getDeclaredField("chunkSet");
+        chunkSetField.setAccessible(true);
+        chunkSetField.set(task, set);
+
+        // Spy scheduler calls via RTP.scheduler directly
+        final java.util.concurrent.atomic.AtomicLong scheduledTicks = new java.util.concurrent.atomic.AtomicLong(-1);
+        RTP.scheduler = new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
+            @Override
+            public void runTaskForPlayer(io.github.dailystruggle.rtp.api.entity.RTPPlayer p, RTPRunnable runnable, long delayTicks) {
+                scheduledTicks.set(delayTicks);
+                super.runTaskForPlayer(p, runnable, delayTicks);
+            }
+        };
+
+        task.setPhase(TeleportPipelineTask.Phase.LOAD);
+        task.run();
+
+        // With small clock tick (e.g. 0-2ms elapsed), toTicks is either 39 or 40, definitely not 100000
+        assertTrue(scheduledTicks.get() >= 38L && scheduledTicks.get() <= 40L, "2000ms remaining should yield ~40 ticks (not 100000)");
+
+        // Now test negative remaining time (start - lastTime > delay)
+        // Elapsed = 5000ms, delay = 2000ms -> remaining = -3000ms -> toTicks must be clamped to 0.
+        data.time = System.currentTimeMillis() - 5000L;
+        scheduledTicks.set(-1);
+
+        task.setPhase(TeleportPipelineTask.Phase.LOAD);
+        task.run();
+
+        assertTrue(scheduledTicks.get() <= 0, "Negative remaining time must clamp toTicks to 0");
+    }
+
+    @Test
+    @DisplayName("processGenerationResult async chunkSet schedules asynchronously")
+    void processGenerationResult_incomplete_chunkSet_schedules_async() throws Exception {
+        SettablePlayer player = createPlayer("AsyncSchedP");
+        Region reg = createTestRegion("async_sched_reg");
+        GenerationContext ctx = new GenerationContext(player, player, null);
+        TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg);
+
+        TeleportData data = new TeleportData();
+        data.sender = player;
+        data.nextTask = task;
+        Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
+        tpDataField.setAccessible(true);
+        tpDataField.set(task, data);
+
+        final AtomicBoolean asyncScheduled = new AtomicBoolean(false);
+        final AtomicBoolean syncScheduled = new AtomicBoolean(false);
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler originalScheduler = RTP.scheduler;
+        try {
+            RTP.scheduler = new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
+                @Override
+                public io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask runTaskAsynchronously(Runnable runnable) {
+                    asyncScheduled.set(true);
+                    return new io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask(null, "test");
+                }
+
+                @Override
+                public void runTask(RTPWorld<?> world, int chunkX, int chunkZ, Runnable runnable) {
+                    syncScheduled.set(true);
+                }
+            };
+
+            CompletableFuture<Long> chunkFuture = new CompletableFuture<>();
+            CompletableFuture<Boolean> setDoneFuture = new CompletableFuture<>();
+            ChunkSet chunkSet = new ChunkSet(world, 0, 0, List.of(chunkFuture), setDoneFuture);
+            ChunkReservation reservation = new ChunkReservation(chunkSet, world);
+
+            RTPCoords coords = new RTPCoords(world.name(), 0, 64, 0);
+            GenerationResult res = new GenerationResult(coords, 1L, chunkSet, reservation);
+
+            Method m = TeleportPipelineTask.class.getDeclaredMethod("processGenerationResult", GenerationResult.class);
+            m.setAccessible(true);
+            m.invoke(task, res);
+
+            assertTrue(asyncScheduled.get(), "When chunkSet is not complete, scheduler must run task asynchronously");
+            assertFalse(syncScheduled.get(), "Sync scheduler must not be called when chunkSet is incomplete");
+
+            // Now test when chunkSet is already done
+            asyncScheduled.set(false);
+            syncScheduled.set(false);
+            setDoneFuture.complete(true);
+
+            TeleportPipelineTask task2 = new TeleportPipelineTask(ctx, reg);
+            tpDataField.set(task2, data);
+            m.invoke(task2, res);
+
+            assertTrue(syncScheduled.get(), "When chunkSet is complete, scheduler must run task synchronously on chunk");
+            assertFalse(asyncScheduled.get(), "Async scheduler must not be called when chunkSet is complete");
+        } finally {
+            RTP.scheduler = originalScheduler;
+        }
+    }
+
+    @Test
+    @DisplayName("setCancelled untracks memory tracker and clears trackingId")
+    void setCancelled_untracks_memory_tracker_and_clears_id() throws Exception {
+        SettablePlayer player = createPlayer("MemUntrackP");
+        GenerationContext ctx = new GenerationContext(player, player, null);
+        TeleportPipelineTask task = new TeleportPipelineTask(ctx);
+
+        Field trackingField = RTPRunnable.class.getDeclaredField("trackingId");
+        trackingField.setAccessible(true);
+        UUID trackingId = (UUID) trackingField.get(task);
+        assertNotNull(trackingId, "Tracking ID must be initialized");
+
+        task.setCancelled(true);
+
+        UUID trackingIdAfter = (UUID) trackingField.get(task);
+        assertNull(trackingIdAfter, "trackingId must be set to null after cancellation");
+    }
+
+    @Test
+    @DisplayName("runLoad null chunkSet advances phase to TELEPORT and schedules")
+    void runLoad_null_chunkSet_advances_to_teleport() throws Exception {
+        SettablePlayer player = createPlayer("NullChunkSetP");
+        Region reg = createTestRegion("null_cs_reg");
+        RTPCoords coords = new RTPCoords(world.name(), 10, 70, 10);
+        GenerationContext ctx = new GenerationContext(player, player, null);
+        TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords);
+
+        final AtomicBoolean syncScheduled = new AtomicBoolean(false);
+        RTP.scheduler = new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
+            @Override
+            public void runTask(Runnable runnable) {
+                syncScheduled.set(true);
+            }
+        };
+
+        Field csField = TeleportPipelineTask.class.getDeclaredField("chunkSet");
+        csField.setAccessible(true);
+        csField.set(task, null);
+
+        Field resField = TeleportPipelineTask.class.getDeclaredField("reservation");
+        resField.setAccessible(true);
+        resField.set(task, null);
+
+        TeleportData data = new TeleportData();
+        data.sender = player;
+        data.targetRegion = reg;
+        data.selectedCoords = coords;
+        data.nextTask = task;
+        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+
+        Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
+        tpDataField.setAccessible(true);
+        tpDataField.set(task, data);
+
+        Field coordsField = TeleportPipelineTask.class.getDeclaredField("coords");
+        coordsField.setAccessible(true);
+        coordsField.set(task, coords);
+
+        Field regField = TeleportPipelineTask.class.getDeclaredField("region");
+        regField.setAccessible(true);
+        regField.set(task, reg);
+
+        // Pre-populate schematicLoad so region.getWorld() null doesn't throw during schematic lookup
+        Field schemField = TeleportPipelineTask.class.getDeclaredField("schematicLoad");
+        schemField.setAccessible(true);
+        schemField.set(task, CompletableFuture.completedFuture(null));
+
+        task.setPhase(TeleportPipelineTask.Phase.LOAD);
+        task.run();
+
+        assertEquals(TeleportPipelineTask.Phase.TELEPORT, task.getPhase(), "Phase should advance to TELEPORT");
+        assertTrue(syncScheduled.get(), "RTP.scheduler.runTask must be called when chunkSet is null");
+    }
 }

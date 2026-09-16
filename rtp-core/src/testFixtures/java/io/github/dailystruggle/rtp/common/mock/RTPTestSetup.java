@@ -70,6 +70,31 @@ public final class RTPTestSetup {
         return accessor;
     }
 
+    /**
+     * Tear down all test singletons and disconnect all databases initialized by {@link #install(File)}.
+     * This ensures no open file handles linger on Windows preventing {@code @TempDir} deletion.
+     */
+    public static void cleanUp() {
+        if (RTP.configs != null) {
+            if (RTP.configs.fileDatabase != null) {
+                RTP.configs.fileDatabase.processQueries(Long.MAX_VALUE);
+                RTP.configs.fileDatabase.disconnect(java.util.Collections.emptyMap());
+            }
+            if (RTP.configs.multiConfigParserMap != null) {
+                for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp : RTP.configs.multiConfigParserMap.values()) {
+                    if (mcp != null && mcp.fileDatabase != null) {
+                        mcp.fileDatabase.processQueries(Long.MAX_VALUE);
+                        mcp.fileDatabase.disconnect(java.util.Collections.emptyMap());
+                    }
+                }
+            }
+        }
+        RTP.configs = null;
+        RTP.serverAccessor = null;
+        RTP.scheduler = null;
+        RTPAPI.serverAccessor = null;
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------

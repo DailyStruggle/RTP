@@ -44,7 +44,7 @@
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('all', 'boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'down', 'logs')]
+  [ValidateSet('all', 'boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'rtptest', 'down', 'logs')]
   [string]$Scenario = 'all',
   [int]$WaitSeconds = 180,
   # Skip the automatic `docker compose up -d` step (use when you already brought
@@ -855,6 +855,47 @@ function Test-KillMidFlight {
   return $false
 }
 
+function Test-RtpTest {
+  # Drives the in-game `/rtp test accessor` self-test on every backend and lobby
+  # via the itzg `rcon-cli` console, then polls each service log for the
+  # `[RTP test/accessor] pass=<bool>` verdict the probe always emits (even for a
+  # console caller). This ties the server-bound RTPServerAccessor contract checks
+  # (materials, senders, formats, biomes, thread probes, menu surface) to a live
+  # Paper/Folia runtime rather than a JVM mock, and - under -Coverage - flushes
+  # the JaCoCo agent so the accessor paths credit server-bound coverage. See
+  # platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md.
+  Write-Host "[rtptest] dispatching '/rtp test accessor' to backends + lobbies via rcon (per-service budget: 30s)..." -ForegroundColor Cyan
+  $services = @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')
+  $anyFail = $false
+  foreach ($svc in $services) {
+    Write-Host "[rtptest] -> $svc : rtp test accessor" -ForegroundColor Cyan
+    $rconOut = & docker compose exec -T $svc rcon-cli rtp test accessor 2>&1
+    $deadline = (Get-Date).AddSeconds(30)
+    $verdict = $null
+    while ((Get-Date) -lt $deadline) {
+      $line = & docker compose logs --tail=200 --no-log-prefix $svc 2>$null |
+        Select-String -Pattern '\[RTP test/accessor\] pass=' -SimpleMatch |
+        Select-Object -Last 1
+      if ($line) { $verdict = $line.ToString(); break }
+      Start-Sleep -Seconds 2
+    }
+    Write-Evidence "rtptest.$svc" "rcon: $rconOut`nverdict: $verdict"
+    if ($verdict -and $verdict -match 'pass=true') {
+      Write-Host "[rtptest]    PASS ($svc)" -ForegroundColor Green
+    } else {
+      $detail = if ($verdict) { $verdict } else { 'no verdict line in log' }
+      Write-Host "[rtptest]    FAIL ($svc): $detail" -ForegroundColor Red
+      $anyFail = $true
+    }
+  }
+  if ($anyFail) {
+    Write-Host '[rtptest] FAIL - one or more services failed the accessor self-test' -ForegroundColor Red
+    return $false
+  }
+  Write-Host '[rtptest] PASS' -ForegroundColor Green
+  return $true
+}
+
 function Test-KillSwitch {
   Write-Host '[killswitch] flipping proxy-a network.killSwitch and asserting claim rejection (typical: <1s)...' -ForegroundColor Cyan
   # The killSwitch knob is read on startup; for a runtime flip the operator
@@ -1002,7 +1043,7 @@ $plan = if ($Scenario -eq 'all') {
     # stack, but it will not pass against lite seeds.
     @('boot', 'roundtrip')
   } else {
-    @('boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch')
+    @('boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'rtptest')
   }
 } else {
   @($Scenario)
@@ -1024,6 +1065,7 @@ try {
       'roundtrip'     { $results[$s] = Test-Roundtrip }
       'killmidflight' { $results[$s] = Test-KillMidFlight }
       'killswitch'    { $results[$s] = Test-KillSwitch }
+      'rtptest'       { $results[$s] = Test-RtpTest }
     }
   }
 } finally {
