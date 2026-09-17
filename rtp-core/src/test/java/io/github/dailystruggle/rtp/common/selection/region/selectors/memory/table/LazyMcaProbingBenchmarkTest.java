@@ -19,6 +19,10 @@ public class LazyMcaProbingBenchmarkTest {
   @Test
   public void testLazyProbingVersusFullParsing() throws Exception {
     Path regionDir = Path.of("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\world\\dimensions\\minecraft\\overworld\\region");
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        Files.isDirectory(regionDir),
+        "Local Minecraft test server region directory not found: " + regionDir);
+
     List<Path> mcaFiles = new ArrayList<>();
 
     try (DirectoryStream<Path> ds = Files.newDirectoryStream(regionDir, "r.*.*.mca")) {

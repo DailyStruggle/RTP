@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 @DisplayName("BrigadierCommandAdapter comprehensive edge case coverage")
 class BrigadierCommandAdapterExtendedTest {
 
+    @SuppressWarnings("PMD.TestClassWithoutTestCases")
     private static final class TestSource {
         final UUID id = UUID.randomUUID();
         final List<String> sentMessages = new ArrayList<>();
