@@ -62,28 +62,30 @@ public final class SimpleCombatLogChecker {
     }
   }
 
-  private static synchronized void resolve(Plugin plugin) {
-    if (probed) return;
-    probed = true;
-    Class<?> pluginClass = plugin.getClass();
-    for (String name : METHOD_NAMES) {
-      Method byPlayer = tryMethod(pluginClass, name, Player.class);
-      if (byPlayer != null && isBooleanReturn(byPlayer)) {
-        query = byPlayer;
-        takesUuid = false;
-        return;
+  private static void resolve(Plugin plugin) {
+    synchronized (SimpleCombatLogChecker.class) {
+      if (probed) return;
+      probed = true;
+      Class<?> pluginClass = plugin.getClass();
+      for (String name : METHOD_NAMES) {
+        Method byPlayer = tryMethod(pluginClass, name, Player.class);
+        if (byPlayer != null && isBooleanReturn(byPlayer)) {
+          query = byPlayer;
+          takesUuid = false;
+          return;
+        }
+        Method byUuid = tryMethod(pluginClass, name, UUID.class);
+        if (byUuid != null && isBooleanReturn(byUuid)) {
+          query = byUuid;
+          takesUuid = true;
+          return;
+        }
       }
-      Method byUuid = tryMethod(pluginClass, name, UUID.class);
-      if (byUuid != null && isBooleanReturn(byUuid)) {
-        query = byUuid;
-        takesUuid = true;
-        return;
-      }
+      RTP.log(
+          Level.INFO,
+          "[RTP] Simple Combat Log is installed but exposes no recognisable combat-query API;"
+              + " RTP's native combat tracker will answer the PvP gate instead.");
     }
-    RTP.log(
-        Level.INFO,
-        "[RTP] Simple Combat Log is installed but exposes no recognisable combat-query API;"
-            + " RTP's native combat tracker will answer the PvP gate instead.");
   }
 
   private static Method tryMethod(Class<?> owner, String name, Class<?> arg) {

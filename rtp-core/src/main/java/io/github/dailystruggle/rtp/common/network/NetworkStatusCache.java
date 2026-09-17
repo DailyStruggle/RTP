@@ -167,15 +167,17 @@ public final class NetworkStatusCache {
      * Start the periodic poll timer on {@link RTP#scheduler}'s async tier.
      * Idempotent.
      */
-    public synchronized void start(long periodTicks) {
-        if (timerTaskHandle != null) return;
-        if (RTP.scheduler == null) {
-            RTP.log(Level.WARNING,
-                    "[RTP] NetworkStatusCache.start called before scheduler available; "
-                            + "poll timer not started.");
-            return;
+    public void start(long periodTicks) {
+        synchronized (this) {
+            if (timerTaskHandle != null) return;
+            if (RTP.scheduler == null) {
+                RTP.log(Level.WARNING,
+                        "[RTP] NetworkStatusCache.start called before scheduler available; "
+                                + "poll timer not started.");
+                return;
+            }
+            timerTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(this::pollOnce, periodTicks, periodTicks);
         }
-        timerTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(this::pollOnce, periodTicks, periodTicks);
     }
 
     /**
@@ -300,12 +302,14 @@ public final class NetworkStatusCache {
     }
 
     /** Idempotent. */
-    public synchronized void shutdown() {
-        if (timerTaskHandle != null && RTP.scheduler != null) {
-            try { RTP.scheduler.cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
+    public void shutdown() {
+        synchronized (this) {
+            if (timerTaskHandle != null && RTP.scheduler != null) {
+                try { RTP.scheduler.cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
+            }
+            timerTaskHandle = null;
+            byPlayer.clear();
+            seededAtMs.clear();
         }
-        timerTaskHandle = null;
-        byPlayer.clear();
-        seededAtMs.clear();
     }
 }

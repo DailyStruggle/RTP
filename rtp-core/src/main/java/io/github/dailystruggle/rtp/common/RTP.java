@@ -475,7 +475,7 @@ public class RTP {
             new ArrayList<>(selectionAPI.regionNames());
         sortedNames.sort(String.CASE_INSENSITIVE_ORDER);
         for (String name : sortedNames) {
-          if (name == null || name.trim().isEmpty()) continue;
+          if (name == null || name.isBlank()) continue;
           if (defaultRegionName != null && defaultRegionName.equalsIgnoreCase(name)) {
             continue; // already offered as the bare default target
           }
@@ -819,9 +819,11 @@ public class RTP {
    * Wraps the installed platform {@link #scheduler} in a profiling decorator
    * to track wall-clock execution time of sync/async tasks. Idempotent.
    */
-  private static synchronized void installProfilingScheduler() {
-    if (!(scheduler instanceof io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler)) {
-      scheduler = new io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler(scheduler);
+  private static void installProfilingScheduler() {
+    synchronized (RTP.class) {
+      if (!(scheduler instanceof io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler)) {
+        scheduler = new io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler(scheduler);
+      }
     }
   }
 

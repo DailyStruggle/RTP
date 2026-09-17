@@ -183,22 +183,24 @@ public final class RTPNeoForgeMod {
    * {@link NeoForgeScheduler} merely queues those timers into its tick map
    * (drained once the server starts), so it is safe to use before bind.</p>
    */
-  private synchronized void prepareCore() {
-    if (corePrepared) {
-      return;
+  private void prepareCore() {
+    synchronized (this) {
+      if (corePrepared) {
+        return;
+      }
+      NeoForgeServerAccessor acc = this.accessor;
+      if (acc == null) {
+        acc = new NeoForgeServerAccessor();
+        this.accessor = acc;
+      }
+      RTP.serverAccessor = acc;
+      RTP.scheduler = acc.getScheduler();
+      wireTestUmbrellaContext();
+      if (RTP.getInstance() == null) {
+        new RTP();
+      }
+      corePrepared = true;
     }
-    NeoForgeServerAccessor acc = this.accessor;
-    if (acc == null) {
-      acc = new NeoForgeServerAccessor();
-      this.accessor = acc;
-    }
-    RTP.serverAccessor = acc;
-    RTP.scheduler = acc.getScheduler();
-    wireTestUmbrellaContext();
-    if (RTP.getInstance() == null) {
-      new RTP();
-    }
-    corePrepared = true;
   }
 
   private void bootCore(MinecraftServer server) {

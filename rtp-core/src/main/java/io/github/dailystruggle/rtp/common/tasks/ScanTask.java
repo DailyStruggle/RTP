@@ -42,7 +42,7 @@ public class ScanTask extends RTPRunnable {
   /** Number of locations to process in each step */
   public final AtomicLong scanIncrement = new AtomicLong(0L);
   private final AtomicLong cps = new AtomicLong(128);
-  private static final BigInteger increment_big = new BigInteger("1");
+  private static final BigInteger increment_big = BigInteger.ONE;
 
   // Instance trackers to natively isolate data per ScanTask
   public long latestAbsolutePos = 0;
@@ -188,8 +188,8 @@ public class ScanTask extends RTPRunnable {
 
   private long lastSaveTime = 0;
 
-  private BigInteger cps_all = new BigInteger("0");
-  private BigInteger cps_divisor = new BigInteger("0");
+  private BigInteger cps_all = BigInteger.ZERO;
+  private BigInteger cps_divisor = BigInteger.ZERO;
 
   {
     RTP.futures.add(done);

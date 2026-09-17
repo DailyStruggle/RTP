@@ -256,10 +256,12 @@ public final class FabricEffectsHandlerUnobf {
      */
     private static final class AlreadyHooked {
         private static volatile boolean done = false;
-        static synchronized boolean flip() {
-            if (done) return false;
-            done = true;
-            return true;
+        static boolean flip() {
+            synchronized (AlreadyHooked.class) {
+                if (done) return false;
+                done = true;
+                return true;
+            }
         }
     }
 }

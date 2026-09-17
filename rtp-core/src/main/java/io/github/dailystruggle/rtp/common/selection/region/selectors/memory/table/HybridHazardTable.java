@@ -27,6 +27,7 @@ import java.util.List;
  *   <li>Native O(log Containers + log Runs) candidate selection: {@link #resolveAccumulate(long)}</li>
  * </ul>
  */
+@SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
 public final class HybridHazardTable {
 
   public static final int CHUNKS_PER_CONTAINER = 65536;
@@ -568,57 +569,75 @@ public final class HybridHazardTable {
     return containers[index];
   }
 
-  public synchronized boolean isBad(long key) {
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
+  public boolean isBad(long key) {
     if (key < 0 || key >= totalRange) return true;
     int cId = (int) (key >>> 16);
     int local = (int) (key & 0xFFFF);
-    return containers[cId].isBad(local);
+    synchronized (this) {
+      return containers[cId].isBad(local);
+    }
   }
 
-  public synchronized void markBad(long key) {
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
+  public void markBad(long key) {
     if (key < 0 || key >= totalRange) return;
     int cId = (int) (key >>> 16);
     int local = (int) (key & 0xFFFF);
-    int oldBad = containers[cId].badCount();
-    containers[cId] = containers[cId].markBad(local);
-    int diff = containers[cId].badCount() - oldBad;
-    if (diff != 0) {
-      totalBadCount += diff;
+    synchronized (this) {
+      int oldBad = containers[cId].badCount();
+      containers[cId] = containers[cId].markBad(local);
+      int diff = containers[cId].badCount() - oldBad;
+      if (diff != 0) {
+        totalBadCount += diff;
+      }
     }
   }
 
-  public synchronized void markBad(long key, boolean ignored) {
+  public void markBad(long key, boolean ignored) {
     markBad(key);
   }
 
-  public synchronized void compact(long minGap, long maxGap) {
-    long newTotalBad = 0L;
-    for (int i = 0; i < containerCount; i++) {
-      containers[i] = containers[i].compact(minGap, maxGap);
-      newTotalBad += containers[i].badCount();
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
+  public void compact(long minGap, long maxGap) {
+    synchronized (this) {
+      long newTotalBad = 0L;
+      for (int i = 0; i < containerCount; i++) {
+        containers[i] = containers[i].compact(minGap, maxGap);
+        newTotalBad += containers[i].badCount();
+      }
+      this.totalBadCount = newTotalBad;
     }
-    this.totalBadCount = newTotalBad;
   }
 
-  public synchronized void recomputeGoodPrefixSums() {
+  public void recomputeGoodPrefixSums() {
     // Deprecated no-op: good/bad counts are maintained in O(1)
     recomputeTotalBadCount();
   }
 
-  public synchronized void recomputeTotalBadCount() {
-    long bad = 0L;
-    for (int i = 0; i < containerCount; i++) {
-      bad += containers[i].badCount();
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
+  public void recomputeTotalBadCount() {
+    synchronized (this) {
+      long bad = 0L;
+      for (int i = 0; i < containerCount; i++) {
+        bad += containers[i].badCount();
+      }
+      this.totalBadCount = bad;
     }
-    this.totalBadCount = bad;
   }
 
-  public synchronized long countBad() {
-    return totalBadCount;
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
+  public long countBad() {
+    synchronized (this) {
+      return totalBadCount;
+    }
   }
 
-  public synchronized long totalGood() {
-    return Math.max(0L, totalRange - totalBadCount);
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
+  public long totalGood() {
+    synchronized (this) {
+      return Math.max(0L, totalRange - totalBadCount);
+    }
   }
 
   /**
@@ -630,46 +649,55 @@ public final class HybridHazardTable {
    * @param target raw good-space index in [0, totalRange - totalBadCount)
    * @return physical coordinate in [0, totalRange), or -1 if target is out of range
    */
-  public synchronized long resolveAccumulate(long target) {
-    long totalGood = totalGood();
-    if (target < 0 || target >= totalGood) return -1L;
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
+  public long resolveAccumulate(long target) {
+    synchronized (this) {
+      long totalGood = totalGood();
+      if (target < 0 || target >= totalGood) return -1L;
 
-    long remainingTarget = target;
-    int targetContainer = -1;
+      long remainingTarget = target;
+      int targetContainer = -1;
 
-    for (int i = 0; i < containerCount; i++) {
-      int cap = (i == containerCount - 1)
-          ? (int) (totalRange - (long) i * CHUNKS_PER_CONTAINER)
-          : CHUNKS_PER_CONTAINER;
-      int goodInContainer = cap - containers[i].badCount();
-      if (remainingTarget < goodInContainer) {
-        targetContainer = i;
-        break;
+      for (int i = 0; i < containerCount; i++) {
+        int cap = (i == containerCount - 1)
+            ? (int) (totalRange - (long) i * CHUNKS_PER_CONTAINER)
+            : CHUNKS_PER_CONTAINER;
+        int goodInContainer = cap - containers[i].badCount();
+        if (remainingTarget < goodInContainer) {
+          targetContainer = i;
+          break;
+        }
+        remainingTarget -= goodInContainer;
       }
-      remainingTarget -= goodInContainer;
+
+      if (targetContainer < 0) return -1L;
+
+      int localKey = containers[targetContainer].resolveLocalAccumulate((int) remainingTarget);
+      if (localKey < 0) return -1L;
+
+      return ((long) targetContainer << 16) | localKey;
     }
-
-    if (targetContainer < 0) return -1L;
-
-    int localKey = containers[targetContainer].resolveLocalAccumulate((int) remainingTarget);
-    if (localKey < 0) return -1L;
-
-    return ((long) targetContainer << 16) | localKey;
   }
 
-  public synchronized int serializedSize() {
-    int size = 8 + 4; // totalRange(8) + containerCount(4)
-    for (int i = 0; i < containerCount; i++) {
-      size += containers[i].serializedSize();
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
+  public int serializedSize() {
+    synchronized (this) {
+      int size = 8 + 4; // totalRange(8) + containerCount(4)
+      for (int i = 0; i < containerCount; i++) {
+        size += containers[i].serializedSize();
+      }
+      return size;
     }
-    return size;
   }
 
-  public synchronized void serialize(ByteBuffer buf) {
-    buf.putLong(totalRange);
-    buf.putInt(containerCount);
-    for (int i = 0; i < containerCount; i++) {
-      containers[i].write(buf);
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
+  public void serialize(ByteBuffer buf) {
+    synchronized (this) {
+      buf.putLong(totalRange);
+      buf.putInt(containerCount);
+      for (int i = 0; i < containerCount; i++) {
+        containers[i].write(buf);
+      }
     }
   }
 

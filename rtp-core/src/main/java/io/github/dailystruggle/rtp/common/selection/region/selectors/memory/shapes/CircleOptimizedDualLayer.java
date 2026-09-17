@@ -50,6 +50,7 @@ public class CircleOptimizedDualLayer extends Circle {
   }
 
   @Override
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lazy-init dynamic point edge cache
   public int getPointEdgeChunks() {
     if (!derived) {
       return cachedPointEdgeChunks;
@@ -517,25 +518,28 @@ public class CircleOptimizedDualLayer extends Circle {
     return candidate;
   }
 
-  private synchronized SegmentedKeyRunTable getOrBuildSegmentedTable(long range) {
-    long[] keys = badKeysCache;
-    long[] sums = badPrefixSumsCache;
-    int count = Math.min(keys.length, sums.length);
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lazy-build segmented run table cache
+  private SegmentedKeyRunTable getOrBuildSegmentedTable(long range) {
+    synchronized (this) {
+      long[] keys = badKeysCache;
+      long[] sums = badPrefixSumsCache;
+      int count = Math.min(keys.length, sums.length);
 
-    if (segmentedTable != null && segmentedTable.totalRange() == range) {
+      if (segmentedTable != null && segmentedTable.totalRange() == range) {
+        return segmentedTable;
+      }
+
+      long[] widths = new long[count];
+      long prev = 0L;
+      for (int i = 0; i < count; i++) {
+        widths[i] = sums[i] - prev;
+        prev = sums[i];
+      }
+
+      long binSize = SegmentedKeyRunTable.deriveOptimalBinSize(range);
+      segmentedTable = SegmentedKeyRunTable.fromRuns(keys, widths, count, range, binSize, 3L);
       return segmentedTable;
     }
-
-    long[] widths = new long[count];
-    long prev = 0L;
-    for (int i = 0; i < count; i++) {
-      widths[i] = sums[i] - prev;
-      prev = sums[i];
-    }
-
-    long binSize = SegmentedKeyRunTable.deriveOptimalBinSize(range);
-    segmentedTable = SegmentedKeyRunTable.fromRuns(keys, widths, count, range, binSize, 3L);
-    return segmentedTable;
   }
 
   // --- Macro-Ring Area LUT & Quantile Remapping ---
@@ -610,6 +614,7 @@ public class CircleOptimizedDualLayer extends Circle {
    * Retrieves or builds the analytical MacroRingLUT for Chebyshev macro-rings.
    * Evaluates valid chunks per ring in O(K) tile tests rather than full-domain chunk enumeration.
    */
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lazy-build macro ring LUT cache
   public MacroRingLUT getOrBuildMacroRingLUT() {
     long r = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();

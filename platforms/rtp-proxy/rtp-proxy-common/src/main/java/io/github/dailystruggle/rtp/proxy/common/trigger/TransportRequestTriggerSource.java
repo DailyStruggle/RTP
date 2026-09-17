@@ -125,22 +125,24 @@ public final class TransportRequestTriggerSource {
      * re-invocation throws {@link IllegalStateException} (matches the
      * {@code CommandTriggerSource} contract).
      */
-    public synchronized void start() {
-        if (started) {
-            throw new IllegalStateException(
-                    "TransportRequestTriggerSource already started; create a new instance.");
+    public void start() {
+        synchronized (this) {
+            if (started) {
+                throw new IllegalStateException(
+                        "TransportRequestTriggerSource already started; create a new instance.");
+            }
+            started = true;
+            running = true;
+            for (int i = 0; i < workerThreads; i++) {
+                Thread t = new Thread(this::workerLoop,
+                        "rtp-proxy-request-worker-" + i);
+                t.setDaemon(true);
+                workers.add(t);
+                t.start();
+            }
+            logger.info("RTP TransportRequestTriggerSource started: workers={}, pollTimeout={}ms.",
+                    workerThreads, pollTimeout.toMillis());
         }
-        started = true;
-        running = true;
-        for (int i = 0; i < workerThreads; i++) {
-            Thread t = new Thread(this::workerLoop,
-                    "rtp-proxy-request-worker-" + i);
-            t.setDaemon(true);
-            workers.add(t);
-            t.start();
-        }
-        logger.info("RTP TransportRequestTriggerSource started: workers={}, pollTimeout={}ms.",
-                workerThreads, pollTimeout.toMillis());
     }
 
     /**
@@ -149,26 +151,28 @@ public final class TransportRequestTriggerSource {
      * worker that fails to exit within the deadline; in that case the
      * thread is abandoned (daemon, so JVM exit is unaffected).
      */
-    public synchronized void stop() {
-        if (!started) return;
-        if (!running) return;
-        running = false;
-        long deadline = System.currentTimeMillis() + SHUTDOWN_TIMEOUT_MS;
-        for (Thread t : workers) {
-            t.interrupt();
-        }
-        for (Thread t : workers) {
-            long remaining = deadline - System.currentTimeMillis();
-            if (remaining <= 0) remaining = 1;
-            try {
-                t.join(remaining);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                break;
+    public void stop() {
+        synchronized (this) {
+            if (!started) return;
+            if (!running) return;
+            running = false;
+            long deadline = System.currentTimeMillis() + SHUTDOWN_TIMEOUT_MS;
+            for (Thread t : workers) {
+                t.interrupt();
             }
-            if (t.isAlive()) {
-                logger.warn("RTP TransportRequestTriggerSource worker {} did not exit within {}ms; abandoning.",
-                        t.getName(), SHUTDOWN_TIMEOUT_MS);
+            for (Thread t : workers) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) remaining = 1;
+                try {
+                    t.join(remaining);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                if (t.isAlive()) {
+                    logger.warn("RTP TransportRequestTriggerSource worker {} did not exit within {}ms; abandoning.",
+                            t.getName(), SHUTDOWN_TIMEOUT_MS);
+                }
             }
         }
     }

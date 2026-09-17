@@ -250,7 +250,7 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
       return "FAIL "
           + cause.getClass().getSimpleName()
           + " ("
-          + String.valueOf(cause.getMessage())
+          + cause.getMessage()
           + ") latency="
           + micros
           + "us";

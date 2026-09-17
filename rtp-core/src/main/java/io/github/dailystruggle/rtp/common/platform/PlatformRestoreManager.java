@@ -35,24 +35,28 @@ public final class PlatformRestoreManager {
    * Constructs (if needed) and starts the process-wide manager, loading any persisted jobs and
    * scheduling the 1 Hz reaper through {@code RTP.scheduler}.
    */
-  public static synchronized void startGlobal() {
-    if (instance != null) return;
-    PlatformRestoreSqlStore store = null;
-    if (RTP.getInstance() != null
-        && RTP.getInstance().databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
-      store = new PlatformRestoreSqlStore(sql);
+  public static void startGlobal() {
+    synchronized (PlatformRestoreManager.class) {
+      if (instance != null) return;
+      PlatformRestoreSqlStore store = null;
+      if (RTP.getInstance() != null
+          && RTP.getInstance().databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+        store = new PlatformRestoreSqlStore(sql);
+      }
+      PlatformRestoreManager m = new PlatformRestoreManager(store);
+      m.loadPersisted();
+      m.start();
+      instance = m;
     }
-    PlatformRestoreManager m = new PlatformRestoreManager(store);
-    m.loadPersisted();
-    m.start();
-    instance = m;
   }
 
   /** Stops and clears the process-wide manager (idempotent). */
-  public static synchronized void stopGlobal() {
-    if (instance == null) return;
-    instance.stop();
-    instance = null;
+  public static void stopGlobal() {
+    synchronized (PlatformRestoreManager.class) {
+      if (instance == null) return;
+      instance.stop();
+      instance = null;
+    }
   }
 
   /** Loads persisted restore jobs into memory (resume across restarts). */

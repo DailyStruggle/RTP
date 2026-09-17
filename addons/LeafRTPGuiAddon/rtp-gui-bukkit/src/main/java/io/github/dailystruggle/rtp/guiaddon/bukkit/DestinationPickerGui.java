@@ -141,7 +141,7 @@ public final class DestinationPickerGui implements InventoryHolder {
   }
 
   private static Material material(String name, Material fallback) {
-    if (name == null || name.trim().isEmpty()) {
+    if (name == null || name.isBlank()) {
       return fallback;
     }
     Material m = Material.matchMaterial(name.trim().toUpperCase());

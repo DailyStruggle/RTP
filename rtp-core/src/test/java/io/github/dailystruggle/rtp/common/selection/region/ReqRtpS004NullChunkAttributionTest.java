@@ -106,6 +106,7 @@ public class ReqRtpS004NullChunkAttributionTest {
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     @DisplayName("every candidate returns null key => bucketed as cause=nullChunk reason=asyncLoadNull")
+    @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: test log inspection snapshot
     void null_key_candidates_are_attributed_to_nullChunk_bucket() {
         LocationGenerator.setRng(new Random(42L));
 
@@ -146,6 +147,7 @@ public class ReqRtpS004NullChunkAttributionTest {
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     @DisplayName("baseline: non-null keys => no nullChunk attribution emitted")
+    @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: test log inspection snapshot
     void healthy_candidates_do_not_produce_nullChunk_attribution() {
         LocationGenerator.setRng(new Random(42L));
 

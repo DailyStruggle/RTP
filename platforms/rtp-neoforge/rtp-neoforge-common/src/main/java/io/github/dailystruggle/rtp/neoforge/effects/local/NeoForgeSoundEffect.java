@@ -268,7 +268,7 @@ public class NeoForgeSoundEffect extends Effect<FabricSoundKeys> {
 
     @Override
     public String toPermission() {
-        return String.valueOf(data.get(FabricSoundKeys.TYPE)) + "."
+        return data.get(FabricSoundKeys.TYPE) + "."
                 + data.get(FabricSoundKeys.VOLUME) + "."
                 + data.get(FabricSoundKeys.PITCH) + "."
                 + data.get(FabricSoundKeys.DX) + "."

@@ -506,7 +506,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       // one subcommand's dispatch + drain window; 0 delta == pass.
       int total = audit.stepWarnDeltas.size();
       int passed = 0;
-      StringBuilder rows = new StringBuilder();
+      StringBuilder rows = new StringBuilder(total * 64);
       List<String> failed = new ArrayList<>();
       for (Map.Entry<String, Integer> e : audit.stepWarnDeltas.entrySet()) {
         int d = e.getValue();
@@ -516,8 +516,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
         rows.append("[RTP test/full]   ")
             .append(ok ? "PASS " : "FAIL ")
             .append(e.getKey())
-            .append(" (warnings=").append(d).append(')')
-            .append('\n');
+            .append(" (warnings=")
+            .append(d)
+            .append(")\n");
       }
       String pct = (total == 0)
           ? "n/a"

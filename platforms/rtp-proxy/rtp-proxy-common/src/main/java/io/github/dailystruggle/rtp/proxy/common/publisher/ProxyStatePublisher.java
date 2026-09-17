@@ -49,20 +49,24 @@ public final class ProxyStatePublisher {
      * Begin publishing on the configured cadence. Idempotent: a second call
      * before {@link #stop()} is a no-op.
      */
-    public synchronized void start() {
-        if (task != null) {
-            return;
+    public void start() {
+        synchronized (this) {
+            if (task != null) {
+                return;
+            }
+            long periodMs = Math.max(1L, config.heartbeatIntervalMs());
+            task = scheduler.scheduleAtFixedRate(this::publishOnce, periodMs, periodMs, TimeUnit.MILLISECONDS);
         }
-        long periodMs = Math.max(1L, config.heartbeatIntervalMs());
-        task = scheduler.scheduleAtFixedRate(this::publishOnce, periodMs, periodMs, TimeUnit.MILLISECONDS);
     }
 
     /** Cancel the publishing task. Idempotent. */
-    public synchronized void stop() {
-        ScheduledFuture<?> t = task;
-        if (t != null) {
-            t.cancel(false);
-            task = null;
+    public void stop() {
+        synchronized (this) {
+            ScheduledFuture<?> t = task;
+            if (t != null) {
+                t.cancel(false);
+                task = null;
+            }
         }
     }
 

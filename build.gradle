@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.spotless)
     alias(libs.plugins.japicmp) apply false
     alias(libs.plugins.cyclonedx) apply false
+    alias(libs.plugins.sonar)
 }
 
 group = 'io.github.dailystruggle'
@@ -848,5 +849,21 @@ tasks.register('jacocoServerReport', JacocoReport) {
         html.outputLocation = layout.buildDirectory.dir('reports/jacoco/server/html')
         xml.required = true
         xml.outputLocation = layout.buildDirectory.file('reports/jacoco/server/jacocoServerReport.xml')
+    }
+}
+
+sonar {
+    properties {
+        property 'sonar.projectKey', 'DailyStruggle_RTP'
+        property 'sonar.organization', 'dailystruggle'
+        property 'sonar.host.url', 'https://sonarcloud.io'
+    }
+}
+
+subprojects {
+    sonar {
+        properties {
+            property 'sonar.coverage.jacoco.xmlReportPaths', layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile.absolutePath
+        }
     }
 }
