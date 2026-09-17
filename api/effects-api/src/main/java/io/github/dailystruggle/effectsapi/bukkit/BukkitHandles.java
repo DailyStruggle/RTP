@@ -352,15 +352,14 @@ public final class BukkitHandles implements HandleProvider {
 
         @Override
         public void spawnFirework(Map<String, Object> data) {
-            org.bukkit.plugin.Plugin caller;
+            org.bukkit.plugin.Plugin caller = null;
             FireworkSafetyListener fsl = io.github.dailystruggle.effectsapi.EffectsAPI.getFireworkSafetyListener();
             if (fsl != null) {
                 caller = fsl.caller;
             } else {
                 try {
                     caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
-                } catch (IllegalStateException pre) {
-                    caller = null;
+                } catch (IllegalStateException ignored) {
                 }
             }
 

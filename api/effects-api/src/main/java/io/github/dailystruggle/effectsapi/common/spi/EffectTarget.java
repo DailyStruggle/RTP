@@ -4,7 +4,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Platform-neutral target for a single {@link io.github.dailystruggle.effectsapi.Effect}
+ * Platform-neutral target for a single {@link io.github.dailystruggle.effectsapi.common.Effect}
  * application. Wraps the player the effect is acting on (may be
  * {@code null} for ambient world effects) and the location the
  * effect is anchored to (e.g. the destination of a teleport for the
