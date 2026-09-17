@@ -104,7 +104,7 @@ jobs:
           python3 scripts/diff-coverage.py --baseline "$BASELINE" --min 0.80
 
       - name: Publish test results
-        uses: mikepenz/action-junit-report@5fb8152be6ff4b7721867dd11ca72fce2b16869e # v4.3.1
+        uses: mikepenz/action-junit-report@db71d41eb79864e25ab0337e395c352e84523afe # v4.3.1
         if: always()
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'

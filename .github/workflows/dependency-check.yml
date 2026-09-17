@@ -43,7 +43,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run OWASP Dependency-Check
-        uses: dependency-check/Dependency-Check_Action@d6ff68a7cc0cb016bfd69ab82ea541e21b72e505 # 2.5.4
+        uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # 1.1.0
         id: depcheck
         with:
           project: 'RTP'
