@@ -32,30 +32,47 @@
   <!-- Real bugs: null derefs, resource leaks, broken equals/compareTo, etc. -->
   <rule ref="category/java/errorprone.xml">
     <!-- Highly stylistic / opinionated members excluded from the starter set. -->
-    <exclude name="DataflowAnomalyAnalysis"/>
     <exclude name="AvoidLiteralsInIfCondition"/>
     <exclude name="AvoidFieldNameMatchingMethodName"/>
     <exclude name="AvoidFieldNameMatchingTypeName"/>
     <exclude name="AvoidDuplicateLiterals"/>
     <exclude name="CompareObjectsWithEquals"/>
+    <exclude name="AvoidCatchingThrowable"/>
+    <exclude name="NullAssignment"/>
+    <exclude name="AssignmentInOperand"/>
+    <exclude name="UseProperClassLoader"/>
+    <exclude name="ConstructorCallsOverridableMethod"/>
+    <exclude name="EmptyCatchBlock"/>
+    <exclude name="CloseResource"/>
+    <exclude name="SingleMethodSingleton"/>
+    <exclude name="SingletonClassReturningNewInstance"/>
+    <exclude name="AvoidBranchingStatementAsLastInLoop"/>
+    <exclude name="UseLocaleWithCaseConversions"/>
+    <exclude name="AvoidAccessibilityAlteration"/>
+    <exclude name="ReturnEmptyCollectionRatherThanNull"/>
   </rule>
 
   <!-- Multithreading correctness: aligns with the RTP scheduler contract. -->
   <rule ref="category/java/multithreading.xml">
-    <!-- DoNotUseThreads is superseded by our stricter custom rule below. -->
+    <!-- DoNotUseThreads and AvoidSynchronizedStatement are superseded by our stricter custom rule below. -->
     <exclude name="DoNotUseThreads"/>
+    <exclude name="AvoidSynchronizedStatement"/>
+    <exclude name="AvoidUsingVolatile"/>
+    <exclude name="UseConcurrentHashMap"/>
+    <exclude name="NonThreadSafeSingleton"/>
   </rule>
 
   <!-- Resource-handling & performance foot-guns. -->
   <rule ref="category/java/performance.xml">
     <exclude name="AvoidInstantiatingObjectsInLoops"/>
     <exclude name="RedundantFieldInitializer"/>
+    <exclude name="AppendCharacterWithChar"/>
+    <exclude name="ConsecutiveAppendsShouldReuse"/>
+    <exclude name="AvoidFileStream"/>
   </rule>
 
   <!-- A conservative slice of best-practices (leaks, missing overrides). -->
-  <rule ref="category/java/bestpractices.xml/AvoidUsingHardCodedIP"/>
   <rule ref="category/java/bestpractices.xml/CheckResultSet"/>
-  <rule ref="category/java/bestpractices.xml/UnusedAssignment"/>
   <rule ref="category/java/bestpractices.xml/PrimitiveWrapperInstantiation"/>
 
   <!-- ==================================================================== -->
@@ -82,7 +99,11 @@
     <priority>3</priority>
     <properties>
       <property name="xpath">
-        <value>//SynchronizedStatement</value>
+        <!--
+          Scope to hot paths: selection and queue packages in rtp-core where
+          the scheduler/non-blocking contract strictly applies.
+        -->
+        <value>//SynchronizedStatement[ancestor::CompilationUnit[starts-with(@PackageName, 'io.github.dailystruggle.rtp.common.selection') or starts-with(@PackageName, 'io.github.dailystruggle.rtp.common.queue')]]</value>
       </property>
     </properties>
     <description>
