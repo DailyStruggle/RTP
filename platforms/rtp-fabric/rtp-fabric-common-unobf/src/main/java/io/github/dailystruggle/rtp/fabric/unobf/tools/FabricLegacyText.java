@@ -406,44 +406,48 @@ public final class FabricLegacyText {
         return null;
     }
 
-    private static synchronized void probeHoverCtors() {
-        if (HOVER_PROBED) return;
-        // 1.21.x: ctor is generic `HoverEvent(Action<T>, T)` → erasure (Action, Object).
-        try {
-            HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Object.class);
-        } catch (Throwable ignored) { /* not on this runtime */ }
-        // 1.20.x: ctor was `HoverEvent(Action, Component)` (pre-generification).
-        if (HOVER_CTOR_LEGACY == null) {
+    private static void probeHoverCtors() {
+        synchronized (FabricLegacyText.class) {
+            if (HOVER_PROBED) return;
+            // 1.21.x: ctor is generic `HoverEvent(Action<T>, T)` → erasure (Action, Object).
             try {
-                HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Component.class);
+                HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Object.class);
             } catch (Throwable ignored) { /* not on this runtime */ }
-        }
-        if (HOVER_CTOR_LEGACY == null) {
-            try {
-                Class<?> showText = Class.forName("net.minecraft.network.chat.HoverEvent$ShowText");
-                HOVER_CTOR_SHOWTEXT = showText.getConstructor(Component.class);
-            } catch (Throwable ignored) {
+            // 1.20.x: ctor was `HoverEvent(Action, Component)` (pre-generification).
+            if (HOVER_CTOR_LEGACY == null) {
                 try {
-                    Class<?> showText = Class.forName("net.minecraft.network.chat.HoverEvent$Text");
-                    HOVER_CTOR_SHOWTEXT = showText.getConstructor(Component.class);
-                } catch (Throwable ignored2) { /* nothing matched */ }
+                    HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Component.class);
+                } catch (Throwable ignored) { /* not on this runtime */ }
             }
+            if (HOVER_CTOR_LEGACY == null) {
+                try {
+                    Class<?> showText = Class.forName("net.minecraft.network.chat.HoverEvent$ShowText");
+                    HOVER_CTOR_SHOWTEXT = showText.getConstructor(Component.class);
+                } catch (Throwable ignored) {
+                    try {
+                        Class<?> showText = Class.forName("net.minecraft.network.chat.HoverEvent$Text");
+                        HOVER_CTOR_SHOWTEXT = showText.getConstructor(Component.class);
+                    } catch (Throwable ignored2) { /* nothing matched */ }
+                }
+            }
+            HOVER_PROBED = true;
         }
-        HOVER_PROBED = true;
     }
 
-    private static synchronized void probeClickCtors() {
-        if (CLICK_PROBED) return;
-        try {
-            CLICK_CTOR_LEGACY = ClickEvent.class.getConstructor(ClickEvent.Action.class, String.class);
-        } catch (Throwable ignored) { /* not on this runtime */ }
-        if (CLICK_CTOR_LEGACY == null) {
+    private static void probeClickCtors() {
+        synchronized (FabricLegacyText.class) {
+            if (CLICK_PROBED) return;
             try {
-                Class<?> suggest = Class.forName("net.minecraft.network.chat.ClickEvent$SuggestCommand");
-                CLICK_CTOR_SUGGEST = suggest.getConstructor(String.class);
-            } catch (Throwable ignored) { /* nothing matched */ }
+                CLICK_CTOR_LEGACY = ClickEvent.class.getConstructor(ClickEvent.Action.class, String.class);
+            } catch (Throwable ignored) { /* not on this runtime */ }
+            if (CLICK_CTOR_LEGACY == null) {
+                try {
+                    Class<?> suggest = Class.forName("net.minecraft.network.chat.ClickEvent$SuggestCommand");
+                    CLICK_CTOR_SUGGEST = suggest.getConstructor(String.class);
+                } catch (Throwable ignored) { /* nothing matched */ }
+            }
+            CLICK_PROBED = true;
         }
-        CLICK_PROBED = true;
     }
 
     private static Style applyFormatting(Style style, ChatFormatting fmt) {

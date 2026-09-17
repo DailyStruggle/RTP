@@ -698,11 +698,13 @@ public final class RtpVelocityPlugin {
      * Package-private entry point used by tests to drive the shutdown
      * sequence without booting a real Velocity host. Idempotent.
      */
-    synchronized void shutdown() {
-        if (shutdownStarted) {
-            return;
+    void shutdown() {
+        synchronized (this) {
+            if (shutdownStarted) {
+                return;
+            }
+            shutdownStarted = true;
         }
-        shutdownStarted = true;
 
         int step = 0;
         boolean cleanShutdown = true;

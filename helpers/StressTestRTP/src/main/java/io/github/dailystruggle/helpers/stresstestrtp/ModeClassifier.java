@@ -100,13 +100,15 @@ public final class ModeClassifier {
     private long thresholdMs = NO_DATA;
 
     /** Resets to an empty population. Called at phase start. */
-    public synchronized void reset() {
-        Arrays.fill(hist, 0L);
-        n = 0;
-        unknownCount = 0;
-        directFast = 0;
-        directCold = 0;
-        thresholdMs = NO_DATA;
+    public void reset() {
+        synchronized (this) {
+            Arrays.fill(hist, 0L);
+            n = 0;
+            unknownCount = 0;
+            directFast = 0;
+            directCold = 0;
+            thresholdMs = NO_DATA;
+        }
     }
 
     /**
@@ -120,25 +122,27 @@ public final class ModeClassifier {
      * @param selectionChunks attributed selection chunk loads,
      *                        {@link #NO_DATA} when no counter was wired
      */
-    public synchronized Mode record(long latencyMs, long selectionChunks) {
-        if (latencyMs < 0) {
-            unknownCount++;
-            return Mode.UNKNOWN;
+    public Mode record(long latencyMs, long selectionChunks) {
+        synchronized (this) {
+            if (latencyMs < 0) {
+                unknownCount++;
+                return Mode.UNKNOWN;
+            }
+            if (n == latencies.length) {
+                latencies = Arrays.copyOf(latencies, n * 2);
+                selections = Arrays.copyOf(selections, n * 2);
+            }
+            latencies[n] = latencyMs;
+            selections[n] = selectionChunks;
+            n++;
+            hist[binOf(latencyMs)]++;
+            if (thresholdMs < 0 ? n >= MIN_SAMPLES : n % RECOMPUTE_EVERY == 0) {
+                thresholdMs = otsuThresholdMs();
+            }
+            Mode m = classify(latencyMs, selectionChunks, thresholdMs);
+            if (m == Mode.UNKNOWN) unknownCount++;
+            return m;
         }
-        if (n == latencies.length) {
-            latencies = Arrays.copyOf(latencies, n * 2);
-            selections = Arrays.copyOf(selections, n * 2);
-        }
-        latencies[n] = latencyMs;
-        selections[n] = selectionChunks;
-        n++;
-        hist[binOf(latencyMs)]++;
-        if (thresholdMs < 0 ? n >= MIN_SAMPLES : n % RECOMPUTE_EVERY == 0) {
-            thresholdMs = otsuThresholdMs();
-        }
-        Mode m = classify(latencyMs, selectionChunks, thresholdMs);
-        if (m == Mode.UNKNOWN) unknownCount++;
-        return m;
     }
 
     /**
@@ -146,13 +150,19 @@ public final class ModeClassifier {
      * {@link #record}: a direct reading is reported, never used to place or
      * validate the inferred boundary.
      */
-    public synchronized void recordDirect(Mode direct) {
-        if (direct == Mode.FAST) directFast++;
-        else if (direct == Mode.COLD) directCold++;
+    public void recordDirect(Mode direct) {
+        synchronized (this) {
+            if (direct == Mode.FAST) directFast++;
+            else if (direct == Mode.COLD) directCold++;
+        }
     }
 
     /** Threshold in effect right now, {@link #NO_DATA} before estimation. */
-    public synchronized long thresholdMs() { return thresholdMs; }
+    public long thresholdMs() {
+        synchronized (this) {
+            return thresholdMs;
+        }
+    }
 
     /** Pure classification rule, exposed so offline re-derivation from the CSV
      *  can reproduce a row exactly. A negative threshold means "unestimated". */
@@ -209,35 +219,37 @@ public final class ModeClassifier {
      * row is internally consistent even though early per-attempt rows were
      * written against a provisional one.
      */
-    public synchronized Summary summarise() {
-        long finalThreshold = n >= MIN_SAMPLES ? otsuThresholdMs() : NO_DATA;
-        String method = finalThreshold >= 0 ? "OTSU_LOG10_LATENCY" : "INSUFFICIENT_SAMPLES";
-        long directTotal = (long) directFast + directCold;
-        double directFraction = directTotal > 0 ? (double) directFast / directTotal : -1.0d;
-        if (finalThreshold < 0) {
-            return new Summary(NO_DATA, method, NO_DATA, NO_DATA, NO_DATA,
-                    unknownCount, -1.0d,
-                    NO_DATA, NO_DATA, NO_DATA, NO_DATA, NO_DATA, NO_DATA,
+    public Summary summarise() {
+        synchronized (this) {
+            long finalThreshold = n >= MIN_SAMPLES ? otsuThresholdMs() : NO_DATA;
+            String method = finalThreshold >= 0 ? "OTSU_LOG10_LATENCY" : "INSUFFICIENT_SAMPLES";
+            long directTotal = (long) directFast + directCold;
+            double directFraction = directTotal > 0 ? (double) directFast / directTotal : -1.0d;
+            if (finalThreshold < 0) {
+                return new Summary(NO_DATA, method, NO_DATA, NO_DATA, NO_DATA,
+                        unknownCount, -1.0d,
+                        NO_DATA, NO_DATA, NO_DATA, NO_DATA, NO_DATA, NO_DATA,
+                        directFast, directCold, directFraction);
+            }
+            int fastN = 0;
+            for (int i = 0; i < n; i++) {
+                if (classify(latencies[i], selections[i], finalThreshold) == Mode.FAST) fastN++;
+            }
+            long[] fast = new long[fastN];
+            long[] cold = new long[n - fastN];
+            int fi = 0, ci = 0;
+            for (int i = 0; i < n; i++) {
+                if (classify(latencies[i], selections[i], finalThreshold) == Mode.FAST) fast[fi++] = latencies[i];
+                else cold[ci++] = latencies[i];
+            }
+            Arrays.sort(fast);
+            Arrays.sort(cold);
+            double fastFraction = n > 0 ? (double) fastN / n : -1.0d;
+            return new Summary(finalThreshold, method, n, fastN, n - fastN, unknownCount, fastFraction,
+                    pct(fast, 50), pct(fast, 95), pct(fast, 99),
+                    pct(cold, 50), pct(cold, 95), pct(cold, 99),
                     directFast, directCold, directFraction);
         }
-        int fastN = 0;
-        for (int i = 0; i < n; i++) {
-            if (classify(latencies[i], selections[i], finalThreshold) == Mode.FAST) fastN++;
-        }
-        long[] fast = new long[fastN];
-        long[] cold = new long[n - fastN];
-        int fi = 0, ci = 0;
-        for (int i = 0; i < n; i++) {
-            if (classify(latencies[i], selections[i], finalThreshold) == Mode.FAST) fast[fi++] = latencies[i];
-            else cold[ci++] = latencies[i];
-        }
-        Arrays.sort(fast);
-        Arrays.sort(cold);
-        double fastFraction = n > 0 ? (double) fastN / n : -1.0d;
-        return new Summary(finalThreshold, method, n, fastN, n - fastN, unknownCount, fastFraction,
-                pct(fast, 50), pct(fast, 95), pct(fast, 99),
-                pct(cold, 50), pct(cold, 95), pct(cold, 99),
-                directFast, directCold, directFraction);
     }
 
     /** Inclusive percentile over a pre-sorted array; {@link #NO_DATA} if empty. */

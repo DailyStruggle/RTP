@@ -74,7 +74,7 @@ public class NeoForgeTitleEffect extends Effect<FabricTitleKeys> {
 
     @Override
     public String toPermission() {
-        return String.valueOf(data.get(FabricTitleKeys.TITLE)) + "."
+        return data.get(FabricTitleKeys.TITLE) + "."
                 + data.get(FabricTitleKeys.SUBTITLE) + "."
                 + data.get(FabricTitleKeys.FADE_IN) + "."
                 + data.get(FabricTitleKeys.STAY) + "."

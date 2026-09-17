@@ -892,7 +892,7 @@ public final class Runner {
             }
         } else {
             for (Player p : Bukkit.getOnlinePlayers()) {
-                if (operatorId != null && p.getUniqueId().equals(operatorId)) continue;
+                if (Objects.equals(operatorId, p.getUniqueId())) continue;
                 out.add(p);
             }
             // Single-account fallback: if the operator is the only player online,

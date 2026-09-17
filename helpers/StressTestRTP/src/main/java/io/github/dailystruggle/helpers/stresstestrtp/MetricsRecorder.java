@@ -153,17 +153,33 @@ public class MetricsRecorder {
          * <p>Zero-width and negative spans are ignored rather than clamped, so
          * a clock hiccup cannot manufacture occupancy.
          */
-        public synchronized void recordTickInterval(long startNs, long endNs) {
+        public void recordTickInterval(long startNs, long endNs) {
             long width = endNs - startNs;
             if (width <= 0L) return;
-            tickIntervalCount++;
-            tickIntervalTotalNs += width;
-            if (width > tickIntervalMaxNs) tickIntervalMaxNs = width;
+            synchronized (this) {
+                tickIntervalCount++;
+                tickIntervalTotalNs += width;
+                if (width > tickIntervalMaxNs) tickIntervalMaxNs = width;
+            }
         }
 
-        public synchronized long tickIntervalCount()   { return tickIntervalCount; }
-        public synchronized long tickIntervalTotalNs() { return tickIntervalTotalNs; }
-        public synchronized long tickIntervalMaxNs()   { return tickIntervalMaxNs; }
+        public long tickIntervalCount() {
+            synchronized (this) {
+                return tickIntervalCount;
+            }
+        }
+
+        public long tickIntervalTotalNs() {
+            synchronized (this) {
+                return tickIntervalTotalNs;
+            }
+        }
+
+        public long tickIntervalMaxNs() {
+            synchronized (this) {
+                return tickIntervalMaxNs;
+            }
+        }
 
         public Attempt(UUID id, String player, String world, String targetLabel, long dispatchEpochMs,
                        double fromX, double fromZ,

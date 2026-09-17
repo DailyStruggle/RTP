@@ -245,19 +245,21 @@ public class McaQualitativeUniquenessBenchmarkTest {
       };
     }
 
-    public synchronized byte[] getRegionBytes(int rx, int rz) {
-      long key = (((long) rx) << 32) | (rz & 0xFFFFFFFFL);
-      byte[] cached = lruCache.get(key);
-      if (cached != null) return cached;
+    public byte[] getRegionBytes(int rx, int rz) {
+      synchronized (this) {
+        long key = (((long) rx) << 32) | (rz & 0xFFFFFFFFL);
+        byte[] cached = lruCache.get(key);
+        if (cached != null) return cached;
 
-      Path f = regionDir.resolve(String.format("r.%d.%d.mca", rx, rz));
-      if (!Files.isRegularFile(f)) return null;
-      try {
-        byte[] bytes = Files.readAllBytes(f);
-        lruCache.put(key, bytes);
-        return bytes;
-      } catch (IOException e) {
-        return null;
+        Path f = regionDir.resolve(String.format("r.%d.%d.mca", rx, rz));
+        if (!Files.isRegularFile(f)) return null;
+        try {
+          byte[] bytes = Files.readAllBytes(f);
+          lruCache.put(key, bytes);
+          return bytes;
+        } catch (IOException e) {
+          return null;
+        }
       }
     }
   }

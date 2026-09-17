@@ -24,6 +24,7 @@ public final class WorldBacklogBinIndex {
    * @param entry entry contributed by some region's
    *              {@link BacklogLocationBuffer}; never {@code null}
    */
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: synchronized bin list access for atomicity
   public void insert(RegionFileCoord key, BacklogLocationBuffer.BacklogEntry entry) {
     for (int attempt = 0; attempt < 32; attempt++) {
       WeakReference<List<BacklogLocationBuffer.BacklogEntry>> ref = bins.get(key);
@@ -67,6 +68,7 @@ public final class WorldBacklogBinIndex {
    * @param key bin coordinate (never null)
    * @return snapshot of entries in the bin
    */
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: synchronized bin list copy for atomicity
   public List<BacklogLocationBuffer.BacklogEntry> snapshot(RegionFileCoord key) {
     WeakReference<List<BacklogLocationBuffer.BacklogEntry>> ref = bins.get(key);
     if (ref == null) return Collections.emptyList();
@@ -85,6 +87,7 @@ public final class WorldBacklogBinIndex {
    * @return {@code true} iff the bin currently has a live list with at least
    *         one entry
    */
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: synchronized bin list check
   public boolean hasBin(RegionFileCoord key) {
     WeakReference<List<BacklogLocationBuffer.BacklogEntry>> ref = bins.get(key);
     if (ref == null) return false;
