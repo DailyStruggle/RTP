@@ -404,8 +404,11 @@ apiModulesForBinaryCheck.each { modulePath ->
             group = 'verification'
             description = "Checks binary compatibility of ${project.name} against version ${baselineVersion}."
 
-            // Compare newly built jar against resolved baseline
-            newClasspath = files(tasks.named('jar'))
+            // Compare newly built jar against resolved baseline.
+            // In Loom-managed modules (such as :effects-api), `remapJar` produces the shippable jar
+            // in build/libs, whereas `jar` outputs to build/devlibs/*-dev.jar.
+            def jarTask = tasks.findByName('remapJar') ?: tasks.named('jar')
+            newClasspath = files(jarTask)
             oldClasspath = configurations.japicmpBaseline
 
             // Report modified classes and emit rich reports
