@@ -4,20 +4,20 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 /** Task for forcing the generation of locations in regions */
 public final class ForceQueue extends RTPRunnable {
   /** Actions to perform before forcing the queue */
-  public static final List<Consumer<ForceQueue>> preActions = new ArrayList<>();
+  public static final List<Consumer<ForceQueue>> preActions = new CopyOnWriteArrayList<>();
 
   /** Actions to perform after forcing the queue */
-  public static final List<Consumer<ForceQueue>> postActions = new ArrayList<>();
+  public static final List<Consumer<ForceQueue>> postActions = new CopyOnWriteArrayList<>();
 
   private final RTPCommandSender sender;
   private final Collection<Region> regions;

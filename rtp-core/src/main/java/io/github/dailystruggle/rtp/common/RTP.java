@@ -165,7 +165,7 @@ public class RTP {
   private static RTP instance;
 
   private static ScheduledExecutorService diagnosticTimer;
-  private static final List<Object> trackedTasks = new ArrayList<>();
+  private static final List<Object> trackedTasks = new CopyOnWriteArrayList<>();
 
   static {
     Factory<Shape<?>> shapeFactory = new Factory<>();

@@ -8,14 +8,14 @@ import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 public final class RTPTeleportCancel extends RTPRunnable {
-  public static final List<Consumer<RTPTeleportCancel>> preActions = new ArrayList<>();
-  public static final List<Consumer<RTPTeleportCancel>> postActions = new ArrayList<>();
+  public static final List<Consumer<RTPTeleportCancel>> preActions = new CopyOnWriteArrayList<>();
+  public static final List<Consumer<RTPTeleportCancel>> postActions = new CopyOnWriteArrayList<>();
   private final UUID playerId;
 
   public RTPTeleportCancel(UUID playerId) {
