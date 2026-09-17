@@ -32,22 +32,8 @@ public class HeapPressureMonitorTest {
         resetMonitorState();
     }
 
-    private void resetMonitorState() throws Exception {
-        Field lastSampleMs = HeapPressureMonitor.class.getDeclaredField("lastSampleMs");
-        lastSampleMs.setAccessible(true);
-        ((AtomicLong) lastSampleMs.get(null)).set(0L);
-
-        Field lastWarnMs = HeapPressureMonitor.class.getDeclaredField("lastWarnMs");
-        lastWarnMs.setAccessible(true);
-        ((AtomicLong) lastWarnMs.get(null)).set(0L);
-
-        Field cachedUnderPressure = HeapPressureMonitor.class.getDeclaredField("cachedUnderPressure");
-        cachedUnderPressure.setAccessible(true);
-        cachedUnderPressure.set(null, false);
-
-        Field cachedUsedPercent = HeapPressureMonitor.class.getDeclaredField("cachedUsedPercent");
-        cachedUsedPercent.setAccessible(true);
-        cachedUsedPercent.set(null, 0.0);
+    private void resetMonitorState() {
+        HeapPressureMonitor.resetForTesting();
     }
 
     @Test
