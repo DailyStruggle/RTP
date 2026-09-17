@@ -240,6 +240,15 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 if (!BACKEND_CHANNEL.equals(channel)) return;
                 BackendHeartbeat hb = decodeBackend(message);
                 if (hb == null) return;
+                // Receive-side trace: fan-out is otherwise silent on success, so
+                // a FINE line here confirms the proxy actually observed a backend
+                // heartbeat on the pub/sub channel (gated by advanced/logging.yml).
+                if (LOG.isLoggable(Level.FINE)) {
+                    LOG.log(Level.FINE, "redis received backend heartbeat for server="
+                            + hb.serverId() + " (players=" + hb.playerCount()
+                            + ", kept=" + hb.keptCount() + ", accepting=" + hb.acceptingRequests()
+                            + "); fanning out to " + subscribers.size() + " subscriber(s)");
+                }
                 for (Sub s : subscribers) {
                     if (s.isClosed()) continue;
                     try { s.sink.accept(hb); }
@@ -295,6 +304,13 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 j.hset(key, hash);
                 j.expire(key, ttlSeconds);
                 j.publish(BACKEND_CHANNEL, encoded);
+                // Write-side trace: the HSET/EXPIRE/PUBLISH triad is silent on
+                // success, so a FINE line here confirms the row actually reached
+                // Redis (gated by advanced/logging.yml).
+                if (LOG.isLoggable(Level.FINE)) {
+                    LOG.log(Level.FINE, "redis published backend heartbeat key=" + key
+                            + " ttl=" + ttlSeconds + "s channel=" + BACKEND_CHANNEL);
+                }
             } catch (Exception e) {
                 LOG.log(Level.WARNING, "publishBackendHeartbeat failed: " + e.getMessage());
             }

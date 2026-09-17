@@ -1,9 +1,7 @@
 # Devstack runtime artifacts. Never commit these.
 .env
 jars/plugin/*
-jars/velocity/*
 !jars/plugin/.gitkeep
-!jars/velocity/.gitkeep
 # Synced jars fanned out by run-acceptance.ps1 Sync-ProxyJars into each proxy's
 # plugins dir (compose binds proxy-{a,b}/plugins -> /server/plugins).
 proxy-a/plugins/*.jar
@@ -49,7 +47,6 @@ acceptance-evidence.log
 logs/
 # Synced jars fanned out into jars/plugin/<pluginName>/ subdirs by sync step.
 jars/plugin/*/
-jars/velocity/*/
 # Optional lobby world (see shared/lobby-world/README.md). Schematics are
 # usually license-restricted (BuiltByBit / marketplace ToS) so they must
 # never be committed; the derived baked world zip is a build artifact.

@@ -117,27 +117,13 @@ public final class FabricBookMenuRenderer implements MenuRenderer {
      * RTP message surface.
      */
     public FabricBookSpec buildSpec(UUID playerId, MenuModel model) {
-        Objects.requireNonNull(model, "model");
-        List<FabricBookSpec.Page> pages = new ArrayList<>(model.pages().size());
-        for (MenuPage page : model.pages()) {
-            List<FabricBookSpec.Line> lines = new ArrayList<>(page.lines().size());
-            for (MenuLine line : page.lines()) {
-                List<FabricBookSpec.Fragment> frags = new ArrayList<>(line.fragments().size());
-                for (MenuFragment fragment : line.fragments()) {
-                    frags.add(toFragment(playerId, fragment));
-                }
-                lines.add(new FabricBookSpec.Line(frags));
-            }
-            pages.add(new FabricBookSpec.Page(lines));
-        }
-        return new FabricBookSpec(format(playerId, model.title()), pages);
-    }
-
-    private static FabricBookSpec.Fragment toFragment(UUID playerId, MenuFragment fragment) {
-        String text = format(playerId, fragment.text());
-        String hover = format(playerId, fragment.hover());
-        String runCommand = toRunCommand(fragment.action());
-        return new FabricBookSpec.Fragment(text, hover, runCommand);
+        io.github.dailystruggle.rtp.api.menu.BookSpec spec =
+            io.github.dailystruggle.rtp.api.menu.BookSpecBuilder.buildSpec(
+                playerId,
+                model,
+                (uuid, raw) -> format(uuid, raw),
+                FabricBookMenuRenderer::toRunCommand);
+        return FabricBookSpec.from(spec);
     }
 
     /**

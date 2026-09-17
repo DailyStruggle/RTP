@@ -8,34 +8,41 @@
 # Execution dumps (.exec) are written to ./jacoco/<service>.exec on server shutdown
 # or when triggered dynamically via `/rtp test accessor` (or `/rtp test full`).
 # Run `./gradlew jacocoServerReport` afterwards to generate HTML/XML coverage reports.
+#
+# The Fabric/NeoForge GUI renderer packages are excluded from instrumentation: they
+# are compiled to JDK 25 bytecode (class major 69), which the bundled JaCoCo 0.8.11
+# agent cannot parse. On a Paper/Folia backend the SPI discovery in
+# RTPGuiCommonAddon.registerServiceRenderers() loads (but never uses) those
+# wrong-platform classes, so without the excludes the agent floods the log with
+# IllegalClassFormatException ("Unsupported class file major version 69") warnings.
 
 services:
   backend-a:
     environment:
-      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/backend-a.exec,includes=io.github.dailystruggle.rtp.*,dumponexit=true,output=file"
+      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/backend-a.exec,includes=io.github.dailystruggle.rtp.*,excludes=io.github.dailystruggle.rtp.guiaddon.fabric.*:io.github.dailystruggle.rtp.guiaddon.neoforge.*,jmx=true,dumponexit=true,output=file"
     volumes:
       - ./jacoco:/jacoco
 
   backend-b:
     environment:
-      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/backend-b.exec,includes=io.github.dailystruggle.rtp.*,dumponexit=true,output=file"
+      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/backend-b.exec,includes=io.github.dailystruggle.rtp.*,excludes=io.github.dailystruggle.rtp.guiaddon.fabric.*:io.github.dailystruggle.rtp.guiaddon.neoforge.*,jmx=true,dumponexit=true,output=file"
     volumes:
       - ./jacoco:/jacoco
 
   backend-c:
     environment:
-      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/backend-c.exec,includes=io.github.dailystruggle.rtp.*,dumponexit=true,output=file"
+      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/backend-c.exec,includes=io.github.dailystruggle.rtp.*,excludes=io.github.dailystruggle.rtp.guiaddon.fabric.*:io.github.dailystruggle.rtp.guiaddon.neoforge.*,jmx=true,dumponexit=true,output=file"
     volumes:
       - ./jacoco:/jacoco
 
   lobby-a:
     environment:
-      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/lobby-a.exec,includes=io.github.dailystruggle.rtp.*,dumponexit=true,output=file"
+      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/lobby-a.exec,includes=io.github.dailystruggle.rtp.*,excludes=io.github.dailystruggle.rtp.guiaddon.fabric.*:io.github.dailystruggle.rtp.guiaddon.neoforge.*,jmx=true,dumponexit=true,output=file"
     volumes:
       - ./jacoco:/jacoco
 
   lobby-b:
     environment:
-      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/lobby-b.exec,includes=io.github.dailystruggle.rtp.*,dumponexit=true,output=file"
+      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/lobby-b.exec,includes=io.github.dailystruggle.rtp.*,excludes=io.github.dailystruggle.rtp.guiaddon.fabric.*:io.github.dailystruggle.rtp.guiaddon.neoforge.*,jmx=true,dumponexit=true,output=file"
     volumes:
       - ./jacoco:/jacoco
