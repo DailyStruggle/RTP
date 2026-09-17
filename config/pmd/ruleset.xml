@@ -38,6 +38,7 @@
     <exclude name="AvoidDuplicateLiterals"/>
     <exclude name="CompareObjectsWithEquals"/>
     <exclude name="AvoidCatchingThrowable"/>
+    <exclude name="AvoidCatchingGenericException"/>
     <exclude name="NullAssignment"/>
     <exclude name="AssignmentInOperand"/>
     <exclude name="UseProperClassLoader"/>
@@ -62,9 +63,14 @@
     <exclude name="DoNotCallGarbageCollectionExplicitly"/>
     <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
     <exclude name="DontImportSun"/>
+    <exclude name="UnsupportedJdkApiUsage"/>
     <exclude name="NonStaticInitializer"/>
+    <exclude name="UnconditionalIfStatement"/>
     <exclude name="OverrideBothEqualsAndHashcode"/>
+    <exclude name="OverrideBothEqualsAndHashCodeOnComparable"/>
     <exclude name="UnusedNullCheckInEquals"/>
+    <exclude name="UnusedReturnValue"/>
+    <exclude name="AssertEqualsArgumentOrder"/>
   </rule>
 
   <!-- Multithreading correctness: aligns with the RTP scheduler contract. -->

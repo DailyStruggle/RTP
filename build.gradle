@@ -863,7 +863,10 @@ sonar {
 subprojects {
     sonar {
         properties {
-            property 'sonar.coverage.jacoco.xmlReportPaths', layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile.absolutePath
+            def jacocoReport = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile
+            if (jacocoReport.exists()) {
+                property 'sonar.coverage.jacoco.xmlReportPaths', jacocoReport.absolutePath
+            }
         }
     }
 }

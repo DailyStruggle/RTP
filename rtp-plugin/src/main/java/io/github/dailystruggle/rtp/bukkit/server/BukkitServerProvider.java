@@ -119,19 +119,6 @@ public class BukkitServerProvider {
                 accessorClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_21_R1.server.ServerAccessorImpl";
                 schedulerClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_21_R1.scheduling.BukkitSchedulerImpl";
             }
-        } else if (version.contains("1.20")) {
-            if (isFolia()) {
-                return foliaModel(
-                        "io.github.dailystruggle.rtp.folia_v1_20_R1.server.ServerAccessorImpl",
-                        "io.github.dailystruggle.rtp.folia_v1_20_R1.scheduling.FoliaSchedulerImpl",
-                        "io.github.dailystruggle.rtp.paper_v1_20_R1.server.ServerAccessorImpl");
-            } else if (isPaper()) {
-                accessorClassName = "io.github.dailystruggle.rtp.paper_v1_20_R1.server.ServerAccessorImpl";
-                schedulerClassName = "io.github.dailystruggle.rtp.paper_v1_20_R1.scheduling.BukkitSchedulerImpl";
-            } else {
-                accessorClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_20_R1.server.ServerAccessorImpl";
-                schedulerClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_20_R1.scheduling.BukkitSchedulerImpl";
-            }
         } else {
             if (isFolia()) {
                 return foliaModel(
