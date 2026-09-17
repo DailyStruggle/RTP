@@ -50,7 +50,7 @@ public final class GroupPlacementRequest {
   }
 
   private static void requireText(String value, String field) {
-    if (value == null || value.trim().isEmpty()) {
+    if (value == null || value.isBlank()) {
       throw new IllegalArgumentException(field + " must not be null or blank");
     }
   }

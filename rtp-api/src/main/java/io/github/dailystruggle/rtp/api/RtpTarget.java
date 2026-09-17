@@ -57,7 +57,7 @@ public final class RtpTarget {
    * @throws IllegalArgumentException if {@code regionName} is {@code null} or blank
    */
   public static RtpTarget region(String regionName) {
-    if (regionName == null || regionName.trim().isEmpty()) {
+    if (regionName == null || regionName.isBlank()) {
       throw new IllegalArgumentException("regionName must not be null or blank");
     }
     return new RtpTarget(Kind.REGION, regionName, null);
@@ -72,10 +72,10 @@ public final class RtpTarget {
    * @throws IllegalArgumentException if either argument is null or blank
    */
   public static RtpTarget network(String serverId, String regionName) {
-    if (serverId == null || serverId.trim().isEmpty()) {
+    if (serverId == null || serverId.isBlank()) {
       throw new IllegalArgumentException("serverId must not be null or blank");
     }
-    if (regionName == null || regionName.trim().isEmpty()) {
+    if (regionName == null || regionName.isBlank()) {
       throw new IllegalArgumentException("regionName must not be null or blank");
     }
     return new RtpTarget(Kind.NETWORK, regionName, serverId);
@@ -89,7 +89,7 @@ public final class RtpTarget {
    * @throws IllegalArgumentException if {@code worldName} is {@code null} or blank
    */
   public static RtpTarget world(String worldName) {
-    if (worldName == null || worldName.trim().isEmpty()) {
+    if (worldName == null || worldName.isBlank()) {
       throw new IllegalArgumentException("worldName must not be null or blank");
     }
     return new RtpTarget(Kind.WORLD, worldName, null);
