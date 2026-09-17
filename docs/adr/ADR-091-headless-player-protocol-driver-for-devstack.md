@@ -41,7 +41,7 @@ Update `run-acceptance.sh` and `run-acceptance.ps1`:
 ### 3. GitHub Actions CI Integration
 
 Provide a dedicated GitHub Actions workflow (`.github/workflows/devstack-acceptance.yml`) that:
-1. Builds the plugin and proxy shadow jars (`:rtp-plugin:shadowJar`, `:rtp-proxy:rtp-proxy-velocity:shadowJar`).
+1. Builds the unified plugin jar (`:rtp-plugin:remapJar`).
 2. Boots the Docker Compose devstack.
 3. Installs dependencies (`npm --prefix devstack/clients install`).
 4. Executes `./run-acceptance.sh --scenario all --no-logs`.

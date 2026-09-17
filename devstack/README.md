@@ -64,12 +64,11 @@ path to a destination.
 
 ## One-time setup
 
-1. Build the jars (from repo root):
+1. Build the jar (from repo root):
 
    ```powershell
-   .\gradlew :rtp-plugin:shadowJar :rtp-proxy:rtp-proxy-velocity:shadowJar
+   .\gradlew :rtp-plugin:remapJar
    Copy-Item rtp-plugin\build\libs\LeafRTP-Pro-*.jar devstack\jars\plugin\
-   Copy-Item rtp-proxy\rtp-proxy-velocity\build\libs\rtp-proxy-velocity-*.jar devstack\jars\velocity\
    ```
 
 2. Provision shared secrets:

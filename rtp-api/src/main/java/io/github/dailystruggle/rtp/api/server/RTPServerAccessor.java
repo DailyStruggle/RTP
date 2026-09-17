@@ -756,4 +756,54 @@ public interface RTPServerAccessor {
   default boolean executeCommand(UUID senderId, String commandLine) {
     return false;
   }
+
+  // ---------------------------------------------------------------------------
+  // Palette identifier normalization & reconciliation SPI
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Reconciles a raw on-disk block or biome palette identifier against the platform registry.
+   *
+   * <p>The default implementation applies namespace-stripping and uppercase normalization
+   * via {@link io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer#normalize(String)}.
+   * Platform adapters (e.g. Bukkit, Paper, Folia, Fabric, NeoForge) should override this to
+   * reconcile against live platform registries (e.g. Material/Registry.BIOME or BuiltInRegistries).
+   *
+   * @param raw raw identifier from disk or config (e.g. "minecraft:stone", "stone")
+   * @return canonical identifier for lookups, or null if raw is null
+   */
+  default String reconcilePaletteIdentifier(String raw) {
+    return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
+  }
+
+  /**
+   * Reconciles a collection of raw identifiers into an unmodifiable set of canonical identifiers.
+   *
+   * @param raw collection of raw identifiers
+   * @return unmodifiable set of canonical identifiers
+   */
+  default Set<String> reconcilePaletteIdentifiers(java.util.Collection<String> raw) {
+    if (raw == null || raw.isEmpty()) return java.util.Collections.emptySet();
+    Set<String> out = new java.util.LinkedHashSet<>(raw.size());
+    for (String s : raw) {
+      if (s == null) continue;
+      String n = reconcilePaletteIdentifier(s);
+      if (n != null && !n.isEmpty()) out.add(n);
+    }
+    return java.util.Collections.unmodifiableSet(out);
+  }
+
+  /**
+   * Checks whether the reconciled form of a raw palette identifier matches any entry in the
+   * reconciled unsafe set.
+   *
+   * @param rawPaletteId raw block palette identifier
+   * @param reconciledUnsafe set of reconciled unsafe block identifiers
+   * @return true if matches, false otherwise
+   */
+  default boolean matchesPaletteIdentifier(String rawPaletteId, Set<String> reconciledUnsafe) {
+    if (reconciledUnsafe == null || reconciledUnsafe.isEmpty()) return false;
+    String n = reconcilePaletteIdentifier(rawPaletteId);
+    return n != null && !n.isEmpty() && reconciledUnsafe.contains(n);
+  }
 }

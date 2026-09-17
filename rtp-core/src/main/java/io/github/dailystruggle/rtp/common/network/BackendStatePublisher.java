@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 
 /**
  * Backend heartbeat loop: periodically samples {@link BackendHeartbeat} state
@@ -22,6 +24,15 @@ public final class BackendStatePublisher {
     private final long intervalMs;
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean stopped = new AtomicBoolean(false);
+    /**
+     * Monotonic count of heartbeats handed to the transport. Surfaced in the
+     * per-tick FINE trace so operators can confirm the publish loop is live
+     * without instrumenting Redis. The happy path is otherwise silent at every
+     * level (publish success emits nothing), so "no heartbeat logs" at INFO is
+     * expected and is NOT evidence the loop stalled - raise the logger to FINE
+     * (advanced/logging.yml) to see each publish.
+     */
+    private final AtomicLong publishedCount = new AtomicLong();
 
     /**
      * Platform-scheduler task handle for the periodic tick.
@@ -91,6 +102,14 @@ public final class BackendStatePublisher {
             BackendHeartbeat row = sampler.sample(serverId);
             if (row == null) return;
             transport.publishBackendHeartbeat(row);
+            // Happy-path trace: the publish itself is silent on success, so emit
+            // a FINE line here (gated by advanced/logging.yml) confirming the
+            // loop is alive and what it just published. Kept off INFO so it does
+            // not spam at the heartbeat cadence.
+            RTP.log(Level.FINE, "[RTP] BackendStatePublisher published heartbeat #"
+                    + publishedCount.incrementAndGet() + " for server=" + serverId
+                    + " (players=" + row.playerCount() + ", kept=" + row.keptCount()
+                    + ", accepting=" + row.acceptingRequests() + ")");
         } catch (RuntimeException e) {
             // RTP.log routes through the canonical accessor; safe to call here.
             io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING,

@@ -111,27 +111,13 @@ public final class NeoForgeBookMenuRenderer implements MenuRenderer {
      * message surface.
      */
     public NeoForgeBookSpec buildSpec(UUID playerId, MenuModel model) {
-        Objects.requireNonNull(model, "model");
-        List<NeoForgeBookSpec.Page> pages = new ArrayList<>(model.pages().size());
-        for (MenuPage page : model.pages()) {
-            List<NeoForgeBookSpec.Line> lines = new ArrayList<>(page.lines().size());
-            for (MenuLine line : page.lines()) {
-                List<NeoForgeBookSpec.Fragment> frags = new ArrayList<>(line.fragments().size());
-                for (MenuFragment fragment : line.fragments()) {
-                    frags.add(toFragment(playerId, fragment));
-                }
-                lines.add(new NeoForgeBookSpec.Line(frags));
-            }
-            pages.add(new NeoForgeBookSpec.Page(lines));
-        }
-        return new NeoForgeBookSpec(format(playerId, model.title()), pages);
-    }
-
-    private static NeoForgeBookSpec.Fragment toFragment(UUID playerId, MenuFragment fragment) {
-        String text = format(playerId, fragment.text());
-        String hover = format(playerId, fragment.hover());
-        String runCommand = toRunCommand(fragment.action());
-        return new NeoForgeBookSpec.Fragment(text, hover, runCommand);
+        io.github.dailystruggle.rtp.api.menu.BookSpec spec =
+            io.github.dailystruggle.rtp.api.menu.BookSpecBuilder.buildSpec(
+                playerId,
+                model,
+                (uuid, raw) -> format(uuid, raw),
+                NeoForgeBookMenuRenderer::toRunCommand);
+        return NeoForgeBookSpec.from(spec);
     }
 
     /**

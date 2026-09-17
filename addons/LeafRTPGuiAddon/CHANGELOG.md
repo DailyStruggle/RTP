@@ -11,6 +11,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Wrong-platform GUI renderer classes are no longer defined on a backend that is
+  not their platform. The bundled multi-loader `rtp-gui` jar lists every
+  platform's renderer in one `META-INF/services` file, and
+  `RTPGuiCommonAddon.registerServiceRenderers()` used to `Class.forName` +
+  instantiate each entry and only then discard the off-platform ones via
+  `isAvailable()`. On a Paper/Folia backend that forced the JVM to define the
+  Fabric/NeoForge renderers (JDK 25, class major version 69), which a bytecode
+  agent such as JaCoCo cannot parse - flooding the log with
+  `IllegalClassFormatException: Unsupported class file major version 69`.
+  Discovery now gates each bundled entry on its platform loader being present
+  (`net.fabricmc.loader.api.FabricLoader` / `net.neoforged.fml.loading.FMLLoader`
+  / `org.bukkit.Bukkit`, matched by the entry's `...guiaddon.<platform>.*`
+  package) and skips it BEFORE loading the class, so the off-platform renderers
+  are never defined. Unrecognised (third-party) entries still load and are
+  filtered by `isAvailable()` exactly as before.
+
 - The Fabric/NeoForge GUI now opens (instead of falling back to classic teleport)
   on the `ServiceLoader` load path even when the platform accessor's typed
   `getServer()` returns null across the addon's child classloader. The renderers
