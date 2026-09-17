@@ -234,62 +234,66 @@ final class V26_1_R1FabricLegacyText {
         return null;
     }
 
-    private static synchronized void probeHoverCtors() {
-        if (HOVER_PROBED) return;
-        try {
-            HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Object.class);
-        } catch (Throwable ignored) { /* not on this runtime */ }
-        if (HOVER_CTOR_LEGACY == null) {
+    private static void probeHoverCtors() {
+        synchronized (V26_1_R1FabricLegacyText.class) {
+            if (HOVER_PROBED) return;
             try {
-                HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Component.class);
+                HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Object.class);
             } catch (Throwable ignored) { /* not on this runtime */ }
+            if (HOVER_CTOR_LEGACY == null) {
+                try {
+                    HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Component.class);
+                } catch (Throwable ignored) { /* not on this runtime */ }
+            }
+            if (HOVER_CTOR_LEGACY == null) {
+                try {
+                    for (Class<?> nested : HoverEvent.class.getDeclaredClasses()) {
+                        if (!HoverEvent.class.isAssignableFrom(nested)) continue;
+                        try {
+                            java.lang.reflect.Constructor<?> ctor = nested.getDeclaredConstructor(Component.class);
+                            ctor.setAccessible(true);
+                            HOVER_CTOR_SHOWTEXT = ctor;
+                            break;
+                        } catch (NoSuchMethodException ignored) { /* try next */ }
+                    }
+                } catch (Throwable ignored) { /* nothing matched */ }
+            }
+            HOVER_PROBED = true;
         }
-        if (HOVER_CTOR_LEGACY == null) {
-            try {
-                for (Class<?> nested : HoverEvent.class.getDeclaredClasses()) {
-                    if (!HoverEvent.class.isAssignableFrom(nested)) continue;
-                    try {
-                        java.lang.reflect.Constructor<?> ctor = nested.getDeclaredConstructor(Component.class);
-                        ctor.setAccessible(true);
-                        HOVER_CTOR_SHOWTEXT = ctor;
-                        break;
-                    } catch (NoSuchMethodException ignored) { /* try next */ }
-                }
-            } catch (Throwable ignored) { /* nothing matched */ }
-        }
-        HOVER_PROBED = true;
     }
 
-    private static synchronized void probeClickCtors() {
-        if (CLICK_PROBED) return;
-        try {
-            CLICK_CTOR_LEGACY = ClickEvent.class.getConstructor(ClickEvent.Action.class, String.class);
-        } catch (Throwable ignored) { /* not on this runtime */ }
-        if (CLICK_CTOR_LEGACY == null) {
+    private static void probeClickCtors() {
+        synchronized (V26_1_R1FabricLegacyText.class) {
+            if (CLICK_PROBED) return;
             try {
-                for (Class<?> nested : ClickEvent.class.getDeclaredClasses()) {
-                    if (!ClickEvent.class.isAssignableFrom(nested)) continue;
-                    java.lang.reflect.Constructor<?> ctor;
-                    try {
-                        ctor = nested.getDeclaredConstructor(String.class);
-                    } catch (NoSuchMethodException ignored) {
-                        continue;
-                    }
-                    ctor.setAccessible(true);
-                    try {
-                        Object instance = ctor.newInstance("");
-                        Object action = readClickAction(instance);
-                        if (action == ClickEvent.Action.SUGGEST_COMMAND && CLICK_CTOR_SUGGEST == null) {
-                            CLICK_CTOR_SUGGEST = ctor;
-                        } else if (action == ClickEvent.Action.RUN_COMMAND && CLICK_CTOR_RUN == null) {
-                            CLICK_CTOR_RUN = ctor;
+                CLICK_CTOR_LEGACY = ClickEvent.class.getConstructor(ClickEvent.Action.class, String.class);
+            } catch (Throwable ignored) { /* not on this runtime */ }
+            if (CLICK_CTOR_LEGACY == null) {
+                try {
+                    for (Class<?> nested : ClickEvent.class.getDeclaredClasses()) {
+                        if (!ClickEvent.class.isAssignableFrom(nested)) continue;
+                        java.lang.reflect.Constructor<?> ctor;
+                        try {
+                            ctor = nested.getDeclaredConstructor(String.class);
+                        } catch (NoSuchMethodException ignored) {
+                            continue;
                         }
-                    } catch (Throwable ignored) { /* not this one */ }
-                    if (CLICK_CTOR_SUGGEST != null && CLICK_CTOR_RUN != null) break;
-                }
-            } catch (Throwable ignored) { /* nothing matched */ }
+                        ctor.setAccessible(true);
+                        try {
+                            Object instance = ctor.newInstance("");
+                            Object action = readClickAction(instance);
+                            if (action == ClickEvent.Action.SUGGEST_COMMAND && CLICK_CTOR_SUGGEST == null) {
+                                CLICK_CTOR_SUGGEST = ctor;
+                            } else if (action == ClickEvent.Action.RUN_COMMAND && CLICK_CTOR_RUN == null) {
+                                CLICK_CTOR_RUN = ctor;
+                            }
+                        } catch (Throwable ignored) { /* not this one */ }
+                        if (CLICK_CTOR_SUGGEST != null && CLICK_CTOR_RUN != null) break;
+                    }
+                } catch (Throwable ignored) { /* nothing matched */ }
+            }
+            CLICK_PROBED = true;
         }
-        CLICK_PROBED = true;
     }
 
     /**

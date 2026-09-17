@@ -29,7 +29,7 @@ public class DistanceParameter extends CommandParameter {
         permission,
         description,
         (uuid, s) -> {
-          if (s == null || s.trim().isEmpty()) return false;
+          if (s == null || s.isBlank()) return false;
           if (s.indexOf('~') >= 0) {
             try {
               RTPCmd.resolveRelativeCoordinate(s, 0L);

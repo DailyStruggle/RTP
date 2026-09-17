@@ -204,7 +204,7 @@ public final class GuiMenuConfig {
     }
     // Then the block the destination backend advertised for this region
     // (provider-side region -> block), if any.
-    if (advertisedBlock != null && !advertisedBlock.trim().isEmpty()) {
+    if (advertisedBlock != null && !advertisedBlock.isBlank()) {
       return advertisedBlock.trim();
     }
     // Then this server's environment -> block translation of the advertised
