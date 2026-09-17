@@ -58,6 +58,10 @@ class TestAccessorCmdTest {
     assertTrue(r.threadValid);
     assertTrue(r.biomeValid);
     assertTrue(r.menuValid);
+    assertTrue(r.versionValid);
+    assertTrue(r.worldValid);
+    assertTrue(r.messagingValid);
+    assertTrue(r.subsystemValid);
     assertEquals("ok", r.message);
   }
 

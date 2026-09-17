@@ -70,6 +70,13 @@ public final class TransportRequestTriggerSource {
     private volatile boolean running;
     private volatile boolean started;
     private final AtomicLong dispatchedCount = new AtomicLong();
+    /**
+     * Count of consecutive {@code dequeueReady} timeouts (reset on any
+     * successful await, empty or not). Surfaced in the timeout WARNING so a
+     * persistent stall is distinguishable from a one-off hiccup - the former
+     * points at queue-executor starvation (see the timeout catch block).
+     */
+    private final AtomicLong consecutiveTimeouts = new AtomicLong();
 
     /**
      * Build a transport-driven trigger source.
@@ -203,20 +210,44 @@ public final class TransportRequestTriggerSource {
                 Thread.currentThread().interrupt();
                 return;
             } catch (java.util.concurrent.TimeoutException te) {
-                // Queue impl exceeded the contract; log and retry.
-                logger.warn("RTP TransportRequestTriggerSource: dequeueReady exceeded {}ms wall-clock; continuing.",
-                        pollTimeout.toMillis() + 1_000L);
+                // The dequeueReady future did not resolve within pollTimeout+1s.
+                // A bare TimeoutException carries NO cause, so the old one-line
+                // warning could not explain the 'why'. The dominant real cause
+                // is queue-executor starvation: the Redis/SQL queue impls run
+                // every dequeue on a SINGLE-THREAD executor, so when more than
+                // one worker blocks it for the full pollTimeout the queued
+                // worker's task cannot even start (let alone finish) inside the
+                // await bound. Other causes: Redis unreachable/slow, or a
+                // GC/host stall. Surface all the context needed to tell these
+                // apart instead of a bare 'exceeded Nms'.
+                long streak = consecutiveTimeouts.incrementAndGet();
+                long awaitMs = pollTimeout.toMillis() + 1_000L;
+                logger.warn("RTP TransportRequestTriggerSource: dequeueReady on worker '{}' did not complete within {}ms "
+                                + "(pollTimeout={}ms + 1000ms grace); consecutiveTimeouts={}, workerThreads={}, thisProxyId={}. "
+                                + "Likely cause: the queue's async executor is saturated - the Redis/SQL NetworkRequestQueue "
+                                + "services dequeues on a single thread, so workerThreads>1 starves it; reduce network worker "
+                                + "threads to 1 or verify Redis reachability/latency. Continuing.",
+                        Thread.currentThread().getName(), awaitMs, pollTimeout.toMillis(),
+                        streak, workerThreads, thisProxyId == null ? "<none>" : thisProxyId);
                 continue;
             } catch (java.util.concurrent.ExecutionException ee) {
+                // Log the FULL cause chain (with stack) - the previous
+                // getMessage()-only line printed 'null' for the many Jedis /
+                // NPE style failures whose message is null, hiding the real
+                // fault (S-004: never silently discard).
+                consecutiveTimeouts.set(0L);
                 Throwable cause = ee.getCause() != null ? ee.getCause() : ee;
-                logger.warn("RTP TransportRequestTriggerSource: dequeueReady failed: {}; continuing.",
-                        cause.getMessage());
+                logger.warn("RTP TransportRequestTriggerSource: dequeueReady failed on worker '{}' ({}); continuing.",
+                        Thread.currentThread().getName(), cause.getClass().getName(), cause);
                 continue;
             } catch (RuntimeException re) {
-                logger.warn("RTP TransportRequestTriggerSource: dequeueReady threw: {}; continuing.",
-                        re.getMessage());
+                consecutiveTimeouts.set(0L);
+                logger.warn("RTP TransportRequestTriggerSource: dequeueReady threw on worker '{}' ({}); continuing.",
+                        Thread.currentThread().getName(), re.getClass().getName(), re);
                 continue;
             }
+            // Any resolved await (empty or not) clears the stall streak.
+            consecutiveTimeouts.set(0L);
             if (popped == null || popped.isEmpty()) {
                 // Timeout / empty queue. Loop.
                 continue;

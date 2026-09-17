@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.common.anvil.AnvilColumnProbeAdapter;
+import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
@@ -490,7 +490,10 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                         io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
                                 regionBytes, rx, rz, finalMinY, finalMaxY);
                 if (probe == null) return null;
-                return (ChunkColumnProbe) new AnvilColumnProbeAdapter(probe, cx, cz);
+                return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
+                        s -> (RTP.serverAccessor != null)
+                                ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+                                : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
             } catch (Throwable t) {
                 RTP.log(Level.FINE,
                         "[RTP][V26_2_R1] probeChunkColumn failed for world=" + name

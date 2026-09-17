@@ -1,52 +1,20 @@
 package io.github.dailystruggle.rtp.fabric.menu;
 
+import io.github.dailystruggle.rtp.api.menu.BookSpec;
+
 import java.util.List;
 
 /**
- * Platform-neutral, fully-formatted page model handed from
- * {@link FabricBookMenuRenderer} (which lives in {@code rtp-fabric-common} and
- * carries no {@code net.minecraft.*} binding) to the per-version
- * {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#openBookMenu
- * openBookMenu} carrier method, which binds the spec to that MC version's
- * {@code WrittenBookContent} / {@code ClientboundOpenBookPacket} types
- * (rtp-fabric-ADR-012 section 4).
- *
- * <p>All text is already run through
- * {@code RTPServerAccessor.format(uuid, raw)} (placeholders + legacy
- * {@code &}/{@code section } colour codes); the carrier feeds each fragment straight
- * into {@code FabricLegacyText.parseInteractive(text, hover, runCommand, RUN)}
- * so the {@code MenuModel} → {@code Component} colour/hover/click translation
- * is not re-implemented per version.
- *
- * <p>Structure: a book is a {@link #title()} plus an ordered list of
- * {@link Page pages}; each page is an ordered list of {@link Line lines};
- * each line is an ordered list of {@link Fragment fragments}. The carrier
- * joins lines with {@code "\n"} and concatenates fragments within a line.
+ * Fabric view of {@link BookSpec} (rtp-fabric-ADR-012 section 4).
  */
-public final class FabricBookSpec {
-
-    /** A single styled, optionally-clickable run of text. */
-    public record Fragment(String text, String hover, String runCommand) {}
-
-    /** One book line: an ordered list of fragments. */
-    public record Line(List<Fragment> fragments) {}
-
-    /** One book page: an ordered list of lines. */
-    public record Page(List<Line> lines) {}
-
-    private final String title;
-    private final List<Page> pages;
+public final class FabricBookSpec extends BookSpec {
 
     public FabricBookSpec(String title, List<Page> pages) {
-        this.title = (title == null) ? "RTP" : title;
-        this.pages = List.copyOf(pages);
+        super(title, pages);
     }
 
-    public String title() {
-        return title;
-    }
-
-    public List<Page> pages() {
-        return pages;
+    public static FabricBookSpec from(BookSpec spec) {
+        if (spec instanceof FabricBookSpec f) return f;
+        return new FabricBookSpec(spec.title(), spec.pages());
     }
 }

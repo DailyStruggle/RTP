@@ -7,8 +7,12 @@
 #
 # Usage:
 #   ./run-acceptance.sh [--scenario all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|down|logs]
-#                       [--wait-seconds N] [--skip-up] [--skip-build] [--no-logs]
-#                       [--purge] [--lite]
+#                       [--wait-seconds N] [--skip-up] [--build] [--skip-build]
+#                       [--no-logs] [--purge] [--lite]
+#
+#   --build       Opt IN to the gradle clean+jar build. Default: OFF - the harness
+#                 does not invoke gradle; build the jars yourself, then it stages
+#                 whatever is under */build/libs.
 #
 # Notes:
 #   - Requires `docker compose` and (optionally) `redis-cli` on PATH; falls
@@ -22,6 +26,10 @@ Scenario="all"
 WaitSeconds=180
 SkipUp=0
 SkipBuild=0
+# Build is opt-in: by default the harness does NOT invoke gradle (the operator/IDE
+# builds the jars); it just stages whatever is under */build/libs. Pass --build to
+# have the harness run the clean+jar build for you.
+Build=0
 NoLogs=0
 Purge=0
 Lite=0
@@ -31,6 +39,7 @@ while [ $# -gt 0 ]; do
     --wait-seconds) WaitSeconds="$2"; shift 2 ;;
     --skip-up) SkipUp=1; shift ;;
     --skip-build) SkipBuild=1; shift ;;
+    --build) Build=1; shift ;;
     --no-logs) NoLogs=1; shift ;;
     --purge) Purge=1; shift ;;
     --lite) Lite=1; shift ;;
@@ -60,19 +69,39 @@ repoRoot="$(cd "$scriptDir/.." && pwd)"
 
 new_secret() { head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '='; }
 
-# redis-cli wrapper: prefer host redis-cli, else docker exec into redis.
+# A configured RTP_NET_SECRET is only usable if it base64-decodes to >= 32 bytes
+# (rtp-proxy-ADR-010 / REQ-RTP-PROXY-007). A non-empty-but-too-short placeholder
+# (e.g. 'replace-me-with-32-byte-base64') decodes to 22 bytes and must be treated
+# as unset so it gets reseeded. Accepts URL-safe base64.
+net_secret_valid() {
+  local s="$1"
+  [ -n "$s" ] || return 1
+  s="$(printf '%s' "$s" | tr '\-_' '+/')"
+  case $(( ${#s} % 4 )) in 2) s="$s==" ;; 3) s="$s=" ;; esac
+  local n
+  n=$(printf '%s' "$s" | base64 -d 2>/dev/null | wc -c) || return 1
+  [ "$n" -ge 32 ]
+}
+
+# redis-cli wrapper: ALWAYS exec into the compose `redis` service (internal port
+# 6379). We must NOT prefer a host-local redis-cli on localhost:6379 - the
+# devstack maps Redis to host port ${REDIS_HOST_PORT:-6380} to avoid colliding
+# with an operator's own local Redis on 6379. A host redis-cli on 6379 would
+# query THAT unrelated server (or nothing), so the heartbeat poll saw zero keys
+# and reported "no heartbeats" even though the backends were publishing fine to
+# the compose-internal redis:6379. Exec-into-container is port-map agnostic.
 redis_cli() {
-  if command -v redis-cli >/dev/null 2>&1; then
-    redis-cli -h localhost -p 6379 "$@"
-  else
-    docker compose exec -T redis redis-cli "$@"
-  fi
+  docker compose exec -T redis redis-cli "$@"
 }
 
 initialize_secrets() {
   local envPath="$scriptDir/.env" fwdPath="$scriptDir/shared/forwarding.secret"
-  if [ ! -f "$envPath" ] || ! grep -Eq '^[[:space:]]*RTP_NET_SECRET[[:space:]]*=[[:space:]]*[^[:space:]]' "$envPath"; then
-    echo "[secrets] seeding RTP_NET_SECRET in .env"
+  local curSecret=''
+  if [ -f "$envPath" ]; then
+    curSecret="$(sed -nE 's/^[[:space:]]*RTP_NET_SECRET[[:space:]]*=[[:space:]]*(.*)$/\1/p' "$envPath" | tail -n1 | tr -d '[:space:]')"
+  fi
+  if ! net_secret_valid "$curSecret"; then
+    echo "[secrets] seeding RTP_NET_SECRET in .env (missing/too-short; needs >= 32 decoded bytes)"
     grep -v -E '^[[:space:]]*RTP_NET_SECRET[[:space:]]*=' "$envPath" 2>/dev/null > "$envPath.tmp" || true
     echo "RTP_NET_SECRET=$(new_secret)" >> "$envPath.tmp"
     mv "$envPath.tmp" "$envPath"
@@ -110,41 +139,35 @@ stop_log_streams() {
 }
 
 invoke_gradle_build() {
-  if [ "$SkipBuild" -eq 1 ]; then echo "[build] --skip-build set; skipping gradle build"; return; fi
+  # Build is opt-in and staging ALWAYS runs. When --build is not passed (and
+  # --skip-build honored), skip straight to staging the jar the operator/IDE
+  # already produced under rtp-plugin/build/libs. This avoids the mandatory clean-build on
+  # every run (which looked like a hang) and cross-JDK daemon jar locks.
   local gradlew="$repoRoot/gradlew"
-  if [ ! -f "$gradlew" ]; then echo "[build] WARN - gradlew not found at $gradlew; skipping auto-build"; return; fi
-  local pluginTask=":rtp-plugin:remapJar"
-  [ "$Lite" -eq 1 ] && pluginTask=":rtp-plugin:remapLiteJar"
-  echo "[build] running gradle (clean + rtp-proxy-velocity:jar + $pluginTask) [edition: $([ "$Lite" -eq 1 ] && echo LITE || echo Pro)]..."
-  local out
-  out="$(cd "$repoRoot" && "$gradlew" \
-    ':rtp-proxy:rtp-proxy-common:clean' \
-    ':rtp-proxy:rtp-proxy-velocity:clean' \
-    ':rtp-plugin:clean' \
-    ':rtp-proxy:rtp-proxy-velocity:jar' \
-    "$pluginTask" \
-    '--console=plain' 2>&1)" || {
-      write_evidence 'build' "$out"
-      echo "[build] FAIL - gradle failed (see acceptance-evidence.log)" >&2
-      echo "$out" | tail -n 40 >&2
-      exit 1
-    }
-  write_evidence 'build' "$out"
-  echo "[build] gradle OK"
-
-  # Stage Velocity jar(s).
-  local velocityLibs="$repoRoot/rtp-proxy/rtp-proxy-velocity/build/libs"
-  local velocityDst="$scriptDir/jars/velocity"
-  mkdir -p "$velocityDst"
-  if [ -d "$velocityLibs" ]; then
-    find "$velocityDst" -maxdepth 1 -name '*.jar' -delete 2>/dev/null || true
-    find "$velocityLibs" -maxdepth 1 -name 'rtp-proxy-velocity-*.jar' \
-      ! -name '*-sources.jar' ! -name '*-javadoc.jar' -exec cp -f {} "$velocityDst/" \;
-    echo "[build] staged Velocity jar(s) -> jars/velocity"
+  if [ "$Build" -ne 1 ] || [ "$SkipBuild" -eq 1 ]; then
+    echo "[build] skipping gradle build (default; pass --build to have the harness build). Staging existing jar from rtp-plugin/build/libs. Build it yourself with:"
+    echo "        ./gradlew :rtp-plugin:remapJar"
+  elif [ ! -f "$gradlew" ]; then
+    echo "[build] WARN - gradlew not found at $gradlew; skipping auto-build"
+  else
+    local pluginTask=":rtp-plugin:remapJar"
+    [ "$Lite" -eq 1 ] && pluginTask=":rtp-plugin:remapLiteJar"
+    echo "[build] running gradle ($pluginTask) [edition: $([ "$Lite" -eq 1 ] && echo LITE || echo Pro)]..."
+    local out
+    out="$(cd "$repoRoot" && "$gradlew" \
+      ':rtp-plugin:clean' \
+      "$pluginTask" \
+      '--console=plain' 2>&1)" || {
+        write_evidence 'build' "$out"
+        echo "[build] FAIL - gradle failed (see acceptance-evidence.log)" >&2
+        echo "$out" | tail -n 40 >&2
+        exit 1
+      }
+    write_evidence 'build' "$out"
+    echo "[build] gradle OK"
   fi
-  find "$velocityDst" -maxdepth 1 -name '.gitkeep' -delete 2>/dev/null || true
 
-  # Stage Paper/Bukkit plugin jar into backends + lobbies + fabric mods.
+  # Stage Paper/Bukkit/Velocity plugin jar into backends + lobbies + fabric mods.
   local pluginLibs="$repoRoot/rtp-plugin/build/libs"
   local pluginStage="$scriptDir/jars/plugin"
   local backendDsts=("$scriptDir/backend-a/plugins" "$scriptDir/backend-b/plugins" "$scriptDir/lobby-a/plugins" "$scriptDir/lobby-b/plugins")
@@ -225,6 +248,21 @@ compose_up() {
   invoke_gradle_build
   sync_proxy_jars
   clear_stale_world_dirs
+  # Fresh configuration on every up: plugins/RTP/ is a host bind mount, so a
+  # stale config.yml / messages.yml / network.yml extracted by an OLDER jar
+  # survives across runs and masks changes in the freshly-built jar (new
+  # baseline keys, ADR-071 network.yml/logging.yml relocation, migrated
+  # defaults). compose_down already resets this, but a plain `up` would reuse
+  # the stale tree. Wipe it here so each boot re-extracts the baseline and
+  # re-seeds network.yml. --include-database keeps parity with the down path.
+  local upResetScript="$scriptDir/reset-rtp-config.sh"
+  if [ -f "$upResetScript" ]; then
+    echo "[up] wiping plugins/RTP/ (incl. runtime DB) so the freshly-built jar re-extracts a fresh baseline..."
+    local upResetOut; upResetOut="$(bash "$upResetScript" --include-database 2>&1)" || true
+    write_evidence 'up.reset-rtp-config' "$upResetOut"
+  else
+    echo "[up] WARN - reset-rtp-config.sh not found at $upResetScript; skipping fresh-config reset"
+  fi
   local attempt=0 crashed
   while true; do
     attempt=$((attempt+1))
@@ -420,6 +458,24 @@ test_killmidflight() {
   return 1
 }
 
+wait_rcon_ready() {
+  # Poll a service's container log until Paper/itzg reports the RCON listener is
+  # up ('RCON running on 0.0.0.0:25575'), bounded by WaitSeconds. Returns 0 once
+  # the listener is open (rcon-cli can connect), 1 on timeout. Closes the race
+  # where the harness dispatches rcon-cli before the server has finished booting
+  # and opened port 25575 (connection refused).
+  local svc="$1" deadline
+  deadline=$(( $(date +%s) + WaitSeconds ))
+  echo "[rtptest] waiting for RCON on $svc (budget: ${WaitSeconds}s; first boot generates worlds, can take 1-3 min)..."
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    if (cd "$scriptDir" && docker compose logs --tail=400 --no-log-prefix "$svc" 2>/dev/null | grep -qF 'RCON running on'); then
+      return 0
+    fi
+    sleep 3
+  done
+  return 1
+}
+
 test_rtptest() {
   # Drives the in-game `/rtp test accessor` self-test on every backend and lobby
   # via the itzg `rcon-cli` console, then polls each service log for the
@@ -432,6 +488,13 @@ test_rtptest() {
   local services=(backend-a backend-b backend-c lobby-a lobby-b)
   local anyFail=0 svc rconOut deadline verdict
   for svc in "${services[@]}"; do
+    # Gate on RCON readiness so we don't fire rcon-cli before port 25575 is open.
+    if ! wait_rcon_ready "$svc"; then
+      echo "[rtptest]    FAIL ($svc): RCON not ready within ${WaitSeconds}s (server still booting?)"
+      write_evidence "rtptest.$svc" 'RCON not ready within budget; skipped dispatch'
+      anyFail=1
+      continue
+    fi
     echo "[rtptest] -> $svc : rtp test accessor"
     rconOut="$(cd "$scriptDir" && docker compose exec -T "$svc" rcon-cli rtp test accessor 2>&1)" || true
     deadline=$(( $(date +%s) + 30 )); verdict=""
