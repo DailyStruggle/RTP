@@ -69,17 +69,19 @@ public class RTPAPI {
    * @throws IllegalStateException    if a different accessor has already been registered
    */
   @PublicApi
-  public static synchronized void setServerAccessor(RTPServerAccessor accessor) {
+  public static void setServerAccessor(RTPServerAccessor accessor) {
     if (accessor == null) {
       throw new IllegalArgumentException("[RTP API] serverAccessor must not be null");
     }
-    if (serverAccessor != null && serverAccessor != accessor) {
-      throw new IllegalStateException(
-          "[RTP API] serverAccessor is already initialised with a different instance. "
-              + "setServerAccessor() must be called at most once per instance during onEnable. "
-              + "If you are an addon developer, do not overwrite RTPAPI.serverAccessor.");
+    synchronized (RTPAPI.class) {
+      if (serverAccessor != null && serverAccessor != accessor) {
+        throw new IllegalStateException(
+            "[RTP API] serverAccessor is already initialised with a different instance. "
+                + "setServerAccessor() must be called at most once per instance during onEnable. "
+                + "If you are an addon developer, do not overwrite RTPAPI.serverAccessor.");
+      }
+      serverAccessor = accessor;
     }
-    serverAccessor = accessor;
   }
 
   /** Biome names available in {@code world}, or {@code null} if core is not loaded. */

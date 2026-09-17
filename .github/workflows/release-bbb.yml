@@ -1,0 +1,315 @@
+name: Release LeafRTP Pro to BuiltByBit, Lite to Modrinth, and GitHub Releases
+
+# Automates release on PR merge:
+#   - LeafRTP Pro to BuiltByBit (resource 105418) with full changelog.
+#   - LeafRTP Lite to Modrinth (project rtp-lite) with filtered Lite changelog (no Pro notes).
+#   - GitHub Releases with LeafRTP Lite jar, checksums, signatures, and SBOM.
+#
+# Trigger:
+#   - PR merged from a version branch matching `v*.*.*` or `V*.*.*` to any `v*` or `V*` branch (e.g. v3.2.2 -> V3, v3, etc.).
+#   - Manual trigger (workflow_dispatch) for manual releases or re-runs.
+#
+# Release Assets:
+#   - LeafRTP-Pro-<version>.jar (uploaded EXCLUSIVELY to BuiltByBit, NOT publicly on GitHub Releases)
+#   - LeafRTP-<version>.jar (public Lite binary uploaded to Modrinth & attached to GitHub Release per ADR-061)
+#   - SHA-256 and SHA-512 checksums for the Lite jar
+#   - PGP signatures (.asc) if signing secrets are provided
+#   - CycloneDX Software Bill of Materials (bom.json)
+#
+# Required repository secrets:
+#   MODRINTH_TOKEN       -- Modrinth PAT with `Create version` scope.
+#   Either:
+#     BBB_API_TOKEN        -- BuiltByBit Private API Token (Authorization: Private <token>)
+#   Or:
+#     BBB_CLIENT_ID        -- BuiltByBit OAuth2 Client ID
+#     BBB_CLIENT_SECRET    -- BuiltByBit OAuth2 Client Secret
+#   Optional:
+#     SIGNING_KEY          -- (Optional) ASCII-armored PGP private key for signing deliverables.
+#     SIGNING_PASSWORD     -- (Optional) Passphrase for SIGNING_KEY.
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - '[vV]*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string to release (e.g. 3.2.3). If omitted, read from gradle.properties.'
+        required: false
+        type: string
+
+jobs:
+  release:
+    # Only run if PR was actually merged from a v*.*.* branch (or manual workflow_dispatch)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       (startsWith(github.head_ref, 'v') || startsWith(github.head_ref, 'V')) &&
+       contains(github.head_ref, '.'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Determine release version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Try parsing from head_ref if it looks like vX.Y.Z
+            HEAD_REF="${{ github.head_ref }}"
+            if [[ "$HEAD_REF" =~ ^[vV]([0-9]+\.[0-9]+.*)$ ]]; then
+              VERSION="${BASH_REMATCH[1]}"
+            else
+              # Fallback: read version directly from gradle.properties
+              VERSION=$(grep -E '^version=' gradle.properties | cut -d '=' -f 2 | tr -d '[:space:]')
+            fi
+          fi
+
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not determine release version."
+            exit 1
+          fi
+
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Prepared release version: ${VERSION} with tag: ${TAG}"
+
+      - name: Create and push Git tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists locally or remotely. Skipping tag creation."
+          else
+            echo "Creating and pushing tag ${TAG}..."
+            git tag -a "$TAG" -m "Release ${TAG}"
+            git push origin "$TAG"
+          fi
+
+      - name: Set up JDK 21 and 25
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          java-version: |
+            21
+            25
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Pro & Lite jars + Checksums + SBOM + Signing
+        env:
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: ./gradlew build :rtp-plugin:remapJar :rtp-plugin:remapLiteJar :rtp-plugin:cyclonedxBom :rtp-plugin:generateChecksums :rtp-plugin:signDeliverables
+
+      - name: Locate release artifacts
+        id: artifacts
+        run: |
+          PRO_JAR=$(find rtp-plugin/build/libs -maxdepth 1 -type f -name 'LeafRTP-Pro-*.jar' \
+            ! -name '*-dev.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)
+          LITE_JAR=$(find rtp-plugin/build/libs -maxdepth 1 -type f -name 'LeafRTP-*.jar' \
+            ! -name 'LeafRTP-Pro-*' ! -name '*-dev.jar' ! -name '*-sources.jar' \
+            ! -name '*-javadoc.jar' | head -n 1)
+
+          if [ -z "$PRO_JAR" ] || [ ! -f "$PRO_JAR" ]; then
+            echo "::error::Could not locate the LeafRTP-Pro jar under rtp-plugin/build/libs/"
+            ls -la rtp-plugin/build/libs/ || true
+            exit 1
+          fi
+
+          if [ -z "$LITE_JAR" ] || [ ! -f "$LITE_JAR" ]; then
+            echo "::error::Could not locate the LeafRTP (Lite) jar under rtp-plugin/build/libs/"
+            ls -la rtp-plugin/build/libs/ || true
+            exit 1
+          fi
+
+          echo "pro_jar=${PRO_JAR}" >> "$GITHUB_OUTPUT"
+          echo "lite_jar=${LITE_JAR}" >> "$GITHUB_OUTPUT"
+          echo "Found Pro jar: ${PRO_JAR}"
+          echo "Found Lite jar: ${LITE_JAR}"
+
+          # Locate SBOM
+          SBOM_FILE=$(find rtp-plugin/build/reports -maxdepth 2 -type f -name 'bom.json' | head -n 1)
+          if [ -n "$SBOM_FILE" ]; then
+            echo "sbom_file=${SBOM_FILE}" >> "$GITHUB_OUTPUT"
+            echo "Found SBOM: ${SBOM_FILE}"
+          fi
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [ ! -f CHANGELOG.md ]; then
+            echo "::warning::CHANGELOG.md not found; falling back to generic release notes."
+            echo "LeafRTP Pro ${VERSION}" > release-notes-pro.md
+            echo "LeafRTP ${VERSION}" > release-notes-lite.md
+          else
+            # 1. Pro / Full release notes: contains all entries including **(Pro)**
+            awk -v ver="$VERSION" '
+              BEGIN { capture = 0 }
+              /^## \[/ {
+                if (capture) { exit }
+                if (index($0, "[" ver "]") > 0) { capture = 1; next }
+              }
+              capture != 1 { next }
+              { print }
+            ' CHANGELOG.md > release-notes-pro.md
+
+            if [ ! -s release-notes-pro.md ]; then
+              echo "::warning::No CHANGELOG.md section matched [${VERSION}]; using placeholder."
+              echo "LeafRTP Pro ${VERSION}" > release-notes-pro.md
+            fi
+
+            # 2. Lite release notes: strips any bullet tagged **(Pro)** and its continuations
+            awk -v ver="$VERSION" '
+              BEGIN { capture = 0; skip = 0 }
+              /^## \[/ {
+                if (capture) { exit }
+                if (index($0, "[" ver "]") > 0) { capture = 1; next }
+              }
+              capture != 1 { next }
+              /^[ \t]*[-*] / {
+                if (index($0, "**(Pro)**") > 0) { skip = 1; next }
+                skip = 0
+                print
+                next
+              }
+              /^### / { skip = 0; print; next }
+              skip == 1 { next }
+              { print }
+            ' CHANGELOG.md > release-notes-lite.md
+
+            if [ ! -s release-notes-lite.md ]; then
+              echo "::warning::No CHANGELOG.md section matched [${VERSION}] for Lite; using placeholder."
+              echo "LeafRTP ${VERSION}" > release-notes-lite.md
+            fi
+          fi
+
+          echo "--- release-notes-pro.md ---"
+          cat release-notes-pro.md
+          echo "--- release-notes-lite.md ---"
+          cat release-notes-lite.md
+          echo "--- end ---"
+
+      - name: Publish LeafRTP Pro to BuiltByBit
+        env:
+          BBB_API_TOKEN: ${{ secrets.BBB_API_TOKEN }}
+          BBB_CLIENT_ID: ${{ secrets.BBB_CLIENT_ID }}
+          BBB_CLIENT_SECRET: ${{ secrets.BBB_CLIENT_SECRET }}
+          RESOURCE_ID: "105418"
+          VERSION: ${{ steps.version.outputs.version }}
+          PRO_JAR: ${{ steps.artifacts.outputs.pro_jar }}
+        run: |
+          AUTH_HEADER=""
+          if [ -n "$BBB_API_TOKEN" ]; then
+            # Direct Ultimate API Private Token
+            AUTH_HEADER="Authorization: Private ${BBB_API_TOKEN}"
+          elif [ -n "$BBB_CLIENT_ID" ] && [ -n "$BBB_CLIENT_SECRET" ]; then
+            echo "Requesting OAuth2 access token using Client ID and Secret..."
+            TOKEN_RESP=$(curl -s -X POST "https://api.builtbybit.com/oauth2/token" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -d "grant_type=client_credentials&client_id=${BBB_CLIENT_ID}&client_secret=${BBB_CLIENT_SECRET}")
+
+            ACCESS_TOKEN=$(echo "$TOKEN_RESP" | jq -r '.access_token // empty')
+            if [ -z "$ACCESS_TOKEN" ]; then
+              echo "::error::Failed to obtain OAuth2 access token: ${TOKEN_RESP}"
+              exit 1
+            fi
+            AUTH_HEADER="Authorization: Bearer ${ACCESS_TOKEN}"
+            echo "Successfully obtained OAuth2 access token."
+          else
+            echo "::error::Neither BBB_API_TOKEN nor (BBB_CLIENT_ID + BBB_CLIENT_SECRET) configured in repository secrets."
+            exit 1
+          fi
+
+          TITLE="LeafRTP Pro ${VERSION}"
+          MESSAGE=$(cat release-notes-pro.md)
+
+          echo "Uploading ${PRO_JAR} as version ${VERSION} to BuiltByBit resource ${RESOURCE_ID}..."
+
+          # BuiltByBit API version upload endpoint:
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.builtbybit.com/v1/resources/${RESOURCE_ID}/versions" \
+            -H "${AUTH_HEADER}" \
+            -F "file=@${PRO_JAR}" \
+            -F "version_name=${VERSION}" \
+            -F "title=${TITLE}" \
+            -F "message=${MESSAGE}")
+
+          HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+          HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n 1)
+
+          echo "BuiltByBit API response status: ${HTTP_STATUS}"
+          echo "BuiltByBit API response body: ${HTTP_BODY}"
+
+          if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 201 ]; then
+            echo "::error::BuiltByBit release upload failed with HTTP status ${HTTP_STATUS}: ${HTTP_BODY}"
+            exit 1
+          fi
+
+          echo "Successfully published LeafRTP Pro ${VERSION} to BuiltByBit!"
+
+      - name: Publish LeafRTP Lite to Modrinth
+        uses: Kir-Antipov/mc-publish@086e3926861ca1252119e0b1f2010874e4c2780e # v3.3
+        with:
+          modrinth-id: rtp-lite
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: ${{ steps.artifacts.outputs.lite_jar }}
+          name: rtp-lite ${{ steps.version.outputs.version }}
+          version: ${{ steps.version.outputs.version }}
+          version-type: ${{ contains(steps.version.outputs.version, 'beta') && 'beta' || contains(steps.version.outputs.version, 'alpha') && 'alpha' || 'release' }}
+          changelog-file: release-notes-lite.md
+          loaders: |
+            paper
+            bukkit
+            spigot
+          game-versions: |
+            1.20
+            1.20.1
+            1.20.2
+            1.20.3
+            1.20.4
+            1.20.5
+            1.20.6
+            1.21
+            1.21.1
+            1.21.2
+            1.21.3
+            1.21.4
+            1.21.5
+          fail-mode: fail
+
+      - name: Generate SLSA Build Provenance
+        uses: actions/attest-build-provenance@c074443f1a5cf70e7c5b0c9146f82725e2e8f5fb # v2.2.3
+        with:
+          subject-path: |
+            ${{ steps.artifacts.outputs.pro_jar }}
+            ${{ steps.artifacts.outputs.lite_jar }}
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d190 # v2.0.8
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: LeafRTP ${{ steps.version.outputs.version }}
+          body_path: release-notes-pro.md
+          prerelease: ${{ contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha') }}
+          files: |
+            ${{ steps.artifacts.outputs.lite_jar }}
+            ${{ steps.artifacts.outputs.lite_jar }}.sha256
+            ${{ steps.artifacts.outputs.lite_jar }}.sha512
+            ${{ steps.artifacts.outputs.lite_asc }}
+            ${{ steps.artifacts.outputs.sbom_file }}
