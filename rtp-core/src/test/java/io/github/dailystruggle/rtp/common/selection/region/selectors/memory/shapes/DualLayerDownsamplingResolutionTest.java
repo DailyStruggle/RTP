@@ -111,10 +111,12 @@ public class DualLayerDownsamplingResolutionTest {
     // But binArea = 1024, so Nyquist cap is 512!
     assertEquals(512, square32.deriveEffectiveStride(square32.getRange()));
 
-    // DownsampledDualLayerSquare also respects the Nyquist cap
-    DownsampledDualLayerSquare downsampled16 = new DownsampledDualLayerSquare("DOWNSAMPLED_P16", 16);
-    downsampled16.set(GenericMemoryShapeParams.uniquePlacements, 16);
-    assertEquals(128, downsampled16.deriveStrideFromUniqueRadius());
+    // SquareOptimizedDualLayer also respects the Nyquist cap with explicit spatialResolution
+    SquareOptimizedDualLayer explicit16 = new SquareOptimizedDualLayer("EXPLICIT_P16", 16);
+    explicit16.set(GenericMemoryShapeParams.radius, 1024L);
+    explicit16.set(GenericMemoryShapeParams.centerRadius, 64L);
+    explicit16.setSpatialResolution(16L); // wants 256
+    assertEquals(128, explicit16.deriveEffectiveStride(explicit16.getRange()));
   }
 
   @Test

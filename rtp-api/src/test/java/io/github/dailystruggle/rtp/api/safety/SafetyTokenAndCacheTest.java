@@ -50,7 +50,7 @@ class SafetyTokenAndCacheTest {
     SafetyToken matSame = SafetyToken.material("STONE", List.of(), "STONE");
     SafetyToken matDiff = SafetyToken.material("DIRT", List.of(), "DIRT");
     SafetyToken matPred = SafetyToken.material("STONE", List.of(pred), "STONE[lit=true]");
-    assertEquals(mat, mat);
+    assertTrue(mat.equals(mat));
     assertEquals(mat, matSame);
     assertEquals(mat.hashCode(), matSame.hashCode());
     assertFalse(mat.equals(null));
@@ -107,7 +107,7 @@ class SafetyTokenAndCacheTest {
     // Equals, hashCode, toString
     StatePredicate predEqSame = new StatePredicate(Map.of("facing", "north"), "facing=north");
     StatePredicate predEqDiff = new StatePredicate(Map.of("facing", "south"), "facing=south");
-    assertEquals(predEq, predEq);
+    assertTrue(predEq.equals(predEq));
     assertEquals(predEq, predEqSame);
     assertEquals(predEq.hashCode(), predEqSame.hashCode());
     assertFalse(predEq.equals(null));
@@ -128,7 +128,7 @@ class SafetyTokenAndCacheTest {
     StatePredicate.NumericComparison cmpGteDiffKey = new StatePredicate.NumericComparison("other", StatePredicate.Comparator.GE, 5);
     StatePredicate.NumericComparison cmpGteDiffOp = new StatePredicate.NumericComparison("level", StatePredicate.Comparator.LE, 5);
     StatePredicate.NumericComparison cmpGteDiffBound = new StatePredicate.NumericComparison("level", StatePredicate.Comparator.GE, 6);
-    assertEquals(cmpGte, cmpGte);
+    assertTrue(cmpGte.equals(cmpGte));
     assertEquals(cmpGte, cmpGteSame);
     assertEquals(cmpGte.hashCode(), cmpGteSame.hashCode());
     assertFalse(cmpGte.equals(null));
@@ -264,7 +264,7 @@ class SafetyTokenAndCacheTest {
 
     // Equals & hashCode
     CompiledUnsafeSet setSame = CompiledUnsafeSet.compile(tokensWithNull);
-    assertEquals(set, set);
+    assertTrue(set.equals(set));
     assertEquals(set, setSame);
     assertEquals(set.hashCode(), setSame.hashCode());
     assertFalse(set.equals(null));

@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.common.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.DownsampledDualLayerSquare;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import java.awt.BasicStroke;
@@ -79,24 +78,24 @@ public class DownsamplingSideBySideBenchmarkTest {
     legacyDefaultShape.set(GenericMemoryShapeParams.expand, false);
 
     // 2. Target 8-Chunk Spacing (R_u = 8 chunks -> S = 64, d = sqrt(64) = 8 chunks / 128 blocks)
-    DownsampledDualLayerSquare stride64Shape = new DownsampledDualLayerSquare("SPACED_S64_RU8", pointEdgeP);
+    SquareOptimizedDualLayer stride64Shape = new SquareOptimizedDualLayer("SPACED_S64_RU8", pointEdgeP);
     stride64Shape.set(GenericMemoryShapeParams.radius, (long) R);
     stride64Shape.set(GenericMemoryShapeParams.centerRadius, 0L);
     stride64Shape.set(GenericMemoryShapeParams.centerX, 0L);
     stride64Shape.set(GenericMemoryShapeParams.centerZ, 0L);
     stride64Shape.set(GenericMemoryShapeParams.uniquePlacements, 8);
     stride64Shape.set(GenericMemoryShapeParams.expand, true);
-    stride64Shape.setExplicitStride(64); // S = 64 => d = sqrt(64) = 8 chunks
+    stride64Shape.setSpatialResolution(8L); // S = 64 => d = sqrt(64) = 8 chunks
 
     // 3. Target 16-Chunk Spacing (R_u = 16 chunks -> S = 256, d = sqrt(256) = 16 chunks / 256 blocks)
-    DownsampledDualLayerSquare stride256Shape = new DownsampledDualLayerSquare("SPACED_S256_RU16", pointEdgeP);
+    SquareOptimizedDualLayer stride256Shape = new SquareOptimizedDualLayer("SPACED_S256_RU16", pointEdgeP);
     stride256Shape.set(GenericMemoryShapeParams.radius, (long) R);
     stride256Shape.set(GenericMemoryShapeParams.centerRadius, 0L);
     stride256Shape.set(GenericMemoryShapeParams.centerX, 0L);
     stride256Shape.set(GenericMemoryShapeParams.centerZ, 0L);
     stride256Shape.set(GenericMemoryShapeParams.uniquePlacements, 16);
     stride256Shape.set(GenericMemoryShapeParams.expand, true);
-    stride256Shape.setExplicitStride(256); // S = 256 => d = sqrt(256) = 16 chunks
+    stride256Shape.setSpatialResolution(16L); // S = 256 => d = sqrt(256) = 16 chunks
 
     // Collect arrivals
     List<ChunkCoord> currentArrivals = samplePoints(legacyDefaultShape, testTeleports);

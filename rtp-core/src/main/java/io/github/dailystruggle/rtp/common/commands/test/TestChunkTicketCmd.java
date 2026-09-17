@@ -144,6 +144,9 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
         return runSentinelProbe();
       }
       baseline = c;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return runSentinelProbe();
     } catch (Throwable t) {
       // Unsupported / mock environment
       return runSentinelProbe();
@@ -258,6 +261,9 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
             }
           }
         }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
       } catch (Throwable ignored) {
       }
       try {
