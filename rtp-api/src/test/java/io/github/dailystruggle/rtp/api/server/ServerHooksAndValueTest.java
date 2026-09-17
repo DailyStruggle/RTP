@@ -58,12 +58,12 @@ class ServerHooksAndValueTest {
         ProgressBar b = new ProgressBar("t", 0.25, "perm");
         assertEquals(a, b);
         assertEquals(a.hashCode(), b.hashCode());
-        assertEquals(a, a);
+        assertTrue(a.equals(a));
         assertNotEquals(a, new ProgressBar("t", 0.30, "perm"));
         assertNotEquals(a, new ProgressBar("u", 0.25, "perm"));
         assertNotEquals(a, new ProgressBar("t", 0.25, "other"));
         assertNotEquals(a, null);
-        assertNotEquals(a, "t");
+        assertFalse(a.equals("t"));
     }
 
     // --- NoopPlayerLifecycleHook ---
