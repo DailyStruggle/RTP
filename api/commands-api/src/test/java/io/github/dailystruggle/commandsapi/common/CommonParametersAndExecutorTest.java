@@ -157,7 +157,7 @@ class CommonParametersAndExecutorTest {
     CommandExecutor executor3 = new CommandExecutor(cmd, otherCaller, Map.of(), null, (msg) -> {}, fut);
     assertNotEquals(executor1, executor3, "Executors with different callers should not be equal");
     assertNotEquals(executor1, null, "Executor should not equal null");
-    assertNotEquals(executor1, "some-string", "Executor should not equal object of different type");
+    assertFalse(executor1.equals("some-string"), "Executor should not equal object of different type");
 
     CommandsAPICommand otherCmd = new CommandsAPICommand() {
       @Override public String name() { return "other"; }

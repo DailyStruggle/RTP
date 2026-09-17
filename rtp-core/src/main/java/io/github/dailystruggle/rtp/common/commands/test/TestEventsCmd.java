@@ -182,6 +182,10 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
     } catch (TimeoutException te) {
       report(callerId, "&c[RTP test/events] " + name + ": TIMEOUT after " + TIMEOUT_MS + "ms", Level.WARNING, null);
       return false;
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      report(callerId, "&c[RTP test/events] " + name + ": INTERRUPTED", Level.WARNING, ie);
+      return false;
     } catch (Throwable t) {
       report(callerId, "&c[RTP test/events] " + name + ": FAILED (" + t.getClass().getSimpleName() + ": " + t.getMessage() + ")", Level.WARNING, t);
       return false;

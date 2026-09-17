@@ -53,7 +53,7 @@ class RtpApiModelsTest {
     RtpTarget netSame = RtpTarget.network("survival-1", "wild");
     RtpTarget netDiffServer = RtpTarget.network("survival-2", "wild");
     RtpTarget netDiffRegion = RtpTarget.network("survival-1", "other");
-    assertEquals(net, net);
+    assertTrue(net.equals(net));
     assertEquals(net, netSame);
     assertEquals(net.hashCode(), netSame.hashCode());
     assertFalse(net.equals(null));
@@ -152,7 +152,7 @@ class RtpApiModelsTest {
     RtpTargetStatus sDiffLabel = new RtpTargetStatus(
         RtpTargetStatus.Availability.ON_COOLDOWN, 5000L, 0.0, "DIRT", "NORMAL", "Other");
 
-    assertEquals(s2, s2);
+    assertTrue(s2.equals(s2));
     assertFalse(s2.equals(null));
     assertFalse(s2.equals("other"));
     assertFalse(s2.equals(sDiffAvail));
@@ -290,7 +290,7 @@ class RtpApiModelsTest {
     RtpTriggerSource.Trigger trig1 = new RtpTriggerSource.Trigger(pid, RtpTriggerSource.Kind.COMMAND, "r", "w");
     RtpTriggerSource.Trigger trigSame = new RtpTriggerSource.Trigger(pid, RtpTriggerSource.Kind.COMMAND, "r", "w");
     RtpTriggerSource.Trigger trigDiff = new RtpTriggerSource.Trigger(pid, RtpTriggerSource.Kind.JOIN, "r", "w");
-    assertEquals(trig1, trig1);
+    assertTrue(trig1.equals(trig1));
     assertEquals(trig1, trigSame);
     assertEquals(trig1.hashCode(), trigSame.hashCode());
     assertFalse(trig1.equals(null));

@@ -398,7 +398,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
    * standing Y (fail-closed, S-004).
    */
   @Override
-  public @Nullable RTPCoords adjustColumn(@NotNull RTPChunk chunk, int localX, int localZ) {
+  public @Nullable RTPCoords adjustColumn(@Nullable RTPChunk chunk, int localX, int localZ) {
     if (chunk == null) return null;
 
     int maxY = getNumber(GenericVerticalAdjustorKeys.maxY, 320L).intValue();

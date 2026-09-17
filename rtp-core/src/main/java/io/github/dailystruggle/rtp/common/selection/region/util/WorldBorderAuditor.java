@@ -105,7 +105,7 @@ public final class WorldBorderAuditor {
 
     if (interpreted != null && interpreted.unit() != SpatialUnit.CHUNK) {
       double chunks = interpreted.toChunks();
-      Object coerced = (chunks == (long) chunks) ? (Long) (long) chunks : (Double) chunks;
+      Object coerced = (chunks == Math.floor(chunks)) ? Long.valueOf((long) chunks) : Double.valueOf(chunks);
       shape.set(key, coerced);
     }
   }

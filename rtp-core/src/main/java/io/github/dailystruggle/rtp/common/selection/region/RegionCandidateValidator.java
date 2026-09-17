@@ -122,10 +122,13 @@ final class RegionCandidateValidator implements CandidateValidator {
 
   private int readSafetyRadius() {
     try {
+      if (RTP.configs == null) return 0;
       @SuppressWarnings("unchecked")
       ConfigParser<SafetyKeys> safety =
           (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-      return safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
+      if (safety == null) return 0;
+      Number n = safety.getNumber(SafetyKeys.safetyRadius, 0);
+      return n != null ? n.intValue() : 0;
     } catch (Throwable ignored) {
       return 0;
     }
