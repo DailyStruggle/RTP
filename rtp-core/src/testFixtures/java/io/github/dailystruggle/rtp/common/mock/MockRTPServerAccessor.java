@@ -429,7 +429,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public boolean executeCommand(UUID senderId, String commandLine) {
-        if (senderId == null || commandLine == null || commandLine.trim().isEmpty()) {
+        if (senderId == null || commandLine == null || commandLine.isBlank()) {
             return false;
         }
         String[] tokens = commandLine.trim().split("\\s+");
