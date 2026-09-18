@@ -4,7 +4,6 @@ import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable;
 import java.security.SecureRandom;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Circle shape implementing the continuous Chebyshev-addressed Hilbert key space with
@@ -23,6 +22,7 @@ public class CircleOptimizedDualLayer extends Circle {
   private final boolean derived;
   private volatile int cachedPointEdgeChunks;
 
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable SegmentedKeyRunTable snapshot
   private volatile SegmentedKeyRunTable segmentedTable;
 
   public CircleOptimizedDualLayer() {
@@ -565,6 +565,7 @@ public class CircleOptimizedDualLayer extends Circle {
     }
   }
 
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable MacroRingLUT cache
   private volatile MacroRingLUT cachedMacroRingLUT;
 
   /**
@@ -706,7 +707,7 @@ public class CircleOptimizedDualLayer extends Circle {
     long totalTilesInRing = 4L * sideLen;
 
     // Pick tile and internal coordinate within ring K
-    long randomTileStep = ThreadLocalRandom.current().nextLong(totalTilesInRing);
+    long randomTileStep = SEED_SOURCE.nextLong(totalTilesInRing);
     long side = randomTileStep / sideLen;
     long sideStep = randomTileStep % sideLen;
 
@@ -726,7 +727,7 @@ public class CircleOptimizedDualLayer extends Circle {
     }
 
     int orientation = orientationFor(px, pz);
-    long randomHilbert = ThreadLocalRandom.current().nextLong(area);
+    long randomHilbert = SEED_SOURCE.nextLong(area);
 
     long fullMacroIdx = 4L * (K - 1L) * (K - 1L) + side * (2L * K - 1L) + sideStep;
     long macroLoc = fullMacroIdx - 4L * lut.kInner * lut.kInner;

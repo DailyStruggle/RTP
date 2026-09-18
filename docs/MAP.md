@@ -119,6 +119,9 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`architecture/08-location-selection-per-attempt.md`](architecture/08-location-selection-per-attempt.md)
 - [`architecture/09-configuration-load-and-reload.md`](architecture/09-configuration-load-and-reload.md)
 - [`architecture/10-shutdown-and-flush-lifecycle.md`](architecture/10-shutdown-and-flush-lifecycle.md)
+- [`architecture/11-configuration-write-and-persist.md`](architecture/11-configuration-write-and-persist.md)
+- [`architecture/12-network-model.md`](architecture/12-network-model.md)
+- [`architecture/13-dual-layer-shape-architecture-and-l3-selection.md`](architecture/13-dual-layer-shape-architecture-and-l3-selection.md)
 
 ## Public site - narrative pages (`site/`)
 - [`site/README.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/site/README.md) — purpose + conventions for the narrative/non-functional page set (repo-only; not published to the site).

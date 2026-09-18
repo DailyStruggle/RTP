@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -588,5 +589,50 @@ class MenuModelSurfaceTest {
             public MenuRenderer create() { return null; }
         };
         assertNull(provider.platformFamily());
+
+        // BookSpecBuilder tests
+        UUID testPlayer = UUID.randomUUID();
+        MenuModel model = new MenuModel("Test &aTitle", List.of(
+                new MenuPage(List.of(
+                        new MenuLine(List.of(
+                                new MenuFragment("Click &bMe", "Hover &cText", new MenuAction.RunRtpCommand(new String[]{"rtp", "world"}))
+                        ))
+                ))
+        ));
+
+        // With explicit formatter and actionMapper
+        BookSpec spec = BookSpecBuilder.buildSpec(
+                testPlayer,
+                model,
+                (uuid, text) -> text.replace('&', '§'),
+                action -> (action instanceof MenuAction.RunRtpCommand cmd) ? "/" + String.join(" ", cmd.args()) : null
+        );
+        assertEquals("Test §aTitle", spec.title());
+        assertEquals(1, spec.pages().size());
+        BookSpec.Page p0 = spec.pages().get(0);
+        assertEquals(1, p0.lines().size());
+        BookSpec.Line l0 = p0.lines().get(0);
+        assertEquals(1, l0.fragments().size());
+        BookSpec.Fragment f0 = l0.fragments().get(0);
+        assertEquals("Click §bMe", f0.text());
+        assertEquals("Hover §cText", f0.hover());
+        assertEquals("/rtp world", f0.runCommand());
+
+        // Null formatter, null actionMapper, empty strings, null model check
+        assertThrows(NullPointerException.class, () -> BookSpecBuilder.buildSpec(testPlayer, null, null, null));
+        MenuModel emptyModel = new MenuModel("", List.of(
+                new MenuPage(List.of(
+                        new MenuLine(List.of(
+                                new MenuFragment("", "", null)
+                        ))
+                ))
+        ));
+        BookSpec emptySpec = BookSpecBuilder.buildSpec(null, emptyModel, null, null);
+        assertEquals("", emptySpec.title());
+        assertEquals(1, emptySpec.pages().size());
+        BookSpec.Fragment emptyFrag = emptySpec.pages().get(0).lines().get(0).fragments().get(0);
+        assertEquals("", emptyFrag.text());
+        assertEquals("", emptyFrag.hover());
+        assertNull(emptyFrag.runCommand());
     }
 }
