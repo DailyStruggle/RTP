@@ -90,6 +90,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * instance is reused for every candidate rather than allocating one per {@link #candidateValidator()}
    * call - avoiding needless GC pressure on the per-candidate hot path.
    */
+  @SuppressWarnings("java:S3077") // Volatile publication of stateless cached CandidateValidator instance
   private volatile CandidateValidator candidateValidator;
 
   public Region(String name, RegionSettings settings) {

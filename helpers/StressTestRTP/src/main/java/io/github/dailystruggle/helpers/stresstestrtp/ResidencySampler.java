@@ -61,6 +61,7 @@ public final class ResidencySampler implements Listener {
     private volatile String targetLabel = "";
 
     /** {@code World#getPluginChunkTickets()} - Paper API, resolved once. */
+    @SuppressWarnings("java:S3077") // Volatile cached reflective Method reference
     private volatile Method getPluginChunkTicketsMethod;
     private volatile boolean ticketsSupported = false;
 

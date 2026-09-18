@@ -70,6 +70,7 @@ public final class FoliaRegionMonitor {
     private volatile long baselineHopStalls = 0L;
     private volatile long baselineAcquisitions = 0L;
 
+    @SuppressWarnings("java:S3077") // Volatile task handle reference
     private volatile Object tickTaskHandle = null;
 
     /** True iff this monitor is measuring, i.e. the server is Folia. */

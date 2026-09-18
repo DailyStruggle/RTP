@@ -42,8 +42,10 @@ public final class TickThreadDetector {
     private static volatile long tickThreadId = -1L;
 
     /** Folia: {@code TickRegionScheduler.isTickThread()}. Null elsewhere or if absent. */
+    @SuppressWarnings("java:S3077") // Volatile cached reflective Method reference
     private static volatile Method foliaIsTickThread;
     /** Folia: {@code Bukkit.isOwnedByCurrentRegion(World, int, int)}. Null elsewhere or if absent. */
+    @SuppressWarnings("java:S3077") // Volatile cached reflective Method reference
     private static volatile Method isOwnedByCurrentRegion;
     private static volatile boolean resolved = false;
 

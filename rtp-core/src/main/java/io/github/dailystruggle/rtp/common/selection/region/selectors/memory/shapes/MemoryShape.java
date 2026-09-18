@@ -44,7 +44,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   private volatile long spatialResolution = 1L;
 
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
   protected volatile long[] badKeysCache = new long[0];
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
   protected volatile long[] badPrefixSumsCache = new long[0];
   /**
    * Per-run rejection cause, aligned 1:1 with {@link #badKeysCache} (one
@@ -53,11 +55,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * cause is kept (first-cause-wins; small-scale information loss is acceptable).
    * Legacy {@code .bin} files and untagged callers default to {@code misc}.
    */
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
   protected volatile byte[] badCauseCache = new byte[0];
   /**
    * Per-run expiration timestamp in unix epoch seconds, aligned 1:1 with {@link #badKeysCache}.
    * Values {@code <= 0} indicate static / permanent retention (infinite TTL).
    */
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
   protected volatile long[] badExpiryCache = new long[0];
 
   /**
@@ -65,9 +69,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * where {@code 1 * TTL <= now < 2 * TTL}. Bypasses active candidate avoidance,
    * but restored in O(log M) if candidate verification re-rejects them.
    */
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
   protected volatile long[] probationKeysCache = new long[0];
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
   protected volatile long[] probationPrefixSumsCache = new long[0];
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
   protected volatile byte[] probationCauseCache = new byte[0];
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
   protected volatile long[] probationExpiryCache = new long[0];
 
   /** {@code FailTypes.misc} ordinal as a byte: the default / unknown cause. */
@@ -129,6 +137,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    *
    * @see BiomeUnionTable
    */
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable BiomeUnionTable holder
   protected volatile BiomeUnionTable biomeUnion = BiomeUnionTable.EMPTY;
 
 
@@ -182,6 +191,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     private int freshBlocks;
 
     /** Lazily built per-biome index views, one slot per id in {@link #names}. */
+    @SuppressWarnings("java:S3077") // Volatile publication of lazy views array
     private volatile BiomeView[] views;
 
     private BiomeUnionTable(
@@ -651,6 +661,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * Parallel hazard mirror table (Slice 1 foundation).
    * Maintained in parallel with bad-run arrays without affecting production read paths.
    */
+  @SuppressWarnings("java:S3077") // Volatile reference publication for hazard mirror table
   private volatile HybridHazardTable hazardMirror = null;
   private final java.util.concurrent.atomic.AtomicBoolean hazardMirrorLogWarned =
       new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -673,6 +684,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   private final AtomicLong outOfDomainMarks = new AtomicLong(0L);
 
+  @SuppressWarnings("java:S3077") // Volatile map publication during active rebuild
   protected volatile ConcurrentHashMap<Long, Long> rebuildingBadLocations = null;
 
   protected final java.util.concurrent.atomic.AtomicReference<
@@ -759,6 +771,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   /**
    * Optional rotating residency manager for stride-group residency and dynamic bin swapping.
    */
+  @SuppressWarnings("java:S3077") // Volatile reference publication for residency manager
   protected volatile StrideGroupResidencyManager residencyManager;
 
   /**
@@ -3417,6 +3430,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected static final String MODE_NEAREST = "NEAREST";
   protected static final String MODE_REROLL = "REROLL";
 
+  @SuppressWarnings("java:S3077") // Volatile reference publication for immutable Knobs
   private volatile Knobs<E> knobs;
   private volatile boolean expandWarningLogged = false;
 
