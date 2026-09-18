@@ -77,12 +77,14 @@ public class MockRTPScheduler implements RTPScheduler {
      *
      * @return this scheduler, for chaining
      */
-    public synchronized MockRTPScheduler enableServerThreads() {
-        if (threaded) return this;
-        mainLane = Executors.newSingleThreadExecutor(laneFactory(Lane.MAIN, "rtp-mock-main"));
-        asyncLane = Executors.newFixedThreadPool(2, laneFactory(Lane.ASYNC, "rtp-mock-async"));
-        threaded = true;
-        return this;
+    public MockRTPScheduler enableServerThreads() {
+        synchronized (this) {
+            if (threaded) return this;
+            mainLane = Executors.newSingleThreadExecutor(laneFactory(Lane.MAIN, "rtp-mock-main"));
+            asyncLane = Executors.newFixedThreadPool(2, laneFactory(Lane.ASYNC, "rtp-mock-async"));
+            threaded = true;
+            return this;
+        }
     }
 
     /** @return {@code true} if this scheduler is running in the threaded model. */
@@ -101,15 +103,17 @@ public class MockRTPScheduler implements RTPScheduler {
     }
 
     /** Stop the lane executors (no-op in the synchronous model). */
-    public synchronized void shutdown() {
-        threaded = false;
-        if (mainLane != null) {
-            mainLane.shutdownNow();
-            mainLane = null;
-        }
-        if (asyncLane != null) {
-            asyncLane.shutdownNow();
-            asyncLane = null;
+    public void shutdown() {
+        synchronized (this) {
+            threaded = false;
+            if (mainLane != null) {
+                mainLane.shutdownNow();
+                mainLane = null;
+            }
+            if (asyncLane != null) {
+                asyncLane.shutdownNow();
+                asyncLane = null;
+            }
         }
     }
 
