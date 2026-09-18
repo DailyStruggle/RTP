@@ -7,6 +7,12 @@ instrumented* lines falls below a threshold. This is the local + CI half of the
 coverage story: it runs offline, works on GitHub Actions and on a LAN runner,
 and its exit code / summary line can drive a PR status check later.
 
+Exclusions match SonarQube / SonarCloud configuration in build.gradle:
+- Global: **/test/**, **/testFixtures/**, **/*Test*.java, **/*Benchmark*.java,
+          **/testing/**, **/mock/**
+- Platform / server-coupled adapters: platforms/**, addons/**, helpers/**,
+          rtp-plugin/**, rtp-proxy/rtp-proxy-velocity/**
+
 Prerequisite: produce JaCoCo XML first (coverage is opt-in in this build):
 
     .\\gradlew.bat test jacocoTestReport -Pcoverage          # logic tier
@@ -26,10 +32,59 @@ appear in the report). Stdlib only (Python 3.12+).
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# SonarQube Coverage Exclusions (mirrored from root build.gradle)
+# ---------------------------------------------------------------------------
+SONAR_GLOBAL_EXCLUSIONS: list[str] = [
+    "**/test/**",
+    "**/testFixtures/**",
+    "**/*Test*.java",
+    "**/*Benchmark*.java",
+    "**/testing/**",
+    "**/mock/**",
+]
+
+SONAR_PROJECT_DIR_EXCLUSIONS: list[str] = [
+    "platforms/",
+    "addons/",
+    "helpers/",
+    "rtp-plugin/",
+    "rtp-proxy/rtp-proxy-velocity/",
+]
+
+
+def is_sonar_excluded(path: str, extra_exclusions: list[str] | None = None) -> bool:
+    """Return True if path matches SonarQube coverage exclusions from build.gradle."""
+    norm = path.replace("\\", "/")
+    if not norm.startswith("/"):
+        norm_with_slash = "/" + norm
+    else:
+        norm_with_slash = norm
+
+    # Check project directory exclusions (platform adapters, addons, helpers, rtp-plugin, etc.)
+    for proj_prefix in SONAR_PROJECT_DIR_EXCLUSIONS:
+        if norm.startswith(proj_prefix) or ("/" + proj_prefix) in norm:
+            return True
+
+    # Check global pattern exclusions (tests, mocks, benchmarks, test fixtures)
+    for pat in SONAR_GLOBAL_EXCLUSIONS:
+        if fnmatch.fnmatch(norm, pat) or fnmatch.fnmatch(norm_with_slash, pat):
+            return True
+
+    # Check extra command-line exclusions if provided
+    if extra_exclusions:
+        for pat in extra_exclusions:
+            if fnmatch.fnmatch(norm, pat) or fnmatch.fnmatch(norm_with_slash, pat):
+                return True
+
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +174,10 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--report", action="append", default=[],
                         help="explicit JaCoCo XML path (repeatable); "
                              "otherwise auto-discovered under build/reports/jacoco")
+    parser.add_argument("--no-sonar-exclusions", action="store_true", default=False,
+                        help="disable SonarQube coverage exclusions (gate all changed Java files)")
+    parser.add_argument("--exclude", action="append", default=[],
+                        help="extra glob pattern to exclude from coverage (repeatable)")
     args = parser.parse_args(argv[1:])
 
     root = Path.cwd()
@@ -136,8 +195,12 @@ def main(argv: list[str]) -> int:
 
     total = 0
     covered = 0
+    excluded_count = 0
     uncovered_report: list[str] = []
     for path in sorted(diff):
+        if not args.no_sonar_exclusions and is_sonar_excluded(path, args.exclude):
+            excluded_count += 1
+            continue
         file_cov = coverage_for_file(path, coverage)
         if file_cov is None:
             continue  # not instrumented (no matching report) -> skip
@@ -154,6 +217,8 @@ def main(argv: list[str]) -> int:
             uncovered_report.append(f"  {path}: uncovered {misses}")
 
     print(f"=== diff coverage vs {args.baseline} ===")
+    if not args.no_sonar_exclusions:
+        print(f"Sonar exclusions active (excluded {excluded_count} changed files)")
     print(f"reports: {len(reports)}  instrumented changed lines: {total}")
     if total == 0:
         print("No instrumented changed lines to measure; passing.")
