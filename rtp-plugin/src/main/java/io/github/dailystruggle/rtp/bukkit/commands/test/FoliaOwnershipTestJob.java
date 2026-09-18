@@ -76,13 +76,13 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
     if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
         || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
       msgInvalidCommand(callerId, name());
-      return true;
+      return false;
     }
 
     RTPScheduler scheduler = RTP.scheduler;
     if (scheduler == null) {
       fail(callerId, "RTP.scheduler is null; core not yet loaded");
-      return true;
+      return false;
     }
 
     // Snapshot the caller location on the dispatch thread. A "synthetic
@@ -99,7 +99,7 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
     }
     if (callerLoc == null) {
       fail(callerId, "no caller location available; run as a player on a Folia/Paper server");
-      return true;
+      return false;
     }
     final RTPLocation loc = callerLoc;
 

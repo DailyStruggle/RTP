@@ -153,7 +153,8 @@ public final class ChunkLoadCounter implements Listener {
         /** Open on-tick burst: nanoTime of the first and most recent load in
          *  the run of tick-thread loads currently being coalesced into one
          *  occupancy interval. {@code 0} means no burst is open. Both fields
-         *  are only ever touched inside {@code synchronized (tally)}. */
+         *  are only ever touched inside {@code synchronized (burstLock)}. */
+        final Object burstLock = new Object();
         long burstStartNs = 0L;
         long burstLastNs = 0L;
     }
@@ -338,7 +339,7 @@ public final class ChunkLoadCounter implements Listener {
      * distinguish one 8 ms stall from sixteen 0.5 ms ones.
      */
     private void noteOnTickBurst(MetricsRecorder.Attempt a, Tally t, long nowNs) {
-        synchronized (t) {
+        synchronized (t.burstLock) {
             if (t.burstStartNs != 0L && nowNs - t.burstLastNs <= BURST_GAP_NS) {
                 t.burstLastNs = nowNs;
                 return;

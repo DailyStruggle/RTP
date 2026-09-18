@@ -63,7 +63,7 @@ jobs:
       - name: Install bot dependencies (for roundtrip scenario)
         working-directory: devstack/clients
         run: |
-          npm install --ignore-scripts --package-lock=false
+          npm ci --ignore-scripts
 
       - name: Run devstack acceptance harness
         id: acceptance
