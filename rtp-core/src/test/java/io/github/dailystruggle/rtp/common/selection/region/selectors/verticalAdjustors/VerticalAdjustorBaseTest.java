@@ -33,6 +33,7 @@ public class VerticalAdjustorBaseTest {
 
     private MockRTPWorld world;
 
+    @SuppressWarnings("java:S115")
     enum DummyKeys {
         minY,
         maxY,

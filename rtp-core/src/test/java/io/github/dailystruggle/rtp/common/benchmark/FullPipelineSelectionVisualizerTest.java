@@ -201,6 +201,7 @@ public class FullPipelineSelectionVisualizerTest {
       Files.copy(sequenceChartFile.toPath(), new File(serverDebugDir, "selection_sequence_comparison_chart.png").toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
     }
     System.out.println("[DEBUG_LOG] Mirrored charts to docs/assets/img/ and root directory");
+    org.junit.jupiter.api.Assertions.assertTrue(totalRange > 0);
   }
 
   private static void drawFullL3Chart(

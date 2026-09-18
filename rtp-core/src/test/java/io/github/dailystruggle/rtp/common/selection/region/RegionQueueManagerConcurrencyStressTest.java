@@ -160,8 +160,8 @@ class RegionQueueManagerConcurrencyStressTest {
                             }
                             case 6 -> {
                                 UUID tokenId = UUID.randomUUID();
-                                CountingReservation res = new CountingReservation(world, 0, 0);
                                 if (qm.networkKeptLocations != null) {
+                                    CountingReservation res = new CountingReservation(world, 0, 0);
                                     qm.networkKeptLocations.offer(reservedLoc(world, 10, 10, res));
                                     RTPLocation reserved = qm.reserveFromNetworkKept(tokenId, "stress_region");
                                     if (reserved != null) {

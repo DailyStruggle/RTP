@@ -416,7 +416,6 @@ public class BukkitEffectsHandler {
                 @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
                 public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
                     Player player = event.getEntity();
-                    if (player == null) return;
                     RTP.getInstance()
                             .miscAsyncTasks
                             .add(

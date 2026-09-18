@@ -102,4 +102,19 @@ public record CompositeRegionModel(
     result = 31 * result + java.util.Arrays.hashCode(insideDomain);
     return result;
   }
+
+  @Override
+  public String toString() {
+    return "CompositeRegionModel[regionName=" + regionName
+        + ", width=" + width
+        + ", height=" + height
+        + ", biomeRgb=" + java.util.Arrays.toString(biomeRgb)
+        + ", hazardMask=" + java.util.Arrays.toString(hazardMask)
+        + ", insideDomain=" + java.util.Arrays.toString(insideDomain)
+        + ", markers=" + markers
+        + ", trajectoryLines=" + trajectoryLines
+        + ", l1Gauge=" + l1Gauge
+        + ", l2Gauge=" + l2Gauge
+        + ", l3Gauge=" + l3Gauge + "]";
+  }
 }

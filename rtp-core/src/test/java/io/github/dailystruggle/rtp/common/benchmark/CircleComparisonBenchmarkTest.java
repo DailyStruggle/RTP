@@ -125,6 +125,7 @@ public class CircleComparisonBenchmarkTest {
 
     // Print ASCII Downsampled Maps
     printAsciiMaps(resTruth, resClassic, resOpt16, resOpt32);
+    org.junit.jupiter.api.Assertions.assertNotNull(resTruth);
   }
 
   private static void printMetricRow(String name, ShapeResult r) {
