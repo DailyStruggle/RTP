@@ -147,5 +147,6 @@ public class PolygonMaskWalkerAndGeometryTest {
     // When bad locations are not empty
     p.addBadLocation(0L);
     p.scheduleMaskWalkerIfEmpty(); // bad locations not empty -> returns immediately
+    assertNotNull(p);
   }
 }

@@ -51,6 +51,7 @@ public final class TransportRequestTriggerSource {
 
     /** Bounded join window for stopping workers (CHECKLIST row E3). */
     public static final long SHUTDOWN_TIMEOUT_MS = 2_000L;
+    private static final String NONE_LITERAL = "<none>";
 
     private final NetworkRequestQueue queue;
     private final RtpDispatcher dispatcher;
@@ -232,7 +233,7 @@ public final class TransportRequestTriggerSource {
                                 + "services dequeues on a single thread, so workerThreads>1 starves it; reduce network worker "
                                 + "threads to 1 or verify Redis reachability/latency. Continuing.",
                         Thread.currentThread().getName(), awaitMs, pollTimeout.toMillis(),
-                        streak, workerThreads, thisProxyId == null ? "<none>" : thisProxyId);
+                        streak, workerThreads, thisProxyId == null ? NONE_LITERAL : thisProxyId);
                 continue;
             } catch (java.util.concurrent.ExecutionException ee) {
                 // Log the FULL cause chain (with stack) - the previous
@@ -276,9 +277,9 @@ public final class TransportRequestTriggerSource {
         logger.info(
                 "[NETWORK][trace] TransportRequestTriggerSource.dispatchEnvelope: received envelope correlationId={} player={} serverHint={} regionKey={} thisProxyId={}",
                 correlationId, playerId,
-                env.serverHint().orElse("<none>"),
-                env.regionKey().orElse("<none>"),
-                thisProxyId == null ? "<none>" : thisProxyId);
+                env.serverHint().orElse(NONE_LITERAL),
+                env.regionKey().orElse(NONE_LITERAL),
+                thisProxyId == null ? NONE_LITERAL : thisProxyId);
         // env.serverHint() must reach the dispatcher in the dedicated
         // serverHint slot (added 2026-05-23) - previously it was smuggled
         // into the originServerId slot, which the BackendSelector does

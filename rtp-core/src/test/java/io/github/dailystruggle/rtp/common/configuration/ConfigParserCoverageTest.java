@@ -35,6 +35,7 @@ class ConfigParserCoverageTest {
     private File pluginDir;
     private YamlFileDatabase db;
 
+    @SuppressWarnings("java:S115")
     enum SampleKeys {
         name,
         delay,
@@ -46,6 +47,7 @@ class ConfigParserCoverageTest {
         version
     }
 
+    @SuppressWarnings("java:S115")
     enum SubKeys {
         minY,
         maxY

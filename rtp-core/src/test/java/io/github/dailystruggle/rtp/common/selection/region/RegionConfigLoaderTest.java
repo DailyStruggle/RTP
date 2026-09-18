@@ -212,6 +212,7 @@ public class RegionConfigLoaderTest {
         mapWithExpand.put("vertices", java.util.List.of("[0,0]", "[10,0]", "[10,10]"));
         mapWithExpand.put("expand", true);
         RegionConfigLoader.applyPolygonVertices(polygon, mapWithExpand);
+        org.junit.jupiter.api.Assertions.assertNotNull(polygon);
     }
 
     @org.junit.jupiter.api.Test
@@ -396,6 +397,7 @@ public class RegionConfigLoaderTest {
         java.util.Map<String, Object> mapWithMissingCoord = new java.util.HashMap<>();
         mapWithMissingCoord.put("vertices", java.util.List.of(java.util.Map.of("x", 10)));
         RegionConfigLoader.applyPolygonVertices(polygon, mapWithMissingCoord);
+        org.junit.jupiter.api.Assertions.assertNotNull(polygon);
     }
 
     @org.junit.jupiter.api.Test

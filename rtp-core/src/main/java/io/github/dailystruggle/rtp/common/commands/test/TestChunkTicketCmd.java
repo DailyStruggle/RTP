@@ -119,6 +119,7 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
    * @param cz chunk Z coordinate
    * @return probe result
    */
+  @SuppressWarnings("java:S1872")
   public static Result runProbe(@Nullable RTPWorld<?> world, int cx, int cz) {
     if (world == null || "MockRTPWorld".equals(world.getClass().getSimpleName())) {
       return runSentinelProbe();

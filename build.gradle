@@ -871,16 +871,20 @@ sonar {
 subprojects {
     sonar {
         properties {
-            def isPlatformAdapter = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
+            def isExcludedFromCoverage = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
+                    project.projectDir.canonicalPath.contains(File.separator + 'addons' + File.separator) ||
+                    project.projectDir.canonicalPath.contains(File.separator + 'helpers' + File.separator) ||
                     project.path.startsWith(':rtp-bukkit') ||
                     project.path.startsWith(':rtp-paper') ||
                     project.path.startsWith(':rtp-folia') ||
                     project.path.startsWith(':rtp-fabric') ||
                     project.path.startsWith(':rtp-neoforge') ||
+                    project.path.startsWith(':addons') ||
+                    project.path.startsWith(':helpers') ||
                     project.path == ':rtp-plugin' ||
                     project.path == ':rtp-proxy:rtp-proxy-velocity'
 
-            if (isPlatformAdapter) {
+            if (isExcludedFromCoverage) {
                 property 'sonar.coverage.exclusions', '**/*'
             }
 

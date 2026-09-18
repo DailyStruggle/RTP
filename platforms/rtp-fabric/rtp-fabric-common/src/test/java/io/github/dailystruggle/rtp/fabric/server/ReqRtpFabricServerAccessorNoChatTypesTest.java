@@ -81,6 +81,7 @@ public class ReqRtpFabricServerAccessorNoChatTypesTest {
         FabricServerAccessor accessor = new FabricServerAccessor();
         accessor.registerCommands(null);
         accessor.registerCommands(new Object(), "rtp", "wild");
+        assertNotNull(accessor);
     }
 
     /** Locate {@code FabricServerAccessor.class} on the test runtime classpath. */

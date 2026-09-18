@@ -980,6 +980,11 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
             result = 31 * result + java.util.Arrays.hashCode(aliases);
             return result;
         }
+
+        @Override
+        public String toString() {
+            return "CommandRegistrationEntry[root=" + root + ", aliases=" + java.util.Arrays.toString(aliases) + "]";
+        }
     }
     private final List<CommandRegistrationEntry> pendingCommandRegistrations = new ArrayList<>();
 

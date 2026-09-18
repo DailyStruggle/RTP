@@ -37,10 +37,6 @@ public final class RegionCompositeResolver implements ChartSpecResolver {
       throw new UnresolvableChartSpecException(
           "no region resolved for '" + spec.regionName() + "'", e);
     }
-    if (region == null) {
-      throw new UnresolvableChartSpecException(
-          "no region resolved for '" + spec.regionName() + "'");
-    }
     if (!(region.shape instanceof MemoryShape<?>)) {
       throw new UnresolvableChartSpecException(
           "region '" + region.name + "' shape is not a MemoryShape");

@@ -186,6 +186,7 @@ public class AdmissibleGapPolicyBenchmarkTest {
     NoiseWorldMask noise = new NoiseWorldMask(SEED, RADIUS_CHUNKS, BAD_SHARE);
     reportVariableWidth(
         "noise 45%", noiseShape, RADIUS_CHUNKS, (cx, cz) -> !noise.isOccupied(cx, cz));
+    assertTrue(noiseShape.keys().size() > 0);
 
     Path root = Path.of(System.getProperty(SAVE_ROOT_PROPERTY, DEFAULT_SAVE_ROOT));
     List<Path> dirs = RealWorldVerdictMask.discoverRegionDirectories(root, SAVE_SEARCH_DEPTH);
