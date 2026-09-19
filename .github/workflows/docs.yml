@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: false # Temporarily disabled for SonarQube runs
     runs-on: ubuntu-latest
 
     steps:

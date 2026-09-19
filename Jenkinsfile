@@ -63,6 +63,7 @@ pipeline {
     // swapped in by replacing the publish tasks with the credentialed target.
     stage('Publish API Artifacts') {
       when {
+        expression { false } // Temporarily disabled for SonarQube runs
         anyOf {
           branch 'V3'
           branch 'V3-beta'
