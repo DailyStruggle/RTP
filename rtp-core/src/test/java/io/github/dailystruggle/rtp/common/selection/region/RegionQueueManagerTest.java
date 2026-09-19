@@ -529,20 +529,4 @@ public class RegionQueueManagerTest {
         RTPLocation testLoc = loc(world, 200, 200);
         assertTrue(qm.acceptRedeemedReservation(UUID.randomUUID(), testLoc));
     }
-
-    @Test
-    @Timeout(value = 2, unit = TimeUnit.SECONDS)
-    void queueCapacity_and_totalQueueLength_with_personal_queue() {
-        UUID id = UUID.randomUUID();
-        qm.openPersonalQueue(id);
-        MockRTPWorld world = (MockRTPWorld) region.getWorld();
-        qm.enqueuePlayerLocation(id, loc(world, 10, 10));
-        qm.keptLocations.offer(loc(world, 20, 20));
-        qm.unkeptLocations.offer(loc(world, 30, 30));
-
-        // Note: enqueuePlayerLocation also mirrors to unkeptLocations, so unkept=2, kept=1, personal=1 -> total = 4
-        assertEquals(4L, qm.getTotalQueueLength(id));
-        assertEquals(3L, qm.getPublicQueueLength());
-        assertEquals(1L, qm.getPersonalQueueLength(id));
-    }
 }

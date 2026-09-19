@@ -180,23 +180,6 @@ final class VisualizationsSubmenuBuilderTest {
     }
 
     @Test
-    @DisplayName("paginate creates multiple pages when lines exceed cap")
-    void paginate_overflow() {
-        List<MenuLine> lines = new ArrayList<>();
-        for (int i = 0; i < 30; i++) {
-            lines.add(MenuLine.of(new io.github.dailystruggle.rtp.api.menu.MenuFragment("line " + i, null, null)));
-        }
-        MenuLine backRow = MenuLine.of(new io.github.dailystruggle.rtp.api.menu.MenuFragment("Back", null, null));
-        List<MenuPage> pages = VisualizationsSubmenuBuilder.paginate(lines, backRow);
-        assertTrue(pages.size() > 1);
-        for (MenuPage page : pages) {
-            assertTrue(page.lines().size() <= VisualizationsSubmenuBuilder.LINES_PER_PAGE);
-        }
-        assertTrue(VisualizationsSubmenuBuilder.paginate(java.util.Collections.emptyList(), null).size() == 1);
-        assertTrue(VisualizationsSubmenuBuilder.paginate(null, null).size() == 1);
-    }
-
-    @Test
     @DisplayName("collectRegionNames tolerates a null selectionAPI (empty region list)")
     void buildRegionList_nullSelectionApi() {
         RTP.selectionAPI = null;

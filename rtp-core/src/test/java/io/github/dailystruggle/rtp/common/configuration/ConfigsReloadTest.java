@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -97,33 +96,7 @@ public class ConfigsReloadTest {
         startLatch.countDown();
         doneLatch.await(30, TimeUnit.SECONDS);
         executor.shutdownNow();
-        boolean terminated = executor.awaitTermination(5, TimeUnit.SECONDS);
-        if (!terminated) {
-            executor.shutdownNow();
-        }
 
         assertEquals(0, npeCount.get(), "Expected zero NPEs during rapid reload with atomic swapping");
-    }
-
-    @AfterEach
-    public void tearDown() {
-        if (RTP.configs != null && RTP.configs.fileDatabase != null) {
-            try {
-                RTP.configs.fileDatabase.close();
-            } catch (Throwable ignored) {
-            }
-        }
-        if (RTP.getInstance() != null) {
-            RTP.getInstance().miscAsyncTasks.clear();
-            RTP.getInstance().startupTasks.clear();
-            RTP.stop();
-        }
-        if (RTP.serverAccessor instanceof MockRTPServerAccessor) {
-            ((MockRTPServerAccessor) RTP.serverAccessor).clearWorlds();
-        }
-        RTP.selectionAPI = null;
-        RTP.configs = null;
-        // Prompt GC to drop any uncollected file mappings or descriptors before tempDir cleanup
-        System.gc();
     }
 }

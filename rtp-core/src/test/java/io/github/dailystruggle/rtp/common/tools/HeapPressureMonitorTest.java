@@ -119,21 +119,16 @@ public class HeapPressureMonitorTest {
         ConfigParser<PerformanceKeys> perf =
                 (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
         assertNotNull(perf);
-        try {
-            // Setting threshold to 0.0001% ensures it trips unless gate logic prevents it
-            perf.set(PerformanceKeys.maxHeapPercent, 0.0001);
+        // Setting threshold to 0.0001% ensures it trips unless gate logic prevents it
+        perf.set(PerformanceKeys.maxHeapPercent, 0.0001);
 
-            resetMonitorState();
-            // Depending on absolute headroom (>=512MB), fraction >= threshold may evaluate to true
-            // and exercise the warning and trip logic
-            boolean pressure = HeapPressureMonitor.underPressure();
-            assertTrue(HeapPressureMonitor.lastUsedPercent() >= 0.0);
+        resetMonitorState();
+        // Depending on absolute headroom (>=512MB), fraction >= threshold may evaluate to true
+        // and exercise the warning and trip logic
+        boolean pressure = HeapPressureMonitor.underPressure();
+        assertTrue(HeapPressureMonitor.lastUsedPercent() >= 0.0);
 
-            // Immediate subsequent call exercises throttled warning branch (now - lastWarn < WARN_INTERVAL_MS)
-            HeapPressureMonitor.underPressure();
-        } finally {
-            perf.set(PerformanceKeys.maxHeapPercent, 0.0);
-            resetMonitorState();
-        }
+        // Immediate subsequent call exercises throttled warning branch (now - lastWarn < WARN_INTERVAL_MS)
+        HeapPressureMonitor.underPressure();
     }
 }

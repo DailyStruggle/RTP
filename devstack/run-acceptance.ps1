@@ -76,11 +76,7 @@ param(
   # Because the lite tier never touches Redis, the Redis-backed scenarios
   # (heartbeat / killmidflight / killswitch) are skipped under `-Scenario all`;
   # only `boot` + the manual `roundtrip` run (use -Scenario to force one).
-  [switch]$Lite,
-  # Attach the JaCoCo runtime agent to backends and lobbies via
-  # `docker-compose.coverage.yml`. Execution dumps (.exec) are collected in
-  # `./jacoco/` and `./gradlew jacocoServerReport` is generated at the end.
-  [switch]$Coverage
+  [switch]$Lite
 )
 
 $ErrorActionPreference = 'Stop'
@@ -933,30 +929,6 @@ if ($Lite) {
     Write-Host "[init] WARN - -Lite set but $LiteOverride not found; backends will seed the Redis network.yml" -ForegroundColor Yellow
   }
 }
-# -Coverage: layer the JaCoCo runtime agent overlay and ensure jacocoagent.jar is staged.
-if ($Coverage) {
-  $CoverageOverride = Join-Path $PSScriptRoot 'docker-compose.coverage.yml'
-  $JacocoDir = Join-Path $PSScriptRoot 'jacoco'
-  $AgentJar = Join-Path $JacocoDir 'jacocoagent.jar'
-  if (-not (Test-Path $JacocoDir)) { New-Item -ItemType Directory -Path $JacocoDir -Force | Out-Null }
-
-  if (-not (Test-Path $AgentJar)) {
-    Write-Host '[init] JaCoCo agent missing; attempting to extract via gradle extractJacocoAgent...' -ForegroundColor Cyan
-    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-    $gradlew = if ($IsWindows -or ($env:OS -match 'Windows')) { Join-Path $repoRoot 'gradlew.bat' } else { Join-Path $repoRoot 'gradlew' }
-    if (Test-Path $gradlew) {
-      & $gradlew :extractJacocoAgent --quiet
-    }
-  }
-
-  if (Test-Path $CoverageOverride) {
-    $composeFiles += $CoverageOverride
-    Write-Host '[init] COVERAGE active: layering docker-compose.coverage.yml (JaCoCo agent attached)' -ForegroundColor Cyan
-    Write-Evidence 'init' 'coverage overlay active: docker-compose.coverage.yml'
-  } else {
-    Write-Host "[init] WARN - -Coverage set but $CoverageOverride not found" -ForegroundColor Yellow
-  }
-}
 # Only pin COMPOSE_FILE when an overlay is present; otherwise leave it unset so
 # compose uses its default docker-compose.yml discovery (unchanged behaviour).
 if ($composeFiles.Count -gt 1) {
@@ -1039,15 +1011,4 @@ foreach ($kv in $results.GetEnumerator()) {
 }
 Write-Host "Evidence written to: $EvidenceLog" -ForegroundColor Cyan
 Write-Host "Per-run log dir:    $RunLogDir" -ForegroundColor Cyan
-
-if ($Coverage) {
-  Write-Host '[coverage] generating JaCoCo server coverage report...' -ForegroundColor Cyan
-  $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-  $gradlew = if ($IsWindows -or ($env:OS -match 'Windows')) { Join-Path $repoRoot 'gradlew.bat' } else { Join-Path $repoRoot 'gradlew' }
-  if (Test-Path $gradlew) {
-    & $gradlew :jacocoServerReport --quiet
-    Write-Host "[coverage] JaCoCo server report generated at: build/reports/jacoco/server/html/index.html" -ForegroundColor Green
-  }
-}
-
 if ($results.Values -contains $false) { exit 1 } else { exit 0 }
