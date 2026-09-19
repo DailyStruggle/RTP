@@ -214,11 +214,6 @@ public class MockRTPScheduler implements RTPScheduler {
         }
     }
 
-    /** Returns an unmodifiable snapshot of currently scheduled tasks. */
-    public List<Object> getScheduledTasks() {
-        return new ArrayList<>(scheduledTasks);
-    }
-
     @Override
     public void runTaskForPlayer(RTPPlayer player, RTPRunnable task, long delayTicks) {
         String taskId = UUID.randomUUID().toString();

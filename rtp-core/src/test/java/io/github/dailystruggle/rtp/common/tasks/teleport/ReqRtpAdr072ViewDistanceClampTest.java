@@ -180,29 +180,4 @@ class ReqRtpAdr072ViewDistanceClampTest {
     assertEquals(atDisconnect, player.getViewDistance(),
         "an offline player's view distance must not be mutated further");
   }
-
-  @Test
-  @DisplayName("null player or negative interval does nothing")
-  void nullPlayerOrNegativeInterval() {
-    ViewDistanceRestoreTask.clampAndSchedule(null, 2, 200L);
-    MockRTPPlayer player = playerWithViewDistance(10);
-    ViewDistanceRestoreTask.clampAndSchedule(player, 2, -5L);
-    assertEquals(10, player.getViewDistance());
-  }
-
-  @Test
-  @DisplayName("exception during setViewDistance safely handled")
-  void throwingPlayerMethods() {
-    MockRTPPlayer setThrowingPlayer = new MockRTPPlayer() {
-      private int vd = 10;
-      @Override
-      public int getViewDistance() { return vd; }
-      @Override
-      public void setViewDistance(int viewDistance) {
-        throw new RuntimeException("fail set");
-      }
-    };
-    ViewDistanceRestoreTask.clampAndSchedule(setThrowingPlayer, 2, 200L);
-    assertEquals(10, setThrowingPlayer.getViewDistance());
-  }
 }

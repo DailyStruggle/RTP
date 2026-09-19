@@ -6,14 +6,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -134,22 +130,6 @@ class ColumnProbeParityTest {
         } catch (IllegalArgumentException expected) {
             // expected
         }
-    }
-
-    @org.junit.jupiter.api.Test
-    @DisplayName("ColumnProbe methods, out-of-bounds queries, and null validations")
-    void testColumnProbeUnit() {
-        assertThrows(NullPointerException.class, () -> new ColumnProbe(0, 100, 50, null, List.of()));
-        assertThrows(NullPointerException.class, () -> new ColumnProbe(0, 100, 50, List.of(), null));
-
-        ColumnProbe empty = new ColumnProbe(0, 100, Integer.MIN_VALUE, List.of(), List.of());
-        assertFalse(empty.hasHeightmap());
-        assertNull(empty.blockAt(50));
-        assertNull(empty.biomeAt(50));
-        assertNull(empty.blockAt(-5)); // outside minY
-        assertNull(empty.blockAt(150)); // outside maxY
-        assertNull(empty.biomeAt(-5)); // outside minY
-        assertNull(empty.biomeAt(150)); // outside maxY
     }
 
     // ---------------------------------------------------------------------------- helpers

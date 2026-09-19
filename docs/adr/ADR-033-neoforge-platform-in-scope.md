@@ -15,7 +15,7 @@ The platform landscape has shifted enough that the blanket exclusion now under-s
 - **NeoForge's distinct API surface is narrow.** It diverges from Fabric primarily at the platform entry point (`@Mod`-annotated class + mod/game `IEventBus` vs. `ModInitializer` + callback registries), the command-registration trampoline (`RegisterCommandsEvent` vs. `CommandRegistrationCallback` — both terminating in vanilla Brigadier, so [commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) is reusable), mod metadata (`neoforge.mods.toml` vs. `fabric.mod.json`), and the build toolchain (NeoGradle / ModDevGradle vs. Loom). Threading and chunk-ticket substrate are vanilla — S-005 reasoning carries over unchanged with no region-ownership analog.
 - **The exclusion was framed defensively, not architecturally.** No design constraint in `rtp-core` or `rtp-api` is hostile to NeoForge; the gap is implementation, not interface (mirroring the April 2026 Fabric gap analysis).
 
-The landscape analysis, API-surface delta, reuse map, risks, and module-layout sketch were captured during early planning and converted into this binding scope decision and subproject `rtp-neoforge-ADR-001`.
+Pre-proposal landscape, API-surface delta, reuse map, risks, and module-layout sketch are captured in [`NEOFORGE_NOTES.md`](../dev/NEOFORGE_NOTES.md). This ADR converts that scratch into a binding scope decision.
 
 What this ADR is **not**:
 
@@ -30,7 +30,7 @@ What this ADR is **not**:
    - The section 0 *In Scope* and *Out of Scope* lists updated to reflect NeoForge as supported and to enumerate the platforms that remain unsupported.
 2. **Activation of NeoForge work is gated** on Fabric stabilization, per the criteria above. Until that gate clears, NeoForge remains a documented in-scope target with **no committed delivery date** and **no module skeleton** under version control.
 3. **When the gate clears**, the bring-up sequence shall be:
-   1. A D-005 proposal referencing this ADR.
+   1. A D-005 proposal referencing this ADR and `NEOFORGE_NOTES.md`.
    2. A subproject ADR `rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md` mirroring [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (per the *Self-Updating Protocol* in `.junie/AGENTS.md`, subproject ADRs restart numbering at `001`).
    3. Phase rows added to `MULTI_PLATFORM_PLAN.md` for the NeoForge axis.
    4. REQ-traceable tests for S-005 and S-006 (`ReqRtpNeoforgeS005ChunkLoadingTest`, `ReqRtpNeoforgeS006EarlyApiTest`) added to [`TRACEABILITY.md`](../dev/TRACEABILITY.md) **before** anvil/ticket parity work.
@@ -63,6 +63,7 @@ What this ADR is **not**:
 
 ## References
 
+- [`NEOFORGE_NOTES.md`](../dev/NEOFORGE_NOTES.md) — pre-proposal scratch (rationale, API-surface delta, reuse map, risks, module-layout sketch, S-00x mapping).
 - [`REQUIREMENTS.md`](../dev/REQUIREMENTS.md) — amended In-Scope list, Out-of-Scope clause, `REQ-RTP-NF-002`, and `REQ-RTP-SYS-002`.
 - [`MULTI_PLATFORM_PLAN.md`](../dev/MULTI_PLATFORM_PLAN.md) — current phase status; NeoForge phase rows to be added on activation.
 - [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) — precedent: Fabric in-scope decision; the NeoForge subproject ADR will mirror its shape.

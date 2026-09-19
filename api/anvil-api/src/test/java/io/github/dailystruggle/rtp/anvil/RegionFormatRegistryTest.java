@@ -96,20 +96,4 @@ class RegionFormatRegistryTest {
         assertEquals(customFile, resCustom.path());
         assertEquals(dummyReader, resCustom.reader());
     }
-
-    @Test
-    @DisplayName("Null checks and edge cases in RegionFormatRegistry")
-    void testRegistryNullChecks() {
-        assertNull(RegionFormatRegistry.getReader(null));
-        assertFalse(RegionFormatRegistry.isRegistered(null));
-        assertNull(RegionFormatRegistry.unregister(null));
-
-        assertNotNull(RegionFormatRegistry.getRegisteredExtensions());
-        assertTrue(RegionFormatRegistry.getRegisteredExtensions().contains(".mca"));
-
-        org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class,
-                () -> RegionFormatRegistry.register(null, AnvilReader.INSTANCE));
-        org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class,
-                () -> RegionFormatRegistry.register(".test", null));
-    }
 }

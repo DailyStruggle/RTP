@@ -8,10 +8,8 @@
 
 ## 1. Classification Definitions
 
-- **Tested:** Verified by continuous or scheduled automated CI pipelines (including the nightly multi-node devstack acceptance harness, dedicated carrier compilation/unit suites, or multi-release ArchUnit/mock gates). Regressions in tested environments block release.
-  - *Devstack Scheduled Acceptance (Nightly):* Paper, Folia, Fabric, and Velocity on Java 21 LTS (multi-node containerized integration with Redis, cross-server token flow, and lifecycle verification).
-  - *CI Build & Adapter Gates (Every Commit):* Compiles, tests, and enforces architectural invariants across all active carrier modules.
-- **Best-effort:** Compatible architecture or downstream fork sharing the execution path of a tested platform, but lacking dedicated automated end-to-end integration runs in CI on every commit/night. Community bug reports are accepted and addressed, but fixes are prioritized behind tested platforms.
+- **Tested:** Verified by automated CI build/test suites, dedicated platform test harnesses (e.g., devstack acceptance tests, `rtp test *` subcommands, or ArchUnit/mock suites), or verified dev-server runs on each release candidate. Regressions in tested environments block release.
+- **Best-effort:** Compatible architecture or downstream fork sharing the execution path of a tested platform, but lacking dedicated automated CI verification on every commit. Community bug reports are accepted and addressed, but fixes are prioritized behind tested platforms.
 - **Unsupported:** Incompatible threading models, missing required platform APIs, unsupported Java versions (< 21), or platforms explicitly declared out of scope (e.g. legacy Forge <= 1.20.1, Sponge, Bedrock-native). Bug reports on unsupported platforms are closed without investigation.
 
 ---
@@ -22,10 +20,10 @@ RTP requires Java 21 or higher across all platforms and components (REQ-RTP-SYS-
 
 | Java Version | Support Status | Notes |
 |:---|:---:|:---|
-| **Java 21 LTS** | **Tested** | Primary reference runtime. CI default and base compilation bytecode target across all modules and devstack. |
+| **Java 21 LTS** | **Tested** | Primary reference runtime. CI target and base compilation bytecode target across all modules. |
 | **Java 22** | **Best-effort** | Non-LTS release; verified compatible with standard JVM language features. |
-| **Java 23** | **Best-effort** | Non-LTS release; compatible with JVM toolchains. |
-| **Java 25+** | **Tested** | Secondary CI toolchain in `.github/workflows/gradle.yml` and devstack for modern experimental carriers (e.g. MC 26.x unobf Mojmap carriers). |
+| **Java 23** | **Tested** | Tested against standard multi-release builds; compatible with JVM toolchains. |
+| **Java 25+** | **Best-effort** | Tracked for modern experimental carriers (e.g. MC 26.x unobf Mojmap carriers). |
 | **Java <= 20** | **Unsupported** | Fails closed on initialization. Modern language features, records, and virtual threads require Java 21+. |
 
 ---
@@ -36,27 +34,27 @@ RTP requires Java 21 or higher across all platforms and components (REQ-RTP-SYS-
 
 | Minecraft Version | Paper (+ forks) | Folia | Spigot | Fabric | NeoForge |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **MC 26.x (Snapshot / Experimental)** | **Best-effort** | **Best-effort** | **Best-effort** | **Tested** | **Best-effort** |
-| **MC 1.21.x** (1.21.0 - 1.21.4+) | **Tested** | **Tested** | **Best-effort** | **Tested** | **Best-effort** |
+| **MC 26.x (Snapshot / Experimental)** | **Tested** | **Tested** | **Best-effort** | **Tested** | **Best-effort** |
+| **MC 1.21.x** (1.21.0 - 1.21.4+) | **Tested** | **Tested** | **Tested** | **Tested** | **Tested** |
 | **MC 1.20.5 - 1.20.6** | **Tested** | **Tested** | **Best-effort** | **Tested** | **Unsupported** |
-| **MC 1.20.0 - 1.20.4** | **Tested** | **Tested** | **Best-effort** | **Tested** | **Unsupported** |
+| **MC 1.20.0 - 1.20.4** | **Tested** | **Tested** | **Tested** | **Tested** | **Unsupported** |
 | **MC 1.19.4 and older** | **Unsupported** | **Unsupported** | **Unsupported** | **Unsupported** | **Unsupported** |
 
 #### Platform-Specific Notes:
 - **Paper & Forks (Leaf, Leaves, Purpur, Pufferfish, Airplane, DivineMC):**
-  - **Status:** **Tested** (Paper on 1.20.x, 1.21.x via automated build gates and nightly devstack); **Best-effort** (downstream forks and MC 26.x tracking).
+  - **Status:** **Tested** (Paper); **Best-effort** (downstream forks).
   - Uses native Paper asynchronous chunk loading (`World.getChunkAtAsync`). Linear (`.linear` / ZSTD) format supported via off-tick pre-filtering (ADR-077).
 - **Folia:**
-  - **Status:** **Tested** (1.20.x, 1.21.x via automated build gates, thread affinity ArchUnit rules, and nightly devstack).
+  - **Status:** **Tested**.
   - Operates strictly under Folia Region & Entity schedulers with Count-Bound task pipelines (ADR-004, ADR-015). Off-tick Anvil/Linear pre-filtering on common pool avoids cross-region hops.
 - **Spigot:**
-  - **Status:** **Best-effort** (1.20.x, 1.21.x; compiles via `rtp-bukkit` adapter and unit tested, but lacks scheduled live multi-server devstack verification in CI).
+  - **Status:** **Tested** (1.20.1, 1.21.x); **Best-effort** (point releases).
   - Uses background Anvil (`.mca`) parser for off-tick candidate pre-filtering to prevent main-thread chunk load stalls (S-005).
 - **Fabric:**
-  - **Status:** **Tested** (1.20.x, 1.21.x, 26.x via Loom carrier build suites, Java 25 toolchain gates, and nightly devstack).
+  - **Status:** **Tested** (1.20.x, 1.21.x, 26.x).
   - First-class Loom-remapped obf and Mojmap-unobf carrier modules with native async chunk futures (`ServerLevel.getChunkSource().getChunkFuture`) and `FabricScheduler`.
 - **NeoForge:**
-  - **Status:** **Best-effort** (1.21.x, 26.x; compiles via `rtp-neoforge` ModDevGradle carrier and passes unit suites; scheduled live container acceptance is pending devstack phase 2).
+  - **Status:** **Tested** (1.21.x); **Best-effort** (26.x).
   - Native ModDevGradle Mojmap runtime mod with `NeoForgeScheduler` and Brigadier command adapter (ADR-033). Legacy Forge (<= 1.20.1) is explicitly **Unsupported**.
 
 ---

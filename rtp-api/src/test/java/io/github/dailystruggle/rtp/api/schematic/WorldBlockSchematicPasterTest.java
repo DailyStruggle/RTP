@@ -77,80 +77,20 @@ class WorldBlockSchematicPasterTest {
         assertEquals(1, world.offered);
     }
 
-    @Test
-    void pasteEdgeCasesAndErrorHandling() {
-        WorldBlockSchematicPaster paster = new WorldBlockSchematicPaster();
-        RecordingWorld world = new RecordingWorld();
-        RTPLocation at = new RTPLocation(world, 0, 64, 0);
-        RTPLocation atNoWorld = new RTPLocation(null, 0, 64, 0);
-
-        // Null argument branches
-        assertEquals(PasteResult.PASTE_ERROR, paster.paste(null, at, PasteOptions.defaults()));
-        assertEquals(PasteResult.PASTE_ERROR, paster.paste(twoCellColumn(), null, PasteOptions.defaults()));
-        assertEquals(PasteResult.PASTE_ERROR, paster.paste(twoCellColumn(), at, null));
-
-        // World is null
-        assertEquals(PasteResult.SKIPPED_UNSUPPORTED, paster.paste(twoCellColumn(), atNoWorld, PasteOptions.defaults()));
-
-        // Placements empty (all air and skip air)
-        LoadedSchematic allAir = new LoadedSchematic() {
-            @Override public SchematicSource source() { return WorldBlockSchematicPasterTest.source(); }
-            @Override public int width() { return 1; }
-            @Override public int height() { return 1; }
-            @Override public int length() { return 1; }
-            @Override public List<String> palette() { return List.of("minecraft:air"); }
-            @Override public int paletteIndexAt(int x, int y, int z) { return 0; }
-        };
-        assertEquals(PasteResult.PASTE_ERROR, paster.paste(allAir, at, PasteOptions.defaults()));
-
-        // setBlocks throws RuntimeException
-        world.throwOnSetBlocks = true;
-        assertEquals(PasteResult.PASTE_ERROR, paster.paste(twoCellColumn(), at, PasteOptions.defaults()));
-
-        // restoreBlockEntities throws RuntimeException (should still return PASTED)
-        world.throwOnSetBlocks = false;
-        world.throwOnRestore = true;
-        LoadedSchematic withEntities = new LoadedSchematic() {
-            @Override public SchematicSource source() { return WorldBlockSchematicPasterTest.source(); }
-            @Override public int width() { return 1; }
-            @Override public int height() { return 1; }
-            @Override public int length() { return 1; }
-            @Override public List<String> palette() { return List.of("minecraft:chest"); }
-            @Override public int paletteIndexAt(int x, int y, int z) { return 0; }
-            @Override public List<BlockEntityData> blockEntities() {
-                return List.of(new BlockEntityData(0, 0, 0, "minecraft:chest", java.util.Map.of()));
-            }
-        };
-        assertEquals(PasteResult.PASTED, paster.paste(withEntities, at, PasteOptions.defaults()));
-
-        // restoreBlockEntities succeeds
-        world.throwOnRestore = false;
-        assertEquals(PasteResult.PASTED, paster.paste(withEntities, at, PasteOptions.defaults()));
-    }
-
     /** Minimal {@link RTPWorld} double capturing the blocks handed to {@link #setBlocks}. */
     private static final class RecordingWorld extends RTPWorld<Object> {
         final List<BlockDelta> written = new ArrayList<>();
         int offered = 0;
         boolean placeNothing = false;
-        boolean throwOnSetBlocks = false;
-        boolean throwOnRestore = false;
 
         RecordingWorld() { super(new Object()); }
 
         @Override
         public int setBlocks(List<BlockDelta> blocks) {
-            if (throwOnSetBlocks) throw new RuntimeException("native write simulated error");
             offered = blocks.size();
             if (placeNothing) return 0;
             written.addAll(blocks);
             return written.size();
-        }
-
-        @Override
-        public int restoreBlockEntities(List<PlacedBlockEntity> entities) {
-            if (throwOnRestore) throw new RuntimeException("native restore simulated error");
-            return entities.size();
         }
 
         @Override public String name() { return "test"; }

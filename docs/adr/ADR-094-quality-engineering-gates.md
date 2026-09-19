@@ -2,7 +2,6 @@
 
 **Status:** Accepted
 **Date:** 2026-09-11
-**Amended:** 2026-09-12 (Definition-of-done audit; checklist retirement criteria)
 
 ## Context
 
@@ -124,59 +123,6 @@ their own ADRs as those phases land rather than being folded in here.
     discarding stale execution data (run `test` and the report task in one
     invocation, per `ENTERPRISE_READINESS.md` section 2.4).
 
-## Definition-of-done audit (2026-09-12)
-
-By 2026-09-12 every work item in `ENTERPRISE_READINESS.md` sections 4-7 was ticked,
-which raised the question of whether the checklist could be retired and this ADR
-left as the sole record. The audit answer is **no, not yet**: a ticked item records
-that a *mechanism* landed, while the file's own section 9 defines done in terms of
-*enforced, externally visible outcomes*. Grading the seven section-9 criteria against
-the repository (not the checklist) gives:
-
-| # | Criterion | Status | Decisive evidence |
-|---|---|---|---|
-| 1 | 90/80 coverage, gated, on every platform-neutral module | NOT MET | `coverageFloors` gates `:rtp-core` at 0.55/0.42 and only `:metrics-api` / `:yaml-api` at target; six Stage A-C modules have no floor. |
-| 2 | Mutation >= 60% on safety packages | PARTIAL | Opt-in `-Pmutation` gate exists; verified on `selection/worldborder` only; not scheduled in CI. |
-| 3 | Every S-00x has an automated rule cited in `TRACEABILITY.md` | MET | `RTPArchitectureTest` rules 1-10, `TRACEABILITY.md` S-001..S-007 rows. |
-| 4 | Tested matrix cells re-verified by CI on a schedule | PARTIAL | Nightly devstack covers Velocity/Paper/Folia/Fabric on one MC line; other "Tested" cells are not re-verified. |
-| 5 | Release ships SBOM, signed artifacts, checksums, acceptance log | PARTIAL | SBOM, checksums, SLSA provenance wired; signing credential-conditional; acceptance log is a 30-day workflow artifact, not a release asset. |
-| 6 | API compatibility gated automatically | NOT MET | `checkBinaryCompatibility` is report-only (`failOnModification = false`, no violation rules) and no workflow invokes it. |
-| 7 | Zero known CVEs, checked automatically | PARTIAL | Weekly OWASP run fails only at CVSS >= 8. |
-
-Cross-cutting: `.github/workflows/gradle.yml` runs plain `build`, so the JaCoCo floors,
-SpotBugs, and ArchUnit rules gate every push, but `-Pcoverage`, `-PstaticAnalysis`,
-`-PfullTests`, `checkBinaryCompatibility`, PIT, and `scripts/diff-coverage.py` are
-never invoked in CI - confirming the "opt-in gates have no teeth until wired"
-trade-off recorded above.
-
-**Decision (amendment):**
-
-1. `ENTERPRISE_READINESS.md` is **retained**, reframed from a ticked TODO list into a
-   definition-of-done **scorecard** (its section 10) that grades each section-9
-   criterion with file-level evidence and the concrete remaining work. Ticking work
-   items is no longer evidence of done; only the scorecard is.
-2. **Retirement criteria for the checklist.** The file may be deleted, and this ADR
-   amended to say so, only when all of the following hold in one commit:
-   - every section-9 criterion reads MET in the scorecard, each with a CI job or
-     build gate an outside reviewer can point at;
-   - the durable facts a reviewer would still need (floor values and their
-     rationale, the measurement caveats of section 2.4, the platform-coupled
-     coverage carve-outs of item 21) have been moved into this ADR, `COVERAGE_PLAN.md`,
-     or `SUPPORT_MATRIX.md`; and
-   - the ~60 `ENTERPRISE_READINESS.md item N` citations in build scripts, test
-     Javadoc, and `scripts/*.py` have been retargeted to a REQ-* ID or ADR so no
-     source comment points at a deleted file.
-3. **Claim language** until then follows the file's section 9: state the measured
-   numbers and the wired gates; do not use the adjective "enterprise-grade" in
-   external copy.
-
-Closing the cheap gaps (wiring `checkBinaryCompatibility`, `-Pcoverage`, and
-`-PstaticAnalysis` into `gradle.yml`; making japicmp fail on binary incompatibility;
-lowering the OWASP threshold; making signing unconditional) touches build and CI
-configuration and is deliberately **not** folded into this amendment; it is proposed
-separately under rule D-005 and, once landed, recorded here or in the follow-up ADR
-that this ADR already anticipates for the remote quality-gate half.
-
 ## References
 
 - [`build.gradle`](../../build.gradle) — root `subprojects` block: tier exclusion,
@@ -191,8 +137,7 @@ that this ADR already anticipates for the remote quality-gate half.
   `jacoco` versions.
 - [`docs/dev/ENTERPRISE_READINESS.md`](../dev/ENTERPRISE_READINESS.md) — the living
   execution plan (staged coverage targets, ratchet, prohibition enforcement,
-  compatibility matrix, supply chain) this decision realises; its section 10 is the
-  definition-of-done scorecard graded by the 2026-09-12 audit above.
+  compatibility matrix, supply chain) this decision realises.
 - `docs/adr/ADR-080-opt-in-simulation-benchmark-tier.md` — the `simulation` tier this
   ADR excludes from the default logic tier.
 - `docs/adr/ADR-000-development-workflow.md` — meta development workflow (cross-links

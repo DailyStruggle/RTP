@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.fabric;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 
+import io.github.dailystruggle.commandsapi.brigadier.BrigadierBridgeContext;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.CoreRtpRoot;
 import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
@@ -12,6 +13,7 @@ import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 
+import java.util.UUID;
 import java.util.logging.Level;
 
 /**
@@ -604,10 +606,70 @@ public final class RTPFabricMod implements ModInitializer {
             }
             RTP.baseCommand = root;
 
-            // Delegate command registration to the platform accessor SPI (RTPServerAccessor).
-            // On Fabric, FabricServerAccessor wraps the root command using BrigadierCommandAdapter
-            // and registers it (and aliases) into CommandRegistrationCallback.EVENT.
-            RTP.serverAccessor.registerCommands(root, "rtp", "wild");
+            BrigadierBridgeContext<Object> bridgeCtx =
+                    new BrigadierBridgeContext<>(
+                            io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge::resolveSenderUuid,
+                            // Permission gating: defer to RTP.serverAccessor.getSender(uuid)
+                            // .hasPermission(perm), which on Fabric routes through
+                            // FabricRTPPlayer.hasPermission - that consults
+                            // fabric-permissions-api first (LuckPerms-Fabric, etc.) and
+                            // falls back to the vanilla op-level check by reading
+                            // ops.json via stable APIs (see FabricRTPPlayer Javadoc).
+                            // Plugin.yml is the source of truth for which nodes default
+                            // to op vs. true vs. false (rtp.use=true, rtp.reload=op,
+                            // rtp.scan=op, rtp.config=op, rtp.other=op, rtp.world=op,
+                            // rtp.region=op, rtp.biome=op, rtp.params=op, ...).
+                            // Non-player sources (console / command blocks / serverId
+                            // sentinel) are treated as fully privileged - same as Bukkit
+                            // ConsoleCommandSender.hasPermission() returning true.
+                            io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge::checkPermission,
+                            (src, msg) -> {
+                                if (msg == null) return;
+                                // Delegate to FabricServerAccessor.sendMessage, which routes
+                                // through FabricRTPPlayer.sendMessage - the canonical
+                                // NM-touching chat path in rtp-fabric-common. Keeping the
+                                // entrypoint class free of net.minecraft.network.chat /
+                                // net.minecraft.network.protocol references avoids JVM
+                                // class-verification failures on MC versions where the
+                                // intermediary names for those types (e.g. class_2596 =
+                                // Packet) are not exposed on the runtime classpath
+                                // (rtp-fabric-ADR-002, rtp-fabric-ADR-007). The 26.1
+                                // deobfuscated release was the first to surface this as
+                                // a hard NoClassDefFoundError on entrypoint load.
+                                try {
+                                    UUID uuid = io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge.resolveSenderUuid(src);
+                                    if (uuid != null && !uuid.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+                                        // Player source - formats placeholders + legacy
+                                        // colour codes and dispatches through the player's
+                                        // RTPCommandSender. tag is reserved for future
+                                        // styled-tag wrapping; null is the documented
+                                        // "no tag" value (see FabricServerAccessor#sendMessage).
+                                        RTP.serverAccessor.sendMessage(uuid, msg, null);
+                                    } else {
+                                        // Console / command-block / serverId sentinel:
+                                        // route through RTP.log so the message lands in
+                                        // the server console with colour codes preserved
+                                        // (RTPServerAccessor.log path), matching the prior
+                                        // CommandSourceStack#sendSuccess behaviour.
+                                        RTP.log(Level.INFO, msg);
+                                    }
+                                } catch (Throwable t) {
+                                    RTP.log(Level.WARNING,
+                                            "[RTP][trace] Brigadier sendMessage failed: " + t.getMessage());
+                                }
+                                RTP.log(Level.FINE,
+                                        "[RTP][trace] Brigadier sendMessage delivered: " + msg);
+                            });
+
+            // Delegate the CommandRegistrationCallback registration to
+            // FabricCommandRegistrar (rtp-fabric-common). This keeps
+            // CommandBuildContext (class_7157), CommandSelection, and
+            // CommandSourceStack (class_2168) out of this entrypoint's
+            // constant pool - those intermediary names are not exposed on
+            // MC 26.1's deobfuscated runtime and would otherwise fail JVM
+            // verify on entrypoint load (rtp-fabric-ADR-002 / ADR-007).
+            io.github.dailystruggle.rtp.fabric.commands.FabricCommandRegistrar
+                    .registerRtpCommand(root, bridgeCtx);
 
             // ----------------------------------------------------------------
             // Non-Folia ChunkUnloadProcessor timer.

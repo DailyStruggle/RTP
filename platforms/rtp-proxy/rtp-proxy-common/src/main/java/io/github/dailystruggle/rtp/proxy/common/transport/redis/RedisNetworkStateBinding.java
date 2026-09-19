@@ -116,7 +116,6 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     private static final long REAP_GRACE_SECONDS = 300L;
 
     private final JedisPool pool;
-    private final boolean ownsPool;
     private final long heartbeatIntervalMs;
     private final int ttlSeconds;
     private final ConcurrentLinkedQueue<Sub> subscribers = new ConcurrentLinkedQueue<>();
@@ -160,35 +159,6 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
      */
     public RedisNetworkStateBinding(String host, int port, String password, long heartbeatIntervalMs,
                                     HmacVerifier verifier, int schemaVersion) {
-        this(buildPool(host, port, password), true, heartbeatIntervalMs, verifier, schemaVersion);
-    }
-
-    /**
-     * Pool-injection constructor. The caller retains ownership of the pool
-     * unless explicitly closed.
-     */
-    public RedisNetworkStateBinding(JedisPool pool, long heartbeatIntervalMs,
-                                    HmacVerifier verifier, int schemaVersion) {
-        this(Objects.requireNonNull(pool, "pool"), false, heartbeatIntervalMs, verifier, schemaVersion);
-    }
-
-    private static JedisPool buildPool(String host, int port, String password) {
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(8);
-        cfg.setMaxIdle(4);
-        cfg.setMinIdle(1);
-        cfg.setTestOnBorrow(true);
-        if (password != null && !password.isEmpty()) {
-            return new JedisPool(cfg, host, port, 2000, password);
-        } else {
-            return new JedisPool(cfg, host, port, 2000);
-        }
-    }
-
-    private RedisNetworkStateBinding(JedisPool pool, boolean ownsPool, long heartbeatIntervalMs,
-                                    HmacVerifier verifier, int schemaVersion) {
-        this.pool = pool;
-        this.ownsPool = ownsPool;
         this.verifier = verifier;
         this.schemaVersion = schemaVersion;
         if (heartbeatIntervalMs <= 0) {
@@ -199,14 +169,26 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         // backend-side "staleAfterMs default 5000" rounding bias.
         this.ttlSeconds = (int) Math.max(2L, (heartbeatIntervalMs * 3L) / 1000L);
 
+        JedisPoolConfig cfg = new JedisPoolConfig();
+        cfg.setMaxTotal(8);
+        cfg.setMaxIdle(4);
+        cfg.setMinIdle(1);
+        cfg.setTestOnBorrow(true);
+        if (password != null && !password.isEmpty()) {
+            this.pool = new JedisPool(cfg, host, port, 2000, password);
+        } else {
+            this.pool = new JedisPool(cfg, host, port, 2000);
+        }
+
         // Eagerly validate connectivity. A bad host should fail at open() time,
         // not silently in publish loops.
         try (Jedis j = pool.getResource()) {
             j.ping();
         } catch (Exception e) {
-            if (ownsPool) pool.close();
+            pool.close();
             throw new IllegalStateException(
-                    "RedisNetworkStateBinding: cannot reach redis (" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")", e);
+                    "RedisNetworkStateBinding: cannot reach redis at " + host + ":" + port
+                            + " (" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")", e);
         }
 
         // A2: load + SHA1-verify the atomic-claim/release Lua scripts, then pre-load
@@ -223,7 +205,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
             this.redeemScript.scriptLoad(pool);
             this.reapScript.scriptLoad(pool);
         } catch (RuntimeException e) {
-            if (ownsPool) pool.close();
+            pool.close();
             throw e;
         }
 
@@ -689,9 +671,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         try { pubSub.unsubscribe(); } catch (Throwable ignored) { /* best-effort */ }
         try { subscriberThread.interrupt(); } catch (Throwable ignored) { /* best-effort */ }
         publisherExec.shutdown();
-        if (ownsPool) {
-            try { pool.close(); } catch (Throwable ignored) { /* best-effort */ }
-        }
+        try { pool.close(); } catch (Throwable ignored) { /* best-effort */ }
     }
 
     private void checkOpen() {

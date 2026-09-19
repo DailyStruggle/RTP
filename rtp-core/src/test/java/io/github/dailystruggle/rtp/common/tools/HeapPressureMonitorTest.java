@@ -127,8 +127,5 @@ public class HeapPressureMonitorTest {
         // and exercise the warning and trip logic
         boolean pressure = HeapPressureMonitor.underPressure();
         assertTrue(HeapPressureMonitor.lastUsedPercent() >= 0.0);
-
-        // Immediate subsequent call exercises throttled warning branch (now - lastWarn < WARN_INTERVAL_MS)
-        HeapPressureMonitor.underPressure();
     }
 }

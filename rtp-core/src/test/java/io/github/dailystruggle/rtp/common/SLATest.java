@@ -46,7 +46,7 @@ class SLATest {
      * future before any tick advance occurs.
      */
     @Test
-    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    @Timeout(value = 100, unit = TimeUnit.MILLISECONDS)
     void cacheHitPath_completesInZeroTicks() throws ExecutionException, InterruptedException {
         long ticksBefore = scheduler.getCurrentTick();
         MockLocationGenerator gen = new MockLocationGenerator();
@@ -73,7 +73,7 @@ class SLATest {
      * advance.  The total ticks consumed remains within the 0-2 tick window.
      */
     @Test
-    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    @Timeout(value = 100, unit = TimeUnit.MILLISECONDS)
     void deferredDispatchPath_completesWithinTwoTicks() {
         AtomicBoolean taskRan = new AtomicBoolean(false);
         long startTick = scheduler.getCurrentTick();
@@ -100,11 +100,11 @@ class SLATest {
     // -------------------------------------------------------------------------
 
     /**
-     * REQ-RTP-F-001: Pipeline completes within the SLA window.
+     * REQ-RTP-F-001: Pipeline completes in under 100 ms wall-clock time.
      * Timeout annotation fails the test immediately if execution blocks.
      */
     @Test
-    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    @Timeout(value = 100, unit = TimeUnit.MILLISECONDS)
     void absoluteCeiling_pipelineCompletesUnder100ms() throws ExecutionException, InterruptedException {
         MockLocationGenerator gen = new MockLocationGenerator();
         long t0 = System.currentTimeMillis();
@@ -117,7 +117,7 @@ class SLATest {
 
         assertTrue(future.isDone(),
                 "Pipeline result must be available by tick 2");
-        assertTrue(elapsed < 1000,
-                "REQ-RTP-F-001: wall-clock must be within acceptable test bounds (was " + elapsed + " ms)");
+        assertTrue(elapsed < 100,
+                "REQ-RTP-F-001: wall-clock must be < 100 ms (was " + elapsed + " ms)");
     }
 }

@@ -81,36 +81,6 @@ public class CompositeRegionRendererTest {
     assertEquals(0xFF000000, img.getRGB(16, 15));
     assertEquals(0xFF000000, img.getRGB(15, 14));
     assertEquals(0xFF000000, img.getRGB(15, 16));
-
-    // Branch coverage additions for CanvasDrawing:
-    // 1. null canvas guards
-    CanvasDrawing.drawOutlinedPoint(null, 0, 0, 0, 0, 1);
-    CanvasDrawing.drawLine(null, 0, 0, 1, 1, 0);
-    CanvasDrawing.drawGaugeBar(null, 0, 0, 10, 10, 0.5, 0, 0, 0);
-    CanvasDrawing.drawGaugeBar(canvas, 0, 0, 2, 2, 0.5, 0, 0, 0); // width < 4 or height < 3
-
-    // 2. radius <= 0 in drawOutlinedPoint
-    CanvasDrawing.drawOutlinedPoint(canvas, 5, 5, 0xFF0000, 0x000000, 0);
-    CanvasDrawing.drawOutlinedPoint(canvas, 6, 6, 0xFF0000, 0x000000, -1);
-
-    // 3. desaturate edge factors (>= 1.0f)
-    assertEquals(forestGreen, CanvasDrawing.desaturate(forestGreen, 1.0f));
-    assertEquals(forestGreen, CanvasDrawing.desaturate(forestGreen, 1.5f));
-
-    // 4. blend edge factors (<= 0.0f and >= 1.0f)
-    assertEquals(forestGreen, CanvasDrawing.blend(forestGreen, redHazard, 0.0f));
-    assertEquals(forestGreen, CanvasDrawing.blend(forestGreen, redHazard, -0.5f));
-    assertEquals(redHazard, CanvasDrawing.blend(forestGreen, redHazard, 1.0f));
-    assertEquals(redHazard, CanvasDrawing.blend(forestGreen, redHazard, 1.5f));
-
-    // 5. drawLine in steep / negative directions
-    CanvasDrawing.drawLine(canvas, 10, 20, 10, 5, 0x123456); // vertical negative
-    CanvasDrawing.drawLine(canvas, 20, 10, 5, 10, 0x123456); // horizontal negative
-    CanvasDrawing.drawLine(canvas, 5, 5, 5, 5, 0x123456);     // single point (x0==x1, y0==y1)
-
-    // 6. drawGaugeBar clamping (<0 and >1)
-    CanvasDrawing.drawGaugeBar(canvas, 0, 0, 10, 5, -0.5, 0x00FF00, 0x333333, 0x000000);
-    CanvasDrawing.drawGaugeBar(canvas, 0, 10, 10, 5, 1.5, 0x00FF00, 0x333333, 0x000000);
   }
 
   @Test

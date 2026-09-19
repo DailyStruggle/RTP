@@ -961,35 +961,4 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
 
         @Override public RTPCommandSender clone() { return new NeoForgeConsoleSender(server); }
     }
-
-    // ---------------------------------------------------------------------------
-    // Command registration SPI
-    // ---------------------------------------------------------------------------
-
-    private record CommandRegistrationEntry(Object root, String[] aliases) {}
-    private final List<CommandRegistrationEntry> pendingCommandRegistrations = new ArrayList<>();
-
-    @Override
-    public synchronized void registerCommands(Object rootCommand, String... aliases) {
-        if (rootCommand == null) return;
-        pendingCommandRegistrations.add(new CommandRegistrationEntry(rootCommand, aliases));
-    }
-
-    /**
-     * Drains all registered command trees into the active Brigadier dispatcher.
-     *
-     * @param dispatcher vanilla Brigadier dispatcher supplied by RegisterCommandsEvent
-     */
-    public synchronized void registerToDispatcher(com.mojang.brigadier.CommandDispatcher<net.minecraft.commands.CommandSourceStack> dispatcher) {
-        if (dispatcher == null) return;
-        if (pendingCommandRegistrations.isEmpty()) {
-            // Default fallback if no command trees were registered yet: build default /rtp
-            io.github.dailystruggle.rtp.neoforge.commands.NeoForgeCommandRegistrar.register(dispatcher);
-            return;
-        }
-        for (CommandRegistrationEntry entry : pendingCommandRegistrations) {
-            io.github.dailystruggle.rtp.neoforge.commands.NeoForgeCommandRegistrar
-                .register(dispatcher, entry.root, entry.aliases);
-        }
-    }
 }

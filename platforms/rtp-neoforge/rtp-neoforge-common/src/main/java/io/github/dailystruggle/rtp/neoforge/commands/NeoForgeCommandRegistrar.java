@@ -36,37 +36,27 @@ public final class NeoForgeCommandRegistrar {
   }
 
   /**
-   * Builds the default {@code /rtp} command tree and registers it against the NeoForge
+   * Builds the {@code /rtp} command tree and registers it against the NeoForge
    * dispatcher supplied by {@code RegisterCommandsEvent}.
    *
    * @param dispatcher the vanilla Brigadier dispatcher
    */
   public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-    CoreRtpRoot root = new CoreRtpRoot();
-    RTP.baseCommand = root;
-    register(dispatcher, root, "rtp", "wild");
-  }
-
-  /**
-   * Builds the Brigadier tree for {@code root} and registers it along with any
-   * {@code aliases} against the NeoForge dispatcher.
-   *
-   * @param dispatcher the vanilla Brigadier dispatcher
-   * @param root       the command root (CommandsAPICommand)
-   * @param aliases    optional command aliases (e.g. "wild")
-   */
-  public static void register(CommandDispatcher<CommandSourceStack> dispatcher,
-                              Object root,
-                              String... aliases) {
     if (dispatcher == null) {
       RTP.log(Level.WARNING, "[RTP][NeoForge] command registration skipped: null dispatcher.");
       return;
     }
-    if (!(root instanceof io.github.dailystruggle.commandsapi.common.CommandsAPICommand cmdRoot)) {
-      RTP.log(Level.WARNING, "[RTP][NeoForge] command registration skipped: invalid root " + root);
-      return;
-    }
     try {
+      // Build the platform-neutral /rtp root directly (ADR-070): the whole
+      // command tree, parameters, dispatch, outcome events, and menu-binding
+      // selection live in CoreRtpRoot, so NeoForge no longer needs a bespoke
+      // root subclass. This mirrors how the Bukkit family now constructs the
+      // shared root in BootstrapSupport.
+      CoreRtpRoot root = new CoreRtpRoot();
+      // Expose the root so other subsystems (info / menu / network) can locate
+      // the canonical command tree, mirroring the Bukkit / Fabric entrypoints.
+      RTP.baseCommand = root;
+
       BrigadierBridgeContext<CommandSourceStack> bridgeCtx =
           new BrigadierBridgeContext<>(
               NeoForgeBrigadierSourceBridge::resolveSenderUuid,
@@ -92,20 +82,13 @@ public final class NeoForgeCommandRegistrar {
               });
 
       LiteralArgumentBuilder<CommandSourceStack> builder =
-          BrigadierCommandAdapter.toBrigadier(cmdRoot, bridgeCtx);
-      com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack> node = dispatcher.register(builder);
-      if (aliases != null) {
-        for (String alias : aliases) {
-          if (alias != null && !alias.isEmpty() && !alias.equalsIgnoreCase(cmdRoot.name())) {
-            dispatcher.register(LiteralArgumentBuilder.<CommandSourceStack>literal(alias).redirect(node));
-          }
-        }
-      }
-      RTP.log(Level.INFO, "[RTP][NeoForge] /" + cmdRoot.name() + " command tree registered.");
+          BrigadierCommandAdapter.toBrigadier(root, bridgeCtx);
+      dispatcher.register(builder);
+      RTP.log(Level.INFO, "[RTP][NeoForge] /rtp command tree registered.");
     } catch (Throwable t) {
       // S-004: never silently swallow a registration failure.
       RTP.log(Level.WARNING,
-          "[RTP][NeoForge] Brigadier registration failed for " + cmdRoot.name() + ": "
+          "[RTP][NeoForge] /rtp Brigadier registration failed: "
               + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
     }
   }

@@ -295,7 +295,7 @@ Any task that produces runtime-testable progress (code, resources, build scripts
 Active development frontiers:
 1. **Network mode / multi-server proxy (`rtp-proxy-*`):** Velocity/BungeeCord proxy support, Redis/SQL state bindings, token reservation reapers ([ADR-036](../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md), [`MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md)).
 2. **Fabric (`rtp-fabric`):** Parity across 1.20.x, 1.21.x, and MC 26.x via obf/unobf carriers ([rtp-fabric-ADR-009](../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md), [`MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md)).
-3. **NeoForge (`rtp-neoforge`):** Native NeoForge adapter and lifecycle ([ADR-033](../docs/adr/ADR-033-neoforge-platform-in-scope.md), [`platforms/rtp-neoforge/README.md`](../platforms/rtp-neoforge/README.md)).
+3. **NeoForge (`rtp-neoforge`):** Native NeoForge adapter and lifecycle ([ADR-033](../docs/adr/ADR-033-neoforge-platform-in-scope.md), [`NEOFORGE_NOTES.md`](../docs/dev/NEOFORGE_NOTES.md)).
 4. **Documentation website:** MkDocs Material site at `https://dailystruggle.github.io/RTP/` ([.github/workflows/docs.yml](../.github/workflows/docs.yml)).
 
 ---

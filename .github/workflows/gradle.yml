@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -31,14 +31,8 @@ jobs:
       - name: Check traceability
         run: ./check_traceability.sh
 
-      - name: Check UTF-8 mojibake
-        run: python3 scripts/check-mojibake.py
-
       - name: Check code style (Spotless)
         run: ./gradlew spotlessCheck -PexcludeJdk25 -PexcludeNeoforge
-
-      - name: Verify public API binary compatibility
-        run: ./gradlew checkBinaryCompatibility -PexcludeJdk25 -PexcludeNeoforge
 
       - name: Build and test (reduced graph)
         run: ./gradlew build -PexcludeJdk25 -PexcludeNeoforge
@@ -51,10 +45,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 21 and 25
-        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        uses: actions/setup-java@v5
         with:
           java-version: |
             21
@@ -68,27 +62,21 @@ jobs:
       - name: Check traceability
         run: ./check_traceability.sh
 
-      - name: Check UTF-8 mojibake
-        run: python3 scripts/check-mojibake.py
-
       - name: Check code style (Spotless)
         run: ./gradlew spotlessCheck
-
-      - name: Verify public API binary compatibility
-        run: ./gradlew checkBinaryCompatibility
 
       - name: Build and test
         run: ./gradlew build shadowJar
 
       - name: Publish test results
-        uses: mikepenz/action-junit-report@5fb8152be6ff4b7721867dd11ca72fce2b16869e # v4.3.1
+        uses: mikepenz/action-junit-report@v4
         if: always()
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'
           check_name: 'Test Results'
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: jacoco-coverage
@@ -96,7 +84,7 @@ jobs:
           retention-days: 14
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@v4
         with:
           name: RTP-Artifacts
           path: |

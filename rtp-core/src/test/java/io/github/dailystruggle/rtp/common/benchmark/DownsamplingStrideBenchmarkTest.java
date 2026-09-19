@@ -390,18 +390,11 @@ public class DownsamplingStrideBenchmarkTest {
     File reportFile = new File(outDir, "player_distribution_comparison.png");
     File rootFile = new File("player_distribution_comparison.png");
     File repoRootFile = new File("../player_distribution_comparison.png");
-    File docsAssetFile = new File("../docs/assets/img/player_distribution_comparison.png");
     File testServerDebugDir = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug");
 
     renderCombinedComparison(shape, reportFile);
     renderCombinedComparison(shape, rootFile);
     renderCombinedComparison(shape, repoRootFile);
-    if (!docsAssetFile.getParentFile().exists()) {
-      docsAssetFile = new File("docs/assets/img/player_distribution_comparison.png");
-    }
-    if (docsAssetFile.getParentFile().exists()) {
-      renderCombinedComparison(shape, docsAssetFile);
-    }
     if (testServerDebugDir.exists()) {
       renderCombinedComparison(shape, new File(testServerDebugDir, "player_distribution_comparison.png"));
     }
@@ -726,11 +719,6 @@ public class DownsamplingStrideBenchmarkTest {
         new File("overlap_simulation_comparison.png"));
     renderHeatmapComparison(resPolar, resHilbertRandom, resStrided64WithTable, resDynamicContinuousRotation,
         new File("../overlap_simulation_comparison.png"));
-    File docsOverlap = new File("../docs/assets/img/overlap_simulation_comparison.png");
-    if (!docsOverlap.getParentFile().exists()) docsOverlap = new File("docs/assets/img/overlap_simulation_comparison.png");
-    if (docsOverlap.getParentFile().exists()) {
-      renderHeatmapComparison(resPolar, resHilbertRandom, resStrided64WithTable, resDynamicContinuousRotation, docsOverlap);
-    }
     renderHeatmapComparison(resPolar, resHilbertRandom, resStrided64WithTable, resDynamicContinuousRotation,
         new File("build/reports/player_distribution/overlap_simulation_comparison.png"));
 
@@ -1895,16 +1883,9 @@ public class DownsamplingStrideBenchmarkTest {
 
     File outFile = new File("spacing_strategies_comparison_chart.png");
     File reportFile = new File("build/reports/player_distribution/spacing_strategies_comparison_chart.png");
-    File repoRootFile = new File("../spacing_strategies_comparison_chart.png");
-    File docsFile = new File("../docs/assets/img/spacing_strategies_comparison_chart.png");
-    if (!docsFile.getParentFile().exists()) docsFile = new File("docs/assets/img/spacing_strategies_comparison_chart.png");
     File testServerFile = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug\\spacing_strategies_comparison_chart.png");
 
     renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate, outFile);
-    renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate, repoRootFile);
-    if (docsFile.getParentFile().exists()) {
-      renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate, docsFile);
-    }
     renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate, reportFile);
     if (testServerFile.getParentFile() != null && testServerFile.getParentFile().exists()) {
       renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate, testServerFile);
@@ -2297,16 +2278,9 @@ public class DownsamplingStrideBenchmarkTest {
 
     File chartFile = new File("player_distribution_prp_chart.png");
     File reportChartFile = new File("build/reports/player_distribution/player_distribution_prp_chart.png");
-    File repoRootChartFile = new File("../player_distribution_prp_chart.png");
-    File docsChartFile = new File("../docs/assets/img/player_distribution_prp_chart.png");
-    if (!docsChartFile.getParentFile().exists()) docsChartFile = new File("docs/assets/img/player_distribution_prp_chart.png");
     File testServerChartFile = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug\\player_distribution_prp_chart.png");
 
     renderFullChartPNG(resPolar, resHilbert, resPRP, chartFile);
-    renderFullChartPNG(resPolar, resHilbert, resPRP, repoRootChartFile);
-    if (docsChartFile.getParentFile().exists()) {
-      renderFullChartPNG(resPolar, resHilbert, resPRP, docsChartFile);
-    }
     renderFullChartPNG(resPolar, resHilbert, resPRP, reportChartFile);
     if (testServerChartFile.getParentFile().exists()) {
       renderFullChartPNG(resPolar, resHilbert, resPRP, testServerChartFile);

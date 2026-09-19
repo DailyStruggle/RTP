@@ -21,20 +21,15 @@ public class MockRegionScheduler implements RegionScheduler {
     private final Queue<Runnable> queue = new ArrayDeque<>();
 
     /**
-     * Drains the internal task queue and executes tasks that were pending
-     * at the start of the call synchronously on the calling thread.
-     * Tasks queued by those executions remain in the queue for a subsequent call.
+     * Drains the internal task queue and executes every pending task
+     * synchronously on the calling thread.
      *
      * @return the number of tasks that were executed
      */
     public int executeAll() {
         int count = 0;
-        int toDrain = queue.size();
-        for (int i = 0; i < toDrain; i++) {
-            Runnable task = queue.poll();
-            if (task == null) {
-                break;
-            }
+        Runnable task;
+        while ((task = queue.poll()) != null) {
             task.run();
             count++;
         }

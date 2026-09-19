@@ -11,7 +11,7 @@
 
 As of 2026-06-01 the Fabric platform is **confirmed stable**: the Phase 2 Step H dual-runtime smoke test passed, the historical S-005 / null-stub / Loom blockers are resolved, and the Fabric beta shipped (Phase 3, 2026-05-31). The activation gate is therefore clear, and the D-005 proposal ([`docs/dev/scratch/PROPOSAL-neoforge-bringup.md`](../../../../docs/dev/scratch/PROPOSAL-neoforge-bringup.md)) is on file. This ADR ratifies the NeoForge adapter's structural decisions so Phase N1 code can begin once a maintainer is assigned and the proposal is approved.
 
-The landscape analysis, API-surface delta from Fabric, reuse map, risks, and S-00x mapping are ratified and converted into binding structural decisions in this record and [ADR-033](../../../../docs/adr/ADR-033-neoforge-platform-in-scope.md).
+The landscape analysis, API-surface delta from Fabric, reuse map, risks, and S-00x mapping are recorded in [`NEOFORGE_NOTES.md`](../../../../docs/dev/NEOFORGE_NOTES.md); this ADR converts the relevant conclusions into binding structural decisions.
 
 ## Decision
 
@@ -94,6 +94,7 @@ A **named maintainer** shall own the NeoForge adapter end-to-end (build, mapping
 ## References
 
 - [ADR-033](../../../../docs/adr/ADR-033-neoforge-platform-in-scope.md) — project-wide NeoForge in-scope (gated) decision this ADR implements.
+- [`NEOFORGE_NOTES.md`](../../../../docs/dev/NEOFORGE_NOTES.md) — landscape, API-surface delta, reuse map, risks, S-00x mapping.
 - [`docs/dev/scratch/PROPOSAL-neoforge-bringup.md`](../../../../docs/dev/scratch/PROPOSAL-neoforge-bringup.md) — the D-005 bring-up proposal.
 - [rtp-fabric-ADR-002](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) — precedent shape (Fabric in-scope, multi-version single-JAR).
 - [rtp-fabric-ADR-001](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md), [rtp-fabric-ADR-003](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md), [rtp-fabric-ADR-007](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md), [rtp-fabric-ADR-009](../../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md) — reused patterns and contrasts.

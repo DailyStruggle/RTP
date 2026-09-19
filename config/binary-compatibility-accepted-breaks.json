@@ -1,5 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Registry of accepted binary-incompatible changes and announced removals per docs/dev/DEPRECATION_POLICY.md. Any entry must have completed the required deprecation notice window.",
-  "acceptedBreaks": []
-}

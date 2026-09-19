@@ -20,171 +20,18 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   private final AsyncScheduler asyncScheduler;
   private final GlobalRegionScheduler globalScheduler;
 
-  /**
-   * Concurrency governor tracking active regional chunk tasks (ADR-087).
-   * Prevents thread pool exhaustion from unbounded disjoint Folia region instantiations.
-   */
-  private final java.util.concurrent.atomic.AtomicInteger inFlightRegionalTasks = new java.util.concurrent.atomic.AtomicInteger(0);
-  private final java.util.concurrent.ConcurrentLinkedQueue<InteractiveWaitEntry> interactiveQueue = new java.util.concurrent.ConcurrentLinkedQueue<>();
-  private final int maxRegionalInflight;
-  private final long defaultInteractiveTimeoutMs;
-
-  private record InteractiveWaitEntry(
-      RTPWorld<?> world,
-      int cx,
-      int cz,
-      Runnable task,
-      Runnable onTimeout,
-      long deadlineNanos,
-      java.util.concurrent.atomic.AtomicBoolean completed) {}
-
   public FoliaSchedulerImpl(Plugin plugin) {
-    this(plugin, Bukkit.getRegionScheduler(), Bukkit.getAsyncScheduler(), Bukkit.getGlobalRegionScheduler());
+    this.plugin = plugin;
+    this.regionScheduler = Bukkit.getRegionScheduler();
+    this.asyncScheduler = Bukkit.getAsyncScheduler();
+    this.globalScheduler = Bukkit.getGlobalRegionScheduler();
   }
 
   public FoliaSchedulerImpl(Plugin plugin, RegionScheduler rs, AsyncScheduler as, GlobalRegionScheduler gs) {
-    this(plugin, rs, as, gs, Math.max(1, Runtime.getRuntime().availableProcessors() / 2), 2500L);
-  }
-
-  public FoliaSchedulerImpl(Plugin plugin, RegionScheduler rs, AsyncScheduler as, GlobalRegionScheduler gs,
-                            int maxRegionalInflight, long defaultInteractiveTimeoutMs) {
     this.plugin = plugin;
     this.regionScheduler = rs;
     this.asyncScheduler = as;
     this.globalScheduler = gs;
-    this.maxRegionalInflight = Math.max(1, maxRegionalInflight);
-    this.defaultInteractiveTimeoutMs = Math.max(100L, defaultInteractiveTimeoutMs);
-  }
-
-  public int getInFlightRegionalTasks() {
-    return inFlightRegionalTasks.get();
-  }
-
-  public int getMaxRegionalInflight() {
-    return maxRegionalInflight;
-  }
-
-  public int getInteractiveQueueSize() {
-    return interactiveQueue.size();
-  }
-
-  /**
-   * Dispatches an interactive regional task with priority queueing and a strict deadline (ADR-087).
-   *
-   * @param world     target RTP world
-   * @param cx        chunk X
-   * @param cz        chunk Z
-   * @param task      task to execute upon regional dispatch
-   * @param onTimeout runnable invoked if timeout expires before worker permit becomes available
-   */
-  public void runInteractiveTask(RTPWorld<?> world, int cx, int cz, Runnable task, Runnable onTimeout) {
-    runInteractiveTask(world, cx, cz, task, onTimeout, defaultInteractiveTimeoutMs);
-  }
-
-  /**
-   * Dispatches an interactive regional task with priority queueing and an explicit deadline.
-   */
-  public void runInteractiveTask(RTPWorld<?> world, int cx, int cz, Runnable task, Runnable onTimeout, long timeoutMs) {
-    if (!plugin.isEnabled()) {
-      if (onTimeout != null) onTimeout.run();
-      return;
-    }
-
-    // Fast-path: if current thread already owns region, execute immediately with zero latency
-    if (world instanceof FoliaRTPWorld foliaRTPWorld && foliaRTPWorld.world() != null) {
-      if (org.bukkit.Bukkit.isOwnedByCurrentRegion(foliaRTPWorld.world(), cx, cz)) {
-        task.run();
-        return;
-      }
-    }
-
-    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(timeoutMs);
-    InteractiveWaitEntry entry = new InteractiveWaitEntry(world, cx, cz, task, onTimeout, deadline, new java.util.concurrent.atomic.AtomicBoolean(false));
-
-    interactiveQueue.offer(entry);
-
-    // Schedule async deadline watchdog to fail-fast cleanly if queue waits past timeout
-    asyncScheduler.runDelayed(plugin, st -> {
-      if (!entry.completed.get()) {
-        if (System.nanoTime() >= entry.deadlineNanos) {
-          if (entry.completed.compareAndSet(false, true)) {
-            interactiveQueue.remove(entry);
-            if (entry.onTimeout != null) {
-              entry.onTimeout.run();
-            }
-          }
-        }
-      }
-    }, timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
-
-    pumpQueue();
-  }
-
-  private void pumpQueue() {
-    while (true) {
-      int current = inFlightRegionalTasks.get();
-      if (current >= maxRegionalInflight) {
-        return; // Saturation ceiling reached; defer until in-flight permits retire
-      }
-
-      InteractiveWaitEntry next = interactiveQueue.poll();
-      if (next == null) {
-        return; // No pending interactive entries
-      }
-
-      if (next.completed.get()) {
-        continue; // Already timed out or completed
-      }
-
-      if (System.nanoTime() >= next.deadlineNanos) {
-        if (next.completed.compareAndSet(false, true)) {
-          if (next.onTimeout != null) {
-            next.onTimeout.run();
-          }
-        }
-        continue;
-      }
-
-      if (!inFlightRegionalTasks.compareAndSet(current, current + 1)) {
-        // CAS contention; put entry back and retry
-        interactiveQueue.offer(next);
-        continue;
-      }
-
-      if (!next.completed.compareAndSet(false, true)) {
-        inFlightRegionalTasks.decrementAndGet();
-        continue;
-      }
-
-      // Dispatch to regional thread and ensure decrement + pumpQueue on completion
-      dispatchRegionalTaskWithPermit(next.world, next.cx, next.cz, next.task);
-    }
-  }
-
-  private void dispatchRegionalTaskWithPermit(RTPWorld<?> world, int cx, int cz, Runnable task) {
-    Runnable wrapped = () -> {
-      try {
-        task.run();
-      } finally {
-        inFlightRegionalTasks.decrementAndGet();
-        pumpQueue();
-      }
-    };
-
-    if (world instanceof FoliaRTPWorld foliaRTPWorld && foliaRTPWorld.world() != null) {
-      if (!plugin.isEnabled()) {
-        inFlightRegionalTasks.decrementAndGet();
-        pumpQueue();
-        return;
-      }
-      regionScheduler.run(plugin, foliaRTPWorld.world(), cx, cz, st -> wrapped.run());
-    } else if (world == null || world.world() == null) {
-      runTaskAsynchronously(wrapped);
-    } else {
-      inFlightRegionalTasks.decrementAndGet();
-      pumpQueue();
-      throw new IllegalArgumentException("World [" + world.name() + "] is not a Folia world");
-    }
   }
 
   @Override
@@ -247,21 +94,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
       } else {
         // We are on the wrong thread; bounce it to the correct Region Scheduler
         if (!plugin.isEnabled()) return;
-        // Background regional dispatch honors the regional concurrency cap (ADR-087)
-        if (inFlightRegionalTasks.get() >= maxRegionalInflight) {
-          // Defer background regional dispatch via async queue to protect Folia thread pool
-          asyncScheduler.runDelayed(plugin, st -> runTask(world, cx, cz, task), 50, java.util.concurrent.TimeUnit.MILLISECONDS);
-          return;
-        }
-        inFlightRegionalTasks.incrementAndGet();
-        regionScheduler.run(plugin, foliaRTPWorld.world(), cx, cz, st -> {
-          try {
-            task.run();
-          } finally {
-            inFlightRegionalTasks.decrementAndGet();
-            pumpQueue();
-          }
-        });
+        regionScheduler.run(plugin, foliaRTPWorld.world(), cx, cz, st -> task.run());
       }
     } else if (world == null || world.world() == null) {
       // TODO: THREAD-VIOLATION - Requires async bridge; null-world fallback crosses to @AsyncThread
