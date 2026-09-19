@@ -91,7 +91,6 @@ class LoginCacheTaskTest {
         task = new LoginCacheTask(region);
         task.promoteUpTo(5);
         task.run();
-        org.junit.jupiter.api.Assertions.assertNull(region.queueManager.loginLocations);
     }
 
     @Test

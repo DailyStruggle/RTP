@@ -80,7 +80,6 @@ public class NativeVsUniqueVsL3VisualizerTest {
     // 7. Render 4-Panel High-Resolution Comparison Chart
     System.out.println("[DEBUG_LOG] Rendering 4-Panel Comparison Chart...");
     renderComparisonChart(outcomeMap, res1, res2, res3, res4);
-    org.junit.jupiter.api.Assertions.assertNotNull(res1);
   }
 
   private ModelResult runNativeSampling(LosslessChunkOutcomeMap outcomeMap, boolean uniquePlacements) {

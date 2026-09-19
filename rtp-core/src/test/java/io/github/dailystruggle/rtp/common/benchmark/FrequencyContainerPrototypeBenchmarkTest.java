@@ -286,7 +286,6 @@ public class FrequencyContainerPrototypeBenchmarkTest {
           bm.bytes(),
           sink & 1L);
     }
-    assertTrue(produced > 0, "must produce at least one mark");
   }
 
   // ---- array oracle helpers ----

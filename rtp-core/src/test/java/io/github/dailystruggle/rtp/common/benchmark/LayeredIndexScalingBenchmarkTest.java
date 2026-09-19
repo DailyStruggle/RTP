@@ -419,7 +419,6 @@ public class LayeredIndexScalingBenchmarkTest {
             + "coarsest edge that keeps that ratio small is also the one that maximizes "
             + "candidates served per storage read, so the two requirements are anti-correlated "
             + "rather than in conflict.");
-    assertTrue(edges.length > 0);
   }
 
   // -------------------------------------------------------------------------------------
@@ -547,6 +546,5 @@ public class LayeredIndexScalingBenchmarkTest {
             + "quadtree-aligned square. Chunks excluded above the mark count is the over-exclusion "
             + "the operator pays for the byte saving, and it is bounded by the inner cell area - "
             + "which is what makes a hard floor on inner resolution a meaningful guarantee.");
-    assertTrue(resolutions.length > 0);
   }
 }

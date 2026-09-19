@@ -245,7 +245,7 @@ public final class ModeClassifier {
             Arrays.sort(fast);
             Arrays.sort(cold);
             double fastFraction = n > 0 ? (double) fastN / n : -1.0d;
-            return new Summary(finalThreshold, method, n, fastN, (long) n - fastN, unknownCount, fastFraction,
+            return new Summary(finalThreshold, method, n, fastN, n - fastN, unknownCount, fastFraction,
                     pct(fast, 50), pct(fast, 95), pct(fast, 99),
                     pct(cold, 50), pct(cold, 95), pct(cold, 99),
                     directFast, directCold, directFraction);

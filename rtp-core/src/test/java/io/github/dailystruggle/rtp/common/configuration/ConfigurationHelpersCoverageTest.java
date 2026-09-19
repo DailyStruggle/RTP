@@ -161,7 +161,6 @@ class ConfigurationHelpersCoverageTest {
         assertEquals("default_msg", Messages.valueByName("invalid_key_xyz", "default_msg"));
     }
 
-    @SuppressWarnings("java:S115")
     enum DummyShapeKeys {
         radius,
         center

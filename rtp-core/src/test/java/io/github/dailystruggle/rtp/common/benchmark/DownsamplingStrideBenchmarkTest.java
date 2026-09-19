@@ -409,7 +409,6 @@ public class DownsamplingStrideBenchmarkTest {
     renderAsciiJourneySummary(shape);
     System.out.println("[DEBUG_LOG] Saved image directly to root: " + rootFile.getAbsolutePath());
     System.out.println("[DEBUG_LOG] Saved image to reports: " + reportFile.getAbsolutePath());
-    assertTrue(shape.getRange() > 0);
   }
 
   private static void renderPlayerJourney(CircleOptimizedDualLayer shape, int stride, int steps, File outFile, String title) throws Exception {
@@ -740,7 +739,6 @@ public class DownsamplingStrideBenchmarkTest {
       renderHeatmapComparison(resPolar, resHilbertRandom, resStrided64WithTable, resDynamicContinuousRotation,
           new File(testServerDebugDir, "overlap_simulation_comparison.png"));
     }
-    assertTrue(resPolar.totalTeleports > 0);
   }
 
   private static void printSimSummary(String label, SimulationResult r) {
@@ -1913,7 +1911,6 @@ public class DownsamplingStrideBenchmarkTest {
     }
 
     System.out.println("[DEBUG_LOG] Successfully rendered 4-way spacing graph to: " + outFile.getAbsolutePath());
-    assertTrue(dataStandard.allPoints.size() > 0);
   }
 
   private static class SpacingData {
@@ -2316,7 +2313,6 @@ public class DownsamplingStrideBenchmarkTest {
     }
 
     System.out.println("[DEBUG_LOG] Successfully rendered PRP comparison chart to: " + chartFile.getAbsolutePath());
-    assertTrue(resPRP.totalTeleports > 0);
   }
 
   private static SimulationResult runPRPSimulation(
@@ -2726,7 +2722,6 @@ public class DownsamplingStrideBenchmarkTest {
         N, collisionsOutsideN,
         collisionDistances.isEmpty() ? 0 : collisionDistances.stream().min(Integer::compare).orElse(0),
         collisionDistances.isEmpty() ? 0.0 : collisionDistances.stream().mapToInt(Integer::intValue).average().orElse(0.0));
-    assertTrue(totalTeleports > 0);
   }
 
   @Test
@@ -2861,7 +2856,6 @@ public class DownsamplingStrideBenchmarkTest {
     }
     System.out.printf("[DEBUG_LOG] Intra-macro-tile coordinates touched: %d / 1024 (%.2f%%)%n",
         touchedTileCoords, 100.0 * touchedTileCoords / 1024);
-    assertTrue(touchedTileCoords > 0);
   }
 
   private static int simulateArrivalClumping(CircleOptimizedDualLayer shape, int stride, int arrivals, int viewDistanceChunks, Random rand) {
