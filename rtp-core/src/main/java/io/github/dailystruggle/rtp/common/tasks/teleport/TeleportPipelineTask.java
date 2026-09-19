@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -53,15 +52,15 @@ public final class TeleportPipelineTask extends RTPRunnable {
    */
   private final boolean immediateTeleport;
   private final java.util.concurrent.atomic.AtomicBoolean pipelineHistogramRecorded = new java.util.concurrent.atomic.AtomicBoolean(false);
-  public static final List<Consumer<TeleportPipelineTask>> setupPreActions = new CopyOnWriteArrayList<>();
+  public static final List<Consumer<TeleportPipelineTask>> setupPreActions = new ArrayList<>();
   public static final List<BiConsumer<TeleportPipelineTask, Boolean>> setupPostActions =
-      new CopyOnWriteArrayList<>();
-  public static final List<Consumer<TeleportPipelineTask>> loadPreActions = new CopyOnWriteArrayList<>();
-  public static final List<Consumer<TeleportPipelineTask>> loadPostActions = new CopyOnWriteArrayList<>();
-  public static final List<Consumer<TeleportPipelineTask>> teleportPreActions = new CopyOnWriteArrayList<>();
-  public static final List<Consumer<TeleportPipelineTask>> teleportPostActions = new CopyOnWriteArrayList<>();
-  public static final List<Consumer<TeleportPipelineTask>> cleanupPreActions = new CopyOnWriteArrayList<>();
-  public static final List<Consumer<TeleportPipelineTask>> cleanupPostActions = new CopyOnWriteArrayList<>();
+      new ArrayList<>();
+  public static final List<Consumer<TeleportPipelineTask>> loadPreActions = new ArrayList<>();
+  public static final List<Consumer<TeleportPipelineTask>> loadPostActions = new ArrayList<>();
+  public static final List<Consumer<TeleportPipelineTask>> teleportPreActions = new ArrayList<>();
+  public static final List<Consumer<TeleportPipelineTask>> teleportPostActions = new ArrayList<>();
+  public static final List<Consumer<TeleportPipelineTask>> cleanupPreActions = new ArrayList<>();
+  public static final List<Consumer<TeleportPipelineTask>> cleanupPostActions = new ArrayList<>();
 
   public static class ConfigCache {
     public static String unsafe = "";

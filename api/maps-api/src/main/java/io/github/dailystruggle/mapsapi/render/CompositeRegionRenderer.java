@@ -13,7 +13,7 @@ import io.github.dailystruggle.mapsapi.model.CompositeRegionModel;
  *   <li><b>Layer 2 (Hazard Wash):</b> Translucent red wash blended over unsafe chunks
  *       (oceans, lava, void, claims) while preserving safe land.
  *   <li><b>Layer 3 (Trajectory Lines):</b> Bresenham vector lines connecting consecutive arrivals.
- *   <li><b>Layer 4 (Candidate &amp; Arrival Points):</b> High-contrast outlined markers
+ *   <li><b>Layer 4 (Candidate & Arrival Points):</b> High-contrast outlined markers
  *       (emerald for L1, cyan for L2, purple for L3, gold for arrivals).
  *   <li><b>Layer 5 (Queue Capacity Health Bars):</b> Bottom panel health bars matching the
  *       queue dot colors.
