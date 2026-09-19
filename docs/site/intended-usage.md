@@ -141,3 +141,4 @@ You *can* pass *override* parameters (custom `shape`, `radius`, `centerX`/`cente
 - [Commands](../admin/COMMANDS.md) - the command reference including `/rtp scan`.
 - [What NOT to do!](what-not-to-do.md) - the anti-patterns.
 - [Why LeafRTP exists](why.md) - the runtime story and distribution algorithm in depth.
+- [Shape algorithm testing & charts](shape-algorithms.md) - empirical unit test verification and comparative charts.

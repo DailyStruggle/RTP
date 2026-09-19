@@ -107,7 +107,15 @@ public final class NeoForgeEffectsHandler {
         });
         TeleportPipelineTask.teleportPreActions.add(task -> {
             if (!effectParsingEnabled(parser) || task.player() == null) return;
-            dispatch("rtp.effect.preteleport", task.player(), runtime);
+            net.minecraft.world.phys.Vec3 originPos = null;
+            if (task.player() instanceof NeoForgeRTPPlayer np && np.handle() != null) {
+                originPos = np.handle().position();
+            }
+            net.minecraft.world.phys.Vec3 destPos = null;
+            if (task.coords() != null) {
+                destPos = new net.minecraft.world.phys.Vec3(task.coords().x(), task.coords().y(), task.coords().z());
+            }
+            dispatch("rtp.effect.preteleport", task.player(), runtime, originPos, destPos, task.coords() != null ? task.coords().worldName() : null, task);
         });
         TeleportPipelineTask.teleportPostActions.add(task -> {
             if (!effectParsingEnabled(parser) || task.player() == null) return;
@@ -207,8 +215,9 @@ public final class NeoForgeEffectsHandler {
 
     private static boolean effectParsingEnabled(FactoryValue<PerformanceKeys> parser) {
         if (parser == null || parser.getData() == null) return false;
-        return Boolean.parseBoolean(
-                parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString());
+        Object val = parser.getData().get(PerformanceKeys.effectParsing);
+        if (val instanceof Boolean b) return b;
+        return val != null && Boolean.parseBoolean(val.toString());
     }
 
     /** UUID-resolving variant for cancel / queue-push / queue-pop hooks. */
@@ -226,6 +235,21 @@ public final class NeoForgeEffectsHandler {
     }
 
     private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime) {
+        dispatch(prefix, player, runtime, null, null, null, null);
+    }
+
+    private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime,
+                                 net.minecraft.world.phys.Vec3 explicitLocation,
+                                 net.minecraft.world.phys.Vec3 destinationLocation,
+                                 String destWorldName) {
+        dispatch(prefix, player, runtime, explicitLocation, destinationLocation, destWorldName, null);
+    }
+
+    private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime,
+                                 net.minecraft.world.phys.Vec3 explicitLocation,
+                                 net.minecraft.world.phys.Vec3 destinationLocation,
+                                 String destWorldName,
+                                 TeleportPipelineTask pipelineTask) {
         try {
             if (!(player instanceof NeoForgeRTPPlayer np)) return;
             ServerPlayer handle = np.handle();
@@ -239,9 +263,30 @@ public final class NeoForgeEffectsHandler {
             Collection<String> union = EffectsResolver.resolveUnioned(stage, np, prefix, perms);
             if (union.isEmpty()) return;
 
+            Object target;
+            if (explicitLocation != null) {
+                Object destHandle = null;
+                if (destinationLocation != null && destWorldName != null) {
+                    destHandle = io.github.dailystruggle.effectsapi.fabric.FabricHandles.wrap(
+                            destinationLocation, destWorldName);
+                }
+                target = new io.github.dailystruggle.effectsapi.common.spi.EffectTarget(
+                        io.github.dailystruggle.effectsapi.fabric.FabricHandles.wrap(handle),
+                        io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(explicitLocation),
+                        destHandle != null ? io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(destHandle) : null);
+            } else {
+                target = handle;
+            }
+
             List<Effect<?>> effects = EffectFactory.buildEffects(prefix, union);
             for (Effect<?> effect : effects) {
-                effect.setTarget(handle);
+                effect.setTarget(target);
+                if (effect instanceof io.github.dailystruggle.effectsapi.common.effects.DeathEffect) {
+                    RTP.deathEffectInFlight.add(handle.getUUID());
+                    if (pipelineTask != null) {
+                        pipelineTask.deathEffectTriggered = true;
+                    }
+                }
                 runtime.schedule(effect, 0);
             }
         } catch (Throwable t) {

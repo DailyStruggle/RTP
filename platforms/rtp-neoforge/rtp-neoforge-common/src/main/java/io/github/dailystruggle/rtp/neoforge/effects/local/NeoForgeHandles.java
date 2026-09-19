@@ -185,6 +185,50 @@ public final class NeoForgeHandles implements HandleProvider {
         }
 
         @Override
+        public void kill(boolean setBed, @Nullable LocationHandle respawnLocation) {
+            MinecraftServer server = player.getServer();
+            Runnable task = () -> {
+                try {
+                    if (respawnLocation != null) {
+                        try {
+                            net.minecraft.server.level.ServerLevel targetLevel = player.serverLevel();
+                            net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> targetDim = targetLevel.dimension();
+                            if (server != null) {
+                                for (net.minecraft.server.level.ServerLevel sl : server.getAllLevels()) {
+                                    if (sl.dimension().location().toString().equals(respawnLocation.worldName())) {
+                                        targetDim = sl.dimension();
+                                        break;
+                                    }
+                                }
+                            }
+                            net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(
+                                    respawnLocation.x(), respawnLocation.y(), respawnLocation.z());
+                            for (java.lang.reflect.Method m : ServerPlayer.class.getMethods()) {
+                                if (!m.getName().equals("setRespawnPosition")) continue;
+                                Class<?>[] pt = m.getParameterTypes();
+                                if (pt.length == 5) {
+                                    m.invoke(player, targetDim, pos, 0.0f, setBed, false);
+                                    break;
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                    player.kill();
+                } catch (Throwable ignored) {}
+            };
+            if (server != null) {
+                server.execute(task);
+            } else {
+                task.run();
+            }
+        }
+
+        @Override
+        public void kill() {
+            kill(true, null);
+        }
+
+        @Override
         public String toString() {
             return "NeoForgePlayerHandle{name=" + name() + ", uuid=" + uuid() + "}";
         }

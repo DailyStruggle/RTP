@@ -197,8 +197,8 @@ public class SquareOptimizedDualLayer extends Square {
     long cenX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cenZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
 
-    long relX = Math.abs((long) x - cenX);
-    long relZ = Math.abs((long) z - cenZ);
+    long relX = Math.abs(x - cenX);
+    long relZ = Math.abs(z - cenZ);
     long chebyshev = Math.max(relX, relZ);
     if (chebyshev < cr) return false;
     if (!expand() && chebyshev > r) return false;
@@ -251,8 +251,8 @@ public class SquareOptimizedDualLayer extends Square {
     long r = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
     long cenX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cenZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
-    long relX = Math.abs((long) coords.x - cenX);
-    long relZ = Math.abs((long) coords.z - cenZ);
+    long relX = Math.abs(coords.x - cenX);
+    long relZ = Math.abs(coords.z - cenZ);
     long chebyshev = Math.max(relX, relZ);
     if (chebyshev < cr || (!expand() && chebyshev > r)) {
       return -1L;
@@ -295,7 +295,7 @@ public class SquareOptimizedDualLayer extends Square {
     if (stride <= 1) {
       long t = selectionCounter.getAndIncrement();
       long permuted = feistelPermute(t, total, getEpochKey(curEpoch, 0L));
-      return (double) Math.min(total - 1, Math.max(0L, permuted));
+      return Math.min(total - 1, Math.max(0L, permuted));
     }
 
     int bits = Integer.numberOfTrailingZeros(stride);
@@ -306,7 +306,7 @@ public class SquareOptimizedDualLayer extends Square {
     // This strictly preserves the d >= sqrt(S) spacing between all active candidates within the epoch!
     long subsetCapacity = (total + stride - 1) / stride;
     if (subsetCapacity <= 0) {
-      return (double) (t % total);
+      return (t % total);
     }
     long epoch = t / subsetCapacity;
     int subsetIdx = (int) (epoch % stride);
@@ -314,13 +314,13 @@ public class SquareOptimizedDualLayer extends Square {
 
     long subsetSize = phaseOffset < total ? (total - 1 - phaseOffset) / stride + 1 : 0;
     if (subsetSize <= 0) {
-      return (double) (t % total);
+      return (t % total);
     }
 
     long kCounter = (t % subsetCapacity) % subsetSize;
     long permutedK = feistelPermute(kCounter, subsetSize, getEpochKey(curEpoch, phaseOffset));
     long candidate = permutedK * stride + phaseOffset;
-    return (double) Math.min(total - 1, Math.max(0L, candidate));
+    return Math.min(total - 1, Math.max(0L, candidate));
   }
 
   /**
@@ -351,7 +351,7 @@ public class SquareOptimizedDualLayer extends Square {
         long footprint = (long) (2 * ru - 1) * (2 * ru - 1);
         int shift = 64 - Long.numberOfLeadingZeros(footprint - 1L);
         int derived = 1 << shift;
-        return (int) Math.max(1, Math.min(maxStrideByBin, Math.min(domainSize / 4L, (long) derived)));
+        return (int) Math.max(1, Math.min(maxStrideByBin, Math.min(domainSize / 4L, derived)));
       }
     }
 

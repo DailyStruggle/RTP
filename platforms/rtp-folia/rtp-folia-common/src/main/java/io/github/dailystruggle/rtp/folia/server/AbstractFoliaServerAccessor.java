@@ -651,7 +651,8 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     try {
       org.bukkit.Material material = org.bukkit.Material.matchMaterial(raw);
       if (material != null) return material.name();
-    } catch (Throwable ignored) {
+    } catch (Exception ignored) {
+      // Material lookup threw; fall back to normalizer
     }
     return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
   }

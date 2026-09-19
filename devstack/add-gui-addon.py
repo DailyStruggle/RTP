@@ -27,8 +27,9 @@ from pathlib import Path
 TARGETS = ["backend-a", "backend-b", "backend-c", "lobby-a", "lobby-b"]
 
 # plugin.yml declares name: LeafRTPGuiAddon, so any LeafRTPGuiAddon*.jar /
-# rtp-gui-bukkit*.jar is "ours" for the remove pass.
-JAR_GLOBS = ["LeafRTPGuiAddon*.jar", "rtp-gui-bukkit*.jar"]
+# rtp-gui-bukkit*.jar is "ours" for the remove pass. Also purge legacy
+# RTP_GuiAddon*.jar so deprecated pre-3.2 GUI jars are cleaned up and don't shadow LeafRTPGuiAddon.
+JAR_GLOBS = ["LeafRTPGuiAddon*.jar", "rtp-gui-bukkit*.jar", "RTP_GuiAddon*.jar"]
 
 
 def _gradlew(repo_root: Path) -> str:
@@ -57,16 +58,16 @@ def main(argv: list[str]) -> int:
         return 0
 
     if not args.skip_build:
-        print("Building addons:LeafRTPGuiAddon:rtp-gui-bukkit:shadowJar ...")
+        print("Building addons:LeafRTPGuiAddon:rtp-gui:shadowJar ...")
         result = subprocess.run(
-            [_gradlew(repo_root), ":addons:LeafRTPGuiAddon:rtp-gui-bukkit:shadowJar", "--console=plain"],
+            [_gradlew(repo_root), ":addons:LeafRTPGuiAddon:rtp-gui:shadowJar", "--console=plain"],
             cwd=repo_root,
         )
         if result.returncode != 0:
             raise SystemExit(f"gradle build failed (exit {result.returncode})")
 
-    libs_dir = repo_root / "addons" / "LeafRTPGuiAddon" / "rtp-gui-bukkit" / "build" / "libs"
-    jars = sorted(libs_dir.glob("rtp-gui-bukkit-*.jar"),
+    libs_dir = repo_root / "addons" / "LeafRTPGuiAddon" / "rtp-gui" / "build" / "libs"
+    jars = sorted(libs_dir.glob("LeafRTPGuiAddon-*.jar"),
                   key=lambda p: p.stat().st_mtime, reverse=True) if libs_dir.exists() else []
     if not jars:
         raise SystemExit(f"Built jar not found under {libs_dir}. "

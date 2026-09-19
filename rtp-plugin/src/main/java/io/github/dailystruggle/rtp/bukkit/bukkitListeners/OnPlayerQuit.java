@@ -17,6 +17,11 @@ public final class OnPlayerQuit implements Listener {
     UUID uuid = event.getPlayer().getUniqueId();
     if (RTP.getInstance().queuedPlayers.contains(uuid)) return;
 
+    TeleportPipelineTask pendingDeath = RTP.pendingDeathTeleports.remove(uuid);
+    if (pendingDeath != null) {
+      pendingDeath.completeDeathTeleport(false);
+    }
+
     RTP.getInstance().invulnerablePlayers.remove(uuid);
     RTP.getInstance().processingPlayers.remove(uuid);
 

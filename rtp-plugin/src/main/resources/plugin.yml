@@ -115,7 +115,7 @@ permissions:
       rtp.region: true
   rtp.servers.*:
     description: allow player to teleport to a region on any networked backend server (network mode)
-    default: op
+    default: true
   rtp.unqueued:
     description: if no locations are queued, generate a new location
     default: op

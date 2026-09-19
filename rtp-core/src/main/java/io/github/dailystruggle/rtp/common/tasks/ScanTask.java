@@ -1141,7 +1141,8 @@ public class ScanTask extends RTPRunnable {
                 if (b != null) {
                   recordBiomeForChunk(shape, pos, cx, cz, b);
                 }
-              } catch (Throwable ignored) {
+              } catch (Exception ignored) {
+                // Best-effort biome resolution from cached chunk
               }
             }
           }
@@ -1189,7 +1190,8 @@ public class ScanTask extends RTPRunnable {
                 if (b != null) {
                   recordBiomeForChunk(shape, pos, cx, cz, b);
                 }
-              } catch (Throwable ignored) {
+              } catch (Exception ignored) {
+                // Best-effort biome resolution from cached chunk
               }
             }
           }
@@ -1776,7 +1778,8 @@ public class ScanTask extends RTPRunnable {
         try {
           String b = probe.biomeAt(y);
           if (b != null && !b.isEmpty()) return b;
-        } catch (Throwable ignored) {
+        } catch (Exception ignored) {
+          // Probe may not have data at this specific Y level
         }
       }
     }
@@ -1786,13 +1789,15 @@ public class ScanTask extends RTPRunnable {
     try {
       String b = probe.biomeAt(midY);
       if (b != null && !b.isEmpty()) return b;
-    } catch (Throwable ignored) {
+    } catch (Exception ignored) {
+      // Probe may not have data at midY
     }
     for (int y = minY + 8; y <= maxY; y += 16) {
       try {
         String b = probe.biomeAt(y);
         if (b != null && !b.isEmpty()) return b;
-      } catch (Throwable ignored) {
+      } catch (Exception ignored) {
+        // Probe may not have data at section Y
       }
     }
     return null;

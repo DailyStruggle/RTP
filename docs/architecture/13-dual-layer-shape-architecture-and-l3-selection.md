@@ -12,6 +12,25 @@ Companion architectural decisions and references:
 
 ---
 
+## Executive Overview (Dual-Layer Spatial Selection)
+
+Dual-layer spatial shapes eliminate random coordinate rerolls by indexing chunk space into coarse Chebyshev macro-tiles traversed by fine Hilbert space-filling curves. Known invalid regions are skipped in $O(1)$ time via segmented prefix-sum tables.
+
+```mermaid
+flowchart LR
+    A["Virtual Target Index<br/>(0 .. totalValidSpace)"] --> B["Two-Tier Segmented Table<br/>(Skip Bad Chunks O(1))"]
+    B --> C["1D Hilbert Key<br/>(Within Macro-Tile)"]
+    C --> D["Chebyshev Macro Ring<br/>(2D Tile Placement)"]
+    D --> E["Physical Chunk Coordinates<br/>(cx, cz)"]
+
+    classDef step fill:#cfe2ff,stroke:#1f4e8a,stroke-width:1px,color:#0b1f3a;
+    classDef target fill:#b7e4b7,stroke:#1f6b1f,stroke-width:2px,color:#0b2a0b;
+    class A,B,C,D step;
+    class E target;
+```
+
+---
+
 ## 1. Dual-Layer Coordinate Addressing and Point Selection Pipeline
 
 Dual-layer shapes (`CircleOptimizedDualLayer`, `SquareOptimizedDualLayer`) address discrete chunk space at native 1-chunk resolution ($S=1$, 16 blocks per cell). Space is decomposed into a two-tier hierarchy:

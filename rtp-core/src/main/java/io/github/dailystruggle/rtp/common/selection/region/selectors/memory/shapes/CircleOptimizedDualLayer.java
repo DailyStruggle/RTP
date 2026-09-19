@@ -95,7 +95,7 @@ public class CircleOptimizedDualLayer extends Circle {
       long[] sums = badPrefixSumsCache;
       long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
       if (badSum > 0L) {
-        return (long) Math.ceil(Math.sqrt((double) r * r + (double) badSum / Math.PI));
+        return (long) Math.ceil(Math.sqrt(r * r + (double) badSum / Math.PI));
       }
     }
     return r;
@@ -296,8 +296,8 @@ public class CircleOptimizedDualLayer extends Circle {
     long rEff = getEffectiveRadius();
     long cenX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cenZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
-    long relX = (long) coords.x - cenX;
-    long relZ = (long) coords.z - cenZ;
+    long relX = coords.x - cenX;
+    long relZ = coords.z - cenZ;
     long distSq = relX * relX + relZ * relZ;
     if (distSq < cr * cr || distSq > rEff * rEff) {
       return -1L;
@@ -340,7 +340,7 @@ public class CircleOptimizedDualLayer extends Circle {
     if (stride <= 1) {
       long t = selectionCounter.getAndIncrement();
       long permuted = feistelPermute(t, total, getEpochKey(curEpoch, 0L));
-      return (double) Math.min(total - 1, Math.max(0L, permuted));
+      return Math.min(total - 1, Math.max(0L, permuted));
     }
 
     int bits = Integer.numberOfTrailingZeros(stride);
@@ -351,7 +351,7 @@ public class CircleOptimizedDualLayer extends Circle {
     // This strictly preserves the d >= sqrt(S) spacing between all active candidates within the epoch!
     long subsetCapacity = (total + stride - 1) / stride;
     if (subsetCapacity <= 0) {
-      return (double) (t % total);
+      return (t % total);
     }
     long epoch = t / subsetCapacity;
     int subsetIdx = (int) (epoch % stride);
@@ -359,13 +359,13 @@ public class CircleOptimizedDualLayer extends Circle {
 
     long subsetSize = phaseOffset < total ? (total - 1 - phaseOffset) / stride + 1 : 0;
     if (subsetSize <= 0) {
-      return (double) (t % total);
+      return (t % total);
     }
 
     long kCounter = (t % subsetCapacity) % subsetSize;
     long permutedK = feistelPermute(kCounter, subsetSize, getEpochKey(curEpoch, phaseOffset));
     long candidate = permutedK * stride + phaseOffset;
-    return (double) Math.min(total - 1, Math.max(0L, candidate));
+    return Math.min(total - 1, Math.max(0L, candidate));
   }
 
   /**
@@ -392,7 +392,7 @@ public class CircleOptimizedDualLayer extends Circle {
         long footprint = (long) (2 * ru - 1) * (2 * ru - 1);
         int shift = 64 - Long.numberOfLeadingZeros(footprint - 1L);
         int derived = 1 << shift;
-        return (int) Math.max(1, Math.min(1024, Math.min(domainSize / 4L, (long) derived)));
+        return (int) Math.max(1, Math.min(1024, Math.min(domainSize / 4L, derived)));
       }
     }
 
@@ -711,22 +711,6 @@ public class CircleOptimizedDualLayer extends Circle {
     long side = randomTileStep / sideLen;
     long sideStep = randomTileStep % sideLen;
 
-    long px, pz;
-    if (side == 0) {
-      px = K - 1L;
-      pz = -(K - 1L) + sideStep;
-    } else if (side == 1) {
-      pz = K - 1L;
-      px = (K - 2L) - sideStep;
-    } else if (side == 2) {
-      px = -K;
-      pz = (K - 2L) - sideStep;
-    } else {
-      pz = -K;
-      px = (-K + 1L) + sideStep;
-    }
-
-    int orientation = orientationFor(px, pz);
     long randomHilbert = SEED_SOURCE.nextLong(area);
 
     long fullMacroIdx = 4L * (K - 1L) * (K - 1L) + side * (2L * K - 1L) + sideStep;

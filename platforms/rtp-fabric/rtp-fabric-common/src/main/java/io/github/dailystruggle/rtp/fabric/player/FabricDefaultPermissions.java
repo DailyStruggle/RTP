@@ -36,7 +36,8 @@ public final class FabricDefaultPermissions {
 
     private static final Set<String> DEFAULT_TRUE = Set.of(
             "rtp.see",
-            "rtp.use"
+            "rtp.use",
+            "rtp.servers.*"
     );
 
     private static final Set<String> DEFAULT_FALSE = Set.of(

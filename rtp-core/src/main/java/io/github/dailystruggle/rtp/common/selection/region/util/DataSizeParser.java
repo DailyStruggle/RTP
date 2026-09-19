@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 public final class DataSizeParser {
 
   private static final Pattern SINGLE_DATA_SIZE_PATTERN =
-      Pattern.compile("^\\s*([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]+)?\\s*+$");
+      Pattern.compile("^\\s*([+-]?[0-9]+(?:\\.[0-9]+)?)(?:\\s*([a-zA-Z]+))?\\s*$");
 
   private DataSizeParser() {}
 

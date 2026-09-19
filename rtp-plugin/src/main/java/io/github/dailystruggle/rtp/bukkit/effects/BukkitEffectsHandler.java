@@ -70,6 +70,21 @@ public class BukkitEffectsHandler {
      * main thread.
      */
     private static void dispatchEffects(JavaPlugin plugin, String prefix, Player player) {
+        dispatchEffects(plugin, prefix, player, null, null, null);
+    }
+
+    private static void dispatchEffects(JavaPlugin plugin, String prefix, Player player, org.bukkit.Location explicitLocation) {
+        dispatchEffects(plugin, prefix, player, explicitLocation, null, null);
+    }
+
+    private static void dispatchEffects(JavaPlugin plugin, String prefix, Player player,
+                                        org.bukkit.Location explicitLocation, org.bukkit.Location destinationLocation) {
+        dispatchEffects(plugin, prefix, player, explicitLocation, destinationLocation, null);
+    }
+
+    private static void dispatchEffects(JavaPlugin plugin, String prefix, Player player,
+                                        org.bukkit.Location explicitLocation, org.bukkit.Location destinationLocation,
+                                        TeleportPipelineTask pipelineTask) {
         // 1) Convert permission-attachment infos to flat node strings (the same
         //    transformation BukkitEffectsInitializer.buildEffects(prefix, perms)
         //    performs internally).
@@ -92,10 +107,26 @@ public class BukkitEffectsHandler {
                 : nodes;
         if (union.isEmpty()) return;
 
+        Object target;
+        if (explicitLocation != null) {
+            target = new io.github.dailystruggle.effectsapi.common.spi.EffectTarget(
+                    io.github.dailystruggle.effectsapi.bukkit.BukkitHandles.wrap(player),
+                    io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(explicitLocation),
+                    destinationLocation != null ? io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(destinationLocation) : null);
+        } else {
+            target = player;
+        }
+
         // 3) Build and dispatch.
         List<Effect<?>> effects = EffectFactory.buildEffects(prefix, union);
         for (Effect<?> effect : effects) {
-            effect.setTarget(player);
+            effect.setTarget(target);
+            if (effect instanceof io.github.dailystruggle.effectsapi.common.effects.DeathEffect) {
+                RTP.deathEffectInFlight.add(player.getUniqueId());
+                if (pipelineTask != null) {
+                    pipelineTask.deathEffectTriggered = true;
+                }
+            }
             // Schedule on a thread that legally owns the player so that
             // platform-restricted ops inside Effect#run (NoteEffect playSound,
             // FireworkEffect spawn, etc.) don't trip Paper's AsyncCatcher
@@ -236,9 +267,18 @@ public class BukkitEffectsHandler {
                             return;
                         Player player = resolveBukkitPlayer(task.player().uuid(), "preteleport");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
-                                .add(() -> dispatchEffects(plugin, "rtp.effect.preteleport", player));
+                        org.bukkit.Location originLocation = player.getLocation();
+                        org.bukkit.Location destinationLocation = null;
+                        if (task.coords() != null) {
+                            org.bukkit.World destWorld = Bukkit.getWorld(task.coords().worldName());
+                            if (destWorld != null) {
+                                destinationLocation = new org.bukkit.Location(destWorld, task.coords().x(), task.coords().y(), task.coords().z());
+                            }
+                        }
+                        final org.bukkit.Location finalDest = destinationLocation;
+                        // Synchronously resolve effects for preteleport so that any DeathEffect
+                        // marks pipelineTask.deathEffectTriggered before runTeleport() executes.
+                        dispatchEffects(plugin, "rtp.effect.preteleport", player, originLocation, finalDest, task);
                     }
                 });
 

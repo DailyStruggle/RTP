@@ -24,6 +24,7 @@ repositories {
 }
 dependencies {
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     // The platform-neutral menu (model, config, render seam, teleport submit).
     // The assembly jar shades rtp-gui-common directly; here it is a plain runtime
     // dependency so the renderer compiles and the assembly resolves it once.
@@ -32,6 +33,7 @@ dependencies {
     // compileOnly (never bundled by this carrier).
     compileOnly project(':rtp-api')
     compileOnly project(':rtp-core')
+    testImplementation project(':rtp-core')
     compileOnly project(':metrics-api')
 }
 // NOTE: plugin.yml carries its `version:` literally (1.0.0), NOT a `${version}`

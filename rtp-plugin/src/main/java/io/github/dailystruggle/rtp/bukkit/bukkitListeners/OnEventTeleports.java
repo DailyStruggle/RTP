@@ -90,6 +90,13 @@ public class OnEventTeleports implements Listener {
     Player player = event.getEntity();
     UUID id = player.getUniqueId();
 
+    if (RTP.pendingDeathTeleports.containsKey(id) || RTP.deathEffectInFlight.contains(id)) {
+      // Intentional death effect in active teleport pipeline:
+      // Do NOT cancel the teleport, do NOT refund, and do NOT generate or recycle a respawn location.
+      // The destination coordinate was anchored as the player's respawn location.
+      return;
+    }
+
     TeleportData senderData = RTP.getInstance().latestTeleportData.get(id);
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(id);

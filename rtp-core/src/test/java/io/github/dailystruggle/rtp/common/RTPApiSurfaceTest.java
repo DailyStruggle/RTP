@@ -236,6 +236,60 @@ class RTPApiSurfaceTest {
 
     @Test
     @Timeout(10)
+    void getTargetStatus_networkTarget_wildcardPermissionRespected() {
+        UUID id = UUID.randomUUID();
+        java.util.Set<String> perms = new java.util.HashSet<>();
+        MockRTPPlayer player = new MockRTPPlayer(
+                id, "NetworkPlayer",
+                new RTPLocation(new MockRTPWorld("default"), 0, 0, 0)) {
+            @Override
+            public boolean hasPermission(String perm) {
+                return perms.contains(perm);
+            }
+        };
+        accessor.addPlayer(player);
+
+        io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat hb =
+                new io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat(
+                        "backend-x", 1, io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat.PluginState.READY, true,
+                        System.currentTimeMillis(), 5.0, 0, 100, 0L, 1L, 0,
+                        List.of(), List.of(),
+                        false, 0, 0, java.util.Set.of("default"), java.util.Map.of());
+        io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot snap =
+                new io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot(
+                        System.currentTimeMillis(), java.util.Map.of("backend-x", hb));
+        io.github.dailystruggle.rtp.common.network.PeerRegionRegistry reg =
+                new io.github.dailystruggle.rtp.common.network.PeerRegionRegistry(() -> snap, "local-1");
+        io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE =
+                new io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap();
+        try {
+            java.lang.reflect.Field field =
+                    io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.class
+                            .getDeclaredField("peerRegionRegistry");
+            field.setAccessible(true);
+            field.set(io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE, reg);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            RtpTarget target = RtpTarget.network("backend-x", "default");
+
+            // Without perms: NO_PERMISSION
+            RtpTargetStatus noPerm = RTPAPI.getTargetStatus(id, target);
+            assertEquals(RtpTargetStatus.Availability.NO_PERMISSION, noPerm.availability());
+
+            // With rtp.servers.*: READY
+            perms.add("rtp.servers.*");
+            RtpTargetStatus withPerm = RTPAPI.getTargetStatus(id, target);
+            assertEquals(RtpTargetStatus.Availability.READY, withPerm.availability());
+        } finally {
+            io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE = null;
+        }
+    }
+
+    @Test
+    @Timeout(10)
     void getMetricsSnapshot_isNonNull() {
         assertNotNull(RTPAPI.getMetricsSnapshot());
     }

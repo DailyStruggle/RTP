@@ -151,7 +151,10 @@ class JoinTriggerSourceTest {
     }
 
     private MockRTPPlayer onlinePlayer(UUID id) {
-        MockRTPPlayer p = new MockRTPPlayer(id, "P-" + id, null);
+        MockRTPPlayer p = new MockRTPPlayer(
+                id, "P-" + id,
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(
+                        accessor.getRTPWorlds().get(0), 0, 64, 0));
         p.setOnline(true);
         accessor.addPlayer(p);
         return p;
@@ -284,7 +287,7 @@ class JoinTriggerSourceTest {
         scheduler.tick(5);
 
         assertEquals(List.of(tokenId), t.redeemedTokens);
-        assertEquals(List.of("rtp"), p.performedCommands);
+        assertEquals(io.github.dailystruggle.rtp.api.RtpTarget.defaultRegion(), src.dispatchedTargetForTesting(id));
     }
 
     @Test
@@ -303,7 +306,7 @@ class JoinTriggerSourceTest {
         hook.joinHandler.accept(id);
         scheduler.tick(5);
 
-        assertEquals(List.of("rtp region=backend-a:nether"), p.performedCommands);
+        assertEquals(io.github.dailystruggle.rtp.api.RtpTarget.region("nether"), src.dispatchedTargetForTesting(id));
     }
 
     @Test
@@ -327,7 +330,7 @@ class JoinTriggerSourceTest {
         scheduler.tick(5);
 
         assertTrue(cache.get(id).isEmpty(), "REDEEMED must evict the local status row");
-        assertEquals(List.of("rtp"), p.performedCommands);
+        assertEquals(io.github.dailystruggle.rtp.api.RtpTarget.defaultRegion(), src.dispatchedTargetForTesting(id));
     }
 
     @Test

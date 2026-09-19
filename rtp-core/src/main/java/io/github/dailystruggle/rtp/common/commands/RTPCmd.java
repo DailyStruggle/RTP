@@ -281,8 +281,10 @@ public interface RTPCmd extends BaseRTPCmd {
     try {
       onCommand(senderId, sender::hasPermission, messageMethod, args)
           .whenComplete((aBoolean, throwable) -> {
-            if (throwable != null) {
-              RTP.log(Level.WARNING, throwable.getMessage(), throwable);
+            if (throwable != null || Boolean.FALSE.equals(aBoolean)) {
+              if (throwable != null) {
+                RTP.log(Level.WARNING, throwable.getMessage(), throwable);
+              }
               RTP.getInstance().processingPlayers.remove(senderId);
             }
           });

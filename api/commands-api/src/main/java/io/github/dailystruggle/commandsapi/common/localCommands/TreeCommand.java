@@ -214,7 +214,10 @@ public interface TreeCommand extends CommandsAPICommand {
                                                  int i,
                                                  @Nullable Map<String,CommandParameter> tempParameters) {
         if(tempParameters == null) tempParameters = new HashMap<>();
-        if(!permissionCheckMethod.test(permission())) return CompletableFuture.completedFuture(false);
+        if(permission() != null && !permissionCheckMethod.test(permission())) {
+            msgNoPermission(callerId, permission(), messageMethod);
+            return CompletableFuture.completedFuture(false);
+        }
         Map<String,List<String>> parameterValues = new HashMap<>();
         Map<String, CommandParameter> parameterLookup = getParameterLookup();
         for (; i < args.length; i++) {
@@ -248,7 +251,8 @@ public interface TreeCommand extends CommandsAPICommand {
                 CommandsAPI.commandPipeline.add(commandExecutor);
 
                 //catch no perms for subcommand
-                if (!permissionCheckMethod.test(subCommand.permission())) {
+                if (subCommand.permission() != null && !permissionCheckMethod.test(subCommand.permission())) {
+                    subCommand.msgNoPermission(callerId, subCommand.permission(), messageMethod);
                     return CompletableFuture.completedFuture(false);
                 }
 
@@ -278,7 +282,8 @@ public interface TreeCommand extends CommandsAPICommand {
             CommandParameter currentParameter = parameterLookup.containsKey(paramName)
                     ? parameterLookup.get(paramName)
                     : tempParameters.get(paramName);
-            if (currentParameter == null || !permissionCheckMethod.test(currentParameter.permission())) {
+            if (currentParameter == null
+                    || (currentParameter.permission() != null && !permissionCheckMethod.test(currentParameter.permission()))) {
                 msgBadParameter(callerId,argSplit[0],argSplit[1],messageMethod);
                 return CompletableFuture.completedFuture(false);
             }

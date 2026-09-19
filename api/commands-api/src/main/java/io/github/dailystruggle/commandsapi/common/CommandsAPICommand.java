@@ -26,6 +26,10 @@ public interface CommandsAPICommand {
     default void msgInvalidCommand(UUID callerId, String argument, Consumer<String> messageMethod) {
         msgInvalidCommand(callerId, argument);
     }
+    default void msgNoPermission(UUID callerId, String permission) {}
+    default void msgNoPermission(UUID callerId, String permission, Consumer<String> messageMethod) {
+        msgNoPermission(callerId, permission);
+    }
     long avgTime();
 
     /**

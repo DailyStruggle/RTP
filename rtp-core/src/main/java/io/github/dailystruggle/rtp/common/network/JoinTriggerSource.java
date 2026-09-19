@@ -46,6 +46,12 @@ public final class JoinTriggerSource {
     private final ConcurrentHashMap<UUID, UUID> activeReservations = new ConcurrentHashMap<>();
 
     /**
+     * Tracks last dispatched RtpTarget per player for auditing and tests.
+     */
+    private final ConcurrentHashMap<UUID, io.github.dailystruggle.rtp.api.RtpTarget> dispatchedTargets =
+            new ConcurrentHashMap<>();
+
+    /**
      * @param transport live backend transport (never null)
      * @param serverId  this backend's {@code network.serverId} (never null/empty)
      */
@@ -185,30 +191,50 @@ public final class JoinTriggerSource {
     }
 
     private void dispatchRtp(UUID id, Optional<String> regionKey) {
-        // Re-attach the cross-server region intent (carried on the reservation
-        // token from the player's `/rtp region=<server>:<region>` command) so
-        // the local pipeline teleports into the requested region rather than
-        // the backend default. Regionless requests dispatch a bare `rtp`.
-        final String command = (regionKey != null && regionKey.isPresent()
-                && !regionKey.get().isEmpty())
-                ? "rtp region=" + regionKey.get()
-                : "rtp";
+        // Trigger the arrival teleport fluidly via the public RTP API without
+        // faking chat commands or triggering parameter permission checks.
+        // Regionless requests target the default region; explicit region keys
+        // (bare 'nether' or qualified 'server:nether') target the local region.
+        String rawKey = (regionKey != null && regionKey.isPresent()) ? regionKey.get() : null;
+        String localRegionName = null;
+        if (rawKey != null && !rawKey.isBlank()) {
+            int colon = rawKey.indexOf(':');
+            localRegionName = (colon >= 0) ? rawKey.substring(colon + 1) : rawKey;
+        }
+        final io.github.dailystruggle.rtp.api.RtpTarget target =
+                (localRegionName != null && !localRegionName.isBlank())
+                        ? io.github.dailystruggle.rtp.api.RtpTarget.region(localRegionName)
+                        : io.github.dailystruggle.rtp.api.RtpTarget.defaultRegion();
+
         // Hop to the player's owning thread (entity scheduler on Folia, main thread on Bukkit).
         Runnable hop = () -> {
             RTPPlayer player = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPlayer(id) : null;
             if (player == null || !player.isOnline()) {
                 RTP.log(Level.FINE,
                         "[RTP][trace] JoinTriggerSource.dispatchRtp: player offline at hop time for " + id
-                                + "; /rtp NOT dispatched");
+                                + "; teleport NOT dispatched");
                 return; // disconnected between join and hop
             }
             RTP.log(Level.FINE,
-                    "[RTP][trace] JoinTriggerSource.dispatchRtp: invoking performCommand(player, \""
-                            + command + "\") for " + id);
+                    "[RTP][trace] JoinTriggerSource.dispatchRtp: invoking RTPAPI.teleport for " + id
+                            + " target=" + target);
+            dispatchedTargets.put(id, target);
             try {
-                player.performCommand(player, command);
+                io.github.dailystruggle.rtp.api.RTPAPI.teleport(id, target)
+                        .whenComplete((result, err) -> {
+                            if (err != null) {
+                                RTP.log(Level.WARNING,
+                                        "[RTP] JoinTriggerSource: RTPAPI.teleport threw for " + id
+                                                + ": " + err.getMessage(), err);
+                            } else if (result != null && !result.isSuccess()) {
+                                RTP.log(Level.WARNING,
+                                        "[RTP] JoinTriggerSource: RTPAPI.teleport failed for " + id
+                                                + " reason=" + result.reason()
+                                                + " msg=" + result.message());
+                            }
+                        });
                 RTP.log(Level.FINE,
-                        "[RTP][trace] JoinTriggerSource.dispatchRtp: performCommand dispatched"
+                        "[RTP][trace] JoinTriggerSource.dispatchRtp: RTPAPI.teleport dispatched"
                                 + " for " + id);
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
@@ -429,5 +455,10 @@ public final class JoinTriggerSource {
     /** Visible for tests: live snapshot of playerId-&gt;tokenId bindings. */
     java.util.Map<UUID, UUID> activeReservationsForTesting() {
         return java.util.Collections.unmodifiableMap(activeReservations);
+    }
+
+    /** Visible for tests: last dispatched RtpTarget for player. */
+    io.github.dailystruggle.rtp.api.RtpTarget dispatchedTargetForTesting(UUID id) {
+        return dispatchedTargets.get(id);
     }
 }

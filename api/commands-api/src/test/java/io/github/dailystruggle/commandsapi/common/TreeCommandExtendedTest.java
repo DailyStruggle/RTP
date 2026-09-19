@@ -25,6 +25,7 @@ class TreeCommandExtendedTest {
         Map<String, List<String>> lastParamValues = null;
         List<String> badParams = new ArrayList<>();
         List<String> invalidCmds = new ArrayList<>();
+        List<String> noPerms = new ArrayList<>();
         boolean executed = false;
 
         TestTreeCmd(String name, String perm) {
@@ -87,6 +88,17 @@ class TreeCommandExtendedTest {
         public void msgInvalidCommand(UUID callerId, String argument, Consumer<String> messageMethod) {
             msgInvalidCommand(callerId, argument);
             messageMethod.accept("invalidCmd:" + argument);
+        }
+
+        @Override
+        public void msgNoPermission(UUID callerId, String permission) {
+            noPerms.add(permission);
+        }
+
+        @Override
+        public void msgNoPermission(UUID callerId, String permission, Consumer<String> messageMethod) {
+            msgNoPermission(callerId, permission);
+            messageMethod.accept("noPerm:" + permission);
         }
 
         @Override
@@ -386,6 +398,7 @@ class TreeCommandExtendedTest {
         // 1. Permission denied on subcommand
         CompletableFuture<Boolean> deniedSub = root.onCommand(caller, p -> !p.equals("perm.sub"), msgs::add, new String[]{"sub"});
         assertFalse(deniedSub.join());
+        assertTrue(msgs.contains("noPerm:perm.sub"));
 
         // Drain the pipeline so queued CommandExecutor doesn't leak into subsequent tests
         CommandsAPI.execute();
@@ -675,5 +688,45 @@ class TreeCommandExtendedTest {
         rootNoSub.addParameter("nosub", paramNoSub);
         List<String> whileSubNull = rootNoSub.onTabComplete(caller, p -> true, new String[]{"nosub=v1", "next="});
         assertNotNull(whileSubNull);
+
+        // 34. onCommand permission denial message feedback for root command and subcommand
+        TestTreeCmd permRoot = new TestTreeCmd("permroot", "perm.required");
+        permRoot.onCommand(caller, p -> false, s -> {}, new String[0]);
+        assertTrue(permRoot.noPerms.contains("perm.required"));
+
+        TestTreeCmd permSub = new TestTreeCmd("permsub", "perm.subreq");
+        permRoot.addSubCommand(permSub);
+        permRoot.onCommand(caller, "perm.required"::equals, s -> {}, new String[]{"permsub"});
+        assertTrue(permSub.noPerms.contains("perm.subreq"));
+
+        // Subcommand with null permission executes cleanly
+        TestTreeCmd nullPermSub = new TestTreeCmd("nullpermsub", null);
+        permRoot.addSubCommand(nullPermSub);
+        CompletableFuture<Boolean> nullPermSubRes = permRoot.onCommand(caller, "perm.required"::equals, s -> {}, new String[]{"nullpermsub"});
+        CommandsAPI.execute();
+        assertNotNull(nullPermSubRes);
+
+        // Subcommand with non-null permission passing
+        TestTreeCmd passingPermSub = new TestTreeCmd("passingsub", "perm.subpass");
+        permRoot.addSubCommand(passingPermSub);
+        CompletableFuture<Boolean> passingPermSubRes = permRoot.onCommand(caller, p -> true, s -> {}, new String[]{"passingsub"});
+        CommandsAPI.execute();
+        assertNotNull(passingPermSubRes);
+
+        // Root with null permission executes cleanly
+        TestTreeCmd nullPermRootCmd = new TestTreeCmd("nullpermroot", null);
+        CompletableFuture<Boolean> nullPermRootRes = nullPermRootCmd.onCommand(caller, p -> false, s -> {}, new String[0]);
+        assertTrue(nullPermRootRes.join());
+
+        // Root with non-null permission passing
+        TestTreeCmd passingPermRoot = new TestTreeCmd("passingroot", "perm.rootpass");
+        CompletableFuture<Boolean> passingPermRootRes = passingPermRoot.onCommand(caller, "perm.rootpass"::equals, s -> {}, new String[0]);
+        assertTrue(passingPermRootRes.join());
+
+        // 35. onCommand parameter with null permission is allowed through
+        TestTreeCmd nullPermParamRoot = new TestTreeCmd("nullpermparamroot", null);
+        nullPermParamRoot.addParameter("open", new DynamicParam(null, "open", Set.of("v"), s -> true));
+        CompletableFuture<Boolean> nullPermParamRes = nullPermParamRoot.onCommand(caller, p -> false, s -> {}, new String[]{"open=v"});
+        assertTrue(nullPermParamRes.join());
       }
 }

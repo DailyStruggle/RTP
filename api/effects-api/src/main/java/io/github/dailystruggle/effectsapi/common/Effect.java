@@ -207,6 +207,7 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
             // Platform-neutral handles (effects-api-ADR-007)
             if (n.equals("io.github.dailystruggle.effectsapi.common.spi.PlayerHandle")) return true;
             if (n.equals("io.github.dailystruggle.effectsapi.common.spi.LocationHandle")) return true;
+            if (n.equals("io.github.dailystruggle.effectsapi.common.spi.EffectTarget")) return true;
 
             for (Class<?> i : c.getInterfaces()) {
                 String in = i.getName();
@@ -214,6 +215,7 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
                 if (in.equals("org.bukkit.Location")) return true;
                 if (in.equals("io.github.dailystruggle.effectsapi.common.spi.PlayerHandle")) return true;
                 if (in.equals("io.github.dailystruggle.effectsapi.common.spi.LocationHandle")) return true;
+                if (in.equals("io.github.dailystruggle.effectsapi.common.spi.EffectTarget")) return true;
             }
         }
         return false;

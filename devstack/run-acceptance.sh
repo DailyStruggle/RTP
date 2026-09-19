@@ -114,6 +114,13 @@ initialize_secrets() {
   local fwd; fwd="$(tr -d '[:space:]' < "$fwdPath")"
   [ -n "$fwd" ] || { echo "shared/forwarding.secret is empty after seeding - cannot continue" >&2; exit 1; }
   export CFG_VELOCITY_FORWARDING_SECRET="$fwd"
+  # Persist it into `.env` too: the exported var only covers compose calls made
+  # by this shell, so a later manual `docker compose up` aborted with
+  # "required variable CFG_VELOCITY_FORWARDING_SECRET is missing a value".
+  # Compose always reads `.env` from the project dir.
+  grep -v -E '^[[:space:]]*CFG_VELOCITY_FORWARDING_SECRET[[:space:]]*=' "$envPath" 2>/dev/null > "$envPath.tmp" || true
+  echo "CFG_VELOCITY_FORWARDING_SECRET=$fwd" >> "$envPath.tmp"
+  mv "$envPath.tmp" "$envPath"
 }
 
 declare -a LOG_PIDS=()

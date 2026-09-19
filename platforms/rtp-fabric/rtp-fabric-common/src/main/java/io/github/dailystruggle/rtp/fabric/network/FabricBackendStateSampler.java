@@ -191,6 +191,18 @@ public final class FabricBackendStateSampler implements BackendStateSampler {
                         } catch (Throwable ignored) {
                             // Defensive: label enrichment is best-effort.
                         }
+                        try {
+                            // Advertise whether this region is permission-gated
+                            // (`requirePermission`) so a peer only demands
+                            // rtp.regions.<region> from its players when this
+                            // backend would. Published only when true; absent
+                            // means "open", matching older peers.
+                            if (region.getSettings().requirePermission()) {
+                                regionMetadata.put(region.name + ".perm", "true");
+                            }
+                        } catch (Throwable ignored) {
+                            // Defensive: settings read must not break the sample.
+                        }
                     }
                 }
             } catch (Throwable ignored) {

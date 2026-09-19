@@ -38,7 +38,8 @@ public final class NeoForgeDefaultPermissions {
 
     private static final Set<String> DEFAULT_TRUE = Set.of(
             "rtp.see",
-            "rtp.use"
+            "rtp.use",
+            "rtp.servers.*"
     );
 
     private static final Set<String> DEFAULT_FALSE = Set.of(

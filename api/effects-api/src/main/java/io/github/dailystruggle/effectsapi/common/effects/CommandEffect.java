@@ -108,7 +108,6 @@ public class CommandEffect extends Effect<CommandEffect.CommandKeys> {
             mode = Mode.PLAYER;
             startIndex = 1;
         } else if (first.equalsIgnoreCase("CONSOLE")) {
-            mode = Mode.CONSOLE;
             startIndex = 1;
         }
 

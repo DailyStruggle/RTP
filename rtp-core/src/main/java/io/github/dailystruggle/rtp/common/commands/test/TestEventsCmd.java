@@ -54,13 +54,13 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
 
     if (!TestSemaphore.tryAcquire(callerId, name())) {
       report(callerId, "&c[RTP test/events] another test is already in flight for this caller", Level.WARNING, null);
-      return true;
+      return false;
     }
 
     if (RTP.scheduler == null) {
       TestSemaphore.release(callerId, name());
       report(callerId, "&c[RTP test/events] RTP.scheduler is null; core not yet loaded", Level.WARNING, null);
-      return true;
+      return false;
     }
 
     final Runnable[] hookHolder = new Runnable[1];

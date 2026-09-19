@@ -92,6 +92,24 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
     return r.pass;
   }
 
+  /**
+   * True when the accessor exposes a usable block-material vocabulary. Platform accessors differ
+   * in form: Bukkit-family returns bare enum names ({@code AIR}), while Fabric/NeoForge return
+   * namespaced registry ids upper-cased ({@code MINECRAFT:AIR}). Accept either, case-insensitively,
+   * so the probe measures registry availability rather than naming style.
+   */
+  private static boolean hasCommonMaterials(@Nullable Set<String> mats) {
+    if (mats == null || mats.isEmpty()) return false;
+    for (String mat : mats) {
+      if (mat == null) continue;
+      String name = mat.trim();
+      int colon = name.lastIndexOf(':');
+      if (colon >= 0) name = name.substring(colon + 1);
+      if (name.equalsIgnoreCase("AIR") || name.equalsIgnoreCase("STONE")) return true;
+    }
+    return false;
+  }
+
   public static Result runProbe(UUID callerId) {
     Result r = new Result();
 
@@ -104,7 +122,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
     // 1. Materials probe
     try {
       Set<String> mats = RTP.serverAccessor.materials();
-      if (mats != null && !mats.isEmpty() && (mats.contains("AIR") || mats.contains("STONE") || mats.contains("minecraft:air"))) {
+      if (hasCommonMaterials(mats)) {
         r.materialsValid = true;
       } else {
         r.pass = false;

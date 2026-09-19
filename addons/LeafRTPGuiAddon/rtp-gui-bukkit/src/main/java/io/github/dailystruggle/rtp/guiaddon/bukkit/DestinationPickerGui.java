@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.guiaddon.bukkit;
 
 import io.github.dailystruggle.rtp.api.RtpTarget;
+import io.github.dailystruggle.rtp.common.tools.MiniMessageColorExpander;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuEntry;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuIcons;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuLayout;
@@ -17,6 +18,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Bukkit chest-inventory rendering of a platform-neutral {@link MenuModel}.
@@ -38,10 +41,14 @@ public final class DestinationPickerGui implements InventoryHolder {
   private final int dashboardSlot;
   private final Map<Integer, RtpTarget> slotTargets = new HashMap<>();
 
+  private static final Pattern HEX_PATTERN_1 = Pattern.compile("&#([0-9a-fA-F]{6})");
+  private static final Pattern HEX_PATTERN_2 = Pattern.compile("#([0-9a-fA-F]{6})");
+  private static final Pattern COLOR_PREFIX_PATTERN =
+      Pattern.compile("^(?:[&\u00a7][0-9a-fk-orA-FK-OR]|(?:&?#[0-9a-fA-F]{6})|<[^>]+>)");
+
   private DestinationPickerGui(MenuModel model, int rows, int dashboardSlot) {
     this.inventory =
-        Bukkit.createInventory(this, rows * COLUMNS,
-            ChatColor.translateAlternateColorCodes('&', model.title()));
+        Bukkit.createInventory(this, rows * COLUMNS, colorize(model.title()));
     this.dashboardSlot = dashboardSlot;
   }
 
@@ -114,7 +121,11 @@ public final class DestinationPickerGui implements InventoryHolder {
     ItemStack item = new ItemStack(material(entry.iconName(), Material.COMPASS));
     ItemMeta meta = item.getItemMeta();
     if (meta != null) {
-      meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&b" + entry.displayName()));
+      String name = entry.displayName();
+      if (name != null && !COLOR_PREFIX_PATTERN.matcher(name).find()) {
+        name = "&b" + name;
+      }
+      meta.setDisplayName(colorize(name));
       meta.setLore(translate(MenuIcons.entryLore(entry)));
       item.setItemMeta(meta);
     }
@@ -125,7 +136,7 @@ public final class DestinationPickerGui implements InventoryHolder {
     ItemStack item = new ItemStack(material(model.dashboardIconName(), Material.PAPER));
     ItemMeta meta = item.getItemMeta();
     if (meta != null) {
-      meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', MenuIcons.dashboardTitle()));
+      meta.setDisplayName(colorize(MenuIcons.dashboardTitle()));
       meta.setLore(translate(MenuIcons.dashboardLore(model)));
       item.setItemMeta(meta);
     }
@@ -135,9 +146,60 @@ public final class DestinationPickerGui implements InventoryHolder {
   private static List<String> translate(List<String> lines) {
     List<String> out = new ArrayList<>(lines.size());
     for (String line : lines) {
-      out.add(ChatColor.translateAlternateColorCodes('&', line));
+      out.add(colorize(line));
     }
     return out;
+  }
+
+  /**
+   * Colorizes text for Bukkit/Paper menus: expands MiniMessage markup, translates
+   * hex color codes (&#rrggbb and #rrggbb into §x§r§r§g§g§b§b), and converts legacy
+   * '&' color/formatting codes to section symbols.
+   */
+  public static String colorize(String text) {
+    if (text == null || text.isEmpty()) {
+      return "";
+    }
+    try {
+      text = MiniMessageColorExpander.expand(text);
+    } catch (Throwable ignored) {
+      // Best-effort expander fallback
+    }
+    Matcher m1 = HEX_PATTERN_1.matcher(text);
+    if (m1.find()) {
+      StringBuilder sb = new StringBuilder(text.length() + 32);
+      int last = 0;
+      m1.reset();
+      while (m1.find()) {
+        sb.append(text, last, m1.start());
+        String hex = m1.group(1);
+        sb.append('\u00a7').append('x');
+        for (int i = 0; i < 6; i++) {
+          sb.append('\u00a7').append(Character.toLowerCase(hex.charAt(i)));
+        }
+        last = m1.end();
+      }
+      sb.append(text, last, text.length());
+      text = sb.toString();
+    }
+    Matcher m2 = HEX_PATTERN_2.matcher(text);
+    if (m2.find()) {
+      StringBuilder sb = new StringBuilder(text.length() + 32);
+      int last = 0;
+      m2.reset();
+      while (m2.find()) {
+        sb.append(text, last, m2.start());
+        String hex = m2.group(1);
+        sb.append('\u00a7').append('x');
+        for (int i = 0; i < 6; i++) {
+          sb.append('\u00a7').append(Character.toLowerCase(hex.charAt(i)));
+        }
+        last = m2.end();
+      }
+      sb.append(text, last, text.length());
+      text = sb.toString();
+    }
+    return ChatColor.translateAlternateColorCodes('&', text);
   }
 
   private static Material material(String name, Material fallback) {

@@ -31,8 +31,9 @@ $repoRoot = Split-Path -Parent $devstack
 $targets = @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')
 
 # plugin.yml declares name: LeafRTPGuiAddon, so any LeafRTPGuiAddon*.jar / rtp-gui-bukkit*.jar
-# is "ours" for the remove pass.
-$jarGlobs = @('LeafRTPGuiAddon*.jar', 'rtp-gui-bukkit*.jar')
+# is "ours" for the remove pass. Also purge legacy RTP_GuiAddon*.jar so deprecated
+# pre-3.2 GUI jars are cleaned up and don't shadow LeafRTPGuiAddon.
+$jarGlobs = @('LeafRTPGuiAddon*.jar', 'rtp-gui-bukkit*.jar', 'RTP_GuiAddon*.jar')
 
 if ($Remove) {
     foreach ($t in $targets) {
@@ -51,18 +52,18 @@ if ($Remove) {
 }
 
 if (-not $SkipBuild) {
-    Write-Host "Building addons:LeafRTPGuiAddon:rtp-gui-bukkit:shadowJar ..."
+    Write-Host "Building addons:LeafRTPGuiAddon:rtp-gui:shadowJar ..."
     Push-Location $repoRoot
     try {
-        & .\gradlew ':addons:LeafRTPGuiAddon:rtp-gui-bukkit:shadowJar' --console=plain
+        & .\gradlew ':addons:LeafRTPGuiAddon:rtp-gui:shadowJar' --console=plain
         if ($LASTEXITCODE -ne 0) { throw "gradle build failed (exit $LASTEXITCODE)" }
     } finally {
         Pop-Location
     }
 }
 
-$libsDir = Join-Path $repoRoot 'addons\LeafRTPGuiAddon\rtp-gui-bukkit\build\libs'
-$jar = Get-ChildItem -Path $libsDir -Filter 'rtp-gui-bukkit-*.jar' -File -ErrorAction SilentlyContinue |
+$libsDir = Join-Path $repoRoot 'addons\LeafRTPGuiAddon\rtp-gui\build\libs'
+$jar = Get-ChildItem -Path $libsDir -Filter 'LeafRTPGuiAddon-*.jar' -File -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $jar) {
     throw "Built jar not found under $libsDir. Run without -SkipBuild, or build the module first."

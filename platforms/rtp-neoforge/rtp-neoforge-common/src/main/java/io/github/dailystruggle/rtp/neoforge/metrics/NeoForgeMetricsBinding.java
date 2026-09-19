@@ -16,8 +16,17 @@ import java.util.function.LongSupplier;
  * EMA approach used by {@code BukkitTpsSampler} in {@code rtp-bukkit-common}:
  * inter-tick deltas are blended into 1m / 5m / 15m exponential moving averages
  * (1200 / 6000 / 18000 ticks at 20 TPS), and TPS = 1e9 / EMA clamped to
- * {@code [0, NOMINAL_TPS]}. {@link #mspt()} returns the raw 1-minute EMA in
- * milliseconds.
+ * {@code [0, NOMINAL_TPS]}.
+ *
+ * <p><b>TPS and MSPT are measured from two different sources.</b> The vanilla
+ * server loop sleeps after each tick to hold the nominal rate, so the
+ * inter-tick wall-clock interval is {@code max(work, 50ms)} - a valid TPS
+ * estimator but floored at 50 ms. Deriving {@link #mspt()} from it pinned the
+ * reading at ~50 ms on a healthy server and made it incapable of ever falling
+ * below that floor. MSPT therefore blends a separate work-duration sample (the
+ * server's own average tick time, supplied via {@code tickWorkNanosSupplier}),
+ * and reports {@link MetricsSnapshot#UNSAMPLED} when no work source is
+ * reachable rather than the misleading interval.
  *
  * <p>Per-region surface ({@link #foliaRegions()}) inherits the default
  * {@link MetricsBinding} empty list - NeoForge is a single-region runtime.
@@ -44,9 +53,21 @@ public final class NeoForgeMetricsBinding implements MetricsBinding {
     private static final double WINDOW_5M_TICKS = 5.0 * 60.0 * NOMINAL_TPS;
     private static final double WINDOW_15M_TICKS = 15.0 * 60.0 * NOMINAL_TPS;
 
+    /**
+     * EMA window in ticks for MSPT (~1s). Deliberately far shorter than the TPS
+     * windows: the upstream work sample is already a smoothed mean (Mojang
+     * averages over 100 ticks), so a long outer window would only double-smooth
+     * and make the reading sluggish to recover.
+     */
+    private static final double MSPT_WINDOW_TICKS = 20.0;
+
+    /** Sentinel for "no work sample available this tick". */
+    private static final long NO_WORK_SAMPLE = -1L;
+
     private final LongSupplier nanoClock;
     private final IntSupplier playerCountSupplier;
     private final IntSupplier softCapSupplier;
+    private final LongSupplier tickWorkNanosSupplier;
 
     private final AtomicLong lastNanos = new AtomicLong(Long.MIN_VALUE);
 
@@ -54,24 +75,50 @@ public final class NeoForgeMetricsBinding implements MetricsBinding {
     private volatile double ema5m = Double.NaN;
     private volatile double ema15m = Double.NaN;
 
+    /** EMA of per-tick work duration in nanos; drives {@link #mspt()}. */
+    private volatile double msptEmaNanos = Double.NaN;
+
     /**
      * Production constructor - uses {@link System#nanoTime()} and
      * caller-supplied count suppliers.
      */
     public NeoForgeMetricsBinding(IntSupplier playerCountSupplier, IntSupplier softCapSupplier) {
-        this(System::nanoTime, playerCountSupplier, softCapSupplier);
+        this(playerCountSupplier, softCapSupplier, () -> NO_WORK_SAMPLE);
+    }
+
+    /**
+     * Production constructor with an explicit per-tick work-duration source.
+     * {@code tickWorkNanosSupplier} yields the average in-tick work duration in
+     * nanoseconds (e.g. reflective {@code MinecraftServer#getAverageTickTimeNanos})
+     * and must return {@code <= 0} when no sample is available; {@link #mspt()}
+     * then reports {@link MetricsSnapshot#UNSAMPLED}.
+     */
+    public NeoForgeMetricsBinding(IntSupplier playerCountSupplier,
+                                  IntSupplier softCapSupplier,
+                                  LongSupplier tickWorkNanosSupplier) {
+        this(System::nanoTime, playerCountSupplier, softCapSupplier, tickWorkNanosSupplier);
     }
 
     /** Test seam. */
     NeoForgeMetricsBinding(LongSupplier nanoClock,
                            IntSupplier playerCountSupplier,
                            IntSupplier softCapSupplier) {
+        this(nanoClock, playerCountSupplier, softCapSupplier, () -> NO_WORK_SAMPLE);
+    }
+
+    /** Test seam. */
+    NeoForgeMetricsBinding(LongSupplier nanoClock,
+                           IntSupplier playerCountSupplier,
+                           IntSupplier softCapSupplier,
+                           LongSupplier tickWorkNanosSupplier) {
         if (nanoClock == null) throw new IllegalArgumentException("nanoClock must not be null");
         if (playerCountSupplier == null) throw new IllegalArgumentException("playerCountSupplier must not be null");
         if (softCapSupplier == null) throw new IllegalArgumentException("softCapSupplier must not be null");
+        if (tickWorkNanosSupplier == null) throw new IllegalArgumentException("tickWorkNanosSupplier must not be null");
         this.nanoClock = nanoClock;
         this.playerCountSupplier = playerCountSupplier;
         this.softCapSupplier = softCapSupplier;
+        this.tickWorkNanosSupplier = tickWorkNanosSupplier;
     }
 
     /** Record one tick from the server thread (production entry point). */
@@ -81,6 +128,30 @@ public final class NeoForgeMetricsBinding implements MetricsBinding {
 
     /** Record one tick using a caller-supplied timestamp. Visible for tests. */
     public void tick(long nowNanos) {
+        long work;
+        try {
+            work = tickWorkNanosSupplier.getAsLong();
+        } catch (Throwable ignored) {
+            work = NO_WORK_SAMPLE; // observability must never throw on the tick thread
+        }
+        tick(nowNanos, work);
+    }
+
+    /**
+     * Record one tick with an explicit work duration. The interval
+     * {@code nowNanos - previous} feeds the TPS EMAs; {@code workNanos} feeds the
+     * MSPT EMA independently. Pass {@code <= 0} for {@code workNanos} when no
+     * work sample is available - MSPT is then left unsampled rather than being
+     * contaminated with the sleep-padded interval.
+     *
+     * @param nowNanos  monotonic timestamp of this tick boundary
+     * @param workNanos in-tick work duration in nanoseconds, or {@code <= 0}
+     */
+    public void tick(long nowNanos, long workNanos) {
+        if (workNanos > 0L) {
+            msptEmaNanos = blend(msptEmaNanos, (double) workNanos, MSPT_WINDOW_TICKS);
+        }
+
         long prev = lastNanos.getAndSet(nowNanos);
         if (prev == Long.MIN_VALUE) return; // first sample: seed only
 
@@ -117,7 +188,7 @@ public final class NeoForgeMetricsBinding implements MetricsBinding {
 
     @Override
     public double mspt() {
-        double v = ema1m;
+        double v = msptEmaNanos;
         if (Double.isNaN(v) || v <= 0.0) return MetricsSnapshot.UNSAMPLED;
         return v / 1e6;
     }

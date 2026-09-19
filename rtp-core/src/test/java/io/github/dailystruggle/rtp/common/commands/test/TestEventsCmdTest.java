@@ -67,7 +67,7 @@ class TestEventsCmdTest {
     RTP.scheduler = null;
     try {
       boolean ret = new TestEventsCmd(null).onCommand(player.uuid(), noArgs(), null);
-      assertTrue(ret);
+      assertFalse(ret);
     } finally {
       RTP.scheduler = accessor.getMockScheduler();
     }
@@ -84,7 +84,7 @@ class TestEventsCmdTest {
     assertTrue(TestSemaphore.tryAcquire(player.uuid(), "other-test"));
 
     boolean ret = new TestEventsCmd(null).onCommand(player.uuid(), noArgs(), null);
-    assertTrue(ret);
+    assertFalse(ret);
 
     assertTrue(
         player.sentMessages.stream().anyMatch(m -> m.contains("another test is already in flight")),

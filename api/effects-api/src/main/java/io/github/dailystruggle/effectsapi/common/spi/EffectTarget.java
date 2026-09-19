@@ -21,14 +21,20 @@ import org.jetbrains.annotations.Nullable;
 public final class EffectTarget {
     private final @Nullable PlayerHandle player;
     private final @NotNull LocationHandle location;
+    private final @Nullable LocationHandle destination;
 
     public EffectTarget(@Nullable Object player, @NotNull Object location) {
+        this(player, location, null);
+    }
+
+    public EffectTarget(@Nullable Object player, @NotNull Object location, @Nullable Object destination) {
         this.player = player == null ? null : HandleRegistry.wrapPlayer(player);
         LocationHandle loc = HandleRegistry.wrapLocation(location);
         if (loc == null) {
             throw new IllegalArgumentException("EffectTarget location shall not be null or unresolvable");
         }
         this.location = loc;
+        this.destination = destination == null ? null : HandleRegistry.wrapLocation(destination);
     }
 
     /** The player the effect targets, or {@code null} for ambient world effects. */
@@ -36,14 +42,20 @@ public final class EffectTarget {
         return player;
     }
 
-    /** The location the effect is anchored to. Never {@code null}. */
+    /** The location the effect is anchored to (e.g. origin/current location). Never {@code null}. */
     public @NotNull LocationHandle location() {
         return location;
+    }
+
+    /** The destination of a teleport/transition, if available. */
+    public @Nullable LocationHandle destination() {
+        return destination;
     }
 
     @Override
     public String toString() {
         return "EffectTarget{player=" + (player == null ? "null" : player.uuid())
-                + ", location=" + location + '}';
+                + ", location=" + location
+                + ", destination=" + destination + '}';
     }
 }

@@ -196,6 +196,90 @@ public final class FabricHandles implements HandleProvider {
         }
 
         @Override
+        public void dropInventory(@Nullable LocationHandle dropLocation) {
+            net.minecraft.server.MinecraftServer server = player.getServer();
+            Runnable task = () -> {
+                try {
+                    player.getInventory().dropAll();
+                } catch (Throwable ignored) {}
+            };
+            if (server != null) {
+                server.execute(task);
+            } else {
+                task.run();
+            }
+        }
+
+        @Override
+        public void dropExperience(@Nullable LocationHandle dropLocation) {
+            net.minecraft.server.MinecraftServer server = player.getServer();
+            Runnable task = () -> {
+                try {
+                    int pointsToDrop = Math.min(player.experienceLevel * 7, 100);
+                    if (pointsToDrop > 0) {
+                        net.minecraft.world.phys.Vec3 pos = player.position();
+                        if (dropLocation != null) {
+                            pos = new net.minecraft.world.phys.Vec3(dropLocation.doubleX(), dropLocation.doubleY(), dropLocation.doubleZ());
+                        }
+                        net.minecraft.world.entity.ExperienceOrb.award(player.serverLevel(), pos, pointsToDrop);
+                    }
+                    player.experienceLevel = 0;
+                    player.experienceProgress = 0.0f;
+                    player.totalExperience = 0;
+                } catch (Throwable ignored) {}
+            };
+            if (server != null) {
+                server.execute(task);
+            } else {
+                task.run();
+            }
+        }
+
+        @Override
+        public void kill(boolean setBed, @Nullable LocationHandle respawnLocation) {
+            net.minecraft.server.MinecraftServer server = player.getServer();
+            Runnable task = () -> {
+                try {
+                    if (respawnLocation != null) {
+                        try {
+                            ServerLevel targetLevel = player.serverLevel();
+                            net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> targetDim = targetLevel.dimension();
+                            if (server != null) {
+                                for (ServerLevel sl : server.getAllLevels()) {
+                                    if (sl.dimension().location().toString().equals(respawnLocation.worldName())) {
+                                        targetDim = sl.dimension();
+                                        break;
+                                    }
+                                }
+                            }
+                            net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(
+                                    respawnLocation.x(), respawnLocation.y(), respawnLocation.z());
+                            for (java.lang.reflect.Method m : ServerPlayer.class.getMethods()) {
+                                if (!m.getName().equals("setRespawnPosition")) continue;
+                                Class<?>[] pt = m.getParameterTypes();
+                                if (pt.length == 5) {
+                                    m.invoke(player, targetDim, pos, 0.0f, setBed, false);
+                                    break;
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                    player.kill();
+                } catch (Throwable ignored) {}
+            };
+            if (server != null) {
+                server.execute(task);
+            } else {
+                task.run();
+            }
+        }
+
+        @Override
+        public void kill() {
+            kill(true, null);
+        }
+
+        @Override
         public void performCommand(@NotNull String command) {
             net.minecraft.server.MinecraftServer server = player.getServer();
             if (server != null) {

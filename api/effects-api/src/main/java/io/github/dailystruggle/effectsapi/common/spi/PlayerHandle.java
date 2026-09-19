@@ -84,4 +84,52 @@ public interface PlayerHandle {
      * @param command command string to run
      */
     default void performCommand(@NotNull String command) {}
+
+    /**
+     * Drops the player's inventory contents naturally at the specified location (or their current location
+     * if null) and clears their inventory.
+     *
+     * @param dropLocation the location to drop the inventory at, or null for current location
+     */
+    default void dropInventory(@org.jetbrains.annotations.Nullable LocationHandle dropLocation) {}
+
+    /**
+     * Drops the player's inventory contents naturally at their current location and clears their inventory.
+     */
+    default void dropInventory() {
+        dropInventory((LocationHandle) null);
+    }
+
+    /**
+     * Drops experience naturally at the specified location (or player's current location if null)
+     * according to the vanilla Minecraft player death experience formula (Math.min(level * 7, 100)),
+     * and clears the player's experience.
+     *
+     * @param dropLocation the location to drop experience at, or null for current location
+     */
+    default void dropExperience(@org.jetbrains.annotations.Nullable LocationHandle dropLocation) {}
+
+    /**
+     * Drops experience naturally at the player's current location according to the vanilla Minecraft
+     * player death experience formula (Math.min(level * 7, 100)), and clears the player's experience.
+     */
+    default void dropExperience() {
+        dropExperience((LocationHandle) null);
+    }
+
+    /**
+     * Kills the player, triggering the standard Minecraft death event and death screen.
+     */
+    default void kill() {
+        kill(true, null);
+    }
+
+    /**
+     * Kills the player, triggering the standard Minecraft death event and death screen,
+     * and optionally sets their respawn position to the target location.
+     *
+     * @param setBed whether to anchor the respawn point (bed/respawn anchor)
+     * @param respawnLocation the location to respawn at, or null to keep standard respawn
+     */
+    default void kill(boolean setBed, @org.jetbrains.annotations.Nullable LocationHandle respawnLocation) {}
 }

@@ -398,8 +398,32 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public String getServerVersion() {
+    // Loom compiles `MinecraftServer#getServerVersion` to the intermediary alias
+    // (method_3827), which is absent on the deobfuscated MC 26.x runtime and throws
+    // NoSuchMethodError. FabricLoader's minecraft mod-container metadata is
+    // mapping-neutral and stable across MC lines, so it is the primary source.
+    try {
+      String v = FabricLoader.getInstance().getModContainer("minecraft")
+          .map(c -> c.getMetadata().getVersion().getFriendlyString())
+          .orElse(null);
+      if (v != null && !v.isEmpty()) return v;
+    } catch (Throwable ignored) {
+      // fall through to the reflective server probe
+    }
     MinecraftServer s = server;
-    return s == null ? "unknown" : s.getServerVersion();
+    if (s == null) return "unknown";
+    // Reflective fallback: try the Mojang name first, then the 1.20/1.21
+    // intermediary alias. Never bake either into a direct invocation.
+    for (String name : new String[] { "getServerVersion", "method_3827" }) {
+      try {
+        java.lang.reflect.Method m = s.getClass().getMethod(name);
+        Object v = m.invoke(s);
+        if (v instanceof String str && !str.isEmpty()) return str;
+      } catch (Throwable ignored) {
+        // try next candidate
+      }
+    }
+    return "unknown";
   }
 
   @Override
@@ -421,14 +445,31 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public Integer getServerIntVersion() {
-    // Mojang server version string is e.g. "1.21.1". Extract the minor as the
-    // integer version Bukkit-family code uses (e.g. 21). Defensive parse.
+    // Contract (RTPServerAccessor#getServerIntVersion): 21 for 1.21.x, 26 for 26.x.
+    // Legacy strings are "1.<minor>.<patch>" so the headline number is the minor;
+    // Mojang's 26.x scheme drops the leading "1." so the major IS the headline
+    // number. Parsing parts[1] unconditionally reported 1 on MC 26.1.x.
     String v = getServerVersion();
     String[] parts = v.split("\\.");
-    if (parts.length >= 2) {
-      try { return Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {}
+    if (parts.length == 0) return 0;
+    try {
+      int major = Integer.parseInt(digitPrefix(parts[0]));
+      if (major != 1) return major;
+      if (parts.length >= 2) return Integer.parseInt(digitPrefix(parts[1]));
+    } catch (NumberFormatException ignored) {
+      // fall through to the unknown sentinel
     }
     return 0;
+  }
+
+  /**
+   * Leading run of digits in {@code s}, so pre-release suffixes
+   * (e.g. {@code "26.2-rc-2"}) parse as their numeric component.
+   */
+  private static String digitPrefix(String s) {
+    int i = 0;
+    while (i < s.length() && s.charAt(i) >= '0' && s.charAt(i) <= '9') i++;
+    return s.substring(0, i);
   }
 
   @Override
@@ -997,14 +1038,106 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     }
   }
 
+  /** Mojang-mapped entry point for the built-in registries holder. */
+  private static final String MOJANG_REGISTRIES_CLASS =
+      "net.minecraft.core.registries.BuiltInRegistries";
+  /** Fabric intermediary alias Loom actually emits for the same holder. */
+  private static final String INTERMEDIARY_REGISTRIES_CLASS = "net.minecraft.class_7923";
+
+  /** Cached {@link #materials()} result; the block registry is immutable post-bootstrap. */
+  private volatile Set<String> materialsCache;
+
+  private static boolean classResolvable(String className) {
+    try {
+      Class.forName(className, false, FabricServerAccessor.class.getClassLoader());
+      return true;
+    } catch (Throwable t) {
+      return false;
+    }
+  }
+
   @Override
   public Set<String> materials() {
-    // Mirror AbstractServerAccessor.materials(): return upper-case identifiers
-    // for every block in the registry. Fabric's BuiltInRegistries.BLOCK is the
-    // direct equivalent of Bukkit's Material.values() (block subset).
+    Set<String> cached = materialsCache;
+    if (cached != null) return cached;
+    // The typed walk below is emitted as intermediary bytecode by Loom, so it can
+    // only run where class_7923 resolves. On the deobfuscated MC 26.x runtime the
+    // intermediary alias is absent and a direct reference raises
+    // NoClassDefFoundError: net/minecraft/class_7923 - walk reflectively instead.
+    Set<String> out;
+    if (classResolvable(INTERMEDIARY_REGISTRIES_CLASS)) {
+      out = materialsTyped();
+    } else if (classResolvable(MOJANG_REGISTRIES_CLASS)) {
+      out = materialsReflectively(MOJANG_REGISTRIES_CLASS);
+    } else {
+      log(Level.WARNING,
+          "[RTP][Fabric] materials() unavailable: neither " + MOJANG_REGISTRIES_CLASS
+              + " nor " + INTERMEDIARY_REGISTRIES_CLASS + " resolved on this runtime;"
+              + " block-name validation will be skipped.");
+      out = Collections.emptySet();
+    }
+    if (!out.isEmpty()) materialsCache = out;
+    return out;
+  }
+
+  /**
+   * Mirror AbstractServerAccessor.materials(): return upper-case identifiers
+   * for every block in the registry. Fabric's BuiltInRegistries.BLOCK is the
+   * direct equivalent of Bukkit's Material.values() (block subset).
+   *
+   * <p>Isolated in its own method so the intermediary constant-pool entry is
+   * resolved only when {@link #materials()} elects this path.</p>
+   */
+  private Set<String> materialsTyped() {
     Set<String> out = new HashSet<>();
     for (ResourceLocation key : BuiltInRegistries.BLOCK.keySet()) {
       out.add(key.toString().toUpperCase());
+    }
+    return out;
+  }
+
+  /**
+   * Reflection-only {@link #materials()} for deobfuscated MC 26.x runtimes.
+   * Resolves the registries holder by name at runtime and reuses the same
+   * dynamic discovery helpers as {@code buildBlockTagSnapshotReflectively},
+   * so no intermediary symbol is baked into this method's bytecode.
+   */
+  private Set<String> materialsReflectively(String registriesClassName) {
+    Set<String> out = new HashSet<>();
+    try {
+      Class<?> registriesCls = Class.forName(
+          registriesClassName, true, FabricServerAccessor.class.getClassLoader());
+      Object blockRegistry = findBlockRegistry(registriesCls);
+      if (blockRegistry == null) {
+        throw new NoSuchFieldException("BLOCK registry field on " + registriesClassName);
+      }
+      if (!(blockRegistry instanceof Iterable<?> registryIterable)) {
+        throw new IllegalStateException(
+            "BLOCK registry is not Iterable: " + blockRegistry.getClass().getName());
+      }
+      java.lang.reflect.Method getKey = findMethodAny(
+          blockRegistry.getClass(), 1, new String[] { "getKey", "method_10221" });
+      if (getKey == null) {
+        throw new NoSuchMethodException(
+            "getKey(Object) on " + blockRegistry.getClass().getName());
+      }
+      for (Object block : registryIterable) {
+        if (block == null) continue;
+        Object blockId;
+        try {
+          blockId = getKey.invoke(blockRegistry, block);
+        } catch (Throwable t) {
+          continue;
+        }
+        if (blockId == null) continue;
+        out.add(blockId.toString().toUpperCase());
+      }
+    } catch (Throwable t) {
+      log(Level.WARNING,
+          "[RTP][Fabric] materials() registry walk failed via " + registriesClassName
+              + " (" + t.getClass().getSimpleName() + ": " + t.getMessage()
+              + "); block-name validation will be skipped.");
+      return Collections.emptySet();
     }
     return out;
   }

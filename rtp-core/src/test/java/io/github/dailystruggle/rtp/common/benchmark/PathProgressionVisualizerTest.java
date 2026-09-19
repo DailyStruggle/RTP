@@ -144,13 +144,16 @@ public class PathProgressionVisualizerTest {
 
     ImageIO.write(img, "png", new File(outReportsDir, "sub_bin_zoom_path_chart.png"));
     ImageIO.write(img, "png", new File("sub_bin_zoom_path_chart.png"));
-    File rootCopy = new File("../sub_bin_zoom_path_chart.png");
-    if (rootCopy.getParentFile().exists()) {
-      ImageIO.write(img, "png", rootCopy);
-    }
-    File docsCopy = new File("../docs/assets/img/sub_bin_zoom_path_chart.png");
-    if (docsCopy.getParentFile().exists()) {
-      ImageIO.write(img, "png", docsCopy);
+
+    File[] candidateDocsDirs = new File[] {
+      new File("docs/assets/img"),
+      new File("../docs/assets/img"),
+      new File("../../docs/assets/img")
+    };
+    for (File dir : candidateDocsDirs) {
+      if (dir.exists()) {
+        ImageIO.write(img, "png", new File(dir, "sub_bin_zoom_path_chart.png"));
+      }
     }
 
     System.out.println("[DEBUG_LOG] Successfully rendered sub-bin zoom chart to: " + new File("sub_bin_zoom_path_chart.png").getAbsolutePath());
@@ -241,13 +244,20 @@ public class PathProgressionVisualizerTest {
     if (!chartFileRoot.getParentFile().exists()) {
       chartFileRoot = new File("region_32x32_zoom_path_chart.png");
     }
-    File chartFileDocs = new File("../docs/assets/img/region_32x32_zoom_path_chart.png");
 
     ImageIO.write(img, "png", chartFileReports);
     ImageIO.write(img, "png", chartFileRoot);
     ImageIO.write(img, "png", new File("region_32x32_zoom_path_chart.png"));
-    if (chartFileDocs.getParentFile().exists()) {
-      ImageIO.write(img, "png", chartFileDocs);
+
+    File[] candidateDocsDirs = new File[] {
+      new File("docs/assets/img"),
+      new File("../docs/assets/img"),
+      new File("../../docs/assets/img")
+    };
+    for (File dir : candidateDocsDirs) {
+      if (dir.exists()) {
+        ImageIO.write(img, "png", new File(dir, "region_32x32_zoom_path_chart.png"));
+      }
     }
 
     System.out.println("[DEBUG_LOG] Successfully rendered 32x32 zoom chart to: " + chartFileRoot.getAbsolutePath());
@@ -569,13 +579,22 @@ public class PathProgressionVisualizerTest {
     if (!chartFileRoot.getParentFile().exists()) {
       chartFileRoot = new File("path_progression_radii_chart.png");
     }
-    File chartFileDocs = new File("../docs/assets/img/path_progression_radii_chart.png");
 
     ImageIO.write(img, "png", chartFileReports);
     ImageIO.write(img, "png", chartFileRoot);
     ImageIO.write(img, "png", new File("path_progression_radii_chart.png"));
-    if (chartFileDocs.getParentFile().exists()) {
-      ImageIO.write(img, "png", chartFileDocs);
+
+    // Ensure it always saves to docs/assets/img/ in the real project repo
+    File[] candidateDocsDirs = new File[] {
+      new File("docs/assets/img"),
+      new File("../docs/assets/img"),
+      new File("../../docs/assets/img")
+    };
+    for (File dir : candidateDocsDirs) {
+      if (dir.exists()) {
+        ImageIO.write(img, "png", new File(dir, "path_progression_radii_chart.png"));
+        System.out.println("[DEBUG_LOG] Wrote path_progression_radii_chart.png to: " + new File(dir, "path_progression_radii_chart.png").getAbsolutePath());
+      }
     }
 
     System.out.println("[DEBUG_LOG] Successfully rendered chart to: " + chartFileRoot.getAbsolutePath());
@@ -599,7 +618,7 @@ public class PathProgressionVisualizerTest {
     // Title inside card
     g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
     g.setColor(isSquare ? new Color(0x7EE787) : new Color(0xF2CC60));
-    String shapeName = isSquare ? "Square (Chebyshev)" : "Circle (Euclidean)";
+    String shapeName = isSquare ? "Square (Chebyshev Close-Up)" : "Circle (Euclidean Close-Up)";
     g.drawString(shapeName, plotX + 10, plotY - 6);
 
     // Instantiate shape
@@ -619,84 +638,127 @@ public class PathProgressionVisualizerTest {
     int p = shape.getPointEdgeChunks();
     long totalRange = shape.getRange();
 
-    // Center and scale factors
+    // Scale window: show a focused close-up of the initial pathing so chunk steps & Hilbert sub-tiles are clear!
+    // For P=1 (R=32), show [-16..16] (window = 32 chunks)
+    // For P=2 (R=64, 126), show [-16..16] (window = 32 chunks)
+    // For P=8 (R=256), show [-24..24] (window = 48 chunks, shows 6x6 of 8x8 bins)
+    // For P=16 (R=512), show [-32..32] (window = 64 chunks, shows 4x4 of 16x16 bins)
+    int viewWindowChunks;
+    if (p == 1) {
+      viewWindowChunks = 32;
+    } else if (p == 2) {
+      viewWindowChunks = 32;
+    } else if (p == 8) {
+      viewWindowChunks = 48;
+    } else {
+      viewWindowChunks = 64;
+    }
+
+    int halfWindow = viewWindowChunks / 2;
     int originX = plotX + plotW / 2;
     int originY = plotY + plotH / 2;
-    double scale = (double) (Math.min(plotW, plotH) - 20) / (2.0 * r);
+    double scale = (double) (Math.min(plotW, plotH) - 10) / viewWindowChunks;
 
-    // Draw boundary guide
-    g.setColor(new Color(0x21262D));
-    if (isSquare) {
-      int boxSize = (int) (2 * r * scale);
-      g.drawRect(originX - boxSize / 2, originY - boxSize / 2, boxSize, boxSize);
-    } else {
-      int diam = (int) (2 * r * scale);
-      g.drawOval(originX - diam / 2, originY - diam / 2, diam, diam);
+    // Draw chunk grid lines if resolution permits
+    if (scale >= 4.0) {
+      g.setColor(new Color(0x131821));
+      for (int c = -halfWindow; c <= halfWindow; c++) {
+        int gx = originX + (int) Math.round(c * scale);
+        int gy = originY + (int) Math.round(c * scale);
+        g.drawLine(gx, plotY, gx, plotY + plotH);
+        g.drawLine(plotX, gy, plotX + plotW, gy);
+      }
+    }
+
+    // Draw macro-cell / sub-bin boundaries (P x P chunks)
+    if (p > 1 && scale * p >= 12.0) {
+      g.setColor(new Color(0x283548));
+      g.setStroke(new BasicStroke(1.2f));
+      int startBin = -((halfWindow / p) + 1) * p;
+      int endBin = ((halfWindow / p) + 1) * p;
+      for (int b = startBin; b <= endBin; b += p) {
+        int bx = originX + (int) Math.round(b * scale);
+        int by = originY + (int) Math.round(b * scale);
+        if (bx >= plotX && bx <= plotX + plotW) {
+          g.drawLine(bx, plotY, bx, plotY + plotH);
+        }
+        if (by >= plotY && by <= plotY + plotH) {
+          g.drawLine(plotX, by, plotX + plotW, by);
+        }
+      }
+      g.setStroke(new BasicStroke(1.0f));
     }
 
     // Draw axes
-    g.setColor(new Color(0x1E242C));
+    g.setColor(new Color(0x303E54));
     g.drawLine(originX, plotY, originX, plotY + plotH);
     g.drawLine(plotX, originY, plotX + plotW, originY);
 
-    // Number of steps to draw: draw representative path
-    // For smaller radii, draw a good fraction of the range; for larger, draw up to 4000 steps or full ring traversal
-    int maxSteps = Math.min((int) totalRange, 2500);
-    if (r <= 64) {
-      maxSteps = Math.min((int) totalRange, 1500);
-    }
-
-    List<PathStep> path = new ArrayList<>(maxSteps);
+    // Collect steps that fall within or traverse the close-up window
+    // Draw enough steps to showcase the spiral/Hilbert progression within the window
+    int targetSteps = Math.min((int) totalRange, Math.max(1024, viewWindowChunks * viewWindowChunks));
+    List<PathStep> path = new ArrayList<>(targetSteps);
     MutableRTPCoords coords = new MutableRTPCoords(0, 0);
 
-    for (int i = 0; i < maxSteps; i++) {
+    for (int i = 0; i < targetSteps; i++) {
       shape.locationToXZ(i, coords);
       path.add(new PathStep(i, coords.x, coords.z));
     }
 
     // Draw trajectory polyline with color gradient
     if (path.size() > 1) {
+      BasicStroke stepStroke = new BasicStroke(scale >= 6.0 ? 2.0f : 1.4f);
+      BasicStroke jumpStroke = new BasicStroke(1.8f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{4.0f, 4.0f}, 0.0f);
+
       for (int i = 0; i < path.size() - 1; i++) {
         PathStep p1 = path.get(i);
         PathStep p2 = path.get(i + 1);
 
-        int sx1 = originX + (int) Math.round(p1.cx * scale);
-        int sy1 = originY + (int) Math.round(p1.cz * scale);
-        int sx2 = originX + (int) Math.round(p2.cx * scale);
-        int sy2 = originY + (int) Math.round(p2.cz * scale);
+        // Clip to window margin
+        if (Math.abs(p1.cx) > halfWindow + 1 && Math.abs(p2.cx) > halfWindow + 1) continue;
+        if (Math.abs(p1.cz) > halfWindow + 1 && Math.abs(p2.cz) > halfWindow + 1) continue;
 
-        float progress = (float) i / (path.size() - 1);
-        // Gradient: Cyan (0.5f) -> Green (0.33f) -> Orange/Gold (0.12f) -> Red/Magenta (0.0f)
-        float hue = 0.55f * (1.0f - progress);
-        g.setColor(new Color(Color.HSBtoRGB(hue, 0.85f, 0.95f)));
-        g.setStroke(new BasicStroke(1.2f));
-        g.drawLine(sx1, sy1, sx2, sy2);
+        int sx1 = originX + (int) Math.round((p1.cx + 0.5) * scale);
+        int sy1 = originY + (int) Math.round((p1.cz + 0.5) * scale);
+        int sx2 = originX + (int) Math.round((p2.cx + 0.5) * scale);
+        int sy2 = originY + (int) Math.round((p2.cz + 0.5) * scale);
+
+        int dist = Math.abs(p2.cx - p1.cx) + Math.abs(p2.cz - p1.cz);
+
+        if (dist > 1) {
+          g.setColor(new Color(0xF85149)); // Disconnecting jump (if any)
+          g.setStroke(jumpStroke);
+          g.drawLine(sx1, sy1, sx2, sy2);
+        } else {
+          float progress = (float) i / (path.size() - 1);
+          float hue = 0.55f * (1.0f - progress);
+          g.setColor(new Color(Color.HSBtoRGB(hue, 0.85f, 0.95f)));
+          g.setStroke(stepStroke);
+          g.drawLine(sx1, sy1, sx2, sy2);
+        }
       }
+      g.setStroke(new BasicStroke(1.0f));
     }
 
     // Highlight starting point (loc 0)
     if (!path.isEmpty()) {
       PathStep start = path.get(0);
-      int sx = originX + (int) Math.round(start.cx * scale);
-      int sy = originY + (int) Math.round(start.cz * scale);
+      int sx = originX + (int) Math.round((start.cx + 0.5) * scale);
+      int sy = originY + (int) Math.round((start.cz + 0.5) * scale);
       g.setColor(new Color(0x388BFD));
       g.fillOval(sx - 4, sy - 4, 9, 9);
       g.setColor(Color.WHITE);
       g.drawOval(sx - 4, sy - 4, 9, 9);
     }
 
-    // Highlight current end point
-    if (path.size() > 1) {
-      PathStep end = path.get(path.size() - 1);
-      int sx = originX + (int) Math.round(end.cx * scale);
-      int sy = originY + (int) Math.round(end.cz * scale);
-      g.setColor(new Color(0xF85149));
-      g.fillOval(sx - 3, sy - 3, 7, 7);
-    }
-
     // Info overlay inside bottom of card
     g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 10));
     g.setColor(new Color(0x8B949E));
-    g.drawString(String.format("Range: %,d | Shown: %,d steps", totalRange, maxSteps), plotX + 8, plotY + plotH - 8);
+    // Clear area behind string so text is crisp
+    String info = String.format("Close-Up: %dx%d chunks | P=%d | Scale: %.1f px/c", viewWindowChunks, viewWindowChunks, p, scale);
+    g.setColor(new Color(0x0D1117));
+    g.fillRect(plotX + 6, plotY + plotH - 20, 310, 16);
+    g.setColor(new Color(0x8B949E));
+    g.drawString(info, plotX + 8, plotY + plotH - 8);
   }
 }
