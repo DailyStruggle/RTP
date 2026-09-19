@@ -100,9 +100,9 @@ public final class RTPLocation implements Cloneable {
    */
   public long distanceSquared(RTPLocation that) {
     if (!this.world.equals(that.world)) return Long.MAX_VALUE;
-    long dx = this.x - that.x;
-    long dy = this.y - that.y;
-    long dz = this.z - that.z;
+    long dx = (long) this.x - that.x;
+    long dy = (long) this.y - that.y;
+    long dz = (long) this.z - that.z;
     return (long) (Math.pow(dx, 2) + Math.pow(dy, 2) + Math.pow(dz, 2));
   }
 
@@ -114,8 +114,8 @@ public final class RTPLocation implements Cloneable {
    */
   public long distanceSquaredXZ(RTPLocation that) {
     if (!this.world.equals(that.world)) return Long.MAX_VALUE;
-    long dx = this.x - that.x;
-    long dz = this.z - that.z;
+    long dx = (long) this.x - that.x;
+    long dz = (long) this.z - that.z;
     return (long) (Math.pow(dx, 2) + Math.pow(dz, 2));
   }
 

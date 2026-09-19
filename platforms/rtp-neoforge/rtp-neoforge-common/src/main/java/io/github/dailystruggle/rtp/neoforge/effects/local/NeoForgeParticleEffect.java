@@ -82,9 +82,9 @@ public class NeoForgeParticleEffect extends Effect<FabricParticleKeys> {
         if (!ParticleOptions.class.isAssignableFrom(p[1])) return false;
         int i = 2;
         for (int b = 0; b < boolPrefix; b++) if (p[i++] != boolean.class) return false;
-        if (p[i++] != double.class || p[i++] != double.class || p[i++] != double.class) return false;
+        for (int d = 0; d < 3; d++) if (p[i++] != double.class) return false;
         if (p[i++] != int.class) return false;
-        if (p[i++] != double.class || p[i++] != double.class || p[i++] != double.class || p[i] != double.class) return false;
+        for (int d = 0; d < 4; d++) if (p[i++] != double.class) return false;
         return true;
     }
 
@@ -133,9 +133,9 @@ public class NeoForgeParticleEffect extends Effect<FabricParticleKeys> {
         if (!ParticleOptions.class.isAssignableFrom(p[0])) return false;
         int i = 1;
         for (int b = 0; b < boolPrefix; b++) if (p[i++] != boolean.class) return false;
-        if (p[i++] != double.class || p[i++] != double.class || p[i++] != double.class) return false;
+        for (int d = 0; d < 3; d++) if (p[i++] != double.class) return false;
         if (p[i++] != int.class) return false;
-        if (p[i++] != double.class || p[i++] != double.class || p[i++] != double.class || p[i] != double.class) return false;
+        for (int d = 0; d < 4; d++) if (p[i++] != double.class) return false;
         return true;
     }
 

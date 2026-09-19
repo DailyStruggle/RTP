@@ -81,16 +81,14 @@ public interface ConfigLoader {
         throw new IllegalStateException("failed to create directory - " + outDir.getPath());
     }
 
-    try {
+    try (InputStream is = in) {
       if (!outFile.exists() || replace) {
-        try {
-          OutputStream out = new FileOutputStream(outFile);
+        try (OutputStream out = new FileOutputStream(outFile)) {
           byte[] buf = new byte[1024];
           int len;
-          while ((len = in.read(buf)) > 0) {
+          while ((len = is.read(buf)) > 0) {
             out.write(buf, 0, len);
           }
-          out.close();
         } catch (IOException ex) {
           RTP.log(Level.SEVERE, "Could not save " + outFile.getName() + " to " + outFile, ex);
         }
@@ -105,11 +103,8 @@ public interface ConfigLoader {
                 + outFile.getName()
                 + " already exists.");
       }
-      in.close();
     } catch (IOException ex) {
       RTP.log(Level.SEVERE, "Could not save " + outFile.getName() + " to " + outFile, ex);
-    } finally {
-
     }
   }
 }

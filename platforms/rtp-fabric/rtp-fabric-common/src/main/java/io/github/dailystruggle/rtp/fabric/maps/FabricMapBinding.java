@@ -72,6 +72,7 @@ public final class FabricMapBinding implements MapBinding, MapBindingLifecycle {
     /** Opaque synthetic map-id counter for {@link MapHandle#mapId()} (the real
      * {@code MapId} is owned by the carrier, keyed by chartId). */
     private final AtomicInteger synthId = new AtomicInteger(1);
+    private final Object bufferLock = new Object();
 
     private volatile boolean disabled = false;
 
@@ -107,7 +108,7 @@ public final class FabricMapBinding implements MapBinding, MapBindingLifecycle {
                     "FabricMapBinding.renderEphemeral: no buffer for chartId=" + handle.chartId()
                             + " (allocate not called?)");
         }
-        synchronized (buf) {
+        synchronized (bufferLock) {
             renderer.render(new FabricMapCanvas(buf), model);
         }
         // Actual server-side map create + pixel + item delivery happens in
@@ -181,12 +182,12 @@ public final class FabricMapBinding implements MapBinding, MapBindingLifecycle {
 
     // --- internals ----------------------------------------------------------
 
-    private static <M extends ChartModel> void renderFrame(int[] buf,
-                                                           ChartRenderer<M> renderer,
-                                                           Supplier<M> supplier) {
+    private <M extends ChartModel> void renderFrame(int[] buf,
+                                                   ChartRenderer<M> renderer,
+                                                   Supplier<M> supplier) {
         M model = supplier.get();
         if (model == null) return; // skip this frame
-        synchronized (buf) {
+        synchronized (bufferLock) {
             renderer.render(new FabricMapCanvas(buf), model);
         }
     }
@@ -206,7 +207,7 @@ public final class FabricMapBinding implements MapBinding, MapBindingLifecycle {
         FabricMapSink player = resolveFabricPlayer(viewer);
         if (player == null) return false;
         int[] snapshot;
-        synchronized (buf) {
+        synchronized (bufferLock) {
             snapshot = buf.clone();
         }
         return player.renderMapChart(chartId, snapshot, locked, deliverItem);

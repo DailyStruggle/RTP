@@ -43,6 +43,17 @@ class RegionBiomesRgbRendererTest {
     assertThrows(NullPointerException.class, () -> new RegionBiomesRgb("r", 2, 2, rgb, null));
     assertThrows(IllegalArgumentException.class, () -> new RegionBiomesRgb("r", 2, 2, new int[3], mask));
     assertThrows(IllegalArgumentException.class, () -> new RegionBiomesRgb("r", 2, 2, rgb, new byte[3]));
+
+    // equals, hashCode, toString
+    RegionBiomesRgb same = new RegionBiomesRgb("test-region", 2, 2, new int[] {0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00}, new byte[] {0, 1, 2, 2});
+    RegionBiomesRgb diff = new RegionBiomesRgb("diff-region", 2, 2, new int[] {0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00}, new byte[] {0, 1, 2, 2});
+    assertEquals(model, model);
+    assertEquals(model, same);
+    assertNotEquals(model, diff);
+    assertNotEquals(model, null);
+    assertNotEquals(model, "not a region biomes rgb");
+    assertEquals(model.hashCode(), same.hashCode());
+    assertNotNull(model.toString());
   }
 
   @Test

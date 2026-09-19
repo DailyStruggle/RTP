@@ -75,9 +75,9 @@ public final class OnPlayerTeleport implements Listener {
       distanceSquared = Double.MAX_VALUE;
     } else {
       distanceSquared =
-          Math.pow(selectedCoords.x() - eventTo.getBlockX(), 2)
-              + Math.pow(selectedCoords.y() - eventTo.getBlockY(), 2)
-              + Math.pow(selectedCoords.z() - eventTo.getBlockZ(), 2);
+          Math.pow((double) selectedCoords.x() - eventTo.getBlockX(), 2)
+              + Math.pow((double) selectedCoords.y() - eventTo.getBlockY(), 2)
+              + Math.pow((double) selectedCoords.z() - eventTo.getBlockZ(), 2);
     }
     if (distanceSquared
         < Math.pow(

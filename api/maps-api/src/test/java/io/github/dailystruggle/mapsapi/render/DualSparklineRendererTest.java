@@ -45,6 +45,17 @@ class DualSparklineRendererTest {
     assertThrows(IllegalArgumentException.class, () -> new DualSparkline("A", new double[2], 0, 1, "B", new double[3], 0, 1));
     assertThrows(IllegalArgumentException.class, () -> new DualSparkline("A", new double[2], 5, 2, "B", new double[2], 0, 1));
     assertThrows(IllegalArgumentException.class, () -> new DualSparkline("A", new double[2], 0, 1, "B", new double[2], 5, 2));
+
+    // equals, hashCode, toString
+    DualSparkline same = new DualSparkline("MSPT", new double[] {10.0, 20.0, 30.0}, 0.0, 50.0, "Heap", new double[] {100.0, 200.0, 300.0}, 0.0, 500.0);
+    DualSparkline diff = new DualSparkline("MSPT2", new double[] {10.0, 20.0, 30.0}, 0.0, 50.0, "Heap", new double[] {100.0, 200.0, 300.0}, 0.0, 500.0);
+    assertEquals(model, model);
+    assertEquals(model, same);
+    assertNotEquals(model, diff);
+    assertNotEquals(model, null);
+    assertNotEquals(model, "not a sparkline");
+    assertEquals(model.hashCode(), same.hashCode());
+    assertNotNull(model.toString());
   }
 
   @Test

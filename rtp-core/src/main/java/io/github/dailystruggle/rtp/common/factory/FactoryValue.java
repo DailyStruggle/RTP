@@ -37,6 +37,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   protected final EnumMap<E, String[]> desc;
 
   protected final Map<String, E> enumLookup;
+  private final Object dataLock = new Object();
 
   /** The name of this factory value (typically the config file name). */
   public String name;
@@ -79,7 +80,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
    */
   @NotNull
   public EnumMap<E, Object> getData() {
-    synchronized (data) {
+    synchronized (dataLock) {
       return data.clone();
     }
   }
@@ -113,8 +114,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     // every cache-back / iterate snapshot); subclasses populating
     // {@code data.put(...)} in constructors run before publication, so the
     // swap pattern is safe across the existing surface.
-    EnumMap<E, Object> oldData = this.data;
-    synchronized (oldData) {
+    synchronized (dataLock) {
       this.data = rebuilt;
     }
   }
@@ -146,8 +146,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
 
           }
         });
-    EnumMap<E, Object> oldData = this.data;
-    synchronized (oldData) {
+    synchronized (dataLock) {
       this.data = rebuilt;
     }
   }
@@ -185,7 +184,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
     if (key == null) throw new IllegalArgumentException("null key");
     if (value == null) throw new IllegalArgumentException("null value");
-    synchronized (this.data) {
+    synchronized (dataLock) {
       this.data.put(key, value);
     }
   }
@@ -196,7 +195,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       FactoryValue<E> clone = (FactoryValue<E>) super.clone();
       // Snapshot under the same lock as getNumber's cache-back put, so the
       // clone observes a coherent EnumMap rather than a partially-mutated one.
-      synchronized (data) {
+      synchronized (dataLock) {
         clone.data = data.clone();
       }
       for (Map.Entry<E, Object> entry : clone.data.entrySet()) {
@@ -227,9 +226,10 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     // publish a new map between the read and the cache-back put, in which
     // case we want both to target the same instance. {@code data} is volatile,
     // so this load is the read-side of the publication.
-    EnumMap<E, Object> snapshot = data;
+    EnumMap<E, Object> snapshot;
     Object resObj;
-    synchronized (snapshot) {
+    synchronized (dataLock) {
+      snapshot = data;
       resObj = snapshot.getOrDefault(key, def);
     }
     // Hot path: already a Number - return without writing back. Pre-fix this
@@ -280,8 +280,10 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     // {@link #setData(EnumMap)} has since swapped {@code data}, the put
     // lands harmlessly in the now-orphaned old map; the next reader will
     // load the new map via the volatile {@code data} field and parse again.
-    synchronized (snapshot) {
-      snapshot.put(key, res);
+    synchronized (dataLock) {
+      if (this.data == snapshot) {
+        snapshot.put(key, res);
+      }
     }
     return res;
   }
@@ -382,14 +384,13 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       try {
         java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream(subDir + "/" + langFile.getName());
         if (in != null) {
-          java.io.FileOutputStream out = new java.io.FileOutputStream(langFile);
-          byte[] buf = new byte[1024];
-          int len;
-          while ((len = in.read(buf)) > 0) {
-            out.write(buf, 0, len);
+          try (in; java.io.FileOutputStream out = new java.io.FileOutputStream(langFile)) {
+            byte[] buf = new byte[1024];
+            int len;
+            while ((len = in.read(buf)) > 0) {
+              out.write(buf, 0, len);
+            }
           }
-          out.close();
-          in.close();
         }
       } catch (Exception ignored) {}
 
@@ -425,5 +426,17 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       } else if (!mine.toString().equalsIgnoreCase(theirs.toString())) return false;
     }
     return true;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = Objects.hash(myClass, name);
+    for (Map.Entry<? extends Enum<?>, Object> e : this.data.entrySet()) {
+      Object mine = e.getValue();
+      if (mine != null) {
+        result = 31 * result + mine.toString().toLowerCase(Locale.ROOT).hashCode();
+      }
+    }
+    return result;
   }
 }

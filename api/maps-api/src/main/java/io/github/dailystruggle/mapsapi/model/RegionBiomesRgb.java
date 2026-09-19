@@ -76,4 +76,33 @@ public record RegionBiomesRgb(String regionName, int width, int height,
     public byte[] mask() {
         return mask.clone();
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof RegionBiomesRgb that)) return false;
+        return width == that.width
+                && height == that.height
+                && regionName.equals(that.regionName)
+                && java.util.Arrays.equals(rgb, that.rgb)
+                && java.util.Arrays.equals(mask, that.mask);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(regionName, width, height);
+        result = 31 * result + java.util.Arrays.hashCode(rgb);
+        result = 31 * result + java.util.Arrays.hashCode(mask);
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "RegionBiomesRgb[" +
+                "regionName=" + regionName + ", " +
+                "width=" + width + ", " +
+                "height=" + height + ", " +
+                "rgb=" + java.util.Arrays.toString(rgb) + ", " +
+                "mask=" + java.util.Arrays.toString(mask) + ']';
+    }
 }

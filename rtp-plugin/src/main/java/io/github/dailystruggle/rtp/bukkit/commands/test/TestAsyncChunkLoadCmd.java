@@ -143,12 +143,12 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
   }
 
   private static long percentile(long[] arr, int pct) {
-    if (arr.length == 0) return 0L;
+    if (arr == null || arr.length == 0) return 0L;
     long[] copy = arr.clone();
     java.util.Arrays.sort(copy);
     int idx = (int) Math.ceil((pct / 100.0) * copy.length) - 1;
-    if (idx < 0) idx = 0;
     if (idx >= copy.length) idx = copy.length - 1;
+    if (idx < 0) idx = 0;
     return copy[idx];
   }
 

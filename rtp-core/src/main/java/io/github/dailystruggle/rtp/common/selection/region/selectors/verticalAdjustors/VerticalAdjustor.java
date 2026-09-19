@@ -214,4 +214,22 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
     }
     return true;
   }
+
+  @Override
+  public int hashCode() {
+    int result = java.util.Objects.hash(super.hashCode(), name);
+    for (Map.Entry<E, Object> entry : getData().entrySet()) {
+      E key = entry.getKey();
+      try {
+        Number number = getNumber(key, 0);
+        result = 31 * result + Double.hashCode(number.doubleValue());
+      } catch (IllegalArgumentException ignored) {
+        Object val = entry.getValue();
+        if (val != null) {
+          result = 31 * result + val.toString().toLowerCase(java.util.Locale.ROOT).hashCode();
+        }
+      }
+    }
+    return result;
+  }
 }

@@ -50,4 +50,32 @@ public record Heatmap2D(int width, int height, double[] values,
     public double valueAt(int x, int y) {
         return values[y * width + x];
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Heatmap2D heatmap2D)) return false;
+        return width == heatmap2D.width
+                && height == heatmap2D.height
+                && Double.compare(heatmap2D.minValue, minValue) == 0
+                && Double.compare(heatmap2D.maxValue, maxValue) == 0
+                && java.util.Arrays.equals(values, heatmap2D.values);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(width, height, minValue, maxValue);
+        result = 31 * result + java.util.Arrays.hashCode(values);
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "Heatmap2D[" +
+                "width=" + width + ", " +
+                "height=" + height + ", " +
+                "values=" + java.util.Arrays.toString(values) + ", " +
+                "minValue=" + minValue + ", " +
+                "maxValue=" + maxValue + ']';
+    }
 }

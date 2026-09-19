@@ -865,7 +865,8 @@ sonar {
                 '**/testing/**',
                 '**/mock/**'
         ].join(',')
-        // Exclude version-pinned platform adapters, deobf/unobf carrier mirrors, and test fixtures from CPD cross-matching
+        // Exclude test fixtures, platform adapters, version shims, unobf carrier mirrors,
+        // and platform-specific implementations from cross-module CPD duplication checks.
         property 'sonar.cpd.exclusions', [
                 '**/test/**',
                 '**/testFixtures/**',
@@ -873,20 +874,27 @@ sonar {
                 '**/*Benchmark*.java',
                 '**/testing/**',
                 '**/mock/**',
-                'platforms/**/v*/**',
-                'platforms/**/*unobf/**',
-                'platforms/**/*Unobf/**',
+                'platforms/**',
+                'addons/**',
+                'helpers/**',
+                'rtp-plugin/**',
                 'api/**/*unobf/**',
                 'api/**/*Unobf/**',
                 '**/server/ServerAccessorImpl.java'
         ].join(',')
+        // ADR-094: Ignore java:S3077 (volatile on non-primitive/array) globally across the project.
+        // Volatile reference publication is an intentional lock-free pattern used across spatial caches,
+        // configuration reloads, and platform handle caches.
+        property 'sonar.issue.ignore.multicriteria', 's3077'
+        property 'sonar.issue.ignore.multicriteria.s3077.ruleKey', 'java:S3077'
+        property 'sonar.issue.ignore.multicriteria.s3077.resourceKey', '**/*'
     }
 }
 
 subprojects {
     sonar {
         properties {
-            def isExcludedFromCoverage = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
+            def isPlatformOrAddon = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
                     project.projectDir.canonicalPath.contains(File.separator + 'addons' + File.separator) ||
                     project.projectDir.canonicalPath.contains(File.separator + 'helpers' + File.separator) ||
                     project.path.startsWith(':rtp-bukkit') ||
@@ -899,8 +907,9 @@ subprojects {
                     project.path == ':rtp-plugin' ||
                     project.path == ':rtp-proxy:rtp-proxy-velocity'
 
-            if (isExcludedFromCoverage) {
+            if (isPlatformOrAddon) {
                 property 'sonar.coverage.exclusions', '**/*'
+                property 'sonar.cpd.exclusions', '**/*'
             }
 
             def isVersionAdapterOrCarrier = project.name.matches('v[0-9]+.*') ||

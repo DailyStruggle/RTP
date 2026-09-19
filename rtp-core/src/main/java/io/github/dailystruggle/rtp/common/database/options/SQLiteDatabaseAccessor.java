@@ -224,11 +224,8 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
 
     // get table info for validation
     String sql = "PRAGMA table_info( " + tableName + " );";
-    Statement statement;
     Map<String, String> columns = new HashMap<>();
-    try {
-      statement = connection.createStatement();
-
+    try (Statement statement = connection.createStatement()) {
       statement.execute(sql);
       ResultSet resultSet;
       try {
@@ -335,66 +332,61 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         }
       }
 
-    } catch (SQLException e) {
-      throw new IllegalStateException();
-    }
+      // validate and add necessary columns
+      List<String> keys = new ArrayList<>();
+      List<String> values = new ArrayList<>();
+      for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
+        String key = entry.getKey().object.toString();
 
-    // validate and add necessary columns
-    List<String> keys = new ArrayList<>();
-    List<String> values = new ArrayList<>();
-    for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
-      String key = entry.getKey().object.toString();
+        keys.add(key);
+        values.add("\"" + entry.getValue().object.toString() + "\"");
 
-      keys.add(key);
-      values.add("\"" + entry.getValue().object.toString() + "\"");
+        if (columns.containsKey(key)) continue;
 
-      if (columns.containsKey(key)) continue;
+        String typeStr;
+        switch (entry.getValue().expectedType) {
+          case INT:
+            typeStr = "INTEGER";
+            break;
+          case REAL:
+            typeStr = "REAL";
+            break;
+          case TEXT:
+            typeStr = "TEXT";
+            break;
+          case BLOB:
+            typeStr = "BLOB";
+            break;
+          default:
+            throw new IllegalStateException("Unexpected value: " + entry.getKey().expectedType);
+        }
 
-      String typeStr;
-      switch (entry.getValue().expectedType) {
-        case INT:
-          typeStr = "INTEGER";
-          break;
-        case REAL:
-          typeStr = "REAL";
-          break;
-        case TEXT:
-          typeStr = "TEXT";
-          break;
-        case BLOB:
-          typeStr = "BLOB";
-          break;
-        default:
-          throw new IllegalStateException("Unexpected value: " + entry.getKey().expectedType);
+        sql = "ALTER TABLE " + tableName + " ADD \"" + key + "\" " + typeStr + ";";
+        try {
+          statement.execute(sql);
+        } catch (SQLException e) {
+          RTP.log(Level.WARNING, e.getMessage(), e);
+        }
       }
 
-      sql = "ALTER TABLE " + tableName + " ADD \"" + key + "\" " + typeStr + ";";
-      try {
-        statement.execute(sql);
-      } catch (SQLException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
+      StringBuilder builder =
+          new StringBuilder("INSERT OR REPLACE INTO ").append(tableName).append(" ( ");
+      for (int k = 0; k < keys.size(); k++) {
+        String key = keys.get(k);
+        builder = builder.append("\"").append(key).append("\"");
+        if (k < keys.size() - 1) builder = builder.append(',');
       }
-    }
+      builder = builder.append(" ) VALUES( ");
+      for (int v = 0; v < values.size(); v++) {
+        String value = values.get(v);
+        builder = builder.append(value);
+        if (v < values.size() - 1) builder = builder.append(',');
+      }
+      builder = builder.append(" );");
 
-    StringBuilder builder =
-        new StringBuilder("INSERT OR REPLACE INTO ").append(tableName).append(" ( ");
-    for (int i = 0; i < keys.size(); i++) {
-      String key = keys.get(i);
-      builder = builder.append("\"").append(key).append("\"");
-      if (i < keys.size() - 1) builder = builder.append(',');
-    }
-    builder = builder.append(" ) VALUES( ");
-    for (int i = 0; i < values.size(); i++) {
-      String value = values.get(i);
-      builder = builder.append(value);
-      if (i < values.size() - 1) builder = builder.append(',');
-    }
-    builder = builder.append(" );");
-
-    try {
       statement.execute(builder.toString());
     } catch (SQLException e) {
-      throw new IllegalStateException();
+      throw new IllegalStateException(e);
     }
   }
 

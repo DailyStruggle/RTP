@@ -703,7 +703,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             int rr = (rgb >> 16) & 0xFF;
             int gg = (rgb >> 8) & 0xFF;
             int bb = rgb & 0xFF;
-            long dr = r - rr, dg = g - gg, db = b - bb;
+            long dr = (long) r - rr, dg = (long) g - gg, db = (long) b - bb;
             long dist = dr * dr + dg * dg + db * db;
             if (dist < bestDist) {
                 bestDist = dist;

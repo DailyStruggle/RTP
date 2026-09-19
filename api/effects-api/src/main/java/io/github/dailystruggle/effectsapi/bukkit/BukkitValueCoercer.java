@@ -46,7 +46,7 @@ public final class BukkitValueCoercer implements ValueCoercer {
         if (def instanceof World) return TypeKey.WORLD;
         // Sound is registry-backed on 1.21.3+ (interface, not enum) - match by
         // name as well as instanceof to cover both eras.
-        if (def instanceof Sound || def.getClass().getName().equals("org.bukkit.Sound")) return TypeKey.SOUND;
+        if (def instanceof Sound || def.getClass().getName().endsWith(".Sound")) return TypeKey.SOUND;
         return TypeKey.UNKNOWN;
     }
 

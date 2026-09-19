@@ -219,7 +219,7 @@ public final class RtpYamlConfig extends RtpYamlSection {
      * matches what call sites expect after a subsequent {@link #save()}.
      */
     public void addDefault(String key, Object value) {
-        if (!contains(key)) set(key, value);
+        if (key != null && !key.isEmpty() && !contains(key)) set(key, value);
     }
 
     /**
@@ -273,8 +273,10 @@ public final class RtpYamlConfig extends RtpYamlSection {
             parent.mkdirs();
         }
         if (overwrite && file.exists()) {
-            //noinspection ResultOfMethodCallIgnored
-            file.delete();
+            boolean deleted = file.delete();
+            if (!deleted && file.exists()) {
+                throw new IOException("Failed to delete existing file: " + file.getAbsolutePath());
+            }
         }
         return file.createNewFile();
     }

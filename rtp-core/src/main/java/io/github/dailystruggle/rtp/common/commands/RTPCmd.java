@@ -278,8 +278,9 @@ public interface RTPCmd extends BaseRTPCmd {
 
     if (!hasSubCommand && !senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
 
+    java.util.function.Consumer<String> effectiveMsg = (messageMethod != null) ? messageMethod : msg -> {};
     try {
-      onCommand(senderId, sender::hasPermission, messageMethod, args)
+      onCommand(senderId, sender::hasPermission, effectiveMsg, args)
           .whenComplete((aBoolean, throwable) -> {
             if (throwable != null || Boolean.FALSE.equals(aBoolean)) {
               if (throwable != null) {

@@ -150,7 +150,7 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
       // Catch EVERYTHING, including Folia's ThreadAccessException if it
       // fires during a future real integration. The server must not
       // crash because a test misfired.
-      if ("ThreadAccessException".equals(t.getClass().getSimpleName())) {
+      if (t.getClass().getName().contains("ThreadAccessException")) {
         String msg =
             "[RTP test/economy-isolation] FAILED: synthetic debit raised "
                 + "ThreadAccessException on thread '"

@@ -181,7 +181,7 @@ public class Polygon extends Square {
       // and it isn't from us (i.e., the bad count grew faster than our walk), bail.
       // We approximate "is the store still ours" by snapshotting pending size.
       if (sinceYield == 0) {
-        long currentBadCount = pendingBadLocations.get().size() + badKeysCache.length;
+        long currentBadCount = (long) pendingBadLocations.get().size() + badKeysCache.length;
         if (currentBadCount > lastObservedBadCount + batchSize) {
           // External writer interleaved with our batch - yield authority.
           return;

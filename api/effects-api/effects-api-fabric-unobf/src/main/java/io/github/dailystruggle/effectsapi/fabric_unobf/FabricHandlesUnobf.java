@@ -318,7 +318,7 @@ public final class FabricHandlesUnobf implements HandleProvider {
                 final UUID id = player.getUUID();
                 net.minecraft.server.MinecraftServer server = ((ServerLevel) player.level()).getServer();
                 if (server != null) {
-                    final long deadline = server.getTickCount() + landingTimeoutTicks;
+                    final long deadline = (long) server.getTickCount() + landingTimeoutTicks;
                     final Runnable[] watchdog = new Runnable[1];
                     watchdog[0] = () -> {
                         if (server.getTickCount() >= deadline) {

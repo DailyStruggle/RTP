@@ -1366,11 +1366,13 @@ public class MetricsRecorder {
 
     /** Inclusive percentile (0..100). Returns -1 when sample is empty. */
     public static long percentile(List<Long> samples, double p) {
-        if (samples.isEmpty()) return -1L;
+        if (samples == null || samples.isEmpty()) return -1L;
         long[] arr = samples.stream().mapToLong(Long::longValue).toArray();
+        if (arr.length == 0) return -1L;
         Arrays.sort(arr);
-        int idx = (int) Math.min(arr.length - 1L,
-                Math.max(0L, Math.round((p / 100.0) * (arr.length - 1))));
+        int idx = (int) Math.round((p / 100.0) * (arr.length - 1));
+        if (idx >= arr.length) idx = arr.length - 1;
+        if (idx < 0) idx = 0;
         return arr[idx];
     }
 

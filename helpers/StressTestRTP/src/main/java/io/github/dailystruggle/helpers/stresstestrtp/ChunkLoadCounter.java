@@ -493,7 +493,7 @@ public final class ChunkLoadCounter implements Listener {
             a.onTickChunkLoads = onTick;
             a.offTickChunkLoads = Math.max(0L, raw - onTick);
             // Close any still-open on-tick burst so its width is not lost.
-            synchronized (t) {
+            synchronized (t.burstLock) {
                 if (t.burstStartNs != 0L) {
                     a.recordTickInterval(t.burstStartNs, t.burstLastNs);
                     t.burstStartNs = 0L;

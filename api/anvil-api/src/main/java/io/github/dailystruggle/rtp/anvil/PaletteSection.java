@@ -61,4 +61,28 @@ public record PaletteSection(int sectionY, List<String> palette, long[] data) {
         }
         return palette.get(paletteIdx);
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof PaletteSection that)) return false;
+        return sectionY == that.sectionY
+                && palette.equals(that.palette)
+                && java.util.Arrays.equals(data, that.data);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(sectionY, palette);
+        result = 31 * result + java.util.Arrays.hashCode(data);
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "PaletteSection[" +
+                "sectionY=" + sectionY + ", " +
+                "palette=" + palette + ", " +
+                "data=" + java.util.Arrays.toString(data) + ']';
+    }
 }

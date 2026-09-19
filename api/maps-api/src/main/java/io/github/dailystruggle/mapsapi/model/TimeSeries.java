@@ -41,4 +41,30 @@ public record TimeSeries(String label, double[] samples, double yMin, double yMa
     public double sampleAt(int i) {
         return samples[i];
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof TimeSeries that)) return false;
+        return Double.compare(that.yMin, yMin) == 0
+                && Double.compare(that.yMax, yMax) == 0
+                && label.equals(that.label)
+                && java.util.Arrays.equals(samples, that.samples);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(label, yMin, yMax);
+        result = 31 * result + java.util.Arrays.hashCode(samples);
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "TimeSeries[" +
+                "label=" + label + ", " +
+                "samples=" + java.util.Arrays.toString(samples) + ", " +
+                "yMin=" + yMin + ", " +
+                "yMax=" + yMax + ']';
+    }
 }

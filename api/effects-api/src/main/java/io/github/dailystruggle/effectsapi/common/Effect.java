@@ -36,8 +36,21 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
     public Effect(EnumMap<T, Object> defaults) throws IllegalArgumentException {
         this.defaults = defaults.clone();
         this.data = defaults.clone();
-        this.persistentClass = (Class<T>) ((ParameterizedType) getClass()
-                .getGenericSuperclass()).getActualTypeArguments()[0];
+        this.persistentClass = resolvePersistentClass();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Class<T> resolvePersistentClass() {
+        for (Class<?> c = getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            java.lang.reflect.Type genericSuper = c.getGenericSuperclass();
+            if (genericSuper instanceof ParameterizedType pt) {
+                java.lang.reflect.Type[] args = pt.getActualTypeArguments();
+                if (args.length > 0 && args[0] instanceof Class<?> clazz) {
+                    return (Class<T>) clazz;
+                }
+            }
+        }
+        return null;
     }
 
     //get parameters. Make sure to use setData to make changes

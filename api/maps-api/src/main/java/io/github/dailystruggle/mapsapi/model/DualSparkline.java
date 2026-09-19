@@ -80,4 +80,39 @@ public record DualSparkline(
     public int sampleCount() {
         return seriesA.length;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof DualSparkline that)) return false;
+        return Double.compare(that.aMin, aMin) == 0
+                && Double.compare(that.aMax, aMax) == 0
+                && Double.compare(that.bMin, bMin) == 0
+                && Double.compare(that.bMax, bMax) == 0
+                && labelA.equals(that.labelA)
+                && java.util.Arrays.equals(seriesA, that.seriesA)
+                && labelB.equals(that.labelB)
+                && java.util.Arrays.equals(seriesB, that.seriesB);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(labelA, aMin, aMax, labelB, bMin, bMax);
+        result = 31 * result + java.util.Arrays.hashCode(seriesA);
+        result = 31 * result + java.util.Arrays.hashCode(seriesB);
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "DualSparkline[" +
+                "labelA=" + labelA + ", " +
+                "seriesA=" + java.util.Arrays.toString(seriesA) + ", " +
+                "aMin=" + aMin + ", " +
+                "aMax=" + aMax + ", " +
+                "labelB=" + labelB + ", " +
+                "seriesB=" + java.util.Arrays.toString(seriesB) + ", " +
+                "bMin=" + bMin + ", " +
+                "bMax=" + bMax + ']';
+    }
 }

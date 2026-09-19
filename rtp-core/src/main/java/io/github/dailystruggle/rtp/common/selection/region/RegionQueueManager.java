@@ -578,7 +578,7 @@ public class RegionQueueManager {
      * @return combined queue length
      */
     public long getTotalQueueLength(UUID uuid) {
-        long res = keptLocations.size() + unkeptLocations.size();
+        long res = (long) keptLocations.size() + unkeptLocations.size();
         ConcurrentLinkedQueue<RTPLocation> queue =
                 perPlayerLocationQueue.get(uuid);
         if (queue != null) res += queue.size();
@@ -592,7 +592,7 @@ public class RegionQueueManager {
      * @return public queue length
      */
     public long getPublicQueueLength() {
-        return keptLocations.size() + unkeptLocations.size();
+        return (long) keptLocations.size() + unkeptLocations.size();
     }
 
     /**

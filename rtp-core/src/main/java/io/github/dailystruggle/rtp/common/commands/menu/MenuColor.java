@@ -131,7 +131,7 @@ public final class MenuColor {
             int cr = (CODE_RGB[i] >> 16) & 0xFF;
             int cg = (CODE_RGB[i] >> 8) & 0xFF;
             int cb = CODE_RGB[i] & 0xFF;
-            long dr = r - cr, dg = g - cg, db = b - cb;
+            long dr = (long) r - cr, dg = (long) g - cg, db = (long) b - cb;
             long dist = dr * dr + dg * dg + db * db;
             if (dist < bestDist) {
                 bestDist = dist;

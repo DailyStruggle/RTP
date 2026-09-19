@@ -110,20 +110,26 @@ public final class ProxyDirectListener {
     public void start() throws Exception {
         if (!running.compareAndSet(false, true)) return;
         ServerSocket ss = new ServerSocket();
-        ss.setReuseAddress(true);
-        ss.bind(new InetSocketAddress(bindHost, port));
-        this.serverSocket = ss;
-        this.workers = Executors.newCachedThreadPool(r -> {
-            Thread t = new Thread(r, "rtp-proxy-direct-worker");
-            t.setDaemon(true);
-            return t;
-        });
-        Thread accept = new Thread(this::acceptLoop, "rtp-proxy-direct-accept");
-        accept.setDaemon(true);
-        this.acceptThread = accept;
-        accept.start();
-        logger.info("RTP proxy-direct listener bound on {}:{} ({}).",
-                bindHost, port, verifier != null ? "HMAC-signed" : "unsigned");
+        try {
+            ss.setReuseAddress(true);
+            ss.bind(new InetSocketAddress(bindHost, port));
+            this.serverSocket = ss;
+            this.workers = Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "rtp-proxy-direct-worker");
+                t.setDaemon(true);
+                return t;
+            });
+            Thread accept = new Thread(this::acceptLoop, "rtp-proxy-direct-accept");
+            accept.setDaemon(true);
+            this.acceptThread = accept;
+            accept.start();
+            logger.info("RTP proxy-direct listener bound on {}:{} ({}).",
+                    bindHost, port, verifier != null ? "HMAC-signed" : "unsigned");
+        } catch (Throwable t) {
+            try { ss.close(); } catch (Throwable ignored) { }
+            running.set(false);
+            throw t;
+        }
     }
 
     private void acceptLoop() {
@@ -224,6 +230,9 @@ public final class ProxyDirectListener {
                 outcome = requestQueue.flushPending(envelopes).get(RPC_AWAIT_MS, TimeUnit.MILLISECONDS);
                 logger.info("RTP proxy-direct: flushPending from {} enqueued {} request(s) -> {}.",
                         remote, envelopes.size(), outcome);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                logger.warn("RTP proxy-direct: flushPending interrupted: {}", ie.getMessage());
             } catch (Throwable t) {
                 logger.warn("RTP proxy-direct: flushPending failed: {}", t.getMessage());
             }
@@ -248,6 +257,9 @@ public final class ProxyDirectListener {
                 for (NetworkRequestQueue.QueueStatus s : rows) {
                     reply.add(ProxyDirectWire.encodeStatus(s));
                 }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                logger.warn("RTP proxy-direct: pollStatus interrupted: {}", ie.getMessage());
             } catch (Throwable t) {
                 logger.warn("RTP proxy-direct: pollStatus failed: {}", t.getMessage());
             }
@@ -269,6 +281,9 @@ public final class ProxyDirectListener {
                     catch (IllegalArgumentException ignored) { }
                 }
                 requestQueue.cancel(id, reason).get(RPC_AWAIT_MS, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                logger.warn("RTP proxy-direct: cancel interrupted: {}", ie.getMessage());
             } catch (Throwable t) {
                 logger.warn("RTP proxy-direct: cancel failed: {}", t.getMessage());
             }
@@ -290,6 +305,9 @@ public final class ProxyDirectListener {
                 if (token != null && token.isPresent()) {
                     reply = ProxyDirectWire.encodeToken(token.get());
                 }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                logger.warn("RTP proxy-direct: findReservation interrupted: {}", ie.getMessage());
             } catch (Throwable t) {
                 logger.warn("RTP proxy-direct: findReservation failed: {}", t.getMessage());
             }
@@ -311,6 +329,9 @@ public final class ProxyDirectListener {
                     outcome = transport.redeem(f[0], id, f[2]).get(RPC_AWAIT_MS, TimeUnit.MILLISECONDS);
                     logger.info("RTP proxy-direct: redeem token={} player={} server={} -> {}.",
                             f[0], f[1], f[2], outcome);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    logger.warn("RTP proxy-direct: redeem interrupted: {}", ie.getMessage());
                 } catch (Throwable t) {
                     logger.warn("RTP proxy-direct: redeem failed: {}", t.getMessage());
                 }
@@ -332,6 +353,9 @@ public final class ProxyDirectListener {
                 for (ReservationToken t : tokens) {
                     reply.add(ProxyDirectWire.encodeToken(t));
                 }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                logger.warn("RTP proxy-direct: listActiveForServer interrupted: {}", ie.getMessage());
             } catch (Throwable t) {
                 logger.warn("RTP proxy-direct: listActiveForServer failed: {}", t.getMessage());
             }

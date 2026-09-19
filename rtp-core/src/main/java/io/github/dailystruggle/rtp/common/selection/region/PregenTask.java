@@ -906,6 +906,11 @@ final class PregenTask implements Runnable {
         }
 
         // --- vert.adjust ---
+        if (chunk == null) {
+            closeIfPresent(reservation);
+            rescheduleNextAttempt();
+            return;
+        }
         RTPCoords res = state.vert.adjust(chunk);
         if (res == null) {
             if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {

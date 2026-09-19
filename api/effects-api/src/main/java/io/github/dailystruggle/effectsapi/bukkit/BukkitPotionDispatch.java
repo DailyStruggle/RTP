@@ -63,6 +63,10 @@ public final class BukkitPotionDispatch {
             return;
         }
 
+        if (caller == null) {
+            return;
+        }
+
         if (!org.bukkit.Bukkit.isPrimaryThread()) {
             org.bukkit.Bukkit.getScheduler().runTask(caller, () -> player.addPotionEffect(pe));
             return;

@@ -64,7 +64,9 @@ public final class FabricEffectsHandlerUnobf {
      */
     public static void setupEffects(MinecraftServer server) {
         RTP.log(Level.FINE, "[RTP][FX-trace] setupEffects ENTER server=" + (server == null ? "null" : server.getClass().getSimpleName()));
-        FabricEffectRuntimeUnobf.bindServer(server);
+        if (server != null) {
+            FabricEffectRuntimeUnobf.bindServer(server);
+        }
         FabricEffectsInitializer.registerAll();
 
         if (!AlreadyHooked.flip()) {

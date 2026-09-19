@@ -227,7 +227,7 @@ public class GlideSafetyListener implements Listener {
             Block head1 = world.getBlockAt(x, y + 1, z);
             Block head2 = world.getBlockAt(x, y + 2, z);
             if (head1.getType().isAir() && head2.getType().isAir()) {
-                Location target = new Location(world, x + 0.5, y + 1, z + 0.5, loc.getYaw(), loc.getPitch());
+                Location target = new Location(world, x + 0.5, (double) y + 1.0, z + 0.5, loc.getYaw(), loc.getPitch());
                 player.setGliding(false);
                 player.teleport(target);
                 Bukkit.getPluginManager().callEvent(new PlayerLandEvent(player, PlayerLandEvent.Reason.SHUTDOWN));
@@ -273,7 +273,7 @@ public class GlideSafetyListener implements Listener {
                     "GlideEffect shutdown: head clearance blocked above synthesized platform for " + player.getName());
             return;
         }
-        Location target = new Location(world, x + 0.5, platformY + 2, z + 0.5, loc.getYaw(), loc.getPitch());
+        Location target = new Location(world, x + 0.5, (double) platformY + 2.0, z + 0.5, loc.getYaw(), loc.getPitch());
         player.setGliding(false);
         player.teleport(target);
         Bukkit.getPluginManager().callEvent(new PlayerLandEvent(player, PlayerLandEvent.Reason.SHUTDOWN_PLATFORM));

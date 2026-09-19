@@ -162,4 +162,18 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
     }
     return true;
   }
+
+  @Override
+  public int hashCode() {
+    int result = Objects.hash(super.hashCode(), name);
+    for (Map.Entry<E, Object> entry : getData().entrySet()) {
+      Object value = entry.getValue();
+      if (value instanceof Number n) {
+        result = 31 * result + Double.hashCode(n.doubleValue());
+      } else if (value != null) {
+        result = 31 * result + value.toString().hashCode();
+      }
+    }
+    return result;
+  }
 }

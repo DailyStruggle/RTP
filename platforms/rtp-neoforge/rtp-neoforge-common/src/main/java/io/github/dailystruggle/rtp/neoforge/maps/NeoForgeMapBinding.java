@@ -60,6 +60,7 @@ public final class NeoForgeMapBinding implements MapBinding, MapBindingLifecycle
     private final ConcurrentHashMap<UUID, Set<String>> chartIdsByViewer = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Object> liveTasks = new ConcurrentHashMap<>();
     private final AtomicInteger synthId = new AtomicInteger(1);
+    private final Object bufferLock = new Object();
 
     private volatile boolean disabled = false;
 
@@ -167,12 +168,12 @@ public final class NeoForgeMapBinding implements MapBinding, MapBindingLifecycle
 
     // --- internals ----------------------------------------------------------
 
-    private static <M extends ChartModel> void renderFrame(int[] buf,
-                                                           ChartRenderer<M> renderer,
-                                                           Supplier<M> supplier) {
+    private <M extends ChartModel> void renderFrame(int[] buf,
+                                                    ChartRenderer<M> renderer,
+                                                    Supplier<M> supplier) {
         M model = supplier.get();
         if (model == null) return; // skip this frame
-        synchronized (buf) {
+        synchronized (bufferLock) {
             renderer.render(new NeoForgeMapCanvas(buf), model);
         }
     }
@@ -187,7 +188,7 @@ public final class NeoForgeMapBinding implements MapBinding, MapBindingLifecycle
         NeoForgeMapSink player = resolveNeoForgePlayer(viewer);
         if (player == null) return false;
         int[] snapshot;
-        synchronized (buf) {
+        synchronized (bufferLock) {
             snapshot = buf.clone();
         }
         return player.renderMapChart(chartId, snapshot, locked, deliverItem);

@@ -173,7 +173,7 @@ public class Region extends FactoryValue<RegionKeys> {
       long[] progress = ScanTask.loadProgress(name, cacheKey());
       if (progress != null) {
         long iter = progress[0];
-        if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) this.shape).getRange()).longValue()) {
+        if (iter > 0 && iter < (long) ((MemoryShape<?>) this.shape).getRange()) {
           MemoryShape<?> ms = (MemoryShape<?>) this.shape;
           ScanTask task = new ScanTask(this, iter);
           RTP.getInstance().scanTasks.put(name, task);
@@ -247,7 +247,7 @@ public class Region extends FactoryValue<RegionKeys> {
       long[] progress = ScanTask.loadProgress(name, cacheKey());
       if (progress != null) {
         long iter = progress[0];
-        if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) this.shape).getRange()).longValue()) {
+        if (iter > 0 && iter < (long) ((MemoryShape<?>) this.shape).getRange()) {
           MemoryShape<?> ms = (MemoryShape<?>) this.shape;
           ScanTask task = new ScanTask(this, iter);
           RTP.getInstance().scanTasks.put(name, task);
@@ -1406,6 +1406,11 @@ public class Region extends FactoryValue<RegionKeys> {
     if (!java.util.Objects.equals(getVert(), region.getVert())) return false;
     if (!java.util.Objects.equals(getWorld(), region.getWorld())) return false;
     return region.settings.worldBorderOverride() == settings.worldBorderOverride();
+  }
+
+  @Override
+  public int hashCode() {
+    return java.util.Objects.hash(getShape(), getVert(), getWorld(), settings.worldBorderOverride());
   }
 
 }

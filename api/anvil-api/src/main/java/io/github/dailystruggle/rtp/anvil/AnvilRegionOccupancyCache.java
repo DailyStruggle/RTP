@@ -31,7 +31,24 @@ public final class AnvilRegionOccupancyCache {
   /** Same working-set rationale as {@link AnvilRegionByteCache}. */
   private static final int CAPACITY = 32;
 
-  private record Entry(long[] bitmap, long mtime) {}
+  private record Entry(long[] bitmap, long mtime) {
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof Entry entry)) return false;
+      return mtime == entry.mtime && java.util.Arrays.equals(bitmap, entry.bitmap);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * Long.hashCode(mtime) + java.util.Arrays.hashCode(bitmap);
+    }
+
+    @Override
+    public String toString() {
+      return "Entry[bitmap=" + java.util.Arrays.toString(bitmap) + ", mtime=" + mtime + "]";
+    }
+  }
 
   private static final LinkedHashMap<Path, Entry> CACHE =
       new LinkedHashMap<>(CAPACITY * 2, 0.75f, /* accessOrder = */ true) {

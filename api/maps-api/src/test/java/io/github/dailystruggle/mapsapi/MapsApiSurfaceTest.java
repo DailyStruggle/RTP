@@ -140,6 +140,16 @@ class MapsApiSurfaceTest {
         RegionBadLocations ok = new RegionBadLocations("r", 1, 1, new byte[1]);
         assertEquals(1, ok.width());
         assertEquals(1, ok.height());
+
+        RegionBadLocations same = new RegionBadLocations("r", 1, 1, new byte[1]);
+        RegionBadLocations diff = new RegionBadLocations("r2", 1, 1, new byte[1]);
+        assertEquals(ok, ok);
+        assertEquals(ok, same);
+        org.junit.jupiter.api.Assertions.assertNotEquals(ok, diff);
+        org.junit.jupiter.api.Assertions.assertNotEquals(ok, null);
+        org.junit.jupiter.api.Assertions.assertNotEquals(ok, "str");
+        assertEquals(ok.hashCode(), same.hashCode());
+        org.junit.jupiter.api.Assertions.assertNotNull(ok.toString());
     }
 
     @Test
@@ -152,6 +162,16 @@ class MapsApiSurfaceTest {
         assertEquals(1.0, ts.sampleAt(0));
 
         assertNotSame(ts.samples(), ts.samples());
+
+        TimeSeries same = new TimeSeries("tps", new double[]{1.0, 2.0, 3.0}, 0.0, 20.0);
+        TimeSeries diff = new TimeSeries("mspt", new double[]{1.0, 2.0, 3.0}, 0.0, 20.0);
+        assertEquals(ts, ts);
+        assertEquals(ts, same);
+        org.junit.jupiter.api.Assertions.assertNotEquals(ts, diff);
+        org.junit.jupiter.api.Assertions.assertNotEquals(ts, null);
+        org.junit.jupiter.api.Assertions.assertNotEquals(ts, "str");
+        assertEquals(ts.hashCode(), same.hashCode());
+        org.junit.jupiter.api.Assertions.assertNotNull(ts.toString());
     }
 
     @Test
@@ -199,6 +219,16 @@ class MapsApiSurfaceTest {
         assertEquals(2, valid.radius());
         assertEquals(5, valid.side());
         assertEquals(25, valid.states().length);
+
+        RegionCoverage same = new RegionCoverage("r", 10, 20, 2, new byte[25]);
+        RegionCoverage diff = new RegionCoverage("r2", 10, 20, 2, new byte[25]);
+        assertEquals(valid, valid);
+        assertEquals(valid, same);
+        org.junit.jupiter.api.Assertions.assertNotEquals(valid, diff);
+        org.junit.jupiter.api.Assertions.assertNotEquals(valid, null);
+        org.junit.jupiter.api.Assertions.assertNotEquals(valid, "str");
+        assertEquals(valid.hashCode(), same.hashCode());
+        org.junit.jupiter.api.Assertions.assertNotNull(valid.toString());
     }
 
     @Test
@@ -237,6 +267,17 @@ class MapsApiSurfaceTest {
                 new Heatmap2D(2, 2, new double[4], 2.0, 1.0));
         assertThrows(NullPointerException.class, () ->
                 new Heatmap2D(2, 2, null, 0.0, 1.0));
+
+        Heatmap2D h1 = new Heatmap2D(2, 2, new double[]{1, 2, 3, 4}, 0.0, 5.0);
+        Heatmap2D same = new Heatmap2D(2, 2, new double[]{1, 2, 3, 4}, 0.0, 5.0);
+        Heatmap2D diff = new Heatmap2D(2, 2, new double[]{1, 2, 3, 5}, 0.0, 5.0);
+        assertEquals(h1, h1);
+        assertEquals(h1, same);
+        org.junit.jupiter.api.Assertions.assertNotEquals(h1, diff);
+        org.junit.jupiter.api.Assertions.assertNotEquals(h1, null);
+        org.junit.jupiter.api.Assertions.assertNotEquals(h1, "str");
+        assertEquals(h1.hashCode(), same.hashCode());
+        org.junit.jupiter.api.Assertions.assertNotNull(h1.toString());
     }
 
     @Test

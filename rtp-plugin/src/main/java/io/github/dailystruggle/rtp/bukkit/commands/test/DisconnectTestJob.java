@@ -339,7 +339,7 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
    *       backend.</li>
    * </ul>
    */
-  static final class SyntheticReservation implements AutoCloseable {
+  static final class SyntheticReservation {
     private final AtomicInteger ticketCount;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -358,7 +358,6 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
       return closed.get();
     }
 
-    @Override
     public void close() {
       // close-once: mirrors ChunkReservation.transferred/close() guard.
       if (closed.compareAndSet(false, true)) {

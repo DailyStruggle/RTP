@@ -52,4 +52,32 @@ public record RegionCoverage(String regionName, int centerX, int centerZ,
     public int side() {
         return 2 * radius + 1;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof RegionCoverage that)) return false;
+        return centerX == that.centerX
+                && centerZ == that.centerZ
+                && radius == that.radius
+                && regionName.equals(that.regionName)
+                && java.util.Arrays.equals(states, that.states);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(regionName, centerX, centerZ, radius);
+        result = 31 * result + java.util.Arrays.hashCode(states);
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "RegionCoverage[" +
+                "regionName=" + regionName + ", " +
+                "centerX=" + centerX + ", " +
+                "centerZ=" + centerZ + ", " +
+                "radius=" + radius + ", " +
+                "states=" + java.util.Arrays.toString(states) + ']';
+    }
 }

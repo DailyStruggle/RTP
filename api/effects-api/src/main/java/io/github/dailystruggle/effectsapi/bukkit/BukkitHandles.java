@@ -467,6 +467,9 @@ public final class BukkitHandles implements HandleProvider {
             if (regionDispatcher.dispatch(caller, location, () -> BukkitHandles.spawnFirework(location, data))) {
                 return;
             }
+            if (caller == null) {
+                return;
+            }
             if (!org.bukkit.Bukkit.isPrimaryThread()) {
                 org.bukkit.Bukkit.getScheduler().runTask(caller, () -> BukkitHandles.spawnFirework(location, data));
                 return;

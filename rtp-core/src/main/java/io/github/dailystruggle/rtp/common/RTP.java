@@ -1133,7 +1133,10 @@ public class RTP {
                   } catch (Exception ignored) {}
                 }
                 if (success) {
-                  file.renameTo(new File(file.getAbsolutePath() + ".migrated"));
+                  boolean renamed = file.renameTo(new File(file.getAbsolutePath() + ".migrated"));
+                  if (!renamed) {
+                    RTP.log(Level.FINE, "[RTP] Failed to rename migrated file: " + file.getName());
+                  }
                 }
               } catch (Exception ignored) {}
             }

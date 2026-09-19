@@ -101,7 +101,7 @@ public class Circle_Normal extends NormalMemoryShape {
       rotation += 0.25;
     }
 
-    double radius = ((long) (Math.sqrt(x * x + z * z)));
+    double radius = ((long) (Math.sqrt((double) x * x + (double) z * z)));
 
     return (long) ((radius * radius - cr * cr) * Math.PI + rotation * (2 * radius * Math.PI));
   }
@@ -129,7 +129,7 @@ public class Circle_Normal extends NormalMemoryShape {
       rotation += 0.25;
     }
 
-    double radius = ((long) (Math.sqrt(x * x + z * z)));
+    double radius = ((long) (Math.sqrt((double) x * x + (double) z * z)));
 
     return (long)(((radius * radius - cr * cr) * Math.PI) + rotation * (2 * radius * Math.PI));
   }

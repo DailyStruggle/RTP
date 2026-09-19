@@ -62,4 +62,30 @@ public record RegionBadLocations(String regionName, int width, int height,
     public byte[] palette() {
         return palette.clone();
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof RegionBadLocations that)) return false;
+        return width == that.width
+                && height == that.height
+                && regionName.equals(that.regionName)
+                && java.util.Arrays.equals(palette, that.palette);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(regionName, width, height);
+        result = 31 * result + java.util.Arrays.hashCode(palette);
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "RegionBadLocations[" +
+                "regionName=" + regionName + ", " +
+                "width=" + width + ", " +
+                "height=" + height + ", " +
+                "palette=" + java.util.Arrays.toString(palette) + ']';
+    }
 }
