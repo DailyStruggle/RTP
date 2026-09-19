@@ -69,30 +69,15 @@ you through all of the above. Use it.
 
 ---
 
-## Supported Versions and Maintenance Windows
+## Response expectations
 
-Bug fixes and patches are released according to the following support tiers:
-
-| Line / Version | Support Level | Maintenance Window | Notes |
-|---|---|---|---|
-| **Current Stable (3.x)** | **Active** | Through next major release + 3 months | Receives bug fixes, security patches, platform compatibility updates, and performance improvements. |
-| **Previous Stable (2.x)** | **Maintenance / Critical Only** | 6 months post-3.0 release | Critical security advisories and fatal data-loss bugs only. No feature backports. |
-| **Legacy (1.x and older)** | **End of Life (EOL)** | None | Unsupported. Upgrade required before filing issues. |
-
-For platform, Minecraft, and Java runtime compatibility, refer to the canonical [Platform Support Matrix](docs/dev/SUPPORT_MATRIX.md).
-
----
-
-## Response Expectations & Timelines
-
-RTP is actively maintained by an open-source team. While we do not offer commercial SLA guarantees, incoming reports are triaged under the following expected response windows:
-
-- **Initial Triage & Acknowledgement:** Typically within **3 to 7 business days** for well-formed reports containing complete logs and reproduction steps.
-- **Bug Fix Delivery:** Confirmed defects on tested platforms are typically addressed in the next patch release (typically **2 to 4 weeks**), or an intermediate snapshot build if critical.
-- **Critical Security Hazards:** Handled on an expedited track via [`SECURITY.md`](SECURITY.md) (acknowledgement within **72 hours**, triage within **7 days**).
-- **Pro Support Priority:** Operators running LeafRTP Pro receive priority ticket review through verified commercial distribution channels.
-- **Incomplete Reports:** Reports missing required reproduction steps, configuration diffs, or `latest.log` links may be flagged or closed until the required context is provided.
-- Pinging the maintainer in DMs, other repositories, or unrelated threads will not speed anything up and is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
+- This is a volunteer project. There is **no SLA**.
+- Typical first response: a few days to a couple of weeks.
+- Issues with incomplete information are closed immediately and not
+  re-opened until the missing context is provided.
+- Pinging the maintainer in DMs, other repositories, or unrelated threads
+  will not speed anything up and is covered by the
+  [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 

@@ -30,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * buffer index wrap-around, and concurrent drain/clear operations (ENTERPRISE_READINESS.md item 25,
  * REQ-FOLIA-F-003).
  */
-@org.junit.jupiter.api.Tag("slow")
 @DisplayName("LockFreeLocationBuffer Concurrency Stress Harness")
 class LockFreeLocationBufferConcurrencyStressTest {
 
@@ -71,7 +70,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
      * 3. Consistent buffer size accounting.
      */
     @Test
-    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void spsc_concurrencySoak_conservationAndFifoOrder() throws InterruptedException {
         int capacity = 64;
         LockFreeLocationBuffer buffer = new LockFreeLocationBuffer(capacity);
@@ -92,7 +91,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
                     RTPLocation location = loc(i);
                     boolean silent = (i % 2 == 0);
                     while (!(silent ? buffer.offerSilently(location) : buffer.offer(location))) {
-                        Thread.sleep(0, 100_000);
+                        Thread.sleep(1);
                     }
                     offered.incrementAndGet();
                 }
@@ -114,7 +113,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
                     if (location != null) {
                         polledIds.add(location.coords().x());
                     } else {
-                        Thread.sleep(0, 100_000);
+                        Thread.sleep(1);
                     }
                 }
             } catch (InterruptedException e) {
@@ -125,7 +124,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
         });
 
         startLatch.countDown();
-        assertTrue(doneLatch.await(25, TimeUnit.SECONDS), "SPSC stress soak timed out");
+        assertTrue(doneLatch.await(8, TimeUnit.SECONDS), "SPSC stress soak timed out");
         exec.shutdown();
 
         assertEquals(totalItems, offered.get(), "All items must be offered");
@@ -143,7 +142,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
      * to guarantee head and tail advance past the power-of-two mask multiple times under concurrency.
      */
     @Test
-    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void ringBufferIndexWrapAround_stress() throws InterruptedException {
         int capacity = 4; // Buffer length will be 4, mask = 3
         LockFreeLocationBuffer buffer = new LockFreeLocationBuffer(capacity);
@@ -164,7 +163,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
                 for (int i = 0; i < totalCycles; i++) {
                     RTPLocation loc = loc(i);
                     while (!buffer.offer(loc)) {
-                        Thread.sleep(0, 100_000);
+                        Thread.sleep(1);
                     }
                     offered.incrementAndGet();
                 }
@@ -184,7 +183,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
                     if (loc != null) {
                         polled.incrementAndGet();
                     } else {
-                        Thread.sleep(0, 100_000);
+                        Thread.sleep(1);
                     }
                 }
             } catch (InterruptedException e) {
@@ -195,7 +194,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
         });
 
         startLatch.countDown();
-        assertTrue(doneLatch.await(25, TimeUnit.SECONDS), "Wrap around stress test timed out");
+        assertTrue(doneLatch.await(6, TimeUnit.SECONDS), "Wrap around stress test timed out");
         exec.shutdown();
 
         assertEquals(totalCycles, offered.get());
@@ -268,7 +267,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
      * Verifies that onAdd and onRemove callbacks fire accurately under concurrency without missed invocations.
      */
     @Test
-    @Timeout(value = 20, unit = TimeUnit.SECONDS)
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void concurrentOfferAndPoll_callbacksExactAccounting() throws InterruptedException {
         int capacity = 64;
         LockFreeLocationBuffer buffer = new LockFreeLocationBuffer(capacity);
@@ -289,7 +288,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
                 for (int i = 0; i < totalItems; i++) {
                     RTPLocation loc = loc(i);
                     while (!buffer.offer(loc)) {
-                        Thread.sleep(0, 100_000);
+                        Thread.sleep(1);
                     }
                 }
             } catch (InterruptedException e) {
@@ -308,7 +307,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
                     if (buffer.poll() != null) {
                         polled++;
                     } else {
-                        Thread.sleep(0, 100_000);
+                        Thread.sleep(1);
                     }
                 }
             } catch (InterruptedException e) {
@@ -319,7 +318,7 @@ class LockFreeLocationBufferConcurrencyStressTest {
         });
 
         startLatch.countDown();
-        assertTrue(doneLatch.await(15, TimeUnit.SECONDS), "Callbacks stress test timed out");
+        assertTrue(doneLatch.await(6, TimeUnit.SECONDS), "Callbacks stress test timed out");
         exec.shutdown();
 
         assertEquals(totalItems, callbackAdds.get(), "Every offer must fire onAdd callback");

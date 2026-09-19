@@ -45,34 +45,7 @@ public final class RTPCmdFabric {
     public static <S> void register(@NotNull CommandDispatcher<S> dispatcher,
                                     @NotNull CommandsAPICommand root,
                                     @NotNull BrigadierBridgeContext<S> ctx) {
-        register(dispatcher, root, ctx, (String[]) null);
-    }
-
-    /**
-     * Build the Brigadier tree for {@code root} using {@code ctx} and register it
-     * along with any {@code aliases} with {@code dispatcher}.
-     *
-     * @param dispatcher the Brigadier dispatcher (typically Fabric's
-     *                   {@code CommandRegistrationCallback}-supplied dispatcher).
-     * @param root       the {@code commands-api} root command (e.g. the RTP root).
-     * @param ctx        platform bridge supplying source-to-UUID, permission, and
-     *                   message lambdas (built by the Fabric entrypoint with the
-     *                   appropriate {@code ServerCommandSource} accessors).
-     * @param aliases    optional aliases to bind (e.g. "wild")
-     * @param <S>        Brigadier source type ({@code ServerCommandSource} on Fabric).
-     */
-    public static <S> void register(@NotNull CommandDispatcher<S> dispatcher,
-                                    @NotNull CommandsAPICommand root,
-                                    @NotNull BrigadierBridgeContext<S> ctx,
-                                    String... aliases) {
         LiteralArgumentBuilder<S> builder = BrigadierCommandAdapter.toBrigadier(root, ctx);
-        com.mojang.brigadier.tree.LiteralCommandNode<S> node = dispatcher.register(builder);
-        if (aliases != null) {
-            for (String alias : aliases) {
-                if (alias != null && !alias.isEmpty() && !alias.equalsIgnoreCase(root.name())) {
-                    dispatcher.register(LiteralArgumentBuilder.<S>literal(alias).redirect(node));
-                }
-            }
-        }
+        dispatcher.register(builder);
     }
 }

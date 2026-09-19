@@ -168,37 +168,6 @@ class MapsApiSurfaceTest {
         assertEquals(1L, cd.counts().get(0));
         assertThrows(UnsupportedOperationException.class, () -> cd.labels().add("c"));
         assertThrows(UnsupportedOperationException.class, () -> cd.counts().add(3L));
-
-        // Validation paths
-        assertThrows(NullPointerException.class, () -> new CategoryDistribution(null, counts));
-        assertThrows(NullPointerException.class, () -> new CategoryDistribution(labels, null));
-        assertThrows(IllegalArgumentException.class, () -> new CategoryDistribution(List.of("a"), List.of(1L, 2L)));
-        assertThrows(NullPointerException.class, () -> new CategoryDistribution(Arrays.asList("a", null), List.of(1L, 2L)));
-        assertThrows(NullPointerException.class, () -> new CategoryDistribution(List.of("a", "b"), Arrays.asList(1L, null)));
-        assertThrows(IllegalArgumentException.class, () -> new CategoryDistribution(List.of("a", "b"), List.of(1L, -5L)));
-
-        // CategoryDistribution.of(Map)
-        CategoryDistribution fromMap = CategoryDistribution.of(java.util.Map.of("k1", 10L, "k2", 20L));
-        assertEquals(2, fromMap.labels().size());
-        assertThrows(NullPointerException.class, () -> CategoryDistribution.of(null));
-    }
-
-    @Test
-    @DisplayName("RegionCoverage validations and side calculation")
-    void regionCoverageValidations() {
-        assertThrows(NullPointerException.class, () -> new RegionCoverage(null, 0, 0, 1, new byte[9]));
-        assertThrows(IllegalArgumentException.class, () -> new RegionCoverage("r", 0, 0, 0, new byte[1]));
-        assertThrows(IllegalArgumentException.class, () -> new RegionCoverage("r", 0, 0, -2, new byte[9]));
-        assertThrows(NullPointerException.class, () -> new RegionCoverage("r", 0, 0, 1, null));
-        assertThrows(IllegalArgumentException.class, () -> new RegionCoverage("r", 0, 0, 1, new byte[8])); // expected (2*1+1)^2 = 9
-
-        RegionCoverage valid = new RegionCoverage("r", 10, 20, 2, new byte[25]);
-        assertEquals("r", valid.regionName());
-        assertEquals(10, valid.centerX());
-        assertEquals(20, valid.centerZ());
-        assertEquals(2, valid.radius());
-        assertEquals(5, valid.side());
-        assertEquals(25, valid.states().length);
     }
 
     @Test

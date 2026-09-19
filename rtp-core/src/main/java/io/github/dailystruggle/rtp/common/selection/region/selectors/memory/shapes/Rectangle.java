@@ -210,11 +210,6 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     long width = getNumber(RectangleParams.width, 256L).longValue();
     long height = getNumber(RectangleParams.height, 256L).longValue();
 
-    if (width <= 0 || height <= 0) {
-      output.setXZ((int) cx, (int) cz);
-      return;
-    }
-
     // compute initial xz
     output.setXZ((int) (location % width), (int) (location / width));
 

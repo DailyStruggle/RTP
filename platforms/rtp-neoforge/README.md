@@ -1,6 +1,6 @@
 # rtp-neoforge — NeoForge platform adapter
 
-In-scope per [ADR-033](../../docs/adr/ADR-033-neoforge-platform-in-scope.md) and the subproject ADR [rtp-neoforge-ADR-001](docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md). This tree is a **sibling** of [`rtp-fabric`](../rtp-fabric) (deliberately not nested under or sharing a tree with it — [ADR-033](../../docs/adr/ADR-033-neoforge-platform-in-scope.md)) and mirrors the Fabric multiversion submodule layout ([rtp-fabric-ADR-001](../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md)).
+In-scope per [ADR-033](../../docs/adr/ADR-033-neoforge-platform-in-scope.md) and the subproject ADR [rtp-neoforge-ADR-001](docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md). This tree is a **sibling** of [`rtp-fabric`](../rtp-fabric) (deliberately not nested under or sharing a tree with it — [`NEOFORGE_NOTES.md`](../../docs/dev/NEOFORGE_NOTES.md) section 11) and mirrors the Fabric multiversion submodule layout ([rtp-fabric-ADR-001](../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md)).
 
 ### Module layout
 
@@ -16,7 +16,7 @@ platforms/rtp-neoforge/
 
 ### Supported Minecraft / NeoForge versions
 
-NeoForge support targets **Minecraft 1.21.1 and up** only. NeoForge is Mojmap-at-runtime from 1.20.4+, which is the assumption baked into [rtp-neoforge-ADR-001](docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md) (no obf carrier required). The carrier roadmap:
+NeoForge support targets **Minecraft 1.21.1 and up** only. NeoForge is Mojmap-at-runtime from 1.20.4+, which is the assumption baked into [rtp-neoforge-ADR-001](docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md) and [`NEOFORGE_NOTES.md`](../../docs/dev/NEOFORGE_NOTES.md) (no obf carrier required). The carrier roadmap:
 
  Carrier | MC line | NeoForge line | Status | Rationale |
 ---------|---------|---------------|--------|-----------|

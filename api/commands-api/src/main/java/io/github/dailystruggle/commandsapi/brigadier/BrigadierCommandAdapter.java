@@ -1,5 +1,9 @@
 package io.github.dailystruggle.commandsapi.brigadier;
 
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -11,6 +15,11 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.CoordinateParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.FloatParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;

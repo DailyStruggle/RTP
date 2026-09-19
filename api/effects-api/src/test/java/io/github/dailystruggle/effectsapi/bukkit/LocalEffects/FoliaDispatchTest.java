@@ -1,6 +1,7 @@
 package io.github.dailystruggle.effectsapi.bukkit.LocalEffects;
 
 import io.github.dailystruggle.effectsapi.common.effects.FireworkEffect;
+import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.bukkit.BukkitHandles;
 import io.github.dailystruggle.effectsapi.bukkit.BukkitPotionDispatch;
 import io.github.dailystruggle.effectsapi.EffectsAPI;

@@ -6,7 +6,9 @@ import io.github.dailystruggle.mapsapi.render.PixelFont;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import javax.imageio.ImageIO;
 
 /**

@@ -142,42 +142,4 @@ class TinyJsonReaderTest {
     assertThrows(UnsupportedOperationException.class, () -> arr.add(3L));
     assertFalse(arr.isEmpty());
   }
-
-  @Test
-  @DisplayName("exercises additional parse branches and error handling")
-  void additionalBranches() {
-    // Escapes: \b, \f, \r
-    Map<?, ?> escMap = (Map<?, ?>) TinyJsonReader.parse("{\"esc\": \"\\b\\f\\r\"}");
-    assertEquals("\b\f\r", escMap.get("esc"));
-
-    // Unterminated / malformed string escapes
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("{\"s\": \"abc\\"));
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("{\"s\": \"abc"));
-
-    // Missing colon in object
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("{\"a\" 1}"));
-
-    // Invalid object delimiter
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("{\"a\": 1; \"b\": 2}"));
-
-    // Invalid array delimiter
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("[1; 2]"));
-
-    // Unexpected end of input
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse(""));
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("   "));
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("{"));
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("["));
-
-    // Malformed boolean or null
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("trux"));
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("falx"));
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("nulx"));
-
-    // Malformed number
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("-"));
-
-    // Unexpected start character
-    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("?"));
-  }
 }

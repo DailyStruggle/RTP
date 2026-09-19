@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit;
 
+import io.github.dailystruggle.commandsapi.bukkit.BukkitCommandRegistrar;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
@@ -101,7 +102,9 @@ public final class BootstrapSupport {
         // binds /rtp and /wild and delegates the legacy String[] command path back
         // to CoreRtpRoot#dispatchString (sender checks + the RTPCmd guard);
         // tab-completion routes through the root's onTabComplete.
-        RTP.serverAccessor.registerCommands(mainCommand, "rtp", "wild");
+        BukkitCommandRegistrar registrar =
+                new BukkitCommandRegistrar(plugin, mainCommand, mainCommand::dispatchString);
+        registrar.register("rtp", "wild");
     }
 
     /**

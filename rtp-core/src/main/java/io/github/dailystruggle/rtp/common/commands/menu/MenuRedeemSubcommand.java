@@ -32,7 +32,7 @@ import java.util.logging.Level;
  * rejects invalid tokens via configurable messages per REQ-RTP-S-004/REQ-RTP-S-007,
  * and maintains S-005 asynchronous safety end-to-end.
  */
-public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
+public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
 
     /** Permission required to redeem a menu token. Reuses {@code rtp.menu}. */
     public static final String PERMISSION = "rtp.menu";

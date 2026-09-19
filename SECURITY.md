@@ -42,27 +42,18 @@ Alternatively, contact the maintainer directly via the SpigotMC resource page pr
 
 ## Scope
 
-This policy covers:
-- Core modules: `rtp-api`, `rtp-core`
-- Backend platform adapters: `rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, `rtp-neoforge`
-- SPI and subsystem modules: `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `anvil-api`, `tags-api`, `yaml-api`
-- Proxy / network modules: `rtp-proxy-common`, `rtp-proxy-velocity`
-- Release deliverable assemblies: `rtp-plugin` (LeafRTP and LeafRTP Pro jars)
+This policy covers the `rtp-api`, `rtp-core`, `rtp-bukkit`, `rtp-paper`, and `rtp-folia` modules.
 
-The `addons/` directory contains first-party and example integrations. Vulnerabilities in external third-party plugins integrated via the addon API (GriefPrevention, WorldGuard, Vault, etc.) should be reported to their respective upstream maintainers.
+The `addons/` directory contains example integrations. Vulnerabilities in third-party plugins integrated via the addon API (GriefPrevention, WorldGuard, Vault, etc.) should be reported to their respective maintainers.
 
 ## Out of Scope
 
-- Vulnerabilities in Minecraft itself, the underlying JVM, or host operating system
-- Upstream vulnerabilities in server software (Spigot, Paper, Folia, Fabric Loader, NeoForge)
-- Issues caused by operator misconfiguration or insecure permissions setups
-- Denial-of-service vectors that require operator-level (`OP`) permissions to trigger
-- Untrusted third-party addons executing outside the official API boundaries
+- Vulnerabilities in Minecraft itself, the JVM, or the server platform (Spigot/Paper/Folia)
+- Issues caused by misconfiguration of the server or other plugins
+- Denial-of-service attacks that require operator-level (`OP`) permissions to trigger
 
 ## Vulnerability Disclosure History
 
-| Advisory ID / CVE | Severity | Affected Versions | Fixed In | Summary | Published Date |
-|---|---|---|---|---|---|
-| *None* | - | - | - | No public vulnerabilities recorded to date. | - |
+No vulnerabilities have been publicly disclosed for RTP as of 2026-04-15.
 
-When a vulnerability is confirmed and patched, it will be published via a GitHub Security Advisory and recorded in the table above with its CVE identifier (if assigned), CVSS severity score, affected versions, fixed version, and an operator advisory summary.
+When a vulnerability is confirmed and patched, it will be recorded here with its CVE identifier (if assigned), affected versions, fixed version, and a brief description. This record is maintained so server operators can audit their exposure history.

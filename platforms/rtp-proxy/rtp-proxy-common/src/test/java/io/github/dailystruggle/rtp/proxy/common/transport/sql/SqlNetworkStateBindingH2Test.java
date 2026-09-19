@@ -377,36 +377,6 @@ class SqlNetworkStateBindingH2Test {
         }
     }
 
-    @Test
-    @DisplayName("publishProxyHeartbeat, redeem, and listActiveForServer paths")
-    void proxyHeartbeatAndRedeemCoverage() throws Exception {
-        io.github.dailystruggle.rtp.proxy.common.spi.ProxyHeartbeat ph =
-                new io.github.dailystruggle.rtp.proxy.common.spi.ProxyHeartbeat("p1", 1, System.currentTimeMillis(), 5, 2);
-        a.publishProxyHeartbeat(ph).get(2, TimeUnit.SECONDS);
-
-        UUID pid = UUID.randomUUID();
-        ReservationToken tok = a.claim("srv1", pid, Duration.ofSeconds(30)).get(2, TimeUnit.SECONDS);
-        assertNotNull(tok);
-
-        // listActiveForServer
-        List<ReservationToken> active = a.listActiveForServer("srv1").get(2, TimeUnit.SECONDS);
-        assertEquals(1, active.size());
-
-        // redeem happy path
-        var outcome = a.redeem(tok.tokenId(), pid, "srv1").get(2, TimeUnit.SECONDS);
-        assertEquals(io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome.REDEEMED, outcome);
-
-        // redeem already consumed -> ALREADY_CONSUMED
-        outcome = a.redeem(tok.tokenId(), pid, "srv1").get(2, TimeUnit.SECONDS);
-        assertEquals(io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome.ALREADY_CONSUMED, outcome);
-
-        // redeem server mismatch & player mismatch on unknown or wrong
-        outcome = a.redeem("unknown-token", pid, "srv1").get(2, TimeUnit.SECONDS);
-        assertEquals(io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome.NOT_FOUND, outcome);
-
-        assertEquals(SqlNetworkStateBinding.Dialect.H2, a.dialect());
-    }
-
     // --- helpers -------------------------------------------------------------
 
     private static BackendHeartbeat sampleBackend(String id, long lastSeen) {

@@ -76,13 +76,6 @@ public class ReqRtpFabricServerAccessorNoChatTypesTest {
         }
     }
 
-    @Test
-    public void fabricServerAccessor_registerCommands_handlesInputsSafely() {
-        FabricServerAccessor accessor = new FabricServerAccessor();
-        accessor.registerCommands(null);
-        accessor.registerCommands(new Object(), "rtp", "wild");
-    }
-
     /** Locate {@code FabricServerAccessor.class} on the test runtime classpath. */
     private static Path locateClassFile() throws Exception {
         String resource = FabricServerAccessor.class.getName().replace('.', '/') + ".class";

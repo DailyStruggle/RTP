@@ -21,6 +21,7 @@ import org.bukkit.entity.Firework;
 import org.bukkit.entity.EntityType;
 import org.bukkit.util.Vector;
 import io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.FireworkSafetyListener;
+import java.util.Objects;
 import java.util.Map;
 
 import java.util.UUID;

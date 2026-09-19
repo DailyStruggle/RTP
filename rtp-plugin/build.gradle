@@ -12,7 +12,6 @@ plugins {
     id 'com.gradleup.shadow'
     // Version pinned in settings.gradle pluginManagement.plugins {}.
     id 'fabric-loom'
-    id 'org.cyclonedx.bom'
 }
 repositories {
     // SirBlobman public Nexus is listed BEFORE jitpack on purpose: the
@@ -1665,86 +1664,3 @@ tasks.named('check') { dependsOn 'liteJarStructureCheck' }
 // (removed in Gradle 10). The `assemble.dependsOn` wiring below is the
 // supported replacement -- see upgrading_version_9.html#sec:archives-configuration.
 assemble.dependsOn tasks.named('remapLiteJar')
-
-// ENTERPRISE_READINESS.md Item 39: Sign shaded plugin jar and publish checksums alongside it.
-// Generates SHA-256 and SHA-512 checksum files for release deliverables (LeafRTP-*.jar and LeafRTP-Pro-*.jar).
-tasks.register('generateChecksums') {
-    group = 'build'
-    description = 'Generates SHA-256 and SHA-512 checksums for release deliverables.'
-    dependsOn tasks.named('remapJar'), tasks.named('remapLiteJar')
-
-    doLast {
-        def deliverables = [
-            tasks.named('remapJar').get().archiveFile.get().asFile,
-            tasks.named('remapLiteJar').get().archiveFile.get().asFile
-        ]
-
-        deliverables.each { File jarFile ->
-            if (jarFile.exists()) {
-                ['SHA-256': '.sha256', 'SHA-512': '.sha512'].each { algo, ext ->
-                    def digest = java.security.MessageDigest.getInstance(algo)
-                    jarFile.withInputStream { is ->
-                        byte[] buffer = new byte[8192]
-                        int read
-                        while ((read = is.read(buffer)) > 0) {
-                            digest.update(buffer, 0, read)
-                        }
-                    }
-                    def hex = digest.digest().collect { String.format('%02x', it) }.join('')
-                    def checksumFile = new File(jarFile.parentFile, jarFile.name + ext)
-                    checksumFile.text = "${hex}  ${jarFile.name}\n"
-                    logger.lifecycle("[Item 39] Generated ${algo} checksum for ${jarFile.name} -> ${checksumFile.name}")
-                }
-            }
-        }
-    }
-}
-
-// Wire signing for release deliverables using the existing signing configuration if present.
-apply plugin: 'signing'
-
-signing {
-    def signingKey = findProperty('signingKey') as String
-    def signingPassword = findProperty('signingPassword') as String
-    if (findProperty('signWithGpgCmd') != null) {
-        useGpgCmd()
-    } else if (signingKey) {
-        useInMemoryPgpKeys(signingKey, signingPassword)
-    }
-}
-
-tasks.register('signDeliverables') {
-    group = 'signing'
-    description = 'Signs the shaded plugin release deliverables (LeafRTP-*.jar and LeafRTP-Pro-*.jar) if signing keys are present.'
-    dependsOn tasks.named('remapJar'), tasks.named('remapLiteJar')
-
-    doLast {
-        def signingKey = findProperty('signingKey') as String
-        def useGpg = findProperty('signWithGpgCmd') != null
-        if (!signingKey && !useGpg) {
-            logger.info('[Item 39] Skipping signDeliverables: no signing credentials configured.')
-            return
-        }
-
-        def deliverables = [
-            tasks.named('remapJar').get().archiveFile.get().asFile,
-            tasks.named('remapLiteJar').get().archiveFile.get().asFile
-        ]
-
-        deliverables.each { File jarFile ->
-            if (jarFile.exists()) {
-                try {
-                    project.signing.sign(jarFile)
-                    logger.lifecycle("[Item 39] Signed deliverable: ${jarFile.name}")
-                } catch (Exception e) {
-                    logger.warn("[Item 39] Failed to sign deliverable ${jarFile.name}: ${e.message}")
-                    if (project.hasProperty('strictSigning')) {
-                        throw e
-                    }
-                }
-            }
-        }
-    }
-}
-
-assemble.dependsOn tasks.named('generateChecksums')

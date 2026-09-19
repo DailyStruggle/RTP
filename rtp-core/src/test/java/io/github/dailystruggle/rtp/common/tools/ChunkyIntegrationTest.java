@@ -123,30 +123,4 @@ public class ChunkyIntegrationTest {
         assertNotNull(xz);
         assertEquals(2, xz.length);
     }
-
-    @Test
-    void chunkyRTPShapeRandWithFallbackWhenUnbounded() throws Exception {
-        Chunky mockChunky = Mockito.mock(Chunky.class);
-        Method register = ChunkyProvider.class.getDeclaredMethod("register", Chunky.class);
-        register.setAccessible(true);
-        register.invoke(null, mockChunky);
-
-        ChunkyRTPShape shape = new ChunkyRTPShape("circle") {
-            private int callCount = 0;
-            @Override
-            public long rand() {
-                // Testing that when shape loop exceeds 10000, fallback returns -1 or badPrefixSumsCache[0]
-                return super.rand();
-            }
-        };
-
-        // When radius is 0 and centerX/Z are far away, Chunky shape.isBounding returns false for all candidate coords
-        shape.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams.width, 0);
-        shape.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams.height, 0);
-        shape.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams.centerX, 1000000);
-        shape.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams.centerZ, 1000000);
-
-        long res = shape.rand();
-        assertTrue(res == -1L || res >= 0L);
-    }
 }

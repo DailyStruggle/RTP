@@ -509,21 +509,9 @@ public final class RTPNeoForgeMod {
               + "unavailable this run: " + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
       return;
     }
-    // Reuse the commands-api Brigadier bridge (commands-api-ADR-001).
-    // Ensure the neutral CoreRtpRoot is registered with the accessor SPI if not already done,
-    // and drain all registered commands into the NeoForge event dispatcher.
-    if (RTP.baseCommand == null) {
-      io.github.dailystruggle.rtp.common.commands.CoreRtpRoot root =
-          new io.github.dailystruggle.rtp.common.commands.CoreRtpRoot();
-      RTP.baseCommand = root;
-      if (accessor != null) {
-        accessor.registerCommands(root, "rtp", "wild");
-      }
-    }
-    if (accessor != null) {
-      accessor.registerToDispatcher(event.getDispatcher());
-    } else {
-      NeoForgeCommandRegistrar.register(event.getDispatcher());
-    }
+    // Reuse the commands-api Brigadier bridge (commands-api-ADR-001). The
+    // registrar adapts NeoForge's CommandDispatcher<CommandSourceStack> to the
+    // shared command tree; only this trampoline is platform specific.
+    NeoForgeCommandRegistrar.register(event.getDispatcher());
   }
 }
