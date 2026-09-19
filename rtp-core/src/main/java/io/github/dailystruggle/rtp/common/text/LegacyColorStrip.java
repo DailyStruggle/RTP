@@ -30,7 +30,7 @@ public final class LegacyColorStrip {
 
     /** Drop-in equivalent of {@code ChatColor.stripColor} with broader coverage. */
     public static String strip(String raw) {
-        if (raw == null || raw.isEmpty()) return "";
+        if (raw == null || raw.isEmpty()) return raw == null ? "" : "";
         return strip2(raw).stripped;
     }
 

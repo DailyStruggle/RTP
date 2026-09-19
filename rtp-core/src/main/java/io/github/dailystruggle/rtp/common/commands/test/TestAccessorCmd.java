@@ -166,8 +166,13 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
       if (formatted != null && formattedNoColor != null) {
         // formatNoColor should not contain the '&' color token if parsed
-        // Some implementations may leave unchanged if no color library, still pass if non-null
-        r.formatValid = true;
+        boolean strippedOrReplaced = !formattedNoColor.contains("&a");
+        if (strippedOrReplaced) {
+          r.formatValid = true;
+        } else {
+          // Some implementations may leave unchanged if no color library, still pass if non-null
+          r.formatValid = true;
+        }
       } else {
         r.pass = false;
         r.details.add("format or formatNoColor returned null");
