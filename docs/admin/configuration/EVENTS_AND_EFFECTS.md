@@ -97,6 +97,9 @@ Registered in `effects-api/.../EffectFactory.java`. Available on every supported
 | `POTION` | `PotionEffect` | Applied to the teleporting player. |
 | `SOUND` | `SoundEffect` | Played at the player's location. |
 | `COMMAND` | `CommandEffect` | Executes a console or player command at the configured trigger stage (effects-api-ADR-007). |
+| `DROP_INVENTORY` | `DropInventoryEffect` | Drops inventory at origin location before teleporting without going through death screen. |
+| `DROP_EXP` | `DropExpEffect` | Drops experience according to vanilla death formula (`min(level * 7, 100)`) and resets exp. |
+| `DEATH` | `DeathEffect` | Kills the player, triggering vanilla death event and death screen. |
 
 #### Positional arguments per type
 
@@ -174,6 +177,36 @@ Executes arbitrary commands at any trigger stage (`presetup`, `postteleport`, `c
   - `[world]` or `{world}`: Target location world name (if available).
   - `[x]`, `[y]`, `[z]` or `{x}`, `{y}`, `{z}`: Target coordinate integers (if available).
 - **Concurrency & Platform Thread Safety:** Dispatched with full thread safety across platforms (scheduled on global region / player entity scheduler on Folia, main server thread on Bukkit/Paper, server thread on Fabric and NeoForge).
+
+**`DROP_INVENTORY`** — `DropInventoryEffect`
+
+Drops the player's inventory items naturally at their origin location and clears their inventory. Upgrades the requested "die before rtp" survival restart flow by dropping items directly at the origin without sending the player through the Minecraft death screen.
+
+- **Format in `definitions/effects/*.yml`:**
+  - `DROP_INVENTORY`: Drops all inventory items (armor, offhand, storage) at the origin location and clears inventory.
+- **Format in permissions:**
+  - `rtp.effect.<stage>.drop_inventory`: Drops inventory on `<stage>` (e.g. `rtp.effect.preteleport.drop_inventory`).
+
+**`DROP_EXP`** — `DropExpEffect` (alias `DROP_EXPERIENCE`)
+
+Drops the player's experience points naturally at their origin location according to the vanilla Minecraft player death experience formula (`min(level * 7, 100)`), and resets their level and experience to 0.
+
+- **Format in `definitions/effects/*.yml`:**
+  - `DROP_EXP`: Drops experience orbs using the vanilla death reset formula.
+- **Format in permissions:**
+  - `rtp.effect.<stage>.drop_exp`: Drops experience on `<stage>` (e.g. `rtp.effect.preteleport.drop_exp`).
+
+**`DEATH`** — `DeathEffect` (alias `KILL`)
+
+Kills the player, triggering the standard vanilla Minecraft death event, death message, death screen, and respawn sequence. Ensures seamless integration with death chests, grave mods, and external death hooks. The player's respawn position is automatically anchored to the RTP destination coordinate, and active teleport cancellation/rerolling on death is prevented so the destination location is never leaked or reused.
+
+- **Format in `definitions/effects/*.yml`:**
+  - `DEATH`: Kills the player and anchors their bed/respawn point to the target location (`set_bed` defaults to `true`).
+  - `DEATH true`: Explicitly enables anchoring bed/respawn point to target location.
+  - `DEATH false`: Kills the player at destination respawn without permanently setting bed/anchor spawn.
+- **Format in permissions:**
+  - `rtp.effect.<stage>.death`: Kills the player on `<stage>` with bed spawn set (e.g. `rtp.effect.preteleport.death`).
+  - `rtp.effect.<stage>.death.false`: Kills the player on `<stage>` without setting bed spawn.
 
 Missing trailing arguments keep the effect's built-in defaults (see each `*Effect` class constructor).
 

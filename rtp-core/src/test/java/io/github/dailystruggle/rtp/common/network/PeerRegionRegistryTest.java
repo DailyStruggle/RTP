@@ -272,6 +272,28 @@ class PeerRegionRegistryTest {
     }
 
     @Test
+    void peerRegionRequiresPermission_onlyWhenPeerAdvertisesPermTrue() {
+        var peer = new BackendHeartbeat(
+                "backend-a", 1, BackendHeartbeat.PluginState.READY, true,
+                System.currentTimeMillis(), 1.0, 0, 100, 0L, 0L, 0,
+                List.of("default", "vip"), List.of(), false, 0, 0,
+                Set.of("default", "vip"),
+                Map.of(),
+                Map.of("vip.perm", "true"));
+
+        var registry = new PeerRegionRegistry(() -> snap(peer), "lobby-a");
+        assertTrue(registry.peerRegionRequiresPermission("backend-a", "vip"));
+        // Open region: no `.perm` attribute -> not gated, so an unprivileged
+        // player still sees `backend-a:default`, matching the local path where
+        // an open region needs no `rtp.regions.<region>`.
+        assertFalse(registry.peerRegionRequiresPermission("backend-a", "default"));
+        // Older peer / unknown server / flaky transport all fail open.
+        assertFalse(registry.peerRegionRequiresPermission("backend-z", "default"));
+        var broken = new PeerRegionRegistry(() -> { throw new RuntimeException("fail"); }, "lobby-a");
+        assertFalse(broken.peerRegionRequiresPermission("backend-a", "vip"));
+    }
+
+    @Test
     void pickMostKept_withLocalDecrements_scoresAndSelects() {
         var a = hb("backend-a", Set.of("default"), false);
         var b = hb("backend-b", Set.of("default"), false);

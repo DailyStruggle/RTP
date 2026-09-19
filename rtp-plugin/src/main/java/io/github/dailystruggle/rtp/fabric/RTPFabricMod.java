@@ -163,7 +163,8 @@ public final class RTPFabricMod implements ModInitializer {
                                 () -> reflectIntZeroArg(accessor.getServer(),
                                         new String[] { "getPlayerCount", "method_3788" }),
                                 () -> reflectIntZeroArg(accessor.getServer(),
-                                        new String[] { "getMaxPlayers", "method_3802" }));
+                                        new String[] { "getMaxPlayers", "method_3802" }),
+                                () -> reflectTickWorkNanos(accessor.getServer()));
                 io.github.dailystruggle.rtp.common.RTP.metrics.setBinding(fabricMetrics);
                 io.github.dailystruggle.rtp.common.RTP.log(Level.INFO,
                         "[RTP] Fabric metrics binding installed (FabricMetricsBinding).");
@@ -852,6 +853,55 @@ public final class RTPFabricMod implements ModInitializer {
             }
         }
         return 0;
+    }
+
+    /**
+     * Resolve the server's average in-tick work duration in nanoseconds.
+     *
+     * <p>MSPT must come from the time actually spent inside {@code tickServer},
+     * not from the interval between tick boundaries: the vanilla loop sleeps to
+     * hold the nominal rate, so that interval is floored at 50 ms and can never
+     * report a healthy server. Mojang exposes the work mean as
+     * {@code getAverageTickTimeNanos()} (1.21+) and as a {@code float}
+     * milliseconds {@code getAverageTickTime()} on older lines; both are tried
+     * by mojmap and intermediary alias so this resolves on any in-scope
+     * mapping. Returns {@code -1} when the server is unbound or no candidate
+     * resolves - the binding then leaves MSPT unsampled instead of publishing a
+     * misleading value.
+     */
+    static long reflectTickWorkNanos(Object target) {
+        if (target == null) return -1L;
+        // Nanosecond accessors first - no precision loss.
+        for (String name : new String[] { "getAverageTickTimeNanos", "method_67824" }) {
+            try {
+                java.lang.reflect.Method m = target.getClass().getMethod(name);
+                Object v = m.invoke(target);
+                if (v instanceof Number n) {
+                    long nanos = n.longValue();
+                    if (nanos > 0L) return nanos;
+                }
+            } catch (NoSuchMethodException ignored) {
+                // try next candidate
+            } catch (Throwable ignored) {
+                // best-effort: a single failing candidate must not block the binding
+            }
+        }
+        // Millisecond (float) accessors - pre-1.21 lines.
+        for (String name : new String[] { "getAverageTickTime", "method_3830" }) {
+            try {
+                java.lang.reflect.Method m = target.getClass().getMethod(name);
+                Object v = m.invoke(target);
+                if (v instanceof Number n) {
+                    double millis = n.doubleValue();
+                    if (millis > 0.0) return (long) (millis * 1_000_000.0);
+                }
+            } catch (NoSuchMethodException ignored) {
+                // try next candidate
+            } catch (Throwable ignored) {
+                // best-effort
+            }
+        }
+        return -1L;
     }
 
     /**

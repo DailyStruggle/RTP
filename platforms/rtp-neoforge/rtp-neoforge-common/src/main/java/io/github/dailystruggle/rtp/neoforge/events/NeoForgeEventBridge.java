@@ -147,6 +147,22 @@ public final class NeoForgeEventBridge {
     }
 
     @SubscribeEvent
+    public void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        try {
+            if (event.getEntity() instanceof ServerPlayer player) {
+                UUID uuid = player.getUUID();
+                io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pending =
+                        RTP.pendingDeathTeleports.remove(uuid);
+                if (pending != null) {
+                    pending.completeDeathTeleport(true);
+                }
+            }
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, "[RTP][NeoForge] PlayerRespawnEvent handler failed", t);
+        }
+    }
+
+    @SubscribeEvent
     public void onPlayerDeath(LivingDeathEvent event) {
         try {
             if (event.getEntity() instanceof ServerPlayer player) {

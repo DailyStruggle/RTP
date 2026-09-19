@@ -97,7 +97,15 @@ public final class FabricEffectsHandler {
         });
         TeleportPipelineTask.teleportPreActions.add(task -> {
             if (!effectParsingEnabled(parser) || task.player() == null) return;
-            dispatch("rtp.effect.preteleport", task.player(), runtime);
+            net.minecraft.world.phys.Vec3 originPos = null;
+            if (task.player() instanceof FabricRTPPlayer fp && fp.handle() != null) {
+                originPos = fp.handle().position();
+            }
+            net.minecraft.world.phys.Vec3 destPos = null;
+            if (task.coords() != null) {
+                destPos = new net.minecraft.world.phys.Vec3(task.coords().x(), task.coords().y(), task.coords().z());
+            }
+            dispatch("rtp.effect.preteleport", task.player(), runtime, originPos, destPos, task.coords() != null ? task.coords().worldName() : null, task);
         });
         TeleportPipelineTask.teleportPostActions.add(task -> {
             if (!effectParsingEnabled(parser) || task.player() == null) return;
@@ -181,6 +189,21 @@ public final class FabricEffectsHandler {
     }
 
     private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime) {
+        dispatch(prefix, player, runtime, null, null, null, null);
+    }
+
+    private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime,
+                                 net.minecraft.world.phys.Vec3 explicitLocation,
+                                 net.minecraft.world.phys.Vec3 destinationLocation,
+                                 String destWorldName) {
+        dispatch(prefix, player, runtime, explicitLocation, destinationLocation, destWorldName, null);
+    }
+
+    private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime,
+                                 net.minecraft.world.phys.Vec3 explicitLocation,
+                                 net.minecraft.world.phys.Vec3 destinationLocation,
+                                 String destWorldName,
+                                 TeleportPipelineTask pipelineTask) {
         try {
             if (!(player instanceof FabricRTPPlayer fp)) return;
             ServerPlayer handle = fp.handle();
@@ -197,9 +220,30 @@ public final class FabricEffectsHandler {
                     EffectsResolver.resolveUnioned(stage, fp, prefix, perms);
             if (union.isEmpty()) return;
 
+            Object target;
+            if (explicitLocation != null) {
+                Object destHandle = null;
+                if (destinationLocation != null && destWorldName != null) {
+                    destHandle = io.github.dailystruggle.effectsapi.fabric.FabricHandles.wrap(
+                            destinationLocation, destWorldName);
+                }
+                target = new io.github.dailystruggle.effectsapi.common.spi.EffectTarget(
+                        io.github.dailystruggle.effectsapi.fabric.FabricHandles.wrap(handle),
+                        io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(explicitLocation),
+                        destHandle != null ? io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(destHandle) : null);
+            } else {
+                target = handle;
+            }
+
             List<Effect<?>> effects = EffectFactory.buildEffects(prefix, union);
             for (Effect<?> effect : effects) {
-                effect.setTarget(handle);
+                effect.setTarget(target);
+                if (effect instanceof io.github.dailystruggle.effectsapi.common.effects.DeathEffect) {
+                    RTP.deathEffectInFlight.add(handle.getUUID());
+                    if (pipelineTask != null) {
+                        pipelineTask.deathEffectTriggered = true;
+                    }
+                }
                 runtime.schedule(effect, 0);
             }
         } catch (Throwable t) {

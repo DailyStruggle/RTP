@@ -12,10 +12,10 @@ import java.util.regex.Pattern;
 public final class DurationParser {
 
   private static final Pattern SINGLE_DURATION_PATTERN =
-      Pattern.compile("^\\s*([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]+)?\\s*+$");
+      Pattern.compile("^\\s*([+-]?[0-9]+(?:\\.[0-9]+)?)(?:\\s*([a-zA-Z]+))?\\s*$");
 
   private static final Pattern COMPOSITE_SEGMENT_PATTERN =
-      Pattern.compile("([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*+([a-zA-Z]+)");
+      Pattern.compile("([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]+)");
 
   private DurationParser() {}
 
@@ -78,7 +78,6 @@ public final class DurationParser {
     // Attempt composite parsing (e.g. "1d12h", "2h 30m 10s")
     Matcher compositeMatcher = COMPOSITE_SEGMENT_PATTERN.matcher(trimmed);
     double totalSeconds = 0.0;
-    int matchedChars = 0;
     boolean foundSegment = false;
 
     while (compositeMatcher.find()) {
@@ -97,7 +96,6 @@ public final class DurationParser {
       }
 
       totalSeconds += unit.toSeconds(segmentValue);
-      matchedChars += compositeMatcher.end() - compositeMatcher.start();
     }
 
     if (!foundSegment) {

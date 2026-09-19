@@ -1737,14 +1737,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 String myCurve = getCurveName();
                 int myP = getPointEdgeChunks();
                 boolean curveMatch = myCurve.equals(readCurve);
-                boolean losslessRatchet = false;
-                if (curveMatch) {
-                  if (myP == readP) {
-                    losslessRatchet = true;
-                  } else if (myP > readP && (myP % readP) == 0) {
-                    losslessRatchet = true; // target P is a multiple of stored P: fold upward
-                  }
-                }
+                boolean losslessRatchet = curveMatch && (myP == readP || (myP > readP && (myP % readP) == 0));
 
                 // Per-bad-run on-disk width:
                 // v3 (modern) = 2*keyWidth + 1 + 8 (key + delta + cause 1 + expiresAt 8)
@@ -3549,7 +3542,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected final boolean expand() {
     Object raw = paramByKey(knobs().expand, Boolean.FALSE);
     if (raw instanceof Boolean b) return b;
-    return raw != null && Boolean.parseBoolean(raw.toString());
+    return Boolean.parseBoolean(raw.toString());
   }
 
   /**

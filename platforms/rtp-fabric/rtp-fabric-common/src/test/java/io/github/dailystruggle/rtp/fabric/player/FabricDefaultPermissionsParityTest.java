@@ -82,6 +82,7 @@ class FabricDefaultPermissionsParityTest {
         // default: true
         m.put("rtp.see", FabricDefaultPermissions.Verdict.TRUE);
         m.put("rtp.use", FabricDefaultPermissions.Verdict.TRUE);
+        m.put("rtp.servers.*", FabricDefaultPermissions.Verdict.TRUE);
         // default: false (the rtp.onevent.* opt-in family + their parent aggregate)
         m.put("rtp.onevent.join", FabricDefaultPermissions.Verdict.FALSE);
         m.put("rtp.onevent.firstjoin", FabricDefaultPermissions.Verdict.FALSE);

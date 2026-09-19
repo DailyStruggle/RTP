@@ -630,19 +630,17 @@ public final class StrideGroupResidencyManager {
       raf.seek(directoryOffset);
       long payloadOffset = -1L;
       int payloadLength = 0;
-      int shardCount = 0;
 
       for (int i = 0; i < groupCount; i++) {
         long gid = raf.readLong();
         long off = raf.readLong();
         int len = raf.readInt();
-        int cnt = raf.readInt();
+        raf.readInt(); // shardCount
         raf.readLong(); // devolvedCount
 
         if (gid == targetGroupId) {
           payloadOffset = off;
           payloadLength = len;
-          shardCount = cnt;
           break;
         }
       }

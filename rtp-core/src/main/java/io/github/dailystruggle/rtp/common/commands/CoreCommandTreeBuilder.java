@@ -80,7 +80,13 @@ public final class CoreCommandTreeBuilder {
               RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
               // Path 1: bare local region name.
               if (RTP.selectionAPI.regionNames().contains(s)) {
-                return sender.hasPermission("rtp.regions." + s);
+                io.github.dailystruggle.rtp.common.selection.region.Region localRegion =
+                    RTP.selectionAPI.getRegion(s);
+                if (localRegion == null || !localRegion.getSettings().requirePermission()) {
+                  return true;
+                }
+                return sender.hasPermission("rtp.regions." + s)
+                    || sender.hasPermission("rtp.regions.*");
               }
               // Path 2: qualified `server:region`. Parse strictly; on any
               // malformed input fall through to reject.
@@ -98,8 +104,17 @@ public final class CoreCommandTreeBuilder {
               if (!registry.isReachableHardPin(parsed.serverHint(), parsed.regionKey())) {
                 return false;
               }
+              // `rtp.regions.<region>` is only demanded for a region the owning
+              // backend declared permission-gated; an open peer region costs no
+              // more than the same region would locally.
+              if (registry.peerRegionRequiresPermission(
+                      parsed.serverHint(), parsed.regionKey())
+                  && !sender.hasPermission("rtp.regions." + parsed.regionKey())
+                  && !sender.hasPermission("rtp.regions.*")) {
+                return false;
+              }
               return sender.hasPermission("rtp.servers." + parsed.serverHint())
-                  && sender.hasPermission("rtp.regions." + parsed.regionKey());
+                  || sender.hasPermission("rtp.servers.*");
             },
             () -> {
               NetworkModeBootstrap live = NetworkModeBootstrap.LIVE;

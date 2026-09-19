@@ -173,7 +173,7 @@ Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https:/
 
 #### Empirical Spatial Distribution & Candidate Selection Benchmarks
 
-Comparative benchmark runs evaluate player dispersion, collision avoidance, and downsampling models:
+Visual test suites and benchmarks evaluate candidate dispersion, collision avoidance, and downsampling models across algorithms and queue tiers:
 
 <div align="center">
 
@@ -192,6 +192,38 @@ Comparative benchmark runs evaluate player dispersion, collision avoidance, and 
 ##### Dual-Layer Geometry & Circle Boundary Fidelity
 ![Circle Comparison Side-by-Side](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/simulation_circle_comparison_side_by_side.png)
 *Side-by-side comparison of circle boundary coverage: ground truth vs. classic polar spiral vs. dual-layer square at varying resolutions.*
+
+##### Full Pipeline Selection Visualizer & L3 Bin Distribution
+![Full L3 State Chart](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/full_l3_state_chart.png)
+*Complete pipeline selection visualizer mapping candidate validation states, active 32x32 L3 bins, and discarded hazard bins across the region.*
+
+##### Pipeline Candidate Selection Sequence Comparison
+![Selection Sequence Comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/selection_sequence_comparison_chart.png)
+*Comparative dispatch sequence showing candidate evaluation order, bin walk progression, and spatial dispersion.*
+
+##### Native vs. Unique vs. L3 Cache Candidate Distribution
+![Native vs Unique vs L3 Comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/native_vs_unique_vs_l3_comparison_chart.png)
+*Visual distribution across raw spiral candidates, deduplicated candidates, and binned L3 backlog cache pools.*
+
+##### Path Progression Across Scaled Radii
+![Path Progression Radii](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/path_progression_radii_chart.png)
+*Path progression and coverage density across increasing region radii.*
+
+##### Sub-Bin and 32x32 Region Path Progression
+![Sub-Bin Zoom Path Chart](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/sub_bin_zoom_path_chart.png)
+*High-resolution sub-bin trajectory showing continuous candidate distribution within a 32x32 chunk sector.*
+
+##### Unique Placements & Expand Progression
+![Unique Placements Expand Progression](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/unique_placements_expand_progression_chart.png)
+*Candidate placement progression under dynamic region expansion and spatial uniqueness constraints.*
+
+##### Real-World Terrain Coverage & Qualitative Uniqueness (.mca Analysis)
+![MCA Qualitative Uniqueness Chart](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/mca_qualitative_uniqueness_chart.png)
+*Qualitative uniqueness verification on real Anvil (.mca) terrain data, measuring hazard avoidance and spatial distribution.*
+
+##### Admissible Gap Policy Candidate Dispersion
+![Admissible Gap Policy Chart](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/admissible_gap_policy_chart.png)
+*Candidate dispersion under varying stride and gap policies to ensure uniform coverage without clustering.*
 
 </div>
 

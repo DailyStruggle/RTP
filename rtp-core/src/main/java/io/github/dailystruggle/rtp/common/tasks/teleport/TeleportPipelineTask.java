@@ -150,6 +150,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private static final java.util.Set<String> loggedSchematicPlatformFallback =
       java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+  public volatile boolean deathEffectTriggered = false;
+
   /**
    * ADR-026 / ADR-058: addon-bound arrival platform creator ({@code RTPHooks#platformCreator()}).
    * Prepared off-thread in {@link #runLoad} and applied on-thread in {@link #buildArrivalPlatform}.
@@ -214,9 +216,16 @@ public final class TeleportPipelineTask extends RTPRunnable {
   @Override
   public void setCancelled(boolean cancel) {
     super.setCancelled(cancel);
-    if (cancel && this.trackingId != null) {
-      io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(this.trackingId);
-      this.trackingId = null;
+    if (cancel) {
+      if (this.trackingId != null) {
+        io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(this.trackingId);
+        this.trackingId = null;
+      }
+      if (player() != null) {
+        UUID pid = player().uuid();
+        RTP.deathEffectInFlight.remove(pid);
+        RTP.pendingDeathTeleports.remove(pid);
+      }
     }
   }
 
@@ -744,6 +753,19 @@ public final class TeleportPipelineTask extends RTPRunnable {
       if (!pastedSchematic && buildPlatform) {
         buildArrivalPlatform(location);
       }
+
+      if (deathEffectTriggered || RTP.deathEffectInFlight.contains(playerId)) {
+        RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport deathEffect active playerId=" + playerId
+            + "; putting teleport on hold until respawn");
+        RTP.pendingDeathTeleports.put(playerId, this);
+        teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
+        RTP.getInstance().processingPlayers.remove(playerId);
+        if (RTP.getInstance().databaseAccessor != null) {
+          RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+        }
+        return;
+      }
+
       RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
 
       teleportData.completed = true;
@@ -798,6 +820,12 @@ public final class TeleportPipelineTask extends RTPRunnable {
                   RTP.getInstance().teleportLimitStore.recordSuccess(playerId,
                       ConfigCache.lockAfterUses, ConfigCache.lockAfterResetMillis,
                       System.currentTimeMillis());
+                }
+              } else if (RTP.deathEffectInFlight.contains(playerId)) {
+                // Player died deliberately via DEATH effect in pipeline; respawn location was
+                // anchored to target and this teleport is completed rather than failed.
+                if (teleportData != null) {
+                  teleportData.completed = true;
                 }
               } else {
                 RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
@@ -859,6 +887,79 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
     } catch (Exception e) {
       SupportLogger.logException(Level.SEVERE, "Error in runTeleport", e);
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
+    }
+  }
+
+  /**
+   * Finalizes a held teleport that was suspended because a DEATH effect was active.
+   *
+   * @param respawned {@code true} if player respawned, {@code false} if disconnected or cancelled.
+   */
+  public void completeDeathTeleport(boolean respawned) {
+    UUID playerId = (context != null && context.player() != null) ? context.player().uuid() : null;
+    if (playerId != null) {
+      RTP.deathEffectInFlight.remove(playerId);
+      RTP.pendingDeathTeleports.remove(playerId);
+    }
+    try {
+      if (respawned) {
+        if (teleportData != null) {
+          teleportData.completed = true;
+        }
+        if (playerId != null) {
+          RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
+
+          if (ConfigCache.lockAfterUses > 0) {
+            RTP.getInstance().teleportLimitStore.recordSuccess(playerId,
+                ConfigCache.lockAfterUses, ConfigCache.lockAfterResetMillis,
+                System.currentTimeMillis());
+          }
+
+          // Invulnerability duration on respawn
+          long duration = 0L;
+          ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+          if (safetyParser != null) {
+            Number num = safetyParser.getNumber(SafetyKeys.invulnerabilityTime, 0L);
+            if (num != null) {
+              duration = num.longValue();
+            }
+          }
+          if (duration > 0) {
+            RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
+            RTP.scheduler.runTaskLater(() -> {
+              RTP.getInstance().invulnerablePlayers.remove(playerId);
+            }, duration * 20L);
+          } else {
+            RTP.getInstance().invulnerablePlayers.remove(playerId);
+          }
+        }
+
+        teleportPostActions.forEach(consumer -> {
+          try {
+            consumer.accept(this);
+          } catch (Exception e) {
+            SupportLogger.logException(Level.WARNING, "Error in teleportPostAction", e);
+          }
+        });
+
+        if (ConfigCache.postTeleportQueueing
+            && region != null
+            && region.cachePipeline != null) {
+          try {
+            region.cachePipeline.add(
+                new io.github.dailystruggle.rtp.common.selection.region.RegionCacheTask(
+                    region, 1_000_000L));
+          } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                "[RTP] postTeleportQueueing dispatch failed: " + t, t);
+          }
+        }
+      }
+    } catch (Exception e) {
+      SupportLogger.logException(Level.SEVERE, "Fatal error in completeDeathTeleport", e);
+    } finally {
       currentPhase = Phase.CLEANUP;
       runCleanup();
     }
@@ -1061,6 +1162,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       if (player() != null) {
         UUID pid = player().uuid();
+        RTP.deathEffectInFlight.remove(pid);
+        RTP.pendingDeathTeleports.remove(pid);
         TeleportData data = RTP.getInstance().latestTeleportData.get(pid);
 
         // Strict reference verification prevents overwriting subsequent requests

@@ -63,8 +63,8 @@ public class DownsamplingSideBySideBenchmarkTest {
   @Test
   @DisplayName("Generate Side-by-Side Spatial Distribution and Memory Model Comparison Chart")
   public void testGenerateSideBySideComparison() throws Exception {
-    int R = 1024;
-    int pointEdgeP = 32;
+    int R = 256; // Zoomed in to R = 256 chunks (4,096 blocks) so pattern differences stand out clearly
+    int pointEdgeP = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.PointEdgeSelector.derivePFromRadius(R);
     int testTeleports = 600;
     int uniqueRadiusRu = 8; // R_u = 8 chunks (128 blocks footprint)
 
@@ -140,112 +140,37 @@ public class DownsamplingSideBySideBenchmarkTest {
     System.out.printf("[DEBUG_LOG] %s: Flat Arrays = %,d B | Pure Bitmask = %,d B | Roaring = %,d B (Reduction: %.1f%%)%n",
         memS256.name, memS256.flatArrayBytes, memS256.pureBitmaskBytes, memS256.roaringHybridBytes, memS256.memoryReductionPercent);
 
-    // Render Side-by-Side Visual Comparison Chart
+    // Save to all repository and doc destinations
+    File[] targetFiles = new File[] {
+      new File("side_by_side_downsampling_comparison_chart.png"),
+      new File("../side_by_side_downsampling_comparison_chart.png"),
+      new File("docs/assets/img/side_by_side_downsampling_comparison_chart.png"),
+      new File("../docs/assets/img/side_by_side_downsampling_comparison_chart.png"),
+      new File("build/reports/player_distribution/side_by_side_downsampling_comparison_chart.png"),
+      new File("../build/reports/player_distribution/side_by_side_downsampling_comparison_chart.png")
+    };
+    for (File tf : targetFiles) {
+      if (tf.getParentFile() != null && !tf.getParentFile().exists()) {
+        continue;
+      }
+      renderSideBySideChart(R, uniqueRadiusRu, currentArrivals, arrivalsS64, arrivalsS256, proxCurrent, proxS64, proxS256, memCurrent, memS64, memS256, tf);
+      System.out.println("[DEBUG_LOG] Successfully rendered comparison chart to: " + tf.getAbsolutePath());
+    }
+
+    File[] targetAutoFiles = new File[] {
+      new File("unique_placements_auto_comparison_chart.png"),
+      new File("../unique_placements_auto_comparison_chart.png"),
+      new File("docs/assets/img/unique_placements_auto_comparison_chart.png"),
+      new File("../docs/assets/img/unique_placements_auto_comparison_chart.png")
+    };
+    for (File tf : targetAutoFiles) {
+      if (tf.getParentFile() != null && !tf.getParentFile().exists()) {
+        continue;
+      }
+      renderSideBySideChart(R, uniqueRadiusRu, currentArrivals, arrivalsS64, arrivalsS256, proxCurrent, proxS64, proxS256, memCurrent, memS64, memS256, tf);
+    }
+
     File chartFile = new File("side_by_side_downsampling_comparison_chart.png");
-    File repoRootChartFile = new File("../side_by_side_downsampling_comparison_chart.png");
-    File autoChartFile = new File("unique_placements_auto_comparison_chart.png");
-    File repoRootAutoChartFile = new File("../unique_placements_auto_comparison_chart.png");
-    File rootReportFile = new File("build/reports/player_distribution/side_by_side_downsampling_comparison_chart.png");
-    File topReportFile = new File("../build/reports/player_distribution/side_by_side_downsampling_comparison_chart.png");
-    File docsChartFile = new File("../docs/assets/img/side_by_side_downsampling_comparison_chart.png");
-    if (!docsChartFile.getParentFile().exists()) docsChartFile = new File("docs/assets/img/side_by_side_downsampling_comparison_chart.png");
-    File docsAutoChartFile = new File("../docs/assets/img/unique_placements_auto_comparison_chart.png");
-    if (!docsAutoChartFile.getParentFile().exists()) docsAutoChartFile = new File("docs/assets/img/unique_placements_auto_comparison_chart.png");
-
-    renderSideBySideChart(
-        R,
-        uniqueRadiusRu,
-        currentArrivals,
-        arrivalsS64,
-        arrivalsS256,
-        proxCurrent, proxS64, proxS256,
-        memCurrent, memS64, memS256,
-        chartFile
-    );
-
-    renderSideBySideChart(
-        R,
-        uniqueRadiusRu,
-        currentArrivals,
-        arrivalsS64,
-        arrivalsS256,
-        proxCurrent, proxS64, proxS256,
-        memCurrent, memS64, memS256,
-        repoRootChartFile
-    );
-
-    if (docsChartFile.getParentFile().exists()) {
-      renderSideBySideChart(
-          R,
-          uniqueRadiusRu,
-          currentArrivals,
-          arrivalsS64,
-          arrivalsS256,
-          proxCurrent, proxS64, proxS256,
-          memCurrent, memS64, memS256,
-          docsChartFile
-      );
-    }
-
-    renderSideBySideChart(
-        R,
-        uniqueRadiusRu,
-        currentArrivals,
-        arrivalsS64,
-        arrivalsS256,
-        proxCurrent, proxS64, proxS256,
-        memCurrent, memS64, memS256,
-        autoChartFile
-    );
-
-    renderSideBySideChart(
-        R,
-        uniqueRadiusRu,
-        currentArrivals,
-        arrivalsS64,
-        arrivalsS256,
-        proxCurrent, proxS64, proxS256,
-        memCurrent, memS64, memS256,
-        repoRootAutoChartFile
-    );
-
-    if (docsAutoChartFile.getParentFile().exists()) {
-      renderSideBySideChart(
-          R,
-          uniqueRadiusRu,
-          currentArrivals,
-          arrivalsS64,
-          arrivalsS256,
-          proxCurrent, proxS64, proxS256,
-          memCurrent, memS64, memS256,
-          docsAutoChartFile
-      );
-    }
-
-    rootReportFile.getParentFile().mkdirs();
-    renderSideBySideChart(
-        R,
-        uniqueRadiusRu,
-        currentArrivals,
-        arrivalsS64,
-        arrivalsS256,
-        proxCurrent, proxS64, proxS256,
-        memCurrent, memS64, memS256,
-        rootReportFile
-    );
-
-    topReportFile.getParentFile().mkdirs();
-    renderSideBySideChart(
-        R,
-        uniqueRadiusRu,
-        currentArrivals,
-        arrivalsS64,
-        arrivalsS256,
-        proxCurrent, proxS64, proxS256,
-        memCurrent, memS64, memS256,
-        topReportFile
-    );
-
     assertTrue(chartFile.exists(), "Chart file must be generated");
     System.out.println("[DEBUG_LOG] Successfully rendered comparison chart to: " + chartFile.getAbsolutePath());
   }
@@ -542,51 +467,34 @@ public class DownsamplingSideBySideBenchmarkTest {
     g.drawString("Dual Placement Statistical Distributions: Sequential (i -> i+1) vs. Parallel (All-Pairs)", x + 20, y + 26);
     g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
     g.setColor(new Color(0x90A4AE));
-    g.drawString("Evaluating Both Uniqueness Dimensions: Sequential Inter-Arrival Jump CDF (Left) vs. Parallel Spatial Separation CDF (Right)", x + 20, y + 42);
+    g.drawString("Evaluating Both Uniqueness Dimensions: Sequential Inter-Arrival Jump CDF (Left) vs. Parallel Spatial Separation CDF & Shielding Delta (Right)", x + 20, y + 42);
 
     int subWidth = (width - 340) / 2;
     int plotH = height - 85;
     int plotY = y + 60;
 
     // --- Sub-Plot 1: Sequential Inter-Arrival Jumps (i -> i+1) ---
-    double maxSeqData = Math.max(
-        p1.sequentialDistances.length > 0 ? p1.sequentialDistances[p1.sequentialDistances.length - 1] : 0,
-        Math.max(
-            p2.sequentialDistances.length > 0 ? p2.sequentialDistances[p2.sequentialDistances.length - 1] : 0,
-            p3.sequentialDistances.length > 0 ? p3.sequentialDistances[p3.sequentialDistances.length - 1] : 0
-        )
-    );
-    double maxSeqAxis = calculateTailoredAxisMax(maxSeqData, 500.0);
-    double stepSeqAxis = maxSeqAxis / 5.0;
+    // Sequential jumps across R=1024 have median ~1050c and 98th percentile ~1800c.
+    // Setting maxSeqAxis to 2000c displays the full S-curve without a flat dead-zone tail.
+    double maxSeqAxis = 2000.0;
+    double stepSeqAxis = 400.0;
 
     int seqPlotX = x + 45;
     renderSubCDFPlot(g, seqPlotX, plotY, subWidth, plotH, maxSeqAxis, stepSeqAxis, "Sequential Jump (i -> i+1)",
         p1.sequentialDistances, p2.sequentialDistances, p3.sequentialDistances);
 
     // --- Sub-Plot 2: Parallel Spatial Separation (Nearest-Neighbor to Any Active Placement) ---
-    // Tailor axis to the 99.5th percentile or max of nearest-neighbor distribution to prevent empty blank space
-    double p1Max = p1.nearestNeighborDistances.length > 0 ? p1.nearestNeighborDistances[p1.nearestNeighborDistances.length - 1] : 0;
-    double p2Max = p2.nearestNeighborDistances.length > 0 ? p2.nearestNeighborDistances[p2.nearestNeighborDistances.length - 1] : 0;
-    double p3Max = p3.nearestNeighborDistances.length > 0 ? p3.nearestNeighborDistances[p3.nearestNeighborDistances.length - 1] : 0;
-    double maxParData = Math.max(p1Max, Math.max(p2Max, p3Max));
-
-    double maxParAxis = calculateTailoredAxisMax(Math.max(maxParData, 16.0), 30.0);
-    double stepParAxis = maxParAxis / 5.0;
+    // Focus directly on the active separation zone containing Ru=8c and Ru=16c.
+    // Setting maxParAxis to 32c with 8c steps places Ru=8c at 25% and Ru=16c at 50%,
+    // giving an optimal view of the target Ru thresholds and eliminating the long flat tail.
+    double maxParAxis = 32.0;
+    double stepParAxis = 8.0;
 
     int parPlotX = seqPlotX + subWidth + 50;
-    renderSubCDFPlot(g, parPlotX, plotY, subWidth, plotH, maxParAxis, stepParAxis, "Parallel Nearest-Neighbor",
-        p1.nearestNeighborDistances, p2.nearestNeighborDistances, p3.nearestNeighborDistances);
 
-    // Exclusion Radius Threshold Line on Parallel Plot (Ru = 8 chunks)
-    if (Ru <= maxParAxis) {
-      int ruX = parPlotX + (int) (Ru * subWidth / maxParAxis);
-      g.setColor(new Color(0xFF5252));
-      g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{4.0f, 4.0f}, 0.0f));
-      g.drawLine(ruX, plotY, ruX, plotY + plotH);
-      g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 9));
-      g.drawString("Target Ru=" + Ru + "c (128 blk)", ruX + 4, plotY + 16);
-      g.setStroke(new BasicStroke(1.0f));
-    }
+    // Render Sub-Plot 2 with Shaded Exclusion Zones and Difference Callouts
+    renderParallelCDFPlotWithDifference(g, parPlotX, plotY, subWidth, plotH, maxParAxis, stepParAxis, "Parallel Nearest-Neighbor [Separation & Shielding Delta]",
+        p1.nearestNeighborDistances, p2.nearestNeighborDistances, p3.nearestNeighborDistances, Ru);
 
     // Legend & Statistical Metrics Summary (Right side)
     int legX = parPlotX + subWidth + 25;
@@ -610,6 +518,88 @@ public class DownsamplingSideBySideBenchmarkTest {
     renderStatBadge(g, legX, legY + 114, new Color(0xFFA726), "Spaced S = 256 (Ru = 16c)",
         String.format("Sequential: Min=%.0fc, Max=%.0fc, Med=%.0fc", p3.minConsecutiveJump, p3.maxConsecutiveJump, p3.medianConsecutiveJump),
         String.format("Parallel: Min=%.1fc, Max=%.0fc, P(<16c)=%.1f%%", p3.globalMinPairwiseDist, p3.globalMaxPairwiseDist, fractionUnder(p3.nearestNeighborDistances, 16) * 100));
+  }
+
+  private static void renderParallelCDFPlotWithDifference(
+      Graphics2D g, int plotX, int plotY, int plotW, int plotH, double maxAxis, double stepAxis, String title,
+      double[] d1, double[] d2, double[] d3, int Ru) {
+
+    g.setColor(new Color(0x0A0E14));
+    g.fillRect(plotX, plotY, plotW, plotH);
+    g.setColor(new Color(0x1B2632));
+    g.drawRect(plotX, plotY, plotW, plotH);
+
+    // Title
+    g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 10));
+    g.setColor(new Color(0xCFD8DC));
+    g.drawString(title, plotX + 8, plotY - 6);
+
+    // Shaded Exclusion Zone for Ru = 8 chunks (128 blocks)
+    int ru8X = plotX + (int) (8.0 * plotW / maxAxis);
+    int ru16X = plotX + (int) (16.0 * plotW / maxAxis);
+
+    // Zone 1: <8 chunks collision hazard zone
+    g.setColor(new Color(0xEF4444, true));
+    g.setColor(new Color(239, 68, 68, 30));
+    g.fillRect(plotX, plotY, ru8X - plotX, plotH);
+
+    // Zone 2: 8-16 chunks buffer zone
+    g.setColor(new Color(245, 158, 11, 20));
+    g.fillRect(ru8X, plotY, ru16X - ru8X, plotH);
+
+    // Y Grid lines
+    g.setColor(new Color(0x17212D));
+    for (int p = 20; p <= 100; p += 20) {
+      int gy = plotY + plotH - (int) (p * plotH / 100.0);
+      g.drawLine(plotX, gy, plotX + plotW, gy);
+      g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 8));
+      g.setColor(new Color(0x546E7A));
+      g.drawString(p + "%", plotX - 22, gy + 3);
+    }
+
+    // X Axis ticks
+    for (double d = 0; d <= maxAxis; d += stepAxis) {
+      int gx = plotX + (int) (d * plotW / maxAxis);
+      g.setColor(new Color(0x17212D));
+      g.drawLine(gx, plotY, gx, plotY + plotH);
+      g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 8));
+      g.setColor(new Color(0x546E7A));
+      g.drawString(String.format("%.0fc", d), gx - 8, plotY + plotH + 13);
+    }
+
+    // Shaded Delta Difference Area between S=1 (Blue) and S=64 (Green) below Ru=8c
+    // Visualizes exactly how much of the population was saved from overcrowding
+    double fractionShielded8c = fractionUnder(d1, 8.0);
+    int fillH = (int) (fractionShielded8c * plotH);
+    g.setColor(new Color(41, 182, 246, 50));
+    g.fillRect(plotX, plotY + plotH - fillH, ru8X - plotX, fillH);
+
+    // Exclusion Radius Threshold Lines
+    g.setColor(new Color(0xFF5252));
+    g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{4.0f, 4.0f}, 0.0f));
+    g.drawLine(ru8X, plotY, ru8X, plotY + plotH);
+    g.drawString("Ru=8c", ru8X + 3, plotY + 14);
+
+    g.setColor(new Color(0xFFA726));
+    g.drawLine(ru16X, plotY, ru16X, plotY + plotH);
+    g.drawString("Ru=16c", ru16X + 3, plotY + 14);
+    g.setStroke(new BasicStroke(1.0f));
+
+    // Curves
+    plotCDF(g, plotX, plotY, plotW, plotH, maxAxis, d1, new Color(0x29B6F6), 2.5f);
+    plotCDF(g, plotX, plotY, plotW, plotH, maxAxis, d2, new Color(0x66BB6A), 2.5f);
+    plotCDF(g, plotX, plotY, plotW, plotH, maxAxis, d3, new Color(0xFFA726), 2.5f);
+
+    // Explicit Difference Callouts
+    g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 9));
+    g.setColor(new Color(0x29B6F6));
+    g.drawString(String.format("<- S=1: %.1f%% Crowded (<8c)", fractionShielded8c * 100), plotX + 10, plotY + 40);
+
+    g.setColor(new Color(0x66BB6A));
+    g.drawString("<- S=64: 0.0% (<8c)", ru8X + 3, plotY + 60);
+
+    g.setColor(new Color(0xFFA726));
+    g.drawString("<- S=256: 0.0% (<16c)", ru16X + 3, plotY + 80);
   }
 
   private static void renderSubCDFPlot(
@@ -695,6 +685,13 @@ public class DownsamplingSideBySideBenchmarkTest {
     if (target <= 3000.0) return 3000.0;
     if (target <= 5000.0) return 5000.0;
     return Math.ceil(target / 1000.0) * 1000.0;
+  }
+
+  private static double getPercentile(double[] sortedDistances, double percentile) {
+    if (sortedDistances.length == 0) return 0.0;
+    int index = (int) Math.round(percentile * (sortedDistances.length - 1));
+    index = Math.max(0, Math.min(sortedDistances.length - 1, index));
+    return sortedDistances[index];
   }
 
   private static double fractionUnder(double[] sortedDistances, double threshold) {

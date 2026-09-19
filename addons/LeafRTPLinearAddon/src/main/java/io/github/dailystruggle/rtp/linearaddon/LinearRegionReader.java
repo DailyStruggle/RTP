@@ -110,8 +110,8 @@ public final class LinearRegionReader implements RegionFileReader {
             throw new UnsupportedAnvilFormatException("Unsupported Linear format version: " + version);
         }
 
-        long newestTimestamp = buf.getLong();
-        byte compressionLevel = buf.get();
+        buf.getLong(); // newestTimestamp
+        buf.get(); // compressionLevel
         int dataPayloadLength = buf.getInt();
 
         int headerSize = 22; // 8 + 1 + 8 + 1 + 4
@@ -169,7 +169,7 @@ public final class LinearRegionReader implements RegionFileReader {
             dis.readFully(nbtBytes);
         } catch (Throwable t) {
             if (t instanceof LinkageError || t instanceof NoClassDefFoundError) {
-                zstdAvailable = false;
+                markZstdUnavailable();
                 throw new IOException("zstd-jni linkage failed during Linear decompression", t);
             }
             if (t instanceof IOException) {
@@ -180,5 +180,9 @@ public final class LinearRegionReader implements RegionFileReader {
 
         LinkedHashMap<String, Object> root = Nbt.readRootCompound(nbtBytes);
         return new AnvilReader.ChunkEntry(255, targetUncompressedLength, root);
+    }
+
+    private static void markZstdUnavailable() {
+        zstdAvailable = false;
     }
 }

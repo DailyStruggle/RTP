@@ -181,6 +181,33 @@ The recommended bring-up sequence for a new region is:
 
 ---
 
+## Survival restart (die / drop inventory before RTP without death screen)
+
+**What you want:** turn `/rtp` into a fresh-start survival journey mechanic where players drop their gear and inventory at their current location before being teleported away, without suffering through the Minecraft death screen, respawn menus, or death events.
+
+**The LeafRTP way:** attach `DROP_INVENTORY` (and optionally `DROP_EXP`) to `preteleport` (or `presetup`) in your effects definitions, or grant permission `rtp.effect.preteleport.drop_inventory`. If you prefer the classic death screen, use `DEATH`.
+
+```yaml
+# In definitions/effects/default.yml (or a dedicated custom effect profile)
+when: preteleport
+effects:
+  - DROP_INVENTORY       # drops inventory items naturally at origin location and clears inventory
+  - DROP_EXP             # drops experience points using vanilla death reset formula (min(level * 7, 100))
+  # - DEATH              # alternative: kills player and triggers classic death screen (respawn anchored to target)
+```
+
+Or via LuckPerms:
+
+```yaml
+permissions:
+  rtp.effect.preteleport.drop_inventory: true
+  rtp.effect.preteleport.drop_exp: true
+```
+
+The player drops their inventory items (and experience) at their starting origin location and arrives at their new random destination alive with a fresh clean state - completely bypassing the death screen.
+
+---
+
 ## At a glance
 
 | You want RTP to... | LeafRTP-native solution |
@@ -190,6 +217,8 @@ The recommended bring-up sequence for a new region is:
 | Scatter players on every login | Grant `rtp.onevent.join` |
 | Scatter players on death | Grant `rtp.onevent.respawn` |
 | Scatter players entering a world | Grant `rtp.onevent.changeworld` |
+| Survival restart / drop inventory before RTP | Use `DROP_INVENTORY` (and `DROP_EXP`) on `preteleport` stage or grant `rtp.effect.preteleport.drop_inventory` |
+| Kill player before RTP (death screen) | Use `DEATH` effect on `preteleport` stage or grant `rtp.effect.preteleport.death` |
 | Avoid teleporting into claims | `integrations.yml` `reroll*` toggles |
 | Show cooldown / queue / region info | Native `%rtp_*%` PlaceholderAPI expansion |
 | Charge money per teleport | `economy.yml` (+ Vault) |

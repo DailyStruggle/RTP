@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 public final class DistanceParser {
 
   private static final Pattern DISTANCE_PATTERN =
-      Pattern.compile("^\\s*([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z'\"]+)?\\s*+$");
+      Pattern.compile("^\\s*([+-]?[0-9]+(?:\\.[0-9]+)?)(?:\\s*([a-zA-Z'\"]+))?\\s*$");
 
   private DistanceParser() {}
 

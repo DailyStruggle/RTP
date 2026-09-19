@@ -6,7 +6,36 @@
 - **Outer attempt-loop re-entry plumbing** — `PregenTask.run()` / `rescheduleNextAttempt()` / `continueInline(...)` is the state-machine harness (ADR-015 Option B) that re-invokes `runAttempt` without blocking. See `PregenTask.java` header.
 - **Chunk ticket lifecycle** (`ChunkReservation`, `MemoryTracker`) — see diagram 03.
 - **Stale-chunk guard** on live-backed chunks — see [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md).
-- **Anvil probe ordering** — see [ADR-016](../adr/ADR-016-anvil-subsystem.md) section 11 and section 13.1.
+> Companion walkthrough: [`CODE_TOUR.md` section 12 — Location selection per attempt](../dev/CODE_TOUR.md).
+
+---
+
+## Executive Overview (Per-Attempt Flow)
+
+This overview illustrates how candidate coordinates progress through generation, chunk resolution, and validation checks. Any failure causes the candidate to be recorded as invalid and prompts a retry, while full validation preloads view-distance chunks for instant arrival.
+
+```mermaid
+flowchart LR
+    A["Shape Candidate<br/>(cx, cz)"] --> B{"Inside WorldBorder?"}
+    B -- "No" --> Ret["Record Failure &<br/>Reschedule Attempt"]
+    B -- "Yes" --> C["Resolve Chunk<br/>(Anvil Off-Tick or Live)"]
+    C --> D{"Vertical & Biome<br/>Match?"}
+    D -- "No" --> Ret
+    D -- "Yes" --> E{"Safety & Claim<br/>Verifiers Pass?"}
+    E -- "No" --> Ret
+    E -- "Yes" --> F["Accept Location<br/>(Preload ChunkSet)"]
+
+    classDef success fill:#b7e4b7,stroke:#1f6b1f,stroke-width:2px,color:#0b2a0b;
+    classDef fail    fill:#f2b8b8,stroke:#8a1f1f,stroke-width:1px,color:#2a0b0b;
+    classDef step    fill:#cfe2ff,stroke:#1f4e8a,stroke-width:1px,color:#0b1f3a;
+    class A,C step;
+    class Ret fail;
+    class F success;
+```
+
+---
+
+## Detailed Attempt Flowchart
 
 ```mermaid
 %% Color legend: green=accepting success; red=hard terminal / fail-fast sink; blue=async or thread-hop work; yellow=config / bookkeeping / data-driven choice.

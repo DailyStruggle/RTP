@@ -187,12 +187,37 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
 
     @Override
     public Integer getServerIntVersion() {
-        String v = getServerVersion();
+        return parseIntVersion(getServerVersion());
+    }
+
+    /**
+     * Contract (RTPServerAccessor#getServerIntVersion): 21 for 1.21.x, 26 for 26.x.
+     * Legacy strings are "1.&lt;minor&gt;.&lt;patch&gt;" so the headline number is the
+     * minor; Mojang's 26.x scheme drops the leading "1." so the major IS the
+     * headline number. Parsing parts[1] unconditionally reported 1 on MC 26.1.x.
+     */
+    static int parseIntVersion(String v) {
+        if (v == null) return 0;
         String[] parts = v.split("\\.");
-        if (parts.length >= 2) {
-            try { return Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {}
+        if (parts.length == 0) return 0;
+        try {
+            int major = Integer.parseInt(digitPrefix(parts[0]));
+            if (major != 1) return major;
+            if (parts.length >= 2) return Integer.parseInt(digitPrefix(parts[1]));
+        } catch (NumberFormatException ignored) {
+            // fall through to the unknown sentinel
         }
         return 0;
+    }
+
+    /**
+     * Leading run of digits in {@code s}, so pre-release suffixes
+     * (e.g. {@code "26.2-rc-2"}) parse as their numeric component.
+     */
+    private static String digitPrefix(String s) {
+        int i = 0;
+        while (i < s.length() && s.charAt(i) >= '0' && s.charAt(i) <= '9') i++;
+        return s.substring(0, i);
     }
 
     @Override

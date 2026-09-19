@@ -91,6 +91,43 @@ class TestAccessorCmdTest {
   }
 
   @Test
+  void runProbe_namespacedMaterials_passes() {
+    MockRTPServerAccessor namespacedAccessor = new MockRTPServerAccessor(tempDir) {
+      @Override
+      public Set<String> materials() {
+        Set<String> out = new HashSet<>();
+        out.add("MINECRAFT:AIR");
+        out.add("MINECRAFT:STONE");
+        out.add("MINECRAFT:GRASS_BLOCK");
+        return out;
+      }
+    };
+    RTP.serverAccessor = namespacedAccessor;
+    RTPAPI.serverAccessor = namespacedAccessor;
+
+    TestAccessorCmd.Result r = TestAccessorCmd.runProbe(RTPAPI.serverId);
+    assertTrue(r.materialsValid, () -> "details: " + r.details);
+  }
+
+  @Test
+  void runProbe_unknownMaterialsOnly_fails() {
+    MockRTPServerAccessor unknownMatsAccessor = new MockRTPServerAccessor(tempDir) {
+      @Override
+      public Set<String> materials() {
+        Set<String> out = new HashSet<>();
+        out.add("EXAMPLEMOD:WEIRD_BLOCK");
+        return out;
+      }
+    };
+    RTP.serverAccessor = unknownMatsAccessor;
+    RTPAPI.serverAccessor = unknownMatsAccessor;
+
+    TestAccessorCmd.Result r = TestAccessorCmd.runProbe(RTPAPI.serverId);
+    assertFalse(r.materialsValid);
+    assertFalse(r.pass);
+  }
+
+  @Test
   void onCommand_emitsSummaryToPlayer() {
     MockRTPPlayer player = new MockRTPPlayer(UUID.randomUUID(), "player1", null);
     accessor.addPlayer(player);

@@ -231,7 +231,13 @@ public final class RTPNeoForgeMod {
       io.github.dailystruggle.rtp.neoforge.metrics.NeoForgeMetricsBinding metrics =
           new io.github.dailystruggle.rtp.neoforge.metrics.NeoForgeMetricsBinding(
               () -> { MinecraftServer s = acc.getServer(); return s == null ? 0 : s.getPlayerCount(); },
-              () -> { MinecraftServer s = acc.getServer(); return s == null ? 0 : s.getPlayerList().getMaxPlayers(); });
+              () -> { MinecraftServer s = acc.getServer(); return s == null ? 0 : s.getPlayerList().getMaxPlayers(); },
+              // MSPT must measure in-tick work, not the tick-to-tick interval:
+              // the vanilla loop sleeps to hold the nominal rate, so that
+              // interval is floored at 50 ms and never reports a healthy
+              // server. getAverageTickTimeNanos is Mojang's own work mean.
+              // -1 keeps MSPT unsampled until the server is bound.
+              () -> { MinecraftServer s = acc.getServer(); return s == null ? -1L : s.getAverageTickTimeNanos(); });
       RTP.metrics.setBinding(metrics);
       RTP.log(Level.INFO, "[RTP][NeoForge] metrics binding installed (NeoForgeMetricsBinding).");
     } catch (Throwable t) {
@@ -545,6 +551,16 @@ public final class RTPNeoForgeMod {
     // Reuse the commands-api Brigadier bridge (commands-api-ADR-001).
     // Ensure the neutral CoreRtpRoot is registered with the accessor SPI if not already done,
     // and drain all registered commands into the NeoForge event dispatcher.
+    ensureBaseCommandRegistered(accessor);
+    registerTestCommand(event);
+    if (accessor != null) {
+      accessor.registerToDispatcher(event.getDispatcher());
+    } else {
+      NeoForgeCommandRegistrar.register(event.getDispatcher());
+    }
+  }
+
+  private static void ensureBaseCommandRegistered(NeoForgeServerAccessor accessor) {
     if (RTP.baseCommand == null) {
       io.github.dailystruggle.rtp.common.commands.CoreRtpRoot root =
           new io.github.dailystruggle.rtp.common.commands.CoreRtpRoot();
@@ -552,12 +568,6 @@ public final class RTPNeoForgeMod {
       if (accessor != null) {
         accessor.registerCommands(root, "rtp", "wild");
       }
-    }
-    registerTestCommand(event);
-    if (accessor != null) {
-      accessor.registerToDispatcher(event.getDispatcher());
-    } else {
-      NeoForgeCommandRegistrar.register(event.getDispatcher());
     }
   }
 

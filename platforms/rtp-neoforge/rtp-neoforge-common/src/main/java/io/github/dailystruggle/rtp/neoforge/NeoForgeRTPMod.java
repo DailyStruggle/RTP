@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.neoforge;
 
-import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.event.lifecycle.FMLDedicatedServerSetupEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;

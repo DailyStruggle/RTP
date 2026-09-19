@@ -161,6 +161,9 @@ public class RTP {
   public static TreeCommand baseCommand;
   public static AtomicBoolean reloading = new AtomicBoolean(false);
 
+  public static final Set<UUID> deathEffectInFlight = ConcurrentHashMap.newKeySet();
+  public static final Map<UUID, io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask> pendingDeathTeleports = new ConcurrentHashMap<>();
+
   /** only one instance will exist at a time, reset on plugin load */
   private static RTP instance;
 
@@ -493,8 +496,11 @@ public class RTP {
         // `server:region` entries advertised across the network so a GUI / addon
         // can offer cross-server destinations alongside local ones. Permission
         // gating mirrors the `/rtp region=<server>:<region>` command path:
-        // `rtp.servers.<server>` AND `rtp.regions.<region>`. Reads are defensive -
-        // a missing/flaky network layer simply contributes no extra targets.
+        // `rtp.servers.<server>` always, plus `rtp.regions.<region>` only when the
+        // owning backend advertised the region as permission-gated - an open peer
+        // region is no more restricted than the same region would be locally.
+        // Reads are defensive - a missing/flaky network layer simply contributes
+        // no extra targets.
         try {
           io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap live =
               io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
@@ -522,8 +528,11 @@ public class RTP {
                   continue;
                 }
                 if (player != null
-                    && (!player.hasPermission("rtp.servers." + serverId)
-                        || !player.hasPermission("rtp.regions." + regionKey))) {
+                    && ((!player.hasPermission("rtp.servers." + serverId)
+                            && !player.hasPermission("rtp.servers.*"))
+                        || (registry.peerRegionRequiresPermission(serverId, regionKey)
+                            && !player.hasPermission("rtp.regions." + regionKey)
+                            && !player.hasPermission("rtp.regions.*")))) {
                   continue;
                 }
                 out.add(io.github.dailystruggle.rtp.api.RtpTarget.network(serverId, regionKey));
@@ -549,15 +558,30 @@ public class RTP {
         }
 
         // Network/peer target: resolves on a remote backend, so there is no
-        // local Region to inspect. Gate on the same two permissions the command
-        // path uses (`rtp.servers.<server>` + `rtp.regions.<region>`) and report
+        // local Region to inspect. Gate on the same permissions the command
+        // path uses: `rtp.servers.<server>` always, plus `rtp.regions.<region>`
+        // only for a region the owning backend declared permission-gated. Report
         // reachability from the live peer registry. Cost is unknown locally (the
         // destination backend owns its economy), so 0.0 is reported here.
         if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.NETWORK) {
           String serverId = target.serverId();
           String regionKey = target.name();
-          if (!player.hasPermission("rtp.servers." + serverId)
-              || !player.hasPermission("rtp.regions." + regionKey)) {
+          boolean peerRegionGated = false;
+          try {
+            io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap gateLive =
+                io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
+            if (gateLive != null && gateLive.peerRegionRegistry() != null) {
+              peerRegionGated = gateLive.peerRegionRegistry()
+                  .peerRegionRequiresPermission(serverId, regionKey);
+            }
+          } catch (Throwable ignored) {
+            // Defensive: a flaky network layer must not crash status reads.
+          }
+          if ((!player.hasPermission("rtp.servers." + serverId)
+                  && !player.hasPermission("rtp.servers.*"))
+              || (peerRegionGated
+                  && !player.hasPermission("rtp.regions." + regionKey)
+                  && !player.hasPermission("rtp.regions.*"))) {
             return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
                 io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION, 0L, 0.0);
           }
@@ -961,6 +985,20 @@ public class RTP {
     // visible to RTPAddon#onLoad (the load is idempotent; late programmatic registrations are
     // loaded eagerly by AddonRegistry#register).
     startupTasks.add(new RTPRunnable(() -> {
+      if (serverAccessor != null) {
+        try {
+          serverAccessor.getPlayerLifecycleHook().onPlayerQuit(uuid -> {
+            if (uuid == null) return;
+            io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pending =
+                pendingDeathTeleports.remove(uuid);
+            if (pending != null) {
+              pending.completeDeathTeleport(false);
+            }
+          });
+        } catch (Throwable t) {
+          log(Level.FINE, "[RTP] player quit hook registration in RTP init skipped: " + t);
+        }
+      }
       addons.discover();
       // Also scan an optional RTP-owned folder so operators can drop addon jars into
       // <pluginDir>/addons instead of plugins/, where the server's plugin loader would

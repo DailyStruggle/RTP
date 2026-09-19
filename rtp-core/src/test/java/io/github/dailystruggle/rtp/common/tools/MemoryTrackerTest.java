@@ -278,4 +278,24 @@ public class MemoryTrackerTest {
         boolean hasDiagLog = accessor.logMessages.stream().anyMatch(m -> m.contains("Diagnostic: Locations="));
         assertTrue(hasDiagLog, "Diagnostic message must be logged when running active GC sweep");
     }
+
+    @Test
+    void runDiagnostics_purgesStalledTeleportDataAndReleasesProcessingPlayer() throws Exception {
+        UUID playerId = UUID.randomUUID();
+        io.github.dailystruggle.rtp.common.playerData.TeleportData td =
+                new io.github.dailystruggle.rtp.common.playerData.TeleportData();
+        td.completed = false;
+
+        RTP.getInstance().processingPlayers.add(playerId);
+        RTP.getInstance().latestTeleportData.put(playerId, td);
+
+        UUID trackId = MemoryTracker.track(td, "TeleportData-" + playerId, 0L);
+        Thread.sleep(5L);
+
+        MemoryTracker.runDiagnostics();
+
+        assertTrue(td.completed, "TeleportData must be marked completed");
+        assertFalse(RTP.getInstance().processingPlayers.contains(playerId), "processingPlayers lock must be released");
+        assertEquals(0, MemoryTracker.trackedCountByLabel("TeleportData-" + playerId), "leaking TeleportData must be purged from tracker");
+    }
 }

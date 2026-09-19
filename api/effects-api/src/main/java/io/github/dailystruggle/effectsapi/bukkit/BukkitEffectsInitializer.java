@@ -89,6 +89,11 @@ public final class BukkitEffectsInitializer {
         // Glide requires elytra (1.9+); register conditionally to keep older servers happy.
         if (EffectsAPI.getServerIntVersion() >= 9) EffectFactory.addEffect("GLIDE", new GlideEffect());
         EffectFactory.addEffect("COMMAND", new io.github.dailystruggle.effectsapi.common.effects.CommandEffect());
+        EffectFactory.addEffect("DROP_INVENTORY", new io.github.dailystruggle.effectsapi.common.effects.DropInventoryEffect());
+        EffectFactory.addEffect("DROP_EXP", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());
+        EffectFactory.addEffect("DROP_EXPERIENCE", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());
+        EffectFactory.addEffect("DEATH", new io.github.dailystruggle.effectsapi.common.effects.DeathEffect());
+        EffectFactory.addEffect("KILL", new io.github.dailystruggle.effectsapi.common.effects.DeathEffect());
     }
 
     /**

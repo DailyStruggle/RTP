@@ -119,6 +119,7 @@ nav:
       - Cross-server verification: admin/proxies/CROSS_SERVER_VERIFICATION.md
   - Developers:
       - Why LeafRTP exists: site/why.md
+      - Shape algorithm testing & charts: site/shape-algorithms.md
       - Addon developers: FOR_ADDON_DEVELOPERS.md
       - Addon quickstart: ADDON_QUICKSTART.md
       - Contributors: FOR_CONTRIBUTORS.md

@@ -187,6 +187,41 @@ public final class FabricEventBridge {
 
             register.invoke(joinEvent, joinProxy);
             register.invoke(disconnectEvent, disconnectProxy);
+
+            // Reflectively register ServerPlayerEvents.AFTER_RESPAWN if present
+            try {
+                Class<?> spe = Class.forName("net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents");
+                Class<?> respawnCallback = Class.forName(
+                        "net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents$AfterRespawn");
+                Object respawnEvent = spe.getField("AFTER_RESPAWN").get(null);
+                Object respawnProxy = java.lang.reflect.Proxy.newProxyInstance(
+                        respawnCallback.getClassLoader(),
+                        new Class<?>[]{respawnCallback},
+                        (proxy, method, args) -> {
+                            try {
+                                if (args != null && args.length >= 1 && args[0] != null) {
+                                    Object newPlayer = args[0];
+                                    java.util.UUID uuid = null;
+                                    try {
+                                        java.lang.reflect.Method m = newPlayer.getClass().getMethod("getUUID");
+                                        Object out = m.invoke(newPlayer);
+                                        if (out instanceof java.util.UUID u) uuid = u;
+                                    } catch (Throwable ignored) {}
+                                    if (uuid != null) {
+                                        io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pending =
+                                                RTP.pendingDeathTeleports.remove(uuid);
+                                        if (pending != null) {
+                                            pending.completeDeathTeleport(true);
+                                        }
+                                    }
+                                }
+                            } catch (Throwable t) {
+                                RTP.log(Level.WARNING, "[RTP] FabricEventBridge AFTER_RESPAWN handler failed", t);
+                            }
+                            return null;
+                        });
+                register.invoke(respawnEvent, respawnProxy);
+            } catch (Throwable ignored) {}
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP][Fabric] ServerPlayConnectionEvents not available (" + t.getClass().getSimpleName()

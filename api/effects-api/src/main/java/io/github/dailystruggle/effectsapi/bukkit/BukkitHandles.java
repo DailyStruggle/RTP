@@ -152,6 +152,9 @@ public final class BukkitHandles implements HandleProvider {
      * Supports {@link Location}, {@link LocationHandle}, {@link Entity}, and {@link PlayerHandle}.
      */
     public static @Nullable Location unwrapLocation(@Nullable Object target) {
+        if (target instanceof io.github.dailystruggle.effectsapi.common.spi.EffectTarget et) {
+            return unwrapLocation(et.location());
+        }
         if (target instanceof LocationHandle lh) {
             return (Location) lh.platformLocation();
         }
@@ -206,6 +209,103 @@ public final class BukkitHandles implements HandleProvider {
         @Override
         public void setGliding(boolean gliding) {
             player.setGliding(gliding);
+        }
+
+        @Override
+        public void dropInventory(@Nullable LocationHandle dropLocation) {
+            final Location targetLoc = dropLocation != null ? unwrapLocation(dropLocation) : player.getLocation();
+            final Location dropAt = (targetLoc != null) ? targetLoc : player.getLocation();
+            Runnable task = () -> {
+                World world = dropAt.getWorld();
+                if (world == null) world = player.getWorld();
+                org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+                org.bukkit.inventory.ItemStack[] contents = inv.getContents();
+                for (org.bukkit.inventory.ItemStack item : contents) {
+                    if (item != null && item.getType() != org.bukkit.Material.AIR) {
+                        world.dropItemNaturally(dropAt, item);
+                    }
+                }
+                inv.clear();
+            };
+
+            runOnRegionOrMain(dropAt, task);
+        }
+
+        @Override
+        public void dropExperience(@Nullable LocationHandle dropLocation) {
+            final Location targetLoc = dropLocation != null ? unwrapLocation(dropLocation) : player.getLocation();
+            final Location dropAt = (targetLoc != null) ? targetLoc : player.getLocation();
+            Runnable task = () -> {
+                World world = dropAt.getWorld();
+                if (world == null) world = player.getWorld();
+
+                // Vanilla Minecraft player death experience formula:
+                // A player drops experience points equal to 7 times their level on death, capped at 100 points.
+                int pointsToDrop = Math.min(player.getLevel() * 7, 100);
+                if (pointsToDrop > 0) {
+                    org.bukkit.entity.ExperienceOrb orb = world.spawn(dropAt, org.bukkit.entity.ExperienceOrb.class);
+                    orb.setExperience(pointsToDrop);
+                }
+                player.setTotalExperience(0);
+                player.setLevel(0);
+                player.setExp(0);
+            };
+
+            runOnRegionOrMain(dropAt, task);
+        }
+
+        @Override
+        public void kill(boolean setBed, @Nullable LocationHandle respawnLocation) {
+            final Location targetLoc = respawnLocation != null ? unwrapLocation(respawnLocation) : null;
+            Runnable task = () -> {
+                if (player.isOnline() && !player.isDead()) {
+                    if (targetLoc != null) {
+                        try {
+                            player.setBedSpawnLocation(targetLoc, setBed);
+                        } catch (Throwable ignored) {}
+                    }
+                    player.setHealth(0.0);
+                }
+            };
+            if (isFolia()) {
+                try {
+                    Object entityScheduler = player.getClass().getMethod("getScheduler").invoke(player);
+                    org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+                    entityScheduler.getClass().getMethod("run", org.bukkit.plugin.Plugin.class, java.util.function.Consumer.class, Runnable.class)
+                            .invoke(entityScheduler, caller, (java.util.function.Consumer<Object>) t -> task.run(), null);
+                    return;
+                } catch (Throwable ignored) {}
+            }
+            if (!org.bukkit.Bukkit.isPrimaryThread()) {
+                org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+                org.bukkit.Bukkit.getScheduler().runTask(caller, task);
+                return;
+            }
+            task.run();
+        }
+
+        @Override
+        public void kill() {
+            kill(true, null);
+        }
+
+        private void runOnRegionOrMain(Location loc, Runnable task) {
+            if (isFolia()) {
+                try {
+                    // On Folia, if region owns loc, run directly, otherwise schedule on region owning loc
+                    Object regionScheduler = org.bukkit.Bukkit.class.getMethod("getRegionScheduler").invoke(null);
+                    org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+                    regionScheduler.getClass().getMethod("execute", org.bukkit.plugin.Plugin.class, Location.class, Runnable.class)
+                            .invoke(regionScheduler, caller, loc, task);
+                    return;
+                } catch (Throwable ignored) {}
+            }
+            if (!org.bukkit.Bukkit.isPrimaryThread()) {
+                org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+                org.bukkit.Bukkit.getScheduler().runTask(caller, task);
+                return;
+            }
+            task.run();
         }
 
         @Override
@@ -360,6 +460,7 @@ public final class BukkitHandles implements HandleProvider {
                 try {
                     caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
                 } catch (IllegalStateException ignored) {
+                    // EffectsAPI not yet initialized; caller remains null
                 }
             }
 

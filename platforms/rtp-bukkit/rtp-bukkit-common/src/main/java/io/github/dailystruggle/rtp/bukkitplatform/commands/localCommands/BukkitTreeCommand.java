@@ -64,10 +64,12 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
             return CommandsAPI.serverId;
         }
         try {
-            if (Bukkit.getServer() != null && sender.getName().equals(Bukkit.getConsoleSender().getName())) {
+            CommandSender console = Bukkit.getConsoleSender();
+            if (console != null && sender.getName().equals(console.getName())) {
                 return CommandsAPI.serverId;
             }
-        } catch (Throwable ignored) {
+        } catch (Exception ignored) {
+            // Console sender lookup may fail during early bootstrap; fall through
         }
         return null;
     }
@@ -84,7 +86,7 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
                 ? messageMethodFactory.apply(sender)
                 : sender::sendMessage;
         Consumer<String> messageMethod = CommandsAPI.messageMethodFor(senderId, fallback);
-        CompletableFuture<Boolean> future = onCommand(senderId, sender::hasPermission, messageMethod, args);
+        onCommand(senderId, sender::hasPermission, messageMethod, args);
 
         return true;
     }

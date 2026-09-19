@@ -295,6 +295,27 @@ public class MemoryTracker {
                           // to prevent infinite log looping
                           return true;
                         }
+
+                        if (actualTask instanceof io.github.dailystruggle.rtp.common.playerData.TeleportData teleportData) {
+                          log(Level.FINE,
+                                  "[RTP][GC] Purging stalled TeleportData label={0} ageOverBudgetMs={1}",
+                                  label, leakDuration);
+                          teleportData.completed = true;
+                          UUID targetPlayerId = null;
+                          if (teleportData.sender instanceof io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer) {
+                            targetPlayerId = rtpPlayer.uuid();
+                          } else if (label != null && label.startsWith("TeleportData-")) {
+                            try {
+                              targetPlayerId = UUID.fromString(label.substring("TeleportData-".length()));
+                            } catch (IllegalArgumentException ignored) {
+                            }
+                          }
+                          if (targetPlayerId != null && RTP.getInstance() != null) {
+                            RTP.getInstance().processingPlayers.remove(targetPlayerId);
+                            RTP.getInstance().latestTeleportData.remove(targetPlayerId, teleportData);
+                          }
+                          return true;
+                        }
                       }
                       return false;
                     });

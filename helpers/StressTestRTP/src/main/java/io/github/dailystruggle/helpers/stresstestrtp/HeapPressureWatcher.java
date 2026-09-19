@@ -125,8 +125,15 @@ public final class HeapPressureWatcher {
                     }
                 }
             }
-            @Override public void flush() {}
-            @Override public void close() throws SecurityException {}
+            @Override
+            public void flush() {
+                // No buffering in this handler; triggers are written directly to sidecarWriter
+            }
+
+            @Override
+            public void close() throws SecurityException {
+                // No external resources tied directly to this handler instance
+            }
         };
         java.util.logging.Logger.getLogger("").addHandler(handler);
     }

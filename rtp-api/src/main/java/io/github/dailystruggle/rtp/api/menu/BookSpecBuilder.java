@@ -73,7 +73,8 @@ public final class BookSpecBuilder {
         UUID uuid = (playerId == null) ? RTPAPI.serverId : playerId;
         return accessor.format(uuid, raw);
       }
-    } catch (Throwable ignored) {
+    } catch (Exception ignored) {
+      // Server accessor formatting unavailable or failed; fall through to raw string
     }
     return raw;
   }

@@ -247,6 +247,17 @@ function Initialize-Secrets {
   if ($fwd) { $fwd = $fwd.Trim() }
   if (-not $fwd) { throw "shared/forwarding.secret is empty after seeding - cannot continue" }
   $env:CFG_VELOCITY_FORWARDING_SECRET = $fwd
+
+  # Persist the value into `.env` as well, not just this process' environment.
+  # The process env var only covers `docker compose` calls made by THIS shell;
+  # any later manual `docker compose up` (or a compose call from another shell /
+  # the IDE) saw no value and aborted with
+  # "required variable CFG_VELOCITY_FORWARDING_SECRET is missing a value".
+  # Compose always reads `.env` from the project directory, so writing the key
+  # there makes the devstack bootable without the harness.
+  $envLines = if (Test-Path $envPath) { @(Get-Content $envPath) } else { @() }
+  $kept = $envLines | Where-Object { $_ -notmatch '^\s*CFG_VELOCITY_FORWARDING_SECRET\s*=' }
+  Set-Content -Path $envPath -Value (@($kept) + "CFG_VELOCITY_FORWARDING_SECRET=$fwd") -Encoding ascii
 }
 
 function Show-LogWindows {

@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -16,6 +17,10 @@ public final class OnPlayerRespawn implements Listener {
   @EventHandler(priority = EventPriority.HIGH)
   public void onPlayerRespawn(PlayerRespawnEvent event) {
     Player player = event.getPlayer();
+    TeleportPipelineTask pendingDeath = RTP.pendingDeathTeleports.remove(player.getUniqueId());
+    if (pendingDeath != null) {
+      pendingDeath.completeDeathTeleport(true);
+    }
     if (player.hasPermission("rtp.personalqueue")) {
       Region region =
           RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));

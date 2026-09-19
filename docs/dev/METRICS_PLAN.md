@@ -27,8 +27,8 @@ This document is the canonical plan for **runtime metrics** in RTP — the platf
 
 | Metric | Type | Source per platform |
 |--------|------|---------------------|
-| `tps1m` / `tps5m` / `tps15m` | rolling double | Paper/Folia: `Bukkit.getTPS()`. Spigot 1.20.1: local sampler (see *Spigot TPS Fallback*). Fabric: server tick callback diff. |
-| `mspt` (mean ms/tick over the last sample window) | double | Paper: `Bukkit.getAverageTickTime()`. Spigot: derived from local sampler. Folia: see *Folia Aggregation*. Fabric: tick-end callback diff. |
+| `tps1m` / `tps5m` / `tps15m` | rolling double | Paper/Folia: `Bukkit.getTPS()`. Spigot 1.20.1: local sampler (see *Spigot TPS Fallback*). Fabric/NeoForge: server tick callback diff (the tick-to-tick wall-clock interval is the correct TPS estimator). |
+| `mspt` (mean ms/tick over the last sample window) | double | Paper: `Bukkit.getAverageTickTime()`. Spigot: derived from local sampler. Folia: see *Folia Aggregation*. Fabric/NeoForge: `MinecraftServer#getAverageTickTimeNanos()` (see *Vanilla MSPT Source*). |
 | `tickBudgetUtilisation` | `mspt / 50.0` | Derived; published for convenience. |
 | `playerCount` | int | Each platform's player-list API. |
 | `softCap` | int | Server config (max-players, or RTP-config override). |
@@ -65,6 +65,16 @@ This document is the canonical plan for **runtime metrics** in RTP — the platf
 | `tickCpuOvershoots` | long | Cumulative count of ticks in which the *measured* per-tick total exceeded `tickCpuBudgetMsAnalytical`. Should be zero; a non-zero count is a contract regression and is surfaced as red in `/rtp info` (S-005-spirit alarm — count-bound caps are no longer holding). |
 
 All values are accessible via a single read-only call: `Metrics.snapshot()` returns a `MetricsSnapshot` immutable record. Individual getters exist for callers that want a single field.
+
+---
+
+## Vanilla MSPT Source (Fabric / NeoForge)
+
+On the vanilla single-loop runtimes, `mspt` shall be sourced from the server's own average in-tick work duration (`MinecraftServer#getAverageTickTimeNanos()`, with the pre-1.21 `float` millisecond `getAverageTickTime()` as fallback), resolved by mojmap and intermediary alias so no mapping is compile-pinned.
+
+`mspt` shall not be derived from the interval between tick boundaries. The vanilla loop sleeps after each tick to hold the nominal rate, so that interval equals `max(work, 50ms)`: it is floored at 50 ms, reports ~50 ms on a fully healthy server, and can never fall below that floor once a spike has raised it. Because `tickBudgetUtilisation` is `mspt / 50.0`, an interval-sourced `mspt` also pins utilisation at ~1.0 and holds every downstream consumer (the ADR-087 adaptive tick budget, `tickStressEvents`) permanently saturated.
+
+When no work source is reachable, `mspt` shall report `MetricsSnapshot.UNSAMPLED` (`NaN`) rather than a substituted interval value, so `tickBudgetUtilisation` propagates "unknown" instead of a false saturation.
 
 ---
 

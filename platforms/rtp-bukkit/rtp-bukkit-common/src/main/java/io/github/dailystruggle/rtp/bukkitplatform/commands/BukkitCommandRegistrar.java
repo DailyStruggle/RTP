@@ -50,10 +50,12 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
       return CommandsAPI.serverId;
     }
     try {
-      if (Bukkit.getServer() != null && sender.getName().equals(Bukkit.getConsoleSender().getName())) {
+      CommandSender console = Bukkit.getConsoleSender();
+      if (console != null && sender.getName().equals(console.getName())) {
         return CommandsAPI.serverId;
       }
-    } catch (Throwable ignored) {
+    } catch (Exception ignored) {
+      // Console sender lookup may fail during early bootstrap; fall through
     }
     return null;
   }

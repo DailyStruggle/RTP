@@ -166,7 +166,7 @@ EzRTP's 7 watchdog stalls (one region unresponsive 20.4 s) are the server's own 
 Full methodology, raw CSVs, per-run analyses: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][I]helpers/StressTestRTP/[/I][/URL]. Video benchmark of [I]/rtp[/I] on a custom world generator: [URL='https://youtu.be/V0NyNK9JydM']youtu.be/V0NyNK9JydM[/URL].
 
 [B][COLOR=#27AE60]Empirical Spatial Distribution & Candidate Selection Benchmarks[/COLOR][/B]
-Comparative benchmark runs evaluate player dispersion, collision avoidance, and downsampling models:
+Visual test suites and benchmarks evaluate candidate dispersion, collision avoidance, and downsampling models across algorithms and queue tiers:
 
 [CENTER]
 [B]Spatial Density & Overlap Simulation (Polar vs. Hilbert vs. Strided vs. Continuous Rotation)[/B]
@@ -184,6 +184,38 @@ Comparative benchmark runs evaluate player dispersion, collision avoidance, and 
 [B]Dual-Layer Geometry & Circle Boundary Fidelity[/B]
 [IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/simulation_circle_comparison_side_by_side.png[/IMG]
 [I]Side-by-side comparison of circle boundary coverage: ground truth vs. classic polar spiral vs. dual-layer square at varying resolutions.[/I]
+
+[B]Full Pipeline Selection Visualizer & L3 Bin Distribution[/B]
+[IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/full_l3_state_chart.png[/IMG]
+[I]Complete pipeline selection visualizer mapping candidate validation states, active 32x32 L3 bins, and discarded hazard bins across the region.[/I]
+
+[B]Pipeline Candidate Selection Sequence Comparison[/B]
+[IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/selection_sequence_comparison_chart.png[/IMG]
+[I]Comparative dispatch sequence showing candidate evaluation order, bin walk progression, and spatial dispersion.[/I]
+
+[B]Native vs. Unique vs. L3 Cache Candidate Distribution[/B]
+[IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/native_vs_unique_vs_l3_comparison_chart.png[/IMG]
+[I]Visual distribution across raw spiral candidates, deduplicated candidates, and binned L3 backlog cache pools.[/I]
+
+[B]Path Progression Across Scaled Radii[/B]
+[IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/path_progression_radii_chart.png[/IMG]
+[I]Path progression and coverage density across increasing region radii.[/I]
+
+[B]Sub-Bin and 32x32 Region Path Progression[/B]
+[IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/sub_bin_zoom_path_chart.png[/IMG]
+[I]High-resolution sub-bin trajectory showing continuous candidate distribution within a 32x32 chunk sector.[/I]
+
+[B]Unique Placements & Expand Progression[/B]
+[IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/unique_placements_expand_progression_chart.png[/IMG]
+[I]Candidate placement progression under dynamic region expansion and spatial uniqueness constraints.[/I]
+
+[B]Real-World Terrain Coverage & Qualitative Uniqueness (.mca Analysis)[/B]
+[IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/mca_qualitative_uniqueness_chart.png[/IMG]
+[I]Qualitative uniqueness verification on real Anvil (.mca) terrain data, measuring hazard avoidance and spatial distribution.[/I]
+
+[B]Admissible Gap Policy Candidate Dispersion[/B]
+[IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/admissible_gap_policy_chart.png[/IMG]
+[I]Candidate dispersion under varying stride and gap policies to ensure uniform coverage without clustering.[/I]
 [/CENTER]
 [/SPOILER]
 

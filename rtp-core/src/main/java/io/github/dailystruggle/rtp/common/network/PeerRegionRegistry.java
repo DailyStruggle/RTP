@@ -111,6 +111,27 @@ public final class PeerRegionRegistry {
     }
 
     /**
+     * Whether a peer region is permission-gated on its owning backend.
+     *
+     * <p>Mirrors the local model: a region only costs
+     * {@code rtp.regions.<region>} when its owner configured
+     * {@code requirePermission}. Peers advertise that as the
+     * {@code <region>.perm} heartbeat attribute; absent (older peer, or an
+     * open region) means "not gated", so the cross-server
+     * {@code rtp.servers.<server>} check remains the only gate. Failing open
+     * here is deliberate - failing closed hid every peer region from
+     * non-op players, including open {@code default} regions that are freely
+     * reachable locally.
+     *
+     * @param serverId  the peer backend's network id
+     * @param regionKey the region name on that backend
+     * @return true when the peer declared the region permission-gated
+     */
+    public boolean peerRegionRequiresPermission(String serverId, String regionKey) {
+        return "true".equalsIgnoreCase(peerRegionAttribute(serverId, regionKey, "perm"));
+    }
+
+    /**
      * Install the topology-peer supplier for plugin-message tier discovery.
      *
      * @param supplier supplier returning peer server IDs

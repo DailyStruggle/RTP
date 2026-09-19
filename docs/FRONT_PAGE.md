@@ -9,27 +9,31 @@ Marketplace listing metadata (current, for SEO reference):
 
 <div align="center">
 
+I built this to be the most efficient location supply pipeline out there. There will be nothing that beats this.
+
+This page is for anyone looking to make this work on a production server or get development help or support the effort. Casual operators should use the free version.
+
 # LeafRTP-Pro - High-Performance Random Teleport (RTP) Plugin for Folia, Paper & Spigot
 
 *Once upon a time, I wanted to explore a minecraft world. I asked for `/rtp` in servers I played on. They told me "no, that's laggy", and I took that personally.*
 
 </div>
 
-No menu, however polished, can make `/rtp` fast - only the engine behind it can. With most random-teleport plugins, **any** click can make the server load chunk after chunk after chunk: it picks a spot, loads it on the main thread, and - if it turns out unsafe - tries another, and another, with nothing telling it to stop. That lag spike never shows up in the menu. It shows up in your MSPT, in the stutter every other player feels, and eventually in the players who quietly stop logging in.
+Most random-teleport plugins pick a coordinate, load the chunk on the main thread, and - if the spot turns out unsafe - pick another, with no bound on the retries. The cost lands in MSPT: one `/rtp` can hold the tick loop for hundreds of milliseconds while every other player waits. A menu sits on top of that; the engine underneath is what decides the tick cost.
 
-**LeafRTP-Pro was built on one idea: a teleport should cost the server nothing the player can feel. No spike. No spinner. No quiet churn.**
+**LeafRTP-Pro is built so that a teleport costs the server nothing a player can feel.**
 
-**Enterprise performance, proven not asserted.** On Paper, 19.8 TP/s sustained at a 4 ms worst-case main-thread tick (next-best plugin: 70 ms). On Folia, 13.5 TP/s with zero region stalls - while the next plugin froze a region for over 20 seconds. Audited safety invariants throughout - no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures. Every number on this page is measured on a public harness, not a marketing claim - and bounded worst-case latency is the one axis a Paper-only, on-tick design cannot follow.
+On Paper: 19.8 TP/s sustained at a 4 ms worst-case main-thread tick, where the next-best plugin needs 70 ms. On Folia: 13.5 TP/s with zero region watchdog stalls, on a run where the next plugin froze a region for over 20 seconds. Four safety prohibitions - no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silently dropped failures - are enforced by build rules that fail the build when code violates them. The harness is in the repo and the quality gates are listed below with their thresholds.
 
 <div align="center">
 
-*Supported: Paper, Folia, Spigot, Fabric, and native NeoForge (1.21.x / 26.1.x) - Minecraft 1.20.x / 1.21.x / 26.x. Legacy Forge is not native: run the Spigot/Paper jar under Arclight / Mohist. Works the moment the jar drops in - no tuning required - and rewards operators who like to dig into YAML and profiler output. Drop-in upgrade from the free LeafRTP build.*
+*Supported: Paper, Folia, Spigot, Fabric, and native NeoForge (1.21.x / 26.1.x) - Minecraft 1.20.x / 1.21.x / 26.x. Legacy Forge is not native: run the Spigot/Paper jar under Arclight / Mohist. Defaults are usable without tuning; every tunable is exposed in YAML. Drop-in upgrade from the free LeafRTP build.*
 
 </div>
 
 ---
 
-## Why operators buy Pro
+## Why operators pick Pro
 
 <div align="center">
 
@@ -37,13 +41,13 @@ No menu, however polished, can make `/rtp` fast - only the engine behind it can.
 
 </div>
 
-**If `/rtp` is the top entry in your timings report, this is the fix.** LeafRTP-Pro is the polygon-bounded, Folia-native Random Teleport engine for high-load and custom-world Minecraft servers:
+LeafRTP-Pro is a polygon-bounded, Folia-native random teleport engine for high-load and custom-world Minecraft servers. If `/rtp` is the top entry in your timings report, this is what it addresses:
 
 - **No lag spikes when players spam `/rtp`.** Worst-case main-thread tick stays at 4 ms (vs. 70-771 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
 - **Instant teleports, no "Finding a safe location..." wait.** Pre-verified location queue serves `/rtp` in one tick instead of loading chunks on demand.
 - **Runs natively on Folia without stalling regions.** Under an identical 3-client burst, LeafRTP-Pro sustained 13.5 TP/s at 100% success with zero Folia watchdog stalls and just 3.96 ms of main-thread cost per teleport, while EzRTP managed 5.3 TP/s and blocked region threads on synchronous chunk loads - tripping the Folia watchdog 7 times, one region frozen for over 20 seconds.
-- **Automatic performance the moment the jar drops in.** Pre-warmed location queue, persistent spatial memory, off-tick Anvil pre-filter and async chunk loading kick in on first start - no profiling, no tuning, no per-world hand-holding. Same `config.yml`, commands, and claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) as the free build, so the upgrade itself is risk-free.
-- **Audited safety**: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures.
+- **No tuning required on install.** Pre-warmed location queue, persistent spatial memory, off-tick Anvil pre-filter, and async chunk loading are all active at first start. The `config.yml`, commands, and claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) are the same as the free build, so the upgrade needs no config migration.
+- **Safety prohibitions enforced at build time.** No unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures. Each prohibition has an ArchUnit rule that fails the build if code violates it - see [Quality metrics](#quality-metrics).
 
 On **Paper 1.21**, measured on the in-repo harness, 2 OPed clients spamming `/rtp` back-to-back:
 
@@ -58,11 +62,9 @@ On **Paper 1.21**, measured on the in-repo harness, 2 OPed clients spamming `/rt
 
 Same throughput as the next-best plugin at **~17x lower worst-case tick spike and 35% less CPU per teleport.** Raw harness: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP).
 
-**And speed isn't a trade against features.** The same off-tick architecture that holds your TPS also runs the full effects engine, eight bundled claim integrations, multi-server proxy support, SQL/Redis backends, and the `safety.yml` token grammar - performance is what makes the feature set affordable, not a compromise against it.
+The same off-tick architecture also runs the full effects engine, eight bundled claim integrations, multi-server proxy support, SQL/Redis backends, and the `safety.yml` token grammar. The table below pairs each capability with the part of the architecture that keeps it off the tick loop:
 
-Each capability below is paired with the part of that architecture that makes it cheap to run - the feature set and the performance are the same system, not opposite ends of a dial:
-
-| Feature you get | What makes it cost the server nothing |
+| Feature | What keeps it off the tick loop |
 |-----------------|---------------------------------------|
 | **Lifecycle effects engine** - multi-phase particles, sounds, titles, fireworks, potions | Effect math and packet work run off the main thread, so they never show up in your MSPT. |
 | **Per-region / per-world controls** - custom shapes, radii, centers, biome filters, safety per region | Locations are pre-warmed and validated in the background queue *before* anyone runs `/rtp`, so depth costs no tick time. |
@@ -71,7 +73,7 @@ Each capability below is paired with the part of that architecture that makes it
 | **Multi-server proxy + SQL/Redis** - cross-network `/rtp`, reservation tokens, shared state | State sync runs on async backends; the teleport hot path stays free of foreign-region and blocking API hops. |
 | **Built-in visualizations & observability** - `/rtp visualization` region/biome maps and bad-location heatmaps painted onto real map items, MSPT / heap / pipeline-latency sparklines, plus live `/rtp info` diagnostics | Charts render from in-memory state through the `maps-api` / `metrics-api` SPI, so analytics never touch the teleport hot path - no separate heatmap or metrics add-on needed. |
 | **Optional PvP / combat-tag gate** - refuse or delay `/rtp` for players who recently dealt or took PvP damage, with native tracking plus PvPManager / CombatLogX / Simple Combat Log integration | Combat state is checked once at `/rtp` pre-dispatch through the `rtp-api` hook, so the anti-escape rule adds no per-tick cost to the teleport path. |
-| **Developer API** (`rtp-api`, `effects-api`) - pre / mid / post teleport hooks | Hooks fire outside the critical loop, so downstream plugins can't stall your TPS. |
+| **Developer API** (`rtp-api`, `effects-api`) - pre / mid / post teleport hooks | Hooks fire outside the critical loop, so a slow downstream plugin does not extend the teleport tick. |
 
 ---
 
@@ -90,7 +92,7 @@ Each capability below is paired with the part of that architecture that makes it
 | *8 claim plugins bundled (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect)* | *Yes*    | *Yes*       |
 | *`effects-api`, `rtp-api`, PlaceholderAPI, ProtocolLib*                                                          | *Yes*    | *Yes*       |
  
-Pro is the early-access tier: the tuned, throughput-optimized versions of new platforms and scaling backends land here first, because each one carries a real hands-on support burden that is only guaranteed on the paid tier. The free build still *runs* on Folia (basic regionized scheduling + async teleport) and supports cross-server moves via plugin-messaging (backends behind a proxy); Pro's tuned Folia adapter and durable (SQL/Redis) transports are what graduates to the free build once stabilized. Same configuration, same data files, same commands as the free build - **upgrade is drop-in.**
+Pro is the early-access tier: tuned versions of new platforms and scaling backends land here first, because each one carries a hands-on support burden that is only guaranteed on the paid tier. The free build runs on Folia (basic regionized scheduling + async teleport) and supports cross-server moves via plugin-messaging (backends behind a proxy); Pro's tuned Folia adapter and durable SQL/Redis transports graduate to the free build once stabilized. Configuration, data files, and commands are identical between the builds, so the upgrade is drop-in.
  
 ---
  
@@ -98,16 +100,57 @@ Pro is the early-access tier: the tuned, throughput-optimized versions of new pl
 
 ## Built for
 
-LeafRTP-Pro works on any server out of the box. It also shines for the setups that push the platform hardest - if any of these describe yours, it's the right tool:
+LeafRTP-Pro runs on any server. The setups below are where the difference in tick cost is largest:
 
 - **High-concurrency servers** where `/rtp` spam used to spike MSPT and shake TPS.
 - **Folia deployments** that need region-aware scheduling and zero foreign-region API hops in the teleport hot path.
 - **Multi-server networks (Velocity)** that need cross-network LeafRTP with reservation tokens and shared state. Validated on the in-repo devstack: **2 Velocity proxies, 2 lobby servers, 2 backend servers** behind a shared Redis transport.
-- **Large or pregenerated worlds** where chunk-load cost dominates - the pre-validated queue and Anvil pre-filter pay for themselves on the first burst.
+- **Large or pregenerated worlds** where chunk-load cost dominates - the pre-validated queue and Anvil pre-filter take that cost off the teleport path.
 - **Custom-generator worlds (Iris, Terra, datapacks)** where the Anvil-first biome read keeps your safety config authoritative across MC upgrades.
-- **Operators of every stripe.** Set it and forget it, or version-control your YAML and read the profiler - both paths work. In-game `/rtp menu` is there when you want it; nothing is hidden behind it.
+- **Either operator style.** Defaults out of the box, or version-controlled YAML and profiler output. The in-game `/rtp menu` is optional; every action it exposes is also a typed command.
 
 **Platform requirements:** Java 21+, on Paper / Folia / Spigot / Fabric / native NeoForge. Legacy Forge is not native - run the Spigot/Paper jar under Arclight / Mohist.
+
+---
+
+## Quality metrics
+
+Every threshold below is enforced by a build gate that fails the run when it is missed, and every row names the file you can open to check it. Coverage percentages are from the `-Pcoverage` run of 2026-09-15; the floors next to them are what the build enforces. Where I haven't reached the target yet, the table says so.
+
+**Test and coverage gates** (JaCoCo floors, enforced in `build.gradle`; a floor cannot be lowered without a commit):
+
+| Module | Instruction / branch measured | Enforced floor | Target (90 / 80) |
+|---|---|---|---|
+| `metrics-api` | 100 % / 94.6 % | 0.95 / 0.85 | met |
+| `tags-api` | 98.2 % / 90.9 % | 0.95 / 0.85 | met |
+| `yaml-api` | 97.0 % / 88.1 % | 0.92 / 0.80 | met |
+| `rtp-api` | 95.7 % / 81.3 % | 0.90 / 0.80 | met |
+| `maps-api` | 94.7 % / 82.1 % | 0.90 / 0.78 | met |
+| `commands-api` | 93.6 % / 80.3 % | 0.90 / 0.80 | met |
+| `anvil-api` | 90.5 % / 80.5 % | 0.86 / 0.75 | met |
+| `rtp-core` | 81.6 % / 65.8 % | 0.80 / 0.64 | not met - branch coverage still climbing |
+| `rtp-proxy-common` | 87.0 % / 68.8 % | 0.85 / 0.67 | not met - branch coverage still climbing |
+
+Safety-critical packages inside `rtp-core` carry their own, higher floors on top of the module number: the teleport pipeline at 0.87 / 0.75, region selection at 0.82 / 0.68, and world-border math at 0.99 / 0.89.
+
+**Everything else the build checks:**
+
+| Gate | Number it enforces | Where it runs |
+|---|---|---|
+| Automated test suite | 651 committed JUnit test classes across the modules; `rtp-core` alone carries roughly 3,700 test cases | `gradle.yml` on every push and pull request |
+| Mutation testing (PIT) | >= 60 % mutation score required on safety packages; measured 83 % (world border), 85 % (vertical adjustors), 81 % (region cache), 77 % (memory table), 61 % (teleport pipeline) | `mutation-testing.yml` |
+| Prohibition enforcement (ArchUnit) | 10 rules, one or more per safety prohibition S-001 through S-007 - no unsafe destinations, no permanently force-loaded chunks, no claim bypass, no swallowed failures, no main-thread chunk I/O | `gradle.yml` |
+| Changed-line coverage | new and modified lines must be >= 80 % covered, or the run fails | `gradle.yml` (`scripts/diff-coverage.py`) |
+| Static analysis | SpotBugs plus a PMD ruleset that includes a project-specific `PreferNonLockingExecution` rule, so blocking constructs are flagged during review | `gradle.yml` (`-PstaticAnalysis`) |
+| Binary API compatibility | all 7 public API modules compared against the last release; an unannounced break fails the build, and removals must clear a 2-minor deprecation window | `gradle.yml` (japicmp) |
+| Dependency CVEs | OWASP dependency-check fails at CVSS >= 4; every accepted finding needs written justification in the suppression file | `dependency-check.yml`, weekly and on dependency changes |
+| Release provenance | every release ships a CycloneDX SBOM, SHA-256 and SHA-512 checksums, GPG signatures, SLSA build provenance, and the acceptance-run evidence bundle | `release.yml` |
+| Runtime acceptance | nightly multi-server devstack: 2 Velocity proxies, 2 lobbies, 2 backends over Redis, exercising Velocity + Paper + Folia + Fabric on Java 21 LTS and 25+ | `devstack-acceptance.yml` |
+| Encoding and docs hygiene | tracked text files scanned for UTF-8 mojibake; the docs site builds from the same tree you read | `gradle.yml`, `docs.yml` |
+
+**What I haven't finished.** `rtp-core` and `rtp-proxy-common` are still under the 90 / 80 target on branch coverage. Their floors sit a point or two below the measured numbers, because a partially recompiled tree makes JaCoCo discard stale execution data and read low; the floors only ever ratchet upward. What's left uncovered in `rtp-core` is concentrated in the platform bootstrap and dispatch seams a plain-JVM test can't reach honestly, so I'm closing those with runtime-attested coverage from the nightly devstack instead of writing tests that only exercise mocks. Spigot, NeoForge, BungeeCord, and non-LTS Java releases run fine but have no scheduled live CI suite, so the support matrix lists them as best-effort.
+
+**Scope of these numbers.** Coverage and mutation scores measure how thoroughly the tests exercise the code. They are not a bug-free claim, and they say nothing about feature correctness on your world, your generator, or your plugin list; the nightly devstack run and your own staging server cover that.
 
 ---
 
@@ -208,7 +251,7 @@ LeafRTP-Pro splits configuration by concern under `plugins/RTP/`. Every file is 
 | LeafRTP (free)   | 12.5     | 4.15          | 0                     | 100 %       |
 | EzRTP        | 5.3      | 6.34          | 7 (one region 20.4 s) | 96.2 %      |
 
-*On Folia, LeafRTP's main-thread cost per teleport drops to ~4 ms as region threads parallelize work Paper serializes onto one tick thread. EzRTP's 7 watchdog stalls (one region unresponsive 20.4 s) are the server's own record of synchronous `World.loadChunk` calls on region threads; LeafRTP issued none. Note the free build cleared the same run at 12.5 TP/s with zero stalls - the shared `rtp-core` engine, not a Pro-only adapter, carries the Folia result, and Pro's tuned adapter is built to pull further ahead as per-region contention rises.*
+*On Folia, LeafRTP's main-thread cost per teleport drops to ~4 ms as region threads parallelize work Paper serializes onto one tick thread. EzRTP's 7 watchdog stalls (one region unresponsive 20.4 s) are the server's own record of synchronous `World.loadChunk` calls on region threads; LeafRTP issued none. The free build cleared the same run at 12.5 TP/s with zero stalls: the shared `rtp-core` engine carries the Folia result, not a Pro-only adapter. The gap between the two editions is 1.0 TP/s at 3 clients and has not been measured under heavier per-region contention.*
 
 **Architecture support matrix:**
 
@@ -224,17 +267,17 @@ LeafRTP-Pro splits configuration by concern under `plugins/RTP/`. Every file is 
 | EssentialsX `/rtp`  | Main-thread chunk load                        | Same                             | N/A                                         |
 | HuskHomes RTP       | Supported                                     | Same                             | p99 ~900 ms                                 |
 
-**Memory & TPS:** queue bounded (bounded by `cacheCap`); each entry is a small POJO. Server TPS held at **20.00** across every Paper and Folia run. On Spigot, every plugin saturates to the same chunk-gen ceiling; LeafRTP-Pro just spends those ticks doing fewer things.
+**Memory & TPS:** queue bounded by `cacheCap`; each entry is a small POJO. Server TPS held at **20.00** across every Paper and Folia run. On Spigot, every plugin saturates to the same chunk-gen ceiling; the difference there is the latency tail, not throughput.
 
 - Paper rows are 2-client runs (LeafRTP-Pro reproduced n=2; others n=1 on a single rig). The Folia run used 3 clients and its EzRTP failure is corroborated by the server's own watchdog log, independent of the harness. - JakesRTP Spigot row ran in slot 4 of a 4-phase chain - Min TPS / CPU-per-TP confounded by carry-over; dispatch-time numbers (throughput, p99) remain valid.
 
-**Caveats.** Small client counts only (2 on Paper, 3 on Folia; the number is a floor, not a ceiling). Hardware, view distance, world state, and other plugins will move the numbers. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link. This table measures performance only; feature breadth is not benchmarked here. LeafRTP ships the clickable GUI menu, Vault economy, the lifecycle effects engine, and eight bundled claim integrations alongside these numbers - it does not trade features for speed.
+**Caveats.** Small client counts only (2 on Paper, 3 on Folia), so the throughput figures are floors rather than ceilings. Hardware, view distance, world state, and other plugins will move the numbers. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link. This table measures performance only; feature breadth is not benchmarked here.
 
 Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP). Video benchmark of `/rtp` on a custom world generator: [youtu.be/V0NyNK9JydM](https://youtu.be/V0NyNK9JydM).
 
 #### Empirical Candidate Selection & Spatial Distribution Benchmarks
 
-Comparative test runs evaluate candidate dispersion, collision avoidance, and geometry accuracy across space-filling curve implementations and legacy polar spiral models:
+Visual test suites and benchmarks evaluate candidate dispersion, collision avoidance, and geometry fidelity across selection algorithms, queue tiers, and memory models:
 
 <div align="center">
 
@@ -253,6 +296,38 @@ Comparative test runs evaluate candidate dispersion, collision avoidance, and ge
 ##### Dual-Layer Geometry & Circle Boundary Fidelity
 ![Circle Comparison Side-by-Side](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/simulation_circle_comparison_side_by_side.png)
 *Side-by-side comparison of circle boundary coverage: ground truth vs. classic polar spiral vs. dual-layer square at varying resolutions.*
+
+##### Full Pipeline Selection Visualizer & L3 Bin Distribution
+![Full L3 State Chart](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/full_l3_state_chart.png)
+*Complete pipeline selection visualizer mapping candidate validation states, active 32x32 L3 bins, and discarded hazard bins across the region.*
+
+##### Pipeline Candidate Selection Sequence Comparison
+![Selection Sequence Comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/selection_sequence_comparison_chart.png)
+*Comparative dispatch sequence showing candidate evaluation order, bin walk progression, and spatial dispersion.*
+
+##### Native vs. Unique vs. L3 Cache Candidate Distribution
+![Native vs Unique vs L3 Comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/native_vs_unique_vs_l3_comparison_chart.png)
+*Visual distribution across raw spiral candidates, deduplicated candidates, and binned L3 backlog cache pools.*
+
+##### Path Progression Across Scaled Radii
+![Path Progression Radii](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/path_progression_radii_chart.png)
+*Path progression and coverage density across increasing region radii.*
+
+##### Sub-Bin and 32x32 Region Path Progression
+![Sub-Bin Zoom Path Chart](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/sub_bin_zoom_path_chart.png)
+*High-resolution sub-bin trajectory showing continuous candidate distribution within a 32x32 chunk sector.*
+
+##### Unique Placements & Expand Progression
+![Unique Placements Expand Progression](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/unique_placements_expand_progression_chart.png)
+*Candidate placement progression under dynamic region expansion and spatial uniqueness constraints.*
+
+##### Real-World Terrain Coverage & Qualitative Uniqueness (.mca Analysis)
+![MCA Qualitative Uniqueness Chart](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/mca_qualitative_uniqueness_chart.png)
+*Qualitative uniqueness verification on real Anvil (.mca) terrain data, measuring hazard avoidance and spatial distribution.*
+
+##### Admissible Gap Policy Candidate Dispersion
+![Admissible Gap Policy Chart](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/admissible_gap_policy_chart.png)
+*Candidate dispersion under varying stride and gap policies to ensure uniform coverage without clustering.*
 
 </div>
 
@@ -274,24 +349,24 @@ Comparative test runs evaluate candidate dispersion, collision avoidance, and ge
 - **Paper** - `World#getChunkAtAsync` used directly. No pre-filter, no main-thread fallback. Reference platform.
 - **Paper forks** (Leaf, Leaves, Purpur, Pufferfish, Airplane, DivineMC, ...) - inherit the Paper code path. Servers using the Linear region format (`.linear`) benefit from off-tick ZSTD pre-filtering (ADR-077).
 - **Folia** - Region read-only pre-filter on `ForkJoinPool.commonPool()` *before* the Region Scheduler; rejected candidates never hop a thread. Confirmed candidates load through Folia's native async API; teleports dispatch through the Entity Scheduler.
-- **Spigot** - `.mca` region files parsed off-tick (`isAir`, `isSafe`, surface-height, sky-light, biome). Paper-class throughput on plain Spigot.
-- **Mohist / Arclight** - officially supported. Spigot code path applies.
-- **Fabric** - first-class, stable, in-tree adapter; supported and regularly tested, at feature parity with the Bukkit family. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x runtimes.
+- **Spigot** - `.mca` region files parsed off-tick (`isAir`, `isSafe`, surface-height, sky-light, biome). Throughput is still capped by Spigot's chunk generator; what the pre-filter removes is the main-thread cost per candidate (3 ms p99 in the benchmark below).
+- **Mohist / Arclight** - supported. Spigot code path applies.
+- **Fabric** - in-tree adapter at feature parity with the Bukkit family. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x runtimes.
 
-**Honest fallback caveats.** The Anvil pre-filter is a data source, not a universal gate. It falls through to the platform's native chunk API in two cases: (1) the chunk is already loaded (live data wins), or (2) the probe returns *unknown* (no region file, unsupported data version, decode error, un-populated). On Spigot the fallback is one on-tick `getChunkAt`. On Folia it's one Region-Scheduler hop. Custom generators (Iris, Terra, datapacks) do **not** trigger the fallback - populated `.mca` palettes are read directly, preserving modded and namespaced IDs that the Bukkit enum would collapse.
+**Fallback cases.** The Anvil pre-filter is a data source, not a universal gate. It falls through to the platform's native chunk API in two cases: (1) the chunk is already loaded (live data wins), or (2) the probe returns *unknown* (no region file, unsupported data version, decode error, un-populated). On Spigot the fallback is one on-tick `getChunkAt`. On Folia it's one Region-Scheduler hop. Custom generators (Iris, Terra, datapacks) do **not** trigger the fallback - populated `.mca` palettes are read directly, preserving modded and namespaced IDs that the Bukkit enum would collapse.
 
-**Upgrade-drift-proof biome filtering.** When you bump your Paper or Folia server across MC versions, Mojang's seed-based biome assignment can change for already-written coordinates. The Anvil-first biome read keeps the `.mca` palette authoritative for populated chunks - the biome a player lands in is the biome your `biomes:` allow-list was written against. No re-pregen, no re-tuning after an upgrade.
+**Biome filtering across MC upgrades.** When you bump your Paper or Folia server across MC versions, Mojang's seed-based biome assignment can change for already-written coordinates. The Anvil-first biome read keeps the `.mca` palette authoritative for populated chunks, so the biome a player lands in is the biome your `biomes:` allow-list was written against - no re-pregen and no re-tuning after an upgrade.
 
-**Operator takeaway:** Paper and Folia run chunk I/O fully off-tick. On vanilla Spigot the Anvil pre-filter covers the common case; rare main-thread fallback is bounded by your configured tick-budget; no platform silently blocks the tick loop without reporting it.
+In short: Paper and Folia run chunk I/O fully off-tick. On vanilla Spigot the Anvil pre-filter covers the common case; the remaining main-thread fallback is bounded by your configured tick budget, and no platform blocks the tick loop without reporting it.
 
 </details>
 
 <details>
-<summary><b>Spatial memory - why the longer it runs, the faster it gets</b></summary>
+<summary><b>Spatial memory - cost per teleport falls as the map is learned</b></summary>
 
-Without spatial indexing, teleportation is a guessing game and the numbers are ugly. A typical Overworld is only **~45% safely teleportable** (oceans, rivers, ravines, steep terrain eat the rest); the Nether is dominated by lava seas and wall-to-wall stone; the End is *almost entirely* void. Standard RTPs pay full chunk-load cost to rediscover this one candidate at a time, forever.
+Without spatial indexing, every candidate is an independent guess, and most guesses fail. A typical Overworld is only **~45% safely teleportable** (oceans, rivers, ravines, and steep terrain take the rest); the Nether is mostly lava seas and solid stone; the End is almost entirely void. A plugin without spatial memory pays full chunk-load cost to rediscover that, one candidate at a time, on every teleport.
 
-LeafRTP-Pro plots your world's geometry as it evaluates candidates. When it hits a massive ocean or unsafe biome, it remembers that sector and shrinks the searchable area, so known bad sectors never get loaded again. The longer it runs, the faster it gets - and `/rtp scan` keeps the learning going during idle periods.
+LeafRTP-Pro records your world's geometry as it evaluates candidates. When a sector turns out to be ocean or an unsafe biome, that sector is marked and removed from the searchable area, so it is never loaded again. Cost per teleport therefore falls with uptime, and `/rtp scan` continues the mapping during idle periods.
 
 Watch the background scan crawl the spiral and accumulate spatial memory in real time: [youtu.be/Ftjy1zw_S04](https://youtu.be/Ftjy1zw_S04).
 
@@ -304,7 +379,7 @@ Watch the background scan crawl the spiral and accumulate spatial memory in real
 <details>
 <summary><b>safety.yml token grammar - Pro exclusive</b></summary>
 
-`safety.yml` has a first-class token grammar. Six shapes can be mixed freely in `unsafeBlocks` and `airBlocks`:
+`safety.yml` accepts a token grammar. Six token shapes can be mixed freely in `unsafeBlocks` and `airBlocks`:
 
 - **Plain material:** `LAVA`, `MAGMA_BLOCK`.
 - **Material + state predicate:** `OAK_SLAB[waterlogged=true]`. Multiple predicates AND together: `OAK_SLAB[waterlogged=true,type=top]`.
@@ -365,13 +440,13 @@ For those interested in writing their own: every one of these ships as a worked 
 </details>
 
 <details>
-<summary><b>Already built in - the things operators usually bolt on with extra plugins</b></summary>
+<summary><b>Already built in - capabilities usually added with extra plugins</b></summary>
 
-LeafRTP-Pro ships, in the core engine, a long list of capabilities that competing setups reach for add-ons to cover. Before installing a companion plugin, check here - it is probably already in the box, under LeafRTP's own vocabulary:
+Several capabilities that other setups cover with companion plugins are already in the core engine, sometimes under different names. Check this table before installing a companion plugin:
 
 | Capability | How LeafRTP already covers it |
 |---|---|
-| Secure in-game menu (no chest-GUI exploits) | `/rtp menu` and `/rtp admin` are a *read-only book* UI: clickable destinations and admin actions with the same permission checks as a typed command, **zero** inventory-dupe / click-exploit surface, and no Folia entity-thread state. The book is the deliberate, safer design - not a missing chest GUI. |
+| Secure in-game menu (no chest-GUI exploits) | `/rtp menu` and `/rtp admin` are a *read-only book* UI: clickable destinations and admin actions with the same permission checks as a typed command, no inventory-dupe / click-exploit surface, and no Folia entity-thread state. The book UI is a deliberate choice over a chest GUI; a chest-GUI picker ships as a bundled addon for operators who want one. |
 | Runtime region authoring (no config-file round-trip) | Ephemeral per-invocation overrides via `rtp.params` (`centerx=`/`centerz=`/`radius=`), or persistent edits via `/rtp config regions <name> centerX=...`. A named region is a full target - center + shape + radius + queue + permissions + price - not just a saved coordinate. |
 | World overrides | Redirect a `/rtp` issued in the Nether or End to a safe world automatically via the `worlds.yml` `override` key - no teleport loops. |
 | Open claim-integration API | Register any claim/region/biome check through `GlobalRegionVerifiers` / `RegionVerifierRegistry` - open, async, platform-neutral. Eight claim plugins are already bundled through it; addons add their own with one lambda. |
@@ -436,12 +511,12 @@ A: Yes - same configuration, same data files, same commands. The free build stil
 
 
 <details>
-<summary><b>Support - it works, and it stays working</b></summary>
+<summary><b>Support</b></summary>
 
-**The whole point of Pro is that you stop thinking about `/rtp`.** It drops in, it works, and on the rare day it doesn't, a maintainer who actually owns the code answers you - not a community thread that goes quiet. That is the part the benchmark can't show: the other plugins' numbers (second-scale ticks, region stalls, sync chunk loads) are not a bad afternoon, they are the ceiling of how good your players' experience can get on that engine. With LeafRTP you are not giving anything up to get that - everything those plugins advertise (GUI, economy, effects, claim support, cross-server) is already in the box - you are just removing the lag and the unanswered ticket.
+Support comes from the maintainer who wrote the code. The behaviour in the benchmark section is architectural, not incidental: second-scale ticks, region stalls, and synchronous chunk loads are what an on-tick design costs under load, and no amount of configuration removes them.
 
-- **Priority support.** Pro tickets jump the queue ahead of the free build - this is the support tier the early-access platforms and scaling backends are guaranteed on.
-- **Bug reports and configuration questions** are welcome - the admin guide answers most setup questions, and a clear repro (server version, plugin version, platform, relevant configs and log lines) gets a fast resolution.
+- **Priority support.** Pro tickets are handled ahead of free-build tickets, and this is the tier on which the early-access platforms and scaling backends are guaranteed.
+- **Bug reports and configuration questions** are welcome. Most setup questions are answered in the admin guide; a report with server version, plugin version, platform, relevant configs, and log lines is resolved fastest.
 - **Response time:** 24-72 h on weekdays. Critical safety issues jump the queue.
 - **Feature requests** via GitHub issues. Priority follows the published roadmap.
 - **Native NeoForge** is supported on Minecraft 1.21.x / 26.1.x. **Native Forge** is not supported - use Arclight or Mohist with the Spigot/Paper jar.
@@ -461,4 +536,4 @@ A: Yes - same configuration, same data files, same commands. The free build stil
 
 ---
 
-> *A deterministic, high-performance teleport engine for serious Minecraft servers. Folia-native concurrency, audited safety invariants, and bounded-latency execution.*
+> *A deterministic random teleport engine: Folia-native concurrency, machine-enforced safety invariants, and bounded worst-case main-thread latency.*

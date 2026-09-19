@@ -79,6 +79,32 @@ public class CoreCommandTreeBuilderTest {
     assertSame(platform.world, params.get("world"), "world must be platform-supplied");
   }
 
+  @Test
+  void regionParameter_localRegionWithoutRequiredPermission_allowed() {
+    StubRoot root = new StubRoot();
+    StubPlatformParameters platform = new StubPlatformParameters();
+    CoreCommandTreeBuilder.attachCommonParameters(root, platform);
+
+    io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square shape =
+        new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square();
+    io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor vert =
+        new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new java.util.ArrayList<>());
+    io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings =
+        new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
+            "default", io.github.dailystruggle.rtp.common.RTP.serverAccessor.getRTPWorlds().get(0), shape, vert,
+            false, false,
+            10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+    io.github.dailystruggle.rtp.common.selection.region.Region region =
+        new io.github.dailystruggle.rtp.common.selection.region.Region("default", settings);
+    io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put("default", region);
+
+    CommandParameter regionParam = root.getParameterLookup().get("region");
+    UUID caller = UUID.randomUUID();
+    // Region exists with requirePermission=false by default.
+    // Caller without explicit "rtp.regions.default" permission should be permitted.
+    assertTrue(regionParam.isRelevant.apply(caller, "default"));
+  }
+
   /** Minimal concrete {@code /rtp} root for exercising the builder. */
   private static final class StubRoot extends BaseRTPCmdImpl implements RTPCmd {
     StubRoot() {

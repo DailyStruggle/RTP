@@ -63,5 +63,10 @@ public final class FabricEffectsInitializer {
         EffectFactory.addEffect("TITLE",    new TitleEffect());
         EffectFactory.addEffect("POTION",   new PotionEffect(MobEffects.BLINDNESS.value()));
         EffectFactory.addEffect("COMMAND",  new io.github.dailystruggle.effectsapi.common.effects.CommandEffect());
+        EffectFactory.addEffect("DROP_INVENTORY", new io.github.dailystruggle.effectsapi.common.effects.DropInventoryEffect());
+        EffectFactory.addEffect("DROP_EXP", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());
+        EffectFactory.addEffect("DROP_EXPERIENCE", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());
+        EffectFactory.addEffect("DEATH", new io.github.dailystruggle.effectsapi.common.effects.DeathEffect());
+        EffectFactory.addEffect("KILL", new io.github.dailystruggle.effectsapi.common.effects.DeathEffect());
     }
 }

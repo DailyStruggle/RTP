@@ -22,6 +22,7 @@ public final class HandleRegistry {
 
     @Nullable
     public static PlayerHandle wrapPlayer(@NotNull Object player) {
+        if (player instanceof EffectTarget et) return et.player();
         if (player instanceof PlayerHandle) return (PlayerHandle) player;
         HandleProvider p = PROVIDER.get();
         return p != null ? p.wrapPlayer(player) : null;
@@ -29,6 +30,7 @@ public final class HandleRegistry {
 
     @Nullable
     public static LocationHandle wrapLocation(@NotNull Object location) {
+        if (location instanceof EffectTarget et) return et.location();
         if (location instanceof LocationHandle) return (LocationHandle) location;
         HandleProvider p = PROVIDER.get();
         return p != null ? p.wrapLocation(location) : null;

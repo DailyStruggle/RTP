@@ -73,6 +73,26 @@ public interface BaseRTPCmd extends TreeCommand {
     RTP.log(Level.WARNING, msg);
   }
 
+  @Override
+  default void msgNoPermission(UUID callerId, String permission) {
+    msgNoPermission(callerId, permission, null);
+  }
+
+  @Override
+  default void msgNoPermission(UUID callerId, String permission, java.util.function.Consumer<String> messageMethod) {
+    String msg = msg(PlayerMessages.noPerms, "&c[P0] you do not have permission to use that command");
+    if (messageMethod != null && CommandsAPI.getMessageSink() != null) {
+      messageMethod.accept(RTP.serverAccessor.format(callerId, msg));
+      return;
+    }
+    if (messageMethod != null) {
+      messageMethod.accept(msg);
+    } else {
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg, null);
+    }
+    RTP.log(Level.WARNING, msg);
+  }
+
   /**
    * Sends a bad-parameter message to the caller with an optional hover/click tag.
    *

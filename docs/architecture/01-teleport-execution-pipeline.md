@@ -9,6 +9,42 @@
 
 > Companion walkthrough: [`CODE_TOUR.md` section 2 — Teleport pipeline (end-to-end)](../dev/CODE_TOUR.md).
 
+---
+
+## Executive Overview (Macro Pipeline)
+
+This high-level overview shows the core execution flow of an `/rtp` request. Pre-verified locations are served immediately from cache, while cache misses trigger asynchronous background candidate generation and safety checks before handing off to the player teleport stage.
+
+```mermaid
+flowchart LR
+    A["Player Runs /rtp"] --> B{"Location in Cache?"}
+
+    %% Fast Path
+    B -- "Yes [Instant]" --> C["Hot L1 Cache<br/>(Pre-verified Location)"]
+
+    %% Async Generation Path
+    B -- "No [Async Fill]" --> D["Spiral Generator<br/>(Archimedean 1D Math)"]
+    D --> E["Anvil Disk Probe<br/>(Read .mca Off-Tick)"]
+    E --> F["Safety & Claim Scan<br/>(Lava, Void, Claims)"]
+    F --> C
+
+    %% Teleport Execution
+    C --> G["Teleport Player<br/>(Entity Scheduler)"]
+
+    classDef fast fill:#b7e4b7,stroke:#1f6b1f,stroke-width:2px,color:#0b2a0b;
+    classDef async fill:#cfe2ff,stroke:#1f4e8a,stroke-width:1px,color:#0b1f3a;
+    classDef finish fill:#d1e7dd,stroke:#0f5132,stroke-width:2px,color:#0f5132;
+    class B,C fast;
+    class D,E,F async;
+    class G finish;
+```
+
+---
+
+## Detailed Teleport State Machine
+
+The detailed lifecycle below tracks thread boundaries, asynchronous chunk reservations, safety evaluation on the region thread, and teardown cleanup.
+
 ```mermaid
 stateDiagram-v2
     CmdTrigger : Player executes /rtp
