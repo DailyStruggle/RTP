@@ -118,14 +118,4 @@ public final class HeapPressureMonitor {
   public static double lastUsedPercent() {
     return cachedUsedPercent;
   }
-
-  /**
-   * Clears cached pressure readings and throttling timers for testing purposes.
-   */
-  public static void resetForTesting() {
-    lastSampleMs.set(0L);
-    lastWarnMs.set(0L);
-    cachedUnderPressure = false;
-    cachedUsedPercent = 0.0;
-  }
 }

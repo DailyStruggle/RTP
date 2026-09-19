@@ -989,7 +989,6 @@ public class RegionLifecycleAndBranchTest {
         if (perf != null) {
             perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.maxHeapPercent, 0.0001);
         }
-        io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.resetForTesting();
 
         try {
             region.execute(10_000_000L);
@@ -1000,7 +999,6 @@ public class RegionLifecycleAndBranchTest {
             if (perf != null) {
                 perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.maxHeapPercent, 0.0);
             }
-            io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.resetForTesting();
         }
     }
 
