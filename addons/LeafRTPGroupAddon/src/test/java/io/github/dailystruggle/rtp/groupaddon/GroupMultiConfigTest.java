@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.groupaddon;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;

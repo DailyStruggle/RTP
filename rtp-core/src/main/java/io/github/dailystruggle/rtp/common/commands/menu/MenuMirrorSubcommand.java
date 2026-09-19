@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /**
  * Shadow {@link TreeCommand} mirroring a node from the live {@code /rtp} tree under {@link MenuRedeemSubcommand}.
