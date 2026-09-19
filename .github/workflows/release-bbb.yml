@@ -300,7 +300,6 @@ jobs:
           subject-path: |
             ${{ steps.artifacts.outputs.pro_jar }}
             ${{ steps.artifacts.outputs.lite_jar }}
-
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d190 # v2.0.8
         with:
