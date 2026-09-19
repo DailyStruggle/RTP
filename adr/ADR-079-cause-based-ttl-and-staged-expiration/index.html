@@ -12,9 +12,13 @@
         <meta name="author" content="DailyStruggle">
       
       
-        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/PROPOSAL-economy-gate-consolidation/">
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-079-cause-based-ttl-and-staged-expiration/">
       
       
+        <link rel="prev" href="../ADR-078-composable-cache-pipeline-stages/">
+      
+      
+        <link rel="next" href="../ADR-080-opt-in-simulation-benchmark-tier/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -22,7 +26,7 @@
     
     
       
-        <title>Proposal: Consolidate teleport economy charging onto a single EconomyGate - LeafRTP</title>
+        <title>ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments - LeafRTP</title>
       
     
     
@@ -74,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#proposal-consolidate-teleport-economy-charging-onto-a-single-economygate" class="md-skip">
+        <a href="#adr-079-cause-based-ttl-and-staged-expiration-on-spatial-memory-segments" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Proposal: Consolidate teleport economy charging onto a single EconomyGate
+              ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
             
           </span>
         </div>
@@ -322,11 +326,13 @@
         
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../adr/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   Architecture decisions
@@ -1124,6 +1130,27 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Spatial memory TTL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1397,25 +1424,30 @@
       
   
   
+    
   
   
+  
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -1426,7 +1458,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             Architecture decisions
@@ -1440,7 +1472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1461,7 +1493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-000-development-workflow/" class="md-nav__link">
+      <a href="../ADR-000-development-workflow/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1482,7 +1514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+      <a href="../ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1503,7 +1535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+      <a href="../ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1524,7 +1556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+      <a href="../ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1545,7 +1577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+      <a href="../ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1566,7 +1598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-005-paperlib-removal/" class="md-nav__link">
+      <a href="../ADR-005-paperlib-removal/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1587,7 +1619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-006-async-queue-pre-generation/" class="md-nav__link">
+      <a href="../ADR-006-async-queue-pre-generation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1608,7 +1640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-007-per-user-isolated-queues/" class="md-nav__link">
+      <a href="../ADR-007-per-user-isolated-queues/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1629,7 +1661,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+      <a href="../ADR-008-memory-tracker-active-gc/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1650,7 +1682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+      <a href="../ADR-009-configurable-spatial-distributions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1671,7 +1703,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+      <a href="../ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1692,7 +1724,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-011-rtp-api-separate-module/" class="md-nav__link">
+      <a href="../ADR-011-rtp-api-separate-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1713,7 +1745,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+      <a href="../ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1734,7 +1766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+      <a href="../ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1755,7 +1787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+      <a href="../ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1776,7 +1808,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-016-anvil-subsystem/" class="md-nav__link">
+      <a href="../ADR-016-anvil-subsystem/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1797,7 +1829,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+      <a href="../ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1818,7 +1850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+      <a href="../ADR-018-agents-md-public-release-structure/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1839,7 +1871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+      <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1860,7 +1892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+      <a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1881,7 +1913,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+      <a href="../ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1902,7 +1934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+      <a href="../ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1923,7 +1955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-023-login-reserve-cache/" class="md-nav__link">
+      <a href="../ADR-023-login-reserve-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1944,7 +1976,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+      <a href="../ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1965,7 +1997,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+      <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1986,7 +2018,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-026-external-hook-api-surface/" class="md-nav__link">
+      <a href="../ADR-026-external-hook-api-surface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2007,7 +2039,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-028-l3-backlog-cache/" class="md-nav__link">
+      <a href="../ADR-028-l3-backlog-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2028,7 +2060,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+      <a href="../ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2049,7 +2081,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+      <a href="../ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2070,7 +2102,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-034-memory-shape-catalog/" class="md-nav__link">
+      <a href="../ADR-034-memory-shape-catalog/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2091,7 +2123,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-035-interactive-menus-book-first/" class="md-nav__link">
+      <a href="../ADR-035-interactive-menus-book-first/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2112,7 +2144,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+      <a href="../ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2133,7 +2165,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+      <a href="../ADR-037-harden-rtp-config-commands/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2154,7 +2186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+      <a href="../ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2175,7 +2207,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+      <a href="../ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2196,7 +2228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+      <a href="../ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2217,7 +2249,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+      <a href="../ADR-041-config-command-and-save-implementation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2238,7 +2270,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+      <a href="../ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2259,7 +2291,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+      <a href="../ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2280,7 +2312,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+      <a href="../ADR-044-command-tree-menu-reflector/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2301,7 +2333,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+      <a href="../ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2322,7 +2354,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-046-maps-api-module/" class="md-nav__link">
+      <a href="../ADR-046-maps-api-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2343,7 +2375,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+      <a href="../ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2364,7 +2396,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+      <a href="../ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2385,7 +2417,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+      <a href="../ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2406,7 +2438,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+      <a href="../ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2427,7 +2459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+      <a href="../ADR-051-two-tier-api-extension-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2448,7 +2480,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+      <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2469,7 +2501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+      <a href="../ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2490,7 +2522,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+      <a href="../ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2511,7 +2543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-055-pvp-combat-gate/" class="md-nav__link">
+      <a href="../ADR-055-pvp-combat-gate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2532,7 +2564,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-056-bare-rtp-root-action/" class="md-nav__link">
+      <a href="../ADR-056-bare-rtp-root-action/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2553,7 +2585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+      <a href="../ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2574,7 +2606,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+      <a href="../ADR-058-region-specific-schematic-paste/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2595,7 +2627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+      <a href="../ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2616,7 +2648,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+      <a href="../ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2637,7 +2669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-061-open-core-dual-licensing/" class="md-nav__link">
+      <a href="../ADR-061-open-core-dual-licensing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2658,7 +2690,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-062-biome-probability-weighting/" class="md-nav__link">
+      <a href="../ADR-062-biome-probability-weighting/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2679,7 +2711,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+      <a href="../ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2700,7 +2732,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+      <a href="../ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2721,7 +2753,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+      <a href="../ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2742,7 +2774,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-066-foreign-config-importer/" class="md-nav__link">
+      <a href="../ADR-066-foreign-config-importer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2763,7 +2795,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+      <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2784,7 +2816,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+      <a href="../ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2805,7 +2837,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+      <a href="../ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2826,7 +2858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+      <a href="../ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2847,7 +2879,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+      <a href="../ADR-071-config-organization-and-discoverability/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2868,7 +2900,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+      <a href="../ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2889,7 +2921,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-073-config-default-inheritance-references/" class="md-nav__link">
+      <a href="../ADR-073-config-default-inheritance-references/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2910,7 +2942,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+      <a href="../ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2931,7 +2963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+      <a href="../ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2952,7 +2984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-076-config-folder-consolidation/" class="md-nav__link">
+      <a href="../ADR-076-config-folder-consolidation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2973,7 +3005,479 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
+      <a href="../ADR-077-multi-format-region-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-077 - Multi-Format Region Support: Linear
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#maintainability-operational-factors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Maintainability &amp; Operational Factors
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-081 — Unified Blocked Biome Run Table in `MemoryShape`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-084 - Layered Learned-State Index: Coarse Spiral Directory over Per-Cell Hilbert RLE Blobs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-086-external-web-map-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-089 — Universal MapCanvas Bridge, Biome-Hazard Composite Overlays, and Visual Pipeline Gauges
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-091 — Automated Headless Client for Devstack via Mineflayer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-094-quality-engineering-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3021,87 +3525,54 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#problem" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
-      Problem
+      Context
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-economy-spi-already-exists-parity-with-biome-checks" class="md-nav__link">
+  <a href="#decision" class="md-nav__link">
     <span class="md-ellipsis">
-      The economy SPI already exists (parity with biome checks)
+      Decision
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#goal" class="md-nav__link">
+  <a href="#alternatives-considered" class="md-nav__link">
     <span class="md-ellipsis">
-      Goal
+      Alternatives Considered
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#proposed-structure" class="md-nav__link">
+  <a href="#maintainability-operational-factors" class="md-nav__link">
     <span class="md-ellipsis">
-      Proposed structure
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Proposed structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#call-site-changes" class="md-nav__link">
-    <span class="md-ellipsis">
-      Call-site changes
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#requirements-adr-references" class="md-nav__link">
-    <span class="md-ellipsis">
-      Requirements / ADR references
+      Maintainability &amp; Operational Factors
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#risks-and-trade-offs" class="md-nav__link">
+  <a href="#consequences" class="md-nav__link">
     <span class="md-ellipsis">
-      Risks and trade-offs
+      Consequences
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#verification-plan" class="md-nav__link">
+  <a href="#references" class="md-nav__link">
     <span class="md-ellipsis">
-      Verification plan
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#open-questions-for-approval" class="md-nav__link">
-    <span class="md-ellipsis">
-      Open questions for approval
+      References
     </span>
   </a>
   
@@ -3125,96 +3596,199 @@
   
 
 
-<h1 id="proposal-consolidate-teleport-economy-charging-onto-a-single-economygate">Proposal: Consolidate teleport economy charging onto a single <code>EconomyGate</code><a class="headerlink" href="#proposal-consolidate-teleport-economy-charging-onto-a-single-economygate" title="Permanent link">&para;</a></h1>
-<p>Status: APPROVED and IMPLEMENTED (Rule D-005)
-Date: 2026-07-27
-Scope: <code>rtp-core</code> (+ additive test); no <code>rtp-api</code> surface change</p>
-<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
-<p>Teleport charging logic exists in <strong>two independent copies</strong>:</p>
+<h1 id="adr-079-cause-based-ttl-and-staged-expiration-on-spatial-memory-segments">ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments<a class="headerlink" href="#adr-079-cause-based-ttl-and-staged-expiration-on-spatial-memory-segments" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-09-03 (Accepted 2026-09-03)</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>RTP's spatial memory subsystem (<code>MemoryShape</code>, <a href="../ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>) maps 2D coordinate space onto a 1D Archimedean spiral and tracks invalid sectors as Run-Length Encoded (RLE) intervals in <code>badKeysCache</code>. <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/">ADR-052</a> added <code>badCauseCache</code> to tag each bad-location run with a <code>LocationGenerator.FailTypes</code> cause byte, using a "first-cause-wins" rule when adjacent runs coalesce.</p>
+<p>Currently, all bad-location runs in <code>MemoryShape</code> are treated as monotonic and permanent: once an index is marked bad, it remains bad indefinitely unless the operator manually runs <code>/rtp scan reset</code>, reconfigures the shape bounds, or changes safety parameters.</p>
+<p>In a live production environment, this permanence creates significant operational problems:
+1. <strong>Dynamic Rejection Causes:</strong> While natural terrain properties (<code>biome</code>, <code>worldBorder</code>, <code>vert</code>, <code>safety</code>) are static or semi-permanent, external restrictions (<code>safetyExternal</code> via claim plugins like GriefPrevention, Towny, Lands, WorldGuard) and player placement dispersion (<code>uniquePlacement</code>) are dynamic.
+2. <strong>Permanent Land Lockout:</strong> If a player claims a plot of land, RTP marks the candidate chunk bad under <code>safetyExternal</code>. If the player later unclaims or abandons the land, the area remains permanently blacklisted in spatial memory. Server operators are forced to discard entire regional caches (<code>/rtp scan reset</code>)—losing hours of expensive off-tick terrain scanning—just to refresh dynamic claims.
+3. <strong>Opaque External Verifier Contract:</strong> The <code>RegionVerifierRegistry</code> API (<a href="../ADR-026-external-hook-api-surface/">ADR-026</a>) currently accepts untyped <code>Predicate&lt;RTPCoords&gt;</code> or async functions without identifying the backing verifier. RTP cannot distinguish whether a verifier represents a permanent server spawn or a transient player claim, making uniform or per-checker expiration configuration difficult.
+4. <strong>Re-generation Churn on Expiration:</strong> A naive hard deletion of expired segments causes immediate tick spikes: if an expired segment is hit on the next selection pass and the claim is still active (which is typical for weeks-long claims), the server must re-execute chunk loads, vertical raycasts, and verifier invocations from scratch.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
 <ol>
-<li><code>RTPCmd.compute(...)</code> (the <code>/rtp</code> command path) - inline, in two branches:</li>
-<li>self branch (<code>RTPCmd.java</code> ~754-788): <code>EconomyKeys.price</code> + optional <code>paramsPrice</code>/<code>biomePrice</code> + <code>RegionKeys.price</code>, <code>balanceFloor</code> check, <code>EconomyHop.take</code>, and a <code>PlayerMessages.notEnoughMoney</code> chat message. Accumulates into <code>TeleportData.cost</code> for later refund-on-failure.</li>
-<li>other-player branch (<code>RTPCmd.java</code> ~790-825): same, but uses <code>EconomyKeys.priceOther</code>, gated on <code>toggleTargetPerms</code> and <code>!uuid.equals(senderId)</code>, and honors the <code>rtp.notme</code> skip.</li>
-<li><code>EconomyGate.chargeSelf(...)</code> (added for the addon-facing API) - wired into <code>RTP.java</code>'s <code>teleportDelegate</code> and <code>runLocalTeleport</code>. Self-payer only; no params/biome (an <code>RtpTarget</code> carries none), no chat message, does not touch <code>TeleportData</code>.</li>
+<li><strong>Volatility Tiers &amp; Core Cause Defaults:</strong>
+   Classify rejection causes directly using pre-existing <code>LocationGenerator.FailTypes</code> categories into three persistence and expiration tiers:</li>
+<li><strong>Static Tier (TTL = $\infty$):</strong> Natural terrain and geometric limits (<code>biome</code>, <code>worldBorder</code>, <code>vert</code>, <code>safety</code>, <code>prefilterBiome</code>, <code>prefilterRange</code>). Persisted permanently to <code>.bin</code> cache files. Reset only on world configuration or seed changes.</li>
+<li><strong>Dynamic Tier (TTL = Finite, e.g. 7–30 days):</strong> Dynamic player and administrative state (<code>safetyExternal</code>, <code>uniquePlacement</code>). Tracked with an expiration epoch. By default, all external verifiers inherit the <code>causes.safetyExternal</code> TTL baseline.</li>
+<li>
+<p><strong>Transient Tier (TTL = 0):</strong> Ephemeral operational failures (<code>timeout</code>, <code>nullChunk</code>, <code>ungenerated</code>). Discarded immediately without entering persistent spatial memory.</p>
+</li>
+<li>
+<p><strong>Selective Coalescing Rule (Refining ADR-052):</strong></p>
+</li>
+<li>Adjacent bad-location runs in <code>MemoryShape</code> shall <strong>only</strong> coalesce if both runs belong to the same volatility tier (Static vs. Dynamic).</li>
+<li>A static run ($\text{TTL} = \infty$) shall <strong>never</strong> coalesce with a dynamic run ($\text{TTL} &lt; \infty$). This prevents permanent natural terrain from expiring prematurely and prevents temporary player claims from becoming immortalized.</li>
+<li>When two dynamic runs coalesce, the merged run inherits $\max(\text{TTL}_A, \text{TTL}_B)$ to prioritize CPU and chunk I/O stability over high-churn fragmentation, while retaining the first cause byte under ADR-052's first-cause-wins rule.</li>
+<li>
+<p>In <code>MemoryShape</code>, run expiration epochs are maintained in an aligned <code>long[] badExpiryCache</code> (storing expiration unix epoch seconds, where <code>&lt;= 0</code> indicates infinite/static retention), matching the indexing of <code>badKeysCache</code> and <code>badCauseCache</code>.</p>
+</li>
+<li>
+<p><strong>Dual-Array Rebuild &amp; Staged Probation Buffer:</strong>
+   Implement a two-phase lazy expiration lifecycle computed in a single off-tick rebuild pass without dynamic object allocation or FIFO queues:</p>
+</li>
+<li><strong>Dual Sorted Arrays in <code>flushAndRebuild()</code>:</strong>
+     During the rebuild pass, candidate runs are partitioned simultaneously into two parallel, compact, sorted 1D RLE structures:<ol>
+<li><strong>Active Tier (<code>badKeysCache</code>, <code>badPrefixSumsCache</code>, <code>badCauseCache</code>, <code>badExpiryCache</code>):</strong> Contains runs where $t &lt; 1\times \text{TTL}$ (or $\text{TTL} \le 0$). Bypassed by candidate selection in $O(\log N)$ time.</li>
+<li><strong>Probation Tier (<code>probationKeysCache</code>, <code>probationPrefixSumsCache</code>, <code>probationCauseCache</code>, <code>probationExpiryCache</code>):</strong> Contains runs where $1\times \text{TTL} \le t &lt; 2\times \text{TTL}$. Omitted from active candidate avoidance, so candidate coordinates become selectable again.</li>
+<li><strong>Eviction:</strong> Runs where $t \ge 2\times \text{TTL}$ are silently dropped during rebuild without requiring secondary cleanup tasks.</li>
 </ol>
-<p>Today the two paths do not overlap (the command schedules its own <code>TeleportPipelineTask</code> directly at <code>RTPCmd.java</code> ~931-957; it does not route through <code>RTPAPI.teleport</code>). But the duplication is a latent <strong>double-charge / divergence hazard</strong>: any future change that makes the command path funnel through the API delegate (or vice versa), or that edits one copy of the price math and not the other, silently produces a double charge or a pricing mismatch. One source of truth removes that class of bug.</p>
-<h2 id="the-economy-spi-already-exists-parity-with-biome-checks">The economy SPI already exists (parity with biome checks)<a class="headerlink" href="#the-economy-spi-already-exists-parity-with-biome-checks" title="Permanent link">&para;</a></h2>
-<p>The swappable provider seam is already in place - no new SPI is needed:</p>
+</li>
+<li>
+<p><strong>Fast $O(\log M)$ Probation Search &amp; Restoration:</strong></p>
 <ul>
-<li><code>RTPEconomy</code> (<code>rtp-api</code>, <code>give</code>/<code>take</code>/<code>bal</code>) is the platform- and plugin-agnostic economy abstraction.</li>
-<li>It is bound at runtime through <code>RTPAPI.hooks().economy().bind(RTPEconomy)</code> (<code>EconomyProviderRegistry</code>, backed by the <code>RTP.economy</code> field in <code>DefaultRTPHooks</code>).</li>
-<li><code>VaultChecker</code> (<code>rtp-plugin</code>) is merely the <em>default</em> binding installed by <code>RTPBukkitPlugin.setupIntegrations()</code>. An addon can call <code>bind(...)</code> with any implementation to replace Vault with another economy system.</li>
+<li>When candidate verification in <code>PregenTask</code> fails and <code>shape.addBadLocation(key, cause)</code> / <code>addBadChunk(key, cause)</code> is called, a binary search on <code>probationKeysCache</code> checks if the key falls within an existing probation run.</li>
+<li><strong>Re-Hit &amp; Re-Rejected (Still Claimed):</strong> If matched, the entire probationary run is immediately restored to <code>pendingBadLocations</code> / active spatial memory with a refreshed TTL, bypassing full terrain re-mapping with zero heap allocation.</li>
+<li><strong>Re-Hit &amp; Succeeded (Now Safe):</strong> If candidate selection succeeds, the sector naturally remains in circulation; the probationary entry drops out on the next rebuild.</li>
 </ul>
-<p>This is directly analogous to the biome-check / region-verifier seam (<code>RegionVerifierRegistry.register(...)</code>, <code>AnvilPrefilterRegistry.bind(...)</code>): the provider is swappable, the core never hard-codes the backend. So "an addon can swap out Vault like they can for biome checks" is <strong>already true at the provider level</strong>.</p>
-<p>What is <em>missing</em> is a single internal orchestrator that sits on top of that provider and owns the price computation + affordability + withdrawal. Today that orchestration is duplicated (command path inline vs. <code>EconomyGate.chargeSelf</code>). Consolidating onto <code>EconomyGate.charge</code>/<code>chargeSelf</code> makes the swappable <code>RTPEconomy</code> provider the <em>only</em> place money leaves an account, through the <em>one</em> gate - which is exactly the "lean toward using <code>chargeSelf</code>/<code>charge</code>" direction.</p>
-<p>Layering after this change:
-- <code>RTPEconomy</code> (rtp-api) = swappable provider SPI (addon-replaceable, Vault is just the default).
-- <code>EconomyGate</code> (rtp-core, internal) = single price-math + floor + <code>take</code> orchestrator over whatever provider is bound.
-- <code>RTPCmd</code> / <code>RTP.java</code> delegate / <code>runLocalTeleport</code> = call sites that own only messaging + <code>TeleportData.cost</code> bookkeeping.</p>
-<h2 id="goal">Goal<a class="headerlink" href="#goal" title="Permanent link">&para;</a></h2>
-<p>A single charging helper is the only place that:
-- reads <code>EconomyKeys.price</code> / <code>priceOther</code> / <code>paramsPrice</code> / <code>biomePrice</code> and <code>RegionKeys.price</code>,
-- performs the <code>balanceFloor</code> affordability check,
-- performs the fire-and-forget <code>EconomyHop.take</code> withdrawal.</p>
-<p>Message emission and <code>TeleportData.cost</code> bookkeeping stay at the call sites (they differ per path and must not be centralized).</p>
-<h2 id="proposed-structure">Proposed structure<a class="headerlink" href="#proposed-structure" title="Permanent link">&para;</a></h2>
-<p>Generalize <code>EconomyGate</code> into a single computation + charge call that returns the computed cost so callers can still record it for refunds.</p>
-<div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">EconomyGate</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kd">enum</span><span class="w"> </span><span class="n">Result</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ALLOWED</span><span class="p">,</span><span class="w"> </span><span class="n">INSUFFICIENT_FUNDS</span><span class="w"> </span><span class="p">}</span>
-
-<span class="w">  </span><span class="cm">/** Whether to charge the self price key or the &quot;other player&quot; price key. */</span>
-<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kd">enum</span><span class="w"> </span><span class="n">Payer</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">SELF</span><span class="p">,</span><span class="w"> </span><span class="n">OTHER</span><span class="w"> </span><span class="p">}</span>
-
-<span class="w">  </span><span class="cm">/** Immutable outcome carrying the affordability verdict and the computed cost. */</span>
-<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kd">record</span> <span class="nc">Charge</span><span class="p">(</span><span class="n">Result</span><span class="w"> </span><span class="n">result</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">cost</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
-
-<span class="w">  </span><span class="cm">/**</span>
-<span class="cm">   * Compute + apply the charge for one payer. Skips (returns ALLOWED, cost 0) when</span>
-<span class="cm">   * no economy is bound, payer is the console id, or the payer has rtp.free.</span>
-<span class="cm">   * On INSUFFICIENT_FUNDS it does NOT withdraw. On ALLOWED with cost&gt;0 it fires the</span>
-<span class="cm">   * EconomyHop.take. Does not send messages and does not touch TeleportData.</span>
-<span class="cm">   */</span>
-<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="n">Charge</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">UUID</span><span class="w"> </span><span class="n">payerId</span><span class="p">,</span><span class="w"> </span><span class="n">RTPPlayer</span><span class="w"> </span><span class="n">payer</span><span class="p">,</span><span class="w"> </span><span class="n">Region</span><span class="w"> </span><span class="n">region</span><span class="p">,</span>
-<span class="w">                              </span><span class="n">Payer</span><span class="w"> </span><span class="n">which</span><span class="p">,</span><span class="w"> </span><span class="kt">boolean</span><span class="w"> </span><span class="n">hasParams</span><span class="p">,</span><span class="w"> </span><span class="kt">boolean</span><span class="w"> </span><span class="n">hasBiome</span><span class="p">);</span>
-<span class="p">}</span>
+</li>
+<li>
+<p><strong>Class-Based Verifier Attribution &amp; Zero Addon-Directory Coupling:</strong></p>
+</li>
+<li>Instead of inventing arbitrary string keys or scanning addon jar files to discover TTL options, verifier identity is derived directly from the verifier's class type.</li>
+<li>Extend <code>RegionVerifierRegistry</code> in <code>rtp-api</code> with overloads accepting the verifier class/source:
+     <div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span><span class="n">Class</span><span class="o">&lt;?&gt;</span><span class="w"> </span><span class="n">source</span><span class="p">,</span><span class="w"> </span><span class="n">Predicate</span><span class="o">&lt;</span><span class="n">RTPCoords</span><span class="o">&gt;</span><span class="w"> </span><span class="n">verifier</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">registerAsync</span><span class="p">(</span><span class="n">Class</span><span class="o">&lt;?&gt;</span><span class="w"> </span><span class="n">source</span><span class="p">,</span><span class="w"> </span><span class="n">Function</span><span class="o">&lt;</span><span class="n">RTPCoords</span><span class="p">,</span><span class="w"> </span><span class="n">CompletableFuture</span><span class="o">&lt;</span><span class="n">Boolean</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">verifier</span><span class="p">);</span>
 </code></pre></div>
-<p>Behavior mapping:
-- <code>price</code> key selected by <code>which</code> (<code>SELF</code> -&gt; <code>EconomyKeys.price</code>, <code>OTHER</code> -&gt; <code>EconomyKeys.priceOther</code>).
-- <code>hasParams</code> adds <code>paramsPrice</code>; <code>hasBiome</code> adds <code>biomePrice</code>.
-- <code>region</code> (nullable) adds <code>RegionKeys.price</code>.
-- <code>rtp.free</code> / console / no-economy -&gt; <code>Charge(ALLOWED, 0.0)</code> with no withdrawal.
-- affordability: <code>bal(payerId) - cost &lt; balanceFloor</code> -&gt; <code>Charge(INSUFFICIENT_FUNDS, cost)</code>, no withdrawal.</p>
-<p>Keep the existing <code>chargeSelf(...)</code> as a thin deprecated-internal delegate to <code>charge(id, player, region, Payer.SELF, hasParams, hasBiome)</code> (or just replace its two call sites in <code>RTP.java</code> and delete it).</p>
-<h3 id="call-site-changes">Call-site changes<a class="headerlink" href="#call-site-changes" title="Permanent link">&para;</a></h3>
-<ol>
-<li><code>RTP.java</code> <code>teleportDelegate</code> and <code>runLocalTeleport</code>: call <code>charge(uuid, player, targetRegion, Payer.SELF, false, false)</code>; on <code>INSUFFICIENT_FUNDS</code> complete the future with <code>RTPResult.Reason.INSUFFICIENT_FUNDS</code> and clear the processing lock (unchanged behavior; cost is ignored since the API has no refund path). </li>
-<li><code>RTPCmd.compute</code> self branch: replace the inline block with <code>charge(senderId, player, region, Payer.SELF, shapeNames!=null||vertNames!=null||doWBO, biomeList!=null)</code>. On <code>INSUFFICIENT_FUNDS</code> send <code>notEnoughMoney</code>, clear locks, <code>return true</code> (as today). On <code>ALLOWED</code> set <code>data.cost += charge.cost()</code> for the refund path. Preserve the <code>rtp.notme</code> <code>continue</code> at the call site (it is control flow, not charging).</li>
-<li><code>RTPCmd.compute</code> other-player branch: same with <code>Payer.OTHER</code>, guarded by the existing <code>toggleTargetPerms &amp;&amp; !uuid.equals(senderId)</code> condition, message sent to the target.</li>
+     Existing methods (<code>register(Predicate&lt;RTPCoords&gt;)</code>) remain supported as default methods delegating to <code>register(verifier.getClass(), verifier)</code>.</li>
+<li>Internal verifier evaluation in <code>GlobalRegionVerifiers</code> captures the registering class, returning a structured result:
+     <div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kd">record</span> <span class="nc">VerifierCheckResult</span><span class="p">(</span><span class="kt">boolean</span><span class="w"> </span><span class="n">passed</span><span class="p">,</span><span class="w"> </span><span class="nd">@Nullable</span><span class="w"> </span><span class="n">Class</span><span class="o">&lt;?&gt;</span><span class="w"> </span><span class="n">verifierClass</span><span class="p">)</span>
+</code></pre></div></li>
+<li>
+<p>This allows <code>PregenTask</code> to attribute rejections in stats and logs (<code>safetyExternal[GriefPreventionChecker]</code>) and resolve the applicable TTL dynamically without requiring the addon to parse configuration or declare custom duration objects.</p>
+</li>
+<li>
+<p><strong>Configuration Hierarchy (<code>advanced/ttl.yml</code>):</strong>
+   Provide an operator configuration under <code>advanced/ttl.yml</code> driven by core <code>FailTypes</code> with optional class-name overrides:
+   <div class="highlight"><pre><span></span><code><span class="c1"># Causes map directly to LocationGenerator.FailTypes</span>
+<span class="nt">causes</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">biome</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+<span class="w">  </span><span class="nt">worldBorder</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+<span class="w">  </span><span class="nt">vert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+<span class="w">  </span><span class="nt">safety</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+<span class="w">  </span><span class="nt">uniquePlacement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30d</span>
+<span class="w">  </span><span class="nt">safetyExternal</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">14d</span><span class="w">   </span><span class="c1"># Base default for all external claim checkers</span>
+
+<span class="c1"># Optional overrides keyed by verifier class name (simple name or FQN)</span>
+<span class="nt">verifiers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">WorldGuardChecker</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span><span class="w">       </span><span class="c1"># Permanent retention for server regions/spawns</span>
+<span class="w">  </span><span class="nt">GriefPreventionChecker</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">14d</span><span class="w"> </span><span class="c1"># Custom retention for player claims</span>
+</code></pre></div></p>
+</li>
+<li><strong>Resolution Order:</strong> <code>verifiers.&lt;ClassName&gt;</code> -&gt; <code>causes.safetyExternal</code> -&gt; default dynamic tier (14d).</li>
+<li>
+<p>Server operators have immediate, granular control over any claim plugin without requiring addon directory scans, addon restarts, or custom code updates in addon modules.</p>
+</li>
+<li>
+<p><strong>Unified Disk Storage (<code>BIN_VERSION 3</code>):</strong></p>
+</li>
+<li>Because active and probation segments have inherently zero spatial overlap, all retained segments are serialized to disk in a single continuous 1D sorted stream.</li>
+<li>Increment <code>BIN_VERSION</code> from <code>2</code> to <code>3</code>. Each bad-run entry on disk stores 25 bytes:<ul>
+<li><code>startKey</code> (<code>long</code>, 8 bytes)</li>
+<li><code>delta</code> / <code>length</code> (<code>long</code>, 8 bytes)</li>
+<li><code>cause</code> (<code>byte</code>, 1 byte)</li>
+<li><code>expiresAtEpochSeconds</code> (<code>long</code>, 8 bytes; <code>&lt;= 0</code> indicates static/infinite retention)</li>
+</ul>
+</li>
+<li>On load, segments are partitioned based on current wall-clock epoch:<ul>
+<li>$t &lt; \text{expiresAt} \implies$ placed in active array (<code>badKeysCache</code>).</li>
+<li>$\text{expiresAt} \le t &lt; \text{expiresAt} + \text{TTL} \implies$ placed in probation array (<code>probationKeysCache</code>).</li>
+<li>$t \ge \text{expiresAt} + \text{TTL} \implies$ pruned on load (offline decay during server downtime).</li>
+</ul>
+</li>
+<li>Reading legacy files (<code>BIN_VERSION &lt;= 2</code>) treats <code>expiresAt</code> as <code>&lt;= 0</code> (permanent), guaranteeing full backward compatibility.</li>
 </ol>
-<p>The <code>notEnoughMoney</code> message text, <code>[money]</code> substitution, <code>sendMessage</code> targets, <code>data.cost</code> accumulation, and the <code>take</code>-returned-false warning message all remain at the call sites. Only the price math + floor check + withdrawal move into <code>EconomyGate</code>.</p>
-<h2 id="requirements-adr-references">Requirements / ADR references<a class="headerlink" href="#requirements-adr-references" title="Permanent link">&para;</a></h2>
-<ul>
-<li>REQ-RTP-F-013 (configurable user-facing messages) - <code>notEnoughMoney</code> stays call-site, so no change.</li>
-<li>S-004 (no silently discarded teleport failure) - money path is S-004-adjacent; the affordability rejection remains explicit (chat message on command path, <code>INSUFFICIENT_FUNDS</code> result on API path). No swallowing introduced.</li>
-<li>S-005 - withdrawal stays fire-and-forget via <code>EconomyHop</code>; no blocking future added.</li>
-</ul>
-<h2 id="risks-and-trade-offs">Risks and trade-offs<a class="headerlink" href="#risks-and-trade-offs" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Behavior-preserving refactor of a money path with existing coverage (<code>RTPTest</code>, <code>RtpApiTeleportSurfaceTest</code>, and the command-path economy assertions). Risk: subtle divergence in cost accumulation order or the <code>rtp.notme</code>/<code>toggleTargetPerms</code> gating. Mitigation: keep those gates as call-site control flow; add a unit test asserting <code>charge(...).cost()</code> equals the old inline sum for a params+biome+region combo on both <code>SELF</code> and <code>OTHER</code>.</li>
-<li><code>Charge</code> record is a new internal type in <code>rtp-core</code> (not <code>rtp-api</code>), so no public surface change and not itself D-005-gated beyond this refactor.</li>
-<li>No double-charge is possible today; this change is preventive (single source of truth) plus dedup, not a live-bug fix.</li>
-</ul>
-<h2 id="verification-plan">Verification plan<a class="headerlink" href="#verification-plan" title="Permanent link">&para;</a></h2>
-<ul>
-<li>New <code>EconomyGateTest</code> (or extend <code>RTPTest</code>): <code>SELF</code>/<code>OTHER</code> price selection, params/biome/region additivity, <code>rtp.free</code>/console/no-economy skip, floor rejection with no withdrawal.</li>
-<li>Re-run <code>RTPTest</code> (economy + existing 34) and <code>RtpApiTeleportSurfaceTest</code>.</li>
-<li>Full <code>.\gradlew.bat build</code>.</li>
-</ul>
-<h2 id="open-questions-for-approval">Open questions for approval<a class="headerlink" href="#open-questions-for-approval" title="Permanent link">&para;</a></h2>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Instant hard deletion of expired segments</td>
+<td>Triggers heavy chunk loading and pipeline re-checks when claims are still valid. Staged probation allows $O(1)$ restoration of still-bad sectors.</td>
+</tr>
+<tr>
+<td>Coalescing dynamic runs with $\min(\text{TTL})$</td>
+<td>Causes large, long-lived claim segments to expire rapidly when bordered by a short-lived claim, increasing scan churn.</td>
+</tr>
+<tr>
+<td>Allowing static and dynamic runs to coalesce</td>
+<td>Causes static ocean/mountain runs to inherit finite TTLs and re-verify periodically, or causes dynamic claims to become permanent.</td>
+</tr>
+<tr>
+<td>Requiring string registration keys and scanning addon jars</td>
+<td>Forces RTP core to scan the filesystem/JARs to discover config options; using pre-existing <code>FailTypes</code> with verifier class names eliminates addon-directory probing.</td>
+</tr>
+<tr>
+<td>Forcing addons to read RTP config files</td>
+<td>Violates addon encapsulation; third-party addons should focus on claim checking while RTP core handles configuration hierarchy.</td>
+</tr>
+<tr>
+<td>Per-location 64-bit expiration timestamps</td>
+<td>Destroys the memory compactness of the RLE interval structure; storing coarse epoch buckets per coalesced run preserves zero-heap efficiency.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="maintainability-operational-factors">Maintainability &amp; Operational Factors<a class="headerlink" href="#maintainability-operational-factors" title="Permanent link">&para;</a></h2>
 <ol>
-<li>Delete <code>chargeSelf(...)</code> outright (replace its 2 call sites) or keep it as a thin delegate?</li>
-<li>Should the command path's <code>data.cost</code> refund semantics be documented/asserted as-is, or is a refund-on-failure test out of scope for this consolidation?</li>
+<li><strong>Subsystem Cohesion &amp; Domain Modeling:</strong></li>
+<li>Decouples geometric coordinate mapping (<code>MemoryShape</code> Archimedean spiral bijection) from assumptions of static immutability.</li>
+<li>
+<p>Leverages core-side <code>LocationGenerator.FailTypes</code> directly, ensuring full alignment with <code>badCauseCache</code> (ADR-052) and <code>/rtp stats</code> outcome metrics.</p>
+</li>
+<li>
+<p><strong>Loose Coupling &amp; API Compatibility:</strong></p>
+</li>
+<li>Additive overloads taking <code>Class&lt;?&gt; source</code> with default methods prevent breaking binary and source compatibility for third-party or legacy claim addons (S-006, ADR-026).</li>
+<li>
+<p>Zero coupling to the addon filesystem or JAR manifests: <code>rtp-core</code> does not need to scan addon directories to discover configurable verifiers. Addons register naturally with their checker class.</p>
+</li>
+<li>
+<p><strong>Performance &amp; Concurrency Guardrails:</strong></p>
+</li>
+<li><strong>Zero-Allocation Hot Path:</strong> The selection path (<code>MemoryShape.rand()</code> and binary search on <code>badKeysCache</code>) remains lock-free and zero-allocation. All segment aging, probation transitions, and evictions are executed off-tick during periodic pulses or rebuild passes (<code>flushAndRebuild()</code>).</li>
+<li><strong>Bounded RLE Growth:</strong> Segmenting runs across volatility boundaries increases RLE run count by only 5–8% in typical workloads, preserving cache compactness.</li>
+<li>
+<p><strong>Probation Side-Space Sizing:</strong> The quarantine buffer is bounded by active candidate selection volume and cleared lazily, preventing heap bloat.</p>
+</li>
+<li>
+<p><strong>Observability &amp; Diagnostics:</strong></p>
+</li>
+<li>Granular failure attribution (<code>safetyExternal[&lt;VerifierName&gt;]</code>) surfaces exact rejection bottlenecks in <code>/rtp stats</code>, verbose logs, and debugging tools, eliminating opaque failure buckets.</li>
+<li>
+<p>Visualizing active vs. probationary segments is supported through existing debug shape JSON exports.</p>
+</li>
+<li>
+<p><strong>Persistence &amp; Migration Safety:</strong></p>
+</li>
+<li>Unified single-stream disk serialization (<code>BIN_VERSION 3</code>) stores expiration epoch seconds per run, enabling smooth offline decay across server restarts while maintaining backward compatibility for legacy <code>BIN_VERSION &lt;= 2</code> caches.</li>
 </ol>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive:</strong></li>
+<li>Abandoned land claims and expired unique placements naturally cycle back into circulation without requiring administrative <code>/rtp scan reset</code>.</li>
+<li>Static world terrain remains permanently cached, preserving baseline performance.</li>
+<li>The probation side space prevents tick spikes and re-generation overhead on recurring failures.</li>
+<li>Granular verifier attribution enables detailed failure metrics per claim plugin in <code>/rtp stats</code>.</li>
+<li>Existing addons remain 100% binary and behaviorally compatible.</li>
+<li><strong>Negative / Trade-offs:</strong></li>
+<li>Segmenting RLE runs by volatility tier slightly increases total run count in <code>badKeysCache</code>.</li>
+<li>Additional memory bookkeeping for the probationary side-space buffer (bounded by active selection traffic).</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>docs/adr/ADR-001-archimedean-spiral-1d-mapping.md</code> (1D spiral indexing).</li>
+<li><code>docs/adr/ADR-026-external-hook-api-surface.md</code> (<code>RegionVerifierRegistry</code>).</li>
+<li><code>docs/adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations.md</code> (Cause-tagged bad-location runs and <code>badCauseCache</code>).</li>
+<li><code>docs/adr/ADR-069-claim-integrations-extracted-to-bundled-addon.md</code> (<code>LeafRTPClaimAddon</code>).</li>
+<li><code>rtp-core</code> <code>selectors/memory/shapes/MemoryShape.java</code>.</li>
+</ul>
 
 
 
@@ -3252,7 +3826,7 @@ Scope: <code>rtp-core</code> (+ additive test); no <code>rtp-api</code> surface 
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.2.1
+      LeafRTP v3.2.2
     </div>
   
   

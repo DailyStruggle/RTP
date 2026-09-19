@@ -1,0 +1,4354 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-080-opt-in-simulation-benchmark-tier/">
+      
+      
+        <link rel="prev" href="../ADR-079-cause-based-ttl-and-staged-expiration/">
+      
+      
+        <link rel="next" href="../ADR-081-unified-blocked-biome-run-table/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-080 — Opt-In Simulation Benchmark Tier - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-080-opt-in-simulation-benchmark-tier-measurement-vs-model-separation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-080 — Opt-In Simulation Benchmark Tier
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../site/why/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  Architecture decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Spatial memory TTL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Architecture decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-000-development-workflow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-000 - Development Workflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-001 — Archimedean Spiral 1D Mapping for Location Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-002 — H2/SQLite for Spatial Memory Persistence Over Flat-File Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-003 — rtp-plugin as a Separate Bridge Module from rtp-core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-004 — CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-005-paperlib-removal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-005 — Removal of PaperLib in Favour of Native Paper APIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-006-async-queue-pre-generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-006 — Async Queue Pre-Generation Over On-Demand Async Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-007-per-user-isolated-queues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-007 — Per-User Isolated Queues Alongside the Global Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-008 — MemoryTracker as Active Task GC with WeakReference Deallocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-009 — Configurable Spatial Distributions: Flat, Normal, Exponential
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-010 — Versioned Platform Adapter Submodules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-011-rtp-api-separate-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-011 — `rtp-api` as a Separately Published Addon Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-012 — `ChunkReservation` as an Internal Chunk Ticket Abstraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-013 — Addons as External Gradle Projects Rather Than Built-In Optional Modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-015 — Stale-Chunk Guard for Count-Bound Pipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-016-anvil-subsystem/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-016 — Anvil Read-Only Subsystem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-017 — Block Tags and Block-State Predicates in Safety Lists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-018 — `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-020 — Language Bootstrap and Locale-Aware ConfigParser
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-022 — Region Shape Cache Key: Seed + Canonical Config Hash
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-023-login-reserve-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-023 — Login Reserve Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-024 — RTP-lite Assembly Variant
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-026-external-hook-api-surface/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-026 — Unified External-Hook API Surface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-028-l3-backlog-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-028 — L3 Backlog Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-033 — NeoForge Platform In-Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-034-memory-shape-catalog/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-034 — Memory Shape Catalog and Polygon Shape
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-035-interactive-menus-book-first/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-035 — Interactive Menus via Written Book
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-037 — Harden RTP Config Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-038 — `/rtpadmin` Setup Wizards
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-039 — `/rtpadmin` Diagnostic Surfaces
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-043 — `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-044 — `menu-api` Module for Generalized Interactive Menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-045 — `/rtp docs` Menu Consumer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-046-maps-api-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-047 - Declarative Chart Composition Bridge
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-049 - Network-mode plumbing in `rtp-core`, platform-specific via `PlayerLifecycleHook` SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-050 - Concrete Menu Commands Supersede Token Registries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-051 - Two-Tier API Model: Thin `rtp-api` Contract + `rtp-core` Extension API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-052 — Always-on generation outcome metrics and cause-tagged bad-location persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-054 — RTPRunnable Self-Scheduling Thread Routing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-055-pvp-combat-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-055 - Optional PvP / combat-tag pre-flight gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-056-bare-rtp-root-action/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-056 - Pluggable bare-`/rtp` root action
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-057 — Platform-agnostic addon SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-058 — Region-Specific Schematic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-059 — Relative Ground-Distance Safety Predicate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-060 — Emergency-Platform Block-Restoration Timeout
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-061-open-core-dual-licensing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-061 — Open-Core Dual Licensing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-062-biome-probability-weighting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-062 — Biome-probability weighting for location selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-063 — Biome-First Menu with Auto-Region Selection by Biome Availability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-065 — World-Override Regions and the `/rtp` World Menu
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-066-foreign-config-importer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-066 - Foreign Config Importer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-068 - Cross-Server Persisted Teleport Limits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-069 - Claim-Plugin Integrations Extracted to the Bundled `LeafRTPClaimAddon`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-070 - Platform-neutral `/rtp` command root
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-071 - Config Organization and Discoverability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-072: Teleport View-Distance Clamp and Steady Restore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-073-config-default-inheritance-references/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-073 - Config Default Inheritance via `@<file>` References
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-074 - Operator-Facing RTP Throughput and Cost Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-075 - Platform-Neutral Player-Move Event SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-076-config-folder-consolidation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-076 - Config Folder Consolidation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-077-multi-format-region-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-077 - Multi-Format Region Support: Linear
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#primary-sources-for-the-design-rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      Primary sources for the design rationale
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-per-attempt-teleport-mode-classification-in-the-measurement-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: per-attempt teleport-mode classification in the measurement harness
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-folia-region-context-accounting-and-region-freeze-detection-in-the-measurement-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: Folia region-context accounting and region-freeze detection in the measurement harness
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-gc-and-residency-accounting-in-the-measurement-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: GC and residency accounting in the measurement harness
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-per-attempt-foregroundasync-chunk-split-and-tick-occupancy-as-intervals" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: per-attempt foreground/async chunk split and tick occupancy as intervals
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-storage-class-characterisation-and-region-file-read-accounting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: storage-class characterisation and region-file read accounting
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-reconciled-instrumentation-rules-and-completeness-as-a-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: reconciled instrumentation rules, and completeness as a gate
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-081 — Unified Blocked Biome Run Table in `MemoryShape`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-084 - Layered Learned-State Index: Coarse Spiral Directory over Per-Cell Hilbert RLE Blobs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-086-external-web-map-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-089 — Universal MapCanvas Bridge, Biome-Hazard Composite Overlays, and Visual Pipeline Gauges
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-091 — Automated Headless Client for Devstack via Mineflayer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-094-quality-engineering-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-TEMPLATE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-NNN — Title
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#primary-sources-for-the-design-rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      Primary sources for the design rationale
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-per-attempt-teleport-mode-classification-in-the-measurement-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: per-attempt teleport-mode classification in the measurement harness
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-folia-region-context-accounting-and-region-freeze-detection-in-the-measurement-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: Folia region-context accounting and region-freeze detection in the measurement harness
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-gc-and-residency-accounting-in-the-measurement-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: GC and residency accounting in the measurement harness
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-per-attempt-foregroundasync-chunk-split-and-tick-occupancy-as-intervals" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: per-attempt foreground/async chunk split and tick occupancy as intervals
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-storage-class-characterisation-and-region-file-read-accounting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: storage-class characterisation and region-file read accounting
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#addendum-reconciled-instrumentation-rules-and-completeness-as-a-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      Addendum: reconciled instrumentation rules, and completeness as a gate
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-080-opt-in-simulation-benchmark-tier-measurement-vs-model-separation">ADR-080 — Opt-In Simulation Benchmark Tier (Measurement vs Model Separation)<a class="headerlink" href="#adr-080-opt-in-simulation-benchmark-tier-measurement-vs-model-separation" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-09-04 (Accepted 2026-09-04)</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>Performance claims for RTP are currently produced by one instrument: the real-server harness in
+<a href="https://github.com/DailyStruggle/RTP/tree/V3/helpers/StressTestRTP"><code>helpers/StressTestRTP</code></a>. It is authoritative — real Spigot / Paper / Folia,
+real competitor plugins, real clients — and it is expensive: 30–60 minutes per data point once setup,
+startup, execution, collection, analysis and logging are counted. That cost has three consequences:</p>
+<ol>
+<li><strong>No iteration.</strong> A design question cannot be explored with a 45-minute instrument; the harness can
+   only <em>confirm</em> a hypothesis, never help form one.</li>
+<li><strong>Structural blind spots.</strong> <code>RESULTS.md</code> states them: it "does not extrapolate beyond 2 concurrent
+   clients", and higher-concurrency saturation curves are named as pending work. Phase lengths of 2–10
+   minutes also cannot reach behaviour that only appears over hours — most importantly, spatial-memory
+   convergence and TTL expiry cycles.</li>
+<li><strong>Some quantities are not measurable there at all.</strong> Plugin-side allocation is buried under the
+   platform's; retained footprint of a specific data structure cannot be isolated from a live server heap.</li>
+</ol>
+<p>Conversely, some quantities are <em>only</em> honestly measurable on a real server: chunk-load and worldgen cost,
+whole-JVM heap and GC under load. Those are platform-owned. Allocating a stand-in array "shaped like a
+chunk" and reporting the result would be arithmetic dressed as measurement.</p>
+<p>There is also a publication hazard. Results from this project are used in user-facing material
+(<code>docs/FRONT_PAGE.md</code>, storefront listings). A benchmark authored by the maintainer of the winning
+plugin, whose cost constants are tunable, can trivially become marketing with a table attached. Two live
+examples of the failure mode already exist in-repo: chunks-per-attempt figures of 35.9 / 64.0 that were
+worldgen-bounded artefacts and collapse to 5.86 / 4.59 in a pregenerated world; and a
+"lower heap usage than reroll-based plugins" claim contradicted by our own best run at the time, in
+which LeafRTP held the <em>highest</em> post-GC trough (9 948 MB) because it is a cache. That run itself has
+since gone stale — it predates the allocation and staged-expiry work of ADR-078 / ADR-079 and the
+competitor releases it measured — which is why the currency rule below exists and why the replacement
+front-page answer quotes no cross-plugin heap figure at all.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>A third instrument tier, opt-in and off by default.</strong>
+   Benchmarks live in <code>rtp-core/src/test/java/.../common/benchmark/</code>, carry <code>@Tag("simulation")</code>, and are
+   excluded from <code>test</code>. They run only via <code>./gradlew :rtp-core:simulationBenchmark</code>.</li>
+<li>Gating is implemented with <code>Test.include</code>/<code>Test.exclude</code> class-file patterns on <code>**/benchmark/**</code>,
+     <strong>not</strong> JUnit tag filters: the root build applies <code>tasks.withType(Test).configureEach { useJUnitPlatform() }</code>,
+     which is realized after the subproject script and resets any tag filter set through that DSL. The
+     <code>@Tag</code> is retained so IDE run configurations and future tag-based tooling agree with the build.</li>
+<li>The task clears the root build's <code>finalizedBy jacocoTestReport</code> (which <code>dependsOn test</code>), otherwise a
+     benchmark run drags in the whole unit-test suite. Coverage of a benchmark tier is meaningless.</li>
+<li>
+<p>The task does <strong>not</strong> override heap or collector. The root build already pins every <code>Test</code> task to
+     <code>maxHeapSize = 1024m</code> and <code>-XX:+UseG1GC</code>; a collector flag set in the subproject would be <em>appended</em>
+     to the root's and HotSpot rejects two collectors on one command line.</p>
+</li>
+<li>
+<p><strong>Division of labour between the three instruments.</strong> Each tier answers only what it can answer honestly.</p>
+</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Instrument</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cost of one chunk load / generation; whole-JVM heap and GC under load</td>
+<td><code>helpers/StressTestRTP</code> (real server)</td>
+</tr>
+<tr>
+<td>Allocation and GC pressure of our own code paths; retained footprint of a specific structure; measured <code>.mca</code> read cost</td>
+<td>this tier (server-free, real classes)</td>
+</tr>
+<tr>
+<td>Behaviour over hours, large radii, and high concurrency</td>
+<td>this tier (behavioural model, priced by the above)</td>
+</tr>
+</tbody>
+</table>
+<ol>
+<li><strong>Mandatory provenance on every emitted number.</strong> Each report row carries one of:</li>
+<li><code>MEASURED</code> — timed or counted on this machine, this run, against shipped code.</li>
+<li><code>DERIVED</code> — arithmetic over <code>MEASURED</code> inputs, no behavioural assumption added.</li>
+<li><code>MODELED</code> — behavioural cost-model output; assumption-dependent.</li>
+</ol>
+<p>Measurement rows and model rows shall not be blended into one published table.</p>
+<ol>
+<li>
+<p><strong>Shared cost oracle with common random numbers.</strong> All simulated strategies draw operation costs from
+   the same measured sample distributions with the same seed, so that identical operations at identical
+   positions in a request stream draw identical samples. Differences between strategies are then
+   attributable only to the operations each strategy chooses to perform, not to draw luck. Distributions
+   are retained as samples, not collapsed to means: a mean-based model cannot produce a credible p99.</p>
+</li>
+<li>
+<p><strong>Reporting.</strong> Markdown + CSV under <code>build/reports/rtp-simulation/</code>, with the JVM's <em>actual</em> input
+   arguments (via <code>ManagementFactory</code>) in the header rather than what the build script asserts. Absolute
+   values are machine-relative and shall be labelled as such.</p>
+</li>
+<li>
+<p><strong>Assertions are self-consistency only.</strong> Calibration completed, rows emitted, seeded runs
+   deterministic. No assertion shall encode a competitive outcome: a test that fails when a competitor
+   wins is not a measurement. Consequently this tier is never a merge gate.</p>
+</li>
+<li>
+<p><strong>Publication rules.</strong> Before any figure from this tier appears in user-facing material:</p>
+</li>
+<li>Its provenance tier shall be stated, with a link to the method.</li>
+<li>Pregenerated-world figures supersede worldgen-bounded ones; a superseded figure shall not be quoted.</li>
+<li><strong>Currency.</strong> A published figure shall describe the <em>current</em> state of every subject it names. A
+     figure is stale, and shall not be published, once the code it measures has changed materially -
+     on our side or a competitor's. Concretely: whole-JVM heap figures predating the allocation and
+     staged-expiry work (ADR-078 / ADR-079) describe neither this plugin nor any competitor's current
+     release, so cross-plugin heap comparisons are withheld until re-measured. Where a claim cannot be
+     made current, the honest publication is to state that it is withheld and why - not to quote the
+     old number with a caveat.</li>
+<li><strong>Validation gates must pass</strong>, fixed before results are read, and each gate governs only the class
+     of figure it validates. Failure blocks publication, not the test.<ul>
+<li><em>Operation-count figures</em> (chunks loaded, region contexts, coverage): the model shall reproduce
+   the between-profile ratio of <code>PRE_WRITEUP.md</code> section 12 chunks-per-attempt within 2x. The ratio
+   rather than the absolute, because the measured figure is per attempt and that run did not record
+   attempts-per-teleport. <strong>Implemented and passing</strong> (measured 3.71, modelled 1.90, deviation
+   0.513x).</li>
+<li><em>Latency figures</em> (p99, p999, stall counts) and <em>throughput figures</em>: the model shall reproduce
+   JakesRTP's measured Paper p99 within 2x and the section 16 Folia throughput split. <strong>Not
+   implemented</strong> - these require a latency model over the cost oracle, which the current
+   operation-count model deliberately does not attempt. Until it exists, no latency or throughput
+   figure from this tier may be published.</li>
+</ul>
+</li>
+<li><strong>Parity shall be disclosed.</strong> Where a competitor is at or near parity on an axis, the report and any
+     published derivative shall say so on that axis. Two well-evidenced differentiators plus an explicit
+     parity statement is both more credible and harder to refute than five soft ones.</li>
+<li><strong>Unmeasured plugins ship as strategy classes, not names.</strong> A competitor with no measured anchor is
+     published as its published-config-derived strategy (for example "TTL-bounded 2D coarse memory +
+     warm-chunk cache + local rescan"), never as a named plugin with modelled numbers attached.</li>
+<li><strong>No grievance framing.</strong> Published derivatives shall be technical and reproducible, and shall not
+     reference disputes with competitor authors or communities.</li>
+<li><strong>Allocation figures carry their omitted term.</strong> Plugin-side allocation excludes chunk-load and
+     worldgen allocation, which is platform-owned. Any published allocation figure shall be
+     accompanied by the chunk-materialisations-per-teleport figure for the same run, because the
+     omitted term scales with it: without that pairing, a design that avoids chunk work looks
+     <em>worse</em> than one that does not.</li>
+<li><strong>Allocation shall be published by load class, never as one total.</strong> Total bytes per teleport
+     mixes four costs that are not interchangeable, and a ratio taken across it compares all four at
+     once. The classes are: (1) <em>one-time construction</em>, paid once per world and not GC pressure at
+     all - a design that pre-allocates bounded arrays will always post a larger figure here than one
+     that allocates lazily, and at steady state that difference costs nothing; (2) <em>steady transient</em>,
+     the per-request trickle, taken as the median sampling bucket so bursts cannot inflate it, and the
+     cheapest class per byte because young-dying objects are reclaimed at a cost proportional to
+     survivors rather than to bytes allocated; (3) <em>burst</em>, allocation above the steady rate from
+     periodic bulk work, the most expensive class because large arrays raise pause time and can bypass
+     the young generation; (4) <em>retained live set</em>, which occupies heap and costs marking work but is
+     not churn. A published figure shall name its class, and instantaneous pressure (p99 and peak
+     bucket rate, plus peak-over-steady burstiness) shall accompany any steady-rate claim, because a
+     design can win on the mean and lose on the tail.</li>
+<li><strong>Serve rate shall be published beside any cost figure.</strong> A starved cache allocates almost
+     nothing, so a cost figure without an unserved-request percentage is unreadable in principle.
+     This is not hypothetical: the first run of the allocation benchmark reported the best figure in
+     the table while serving 0.3 % of requests, and only the serve-rate row exposed it.</li>
+</ol>
+<h2 id="primary-sources-for-the-design-rationale">Primary sources for the design rationale<a class="headerlink" href="#primary-sources-for-the-design-rationale" title="Permanent link">&para;</a></h2>
+<p>The 1D-over-2D spatial-memory decision predates this repository and is documented publicly:</p>
+<ul>
+<li>r/admincraft, <strong>"too much math"</strong> (<code>/comments/owgvzz</code>, Aug 2021) — the original analysis. States the
+  clustering-versus-preloaded-space trade-off ("this makes it harder to fully utilize pre-loaded space,
+  and users end up having to teleport more often"), the reroll scaling thesis ("rerolling ... gives you a
+  much more non-deterministic computation time, getting less stable and statistically worse as you add
+  more space to avoid"), the 1D spiral bijection, a measured ~13 % selection-cost overhead versus naive
+  sampling, and — five years before it shipped — the <code>MemoryShape</code> design: "subtracting missing space from
+  the total before randomizing and shifting the random point by the missing area under the curve (probably
+  by keeping running tabs on each 'bad sector' on the disc)".</li>
+<li>r/admincraft, <strong>"[info] testing different teleportation optimizations"</strong> (<code>/comments/p0vu0d</code>) — follow-up.</li>
+<li><a href="https://github.com/DailyStruggle/RTP/tree/V3/python_test_scripts"><code>python_test_scripts/randomDonutFixed - Spatial Indexing.py</code></a> — surviving
+  script from that period implementing the 1D-area to (radius, rotation) bijection and indexing a region
+  into 1D occupancy spans; the direct ancestor of <code>MemoryShape</code>.</li>
+</ul>
+<p>The accompanying 2D coarse-grid footprint analysis from that period was not persisted. It is
+reconstructed in this tier by <code>RetainedFootprintBenchmarkTest</code> (measured footprint of the shipped
+run-length representation against a chunk-keyed TTL map) and <code>SpatialMemoryScalingBenchmarkTest</code>
+(coverage convergence under blanket TTL versus cause-typed persistence). Both <strong>partially contradict</strong>
+the remembered conclusion; see Consequences.</p>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Extend <code>helpers/StressTestRTP</code> only</td>
+<td>Cannot reach hour-scale horizons or isolate plugin-side allocation, and 30–60 min per data point forbids iteration. Retained as the authoritative tier for platform-owned costs.</td>
+</tr>
+<tr>
+<td>Python analysis scripts</td>
+<td>Cannot allocate or measure JVM heap, and would measure a reimplementation rather than the shipped <code>MemoryShape</code> / <code>AnvilRegionByteCache</code>. Java gives parity with production code.</td>
+</tr>
+<tr>
+<td>A new Gradle module (<code>helpers/RtpSimulation</code>)</td>
+<td><code>rtp-core</code> already declares <code>api project(':anvil-api')</code>, so the measured <code>.mca</code> calibration needs no new module or dependency edge. Reconsider only if the tier grows platform dependencies.</td>
+</tr>
+<tr>
+<td>Run benchmarks as part of <code>test</code> behind a system property</td>
+<td>A property switch cannot pin JVM args per run, and allocation/heap figures are not comparable across differing heap sizes or collectors. A separate <code>Test</code> task can.</td>
+</tr>
+<tr>
+<td>Model chunk-load allocation with stand-in arrays</td>
+<td>Chunk objects, palettes, heightmaps and NBT buffers are platform-owned; a synthetic array measures our stand-in, not the platform. Left to the real harness.</td>
+</tr>
+<tr>
+<td>Assert competitor-relative thresholds</td>
+<td>A benchmark that fails when we lose is not a measurement. Self-consistency assertions only.</td>
+</tr>
+<tr>
+<td>Publish modelled figures without provenance labels</td>
+<td>Indistinguishable from marketing, and unfalsifiable by a reader. Labels plus a validation gate are what make the tier publishable at all.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive:</strong></li>
+<li>Design questions become iterable: seconds per run instead of tens of minutes.</li>
+<li>Allocation and GC-pressure changes to our own code become measurable and regression-visible. The first
+    run already quantified the <code>AnvilRegionByteCache</code> buffer pool at ~2.6 KB allocated per region read
+    versus ~4.2 MB when reallocating per probe (0 GC collections versus 3), and surfaced that two staleness
+    <code>stat</code> syscalls account for essentially the entire warm-hit cost.</li>
+<li>Long-horizon and high-concurrency behaviour — the gap <code>RESULTS.md</code> names as pending — becomes
+    addressable without a bot harness.</li>
+<li>Provenance labelling plus fixed validation gates make published figures falsifiable by a reader.</li>
+<li><strong>The tier immediately corrected two of the maintainer's own working assumptions</strong>, which is the
+    clearest evidence that it is a measurement instrument and not a marketing one:<ul>
+<li>The spatial-memory footprint advantage is <strong>~4x, not ~1000x</strong> (25.9 B per known-bad chunk versus
+  111.3 B for a chunk-keyed TTL entry). The ~1000x estimate assumed dense bit-per-chunk coverage;
+  at the sparse learned densities that actually occur, both representations are per-entry.
+  Footprint alone therefore does <em>not</em> establish that a coarse 2D map must expire entries.</li>
+<li><strong>Verification order dominates spatial-memory durability.</strong> At a 10 000-block radius the model
+  attributes nearly the whole cost gap to prefilter-before-load (1.94 -&gt; 1.00 chunk loads per
+  served teleport), while durable memory moves load-then-check only 2.01 -&gt; 1.94. Spatial memory
+  pays in proportion to coverage, and coverage of a production-sized world is low for every
+  strategy. Published claims shall lead with verification order and present memory durability as
+  the long-horizon second-order effect it measures as.</li>
+<li>Also corrected: run-length compression is a <em>within-ring</em> property of the 1D index, so clustered
+  and scattered bad sets cost the same. The footprint result is distribution-independent rather
+  than a clustering win.</li>
+<li><strong>The undifferentiated allocation total was itself the wrong measurement, and it inverted the
+  result.</strong> Read as one mean, durable 1D memory looked like the most allocating design of five
+  (485 B per served teleport at the 300 s rebuild cadence, against 315 B stateless reroll, 381 B
+  clustered reroll, 176 B warm queue, 471 B TTL coarse-2D memory). Classified, the ordering
+  changes: its <em>steady transient</em> churn is <strong>124.8 B per teleport, the second lowest of the five</strong>
+  (stateless reroll 308.7 B, clustered reroll 379.1 B, TTL coarse-2D 455.7 B, warm queue 176.0 B),
+  because a candidate rejected by spatial memory allocates nothing at all. 75 % of its allocation
+  is <em>burst</em> from the periodic span-array rebuild, whose cost scales with knowledge retained
+  rather than with the triggering request - a cadence parameter, not a property of the
+  representation: burst falls from 1 259 B per teleport at a 60 s cadence to 55 B at 3 600 s while
+  steady transient stays flat at 130 -&gt; 121 B and chunk materialisations stay flat at ~1.36. Its
+  <em>one-time</em> construction cost is 18 192 B, which amortises to 0.09 B per teleport and is not GC
+  pressure.</li>
+<li><strong>Recomputation is dirtiness-gated, so the burst class is work-proportional rather than
+  periodic.</strong> The shipped guard (<code>MemoryShape.maybeFlushAndRebuild</code>) returns unless a mark is
+  pending and requires <code>min(256, runs/8)</code> pending marks, so a cadence deadline that comes due
+  with nothing newly learned performs no merge at all - at a 60 s cadence the model performs 230
+  rebuilds and declines 62 000 deadlines. Burst therefore decays as the memory converges instead
+  of recurring forever on the clock, and a model that rebuilds unconditionally on a timer
+  overstates it. Any simulated design shall reproduce its subject's recomputation <em>trigger</em>, not
+  merely its period.</li>
+<li><strong>The honest remaining cost is burstiness, not volume.</strong> Peak-over-steady is <strong>~45x</strong> for
+  durable memory against ~1.06-1.16x for every memoryless arm: rerolling spreads its plugin-side
+  bytes thinly across attempts and forgets, remembering allocates in bursts and keeps. Bulk
+  allocation is the class that produces pauses rather than merely collection counts, so this is
+  a real cost and it is
+  what the rebuild cadence trades against. What it buys is the chunk work the same run shows
+  avoided, and this tier does not price chunk work. No allocation figure from this tier is
+  publishable without its class label and that pairing.</li>
+<li><strong>"Rerolling allocates a little per attempt" is true only of the bytes this tier can measure,
+  and shall not be written without that qualifier.</strong> A retry's dominant allocation is the chunk
+  it materialises - chunk objects, palettes, sections, heightmaps, NBT decode buffers - which is
+  platform-owned, is not fabricated here, and is far larger than any bookkeeping measured. The
+  memoryless arms materialise ~1.79 chunks per served teleport against ~1.36 for durable memory,
+  so the omitted term is both the largest and the one that most favours remembering. No row from
+  this tier is a total cost of a design.</li>
+<li><strong>The durable arm's extra allocation is extra work, not a confound - and it is auditable.</strong> The
+  question "is this arm allocating more because it does more?" is answered by rows, not by
+  argument: it admits 1.005 real <code>RTPLocation</code>/<code>RTPCoords</code> objects per teleport where the
+  strategy classes hold one flat array, and it records 0.357 learning marks per teleport where a
+  memoryless design records none. A depth-parity arm settles the other candidate explanation -
+  hot-tier capacity 20 allocates 483.9 B per teleport against 485.4 B at capacity 1024, a 0.3 %
+  difference, so cache depth is free at steady state and is not the cause. Any arm whose figure
+  differs from a comparator shall report the operation counts that explain the difference.</li>
+<li><strong>The pre-scanned configuration is the one this design is built for, and it inverts the
+  table.</strong> With spatial memory pre-populated by an off-tick crawl (<code>/rtp scan</code>), the durable arm
+  becomes the cheapest arm in <em>every</em> load class: burst falls 364.7 -&gt; 1.2 B per teleport,
+  burstiness 45.5x -&gt; 1.17x, steady transient 124.8 -&gt; 107.0 B, and chunk materialisations
+  1.362 -&gt; 1.005 - the floor, one chunk per teleport. Zero span-array rebuilds are performed and
+  all 200 004 cadence deadlines are declined, because a converged memory is never dirty. The
+  crawl itself is charged as class 1: 15.5 MB one-time for full coverage of a 262 144-cell
+  region, amortising to 77.4 B per teleport over the run and to nothing over a server's life.
+  Partial scans interpolate monotonically (25 % of radius = 6.25 % of area -&gt; 1.339 chunks per
+  teleport; 50 % -&gt; 1.272). Publication rule: a pre-scanned figure shall never appear without
+  its coverage row and its class-1 crawl cost, and shall never be compared against a
+  cold-start row of another design.</li>
+<li><strong>Operation counting cannot produce a latency spread, and a queue can.</strong> The count model's
+  between-arm range was ~1.9x where the rig measures ~417x on mean latency. The missing factor is
+  contention, not a cost constant: a multi-second stall is a queue length. The latency tier is
+  therefore a discrete-event model with closed-loop clients, a paced dispatch gate, a serial tick
+  thread (per-region threads on Folia), a contended async pool, and a tick duty cycle - so
+  throughput and the tail are outputs rather than inputs. Rule: <strong>a latency or throughput figure
+  shall not be produced by summing per-request operation costs.</strong></li>
+<li><strong>Calibrate on one arm, validate on the rest, and report signed residuals.</strong> Foreground
+  chunk-load cost is <em>derived</em> from the calibration run by arithmetic
+  (<code>mainCpu / (chunks * (1 - asyncShare))</code> = 75.8 ms); an independent search that included it
+  selected 73.8 ms, a 3 % agreement between a fit and a derivation sharing no inputs. Only three
+  scheduling parameters are fitted, against this plugin on Paper alone, then applied unchanged to
+  every other arm. Rule: <strong>no parameter shall be fitted to a competitor row</strong>, and residuals
+  shall be reported signed, because the count model passed a 2x absolute gate while being wrong
+  in the flattering direction on every arm.</li>
+<li><strong>Current verdict: latency and throughput figures from this tier are NOT publishable.</strong> The
+  calibration arm reproduces its measured p50 within 16 % and the uniform live-verify arm its
+  p95/p99/max within 3-12 %, but only 64 % of validation comparisons are within 2x (threshold
+  0.80) and the mean signed residual is +1.55 (threshold +-0.50). Positive bias means the model
+  over-states competitor cost, which flatters this plugin - the exact direction a published
+  figure must not be wrong in. The remaining residual is a competitor arm whose modelled
+  cache-hit fraction sits on the 0.5 boundary where p50 is maximally sensitive; closing it needs
+  a measurement (per-plugin cache-hit rate) rather than a knob.</li>
+<li><strong>Four modelling errors found, each of which had turned a harness artefact into a reported
+  property of a design.</strong> Recorded because all four read as plausible results: (1) background
+  refill and player requests sharing one FIFO made every cached serve wait behind the refill
+  backlog (p50 103 ms modelled against 1 ms measured); (2) a pulse cursor advanced per request
+  drifted ahead of the clock and starved refill entirely; (3) a strictly sequential refiller
+  waited out each async chunk load in turn, capping production at ~8/s against 18/s demand and
+  pinning cache-hit rate near 0.5; (4) a 40-item once-a-second refill burst produced a 19x p50
+  over-prediction at the same average rate. Rule: <strong>pulse width, queue discipline and pipelining
+  are behaviour, not implementation detail</strong> - an arm's scheduling must be reproduced, not just
+  its rates.</li>
+</ul>
+</li>
+<li><strong>Negative / Trade-offs:</strong></li>
+<li>A second results surface exists, so superseded figures can be quoted by mistake; mitigated by the
+    supersession rule and by keeping model rows out of measurement tables.</li>
+<li>Modelled rows depend on assumptions and will attract scrutiny; that is the intended cost of publishing
+    them at all.</li>
+<li>Absolute values are machine-relative and not comparable across rigs.</li>
+<li>Figures age out. Competitor releases and our own optimisation work both invalidate published
+    comparisons, so the currency rule guarantees a recurring re-measurement cost or a withheld claim.
+    The front-page memory answer is currently the withheld case: it publishes only the per-entry costs
+    measured against current code and explicitly declines a cross-plugin heap comparison.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>docs/adr/ADR-001-archimedean-spiral-1d-mapping.md</code> (1D spiral mapping).</li>
+<li><code>docs/adr/ADR-016-anvil-subsystem.md</code>, <code>docs/adr/ADR-077-multi-format-region-support.md</code> (off-tick prefilter).</li>
+<li><code>docs/adr/ADR-028-l3-backlog-cache.md</code> (L3 backlog screening, the path priced by the allocation tier).</li>
+<li><code>docs/adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations.md</code>,
+  <code>docs/adr/ADR-079-cause-based-ttl-and-staged-expiration.md</code> (cause-typed retention: static terrain is
+  permanent, dynamic claim state expires — the axis the behavioural tier models).</li>
+<li><code>helpers/StressTestRTP/RESULTS.md</code>, <code>helpers/StressTestRTP/PRE_WRITEUP.md</code> (measured ground truth).</li>
+<li><code>rtp-core/src/test/java/io/github/dailystruggle/rtp/common/benchmark/</code> (this tier).</li>
+</ul>
+<h2 id="addendum-per-attempt-teleport-mode-classification-in-the-measurement-harness">Addendum: per-attempt teleport-mode classification in the measurement harness<a class="headerlink" href="#addendum-per-attempt-teleport-mode-classification-in-the-measurement-harness" title="Permanent link">&para;</a></h2>
+<p>Latency populations produced by RTP-style plugins are bimodal: a request is either served from a
+pre-computed location or it selects and verifies a destination on demand. A p50 taken across a
+near-50/50 mixture sits on the mode boundary and is maximally unstable, and a mean over such a
+population describes neither mode.</p>
+<p><code>StressTestRTP</code> therefore classifies each attempt and reports the two modes separately.</p>
+<ul>
+<li>The classification uses <strong>observable signals only</strong>: the attempt latency and the attributed
+  selection chunk loads, both already columns in the per-attempt CSV. A competitor's internal
+  cache state is not observable from outside the plugin and shall not be reconstructed, guessed,
+  or published as if it were read.</li>
+<li>The fast/cold boundary is <strong>derived from the phase's own attempt population</strong> (Otsu two-class
+  split over log10 latency) and written into the phases CSV as <code>mode_threshold_ms</code> alongside
+  <code>mode_threshold_method</code>, so any reader can re-derive every row. No millisecond constant is
+  hardcoded and no threshold is chosen after looking at a result.</li>
+<li>This plugin's own serving mode is knowable directly; a competitor's is not. The direct reading
+  has its own columns (<code>served_mode_direct</code>, <code>direct_fast_mode_fraction</code>) and shall never feed the
+  inferred classifier's threshold or its per-mode percentiles. The two readings are reported side
+  by side and labelled, never merged.</li>
+<li>Every new numeric column uses <code>-1</code> for "not measured" and every new string column uses empty.
+  A competitor arm's blanks shall never be readable as zeros. The sentinels are documented in the
+  run's <code>&lt;stamp&gt;-schema.txt</code> sidecar.</li>
+<li>Phase rows publish <code>fast_mode_fraction</code> and p50/p95/p99 <strong>within each mode</strong>. A bare mean over
+  the combined population shall not be published.</li>
+</ul>
+<h2 id="addendum-folia-region-context-accounting-and-region-freeze-detection-in-the-measurement-harness">Addendum: Folia region-context accounting and region-freeze detection in the measurement harness<a class="headerlink" href="#addendum-folia-region-context-accounting-and-region-freeze-detection-in-the-measurement-harness" title="Permanent link">&para;</a></h2>
+<p>The strongest validation target in the measured dataset is not a percentile but a discrete integer:
+7 region freezes against 0, reproducing at exactly 7 across two independent 600 s runs, worst
+freeze 21.0 s. An integer that reproduces is a harder target than any tail statistic, and 21 s sits
+two orders of magnitude past every entry in the latency table - so it is a distinct mechanism
+(scheduler churn, region prepare / tick / GC), not the same distribution's tail, and it shall not
+be reported as one.</p>
+<p><code>StressTestRTP</code> therefore accounts for Folia region context per attempt and detects region freezes
+per phase.</p>
+<ul>
+<li><strong>The detection criterion is fixed before any run is read, and travels with the data.</strong> A region
+  freeze is a wall-clock stall of at least a compile-time threshold (5000 ms) on a Folia region
+  thread. The threshold is 100x the nominal tick and two orders above the measured latency table,
+  so a freeze can be neither tick jitter nor a latency tail. It is written into every phase row as
+  <code>region_freeze_threshold_ms</code> so no reader has to assume it. A detector that fails to reproduce an
+  archived freeze count shall be reported as a broken detector; the threshold <strong>shall not</strong> be
+  adjusted until the result agrees.</li>
+<li><strong>Exactly two channels, each reported separately.</strong> Tick stall - the wall gap between consecutive
+  invocations of a 1-tick global-region-scheduler timer. Hop stall - the wall wait for a
+  player-owning region's entity scheduler to execute a dispatch. <code>region_freezes</code> is their union;
+  <code>region_freezes_tick_stall</code> and <code>region_freezes_hop_stall</code> keep the mechanism visible, because a
+  single fused count cannot distinguish "the region stopped ticking" from "the region stopped
+  draining its task queue".</li>
+<li><strong>Runtime detection only.</strong> The columns are gated on the existing <code>Sched.isFolia()</code> /
+  <code>Runner.isFoliaFamily()</code> probes. There is no build variant and no config toggle for something the
+  JVM can be asked directly.</li>
+<li><strong>The schema is platform-independent.</strong> Off Folia the columns are still emitted, carrying <code>-1</code>
+  for NOT MEASURED. A Folia phase that genuinely never froze writes <code>0</code>, which is a measurement.
+  A non-Folia arm's <code>-1</code> shall never be readable as "zero freezes".</li>
+<li><strong>The apparatus stays off the measured path.</strong> Primitive and <code>AtomicLong</code> state only, no
+  allocation per attempt or per tick, no snapshot copy, no blocking on a tick thread. This tier has
+  twice had its own instrumentation become the headline - a snapshot copy that inflated allocation
+  24x, and a shared FIFO that reported its own queue discipline as the design's latency - so a new
+  counter's cost is a design constraint, not an afterthought.</li>
+<li><strong>No freeze figure is publishable until the detector is validated.</strong> Until it reproduces the
+  archived 0-versus-7 split with its worst freeze, these columns carry data and no claim.</li>
+</ul>
+<h2 id="addendum-gc-and-residency-accounting-in-the-measurement-harness">Addendum: GC and residency accounting in the measurement harness<a class="headerlink" href="#addendum-gc-and-residency-accounting-in-the-measurement-harness" title="Permanent link">&para;</a></h2>
+<p>Heap-used sampled every 50 ms cannot distinguish memory that is <strong>retained</strong> from memory that is
+<strong>churned</strong>: two designs with identical heap curves can differ entirely in whether the bytes are
+live at the end of a teleport. That gap is why the cross-plugin heap claim is withheld from the
+front page under the currency rule, and restoring any such claim is gated on the accounting below
+being present for every phase compared.</p>
+<ul>
+<li>GC is recorded as <strong>per-phase deltas of <code>GarbageCollectorMXBean</code> collection count and collection
+  time</strong>, split young/old by collector name, with beans whose generation cannot be identified
+  charged only to the totals and counted in their own column. Tick-thread allocation rate comes
+  from <code>getThreadAllocatedBytes</code> on the recorded tick thread, as a phase delta.</li>
+<li>Residency is recorded as <strong>peak resident chunks</strong> and <strong>peak plugin chunk tickets held</strong> per
+  phase. This is the honest observable proxy for the platform-owned retained term the simulation
+  tier cannot weigh, and it is the row on which the designs actually differ: the axis is residency
+  policy - coordinate tuples plus tracked-and-released tickets against resident chunk
+  neighbourhoods - not the presence or absence of a cache. Peaks, not averages, because a peak is
+  what exposes retention.</li>
+<li>Peak tickets depend on Paper's <code>World#getPluginChunkTickets()</code>. Where the platform does not
+  expose it the column is <code>-1</code> (not measured) and never <code>0</code>, per the no-data sentinel rule.</li>
+<li>Heap-pressure control loops are <strong>recorded, not modelled</strong>. Where a plugin observably changes
+  behaviour under heap pressure (one competitor reduces max attempts and switches to a cache-only
+  mode under a heap limit), the harness captures the matching log line and the heap-used level at
+  which it fired. The trigger is evidence; no behavioural response is inferred, simulated, or
+  attributed from a match.</li>
+<li>Instrumentation shall stay off the measured path: primitive counters, no per-attempt allocation,
+  no blocking call on a tick thread. This tier has twice had its own apparatus become the
+  headline - a snapshot copy that inflated allocation 24x, and a shared FIFO that reported its own
+  queue discipline as a design's latency - so a new counter that allocates or blocks is a
+  measurement error, not a cost.</li>
+<li>Folia-specific interpretation is gated at <strong>runtime</strong> on Folia detection; there is no build
+  variant and no config toggle for a detectable property. Folia has no single tick thread, so the
+  allocation column carries a scope label identifying it as one region thread's share.</li>
+<li>The output of this accounting is <strong>columns</strong>. No comparative heap or GC conclusion is written
+  from it here; an uninstrumented reading already produced one inverted published claim, and
+  interpretation is a later, separate decision under the currency rule.</li>
+</ul>
+<h2 id="addendum-per-attempt-foregroundasync-chunk-split-and-tick-occupancy-as-intervals">Addendum: per-attempt foreground/async chunk split and tick occupancy as intervals<a class="headerlink" href="#addendum-per-attempt-foregroundasync-chunk-split-and-tick-occupancy-as-intervals" title="Permanent link">&para;</a></h2>
+<p>The foreground share of chunk work is the single strongest health discriminator in the dataset -
+across four plugins the async share spread 85 / 47 / 8 / 1 %, and foreground chunk work either
+wrecks the tick tail or caps throughput. It was nonetheless only ever recorded <strong>per phase</strong>, as an
+average. An average cannot answer the question the queueing model actually asks, because the tail
+is produced by <em>when</em> foreground work lands relative to the tick, not by how much of it there is on
+aggregate.</p>
+<ul>
+<li>The split is recorded <strong>per attempt</strong>: chunk loads attributed to a teleport are divided into
+  on-tick and off-tick counts. The decision is made once per <code>ChunkLoadEvent</code> from thread identity
+  and reused for both the per-attempt split and the per-phase counters, so the two can never
+  disagree with each other.</li>
+<li>Thread identity is <strong>runtime-detected</strong>. On a single-tick-thread platform the primary-thread
+  check is exact. On Folia the question is region-scoped and is asked as "is this the region thread
+  that owns the chunk that just loaded", because Folia has no single tick thread and a
+  primary-thread check is not meaningful there. There is no build variant and no config toggle for
+  a detectable property, and each row records which oracle classified it so the columns are never
+  silently compared across platforms.</li>
+<li>Tick-thread occupancy is recorded as <strong>intervals</strong>, summarised to count, total and max - never a
+  total alone. One 8 ms stall and sixteen 0.5 ms stalls have the same total and completely
+  different tick tails, so a total cannot validate queue discipline and an interval list can.
+  Only spans the harness can genuinely observe are recorded: the synchronous span inside the
+  dispatched command, and runs of on-tick loads for one attempt coalesced at a gap fixed well below
+  a tick so work on two different ticks can never merge into one interval.</li>
+<li>The pre-existing per-phase aggregate columns are <strong>left exactly as they are</strong> and the new columns
+  are appended alongside. This is not tidiness: the derived foreground chunk-load cost is the
+  model's only unfitted dominant term, and moving or redefining a column it reads would break the
+  one term that was independently corroborated rather than fitted. Prior runs also stay comparable.</li>
+<li>The measured async share is reported <strong>alongside</strong> the derived one, never in place of it. A
+  measurement and a derivation of the same quantity are kept in separate columns so neither can be
+  quietly substituted for the other, and agreement between them becomes checkable evidence instead
+  of an assumption.</li>
+<li>Every new count and duration uses <code>-1</code> for "not measured". <code>-1</code> interval count means no interval
+  was ever observed and is explicitly <strong>not</strong> the claim that an arm consumed no tick time; a
+  competitor arm's blanks must never be readable as zeros.</li>
+<li>The apparatus stays off the measured path: the per-attempt split reuses the existing per-attempt
+  tally through a static field updater, adding <strong>zero</strong> allocation per attempt, and the interval
+  accumulator is plain primitive fields under an uncontended per-attempt monitor. On a tick thread
+  the added work is two monotonic clock reads. This tier has twice had its own apparatus become the
+  headline, so a counter that allocates or blocks is a measurement error rather than a cost.</li>
+<li>The output is <strong>columns</strong>. No foreground or async-share conclusion for any arm is written from
+  them here; interpretation is a later, separate decision under the currency rule.</li>
+</ul>
+<h2 id="addendum-storage-class-characterisation-and-region-file-read-accounting">Addendum: storage-class characterisation and region-file read accounting<a class="headerlink" href="#addendum-storage-class-characterisation-and-region-file-read-accounting" title="Permanent link">&para;</a></h2>
+<p>The leverage argument for answering safety from region bytes before materialising a chunk is a
+ratio between a cold region-file read and a warm in-memory hit. A ratio of that size is dominated
+by the medium it was measured on, so quoting it without the medium is quoting a property of one
+machine as a property of a design.</p>
+<ul>
+<li><strong>A read-cost figure shall carry its device class.</strong> Every run records the world directory's
+  storage class (<code>NVME | SATA_SSD | SPINNING | NETWORK | UNKNOWN</code>), the method that produced the
+  verdict, and a measured read-latency distribution (p50/p90/p99/max) taken from the actual
+  device, as a per-phase header block and as phase columns. A downstream model then selects a cost
+  distribution from a recorded histogram instead of assuming one. <code>UNKNOWN</code> is written literally
+  and never means "fast".</li>
+<li><strong>The classification thresholds are fixed before any result is read.</strong> They are compile-time
+  constants applied to the p50 of a random 4 KiB read, chosen as device-physics boundaries rather
+  than tuned to output. A network mount is decided by filesystem type and is never overridden by
+  latency, because latency on a network store describes the link rather than the medium.</li>
+<li><strong>A probe that warms the pages it then measures shall say so.</strong> No page-cache drop is portable
+  from a JVM, so the profiler does not pretend to one. It instead times only first touches of
+  distinct region files, never re-reads a file it has already probed, and selects probe files
+  farthest from the origin the benchmark radius is centred on - so no sample can measure pages the
+  profiler itself warmed. Prior warmth from the server or an earlier run remains uncontrolled and
+  indistinguishable, so the distribution is published under the label
+  <code>FIRST_TOUCH_UNKNOWN_PAGE_CACHE</code> and treated as a <strong>lower bound</strong>. A silent conflation would not
+  be acceptable; a labelled one is.</li>
+<li><strong>An assumed batch size is an assumed order of magnitude, and shall be measured instead.</strong>
+  Batching is worth up to the full read-term leverage, so a model that assumes 64 candidates per
+  binned batch has assumed the answer - and in this case understates the design it is defending,
+  which is the wrong direction for a published figure. Region-file reads are therefore counted per
+  distinct 32x32 bin, and both the candidate count and the read count are written per attempt and
+  per phase so reads-per-teleport is regressed against measured occupancy rather than asserted.
+  The mean occupancy never ships without its peak.</li>
+<li><strong>The read count is chunk-load-implied, and its blind spot favours the competition.</strong> It is not
+  an intercepted syscall count: it cannot see region bytes read without a chunk materialising,
+  which is precisely what this project's own prefilter does. It therefore under-states this
+  plugin's avoided reads and can only err against our own case.</li>
+<li><strong>The apparatus stays off the measured path.</strong> All probe I/O is asynchronous and never waited
+  on; bin and region accounting runs once per attempt at completion over coordinates already
+  collected, adding no per-event work and no snapshot copy. This tier has twice had its own
+  instrumentation become the headline, and the rule earned there applies here unchanged.</li>
+</ul>
+<h2 id="addendum-reconciled-instrumentation-rules-and-completeness-as-a-gate">Addendum: reconciled instrumentation rules, and completeness as a gate<a class="headerlink" href="#addendum-reconciled-instrumentation-rules-and-completeness-as-a-gate" title="Permanent link">&para;</a></h2>
+<p>Five instrumentation efforts landed against this tier independently - per-attempt teleport-mode
+classification, storage-class and region-read accounting, Folia region-context and freeze
+detection, GC and residency accounting, and the per-attempt foreground/async split. Each wrote its
+own rules; the rules agree, and the agreement is worth stating once rather than five times.</p>
+<ul>
+<li><strong>No-data sentinel, uniformly.</strong> Every instrumented quantity has an explicit "not available"
+  value: <code>-1</code> for counts and durations, empty for strings in the harness CSV, and <code>NaN</code> for the
+  real-valued anchors the model reads. <code>NaN</code> is chosen on the model side deliberately, because it
+  propagates through arithmetic instead of producing a plausible product. Sentinels are documented
+  in the run's schema sidecar rather than in a <code>#</code> comment line, which a dictionary reader would
+  not tolerate. A blank or a zero shall never be readable as a measurement, and a <code>-1</code> shall never
+  be readable as "this arm did none of that".</li>
+<li><strong>Provenance is computed, not asserted.</strong> A quantity's <code>MEASURED</code> / <code>MODELED</code> label is derived
+  from whether its slot holds a sentinel, at report time. A hand-written label is how a placeholder
+  eventually gets published as evidence; deriving it makes that failure unrepresentable.</li>
+<li><strong>Completeness precedes accuracy, and its failure is not the lesser failure.</strong> An accuracy gate
+  evaluated while inputs are absent is a model agreeing with its own fallback constants, so the
+  tier carries a third gate: every quantity the harness was instrumented to measure must actually
+  be present. When it is not, the tier verdict is <code>FAIL (INPUTS ABSENT)</code>, and it withholds
+  publication exactly as a numeric failure does. The expected-input list lives in one place, so
+  instrumenting a new quantity and forgetting to declare it cannot make the gate pass by omission.</li>
+<li><strong>Thresholds are written down before results are read, and are not moved afterwards.</strong> The
+  accuracy threshold (within-2x fraction <code>&gt;= 0.80</code>) and the bias threshold (mean <strong>signed</strong>
+  residual within <code>+-0.50</code>) are carried forward unchanged. The signed test is retained precisely
+  because the observed bias is in the flattering direction: a model that is consistently
+  conservative about a competitor's cost is biased, not safe, and an absolute-error gate cannot
+  distinguish the two.</li>
+<li><strong>Off-path instrumentation is a correctness requirement, not a preference.</strong> Counters are
+  primitive fields, <code>AtomicLong</code> at worst, allocate nothing per attempt, take no snapshot copy and
+  never block a tick thread. This tier has twice had its own apparatus become the headline - a 24x
+  allocation inflation from a snapshot copy, and a shared FIFO reporting its own queue discipline
+  as the design's latency - so an allocating or blocking counter is a measurement error.</li>
+<li><strong>Folia is detected at runtime, never configured.</strong> Folia-only columns are gated on the existing
+  runtime detection. No build variant and no config toggle is introduced for something the process
+  can observe about itself. Off Folia the columns are still emitted carrying their sentinel, so the
+  schema is platform-independent and a reader cannot mistake a platform for a result.</li>
+<li><strong>Fitting surface is unchanged.</strong> A harness-supplied competitor quantity may be used as a
+  disclosed input or compared as a signed residual. It may never become a fitting target:
+  parameters are fitted against this plugin on Paper and against nothing else.</li>
+</ul>
+<p><strong>Consequence at the time of writing.</strong> All five efforts are integrated and none has been run, so
+every new slot holds its sentinel, input completeness stands at 0 of 7, and the tier verdict is
+<code>FAIL (INPUTS ABSENT)</code> on top of the pre-existing accuracy (0.643 against 0.80) and bias (+1.554
+against +-0.50) failures. Nothing was relabelled <code>MEASURED</code> and no threshold was relaxed, so no
+latency or throughput figure from this tier publishes. The instrumentation becomes live on the
+first archived run with no further model change.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.2.2
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

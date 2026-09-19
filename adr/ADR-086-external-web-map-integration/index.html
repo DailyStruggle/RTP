@@ -12,9 +12,13 @@
         <meta name="author" content="DailyStruggle">
       
       
-        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/NEOFORGE_NOTES/">
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-086-external-web-map-integration/">
       
       
+        <link rel="prev" href="../ADR-085-spiral-addressed-hilbert-key-space/">
+      
+      
+        <link rel="next" href="../ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -22,7 +26,7 @@
     
     
       
-        <title>NeoForge — Loose Planning Notes - LeafRTP</title>
+        <title>ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory - LeafRTP</title>
       
     
     
@@ -74,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#neoforge-loose-planning-notes" class="md-skip">
+        <a href="#adr-086-external-web-map-integration-via-anvil-api-maps-api-and-spatial-memory" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              NeoForge — Loose Planning Notes
+              ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
             
           </span>
         </div>
@@ -322,11 +326,13 @@
         
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../adr/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   Architecture decisions
@@ -1124,6 +1130,27 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Spatial memory TTL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1397,25 +1424,30 @@
       
   
   
+    
   
   
+  
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -1426,7 +1458,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             Architecture decisions
@@ -1440,7 +1472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1461,7 +1493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-000-development-workflow/" class="md-nav__link">
+      <a href="../ADR-000-development-workflow/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1482,7 +1514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+      <a href="../ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1503,7 +1535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+      <a href="../ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1524,7 +1556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+      <a href="../ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1545,7 +1577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+      <a href="../ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1566,7 +1598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-005-paperlib-removal/" class="md-nav__link">
+      <a href="../ADR-005-paperlib-removal/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1587,7 +1619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-006-async-queue-pre-generation/" class="md-nav__link">
+      <a href="../ADR-006-async-queue-pre-generation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1608,7 +1640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-007-per-user-isolated-queues/" class="md-nav__link">
+      <a href="../ADR-007-per-user-isolated-queues/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1629,7 +1661,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+      <a href="../ADR-008-memory-tracker-active-gc/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1650,7 +1682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+      <a href="../ADR-009-configurable-spatial-distributions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1671,7 +1703,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+      <a href="../ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1692,7 +1724,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-011-rtp-api-separate-module/" class="md-nav__link">
+      <a href="../ADR-011-rtp-api-separate-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1713,7 +1745,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+      <a href="../ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1734,7 +1766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+      <a href="../ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1755,7 +1787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+      <a href="../ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1776,7 +1808,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-016-anvil-subsystem/" class="md-nav__link">
+      <a href="../ADR-016-anvil-subsystem/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1797,7 +1829,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+      <a href="../ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1818,7 +1850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+      <a href="../ADR-018-agents-md-public-release-structure/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1839,7 +1871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+      <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1860,7 +1892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+      <a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1881,7 +1913,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+      <a href="../ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1902,7 +1934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+      <a href="../ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1923,7 +1955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-023-login-reserve-cache/" class="md-nav__link">
+      <a href="../ADR-023-login-reserve-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1944,7 +1976,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+      <a href="../ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1965,7 +1997,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+      <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1986,7 +2018,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-026-external-hook-api-surface/" class="md-nav__link">
+      <a href="../ADR-026-external-hook-api-surface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2007,7 +2039,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-028-l3-backlog-cache/" class="md-nav__link">
+      <a href="../ADR-028-l3-backlog-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2028,7 +2060,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+      <a href="../ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2049,7 +2081,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+      <a href="../ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2070,7 +2102,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-034-memory-shape-catalog/" class="md-nav__link">
+      <a href="../ADR-034-memory-shape-catalog/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2091,7 +2123,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-035-interactive-menus-book-first/" class="md-nav__link">
+      <a href="../ADR-035-interactive-menus-book-first/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2112,7 +2144,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+      <a href="../ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2133,7 +2165,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+      <a href="../ADR-037-harden-rtp-config-commands/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2154,7 +2186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+      <a href="../ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2175,7 +2207,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+      <a href="../ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2196,7 +2228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+      <a href="../ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2217,7 +2249,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+      <a href="../ADR-041-config-command-and-save-implementation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2238,7 +2270,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+      <a href="../ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2259,7 +2291,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+      <a href="../ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2280,7 +2312,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+      <a href="../ADR-044-command-tree-menu-reflector/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2301,7 +2333,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+      <a href="../ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2322,7 +2354,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-046-maps-api-module/" class="md-nav__link">
+      <a href="../ADR-046-maps-api-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2343,7 +2375,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+      <a href="../ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2364,7 +2396,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+      <a href="../ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2385,7 +2417,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+      <a href="../ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2406,7 +2438,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+      <a href="../ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2427,7 +2459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+      <a href="../ADR-051-two-tier-api-extension-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2448,7 +2480,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+      <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2469,7 +2501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+      <a href="../ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2490,7 +2522,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+      <a href="../ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2511,7 +2543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-055-pvp-combat-gate/" class="md-nav__link">
+      <a href="../ADR-055-pvp-combat-gate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2532,7 +2564,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-056-bare-rtp-root-action/" class="md-nav__link">
+      <a href="../ADR-056-bare-rtp-root-action/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2553,7 +2585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+      <a href="../ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2574,7 +2606,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+      <a href="../ADR-058-region-specific-schematic-paste/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2595,7 +2627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+      <a href="../ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2616,7 +2648,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+      <a href="../ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2637,7 +2669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-061-open-core-dual-licensing/" class="md-nav__link">
+      <a href="../ADR-061-open-core-dual-licensing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2658,7 +2690,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-062-biome-probability-weighting/" class="md-nav__link">
+      <a href="../ADR-062-biome-probability-weighting/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2679,7 +2711,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+      <a href="../ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2700,7 +2732,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+      <a href="../ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2721,7 +2753,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+      <a href="../ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2742,7 +2774,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-066-foreign-config-importer/" class="md-nav__link">
+      <a href="../ADR-066-foreign-config-importer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2763,7 +2795,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+      <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2784,7 +2816,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+      <a href="../ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2805,7 +2837,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+      <a href="../ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2826,7 +2858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+      <a href="../ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2847,7 +2879,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+      <a href="../ADR-071-config-organization-and-discoverability/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2868,7 +2900,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+      <a href="../ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2889,7 +2921,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-073-config-default-inheritance-references/" class="md-nav__link">
+      <a href="../ADR-073-config-default-inheritance-references/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2910,7 +2942,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+      <a href="../ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2931,7 +2963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+      <a href="../ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2952,7 +2984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-076-config-folder-consolidation/" class="md-nav__link">
+      <a href="../ADR-076-config-folder-consolidation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2973,7 +3005,551 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
+      <a href="../ADR-077-multi-format-region-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-077 - Multi-Format Region Support: Linear
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-081 — Unified Blocked Biome Run Table in `MemoryShape`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-084 - Layered Learned-State Index: Coarse Spiral Directory over Per-Cell Hilbert RLE Blobs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-context-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Context and Problem Statement
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Context and Problem Statement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem-with-existing-cartography-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      The Problem with Existing Cartography Integration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2a-on-demand-raster-tile-provider-pl3xmap-dynmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      2a. On-Demand Raster Tile Provider (Pl3xMap / Dynmap)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2b-vector-volume-and-marker-sets-bluemap-dynmap-pl3xmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      2b. Vector Volume and Marker Sets (BlueMap / Dynmap / Pl3xMap)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2c-reverse-integration-cartography-pre-filter-bluemapmapsettilefilter" class="md-nav__link">
+    <span class="md-ellipsis">
+      2c. Reverse Integration: Cartography Pre-Filter (BlueMapMap.setTileFilter)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-structural-boundaries-packaging" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Structural Boundaries &amp; Packaging
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Consequences
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positive
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative / Trade-offs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-hardware-prerequisite-failure-domain-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Hardware Prerequisite &amp; Failure Domain Contract
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-089 — Universal MapCanvas Bridge, Biome-Hazard Composite Overlays, and Visual Pipeline Gauges
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-091 — Automated Headless Client for Devstack via Mineflayer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-094-quality-engineering-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3021,99 +3597,126 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-why-neoforge-and-why-now-eventually" class="md-nav__link">
+  <a href="#1-context-and-problem-statement" class="md-nav__link">
     <span class="md-ellipsis">
-      1. Why NeoForge, and why now (eventually)
+      1. Context and Problem Statement
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Context and Problem Statement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem-with-existing-cartography-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      The Problem with Existing Cartography Integration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2a-on-demand-raster-tile-provider-pl3xmap-dynmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      2a. On-Demand Raster Tile Provider (Pl3xMap / Dynmap)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2b-vector-volume-and-marker-sets-bluemap-dynmap-pl3xmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      2b. Vector Volume and Marker Sets (BlueMap / Dynmap / Pl3xMap)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2c-reverse-integration-cartography-pre-filter-bluemapmapsettilefilter" class="md-nav__link">
+    <span class="md-ellipsis">
+      2c. Reverse Integration: Cartography Pre-Filter (BlueMapMap.setTileFilter)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-structural-boundaries-packaging" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Structural Boundaries &amp; Packaging
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-api-surface-differences-from-fabric-the-part-that-matters-for-adapter-design" class="md-nav__link">
+  <a href="#4-consequences" class="md-nav__link">
     <span class="md-ellipsis">
-      2. API surface differences from Fabric (the part that matters for adapter design)
+      4. Consequences
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positive
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative / Trade-offs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-hardware-prerequisite-failure-domain-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Hardware Prerequisite &amp; Failure Domain Contract
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-what-we-can-reuse-from-rtp-fabric-high" class="md-nav__link">
+  <a href="#6-references" class="md-nav__link">
     <span class="md-ellipsis">
-      3. What we can reuse from rtp-fabric (high)
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-what-we-cannot-reuse-must-rewrite-per-platform" class="md-nav__link">
-    <span class="md-ellipsis">
-      4. What we cannot reuse (must rewrite per platform)
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-module-layout-sketch-illustrative-not-approved" class="md-nav__link">
-    <span class="md-ellipsis">
-      5. Module layout sketch (illustrative, not approved)
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-threading-s-00x-mapping" class="md-nav__link">
-    <span class="md-ellipsis">
-      6. Threading &amp; S-00x mapping
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#7-ftb-chunks-claim-mods-soft-depend-not-adapter-scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      7. FTB Chunks / claim mods — soft-depend, not adapter scope
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#8-build-toolchain-open-questions" class="md-nav__link">
-    <span class="md-ellipsis">
-      8. Build / toolchain open questions
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#9-risks-gotchas-to-expect" class="md-nav__link">
-    <span class="md-ellipsis">
-      9. Risks / gotchas to expect
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#10-minimum-viable-scoping-when-work-actually-starts" class="md-nav__link">
-    <span class="md-ellipsis">
-      10. Minimum-viable scoping (when work actually starts)
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#11-out-of-scope-for-these-notes-deliberate" class="md-nav__link">
-    <span class="md-ellipsis">
-      11. Out of scope for these notes (deliberate)
+      6. References
     </span>
   </a>
   
@@ -3137,135 +3740,105 @@
   
 
 
-<h1 id="neoforge-loose-planning-notes">NeoForge — Loose Planning Notes<a class="headerlink" href="#neoforge-loose-planning-notes" title="Permanent link">&para;</a></h1>
-<blockquote>
-<p><strong>Status:</strong> Pre-proposal scratch. <strong>Not</strong> a plan, <strong>not</strong> an ADR, <strong>not</strong> a commitment. These notes exist so we don't have to re-derive the landscape every time NeoForge comes up. Anything here that turns into actual work must go through a D-005 proposal first and (likely) a formal ADR + an entry in <code>MULTI_PLATFORM_PLAN.md</code>.</p>
-<p><strong>Current scope reminder (updated 2026-06-02):</strong> NeoForge is <strong>in scope</strong> per <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> (Accepted), the Fabric stabilization gate is <strong>clear</strong> (Fabric confirmed stable 2026-06-01), the D-005 proposal (<a href="scratch/PROPOSAL-neoforge-bringup.md"><code>scratch/PROPOSAL-neoforge-bringup.md</code></a>) is <strong>approved</strong>, and the named maintainer is assigned (project lead, <code>@leaf_26</code>). The <strong>Phase N1 module skeleton has landed</strong> under <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/README.md"><code>platforms/rtp-neoforge/</code></a>: ModDevGradle build wiring, <code>neoforge.mods.toml</code>, the <code>@Mod</code> entry point, a complete server-thread scheduler, and command/version-adapter scaffolds, merged into the unified LeafRTP-Pro jar so a single artifact loads on Bukkit/Fabric/Velocity and NeoForge. The NeoForge modules build BY DEFAULT; drop them with <code>-PexcludeNeoforge</code> (or EXCLUDE_NEOFORGE) on network-constrained hosts to keep the offline build green. <strong>Still open:</strong> the <code>RTPServerAccessor</code> implementation, command Brigadier-bridge wiring, the S-005 async chunk path, the <code>/rtp</code> round-trip exit gate, the S-005/S-006 REQ-traceable guards, and a network-host build verification.</p>
-</blockquote>
+<h1 id="adr-086-external-web-map-integration-via-anvil-api-maps-api-and-spatial-memory">ADR-086 - External Web Map Integration via <code>anvil-api</code>, <code>maps-api</code>, and Spatial Memory<a class="headerlink" href="#adr-086-external-web-map-integration-via-anvil-api-maps-api-and-spatial-memory" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Proposed</p>
+<p><strong>Date:</strong> 2026-09-06</p>
+<p><strong>Context:</strong>
+- <a href="../ADR-016-anvil-subsystem/">ADR-016</a> — Anvil Read-Only Subsystem (Prefilter, Backed Chunk View, Shared Module).
+- <a href="../ADR-046-maps-api-module/">ADR-046</a> — <code>maps-api</code> Module for Runtime Cartography Chart Generation.
+- <a href="../ADR-077-multi-format-region-support/">ADR-077</a> — Multi-Format Region Support: Linear (ZSTD) and Pluggable Region Readers.
+- <a href="../ADR-085-spiral-addressed-hilbert-key-space/">ADR-085</a> — Spiral-Addressed Hilbert Key Space for Learned State.
+- <a href="https://github.com/DailyStruggle/RTP/blob/V3/api/maps-api/docs/adr/maps-api-ADR-001-bootstrap.md"><code>maps-api-ADR-001</code></a> — Module Bootstrap, Package Layout, and Palette Policy.</p>
 <hr />
-<h2 id="1-why-neoforge-and-why-now-eventually">1. Why NeoForge, and why now (eventually)<a class="headerlink" href="#1-why-neoforge-and-why-now-eventually" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Audience.</strong> NeoForge is the active successor to legacy Forge and currently the dominant modded-Java platform on 1.20.4+. Large-modpack servers (technical/exploration packs) are exactly the user profile that benefits most from a bounded-distribution RTP.</li>
-<li><strong>Strategic ordering.</strong> Fabric first (in flight), NeoForge second. Reasons:</li>
-<li><code>rtp-fabric</code>'s obf/unobf carrier split and Mojmap-decoupling work (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md">rtp-fabric-ADR-007</a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md">rtp-fabric-ADR-009</a>) directly informs NeoForge's mappings problem.</li>
-<li>The anvil-prefilter parity work (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md">rtp-fabric-ADR-005</a>) and non-blocking chunk generation (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md">rtp-fabric-ADR-008</a>) are the same problems on NeoForge, with slightly different APIs.</li>
-<li><strong>Forge (legacy ≤1.20.1).</strong> Out of scope. Sunsetting. If we ever feel pressure here, address via a NeoForge backport, not a parallel module tree.</li>
-</ul>
-<h2 id="2-api-surface-differences-from-fabric-the-part-that-matters-for-adapter-design">2. API surface differences from Fabric (the part that matters for adapter design)<a class="headerlink" href="#2-api-surface-differences-from-fabric-the-part-that-matters-for-adapter-design" title="Permanent link">&para;</a></h2>
-<p>These are the things that make NeoForge a genuinely distinct adapter, not a Fabric reskin:</p>
-<ul>
-<li><strong>Event bus.</strong> NeoForge uses its own annotation-driven event bus (<code>@SubscribeEvent</code>, <code>IEventBus</code>, mod bus vs game bus split). Fabric uses callback registration (<code>ServerLifecycleEvents.SERVER_STARTED.register(...)</code>). Wiring point in <code>FabricVersionAdapter</code> is not directly portable.</li>
-<li><strong>Registries.</strong> NeoForge has its own <code>DeferredRegister&lt;T&gt;</code> / <code>Holder&lt;T&gt;</code> flow on top of the vanilla registry. We don't register much (no blocks/items), so this is mostly relevant for command registration and tag access.</li>
-<li><strong>Command registration.</strong> NeoForge fires <code>RegisterCommandsEvent</code> on the mod bus; Fabric uses <code>CommandRegistrationCallback</code>. Both terminate in vanilla <code>Brigadier</code>, so <code>commands-api</code> Brigadier bridge (<a href="https://github.com/DailyStruggle/RTP/blob/V3/commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md">commands-api-ADR-001</a>) is reusable; only the <em>registration trampoline</em> differs.</li>
-<li><strong>Mod metadata.</strong> <code>META-INF/neoforge.mods.toml</code> vs <code>fabric.mod.json</code>. Trivial.</li>
-<li><strong>Mappings.</strong> NeoForge is Mojmap-at-runtime (same as modern Fabric without Yarn). The Mojmap-decoupling discipline from <code>rtp-fabric-ADR-007</code> carries over: keep <code>rtp-core</code> / <code>rtp-api</code> free of NM-typed surfaces; isolate NM in a per-version carrier.</li>
-<li><strong>Threading.</strong> NeoForge servers are single-main-thread, same as vanilla / Fabric (no Folia-style regions). All S-005 reasoning carries over unchanged. <strong>No region-ownership checks needed.</strong> Bukkit's <code>Entity#teleport</code> semantics don't exist; we'd be calling <code>Entity.teleportTo</code> / the <code>TeleportTransition</code> API directly.</li>
-<li><strong>Chunk tickets.</strong> Same vanilla <code>DistanceManager</code> / <code>ChunkHolder</code> substrate as Fabric. The non-persistent ticket work (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md">rtp-fabric-ADR-003</a>) and ticket-radius work (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md">rtp-fabric-ADR-006</a>) should port near-verbatim; if anything, NeoForge sometimes provides slightly friendlier accessors.</li>
-</ul>
-<h2 id="3-what-we-can-reuse-from-rtp-fabric-high">3. What we can reuse from <code>rtp-fabric</code> (high)<a class="headerlink" href="#3-what-we-can-reuse-from-rtp-fabric-high" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>rtp-core</code>, <code>rtp-api</code>, <code>rtp-anvil</code>, <code>commands-api</code>, <code>effects-api</code> — all platform-neutral. Reused 1:1.</li>
-<li>The <strong>obf/unobf carrier split</strong> (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md">rtp-fabric-ADR-009</a>) pattern. NeoForge is Mojmap-at-runtime for 1.20.4+, so we may not need an obf carrier — but the <strong>structural separation</strong> (NM-typed surfaces in a per-version carrier; deobf top-level) still applies, because runtime class names will shift across MC versions and we don't want <code>rtp-core</code> linked to a specific MC rev.</li>
-<li>The <strong>multi-version submodule layout</strong> (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md">rtp-fabric-ADR-001</a>): per-MC-version carriers (<code>rtp-neoforge-v1_20_R1</code>, <code>rtp-neoforge-v1_21_R1</code>, …) dispatched by a <code>NeoForgeVersionAdapter</code>. Mirror the rtp-fabric naming.</li>
-<li><strong>Anvil prefilter</strong> (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md">rtp-fabric-ADR-005</a>) — same <code>.mca</code> substrate, same code. No work.</li>
-<li><strong>Non-blocking chunk generation</strong> (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md">rtp-fabric-ADR-008</a>) — same vanilla async generation primitives.</li>
-<li><strong>Typed block-tag snapshot</strong> (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-010-typed-block-tag-snapshot.md">rtp-fabric-ADR-010</a>) — same registry concept; the snapshot reader will adapt cleanly.</li>
-</ul>
-<h2 id="4-what-we-cannot-reuse-must-rewrite-per-platform">4. What we cannot reuse (must rewrite per platform)<a class="headerlink" href="#4-what-we-cannot-reuse-must-rewrite-per-platform" title="Permanent link">&para;</a></h2>
-<ul>
-<li>The platform entry point (<code>@Mod</code>-annotated class vs Fabric's <code>ModInitializer</code>).</li>
-<li>Event wiring (mod bus / game bus subscribe vs Fabric callbacks).</li>
-<li>Command registration trampoline.</li>
-<li>Build system: NeoForge uses <strong>NeoGradle</strong> (or <strong>ModDevGradle</strong> / <strong>ModsDotGroovy</strong> depending on version) instead of Fabric Loom. Toolchain choice will need a decision (see open questions).</li>
-<li>The S-006 entry-point guarantees — same shape, different listener type.</li>
-</ul>
-<h2 id="5-module-layout-sketch-illustrative-not-approved">5. Module layout sketch (illustrative, not approved)<a class="headerlink" href="#5-module-layout-sketch-illustrative-not-approved" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>rtp-neoforge/
-  docs/
-    adr/                      # per-subproject ADRs, restart at 001 per AGENTS.md self-update rules
-  rtp-neoforge-common/        # Mojmap, no per-version NM (mirrors rtp-fabric-common-unobf in spirit)
-  rtp-neoforge-v1_20_R1/      # per-MC carrier (NeoForge supports 1.20.4+; numbering follows existing convention)
-  rtp-neoforge-v1_21_R1/
-  rtp-neoforge-v1_21_R11/     # if/when we add later MC revs
+<h2 id="1-context-and-problem-statement">1. Context and Problem Statement<a class="headerlink" href="#1-context-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Modern Minecraft servers frequently run external web-based cartography engines—predominantly <strong>BlueMap</strong>, <strong>Pl3xMap</strong>, and <strong>Dynmap</strong>—to provide high-resolution, browser-viewable maps of their worlds.</p>
+<p>Concurrently, server operators require spatial visualization of their random teleport subsystems:
+1. <strong>Region boundaries and deadzones:</strong> Verifying configured shapes (<code>Circle</code>, <code>Square</code>, <code>Polygon</code>), center offsets, and world border clamps.
+2. <strong>Safety and hazard topologies:</strong> Visualizing safe landing zones, hazardous terrain (oceans, lava pools, void, steep slopes), and claim exclusions.
+3. <strong>Player teleport distribution and dispersion:</strong> Auditing destination randomness to verify uniform dispersion across the border and detect clustering anomalies.</p>
+<h3 id="the-problem-with-existing-cartography-integration">The Problem with Existing Cartography Integration<a class="headerlink" href="#the-problem-with-existing-cartography-integration" title="Permanent link">&para;</a></h3>
+<p>External web-map integrations in the ecosystem typically approach mapping in one of two flawed ways:
+1. <strong>Synchronous or Heavy Tile Rendering:</strong> Attempting to render custom map tiles by querying the Minecraft server engine (<code>world.getChunkAt()</code> or <code>world.getHighestBlockAt()</code>), which violates safety prohibition <strong>S-005</strong> (no chunk loading on the main thread) and triggers catastrophic region-scheduler thrashing on Folia and multi-second MSPT spikes on Paper.
+2. <strong>Primitive Marker Overlays:</strong> Injecting simple vector outlines or single coordinate markers via map APIs. While lightweight, vector markers cannot depict pixel-level safety terrain, biome classifications, or continuous spatial densities without thousands of discrete DOM/marker objects overloading client browsers.</p>
+<p>Furthermore, general web map tile renderers spend hours rendering empty deep-ocean chunks because they possess no prior knowledge of world topology.</p>
+<hr />
+<h2 id="2-decision">2. Decision<a class="headerlink" href="#2-decision" title="Permanent link">&para;</a></h2>
+<p>We establish an architecture for on-demand, non-blocking external web map integration composed entirely of existing LeafRTP subsystem primitives: <strong><code>anvil-api</code></strong>, <strong><code>MemoryShape</code> (ADR-085 key space)</strong>, and <strong><code>maps-api</code></strong>.</p>
+<p>This integration is partitioned into three functional tiers:</p>
+<h3 id="2a-on-demand-raster-tile-provider-pl3xmap-dynmap">2a. On-Demand Raster Tile Provider (Pl3xMap / Dynmap)<a class="headerlink" href="#2a-on-demand-raster-tile-provider-pl3xmap-dynmap" title="Permanent link">&para;</a></h3>
+<p>For 2D raster web map engines (such as Pl3xMap's Leaflet tile layer and Dynmap's custom map types):
+- <strong>On-Demand Slippy Map Tile Interface:</strong> Implement a custom tile provider serving standard Web Mercator raster tiles ($512 \times 512$ or $256 \times 256$ pixels) mapped to chunk coordinates.
+- <strong>Zero-Chunk-Load Pipeline:</strong> When the browser requests tile <code>(z, x, y)</code>:
+  1. The tile bounds are converted to world chunk bounds $[cx_{\min}..cx_{\max}, cz_{\min}..cz_{\max}]$.
+  2. For chunks already evaluated: The safety verdict and biome are resolved in memory via <code>MemoryShape.isBadLocation(k)</code> in <strong>$O(\log N)$ binary search time ($208\text{ ns}$ per chunk)</strong>.
+  3. For unverified chunks: The tile provider queries <code>anvil-api</code> / <code>RegionFileReader</code> (ADR-016 / ADR-077) off-tick directly from <code>.mca</code> / <code>.linear</code> files on disk, bypassing the server's chunk loading pipeline entirely (<strong>Zero main-thread blocking, S-005 compliant</strong>).
+  4. The raster image is painted into an off-main buffer using <code>maps-api</code>'s <code>HeatmapRenderer</code> and streamed directly to the browser as PNG/WebP bytes.</p>
+<h3 id="2b-vector-volume-and-marker-sets-bluemap-dynmap-pl3xmap">2b. Vector Volume and Marker Sets (BlueMap / Dynmap / Pl3xMap)<a class="headerlink" href="#2b-vector-volume-and-marker-sets-bluemap-dynmap-pl3xmap" title="Permanent link">&para;</a></h3>
+<p>For 3D WebGL and vector overlay layers:
+- <strong>Shape &amp; Region Overlays:</strong> Register lightweight <code>MarkerSet</code> instances representing configured RTP regions. Region perimeters (circles, squares, polygons) and inner <code>centerRadius</code> exclusion zones are projected as semi-transparent extruded polygonal volumes.
+- <strong>Dispersion Radar:</strong> Provide an optional "Recent Teleports" layer rendering player landing markers with decaying opacity, allowing server administrators to visually audit real-world spatial dispersion.</p>
+<h3 id="2c-reverse-integration-cartography-pre-filter-bluemapmapsettilefilter">2c. Reverse Integration: Cartography Pre-Filter (<code>BlueMapMap.setTileFilter</code>)<a class="headerlink" href="#2c-reverse-integration-cartography-pre-filter-bluemapmapsettilefilter" title="Permanent link">&para;</a></h3>
+<p>Leverage LeafRTP's <code>anvil-api</code> and spatial memory in reverse to accelerate web map generation:
+- Provide an optional <code>TileFilter</code> predicate to BlueMap and Dynmap that rejects ungenerated chunks or pure deep-ocean/void regions where no safe terrain exists.
+- This prevents the external map engine from allocating disk space and CPU cycles rendering empty ocean tiles across a 10,000-block border.</p>
+<hr />
+<h2 id="3-structural-boundaries-packaging">3. Structural Boundaries &amp; Packaging<a class="headerlink" href="#3-structural-boundaries-packaging" title="Permanent link">&para;</a></h2>
+<p>Per <strong>ADR-013</strong>, <strong>ADR-019</strong>, and <strong>ADR-057</strong>, integrations with third-party plugins must not pollute <code>rtp-core</code> or platform adapters with external dependencies:</p>
+<div class="highlight"><pre><span></span><code>[ rtp-core ]
+     │ (Spatial Memory / MemoryShape)
+     ▼
+[ api/maps-api ] ──► [ api/anvil-api ]
+     │ (Abstract Render Pipeline / Canvas)
+     ▼
+[ addons/LeafRTP-Pl3xMapAddon ]   [ addons/LeafRTP-BlueMapAddon ]   [ addons/LeafRTP-DynmapAddon ]
+  (Optional Addon Modules depending strictly on rtp-api and map-specific APIs)
 </code></pre></div>
-<p>Open: whether to additionally split a <code>*-unobf</code> carrier the way Fabric does. NeoForge being Mojmap-at-runtime suggests <strong>no</strong>, but if NeoForge ever ships an SRG/Mercury-mapped intermediate (it has experimented), revisit.</p>
-<h2 id="6-threading-s-00x-mapping">6. Threading &amp; S-00x mapping<a class="headerlink" href="#6-threading-s-00x-mapping" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Rule</th>
-<th>NeoForge implication</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>S-001</td>
-<td>Same as Fabric — block-safety logic lives in <code>rtp-core</code>. No fork-API second-check.</td>
-</tr>
-<tr>
-<td>S-002</td>
-<td>Same. <code>DistanceManager</code> tickets via the non-persistent ticket pattern (<code>rtp-fabric-ADR-003</code>).</td>
-</tr>
-<tr>
-<td>S-003</td>
-<td>Claim plugins effectively don't exist on NeoForge; the few that do are mod-side (FTB Chunks, etc.). Treat as a reflection-gated hook entry per <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a> if/when demand appears.</td>
-</tr>
-<tr>
-<td>S-004</td>
-<td>Same; <code>FailTypes.nullChunk</code> attribution path is platform-neutral.</td>
-</tr>
-<tr>
-<td>S-005</td>
-<td><strong>Critical.</strong> NeoForge single-main-thread; <code>ServerLevel#getChunk(int, int, ...)</code> is sync by default. Adapter must route through the same async-generation pattern used in <code>rtp-fabric</code>. The Fabric <code>FabricWorld.getChunkAt</code> regression (S-005 blocker called out in <em>Current Development Focus</em>) must <strong>not</strong> be re-introduced here.</td>
-</tr>
-<tr>
-<td>S-006</td>
-<td>Same — <code>IllegalStateException</code> on early API use, not null/no-op.</td>
-</tr>
-<tr>
-<td>S-007</td>
-<td>Same — <code>messages.yml</code> already covers this; no platform work.</td>
-</tr>
-</tbody>
-</table>
-<h2 id="7-ftb-chunks-claim-mods-soft-depend-not-adapter-scope">7. FTB Chunks / claim mods — soft-depend, not adapter scope<a class="headerlink" href="#7-ftb-chunks-claim-mods-soft-depend-not-adapter-scope" title="Permanent link">&para;</a></h2>
-<p>Mod-side land protection (FTB Chunks, OpenPartiesAndClaims, Argonauts, etc.) is the rough equivalent of Bukkit claim plugins. Per <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/">ADR-019</a> and S-003, integrations are folded into the plugin via reflection / soft API. Same playbook for NeoForge: catalog any hook in <a href="../EXTERNAL_HOOKS/"><code>EXTERNAL_HOOKS.md</code></a> per <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a>. No claim-mod code inside the pipeline.</p>
-<h2 id="8-build-toolchain-open-questions">8. Build / toolchain open questions<a class="headerlink" href="#8-build-toolchain-open-questions" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Gradle plugin:</strong> NeoGradle vs ModDevGradle. ModDevGradle is the newer official path (2024+) and is closer to Loom in spirit; lean toward ModDevGradle pending a quick spike.</li>
-<li><strong>Java level:</strong> NeoForge tracks vanilla — Java 21 for 1.20.5+, Java 21+ for 1.21+. Matches our REQ-RTP-SYS-001 baseline.</li>
-<li><strong>Run config:</strong> NeoForge dev-launch uses its own runtime; need to verify <code>run_test</code> and the existing IntelliJ run-configs can drive a NeoForge dev server. Likely requires a new <code>.run</code> XML per per-version submodule.</li>
-<li><strong>Lite-jar matrix:</strong> Each NeoForge carrier added expands the assembly matrix (<a href="../../adr/ADR-024-rtp-lite-assembly-variant/">ADR-024</a>). Decide whether NeoForge ships only the full jar initially.</li>
-</ul>
-<h2 id="9-risks-gotchas-to-expect">9. Risks / gotchas to expect<a class="headerlink" href="#9-risks-gotchas-to-expect" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Mappings drift across MC revs.</strong> Mojmap class/field/method names move between 1.20.4 → 1.21 → 1.21.x. Per-version carriers absorb this; do not let names leak into <code>rtp-core</code>.</li>
-<li><strong>NeoForge "mod loading phases."</strong> Some APIs (registries, tags) are only safe to touch after specific phases. The S-006 guarantee is friendly to this — we already throw on early use.</li>
-<li><strong>AccessTransformers / Mixins.</strong> Hopefully unnecessary. If we need either, that's a red flag — re-examine whether the public API suffices first.</li>
-<li><strong>CompletableFuture interop with the server thread executor.</strong> NeoForge's <code>ServerLevel</code> executor (<code>server::tell</code> / <code>MinecraftServer#submit</code>) is the safe sink for "back to main thread"; codify in the platform adapter the same way Fabric does.</li>
-<li><strong>Folia analogue.</strong> None. Do not invent one. If NeoForge ever ships region-threading, treat as a new platform, not a flag.</li>
-<li><strong><code>Entity#teleportTo</code> semantics change across MC versions</strong> (notably 1.21.x's <code>TeleportTransition</code> rework). Carrier per-version absorbs this.</li>
-</ul>
-<h2 id="10-minimum-viable-scoping-when-work-actually-starts">10. Minimum-viable scoping (when work actually starts)<a class="headerlink" href="#10-minimum-viable-scoping-when-work-actually-starts" title="Permanent link">&para;</a></h2>
-<p>In order, do not skip:</p>
 <ol>
-<li><strong>D-005 proposal</strong> referencing this notes file.</li>
-<li><strong>ADR</strong>: <em>NeoForge platform in-scope</em> (mirror <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a>), under <code>rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-…</code>.</li>
-<li><strong><code>MULTI_PLATFORM_PLAN.md</code></strong> phase rows for NeoForge (Phases 0–4 mirror layout).</li>
-<li><strong>Module skeleton</strong> + dev-launch + a single <code>/rtp</code> round-trip on the default world before any optimization or anvil work.</li>
-<li><strong>REQ-traceable tests</strong> for S-005 and S-006 first (<code>ReqRtpNeoforgeS005ChunkLoadingTest</code>, <code>ReqRtpNeoforgeS006EarlyApiTest</code>).</li>
-<li>Only then: anvil parity, ticket parity, the multi-version carrier split.</li>
+<li><strong><code>maps-api</code> Extension:</strong> <code>maps-api</code> gains an abstract <code>WebTileRenderer</code> capable of translating chunk bounding boxes into raster image streams without referencing any specific web map class.</li>
+<li><strong>Addon Delivery:</strong> Concrete integrations (<code>LeafRTP-Pl3xMapAddon</code>, etc.) live as optional addon modules discovering LeafRTP via the <code>RTPAddon</code> SPI (ADR-057).</li>
+<li><strong>Fail-Closed Contract:</strong> If the host map plugin is updated, absent, or disabled, the addon unregisters its layers cleanly without affecting core teleport services (S-006).</li>
 </ol>
-<h2 id="11-out-of-scope-for-these-notes-deliberate">11. Out of scope for these notes (deliberate)<a class="headerlink" href="#11-out-of-scope-for-these-notes-deliberate" title="Permanent link">&para;</a></h2>
+<hr />
+<h2 id="4-consequences">4. Consequences<a class="headerlink" href="#4-consequences" title="Permanent link">&para;</a></h2>
+<h3 id="positive">Positive<a class="headerlink" href="#positive" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Forge (legacy) bring-up.</li>
-<li>Sponge.</li>
-<li>Bukkit-via-Mohist / Magma / Arclight (hybrid servers). If demand appears, treat as a <code>rtp-paper</code> runtime-compatibility issue, <strong>not</strong> a new adapter — they ship a Paper API surface.</li>
-<li>Cross-server (Velocity/Bungee) interaction. Tracked separately in <a href="../MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a>.</li>
-<li>Whether NeoForge should share a carrier directory tree with Fabric. Tempting; almost certainly a trap (build-system divergence, dependency graph divergence). Notes say no; revisit only with hard evidence.</li>
+<li><strong>True Zero-Tick-Cost Web Heatmaps:</strong> Operators can inspect full-world RTP safety, biome distributions, and landing densities in their web browser with zero server MSPT degradation and zero chunk loading.</li>
+<li><strong>Instantaneous Streaming:</strong> Because <code>MemoryShape</code> stores the mathematical complement of bad space in a compact, Hilbert-ordered run table (ADR-085), tile generation operates directly out of CPU cache lines without disk I/O for all scanned areas.</li>
+<li><strong>Proof of Dispersion:</strong> Provides operators with an intuitive visual verification of LeafRTP's uniform landing distribution versus competitor clumping.</li>
+<li><strong>Map Generation Speedup:</strong> Web map plugins using the <code>TileFilter</code> hook can skip rendering uninhabitable void/ocean tiles, drastically reducing initial map render times.</li>
+</ul>
+<h3 id="negative-trade-offs">Negative / Trade-offs<a class="headerlink" href="#negative-trade-offs" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>API Volatility in Downstream Map Plugins:</strong> Web map plugins (particularly Pl3xMap and BlueMap) update internal layer APIs across major Minecraft releases; isolating these into optional addons mitigates core stability risk.</li>
+<li><strong>Memory Overhead for Dynamic Tiles:</strong> Streaming dynamic tile rasters requires transient image buffer allocations on the web server worker pool, which must be throttled to prevent memory exhaustion under concurrent browser requests.</li>
 </ul>
 <hr />
-<p><em>Last touched: 2026-05-11. Owner: unassigned. Delete or fold into a real plan/ADR once NeoForge work is actually approved.</em></p>
+<h2 id="5-hardware-prerequisite-failure-domain-contract">5. Hardware Prerequisite &amp; Failure Domain Contract<a class="headerlink" href="#5-hardware-prerequisite-failure-domain-contract" title="Permanent link">&para;</a></h2>
+<p>To preserve server performance and regional tick stability under multi-user web panning or automated scrapers:</p>
+<ol>
+<li><strong>Failure Domain Isolation (Bulkhead Pattern):</strong></li>
+<li>Web cartography rendering execution shall run strictly within the failure domain of the web worker thread pool.</li>
+<li>Any allocation spike, unhandled exception, or thread abort within raster generation shall never propagate to <code>rtp-core</code>, <code>RegionQueueManager</code>, or Folia/Paper regional ticking tasks.</li>
+<li><strong>Hardware Headroom Prerequisite:</strong></li>
+<li>Enabling on-demand web map raster layers requires an operator memory headroom allocation:
+     $$M_{\text{map_headroom}} \ge C_{\text{max_renderers}} \times \text{TileBufferSize} \times 2.5$$</li>
+<li>Under default concurrency limits ($C_{\text{max_renderers}} = 4$) at $512 \times 512$ ARGB raster dimensions, required transient headroom is $\sim 16\text{ MB}$.</li>
+<li><strong>Concurrency Limiter &amp; Fail-Closed Fast Path (<code>AsyncRenderLimiter</code>):</strong></li>
+<li><code>maps-api</code> enforces a hard non-blocking concurrency limiter:
+     $$C_{\text{max_renderers}} = \max\left(1, \min\left(4, \left\lfloor \frac{\text{availableProcessors}}{4} \right\rfloor\right)\right)$$</li>
+<li>When incoming web tile requests fail to acquire an execution permit within <code>500ms</code>, the pipeline fails closed: it immediately returns a static 1x1 transparent PNG or HTTP 503 response without allocating $512 \times 512$ ARGB raster buffers in JVM heap.</li>
+<li><strong>SPI Fail-Closed Isolation:</strong></li>
+<li>Web map addons interact with core exclusively through <code>rtp-api</code> and <code>maps-api</code> read-only primitives. They never hold chunk tickets or references to <code>TeleportPipelineTask</code>. Memory or CPU pressure on the web tier cannot stall regional ticking or candidate generation.</li>
+</ol>
+<hr />
+<h2 id="6-references">6. References<a class="headerlink" href="#6-references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../ADR-016-anvil-subsystem/">ADR-016: Anvil Subsystem</a></li>
+<li><a href="../ADR-046-maps-api-module/">ADR-046: maps-api Module</a></li>
+<li><a href="../ADR-077-multi-format-region-support/">ADR-077: Multi-Format Region Support</a></li>
+<li><a href="../ADR-085-spiral-addressed-hilbert-key-space/">ADR-085: Spiral-Addressed Hilbert Key Space</a></li>
+<li><a href="https://github.com/DailyStruggle/RTP/blob/V3/api/maps-api/docs/adr/maps-api-ADR-001-bootstrap.md"><code>maps-api-ADR-001</code></a></li>
+</ul>
 
 
 
@@ -3303,7 +3876,7 @@
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.2.1
+      LeafRTP v3.2.2
     </div>
   
   
