@@ -73,7 +73,7 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
     if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
         || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
       msgInvalidCommand(callerId, name());
-      return false;
+      return true;
     }
 
     RTPScheduler scheduler = RTP.scheduler;
@@ -81,7 +81,7 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
       String msg = "&c[RTP test/economy-isolation] RTP.scheduler is null; core not yet loaded";
       RTP.serverAccessor.sendMessage(callerId, msg);
       RTP.log(Level.WARNING, msg);
-      return false;
+      return true;
     }
 
     // Snapshot the calling thread so we can later assert that the

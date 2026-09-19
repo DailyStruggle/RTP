@@ -819,7 +819,7 @@ public interface RTPCmd extends BaseRTPCmd {
                         string, io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK);
                 if (parsedDist != null && parsedDist.explicitUnit()) {
                   double chunks = parsedDist.toChunks();
-                  value = (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
+                  value = (chunks == Math.floor(chunks)) ? Long.valueOf((long) chunks) : Double.valueOf(chunks);
                 } else if (parsedDist != null) {
                   double worldBorderRad = 0.0;
                   try {
@@ -838,7 +838,7 @@ public interface RTPCmd extends BaseRTPCmd {
                           parsedDist, worldBorderRad, name);
                   if (interpreted != null && interpreted.unit() != io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK) {
                     double chunks = interpreted.toChunks();
-                    value = (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
+                    value = (chunks == Math.floor(chunks)) ? Long.valueOf((long) chunks) : Double.valueOf(chunks);
                   } else {
                     try {
                       value = Long.parseLong(string);
@@ -847,7 +847,7 @@ public interface RTPCmd extends BaseRTPCmd {
                         value = Double.parseDouble(string);
                       } catch (IllegalArgumentException ignored2) {
                         double chunks = parsedDist.toChunks();
-                        value = (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
+                        value = (chunks == Math.floor(chunks)) ? Long.valueOf((long) chunks) : Double.valueOf(chunks);
                       }
                     }
                   }

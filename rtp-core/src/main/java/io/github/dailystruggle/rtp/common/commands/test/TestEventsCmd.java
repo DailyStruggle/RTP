@@ -169,8 +169,6 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
     }
   }
 
-  private static final String ERR_PREFIX = "&c[RTP test/events] ";
-
   private boolean awaitProbe(UUID callerId, String name, CompletableFuture<Boolean> fut) {
     try {
       Boolean res = fut.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
@@ -178,18 +176,18 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
         report(callerId, "[RTP test/events] " + name + ": ok", Level.INFO, null);
         return true;
       } else {
-        report(callerId, ERR_PREFIX + name + ": FAILED (completed false)", Level.WARNING, null);
+        report(callerId, "&c[RTP test/events] " + name + ": FAILED (completed false)", Level.WARNING, null);
         return false;
       }
     } catch (TimeoutException te) {
-      report(callerId, ERR_PREFIX + name + ": TIMEOUT after " + TIMEOUT_MS + "ms", Level.WARNING, null);
+      report(callerId, "&c[RTP test/events] " + name + ": TIMEOUT after " + TIMEOUT_MS + "ms", Level.WARNING, null);
       return false;
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
-      report(callerId, ERR_PREFIX + name + ": INTERRUPTED", Level.WARNING, ie);
+      report(callerId, "&c[RTP test/events] " + name + ": INTERRUPTED", Level.WARNING, ie);
       return false;
     } catch (Throwable t) {
-      report(callerId, ERR_PREFIX + name + ": FAILED (" + t.getClass().getSimpleName() + ": " + t.getMessage() + ")", Level.WARNING, t);
+      report(callerId, "&c[RTP test/events] " + name + ": FAILED (" + t.getClass().getSimpleName() + ": " + t.getMessage() + ")", Level.WARNING, t);
       return false;
     }
   }

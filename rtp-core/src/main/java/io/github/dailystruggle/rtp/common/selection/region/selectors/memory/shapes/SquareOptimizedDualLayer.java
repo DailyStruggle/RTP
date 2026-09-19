@@ -3,7 +3,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable;
-import java.security.SecureRandom;
+
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Square shape implementing the continuous spiral-addressed Hilbert key space with
@@ -259,8 +260,7 @@ public class SquareOptimizedDualLayer extends Square {
     return location;
   }
 
-  private static final SecureRandom SEED_SOURCE = new SecureRandom();
-  private final long feistelSalt = SEED_SOURCE.nextLong();
+  private final long feistelSalt = ThreadLocalRandom.current().nextLong();
   private final java.util.concurrent.atomic.AtomicLong selectionCounter = new java.util.concurrent.atomic.AtomicLong(0);
   private final java.util.concurrent.atomic.AtomicLong backlogCounter = new java.util.concurrent.atomic.AtomicLong(0);
 

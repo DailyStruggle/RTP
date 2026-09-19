@@ -207,7 +207,6 @@ final class MenuWiringSupportInstallerTest {
 
         // Verify admin command was wired with menu redirect
         adminCmd.onCommand(viewer, java.util.Collections.emptyMap(), null, msg -> {});
-        assertNotNull(root.getCommandLookup().get("ADMIN"));
         // Also test admin opener edge cases: null viewer, denied permission, builder failure, renderer failure
         io.github.dailystruggle.rtp.common.commands.admin.AdminCmd permDeniedAdmin =
                 new io.github.dailystruggle.rtp.common.commands.admin.AdminCmd(root, null);

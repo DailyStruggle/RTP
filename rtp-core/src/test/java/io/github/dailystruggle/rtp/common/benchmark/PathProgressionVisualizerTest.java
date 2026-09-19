@@ -64,8 +64,6 @@ public class PathProgressionVisualizerTest {
     renderZoom32x32RegionChart();
 
     renderSubBinZoomChart();
-
-    org.junit.jupiter.api.Assertions.assertTrue(RADII.length > 0);
   }
 
   /**

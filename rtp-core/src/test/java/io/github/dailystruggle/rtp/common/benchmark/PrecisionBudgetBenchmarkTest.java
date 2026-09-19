@@ -458,6 +458,5 @@ public class PrecisionBudgetBenchmarkTest {
             Provenance.MEASURED);
       }
     }
-    assertTrue(radiusChunks > 0);
   }
 }

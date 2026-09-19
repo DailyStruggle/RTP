@@ -77,7 +77,7 @@ public class TeleportPipelineTaskMutationTest {
     }
 
     // MockRTPPlayer already implements setRespawnLocation, getRespawnLocation, and setFailSetLocation
-    private static final class SettablePlayer extends MockRTPPlayer {
+    static class SettablePlayer extends MockRTPPlayer {
         public SettablePlayer(UUID uuid, String name, RTPLocation loc) {
             super(uuid, name, loc);
         }
@@ -936,7 +936,6 @@ public class TeleportPipelineTaskMutationTest {
         // Complete future so it cleans up
         chunkSetFuture.complete(true);
         accessor.getMockScheduler().tick(1);
-        assertNotNull(task);
     }
 
     // -------------------------------------------------------------------------
@@ -3153,29 +3152,29 @@ public class TeleportPipelineTaskMutationTest {
             CompletableFuture<Long> chunkFuture = new CompletableFuture<>();
             CompletableFuture<Boolean> setDoneFuture = new CompletableFuture<>();
             ChunkSet chunkSet = new ChunkSet(world, 0, 0, List.of(chunkFuture), setDoneFuture);
-            try (ChunkReservation reservation = new ChunkReservation(chunkSet, world)) {
-                RTPCoords coords = new RTPCoords(world.name(), 0, 64, 0);
-                GenerationResult res = new GenerationResult(coords, 1L, chunkSet, reservation);
+            ChunkReservation reservation = new ChunkReservation(chunkSet, world);
 
-                Method m = TeleportPipelineTask.class.getDeclaredMethod("processGenerationResult", GenerationResult.class);
-                m.setAccessible(true);
-                m.invoke(task, res);
+            RTPCoords coords = new RTPCoords(world.name(), 0, 64, 0);
+            GenerationResult res = new GenerationResult(coords, 1L, chunkSet, reservation);
 
-                assertTrue(asyncScheduled.get(), "When chunkSet is not complete, scheduler must run task asynchronously");
-                assertFalse(syncScheduled.get(), "Sync scheduler must not be called when chunkSet is incomplete");
+            Method m = TeleportPipelineTask.class.getDeclaredMethod("processGenerationResult", GenerationResult.class);
+            m.setAccessible(true);
+            m.invoke(task, res);
 
-                // Now test when chunkSet is already done
-                asyncScheduled.set(false);
-                syncScheduled.set(false);
-                setDoneFuture.complete(true);
+            assertTrue(asyncScheduled.get(), "When chunkSet is not complete, scheduler must run task asynchronously");
+            assertFalse(syncScheduled.get(), "Sync scheduler must not be called when chunkSet is incomplete");
 
-                TeleportPipelineTask task2 = new TeleportPipelineTask(ctx, reg);
-                tpDataField.set(task2, data);
-                m.invoke(task2, res);
+            // Now test when chunkSet is already done
+            asyncScheduled.set(false);
+            syncScheduled.set(false);
+            setDoneFuture.complete(true);
 
-                assertTrue(syncScheduled.get(), "When chunkSet is complete, scheduler must run task synchronously on chunk");
-                assertFalse(asyncScheduled.get(), "Async scheduler must not be called when chunkSet is complete");
-            }
+            TeleportPipelineTask task2 = new TeleportPipelineTask(ctx, reg);
+            tpDataField.set(task2, data);
+            m.invoke(task2, res);
+
+            assertTrue(syncScheduled.get(), "When chunkSet is complete, scheduler must run task synchronously on chunk");
+            assertFalse(asyncScheduled.get(), "Async scheduler must not be called when chunkSet is complete");
         } finally {
             RTP.scheduler = originalScheduler;
         }

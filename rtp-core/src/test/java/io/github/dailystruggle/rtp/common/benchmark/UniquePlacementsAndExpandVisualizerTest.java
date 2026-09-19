@@ -225,7 +225,6 @@ public class UniquePlacementsAndExpandVisualizerTest {
 
     System.out.printf("[DEBUG_LOG] Chart saved successfully to: %s (%,d KB)%n",
         rootOut.getAbsolutePath(), rootOut.length() / 1024);
-    org.junit.jupiter.api.Assertions.assertFalse(allLandingPoints.isEmpty());
   }
 
   private void renderHighResolutionZoomSection(

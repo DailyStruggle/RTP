@@ -28,7 +28,6 @@ class MultiConfigParserCoverageTest {
 
     private File pluginDir;
 
-    @SuppressWarnings("java:S115")
     enum TestRegionKeys {
         shape,
         vert,

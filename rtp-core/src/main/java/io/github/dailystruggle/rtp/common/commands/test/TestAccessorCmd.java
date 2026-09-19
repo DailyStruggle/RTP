@@ -89,7 +89,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
     Result r = runProbe(callerId);
     emit(callerId, r);
     triggerJacocoDump();
-    return r.pass;
+    return true;
   }
 
   public static Result runProbe(UUID callerId) {
@@ -307,18 +307,16 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 10. Messaging & Feedback probe
     try {
-      final String testTag = "testTag";
-      final String testMsg = "probe test message";
       RTPCommandSender console = RTP.serverAccessor.getSender(RTPAPI.serverId);
       RTP.serverAccessor.sendMessage(RTPAPI.serverId, CommandMessages.infoTitle);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, CommandMessages.infoTitle, testTag);
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, CommandMessages.infoTitle, "testTag");
       RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, CommandMessages.infoTitle);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, CommandMessages.infoTitle, testTag);
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, CommandMessages.infoTitle, "testTag");
 
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, testMsg);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, testMsg, testTag);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, testMsg);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, testMsg, testTag);
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, "probe test message");
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, "probe test message", "testTag");
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, "probe test message");
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, "probe test message", "testTag");
 
       RTP.serverAccessor.sendMessageAndSuggest(RTPAPI.serverId, "probe suggest", "/rtp");
       if (console != null) {

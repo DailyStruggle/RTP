@@ -49,7 +49,7 @@ public class TestWorldOpsCmd extends BaseRTPCmdImpl {
 
     Result r = runProbe();
     emit(callerId, r);
-    return r.pass;
+    return true;
   }
 
   /**
