@@ -230,11 +230,11 @@ jobs:
             folia
             bukkit
             spigot
-          # MC versions derived from the rtp-bukkit-v* / rtp-paper-v* submodule
-          # set. Basic Folia support is included in lite per ADR-024 2026-06-10 amendment.
-          # Fabric is held until rtp-fabric Phase 4 closes
-          # (MULTI_PLATFORM_PLAN.md). Update this list when a new MC adapter
-          # submodule lands under rtp-bukkit/ or rtp-paper/.
+            fabric
+            neoforge
+            velocity
+          # MC versions: 1.20+ for Bukkit/Paper/Spigot/Folia; lowest supported for Fabric and NeoForge is 1.21.1.
+          # Testing up to 26.3.
           game-versions: |
             1.20
             1.20.1
@@ -249,6 +249,17 @@ jobs:
             1.21.3
             1.21.4
             1.21.5
+            1.21.6
+            1.21.7
+            1.21.8
+            1.21.9
+            1.21.10
+            1.21.11
+            26.1
+            26.1.1
+            26.1.2
+            26.2
+            26.3
           # Fail loudly if Modrinth rejects (e.g. version collision, slug typo,
           # token scope). A silent skip would leave the tag without an
           # artifact on Modrinth and contradict S-004 (no silently swallowed
