@@ -1,19 +1,31 @@
-package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table;
+package io.github.dailystruggle.rtp.common.benchmark;
 
 import java.util.Arrays;
 
 /**
- * Segmented two-tier secondary table with active span pinning over a continuous 1D key space.
+ * A segmented run table over 1D keys partitioned into fixed-capacity bins (e.g. 256, 512, or 1024
+ * chunks), with <b>pinned straddling endpoints</b> at bin boundaries.
  *
- * <p>Splits a continuous key space $[0, \text{totalRange})$ into fixed-capacity bins (e.g. 256, 512, 1024),
- * pinning straddling run spans at bin boundary offset 0. This guarantees:
+ * <p><b>The Hazard Solved.</b> In a naive segmented table where runs are indexed only by their start
+ * keys, a bad run longer than a bin (such as an ocean crossing several bins) leaves intermediate
+ * bins with no start keys. A query landing in such a bin would see an empty table and falsely accept
+ * the ocean chunk, unless the search probes backward into preceding bins (destroying O(1) bin
+ * lookup and thrashing cache lines).
+ *
+ * <p><b>Active Span Pinning (Clamped Slices).</b> Each bin covers a contiguous key interval
+ * {@code [b * binSize, (b + 1) * binSize)}. Any run {@code [start, start + length)} that overlaps
+ * the bin is clamped to {@code [max(start, b * binSize), min(start + length, (b + 1) * binSize))}.
+ * If the run starts before the bin, its clamped start is <i>pinned at offset 0</i> of that bin.
+ * Consequently:
  * <ul>
- *   <li><b>Zero backward pointer chasing:</b> queries landing in bin $b$ inspect only bin $b$'s local runs.
- *   <li><b>Cache locality:</b> local binary search inside a bin of 6–22 runs executes inside on-chip CPU cache ($< 15\text{ ns}$).
- *   <li><b>O(1) Accumulate offset resolution:</b> Tier 1 bisection over {@code dirBadPrefixSums} ($\le 64$ ints in hardware cache)
- *       finds the target bin in 1–2 steps, and Tier 2 resolves locally inside the bin.
- *   <li><b>Reconciliation locality:</b> inserting a mark mutates only a single local bin.
+ *   <li>Every query {@code contains(key)} is <b>strictly local</b>: {@code bin = key / binSize},
+ *       followed by a binary search solely within {@code bin}. Zero backward probing.
+ *   <li>If a bin is completely covered by a run, it has a single clamped entry spanning the full bin
+ *       ({@code [0, binSize)}), or can be marked fully bad.
+ *   <li>Each bin holds a small array that fits in L1/L2 cache (typically <= 64 entries).
  * </ul>
+ *
+ * <p><b>Test scope only.</b> ADR-080 opt-in tier.
  */
 public final class SegmentedKeyRunTable {
 
@@ -21,6 +33,7 @@ public final class SegmentedKeyRunTable {
     private final int binIndex;
     private final long binStartKey;
     private final long binSize;
+    // Offsets within the bin: [0, binSize)
     private final int[] starts;
     private final int[] lengths;
     private final int count;
@@ -76,10 +89,11 @@ public final class SegmentedKeyRunTable {
      */
     public int resolveLocalAccumulate(int localTarget) {
       if (count == 0) {
+        // Completely empty (all good): physical offset is exactly localTarget
         return (localTarget < binSize) ? localTarget : -1;
       }
       if (isFull()) {
-        return -1;
+        return -1; // No good chunks
       }
 
       int currentBad = 0;
@@ -106,12 +120,11 @@ public final class SegmentedKeyRunTable {
     /**
      * Local binary search within this bin.
      *
-     * @param offset relative offset within this bin in [0, binSize)
+     * @param offset offset from binStartKey, in [0, binSize)
      * @return true if covered
      */
     public boolean containsOffset(int offset) {
       if (count == 0) return false;
-      if (isFull()) return true;
       int idx = Arrays.binarySearch(starts, 0, count, offset);
       if (idx >= 0) return true;
       int floor = -(idx + 1) - 1;
@@ -149,34 +162,36 @@ public final class SegmentedKeyRunTable {
   }
 
   /**
-   * Constructs a segmented key run table from sorted starts and lengths arrays.
+   * Partitions an existing flat {@link KeyRunTable} into segmented bins with pinned endpoints,
+   * collapsing bins that are completely full or within {@code fullCollapseTolerance} of full.
    *
-   * @param starts run start coordinates
-   * @param lengths run lengths
-   * @param flatCount number of valid runs
+   * @param flat source table
    * @param totalRange maximum key range (domain chunk count)
    * @param binSize number of keys per bin (e.g. 256, 512, 1024)
-   * @param fullCollapseTolerance maximum remaining usable chunks in a bin to collapse to FULL
+   * @param fullCollapseTolerance maximum remaining usable chunks in a bin to collapse to FULL (e.g. spatialResolution)
    * @return partitioned table
    */
-  public static SegmentedKeyRunTable fromRuns(
-      long[] starts, long[] lengths, int flatCount, long totalRange, long binSize, long fullCollapseTolerance) {
+  public static SegmentedKeyRunTable fromFlat(
+      KeyRunTable flat, long totalRange, long binSize, long fullCollapseTolerance) {
     if (binSize <= 0) throw new IllegalArgumentException("binSize must be > 0: " + binSize);
     int numBins = (int) ((totalRange + binSize - 1) / binSize);
     if (numBins <= 0) numBins = 1;
 
+    // Temporary accumulators per bin
     int[][] tempStarts = new int[numBins][];
     int[][] tempLengths = new int[numBins][];
     int[] tempCounts = new int[numBins];
 
+    // Initial capacity estimate: small power of two
     for (int b = 0; b < numBins; b++) {
       tempStarts[b] = new int[8];
       tempLengths[b] = new int[8];
     }
 
+    int flatCount = flat.runs();
     for (int i = 0; i < flatCount; i++) {
-      long rStart = starts[i];
-      long rLen = lengths[i];
+      long rStart = flat.start(i);
+      long rLen = flat.length(i);
       long rEnd = rStart + rLen;
 
       if (rStart >= totalRange) break;
@@ -200,6 +215,7 @@ public final class SegmentedKeyRunTable {
         int localLen = (int) (clampedEnd - clampedStart);
 
         int c = tempCounts[b];
+        // If the bin already has a run that abuts or overlaps this clamped run, merge them
         if (c > 0 && localStart <= tempStarts[b][c - 1] + tempLengths[b][c - 1]) {
           tempLengths[b][c - 1] = Math.max(tempLengths[b][c - 1], localStart + localLen - tempStarts[b][c - 1]);
         } else {
@@ -224,9 +240,11 @@ public final class SegmentedKeyRunTable {
       for (int i = 0; i < c; i++) covered += tempLengths[b][i];
 
       if (c == 0) {
+        // Completely empty bin (100% good land): zero run arrays
         bins[b] = new Bin(b, bStartKey, bSize, EMPTY_ARRAY, EMPTY_ARRAY, 0);
       } else if ((c == 1 && tempStarts[b][0] == 0 && tempLengths[b][0] == bSize)
           || (bSize - covered <= fullCollapseTolerance && fullCollapseTolerance > 0)) {
+        // Full bin or near-full within spatialResolution/tolerance: collapse to FULL
         bins[b] = new Bin(b, bStartKey, bSize, FULL_START, new int[] {(int) bSize}, 1);
       } else {
         int[] s = Arrays.copyOf(tempStarts[b], c);
@@ -238,18 +256,25 @@ public final class SegmentedKeyRunTable {
     return new SegmentedKeyRunTable(totalRange, binSize, bins);
   }
 
+  public static SegmentedKeyRunTable fromFlat(KeyRunTable flat, long totalRange, long binSize) {
+    return fromFlat(flat, totalRange, binSize, 0L);
+  }
+
   /**
-   * Derives an optimal bin size in powers of two according to domain scale,
-   * targeting between 32 and 128 total bins.
+   * Automatically derives an optimal bin size in powers of two according to domain scale,
+   * targeting between 32 and 128 total bins to cap directory overhead while keeping bins L1-sized.
    *
    * @param totalRange total chunks in domain
    * @return derived bin size (power of two, in [128, 4096])
    */
   public static long deriveOptimalBinSize(long totalRange) {
     if (totalRange <= 0) return 256L;
+    // Target ~64 bins
     long target = totalRange / 64L;
+    // Clamp to [128, 4096]
     if (target < 128L) target = 128L;
     if (target > 4096L) target = 4096L;
+    // Round up to power of two
     long pow2 = 128L;
     while (pow2 < target) {
       pow2 <<= 1;
@@ -305,7 +330,11 @@ public final class SegmentedKeyRunTable {
   }
 
   /**
-   * Resolves a target in [0, totalGood) in ACCUMULATE mode using two-tier bad prefix sums.
+   * Resolves a target in [0, totalGood) in ACCUMULATE mode using the two-tier bad prefix sums.
+   *
+   * <p>Tier 1: Bisection/search over {@code dirBadPrefixSums} in L1 cache (<= 128 elements)
+   * to locate the target bin in 1-2 steps.
+   * <p>Tier 2: Resolves local offset within the located bin's local bad runs (<= 16 runs).
    *
    * @param target raw good-space index in [0, totalRange - totalCovered)
    * @return physical coordinate in [0, totalRange), or -1 if target is out of range
@@ -314,13 +343,19 @@ public final class SegmentedKeyRunTable {
     long totalGood = totalRange - totalCovered;
     if (target < 0 || target >= totalGood) return -1L;
 
+    // Fast initial guess for the target bin
     int b = (int) (target / binSize);
     if (b >= numBins) b = numBins - 1;
 
+    // Fixed-point convergence across bins using dirBadPrefixSums:
+    // We want bin b such that target + badBefore(b) lands inside bin b's good range.
+    // That is: goodBefore(b) <= target < goodBefore(b+1)
+    // where goodBefore(b) = b * binSize - badBefore(b)
     long badBefore = (b > 0) ? dirBadPrefixSums[b - 1] : 0L;
     long goodBefore = b * binSize - badBefore;
 
     if (target < goodBefore) {
+      // Search backward
       int low = 0;
       int high = b - 1;
       while (low <= high) {
@@ -335,9 +370,11 @@ public final class SegmentedKeyRunTable {
         }
       }
     } else {
+      // Check if target extends past bin b
       Bin curBin = bins[b];
       long binGood = curBin.binSize - curBin.coveredCells();
       if (target >= goodBefore + binGood) {
+        // Search forward
         int low = b + 1;
         int high = numBins - 1;
         while (low <= high) {
@@ -358,6 +395,7 @@ public final class SegmentedKeyRunTable {
     goodBefore = b * binSize - badBefore;
     int localTarget = (int) (target - goodBefore);
 
+    // Tier 2: local resolution within bin b
     int localOffset = bins[b].resolveLocalAccumulate(localTarget);
     if (localOffset < 0) return -1L;
 
@@ -365,18 +403,16 @@ public final class SegmentedKeyRunTable {
   }
 
   /**
-   * Approximate payload heap bytes.
+   * Approximate payload heap bytes: object headers + directory array + int[] per bin.
    */
   public long retainedBytes() {
-    long bytes = 48L; // Object header + fields
-    bytes += (long) numBins * 8L + 24L; // Bin[] array
-    bytes += (long) dirBadPrefixSums.length * 8L + 24L; // dirBadPrefixSums array
+    long bytes = 64L; // base object
+    bytes += (long) numBins * 8L; // Bin references
     for (Bin b : bins) {
-      bytes += 48L; // Bin object header
-      if (!b.isEmpty() && !b.isFull()) {
-        bytes += (long) b.starts.length * 4L + 24L;
-        bytes += (long) b.lengths.length * 4L + 24L;
-        bytes += (long) b.badPrefixSums.length * 4L + 24L;
+      bytes += 48L; // Bin object header + fields
+      if (b.count() > 0 && !b.isFull()) {
+        bytes += 16L + (long) b.count() * 4L; // starts[]
+        bytes += 16L + (long) b.count() * 4L; // lengths[]
       }
     }
     return bytes;

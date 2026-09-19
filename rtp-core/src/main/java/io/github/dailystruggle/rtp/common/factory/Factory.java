@@ -71,7 +71,6 @@ public class Factory<T extends FactoryValue<?>> {
    * @return mutable copy of an item
    */
   @Nullable
-  @SuppressWarnings("unchecked") // clone() returns the runtime type of the stored T template
   public FactoryValue<?> construct(String name) {
     String comparableName = name.toUpperCase();
     if (!comparableName.endsWith(".YML")) comparableName = comparableName + ".YML";
@@ -104,7 +103,6 @@ public class Factory<T extends FactoryValue<?>> {
    * @return mutable cloned copy, or {@code null} if factory is empty
    */
   @Nullable
-  @SuppressWarnings("unchecked") // clone() returns the runtime type of the stored T template
   public FactoryValue<?> construct(String name, String fromName) {
     if (fromName == null) return construct(name);
     String fromKey = fromName.toUpperCase();
@@ -148,7 +146,6 @@ public class Factory<T extends FactoryValue<?>> {
    * @return a clone of the best-matching value; never {@code null} when the map is non-empty
    */
   @NotNull
-  @SuppressWarnings("unchecked") // construct(name) returns a clone of this factory's T template
   public FactoryValue<?> getOrDefault(String name) {
     name = name.toUpperCase();
     if (!name.endsWith(".YML")) name = name + ".YML";

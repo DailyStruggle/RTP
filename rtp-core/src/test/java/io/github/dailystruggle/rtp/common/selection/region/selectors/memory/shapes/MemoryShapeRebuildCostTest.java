@@ -8,7 +8,6 @@ import java.lang.management.ManagementFactory;
 import java.util.Random;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Wall-clock JUnit timings, not JMH: cite the scaling ratios, not the absolute latencies.
  */
-@Tag("slow")
 public class MemoryShapeRebuildCostTest {
 
   private static final int PENDING_PER_REBUILD = 16;
