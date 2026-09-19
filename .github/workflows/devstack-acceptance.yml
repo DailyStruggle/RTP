@@ -56,9 +56,9 @@ jobs:
           chmod +x gradlew
           chmod +x devstack/*.sh
 
-      - name: Pre-build devstack plugin jar
+      - name: Pre-build devstack plugin & proxy jars
         run: |
-          ./gradlew :rtp-plugin:remapJar --console=plain
+          ./gradlew :rtp-proxy:rtp-proxy-velocity:jar :rtp-plugin:remapJar --console=plain
 
       - name: Install bot dependencies (for roundtrip scenario)
         working-directory: devstack/bot

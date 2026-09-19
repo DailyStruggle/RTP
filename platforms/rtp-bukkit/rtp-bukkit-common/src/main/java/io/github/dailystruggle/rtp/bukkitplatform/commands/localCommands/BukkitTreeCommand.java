@@ -8,9 +8,7 @@ import io.github.dailystruggle.rtp.bukkitplatform.commands.BukkitCommand;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.command.PluginCommand;
-import org.bukkit.command.RemoteConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
@@ -55,27 +53,14 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
         return parent;
     }
 
-    private static UUID resolveSenderId(CommandSender sender) {
-        if (sender instanceof Player) {
-            return ((Player) sender).getUniqueId();
-        }
-        if (sender instanceof ConsoleCommandSender
-                || sender instanceof RemoteConsoleCommandSender) {
-            return CommandsAPI.serverId;
-        }
-        try {
-            if (Bukkit.getServer() != null && sender.getName().equals(Bukkit.getConsoleSender().getName())) {
-                return CommandsAPI.serverId;
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
-    }
-
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        UUID senderId = resolveSenderId(sender);
-        if (senderId == null) {
+        UUID senderId;
+        if(sender instanceof Player) {
+            senderId = ((Player) sender).getUniqueId();
+        }
+        else if(sender.getName().equals(Bukkit.getConsoleSender().getName())) senderId = CommandsAPI.serverId;
+        else {
             sender.sendMessage("alternate command senders not currently supported");
             return false;
         }
@@ -91,8 +76,12 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        UUID senderId = resolveSenderId(sender);
-        if (senderId == null) return null;
+        UUID senderId;
+        if(sender instanceof Player) {
+            senderId = ((Player) sender).getUniqueId();
+        }
+        else if(sender.getName().equals(Bukkit.getConsoleSender().getName())) senderId = CommandsAPI.serverId;
+        else return null;
 
         return onTabComplete(senderId,sender::hasPermission,args);
     }

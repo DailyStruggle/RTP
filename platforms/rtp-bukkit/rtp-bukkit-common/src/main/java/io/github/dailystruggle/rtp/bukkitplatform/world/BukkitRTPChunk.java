@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
+import io.github.dailystruggle.rtp.bukkitplatform.anvil.PaletteNormalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -161,7 +162,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
 
   /**
    * 5-second-throttled reconciled snapshot of {@code BlocksKeys.airBlocks}. Built
-   * from {@code RTP.configs} via {@code reconcilePaletteIdentifiers} so the
+   * from {@code RTP.configs} via {@link PaletteNormalizer#reconcileAll(Collection)} so the
    * canonical, tag-expanded forms (per {@code JumpAdjustor.refreshSafetySets}'s
    * mutation of the parser) line up with both the live {@code Material.name()}
    * comparison and the {@link AnvilChunkView#isAir(int,int,int,Set)} comparison
@@ -228,9 +229,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
           raw.add(token);
         }
       }
-      Set<String> reconciled = (RTP.serverAccessor != null)
-          ? RTP.serverAccessor.reconcilePaletteIdentifiers(raw)
-          : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(raw);
+      Set<String> reconciled = PaletteNormalizer.reconcileAll(raw);
       AIR_BLOCKS_CACHE.set(reconciled);
       return reconciled;
     } catch (Throwable ignored) {
@@ -247,9 +246,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
     org.bukkit.Material type = chunk.getBlock(x & 0xF, y, z & 0xF).getType();
     if (type.isAir()) return true;
     if (airSet.isEmpty()) return false;
-    return (RTP.serverAccessor != null)
-        ? RTP.serverAccessor.matchesPaletteIdentifier(type.name(), airSet)
-        : airSet.contains(io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(type.name()));
+    return PaletteNormalizer.matches(type.name(), airSet);
   }
 
   /**
@@ -306,22 +303,18 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
 
   @Override
   public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
-    Set<String> reconciledUnsafeSet = (RTP.serverAccessor != null)
-        ? RTP.serverAccessor.reconcilePaletteIdentifiers(unsafeBlocks)
-        : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks);
     if (anvilView != null) {
       // Prefer the pre-reconciled set we were constructed with; if absent, reconcile
       // per-call to stay in sync with the raw config form (back-compat for ad-hoc
       // callers that construct an Anvil-backed chunk without supplying a reconciled set).
-      Set<String> set = (reconciledUnsafe != null) ? reconciledUnsafe : reconciledUnsafeSet;
+      Set<String> set =
+          (reconciledUnsafe != null) ? reconciledUnsafe : PaletteNormalizer.reconcileAll(unsafeBlocks);
       return anvilView.isSafe(x & 0xF, y, z & 0xF, set);
     }
     // Live chunk path: reconcile both the block's material name and the raw unsafe
     // set to ensure a canonical comparison, matching the Anvil path's logic.
     String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
-    return (RTP.serverAccessor != null)
-        ? !RTP.serverAccessor.matchesPaletteIdentifier(materialName, reconciledUnsafeSet)
-        : !reconciledUnsafeSet.contains(io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(materialName));
+    return !PaletteNormalizer.matches(materialName, PaletteNormalizer.reconcileAll(unsafeBlocks));
   }
 
   /**

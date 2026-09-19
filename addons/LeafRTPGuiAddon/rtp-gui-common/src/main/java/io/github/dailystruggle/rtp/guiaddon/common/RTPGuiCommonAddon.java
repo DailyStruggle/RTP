@@ -167,18 +167,6 @@ public final class RTPGuiCommonAddon implements RTPAddon {
     }
 
     for (String className : classNames) {
-      // Skip an obviously wrong-platform entry BEFORE loading its class. The
-      // bundled multi-loader jar lists every platform's renderer in one service
-      // file; defining e.g. the Fabric/NeoForge renderer classes on a Paper/Folia
-      // backend is pure waste (they are discarded by isAvailable() below anyway)
-      // and, worse, forces the JVM to define JDK-25 bytecode that a bytecode
-      // agent (JaCoCo) then chokes on, flooding the log. Gating on the package's
-      // matching platform loader avoids ever defining those classes here.
-      if (isWrongPlatformEntry(className)) {
-        RTP.log(Level.FINE, "[RTP-GUI] skipping MenuRenderer service entry '"
-            + className + "'; its platform loader is not present on this runtime");
-        continue;
-      }
       try {
         // Loading and instantiating a wrong-platform renderer throws
         // NoClassDefFoundError (its platform UI types are absent); the per-entry
@@ -211,42 +199,6 @@ public final class RTPGuiCommonAddon implements RTPAddon {
         RTP.log(Level.FINE, "[RTP-GUI] skipped a MenuRenderer service entry '"
             + className + "'", badEntry);
       }
-    }
-  }
-
-  /**
-   * Package-to-loader gate that decides whether a discovered {@link MenuRenderer}
-   * service entry belongs to a platform that is NOT the current runtime, so it can
-   * be skipped before its class is ever defined. Only bundled renderers whose
-   * package encodes a platform ({@code ...guiaddon.fabric.*},
-   * {@code ...guiaddon.neoforge.*}, {@code ...guiaddon.bukkit.*}) are gated; any
-   * unrecognised (third-party) entry returns {@code false} so it still loads and
-   * is filtered by {@link MenuRenderer#isAvailable()} as before.
-   *
-   * @param className fully-qualified renderer class name from a service file
-   * @return {@code true} if the entry's platform loader is absent on this runtime
-   */
-  private static boolean isWrongPlatformEntry(String className) {
-    String markerClass;
-    if (className.contains(".guiaddon.fabric.")) {
-      markerClass = "net.fabricmc.loader.api.FabricLoader";
-    } else if (className.contains(".guiaddon.neoforge.")) {
-      markerClass = "net.neoforged.fml.loading.FMLLoader";
-    } else if (className.contains(".guiaddon.bukkit.")) {
-      markerClass = "org.bukkit.Bukkit";
-    } else {
-      return false;
-    }
-    return !isClassPresent(markerClass);
-  }
-
-  /** @return true when {@code fqcn} can be resolved on this addon's classloader. */
-  private static boolean isClassPresent(String fqcn) {
-    try {
-      Class.forName(fqcn, false, RTPGuiCommonAddon.class.getClassLoader());
-      return true;
-    } catch (Throwable notPresent) {
-      return false;
     }
   }
 
