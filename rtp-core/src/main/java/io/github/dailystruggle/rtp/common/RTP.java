@@ -850,12 +850,8 @@ public class RTP {
     instance = this;
 
     addShape(new Circle());
-    addShape(new Circle("CIRCLE_DEPRECATED_PURE_SPIRAL"));
-    addShape(new CircleOptimizedDualLayer());
     addShape(new Ellipse());
     addShape(new Square());
-    addShape(new Square("SQUARE_DEPRECATED_PURE_SPIRAL"));
-    addShape(new SquareOptimizedDualLayer());
     addShape(new Rectangle());
     addShape(new Circle_Normal());
     addShape(new Square_Normal());

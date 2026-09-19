@@ -1,12 +1,7 @@
-package io.github.dailystruggle.rtp.linearaddon;
+package io.github.dailystruggle.rtp.anvil;
 
 import com.github.luben.zstd.Zstd;
 import com.github.luben.zstd.ZstdInputStream;
-import io.github.dailystruggle.rtp.anvil.AnvilReader;
-import io.github.dailystruggle.rtp.anvil.CorruptRegionEntryException;
-import io.github.dailystruggle.rtp.anvil.Nbt;
-import io.github.dailystruggle.rtp.anvil.RegionFileReader;
-import io.github.dailystruggle.rtp.anvil.UnsupportedAnvilFormatException;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -22,6 +17,17 @@ import java.util.logging.Logger;
  * <p>Linear region files ({@code .linear}) replace Mojang's 4 KiB sector-aligned Anvil layout
  * with continuous ZStandard ({@code zstd}) streams. Developed by high-performance server forks
  * (Leaves, Gale) and modded environments to reduce disk footprint by 30-60% and improve I/O.</p>
+ *
+ * <p>Format Specification:
+ * <ul>
+ *   <li>Magic header (8 bytes): {@code 0xC370ACDE22013702L} (signed long: {@code -4363842145328286974L}) or {@code "SUPER\0\0\0"}</li>
+ *   <li>Version byte (1 byte): 1 or 2</li>
+ *   <li>Newest timestamp (8 bytes) / Header metadata</li>
+ *   <li>Compression level (1 byte)</li>
+ *   <li>Chunk count / size table (1024 entries of 4-byte uncompressed lengths)</li>
+ *   <li>Timestamps (1024 entries of 4-byte timestamps in v1, or 8-byte in v2)</li>
+ *   <li>Continuous ZSTD-compressed stream containing the sequential chunk NBT payloads</li>
+ * </ul>
  */
 public final class LinearRegionReader implements RegionFileReader {
 
@@ -37,7 +43,7 @@ public final class LinearRegionReader implements RegionFileReader {
 
     private static volatile boolean zstdAvailable = true;
 
-    LinearRegionReader() {}
+    private LinearRegionReader() {}
 
     /**
      * Checks if native ZStandard decompression via zstd-jni is available in the current runtime.
@@ -74,6 +80,8 @@ public final class LinearRegionReader implements RegionFileReader {
                 return false;
             }
 
+            // Skip newest timestamp (8 bytes) + compression level (1 byte) + data payload length (4 bytes)
+            // Header layout: magic(8) + version(1) + newestTimestamp(8) + compressionLevel(1) + dataLen(4) = 22 bytes minimum
             if (regionBytes.length < 22 + CHUNKS_PER_REGION * 4) {
                 return false;
             }
@@ -154,6 +162,7 @@ public final class LinearRegionReader implements RegionFileReader {
             while (skipped < uncompressedOffsetToTarget) {
                 long s = zis.skip(uncompressedOffsetToTarget - skipped);
                 if (s <= 0) {
+                    // Try reading byte if skip returns 0
                     int b = zis.read();
                     if (b == -1) break;
                     skipped++;
@@ -179,6 +188,7 @@ public final class LinearRegionReader implements RegionFileReader {
         }
 
         LinkedHashMap<String, Object> root = Nbt.readRootCompound(nbtBytes);
+        // Linear mode: compressionType 255 (custom/ZSTD)
         return new AnvilReader.ChunkEntry(255, targetUncompressedLength, root);
     }
 }
