@@ -16,7 +16,6 @@ public class SquareOptimizedDualLayer extends Square {
   private final boolean derived;
   private volatile int cachedPointEdgeChunks;
 
-  @SuppressWarnings("java:S3077") // Volatile publication of immutable SegmentedKeyRunTable snapshot
   private volatile SegmentedKeyRunTable segmentedTable;
 
   public SquareOptimizedDualLayer() {

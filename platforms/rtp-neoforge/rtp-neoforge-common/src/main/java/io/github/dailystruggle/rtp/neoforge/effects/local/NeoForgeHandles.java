@@ -39,7 +39,6 @@ public final class NeoForgeHandles implements HandleProvider {
         return null;
     }
 
-    @SuppressWarnings("java:S3077") // Volatile reference publication for server handle
     private static volatile MinecraftServer cachedServer;
 
     public static void setServer(MinecraftServer server) {

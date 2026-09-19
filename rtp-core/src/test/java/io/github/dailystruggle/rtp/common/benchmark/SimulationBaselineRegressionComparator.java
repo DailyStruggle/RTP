@@ -82,7 +82,7 @@ public final class SimulationBaselineRegressionComparator {
 
     // Pattern to match each entry object in "benchmarks": [ ... ]
     // Each entry has: stem, section, subject, metric, value, provenance
-    Pattern entryPattern = Pattern.compile("\\{[^}]*?\"stem\"\\s*+:\\s*+\"([^\"]++)\"[^}]*?\\}");
+    Pattern entryPattern = Pattern.compile("\\{[^{}]*\"stem\"\\s*:\\s*\"([^\"]+)\"[^{}]*\\}", Pattern.DOTALL);
     Matcher entryMatcher = entryPattern.matcher(json);
 
     while (entryMatcher.find()) {
@@ -123,7 +123,7 @@ public final class SimulationBaselineRegressionComparator {
     if (fileStem == null || fileStem.isBlank()) return;
 
     List<SimulationReport.Row> rows = new ArrayList<>();
-    Pattern rowPattern = Pattern.compile("\\{[^}]*?\"section\"[^}]*?\\}");
+    Pattern rowPattern = Pattern.compile("\\{[^{}]*\"section\"[^{}]*\\}", Pattern.DOTALL);
     Matcher m = rowPattern.matcher(json);
     while (m.find()) {
       String block = m.group(0);
