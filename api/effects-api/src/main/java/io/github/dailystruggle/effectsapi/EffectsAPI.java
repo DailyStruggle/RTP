@@ -213,8 +213,7 @@ public final class EffectsAPI {
                     intVersion = Integer.valueOf( splitVersion[0] );
                 } catch (NumberFormatException e) {
                     Bukkit.getLogger().log(Level.SEVERE, "expected number, received - " + splitVersion[0]);
-                    Bukkit.getLogger().log(Level.SEVERE, "full string - " + getServerVersion());
-                    e.printStackTrace();
+                    Bukkit.getLogger().log(Level.SEVERE, "full string - " + getServerVersion(), e);
                     intVersion = 1;
                 }
             } else {
@@ -222,8 +221,7 @@ public final class EffectsAPI {
                     intVersion = Integer.valueOf( splitVersion[1] );
                 } catch (NumberFormatException e) {
                     Bukkit.getLogger().log(Level.SEVERE, "expected number, received - " + splitVersion[1]);
-                    Bukkit.getLogger().log(Level.SEVERE, "full string - " + getServerVersion());
-                    e.printStackTrace();
+                    Bukkit.getLogger().log(Level.SEVERE, "full string - " + getServerVersion(), e);
                     intVersion = 1;
                 }
             }

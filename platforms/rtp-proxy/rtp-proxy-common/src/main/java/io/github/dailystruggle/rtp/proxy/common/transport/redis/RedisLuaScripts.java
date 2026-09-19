@@ -118,6 +118,7 @@ final class RedisLuaScripts {
         }
     }
 
+    @SuppressWarnings("java:S4790") // SHA-1 is mandated by the Redis EVALSHA / SCRIPT LOAD protocol, not used in a security/cryptographic context
     private static String sha1Hex(byte[] bytes) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-1");

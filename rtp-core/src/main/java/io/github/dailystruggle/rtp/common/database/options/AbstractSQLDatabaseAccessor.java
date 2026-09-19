@@ -8,13 +8,17 @@ import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Abstract SQL database accessor with a batched async write queue.
@@ -244,6 +248,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
   protected abstract String getInsertStatement();
 
   @Override
+  @SuppressWarnings("java:S2077") // Dynamic table and column identifiers cannot be parameterized in JDBC; values use parameter binding
   public void delete(Connection connection, String tableName, Map.Entry<String, Object> lookup) {
     String sql = "DELETE FROM " + tableName + " WHERE " + lookup.getKey() + " = ?";
     try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -370,5 +375,77 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
     } catch (SQLException e) {
       RTP.log(Level.WARNING, "Failed to close database connection", e);
     }
+  }
+
+  @Override
+  public void startup() {
+    Connection connection = connect();
+    if (connection == null) return;
+    try {
+      String sql = "SELECT * FROM rtp_teleport_data";
+      try (PreparedStatement statement = connection.prepareStatement(sql);
+          ResultSet resultSet = statement.executeQuery()) {
+
+        while (resultSet.next()) {
+          String uuidStr = resultSet.getString("senderId");
+          if (uuidStr == null) continue;
+
+          UUID uuid = UUID.fromString(uuidStr);
+
+          TeleportData teleportData = new TeleportData();
+          teleportData.completed = true;
+          teleportData.time = resultSet.getLong("time");
+          teleportData.selectedCoords =
+              new RTPCoords(
+                  resultSet.getString("selectedWorldName"),
+                  resultSet.getInt("selectedX"),
+                  resultSet.getInt("selectedY"),
+                  resultSet.getInt("selectedZ"));
+          teleportData.originalCoords =
+              new RTPCoords(
+                  resultSet.getString("originalWorldName"),
+                  resultSet.getInt("originalX"),
+                  resultSet.getInt("originalY"),
+                  resultSet.getInt("originalZ"));
+          teleportData.cost = resultSet.getDouble("cost");
+
+          RTP.getInstance().latestTeleportData.put(uuid, teleportData);
+        }
+      }
+    } catch (SQLException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    } catch (IllegalArgumentException ignored) {
+    } finally {
+      disconnect(connection);
+    }
+
+    purgeStaleLocations();
+  }
+
+  @Override
+  @SuppressWarnings("java:S2077") // Dynamic table and column identifiers cannot be parameterized in JDBC; values use parameter binding
+  public @NotNull Optional<Map<String, Object>> read(
+      Connection connection, String tableName, Map.Entry<String, Object> lookup) {
+    Map<String, Object> row = new HashMap<>();
+    String sql = "SELECT * FROM " + tableName + " WHERE " + lookup.getKey() + " = ?";
+
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setObject(1, lookup.getValue());
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet.next()) {
+          ResultSetMetaData metaData = resultSet.getMetaData();
+          int columnCount = metaData.getColumnCount();
+          for (int i = 1; i <= columnCount; i++) {
+            String key = metaData.getColumnName(i);
+            Object object = resultSet.getObject(i);
+            if (object == null) continue;
+            row.put(key, object);
+          }
+          return Optional.of(row);
+        }
+      }
+    } catch (SQLException ignored) {
+    }
+    return Optional.empty();
   }
 }

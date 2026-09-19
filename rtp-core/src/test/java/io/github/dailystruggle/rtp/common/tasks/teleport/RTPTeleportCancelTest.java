@@ -273,4 +273,115 @@ class RTPTeleportCancelTest {
         data.nextTask = null;
         assertDoesNotThrow(cancel::run);
     }
+
+    @Test
+    void refund_handles_null_configs_and_missing_eco_parser() {
+        UUID id = UUID.randomUUID();
+        io.github.dailystruggle.rtp.common.configuration.Configs savedConfigs = RTP.configs;
+        try {
+            RTP.configs = null;
+            assertDoesNotThrow(() -> RTPTeleportCancel.refund(id));
+
+            RTP.configs = new io.github.dailystruggle.rtp.common.configuration.Configs(tempDir);
+            RTP.configs.configParserMap = null;
+            assertDoesNotThrow(() -> RTPTeleportCancel.refund(id));
+
+            RTP.configs.configParserMap = new java.util.concurrent.ConcurrentHashMap<>();
+            assertDoesNotThrow(() -> RTPTeleportCancel.refund(id));
+        } finally {
+            RTP.configs = savedConfigs;
+        }
+    }
+
+    @Test
+    void refund_handles_string_and_custom_object_config_values() {
+        UUID id = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(id, "EcoStringP", new RTPLocation(world, 0, 64, 0));
+        accessor.addPlayer(player);
+
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
+            (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
+                RTP.configs.configParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
+
+        AtomicInteger refundCalls = new AtomicInteger();
+        RTP.economy = new RTPEconomy() {
+            @Override public void give(UUID player, double amount) { refundCalls.incrementAndGet(); }
+            @Override public boolean take(UUID player, double amount) { return false; }
+            @Override public double bal(UUID player) { return 0; }
+        };
+
+        // 1. String configValue "true"
+        eco.set(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.refundOnCancel, "true");
+        TeleportData data = new TeleportData();
+        data.completed = false;
+        data.cost = 10.0;
+        data.sender = player;
+        data.selectedCoords = new io.github.dailystruggle.rtp.api.world.RTPCoords(world.name(), 1, 64, 1);
+        io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle circle =
+            new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle();
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor vert =
+            new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new java.util.ArrayList<>());
+        io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings =
+            new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
+                "dummy", world, circle, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        data.targetRegion = new io.github.dailystruggle.rtp.common.selection.region.Region("dummy", settings);
+        RTP.getInstance().latestTeleportData.put(id, data);
+        RTPTeleportCancel.refund(id);
+        assertEquals(1, refundCalls.get());
+
+        // 2. Custom Object configValue whose toString() is "false"
+        eco.set(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.refundOnCancel, new Object() {
+            @Override public String toString() { return "false"; }
+        });
+        TeleportData data2 = new TeleportData();
+        data2.completed = false;
+        data2.cost = 10.0;
+        data2.sender = player;
+        RTP.getInstance().latestTeleportData.put(id, data2);
+        RTPTeleportCancel.refund(id);
+        assertEquals(1, refundCalls.get(), "False refundOnCancel should not issue refund");
+
+        // 3. Sender is non-player (e.g. console/server)
+        eco.set(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.refundOnCancel, true);
+        TeleportData data3 = new TeleportData();
+        data3.completed = false;
+        data3.cost = 10.0;
+        data3.sender = new io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender(UUID.randomUUID(), "CONSOLE");
+        RTP.getInstance().latestTeleportData.put(id, data3);
+        RTPTeleportCancel.refund(id);
+        assertEquals(1, refundCalls.get(), "Non-player sender should not receive player refund");
+    }
+
+    @Test
+    void run_handles_null_player_and_offline_player() {
+        UUID id = UUID.randomUUID();
+        // player is null in accessor
+        TeleportData data = new TeleportData();
+        data.completed = false;
+        TeleportPipelineTask task = new TeleportPipelineTask(new io.github.dailystruggle.rtp.api.selection.GenerationContext(null, null, null));
+        data.nextTask = task;
+        RTP.getInstance().latestTeleportData.put(id, data);
+
+        RTPTeleportCancel cancel = new RTPTeleportCancel(id);
+        cancel.run();
+        assertTrue(task.isCancelled());
+
+        // player is offline
+        UUID id2 = UUID.randomUUID();
+        MockRTPPlayer offlinePlayer = new MockRTPPlayer(id2, "OfflineP", new RTPLocation(world, 0, 64, 0)) {
+            @Override public boolean isOnline() { return false; }
+            @Override public boolean hasPermission(String permission) { return true; }
+        };
+        accessor.addPlayer(offlinePlayer);
+
+        TeleportData data2 = new TeleportData();
+        data2.completed = false;
+        TeleportPipelineTask task2 = new TeleportPipelineTask(new io.github.dailystruggle.rtp.api.selection.GenerationContext(offlinePlayer, offlinePlayer, null));
+        data2.nextTask = task2;
+        RTP.getInstance().latestTeleportData.put(id2, data2);
+
+        RTPTeleportCancel cancel2 = new RTPTeleportCancel(id2);
+        cancel2.run();
+        assertTrue(task2.isCancelled());
+    }
 }

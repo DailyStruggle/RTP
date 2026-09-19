@@ -335,6 +335,7 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
    * reservation-token surface that {@code rtp-proxy-ADR-005} A1+A2 + the
    * reservation-token TTL reaper newly enable on Redis.</p>
    */
+  @SuppressWarnings("java:S2245") // Non-cryptographic pseudo-random number generator is safe for generating synthetic benchmark test UUIDs
   private void runTokenProbe(
           UUID callerId, NetworkTransport transport, int peerCount, long ttlMs) {
     final String suffix = " (" + transport.getClass().getSimpleName() + ")";

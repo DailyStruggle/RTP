@@ -560,6 +560,17 @@ public class MetricsRecorder {
         phaseTickIntervalMaxNs.accumulateAndGet(max, (l, r) -> Math.max(l, r));
     }
 
+    /**
+     * Protected no-op constructor for proxies and test doubles that override recording methods
+     * without writing to disk.
+     */
+    protected MetricsRecorder() {
+        this.csvPath = null;
+        this.phasesCsvPath = null;
+        this.partialPhaseCsvPath = null;
+        this.storageProfilePath = null;
+    }
+
     public MetricsRecorder(Path csvPath) throws IOException {
         this.csvPath = csvPath;
         // Sibling CSV next to the main per-attempt CSV: <stamp>.csv → <stamp>-phases.csv

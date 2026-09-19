@@ -865,6 +865,21 @@ sonar {
                 '**/testing/**',
                 '**/mock/**'
         ].join(',')
+        // Exclude version-pinned platform adapters, deobf/unobf carrier mirrors, and test fixtures from CPD cross-matching
+        property 'sonar.cpd.exclusions', [
+                '**/test/**',
+                '**/testFixtures/**',
+                '**/*Test*.java',
+                '**/*Benchmark*.java',
+                '**/testing/**',
+                '**/mock/**',
+                'platforms/**/v*/**',
+                'platforms/**/*unobf/**',
+                'platforms/**/*Unobf/**',
+                'api/**/*unobf/**',
+                'api/**/*Unobf/**',
+                '**/server/ServerAccessorImpl.java'
+        ].join(',')
     }
 }
 
@@ -886,6 +901,13 @@ subprojects {
 
             if (isExcludedFromCoverage) {
                 property 'sonar.coverage.exclusions', '**/*'
+            }
+
+            def isVersionAdapterOrCarrier = project.name.matches('v[0-9]+.*') ||
+                    project.name.contains('unobf') ||
+                    project.path.matches('.*:(v[0-9]+.*|.*unobf.*)')
+            if (isVersionAdapterOrCarrier) {
+                property 'sonar.cpd.exclusions', '**/*'
             }
 
             def jacocoReport = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile

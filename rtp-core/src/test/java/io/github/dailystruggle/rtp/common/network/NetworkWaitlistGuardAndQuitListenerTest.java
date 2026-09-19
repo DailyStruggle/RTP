@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.network;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.api.network.RtpTriggerSource;
 import io.github.dailystruggle.rtp.api.server.PlayerLifecycleHook;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
