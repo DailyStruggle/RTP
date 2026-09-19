@@ -85,17 +85,15 @@ public final class NetworkEnrolmentBuffer {
      *
      * @param periodTicks flush interval in server ticks
      */
-    public void start(long periodTicks) {
-        synchronized (this) {
-            if (timerTaskHandle != null) return;
-            if (RTP.scheduler == null) {
-                RTP.log(Level.WARNING,
-                        "[RTP] NetworkEnrolmentBuffer.start called before scheduler available; "
-                                + "flush timer not started.");
-                return;
-            }
-            timerTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(this::flushOnce, periodTicks, periodTicks);
+    public synchronized void start(long periodTicks) {
+        if (timerTaskHandle != null) return;
+        if (RTP.scheduler == null) {
+            RTP.log(Level.WARNING,
+                    "[RTP] NetworkEnrolmentBuffer.start called before scheduler available; "
+                            + "flush timer not started.");
+            return;
         }
+        timerTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(this::flushOnce, periodTicks, periodTicks);
     }
 
     /**
@@ -127,12 +125,10 @@ public final class NetworkEnrolmentBuffer {
     }
 
     /** Idempotent. */
-    public void shutdown() {
-        synchronized (this) {
-            if (timerTaskHandle != null && RTP.scheduler != null) {
-                try { RTP.scheduler.cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
-            }
-            timerTaskHandle = null;
+    public synchronized void shutdown() {
+        if (timerTaskHandle != null && RTP.scheduler != null) {
+            try { RTP.scheduler.cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
         }
+        timerTaskHandle = null;
     }
 }

@@ -162,77 +162,75 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
   }
 
   /** Drain the write queue and execute a batched insert. */
-  public void flush() {
-    synchronized (this) {
-      if (writeQueue.isEmpty()) return;
+  public synchronized void flush() {
+    if (writeQueue.isEmpty()) return;
 
-      Connection connection = null;
-      boolean autoCommitToggled = false;
-      boolean batchAdded = false;
-      try {
-        connection = getConnection();
-        // Guard against a shared connection whose auto-commit state
-        // may have been flipped by another operation on the same
-        // SQLite/H2 connection. Only toggle if we actually own the
-        // transition so we can restore it in the finally block.
-        if (connection.getAutoCommit()) {
-          connection.setAutoCommit(false);
-          autoCommitToggled = true;
+    Connection connection = null;
+    boolean autoCommitToggled = false;
+    boolean batchAdded = false;
+    try {
+      connection = getConnection();
+      // Guard against a shared connection whose auto-commit state
+      // may have been flipped by another operation on the same
+      // SQLite/H2 connection. Only toggle if we actually own the
+      // transition so we can restore it in the finally block.
+      if (connection.getAutoCommit()) {
+        connection.setAutoCommit(false);
+        autoCommitToggled = true;
+      }
+      String sql = getInsertStatement();
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        TeleportData data;
+        while ((data = writeQueue.poll()) != null) {
+          Map<String, Object> columns = toColumns(data);
+          statement.setString(1, String.valueOf(columns.get("senderName")));
+          statement.setString(2, String.valueOf(columns.get("senderId")));
+          statement.setLong(3, ((Number) columns.getOrDefault("time", 0L)).longValue());
+          statement.setLong(4, ((Number) columns.getOrDefault("delay", 0L)).longValue());
+          statement.setInt(5, ((Number) columns.getOrDefault("selectedX", 0)).intValue());
+          statement.setInt(6, ((Number) columns.getOrDefault("selectedY", 0)).intValue());
+          statement.setInt(7, ((Number) columns.getOrDefault("selectedZ", 0)).intValue());
+          statement.setString(8, String.valueOf(columns.get("selectedWorldName")));
+          statement.setString(9, String.valueOf(columns.get("selectedWorldId")));
+          statement.setInt(10, ((Number) columns.getOrDefault("originalX", 0)).intValue());
+          statement.setInt(11, ((Number) columns.getOrDefault("originalY", 0)).intValue());
+          statement.setInt(12, ((Number) columns.getOrDefault("originalZ", 0)).intValue());
+          statement.setString(13, String.valueOf(columns.get("originalWorldName")));
+          statement.setString(14, String.valueOf(columns.get("originalWorldId")));
+          statement.setString(15, String.valueOf(columns.get("region")));
+          statement.setDouble(16, ((Number) columns.getOrDefault("cost", 0.0)).doubleValue());
+          statement.setLong(17, ((Number) columns.getOrDefault("attempts", 0L)).longValue());
+          statement.addBatch();
+          batchAdded = true;
         }
-        String sql = getInsertStatement();
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-          TeleportData data;
-          while ((data = writeQueue.poll()) != null) {
-            Map<String, Object> columns = toColumns(data);
-            statement.setString(1, String.valueOf(columns.get("senderName")));
-            statement.setString(2, String.valueOf(columns.get("senderId")));
-            statement.setLong(3, ((Number) columns.getOrDefault("time", 0L)).longValue());
-            statement.setLong(4, ((Number) columns.getOrDefault("delay", 0L)).longValue());
-            statement.setInt(5, ((Number) columns.getOrDefault("selectedX", 0)).intValue());
-            statement.setInt(6, ((Number) columns.getOrDefault("selectedY", 0)).intValue());
-            statement.setInt(7, ((Number) columns.getOrDefault("selectedZ", 0)).intValue());
-            statement.setString(8, String.valueOf(columns.get("selectedWorldName")));
-            statement.setString(9, String.valueOf(columns.get("selectedWorldId")));
-            statement.setInt(10, ((Number) columns.getOrDefault("originalX", 0)).intValue());
-            statement.setInt(11, ((Number) columns.getOrDefault("originalY", 0)).intValue());
-            statement.setInt(12, ((Number) columns.getOrDefault("originalZ", 0)).intValue());
-            statement.setString(13, String.valueOf(columns.get("originalWorldName")));
-            statement.setString(14, String.valueOf(columns.get("originalWorldId")));
-            statement.setString(15, String.valueOf(columns.get("region")));
-            statement.setDouble(16, ((Number) columns.getOrDefault("cost", 0.0)).doubleValue());
-            statement.setLong(17, ((Number) columns.getOrDefault("attempts", 0L)).longValue());
-            statement.addBatch();
-            batchAdded = true;
-          }
-          if (batchAdded) {
-            statement.executeBatch();
-            if (!connection.getAutoCommit()) {
-              connection.commit();
-            }
-          }
-        } catch (SQLException e) {
-          // Only attempt rollback if we are actually in a transaction.
-          // On a shared SQLite/H2 connection another caller may have
-          // restored auto-commit, in which case rollback would throw
-          // "database in auto-commit mode" and mask the real error.
-          try {
-            if (!connection.getAutoCommit()) {
-              connection.rollback();
-            }
-          } catch (SQLException rollbackEx) {
-            RTP.log(Level.WARNING, "Failed to rollback after flush error", rollbackEx);
-          }
-          RTP.log(Level.WARNING, "Failed to flush teleport data batch", e);
-        } finally {
-          if (autoCommitToggled) {
-            try {
-              connection.setAutoCommit(true);
-            } catch (SQLException ignored) {}
+        if (batchAdded) {
+          statement.executeBatch();
+          if (!connection.getAutoCommit()) {
+            connection.commit();
           }
         }
       } catch (SQLException e) {
-        RTP.log(Level.WARNING, "Database connection error during flush", e);
+        // Only attempt rollback if we are actually in a transaction.
+        // On a shared SQLite/H2 connection another caller may have
+        // restored auto-commit, in which case rollback would throw
+        // "database in auto-commit mode" and mask the real error.
+        try {
+          if (!connection.getAutoCommit()) {
+            connection.rollback();
+          }
+        } catch (SQLException rollbackEx) {
+          RTP.log(Level.WARNING, "Failed to rollback after flush error", rollbackEx);
+        }
+        RTP.log(Level.WARNING, "Failed to flush teleport data batch", e);
+      } finally {
+        if (autoCommitToggled) {
+          try {
+            connection.setAutoCommit(true);
+          } catch (SQLException ignored) {}
+        }
       }
+    } catch (SQLException e) {
+      RTP.log(Level.WARNING, "Database connection error during flush", e);
     }
   }
 

@@ -449,81 +449,77 @@ public final class FabricLegacyText {
         return null;
     }
 
-    private static void probeHoverCtors() {
-        synchronized (FabricLegacyText.class) {
-            if (HOVER_PROBED) return;
-            // 1.21.x: ctor is generic `HoverEvent(Action<T>, T)` → erasure (Action, Object).
+    private static synchronized void probeHoverCtors() {
+        if (HOVER_PROBED) return;
+        // 1.21.x: ctor is generic `HoverEvent(Action<T>, T)` → erasure (Action, Object).
+        try {
+            HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Object.class);
+        } catch (Throwable ignored) { /* not on this runtime */ }
+        // 1.20.x: ctor was `HoverEvent(Action, Component)` (pre-generification).
+        if (HOVER_CTOR_LEGACY == null) {
             try {
-                HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Object.class);
+                HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Component.class);
             } catch (Throwable ignored) { /* not on this runtime */ }
-            // 1.20.x: ctor was `HoverEvent(Action, Component)` (pre-generification).
-            if (HOVER_CTOR_LEGACY == null) {
-                try {
-                    HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Component.class);
-                } catch (Throwable ignored) { /* not on this runtime */ }
-            }
-            if (HOVER_CTOR_LEGACY == null) {
-                // 1.21.5+: per-action records nested under HoverEvent. The mojmap name
-                // is "ShowText", but on intermediary-mapped runtimes (Fabric production)
-                // the nested class is "class_2568$class_NNNN". String.forName with the
-                // mojmap literal won't resolve there - enumerate nested classes of the
-                // (already-remapped) HoverEvent.class symbol instead and pick the
-                // unique subclass whose single-arg ctor takes a Component.
-                try {
-                    for (Class<?> nested : HoverEvent.class.getDeclaredClasses()) {
-                        if (!HoverEvent.class.isAssignableFrom(nested)) continue;
-                        try {
-                            java.lang.reflect.Constructor<?> ctor = nested.getDeclaredConstructor(Component.class);
-                            ctor.setAccessible(true);
-                            HOVER_CTOR_SHOWTEXT = ctor;
-                            break;
-                        } catch (NoSuchMethodException ignored) { /* try next */ }
-                    }
-                } catch (Throwable ignored) { /* nothing matched */ }
-            }
-            HOVER_PROBED = true;
-            logProbeResults();
         }
+        if (HOVER_CTOR_LEGACY == null) {
+            // 1.21.5+: per-action records nested under HoverEvent. The mojmap name
+            // is "ShowText", but on intermediary-mapped runtimes (Fabric production)
+            // the nested class is "class_2568$class_NNNN". String.forName with the
+            // mojmap literal won't resolve there - enumerate nested classes of the
+            // (already-remapped) HoverEvent.class symbol instead and pick the
+            // unique subclass whose single-arg ctor takes a Component.
+            try {
+                for (Class<?> nested : HoverEvent.class.getDeclaredClasses()) {
+                    if (!HoverEvent.class.isAssignableFrom(nested)) continue;
+                    try {
+                        java.lang.reflect.Constructor<?> ctor = nested.getDeclaredConstructor(Component.class);
+                        ctor.setAccessible(true);
+                        HOVER_CTOR_SHOWTEXT = ctor;
+                        break;
+                    } catch (NoSuchMethodException ignored) { /* try next */ }
+                }
+            } catch (Throwable ignored) { /* nothing matched */ }
+        }
+        HOVER_PROBED = true;
+        logProbeResults();
     }
 
-    private static void probeClickCtors() {
-        synchronized (FabricLegacyText.class) {
-            if (CLICK_PROBED) return;
+    private static synchronized void probeClickCtors() {
+        if (CLICK_PROBED) return;
+        try {
+            CLICK_CTOR_LEGACY = ClickEvent.class.getConstructor(ClickEvent.Action.class, String.class);
+        } catch (Throwable ignored) { /* not on this runtime */ }
+        if (CLICK_CTOR_LEGACY == null) {
+            // 1.21.5+: per-action records nested under ClickEvent. Mojmap names
+            // are "SuggestCommand" / "RunCommand", but on intermediary-mapped
+            // runtimes those are "class_2558$class_NNNN". Enumerate nested
+            // (String)-ctor subclasses, instantiate each, and dispatch by the
+            // result of its action() accessor - robust across mappings.
             try {
-                CLICK_CTOR_LEGACY = ClickEvent.class.getConstructor(ClickEvent.Action.class, String.class);
-            } catch (Throwable ignored) { /* not on this runtime */ }
-            if (CLICK_CTOR_LEGACY == null) {
-                // 1.21.5+: per-action records nested under ClickEvent. Mojmap names
-                // are "SuggestCommand" / "RunCommand", but on intermediary-mapped
-                // runtimes those are "class_2558$class_NNNN". Enumerate nested
-                // (String)-ctor subclasses, instantiate each, and dispatch by the
-                // result of its action() accessor - robust across mappings.
-                try {
-                    for (Class<?> nested : ClickEvent.class.getDeclaredClasses()) {
-                        if (!ClickEvent.class.isAssignableFrom(nested)) continue;
-                        java.lang.reflect.Constructor<?> ctor;
-                        try {
-                            ctor = nested.getDeclaredConstructor(String.class);
-                        } catch (NoSuchMethodException ignored) {
-                            continue;
-                        }
-                        ctor.setAccessible(true);
-                        try {
-                            Object instance = ctor.newInstance("");
-                            ClickEvent.Action action = ((ClickEvent) instance).getAction();
-                            if (action == ClickEvent.Action.SUGGEST_COMMAND && CLICK_CTOR_SUGGEST == null) {
-                                CLICK_CTOR_SUGGEST = ctor;
-                            } else if (action == ClickEvent.Action.RUN_COMMAND && CLICK_CTOR_RUN == null) {
-                                CLICK_CTOR_RUN = ctor;
-                            }
-                        } catch (Throwable ignored) { /* not this one */ }
-                        if (CLICK_CTOR_SUGGEST != null && CLICK_CTOR_RUN != null) break;
+                for (Class<?> nested : ClickEvent.class.getDeclaredClasses()) {
+                    if (!ClickEvent.class.isAssignableFrom(nested)) continue;
+                    java.lang.reflect.Constructor<?> ctor;
+                    try {
+                        ctor = nested.getDeclaredConstructor(String.class);
+                    } catch (NoSuchMethodException ignored) {
+                        continue;
                     }
-                } catch (Throwable ignored) { /* nothing matched */ }
-            }
-            CLICK_PROBED = true;
-            logProbeResults();
+                    ctor.setAccessible(true);
+                    try {
+                        Object instance = ctor.newInstance("");
+                        ClickEvent.Action action = ((ClickEvent) instance).getAction();
+                        if (action == ClickEvent.Action.SUGGEST_COMMAND && CLICK_CTOR_SUGGEST == null) {
+                            CLICK_CTOR_SUGGEST = ctor;
+                        } else if (action == ClickEvent.Action.RUN_COMMAND && CLICK_CTOR_RUN == null) {
+                            CLICK_CTOR_RUN = ctor;
+                        }
+                    } catch (Throwable ignored) { /* not this one */ }
+                    if (CLICK_CTOR_SUGGEST != null && CLICK_CTOR_RUN != null) break;
+                }
+            } catch (Throwable ignored) { /* nothing matched */ }
         }
+        CLICK_PROBED = true;
+        logProbeResults();
     }
 
     // ------------------------------------------------------------------
@@ -541,29 +537,27 @@ public final class FabricLegacyText {
     private static volatile boolean HOVER_BUILD_FAILURE_LOGGED;
     private static volatile boolean CLICK_BUILD_FAILURE_LOGGED;
 
-    private static void logProbeResults() {
-        synchronized (FabricLegacyText.class) {
-            if (PROBE_LOGGED) return;
-            PROBE_LOGGED = true;
-            try {
-                // Probes run lazily: hover probe runs from buildShowTextHover, click probe
-                // from buildClick. logProbeResults is called from both, so only emit once
-                // both have actually been run.
-                if (!HOVER_PROBED || !CLICK_PROBED) {
-                    PROBE_LOGGED = false; // retry on the next probe
-                    return;
-                }
-                RTP.log(Level.INFO,
-                        "[RTP] FabricLegacyText probe results: "
-                                + "HOVER_CTOR_LEGACY=" + (HOVER_CTOR_LEGACY != null)
-                                + ", HOVER_CTOR_SHOWTEXT=" + (HOVER_CTOR_SHOWTEXT != null)
-                                + ", CLICK_CTOR_LEGACY=" + (CLICK_CTOR_LEGACY != null)
-                                + ", CLICK_CTOR_SUGGEST=" + (CLICK_CTOR_SUGGEST != null)
-                                + ", CLICK_CTOR_RUN=" + (CLICK_CTOR_RUN != null)
-                                + " (HoverEvent class=" + HoverEvent.class.getName()
-                                + ", ClickEvent class=" + ClickEvent.class.getName() + ")");
-            } catch (Throwable ignored) { /* best-effort */ }
-        }
+    private static synchronized void logProbeResults() {
+        if (PROBE_LOGGED) return;
+        PROBE_LOGGED = true;
+        try {
+            // Probes run lazily: hover probe runs from buildShowTextHover, click probe
+            // from buildClick. logProbeResults is called from both, so only emit once
+            // both have actually been run.
+            if (!HOVER_PROBED || !CLICK_PROBED) {
+                PROBE_LOGGED = false; // retry on the next probe
+                return;
+            }
+            RTP.log(Level.INFO,
+                    "[RTP] FabricLegacyText probe results: "
+                            + "HOVER_CTOR_LEGACY=" + (HOVER_CTOR_LEGACY != null)
+                            + ", HOVER_CTOR_SHOWTEXT=" + (HOVER_CTOR_SHOWTEXT != null)
+                            + ", CLICK_CTOR_LEGACY=" + (CLICK_CTOR_LEGACY != null)
+                            + ", CLICK_CTOR_SUGGEST=" + (CLICK_CTOR_SUGGEST != null)
+                            + ", CLICK_CTOR_RUN=" + (CLICK_CTOR_RUN != null)
+                            + " (HoverEvent class=" + HoverEvent.class.getName()
+                            + ", ClickEvent class=" + ClickEvent.class.getName() + ")");
+        } catch (Throwable ignored) { /* best-effort */ }
     }
 
     private static void logDecorationFailureOnce(Throwable t, boolean hasHover,

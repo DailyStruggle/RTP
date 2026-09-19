@@ -79,88 +79,86 @@ public final class MetricsBindingDispatcher {
      * Install the platform-appropriate binding into {@link RTP#metrics}.
      * Safe to call repeatedly - only the first call has effect.
      */
-    public static void install() {
-        synchronized (MetricsBindingDispatcher.class) {
-            if (installed) {
-                RTP.log(Level.FINER, LOG_TAG + " install() noop (already installed)");
-                return;
+    public static synchronized void install() {
+        if (installed) {
+            RTP.log(Level.FINER, LOG_TAG + " install() noop (already installed)");
+            return;
+        }
+        try {
+            // Folia and Paper bindings are resolved by FQN and may be absent from
+            // trimmed assemblies (e.g. the rtp-lite jar excludes
+            // io/github/dailystruggle/rtp/folia/**). When the preferred binding is
+            // not on the classpath, fall through to the next applicable path
+            // rather than aborting with a WARNING + stack trace.
+            if (isFoliaRuntime()) {
+                MetricsBinding folia = instantiateBinding(
+                        FOLIA_BINDING_FQN, "FoliaMetricsBinding (threaded-regions detected)");
+                if (folia != null) {
+                    // No external sampler task: FoliaRegionProcessor drives
+                    // FoliaMetricsBinding#recordRegionTick from each region's
+                    // own thread (C1.2b).
+                    //
+                    // Per-field merge: prefer spark's TPS/MSPT over the native
+                    // Folia values when spark is present. Folia's native
+                    // FoliaRegionTpsSampler derives MSPT from the inter-tick
+                    // interval (~50 ms on a healthy server), not the real
+                    // per-tick processing time, so /rtp info and the map
+                    // visualizer showed a flat/incorrect MSPT. spark exposes a
+                    // true MSPT statistic that is consistent on Folia. The
+                    // SparkMetricsBinding delegates foliaRegions() to the Folia
+                    // binding, so per-region samples are preserved.
+                    RTP.log(Level.FINE, LOG_TAG
+                            + " installed FoliaMetricsBinding (threaded-regions detected)");
+                    RTP.metrics.setBinding(wrapWithSparkIfPresent(folia));
+                    installed = true;
+                    return;
+                }
             }
-            try {
-                // Folia and Paper bindings are resolved by FQN and may be absent from
-                // trimmed assemblies (e.g. the rtp-lite jar excludes
-                // io/github/dailystruggle/rtp/folia/**). When the preferred binding is
-                // not on the classpath, fall through to the next applicable path
-                // rather than aborting with a WARNING + stack trace.
-                if (isFoliaRuntime()) {
-                    MetricsBinding folia = instantiateBinding(
-                            FOLIA_BINDING_FQN, "FoliaMetricsBinding (threaded-regions detected)");
-                    if (folia != null) {
-                        // No external sampler task: FoliaRegionProcessor drives
-                        // FoliaMetricsBinding#recordRegionTick from each region's
-                        // own thread (C1.2b).
-                        //
-                        // Per-field merge: prefer spark's TPS/MSPT over the native
-                        // Folia values when spark is present. Folia's native
-                        // FoliaRegionTpsSampler derives MSPT from the inter-tick
-                        // interval (~50 ms on a healthy server), not the real
-                        // per-tick processing time, so /rtp info and the map
-                        // visualizer showed a flat/incorrect MSPT. spark exposes a
-                        // true MSPT statistic that is consistent on Folia. The
-                        // SparkMetricsBinding delegates foliaRegions() to the Folia
-                        // binding, so per-region samples are preserved.
-                        RTP.log(Level.FINE, LOG_TAG
-                                + " installed FoliaMetricsBinding (threaded-regions detected)");
-                        RTP.metrics.setBinding(wrapWithSparkIfPresent(folia));
-                        installed = true;
-                        return;
-                    }
+            if (isPaperRuntime()) {
+                MetricsBinding paper = instantiateBinding(
+                        PAPER_BINDING_FQN, "PaperMetricsBinding (Bukkit#getTPS detected)");
+                if (paper != null) {
+                    RTP.log(Level.FINE, LOG_TAG
+                            + " installed PaperMetricsBinding (Bukkit#getTPS detected)");
+                    // Per-field merge: prefer spark's TPS/MSPT over the native
+                    // Paper values when spark is present (Folia is handled above
+                    // and intentionally stays on its native per-region binding).
+                    RTP.metrics.setBinding(wrapWithSparkIfPresent(paper));
+                    installed = true;
+                    return;
                 }
-                if (isPaperRuntime()) {
-                    MetricsBinding paper = instantiateBinding(
-                            PAPER_BINDING_FQN, "PaperMetricsBinding (Bukkit#getTPS detected)");
-                    if (paper != null) {
-                        RTP.log(Level.FINE, LOG_TAG
-                                + " installed PaperMetricsBinding (Bukkit#getTPS detected)");
-                        // Per-field merge: prefer spark's TPS/MSPT over the native
-                        // Paper values when spark is present (Folia is handled above
-                        // and intentionally stays on its native per-region binding).
-                        RTP.metrics.setBinding(wrapWithSparkIfPresent(paper));
-                        installed = true;
-                        return;
-                    }
-                }
-                {
-                    Class<?> samplerClass = Class.forName(SPIGOT_SAMPLER_FQN);
-                    Object sampler = samplerClass.getDeclaredConstructor().newInstance();
-                    // Merge spark TPS/MSPT over the raw-Spigot sampler when present;
-                    // the sampler is still driven below so its values back the
-                    // merge's fallback and supply playerCount / softCap.
-                    RTP.metrics.setBinding(wrapWithSparkIfPresent((MetricsBinding) sampler));
-                    spigotSamplerInstance = sampler;
-                    // Drive sampler.tick() once per server tick. The sampler is
-                    // documented as single-tick-thread-only, which matches
-                    // RTP.scheduler.runTaskTimer (global region scheduler on Folia,
-                    // main thread on Spigot/Paper).
-                    java.lang.reflect.Method tick = samplerClass.getMethod("tick");
-                    spigotSamplerTaskHandle = RTP.scheduler.runTaskTimer(() -> {
-                        try {
-                            tick.invoke(sampler);
-                        } catch (Throwable t) {
-                            // Don't spam: a single warning on first failure is
-                            // enough - the binding will simply continue to
-                            // report UNSAMPLED, which is the documented sentinel.
-                            RTP.log(Level.WARNING,
-                                    LOG_TAG + " BukkitTpsSampler.tick() invocation failed", t);
-                        }
-                    }, 1L, 1L);
-                    RTP.log(Level.FINE,
-                            LOG_TAG + " installed BukkitTpsSampler (raw Spigot fallback, 1-tick sampler)");
-                }
-                installed = true;
-            } catch (Throwable t) {
-                RTP.log(Level.WARNING,
-                        LOG_TAG + " failed to install MetricsBinding; /rtp info will report UNSAMPLED", t);
             }
+            {
+                Class<?> samplerClass = Class.forName(SPIGOT_SAMPLER_FQN);
+                Object sampler = samplerClass.getDeclaredConstructor().newInstance();
+                // Merge spark TPS/MSPT over the raw-Spigot sampler when present;
+                // the sampler is still driven below so its values back the
+                // merge's fallback and supply playerCount / softCap.
+                RTP.metrics.setBinding(wrapWithSparkIfPresent((MetricsBinding) sampler));
+                spigotSamplerInstance = sampler;
+                // Drive sampler.tick() once per server tick. The sampler is
+                // documented as single-tick-thread-only, which matches
+                // RTP.scheduler.runTaskTimer (global region scheduler on Folia,
+                // main thread on Spigot/Paper).
+                java.lang.reflect.Method tick = samplerClass.getMethod("tick");
+                spigotSamplerTaskHandle = RTP.scheduler.runTaskTimer(() -> {
+                    try {
+                        tick.invoke(sampler);
+                    } catch (Throwable t) {
+                        // Don't spam: a single warning on first failure is
+                        // enough - the binding will simply continue to
+                        // report UNSAMPLED, which is the documented sentinel.
+                        RTP.log(Level.WARNING,
+                                LOG_TAG + " BukkitTpsSampler.tick() invocation failed", t);
+                    }
+                }, 1L, 1L);
+                RTP.log(Level.FINE,
+                        LOG_TAG + " installed BukkitTpsSampler (raw Spigot fallback, 1-tick sampler)");
+            }
+            installed = true;
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    LOG_TAG + " failed to install MetricsBinding; /rtp info will report UNSAMPLED", t);
         }
     }
 
@@ -168,35 +166,33 @@ public final class MetricsBindingDispatcher {
      * Tear down the binding and cancel the sampler task (if any).
      * Safe to call repeatedly.
      */
-    public static void uninstall() {
-        synchronized (MetricsBindingDispatcher.class) {
-            if (!installed) return;
-            Object handle = spigotSamplerTaskHandle;
-            spigotSamplerTaskHandle = null;
-            spigotSamplerInstance = null;
-            if (handle != null) {
-                try {
-                    // The scheduler returns Object; the underlying type exposes
-                    // cancel() on every supported platform (BukkitTask /
-                    // ScheduledTask / our Folia wrapper). Reflectively invoke to
-                    // avoid binding rtp-plugin to a platform-specific task type.
-                    handle.getClass().getMethod("cancel").invoke(handle);
-                } catch (Throwable t) {
-                    RTP.log(Level.FINER,
-                            LOG_TAG + " sampler task cancel() failed (ignored): "
-                                    + t.getClass().getSimpleName() + ": " + t.getMessage());
-                }
-            }
+    public static synchronized void uninstall() {
+        if (!installed) return;
+        Object handle = spigotSamplerTaskHandle;
+        spigotSamplerTaskHandle = null;
+        spigotSamplerInstance = null;
+        if (handle != null) {
             try {
-                RTP.metrics.setBinding(null);
+                // The scheduler returns Object; the underlying type exposes
+                // cancel() on every supported platform (BukkitTask /
+                // ScheduledTask / our Folia wrapper). Reflectively invoke to
+                // avoid binding rtp-plugin to a platform-specific task type.
+                handle.getClass().getMethod("cancel").invoke(handle);
             } catch (Throwable t) {
                 RTP.log(Level.FINER,
-                        LOG_TAG + " setBinding(null) failed (ignored): "
+                        LOG_TAG + " sampler task cancel() failed (ignored): "
                                 + t.getClass().getSimpleName() + ": " + t.getMessage());
             }
-            installed = false;
-            RTP.log(Level.FINE, LOG_TAG + " uninstalled MetricsBinding");
         }
+        try {
+            RTP.metrics.setBinding(null);
+        } catch (Throwable t) {
+            RTP.log(Level.FINER,
+                    LOG_TAG + " setBinding(null) failed (ignored): "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+        }
+        installed = false;
+        RTP.log(Level.FINE, LOG_TAG + " uninstalled MetricsBinding");
     }
 
     /**

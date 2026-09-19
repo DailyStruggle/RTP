@@ -44,7 +44,6 @@ public class SquareOptimizedDualLayer extends Square {
   }
 
   @Override
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lazy-init dynamic point edge cache
   public int getPointEdgeChunks() {
     if (!derived) {
       return cachedPointEdgeChunks;
@@ -509,28 +508,25 @@ public class SquareOptimizedDualLayer extends Square {
     return candidate;
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lazy-build segmented run table cache
-  private SegmentedKeyRunTable getOrBuildSegmentedTable(long range) {
-    synchronized (this) {
-      long[] keys = badKeysCache;
-      long[] sums = badPrefixSumsCache;
-      int count = Math.min(keys.length, sums.length);
+  private synchronized SegmentedKeyRunTable getOrBuildSegmentedTable(long range) {
+    long[] keys = badKeysCache;
+    long[] sums = badPrefixSumsCache;
+    int count = Math.min(keys.length, sums.length);
 
-      if (segmentedTable != null && segmentedTable.totalRange() == range) {
-        return segmentedTable;
-      }
-
-      long[] widths = new long[count];
-      long prev = 0L;
-      for (int i = 0; i < count; i++) {
-        widths[i] = sums[i] - prev;
-        prev = sums[i];
-      }
-
-      long binSize = SegmentedKeyRunTable.deriveOptimalBinSize(range);
-      segmentedTable = SegmentedKeyRunTable.fromRuns(keys, widths, count, range, binSize, 3L);
+    if (segmentedTable != null && segmentedTable.totalRange() == range) {
       return segmentedTable;
     }
+
+    long[] widths = new long[count];
+    long prev = 0L;
+    for (int i = 0; i < count; i++) {
+      widths[i] = sums[i] - prev;
+      prev = sums[i];
+    }
+
+    long binSize = SegmentedKeyRunTable.deriveOptimalBinSize(range);
+    segmentedTable = SegmentedKeyRunTable.fromRuns(keys, widths, count, range, binSize, 3L);
+    return segmentedTable;
   }
 
 

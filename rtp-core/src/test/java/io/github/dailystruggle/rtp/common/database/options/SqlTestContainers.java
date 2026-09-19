@@ -46,32 +46,22 @@ final class SqlTestContainers {
         }
     }
 
-    static MySQLContainer<?> mysql() {
+    static synchronized MySQLContainer<?> mysql() {
         MySQLContainer<?> c = mysql;
         if (c == null) {
-            synchronized (SqlTestContainers.class) {
-                c = mysql;
-                if (c == null) {
-                    c = new MySQLContainer<>(MYSQL_IMAGE);
-                    c.start();
-                    mysql = c;
-                }
-            }
+            c = new MySQLContainer<>(MYSQL_IMAGE);
+            c.start();
+            mysql = c;
         }
         return c;
     }
 
-    static PostgreSQLContainer<?> postgres() {
+    static synchronized PostgreSQLContainer<?> postgres() {
         PostgreSQLContainer<?> c = postgres;
         if (c == null) {
-            synchronized (SqlTestContainers.class) {
-                c = postgres;
-                if (c == null) {
-                    c = new PostgreSQLContainer<>(POSTGRES_IMAGE);
-                    c.start();
-                    postgres = c;
-                }
-            }
+            c = new PostgreSQLContainer<>(POSTGRES_IMAGE);
+            c.start();
+            postgres = c;
         }
         return c;
     }

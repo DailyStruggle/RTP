@@ -68,33 +68,31 @@ public final class FabricMenuRenderer implements MenuRenderer {
    * SERVER_STARTED alone: the tick listener back-fills the reference on the next tick
    * when the server is already running by the time this listener is registered.
    */
-  private static void ensureServerCapture() {
-    synchronized (FabricMenuRenderer.class) {
-      if (lifecycleHooked) {
-        return;
-      }
-      // Touching ServerLifecycleEvents/ServerTickEvents links Fabric API classes that
-      // do not exist off a Fabric runtime. The SPI/bundled-in-jar load path constructs
-      // this renderer on every platform (Bukkit, NeoForge, ...) before isAvailable()
-      // is consulted, so guard the wiring on the loader being present. Without this
-      // gate a fresh Paper start logs an alarming NoClassDefFoundError WARN even though
-      // the renderer is correctly skipped as unavailable afterwards.
-      if (!isFabricRuntime()) {
-        return;
-      }
-      lifecycleHooked = true;
-      try {
-        ServerLifecycleEvents.SERVER_STARTED.register(s -> capturedServer = s);
-        ServerLifecycleEvents.SERVER_STOPPING.register(s -> capturedServer = null);
-        ServerTickEvents.START_SERVER_TICK.register(s -> {
-          if (capturedServer == null) {
-            capturedServer = s;
-          }
-        });
-      } catch (Throwable cannotHook) {
-        RTP.log(java.util.logging.Level.WARNING,
-            "[RTP-GUI] Fabric renderer: could not register server-capture listeners", cannotHook);
-      }
+  private static synchronized void ensureServerCapture() {
+    if (lifecycleHooked) {
+      return;
+    }
+    // Touching ServerLifecycleEvents/ServerTickEvents links Fabric API classes that
+    // do not exist off a Fabric runtime. The SPI/bundled-in-jar load path constructs
+    // this renderer on every platform (Bukkit, NeoForge, ...) before isAvailable()
+    // is consulted, so guard the wiring on the loader being present. Without this
+    // gate a fresh Paper start logs an alarming NoClassDefFoundError WARN even though
+    // the renderer is correctly skipped as unavailable afterwards.
+    if (!isFabricRuntime()) {
+      return;
+    }
+    lifecycleHooked = true;
+    try {
+      ServerLifecycleEvents.SERVER_STARTED.register(s -> capturedServer = s);
+      ServerLifecycleEvents.SERVER_STOPPING.register(s -> capturedServer = null);
+      ServerTickEvents.START_SERVER_TICK.register(s -> {
+        if (capturedServer == null) {
+          capturedServer = s;
+        }
+      });
+    } catch (Throwable cannotHook) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP-GUI] Fabric renderer: could not register server-capture listeners", cannotHook);
     }
   }
 

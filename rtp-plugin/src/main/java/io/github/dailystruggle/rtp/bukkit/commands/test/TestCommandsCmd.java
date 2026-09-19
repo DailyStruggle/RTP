@@ -232,7 +232,7 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
   }
 
   private static boolean isBlank(String s) {
-    return s == null || s.isBlank();
+    return s == null || s.trim().isEmpty();
   }
 
   /**

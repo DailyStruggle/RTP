@@ -90,7 +90,7 @@ final class DestinationPickerMenu extends ChestMenu {
   /** Fills every still-empty slot with the configured filler item (blank label). */
   private static void applyFiller(SimpleContainer container, MenuModel model) {
     String fillerName = model.fillerName();
-    if (fillerName == null || fillerName.isBlank()) {
+    if (fillerName == null || fillerName.trim().isEmpty()) {
       return;
     }
     Item fillerItem = resolveItem(fillerName);

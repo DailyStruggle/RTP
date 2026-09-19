@@ -95,23 +95,19 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
     private volatile boolean registered;
 
     /** Register the listener with Bukkit. Idempotent. */
-    public void register(Plugin plugin) {
+    public synchronized void register(Plugin plugin) {
         Objects.requireNonNull(plugin, "plugin");
-        synchronized (this) {
-            if (registered) return;
-            Bukkit.getPluginManager().registerEvents(this, plugin);
-            registered = true;
-        }
+        if (registered) return;
+        Bukkit.getPluginManager().registerEvents(this, plugin);
+        registered = true;
     }
 
     /** Unregister the listener. Safe to call multiple times. */
-    public void unregister() {
-        synchronized (this) {
-            if (!registered) return;
-            HandlerList.unregisterAll(this);
-            registered = false;
-            active.clear();
-        }
+    public synchronized void unregister() {
+        if (!registered) return;
+        HandlerList.unregisterAll(this);
+        registered = false;
+        active.clear();
     }
 
     @Override

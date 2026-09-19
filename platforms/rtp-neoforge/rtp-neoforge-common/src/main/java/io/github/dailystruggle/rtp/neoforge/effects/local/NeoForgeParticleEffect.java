@@ -176,7 +176,7 @@ public class NeoForgeParticleEffect extends Effect<FabricParticleKeys> {
 
     @Override
     public String toPermission() {
-        return data.get(FabricParticleKeys.TYPE) + "."
+        return String.valueOf(data.get(FabricParticleKeys.TYPE)) + "."
                 + data.get(FabricParticleKeys.COUNT) + "."
                 + data.get(FabricParticleKeys.DX) + "."
                 + data.get(FabricParticleKeys.DY) + "."

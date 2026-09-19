@@ -45,17 +45,12 @@ final class RedisTestContainer {
         }
     }
 
-    private static GenericContainer<?> instance() {
+    private static synchronized GenericContainer<?> instance() {
         GenericContainer<?> c = container;
         if (c == null) {
-            synchronized (RedisTestContainer.class) {
-                c = container;
-                if (c == null) {
-                    c = new GenericContainer<>(IMAGE).withExposedPorts(REDIS_PORT);
-                    c.start();
-                    container = c;
-                }
-            }
+            c = new GenericContainer<>(IMAGE).withExposedPorts(REDIS_PORT);
+            c.start();
+            container = c;
         }
         return c;
     }

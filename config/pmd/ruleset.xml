@@ -52,19 +52,6 @@
     <exclude name="ReturnEmptyCollectionRatherThanNull"/>
     <exclude name="TestClassWithoutTestCases"/>
     <exclude name="EqualsNull"/>
-    <exclude name="ProperCloneImplementation"/>
-    <exclude name="CloneMethodReturnTypeMustMatchClassName"/>
-    <exclude name="AvoidCatchingNPE"/>
-    <exclude name="AvoidInstanceofChecksInCatchClause"/>
-    <exclude name="UnnecessaryBooleanAssertion"/>
-    <exclude name="UnnecessaryCaseChange"/>
-    <exclude name="AssignmentToNonFinalStatic"/>
-    <exclude name="DoNotCallGarbageCollectionExplicitly"/>
-    <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
-    <exclude name="DontImportSun"/>
-    <exclude name="NonStaticInitializer"/>
-    <exclude name="OverrideBothEqualsAndHashcode"/>
-    <exclude name="UnusedNullCheckInEquals"/>
   </rule>
 
   <!-- Multithreading correctness: aligns with the RTP scheduler contract. -->
@@ -75,7 +62,6 @@
     <exclude name="AvoidUsingVolatile"/>
     <exclude name="UseConcurrentHashMap"/>
     <exclude name="NonThreadSafeSingleton"/>
-    <exclude name="AvoidThreadGroup"/>
   </rule>
 
   <!-- Resource-handling & performance foot-guns. -->
@@ -85,18 +71,10 @@
     <exclude name="AppendCharacterWithChar"/>
     <exclude name="ConsecutiveAppendsShouldReuse"/>
     <exclude name="AvoidFileStream"/>
-    <exclude name="ConsecutiveLiteralAppends"/>
-    <exclude name="UseStringBufferForStringAppends"/>
-    <exclude name="InsufficientStringBufferDeclaration"/>
-    <exclude name="InefficientStringBuffering"/>
-    <exclude name="AddEmptyString"/>
-    <exclude name="TooFewBranchesForSwitch"/>
-    <exclude name="AvoidArrayLoops"/>
-    <exclude name="UseArraysAsList"/>
-    <exclude name="StringToString"/>
   </rule>
 
   <!-- A conservative slice of best-practices (leaks, missing overrides). -->
+  <rule ref="category/java/bestpractices.xml/CheckResultSet"/>
   <rule ref="category/java/bestpractices.xml/PrimitiveWrapperInstantiation"/>
 
   <!-- ==================================================================== -->

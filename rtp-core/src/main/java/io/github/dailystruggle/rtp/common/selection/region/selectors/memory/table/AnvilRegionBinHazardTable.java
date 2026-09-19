@@ -18,7 +18,6 @@ import java.util.List;
  *   <li><b>16-Long Bitmask:</b> 128 bytes (16 longs) when runs &gt; 32 or during cold-start.</li>
  * </ul>
  */
-@SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
 public final class AnvilRegionBinHazardTable {
 
   public static final int CHUNKS_PER_BIN = 1024; // 32x32 chunks
@@ -382,120 +381,93 @@ public final class AnvilRegionBinHazardTable {
   /**
    * Marks an entire MCA bin as a discarded / full hazard bin (e.g. 100% deep ocean or 16/16 rejected).
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
-  public void discardBin(int binIndex) {
+  public synchronized void discardBin(int binIndex) {
     if (binIndex < 0 || binIndex >= binCount) return;
-    synchronized (this) {
-      bins[binIndex] = FullDiscardedBin.INSTANCE;
-    }
+    bins[binIndex] = FullDiscardedBin.INSTANCE;
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
-  public boolean isBinDiscarded(int binIndex) {
+  public synchronized boolean isBinDiscarded(int binIndex) {
     if (binIndex < 0 || binIndex >= binCount) return true;
-    synchronized (this) {
-      return bins[binIndex] == FullDiscardedBin.INSTANCE || bins[binIndex].badCount() == CHUNKS_PER_BIN;
-    }
+    return bins[binIndex] == FullDiscardedBin.INSTANCE || bins[binIndex].badCount() == CHUNKS_PER_BIN;
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
-  public boolean isBad(long key) {
+  public synchronized boolean isBad(long key) {
     if (key < 0 || key >= totalRange) return true;
     int bId = (int) (key >>> 10); // key / 1024
     int local = (int) (key & 1023); // key % 1024
-    synchronized (this) {
-      return bins[bId].isBad(local);
-    }
+    return bins[bId].isBad(local);
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
-  public void markBad(long key) {
+  public synchronized void markBad(long key) {
     if (key < 0 || key >= totalRange) return;
     int bId = (int) (key >>> 10);
     int local = (int) (key & 1023);
-    synchronized (this) {
-      bins[bId] = bins[bId].markBad(local);
-    }
+    bins[bId] = bins[bId].markBad(local);
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
-  public void compact(long minGap, long maxGap) {
-    synchronized (this) {
-      for (int i = 0; i < binCount; i++) {
-        bins[i] = bins[i].compact(minGap, maxGap);
-      }
-      recomputeGoodPrefixSums();
+  public synchronized void compact(long minGap, long maxGap) {
+    for (int i = 0; i < binCount; i++) {
+      bins[i] = bins[i].compact(minGap, maxGap);
     }
+    recomputeGoodPrefixSums();
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
-  public void recomputeGoodPrefixSums() {
-    synchronized (this) {
-      long sum = 0L;
-      for (int i = 0; i < binCount; i++) {
-        int cap = (i == binCount - 1)
-            ? (int) (totalRange - (long) i * CHUNKS_PER_BIN)
-            : CHUNKS_PER_BIN;
-        int good = Math.max(0, cap - bins[i].badCount());
-        sum += good;
-        binGoodPrefixSums[i] = sum;
-      }
-      this.totalGoodCount = sum;
+  public synchronized void recomputeGoodPrefixSums() {
+    long sum = 0L;
+    for (int i = 0; i < binCount; i++) {
+      int cap = (i == binCount - 1)
+          ? (int) (totalRange - (long) i * CHUNKS_PER_BIN)
+          : CHUNKS_PER_BIN;
+      int good = Math.max(0, cap - bins[i].badCount());
+      sum += good;
+      binGoodPrefixSums[i] = sum;
     }
+    this.totalGoodCount = sum;
   }
 
   public long totalGood() {
     return totalGoodCount;
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
-  public long resolveAccumulate(long virtualRank) {
-    synchronized (this) {
-      if (virtualRank < 0 || virtualRank >= totalGoodCount) return -1L;
+  public synchronized long resolveAccumulate(long virtualRank) {
+    if (virtualRank < 0 || virtualRank >= totalGoodCount) return -1L;
 
-      int low = 0, high = binCount - 1, targetBin = -1;
-      while (low <= high) {
-        int mid = (low + high) >>> 1;
-        long midSum = binGoodPrefixSums[mid];
-        if (midSum > virtualRank) {
-          targetBin = mid;
-          high = mid - 1;
-        } else {
-          low = mid + 1;
-        }
+    int low = 0, high = binCount - 1, targetBin = -1;
+    while (low <= high) {
+      int mid = (low + high) >>> 1;
+      long midSum = binGoodPrefixSums[mid];
+      if (midSum > virtualRank) {
+        targetBin = mid;
+        high = mid - 1;
+      } else {
+        low = mid + 1;
       }
-
-      if (targetBin < 0) return -1L;
-
-      long prevSum = (targetBin > 0) ? binGoodPrefixSums[targetBin - 1] : 0L;
-      int localRank = (int) (virtualRank - prevSum);
-
-      int localKey = bins[targetBin].resolveLocalAccumulate(localRank);
-      if (localKey < 0) return -1L;
-
-      return ((long) targetBin << 10) | localKey;
     }
+
+    if (targetBin < 0) return -1L;
+
+    long prevSum = (targetBin > 0) ? binGoodPrefixSums[targetBin - 1] : 0L;
+    int localRank = (int) (virtualRank - prevSum);
+
+    int localKey = bins[targetBin].resolveLocalAccumulate(localRank);
+    if (localKey < 0) return -1L;
+
+    return ((long) targetBin << 10) | localKey;
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
-  public int serializedSize() {
-    synchronized (this) {
-      int size = 8 + 4;
-      for (int i = 0; i < binCount; i++) {
-        size += bins[i].serializedSize();
-      }
-      return size;
+  public synchronized int serializedSize() {
+    int size = 8 + 4;
+    for (int i = 0; i < binCount; i++) {
+      size += bins[i].serializedSize();
     }
+    return size;
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
-  public void serialize(ByteBuffer buf) {
-    synchronized (this) {
-      buf.putLong(totalRange);
-      buf.putInt(binCount);
-      for (int i = 0; i < binCount; i++) {
-        bins[i].write(buf);
-      }
+  public synchronized void serialize(ByteBuffer buf) {
+    buf.putLong(totalRange);
+    buf.putInt(binCount);
+    for (int i = 0; i < binCount; i++) {
+      bins[i].write(buf);
     }
   }
 
