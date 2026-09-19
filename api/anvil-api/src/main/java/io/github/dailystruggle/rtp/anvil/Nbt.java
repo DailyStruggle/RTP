@@ -134,11 +134,12 @@ public final class Nbt {
             }
             case TAG_COMPOUND: {
                 LinkedHashMap<String, Object> map = new LinkedHashMap<>();
-                for (byte childType = in.readByte(); childType != TAG_END; childType = in.readByte()) {
+                while (true) {
+                    byte childType = in.readByte();
+                    if (childType == TAG_END) return map;
                     String childName = in.readUTF();
                     map.put(childName, readPayload(in, childType));
                 }
-                return map;
             }
             case TAG_INT_ARRAY: {
                 int n = in.readInt();
@@ -211,11 +212,12 @@ public final class Nbt {
                 return;
             }
             case TAG_COMPOUND: {
-                for (byte childType = in.readByte(); childType != TAG_END; childType = in.readByte()) {
+                while (true) {
+                    byte childType = in.readByte();
+                    if (childType == TAG_END) return;
                     in.readUTF(); // child name, discarded
                     skipPayload(in, childType);
                 }
-                return;
             }
             case TAG_INT_ARRAY: {
                 int n = in.readInt();

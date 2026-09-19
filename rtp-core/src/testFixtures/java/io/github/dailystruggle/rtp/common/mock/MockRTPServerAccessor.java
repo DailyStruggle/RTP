@@ -18,13 +18,12 @@ import org.jetbrains.annotations.Nullable;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -34,11 +33,11 @@ import java.util.logging.Logger;
  */
 public class MockRTPServerAccessor implements RTPServerAccessor {
 
-    private final Map<String, MockRTPWorld> worldsByName = new ConcurrentHashMap<>();
-    private final Map<UUID, MockRTPWorld> worldsById = new ConcurrentHashMap<>();
-    private final Map<UUID, MockRTPPlayer> playersById = new ConcurrentHashMap<>();
-    private final Map<String, MockRTPPlayer> playersByName = new ConcurrentHashMap<>();
-    private final Map<String, Object> registeredCommands = new ConcurrentHashMap<>();
+    private final Map<String, MockRTPWorld> worldsByName = new HashMap<>();
+    private final Map<UUID, MockRTPWorld> worldsById = new HashMap<>();
+    private final Map<UUID, MockRTPPlayer> playersById = new HashMap<>();
+    private final Map<String, MockRTPPlayer> playersByName = new HashMap<>();
+    private final Map<String, Object> registeredCommands = new HashMap<>();
 
     private final MockRTPPlayer consolePlayer = new MockRTPPlayer(RTP.serverId, "CONSOLE", null);
     private final MockRTPScheduler scheduler = new MockRTPScheduler();
@@ -256,7 +255,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
      * diagnostic output (e.g. the REQ-RTP-S-004 nullChunk attribution summary line).
      * Format: {@code "<LEVEL>: <msg>"}.
      */
-    public final List<String> logMessages = new CopyOnWriteArrayList<>();
+    public final List<String> logMessages = Collections.synchronizedList(new ArrayList<>());
 
     @Override
     public void log(Level level, String msg) {
@@ -271,7 +270,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     }
 
     /** Messages passed to {@link #announce} - inspectable in tests. */
-    public final List<String> announcedMessages = new CopyOnWriteArrayList<>();
+    public final List<String> announcedMessages = new ArrayList<>();
 
     @Override
     public void announce(String msg, String permission, String tag) {

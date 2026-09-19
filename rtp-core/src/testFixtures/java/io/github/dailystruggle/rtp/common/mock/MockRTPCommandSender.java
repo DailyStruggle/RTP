@@ -3,21 +3,22 @@ package io.github.dailystruggle.rtp.common.mock;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Minimal in-memory implementation of {@link RTPCommandSender} for use in unit tests. */
 public class MockRTPCommandSender implements RTPCommandSender {
 
     private final UUID uuid;
     private final String name;
-    public final List<String> sentMessages = new CopyOnWriteArrayList<>();
-    public final List<String> performedCommands = new CopyOnWriteArrayList<>();
+    public final List<String> sentMessages = Collections.synchronizedList(new ArrayList<>());
+    public final List<String> performedCommands = new ArrayList<>();
     private final Map<String, Boolean> permissions = new ConcurrentHashMap<>();
     private long cooldown = 0L;
     private long delay = 0L;
