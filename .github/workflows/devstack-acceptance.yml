@@ -61,9 +61,9 @@ jobs:
           ./gradlew :rtp-plugin:remapJar --console=plain
 
       - name: Install bot dependencies (for roundtrip scenario)
-        working-directory: devstack/clients
+        working-directory: devstack/bot
         run: |
-          npm install --ignore-scripts --package-lock=false
+          npm ci || npm install
 
       - name: Run devstack acceptance harness
         id: acceptance

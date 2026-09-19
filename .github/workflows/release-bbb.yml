@@ -61,14 +61,12 @@ jobs:
 
       - name: Determine release version
         id: version
-        env:
-          HEAD_REF: ${{ github.head_ref }}
-          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            VERSION="$INPUT_VERSION"
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
           else
             # Try parsing from head_ref if it looks like vX.Y.Z
+            HEAD_REF="${{ github.head_ref }}"
             if [[ "$HEAD_REF" =~ ^[vV]([0-9]+\.[0-9]+.*)$ ]]; then
               VERSION="${BASH_REMATCH[1]}"
             else

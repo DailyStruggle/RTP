@@ -76,30 +76,4 @@ public record CompositeRegionModel(
   public boolean[] insideDomain() {
     return insideDomain.clone();
   }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) return true;
-    if (!(o instanceof CompositeRegionModel that)) return false;
-    return width == that.width
-        && height == that.height
-        && Objects.equals(regionName, that.regionName)
-        && java.util.Arrays.equals(biomeRgb, that.biomeRgb)
-        && java.util.Arrays.equals(hazardMask, that.hazardMask)
-        && java.util.Arrays.equals(insideDomain, that.insideDomain)
-        && Objects.equals(markers, that.markers)
-        && Objects.equals(trajectoryLines, that.trajectoryLines)
-        && Objects.equals(l1Gauge, that.l1Gauge)
-        && Objects.equals(l2Gauge, that.l2Gauge)
-        && Objects.equals(l3Gauge, that.l3Gauge);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = Objects.hash(regionName, width, height, markers, trajectoryLines, l1Gauge, l2Gauge, l3Gauge);
-    result = 31 * result + java.util.Arrays.hashCode(biomeRgb);
-    result = 31 * result + java.util.Arrays.hashCode(hazardMask);
-    result = 31 * result + java.util.Arrays.hashCode(insideDomain);
-    return result;
-  }
 }

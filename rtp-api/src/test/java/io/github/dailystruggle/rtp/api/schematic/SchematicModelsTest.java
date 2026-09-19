@@ -75,7 +75,7 @@ class SchematicModelsTest {
     PasteOptions optDiffAir = new PasteOptions(PasteAnchor.CENTER, false, false);
     PasteOptions optDiffClaim = new PasteOptions(PasteAnchor.CENTER, true, true);
 
-    assertTrue(opt.equals(opt));
+    assertEquals(opt, opt);
     assertEquals(opt, optSame);
     assertEquals(opt.hashCode(), optSame.hashCode());
     assertFalse(opt.equals(null));
@@ -109,7 +109,7 @@ class SchematicModelsTest {
     SchematicSource sourceNullHint = new SchematicSource("test-house", java.nio.file.Path.of("test.schem"), null);
     assertEquals("", sourceNullHint.formatHint());
 
-    assertTrue(source.equals(source));
+    assertEquals(source, source);
     assertEquals(source, sourceSame);
     assertEquals(source.hashCode(), sourceSame.hashCode());
     assertFalse(source.equals(null));

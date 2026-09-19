@@ -217,7 +217,7 @@ public class TestWorldOpsCmd extends BaseRTPCmdImpl {
             + " msg="
             + r.message;
 
-    if (!callerId.equals(RTPAPI.serverId) && RTP.serverAccessor != null) {
+    if (!callerId.equals(RTPAPI.serverId)) {
       RTP.serverAccessor.sendMessage(callerId, summary);
     }
     RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);

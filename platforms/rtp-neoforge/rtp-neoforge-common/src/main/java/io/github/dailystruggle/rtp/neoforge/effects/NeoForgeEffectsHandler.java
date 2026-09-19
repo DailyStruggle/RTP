@@ -206,7 +206,6 @@ public final class NeoForgeEffectsHandler {
     }
 
     private static boolean effectParsingEnabled(FactoryValue<PerformanceKeys> parser) {
-        if (parser == null || parser.getData() == null) return false;
         return Boolean.parseBoolean(
                 parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString());
     }

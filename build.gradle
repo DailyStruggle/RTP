@@ -857,33 +857,12 @@ sonar {
         property 'sonar.projectKey', 'DailyStruggle_RTP'
         property 'sonar.organization', 'dailystruggle'
         property 'sonar.host.url', 'https://sonarcloud.io'
-        property 'sonar.coverage.exclusions', [
-                '**/test/**',
-                '**/testFixtures/**',
-                '**/*Test*.java',
-                '**/*Benchmark*.java',
-                '**/testing/**',
-                '**/mock/**'
-        ].join(',')
     }
 }
 
 subprojects {
     sonar {
         properties {
-            def isPlatformAdapter = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
-                    project.path.startsWith(':rtp-bukkit') ||
-                    project.path.startsWith(':rtp-paper') ||
-                    project.path.startsWith(':rtp-folia') ||
-                    project.path.startsWith(':rtp-fabric') ||
-                    project.path.startsWith(':rtp-neoforge') ||
-                    project.path == ':rtp-plugin' ||
-                    project.path == ':rtp-proxy:rtp-proxy-velocity'
-
-            if (isPlatformAdapter) {
-                property 'sonar.coverage.exclusions', '**/*'
-            }
-
             def jacocoReport = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile
             if (jacocoReport.exists()) {
                 property 'sonar.coverage.jacoco.xmlReportPaths', jacocoReport.absolutePath

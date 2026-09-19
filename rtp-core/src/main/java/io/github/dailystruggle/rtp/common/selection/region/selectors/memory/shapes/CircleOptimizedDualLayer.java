@@ -305,7 +305,7 @@ public class CircleOptimizedDualLayer extends Circle {
     return location;
   }
 
-  private final long feistelSalt = ThreadLocalRandom.current().nextLong();
+  private final long secretKey = ThreadLocalRandom.current().nextLong();
   private final java.util.concurrent.atomic.AtomicLong selectionCounter = new java.util.concurrent.atomic.AtomicLong(0);
   private final java.util.concurrent.atomic.AtomicLong backlogCounter = new java.util.concurrent.atomic.AtomicLong(0);
 
@@ -316,7 +316,7 @@ public class CircleOptimizedDualLayer extends Circle {
   }
 
   private long getEpochKey(long epoch, long phaseOffset) {
-    return feistelSalt ^ (epoch * 0x517CC1B727220A95L) ^ (phaseOffset * 0x9E3779B97F4A7C15L);
+    return secretKey ^ (epoch * 0x517CC1B727220A95L) ^ (phaseOffset * 0x9E3779B97F4A7C15L);
   }
 
   /**
