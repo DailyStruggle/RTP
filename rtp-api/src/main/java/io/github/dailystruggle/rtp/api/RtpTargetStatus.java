@@ -86,9 +86,9 @@ public final class RtpTargetStatus {
     this.availability = availability;
     this.remainingCooldownMillis = Math.max(0L, remainingCooldownMillis);
     this.cost = (cost < 0.0 || Double.isNaN(cost)) ? 0.0 : cost;
-    this.iconBlock = (iconBlock == null || iconBlock.isBlank()) ? null : iconBlock.trim();
-    this.environment = (environment == null || environment.isBlank()) ? null : environment.trim();
-    this.label = (label == null || label.isBlank()) ? null : label.trim();
+    this.iconBlock = (iconBlock == null || iconBlock.trim().isEmpty()) ? null : iconBlock.trim();
+    this.environment = (environment == null || environment.trim().isEmpty()) ? null : environment.trim();
+    this.label = (label == null || label.trim().isEmpty()) ? null : label.trim();
   }
 
   /**
