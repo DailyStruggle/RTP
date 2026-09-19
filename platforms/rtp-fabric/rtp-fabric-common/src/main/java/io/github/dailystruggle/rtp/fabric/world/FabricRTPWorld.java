@@ -9,7 +9,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
+import io.github.dailystruggle.rtp.common.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.core.BlockPos;
@@ -300,9 +300,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                     java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
                     return anvilProbeSupport
                             .probeAndPublish(worldFolder, dim, chunkX, chunkZ, key, rawUnsafe,
-                                    s -> (RTP.serverAccessor != null)
-                                            ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
-                                            : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s))
+                                    io.github.dailystruggle.rtp.common.anvil.PaletteNormalizer::reconcile)
                             .thenCompose(result -> {
                                 io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
                                 if (view != null) {
@@ -987,10 +985,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                     io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
                         regionBytes, rx, rz, finalMinY, finalMaxY);
                 if (probe == null) return null;
-                return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
-                    s -> (RTP.serverAccessor != null)
-                        ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
-                        : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
+                return (ChunkColumnProbe) new AnvilColumnProbeAdapter(probe, cx, cz);
             } catch (Throwable t) {
                 RTP.log(java.util.logging.Level.FINE,
                     "[RTP] FabricRTPWorld.probeChunkColumn failed for world=" + name
@@ -1424,9 +1419,9 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         if (view != null) {
             int cx = (int) (key & 0xffffffffL);
             int cz = (int) (key >> 32);
-            java.util.Set<String> reconciled = (RTP.serverAccessor != null)
-                    ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
-                    : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
+            java.util.Set<String> reconciled =
+                    io.github.dailystruggle.rtp.common.anvil.PaletteNormalizer
+                            .reconcileAll(currentUnsafeBlocks());
             return new FabricRTPChunk(view, cx, cz, id, reconciled);
         }
         return null;

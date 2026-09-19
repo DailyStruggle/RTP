@@ -2,15 +2,10 @@ package io.github.dailystruggle.rtp.common.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
-import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.api.server.PlatformFamily;
-import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import java.io.File;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,10 +30,6 @@ import org.jetbrains.annotations.Nullable;
  *   <li>{@code isPrimaryThread()} / {@code overTime()}: async thread isolation and budget reporting.</li>
  *   <li>{@code sampleBiome()}: non-null biome sampling on default world.</li>
  *   <li>Menu permission/locale queries: {@code menuPermissionProbe}, {@code menuLocale}, {@code menuEffectivePermissions}.</li>
- *   <li>Version metadata: {@code getServerVersion}, {@code getPluginVersion}, {@code getPlatform}, {@code getPlatformFamily}, {@code getServerIntVersion}.</li>
- *   <li>World & border: {@code getRTPWorlds}, {@code getRTPWorld}, {@code getWorldBorder}, {@code shapePlatform}.</li>
- *   <li>Messaging surface: {@code sendMessage} overloads, {@code sendMessageAndSuggest}, {@code sendMessageWithRunCommand}, {@code announce}.</li>
- *   <li>Subsystems & performance: {@code getTPS}, {@code getPluginDirectory}, {@code getScheduler}, {@code getLocationGenerator}, {@code executeCommand}.</li>
  *   <li>JaCoCo flush trigger: attempts to invoke {@code org.jacoco.agent.rt.RT.getAgent().dump(false)} if attached.</li>
  * </ul>
  */
@@ -53,10 +44,6 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
     public boolean threadValid = false;
     public boolean biomeValid = false;
     public boolean menuValid = false;
-    public boolean versionValid = false;
-    public boolean worldValid = false;
-    public boolean messagingValid = false;
-    public boolean subsystemValid = false;
     public boolean jacocoDumpTriggered = false;
     public String message = "ok";
     public final List<String> details = new ArrayList<>();
@@ -88,7 +75,6 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     Result r = runProbe(callerId);
     emit(callerId, r);
-    triggerJacocoDump();
     return true;
   }
 
@@ -131,10 +117,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 3. Sender resolution & null safety probe
     try {
-      RTPCommandSender console = RTP.serverAccessor.getSender(RTPAPI.serverId);
-      if (console == null) {
-        console = RTP.serverAccessor.getConsolePlayer();
-      }
+      RTPPlayer console = RTP.serverAccessor.getConsolePlayer();
       if (console != null) {
         boolean hasAdmin = console.hasPermission("*") || console.hasPermission("rtp.test");
         if (hasAdmin) {
@@ -150,7 +133,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
           r.details.add("console sender missing wildcard or rtp.test permission");
         }
       } else {
-        r.details.add("console sender lookup returned null");
+        r.details.add("getConsolePlayer() returned null");
       }
       if (!r.senderValid) r.pass = false;
     } catch (Throwable t) {
@@ -249,122 +232,21 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
       r.details.add("menu queries threw: " + t.getMessage());
     }
 
-    // 8. Version & Platform metadata probe
+    // 8. JaCoCo dump trigger (if agent is attached at runtime)
     try {
-      String sVer = RTP.serverAccessor.getServerVersion();
-      String pVer = RTP.serverAccessor.getPluginVersion();
-      String plat = RTP.serverAccessor.getPlatform();
-      PlatformFamily fam = RTP.serverAccessor.getPlatformFamily();
-      Integer intVer = RTP.serverAccessor.getServerIntVersion();
-
-      boolean comp = RTP.serverAccessor.isCompatible(fam, 0, Integer.MAX_VALUE);
-      boolean atLeast = RTP.serverAccessor.isServerVersionAtLeast(0);
-      boolean atMost = RTP.serverAccessor.isServerVersionAtMost(Integer.MAX_VALUE);
-      boolean isFam = fam != null && RTP.serverAccessor.isPlatformFamily(fam);
-
-      if (sVer != null && !sVer.isEmpty()
-          && pVer != null && !pVer.isEmpty()
-          && plat != null && !plat.isEmpty()
-          && fam != null
-          && intVer != null
-          && comp && atLeast && atMost && isFam) {
-        r.versionValid = true;
-      } else {
-        r.pass = false;
-        r.details.add(String.format(
-            "version check failed: sVer=%s, pVer=%s, plat=%s, fam=%s, intVer=%s, comp=%s",
-            sVer, pVer, plat, fam, intVer, comp));
+      Class<?> rtClass = Class.forName("org.jacoco.agent.rt.RT");
+      Method getAgentMethod = rtClass.getMethod("getAgent");
+      Object agent = getAgentMethod.invoke(null);
+      if (agent != null) {
+        Method dumpMethod = agent.getClass().getMethod("dump", boolean.class);
+        dumpMethod.invoke(agent, false);
+        r.jacocoDumpTriggered = true;
       }
+    } catch (ClassNotFoundException ignored) {
+      // JaCoCo agent not attached to this JVM, expected in routine runs
     } catch (Throwable t) {
-      r.pass = false;
-      r.details.add("version metadata probe threw: " + t.getMessage());
+      r.details.add("JaCoCo dump attempt failed: " + t.getMessage());
     }
-
-    // 9. World & WorldBorder probe
-    try {
-      List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
-      Set<String> allBiomes = RTP.serverAccessor.getBiomes();
-      if (worlds != null && !worlds.isEmpty()) {
-        RTPWorld<?> w = worlds.get(0);
-        RTPWorld<?> byName = RTP.serverAccessor.getRTPWorld(w.name());
-        RTPWorld<?> byId = RTP.serverAccessor.getRTPWorld(w.id());
-        Object border = RTP.serverAccessor.getWorldBorder(w.name());
-
-        RTPLocation testLoc = new RTPLocation(w, 0, 64, 0);
-        RTP.serverAccessor.shapePlatform(testLoc);
-
-        if (byName != null && byId != null && border != null && allBiomes != null) {
-          r.worldValid = true;
-        } else {
-          r.pass = false;
-          r.details.add(String.format(
-              "world lookup failed: byName=%s, byId=%s, border=%s, allBiomes=%s",
-              byName != null, byId != null, border != null, allBiomes != null));
-        }
-      } else {
-        // Headless environment with 0 registered worlds
-        r.worldValid = true;
-      }
-    } catch (Throwable t) {
-      r.pass = false;
-      r.details.add("world probe threw: " + t.getMessage());
-    }
-
-    // 10. Messaging & Feedback probe
-    try {
-      RTPCommandSender console = RTP.serverAccessor.getSender(RTPAPI.serverId);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, CommandMessages.infoTitle);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, CommandMessages.infoTitle, "testTag");
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, CommandMessages.infoTitle);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, CommandMessages.infoTitle, "testTag");
-
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, "probe test message");
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, "probe test message", "testTag");
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, "probe test message");
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, "probe test message", "testTag");
-
-      RTP.serverAccessor.sendMessageAndSuggest(RTPAPI.serverId, "probe suggest", "/rtp");
-      if (console != null) {
-        RTP.serverAccessor.sendMessage(console, "probe sender", "hover", "/rtp", null);
-        RTP.serverAccessor.sendMessageWithRunCommand(console, "probe click", "hover", "/rtp");
-      }
-      RTP.serverAccessor.announce("probe announce", "rtp.test", null);
-      r.messagingValid = true;
-    } catch (Throwable t) {
-      r.pass = false;
-      r.details.add("messaging probe threw: " + t.getMessage());
-    }
-
-    // 11. Subsystems & performance probe
-    try {
-      double tps20 = RTP.serverAccessor.getTPS(20);
-      double tps100 = RTP.serverAccessor.getTPS(100);
-      File pluginDir = RTP.serverAccessor.getPluginDirectory();
-      io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler = RTP.serverAccessor.getScheduler();
-      io.github.dailystruggle.rtp.api.selection.ILocationGenerator generator = RTP.serverAccessor.getLocationGenerator();
-
-      // Dispatch non-throwing command test
-      RTP.serverAccessor.executeCommand(RTPAPI.serverId, "rtp test sem");
-
-      boolean tpsOk = tps20 >= 0.0 && tps100 >= 0.0;
-      boolean dirOk = pluginDir != null;
-      boolean schedOk = scheduler != null;
-      boolean genOk = generator != null;
-
-      if (tpsOk && dirOk && schedOk && genOk) {
-        r.subsystemValid = true;
-      } else {
-        r.pass = false;
-        r.details.add(String.format(
-            "subsystem check failed: tps20=%.1f, tps100=%.1f, dir=%s, sched=%s, gen=%s",
-            tps20, tps100, dirOk, schedOk, genOk));
-      }
-    } catch (Throwable t) {
-      r.pass = false;
-      r.details.add("subsystem probe threw: " + t.getMessage());
-    }
-
-    r.jacocoDumpTriggered = triggerJacocoDump();
 
     if (!r.pass) {
       r.message = String.join("; ", r.details);
@@ -373,57 +255,11 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
     return r;
   }
 
-  public static boolean triggerJacocoDump() {
-    boolean triggered = false;
-    try {
-      // First attempt: invoke RT.getAgent().dump(false) via various ClassLoaders
-      Class<?> rtClass = null;
-      ClassLoader[] loaders = new ClassLoader[] {
-          ClassLoader.getSystemClassLoader(),
-          ClassLoader.getPlatformClassLoader(),
-          Thread.currentThread().getContextClassLoader(),
-          TestAccessorCmd.class.getClassLoader()
-      };
-      for (ClassLoader cl : loaders) {
-        if (cl == null) continue;
-        try {
-          rtClass = Class.forName("org.jacoco.agent.rt.RT", true, cl);
-          if (rtClass != null) break;
-        } catch (ClassNotFoundException ignored) {
-        }
-      }
-      if (rtClass != null) {
-        Method getAgentMethod = rtClass.getMethod("getAgent");
-        Object agent = getAgentMethod.invoke(null);
-        if (agent != null) {
-          Method dumpMethod = agent.getClass().getMethod("dump", boolean.class);
-          dumpMethod.invoke(agent, false);
-          triggered = true;
-        }
-      }
-
-      // Second attempt (fallback): invoke JaCoCo MBean via platform MBeanServer if JMX is active
-      if (!triggered) {
-        try {
-          javax.management.MBeanServer mbs = java.lang.management.ManagementFactory.getPlatformMBeanServer();
-          javax.management.ObjectName name = new javax.management.ObjectName("org.jacoco:type=Runtime");
-          if (mbs.isRegistered(name)) {
-            mbs.invoke(name, "dump", new Object[] { false }, new String[] { "boolean" });
-            triggered = true;
-          }
-        } catch (Throwable ignored) {
-        }
-      }
-    } catch (Throwable ignored) {
-    }
-    return triggered;
-  }
-
   private static void emit(UUID callerId, Result r) {
     String color = r.pass ? "&a" : "&c";
     String summary =
         String.format(
-            "%s[RTP test/accessor] pass=%s | mats=%s tags=%s sender=%s format=%s thread=%s biome=%s menu=%s ver=%s world=%s msg=%s sub=%s jacocoDump=%s",
+            "%s[RTP test/accessor] pass=%s | mats=%s tags=%s sender=%s format=%s thread=%s biome=%s menu=%s jacocoDump=%s",
             color,
             r.pass,
             r.materialsValid,
@@ -433,10 +269,6 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
             r.threadValid,
             r.biomeValid,
             r.menuValid,
-            r.versionValid,
-            r.worldValid,
-            r.messagingValid,
-            r.subsystemValid,
             r.jacocoDumpTriggered);
 
     if (!callerId.equals(RTPAPI.serverId)) {

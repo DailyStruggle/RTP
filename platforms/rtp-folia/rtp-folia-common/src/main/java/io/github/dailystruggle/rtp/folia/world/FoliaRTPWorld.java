@@ -196,9 +196,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       String dim = dimensionRegionSubpath(world);
       return anvilProbeSupport
           .probeAndPublish(worldFolder, dim, cx, cz, key, rawUnsafe,
-              s -> (RTP.serverAccessor != null)
-                  ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
-                  : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(s))
+              io.github.dailystruggle.rtp.bukkitplatform.anvil.PaletteNormalizer::reconcile)
           .thenCompose(result -> {
             io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
             if (view != null) {
@@ -272,11 +270,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
             io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
                 regionBytes, rx, rz, finalMinY, finalMaxY);
         if (probe == null) return null;
-        return io.github.dailystruggle.rtp.api.world.ChunkColumnProbe.of(
-            new io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter(probe, cx, cz,
-                s -> (RTP.serverAccessor != null)
-                    ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
-                    : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
+        return (io.github.dailystruggle.rtp.api.world.ChunkColumnProbe)
+            new io.github.dailystruggle.rtp.bukkitplatform.anvil.probe.AnvilColumnProbeAdapter(probe, cx, cz);
       } catch (Throwable t) {
         RTP.log(java.util.logging.Level.FINE,
             "[RTP] probeChunkColumn failed for world=" + name
@@ -700,25 +695,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     if (view != null) {
       int cx = (int) (key & 0xffffffffL);
       int cz = (int) (key >> 32);
-      java.util.Set<String> reconciled = (RTP.serverAccessor != null)
-          ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
-          : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
+      java.util.Set<String> reconciled =
+          io.github.dailystruggle.rtp.bukkitplatform.anvil.PaletteNormalizer.reconcileAll(
+              currentUnsafeBlocks());
       return new FoliaRTPChunk(view, cx, cz, id, reconciled);
     }
     return null;
-  }
-
-  @Override
-  public RTPChunk<?> createChunk(Object preformedData, int cx, int cz, Set<String> reconciledUnsafe) {
-    if (preformedData instanceof io.github.dailystruggle.rtp.anvil.AnvilChunkView view) {
-      java.util.Set<String> reconciled = (reconciledUnsafe != null)
-          ? reconciledUnsafe
-          : ((RTP.serverAccessor != null)
-              ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
-              : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks()));
-      return new FoliaRTPChunk(view, cx, cz, id, reconciled);
-    }
-    throw new IllegalArgumentException("Unsupported preformed chunk data: " + (preformedData == null ? "null" : preformedData.getClass().getName()));
   }
 
 

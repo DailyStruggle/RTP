@@ -38,11 +38,7 @@ services:
       retries: 10
 
   proxy-a:
-    # java25 image: current Velocity builds shipped by itzg/mc-proxy are compiled
-    # with a Java 25 toolchain (class file v69). The java21 image only reads up to
-    # v65 and aborts at boot with `UnsupportedClassVersionError ... Velocity`.
-    # Matches the java25 backends; bump in lockstep if Velocity's baseline changes.
-    image: itzg/mc-proxy:java25
+    image: itzg/mc-proxy:java21
     # itzg/mc-proxy supports TYPE=VELOCITY to run Velocity (vs BUNGEECORD/WATERFALL).
     # SKIP_CHOWN=TRUE: the itzg entrypoint chowns /server on boot, which fails on
     # Windows/Docker-Desktop bind mounts (host files aren't owned by the container UID,
@@ -67,8 +63,7 @@ services:
       redis:
         condition: service_healthy
   proxy-b:
-    # java25: see proxy-a note (Velocity requires Java 25 / class file v69).
-    image: itzg/mc-proxy:java25
+    image: itzg/mc-proxy:java21
     environment:
       TYPE: VELOCITY
       MEMORY: 512M
@@ -137,16 +132,16 @@ services:
       ENV_VARIABLE_PREFIX: "CFG_"
       CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
     user: "0:0"
-    # Seed RTP/advanced/network.yml by COPY (not bind) so the plugin's runtime
+    # Seed RTP/network.yml by COPY (not bind) so the plugin's runtime
     # rewrites stay inside the container's writable layer and cannot
     # backpropagate to the host devstack tree. The host file is mounted
-    # read-only at /seed/network.yml and copied into /data/plugins/RTP/advanced/
-    # before /start runs (ADR-071 canonical path). On `docker compose down` the
-    # writable layer is discarded, so the next `up` re-seeds from the host's copy.
+    # read-only at /seed/network.yml and copied into /data/plugins/RTP/
+    # before /start runs. On `docker compose down` the writable layer is
+    # discarded, so the next `up` re-seeds from the host's pristine copy.
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP/regions /data/plugins/RTP/advanced && cp -f /seed/network.yml /data/plugins/RTP/advanced/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/advanced/logging.yml && (cp -f /seed/regions/*.yml /data/plugins/RTP/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP/regions && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && (cp -f /seed/regions/*.yml /data/plugins/RTP/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       # Plugin jars: bind a PER-BACKEND plugins dir into /data/plugins (writable).
       # We MUST NOT share ./jars/plugin between backend-a and backend-b: Paper writes
@@ -242,7 +237,7 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP/advanced && cp -f /seed/network.yml /data/plugins/RTP/advanced/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/advanced/logging.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       - ./lobby-a/plugins:/data/plugins
       # Seed-only (read-only); copied into /data/plugins/RTP/network.yml at boot.
@@ -300,7 +295,7 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP/advanced && cp -f /seed/network.yml /data/plugins/RTP/advanced/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/advanced/logging.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       - ./lobby-b/plugins:/data/plugins
       # Seed-only (read-only); copied into /data/plugins/RTP/network.yml at boot.
@@ -360,7 +355,7 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP/regions /data/plugins/RTP/advanced && cp -f /seed/network.yml /data/plugins/RTP/advanced/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/advanced/logging.yml && (cp -f /seed/regions/*.yml /data/plugins/RTP/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP/regions && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && (cp -f /seed/regions/*.yml /data/plugins/RTP/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       # See backend-a: per-backend plugins dir (shared host bind corrupts the
       # .paper-remapped cache when both backends race on it).
@@ -422,7 +417,7 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP/regions /data/plugins/RTP/advanced && cp -f /seed/network.yml /data/plugins/RTP/advanced/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/advanced/logging.yml && (cp -f /seed/regions/*.yml /data/plugins/RTP/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP/regions && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && (cp -f /seed/regions/*.yml /data/plugins/RTP/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       # See backend-a: per-backend plugins dir (shared host bind corrupts the
       # .paper-remapped cache when both backends race on it).

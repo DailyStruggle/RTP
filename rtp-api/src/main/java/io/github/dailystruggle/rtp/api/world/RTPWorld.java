@@ -197,45 +197,6 @@ public abstract class RTPWorld<T> {
   public abstract RTPChunk<?> getCachedChunk(long key);
 
   /**
-   * Creates an {@link RTPChunk} instance backed by preformed chunk data (e.g. an
-   * {@code AnvilChunkView}) without triggering a live chunk load.
-   *
-   * @param preformedData decoded chunk view or preformed snapshot; must not be null
-   * @param cx chunk X coordinate
-   * @param cz chunk Z coordinate
-   * @param reconciledUnsafe optional pre-reconciled unsafe blocks set
-   * @return an RTPChunk answering queries from preformed data
-   */
-  public RTPChunk<?> createChunk(Object preformedData, int cx, int cz, Set<String> reconciledUnsafe) {
-    throw new UnsupportedOperationException("createChunk from preformed data is not supported by " + getClass().getName());
-  }
-
-  /**
-   * Convenience overload of {@link #createChunk(Object, int, int, Set)} with no pre-reconciled set.
-   *
-   * @param preformedData decoded chunk view or preformed snapshot; must not be null
-   * @param cx chunk X coordinate
-   * @param cz chunk Z coordinate
-   * @return an RTPChunk answering queries from preformed data
-   */
-  public RTPChunk<?> createChunk(Object preformedData, int cx, int cz) {
-    return createChunk(preformedData, cx, cz, null);
-  }
-
-  /**
-   * Retrieves an {@link RTPChunk} for {@code (cx, cz)}, resolving from cached/preformed data if
-   * present, or returning null if not already loaded or cached without blocking.
-   *
-   * @param cx chunk X coordinate
-   * @param cz chunk Z coordinate
-   * @return cached/present RTPChunk, or null if not available
-   */
-  public RTPChunk<?> getChunk(int cx, int cz) {
-    final long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
-    return getCachedChunk(key);
-  }
-
-  /**
    * Tagged variant of {@link #getOrLoadChunk(int, int)}: records the call site under
    * {@link #chunkLoadsByOrigin} for diagnostic attribution, then delegates to the 2-arg
    * implementation.

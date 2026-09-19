@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
 import io.github.dailystruggle.rtp.folia.thread.RegionThread;
+import io.github.dailystruggle.rtp.bukkitplatform.anvil.PaletteNormalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -218,9 +219,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
           raw.add(token);
         }
       }
-      Set<String> reconciled = (RTP.serverAccessor != null)
-          ? RTP.serverAccessor.reconcilePaletteIdentifiers(raw)
-          : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(raw);
+      Set<String> reconciled = PaletteNormalizer.reconcileAll(raw);
       AIR_BLOCKS_CACHE.set(reconciled);
       return reconciled;
     } catch (Throwable ignored) {
@@ -238,9 +237,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     org.bukkit.Material type = chunk.getBlock(x & 0xF, y, z & 0xF).getType();
     if (type.isAir()) return true;
     if (airSet.isEmpty()) return false;
-    return (RTP.serverAccessor != null)
-        ? RTP.serverAccessor.matchesPaletteIdentifier(type.name(), airSet)
-        : airSet.contains(io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(type.name()));
+    return PaletteNormalizer.matches(type.name(), airSet);
   }
 
   /**
@@ -311,9 +308,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     if (anvilView != null) {
       Set<String> effective = (reconciledUnsafe != null)
           ? reconciledUnsafe
-          : ((RTP.serverAccessor != null)
-              ? RTP.serverAccessor.reconcilePaletteIdentifiers(unsafeBlocks)
-              : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks));
+          : PaletteNormalizer.reconcileAll(unsafeBlocks);
       return anvilView.isSafe(x & 0xF, y, z & 0xF, effective);
     }
     // Callers are required to invoke this on the chunk's owning region thread

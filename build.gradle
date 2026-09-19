@@ -800,45 +800,13 @@ tasks.register('jacocoServerReport', JacocoReport) {
             '**/devstack/jacoco/*.exec',
             '**/build/jacoco/server*.exec',
             '**/build/jacoco/backend*.exec'
-    ]).filter { it.isFile() && it.length() > 50 }
+    ])
     executionData.from = execFiles
 
-    def serverProjects = subprojects.findAll {
-        !it.name.toLowerCase().contains('fabric') && !it.name.toLowerCase().contains('neoforge')
-    }
-
-    sourceDirectories.from = files(serverProjects.collect { it.sourceSets.main.allSource.srcDirs })
-
-    def pluginJar = fileTree(dir: "${rootDir}/rtp-plugin/build/libs").matching {
-        include 'LeafRTP-Pro-*.jar'
-        exclude '*-dev.jar'
-    }
-    def addonClassTrees = serverProjects.findAll { it.path.startsWith(':addons') }.collect {
-        it.fileTree(dir: it.layout.buildDirectory, includes: ['classes/java/main/**', 'classes/kotlin/main/**'])
-    }
-
-    if (!pluginJar.empty) {
-        classDirectories.from = files(
-                zipTree(pluginJar.singleFile).matching {
-                    include 'io/github/dailystruggle/rtp/**'
-                    exclude '**/unobf/**', '**/*Unobf*', '**/*unobf*', '**/v26_*/**', '**/neoforge/**', '**/*NeoForge*'
-                },
-                addonClassTrees
-        )
-    } else {
-        classDirectories.from = files(serverProjects.collect {
-            it.fileTree(dir: it.layout.buildDirectory,
-                    includes: ['classes/java/main/**', 'classes/kotlin/main/**'],
-                    excludes: [
-                            '**/unobf/**',
-                            '**/*Unobf*',
-                            '**/*unobf*',
-                            '**/v26_*/**',
-                            '**/neoforge/**',
-                            '**/*NeoForge*'
-                    ])
-        })
-    }
+    sourceDirectories.from = files(subprojects.collect { it.sourceSets.main.allSource.srcDirs })
+    classDirectories.from = files(subprojects.collect {
+        it.fileTree(dir: it.buildDir, includes: ['classes/java/main/**', 'classes/kotlin/main/**'])
+    })
 
     reports {
         html.required = true

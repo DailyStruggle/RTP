@@ -99,10 +99,11 @@ show exactly which `rtp-core` classes the devstack uniquely covers.
 
 1. Docker Desktop running (Docker Engine 29+, min API 1.40 - same daemon the
    Testcontainers SQL tier now uses).
-2. Build + stage jar from repo root:
+2. Build + stage jars from repo root:
    ```powershell
-   .\gradlew.bat :rtp-plugin:remapJar
+   .\gradlew.bat :rtp-plugin:shadowJar :rtp-proxy:rtp-proxy-velocity:shadowJar
    Copy-Item rtp-plugin\build\libs\LeafRTP-Pro-*.jar devstack\jars\plugin\
+   Copy-Item rtp-proxy\rtp-proxy-velocity\build\libs\rtp-proxy-velocity-*.jar devstack\jars\velocity\
    ```
 3. Provision secrets (once):
    ```powershell

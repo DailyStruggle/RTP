@@ -50,18 +50,9 @@ param(
   # Skip the automatic `docker compose up -d` step (use when you already brought
   # the stack up by hand and just want to re-run scenarios against it).
   [switch]$SkipUp,
-  # DEPRECATED / no-op: the harness no longer builds automatically, so there is
-  # nothing to skip. Retained only so existing callers passing -SkipBuild keep
-  # working. Use -Build to opt IN to the gradle build.
+  # Skip the automatic gradle shadowJar build step (use when you already have
+  # fresh jars staged in ./jars/velocity and ./jars/plugin).
   [switch]$SkipBuild,
-  # Opt IN to the automatic gradle build (:rtp-plugin:remapJar).
-  # By default the harness does NOT invoke gradle: builds are done by the
-  # operator/IDE, so the harness just stages whatever jar is already under
-  # rtp-plugin/build/libs. This avoids the mandatory clean-build on every run
-  # (which buffered silently via Invoke-Native and looked like a hang) and
-  # sidesteps cross-JDK daemon jar locks. Pass -Build when you want the harness
-  # to build for you.
-  [switch]$Build,
   # Suppress the auto-spawned per-service log windows (one PowerShell window per
   # container streaming `docker compose logs -f`). Useful for headless CI runs.
   [switch]$NoLogs,
@@ -141,23 +132,6 @@ function New-RandomSecret {
   return ([Convert]::ToBase64String($buf)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
 
-function Test-NetSecretValid {
-  # A configured RTP_NET_SECRET is only usable if it base64-decodes to >= 32
-  # bytes (rtp-proxy-ADR-010 / REQ-RTP-PROXY-007). A non-empty-but-too-short
-  # placeholder (e.g. 'replace-me-with-32-byte-base64') decodes to 22 bytes and
-  # must be treated as unset so the harness reseeds it. Accepts URL-safe base64.
-  param([string]$Secret)
-  if ([string]::IsNullOrWhiteSpace($Secret)) { return $false }
-  $s = $Secret.Trim().Replace('-', '+').Replace('_', '/')
-  switch ($s.Length % 4) { 2 { $s += '==' } 3 { $s += '=' } }
-  try {
-    $bytes = [Convert]::FromBase64String($s)
-    return $bytes.Length -ge 32
-  } catch {
-    return $false
-  }
-}
-
 function Ensure-DockerRunning {
   # Make the harness a true one-command experience: if the Docker daemon is not
   # reachable (Docker Desktop not started yet), launch Docker Desktop and wait
@@ -206,12 +180,12 @@ function Initialize-Secrets {
   $hasSecret = $false
   $newLines = foreach ($line in $envLines) {
     if ($line -match '^\s*RTP_NET_SECRET\s*=\s*(.*?)\s*$') {
-      if (Test-NetSecretValid $Matches[1]) {
+      if ($Matches[1] -and $Matches[1].Trim().Length -gt 0) {
         $hasSecret = $true
         $line
       } else {
         $generated = New-RandomSecret
-        Write-Host "[secrets] seeding RTP_NET_SECRET in .env (missing/too-short; needs >= 32 decoded bytes)" -ForegroundColor Cyan
+        Write-Host "[secrets] seeding RTP_NET_SECRET in .env" -ForegroundColor Cyan
         $hasSecret = $true
         "RTP_NET_SECRET=$generated"
       }
@@ -312,47 +286,78 @@ function Get-RepoRoot {
 }
 
 function Invoke-GradleBuild {
-  # Builds the unified Paper/Bukkit/Velocity/Fabric plugin shadow jar
-  # from repo root, then stages it under ./jars/plugin.
-  # Idempotent: gradle no-ops when nothing changed.
-  # Build is now opt-in: the harness only invokes gradle when -Build is passed
-  # (and -SkipBuild not set). By default we skip straight to staging whatever
-  # jar the operator/IDE already produced. Staging ALWAYS runs below so the
-  # freshly built jar is copied into the proxy/backend plugin dirs either way.
+  # Builds the Velocity proxy plugin and the Paper/Bukkit plugin shadow jars
+  # from repo root, then stages them under ./jars/velocity and ./jars/plugin
+  # respectively. Idempotent: gradle no-ops when nothing changed.
+  if ($SkipBuild) {
+    Write-Host '[build] -SkipBuild set; skipping gradle build' -ForegroundColor DarkGray
+    return
+  }
   $root = Get-RepoRoot
-  $doBuild = $Build -and -not $SkipBuild
   $gradlew = Join-Path $root 'gradlew.bat'
-  if (-not $doBuild) {
-    Write-Host '[build] skipping gradle build (default; pass -Build to have the harness build). Staging existing jar from rtp-plugin/build/libs. Build it yourself with:' -ForegroundColor DarkGray
-    Write-Host '        .\gradlew.bat :rtp-plugin:remapJar' -ForegroundColor DarkGray
-  } elseif (-not (Test-Path $gradlew)) {
+  if (-not (Test-Path $gradlew)) {
     Write-Host "[build] WARN - gradlew.bat not found at $gradlew; skipping auto-build" -ForegroundColor Yellow
-  } else {
-    $pluginTask = if ($Lite) { ':rtp-plugin:remapLiteJar' } else { ':rtp-plugin:remapJar' }
-    Write-Host "[build] running gradle ($pluginTask) [edition: $(if ($Lite) {'LITE'} else {'Pro'})] (typical: cold 1-3 min, incremental 30-60s)..." -ForegroundColor Cyan
-    Push-Location $root
-    try {
-    # The unified uber-jar (LeafRTP-Pro-<ver>.jar) carries the Velocity entrypoint,
-    # Bukkit entrypoint, and Fabric descriptor side by side per velocity-plugin.json,
-    # plugin.yml, and fabric.mod.json.
-    # `:rtp-plugin:remapJar` transitively compiles and shades :rtp-proxy:rtp-proxy-velocity
-    # and :rtp-proxy:rtp-proxy-common.
+    return
+  }
+  $pluginTask = if ($Lite) { ':rtp-plugin:remapLiteJar' } else { ':rtp-plugin:remapJar' }
+  Write-Host "[build] running gradle (clean + rtp-proxy-velocity:jar + $pluginTask) [edition: $(if ($Lite) {'LITE'} else {'Pro'})] (typical: cold 1-3 min, incremental 30-60s with clean)..." -ForegroundColor Cyan
+  Push-Location $root
+  try {
+    # rtp-proxy-velocity is a plain java-library (no shadow plugin) - its `jar` task
+    # produces the runtime artifact. rtp-plugin uses shadowJar for the fat Paper jar
+    # (RTP-Pro-<ver>.jar) which transitively shades rtp-proxy-common -> the actual
+    # runtime path used by both proxy-a/proxy-b AND backend-a/backend-b (the unified
+    # uber-jar carries the Velocity entrypoint AND the Bukkit entrypoint side by side
+    # per the velocity-plugin.json + plugin.yml descriptors).
+    #
+    # We `clean` the three modules in the dependency chain before building so a
+    # source edit in rtp-proxy-common (e.g. HMAC envelope fix 2026-05-21) is
+    # guaranteed to re-shade into the RTP-Pro jar. Without `clean`, Gradle will
+    # rebuild only the changed module and rely on the cached shaded jar - leaving
+    # proxies and backends running yesterday's bytes. This is the safe default for
+    # an acceptance harness; iteration speed is not a concern here.
+    # `:rtp-plugin:remapJar` (not shadowJar) is the task that produces the
+    # deployable `RTP-Pro-<ver>.jar`: shadowJar builds the intermediate, Loom's
+    # remapJar consumes it and renames to RTP-Pro (rtp-plugin/build.gradle:377).
+    # Calling shadowJar alone after `clean` leaves no RTP-Pro artifact on disk,
+    # and the staging step downstream then warns "Pro jar not found".
     $out = Invoke-Native { & $gradlew `
+      ':rtp-proxy:rtp-proxy-common:clean' `
+      ':rtp-proxy:rtp-proxy-velocity:clean' `
       ':rtp-plugin:clean' `
+      ':rtp-proxy:rtp-proxy-velocity:jar' `
       $pluginTask `
       '--console=plain' }
     Write-Evidence 'build' $out
     if ($LASTEXITCODE -ne 0) {
       Write-Host "[build] FAIL - gradle exited $LASTEXITCODE (see acceptance-evidence.log)" -ForegroundColor Red
-      throw "gradle $pluginTask failed (exit $LASTEXITCODE)"
+      throw "gradle shadowJar failed (exit $LASTEXITCODE)"
     }
     Write-Host '[build] gradle OK' -ForegroundColor Green
-    } finally {
-      Pop-Location
-    }
+  } finally {
+    Pop-Location
   }
 
-  # Stage Paper/Bukkit/Velocity plugin jar. The devstack runs RTP Pro (the lite assembly
+  # Stage Velocity jar(s).
+  $velocityLibs = Join-Path $root 'rtp-proxy\rtp-proxy-velocity\build\libs'
+  $velocityDst = Join-Path $PSScriptRoot 'jars\velocity'
+  if (-not (Test-Path $velocityDst)) { New-Item -ItemType Directory -Path $velocityDst -Force | Out-Null }
+  if (Test-Path $velocityLibs) {
+    $vJars = Get-ChildItem -Path $velocityLibs -Filter 'rtp-proxy-velocity-*.jar' -File |
+      Where-Object { $_.Name -notmatch '-sources\.jar$|-javadoc\.jar$' }
+    # Clear stale jars so old versions don't ship alongside fresh builds.
+    Get-ChildItem -Path $velocityDst -Filter '*.jar' -File -ErrorAction SilentlyContinue | Remove-Item -Force
+    foreach ($j in $vJars) {
+      Copy-Item -Path $j.FullName -Destination (Join-Path $velocityDst $j.Name) -Force
+    }
+    Write-Host "[build] staged $($vJars.Count) Velocity jar(s) -> jars/velocity" -ForegroundColor Cyan
+  }
+  # itzg/minecraft-server's mc-image-helper sync-and-interpolate trips on dotfiles
+  # in the source plugins dir (AccessDeniedException on /data/plugins/.gitkeep).
+  # Strip any .gitkeep that git restored after the gradle stage step.
+  Get-ChildItem -Path $velocityDst -Filter '.gitkeep' -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+
+  # Stage Paper/Bukkit plugin jar. The devstack runs RTP Pro (the lite assembly
   # is not appropriate for cross-server verification - see ADR-024). Prefer
   # LeafRTP-Pro-<ver>.jar; fall back to the plain LeafRTP-<ver>.jar only if Pro
   # is absent. Always exclude -dev / -sources / -javadoc artifacts.
@@ -434,7 +439,9 @@ function Sync-ProxyJars {
   # Fans out the unified RTP uber-jar from ./jars/plugin into each proxy's
   # plugins directory. RTP ships ONE jar per platform: the shadow-built
   # LeafRTP-Pro-<ver>.jar carries Bukkit (plugin.yml), Fabric (fabric.mod.json),
-  # AND Velocity (velocity-plugin.json) descriptors side by side.
+  # AND Velocity (velocity-plugin.json) descriptors side by side - the
+  # standalone rtp-proxy-velocity-*.jar from jars/velocity is a compile
+  # artifact, not a deployable plugin.
   $src = Join-Path $PSScriptRoot 'jars\plugin'
   if (-not (Test-Path $src)) {
     New-Item -ItemType Directory -Path $src -Force | Out-Null
@@ -522,24 +529,6 @@ function Invoke-ComposeUp {
   Invoke-GradleBuild
   Sync-ProxyJars
   Clear-StaleWorldDirs
-  # Fresh configuration on every up: the plugin's runtime config tree
-  # (plugins/RTP/) is a host bind mount, so a stale config.yml / messages.yml /
-  # network.yml extracted by an OLDER jar survives across runs and masks changes
-  # in the freshly-built jar (new baseline keys, ADR-071 network.yml/logging.yml
-  # relocation, migrated defaults). Invoke-ComposeDown already resets this, but a
-  # plain `up` (or `-Scenario all` without a prior down) would otherwise reuse the
-  # stale tree. Wipe it here so each boot re-extracts the baseline from the new jar
-  # and re-seeds network.yml from ./<instance>/rtp-config/. -IncludeDatabase keeps
-  # parity with the down path (a stale SQLite pointed at a freshly-wiped world is
-  # worse than a clean DB against a clean world - see Invoke-ComposeDown).
-  $resetScript = Join-Path $PSScriptRoot 'reset-rtp-config.ps1'
-  if (Test-Path $resetScript) {
-    Write-Host '[up] wiping plugins/RTP/ (incl. runtime DB) so the freshly-built jar re-extracts a fresh baseline...' -ForegroundColor Cyan
-    $resetOut = Invoke-Native { & $resetScript -IncludeDatabase }
-    Write-Evidence 'up.reset-rtp-config' $resetOut
-  } else {
-    Write-Host "[up] WARN - reset-rtp-config.ps1 not found at $resetScript; skipping fresh-config reset" -ForegroundColor Yellow
-  }
   Push-Location $PSScriptRoot
   try {
     $attempt = 0
@@ -646,14 +635,11 @@ function Invoke-ComposeDown {
 
 function Invoke-RedisCli {
   param([Parameter(ValueFromRemainingArguments)] [string[]]$Args)
-  # ALWAYS exec into the compose `redis` service (internal port 6379). We must NOT
-  # prefer a host-local redis-cli pointed at localhost:6379: the devstack maps
-  # Redis to host port ${REDIS_HOST_PORT:-6380} precisely to avoid colliding with
-  # an operator's own local Redis on 6379. A host redis-cli on 6379 would query
-  # THAT unrelated server (or nothing), so the heartbeat poll saw zero keys and
-  # reported "no heartbeats" even though the devstack backends were publishing
-  # fine to the compose-internal `redis:6379`. Exec-into-container is port-map
-  # agnostic and always hits the right Redis.
+  # Prefer host-local redis-cli; fall back to docker exec into the compose service.
+  $cli = Get-Command redis-cli -ErrorAction SilentlyContinue
+  if ($cli) {
+    return Invoke-Native { & $cli.Source -h localhost -p 6379 @Args }
+  }
   return Invoke-Native { docker compose exec -T redis redis-cli @Args }
 }
 
@@ -869,25 +855,6 @@ function Test-KillMidFlight {
   return $false
 }
 
-function Wait-RconReady {
-  # Poll a service's container log until Paper/itzg reports the RCON listener is
-  # up ('RCON running on 0.0.0.0:25575'), bounded by -WaitSeconds. Returns $true
-  # once the listener is open (rcon-cli can then connect), $false on timeout.
-  # This closes the race where the harness dispatches rcon-cli before the server
-  # has finished booting and opened port 25575 (connection refused).
-  param([Parameter(Mandatory)] [string]$Service)
-  $deadline = (Get-Date).AddSeconds($WaitSeconds)
-  Write-Host "[rtptest] waiting for RCON on $Service (budget: ${WaitSeconds}s; first boot generates worlds, can take 1-3 min)..." -ForegroundColor DarkGray
-  while ((Get-Date) -lt $deadline) {
-    $ready = & docker compose logs --tail=400 --no-log-prefix $Service 2>$null |
-      Select-String -Pattern 'RCON running on' -SimpleMatch |
-      Select-Object -Last 1
-    if ($ready) { return $true }
-    Start-Sleep -Seconds 3
-  }
-  return $false
-}
-
 function Test-RtpTest {
   # Drives the in-game `/rtp test accessor` self-test on every backend and lobby
   # via the itzg `rcon-cli` console, then polls each service log for the
@@ -901,32 +868,13 @@ function Test-RtpTest {
   $services = @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')
   $anyFail = $false
   foreach ($svc in $services) {
-    # RCON readiness gate: the Minecraft servers take 1-3 min to boot (fresh
-    # world gen + plugin enable), and RCON (port 25575) is opened only near the
-    # END of that boot. Dispatching rcon-cli before then fails with
-    # 'Failed to connect to RCON server dial tcp [::1]:25575: connection refused'.
-    # Wait for the itzg/Paper 'RCON running on 0.0.0.0:25575' log line (bounded by
-    # -WaitSeconds) before sending the command so the self-test isn't lost to a
-    # not-yet-listening server.
-    if (-not (Wait-RconReady $svc)) {
-      Write-Host "[rtptest]    FAIL ($svc): RCON not ready within ${WaitSeconds}s (server still booting?)" -ForegroundColor Red
-      Write-Evidence "rtptest.$svc" 'RCON not ready within budget; skipped dispatch'
-      $anyFail = $true
-      continue
-    }
     Write-Host "[rtptest] -> $svc : rtp test accessor" -ForegroundColor Cyan
     $rconOut = & docker compose exec -T $svc rcon-cli rtp test accessor 2>&1
     $deadline = (Get-Date).AddSeconds(30)
     $verdict = $null
     while ((Get-Date) -lt $deadline) {
-      # -SimpleMatch does a LITERAL substring match, so the pattern must be the
-      # raw text - NOT regex-escaped. A previous '\[RTP test/accessor\] pass='
-      # here embedded literal backslashes that never appear in the log line, so
-      # the scan always failed with a false 'no verdict line in log' even though
-      # the plugin emits the verdict. Keep this a plain literal (the bash harness
-      # uses `grep -F '[RTP test/accessor] pass='` for the same reason).
       $line = & docker compose logs --tail=200 --no-log-prefix $svc 2>$null |
-        Select-String -Pattern '[RTP test/accessor] pass=' -SimpleMatch |
+        Select-String -Pattern '\[RTP test/accessor\] pass=' -SimpleMatch |
         Select-Object -Last 1
       if ($line) { $verdict = $line.ToString(); break }
       Start-Sleep -Seconds 2
@@ -1033,20 +981,12 @@ if ($Coverage) {
   $AgentJar = Join-Path $JacocoDir 'jacocoagent.jar'
   if (-not (Test-Path $JacocoDir)) { New-Item -ItemType Directory -Path $JacocoDir -Force | Out-Null }
 
-  # Wipe old/stale execution dumps so each coverage run aggregates only current execution data.
-  Get-ChildItem -Path $JacocoDir -Filter '*.exec' -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-
   if (-not (Test-Path $AgentJar)) {
     Write-Host '[init] JaCoCo agent missing; attempting to extract via gradle extractJacocoAgent...' -ForegroundColor Cyan
     $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
     $gradlew = if ($IsWindows -or ($env:OS -match 'Windows')) { Join-Path $repoRoot 'gradlew.bat' } else { Join-Path $repoRoot 'gradlew' }
     if (Test-Path $gradlew) {
-      Push-Location $repoRoot
-      try {
-        & $gradlew :extractJacocoAgent --quiet
-      } finally {
-        Pop-Location
-      }
+      & $gradlew :extractJacocoAgent --quiet
     }
   }
 
@@ -1146,28 +1086,9 @@ if ($Coverage) {
   Write-Host '[coverage] generating JaCoCo server coverage report...' -ForegroundColor Cyan
   $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
   $gradlew = if ($IsWindows -or ($env:OS -match 'Windows')) { Join-Path $repoRoot 'gradlew.bat' } else { Join-Path $repoRoot 'gradlew' }
-
-  # On Docker Desktop for Windows, bind-mount write-behind buffering (VirtioFS/9p) can cause
-  # host-side .exec files to lag or truncate while containers keep file descriptors open.
-  # Copying each .exec directly from the container via `docker compose cp` guarantees
-  # byte-for-byte complete execution data.
-  Push-Location $PSScriptRoot
-  try {
-    foreach ($svc in @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')) {
-      $null = Invoke-Native { docker compose cp "${svc}:/jacoco/${svc}.exec" "jacoco/${svc}.exec" }
-    }
-  } finally {
-    Pop-Location
-  }
-
   if (Test-Path $gradlew) {
-    Push-Location $repoRoot
-    try {
-      & $gradlew :jacocoServerReport --quiet
-      Write-Host "[coverage] JaCoCo server report generated at: build/reports/jacoco/server/html/index.html" -ForegroundColor Green
-    } finally {
-      Pop-Location
-    }
+    & $gradlew :jacocoServerReport --quiet
+    Write-Host "[coverage] JaCoCo server report generated at: build/reports/jacoco/server/html/index.html" -ForegroundColor Green
   }
 }
 

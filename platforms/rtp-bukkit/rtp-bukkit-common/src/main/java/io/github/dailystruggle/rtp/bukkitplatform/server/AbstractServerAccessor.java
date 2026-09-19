@@ -270,6 +270,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @Nullable RTPPlayer getPlayer(UUID uuid) {
+    RTPPlayer mock = io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return null;
     return wrapPlayer(player);
@@ -277,6 +279,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @Nullable RTPPlayer getPlayer(String name) {
+    RTPPlayer mock = io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry.getByName(name);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(name);
     if (player == null) return null;
     return wrapPlayer(player);
@@ -290,6 +294,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public @NotNull RTPCommandSender getSender(UUID uuid) {
     if (uuid.equals(RTPAPI.serverId)) return new BukkitRTPCommandSender(Bukkit.getConsoleSender());
+    RTPPlayer mock = io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return new BukkitRTPCommandSender(Bukkit.getConsoleSender());
     return wrapPlayer(player);
@@ -332,6 +338,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
       return;
     }
+    RTPPlayer mock = io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry.get(target);
+    if (mock != null) {
+      mock.sendMessage(message);
+      return;
+    }
     Player player = Bukkit.getPlayer(target);
     RTP.log(Level.FINE, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage(UUID, String) target=" + target
             + " bukkitPlayerNonNull=" + (player != null)
@@ -359,8 +370,13 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     if (target1.equals(RTPAPI.serverId)) {
       io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
     } else {
-      Player p1 = Bukkit.getPlayer(target1);
-      if (p1 != null) io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(p1, message);
+      RTPPlayer mock1 = io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry.get(target1);
+      if (mock1 != null) {
+        mock1.sendMessage(message);
+      } else {
+        Player p1 = Bukkit.getPlayer(target1);
+        if (p1 != null) io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(p1, message);
+      }
     }
 
     // Prevent double sending if target1 and target2 are the exact same entity
@@ -369,8 +385,13 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     if (target2.equals(RTPAPI.serverId)) {
       io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
     } else {
-      Player p2 = Bukkit.getPlayer(target2);
-      if (p2 != null) io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(p2, message);
+      RTPPlayer mock2 = io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry.get(target2);
+      if (mock2 != null) {
+        mock2.sendMessage(message);
+      } else {
+        Player p2 = Bukkit.getPlayer(target2);
+        if (p2 != null) io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(p2, message);
+      }
     }
   }
 
@@ -819,6 +840,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public java.util.function.Predicate<String> menuPermissionProbe(UUID player) {
     return node -> {
       if (player == null || node == null) return false;
+      RTPPlayer mock = io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry.get(player);
+      if (mock != null) return mock.hasPermission(node);
       try {
         Player p = Bukkit.getPlayer(player);
         if (p != null) return p.hasPermission(node);
@@ -834,6 +857,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public Set<String> menuEffectivePermissions(UUID player) {
     if (player == null) return Collections.emptySet();
+    RTPPlayer mock = io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry.get(player);
+    if (mock != null) return mock.getEffectivePermissions();
     try {
       Player p = Bukkit.getPlayer(player);
       if (p == null) return Collections.emptySet();
@@ -862,6 +887,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public String menuRegionDescriptor(UUID player) {
     if (player == null) return "";
+    RTPPlayer mock = io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry.get(player);
+    if (mock != null) {
+      RTPLocation loc = mock.getLocation();
+      return (loc == null || loc.world() == null) ? "" : loc.world().name();
+    }
     try {
       Player p = Bukkit.getPlayer(player);
       if (p == null) return "";
@@ -906,20 +936,5 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       if (sender == null) return false;
     }
     return Bukkit.dispatchCommand(sender, commandLine);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Palette identifier normalization & reconciliation SPI
-  // ---------------------------------------------------------------------------
-
-  @Override
-  public String reconcilePaletteIdentifier(String raw) {
-    if (raw == null) return null;
-    try {
-      Material material = Material.matchMaterial(raw);
-      if (material != null) return material.name();
-    } catch (Throwable ignored) {
-    }
-    return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
   }
 }

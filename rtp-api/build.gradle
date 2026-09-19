@@ -16,7 +16,6 @@ dependencies {
     // platform adapters see these types transitively.
     api project(':commands-api')
     api project(':yaml-api')
-    api project(':anvil-api')
     // metrics-api: the GUI-author SPI exposes runtime-health reads
     // (RTPAPI.getMetricsSnapshot / getRegionSamples) returning MetricsSnapshot
     // and FoliaRegionSample. metrics-api is a pure-Java, dependency-free SPI
@@ -26,7 +25,7 @@ dependencies {
     api project(':metrics-api')
 
     compileOnly 'org.jetbrains:annotations:24.1.0'
-    // Checker Framework processor - runs during compileJava only, not shipped in the JAR.
+    // Checker Framework processor â€” runs during compileJava only, not shipped in the JAR.
     // checker-qual (the annotation classes) is inherited from the root subprojects block.
     checkerFramework 'org.checkerframework:checker:3.42.0'
 }

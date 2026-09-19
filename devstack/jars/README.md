@@ -4,7 +4,7 @@ Staging area for built artifacts. `run-acceptance.ps1` fans them out from here
 into the per-service plugin directories before `docker compose up`.
 
 - `jars/plugin/` is the staging source for the unified RTP uber-jar
-  (`LeafRTP-Pro-<version>.jar` from `:rtp-plugin:remapJar`). The acceptance
+  (`LeafRTP-Pro-<version>.jar` from `:rtp-plugin:shadowJar`). The acceptance
   harness copies it from here into:
   - `./backend-a/plugins/` (mounted at `/data/plugins` in `backend-a`)
   - `./backend-b/plugins/` (mounted at `/data/plugins` in `backend-b`)
@@ -16,11 +16,17 @@ into the per-service plugin directories before `docker compose up`.
   backends racing on the same host directory corrupt that cache
   (`ZipException: invalid LOC header (bad signature)`).
 
-Build from the repo root:
+- `jars/velocity/` mounted into both Velocity proxies at `/server/plugins`.
+  Holds the compile-only `rtp-proxy-velocity-<version>.jar` from
+  `:rtp-proxy:rtp-proxy-velocity:shadowJar` (not a deployable plugin; the
+  uber-jar above is what proxies actually load at runtime).
+
+Build everything from the repo root:
 
 ```powershell
-.\gradlew :rtp-plugin:remapJar
+.\gradlew :rtp-plugin:shadowJar :rtp-proxy:rtp-proxy-velocity:shadowJar
 Copy-Item rtp-plugin\build\libs\LeafRTP-Pro-*.jar devstack\jars\plugin\
+Copy-Item rtp-proxy\rtp-proxy-velocity\build\libs\rtp-proxy-velocity-*.jar devstack\jars\velocity\
 ```
 
 If you are NOT using `run-acceptance.ps1`, manually mirror the uber-jar into
