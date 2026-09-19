@@ -45,10 +45,6 @@ jobs:
       - name: Run OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # 1.1.0
         id: depcheck
-        env:
-          # actions/setup-java overrides JAVA_HOME on the runner, which leaks into the docker action.
-          # Reset JAVA_HOME to the container image's internal JRE path.
-          JAVA_HOME: /opt/jdk
         with:
           project: 'RTP'
           path: '.'
