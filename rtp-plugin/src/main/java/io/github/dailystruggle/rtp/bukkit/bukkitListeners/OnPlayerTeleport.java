@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import java.util.logging.Level;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -56,7 +57,7 @@ public final class OnPlayerTeleport implements Listener {
       //noinspection unchecked
       configParser = (ConfigParser<ConfigKeys>) parser;
     else {
-      new IllegalStateException("ConfigParser is not using ConfigKeys").printStackTrace();
+      RTP.log(Level.WARNING, "ConfigParser is not using ConfigKeys: " + parser.myClass);
       return;
     }
 

@@ -2,13 +2,10 @@ package io.github.dailystruggle.rtp.common.database.options;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import java.sql.*;
 import java.util.*;
 import java.util.logging.Level;
-import org.jetbrains.annotations.NotNull;
 
 public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   private final HikariDataSource dataSource;
@@ -86,78 +83,6 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   }
 
   @Override
-  public void startup() {
-    try (Connection connection = getConnection()) {
-      // get full table
-      String tableName = "rtp_teleport_data";
-      String sql = "SELECT * FROM " + tableName;
-      try (Statement statement = connection.createStatement();
-          ResultSet resultSet = statement.executeQuery(sql)) {
-
-        // each data
-        while (resultSet.next()) {
-          String uuidStr = resultSet.getString("senderId");
-          if (uuidStr == null) continue;
-
-          UUID uuid = UUID.fromString(uuidStr);
-
-          TeleportData teleportData = new TeleportData();
-          teleportData.completed = true;
-          teleportData.time = resultSet.getLong("time");
-          teleportData.selectedCoords =
-              new RTPCoords(
-                  resultSet.getString("selectedWorldName"),
-                  resultSet.getInt("selectedX"),
-                  resultSet.getInt("selectedY"),
-                  resultSet.getInt("selectedZ"));
-          teleportData.originalCoords =
-              new RTPCoords(
-                  resultSet.getString("originalWorldName"),
-                  resultSet.getInt("originalX"),
-                  resultSet.getInt("originalY"),
-                  resultSet.getInt("originalZ"));
-          teleportData.cost = resultSet.getDouble("cost");
-
-          RTP.getInstance().latestTeleportData.put(uuid, teleportData);
-        }
-      }
-    } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
-    } catch (IllegalArgumentException ignored) {
-    }
-
-    purgeStaleLocations();
-  }
-
-  @Override
-  public @NotNull Optional<Map<String, Object>> read(
-      Connection connection, String tableName, Map.Entry<String, Object> lookup) {
-    Map<String, Object> row = new HashMap<>();
-
-    String sql = "SELECT * FROM " + tableName + " WHERE " + lookup.getKey() + " = ?";
-
-    try (PreparedStatement statement = connection.prepareStatement(sql)) {
-      statement.setObject(1, lookup.getValue());
-      try (ResultSet resultSet = statement.executeQuery()) {
-          if (resultSet.next()) {
-              ResultSetMetaData metaData = resultSet.getMetaData();
-              int columnCount = metaData.getColumnCount();
-              for (int i = 1; i <= columnCount; i++) {
-                  String key = metaData.getColumnName(i);
-                  Object object = resultSet.getObject(i);
-                  if (object == null) continue;
-                  row.put(key, object);
-              }
-              return Optional.of(row);
-          }
-      }
-    } catch (SQLException ignored) {
-    }
-
-    return Optional.empty();
-  }
-
-  @Override
   protected String getInsertStatement() {
     // Identifiers are left unquoted so PostgreSQL folds them to the same lower
     // case used by the unquoted CREATE TABLE column definitions. A quoted mixed
@@ -169,6 +94,7 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   }
 
   @Override
+  @SuppressWarnings("java:S2077") // Dynamic table and column identifiers cannot be parameterized in JDBC; values use parameter binding
   public void write(
       Connection connection, String tableName, Map<TableObj, TableObj> keyValuePairs) {
     if (keyValuePairs == null || keyValuePairs.isEmpty()) throw new IllegalStateException();

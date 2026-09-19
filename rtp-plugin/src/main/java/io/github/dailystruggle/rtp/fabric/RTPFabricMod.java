@@ -682,8 +682,7 @@ public final class RTPFabricMod implements ModInitializer {
         } catch (Throwable t) {
             // Loud failure; ModInitializer swallowing exceptions would leave
             // the mod silently non-functional, violating REQ-RTP-S-004.
-            System.err.println("[RTP] Fabric onInitialize failed:");
-            t.printStackTrace();
+            RTP.log(Level.SEVERE, "[RTP] Fabric onInitialize failed", t);
             throw new RuntimeException("RTP Fabric initialization failed", t);
         }
     }

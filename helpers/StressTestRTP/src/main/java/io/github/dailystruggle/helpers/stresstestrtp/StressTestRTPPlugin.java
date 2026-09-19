@@ -129,14 +129,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         // by beginRun() each /rtpstress start|burst. When no run is live
         // the proxy drops everything, since the probe's expectation map
         // is also empty in that state.
-        RecorderProxy proxy;
-        try {
-            proxy = new RecorderProxy(this);
-        } catch (IOException e) {
-            getLogger().log(Level.SEVERE, "StressTestRTP failed to initialise temp recorder", e);
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
+        RecorderProxy proxy = new RecorderProxy(this);
         probe = new TeleportProbe(this, proxy);
         probe.register();
         runner = new Runner(this, proxy, probe, sampler, getConfig());
@@ -308,8 +301,8 @@ public final class StressTestRTPPlugin extends JavaPlugin {
      */
     private static final class RecorderProxy extends MetricsRecorder {
         private final StressTestRTPPlugin plugin;
-        RecorderProxy(StressTestRTPPlugin plugin) throws IOException {
-            super(java.nio.file.Files.createTempFile("stresstestrtp-proxy-unused", ".csv"));
+        RecorderProxy(StressTestRTPPlugin plugin) {
+            super();
             this.plugin = plugin;
         }
         @Override public void onDispatch(Attempt a) {

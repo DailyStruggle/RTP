@@ -75,71 +75,11 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
   }
 
   private static void squareOct2Coords(long radius, double perimeterStep, MutableRTPCoords output) {
-    int x, z;
-    // getFromString how far to go from a corner
-    double shortStep = perimeterStep % radius;
-
-    if (perimeterStep < radius * 4) {
-      if (perimeterStep < radius * 2) {
-        if (perimeterStep < radius) { // octant 1, from 0 to pi/4
-          x = (int) radius;
-          z = (int) shortStep;
-        } else { // octant 2, from pi/4 to pi/2
-          x = (int) (radius - shortStep);
-          z = (int) radius;
-        }
-      } else {
-        if (perimeterStep < radius * 3) { // octant 3
-          x = (int) -shortStep;
-          z = (int) radius;
-        } else { // octant 4
-          x = (int) -radius;
-          z = (int) (radius - shortStep);
-        }
-      }
-    } else {
-      if (perimeterStep < radius * 6) {
-        if (perimeterStep < radius * 5) { // octant 5
-          x = (int) -radius;
-          z = (int) -shortStep;
-        } else { // octant 6
-          x = (int) -(radius - shortStep);
-          z = (int) -radius;
-        }
-      } else {
-        if (perimeterStep < radius * 7) { // octant 7
-          x = (int) shortStep;
-          z = (int) -radius;
-        } else { // octant 8
-          x = (int) radius;
-          z = (int) -(radius - shortStep);
-        }
-      }
-    }
-    output.setXZ(x, z);
+    io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.SquareGeometry.squareOct2Coords(radius, perimeterStep, output);
   }
 
-  /**
-   * Perimeter index of a ring cell, counted counter-clockwise from {@code (R,0)}.
-   *
-   * <p>Integer edge tests, not a floating-point angle: {@code atan(z/x)} folded into a quarter
-   * turn reflects quadrants 2 and 4 and collapses the axis cases, so the two cells meeting at
-   * every octant seam shared one index (e.g. {@code (-R,0)} and {@code (-R,R)}). Exact inverse of
-   * {@link #squareOct2Coords(long, double, MutableRTPCoords)}: the {@code 8R} cells of ring
-   * {@code R} map bijectively onto {@code [0, 8R)}. Corner ownership follows the test order -
-   * top edge, then left, then bottom, leaving the right edge with the wrap at {@code z < 0}.
-   *
-   * @param x      ring-relative x, with {@code max(|x|,|z|) == radius}
-   * @param z      ring-relative z
-   * @param radius Chebyshev radius of the ring
-   * @return perimeter index in {@code [0, 8 * radius)}, or {@code 0} for the centre cell
-   */
   private static long perimeterStep(long x, long z, long radius) {
-    if (radius == 0L) return 0L;
-    if (z == radius) return (radius * 2L) - x;
-    if (x == -radius) return (radius * 4L) - z;
-    if (z == -radius) return (radius * 6L) + x;
-    return (z >= 0L) ? z : ((radius * 8L) + z);
+    return io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.SquareGeometry.perimeterStep(x, z, radius);
   }
 
   private static int[] squareOct2Coords(long radius, double perimeterStep) {
@@ -148,41 +88,12 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
     return new int[] {output.x, output.z};
   }
 
-  /**
-   * First index of ring {@code r}, i.e. the index of {@code (r, 0)}.
-   *
-   * <p>Ring {@code r} holds exactly {@code 8r} cells, so allotting it exactly {@code 8r} indices
-   * makes the index space the cell count and the map a bijection. Summing that over
-   * {@code [cr, r)} telescopes to {@code 4(r(r-1) - cr(cr-1))}. The earlier allotment,
-   * {@code 4(r^2 - cr^2)}, gave each ring {@code 8r + 4} indices - 4 more than it has cells - so
-   * the reverse map had to alias 4 cells per ring.
-   *
-   * <p>With {@code cr == 0} the origin is a one-cell ring that owns index {@code 0}, hence the
-   * {@code +1} shift on every other ring.
-   */
   private static long ringStart(long r, long cr) {
-    long base = ((r * (r - 1L)) - (cr * (cr - 1L))) * 4L;
-    return (cr == 0L) ? base + 1L : base;
+    return io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.SquareGeometry.ringStart(r, cr);
   }
 
-  /**
-   * Ring holding {@code location}, i.e. the largest {@code r} with {@code ringStart(r) <= location}.
-   *
-   * <p>{@code floor(location / 4) + cr(cr-1)} lies in {@code [r(r-1), r(r+1))} exactly, so the
-   * {@code sqrt} only seeds the answer; the correction steps remove double rounding at large radii,
-   * where a half-ulp error would otherwise place a cell on the wrong ring.
-   */
   private static long ringOf(long location, long cr) {
-    if (cr == 0L) {
-      if (location <= 0L) return 0L;
-      location -= 1L;
-    }
-    long target = (location / 4L) + (cr * (cr - 1L));
-    long r = (long) ((1.0 + Math.sqrt(1.0 + (4.0 * (double) target))) / 2.0);
-    if (r < 1L) r = 1L;
-    while (r > 1L && (r * (r - 1L)) > target) r--;
-    while (((r + 1L) * r) <= target) r++;
-    return r;
+    return io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.SquareGeometry.ringOf(location, cr);
   }
 
   @Override

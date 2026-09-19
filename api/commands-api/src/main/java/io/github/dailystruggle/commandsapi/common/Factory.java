@@ -9,6 +9,8 @@ import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Factory {
     private final ConcurrentHashMap<String,Class<?>> map = new ConcurrentHashMap<>();
@@ -35,7 +37,7 @@ public class Factory {
         try {
             res = map.get(name.toUpperCase()).getConstructor(parameterTypes).newInstance(parameters);
         } catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
-            e.printStackTrace();
+            Logger.getLogger(Factory.class.getName()).log(Level.WARNING, "Factory: failed to construct " + name, e);
             return null;
         }
         return res;

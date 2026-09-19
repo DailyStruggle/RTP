@@ -3254,4 +3254,89 @@ public class TeleportPipelineTaskMutationTest {
         assertEquals(TeleportPipelineTask.Phase.TELEPORT, task.getPhase(), "Phase should advance to TELEPORT");
         assertTrue(syncScheduled.get(), "RTP.scheduler.runTask must be called when chunkSet is null");
     }
+
+    @Test
+    @DisplayName("completeDeathTeleport: covers respawned=false, duration>0 invulnerability, lockAfterUses>0, and postTeleportQueueing")
+    void completeDeathTeleport_branch_coverage() throws Exception {
+        SettablePlayer player = createPlayer("DeathRespawnP");
+        Region reg = createTestRegion("death_respawn_reg");
+        GenerationContext ctx = new GenerationContext(player, player, null);
+        TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg);
+
+        TeleportData data = new TeleportData();
+        data.sender = player;
+        data.targetRegion = reg;
+        data.completed = false;
+        Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
+        tpDataField.setAccessible(true);
+        tpDataField.set(task, data);
+
+        // 1. respawned = false (player disconnected or cancelled)
+        task.completeDeathTeleport(false);
+        assertFalse(data.completed, "teleportData should not be marked completed if respawned is false");
+        assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
+
+        // 2. respawned = true with duration > 0, lockAfterUses > 0, postTeleportQueueing = true
+        TeleportPipelineTask task2 = new TeleportPipelineTask(ctx, reg);
+        TeleportData data2 = new TeleportData();
+        data2.sender = player;
+        data2.targetRegion = reg;
+        data2.completed = false;
+        tpDataField.set(task2, data2);
+
+        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 5L);
+        TeleportPipelineTask.ConfigCache.lockAfterUses = 5L;
+        TeleportPipelineTask.ConfigCache.lockAfterResetMillis = 60000L;
+        TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
+        try {
+            task2.completeDeathTeleport(true);
+            assertTrue(data2.completed);
+            assertTrue(RTP.getInstance().invulnerablePlayers.containsKey(player.uuid()));
+        } finally {
+            TeleportPipelineTask.ConfigCache.lockAfterUses = 0L;
+            TeleportPipelineTask.ConfigCache.postTeleportQueueing = false;
+        }
+
+        // 3. respawned = true with context == null (null playerId handling)
+        TeleportPipelineTask task3 = new TeleportPipelineTask(new GenerationContext(null, null, null));
+        assertDoesNotThrow(() -> task3.completeDeathTeleport(true));
+    }
+
+    @Test
+    @DisplayName("schematicFootprintClear: anchor ORIGIN vs CENTER and negative dimensions")
+    void schematicFootprintClear_anchors_and_verifiers() throws Exception {
+        LoadedSchematic schem = new TestSchematic(3, 3, 3, -1, -1);
+        RTPLocation loc = new RTPLocation(world, 100, 64, 100);
+
+        // ORIGIN anchor
+        PasteOptions originOptions = new PasteOptions(PasteAnchor.ORIGIN, false, true);
+        assertTrue(TeleportPipelineTask.schematicFootprintClear(schem, loc, originOptions, world.name()));
+
+        // Non-positive width or length returns true immediately
+        LoadedSchematic zeroSchem = new TestSchematic(0, 0, 0, 0, 0);
+        assertTrue(TeleportPipelineTask.schematicFootprintClear(zeroSchem, loc, originOptions, world.name()));
+
+        // Verifier returning false fails the footprint check
+        GlobalRegionVerifiers.addGlobalRegionVerifier(coords -> false);
+        try {
+            assertFalse(TeleportPipelineTask.schematicFootprintClear(schem, loc, originOptions, world.name()));
+        } finally {
+            GlobalRegionVerifiers.clearGlobalRegionVerifiers();
+        }
+    }
+
+    @Test
+    @DisplayName("ConfigCache reload handles null cfg and non-null values")
+    void configCache_reload_branches() {
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> cfgParser =
+            RTP.configs.configParserMap.remove(ConfigKeys.class);
+        try {
+            assertDoesNotThrow(TeleportPipelineTask.ConfigCache::reload);
+        } finally {
+            if (cfgParser != null) {
+                RTP.configs.configParserMap.put(ConfigKeys.class, cfgParser);
+            }
+            TeleportPipelineTask.ConfigCache.reload();
+        }
+    }
 }

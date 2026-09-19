@@ -12,6 +12,8 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Factory and registry for {@link Effect} prototypes, keyed by name.
@@ -92,8 +94,7 @@ public class EffectFactory {
         try {
             effect = (Effect<T>) effectMap.get(name.toUpperCase()).clone();
         } catch (Throwable throwable) {
-            //todo: figure out how these are triggered and log how to fix them
-            throwable.printStackTrace();
+            Logger.getLogger(EffectFactory.class.getName()).log(Level.WARNING, "Failed to build effect: " + name, throwable);
             return null;
         }
         return effect;

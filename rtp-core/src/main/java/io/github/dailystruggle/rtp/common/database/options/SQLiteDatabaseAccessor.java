@@ -120,27 +120,10 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     }
 
     // get full table
-    String tableName = "rtp_teleport_data";
-    String sql = "SELECT * FROM " + tableName;
-    Statement statement;
+    String sql = "SELECT * FROM rtp_teleport_data";
 
-    try {
-      statement = connection.createStatement();
-
-      try {
-        statement.execute(sql);
-      } catch (SQLException e) {
-        return;
-      }
-
-      ResultSet resultSet;
-
-      try {
-        resultSet = statement.getResultSet();
-      } catch (SQLException e) {
-        return;
-      }
-
+    try (PreparedStatement statement = connection.prepareStatement(sql);
+        ResultSet resultSet = statement.executeQuery()) {
       if (resultSet == null) {
         return;
       }
@@ -181,14 +164,13 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   }
 
   @Override
+  @SuppressWarnings("java:S2077") // Dynamic table and column identifiers cannot be parameterized in JDBC; values use parameter binding
   public @NotNull Optional<Map<String, Object>> read(
       Connection connection, String tableName, Map.Entry<String, Object> lookup) {
     String sql = "PRAGMA table_info( " + tableName + " );";
-    Statement statement;
     Map<String, String> column_info = new HashMap<>();
 
-    try {
-      statement = connection.createStatement();
+    try (Statement statement = connection.createStatement()) {
       statement.execute(sql);
       ResultSet resultSet = statement.getResultSet();
 
@@ -204,25 +186,22 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     // validate and add necessary column_info
     Map<String, Object> row = new HashMap<>();
 
-    sql =
-        "SELECT * FROM "
-            + tableName
-            + " WHERE "
-            + lookup.getKey()
-            + " = "
-            + "\""
-            + lookup.getValue().toString()
-            + "\"";
+    String selectSql = "SELECT * FROM " + tableName + " WHERE " + lookup.getKey() + " = ?";
 
-    try {
-      statement.execute(sql);
-      ResultSet resultSet = statement.getResultSet();
-      for (String key : column_info.keySet()) {
-        Object object = resultSet.getObject(key);
-        if (object == null || object.equals("NULL")) continue;
-        row.put(key, object);
+    try (PreparedStatement statement = connection.prepareStatement(selectSql)) {
+      statement.setObject(1, lookup.getValue());
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet != null) {
+          if (resultSet.next()) {
+            for (String key : column_info.keySet()) {
+              Object object = resultSet.getObject(key);
+              if (object == null || object.equals("NULL")) continue;
+              row.put(key, object);
+            }
+          }
+          return Optional.of(row);
+        }
       }
-      return Optional.of(row);
     } catch (SQLException ignored) {
 
     }
@@ -236,6 +215,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   }
 
   @Override
+  @SuppressWarnings("java:S2077") // Dynamic table and column identifiers cannot be parameterized in JDBC; values use parameter binding
   public void write(
       Connection connection, String tableName, Map<TableObj, TableObj> keyValuePairs) {
     if (keyValuePairs == null) throw new IllegalStateException();

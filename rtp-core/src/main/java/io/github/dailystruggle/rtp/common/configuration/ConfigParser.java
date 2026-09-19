@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -605,16 +607,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     Map<E, Object> defaults = new EnumMap<>(myClass);
     java.io.InputStream in = getResourceFromJar(jarPrefix() + this.name);
     if (in == null) return defaults;
-    File tmp = null;
-    try {
-      tmp = File.createTempFile("rtp-baseline-", "-" + this.name.replace('/', '_'));
-      try (java.io.FileOutputStream out = new java.io.FileOutputStream(tmp)) {
-        byte[] buf = new byte[1024];
-        int len;
-        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-      }
-      RtpYamlConfig baseline = new RtpYamlConfig(tmp.getPath());
-      baseline.loadWithComments();
+    try (InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+      RtpYamlConfig baseline = RtpYamlConfig.parse(reader);
       for (String key : baseline.getKeys(false)) {
         E enumKey = enumLookup.get(key.toLowerCase(Locale.ROOT));
         if (enumKey == null) continue;
@@ -625,11 +619,6 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       }
     } catch (IOException | RuntimeException ex) {
       // Treat any failure as "no baseline known"; caller will preserve all values.
-    } finally {
-      try { in.close(); } catch (IOException ignored) {}
-      if (tmp != null) {
-        try { java.nio.file.Files.deleteIfExists(tmp.toPath()); } catch (IOException ignored) {}
-      }
     }
     return defaults;
   }
@@ -860,16 +849,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     Map<E, Object> defaults = new EnumMap<>(myClass);
     java.io.InputStream in = getDefaultsFromJar();
     if (in == null) return defaults;
-    File tmp = null;
-    try {
-      tmp = File.createTempFile("rtp-localized-", "-" + this.name.replace('/', '_'));
-      try (java.io.FileOutputStream out = new java.io.FileOutputStream(tmp)) {
-        byte[] buf = new byte[1024];
-        int len;
-        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-      }
-      RtpYamlConfig localized = new RtpYamlConfig(tmp.getPath());
-      localized.loadWithComments();
+    try (InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+      RtpYamlConfig localized = RtpYamlConfig.parse(reader);
       for (String key : localized.getKeys(false)) {
         String canonical = reverse_language_mapping.getOrDefault(key, key);
         E enumKey = enumLookup.get(canonical.toLowerCase(Locale.ROOT));
@@ -882,11 +863,6 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       }
     } catch (IOException | RuntimeException ex) {
       // Treat any failure as "no localized baseline known"; caller falls back to no migration.
-    } finally {
-      try { in.close(); } catch (IOException ignored) {}
-      if (tmp != null) {
-        try { java.nio.file.Files.deleteIfExists(tmp.toPath()); } catch (IOException ignored) {}
-      }
     }
     return defaults;
   }

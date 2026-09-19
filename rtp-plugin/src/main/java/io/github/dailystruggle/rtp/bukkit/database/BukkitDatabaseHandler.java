@@ -7,6 +7,7 @@ import java.io.File;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.util.Map;
+import java.util.logging.Level;
 
 public class BukkitDatabaseHandler {
     public static void setupDatabase(RTP rtp) throws FileSystemException {
@@ -57,7 +58,7 @@ public class BukkitDatabaseHandler {
         try {
             Files.write(dbStateFile.toPath(), effectiveType.getBytes());
         } catch (Exception e) {
-            e.printStackTrace();
+            RTP.log(Level.WARNING, "Failed to write database state file", e);
         }
 
         RTP.configs.reloadRegions();
