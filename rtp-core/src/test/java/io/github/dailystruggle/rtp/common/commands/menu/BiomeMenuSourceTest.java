@@ -15,10 +15,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -68,15 +70,25 @@ class BiomeMenuSourceTest {
     return shape;
   }
 
-  /** Distinct run start per seeded biome, so the union's clipping never merges two of them. */
-  private static long nextSeedKey = 1_000_000L;
-
+  @SuppressWarnings("unchecked")
   private static void seedBiome(MemoryShape<?> shape, String biome, long count) throws Exception {
-    // Record a real observation and merge it: the biome table exists only as the shape's blocked
-    // union, so there is no per-biome map to inject into.
-    shape.addBiomeLocation(nextSeedKey, count, biome);
-    nextSeedKey += 1_000_000L;
-    shape.flushAndRebuild(shape.spatialResolution());
+    Field f = MemoryShape.class.getDeclaredField("biomePrefixSumsCache");
+    f.setAccessible(true);
+    Map<String, long[]> map = (Map<String, long[]>) f.get(shape);
+    if (map == null) {
+      map = new ConcurrentHashMap<>();
+      f.set(shape, map);
+    }
+    map.put(biome, new long[] {count});
+
+    Field kf = MemoryShape.class.getDeclaredField("biomeKeysCache");
+    kf.setAccessible(true);
+    Map<String, long[]> kmap = (Map<String, long[]>) kf.get(shape);
+    if (kmap == null) {
+      kmap = new ConcurrentHashMap<>();
+      kf.set(shape, kmap);
+    }
+    kmap.put(biome, new long[] {0L});
   }
 
   @Test
