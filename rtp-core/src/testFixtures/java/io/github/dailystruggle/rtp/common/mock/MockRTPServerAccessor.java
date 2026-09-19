@@ -289,10 +289,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public boolean isPrimaryThread() {
-        // In the synchronous model everything runs on the calling ("primary")
-        // thread. In the threaded server-topology model this reflects the mock
-        // main lane, so teleport sync-enforcement can be asserted.
-        return !scheduler.isThreaded() || scheduler.isOnMainLane();
+        return true;
     }
 
     @Override

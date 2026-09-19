@@ -224,7 +224,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       try {
         configParser.save();
       } catch (IOException ex) {
-        RTP.log(java.util.logging.Level.WARNING, "Failed to save configuration parser " + configParser.name, ex);
+        ex.printStackTrace();
       }
 
       String updatedMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updated, ""));

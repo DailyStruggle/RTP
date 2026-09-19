@@ -32,12 +32,9 @@ public class GlobalRegionVerifiers {
      * @param source        The class registering the verifier.
      * @param locationCheck A predicate that returns {@code true} for a valid location,
      *                      or {@code false} for an invalid one.
-     * @return an {@link AutoCloseable} that unregisters this verifier when closed.
      */
-    public static AutoCloseable addGlobalRegionVerifier(Class<?> source, Predicate<RTPCoords> locationCheck) {
-        RegisteredSyncVerifier entry = new RegisteredSyncVerifier(source != null ? source : locationCheck.getClass(), locationCheck);
-        regionVerifiers.add(entry);
-        return () -> regionVerifiers.remove(entry);
+    public static void addGlobalRegionVerifier(Class<?> source, Predicate<RTPCoords> locationCheck) {
+        regionVerifiers.add(new RegisteredSyncVerifier(source != null ? source : locationCheck.getClass(), locationCheck));
     }
 
     /**
@@ -46,10 +43,9 @@ public class GlobalRegionVerifiers {
      *
      * @param locationCheck A predicate that returns {@code true} for a valid location,
      *                      or {@code false} for an invalid one.
-     * @return an {@link AutoCloseable} that unregisters this verifier when closed.
      */
-    public static AutoCloseable addGlobalRegionVerifier(Predicate<RTPCoords> locationCheck) {
-        return addGlobalRegionVerifier(locationCheck.getClass(), locationCheck);
+    public static void addGlobalRegionVerifier(Predicate<RTPCoords> locationCheck) {
+        addGlobalRegionVerifier(locationCheck.getClass(), locationCheck);
     }
 
     /**
@@ -59,12 +55,9 @@ public class GlobalRegionVerifiers {
      * @param locationCheck A function that returns a {@link CompletableFuture<Boolean>}
      *                      which completes with {@code true} for a valid location,
      *                      or {@code false} for an invalid one.
-     * @return an {@link AutoCloseable} that unregisters this verifier when closed.
      */
-    public static AutoCloseable addGlobalRegionVerifierAsync(Class<?> source, Function<RTPCoords, CompletableFuture<Boolean>> locationCheck) {
-        RegisteredAsyncVerifier entry = new RegisteredAsyncVerifier(source != null ? source : locationCheck.getClass(), locationCheck);
-        asyncRegionVerifiers.add(entry);
-        return () -> asyncRegionVerifiers.remove(entry);
+    public static void addGlobalRegionVerifierAsync(Class<?> source, Function<RTPCoords, CompletableFuture<Boolean>> locationCheck) {
+        asyncRegionVerifiers.add(new RegisteredAsyncVerifier(source != null ? source : locationCheck.getClass(), locationCheck));
     }
 
     /**
@@ -74,32 +67,9 @@ public class GlobalRegionVerifiers {
      * @param locationCheck A function that returns a {@link CompletableFuture<Boolean>}
      *                      which completes with {@code true} for a valid location,
      *                      or {@code false} for an invalid one.
-     * @return an {@link AutoCloseable} that unregisters this verifier when closed.
      */
-    public static AutoCloseable addGlobalRegionVerifierAsync(Function<RTPCoords, CompletableFuture<Boolean>> locationCheck) {
-        return addGlobalRegionVerifierAsync(locationCheck.getClass(), locationCheck);
-    }
-
-    /**
-     * Removes all registered verifiers (sync and async) attributed to the given source class.
-     *
-     * @param source the source class whose verifiers should be unregistered
-     * @return the number of verifiers removed
-     */
-    public static int removeGlobalRegionVerifiersBySource(Class<?> source) {
-        if (source == null) return 0;
-        int removed = 0;
-        for (RegisteredSyncVerifier v : regionVerifiers) {
-            if (source.equals(v.source())) {
-                if (regionVerifiers.remove(v)) removed++;
-            }
-        }
-        for (RegisteredAsyncVerifier v : asyncRegionVerifiers) {
-            if (source.equals(v.source())) {
-                if (asyncRegionVerifiers.remove(v)) removed++;
-            }
-        }
-        return removed;
+    public static void addGlobalRegionVerifierAsync(Function<RTPCoords, CompletableFuture<Boolean>> locationCheck) {
+        addGlobalRegionVerifierAsync(locationCheck.getClass(), locationCheck);
     }
 
     /**

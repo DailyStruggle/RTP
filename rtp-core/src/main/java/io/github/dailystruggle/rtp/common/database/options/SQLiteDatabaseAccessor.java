@@ -172,7 +172,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         RTP.getInstance().latestTeleportData.put(uuid, teleportData);
       }
     } catch (SQLException throwables) {
-      RTP.log(Level.WARNING, "Failed to load cached locations from SQLite", throwables);
+      throwables.printStackTrace();
     } catch (IllegalArgumentException ignored) {
 
     }

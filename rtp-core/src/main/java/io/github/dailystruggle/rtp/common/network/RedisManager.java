@@ -64,8 +64,7 @@ public class RedisManager implements RTPNetworkManager {
                     }
                 }, rpcChannel);
             } catch (Exception e) {
-                io.github.dailystruggle.rtp.common.RTP.log(
-                        java.util.logging.Level.WARNING, "Exception during Redis subscription to " + rpcChannel, e);
+                e.printStackTrace();
             }
         });
     }

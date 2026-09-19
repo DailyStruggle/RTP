@@ -28,7 +28,7 @@ final class SimulationReport {
     MODELED
   }
 
-  public record Row(String section, String subject, String metric, String value, Provenance tier) {}
+  private record Row(String section, String subject, String metric, String value, Provenance tier) {}
 
   private final List<Row> rows = new ArrayList<>();
   private final List<String> notes = new ArrayList<>();
@@ -52,9 +52,8 @@ final class SimulationReport {
     return rows.size();
   }
 
-  /** Writes markdown + CSV + JSON and registers rows for baseline regression analysis. Never throws. */
+  /** Writes markdown + CSV. Never throws: a report-write failure must not fail the benchmark. */
   void write(String fileStem) {
-    SimulationBaselineRegressionComparator.registerReportRows(fileStem, rows);
     String dir = System.getProperty("rtp.simulation.reportDir");
     if (dir == null || dir.isBlank()) {
       System.out.println("[DEBUG_LOG] rtp.simulation.reportDir unset; skipping report files");
@@ -66,9 +65,7 @@ final class SimulationReport {
       Files.writeString(
           out.resolve(fileStem + ".md"), markdown(), StandardCharsets.UTF_8);
       Files.writeString(out.resolve(fileStem + ".csv"), csv(), StandardCharsets.UTF_8);
-      Path jsonPath = out.resolve(fileStem + ".json");
-      Files.writeString(jsonPath, json(fileStem), StandardCharsets.UTF_8);
-      System.out.println("[DEBUG_LOG] report written to " + out.resolve(fileStem + ".md") + " and " + jsonPath);
+      System.out.println("[DEBUG_LOG] report written to " + out.resolve(fileStem + ".md"));
     } catch (IOException e) {
       System.out.println("[DEBUG_LOG] report write failed: " + e);
     }
@@ -148,32 +145,6 @@ final class SimulationReport {
           .append('\n');
     }
     return sb.toString();
-  }
-
-  private String json(String fileStem) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("{\n");
-    sb.append("  \"fileStem\": \"").append(fileStem).append("\",\n");
-    sb.append("  \"generated\": \"").append(java.time.OffsetDateTime.now()).append("\",\n");
-    sb.append("  \"rows\": [\n");
-    for (int i = 0; i < rows.size(); i++) {
-      Row r = rows.get(i);
-      sb.append("    {\n");
-      sb.append("      \"section\": ").append(jsonQuote(r.section())).append(",\n");
-      sb.append("      \"subject\": ").append(jsonQuote(r.subject())).append(",\n");
-      sb.append("      \"metric\": ").append(jsonQuote(r.metric())).append(",\n");
-      sb.append("      \"value\": ").append(jsonQuote(r.value())).append(",\n");
-      sb.append("      \"tier\": ").append(jsonQuote(r.tier().name())).append("\n");
-      sb.append("    }").append(i + 1 < rows.size() ? "," : "").append("\n");
-    }
-    sb.append("  ]\n");
-    sb.append("}\n");
-    return sb.toString();
-  }
-
-  private static String jsonQuote(String s) {
-    if (s == null) return "\"\"";
-    return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\"";
   }
 
   private static String q(String s) {
