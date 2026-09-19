@@ -354,7 +354,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
                 }
                 String detail;
                 try {
-                    detail = either.getClass().getName() + " -> " + either;
+                    detail = either.getClass().getName() + " -> " + String.valueOf(either);
                 } catch (Throwable t) {
                     detail = either.getClass().getName() + " (toString threw "
                             + t.getClass().getSimpleName() + ")";

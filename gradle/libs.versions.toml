@@ -33,7 +33,7 @@ jacoco = "0.8.11"
 # a curated starter ruleset lives at config/pmd/ruleset.xml and custom rules
 # (e.g. prefer-non-locking) are appended there. PMD 7.x parses Java 21+ and
 # needs Gradle 8.6+ (this build runs Gradle 9.5).
-pmd = "7.27.0"
+pmd = "7.7.0"
 # PIT mutation testing (ENTERPRISE_READINESS.md item 22): the opt-in `-Pmutation`
 # gate on rtp-core's safety packages. `pitestPlugin` is the Gradle plugin (1.19.0
 # is the first stable line with Gradle 9 support - this build runs Gradle 9.5);
