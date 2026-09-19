@@ -18,5 +18,5 @@
   # P0
   - "[RTP]"
 
-# 버전 번호는 변경하지 마세요
+# DO NOT TOUCH VERSION NUMBER
 version: 1.0

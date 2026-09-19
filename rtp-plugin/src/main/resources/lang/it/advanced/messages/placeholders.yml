@@ -22,5 +22,5 @@ segnaposto:
   # P0
   - "[RTP]"
 
-# NON MODIFICARE IL NUMERO DI VERSIONE
+# DO NOT TOUCH VERSION NUMBER
 version: 1.0

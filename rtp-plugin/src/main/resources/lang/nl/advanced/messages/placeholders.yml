@@ -14,11 +14,9 @@
 # ###############################################################################
 # Sectie 1: Algemene instellingen
 # ###############################################################################
-# lijst met extra plaatshouders
-# formaat: Pn - waarbij n de index in deze lijst is
 plaatshouders:
   # P0
   - "[RTP]"
 
-# RAAK HET VERSIENUMMER NIET AAN
+# DO NOT TOUCH VERSION NUMBER
 version: 1.0

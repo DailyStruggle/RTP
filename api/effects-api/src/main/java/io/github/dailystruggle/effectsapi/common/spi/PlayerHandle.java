@@ -77,11 +77,4 @@ public interface PlayerHandle {
      */
     void startGlide(int relativeLift, int maxY, int landingTimeoutTicks,
                     boolean allowFireworks, boolean placeOnShutdown, String platformMaterial);
-
-    /**
-     * Executes a command as this player (effects-api-ADR-007).
-     *
-     * @param command command string to run
-     */
-    default void performCommand(@NotNull String command) {}
 }

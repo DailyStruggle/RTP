@@ -783,12 +783,8 @@ public interface RTPCmd extends BaseRTPCmd {
             String name = entry.getKey().name();
             if (name.equalsIgnoreCase("name")) continue;
             if (name.equalsIgnoreCase("version")) continue;
-            String argKey = name;
-            if (!rtpArgs.containsKey(argKey) && name.equalsIgnoreCase("height") && rtpArgs.containsKey("length")) {
-              argKey = "length";
-            }
-            if (rtpArgs.containsKey(argKey)) {
-              String string = pickOne(rtpArgs.get(argKey), "");
+            if (rtpArgs.containsKey(name)) {
+              String string = pickOne(rtpArgs.get(name), "");
 
               Object value;
               boolean isCoord =
@@ -814,50 +810,15 @@ public interface RTPCmd extends BaseRTPCmd {
               } else if (string.equalsIgnoreCase("false")) {
                 value = false;
               } else {
-                io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance parsedDist =
-                    io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.parse(
-                        string, io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK);
-                if (parsedDist != null && parsedDist.explicitUnit()) {
-                  double chunks = parsedDist.toChunks();
-                  value = (chunks == (long) chunks) ? (Long) (long) chunks : (Double) chunks;
-                } else if (parsedDist != null) {
-                  double worldBorderRad = 0.0;
+                try {
+                  value = Long.parseLong(string);
+                } catch (IllegalArgumentException ignored) {
                   try {
-                    Object wbObj = RTP.serverAccessor.getWorldBorder(rtpWorld.name());
-                    if (wbObj instanceof io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder wb
-                        && wb.getShape() != null
-                        && wb.getShape().get() instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square bs) {
-                      worldBorderRad = bs.getNumber(
-                          io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.radius,
-                          0L).doubleValue() * 16.0;
-                    }
-                  } catch (Throwable ignored) {
-                  }
-                  io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance interpreted =
-                      io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.autoInterpret(
-                          parsedDist, worldBorderRad, name);
-                  if (interpreted != null && interpreted.unit() != io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK) {
-                    double chunks = interpreted.toChunks();
-                    value = (chunks == (long) chunks) ? (Long) (long) chunks : (Double) chunks;
-                  } else {
+                    value = Double.parseDouble(string);
+                  } catch (IllegalArgumentException ignored2) {
                     try {
-                      value = Long.parseLong(string);
-                    } catch (IllegalArgumentException ignored) {
-                      try {
-                        value = Double.parseDouble(string);
-                      } catch (IllegalArgumentException ignored2) {
-                        double chunks = parsedDist.toChunks();
-                        value = (chunks == (long) chunks) ? (Long) (long) chunks : (Double) chunks;
-                      }
-                    }
-                  }
-                } else {
-                  try {
-                    value = Long.parseLong(string);
-                  } catch (IllegalArgumentException ignored) {
-                    try {
-                      value = Double.parseDouble(string);
-                    } catch (IllegalArgumentException ignored2) {
+                      value = Boolean.valueOf(string);
+                    } catch (IllegalArgumentException ignored3) {
                       value = string;
                     }
                   }
