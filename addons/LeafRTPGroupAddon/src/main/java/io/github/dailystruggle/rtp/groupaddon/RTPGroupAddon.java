@@ -10,8 +10,7 @@ import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
  *
  * <p>Discovered by {@code rtp-core} through {@link java.util.ServiceLoader}.
  * Profiles are configured as separate {@code .yml} files under {@code definitions/groups/}
- * and managed by {@link MultiConfigParser}. Maintains a 3-tiered group subspace cache
- * (hot/cold/backlog).
+ * and managed by {@link MultiConfigParser}. Maintains a 3-tiered group subspace cache (L1/L2/L3).
  */
 public final class RTPGroupAddon implements RTPAddon {
   private static GroupSubspaceCache cache;
