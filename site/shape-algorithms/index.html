@@ -12,9 +12,13 @@
         <meta name="author" content="DailyStruggle">
       
       
-        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/PROPOSAL-tether-and-move-event-spi/">
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/site/shape-algorithms/">
       
       
+        <link rel="prev" href="../why/">
+      
+      
+        <link rel="next" href="../../FOR_ADDON_DEVELOPERS/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -22,7 +26,7 @@
     
     
       
-        <title>Proposal (D-005): Platform-Neutral Player-Move Event SPI + Tether (Region-Confinement) Addon - LeafRTP</title>
+        <title>Shape algorithm testing & charts - LeafRTP</title>
       
     
     
@@ -74,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#proposal-d-005-platform-neutral-player-move-event-spi-tether-region-confinement-addon" class="md-skip">
+        <a href="#shape-algorithm-verification-visual-unit-tests" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Proposal (D-005): Platform-Neutral Player-Move Event SPI + Tether (Region-Confinement) Addon
+              Shape algorithm testing & charts
             
           </span>
         </div>
@@ -304,11 +308,13 @@
         
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../site/why/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../why/" class="md-tabs__link">
           
   
   Developers
@@ -491,7 +497,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../site/intended-usage/" class="md-nav__link">
+      <a href="../intended-usage/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -512,7 +518,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../site/what-not-to-do/" class="md-nav__link">
+      <a href="../what-not-to-do/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1124,6 +1130,27 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Spatial memory TTL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1266,25 +1293,30 @@
       
   
   
+    
   
   
+  
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -1295,7 +1327,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             Developers
@@ -1309,7 +1341,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../site/why/" class="md-nav__link">
+      <a href="../why/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1318,6 +1350,271 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Shape algorithm testing & charts
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Shape algorithm testing & charts
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-4-way-selection-comparison-native-vs-unique-vs-l3" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. 4-Way Selection Comparison: Native vs. Unique vs. L3
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 4-Way Selection Comparison: Native vs. Unique vs. L3">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-unit-test-evaluates" class="md-nav__link">
+    <span class="md-ellipsis">
+      What the Unit Test Evaluates
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quantitative-metrics-asserted-in-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      Quantitative Metrics Asserted in Test
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-full-pipeline-selection-32x32-macro-bin-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Full Pipeline Selection &amp; 32x32 Macro-Bin Distribution
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Full Pipeline Selection & 32x32 Macro-Bin Distribution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuous-selection-sequence-density-1k-vs-10k-vs-100k" class="md-nav__link">
+    <span class="md-ellipsis">
+      Continuous Selection Sequence Density (1k vs. 10k vs. 100k)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-unit-test-evaluates_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      What the Unit Test Evaluates
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-selection-distance-curve-trajectory-across-scaled-radii" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Selection Distance Curve &amp; Trajectory Across Scaled Radii
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Selection Distance Curve & Trajectory Across Scaled Radii">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#localized-curve-structure-across-varying-bin-sizes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Localized Curve Structure Across Varying Bin Sizes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#macro-scale-trajectory-progression-across-scaled-radii" class="md-nav__link">
+    <span class="md-ellipsis">
+      Macro-Scale Trajectory Progression Across Scaled Radii
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-radial-distance-distribution-curve" class="md-nav__link">
+    <span class="md-ellipsis">
+      The Radial Distance Distribution Curve
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-nearest-neighbor-pairwise-distance-distribution-curves" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Nearest-Neighbor Pairwise Distance Distribution Curves
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Nearest-Neighbor Pairwise Distance Distribution Curves">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-unit-test-evaluates_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      What the Unit Test Evaluates
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-spatial-density-overlap-simulation-polar-vs-hilbert-vs-prp" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Spatial Density &amp; Overlap Simulation (Polar vs. Hilbert vs. PRP)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Spatial Density & Overlap Simulation (Polar vs. Hilbert vs. PRP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-unit-test-evaluates_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      What the Unit Test Evaluates
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-spacing-strategies-dynamic-landings" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Spacing Strategies &amp; Dynamic Landings
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Spacing Strategies & Dynamic Landings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-selections-are-clearly-spaced-in-this-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why Selections Are Clearly Spaced in This Benchmark
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-how-unit-tests-render-visual-charts" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. How Unit Tests Render Visual Charts
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. How Unit Tests Render Visual Charts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-the-visual-tests-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running the Visual Tests Locally
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2973,6 +3270,384 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-077-multi-format-region-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-077 - Multi-Format Region Support: Linear
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-081 — Unified Blocked Biome Run Table in `MemoryShape`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-084 - Layered Learned-State Index: Coarse Spiral Directory over Per-Cell Hilbert RLE Blobs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-086-external-web-map-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-089 — Universal MapCanvas Bridge, Biome-Hazard Composite Overlays, and Visual Pipeline Gauges
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-091 — Automated Headless Client for Devstack via Mineflayer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-094-quality-engineering-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3021,65 +3696,206 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-motivation" class="md-nav__link">
+  <a href="#1-4-way-selection-comparison-native-vs-unique-vs-l3" class="md-nav__link">
     <span class="md-ellipsis">
-      1. Motivation
+      1. 4-Way Selection Comparison: Native vs. Unique vs. L3
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 4-Way Selection Comparison: Native vs. Unique vs. L3">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-unit-test-evaluates" class="md-nav__link">
+    <span class="md-ellipsis">
+      What the Unit Test Evaluates
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#2-affected-classes-modules" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#quantitative-metrics-asserted-in-test" class="md-nav__link">
     <span class="md-ellipsis">
-      2. Affected classes / modules
+      Quantitative Metrics Asserted in Test
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#3-intended-beforeafter-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      3. Intended before/after structure
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-relevant-requirements-adrs" class="md-nav__link">
+  <a href="#2-full-pipeline-selection-32x32-macro-bin-distribution" class="md-nav__link">
     <span class="md-ellipsis">
-      4. Relevant requirements / ADRs
+      2. Full Pipeline Selection &amp; 32x32 Macro-Bin Distribution
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Full Pipeline Selection & 32x32 Macro-Bin Distribution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuous-selection-sequence-density-1k-vs-10k-vs-100k" class="md-nav__link">
+    <span class="md-ellipsis">
+      Continuous Selection Sequence Density (1k vs. 10k vs. 100k)
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#5-risks-and-trade-offs" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-unit-test-evaluates_1" class="md-nav__link">
     <span class="md-ellipsis">
-      5. Risks and trade-offs
+      What the Unit Test Evaluates
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#6-proposed-rollout-only-after-approval" class="md-nav__link">
-    <span class="md-ellipsis">
-      6. Proposed rollout (only after approval)
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#7-decision-requested" class="md-nav__link">
+  <a href="#3-selection-distance-curve-trajectory-across-scaled-radii" class="md-nav__link">
     <span class="md-ellipsis">
-      7. Decision requested
+      3. Selection Distance Curve &amp; Trajectory Across Scaled Radii
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="3. Selection Distance Curve & Trajectory Across Scaled Radii">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#localized-curve-structure-across-varying-bin-sizes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Localized Curve Structure Across Varying Bin Sizes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#macro-scale-trajectory-progression-across-scaled-radii" class="md-nav__link">
+    <span class="md-ellipsis">
+      Macro-Scale Trajectory Progression Across Scaled Radii
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-radial-distance-distribution-curve" class="md-nav__link">
+    <span class="md-ellipsis">
+      The Radial Distance Distribution Curve
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-nearest-neighbor-pairwise-distance-distribution-curves" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Nearest-Neighbor Pairwise Distance Distribution Curves
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Nearest-Neighbor Pairwise Distance Distribution Curves">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-unit-test-evaluates_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      What the Unit Test Evaluates
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-spatial-density-overlap-simulation-polar-vs-hilbert-vs-prp" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Spatial Density &amp; Overlap Simulation (Polar vs. Hilbert vs. PRP)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Spatial Density & Overlap Simulation (Polar vs. Hilbert vs. PRP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-unit-test-evaluates_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      What the Unit Test Evaluates
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-spacing-strategies-dynamic-landings" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Spacing Strategies &amp; Dynamic Landings
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Spacing Strategies & Dynamic Landings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-selections-are-clearly-spaced-in-this-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why Selections Are Clearly Spaced in This Benchmark
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-how-unit-tests-render-visual-charts" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. How Unit Tests Render Visual Charts
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. How Unit Tests Render Visual Charts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-the-visual-tests-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running the Visual Tests Locally
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3101,117 +3917,228 @@
   
 
 
-<h1 id="proposal-d-005-platform-neutral-player-move-event-spi-tether-region-confinement-addon">Proposal (D-005): Platform-Neutral Player-Move Event SPI + Tether (Region-Confinement) Addon<a class="headerlink" href="#proposal-d-005-platform-neutral-player-move-event-spi-tether-region-confinement-addon" title="Permanent link">&para;</a></h1>
-<p><strong>Status:</strong> Approved (2026-07-25)
-<strong>Date:</strong> 2026-07-25
-<strong>Rule:</strong> D-005 (propose before implementation; this change crosses module boundaries and adds new
-<code>rtp-api</code> surface).</p>
-<p>This proposal has two layers:</p>
+<h1 id="shape-algorithm-verification-visual-unit-tests">Shape Algorithm Verification &amp; Visual Unit Tests<a class="headerlink" href="#shape-algorithm-verification-visual-unit-tests" title="Permanent link">&para;</a></h1>
+<p>In LeafRTP, spatial selection algorithms are not tested as black boxes with blind assertions. Instead, the test suite (<code>rtp-core/src/test/java/.../benchmark/</code>) includes comprehensive visual test fixtures that run production Java shape code against real-world Minecraft Anvil (<code>.mca</code>) terrain data, measure quantitative performance metrics, and render high-resolution comparative charts to share publicly.</p>
+<p>This page documents how shape algorithms are tested in unit test format, what metrics are measured, and the charts generated directly by our JUnit tests.</p>
+<hr />
+<h2 id="1-4-way-selection-comparison-native-vs-unique-vs-l3">1. 4-Way Selection Comparison: Native vs. Unique vs. L3<a class="headerlink" href="#1-4-way-selection-comparison-native-vs-unique-vs-l3" title="Permanent link">&para;</a></h2>
+<p><strong>Unit Test:</strong> <code>NativeVsUniqueVsL3VisualizerTest.java</code>
+<strong>Generated Chart:</strong> <code>native_vs_unique_vs_l3_comparison_chart.png</code></p>
+<div class="highlight"><pre><span></span><code>Test: testCompareNativeAndUniqueAndL3()
+Target: SquareOptimizedDualLayer (R = 256 chunks / 8,192 blocks)
+Terrain: LosslessChunkOutcomeMap (Real Overworld Anvil Terrain)
+Sample Count: 5,000 Selections
+</code></pre></div>
+<p><img alt="Native vs Unique vs L3 Comparison" src="../../assets/img/native_vs_unique_vs_l3_comparison_chart.png" /></p>
+<h3 id="what-the-unit-test-evaluates">What the Unit Test Evaluates<a class="headerlink" href="#what-the-unit-test-evaluates" title="Permanent link">&para;</a></h3>
+<p>This test compares four distinct selection models running against the same terrain mask:</p>
 <ol>
-<li>A <strong>core</strong> change: add a platform-neutral player-move event SPI to <code>rtp-api</code> / <code>rtp-core</code> and
-   implement it in every platform adapter. Recorded as <a href="../../adr/ADR-075-platform-neutral-player-move-event-spi/">ADR-075</a>.</li>
-<li>An <strong>addon</strong> that consumes it: <code>LeafRTPTetherAddon</code>, which keeps a player inside the RTP region
-   they were teleported into ("tether" = region confinement). Recorded as
-   <a href="https://github.com/DailyStruggle/RTP/blob/V3/addons/LeafRTPTetherAddon/docs/adr/leafrtp-tether-addon-ADR-001-cross-platform-region-confinement.md">leafrtp-tether-addon-ADR-001</a>.</li>
+<li><strong>Model 1: Native Sampling (<code>shape.select()</code>)</strong></li>
+<li>Standard random selection using raw coordinate indexing.</li>
+<li>Evaluates base duplicate rates (typically ~5.4% over 5,000 draws).</li>
+<li><strong>Model 2: Native + Unique Placements (<code>uniquePlacements = 1</code>)</strong></li>
+<li>Eliminates repeat visits by adding landed chunks to the exclusion mask.</li>
+<li>Verified outcome: <strong>0.00% duplicates</strong>, preserving high jump distances.</li>
+<li><strong>Model 3: L3 Dyadic Harvester (<code>shape.selectL3Candidate()</code>)</strong></li>
+<li>Harvests candidates through keyed pseudo-random permutations (PRP) across dyadic subsets.</li>
+<li>Non-repeating Feistel bijection guarantees zero duplicate selections across the entire domain.</li>
+<li>Bypasses known ocean/void runs without rerolling.</li>
+<li><strong>Model 4: L3 + Unique Placements</strong></li>
+<li>Combines off-tick dyadic candidate harvesting with exclusion masking to permanently retire visited chunks.</li>
 </ol>
-<p>Only the addon <strong>scaffold</strong> (config + lifecycle no-op) exists today. This proposal is <strong>approved</strong> -
-the D-005 gate is cleared and the rollout in section 6 may proceed. The move-event surface lands in the
-server-independent <code>rtp-api</code>, consistent with the tentative plan to later decouple <code>rtp-api</code> into a
-standalone library.</p>
-<h2 id="1-motivation">1. Motivation<a class="headerlink" href="#1-motivation" title="Permanent link">&para;</a></h2>
-<p>Servers want to keep a randomly-teleported player inside a bounded area (competitor plugins call it a
-"zone"/"arena"). On Bukkit this is trivially done with WorldGuard's <code>entry</code>/<code>exit</code> region trap, but
-WorldGuard is Bukkit-family only - there is no WorldGuard on Fabric or NeoForge, both first-class RTP
-platforms. To make confinement work on every platform, RTP must own the mechanism.</p>
-<p>Two observations shape the design:</p>
+<h3 id="quantitative-metrics-asserted-in-test">Quantitative Metrics Asserted in Test<a class="headerlink" href="#quantitative-metrics-asserted-in-test" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>--- 1. Native Sampling (Standard select()) ---
+  Total Draws:       5,000
+  Unique Landings:   4,730
+  Duplicate Chunks:  270 (5.40%)
+  Avg Hop Distance:  289.4 chunks (4,630 blocks)
+
+--- 2. Native + Unique Placements (uniquePlacements=1) ---
+  Total Draws:       5,000
+  Unique Landings:   5,000
+  Duplicate Chunks:  0 (0.00%)
+  Avg Hop Distance:  289.6 chunks (4,634 blocks)
+
+--- 3. L3 Dyadic Harvester (PRP Stride) ---
+  Total Draws:       5,000
+  Unique Landings:   5,000
+  Duplicate Chunks:  0 (0.00%)
+  Avg Hop Distance:  291.2 chunks (4,659 blocks)
+
+--- 4. L3 + Unique Placements (Dyadic Harvester + Unique) ---
+  Total Draws:       5,000
+  Unique Landings:   5,000
+  Duplicate Chunks:  0 (0.00%)
+  Avg Hop Distance:  290.8 chunks (4,653 blocks)
+</code></pre></div>
+<hr />
+<h2 id="2-full-pipeline-selection-32x32-macro-bin-distribution">2. Full Pipeline Selection &amp; 32x32 Macro-Bin Distribution<a class="headerlink" href="#2-full-pipeline-selection-32x32-macro-bin-distribution" title="Permanent link">&para;</a></h2>
+<p><strong>Unit Test:</strong> <code>FullPipelineSelectionVisualizerTest.java</code>
+<strong>Generated Charts:</strong> <code>full_l3_state_chart.png</code> and <code>selection_sequence_comparison_chart.png</code></p>
+<div class="highlight"><pre><span></span><code>Test: testDrawFullSelectionProcess()
+Target: SquareOptimizedDualLayer (R = 1,024 chunks / 2,048 x 2,048 chunk world)
+Subsystem: AnvilRegionBinHazardTable (4,096 macro-bins of 32x32 chunks)
+L3 Buffer Capacity: 10,000 candidates
+Continuous Selections: 1,000 | 10,000 | 100,000 teleports
+</code></pre></div>
+<p><img alt="Full L3 State Chart" src="../../assets/img/full_l3_state_chart.png" /></p>
+<h3 id="continuous-selection-sequence-density-1k-vs-10k-vs-100k">Continuous Selection Sequence Density (1k vs. 10k vs. 100k)<a class="headerlink" href="#continuous-selection-sequence-density-1k-vs-10k-vs-100k" title="Permanent link">&para;</a></h3>
+<p>Beyond hop distance and instantaneous safety, the test evaluates long-term ergodicity and land utilization across thousands of consecutive server teleports:</p>
+<p><img alt="Selection Sequence Comparison" src="../../assets/img/selection_sequence_comparison_chart.png" /></p>
+<h3 id="what-the-unit-test-evaluates_1">What the Unit Test Evaluates<a class="headerlink" href="#what-the-unit-test-evaluates_1" title="Permanent link">&para;</a></h3>
 <ul>
-<li>A "zone" is ~90% just an existing <strong>RTP region</strong> (a bounded area with shape/geometry). The
-  non-redundant capability is <strong>confinement</strong>, which we name <strong>tether</strong>. No new area model is needed.</li>
-<li>Confinement needs a <strong>move signal</strong> RTP owns. RTP already has platform-neutral teleport/queue/chunk
-  events dispatched from <code>rtp-core</code> via per-platform bridges; the only missing piece is movement.</li>
+<li><strong>Macro-Bin Pruning:</strong> Full 32x32 chunk bins that contain zero safe ground (e.g. 100% deep ocean or void) are marked as discarded in <code>AnvilRegionBinHazardTable</code>.</li>
+<li><strong>$O(1)$ Selection from Good Space:</strong> The test asserts that candidate generation selects only from usable bins via two-tier segmented prefix sums, skipping discarded territory without trial-and-error chunk loads.</li>
+<li><strong>L3 Backlog Warming:</strong> Simulates how <code>Region.java</code> warms background pools, plotting candidate vectors, active bins, and discarded bins across the world map.</li>
+<li><strong>Continuous Selection Sequence:</strong> Verifies arrival dispersion across three stages:</li>
+<li><em>After 1,000 Selections:</em> Early dispersion with clean Poisson-like spacing and zero center clumping.</li>
+<li><em>After 10,000 Selections:</em> Full L3 cycle showing uniform, balanced coverage across all continents.</li>
+<li><em>After 100,000 Selections:</em> Sustained ergodicity achieving 100% coverage of usable land with zero hazard violations and zero duplicates.</li>
 </ul>
-<h2 id="2-affected-classes-modules">2. Affected classes / modules<a class="headerlink" href="#2-affected-classes-modules" title="Permanent link">&para;</a></h2>
-<p><strong>Core (new surface - the D-005 subject):</strong></p>
+<hr />
+<h2 id="3-selection-distance-curve-trajectory-across-scaled-radii">3. Selection Distance Curve &amp; Trajectory Across Scaled Radii<a class="headerlink" href="#3-selection-distance-curve-trajectory-across-scaled-radii" title="Permanent link">&para;</a></h2>
+<p><strong>Unit Test:</strong> <code>PathProgressionVisualizerTest.java</code>
+<strong>Generated Charts:</strong> <code>sub_bin_zoom_path_chart.png</code> and <code>path_progression_radii_chart.png</code></p>
+<div class="highlight"><pre><span></span><code>Test: testVisualizePathProgression()
+Target: Square (Chebyshev) vs. Circle (Euclidean) Dual-Layer Shapes
+Tested Radii: R = 32, 64, 126, 256, 512 chunks
+Sub-Bin Scales: P = 1, 2, 4, 8, 16 (derived from radius settings via PointEdgeSelector)
+Visualization: Localized 4x4 Sub-Bin Zoom with Intra-Bin Hilbert Paths &amp; Inter-Bin Seam Continuity
+</code></pre></div>
+<p><img alt="Sub-Bin Zoom Path Chart" src="../../assets/img/sub_bin_zoom_path_chart.png" /></p>
+<h3 id="localized-curve-structure-across-varying-bin-sizes">Localized Curve Structure Across Varying Bin Sizes<a class="headerlink" href="#localized-curve-structure-across-varying-bin-sizes" title="Permanent link">&para;</a></h3>
+<p>In LeafRTP's dual-layer space-filling architecture, the domain radius configuration directly determines the macro-cell sub-bin size $P$ (chunks per cell edge) via <code>PointEdgeSelector.derivePFromRadius(R)</code>. This ensures that each macro-cell contains an optimal power-of-two number of chunks ($P \times P$) while preserving at least 64 coarse cells per edge:</p>
 <ul>
-<li><code>rtp-api</code>: a new neutral player-move event type + an opt-in per-player subscription surface, added
-  alongside the existing event/hook APIs. (Exact type names to be settled during implementation
-  review; the SPI shape is: subscribe(player) / unsubscribe(player) + a callback carrying player,
-  previous block coord, new block coord.)</li>
-<li><code>rtp-core</code>: dispatch/plumbing for the new event, mirroring existing event dispatch.</li>
-<li>Platform adapters, one concrete producer each:</li>
-<li>Bukkit family (<code>rtp-plugin</code> <code>events/</code> package): filter <code>PlayerMoveEvent</code> to block-granularity.</li>
-<li><code>rtp-fabric</code> (<code>FabricEventBridge</code>): sample position on the server tick, diff against last block.</li>
-<li><code>rtp-neoforge</code> (<code>NeoForgeEventBridge</code>): same tick-sampled diff.</li>
+<li><strong>$P = 1$ ($R &lt; 64$, 1 chunk/cell):</strong> No sub-binning. The key order is the bare Archimedean spiral where each key addresses an individual chunk in outward concentric rings.</li>
+<li><strong>$P = 2$ ($R \ge 64$, 4 chunks/bin, $2 \times 2$ window):</strong> The spiral steps through $2 \times 2$ macro-cells, filling each via a 4-step Hilbert curve before stepping to the adjacent cell.</li>
+<li><strong>$P = 4$ ($R \ge 128$, 16 chunks/bin, $4 \times 4$ window):</strong> 16-chunk second-order Hilbert curves within each bin ensure unit-step continuity ($d = 1$ chunk) across 93.8% of transitions.</li>
+<li><strong>$P = 8$ ($R \ge 256$, 64 chunks/bin, $8 \times 8$ window):</strong> Third-order recursive Hilbert order provides strong 2D spatial locality within each macro-tile, eliminating long spiral stride leaps.</li>
+<li><strong>$P = 16$ ($R \ge 512$, 256 chunks/bin, $16 \times 16$ window):</strong> Fourth-order Hilbert curves partition dense regional terrain. The recursive Hilbert curve dominates locally while the Archimedean spiral operates at the macro-bin scale.</li>
 </ul>
-<p><strong>Addon (already scaffolded, consumes the core SPI):</strong></p>
+<p>As verified in the sub-bin zoom chart above, at every bin scale $P$, the red exit chunk of each bin is orthogonally adjacent to the green entry chunk of the next bin (<strong>Jumps: 0</strong> on all panels), maintaining continuous chunk-to-chunk step continuity without seam disconnections.</p>
+<h3 id="macro-scale-trajectory-progression-across-scaled-radii">Macro-Scale Trajectory Progression Across Scaled Radii<a class="headerlink" href="#macro-scale-trajectory-progression-across-scaled-radii" title="Permanent link">&para;</a></h3>
+<p>Across the full radius range, the Archimedean spiral governs the outer progression across macro-cells:</p>
+<p><img alt="Path Progression Radii Chart" src="../../assets/img/path_progression_radii_chart.png" /></p>
+<p>The unit test visualizes close-up trajectory progression, chunk-to-chunk step continuity, and macro-cell traversal order across increasing radii:
+- <strong>R=32 (P=1):</strong> Pure 1-chunk Archimedean spiral. Each key visits an individual chunk in outward concentric rings with zero Hilbert sub-binning.
+- <strong>R=64 (P=2) &amp; R=126 (P=2):</strong> 2x2 Hilbert sub-clusters. The spiral visits 2x2 macro-cells, filling each via a 4-step Hilbert curve before stepping to the next cell.
+- <strong>R=256 (P=8):</strong> 8x8 Hilbert sub-clusters (64 chunks/bin). Strong 2D spatial locality within each macro-tile, eliminating long spiral stride leaps.
+- <strong>R=512 (P=16):</strong> 16x16 Hilbert sub-clusters (256 chunks/bin). Macro-scale spiral ring progression partitioning dense regional terrain with unit-step continuity.</p>
+<h3 id="the-radial-distance-distribution-curve">The Radial Distance Distribution Curve<a class="headerlink" href="#the-radial-distance-distribution-curve" title="Permanent link">&para;</a></h3>
+<p>A core objective in LeafRTP's design is maintaining a mathematically ideal <strong>radial selection distance curve</strong>. In a donut shape (with an inner spawn exclusion hole $r_{min}$ and outer boundary $r_{max}$), typical plugins produce distorted distance curves:</p>
+<p><img alt="Radial Distance Distribution Chart" src="../../assets/img/radial_distance_distribution_chart.png" /></p>
+<p><em>Comparison of radial placement counts and normalized 2D area density error across 100,000 iterations on a donut region ($R = 4,096, R_{center} = 1,024$). Top plot displays raw low-pass filtered counts; bottom plot illustrates the percentage density deviation $\Delta \% = (N(r) - N_{ideal}(r)) / N_{ideal}(r)$ relative to uniform area density.</em></p>
 <ul>
-<li><code>addons/LeafRTPTetherAddon/</code> - <code>RTPTetherAddon</code>, <code>TetherKeys</code>, <code>addons/tether.yml</code>, service file,
-  <code>README.md</code>, <code>REQUIREMENTS.md</code>, <code>docs/adr/leafrtp-tether-addon-ADR-001-...md</code>. Currently a no-op.</li>
+<li><strong>Method 1 (Naive Polar $r \sim \mathcal{U}(r_{min}, r_{max})$):</strong> Emits a flat count across all radii (red curve), causing spatial player density to plummet as $1/r$. The difference plot reveals <strong>+120% extreme center clumping</strong> around the spawn hole and a -60% starvation drop at the outer perimeter.</li>
+<li><strong>Method 2 (Square-Root Stretched Circle $r = r_{min} + (r_{max} - r_{min})\sqrt{u}$):</strong> Fixes solid circles by accounting for area growth, but breaks severely when stretched over donuts (as historically implemented in plugins like BetterRTP). Because $f(r) \propto (r - r_{min})$, the difference plot demonstrates <strong>-100% total starvation</strong> (zero placements) immediately adjacent to the inner spawn hole ($r = 1,024$), ramping up into <strong>+25% unnatural crowding</strong> near the outer boundary (orange curve).</li>
+<li><strong>Method 3 (LeafRTP Space-Filling Curve):</strong> Resolves distance as $r = \sqrt{d/\pi + r_{min}^2}$ for continuous 1D area $d \in [0, \text{area}]$. The resulting selection distance curve grows linearly with radius ($2\pi r \, dr$, green curve), achieving an <strong>exact 0.0% deviation baseline</strong> across the entire donut.</li>
 </ul>
-<p><strong>Docs / index (this change, already applied):</strong></p>
-<ul>
-<li><code>docs/adr/ADR-075-...md</code>, this proposal, <code>docs/adr/README.md</code> (index + subproject rows),
-  <code>settings.gradle</code>, <code>docs/dev/ROADMAP.md</code>, and the <code>GLOSSARY.md</code> synonym note for "zone".</li>
-</ul>
-<h2 id="3-intended-beforeafter-structure">3. Intended before/after structure<a class="headerlink" href="#3-intended-beforeafter-structure" title="Permanent link">&para;</a></h2>
-<p><strong>Before:</strong> RTP has no move signal. Region confinement is only achievable per-platform (WorldGuard on
-Bukkit) with no Fabric/NeoForge story. The <code>LeafRTPZoneAddon</code> scaffold framed the feature as
-"named zones + optional claim-plugin bound", which is redundant with RTP regions and does not solve
-confinement.</p>
-<p><strong>After:</strong> RTP exposes one normalized, opt-in, per-player move event across all platforms. The renamed
-<code>LeafRTPTetherAddon</code> consumes it to enforce region confinement identically everywhere:</p>
-<ul>
-<li><strong>Membership</strong> is edge-triggered by RTP's own <code>PostTeleportEvent</code> (arm on teleport into a tethered
-  region; disarm on a teleport out or explicit release). The move event is only the <em>enforcement</em>
-  channel.</li>
-<li><strong>Watching</strong> is limited to the tethered set (opt-in subscription), so per-move cost scales with
-  confined players, not total online.</li>
-<li><strong>Containment</strong> is a chunk-free math test against the region's own geometry.</li>
-<li><strong>Enforcement</strong> is safe pull-back: on a boundary crossing the player is returned to a fresh
-  verified destination inside the region (drawn from the supply pipeline, passing S-001..S-005; never
-  silently dropped, S-004). Pull-back, not move-veto, because veto is Bukkit-only.</li>
-<li><strong>Persistence</strong> (optional) via the core database interface so tethers survive restart/relog.</li>
-<li>External region sources (WorldGuard/claim mods) remain optional bounds via the ADR-026 hook, never
-  required.</li>
-</ul>
-<h2 id="4-relevant-requirements-adrs">4. Relevant requirements / ADRs<a class="headerlink" href="#4-relevant-requirements-adrs" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="../../adr/ADR-075-platform-neutral-player-move-event-spi/">ADR-075</a> - the core SPI (this proposal).</li>
-<li><a href="https://github.com/DailyStruggle/RTP/blob/V3/addons/LeafRTPTetherAddon/docs/adr/leafrtp-tether-addon-ADR-001-cross-platform-region-confinement.md">leafrtp-tether-addon-ADR-001</a> + <a href="https://github.com/DailyStruggle/RTP/blob/V3/addons/LeafRTPTetherAddon/REQUIREMENTS.md"><code>addons/LeafRTPTetherAddon/REQUIREMENTS.md</code></a> - the consumer.</li>
-<li><a href="../../adr/ADR-057-platform-agnostic-addon-spi/">ADR-057</a> - addon SPI (<code>RTPAddon</code> + ServiceLoader).</li>
-<li><a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a> - external hook surface (optional bounds).</li>
-<li><a href="../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/">ADR-054</a> - thread routing reused for pull-back.</li>
-<li><a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/">ADR-002</a> - the database interface tethers persist through.</li>
-<li>S-001..S-005 (REQUIREMENTS.md section 3) - pull-back destinations must satisfy all teleport safety rules; no chunk I/O on tick/region threads; no silently dropped enforcement.</li>
-</ul>
-<h2 id="5-risks-and-trade-offs">5. Risks and trade-offs<a class="headerlink" href="#5-risks-and-trade-offs" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Movement is a performance footgun.</strong> Mitigated by (a) block-granularity, (b) opt-in per-player
-  subscription so only tethered players are watched, (c) no chunk I/O in the signal path.</li>
-<li><strong>Fabric/NeoForge observe at tick resolution</strong>, not true event resolution. Acceptable for
-  confinement (a one-tick-late pull-back is fine); documented as a known limitation.</li>
-<li><strong>New per-adapter maintenance obligation.</strong> Every current and future platform adapter must produce
-  the signal. This is the cost of a genuinely cross-platform primitive; the alternative (Bukkit-only)
-  fails the goal.</li>
-<li><strong>Behavioral difference from WorldGuard.</strong> Pull-back is a visible relocation rather than a silent
-  wall with a <code>deny-message</code>. Judged acceptable (arguably clearer to the player); can be paired with a
-  configurable message later.</li>
-<li><strong>Scope creep guard.</strong> The SPI is a pure notification; it does not add move-veto or any Bukkit-only
-  concept to the neutral surface. Enforcement policy stays in the addon.</li>
-</ul>
-<h2 id="6-proposed-rollout-only-after-approval">6. Proposed rollout (only after approval)<a class="headerlink" href="#6-proposed-rollout-only-after-approval" title="Permanent link">&para;</a></h2>
+<hr />
+<h2 id="4-nearest-neighbor-pairwise-distance-distribution-curves">4. Nearest-Neighbor Pairwise Distance Distribution Curves<a class="headerlink" href="#4-nearest-neighbor-pairwise-distance-distribution-curves" title="Permanent link">&para;</a></h2>
+<p><strong>Unit Test:</strong> <code>DownsamplingSideBySideBenchmarkTest.java</code>
+<strong>Generated Chart:</strong> <code>side_by_side_downsampling_comparison_chart.png</code> (and <code>unique_placements_auto_comparison_chart.png</code>)</p>
+<div class="highlight"><pre><span></span><code>Test: testGenerateSideBySideComparison()
+Target: SquareOptimizedDualLayer (R = 256 chunks / 4,096 blocks)
+Placements: 600 consecutive teleports across 256-chunk world (263,169 chunk domain)
+Evaluations: Sequential Inter-Arrival Jump CDF vs. Parallel Nearest-Neighbor Distance CDF &amp; Shielding Delta
+</code></pre></div>
+<p><img alt="Side by Side Downsampling Comparison" src="../../assets/img/side_by_side_downsampling_comparison_chart.png" /></p>
+<h3 id="what-the-unit-test-evaluates_2">What the Unit Test Evaluates<a class="headerlink" href="#what-the-unit-test-evaluates_2" title="Permanent link">&para;</a></h3>
+<p>This test suite measures two complementary spatial metrics across multiple spacing strategies:</p>
 <ol>
-<li>Land the <code>rtp-api</code> event type + subscription surface and <code>rtp-core</code> dispatch, with tests.</li>
-<li>Implement the Bukkit producer (block-filtered <code>PlayerMoveEvent</code>); test on Paper + Folia
-   (region-thread dispatch).</li>
-<li>Implement the Fabric and NeoForge tick-sampled producers; test on each.</li>
-<li>Implement the tether addon enforcement against the new SPI (arm/disarm, containment, safe
-   pull-back, optional DB persistence), with tests; flip it from no-op to active.</li>
-<li>Full multi-module build (<code>./gradlew build</code>) before submit.</li>
+<li><strong>Sequential Inter-Arrival Jump CDF ($i \to i+1$):</strong></li>
+<li>Measures the hop distance between consecutive teleports in time.</li>
+<li>Bounded to the 98th percentile ($[0, 600\text{c}]$) to eliminate distant corner outliers, confirming that players teleporting in sequence are not deposited in adjacent chunks.</li>
+<li><strong>Parallel Nearest-Neighbor Distance CDF (All-Pairs Minimum Distance &amp; Shielding Delta):</strong></li>
+<li>Evaluates the spatial separation between any player placement and its closest neighboring arrival across the entire active server lifetime.</li>
+<li>Focused directly on the target separation zone ($[0, 32\text{c}]$) where the separation thresholds $R_u = 8\text{c}$ and $R_u = 16\text{c}$ reside, eliminating the long empty tail and displaying both thresholds with high visual clarity across the CDF range.</li>
+<li><strong>Unconstrained Feistel PRP ($S=1$, Blue Curve):</strong> While consecutive jumps are large, unconstrained draws across a large population naturally result in <strong>35.8% of arrivals landing within $&lt;8$ chunks of an existing placement</strong> ($1.0$ chunk global minimum).</li>
+<li><strong>Spaced Dyadic Stride ($S=64, R_u=8$, Green Curve):</strong> Downsampled dyadic stride shifts the CDF curve sharply to the right. The highlighted blue delta region visually quantifies the <strong>35.8% of the player base shielded from render-distance crowding</strong>, enforcing an 8-chunk (128-block) exclusion threshold with $0.0\%$ collisions.</li>
+<li><strong>Wide Spaced Dyadic Stride ($S=256, R_u=16$, Orange Curve):</strong> Shifts the minimum nearest-neighbor distance to 16 chunks (256 blocks), completely clearing player render horizons.</li>
 </ol>
-<h2 id="7-decision-requested">7. Decision requested<a class="headerlink" href="#7-decision-requested" title="Permanent link">&para;</a></h2>
-<p>Approve (or amend) the core move-event SPI shape in section 2/3 so implementation can proceed under
-D-005. Until then, the tether addon ships as a safe no-op and no core code is written.</p>
+<hr />
+<h2 id="5-spatial-density-overlap-simulation-polar-vs-hilbert-vs-prp">5. Spatial Density &amp; Overlap Simulation (Polar vs. Hilbert vs. PRP)<a class="headerlink" href="#5-spatial-density-overlap-simulation-polar-vs-hilbert-vs-prp" title="Permanent link">&para;</a></h2>
+<p><strong>Unit Test:</strong> <code>DownsamplingStrideBenchmarkTest.java</code>
+<strong>Generated Charts:</strong> <code>overlap_simulation_comparison.png</code> and <code>player_distribution_prp_chart.png</code></p>
+<div class="highlight"><pre><span></span><code>Test: testSpatialDensityAndOverlapSimulation()
+Test: testGeneratePRPComparisonChart()
+Teleports: 24,000 consecutive arrivals
+View Distance: 8 chunks (128-block radius)
+</code></pre></div>
+<p><img alt="Spatial Density Overlap Comparison" src="../../assets/img/overlap_simulation_comparison.png" /></p>
+<p><img alt="Player Distribution PRP Chart" src="../../assets/img/player_distribution_prp_chart.png" /></p>
+<h3 id="what-the-unit-test-evaluates_3">What the Unit Test Evaluates<a class="headerlink" href="#what-the-unit-test-evaluates_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Center Clumping Elimination:</strong> Classic polar spirals ($1/r$ probability density) suffer from high overlap near the origin. The test computes an <code>overlapScore</code> for each landing based on prior visits within client render distance.</li>
+<li><strong>Keyed Permutation Spacing:</strong> Keyed Feistel permutations guarantee that consecutive teleports do not land in adjacent chunks, giving each player a fresh horizon while maintaining equal overall spatial utilization.</li>
+</ul>
+<hr />
+<h2 id="6-spacing-strategies-dynamic-landings">6. Spacing Strategies &amp; Dynamic Landings<a class="headerlink" href="#6-spacing-strategies-dynamic-landings" title="Permanent link">&para;</a></h2>
+<p><strong>Unit Test:</strong> <code>DownsamplingStrideBenchmarkTest.java</code>
+<strong>Generated Chart:</strong> <code>spacing_strategies_comparison_chart.png</code></p>
+<div class="highlight"><pre><span></span><code>Test: testRenderSpacingStrategiesGraph()
+Target: CircleOptimizedDualLayer (R = 256 chunks / 4,096 blocks)
+Samples: 600 candidate placements across 202,000 chunk domain (0.3% low sampling density)
+Trail: 15-step sequential trajectory vector (yellow connecting trail)
+Recall Window: N = 32 recent arrival coordinates
+Strategies: Standard PRP vs. Best-of-3 Tournament vs. Dyadic Interleaved Subsets vs. Min-Distance Gate
+</code></pre></div>
+<p><img alt="Spacing Strategies Comparison" src="../../assets/img/spacing_strategies_comparison_chart.png" /></p>
+<h3 id="why-selections-are-clearly-spaced-in-this-benchmark">Why Selections Are Clearly Spaced in This Benchmark<a class="headerlink" href="#why-selections-are-clearly-spaced-in-this-benchmark" title="Permanent link">&para;</a></h3>
+<p>When evaluating this visual benchmark, readers often notice that placements appear distinct, crisp, and separated by wide open territory compared to dense all-time simulation runs. This clarity is driven by four algorithmic and experimental design factors:</p>
+<ol>
+<li><strong>Controlled Sampling Density (600 Points vs. Tens of Thousands):</strong></li>
+<li>The test samples exactly <strong>600 points</strong> across an $R = 256$ chunk region ($\approx 202,000$ usable chunk cells).</li>
+<li>The resulting spatial occupancy is only <strong>0.30%</strong>. At this density, points do not visually merge, allowing the geometric properties of each spacing algorithm to stand out clearly.</li>
+<li><strong>Sequential Jump Trajectory (15-Step Trail):</strong></li>
+<li>The bright yellow trail plots the consecutive path of player arrivals ($i \to i+1$).</li>
+<li>Because LeafRTP couples dyadic phase rotation with Feistel permutations, consecutive teleports leap across quadrants—averaging <strong>~290 chunks (~4,640 blocks)</strong> per hop—demonstrating that players arriving back-to-back are never sent to neighboring areas.</li>
+<li><strong>Active Dispersion &amp; Repulsion Mechanisms:</strong></li>
+<li><strong>Panel 1 (Standard PRP - White Noise):</strong> Uniform pseudo-random permutation. Generates even overall coverage, but occasional nearest-neighbor collisions naturally occur by chance.</li>
+<li><strong>Panel 2 (Option A: Best-of-3 Tournament - Blue Noise):</strong> Samples 3 candidates per draw and selects the one that maximizes the minimum Euclidean distance to all coordinates in the 32-player recall window ($N=32$), increasing effective spacing by +30%.</li>
+<li><strong>Panel 3 (Option B: Dyadic Subsets - Stride $S=64$):</strong> Enforces bit-reversal interleaved phase offsets across subsets ($0, 32, 16, 48, 8, 40\dots$), guaranteeing that consecutive selections land in disjoint macro-tiles with $O(1)$ zero-overhead computation.</li>
+<li><strong>Panel 4 (Option C: Min-Distance Gate - $D \ge 16\text{c}$):</strong> Uses an explicit spatial exclusion gate that discards any candidate landing within 16 chunks (256 blocks) of any recent placement, guaranteeing 0% render-horizon clumping.</li>
+<li><strong>Sequential Hop vs. Parallel Nearest-Neighbor Separation:</strong></li>
+<li><strong>Sequential distance</strong> measures how far player $B$ lands from player $A$ who teleported immediately prior.</li>
+<li><strong>Parallel distance</strong> measures how close any player lands to <em>any other player</em> over the entire lifetime of the server. Section 4 above details how downsampled dyadic strides ($S=64$ and $S=256$) scale this lifetime protection to thousands of arrivals without memory overhead.</li>
+</ol>
+<hr />
+<h2 id="7-how-unit-tests-render-visual-charts">7. How Unit Tests Render Visual Charts<a class="headerlink" href="#7-how-unit-tests-render-visual-charts" title="Permanent link">&para;</a></h2>
+<p>Unlike external graphing tools that require post-processing scripts, LeafRTP's benchmark unit tests render charts directly from the JVM using Java's built-in <code>java.awt.Graphics2D</code> and <code>javax.imageio.ImageIO</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Snippet from NativeVsUniqueVsL3VisualizerTest.java</span>
+<span class="n">BufferedImage</span><span class="w"> </span><span class="n">img</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">BufferedImage</span><span class="p">(</span><span class="n">totalWidth</span><span class="p">,</span><span class="w"> </span><span class="n">totalHeight</span><span class="p">,</span><span class="w"> </span><span class="n">BufferedImage</span><span class="p">.</span><span class="na">TYPE_INT_RGB</span><span class="p">);</span>
+<span class="n">Graphics2D</span><span class="w"> </span><span class="n">g</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">img</span><span class="p">.</span><span class="na">createGraphics</span><span class="p">();</span>
+<span class="n">g</span><span class="p">.</span><span class="na">setRenderingHint</span><span class="p">(</span><span class="n">RenderingHints</span><span class="p">.</span><span class="na">KEY_ANTIALIASING</span><span class="p">,</span><span class="w"> </span><span class="n">RenderingHints</span><span class="p">.</span><span class="na">VALUE_ANTIALIAS_ON</span><span class="p">);</span>
+
+<span class="c1">// Render background, real-world terrain mask, and candidate vectors...</span>
+<span class="n">renderPanel</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">px</span><span class="p">,</span><span class="w"> </span><span class="n">py</span><span class="p">,</span><span class="w"> </span><span class="n">panelSize</span><span class="p">,</span><span class="w"> </span><span class="n">outcomeMap</span><span class="p">,</span><span class="w"> </span><span class="n">modelResult</span><span class="p">,</span><span class="w"> </span><span class="n">accentColor</span><span class="p">);</span>
+<span class="n">renderFooterMetrics</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">px</span><span class="p">,</span><span class="w"> </span><span class="n">py</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">panelSize</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span><span class="w"> </span><span class="n">panelSize</span><span class="p">,</span><span class="w"> </span><span class="n">modelResult</span><span class="p">,</span><span class="w"> </span><span class="n">accentColor</span><span class="p">);</span>
+
+<span class="c1">// Save directly to documentation assets</span>
+<span class="n">File</span><span class="w"> </span><span class="n">outDocs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">File</span><span class="p">(</span><span class="s">&quot;../docs/assets/img/native_vs_unique_vs_l3_comparison_chart.png&quot;</span><span class="p">);</span>
+<span class="n">ImageIO</span><span class="p">.</span><span class="na">write</span><span class="p">(</span><span class="n">img</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;png&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">outDocs</span><span class="p">);</span>
+</code></pre></div>
+<h3 id="running-the-visual-tests-locally">Running the Visual Tests Locally<a class="headerlink" href="#running-the-visual-tests-locally" title="Permanent link">&para;</a></h3>
+<p>You can run any of these visual benchmark tests directly via Gradle:</p>
+<div class="highlight"><pre><span></span><code><span class="c"># Run the 4-way comparison test and regenerate its chart:</span>
+<span class="p">.\</span><span class="n">gradlew</span><span class="p">.</span><span class="n">bat</span> <span class="p">:</span><span class="n">rtp-core</span><span class="p">:</span><span class="n">test</span> <span class="p">-</span><span class="n">-tests</span> <span class="s2">&quot;*NativeVsUniqueVsL3VisualizerTest*&quot;</span>
+
+<span class="c"># Run the full pipeline visualizer test (L3 state + selection sequence comparison):</span>
+<span class="p">.\</span><span class="n">gradlew</span><span class="p">.</span><span class="n">bat</span> <span class="p">:</span><span class="n">rtp-core</span><span class="p">:</span><span class="n">test</span> <span class="p">-</span><span class="n">-tests</span> <span class="s2">&quot;*FullPipelineSelectionVisualizerTest*&quot;</span>
+
+<span class="c"># Run the selection curve path progression and radii visualizer test:</span>
+<span class="p">.\</span><span class="n">gradlew</span><span class="p">.</span><span class="n">bat</span> <span class="p">:</span><span class="n">rtp-core</span><span class="p">:</span><span class="n">test</span> <span class="p">-</span><span class="n">-tests</span> <span class="s2">&quot;*PathProgressionVisualizerTest*&quot;</span>
+
+<span class="c"># Run the radial distance distribution curve benchmark generator:</span>
+<span class="p">.\</span><span class="n">gradlew</span><span class="p">.</span><span class="n">bat</span> <span class="p">:</span><span class="n">rtp-core</span><span class="p">:</span><span class="n">simulationBenchmark</span> <span class="p">-</span><span class="n">-tests</span> <span class="s2">&quot;*RadialDistanceDistributionVisualizerTest*&quot;</span>
+
+<span class="c"># Run the nearest-neighbor pairwise distance distribution and downsampling test:</span>
+<span class="p">.\</span><span class="n">gradlew</span><span class="p">.</span><span class="n">bat</span> <span class="p">:</span><span class="n">rtp-core</span><span class="p">:</span><span class="n">test</span> <span class="p">-</span><span class="n">-tests</span> <span class="s2">&quot;*DownsamplingSideBySideBenchmarkTest*&quot;</span>
+
+<span class="c"># Run the spatial density, PRP distribution, and spacing strategies benchmark tests:</span>
+<span class="p">.\</span><span class="n">gradlew</span><span class="p">.</span><span class="n">bat</span> <span class="p">:</span><span class="n">rtp-core</span><span class="p">:</span><span class="n">test</span> <span class="p">-</span><span class="n">-tests</span> <span class="s2">&quot;*DownsamplingStrideBenchmarkTest*&quot;</span>
+</code></pre></div>
+<p>All test outcomes and generated charts are written directly to <code>docs/assets/img/</code> and <code>build/reports/</code>, ensuring that our public documentation reflects the exact behavior of our compiled Java code.</p>
 
 
 
@@ -3249,7 +4176,7 @@ D-005. Until then, the tether addon ships as a safe no-op and no core code is wr
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.2.1
+      LeafRTP v3.2.2
     </div>
   
   
