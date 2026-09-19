@@ -72,8 +72,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
       ConfigParser<PerformanceKeys> perf =
               (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
       if (perf != null) {
-        Object periodObj = perf.getConfigValue(PerformanceKeys.period, 0);
-        period = ConfigParser.parseDurationTicks(periodObj, 0L);
+        period = perf.getNumber(PerformanceKeys.period, 0).longValue();
 
         long configMs = perf.getNumber(PerformanceKeys.asyncAllottedTime, 10).longValue();
         // Cap async time to prevent saturating the background thread pool

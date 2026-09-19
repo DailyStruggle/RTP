@@ -12,16 +12,11 @@ pausarEscaneo: "#A020F0[P0] tarea de escaneo pausada para las regiones: [scan_re
 reanudarEscaneo: "#10A5F5[P0] tarea de escaneo reanudada para las regiones: [scan_regions]"
 escaneoActivo: "&c[P0] ya hay una tarea de escaneo en curso para las regiones: [scan_regions]"
 escaneoNoActivo: "&c[P0] no hay ninguna tarea de escaneo en curso para las regiones: [scan_regions]"
-
-# marcador: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+# placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 estadoEscaneo: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 tierra &8| &7ETA #7E9CC8[scan_eta]"
-
-# Título de la boss-bar mostrado a los jugadores con el permiso rtp.scan mientras se ejecuta un escaneo del mundo.
-# Establecer como cadena vacía para desactivar la boss-bar.
-# El color de la barra se toma del primer código de color heredado en este valor:
-#   &c/&4 = rojo, &e/&6 = amarillo, &a/&2 = verde, &9/&1/&3/&b = azul,
-#   &5 = morado, &d = rosa, &f/&7/&8/&0 = blanco. Por defecto es verde si no hay ninguno.
-# marcador: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanBossBar: "Escaneando [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% tierra) ETA [scan_eta]"
 
 # ###############################################################################
@@ -34,54 +29,41 @@ infoMSPT: "&7MSPT actual del plugin: #7E9CC8[mspt]"
 infoCargasTotales: "&7Chunks cargados de por vida: #7E9CC8[loads]"
 infoCargasPorOrigen: "&7Cargas por origen: #7E9CC8[loadsByOrigin]"
 infoTasaFuga: "&7Tasa actual de fuga de chunks: #7E9CC8[leakRate]"
-
-# --- Bloque de métricas de estado ---
+# --- Health metrics block ---
 infoQueueDepth: "&7Jugadores esperando en colas de región: #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7Tuberías de teletransporte pendientes: #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7Latencia media de la tubería: #7E9CC8[avgPipelineMs] ms"
-
-# Percentiles de latencia de tubería. Marcadores: [pipelineMsP50] [pipelineMsP75]
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Latencia de pipeline (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-
-# Auditoría de teletransportes lentos (solo teletransportes inmediatos/sin cola). Marcadores:
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Teletransportes lentos (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-
-# Auditoría de crecimiento de cola. Marcadores: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Avisos de crecimiento de cola (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7Heap de la JVM: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
-
 # Línea de encabezado para el bloque etiquetado del pipeline de Health en /rtp info.
 infoHealthPipelineHeader: "&7--- Estado: pipeline ---"
-
 # Lectura de TPS para las ventanas 1m / 5m / 15m. Marcadores: [tps1m] [tps5m] [tps15m].
 infoTps: "&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
-
 # MSPT del servidor en vivo y uso del presupuesto de tick. Marcadores: [mspt] [tickBudgetUtilisation].
 infoMSPTLive: "&7MSPT del servidor: #7E9CC8[mspt] ms (&7presupuesto de tick: #7E9CC8[tickBudgetUtilisation]&7)"
-
-# Límite suave de jugadores configurado frente a la cantidad actual en línea. Marcadores: [softCap] [playerCount].
+# Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
 infoSoftCap: "&7Jugadores: #7E9CC8[playerCount] / [softCap]"
-
 # Latencia de ida y vuelta más reciente de la base de datos en ms. Marcador: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7Latencia de base de datos: #7E9CC8[databaseLatencyMs] ms"
-
-# Métricas de resultados de generación.
-# Tasa de éxito/fallo sobre todos los intentos de generación registrados. Marcadores:
+# Generation outcome metrics.
+# Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Éxito de generación: #7E9CC8[genSuccessRate]&7 (fallos #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
-
-# Causa de rechazo más común individual y su porcentaje sobre todos los fallos. Marcadores:
+# Single most common rejection cause and its share of all failures. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Causa principal de rechazo: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-
-# Desglose de rechazos por causa.
-# Marcador: [genFailureBreakdown] - lista causa=N separada por comas, más frecuente primero.
+# Per-cause rejection breakdown.
+# Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Rechazos por causa: #7E9CC8[genFailureBreakdown]"
-
-# Umbrales de franjas de color para el estado de salud. Se usan para colorear las variantes
-# coloreadas de los marcadores (p. ej. [tps1mColoured]) en verde/amarillo/rojo.
+# Health colour-band thresholds. Used to colour the coloured-variant
+# placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoThresholdTpsGreen: 19.5
 infoThresholdTpsYellow: 18.0
 infoThresholdMsptGreen: 30.0
@@ -89,11 +71,9 @@ infoThresholdMsptYellow: 45.0
 infoThresholdCacheFillGreen: 0.5
 infoThresholdCacheFillYellow: 0.25
 infoThresholdNetworkAgeYellow: 5.0
-
-# Línea de encabezado que introduce la tabla por región de Folia (solo en tiempo de ejecución de Folia).
+# Header line introducing the per-Folia-region table (Folia runtime only).
 infoFoliaRegionsHeader: "&7--- Regiones de Folia ---"
-
-# Plantilla por fila para una sola región de Folia. Marcadores: [regionId] [tps1m]
+# Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
 infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 cabeceraAvisoInfo: "&7--- Aviso de diagnóstico ---"
@@ -104,21 +84,17 @@ infoMundo: "#21ADA8[world]"
 cabeceraRegionInfo: "#63C5DARegiones:"
 cabeceraRegionConsolaInfo: "&7--- Regiones ---"
 infoRegion: "#52B2BF[region]"
-
-# Tabla de clasificación de ocupación de biomas mostrada por /rtp info biomes: en qué biomas
-# pasan el tiempo los jugadores conectados, muestreado a lo largo del tiempo de actividad del servidor.
-# Marcadores del encabezado: [biomeTotalSamples] [biomeDistinctCount].
+# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
+# players spend their time in, sampled over the server's uptime.
+# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
 infoBiomeActivityHeader: "&8--- &3Ocupación de biomas &8(&3[biomeTotalSamples]&8 muestras, &3[biomeDistinctCount]&8 biomas) ---"
-
-# Fila por bioma. Marcadores: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
 infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
-
-# Mostrado cuando aún no se ha tomado ninguna muestra de ocupación.
+# Shown when no occupancy has been sampled yet.
 infoBiomeActivityEmpty: "&8--- &7aún no se ha muestreado la ocupación de biomas &8---"
 
-# listados de subinformación
-# marcadores: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
-# marcadores de estado aprendido (se resuelven en N/D cuando la región no tiene forma de memoria o no ha sido escaneada): [memCoveragePct], [memBadPct], [memBadCount], [memTopCause], [memTopCausePct]
+# sub-info listings
+# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
 datosMundo:
   - "#21ADA8[world]:"
   - "#99EEBB  - región: [region]"
@@ -145,78 +121,59 @@ datosRegion:
 # Estas claves no se traducen en lang/es/messages.lang.yml, por lo que se usan
 # los nombres canónicos en inglés (fallback al baseline).
 menuInvalid: "&c[P0] ese enlace de menú no es válido."
-
 # Enviado cuando un canje de menú no puede resolver el UUID del jugador que llama.
 menuUnknownPlayer: "&c[P0] los enlaces de menú solo pueden usarlos jugadores en el juego."
-
 # Plantilla de información emergente cuando no hay comentario YAML disponible para un parámetro. Marcador: [type] - el tipo declarado del parámetro.
 menuHoverFallbackType: "tipo: [type]"
-
 # Plantilla de información emergente cuando un parámetro expone un conjunto pequeño de valores. Marcador: [values] - valores aceptados separados por coma.
 menuHoverFallbackBounds: "aceptados: [values]"
-
 # Etiqueta de la fila de navegación "volver un nivel" en cada página de menú no raíz.
 menuBack: "&7« atrás"
-
 # Plantilla de la fila "ejecutar el comando ensamblado" en cada página de menú ejecutable no raíz. Marcador: [command] - la invocación /rtp ... ensamblada.
 menuExecute: "&2▶ ejecutar [command]"
-
 # Encabezado de una sub-página selector de valor de parámetro (Etapa A.2).
 # Marcadores: [param] - nombre del parámetro; [command] - la invocación /rtp ... ensamblada.
 menuPickValue: "&7elige un valor para [param] (ejecutará: /rtp [command] [param]:<value>)"
-
 # Etiqueta de la fila "escribir valor personalizado" como alternativa en el selector.
 # Al hacer clic prellena el chat con el comando ensamblado hasta '<param>:'.
 menuTypeValue: "&7✎ escribe un valor personalizado..."
-
-# Fila de encabezado no interactiva en la parte superior de cada página de menú no raíz.
-# Muestra la invocación /rtp que se está construyendo actualmente, incluidas las asignaciones
-# de parámetros preparadas (nombre:valor). Marcador: [command] - argumentos ensamblados.
+# Non-clickable header row at the top of every non-root menu page.
+# Surfaces the currently-constructed /rtp invocation including any staged
+# parameter assignments (name:value). Placeholder: [command] - assembled args.
 menuConstructed: "&7construyendo: #7E9CC8/rtp [command]"
-
 # Título no interactivo en la parte superior del menú raíz /rtp menu (Etapa A.5).
 menuRootTitle: "#5FB3B3&l⚡ menú de RTP"
-
 # Subtítulo/orientación no interactivo bajo menuRootTitle (Etapa A.5).
 menuRootHint: "&7haz clic en una opción para comenzar"
-
 # Filas de navegación añadidas a páginas de menú paginadas (Etapa A.6).
 # Marcador: [page] - número de página destino (base 1).
 menuPagePrev: "&7« página anterior ([page])"
 menuPageNext: "&7página siguiente ([page]) »"
-
-# Divisor de sección en la página principal sobre las filas de teletransporte (vista del jugador).
+# Section divider on the front page above teleport rows (player view).
 menuFrontPageSectionTeleport: "&8--- &7teletransporte &8---"
-
-# Filas de la página principal. Sin marcadores.
+# Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- elige un mundo"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- elige un bioma"
 menuFrontPageRowHelp: "#7A4FB8❓ listar comandos &7- /rtp help"
-
-# Fila de entrada de administración en la página principal: la única fila visible para administradores
-# en la página principal; al hacer clic se accede al panel de administración. Oculta cuando el espectador
-# carece de rtp.menu.admin.
+# Front-page admin entry row: the only inline admin-visible row on the
+# front page; click descends into the admin panel. Hidden when the viewer
+# lacks rtp.menu.admin.
 menuFrontPageRowAdmin: "#9D7CD8▶ panel de administración &7- herramientas de operador"
-
-# Texto emergente para la fila de entrada del panel de administración. Sin marcadores.
+# Hover text for the admin-panel entry row. No placeholders.
 menuFrontPageHoverAdmin: "&7herramientas de operador: configuración, escaneos, diagnósticos, recarga"
-
-# --- Página de libro del panel de administración ---
-# Fila de título no interactiva en la parte superior del panel de administración. Sin marcadores.
+# --- Admin panel book page ---
+# Non-clickable title row at the top of the admin panel. No placeholders.
 menuAdminPanelTitle: "#5FB3B3&l⚙ panel de administración"
-
-# Fila de sugerencia no interactiva debajo de menuAdminPanelTitle. Sin marcadores.
+# Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
-
-# Divisores de sección en el panel de administración. Sin marcadores.
+# Section dividers on the admin panel. No placeholders.
 menuAdminPanelSectionConfig: "&8--- &7configuración &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7diagnósticos &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7ciclo de vida &8---"
 menuAdminPanelSectionBrowse: "&8--- &7explorar &8---"
-
-# Filas del panel de administración + textos emergentes. Sin marcadores.
+# Admin-panel rows + hovers. No placeholders.
 menuAdminPanelRowConfig: "&b▶ editor de configuración"
 menuAdminPanelHoverConfig: "&7abre el selector de configuración curado"
 menuAdminPanelRowRegions: "#5FB3B3▶ regiones"
@@ -238,242 +195,177 @@ menuAdminPanelHoverReload: "&7recarga todos los archivos de configuración; los 
 menuAdminPanelRowBrowse: "&b▶ explorar todos los comandos"
 menuAdminPanelHoverBrowse: "&7abre el árbol reflejado del comando /rtp"
 menuAdminPanelRowBack: "&7« atrás"
-
-# --- Submenú de visualizaciones (mapa de administración de ubicaciones no válidas por región) ---
-# Fila del panel de administración: abre el submenú de Visualizaciones. Sin marcadores.
+# --- Visualizations submenu (admin map of bad locations per region) ---
+# Admin-panel row: open the Visualizations submenu. No placeholders.
 menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizaciones"
-
-# Texto emergente para la fila de Visualizaciones del panel de administración. Sin marcadores.
+# Hover text for the admin-panel Visualizations row. No placeholders.
 menuAdminPanelHoverVisualizations: "&7abre mapas y otras visualizaciones para el operador"
-
-# Divisor de sección sobre el bloque de Visualizaciones en el panel de administración.
+# Section divider above the Visualizations block on the admin panel.
 menuAdminPanelSectionVisualizations: "&8» &7visualizaciones"
-
-# Fila de título no interactiva en la parte superior del submenú de Visualizaciones.
+# Non-clickable title row at the top of the Visualizations submenu.
 menuVisualizationsTitle: "#9D7CD8&l⌖ visualizaciones"
-
-# Fila de sugerencia no interactiva debajo del título.
+# Non-clickable hint row below the title.
 menuVisualizationsHint: "&7elige una región para ver su mapa de ubicaciones inseguras"
-
-# Plantilla de fila de Visualizaciones; [region] - nombre de la región.
+# Visualizations row template; [region] - region name.
 menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- mapa de forma de región"
-
-# Texto emergente para una fila de región de Visualizaciones; [region] - nombre de la región.
+# Hover text for a Visualizations region row; [region] - region name.
 menuVisualizationsHoverRegion: "&7abre un mapa que muestra las ubicaciones inseguras en &b[region]"
-
-# Fila de sugerencia no interactiva mostrada cuando no hay regiones configuradas.
+# Non-clickable hint row shown when no regions are configured.
 menuVisualizationsEmpty: "&7(no hay regiones configuradas)"
-
-# Fila para volver del submenú de Visualizaciones (regresa al panel de administración).
+# Visualizations submenu back row (returns to the admin panel).
 menuVisualizationsRowBack: "&7« atrás"
-
-# --- Sección de configuración del panel de administración: plantillas seleccionadas ---
-# Divisor de sección sobre el bloque de Configuración (inicio rápido) en el panel de administración.
+# --- Admin panel Setup section: curated prefabs ---
+# Section divider above the Setup (quick start) block on the admin panel.
 menuAdminPanelSectionSetup: "&8» &7configuración (inicio rápido)"
-
-# Fila de configuración + texto emergente: superposición de identidad survival-default (restablecer a los valores predeterminados de fábrica).
+# Setup row + hover: survival-default identity overlay (reset to shipped defaults).
 menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
 menuPrefabSurvivalDefaultHover: "&7restablece los valores predeterminados de fábrica (capa de identidad)"
-
-# Fila de configuración + texto emergente: bajo rendimiento (pulso más largo, cachés más pequeñas, caché de inicio de sesión desactivada).
+# Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
 menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
 menuPrefabLowPerformanceHover: "&7hosts de pocos recursos / VPS de CPU compartida: pulso más largo, cachés más pequeñas, caché de inicio de sesión desactivada"
-
-# Fila de configuración + texto emergente: alto rendimiento (pulso corto, cachés grandes, caché de inicio de sesión activada).
+# Setup row + hover: high-performance (short pulse, large caches, login cache on).
 menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
 menuPrefabHighPerformanceHover: "&7hardware dedicado / gran cantidad de jugadores: pulso corto, cachés grandes, caché de inicio de sesión activada"
-
-# Fila de configuración + texto emergente: folia-tuned (ajuste del planificador regional).
+# Setup row + hover: folia-tuned (regional scheduler tuning).
 menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
 menuPrefabFoliaTunedHover: "&7planificador regional de folia: pulsos por región más rápidos, menos tickets de chunk concurrentes"
-
-# Fila de configuración + texto emergente: multi-world (una región por mundo a partir del valor predeterminado actual).
+# Setup row + hover: multi-world (one region per world from current default).
 menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
 menuPrefabMultiWorldHover: "&7sintetiza una región por mundo a partir del valor predeterminado actual"
-
-# Título del menú de confirmación. Marcador: [prefab] - id de plantilla o nombre para mostrar.
+# Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
 menuPrefabConfirmTitle: "#9D7CD8&l⚙ confirmar plantilla: #5FB3B3[prefab]"
-
-# Fila de sugerencia no interactiva del menú de confirmación debajo del título. Sin marcadores.
+# Confirmation menu non-clickable hint row below the title. No placeholders.
 menuPrefabConfirmHint: "&7revisa los cambios de abajo y luego haz clic en confirmar o cancelar"
-
-# Fila de pie de página del menú de confirmación: confirmar y escribir la plantilla en el disco.
+# Confirmation menu footer row: confirm and write the prefab to disk.
 menuPrefabConfirmRow: "&2&l[confirm]"
-
-# Fila de pie de página del menú de confirmación: cancelar y volver al panel de administración.
+# Confirmation menu footer row: cancel and return to the admin panel.
 menuPrefabCancelRow: "&c&l[cancel]"
-
-# Etiqueta de fila interactiva para la acción de Actualizar en la parte inferior del libro
-# de /rtp info. Vuelve a renderizar el ámbito actual con una instantánea de métricas nueva.
+# Clickable row label for the Refresh affordance at the bottom of the /rtp info
+# book. Re-renders the current scope against a fresh metrics snapshot.
 infoBookRefreshRow: "&2[Refresh]"
-
-# Texto emergente para la fila de actualizar del libro de información.
+# Hover text for the info-book refresh row.
 infoBookRefreshHover: "&7Vuelve a renderizar esta página con una instantánea de métricas nueva."
-
-# Etiqueta de fila interactiva para la acción de Cambiar al chat en la parte inferior del
-# libro de /rtp info. Vuelve a ejecutar el mismo ámbito a través del chat heredado.
+# Clickable row label for the Switch-to-chat affordance at the bottom of the
+# /rtp info book. Re-runs the same scope through the legacy chat path.
 infoBookSwitchToTextRow: "&7[Switch to chat]"
-
-# Texto emergente para la fila de cambiar al chat del libro de información.
+# Hover text for the info-book switch-to-chat row.
 infoBookSwitchToTextHover: "&7Vuelve a ejecutar /rtp info en el chat en lugar del libro."
-
-# Fila de pie de página mostrada cuando el contenido del libro de /rtp info supera el
-# límite de páginas del libro. Hacer clic vuelve a ejecutar el mismo ámbito en modo chat para no perder datos.
+# Footer row rendered when the /rtp info book content exceeds the book page
+# cap. Clicking re-runs the same scope in chat mode so no data is lost.
 infoBookOverflowFooter: "&7(contenido truncado - haz clic para ver la salida completa en el chat)"
-
-# Fila de nota no interactiva que indica que la actualización automática periódica para el libro
-# de información no es compatible actualmente en esta versión (aplazada para un hito posterior).
-# Los usuarios pueden hacer clic en la fila Actualizar para actualizar manualmente.
+# Non-clickable note row indicating that periodic auto-refresh for the info
+# book is not currently supported on this build (deferred to a later
+# milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(actualización automática aún no admitida; haz clic en Actualizar)"
-
-# Fila de título no interactiva en la parte superior de la página del selector de archivos de configuración.
-# Se muestra cuando un administrador hace clic en "/rtp config" desde la página principal.
+# Non-clickable title row at the top of the config-file selector page.
+# Shown when an admin clicks "/rtp config" from the front page.
 configSelectorTitle: "#5FB3B3&l⚙ archivos de configuración"
-
-# Etiqueta para la fila de navegación "volver a la raíz del menú /rtp" en la página del selector de configuración.
+# Label for the "back to /rtp menu root" navigation row on the config selector page.
 configSelectorBackRow: "&7« volver al menú"
-
-# Fila de título no interactiva en la parte superior de una página de archivo de configuración individual.
-# Marcador: [file] - el nombre del archivo de configuración (p. ej. "performance", "safety").
+# Non-clickable title row at the top of a single config-file page.
+# Placeholder: [file] - the config file name (e.g. "performance", "safety").
 configFileTitle: "#5FB3B3&l⚙ configuración: &7[file]"
-
-# Etiqueta para la fila de navegación "volver al selector de configuración" en una página de archivo de configuración individual.
+# Label for the "back to config selector" navigation row on a single config-file page.
 configFileBackRow: "&7« volver a los archivos de configuración"
-
-# Fila de sugerencia no interactiva que se muestra cuando un archivo de configuración no tiene claves editables.
+# Non-clickable hint row shown when a config file has no editable keys.
 configFileEmptyHint: "&7(no hay claves editables en este archivo)"
-
-# Etiqueta de fila por clave en una página de archivo de configuración. Marcadores:
-#   [key]   - el nombre de la clave de configuración; [value] - el valor almacenado actualmente.
+# Per-key row label on a config-file page. Placeholders:
+#   [key]   - the config key name; [value] - the currently-stored value.
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
-
-# Texto emergente para una fila por clave en una página de archivo de configuración. Marcadores:
-#   [key], [value], [type] - el nombre de la clave de configuración, el valor actual y el tipo declarado.
+# Hover text for a per-key row on a config-file page. Placeholders:
+#   [key], [value], [type] - the config key name, current value, and declared type.
 configKeyHoverFormat: "&7haz clic para editar &7[key] &7(tipo: [type])"
-
-# Fila de título no interactiva en la parte superior de una página de selector de tipo de shape/vert.
-# Marcadores: [param] - "shape" o "vert"; [current] - nombre del tipo activo actualmente.
+# Non-clickable title row at the top of a shape/vert type-picker page.
+# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
 configTypePickerTitle: "#5FB3B3&l⚙ elige el tipo de [param] &7(actual: &7[current]&7)"
-
-# Fila de título no interactiva en la parte superior de una página de subparámetros de shape/vert.
-# Marcadores: [param] - "shape" o "vert"; [type] - el nombre del tipo activo.
+# Non-clickable title row at the top of a shape/vert sub-parameter page.
+# Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
 configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7subparámetros"
-
-# Sugerencia enviada cuando la vista de libro recurre al volcado de YAML en bruto en el chat
-# (no hay renderizador de libros disponible en esta plataforma).
+# Hint sent when the book view falls back to the legacy raw-YAML chat dump
+# (no book renderer available on this platform).
 configViewRawHint: "&7[P0] vista de libro no disponible; recurriendo al volcado en bruto."
-
-# Texto de marcador de posición representado en lugar de un valor de configuración que no se ha establecido.
+# Placeholder text rendered in place of a config value that has not been set.
 configValueUnsetPlaceholder: "&8(sin definir)"
-
-# Fila de encabezado no interactiva que separa la lista "Modificable" de la lista "Pendiente"
-# en el carrito provisional en una página de archivo de configuración cuando el visor ha preparado una o
-# más ediciones no aplicadas. Sin marcadores. Evitar amarillo (&e/&6) y blanco (&f): el pergamino del libro los desvanece.
+# Non-clickable header row separating the "Changeable" list from the "Pending"
+# staging-cart list on a config-file page when the viewer has staged one or
+# more uncommitted edits. No placeholders.
 configPendingHeader: "&6&l-- pending changes --"
-
-# Etiqueta por fila para una entrada key=value preparada (pendiente) en una página de archivo de configuración.
-# Hacer clic en la fila la elimina del carrito. Marcadores: [key], [value].
-# Evitar amarillo/blanco en el pergamino del libro.
+# Per-row label for a staged (pending) key=value entry on a config-file page.
+# Clicking the row removes it from the cart. Placeholders: [key], [value].
 configPendingRowFormat: "&9[key]&8 = &0[value]"
-
-# Texto emergente mostrado cuando el visor pasa el cursor sobre una fila pendiente (preparada) en una
-# página de archivo de configuración. Sin marcadores.
+# Hover text shown when the viewer hovers a pending (staged) row on a
+# config-file page. No placeholders.
 configPendingRowHover: "haz clic para descartar"
-
-# Etiqueta interactiva para la fila "aplicar cambios preparados" en una página de archivo de configuración.
-# Ejecuta el comando ensamblado /rtp config <file> k1=v1 ... y vacía el carrito.
+# Clickable label for the "apply staged changes" row on a config-file page.
+# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
 configApplyRow: "&2&l[apply]"
-
-# Etiqueta interactiva para la fila "descartar cambios preparados" en una página de archivo de configuración.
-# Vacía el carrito sin aplicar los cambios.
+# Clickable label for the "discard staged changes" row on a config-file page.
+# Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
 
-# --- Renderizado de mapas / gráficos ---
-# Enviado cuando se hace clic en una fila de mapa pero el renderizado de mapas no está disponible en este
-# servidor (p. ej. la compilación Lite, o ningún proveedor de mapas instalado).
+# --- Map / chart rendering ---
+# Sent when a map row is clicked but map rendering is not available on this
+# server (e.g. the Lite assembly, or no map provider installed).
 mapBindingMissing: "&c[P0] el renderizado de mapas no está disponible en este servidor."
-
-# Enviado cuando se solicita un gráfico pero no hay ningún renderizador registrado para ese
-# tipo de gráfico.
+# Sent when a chart is requested but no renderer is registered for that
+# chart type.
 mapResolverMissing: "&c[P0] no hay ningún resolutor de gráficos registrado para esta solicitud."
-
-# Enviado cuando un resolutor se ejecuta pero la fuente de datos subyacente no está disponible
-# para el objetivo solicitado (región desconocida, sin datos aún, mundo descargado).
-# Marcador: [region] - el nombre de la región solicitada (puede estar vacío).
+# Sent when a resolver runs but the underlying data source is unavailable
+# for the requested target (unknown region, no data yet, world unloaded).
+# Placeholder: [region] - the requested region name (may be empty).
 mapUnavailable: "&e[P1] los datos del gráfico no están disponibles ahora mismo."
-
-# Enviado cuando el servicio de mapas no puede asignar un mapa ahora mismo (p. ej. se ha
-# alcanzado un límite por espectador).
+# Sent when the map service cannot allocate a map right now (e.g. a
+# per-viewer cap has been reached).
 mapBusy: "&e[P1] el servicio de mapas está ocupado; inténtalo de nuevo en breve."
-
-# Etiqueta para la fila de menú interactiva "/rtp info" que genera un mapa térmico de
-# las ubicaciones no válidas conocidas de la región actual. Oculta cuando el renderizado de mapas
-# no está disponible en este servidor.
+# Label for the clickable "/rtp info" menu row that renders a heatmap of
+# the current region's known bad locations. Hidden when map rendering is
+# not available on this server.
 menuInfoBadPointsLabel: "#9D7CD8&l# mapa de puntos inseguros"
 
-# --- Submenú MultiConfig ---
-# Alternativa de encabezado utilizada cuando no hay una clave de encabezado registrada por tipo.
-# Marcador: [parserKind] - el nombre en bruto del tipo de multiconfiguración.
+# --- MultiConfig submenu ---
+# Header row fallback used when no per-kind header key is registered.
+# Placeholder: [parserKind] - the raw multi-config kind name.
 multiconfigHeaderDefault: "#5FB3B3&l[parserKind]"
-
-# Etiqueta de la fila de encabezado para la página del selector de multiconfiguración de regiones. Sin marcadores.
+# Header row label for the regions multi-config selector page. No placeholders.
 multiconfigHeaderRegions: "#5FB3B3&l regiones"
-
-# Etiqueta de la fila de encabezado para la página del selector de multiconfiguración de mundos. Sin marcadores.
+# Header row label for the worlds multi-config selector page. No placeholders.
 multiconfigHeaderWorlds: "#5FB3B3&l mundos"
-
-# Etiqueta de la fila de alternancia cuando el modo de eliminación está DESACTIVADO. Sin marcadores.
+# Toggle-row label when remove-mode is OFF. No placeholders.
 multiconfigToggleRemoveModeOff: "&8[ ] modo eliminar"
-
-# Etiqueta de la fila de alternancia cuando el modo de eliminación está ACTIVADO. Los clics en las filas de entrada eliminan.
+# Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] modo eliminar (haz clic en una entrada para borrarla)"
-
-# Etiqueta de fila del selector para la entrada "+ Añadir nuevo...". Sin marcadores.
+# Selector row label for the "+ Add new..." entry. No placeholders.
 multiconfigRowAdd: "&2+ añadir nuevo..."
-
-# Texto emergente para la fila Añadir. Marcador: [name] - nombre predeterminado prerrellenado.
+# Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7escribe un nombre en el aviso del yunque; prerrellenado: &f[name]"
-
-# Texto emergente para una fila de entrada en modo normal. Marcador: [name].
+# Hover text for an entry row in normal mode. Placeholder: [name].
 multiconfigRowEditHover: "&7editar &f[name]"
-
-# Texto emergente para una fila de entrada en modo de eliminación. Marcador: [name].
+# Hover text for an entry row in remove-mode. Placeholder: [name].
 multiconfigRowRemoveHover: "&cborrar &f[name]"
-
-# Fila de título de la página de confirmación de eliminación. Marcador: [name].
+# Confirm-delete page title row. Placeholder: [name].
 multiconfigConfirmTitle: "&c&l¿borrar [name]?"
-
-# Etiqueta de fila Sí en la página de confirmación de eliminación. Sin marcadores.
+# Confirm-delete page Yes-row label. No placeholders.
 multiconfigConfirmYes: "&c&l[confirm delete]"
-
-# Etiqueta de fila Cancelar en la página de confirmación de eliminación. Sin marcadores.
+# Confirm-delete page Cancel-row label. No placeholders.
 multiconfigConfirmNo: "&2&l[cancel]"
-
-# Texto emergente en una fila de región predeterminada bloqueada (atenuada). Sin marcadores.
+# Hover text on a locked (grayed) default-region row. No placeholders.
 multiconfigLockRegionDefault: "&7la región predeterminada no se puede eliminar"
-
-# Texto emergente en una fila de mundo bloqueada (atenuada). Marcador: [name].
+# Hover text on a locked (grayed) world row. Placeholder: [name].
 multiconfigLockWorldLoaded: "&7el mundo '[name]' está cargado en el servidor; descárgalo antes de eliminar su configuración"
-
-# Mensaje de resultado tras una acción de AÑADIR exitosa. Marcador: [name].
+# Result message after a successful ADD. Placeholder: [name].
 multiconfigResultAdded: "&aañadido '[name]'."
-
-# Mensaje de resultado tras una acción de ELIMINAR exitosa. Marcador: [name].
+# Result message after a successful REMOVE. Placeholder: [name].
 multiconfigResultRemoved: "&aeliminado '[name]'."
-
-# Mensaje de resultado cuando AÑADIR falló. Marcadores: [name], [reason].
+# Result message when ADD failed. Placeholders: [name], [reason].
 multiconfigResultAddFailed: "&cno se pudo añadir '[name]': [reason]"
-
-# Mensaje de resultado cuando ELIMINAR falló. Marcadores: [name], [reason].
+# Result message when REMOVE failed. Placeholders: [name], [reason].
 multiconfigResultRemoveFailed: "&cno se pudo eliminar '[name]': [reason]"
-
-# Mensaje de resultado cuando el desinfectador rechaza el nombre de entrada propuesto.
-# Marcador: [name].
+# Result message when the proposed entry name is rejected by the sanitiser.
+# Placeholder: [name].
 multiconfigResultNameInvalid: "&cel nombre '[name]' no está permitido; usa letras, dígitos, '_', '-', '.'"
-
-# Mensaje de resultado cuando una acción de AÑADIR entra en conflicto con un nombre de entrada existente.
-# Marcador: [name].
+# Result message when an ADD collides with an existing entry name.
+# Placeholder: [name].
 multiconfigResultNameTaken: "&cya existe una entrada llamada '[name]'."
 
-# NO MODIFICAR EL NÚMERO DE VERSIÓN
+# DO NOT TOUCH VERSION NUMBER
 version: 1.0

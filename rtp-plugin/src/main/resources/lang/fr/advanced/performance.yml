@@ -156,6 +156,5 @@ prefabrique:
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
-
 # NE PAS MODIFIER LE NUMÉRO DE VERSION
 version: 1.0

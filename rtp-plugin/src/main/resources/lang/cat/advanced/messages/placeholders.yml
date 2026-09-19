@@ -16,13 +16,13 @@
 # Note: keys like `busy` and `invalidCommand` are not key-renamed in
 # messages.lang.yml, so they keep their English left-hand names below.
 # ###############################################################################
-# Section 1: General Catnip
+# Section 1: General Configuration
 # ###############################################################################
-# list of extra bowl labels
-# format: Pn - where n is the spot in this bowl pile
+# list of additional placeholders
+# format: Pn - where n is the index in this list
 empty_bowls:
   # P0
   - "[RTP]"
 
-# Do not bite the version number, sacred catnip
+# DO NOT TOUCH VERSION NUMBER
 version: 1.0
