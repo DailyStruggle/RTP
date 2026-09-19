@@ -12,7 +12,6 @@ version = providers.gradleProperty('version').get()
 ext.liteVersion = providers.gradleProperty('liteVersion').get()
 
 spotless {
-    lineEndings 'UNIX'
     java {
         target 'rtp-*/**/*.java', 'addons/**/*.java'
         targetExclude '**/build/**', '**/.gradle/**', '**/generated/**', '**/target/**'

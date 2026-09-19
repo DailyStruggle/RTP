@@ -55,7 +55,6 @@ public final class RegionBiomesResolver implements ChartSpecResolver {
                     "region '" + region.name
                             + "' shape is not a MemoryShape; no contains(x, z) surface");
         }
-        memoryShape.flushAndRebuild(memoryShape.spatialResolution());
         long range;
         try {
             range = memoryShape.getRange();
