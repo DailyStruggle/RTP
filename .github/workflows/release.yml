@@ -2,16 +2,7 @@ name: Release rtp-lite to Modrinth
 
 # Publishes the lite assembly variant (ADR-024) to the Modrinth project
 # `rtp-lite` (https://modrinth.com/project/rtp-lite) on every tag matching
-# `lite-v*` (e.g. `lite-v1.0.0`, `lite-v1.0.1-beta.1`).
-#
-# Pro builds are intentionally NOT published here. Pro tags (`v*`) continue
-# to be handled by the existing Jenkins pipeline (Jenkinsfile) and the
-# BuiltByBit distribution channel; they should not trigger this workflow.
-#
-# Required repo secrets:
-#   MODRINTH_TOKEN       -- Modrinth PAT with the `Create version` scope.
-#   SIGNING_KEY          -- (Optional) ASCII-armored PGP private key for signing release deliverables.
-#   SIGNING_PASSWORD     -- (Optional) Passphrase for SIGNING_KEY.
+# `v*` (e.g. `v1.0.0`, `v1.0.1-beta.1`).
 #
 # Release notes are taken from CHANGELOG.md (the section matching the tag's
 # version string), with any bullet tagged `**(Pro)**` stripped out so the
@@ -23,16 +14,17 @@ name: Release rtp-lite to Modrinth
 on:
   push:
     tags:
-      - 'lite-v*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. lite-v1.0.0). Must already exist.'
+        description: 'Tag to release (e.g. v1.0.0). Must already exist.'
         required: true
         type: string
 
 jobs:
   release:
+    if: false # Temporarily disabled for SonarQube runs
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -51,8 +43,8 @@ jobs:
         id: version
         run: |
           RAW_TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          # Strip the `lite-v` prefix (e.g. `lite-v1.0.0` -> `1.0.0`).
-          VERSION="${RAW_TAG#lite-v}"
+          # Strip the `v` prefix (e.g. `v1.0.0` -> `1.0.0`).
+          VERSION="${RAW_TAG#v}"
           echo "tag=${RAW_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Releasing lite version: ${VERSION} (from tag ${RAW_TAG})"
@@ -235,11 +227,12 @@ jobs:
           changelog-file: release-notes.md
           loaders: |
             paper
+            folia
             bukkit
             spigot
           # MC versions derived from the rtp-bukkit-v* / rtp-paper-v* submodule
-          # set. Folia is intentionally absent (ADR-024 keeps Folia in Pro
-          # only); Fabric is held until rtp-fabric Phase 4 closes
+          # set. Basic Folia support is included in lite per ADR-024 2026-06-10 amendment.
+          # Fabric is held until rtp-fabric Phase 4 closes
           # (MULTI_PLATFORM_PLAN.md). Update this list when a new MC adapter
           # submodule lands under rtp-bukkit/ or rtp-paper/.
           game-versions: |

@@ -43,12 +43,13 @@ on:
 
 jobs:
   release:
-    # Only run if PR was actually merged from a v*.*.* branch (or manual workflow_dispatch)
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.merged == true &&
-       (startsWith(github.head_ref, 'v') || startsWith(github.head_ref, 'V')) &&
-       contains(github.head_ref, '.'))
+    # Temporarily disabled for SonarQube runs
+    if: false
+    # if: >
+    #   github.event_name == 'workflow_dispatch' ||
+    #   (github.event.pull_request.merged == true &&
+    #    (startsWith(github.head_ref, 'v') || startsWith(github.head_ref, 'V')) &&
+    #    contains(github.head_ref, '.'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -280,6 +281,7 @@ jobs:
           changelog-file: release-notes-lite.md
           loaders: |
             paper
+            folia
             bukkit
             spigot
           game-versions: |
