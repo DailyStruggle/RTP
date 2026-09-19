@@ -56,13 +56,12 @@ public class SquareTest {
     }
 
     @Test
-    void getRange_isExactCellCount() {
+    void getRange_formula_is4TimesDiff() {
         Square shape = new Square();
         shape.set(GenericMemoryShapeParams.radius, 100L);
         shape.set(GenericMemoryShapeParams.centerRadius, 0L);
         long range = shape.getRange();
-        // one index per cell of the 199x199 block max(|x|,|z|) < 100
-        assertEquals(199L * 199L, range);
+        assertEquals(100L * 100L * 4, range);
     }
 
     // -------------------------------------------------------------------------

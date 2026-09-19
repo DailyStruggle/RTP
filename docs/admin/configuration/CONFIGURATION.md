@@ -76,7 +76,7 @@ The `shape` block defines how horizontal coordinates are selected. The `name` ke
 
 | Key | Type | Description |
 |---|---|---|
-| `name` | String | Shape engine: `CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `ELLIPSE`, `RECTANGLE`, `POLYGON`. |
+| `name` | String | Shape engine: `CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `RECTANGLE`. |
 | `mode` | String | Selection logic. See table below. |
 | `centerX` | Integer | Chunk X coordinate of the region centre (default `0`). |
 | `centerZ` | Integer | Chunk Z coordinate of the region centre (default `0`). |
@@ -120,25 +120,6 @@ Normal-distribution variants replace `weight` with explicit statistical paramete
 | `height` / `length` | Integer / Distance | — | Full height / length of the rectangle (total Z-axis extent, centred on the region; supports spatial suffixes). |
 | `rotation` | Double | `0.0` | Rotation of the rectangle in degrees around the centre. |
 
-#### `ELLIPSE` — additional keys
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `radius` / `radius2` | Integer / Distance | `256` | The two outer semi-axes in **chunks** (supports spatial suffixes). The wider of the two bounds the spiral mapping. |
-| `centerRadius` / `centerRadius2` | Integer / Distance | `0` | The two semi-axes of the inner exclusion ellipse, in **chunks**. |
-| `rotation` | Double | `0.0` | Rotation of both the outer and inner ellipse in degrees around the centre. |
-| `weight` | Double | `1.0` | Distribution weight, same meaning as `CIRCLE`. |
-| `expand` | Boolean | `false` | If `true`, the radii grow automatically as locations are consumed. |
-
-#### `POLYGON` — additional keys
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `vertices` | List of `[x, z]` pairs | — | Boundary vertices in traversal order, in the same format Chunky uses. At least 3, not all collinear, no self-intersections. Invalid or self-intersecting vertices trigger a warning and fall back to the bounding square. See [REGIONS.md](REGIONS.md#polygon). |
-| `weight` | Double | `1.0` | Distribution weight across the vertex bounding box. |
-
-`expand` is not part of the polygon surface and is ignored: the boundary is admin-authored, so growing it would push landings outside it.
-
 ---
 
 ### `vert` section
@@ -149,7 +130,7 @@ The `vert` block controls how the Y coordinate (height) is chosen once a horizon
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `name` | String | `"JUMP"` | Vertical adjustor engine: `JUMP`, `LINEAR`, or `FIXED`. |
+| `name` | String | `"JUMP"` | Vertical adjustor engine: `JUMP` or `LINEAR`. |
 | `minY` | Integer | `32` | Minimum Y level a player can land at. |
 | `maxY` | Integer | `255` | Maximum Y level a player can land at. |
 | `requireSkyLight` | Boolean | `false` | If `true`, only accept locations with direct sky access (above-ground only). |
@@ -165,12 +146,6 @@ The `vert` block controls how the Y coordinate (height) is chosen once a horizon
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `direction` | Integer | `2` | Search direction: `0` = bottom-up (scan from `minY` to `maxY`), `1` = top-down (scan from `maxY` to `minY`), `2` = middle-out (default), `3` = edges-in, any other integer = randomized order. |
-
-#### `FIXED` — additional keys
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `y` | Integer | `64` | Exact Y level for mid-air placement. No terrain scan runs, so `minY`, `maxY`, `direction`, and `requireSkyLight` are ignored. Intended for skyblock-style worlds; pair it with a platform builder or the player falls through air. See [REGIONS.md](REGIONS.md). |
 
 ---
 
@@ -239,9 +214,7 @@ For in-depth explanations and complete key tables of each configuration file:
 
 ## Custom Shapes and Addons
 
-The built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `ELLIPSE`, `RECTANGLE`, `POLYGON`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
-
-That list is the set this build registers at startup. Addons can register more, so the authoritative list for your install is written to `plugins/RTP/definitions/regions/SHAPES.md` (and `VERT.md` for vertical adjustors) on every start and `/rtp reload`, generated from the live registry.
+All five built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `RECTANGLE`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
 
 Custom shapes can be registered at runtime via `rtp-api`. See [`addons/`](../../addons/) for examples. A registered custom shape appears as a valid `shape.name` value in any region config.
 
