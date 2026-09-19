@@ -88,8 +88,7 @@ class ChartSpecSurfaceTest {
                 ChartSpec.Kind.REGION_COVERAGE,
                 ChartSpec.Kind.FAIL_RATE_HEATMAP,
                 ChartSpec.Kind.CACHE_OCCUPANCY,
-                ChartSpec.Kind.METRIC_SPARKLINE,
-                ChartSpec.Kind.REGION_COMPOSITE);
+                ChartSpec.Kind.METRIC_SPARKLINE);
         Set<ChartSpec.Kind> actual = EnumSet.allOf(ChartSpec.Kind.class);
         assertEquals(expected, actual,
                 "ChartSpec.Kind must list exactly the seven values locked by CHECKLIST-metrics-to-maps.md row 1.2 "

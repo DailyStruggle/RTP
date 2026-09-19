@@ -889,11 +889,6 @@ public class PlaceholderProvider {
                 "scan_chunks",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0";
-                    Region region = RTP.regionContext.get();
-                    if (region != null) {
-                        ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                        return (task != null) ? String.valueOf(task.latestAbsolutePos) : "0";
-                    }
                     long total = 0;
                     for (ScanTask task : RTP.getInstance().scanTasks.values()) {
                         total += task.latestAbsolutePos;
@@ -904,11 +899,6 @@ public class PlaceholderProvider {
                 "scan_totalChunks",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0";
-                    Region region = RTP.regionContext.get();
-                    if (region != null) {
-                        ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                        return (task != null) ? String.valueOf(task.latestAbsoluteTotal) : "0";
-                    }
                     long total = 0;
                     for (ScanTask task : RTP.getInstance().scanTasks.values()) {
                         total += task.latestAbsoluteTotal;
@@ -919,11 +909,6 @@ public class PlaceholderProvider {
                 "scan_cps",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0";
-                    Region region = RTP.regionContext.get();
-                    if (region != null) {
-                        ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                        return (task != null) ? String.valueOf(task.latestCps) : "0";
-                    }
                     long total = 0;
                     for (ScanTask task : RTP.getInstance().scanTasks.values()) {
                         total += task.latestCps;
@@ -934,54 +919,44 @@ public class PlaceholderProvider {
                 "scan_regions",
                 uuid -> {
                     if (RTP.getInstance() == null) return "";
-                    Region region = RTP.regionContext.get();
-                    if (region != null) return region.name;
                     return String.join(", ", RTP.getInstance().scanTasks.keySet());
-                });
-        placeholders.put(
-                "scan_landPercentage",
-                uuid -> {
-                    if (RTP.getInstance() == null) return "0.00";
-                    Region r = RTP.regionContext.get();
-                    if (r != null && r.getShape() instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> ms) {
-                        long bad = ms.getEffectiveBadCount();
-                        long denom = ms.getEffectiveGoodCount() + bad;
-                        if (denom <= 0) return "0.00";
-                        double pct = ((denom - bad) * 100.0) / denom;
-                        return String.format(java.util.Locale.ROOT, "%.2f", pct);
-                    }
-                    long totalBad = 0;
-                    long totalEvaluated = 0;
-                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                        if (task.region.getShape() instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> ms) {
-                            long bad = ms.getEffectiveBadCount();
-                            long denom = ms.getEffectiveGoodCount() + bad;
-                            totalBad += bad;
-                            totalEvaluated += denom;
-                        }
-                    }
-                    if (totalEvaluated <= 0) return "0.00";
-                    double pct = ((totalEvaluated - totalBad) * 100.0) / totalEvaluated;
-                    return String.format(java.util.Locale.ROOT, "%.2f", pct);
                 });
         placeholders.put(
                 "scan_eta",
                 uuid -> {
                     try {
                         if (RTP.getInstance() == null) return "0s";
-                        Region region = RTP.regionContext.get();
-                        if (region != null) {
-                            ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                            long eta = (task != null) ? task.latestEtaSeconds : 0L;
-                            return formatEta(eta);
-                        }
 
                         long maxEta = 0;
                         for (ScanTask task : RTP.getInstance().scanTasks.values()) {
                             if (task.latestEtaSeconds > maxEta) maxEta = task.latestEtaSeconds;
                         }
 
-                        return formatEta(maxEta);
+
+                        if (RTP.configs == null) return maxEta + "s";
+
+                        long days = TimeUnit.SECONDS.toDays(maxEta);
+                        long hours = TimeUnit.SECONDS.toHours(maxEta) % 24;
+                        long minutes = TimeUnit.SECONDS.toMinutes(maxEta) % 60;
+                        long seconds = maxEta % 60;
+
+                        StringBuilder replacement = new StringBuilder();
+
+                        if (days > 0) {
+                            replacement.append(days).append(String.valueOf(RTP.configs.getConfigValue(PlayerMessages.days, ""))).append(" ");
+                        }
+                        if (hours > 0) {
+                            replacement.append(hours).append(String.valueOf(RTP.configs.getConfigValue(PlayerMessages.hours, ""))).append(" ");
+                        }
+                        if (minutes > 0) {
+                            replacement.append(minutes).append(String.valueOf(RTP.configs.getConfigValue(PlayerMessages.minutes, ""))).append(" ");
+                        }
+
+                        if (seconds > 0 || replacement.length() == 0) {
+                            replacement.append(seconds).append(String.valueOf(RTP.configs.getConfigValue(PlayerMessages.seconds, "")));
+                        }
+
+                        return replacement.toString().trim();
                     } catch (Exception e) {
                         RTP.log(java.util.logging.Level.WARNING, "Placeholder resolution failed for scan_eta", e);
                         return "0s";
@@ -1215,39 +1190,7 @@ public class PlaceholderProvider {
     }
 
     /** Two-decimal percent with a trailing {@code %}; {@code "N/A"} when not sampled. */
-    /**
-     * Format seconds into a human-readable ETA string using configured time unit labels.
-     *
-     * @param totalSeconds duration in seconds
-     * @return formatted duration string (e.g. "2h 19m 28s")
-     */
-    public static String formatEta(long totalSeconds) {
-        if (totalSeconds < 0) totalSeconds = 0;
-        if (RTP.configs == null) return totalSeconds + "s";
-
-        long days = TimeUnit.SECONDS.toDays(totalSeconds);
-        long hours = TimeUnit.SECONDS.toHours(totalSeconds) % 24;
-        long minutes = TimeUnit.SECONDS.toMinutes(totalSeconds) % 60;
-        long seconds = totalSeconds % 60;
-
-        StringBuilder sb = new StringBuilder();
-        if (days > 0) {
-            sb.append(days).append(RTP.configs.getConfigValue(PlayerMessages.days, "d")).append(" ");
-        }
-        if (hours > 0) {
-            sb.append(hours).append(RTP.configs.getConfigValue(PlayerMessages.hours, "h")).append(" ");
-        }
-        if (minutes > 0) {
-            sb.append(minutes).append(RTP.configs.getConfigValue(PlayerMessages.minutes, "m")).append(" ");
-        }
-        if (seconds > 0 || sb.length() == 0) {
-            sb.append(seconds).append(RTP.configs.getConfigValue(PlayerMessages.seconds, "s"));
-        }
-
-        return sb.toString().trim();
-    }
-
-    public static String formatPercent(double v) {
+    private static String formatPercent(double v) {
         if (Double.isNaN(v) || Double.isInfinite(v)) return "N/A";
         return String.format(java.util.Locale.ROOT, "%.2f%%", v);
     }

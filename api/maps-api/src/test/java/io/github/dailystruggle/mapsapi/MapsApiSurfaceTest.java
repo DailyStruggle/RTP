@@ -49,8 +49,7 @@ class MapsApiSurfaceTest {
                 RegionBadLocations.class.getName(),
                 RegionBiomesRgb.class.getName(),
                 MermaidChart.class.getName(),
-                io.github.dailystruggle.mapsapi.model.DualSparkline.class.getName(),
-                io.github.dailystruggle.mapsapi.model.CompositeRegionModel.class.getName());
+                io.github.dailystruggle.mapsapi.model.DualSparkline.class.getName());
         assertEquals(expected, permitted,
                 "ChartModel permits clause shall list exactly the documented record shapes");
     }
