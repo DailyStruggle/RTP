@@ -37,7 +37,7 @@ public class Factory {
         try {
             res = map.get(name.toUpperCase()).getConstructor(parameterTypes).newInstance(parameters);
         } catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
-            Logger.getLogger(Factory.class.getName()).log(Level.WARNING, "Factory: failed to construct " + name, e);
+            Logger.getLogger(Factory.class.getName()).log(Level.WARNING, e, () -> "Factory: failed to construct " + name);
             return null;
         }
         return res;

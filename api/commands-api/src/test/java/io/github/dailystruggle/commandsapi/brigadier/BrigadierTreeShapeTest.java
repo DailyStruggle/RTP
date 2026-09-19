@@ -91,7 +91,8 @@ class BrigadierTreeShapeTest {
         // (commands-api-ADR-001 addendum 2026-05-06d): each parameter
         // Brigadier node accepts a single word matching the wire format, and
         // BrigadierCommandAdapter.reconstructArgs passes it through verbatim.
-        dispatcher.execute("rtp sub p=hello", new Source());
+        int result = dispatcher.execute("rtp sub p=hello", new Source());
+        assertEquals(1, result, "sub-command parameter execution must succeed");
     }
 
     @Test
@@ -100,7 +101,8 @@ class BrigadierTreeShapeTest {
         CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(fixtureRoot(), permissive()));
         // The user types name=value tokens; sibling chaining lets them appear in any order.
-        dispatcher.execute("rtp a=foo b=bar", new Source());
+        int result = dispatcher.execute("rtp a=foo b=bar", new Source());
+        assertEquals(1, result, "sibling parameter chain execution must succeed");
     }
 
     @Test
@@ -109,8 +111,10 @@ class BrigadierTreeShapeTest {
         CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(fixtureRoot(), permissive()));
         // 'a' followed by nested 'x' / 'y' (subParams). Two positional values.
-        dispatcher.execute("rtp a=foo x=qux", new Source());
-        dispatcher.execute("rtp a=foo y=quux", new Source());
+        assertDoesNotThrow(() -> {
+            dispatcher.execute("rtp a=foo x=qux", new Source());
+            dispatcher.execute("rtp a=foo y=quux", new Source());
+        });
     }
 
     @Test
@@ -266,7 +270,8 @@ class BrigadierTreeShapeTest {
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(root, permissive()));
         // The parameter node must still parse a typed value (suggestions are a
         // separate path; throwing values() must not strip the node).
-        dispatcher.execute("rtp p=anything", new Source());
+        int result = dispatcher.execute("rtp p=anything", new Source());
+        assertEquals(1, result, "parameter node parsing must succeed despite throwing suggestions");
     }
 
     // ------------------------------------------------------------------

@@ -31,7 +31,9 @@ on:
   pull_request:
     types: [closed]
     branches:
-      - '[vV]*'
+      - V3
+      - V2
+      - V1
   workflow_dispatch:
     inputs:
       version:

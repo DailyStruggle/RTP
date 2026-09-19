@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -112,7 +113,7 @@ class VelocityWaitlistQuitListenerTest {
         VelocityWaitlistQuitListener listener =
                 new VelocityWaitlistQuitListener(waitlist, LoggerFactory.getLogger("test"));
         // Must not propagate the IllegalStateException.
-        listener.onDisconnect(event);
+        assertDoesNotThrow(() -> listener.onDisconnect(event));
     }
 
     @Test

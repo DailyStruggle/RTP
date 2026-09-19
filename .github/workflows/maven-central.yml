@@ -5,11 +5,8 @@ name: Publish API artifacts to Maven Central
 # Portal.
 #
 # WHEN THIS RUNS
-#   Only on a push to a release line branch -- `V1`, `V2`, `V3`, ... (and their
-#   lowercase forms). A push to a protected release branch happens only when a
-#   pull request is merged into it, so in practice this publishes "after a pull
-#   request", never on an ad-hoc direct commit or a feature branch. A manual
-#   `workflow_dispatch` is also allowed for re-runs.
+#   Only on a push to the primary branch (`V3`). A manual `workflow_dispatch`
+#   is also allowed for re-runs. Never on an ad-hoc feature or development branch.
 #
 # WHY FIRST-PARTY ONLY
 #   The build uses only Gradle's built-in `maven-publish` + `signing` plugins
@@ -39,8 +36,7 @@ name: Publish API artifacts to Maven Central
 on:
   push:
     branches:
-      - 'V[0-9]*'
-      - 'v[0-9]*'
+      - V3
   workflow_dispatch:
 
 jobs:

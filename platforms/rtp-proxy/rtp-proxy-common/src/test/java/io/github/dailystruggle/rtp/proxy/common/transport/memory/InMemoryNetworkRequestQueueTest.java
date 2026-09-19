@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -202,7 +203,9 @@ final class InMemoryNetworkRequestQueueTest {
     @Test
     void invoking_an_in_memory_request_then_shutdown_does_not_leak_threads() {
         // best-effort: shutdown must not throw and must be idempotent.
-        q.shutdown();
-        q.shutdown();
+        assertDoesNotThrow(() -> {
+            q.shutdown();
+            q.shutdown();
+        });
     }
 }

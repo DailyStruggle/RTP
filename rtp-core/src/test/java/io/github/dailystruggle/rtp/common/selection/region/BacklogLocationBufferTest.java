@@ -244,6 +244,7 @@ class BacklogLocationBufferTest {
     if (failure.get() != null) {
       throw new AssertionError("concurrent drain threw", failure.get());
     }
+    assertNull(failure.get(), "concurrent drain must not fail");
   }
 
   @Test

@@ -20,6 +20,7 @@ import org.jetbrains.annotations.Nullable;
  * Subcommands manage prefabs (gates on {@code rtp.admin.prefab}).
  * Rejects with {@code menuInvalid} when no opener is wired (REQ-RTP-S-004, S-007).
  */
+@SuppressWarnings("java:S1845") // PERMISSION constant matches convention alongside permission() method
 public class AdminCmd extends BaseRTPCmdImpl {
 
     /** Permission key for the bare {@code /rtp admin} form. Mirrors {@code MenuRedeemSubcommand.ADMIN_MENU_PERMISSION}. */

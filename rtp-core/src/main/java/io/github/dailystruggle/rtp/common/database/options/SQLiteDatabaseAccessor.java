@@ -120,7 +120,8 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     }
 
     // get full table
-    String sql = "SELECT * FROM rtp_teleport_data";
+    String sql = "SELECT senderId, time, selectedWorldName, selectedX, selectedY, selectedZ, "
+        + "originalWorldName, originalX, originalY, originalZ, cost FROM rtp_teleport_data";
 
     try (PreparedStatement statement = connection.prepareStatement(sql);
         ResultSet resultSet = statement.executeQuery()) {
@@ -157,7 +158,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     } catch (SQLException throwables) {
       RTP.log(Level.WARNING, "Failed to load cached locations from SQLite", throwables);
     } catch (IllegalArgumentException ignored) {
-
+      // Ignore corrupted or malformed UUID strings in database rows
     }
 
     purgeStaleLocations();

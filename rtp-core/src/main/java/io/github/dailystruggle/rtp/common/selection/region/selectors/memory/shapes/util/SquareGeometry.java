@@ -17,45 +17,44 @@ public final class SquareGeometry {
    * @param output mutable output coordinates container
    */
   public static void squareOct2Coords(long radius, double perimeterStep, MutableRTPCoords output) {
-    int x, z;
+    int x;
+    int z;
     double shortStep = perimeterStep % radius;
+    int octant = (int) (perimeterStep / radius);
 
-    if (perimeterStep < radius * 4) {
-      if (perimeterStep < radius * 2) {
-        if (perimeterStep < radius) { // octant 1, from 0 to pi/4
-          x = (int) radius;
-          z = (int) shortStep;
-        } else { // octant 2, from pi/4 to pi/2
-          x = (int) (radius - shortStep);
-          z = (int) radius;
-        }
-      } else {
-        if (perimeterStep < radius * 3) { // octant 3
-          x = (int) -shortStep;
-          z = (int) radius;
-        } else { // octant 4
-          x = (int) -radius;
-          z = (int) (radius - shortStep);
-        }
-      }
-    } else {
-      if (perimeterStep < radius * 6) {
-        if (perimeterStep < radius * 5) { // octant 5
-          x = (int) -radius;
-          z = (int) -shortStep;
-        } else { // octant 6
-          x = (int) -(radius - shortStep);
-          z = (int) -radius;
-        }
-      } else {
-        if (perimeterStep < radius * 7) { // octant 7
-          x = (int) shortStep;
-          z = (int) -radius;
-        } else { // octant 8
-          x = (int) radius;
-          z = (int) -(radius - shortStep);
-        }
-      }
+    switch (octant) {
+      case 0: // octant 1, from 0 to pi/4
+        x = (int) radius;
+        z = (int) shortStep;
+        break;
+      case 1: // octant 2, from pi/4 to pi/2
+        x = (int) (radius - shortStep);
+        z = (int) radius;
+        break;
+      case 2: // octant 3
+        x = (int) -shortStep;
+        z = (int) radius;
+        break;
+      case 3: // octant 4
+        x = (int) -radius;
+        z = (int) (radius - shortStep);
+        break;
+      case 4: // octant 5
+        x = (int) -radius;
+        z = (int) -shortStep;
+        break;
+      case 5: // octant 6
+        x = (int) -(radius - shortStep);
+        z = (int) -radius;
+        break;
+      case 6: // octant 7
+        x = (int) shortStep;
+        z = (int) -radius;
+        break;
+      default: // octant 8
+        x = (int) radius;
+        z = (int) -(radius - shortStep);
+        break;
     }
     output.setXZ(x, z);
   }
@@ -101,7 +100,7 @@ public final class SquareGeometry {
       location -= 1L;
     }
     long target = (location / 4L) + (cr * (cr - 1L));
-    long r = (long) ((1.0 + Math.sqrt(1.0 + (4.0 * (double) target))) / 2.0);
+    long r = (long) ((1.0 + Math.sqrt(1.0 + (4.0 * target))) / 2.0);
     if (r < 1L) r = 1L;
     while (r > 1L && (r * (r - 1L)) > target) r--;
     while (((r + 1L) * r) <= target) r++;

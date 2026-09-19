@@ -15,6 +15,7 @@ import org.jetbrains.annotations.Nullable;
  * Parent {@code /rtp clear} command for sub-actions (cache, cooldown, queue, limit, invuln).
  * Requires {@code rtp.admin} permission.
  */
+@SuppressWarnings("java:S1845") // PERMISSION constant matches convention alongside permission() method
 public class ClearCmd extends BaseRTPCmdImpl {
 
   /** Permission key for {@code /rtp clear} and its children. */

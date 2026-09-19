@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -156,8 +157,10 @@ class ReservationTokenReaperReleaseSinkTest {
     @DisplayName("ReleaseSink.NO_OP is a true no-op (safe for high-fanout reaps)")
     void noOpSinkIsActuallyNoOp() {
         // Smoke test: NO_OP must accept any (non-null) inputs without throwing.
-        ReleaseSink.NO_OP.onRelease("t1", ReleaseReason.TTL_EXPIRED);
-        ReleaseSink.NO_OP.onRelease("t2", ReleaseReason.OPERATOR);
-        ReleaseSink.NO_OP.onRelease("t3", ReleaseReason.CONSUMED);
+        assertDoesNotThrow(() -> {
+            ReleaseSink.NO_OP.onRelease("t1", ReleaseReason.TTL_EXPIRED);
+            ReleaseSink.NO_OP.onRelease("t2", ReleaseReason.OPERATOR);
+            ReleaseSink.NO_OP.onRelease("t3", ReleaseReason.CONSUMED);
+        });
     }
 }

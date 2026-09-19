@@ -3304,7 +3304,7 @@ public class TeleportPipelineTaskMutationTest {
 
     @Test
     @DisplayName("schematicFootprintClear: anchor ORIGIN vs CENTER and negative dimensions")
-    void schematicFootprintClear_anchors_and_verifiers() throws Exception {
+    void schematicFootprintClear_anchors_and_verifiers() {
         LoadedSchematic schem = new TestSchematic(3, 3, 3, -1, -1);
         RTPLocation loc = new RTPLocation(world, 100, 64, 100);
 
