@@ -692,12 +692,11 @@ public class RegionQueueManager {
      * @param location location to add to the player's private queue
      */
     void enqueuePlayerLocation(UUID uuid, RTPLocation location) {
-        if (uuid == null) return;
-        ConcurrentLinkedQueue<RTPLocation> queue =
-                perPlayerLocationQueue.computeIfAbsent(uuid, k -> new ConcurrentLinkedQueue<>());
+        perPlayerLocationQueue.putIfAbsent(uuid, new ConcurrentLinkedQueue<>());
         if (perPlayerStage != null) {
             perPlayerStage.open(uuid, 1);
         }
+        ConcurrentLinkedQueue<RTPLocation> queue = perPlayerLocationQueue.get(uuid);
 
         // Enforce max 1 location per player: drain any existing extras before adding the new one
         RTPLocation excess;

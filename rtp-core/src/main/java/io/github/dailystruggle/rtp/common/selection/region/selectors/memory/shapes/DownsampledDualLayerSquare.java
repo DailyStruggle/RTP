@@ -47,12 +47,8 @@ public class DownsampledDualLayerSquare extends SquareOptimizedDualLayer {
    * If R_u is a power of 2, S = R_u^2 is a power of 4, guaranteeing perfect quadtree resonance.
    */
   public int deriveStrideFromUniqueRadius() {
-    int p = getPointEdgeChunks();
-    long binArea = (long) p * p;
-    long maxStrideByBin = Math.max(1L, binArea / 2L);
-
     if (explicitStride > 0) {
-      return (int) Math.min(explicitStride, maxStrideByBin);
+      return explicitStride;
     }
     Object raw = data.get(GenericMemoryShapeParams.uniquePlacements);
     int ru = uniquePlacementsRadius(raw);
@@ -65,7 +61,7 @@ public class DownsampledDualLayerSquare extends SquareOptimizedDualLayer {
     int shift = 64 - Long.numberOfLeadingZeros(ru - 1);
     int powerOfTwoRu = 1 << shift;
     int derivedStride = powerOfTwoRu * powerOfTwoRu;
-    return (int) Math.max(1, Math.min(maxStrideByBin, (long) derivedStride));
+    return Math.max(1, Math.min(1024, derivedStride));
   }
 
   /**

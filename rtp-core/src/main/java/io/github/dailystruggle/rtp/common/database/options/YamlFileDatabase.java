@@ -487,7 +487,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
           }
         }
       } catch (IllegalArgumentException exception) {
-        RTP.log(Level.WARNING, "Failed to parse teleportData referenceTime", exception);
+        exception.printStackTrace();
       }
     }
   }
