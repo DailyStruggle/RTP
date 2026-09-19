@@ -44,18 +44,16 @@ public class NetworkWaitlistNotifier {
     }
 
     /** Idempotent. */
-    public void start(long periodTicks) {
-        synchronized (this) {
-            if (timerTaskHandle != null) return;
-            if (RTP.scheduler == null) {
-                RTP.log(Level.WARNING,
-                        "[RTP] NetworkWaitlistNotifier.start called before scheduler available; "
-                                + "notifier not started.");
-                return;
-            }
-            long ticks = Math.max(1L, periodTicks);
-            timerTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(this::pulse, ticks, ticks);
+    public synchronized void start(long periodTicks) {
+        if (timerTaskHandle != null) return;
+        if (RTP.scheduler == null) {
+            RTP.log(Level.WARNING,
+                    "[RTP] NetworkWaitlistNotifier.start called before scheduler available; "
+                            + "notifier not started.");
+            return;
         }
+        long ticks = Math.max(1L, periodTicks);
+        timerTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(this::pulse, ticks, ticks);
     }
 
     /**
@@ -74,35 +72,33 @@ public class NetworkWaitlistNotifier {
     }
 
     /** Package-visible pulse with injectable clock for tests. */
-    void doPulse(long nowMs) {
-        synchronized (this) {
-            Map<UUID, NetworkStatusCache.QueueStatus> snap = statusCache.snapshot();
-            // Evict dedup entries for players that fell out of the cache.
-            lastEmitted.keySet().retainAll(snap.keySet());
-            lastEmittedAtMs.keySet().retainAll(snap.keySet());
+    synchronized void doPulse(long nowMs) {
+        Map<UUID, NetworkStatusCache.QueueStatus> snap = statusCache.snapshot();
+        // Evict dedup entries for players that fell out of the cache.
+        lastEmitted.keySet().retainAll(snap.keySet());
+        lastEmittedAtMs.keySet().retainAll(snap.keySet());
 
-            for (Map.Entry<UUID, NetworkStatusCache.QueueStatus> entry : snap.entrySet()) {
-                UUID uuid = entry.getKey();
-                NetworkStatusCache.QueueStatus status = entry.getValue();
-                if (status.state() != NetworkStatusCache.QueueStatus.State.WAITLISTED) {
-                    // Player left WAITLISTED (e.g. drained to ROUTING). Reset
-                    // dedup so a future WAITLISTED re-entry emits immediately.
-                    lastEmitted.remove(uuid);
-                    lastEmittedAtMs.remove(uuid);
-                    continue;
-                }
-                String body = renderBody(status);
-                String prev = lastEmitted.get(uuid);
-                Long lastAt = lastEmittedAtMs.get(uuid);
-                boolean bodyChanged = !body.equals(prev);
-                boolean intervalElapsed = lastAt == null
-                        || (nowMs - lastAt) >= reNotifyIntervalMs;
-                if (!bodyChanged && !intervalElapsed) continue;
+        for (Map.Entry<UUID, NetworkStatusCache.QueueStatus> entry : snap.entrySet()) {
+            UUID uuid = entry.getKey();
+            NetworkStatusCache.QueueStatus status = entry.getValue();
+            if (status.state() != NetworkStatusCache.QueueStatus.State.WAITLISTED) {
+                // Player left WAITLISTED (e.g. drained to ROUTING). Reset
+                // dedup so a future WAITLISTED re-entry emits immediately.
+                lastEmitted.remove(uuid);
+                lastEmittedAtMs.remove(uuid);
+                continue;
+            }
+            String body = renderBody(status);
+            String prev = lastEmitted.get(uuid);
+            Long lastAt = lastEmittedAtMs.get(uuid);
+            boolean bodyChanged = !body.equals(prev);
+            boolean intervalElapsed = lastAt == null
+                    || (nowMs - lastAt) >= reNotifyIntervalMs;
+            if (!bodyChanged && !intervalElapsed) continue;
 
-                if (emit(uuid, body)) {
-                    lastEmitted.put(uuid, body);
-                    lastEmittedAtMs.put(uuid, nowMs);
-                }
+            if (emit(uuid, body)) {
+                lastEmitted.put(uuid, body);
+                lastEmittedAtMs.put(uuid, nowMs);
             }
         }
     }
@@ -153,21 +149,15 @@ public class NetworkWaitlistNotifier {
     }
 
     /** Idempotent. */
-    public void shutdown() {
-        synchronized (this) {
-            if (timerTaskHandle != null && RTP.scheduler != null) {
-                try { RTP.scheduler.cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
-            }
-            timerTaskHandle = null;
-            lastEmitted.clear();
-            lastEmittedAtMs.clear();
+    public synchronized void shutdown() {
+        if (timerTaskHandle != null && RTP.scheduler != null) {
+            try { RTP.scheduler.cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
         }
+        timerTaskHandle = null;
+        lastEmitted.clear();
+        lastEmittedAtMs.clear();
     }
 
     /** Visible for tests. */
-    int trackedCount() {
-        synchronized (this) {
-            return lastEmitted.size();
-        }
-    }
+    synchronized int trackedCount() { return lastEmitted.size(); }
 }

@@ -506,7 +506,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
      * @param id biome id, as returned by {@link #idOf(String)}
      * @return the view, or {@code null} for an unknown id
      */
-    @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lazy-init per-biome index view
     BiomeView viewOf(int id) {
       if (id < 0 || id >= names.length) return null;
       BiomeView[] local = views;
@@ -3496,7 +3495,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param def returned when {@code key} is {@code null} or holds no value
    * @return the configured value, or {@code def}
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: synchronized read of configuration EnumMap
   private Object paramByKey(E key, Object def) {
     if (key == null) return def;
     EnumMap<E, Object> snapshot = data;

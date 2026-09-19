@@ -257,12 +257,10 @@ public final class NeoForgeEffectsHandler {
 
     private static final class AlreadyHooked {
         private static volatile boolean done = false;
-        static boolean flip() {
-            synchronized (AlreadyHooked.class) {
-                if (done) return false;
-                done = true;
-                return true;
-            }
+        static synchronized boolean flip() {
+            if (done) return false;
+            done = true;
+            return true;
         }
     }
 }

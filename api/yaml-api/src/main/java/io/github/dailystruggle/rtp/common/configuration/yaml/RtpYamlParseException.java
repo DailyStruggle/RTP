@@ -12,8 +12,6 @@ package io.github.dailystruggle.rtp.common.configuration.yaml;
  */
 public final class RtpYamlParseException extends RuntimeException {
 
-    private static final long serialVersionUID = 1L;
-
     private final int line;
     private final int column;
     private final String messageKey;

@@ -29,16 +29,14 @@ public final class BukkitCommandEvents {
    * Subscribe the Bukkit event republishers exactly once. Idempotent across
    * plugin re-enables (e.g. {@code /reload}) so events are never double-fired.
    */
-  public static void register() {
-    synchronized (BukkitCommandEvents.class) {
-      if (registered) return;
-      RTPCommandEvents.onSuccess(
-          (sender, player) ->
-              Bukkit.getPluginManager().callEvent(new TeleportCommandSuccessEvent(sender, player)));
-      RTPCommandEvents.onFail(
-          (sender, msg) ->
-              Bukkit.getPluginManager().callEvent(new TeleportCommandFailEvent(sender, msg)));
-      registered = true;
-    }
+  public static synchronized void register() {
+    if (registered) return;
+    RTPCommandEvents.onSuccess(
+        (sender, player) ->
+            Bukkit.getPluginManager().callEvent(new TeleportCommandSuccessEvent(sender, player)));
+    RTPCommandEvents.onFail(
+        (sender, msg) ->
+            Bukkit.getPluginManager().callEvent(new TeleportCommandFailEvent(sender, msg)));
+    registered = true;
   }
 }

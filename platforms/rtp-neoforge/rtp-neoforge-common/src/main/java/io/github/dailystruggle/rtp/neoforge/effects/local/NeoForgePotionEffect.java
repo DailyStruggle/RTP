@@ -181,7 +181,7 @@ public class NeoForgePotionEffect extends Effect<FabricPotionKeys> {
 
     @Override
     public String toPermission() {
-        return data.get(FabricPotionKeys.TYPE) + "."
+        return String.valueOf(data.get(FabricPotionKeys.TYPE)) + "."
                 + data.get(FabricPotionKeys.DURATION) + "."
                 + data.get(FabricPotionKeys.AMPLIFIER) + "."
                 + data.get(FabricPotionKeys.AMBIENT) + "."

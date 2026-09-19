@@ -26,17 +26,15 @@ public final class UsageCapTracker {
    * @param now         current epoch milliseconds
    * @return {@code true} if the player should be denied
    */
-  public boolean isLocked(UUID id, long cap, long resetMillis, long now) {
+  public synchronized boolean isLocked(UUID id, long cap, long resetMillis, long now) {
     if (cap <= 0 || id == null) return false;
-    synchronized (this) {
-      Window w = windows.get(id);
-      if (w == null) return false;
-      if (resetMillis > 0 && now - w.start >= resetMillis) {
-        windows.remove(id);
-        return false;
-      }
-      return w.count >= cap;
+    Window w = windows.get(id);
+    if (w == null) return false;
+    if (resetMillis > 0 && now - w.start >= resetMillis) {
+      windows.remove(id);
+      return false;
     }
+    return w.count >= cap;
   }
 
   /**
@@ -49,20 +47,18 @@ public final class UsageCapTracker {
    *                    means the window never resets)
    * @param now         current epoch milliseconds
    */
-  public void recordSuccess(UUID id, long cap, long resetMillis, long now) {
+  public synchronized void recordSuccess(UUID id, long cap, long resetMillis, long now) {
     if (cap <= 0 || id == null) return;
-    synchronized (this) {
-      Window w = windows.computeIfAbsent(id, k -> {
-        Window x = new Window();
-        x.start = now;
-        return x;
-      });
-      if (resetMillis > 0 && now - w.start >= resetMillis) {
-        w.count = 0;
-        w.start = now;
-      }
-      w.count++;
+    Window w = windows.computeIfAbsent(id, k -> {
+      Window x = new Window();
+      x.start = now;
+      return x;
+    });
+    if (resetMillis > 0 && now - w.start >= resetMillis) {
+      w.count = 0;
+      w.start = now;
     }
+    w.count++;
   }
 
   /**
@@ -77,14 +73,12 @@ public final class UsageCapTracker {
    *     disabled, the window never resets, the player has no open window, or the
    *     window has already elapsed
    */
-  public long millisUntilReset(UUID id, long cap, long resetMillis, long now) {
+  public synchronized long millisUntilReset(UUID id, long cap, long resetMillis, long now) {
     if (cap <= 0 || resetMillis <= 0 || id == null) return 0L;
-    synchronized (this) {
-      Window w = windows.get(id);
-      if (w == null) return 0L;
-      long remaining = (w.start + resetMillis) - now;
-      return remaining > 0 ? remaining : 0L;
-    }
+    Window w = windows.get(id);
+    if (w == null) return 0L;
+    long remaining = (w.start + resetMillis) - now;
+    return remaining > 0 ? remaining : 0L;
   }
 
   /**
@@ -96,26 +90,20 @@ public final class UsageCapTracker {
    * @param now         current epoch milliseconds
    * @return teleports used in current window, or {@code 0} if expired or unrecorded
    */
-  public long uses(UUID id, long resetMillis, long now) {
+  public synchronized long uses(UUID id, long resetMillis, long now) {
     if (id == null) return 0L;
-    synchronized (this) {
-      Window w = windows.get(id);
-      if (w == null) return 0L;
-      if (resetMillis > 0 && now - w.start >= resetMillis) {
-        windows.remove(id);
-        return 0L;
-      }
-      return w.count;
+    Window w = windows.get(id);
+    if (w == null) return 0L;
+    if (resetMillis > 0 && now - w.start >= resetMillis) {
+      windows.remove(id);
+      return 0L;
     }
+    return w.count;
   }
 
   /** Clear the recorded usage for a single player (e.g. on an admin reset). */
-  public void reset(UUID id) {
-    if (id != null) {
-      synchronized (this) {
-        windows.remove(id);
-      }
-    }
+  public synchronized void reset(UUID id) {
+    if (id != null) windows.remove(id);
   }
 
   /**
@@ -125,13 +113,11 @@ public final class UsageCapTracker {
    * @return a {@code {count, start}} pair, or {@code null} when the player has no
    *     open window
    */
-  public long[] snapshot(UUID id) {
+  public synchronized long[] snapshot(UUID id) {
     if (id == null) return null;
-    synchronized (this) {
-      Window w = windows.get(id);
-      if (w == null) return null;
-      return new long[] {w.count, w.start};
-    }
+    Window w = windows.get(id);
+    if (w == null) return null;
+    return new long[] {w.count, w.start};
   }
 
   /**
@@ -143,23 +129,19 @@ public final class UsageCapTracker {
    * @param count the persisted use count within the window
    * @param start the persisted window-start epoch milliseconds
    */
-  public void restore(UUID id, long count, long start) {
+  public synchronized void restore(UUID id, long count, long start) {
     if (id == null) return;
-    synchronized (this) {
-      if (count <= 0) {
-        windows.remove(id);
-        return;
-      }
-      Window w = windows.computeIfAbsent(id, k -> new Window());
-      w.count = count;
-      w.start = start;
+    if (count <= 0) {
+      windows.remove(id);
+      return;
     }
+    Window w = windows.computeIfAbsent(id, k -> new Window());
+    w.count = count;
+    w.start = start;
   }
 
   /** Clear all recorded usage (e.g. on plugin reload/shutdown). */
-  public void clear() {
-    synchronized (this) {
-      windows.clear();
-    }
+  public synchronized void clear() {
+    windows.clear();
   }
 }

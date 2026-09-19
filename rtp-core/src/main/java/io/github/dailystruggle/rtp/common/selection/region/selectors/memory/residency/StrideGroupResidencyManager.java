@@ -39,7 +39,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * a synchronous chunk load on the main thread (S-005). A mark is never dropped on
  * eviction or devolution (S-004 direction).
  */
-@SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
 public final class StrideGroupResidencyManager {
 
   /** 1024 chunks per Anvil-aligned 1024-chunk bin (P=32 -> 32x32). */
@@ -141,7 +140,6 @@ public final class StrideGroupResidencyManager {
    * @param key global spiral key
    * @return {@code true} if the resident table in RAM was updated, {@code false} if non-resident
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public boolean updateIfResident(long key) {
     if (key < 0 || key >= range) return false;
     GroupState g = state(groupOfKey(key));
@@ -172,7 +170,6 @@ public final class StrideGroupResidencyManager {
    * regardless of residency state (resident, paged out, or devolved). A devolved
    * group answers from the shard under a quota scan rather than under-marking.
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public boolean isKnownBad(long key) {
     if (key < 0 || key >= range) return true;
     GroupState g = groups.get(groupOfKey(key));
@@ -192,7 +189,6 @@ public final class StrideGroupResidencyManager {
    *
    * @return global key, or {@code -1} if out of range
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public long resolveGroupAccumulate(long groupId, long localRank) {
     GroupState g = state(groupId);
     synchronized (g) {
@@ -213,7 +209,6 @@ public final class StrideGroupResidencyManager {
    * Prefetch-on-approach: materialize the group's exact table off-tick. Also serves
    * as the sole rematerialization path for a devolved group (no re-promote-on-heat).
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public void loadStrideGroup(long groupId) {
     GroupState g = state(groupId);
     Runnable load = () -> {
@@ -230,7 +225,6 @@ public final class StrideGroupResidencyManager {
    * Release-behind: drop the resident exact table once the cursor has passed the
    * group this rotation. Lossless - the persistent shard is retained.
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public void pageOut(long groupId) {
     GroupState g = groups.get(groupId);
     if (g == null) return;
@@ -248,7 +242,6 @@ public final class StrideGroupResidencyManager {
    *
    * @return {@code true} if the group was devolved
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public boolean devolveToCount(long groupId) {
     GroupState g = groups.get(groupId);
     if (g == null) return false;
@@ -382,7 +375,6 @@ public final class StrideGroupResidencyManager {
    * resident footprint is under budget. Only bitmask-tier groups are eligible; if no
    * eligible group remains, the working set is left as-is (sparse groups stay exact).
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   private void enforceBudget(LinkedHashSet<Long> upcomingGroups) {
     if (budgetBytes <= 0) return;
 
@@ -418,7 +410,6 @@ public final class StrideGroupResidencyManager {
   // Introspection (residency accounting + test hooks)
   // ---------------------------------------------------------------------------
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public boolean isResidentExact(long groupId) {
     GroupState g = groups.get(groupId);
     if (g == null) return false;
@@ -427,7 +418,6 @@ public final class StrideGroupResidencyManager {
     }
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public boolean isDevolved(long groupId) {
     GroupState g = groups.get(groupId);
     if (g == null) return false;
@@ -436,7 +426,6 @@ public final class StrideGroupResidencyManager {
     }
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public long devolvedCount(long groupId) {
     GroupState g = groups.get(groupId);
     if (g == null) return -1L;
@@ -445,7 +434,6 @@ public final class StrideGroupResidencyManager {
     }
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public long shardCount(long groupId) {
     GroupState g = groups.get(groupId);
     if (g == null) return 0L;
@@ -462,7 +450,6 @@ public final class StrideGroupResidencyManager {
     return n;
   }
 
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public long residentBytes(long groupId) {
     GroupState g = groups.get(groupId);
     if (g == null) return 0L;
@@ -515,7 +502,6 @@ public final class StrideGroupResidencyManager {
    * @param stride the stride parameter governing the batch
    * @throws IOException on I/O error
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-GroupState synchronization protects shard/resident consistency
   public void saveBatchShards(File file, long stride) throws IOException {
     long t0 = System.nanoTime();
     List<Long> groupIds = new ArrayList<>(groups.keySet());

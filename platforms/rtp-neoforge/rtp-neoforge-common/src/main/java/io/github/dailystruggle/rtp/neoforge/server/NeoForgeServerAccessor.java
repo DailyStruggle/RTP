@@ -970,11 +970,9 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     private final List<CommandRegistrationEntry> pendingCommandRegistrations = new ArrayList<>();
 
     @Override
-    public void registerCommands(Object rootCommand, String... aliases) {
+    public synchronized void registerCommands(Object rootCommand, String... aliases) {
         if (rootCommand == null) return;
-        synchronized (this) {
-            pendingCommandRegistrations.add(new CommandRegistrationEntry(rootCommand, aliases));
-        }
+        pendingCommandRegistrations.add(new CommandRegistrationEntry(rootCommand, aliases));
     }
 
     /**
@@ -982,18 +980,16 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
      *
      * @param dispatcher vanilla Brigadier dispatcher supplied by RegisterCommandsEvent
      */
-    public void registerToDispatcher(com.mojang.brigadier.CommandDispatcher<net.minecraft.commands.CommandSourceStack> dispatcher) {
+    public synchronized void registerToDispatcher(com.mojang.brigadier.CommandDispatcher<net.minecraft.commands.CommandSourceStack> dispatcher) {
         if (dispatcher == null) return;
-        synchronized (this) {
-            if (pendingCommandRegistrations.isEmpty()) {
-                // Default fallback if no command trees were registered yet: build default /rtp
-                io.github.dailystruggle.rtp.neoforge.commands.NeoForgeCommandRegistrar.register(dispatcher);
-                return;
-            }
-            for (CommandRegistrationEntry entry : pendingCommandRegistrations) {
-                io.github.dailystruggle.rtp.neoforge.commands.NeoForgeCommandRegistrar
-                    .register(dispatcher, entry.root, entry.aliases);
-            }
+        if (pendingCommandRegistrations.isEmpty()) {
+            // Default fallback if no command trees were registered yet: build default /rtp
+            io.github.dailystruggle.rtp.neoforge.commands.NeoForgeCommandRegistrar.register(dispatcher);
+            return;
+        }
+        for (CommandRegistrationEntry entry : pendingCommandRegistrations) {
+            io.github.dailystruggle.rtp.neoforge.commands.NeoForgeCommandRegistrar
+                .register(dispatcher, entry.root, entry.aliases);
         }
     }
 }

@@ -1347,7 +1347,6 @@ public class Region extends FactoryValue<RegionKeys> {
    *
    * @return a region-backed candidate validator (never {@code null})
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lazy-init singleton validator for region
   public CandidateValidator candidateValidator() {
     CandidateValidator local = candidateValidator;
     if (local == null) {

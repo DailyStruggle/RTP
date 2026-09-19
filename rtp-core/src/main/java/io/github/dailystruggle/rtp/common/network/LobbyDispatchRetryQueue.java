@@ -180,34 +180,30 @@ public final class LobbyDispatchRetryQueue {
      * Start the periodic retry pulse on {@link RTP#scheduler}'s async
      * tier. Idempotent: a second call is a no-op.
      */
-    public void start() {
-        synchronized (this) {
-            if (timerHandle != null) return;
-            if (RTP.scheduler == null) {
-                RTP.log(Level.WARNING,
-                        "[RTP][lobbyRetry] start called before scheduler available; "
-                                + "retry pulse not started.");
-                return;
-            }
-            long periodTicks = Math.max(1L, pulseIntervalMs / 50L);
-            timerHandle = RTP.scheduler.runTaskTimerAsynchronously(
-                    this::pulse, periodTicks, periodTicks);
+    public synchronized void start() {
+        if (timerHandle != null) return;
+        if (RTP.scheduler == null) {
+            RTP.log(Level.WARNING,
+                    "[RTP][lobbyRetry] start called before scheduler available; "
+                            + "retry pulse not started.");
+            return;
         }
+        long periodTicks = Math.max(1L, pulseIntervalMs / 50L);
+        timerHandle = RTP.scheduler.runTaskTimerAsynchronously(
+                this::pulse, periodTicks, periodTicks);
     }
 
     /** Idempotent. Cancels every parked retry with a terminal message. */
-    public void shutdown() {
-        synchronized (this) {
-            if (timerHandle != null && RTP.scheduler != null) {
-                try { RTP.scheduler.cancelTask(timerHandle); } catch (Throwable ignored) { /* best-effort */ }
-            }
-            timerHandle = null;
-            // Drain: send a terminal message to anyone still parked. We use
-            // networkRegionUnavailable here as the closest existing key; a
-            // dedicated networkNotReady key is a deferred follow-up.
-            for (UUID id : parked.keySet()) {
-                cancel(id, NetworkMessages.networkRegionUnavailable);
-            }
+    public synchronized void shutdown() {
+        if (timerHandle != null && RTP.scheduler != null) {
+            try { RTP.scheduler.cancelTask(timerHandle); } catch (Throwable ignored) { /* best-effort */ }
+        }
+        timerHandle = null;
+        // Drain: send a terminal message to anyone still parked. We use
+        // networkRegionUnavailable here as the closest existing key; a
+        // dedicated networkNotReady key is a deferred follow-up.
+        for (UUID id : parked.keySet()) {
+            cancel(id, NetworkMessages.networkRegionUnavailable);
         }
     }
 

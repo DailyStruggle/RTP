@@ -240,45 +240,42 @@ public final class RingCacheStage<T> implements CacheStage<T> {
     }
 
     @Override
-    @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: synchronized resize of ring buffer
-    public int resizeCapacity(int newCapacity) {
-        synchronized (this) {
-            if (delegate != null) {
-                return delegate.capacity();
-            }
-            Ring<T> oldRing = currentRing.get();
-            Ring<T> newRing = new Ring<>(newCapacity);
-
-            // First, drain any surplus from oldRing silently from the head (oldest entries)
-            // so that the newest entries within newRing.capacity are preserved, or drain
-            // preserving publication order consistent with SimpleCacheStage.
-            // In SimpleCacheStage:
-            // while (occupancy > applied) { surplus = poll(); dispose(surplus); }
-            // That means the oldest entries (head) were disposed first as surplus!
-            int excess = oldRing.occupancy.get() - newRing.capacity;
-            for (int i = 0; i < excess; i++) {
-                Optional<T> surplus = pollFromRing(oldRing, false);
-                if (surplus.isEmpty()) break;
-                dispose(surplus.get());
-            }
-
-            // Migrate remaining entries from oldRing to newRing silently preserving publication order
-            Optional<T> item;
-            while ((item = pollFromRing(oldRing, false)).isPresent()) {
-                T val = item.get();
-                int reserved = newRing.occupancy.incrementAndGet();
-                if (reserved > newRing.capacity) {
-                    newRing.occupancy.decrementAndGet();
-                    dispose(val);
-                } else {
-                    long currentTail = newRing.tail.getAndIncrement();
-                    newRing.buffer.set((int) (currentTail & newRing.mask), val);
-                }
-            }
-
-            currentRing.set(newRing);
-            return newRing.capacity;
+    public synchronized int resizeCapacity(int newCapacity) {
+        if (delegate != null) {
+            return delegate.capacity();
         }
+        Ring<T> oldRing = currentRing.get();
+        Ring<T> newRing = new Ring<>(newCapacity);
+
+        // First, drain any surplus from oldRing silently from the head (oldest entries)
+        // so that the newest entries within newRing.capacity are preserved, or drain
+        // preserving publication order consistent with SimpleCacheStage.
+        // In SimpleCacheStage:
+        // while (occupancy > applied) { surplus = poll(); dispose(surplus); }
+        // That means the oldest entries (head) were disposed first as surplus!
+        int excess = oldRing.occupancy.get() - newRing.capacity;
+        for (int i = 0; i < excess; i++) {
+            Optional<T> surplus = pollFromRing(oldRing, false);
+            if (surplus.isEmpty()) break;
+            dispose(surplus.get());
+        }
+
+        // Migrate remaining entries from oldRing to newRing silently preserving publication order
+        Optional<T> item;
+        while ((item = pollFromRing(oldRing, false)).isPresent()) {
+            T val = item.get();
+            int reserved = newRing.occupancy.incrementAndGet();
+            if (reserved > newRing.capacity) {
+                newRing.occupancy.decrementAndGet();
+                dispose(val);
+            } else {
+                long currentTail = newRing.tail.getAndIncrement();
+                newRing.buffer.set((int) (currentTail & newRing.mask), val);
+            }
+        }
+
+        currentRing.set(newRing);
+        return newRing.capacity;
     }
 
     @Override

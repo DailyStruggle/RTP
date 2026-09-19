@@ -725,32 +725,30 @@ public final class RTPCostMetricsCharts {
    * counters ({@link io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile})
    * and the RTP-served counter ({@link RtpOutcomeStats}) since the previous fire.
    */
-  static void startRtpCostSampler() {
-    synchronized (RTPCostMetricsCharts.class) {
-      try {
-        if (rtpCostSamplerTask != null) return;
-        if (RTP.scheduler == null) return;
-        // 1 minute == 1200 server ticks (20 tps).
-        rtpCostSamplerTask = RTP.scheduler.runTaskTimerAsynchronously(() -> {
-          try {
-            long rtp = RtpOutcomeStats.GLOBAL.successCount();
-            RTP_SYNC_COST_WINDOW.sample(
-                    io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile.GLOBAL.syncNanos(), rtp);
-            RTP_ASYNC_COST_WINDOW.sample(
-                    io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile.GLOBAL.asyncNanos(), rtp);
-            // Chunk-load wall-clock cost, split generated vs ungenerated, folded into
-            // whichever per-RTP cost chart matches the backend's chunk-load mode.
-            RTP_CHUNK_GEN_COST_WINDOW.sample(
-                    io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile.GLOBAL.totalNanos(true), rtp);
-            RTP_CHUNK_UNGEN_COST_WINDOW.sample(
-                    io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile.GLOBAL.totalNanos(false), rtp);
-          } catch (Throwable ignored) {
-            // Sampler must never poison the scheduler thread.
-          }
-        }, 1200L, 1200L);
-      } catch (Throwable t) {
-        RTP.log(Level.WARNING, "[RTP] failed to start rtp-cost sampler", t);
-      }
+  static synchronized void startRtpCostSampler() {
+    try {
+      if (rtpCostSamplerTask != null) return;
+      if (RTP.scheduler == null) return;
+      // 1 minute == 1200 server ticks (20 tps).
+      rtpCostSamplerTask = RTP.scheduler.runTaskTimerAsynchronously(() -> {
+        try {
+          long rtp = RtpOutcomeStats.GLOBAL.successCount();
+          RTP_SYNC_COST_WINDOW.sample(
+                  io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile.GLOBAL.syncNanos(), rtp);
+          RTP_ASYNC_COST_WINDOW.sample(
+                  io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile.GLOBAL.asyncNanos(), rtp);
+          // Chunk-load wall-clock cost, split generated vs ungenerated, folded into
+          // whichever per-RTP cost chart matches the backend's chunk-load mode.
+          RTP_CHUNK_GEN_COST_WINDOW.sample(
+                  io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile.GLOBAL.totalNanos(true), rtp);
+          RTP_CHUNK_UNGEN_COST_WINDOW.sample(
+                  io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile.GLOBAL.totalNanos(false), rtp);
+        } catch (Throwable ignored) {
+          // Sampler must never poison the scheduler thread.
+        }
+      }, 1200L, 1200L);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[RTP] failed to start rtp-cost sampler", t);
     }
   }
 
@@ -799,26 +797,24 @@ public final class RTPCostMetricsCharts {
      * RTP-served counter. The first call only seeds the baselines (deltas
      * unknown), recording a zero-cost / zero-RTP minute.
      */
-    void sample(long cumulativeNanos, long cumulativeRtp) {
-      synchronized (this) {
-        long nanosDelta;
-        long rtpDelta;
-        if (lastCumulativeNanos < 0L) {
-          nanosDelta = 0L;
-          rtpDelta = 0L;
-        } else {
-          nanosDelta = cumulativeNanos - lastCumulativeNanos;
-          rtpDelta = cumulativeRtp - lastCumulativeRtp;
-          if (nanosDelta < 0L) nanosDelta = 0L; // defensive: counter reset
-          if (rtpDelta < 0L) rtpDelta = 0L;
-        }
-        lastCumulativeNanos = cumulativeNanos;
-        lastCumulativeRtp = cumulativeRtp;
-        nanosByMinute[cursor] = nanosDelta;
-        rtpByMinute[cursor] = rtpDelta;
-        filled[cursor] = true;
-        cursor = (cursor + 1) % minutes;
+    synchronized void sample(long cumulativeNanos, long cumulativeRtp) {
+      long nanosDelta;
+      long rtpDelta;
+      if (lastCumulativeNanos < 0L) {
+        nanosDelta = 0L;
+        rtpDelta = 0L;
+      } else {
+        nanosDelta = cumulativeNanos - lastCumulativeNanos;
+        rtpDelta = cumulativeRtp - lastCumulativeRtp;
+        if (nanosDelta < 0L) nanosDelta = 0L; // defensive: counter reset
+        if (rtpDelta < 0L) rtpDelta = 0L;
       }
+      lastCumulativeNanos = cumulativeNanos;
+      lastCumulativeRtp = cumulativeRtp;
+      nanosByMinute[cursor] = nanosDelta;
+      rtpByMinute[cursor] = rtpDelta;
+      filled[cursor] = true;
+      cursor = (cursor + 1) % minutes;
     }
 
     /**
@@ -827,32 +823,28 @@ public final class RTPCostMetricsCharts {
      * {@link Double#NaN} when no minute has been recorded or no RTP has been
      * served in the window.
      */
-    double msPerRtp() {
-      synchronized (this) {
-        long nanosAccum = 0L;
-        long rtpAccum = 0L;
-        boolean any = false;
-        for (int i = 0; i < minutes; i++) {
-          if (!filled[i]) continue;
-          any = true;
-          nanosAccum += nanosByMinute[i];
-          rtpAccum += rtpByMinute[i];
-        }
-        if (!any || rtpAccum <= 0L) return Double.NaN;
-        return (nanosAccum / 1.0e6) / (double) rtpAccum;
+    synchronized double msPerRtp() {
+      long nanosAccum = 0L;
+      long rtpAccum = 0L;
+      boolean any = false;
+      for (int i = 0; i < minutes; i++) {
+        if (!filled[i]) continue;
+        any = true;
+        nanosAccum += nanosByMinute[i];
+        rtpAccum += rtpByMinute[i];
       }
+      if (!any || rtpAccum <= 0L) return Double.NaN;
+      return (nanosAccum / 1.0e6) / (double) rtpAccum;
     }
 
     /** Test hook: clears the window to its freshly-constructed state. */
-    void reset() {
-      synchronized (this) {
-        Arrays.fill(nanosByMinute, 0L);
-        Arrays.fill(rtpByMinute, 0L);
-        Arrays.fill(filled, false);
-        cursor = 0;
-        lastCumulativeNanos = -1L;
-        lastCumulativeRtp = -1L;
-      }
+    synchronized void reset() {
+      Arrays.fill(nanosByMinute, 0L);
+      Arrays.fill(rtpByMinute, 0L);
+      Arrays.fill(filled, false);
+      cursor = 0;
+      lastCumulativeNanos = -1L;
+      lastCumulativeRtp = -1L;
     }
   }
 
