@@ -124,14 +124,12 @@ public final class AnvilReader implements RegionFileReader {
             return null;
         }
 
-        // long math: sectorOffset is 24-bit, so sectorOffset * SECTOR_SIZE overflows int on corrupt headers.
-        long payloadStartLong = (long) sectorOffset * SECTOR_SIZE;
+        int payloadStart = sectorOffset * SECTOR_SIZE;
         int payloadBudget = sectorCount * SECTOR_SIZE;
-        if (payloadStartLong + payloadBudget > regionBytes.length) {
+        if (payloadStart + payloadBudget > regionBytes.length) {
             throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") spans past end of file: start="
-                    + payloadStartLong + " budget=" + payloadBudget + " fileLen=" + regionBytes.length);
+                    + payloadStart + " budget=" + payloadBudget + " fileLen=" + regionBytes.length);
         }
-        int payloadStart = (int) payloadStartLong;
 
         ByteBuffer bb = ByteBuffer.wrap(regionBytes, payloadStart, payloadBudget);
         int declaredLength = bb.getInt();

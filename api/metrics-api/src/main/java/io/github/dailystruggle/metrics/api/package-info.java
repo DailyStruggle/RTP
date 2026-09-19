@@ -19,8 +19,7 @@
  * <p>Surface: {@code Metrics} (read-only facade + static registry),
  * {@code MetricsBinding} (host-runtime contract), {@code MetricsSnapshot}
  * (immutable snapshot + typed extension slot), {@code MetricsExtension}
- * (typed plugin-counter slot), {@code FoliaRegionSample} (per-region detail),
- * {@code RegionQueueRow} and {@code RegionQueueStatus} (per-region queue and cache status).
+ * (typed plugin-counter slot), {@code FoliaRegionSample} (per-region detail).
  * Rationale and the rtp-core extraction history are recorded in
  * {@code metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md}.
  */

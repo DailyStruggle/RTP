@@ -1,23 +1,11 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.selection.region.cache.CacheStage;
-import io.github.dailystruggle.rtp.common.selection.region.cache.HotSink;
-import io.github.dailystruggle.rtp.common.selection.region.cache.KeyedCacheStage;
-import io.github.dailystruggle.rtp.common.selection.region.cache.RingCacheStage;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
-import java.util.logging.Level;
 
 /**
  * Manages pre-calculated teleport location queues for a region:
@@ -32,11 +20,9 @@ public class RegionQueueManager {
 
     // Hot Queue: Chunks are loaded, verified, and actively have keep(true) applied
     public final LockFreeLocationBuffer keptLocations;
-    public final RingCacheStage<RTPLocation> keptStage;
 
     // Cold Queue: Chunks are verified and safe, but have been released to save RAM
     public final LockFreeLocationBuffer unkeptLocations;
-    public final RingCacheStage<RTPLocation> unkeptStage;
 
     /**
      * Cross-server sibling of {@link #keptLocations} for network reservations.
@@ -45,7 +31,6 @@ public class RegionQueueManager {
      * clamped to {@code min(networkReserveSize, cacheCap)}.
      */
     public final LockFreeLocationBuffer networkKeptLocations;
-    public final RingCacheStage<RTPLocation> networkKeptStage;
 
     /**
      * In-flight cross-server reservations keyed by proxy-issued {@code networkTokenId}.
@@ -88,17 +73,10 @@ public class RegionQueueManager {
      * Decoupled from {@code Region.execute()} refill loops.
      */
     public LockFreeLocationBuffer loginLocations;
-    public RingCacheStage<RTPLocation> loginStage;
 
     /** When reserving/recycling locations for specific players, I want to guard against */
     public final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RTPLocation>>
             perPlayerLocationQueue = new ConcurrentHashMap<>();
-    public final KeyedCacheStage<UUID, RTPLocation> perPlayerStage;
-
-    private final HotSink<RTPLocation> keptHotSink;
-    private final HotSink<RTPLocation> networkKeptHotSink;
-    private HotSink<RTPLocation> loginHotSink;
-    private final HotSink<RTPLocation> personalHotSink;
 
     /** */
     public final ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>> fastLocations =
@@ -118,26 +96,6 @@ public class RegionQueueManager {
 
     public RegionQueueManager(Region region) {
         this.region = region;
-
-        Consumer<RTPLocation> hotDispose = loc -> {
-            if (loc != null && loc.reservation() != null) {
-                try {
-                    loc.reservation().close();
-                } catch (Throwable t) {
-                    RTP.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
-                }
-            }
-        };
-        Consumer<RTPLocation> coldDispose = loc -> {
-            if (loc != null && loc.reservation() != null) {
-                try {
-                    loc.reservation().close();
-                } catch (Throwable t) {
-                    RTP.log(Level.WARNING, "[RTP] cold disposal: unexpected reservation closed at " + loc.coords() + ": " + t, t);
-                }
-            }
-        };
-
         RegionSettings settings = region.getSettings();
         if(settings!=null) {
             // Size unkeptLocations to fit both kept+unkept rows on hydration: the database
@@ -171,63 +129,6 @@ public class RegionQueueManager {
             this.backlogLocations = null;
             this.networkKeptLocations = null;
         }
-
-        this.unkeptStage = new RingCacheStage<>("unkeptLocations", this.unkeptLocations, coldDispose);
-        this.keptStage = new RingCacheStage<>("keptLocations", this.keptLocations, hotDispose);
-        if (this.networkKeptLocations != null) {
-            this.networkKeptStage = new RingCacheStage<>("networkKeptLocations", this.networkKeptLocations, hotDispose);
-        } else {
-            this.networkKeptStage = null;
-        }
-
-        this.perPlayerStage = new KeyedCacheStage<>(
-                "perPlayerLocationQueue",
-                (uuid, cap) -> {
-                    ConcurrentLinkedQueue<RTPLocation> queue =
-                            this.perPlayerLocationQueue.computeIfAbsent(uuid, k -> new ConcurrentLinkedQueue<>());
-                    return new PartitionCacheStage("perPlayerLocationQueue:" + uuid, queue, cap, hotDispose);
-                }
-        );
-
-        this.keptHotSink = new HotSink<>() {
-            @Override public String name() { return "keptLocations"; }
-            @Override public CacheStage<RTPLocation> stage() { return keptStage; }
-            @Override public CacheStage<?> coldSource() { return unkeptStage; }
-            @Override public boolean accepts(RTPLocation entry) { return checkAccepts(entry); }
-            @Override public boolean hasExtrinsicVerifier() { return false; }
-            @Override public boolean isExternallyLeased() { return false; }
-            @Override public boolean narrowsBeyondColdSource() { return false; }
-            @Override public int chunkCostPerEntry() { return 1; }
-            @Override public long demandWeight() { return 0L; }
-        };
-
-        if (this.networkKeptStage != null) {
-            this.networkKeptHotSink = new HotSink<>() {
-                @Override public String name() { return "networkKeptLocations"; }
-                @Override public CacheStage<RTPLocation> stage() { return networkKeptStage; }
-                @Override public CacheStage<?> coldSource() { return unkeptStage; }
-                @Override public boolean accepts(RTPLocation entry) { return checkAccepts(entry); }
-                @Override public boolean hasExtrinsicVerifier() { return false; }
-                @Override public boolean isExternallyLeased() { return true; }
-                @Override public boolean narrowsBeyondColdSource() { return false; }
-                @Override public int chunkCostPerEntry() { return 1; }
-                @Override public long demandWeight() { return networkReservedLocations.size(); }
-            };
-        } else {
-            this.networkKeptHotSink = null;
-        }
-
-        this.personalHotSink = new HotSink<>() {
-            @Override public String name() { return "perPlayerLocationQueue"; }
-            @Override public CacheStage<RTPLocation> stage() { return personalAggregateStage; }
-            @Override public CacheStage<?> coldSource() { return unkeptStage; }
-            @Override public boolean accepts(RTPLocation entry) { return checkAccepts(entry); }
-            @Override public boolean hasExtrinsicVerifier() { return false; }
-            @Override public boolean isExternallyLeased() { return true; }
-            @Override public boolean narrowsBeyondColdSource() { return false; }
-            @Override public int chunkCostPerEntry() { return 1; }
-            @Override public long demandWeight() { return perPlayerLocationQueue.size(); }
-        };
 
         installDatabaseCallbacks();
     }
@@ -319,7 +220,7 @@ public class RegionQueueManager {
             // offer is bounded; if the sibling pool happens to be full (capacity
             // shrunk by reload, or operator manually drained), demote to unkept so
             // the coordinate is not silently lost (S-004 attribution rule).
-            if (!this.networkKeptLocations.offerSilently(loc)) {
+            if (!this.networkKeptLocations.offer(loc)) {
                 demoteToUnkept(loc);
             }
         } else {
@@ -347,12 +248,7 @@ public class RegionQueueManager {
                                 + loc.coords() + ": " + t, t);
             }
         }
-        RTPLocation bare = new RTPLocation(loc.coords(), loc.attempts(), null);
-        if (unkeptStage != null) {
-            unkeptStage.offerSilently(bare);
-        } else {
-            unkeptLocations.offerSilently(bare);
-        }
+        unkeptLocations.offer(new RTPLocation(loc.coords(), loc.attempts(), null));
     }
 
     /**
@@ -403,28 +299,7 @@ public class RegionQueueManager {
             // Already enabled; reload changes use disable+enable.
             return;
         }
-        Consumer<RTPLocation> hotDispose = loc -> {
-            if (loc != null && loc.reservation() != null) {
-                try {
-                    loc.reservation().close();
-                } catch (Throwable t) {
-                    RTP.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
-                }
-            }
-        };
         this.loginLocations = new LockFreeLocationBuffer(capacity);
-        this.loginStage = new RingCacheStage<>("loginLocations", this.loginLocations, hotDispose);
-        this.loginHotSink = new HotSink<>() {
-            @Override public String name() { return "loginLocations"; }
-            @Override public CacheStage<RTPLocation> stage() { return loginStage; }
-            @Override public CacheStage<?> coldSource() { return unkeptStage; }
-            @Override public boolean accepts(RTPLocation entry) { return checkAccepts(entry); }
-            @Override public boolean hasExtrinsicVerifier() { return false; }
-            @Override public boolean isExternallyLeased() { return false; }
-            @Override public boolean narrowsBeyondColdSource() { return false; }
-            @Override public int chunkCostPerEntry() { return 1; }
-            @Override public long demandWeight() { return 0L; }
-        };
         installDatabaseCallbacks();
     }
 
@@ -433,18 +308,16 @@ public class RegionQueueManager {
      * reservations) and null the buffer reference. Safe to call multiple times.
      */
     public void disableLoginCache() {
-        RingCacheStage<RTPLocation> login = this.loginStage;
-        if (login == null && this.loginLocations == null) return;
-        this.loginStage = null;
+        LockFreeLocationBuffer login = this.loginLocations;
+        if (login == null) return;
         this.loginLocations = null;
-        this.loginHotSink = null;
-        if (login != null) {
-            Optional<RTPLocation> loc;
-            while ((loc = login.pollSilently()).isPresent()) {
-                demoteToUnkept(loc.get());
-            }
-            login.close();
+        RTPLocation loc;
+        while ((loc = login.poll()) != null) {
+            // Re-offer to unkept so the location persists (without reservation)
+            // for the next startup burst.
+            demoteToUnkept(loc);
         }
+        login.clear();
     }
 
     /**
@@ -472,9 +345,6 @@ public class RegionQueueManager {
         if (uuid == null) return;
         // Idempotent bucket allocation.
         perPlayerLocationQueue.putIfAbsent(uuid, new ConcurrentLinkedQueue<>());
-        if (perPlayerStage != null) {
-            perPlayerStage.open(uuid, 1);
-        }
 
         // Push-on-open fill (ADR-043). Skip if a fill is already in flight
         // for this uuid, or if the bucket already holds at least one
@@ -510,9 +380,6 @@ public class RegionQueueManager {
             while ((loc = bucket.poll()) != null) {
                 demoteToUnkept(loc);
             }
-        }
-        if (perPlayerStage != null) {
-            perPlayerStage.closeKey(uuid);
         }
         perPlayerInFlight.remove(uuid);
         // A close call does NOT remove uuid from playerQueue or
@@ -628,26 +495,19 @@ public class RegionQueueManager {
         // Disable DB removal during shutdown so the persisted rows survive for the next boot.
         keptLocations.setCallbacks(null, null);
         unkeptLocations.setCallbacks(null, null);
-        if (loginLocations != null) loginLocations.setCallbacks(null, null);
-        if (networkKeptLocations != null) networkKeptLocations.setCallbacks(null, null);
-
-        keptStage.close();
-        unkeptStage.close();
-        if (loginStage != null) {
-            loginStage.close();
-            loginStage = null;
-            loginLocations = null;
-            loginHotSink = null;
-        }
-        if (networkKeptStage != null) {
-            networkKeptStage.close();
-        }
+        keptLocations.clear();
+        unkeptLocations.clear();
         // ADR-028: drop the backlog on shutdown. Entries are unverified candidate
         // locations with no chunk tickets and no DB rows, so a clear() is sufficient.
         // The world-level WorldBacklogBinIndex holds only weak references to per-bin lists
         // and becomes GC-eligible automatically once the BacklogEntry strong-pins are gone.
         if (backlogLocations != null) backlogLocations.clear();
-        if (perPlayerStage != null) perPlayerStage.close();
+        perPlayerLocationQueue.forEach((uuid, queue) -> {
+            RTPLocation loc;
+            while ((loc = queue.poll()) != null) {
+                if (loc.reservation() != null) loc.reservation().close();
+            }
+        });
         perPlayerLocationQueue.clear();
         fastLocations.forEach((uuid, future) -> {
             if (future.isDone()) {
@@ -693,15 +553,13 @@ public class RegionQueueManager {
      */
     void enqueuePlayerLocation(UUID uuid, RTPLocation location) {
         perPlayerLocationQueue.putIfAbsent(uuid, new ConcurrentLinkedQueue<>());
-        if (perPlayerStage != null) {
-            perPlayerStage.open(uuid, 1);
-        }
         ConcurrentLinkedQueue<RTPLocation> queue = perPlayerLocationQueue.get(uuid);
 
         // Enforce max 1 location per player: drain any existing extras before adding the new one
         RTPLocation excess;
         while ((excess = queue.poll()) != null) {
-            demoteToUnkept(excess);
+            if (excess.reservation() != null) excess.reservation().close();
+            unkeptLocations.offer(excess);
         }
 
         queue.add(location);
@@ -736,7 +594,6 @@ public class RegionQueueManager {
      * Clear all per-player location queues.
      */
     void clearPerPlayerQueues() {
-        if (perPlayerStage != null) perPlayerStage.close();
         perPlayerLocationQueue.clear();
     }
 
@@ -787,110 +644,6 @@ public class RegionQueueManager {
                     io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING, "Failed to recover chunk ticket: " + e.getMessage(), e);
                 }
             });
-        }
-    }
-
-    /**
-     * Returns an unmodifiable collection of all currently active hot sinks for this region
-     * for pulse budget allocation and zero-I/O rebalancing (ADR-078 Phase 4 & Phase 5).
-     *
-     * @return collection of registered {@link HotSink} instances
-     */
-    public Collection<HotSink<RTPLocation>> hotSinks() {
-        List<HotSink<RTPLocation>> sinks = new ArrayList<>(4);
-        if (this.keptHotSink != null) sinks.add(this.keptHotSink);
-        if (this.loginStage != null && this.loginHotSink != null) sinks.add(this.loginHotSink);
-        if (this.networkKeptStage != null && this.networkKeptHotSink != null) sinks.add(this.networkKeptHotSink);
-        if (this.personalHotSink != null) sinks.add(this.personalHotSink);
-        return Collections.unmodifiableList(sinks);
-    }
-
-    private boolean checkAccepts(RTPLocation entry) {
-        if (entry == null) return false;
-        if (entry.reservation() == null) return false;
-        if (entry.coords() == null) return false;
-        if (region.getWorld() == null || !region.getWorld().name().equals(entry.coords().worldName())) return false;
-        if (region.getShape() != null && !region.getShape().contains(entry.coords().x(), entry.coords().z())) return false;
-        RegionSettings settings = region.getSettings();
-        if (settings != null && settings.vert() != null) {
-            int y = entry.coords().y();
-            if (y < settings.vert().minY() || y > settings.vert().maxY()) return false;
-        }
-        return true;
-    }
-
-    private final CacheStage<RTPLocation> personalAggregateStage = new CacheStage<>() {
-        @Override public String name() { return "perPlayerLocationQueue"; }
-        @Override public Optional<RTPLocation> poll() { return Optional.empty(); }
-        @Override public Optional<RTPLocation> pollSilently() { return Optional.empty(); }
-        @Override public boolean offer(RTPLocation item) { return false; }
-        @Override public boolean offerSilently(RTPLocation item) { return false; }
-        @Override
-        public int size() {
-            int total = 0;
-            for (ConcurrentLinkedQueue<RTPLocation> q : perPlayerLocationQueue.values()) {
-                total += q.size();
-            }
-            return total;
-        }
-        @Override
-        public int capacity() {
-            return Math.max(size(), perPlayerLocationQueue.size());
-        }
-        @Override public int resizeCapacity(int newCapacity) { return capacity(); }
-        @Override public void close() { perPlayerStage.close(); }
-    };
-
-    private static final class PartitionCacheStage implements CacheStage<RTPLocation> {
-        private final String name;
-        private final ConcurrentLinkedQueue<RTPLocation> queue;
-        private final AtomicInteger capacity;
-        private final Consumer<RTPLocation> onDispose;
-
-        PartitionCacheStage(String name,
-                            ConcurrentLinkedQueue<RTPLocation> queue,
-                            int capacity,
-                            Consumer<RTPLocation> onDispose) {
-            this.name = name;
-            this.queue = queue;
-            this.capacity = new AtomicInteger(Math.max(1, capacity));
-            this.onDispose = onDispose;
-        }
-
-        @Override public String name() { return name; }
-        @Override public Optional<RTPLocation> poll() { return Optional.ofNullable(queue.poll()); }
-        @Override public Optional<RTPLocation> pollSilently() { return Optional.ofNullable(queue.poll()); }
-        @Override
-        public boolean offer(RTPLocation item) {
-            return offerSilently(item);
-        }
-        @Override
-        public boolean offerSilently(RTPLocation item) {
-            if (item == null) return false;
-            if (queue.size() >= capacity.get()) {
-                if (onDispose != null) onDispose.accept(item);
-                return false;
-            }
-            return queue.offer(item);
-        }
-        @Override public int size() { return queue.size(); }
-        @Override public int capacity() { return capacity.get(); }
-        @Override
-        public int resizeCapacity(int newCapacity) {
-            int applied = Math.max(1, newCapacity);
-            capacity.set(applied);
-            while (queue.size() > applied) {
-                RTPLocation surplus = queue.poll();
-                if (surplus != null && onDispose != null) onDispose.accept(surplus);
-            }
-            return applied;
-        }
-        @Override
-        public void close() {
-            RTPLocation loc;
-            while ((loc = queue.poll()) != null) {
-                if (onDispose != null) onDispose.accept(loc);
-            }
         }
     }
 }
