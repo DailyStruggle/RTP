@@ -156,17 +156,11 @@ public final class AnvilRegionScanner {
 
     private static void scanRegionFile(Path regionFile, Set<String> out) {
         byte[] bytes;
-        // Bypasses AnvilRegionByteCache deliberately: a full-folder biome scan would evict the
-        // whole LRU for a one-shot walk. It is still a cold device read, so it is still a valid
-        // latency sample.
-        long readStart = System.nanoTime();
         try {
             bytes = Files.readAllBytes(regionFile);
         } catch (IOException ignored) {
-            StorageLatencyProbe.record(System.nanoTime() - readStart, 0L);
             return;
         }
-        StorageLatencyProbe.record(System.nanoTime() - readStart, bytes.length);
         String fileName = regionFile.getFileName().toString();
         RegionFileReader reader = fileName.endsWith(".linear")
                 ? LinearRegionReader.INSTANCE
