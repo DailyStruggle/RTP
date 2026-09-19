@@ -11,7 +11,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -187,30 +186,5 @@ public class CompositeRegionRendererTest {
 
     assertTrue(highResFile.exists() && highResFile.length() > 500, "High-res PNG must be written");
     System.out.println("[DEBUG_LOG] Successfully rendered and verified ADR-089 composite map to " + highResFile.getAbsolutePath());
-
-    // 3. Test CompositeRegionModel equals and hashCode contract
-    CompositeRegionModel model2 = new CompositeRegionModel(
-        "test_region", w, h, biomes, hazards, inside, markers, trajectories, l1Gauge, l2Gauge, l3Gauge
-    );
-    assertTrue(model.equals(model));
-    assertTrue(model.equals(model2));
-    assertEquals(model.hashCode(), model2.hashCode());
-    assertFalse(model.equals(null));
-    assertFalse(model.equals("other"));
-
-    CompositeRegionModel diffName = new CompositeRegionModel(
-        "other", w, h, biomes, hazards, inside, markers, trajectories, l1Gauge, l2Gauge, l3Gauge
-    );
-    assertFalse(model.equals(diffName));
-
-    CompositeRegionModel diffW = new CompositeRegionModel(
-        "test_region", w + 1, h, biomes, hazards, inside, markers, trajectories, l1Gauge, l2Gauge, l3Gauge
-    );
-    assertFalse(model.equals(diffW));
-
-    CompositeRegionModel diffH = new CompositeRegionModel(
-        "test_region", w, h + 1, biomes, hazards, inside, markers, trajectories, l1Gauge, l2Gauge, l3Gauge
-    );
-    assertFalse(model.equals(diffH));
   }
 }

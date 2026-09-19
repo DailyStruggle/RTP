@@ -966,21 +966,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     // Command registration SPI
     // ---------------------------------------------------------------------------
 
-    private record CommandRegistrationEntry(Object root, String[] aliases) {
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof CommandRegistrationEntry that)) return false;
-            return java.util.Objects.equals(root, that.root) && java.util.Arrays.equals(aliases, that.aliases);
-        }
-
-        @Override
-        public int hashCode() {
-            int result = java.util.Objects.hashCode(root);
-            result = 31 * result + java.util.Arrays.hashCode(aliases);
-            return result;
-        }
-    }
+    private record CommandRegistrationEntry(Object root, String[] aliases) {}
     private final List<CommandRegistrationEntry> pendingCommandRegistrations = new ArrayList<>();
 
     @Override

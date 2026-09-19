@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.anvil.AnvilReader;
 import io.github.dailystruggle.rtp.anvil.ColumnProbe;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.DownsampledDualLayerSquare;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import java.awt.BasicStroke;
@@ -143,20 +144,20 @@ public class McaQualitativeUniquenessBenchmarkTest {
     s1Shape.set(GenericMemoryShapeParams.uniquePlacements, 0);
 
     // 2. Spaced S = 64 (R_u = 8 chunks spacing)
-    SquareOptimizedDualLayer s64Shape = new SquareOptimizedDualLayer("SPACED_S64", pointEdgeP);
+    DownsampledDualLayerSquare s64Shape = new DownsampledDualLayerSquare("SPACED_S64", pointEdgeP);
     s64Shape.set(GenericMemoryShapeParams.radius, (long) inscribedR);
     s64Shape.set(GenericMemoryShapeParams.centerRadius, 0L);
     s64Shape.set(GenericMemoryShapeParams.centerX, 0L);
     s64Shape.set(GenericMemoryShapeParams.centerZ, 0L);
-    s64Shape.setSpatialResolution(8L); // S = 64
+    s64Shape.setExplicitStride(64);
 
     // 3. Spaced S = 256 (R_u = 16 chunks spacing)
-    SquareOptimizedDualLayer s256Shape = new SquareOptimizedDualLayer("SPACED_S256", pointEdgeP);
+    DownsampledDualLayerSquare s256Shape = new DownsampledDualLayerSquare("SPACED_S256", pointEdgeP);
     s256Shape.set(GenericMemoryShapeParams.radius, (long) inscribedR);
     s256Shape.set(GenericMemoryShapeParams.centerRadius, 0L);
     s256Shape.set(GenericMemoryShapeParams.centerX, 0L);
     s256Shape.set(GenericMemoryShapeParams.centerZ, 0L);
-    s256Shape.setSpatialResolution(16L); // S = 256
+    s256Shape.setExplicitStride(256);
 
     // Sample safe valid placements for each strategy
     List<ChunkCoord> ptsS1 = sampleSafePlacements(s1Shape, mask, inscribedR, testCount);

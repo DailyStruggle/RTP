@@ -30,9 +30,9 @@ class TagFileAndParserTest {
     assertEquals(f1.hashCode(), f2.hashCode());
     assertNotEquals(f1, f3);
     assertNotEquals(f1, f4);
-    assertFalse(f1.equals("other"));
+    assertNotEquals(f1, "other");
     assertNotEquals(f1, null);
-    assertTrue(f1.equals(f1));
+    assertEquals(f1, f1);
 
     assertEquals("minecraft:leaves", f1.namespacedId());
     assertFalse(f1.replace());
