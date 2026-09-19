@@ -7,7 +7,6 @@ import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -119,7 +118,7 @@ public class ThreeWayScaleBenchmarkTest {
 
       KeyRunTable originalTable = KeyRunTable.exact(sArr, sArr.length).coalesceFixed(3);
       KeyRunTable flatHilbertTable = KeyRunTable.exact(hArr, hArr.length).coalesceFixed(3);
-      SegmentedKeyRunTable segHilbertTable = flatHilbertTable.toSegmented(totalRange, optimalBinSize, 3L);
+      SegmentedKeyRunTable segHilbertTable = SegmentedKeyRunTable.fromFlat(flatHilbertTable, totalRange, optimalBinSize, 3L);
 
       // Verify exact equivalence between flat and segmented Hilbert
       assertEquals(flatHilbertTable.coveredCells(), segHilbertTable.totalCovered(), "Covered cells must match");
@@ -191,7 +190,7 @@ public class ThreeWayScaleBenchmarkTest {
 
       // Segmented Hilbert Rebuild
       long tr2 = System.nanoTime();
-      newFlat.toSegmented(totalRange, optimalBinSize, 3L);
+      SegmentedKeyRunTable.fromFlat(newFlat, totalRange, optimalBinSize, 3L);
       double segHReconNs = (double) (System.nanoTime() - tr2) / markCount;
 
       // Record in report
