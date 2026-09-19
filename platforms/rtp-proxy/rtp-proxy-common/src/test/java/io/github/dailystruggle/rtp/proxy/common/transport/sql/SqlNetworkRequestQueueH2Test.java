@@ -23,6 +23,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -232,8 +233,10 @@ class SqlNetworkRequestQueueH2Test {
     @Test
     @DisplayName("shutdown is idempotent and subsequent calls do not throw")
     void shutdownIdempotent() {
-        queue.shutdown();
-        queue.shutdown(); // no-op, must not throw
+        assertDoesNotThrow(() -> {
+            queue.shutdown();
+            queue.shutdown(); // no-op, must not throw
+        });
     }
 
     @Test

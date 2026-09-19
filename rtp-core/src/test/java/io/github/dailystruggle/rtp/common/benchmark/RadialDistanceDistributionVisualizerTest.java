@@ -11,6 +11,7 @@ import java.util.Random;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Generates the empirical Radial Distance Distribution Curve benchmark chart.
@@ -93,6 +94,9 @@ public class RadialDistanceDistributionVisualizerTest {
 
     // 3. Render High-Resolution Dark-Themed Benchmark Chart
     renderChart(lpfM1, lpfM2, lpfM3, xM2, zM2, xM3, zM3, filteredLen);
+
+    File reportOut = new File("build/reports/player_distribution/radial_distance_distribution_chart.png");
+    assertTrue(reportOut.exists(), "radial distance distribution chart must be generated");
   }
 
   private void renderChart(

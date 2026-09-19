@@ -18,6 +18,7 @@ import org.jetbrains.annotations.Nullable;
  * {@code /rtp admin} verb additionally gates on {@code rtp.menu.admin} for
  * its bare form (see {@code AdminCmd}).
  */
+@SuppressWarnings("java:S1845") // PERMISSION constant matches convention alongside permission() method
 public class PrefabCommand extends BaseRTPCmdImpl {
 
     /** Permission key for the {@code prefab} subtree (every verb shares it). */

@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>Permission: {@code rtp.admin}.
  */
+@SuppressWarnings("java:S1845") // PERMISSION constant matches convention alongside permission() method
 public class ClearCacheCmd extends BaseRTPCmdImpl {
 
   /** Permission key for {@code /rtp clear cache}. */

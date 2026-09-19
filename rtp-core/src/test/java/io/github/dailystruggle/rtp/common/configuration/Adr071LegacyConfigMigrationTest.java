@@ -215,7 +215,7 @@ public class Adr071LegacyConfigMigrationTest {
                 BlocksKeys.class, "advanced/blocks.yml", "1.0", tempDir.toFile(),
                 new YamlFileDatabase(tempDir.toFile()), "en");
         // No safety.yml written: must not throw.
-        configs.migrateLegacyKeysFromFile(blocks, "safety.yml", "blocks");
+        assertDoesNotThrow(() -> configs.migrateLegacyKeysFromFile(blocks, "safety.yml", "blocks"));
     }
 
     @Test

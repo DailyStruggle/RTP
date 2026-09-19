@@ -350,6 +350,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
   }
 
   /** Structured probe result. Package-private so the unit test can assert on it. */
+  @SuppressWarnings("java:S1845") // Factory method skipped() matches static pattern alongside boolean field
   static final class Result {
     String worldName = "<none>";
     int cx;

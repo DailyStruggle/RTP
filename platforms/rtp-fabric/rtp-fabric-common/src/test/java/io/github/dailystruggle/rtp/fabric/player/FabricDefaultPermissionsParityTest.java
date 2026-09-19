@@ -140,14 +140,12 @@ class FabricDefaultPermissionsParityTest {
                             .append(", got ").append(actual).append('\n');
                 }
             }
-            if (mismatches.length() > 0) {
-                throw new AssertionError(
-                        "FabricDefaultPermissions has drifted from plugin.yml declared defaults:\n"
-                                + mismatches
-                                + "Update FabricDefaultPermissions (rtp-fabric-common) and this test's "
-                                + "EXPECTED_DEFAULTS table together; both trace plugin.yml as their "
-                                + "source of truth.");
-            }
+            assertEquals(0, mismatches.length(),
+                    "FabricDefaultPermissions has drifted from plugin.yml declared defaults:\n"
+                            + mismatches
+                            + "Update FabricDefaultPermissions (rtp-fabric-common) and this test's "
+                            + "EXPECTED_DEFAULTS table together; both trace plugin.yml as their "
+                            + "source of truth.");
         }
 
         @Test

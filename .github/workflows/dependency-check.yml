@@ -6,13 +6,13 @@ on:
     - cron: '0 4 * * 1'
   workflow_dispatch:
   push:
-    branches: [ V3, main ]
+    branches: [ V3 ]
     paths:
       - 'gradle/libs.versions.toml'
       - 'build.gradle'
       - '**/build.gradle'
   pull_request:
-    branches: [ V3, V2, V1, main ]
+    branches: [ V3, V2, V1 ]
     paths:
       - 'gradle/libs.versions.toml'
       - 'build.gradle'

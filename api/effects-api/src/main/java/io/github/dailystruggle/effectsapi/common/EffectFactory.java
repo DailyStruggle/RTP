@@ -94,7 +94,7 @@ public class EffectFactory {
         try {
             effect = (Effect<T>) effectMap.get(name.toUpperCase()).clone();
         } catch (Throwable throwable) {
-            Logger.getLogger(EffectFactory.class.getName()).log(Level.WARNING, "Failed to build effect: " + name, throwable);
+            Logger.getLogger(EffectFactory.class.getName()).log(Level.WARNING, throwable, () -> "Failed to build effect: " + name);
             return null;
         }
         return effect;

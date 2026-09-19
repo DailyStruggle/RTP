@@ -19,11 +19,21 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Abstract SQL database accessor with a batched async write queue.
  */
 public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Connection> {
+
+  private static final String COL_SELECTED_X = "selectedX";
+  private static final String COL_SELECTED_Y = "selectedY";
+  private static final String COL_SELECTED_Z = "selectedZ";
+  private static final String COL_SELECTED_WORLD_NAME = "selectedWorldName";
+  private static final String COL_ORIGINAL_X = "originalX";
+  private static final String COL_ORIGINAL_Y = "originalY";
+  private static final String COL_ORIGINAL_Z = "originalZ";
+  private static final String COL_ORIGINAL_WORLD_NAME = "originalWorldName";
 
   /** Default constructor. Subclasses supply the JDBC connection. */
   protected AbstractSQLDatabaseAccessor() {
@@ -124,10 +134,10 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
           teleportData.targetRegion = RTP.selectionAPI.getRegion(data.get("region").toString());
         }
 
-        Object selectedX = data.get("selectedX");
-        Object selectedY = data.get("selectedY");
-        Object selectedZ = data.get("selectedZ");
-        Object selectedWorldName = data.get("selectedWorldName");
+        Object selectedX = data.get(COL_SELECTED_X);
+        Object selectedY = data.get(COL_SELECTED_Y);
+        Object selectedZ = data.get(COL_SELECTED_Z);
+        Object selectedWorldName = data.get(COL_SELECTED_WORLD_NAME);
         if (selectedX != null && selectedY != null && selectedZ != null && selectedWorldName != null) {
           teleportData.selectedCoords =
               new RTPCoords(
@@ -137,10 +147,10 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
                   ((Number) selectedZ).intValue());
         }
 
-        Object originalX = data.get("originalX");
-        Object originalY = data.get("originalY");
-        Object originalZ = data.get("originalZ");
-        Object originalWorldName = data.get("originalWorldName");
+        Object originalX = data.get(COL_ORIGINAL_X);
+        Object originalY = data.get(COL_ORIGINAL_Y);
+        Object originalZ = data.get(COL_ORIGINAL_Z);
+        Object originalWorldName = data.get(COL_ORIGINAL_WORLD_NAME);
         if (originalX != null && originalY != null && originalZ != null && originalWorldName != null) {
           teleportData.originalCoords =
               new RTPCoords(
@@ -192,15 +202,15 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
             statement.setString(2, String.valueOf(columns.get("senderId")));
             statement.setLong(3, ((Number) columns.getOrDefault("time", 0L)).longValue());
             statement.setLong(4, ((Number) columns.getOrDefault("delay", 0L)).longValue());
-            statement.setInt(5, ((Number) columns.getOrDefault("selectedX", 0)).intValue());
-            statement.setInt(6, ((Number) columns.getOrDefault("selectedY", 0)).intValue());
-            statement.setInt(7, ((Number) columns.getOrDefault("selectedZ", 0)).intValue());
-            statement.setString(8, String.valueOf(columns.get("selectedWorldName")));
+            statement.setInt(5, ((Number) columns.getOrDefault(COL_SELECTED_X, 0)).intValue());
+            statement.setInt(6, ((Number) columns.getOrDefault(COL_SELECTED_Y, 0)).intValue());
+            statement.setInt(7, ((Number) columns.getOrDefault(COL_SELECTED_Z, 0)).intValue());
+            statement.setString(8, String.valueOf(columns.get(COL_SELECTED_WORLD_NAME)));
             statement.setString(9, String.valueOf(columns.get("selectedWorldId")));
-            statement.setInt(10, ((Number) columns.getOrDefault("originalX", 0)).intValue());
-            statement.setInt(11, ((Number) columns.getOrDefault("originalY", 0)).intValue());
-            statement.setInt(12, ((Number) columns.getOrDefault("originalZ", 0)).intValue());
-            statement.setString(13, String.valueOf(columns.get("originalWorldName")));
+            statement.setInt(10, ((Number) columns.getOrDefault(COL_ORIGINAL_X, 0)).intValue());
+            statement.setInt(11, ((Number) columns.getOrDefault(COL_ORIGINAL_Y, 0)).intValue());
+            statement.setInt(12, ((Number) columns.getOrDefault(COL_ORIGINAL_Z, 0)).intValue());
+            statement.setString(13, String.valueOf(columns.get(COL_ORIGINAL_WORLD_NAME)));
             statement.setString(14, String.valueOf(columns.get("originalWorldId")));
             statement.setString(15, String.valueOf(columns.get("region")));
             statement.setDouble(16, ((Number) columns.getOrDefault("cost", 0.0)).doubleValue());
@@ -356,6 +366,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
     }
   }
 
+  @Nullable
   @Override
   public Connection connect() {
     try {
@@ -382,7 +393,8 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
     Connection connection = connect();
     if (connection == null) return;
     try {
-      String sql = "SELECT * FROM rtp_teleport_data";
+      String sql = "SELECT senderId, time, selectedWorldName, selectedX, selectedY, selectedZ, "
+          + "originalWorldName, originalX, originalY, originalZ, cost FROM rtp_teleport_data";
       try (PreparedStatement statement = connection.prepareStatement(sql);
           ResultSet resultSet = statement.executeQuery()) {
 
@@ -397,16 +409,16 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
           teleportData.time = resultSet.getLong("time");
           teleportData.selectedCoords =
               new RTPCoords(
-                  resultSet.getString("selectedWorldName"),
-                  resultSet.getInt("selectedX"),
-                  resultSet.getInt("selectedY"),
-                  resultSet.getInt("selectedZ"));
+                  resultSet.getString(COL_SELECTED_WORLD_NAME),
+                  resultSet.getInt(COL_SELECTED_X),
+                  resultSet.getInt(COL_SELECTED_Y),
+                  resultSet.getInt(COL_SELECTED_Z));
           teleportData.originalCoords =
               new RTPCoords(
-                  resultSet.getString("originalWorldName"),
-                  resultSet.getInt("originalX"),
-                  resultSet.getInt("originalY"),
-                  resultSet.getInt("originalZ"));
+                  resultSet.getString(COL_ORIGINAL_WORLD_NAME),
+                  resultSet.getInt(COL_ORIGINAL_X),
+                  resultSet.getInt(COL_ORIGINAL_Y),
+                  resultSet.getInt(COL_ORIGINAL_Z));
           teleportData.cost = resultSet.getDouble("cost");
 
           RTP.getInstance().latestTeleportData.put(uuid, teleportData);
@@ -415,6 +427,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
     } catch (SQLException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
     } catch (IllegalArgumentException ignored) {
+      // Ignore corrupted or malformed UUID strings in database rows
     } finally {
       disconnect(connection);
     }
@@ -445,6 +458,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         }
       }
     } catch (SQLException ignored) {
+      // Table or column may not exist yet; return empty
     }
     return Optional.empty();
   }

@@ -37,6 +37,7 @@ import java.util.Objects;
  * handler swallows {@link Throwable} so a malformed frame cannot break
  * Velocity's event dispatcher.</p>
  */
+@SuppressWarnings("java:S1845") // channel field alongside CHANNEL identifier constant
 public final class VelocityProxyCacheListener {
 
     /** Mirrors {@code BukkitNetworkBridge.PROXY_CHANNEL}. */

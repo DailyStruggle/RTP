@@ -11,6 +11,7 @@ import java.util.function.Consumer;
  * Transmissions require an online carrier player; returns {@link Optional#empty()}
  * when no player is online.
  */
+@SuppressWarnings("java:S1845") // ARMED constant alongside record components
 public interface NetworkBridge {
 
     /**

@@ -484,11 +484,8 @@ That manual click is the price of not handing a third-party plugin your signing 
 ### 7. CI publishing (GitHub Actions)
 
 The workflow `.github/workflows/maven-central.yml` automates steps 1-2 above (sign into the
-`CentralStaging` dir, zip, and `curl` the bundle to the Portal). It runs **only on a push to a
-release-line branch** (`V1`, `V2`, `V3`, ... and their lowercase forms), plus manual
-`workflow_dispatch`. Because those branches are protected, a push happens only when a pull
-request is merged - so publication is gated behind a PR, never an ad-hoc direct commit or a
-feature branch.
+`CentralStaging` dir, zip, and `curl` the bundle to the Portal). It runs **only on a push to
+V3**, plus manual `workflow_dispatch`. Feature and development branches will not trigger it.
 
 Required repository secrets (**Settings → Secrets and variables → Actions**):
 

@@ -23,6 +23,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>Supports targeting self, explicit player lists, or all players (console).
  */
+@SuppressWarnings("java:S1845") // PERMISSION constant matches convention alongside permission() method
 public abstract class PlayerTargetedClearCmd extends BaseRTPCmdImpl {
 
   /** Permission key shared by every player-targeted clear verb. */

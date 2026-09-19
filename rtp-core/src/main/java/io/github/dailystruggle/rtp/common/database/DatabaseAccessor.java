@@ -846,9 +846,9 @@ public abstract class DatabaseAccessor<D> {
   /**
    * Connect to the database
    *
-   * @return the database connection or context
+   * @return the database connection or context, or {@code null} if connection failed
    */
-  @NotNull
+  @Nullable
   public abstract D connect();
 
   /**

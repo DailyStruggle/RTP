@@ -6,7 +6,7 @@ name: Publish docs site
 
 on:
   push:
-    branches: [ V3, main ]
+    branches: [ V3 ]
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
@@ -40,7 +40,7 @@ jobs:
           cache-dependency-path: docs/requirements.txt
 
       - name: Install docs toolchain
-        run: pip install --only-binary :all: -r docs/requirements.txt
+        run: pip install --only-binary ':all:' -r docs/requirements.txt
 
       - name: Build and deploy to gh-pages
         run: mkdocs gh-deploy --force --clean

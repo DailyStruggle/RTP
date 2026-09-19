@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -56,6 +57,6 @@ class FoliaMapBindingTest {
     void quitOnFreshBindingIsNoop() {
         FoliaMapBinding binding = new FoliaMapBinding();
         // Inherits the BukkitMapBinding cache; an unknown-quit must not throw.
-        binding.onPlayerQuit(UUID.randomUUID());
+        assertDoesNotThrow(() -> binding.onPlayerQuit(UUID.randomUUID()));
     }
 }
