@@ -53,7 +53,7 @@ public final class GroupProfileSpec {
       int minSeparation,
       int elevationTolerance,
       int maxGroupSize) {
-    if (distribution == null || distribution.isBlank()) {
+    if (distribution == null || distribution.trim().isEmpty()) {
       throw new IllegalArgumentException("distribution must not be null or blank");
     }
     return new GroupProfileSpec(

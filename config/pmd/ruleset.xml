@@ -50,8 +50,6 @@
     <exclude name="UseLocaleWithCaseConversions"/>
     <exclude name="AvoidAccessibilityAlteration"/>
     <exclude name="ReturnEmptyCollectionRatherThanNull"/>
-    <exclude name="TestClassWithoutTestCases"/>
-    <exclude name="EqualsNull"/>
   </rule>
 
   <!-- Multithreading correctness: aligns with the RTP scheduler contract. -->
