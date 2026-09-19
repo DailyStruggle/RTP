@@ -18,7 +18,6 @@ import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask.Co
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
-import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -34,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
+import org.jetbrains.annotations.Nullable;
 
 public class Region extends FactoryValue<RegionKeys> {
   public static final List<BiConsumer<Region, UUID>> onPlayerQueuePush = new ArrayList<>();
@@ -343,7 +343,6 @@ public class Region extends FactoryValue<RegionKeys> {
           this.queueManager.perPlayerLocationQueue.computeIfAbsent(stored.getPlayerId(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).add(recoveredLoc);
           if (db != null) db.removeCachedLocation(stored.getId());
         }
-        RtpOutcomeStats.GLOBAL.recordSuccess();
       }
     } finally {
       this.queueManager.installDatabaseCallbacks();
@@ -355,7 +354,7 @@ public class Region extends FactoryValue<RegionKeys> {
    */
   private void logPromotionDropDiag(
       RTPLocation coldLoc,
-      io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk,
+      @Nullable io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk,
       int cx, int cz) {
     try {
       if (rtpChunk == null) {
@@ -923,8 +922,6 @@ public class Region extends FactoryValue<RegionKeys> {
     boolean heapUnderPressure =
         io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.underPressure();
     if (currentShape != null && backlogRefillActive && !heapUnderPressure) {
-      // Clean invalidated entries if heuristic is met before refilling.
-      backlog.cleanIfHeuristicMet();
       // Bounded rejection sampling: cap consecutive pregenPref rejections per pulse.
       final int maxConsecutivePregenRejects = Math.max(16, backlog.capacity());
       int consecutivePregenRejects = 0;
@@ -949,13 +946,7 @@ public class Region extends FactoryValue<RegionKeys> {
         RTPCoords coords = new RTPCoords(worldName, blockX, verticalY, blockZ);
         RTPLocation loc = new RTPLocation(coords, 0L);
         BacklogLocationBuffer.BacklogEntry entry = backlog.offerUnverified(loc);
-        if (entry == null) {
-          // If rejected due to capacity, attempt heuristic cleaning and retry once
-          if (backlog.cleanIfHeuristicMet() > 0) {
-            entry = backlog.offerUnverified(loc);
-          }
-          if (entry == null) break; // capacity rejection
-        }
+        if (entry == null) break; // capacity rejection
         binIndex.insert(RegionFileCoord.of(coords), entry);
       }
     }
@@ -990,24 +981,15 @@ public class Region extends FactoryValue<RegionKeys> {
           if (d == null) d =
               io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision.UNKNOWN;
           switch (d) {
-            case REJECT -> {
-              next = BacklogLocationBuffer.Validity.INVALIDATED;
-              RtpOutcomeStats.GLOBAL.recordFailure(LocationGenerator.FailTypes.biome);
-              if (this.shape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape ms) {
-                long loc1D = ms.xzToLocation(e.location().coords().x(), e.location().coords().z());
-                if (loc1D >= 0) {
-                  ms.addBadChunk(loc1D, LocationGenerator.FailTypes.biome);
-                }
-              }
-            }
+            case REJECT -> next = BacklogLocationBuffer.Validity.INVALIDATED;
             case ACCEPT, UNKNOWN -> next = BacklogLocationBuffer.Validity.VALIDATED;
             default -> next = BacklogLocationBuffer.Validity.VALIDATED;
           }
         }
         e.setValidity(next);
       }
-      // Clean invalidated entries if heuristic is met to free L3 capacity.
-      backlog.cleanIfHeuristicMet();
+      // Eagerly remove invalidated entries to free L3 capacity.
+      backlog.removeInvalidated();
     }
 
     // Drain validated head into unkeptLocations up to L2 capacity.
@@ -1020,7 +1002,6 @@ public class Region extends FactoryValue<RegionKeys> {
         if (!queueManager.unkeptLocations.offer(e.location())) {
           break;
         }
-        RtpOutcomeStats.GLOBAL.recordSuccess();
       }
     }
   }
@@ -1102,7 +1083,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param uuid player uuid
    * @return true if location is ready
    */
-  public boolean hasLocation(UUID uuid) {
+  public boolean hasLocation(@Nullable UUID uuid) {
     boolean res = !queueManager.keptLocations.isEmpty();
     res |= (uuid != null) && (queueManager.perPlayerLocationQueue.containsKey(uuid));
     return res;
@@ -1115,7 +1096,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param biomeNames set of biomes to filter by
    * @return location and number of attempts
    */
-  public CompletableFuture<GenerationResult> getLocation(Set<String> biomeNames) {
+  public CompletableFuture<GenerationResult> getLocation(@Nullable Set<String> biomeNames) {
     return RTP.serverAccessor.getLocationGenerator().generateLocation(this, new GenerationContext(null, null, biomeNames));
   }
 
