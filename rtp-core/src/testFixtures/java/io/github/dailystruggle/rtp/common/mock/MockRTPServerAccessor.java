@@ -301,10 +301,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public Set<String> materials() {
-        Set<String> set = new HashSet<>();
-        set.add("AIR");
-        set.add("STONE");
-        return set;
+        return new HashSet<>();
     }
 
     // -------------------------------------------------------------------------

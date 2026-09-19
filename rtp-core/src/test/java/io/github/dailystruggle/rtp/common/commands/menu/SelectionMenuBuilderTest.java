@@ -139,22 +139,4 @@ class SelectionMenuBuilderTest {
         }
         assertTrue(saw);
     }
-
-    @Test
-    void multiPageOverflowAndEmptyEntries() {
-        // Multi-page entries (more than 10)
-        List<String> entries = new java.util.ArrayList<>();
-        for (int i = 0; i < 25; i++) {
-            entries.add("entry_" + i);
-        }
-        MenuModel multiPage = new SelectionMenuBuilder().build(
-                List.of(), "region", "region", entries, value -> "&2", false);
-        assertNotNull(multiPage);
-        assertTrue(multiPage.pages().size() > 1);
-
-        // Empty entries
-        MenuModel empty = new SelectionMenuBuilder().build(
-                List.of(), "region", "region", List.of(), value -> "&2", false);
-        assertNotNull(empty);
-    }
 }

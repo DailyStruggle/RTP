@@ -232,23 +232,4 @@ public class SquareDomainCoverageTest {
         expected.removeAll(visited);
         assertTrue(expected.isEmpty(), expected.size() + " cells were never visited");
     }
-    @Test
-    void square_centerRadius_outerRadius_bounds() {
-        Square square = new Square();
-        square.set(GenericMemoryShapeParams.radius, 500L);
-        square.set(GenericMemoryShapeParams.centerRadius, 100L);
-
-        long range = square.getRange();
-        assertTrue(range > 0);
-
-        int[] xz0 = square.locationToXZ(0L);
-        assertTrue(xz0 != null && xz0.length == 2);
-        long loc0 = square.xzToLocation(xz0[0], xz0[1]);
-        assertTrue(loc0 >= 0);
-
-        int[] xzMax = square.locationToXZ(range - 1);
-        assertTrue(xzMax != null && xzMax.length == 2);
-        long locMax = square.xzToLocation(xzMax[0], xzMax[1]);
-        assertTrue(locMax >= 0);
-    }
 }

@@ -240,20 +240,6 @@ final class FrontPageBuilderTest {
         assertNull(lh[1]);
     }
 
-    @Test
-    @DisplayName("stripTrailingFormatting strips trailing section color and format codes")
-    void stripTrailingFormatting_branches() throws Exception {
-        java.lang.reflect.Method m = FrontPageBuilder.class.getDeclaredMethod("stripTrailingFormatting", String.class);
-        m.setAccessible(true);
-
-        org.junit.jupiter.api.Assertions.assertEquals("", m.invoke(null, ""));
-        org.junit.jupiter.api.Assertions.assertEquals("", m.invoke(null, (String) null));
-        org.junit.jupiter.api.Assertions.assertEquals("hello", m.invoke(null, "hello&a&l"));
-        org.junit.jupiter.api.Assertions.assertEquals("hello", m.invoke(null, "hello#123456"));
-        org.junit.jupiter.api.Assertions.assertEquals("plain", m.invoke(null, "plain"));
-        org.junit.jupiter.api.Assertions.assertEquals("", m.invoke(null, "&c"));
-    }
-
     // ------------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------------

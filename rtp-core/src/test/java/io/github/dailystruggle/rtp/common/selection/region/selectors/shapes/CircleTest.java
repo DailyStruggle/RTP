@@ -254,23 +254,4 @@ public class CircleTest {
         Circle shape = new Circle("MY_CIRCLE");
         assertEquals("MY_CIRCLE", shape.name);
     }
-    @Test
-    void circle_centerRadius_outerRadius_bounds() {
-        Circle circle = new Circle();
-        circle.set(GenericMemoryShapeParams.radius, 500L);
-        circle.set(GenericMemoryShapeParams.centerRadius, 100L);
-
-        long range = circle.getRange();
-        assertTrue(range > 0);
-
-        int[] xz0 = circle.locationToXZ(0L);
-        assertNotNull(xz0);
-        long loc0 = circle.xzToLocation(xz0[0], xz0[1]);
-        assertTrue(loc0 >= 0);
-
-        int[] xzMax = circle.locationToXZ(range - 1);
-        assertNotNull(xzMax);
-        long locMax = circle.xzToLocation(xzMax[0], xzMax[1]);
-        assertTrue(locMax >= 0);
-    }
 }

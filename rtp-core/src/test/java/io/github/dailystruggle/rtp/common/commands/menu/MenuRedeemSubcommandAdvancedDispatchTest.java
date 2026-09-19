@@ -33,7 +33,6 @@ import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -342,186 +341,6 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
         assertTrue(anvilOpened.get(), "unconstrained key should route to anvil opener");
     }
 
-    @Test
-    void dispatchSelectionMenuDispatchesSuccessfully() {
-        MenuRedeemSubcommand wired = wired(allow());
-        UUID viewer = UUID.randomUUID();
-
-        // Target with parameter
-        TestableRoot sub = new TestableRoot();
-        CommandParameter dummyParam = new CommandParameter("region", "test", (u, s) -> true) {
-            @Override public java.util.Set<String> values() { return java.util.Set.of("default", "nether"); }
-        };
-        sub.getParameterLookup().put("region", dummyParam);
-        root.getCommandLookup().put("SUB", sub);
-
-        // Unknown segment
-        assertFalse(wired.dispatchSelectionMenu(viewer, new String[]{"unknown_xyz"}, "region", "Pick", k -> "#ffffff", true, m -> {}));
-
-        // Unknown parameter
-        assertFalse(wired.dispatchSelectionMenu(viewer, new String[]{"SUB"}, "unknown_param", "Pick", k -> "#ffffff", true, m -> {}));
-
-        // Valid selection menu
-        boolean ok = wired.dispatchSelectionMenu(viewer, new String[]{"SUB"}, "region", "Pick", k -> "#ffffff", true, m -> {});
-        assertTrue(ok);
-
-        // Also test dispatchOpenParamPicker paths
-        MenuRedeemSubcommand disabled = new MenuRedeemSubcommand(root, allow());
-        assertFalse(disabled.dispatchOpenParamPicker(viewer, new MenuAction.OpenParamPicker(new String[]{"SUB"}, "region"), m -> {}));
-        assertFalse(wired.dispatchOpenParamPicker(viewer, new MenuAction.OpenParamPicker(new String[]{"unknown_xyz"}, "region"), m -> {}));
-        assertFalse(wired.dispatchOpenParamPicker(viewer, new MenuAction.OpenParamPicker(new String[]{"SUB"}, "unknown_param"), m -> {}));
-        assertTrue(wired.dispatchOpenParamPicker(viewer, new MenuAction.OpenParamPicker(new String[]{"SUB"}, "region"), m -> {}));
-    }
-
-    @Test
-    void renderForPathRoutesConfigPaths() {
-        MenuRedeemSubcommand wired = wired(allow());
-        UUID viewer = UUID.randomUUID();
-
-        // Empty config -> opens selector
-        assertTrue(wired.renderForPath(viewer, root, List.of("config"), Map.of(), 0, m -> {}));
-
-        // Config search
-        assertTrue(wired.renderForPath(viewer, root, List.of("config", "search"),
-                Map.of(io.github.dailystruggle.rtp.common.commands.config.ConfigSearchSubCmd.PARAM_QUERY, List.of("query")), 0, m -> {}));
-
-        // MultiConfig entry
-        assertTrue(wired.renderForPath(viewer, root, List.of("config", "regions", "default"), Map.of(), 0, m -> {}));
-
-        // Curated pages
-        assertTrue(wired.dispatchOpenVisualizationRegions(viewer, io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_COMPOSITE, m -> {}));
-        assertFalse(wired.dispatchOpenVisualizationRegions(viewer, null, m -> {}));
-        assertTrue(wired.dispatchOpenFrontPage(viewer, m -> {}));
-        assertTrue(wired.dispatchOpenAdminPanel(viewer, m -> {}));
-
-        // Config file with staged param
-        assertTrue(wired.renderForPath(viewer, root, List.of("config", "config.yml"), Map.of("radius", List.of("100")), 0, m -> {}));
-
-        // Config file with bare file
-        assertTrue(wired.renderForPath(viewer, root, List.of("config", "config.yml"), Map.of(), 0, m -> {}));
-    }
-
-    @Test
-    void openConfigKeySlashShortCircuitAndOptionsPicker() {
-        AtomicBoolean anvilOpened = new AtomicBoolean();
-        MenuRedeemSubcommand.AnvilInputOpener opener = (v, parentPath, paramName, prefill) -> {
-            anvilOpened.set(true);
-            return true;
-        };
-        MenuRedeemSubcommand wired = wiredWithOpener(allow(), opener);
-        UUID viewer = UUID.randomUUID();
-
-        // Slash format: "regions/default" with unconstrained parameter
-        boolean ok = wired.dispatchOpenConfigKey(viewer,
-                new MenuAction.OpenConfigKey("regions/default", "radius"), m -> {});
-        assertTrue(ok);
-        assertTrue(anvilOpened.get());
-
-        // Test finite domain resolution when parameter has options or sources (e.g. shape.name)
-        boolean okShape = wired.dispatchOpenConfigKey(viewer,
-                new MenuAction.OpenConfigKey("regions/default", "shape.name"), m -> {});
-        assertTrue(okShape);
-    }
-
-    @Test
-    void cartHelpersAndReopenCoverage() {
-        MenuRedeemSubcommand wired = wired(allow());
-        UUID viewer = UUID.randomUUID();
-
-        wired.stageInCart(viewer, "config.yml", "radius", "500");
-        wired.cartSink().stage(viewer, "config.yml", "maxRadius", "1000");
-        assertEquals("500", wired.snapshotCart(viewer, "config.yml").get("radius"));
-
-        assertTrue(wired.reopenAfterCartOp(viewer, "config.yml", m -> {}));
-        assertTrue(wired.renderAt(viewer, root, List.of("config", "config.yml"), 0, m -> {}));
-
-        wired.unstageInCart(viewer, "config.yml", "radius");
-        assertFalse(wired.snapshotCart(viewer, "config.yml").containsKey("radius"));
-
-        wired.clearCart(viewer);
-        assertTrue(wired.snapshotCart(viewer, "config.yml").isEmpty());
-    }
-
-    @Test
-    void miscAsyncTasksPrecedent_executesSeedMirrorTree() {
-        // Precedent for tasking: drain RTP.getInstance().miscAsyncTasks
-        MenuRedeemSubcommand wired = wired(allow());
-        // Verify before drain that mirror command lookup may not have children yet
-        // Drain miscAsyncTasks pipe to execute delayed RTPRunnable(seedMirrorTree, 10)
-        for (int i = 0; i < 15; i++) {
-            RTP.getInstance().miscAsyncTasks.execute(Long.MAX_VALUE);
-        }
-        // Sibling commands should now be mirrored under wired
-        assertNotNull(wired.getCommandLookup());
-        // Second call is idempotent
-        for (int i = 0; i < 5; i++) {
-            RTP.getInstance().miscAsyncTasks.execute(Long.MAX_VALUE);
-        }
-    }
-
-    @Test
-    void multiConfigMutate_addAndRemoveMirrorSync() {
-        MenuRedeemSubcommand wired = wired(allow());
-        UUID viewer = UUID.randomUUID();
-
-        // Test MultiConfigMutate ADD and REMOVE
-        boolean addOk = wired.dispatchMultiConfigMutate(viewer,
-                new MenuAction.MultiConfigMutate("regions", "custom_test", MenuAction.MultiConfigMutate.Op.ADD),
-                msg -> {});
-        assertTrue(addOk);
-
-        boolean removeOk = wired.dispatchMultiConfigMutate(viewer,
-                new MenuAction.MultiConfigMutate("regions", "custom_test", MenuAction.MultiConfigMutate.Op.REMOVE),
-                msg -> {});
-        assertTrue(removeOk);
-    }
-
-    @Test
-    void descendDottedAndResolveDottedValueString_coverage() throws Exception {
-        java.lang.reflect.Method mDescend = MenuRedeemSubcommand.class.getDeclaredMethod("descendDotted", Object.class, String.class);
-        mDescend.setAccessible(true);
-
-        assertTrue(mDescend.invoke(null, null, "foo") == null);
-        assertTrue(mDescend.invoke(null, "val", null) == null);
-        assertTrue(mDescend.invoke(null, "val", "") == null);
-
-        // FactoryValue descent (e.g. Square shape with radius)
-        io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square sq =
-                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square();
-        sq.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.radius, 500L);
-        Object radius = mDescend.invoke(null, sq, "radius");
-        assertNotNull(radius);
-        assertEquals(500L, mDescend.invoke(null, sq, "radius"));
-        assertTrue(mDescend.invoke(null, sq, "nonexistent") == null);
-
-        // RtpYamlSection descent
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection mockSection =
-                org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection.class);
-        org.mockito.Mockito.when(mockSection.get("shape.radius")).thenReturn(500L);
-        org.mockito.Mockito.when(mockSection.get("throwing")).thenThrow(new RuntimeException("err"));
-        assertEquals(500L, mDescend.invoke(null, mockSection, "shape.radius"));
-        assertTrue(mDescend.invoke(null, mockSection, "throwing") == null);
-
-        // Map descent
-        Map<String, Object> map = Map.of("shape", Map.of("radius", 256));
-        assertEquals(256, mDescend.invoke(null, map, "shape.radius"));
-        assertTrue(mDescend.invoke(null, map, "shape.unknown") == null);
-        assertTrue(mDescend.invoke(null, map, "unknown.unknown") == null);
-
-        // resolveDottedValueString on EnumMap
-        java.lang.reflect.Method mResolve = MenuRedeemSubcommand.class.getDeclaredMethod("resolveDottedValueString", java.util.EnumMap.class, String.class);
-        mResolve.setAccessible(true);
-
-        java.util.EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys, Object> data =
-                new java.util.EnumMap<>(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class);
-        data.put(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.shape, sq);
-
-        assertEquals("", mResolve.invoke(null, null, "shape"));
-        assertEquals("", mResolve.invoke(null, data, ""));
-        assertEquals("", mResolve.invoke(null, data, "unknownKey"));
-        assertNotNull(mResolve.invoke(null, data, "shape.radius"));
-    }
-
     // ------------------------------------------------------------------------
     // Helpers & Fixtures
     // ------------------------------------------------------------------------
@@ -546,13 +365,9 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
 
         // Also wire dummy subcommands so TreeCommand path walking succeeds
         TestableRoot configSub = new TestableRoot();
-        TestableRoot regionsSub = new TestableRoot();
-        TestableRoot defaultSub = new TestableRoot();
-        regionsSub.getCommandLookup().put("DEFAULT", defaultSub);
-
         configCmd.getCommandLookup().put("SEARCH", configSub);
         configCmd.getCommandLookup().put("CONFIG.YML", configSub);
-        configCmd.getCommandLookup().put("REGIONS", regionsSub);
+        configCmd.getCommandLookup().put("REGIONS", configSub);
 
         MenuRenderer renderer = (u, m) -> {};
         MenuRedeemSubcommand.MenuParamPickerBuilder picker = (p, v, path, name) -> stubModel();

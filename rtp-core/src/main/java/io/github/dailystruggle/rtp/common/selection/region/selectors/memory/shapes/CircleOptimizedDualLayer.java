@@ -722,7 +722,7 @@ public class CircleOptimizedDualLayer extends Circle {
     int orientation = orientationFor(px, pz);
     long randomHilbert = ThreadLocalRandom.current().nextLong(area);
 
-    long fullMacroIdx = 4L * (K - 1L) * (K - 1L) + side * (2L * K - 1L) + sideStep;
+    long fullMacroIdx = 4L * (K - 1L) * (K - 1L) + side * sideLen + sideStep;
     long macroLoc = fullMacroIdx - 4L * lut.kInner * lut.kInner;
     if (macroLoc < 0) return -1L;
 

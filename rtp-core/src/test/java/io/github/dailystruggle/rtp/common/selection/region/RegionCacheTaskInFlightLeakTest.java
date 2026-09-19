@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
-import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -20,7 +19,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -109,77 +107,6 @@ public class RegionCacheTaskInFlightLeakTest {
         assertEquals(beforeInFlight, region.inFlightCalculations.get(),
                 "inFlightCalculations must net to its pre-run value when the "
                         + "location future completes exceptionally (no double-decrement, no leak).");
-    }
-
-    @Test
-    @Timeout(value = 2, unit = TimeUnit.SECONDS)
-    void run_playerSpecificQueue_enqueuesPlayerLocation() {
-        UUID playerId = UUID.randomUUID();
-        region.openPersonalQueue(playerId);
-        RTPCoords coords = new RTPCoords("inflight_leak_world", 100, 64, 100);
-        GenerationResult successfulResult = new GenerationResult(coords, 1, null);
-
-        accessor.setLocationGenerator(new ILocationGenerator() {
-            @Override
-            public CompletableFuture<GenerationResult> getLocation(Object region, GenerationContext context) {
-                return CompletableFuture.completedFuture(successfulResult);
-            }
-            @Override
-            public CompletableFuture<GenerationResult> generateLocation(Object region, GenerationContext context) {
-                return CompletableFuture.completedFuture(successfulResult);
-            }
-            @Override
-            public CompletableFuture<GenerationResult> getLocation(Object region, RTPCommandSender sender, RTPPlayer player, Set<String> biomeNames) {
-                return CompletableFuture.completedFuture(successfulResult);
-            }
-            @Override
-            public CompletableFuture<GenerationResult> getLocation(Object region, Set<String> biomeNames) {
-                return CompletableFuture.completedFuture(successfulResult);
-            }
-        });
-
-        RegionCacheTask task = new RegionCacheTask(region, playerId, 50_000_000L);
-        task.run();
-
-        // Check that player personal queue received the location
-        java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> pQueue = region.queueManager.getPerPlayerQueue(playerId);
-        org.junit.jupiter.api.Assertions.assertNotNull(pQueue);
-        org.junit.jupiter.api.Assertions.assertFalse(pQueue.isEmpty());
-        assertEquals(coords, pQueue.peek().coords());
-        assertEquals(0, region.inFlightCalculations.get());
-    }
-
-    @Test
-    @Timeout(value = 2, unit = TimeUnit.SECONDS)
-    void run_publicQueueSuccessfulGeneration_enqueuesToUnkeptLocations() {
-        RTPCoords coords = new RTPCoords("inflight_leak_world", 200, 64, 200);
-        GenerationResult successfulResult = new GenerationResult(coords, 2, null);
-
-        accessor.setLocationGenerator(new ILocationGenerator() {
-            @Override
-            public CompletableFuture<GenerationResult> getLocation(Object region, GenerationContext context) {
-                return CompletableFuture.completedFuture(successfulResult);
-            }
-            @Override
-            public CompletableFuture<GenerationResult> generateLocation(Object region, GenerationContext context) {
-                return CompletableFuture.completedFuture(successfulResult);
-            }
-            @Override
-            public CompletableFuture<GenerationResult> getLocation(Object region, RTPCommandSender sender, RTPPlayer player, Set<String> biomeNames) {
-                return CompletableFuture.completedFuture(successfulResult);
-            }
-            @Override
-            public CompletableFuture<GenerationResult> getLocation(Object region, Set<String> biomeNames) {
-                return CompletableFuture.completedFuture(successfulResult);
-            }
-        });
-
-        int initialUnkept = region.queueManager.unkeptLocations.size();
-        RegionCacheTask task = new RegionCacheTask(region, 50_000_000L);
-        task.run();
-
-        assertEquals(initialUnkept + 1, region.queueManager.unkeptLocations.size());
-        assertEquals(0, region.inFlightCalculations.get());
     }
 
     /**

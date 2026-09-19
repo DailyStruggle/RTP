@@ -596,7 +596,7 @@ class TeleportPipelineTaskPhaseTest {
     }
 
     @Test
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void platform_creator_lifecycle_handling() {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("plat_creator_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =

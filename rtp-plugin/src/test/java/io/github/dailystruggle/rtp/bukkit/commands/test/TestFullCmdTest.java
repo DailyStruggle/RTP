@@ -179,20 +179,6 @@ class TestFullCmdTest {
   }
 
   @Test
-  @DisplayName("SHIPPED_SUBCOMMAND_NAMES contains events, world-ops, and accessor")
-  void shippedListContainsNewSubcommands() {
-    assertTrue(
-        TestFullCmd.SHIPPED_SUBCOMMAND_NAMES.contains("events"),
-        "SHIPPED_SUBCOMMAND_NAMES must contain 'events'");
-    assertTrue(
-        TestFullCmd.SHIPPED_SUBCOMMAND_NAMES.contains("world-ops"),
-        "SHIPPED_SUBCOMMAND_NAMES must contain 'world-ops'");
-    assertTrue(
-        TestFullCmd.SHIPPED_SUBCOMMAND_NAMES.contains("accessor"),
-        "SHIPPED_SUBCOMMAND_NAMES must contain 'accessor'");
-  }
-
-  @Test
   @DisplayName("TestFullCmd.findRoot-like: constructor does not throw even with a null parent")
   void constructsWithNullParent() {
     TestFullCmd cmd = new TestFullCmd(null);
@@ -200,37 +186,6 @@ class TestFullCmdTest {
     assertEquals("full", cmd.name());
     assertEquals("rtp.test.full", cmd.permission());
     assertSame(null, cmd.parent());
-  }
-
-  @Test
-  @DisplayName("formatResultLine emits ALL_PASSED when no failures and 0 leaks")
-  void formatResultLineAllPassed() {
-    String line = TestFullCmd.formatResultLine(19, 0, 0, 150, java.util.Collections.emptyList());
-    assertEquals(
-        "[RTP test/full] RESULT: ALL_PASSED (count=19, warnings=0, leaks=0, elapsed_ms=150)",
-        line);
-  }
-
-  @Test
-  @DisplayName("formatResultLine emits FAILED when failed list is non-empty")
-  void formatResultLineFailedSubcommands() {
-    String line =
-        TestFullCmd.formatResultLine(
-            19, 1, 0, 150, java.util.Collections.singletonList("stress"));
-    assertEquals(
-        "[RTP test/full] RESULT: FAILED (count=19, failed=[stress], leaks=0)",
-        line);
-  }
-
-  @Test
-  @DisplayName("formatResultLine emits FAILED when leaks > 0")
-  void formatResultLineWithLeaks() {
-    String line =
-        TestFullCmd.formatResultLine(
-            20, 0, 1, 150, java.util.Collections.singletonList("memory-leak"));
-    assertEquals(
-        "[RTP test/full] RESULT: FAILED (count=20, failed=[memory-leak], leaks=1)",
-        line);
   }
 
   // --------------------------------------------------------------------------

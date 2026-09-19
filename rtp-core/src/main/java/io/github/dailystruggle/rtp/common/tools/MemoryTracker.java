@@ -143,42 +143,6 @@ public class MemoryTracker {
   }
 
   /**
-   * Returns the count of currently active chunk tickets held across all loaded worlds.
-   */
-  public static long activeTickets() {
-    long activeTickets = 0;
-    if (RTP.serverAccessor != null) {
-      List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
-      if (worlds != null) {
-        for (RTPWorld<?> world : worlds) {
-          if (world != null && world.activeChunkTickets != null) {
-            activeTickets += world.activeChunkTickets.get();
-          }
-        }
-      }
-    }
-    return activeTickets;
-  }
-
-  /**
-   * Returns the count of currently active/in-flight tasks tracked in MemoryTracker.
-   */
-  public static int activeTasks() {
-    int tasks = 0;
-    for (TrackedObject obj : trackedObjects.values()) {
-      if (obj.isCollected()) continue;
-      String label = obj.getLabel();
-      Object target = obj.getTarget();
-      if ("TeleportPipelineTask".equals(label)
-          || target instanceof io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask
-          || target instanceof io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask) {
-        tasks++;
-      }
-    }
-    return tasks;
-  }
-
-  /**
    * Sets the configured memory ceiling / buffer quota in bytes.
    *
    * @param bytes ceiling in bytes, or -1L for unlimited

@@ -4,7 +4,6 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
-import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
@@ -20,8 +19,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -309,7 +311,7 @@ class MenuRedeemAnvilAndBookResponseTest {
         MenuRedeemSubcommand.MenuConfigSubtreeBuilder subtreeBuilder = new MenuRedeemSubcommand.MenuConfigSubtreeBuilder() {
             @Override public MenuModel buildSelector(UUID viewer) { return null; }
             @Override public MenuModel buildFile(UUID viewer, String fileName, java.util.LinkedHashMap<String, String> staged) {
-                return new MenuModel("Config: " + fileName + " staged=" + staged.size(), List.of(new MenuPage(List.of())));
+                return new MenuModel("Config: " + fileName + " staged=" + staged.size(), List.of());
             }
             @Override public MenuModel buildFile(UUID viewer, String fileName) { return null; }
             @Override public MenuModel buildKey(UUID viewer, String fileName, String paramName) { return null; }
@@ -352,7 +354,7 @@ class MenuRedeemAnvilAndBookResponseTest {
         MenuRedeemSubcommand.MenuPageBuilder pageBuilder = (node, open, pathList) -> null;
 
         MenuRedeemSubcommand.MenuConfigSearchBuilder searchBuilder = (v, query, page) ->
-                new MenuModel("Search: " + query + " page=" + page, List.of(new MenuPage(List.of())));
+                new MenuModel("Search: " + query + " page=" + page, List.of());
 
         MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(
                 root,

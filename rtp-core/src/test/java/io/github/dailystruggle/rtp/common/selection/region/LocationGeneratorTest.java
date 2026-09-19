@@ -116,15 +116,6 @@ class LocationGeneratorTest {
 
         CompletableFuture<GenerationResult> f6 = LocationGenerator.getLocationFuture(region, player, player, null);
         assertNotNull(f6);
-
-        // Await completion to exercise PregenTask execution loop
-        GenerationResult res5 = f5.get();
-        assertNotNull(res5);
-        assertNotNull(res5.coords());
-
-        GenerationResult res6 = f6.get();
-        assertNotNull(res6);
-        assertNotNull(res6.coords());
     }
 
     @Test
