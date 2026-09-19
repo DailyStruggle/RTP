@@ -15,7 +15,6 @@ import java.util.List;
  */
 public final class HeapSampler {
 
-    @SuppressWarnings("java:S3077") // Volatile cached reference to JVM MemoryPoolMXBean
     private static volatile MemoryPoolMXBean cachedOldGenPool = null;
     private static volatile boolean oldGenPoolSearched = false;
 

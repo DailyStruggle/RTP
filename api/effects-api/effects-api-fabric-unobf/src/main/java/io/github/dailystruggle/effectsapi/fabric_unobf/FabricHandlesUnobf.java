@@ -63,7 +63,6 @@ public final class FabricHandlesUnobf implements HandleProvider {
         return null;
     }
 
-    @SuppressWarnings("java:S3077") // Volatile reference publication for server handle
     private static volatile net.minecraft.server.MinecraftServer cachedServer;
 
     public static void setServer(net.minecraft.server.MinecraftServer server) {

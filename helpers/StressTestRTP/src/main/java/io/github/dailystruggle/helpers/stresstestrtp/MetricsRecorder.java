@@ -518,26 +518,20 @@ public class MetricsRecorder {
 
     /** Optional GC / tick-thread-allocation sampler. May be null, in which
      *  case every GC and allocation column is the -1 not-measured sentinel. */
-    @SuppressWarnings("java:S3077") // Volatile reference publication for monitor component
     private volatile GcSampler gcSampler;
     /** Optional residency sampler (peak resident chunks, peak plugin tickets). */
-    @SuppressWarnings("java:S3077") // Volatile reference publication for monitor component
     private volatile ResidencySampler residencySampler;
     /** Optional heap-pressure trigger recorder. Records; never models. */
-    @SuppressWarnings("java:S3077") // Volatile reference publication for monitor component
     private volatile HeapPressureWatcher heapPressureWatcher;
     /** Optional setup-phase ticket-footprint calibration. May be null, in
      *  which case every ticket_footprint_* column is the -1 / empty
      *  not-measured sentinel. */
-    @SuppressWarnings("java:S3077") // Volatile reference publication for monitor component
     private volatile TicketFootprintProbe ticketProbe;
     /** GC / allocation counters at phase start; deltas are written per phase. */
-    @SuppressWarnings("java:S3077") // Volatile reference publication for snapshot record
     private volatile GcSampler.Snapshot phaseStartGc;
     /** Optional world-directory storage characteriser. May be null, in which
      *  case every storage column is the -1 / empty not-measured sentinel and
      *  no storage block sidecar is produced. */
-    @SuppressWarnings("java:S3077") // Volatile reference publication for monitor component
     private volatile StorageProfiler storageProfiler;
     /** Sidecar receiving one storage header block per phase. */
     private final Path storageProfilePath;
@@ -601,7 +595,6 @@ public class MetricsRecorder {
     /** Per-phase teleport-mode classifier. A measurement phase is one target
      *  arm's window, so the derived threshold is per-arm by construction. */
     private final ModeClassifier modeClassifier = new ModeClassifier();
-    @SuppressWarnings("java:S3077") // Volatile reference publication for provider interface
     private volatile DirectModeSource directModeSource = null;
 
     /** Wires the direct-reading source (this plugin's arm only; see
@@ -630,7 +623,6 @@ public class MetricsRecorder {
     /** Optional Folia region monitor (set by the plugin on enable). May be
      *  null - in which case every region column falls back to the {@code -1}
      *  not-measured sentinel, exactly as it does on a non-Folia server. */
-    @SuppressWarnings("java:S3077") // Volatile reference publication for monitor component
     private volatile FoliaRegionMonitor regionMonitor;
 
     /** Wires the Folia region-context / freeze monitor. Active only when

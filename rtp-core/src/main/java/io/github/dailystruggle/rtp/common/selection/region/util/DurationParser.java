@@ -12,10 +12,10 @@ import java.util.regex.Pattern;
 public final class DurationParser {
 
   private static final Pattern SINGLE_DURATION_PATTERN =
-      Pattern.compile("^\\s*([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]+)?\\s*+$");
+      Pattern.compile("^\\s*([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]+)?\\s*$");
 
   private static final Pattern COMPOSITE_SEGMENT_PATTERN =
-      Pattern.compile("([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*+([a-zA-Z]+)");
+      Pattern.compile("([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]+)");
 
   private DurationParser() {}
 
@@ -105,7 +105,7 @@ public final class DurationParser {
     }
 
     // Verify there are no leftover non-whitespace characters
-    String residual = COMPOSITE_SEGMENT_PATTERN.matcher(trimmed).replaceAll("").trim();
+    String residual = trimmed.replaceAll("[+-]?[0-9]+(?:\\.[0-9]+)?\\s*[a-zA-Z]+", "").trim();
     if (!residual.isEmpty()) {
       return null;
     }
