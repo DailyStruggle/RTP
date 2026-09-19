@@ -133,10 +133,6 @@
          <lastmod>2026-09-19</lastmod>
     </url>
     <url>
-         <loc>https://dailystruggle.github.io/RTP/admin/configuration/TTL/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
          <loc>https://dailystruggle.github.io/RTP/admin/configuration/WORLDS/</loc>
          <lastmod>2026-09-19</lastmod>
     </url>
@@ -449,78 +445,6 @@
          <lastmod>2026-09-19</lastmod>
     </url>
     <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-077-multi-format-region-support/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-078-composable-cache-pipeline-stages/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-079-cause-based-ttl-and-staged-expiration/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-080-opt-in-simulation-benchmark-tier/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-081-unified-blocked-biome-run-table/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-082-cache-conscious-b-plus-tree-primitive-arrays/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-083-two-tier-probabilistic-region-routing/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-084-layered-spiral-hilbert-rle-index/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-085-spiral-addressed-hilbert-key-space/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-086-external-web-map-integration/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-088-configurable-downsampling-stride-filter/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-090-test-driver-and-synthetic-mca-architecture/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-091-headless-player-protocol-driver-for-devstack/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/adr/ADR-094-quality-engineering-gates/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
          <loc>https://dailystruggle.github.io/RTP/adr/ADR-TEMPLATE/</loc>
          <lastmod>2026-09-19</lastmod>
     </url>
@@ -573,10 +497,6 @@
          <lastmod>2026-09-19</lastmod>
     </url>
     <url>
-         <loc>https://dailystruggle.github.io/RTP/architecture/13-dual-layer-shape-architecture-and-l3-selection/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
          <loc>https://dailystruggle.github.io/RTP/dev/ADDON_CROSS_SERVER/</loc>
          <lastmod>2026-09-19</lastmod>
     </url>
@@ -621,19 +541,7 @@
          <lastmod>2026-09-19</lastmod>
     </url>
     <url>
-         <loc>https://dailystruggle.github.io/RTP/dev/DEPRECATION_POLICY/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
          <loc>https://dailystruggle.github.io/RTP/dev/DESIGN/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/dev/DEVSTACK_COVERAGE_PLAN/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/dev/ENTERPRISE_READINESS/</loc>
          <lastmod>2026-09-19</lastmod>
     </url>
     <url>
@@ -653,10 +561,6 @@
          <lastmod>2026-09-19</lastmod>
     </url>
     <url>
-         <loc>https://dailystruggle.github.io/RTP/dev/LICENSING/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
          <loc>https://dailystruggle.github.io/RTP/dev/METRICS_PLAN/</loc>
          <lastmod>2026-09-19</lastmod>
     </url>
@@ -669,7 +573,19 @@
          <lastmod>2026-09-19</lastmod>
     </url>
     <url>
+         <loc>https://dailystruggle.github.io/RTP/dev/NEOFORGE_NOTES/</loc>
+         <lastmod>2026-09-19</lastmod>
+    </url>
+    <url>
          <loc>https://dailystruggle.github.io/RTP/dev/POTENTIAL_BUGS/</loc>
+         <lastmod>2026-09-19</lastmod>
+    </url>
+    <url>
+         <loc>https://dailystruggle.github.io/RTP/dev/PROPOSAL-economy-gate-consolidation/</loc>
+         <lastmod>2026-09-19</lastmod>
+    </url>
+    <url>
+         <loc>https://dailystruggle.github.io/RTP/dev/PROPOSAL-tether-and-move-event-spi/</loc>
          <lastmod>2026-09-19</lastmod>
     </url>
     <url>
@@ -689,15 +605,7 @@
          <lastmod>2026-09-19</lastmod>
     </url>
     <url>
-         <loc>https://dailystruggle.github.io/RTP/dev/SEMVER/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
          <loc>https://dailystruggle.github.io/RTP/dev/STAKEHOLDERS/</loc>
-         <lastmod>2026-09-19</lastmod>
-    </url>
-    <url>
-         <loc>https://dailystruggle.github.io/RTP/dev/SUPPORT_MATRIX/</loc>
          <lastmod>2026-09-19</lastmod>
     </url>
     <url>
