@@ -1,8 +1,7 @@
 plugins {
     id 'java'
-    // Shared plugin versions live in gradle/libs.versions.toml (version catalog).
-    alias(libs.plugins.shadow) apply false
-    alias(libs.plugins.spotless)
+    id 'com.gradleup.shadow' version '8.3.8' apply false
+    id 'com.diffplug.spotless' version '6.25.0'
 }
 
 group = 'io.github.dailystruggle'
@@ -49,7 +48,7 @@ subprojects {
 
     java {
         toolchain {
-            languageVersion = JavaLanguageVersion.of(Integer.parseInt(libs.versions.javaToolchain.get()))
+            languageVersion = JavaLanguageVersion.of(21)
         }
         // `-sources` / `-javadoc` jars are intentionally NOT produced: the build
         // only ships the executable artifacts. The addon-API publish closure
@@ -76,18 +75,17 @@ subprojects {
     }
 
     dependencies {
-        // Shared versions are centralized in gradle/libs.versions.toml.
-        compileOnly libs.jetbrains.annotations
+        compileOnly 'org.jetbrains:annotations:24.1.0'
         // Checker Framework qualifier annotations (compile-time only; not shipped in JARs).
         // The Resource Leak Checker reads @MustCall, @Owning, and @EnsuresCalledMethods
         // from this artifact during annotation processing.
-        compileOnly libs.checker.qual
-        testCompileOnly libs.checker.qual
-        testImplementation platform(libs.junit.bom)
-        testImplementation libs.junit.jupiter
-        testImplementation libs.mockito.core
-        testImplementation libs.jetbrains.annotations
-        testRuntimeOnly libs.junit.platform.launcher
+        compileOnly 'org.checkerframework:checker-qual:3.42.0'
+        testCompileOnly 'org.checkerframework:checker-qual:3.42.0'
+        testImplementation platform('org.junit:junit-bom:5.10.0')
+        testImplementation 'org.junit.jupiter:junit-jupiter'
+        testImplementation 'org.mockito:mockito-core:5.5.0'
+        testImplementation 'org.jetbrains:annotations:24.1.0'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     }
 
     test {
@@ -95,7 +93,7 @@ subprojects {
     }
 
     apply plugin: 'jacoco'
-    jacoco { toolVersion = libs.versions.jacoco.get() }
+    jacoco { toolVersion = "0.8.11" }
     tasks.withType(Test) { finalizedBy jacocoTestReport }
     jacocoTestReport {
         dependsOn test
