@@ -675,22 +675,9 @@ class QueueTaskTest {
         MockRTPWorld spyWorld = new MockRTPWorld("unclaimable_fast_world") {
             @Override
             public CompletableFuture<RTPChunk<?>> getOrLoadChunk(int cx, int cz, String origin) {
-                if (cx == 5 && cz == 5) {
-                    CompletableFuture<RTPChunk<?>> failed = new CompletableFuture<>();
-                    failed.completeExceptionally(new IllegalStateException("Simulated chunk load failure for unclaimable reservation"));
-                    return failed;
-                }
-                return super.getOrLoadChunk(cx, cz, origin);
-            }
-
-            @Override
-            public RTPChunk<?> getCachedChunk(long key) {
-                int cx = (int) (key >> 32);
-                int cz = (int) (key & 0xFFFFFFFFL);
-                if (cx == 5 && cz == 5) {
-                    return null;
-                }
-                return super.getCachedChunk(key);
+                CompletableFuture<RTPChunk<?>> failed = new CompletableFuture<>();
+                failed.completeExceptionally(new IllegalStateException("Simulated chunk load failure for unclaimable reservation"));
+                return failed;
             }
         };
         accessor.addWorld(spyWorld);
@@ -865,9 +852,8 @@ class QueueTaskTest {
 
         testRegion.queueManager.keptLocations.offer(reservedLoc);
 
-        // Only invalidate chunk (4, 4), leaving fallback chunks intact
-        long staleTargetKey = (4L & 0xffffffffL) | (4L << 32);
-        staleWorld.isChunkLoadedPredicate = k -> k != staleTargetKey;
+        // Simulate chunk unloaded / invalidated concurrently before dispatch
+        staleWorld.isChunkLoadedPredicate = k -> false;
 
         QueueTask task = new QueueTask(testRegion, player, player, null, result);
         task.start();

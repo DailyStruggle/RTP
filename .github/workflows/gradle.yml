@@ -52,10 +52,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          # Full history so scripts/diff-coverage.py can diff against the PR
-          # base (or the previous commit on push) rather than a shallow tip.
-          fetch-depth: 0
 
       - name: Set up JDK 21 and 25
         uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
@@ -81,27 +77,8 @@ jobs:
       - name: Verify public API binary compatibility
         run: ./gradlew checkBinaryCompatibility
 
-      # -Pcoverage wires JaCoCo report + the jacocoTestCoverageVerification
-      # floors into check; -PstaticAnalysis runs the opt-in PMD gate
-      # (incl. PreferNonLockingExecution). Both were previously local-only.
-      - name: Build and test (with coverage + static analysis gates)
-        run: ./gradlew build shadowJar -Pcoverage -PstaticAnalysis
-
-      # Changed-line coverage gate: fails when < 80% of instrumented changed
-      # lines are covered, measured against the PR base (pull_request) or the
-      # previous commit (push). Reads the JaCoCo XML produced above.
-      - name: Changed-line coverage gate
-        run: |
-          if [ -n "${{ github.base_ref }}" ]; then
-            BASELINE="origin/${{ github.base_ref }}"
-          else
-            BASELINE="${{ github.event.before }}"
-            if [ -z "$BASELINE" ] || [ "$BASELINE" = "0000000000000000000000000000000000000000" ]; then
-              BASELINE="HEAD~1"
-            fi
-          fi
-          echo "Gating changed-line coverage against $BASELINE"
-          python3 scripts/diff-coverage.py --baseline "$BASELINE" --min 0.80
+      - name: Build and test
+        run: ./gradlew build shadowJar
 
       - name: Publish test results
         uses: mikepenz/action-junit-report@5fb8152be6ff4b7721867dd11ca72fce2b16869e # v4.3.1

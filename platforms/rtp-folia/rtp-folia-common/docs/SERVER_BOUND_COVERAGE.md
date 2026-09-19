@@ -83,13 +83,6 @@ asserts its observable server effect, then moving the row to `covered`.
 
 ## 5. `AbstractFoliaServerAccessor` (server surface / SPI wiring)
 
-> The `accessor`-owned rows below are driven live in the devstack via the
-> `rtptest` acceptance scenario (`run-acceptance.{sh,ps1} --scenario rtptest`),
-> which dispatches `/rtp test accessor` to every backend + lobby through
-> `rcon-cli` and asserts the `[RTP test/accessor] pass=true` verdict per service.
-> Under the coverage overlay (`docker-compose.coverage.yml`) the probe also
-> flushes the JaCoCo agent so these paths credit server-bound coverage.
-
 | Path | Owning `rtp test *` | Assertion today | Status |
 |---|---|---|---|
 | `getRTPWorld` / `getRTPWorlds` / `getPlayer` / `getSender` | `accessor`, `world-ops` (in `full`) | console sender, null safety, world height asserted | covered |
@@ -127,10 +120,8 @@ surfaces with **no owning positive-assertion test**:
 5. Player client effects - `sendClientBlockChange(s)`, bossbar progress bars,
    `setRespawnLocation`.
 6. Server surface - `getTPS` and world-border creation/lookup are covered via
-   `world-ops`; menu permission / locale / region-descriptor probes are now
-   asserted live in the devstack via the `rtptest` scenario (`/rtp test accessor`
-   dispatched per service through `rcon-cli`). Only `start`/`stop` lifecycle
-   remains unasserted (devstack boot only).
+   `world-ops`; menu permission / locale / region-descriptor probes, `start`/`stop`
+   lifecycle remain unasserted.
 7. Teleport landing assertion - `FoliaRTPPlayer.setLocation` runs under `stress`
    but is only warn-audited; it does not assert the entity landed on the owning
    region thread at a safe block (S-001).
