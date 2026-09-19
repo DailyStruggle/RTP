@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 
 public class VertParameter extends CommandParameter {
-  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public VertParameter(
       String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
     super(permission, description, isRelevant);
@@ -24,7 +23,6 @@ public class VertParameter extends CommandParameter {
   }
 
   @Override
-  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public Set<String> values() {
     Factory<VerticalAdjustor<?>> factory =
         (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);

@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.Test;
  * figure that matters here: the old form's garbage was short-lived by construction, so retained
  * heap would show nothing while GC pressure per attempt was the actual cost.
  */
-@Tag("slow")
 class BiomeRecallDrawCostTest {
 
   private static final int BIOMES = 8;

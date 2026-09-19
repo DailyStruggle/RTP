@@ -7,9 +7,8 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Path;
+import java.io.File;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -19,15 +18,13 @@ import static org.mockito.Mockito.*;
 
 public class ConfigsReloadTest {
     private RTP rtp;
-
-    // JUnit-managed temp dir: keeps config I/O out of the legacy rtp-core/target/
-    // tree so no stale default.yml fixture lingers between runs.
-    @TempDir
-    Path tempDir;
+    private File tempDir;
 
     @BeforeEach
     public void setUp() {
-        MockRTPServerAccessor accessor = RTPTestSetup.install(tempDir.toFile());
+        tempDir = new File("target/test-configs-reload");
+        if (!tempDir.exists()) tempDir.mkdirs();
+        MockRTPServerAccessor accessor = RTPTestSetup.install(tempDir);
         // Requires empty world list.
         accessor.clearWorlds();
         RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();

@@ -157,7 +157,6 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
    * {@link #acceptProbeY} so the live full-load fallback rejects fluids hidden
    * under a thin solid crust (sand-over-water, magma-under-cobblestone).
    */
-  @SuppressWarnings("unchecked") // raw RTPChunk member calls; adjustor is type-erased over chunk backing
   private static boolean isGroundSafe(
       RTPChunk chunk, int x, int y, int z, Set<String> unsafeBlocks, int platformDepth) {
     int depth = Math.max(1, platformDepth);
@@ -181,7 +180,6 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
   }
 
   @Override
-  @SuppressWarnings("unchecked") // raw RTPChunk member calls; adjustor is type-erased over chunk backing
   public boolean adjust(@NotNull RTPChunk chunk, @NotNull MutableRTPCoords output) {
     if (chunk == null) throw new NullPointerException("Chunk cannot be null");
 
@@ -265,7 +263,6 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
    * headroom + safety predicate as {@link #adjust(RTPChunk, MutableRTPCoords)}.
    */
   @Override
-  @SuppressWarnings("unchecked") // raw RTPChunk member calls; adjustor is type-erased over chunk backing
   public @Nullable RTPCoords adjustColumn(@NotNull RTPChunk chunk, int localX, int localZ) {
     if (chunk == null) throw new NullPointerException("Chunk cannot be null");
 

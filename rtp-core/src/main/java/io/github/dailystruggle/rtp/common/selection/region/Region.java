@@ -1366,7 +1366,6 @@ public class Region extends FactoryValue<RegionKeys> {
    *
    * @return configured display name or region name
    */
-  @SuppressWarnings("unchecked") // multiConfigParserMap keyed by RegionKeys.class guarantees the parser's E
   public String displayName() {
     try {
       MultiConfigParser<RegionKeys> regions =
