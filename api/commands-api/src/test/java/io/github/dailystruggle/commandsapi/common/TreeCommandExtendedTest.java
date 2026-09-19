@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 @DisplayName("TreeCommand comprehensive tab-completion, execution, regex, and subparameter mechanics")
 class TreeCommandExtendedTest {
 
-    @SuppressWarnings("PMD.TestClassWithoutTestCases")
     private static class TestTreeCmd implements TreeCommand {
         private final String name;
         private final String perm;

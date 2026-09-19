@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Immutable per-region queue and cache status carrier (ADR-078).
+ * Immutable per-region queue and cache status carrier (METRICS_PLAN.md & ADR-078 Phase M2).
  *
  * <p>Captures the per-region player queue depth, hot/cold/login inventory levels,
  * stage occupancy, and zero-I/O reallocation counts. No platform types appear here.
@@ -25,7 +25,7 @@ public final class RegionQueueRow {
     public final int reallocations;
 
     /**
-     * Standard constructor matching queue and cache status carrier specification.
+     * Standard constructor matching METRICS_PLAN.md Phase M2 specification.
      */
     public RegionQueueRow(
             int playerQueueDepth,
