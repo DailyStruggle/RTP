@@ -461,12 +461,13 @@ public class RegionLifecycleAndBranchTest {
 
         // Drained candidates should be moved to unkeptLocations up to cold capacity (5)
         assertEquals(5, region.queueManager.unkeptLocations.size(), "Should drain up to cold cap (5)");
-        // Remaining in backlog: initially 10, up to 5 drained (or more refilled depending on refillBudget)
-        assertTrue(region.queueManager.backlogLocations.size() > 0, "Backlog should retain items");
+        // Remaining in backlog should be reduced by 5
+        assertEquals(5, region.queueManager.backlogLocations.size(), "Backlog should retain non-drained items");
 
         // When unkept is already at cold cap, further processBacklog call should drain 0
         processBacklogMethod.invoke(region, budgetNanos, System.nanoTime());
         assertEquals(5, region.queueManager.unkeptLocations.size());
+        assertEquals(5, region.queueManager.backlogLocations.size());
     }
 
     @Test

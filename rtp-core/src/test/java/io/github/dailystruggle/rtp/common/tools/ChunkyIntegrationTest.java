@@ -18,11 +18,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -62,19 +60,14 @@ public class ChunkyIntegrationTest {
     }
 
     @Test
-    void loadChunkyWhenProviderNotRegisteredIsNoOp() throws Exception {
+    void loadChunkyWhenProviderNotRegisteredIsNoOp() {
         ChunkyChecker.loadChunky();
         @SuppressWarnings("unchecked")
         Factory<Shape<?>> shapeFactory =
                 (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
         assertNotNull(shapeFactory);
         // Chunky shapes should not be registered when provider returns null / throws
-        assertNull(shapeFactory.get("chunky_circle"));
-
-        // Call private getChunky() to verify exception handling / setting chunky to null
-        java.lang.reflect.Method getChunkyMethod = ChunkyChecker.class.getDeclaredMethod("getChunky");
-        getChunkyMethod.setAccessible(true);
-        assertDoesNotThrow(() -> getChunkyMethod.invoke(null));
+        assertFalse(shapeFactory.contains("chunky_circle"));
     }
 
     @Test
@@ -129,16 +122,6 @@ public class ChunkyIntegrationTest {
         int[] xz = shape.locationToXZ(rand);
         assertNotNull(xz);
         assertEquals(2, xz.length);
-        assertTrue(rand >= 0L);
-
-        // Test with custom center and dimensions
-        shape.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams.centerX, 100);
-        shape.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams.centerZ, -50);
-        shape.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams.width, 500);
-        shape.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams.height, 500);
-
-        long boundedRand = shape.rand();
-        assertTrue(boundedRand >= 0L);
     }
 
     @Test

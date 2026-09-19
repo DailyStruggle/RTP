@@ -80,10 +80,6 @@ public class HeapPressureMonitorTest {
         assertFalse(HeapPressureMonitor.underPressure());
         assertEquals(0.0, HeapPressureMonitor.lastUsedPercent());
 
-        perf.set(PerformanceKeys.maxHeapPercent, -0.001);
-        resetMonitorState();
-        assertFalse(HeapPressureMonitor.underPressure());
-
         perf.set(PerformanceKeys.maxHeapPercent, -10.0);
         resetMonitorState();
         assertFalse(HeapPressureMonitor.underPressure());
@@ -100,10 +96,6 @@ public class HeapPressureMonitorTest {
         resetMonitorState();
         assertFalse(HeapPressureMonitor.underPressure());
         assertEquals(0.0, HeapPressureMonitor.lastUsedPercent());
-
-        perf.set(PerformanceKeys.maxHeapPercent, 100.001);
-        resetMonitorState();
-        assertFalse(HeapPressureMonitor.underPressure());
 
         perf.set(PerformanceKeys.maxHeapPercent, 150.0);
         resetMonitorState();
@@ -136,25 +128,9 @@ public class HeapPressureMonitorTest {
             // and exercise the warning and trip logic
             boolean pressure = HeapPressureMonitor.underPressure();
             assertTrue(HeapPressureMonitor.lastUsedPercent() >= 0.0);
-            assertEquals(pressure, HeapPressureMonitor.underPressure());
-
-            // Advance sample interval to force fresh sample while under pressure
-            Field lastSampleMs = HeapPressureMonitor.class.getDeclaredField("lastSampleMs");
-            lastSampleMs.setAccessible(true);
-            ((AtomicLong) lastSampleMs.get(null)).set(0L);
 
             // Immediate subsequent call exercises throttled warning branch (now - lastWarn < WARN_INTERVAL_MS)
-            boolean resampledPressure = HeapPressureMonitor.underPressure();
-            assertEquals(pressure, resampledPressure);
-
-            // Advance lastWarnMs past WARN_INTERVAL_MS (30,000ms) to trigger warning logging
-            ((AtomicLong) lastSampleMs.get(null)).set(0L);
-            Field lastWarnMs = HeapPressureMonitor.class.getDeclaredField("lastWarnMs");
-            lastWarnMs.setAccessible(true);
-            ((AtomicLong) lastWarnMs.get(null)).set(0L);
-
-            boolean warnPressure = HeapPressureMonitor.underPressure();
-            assertEquals(pressure, warnPressure);
+            HeapPressureMonitor.underPressure();
         } finally {
             perf.set(PerformanceKeys.maxHeapPercent, 0.0);
             resetMonitorState();

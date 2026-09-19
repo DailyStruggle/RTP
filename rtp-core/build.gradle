@@ -119,15 +119,15 @@ test {
     exclude '**/usability/**'
 
     // ENTERPRISE_READINESS.md item 18: the Docker-gated MySQL/PostgreSQL
-    // integration tier reaches the local Docker daemon through docker-java, which
-    // falls back to Docker Engine API 1.32 when it cannot negotiate higher. Modern
-    // daemons (Docker Engine 29+, minimum API 1.40) reject 1.32 with HTTP 400, so
-    // every container-detection strategy fails and the tier silently skips even
-    // with Docker running. The floor API version is pinned via the test-classpath
-    // resource src/test/resources/docker-java.properties (api.version), which is
-    // the only override docker-java honours here (the DOCKER_API_VERSION env var is
-    // not mapped into its client config, and the api.version system property is not
-    // consulted by the ping). See that file and testcontainers/testcontainers-java#11212.
+    // integration tier talks to the local Docker daemon through docker-java, which
+    // negotiates a default Docker Engine API version that recent daemons
+    // (Docker Engine 29+, minimum API 1.40) reject with HTTP 400. Pin a floor API
+    // version for the test workers unless the environment already supplies one, so
+    // the container tests connect on modern Docker without forcing every developer
+    // to export DOCKER_API_VERSION. Mirrors rtp-proxy-common's item-17 wiring.
+    if (System.getenv('DOCKER_API_VERSION') == null) {
+        environment 'DOCKER_API_VERSION', '1.44'
+    }
 }
 
 // Opt-in benchmark tier (ADR-080).
@@ -268,7 +268,6 @@ if (project.hasProperty('mutation')) {
             'io.github.dailystruggle.rtp.common.tasks.teleport.*',
             'io.github.dailystruggle.rtp.common.selection.region.*',
             'io.github.dailystruggle.rtp.common.selection.worldborder.*',
-            'io.github.dailystruggle.rtp.common.tools.*',
     ]
     // Optional narrowing override: `-PmutationPackages=<glob>[,<glob>...]`.
     // A full run over all three packages is expensive (the teleport/region

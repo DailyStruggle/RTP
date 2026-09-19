@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.tools;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -229,11 +228,6 @@ public class GradientExpanderTest {
         assertTrue(out.contains(SECTION + "cX"), out);
         // After the reset, Y is colorized again by the gradient.
         assertTrue(out.contains(SECTION + "x"), out);
-
-        // Also test uppercase reset \u00a7R
-        String outUpper = GradientExpander.expand("<gradient:#ff0000:#0000ff>" + SECTION + "cX" + SECTION + "RY</gradient>");
-        assertTrue(outUpper.contains(SECTION + "cX"), outUpper);
-        assertTrue(outUpper.contains(SECTION + "x"), outUpper);
     }
 
     // ---- nested tags ----
@@ -301,54 +295,6 @@ public class GradientExpanderTest {
         String hexRun = SECTION + "x" + SECTION + "0" + SECTION + "0" + SECTION + "0" + SECTION + "0" + SECTION + "0" + SECTION + "0";
         String out = GradientExpander.expand("<rainbow>A" + hexRun + "B</rainbow>");
         assertTrue(out.contains(hexRun), out);
-    }
-
-    @Test
-    void parseColorCoverage() throws Exception {
-        java.lang.reflect.Method parseColorMethod = GradientExpander.class.getDeclaredMethod("parseColor", String.class);
-        parseColorMethod.setAccessible(true);
-
-        assertEquals(0xFF0000, parseColorMethod.invoke(null, "#ff0000"));
-        assertEquals(0xFF0000, parseColorMethod.invoke(null, "#FF0000"));
-        assertEquals(0xFF5555, parseColorMethod.invoke(null, "red"));
-        assertEquals(0x5555FF, parseColorMethod.invoke(null, "blue"));
-        assertNull(parseColorMethod.invoke(null, ""));
-        assertNull(parseColorMethod.invoke(null, "invalidColor"));
-        assertNull(parseColorMethod.invoke(null, "#12"));
-        assertNull(parseColorMethod.invoke(null, "#1234567"));
-        assertNull(parseColorMethod.invoke(null, "#gggggg"));
-
-        // Test withReset coverage
-        java.lang.reflect.Method withResetMethod = GradientExpander.class.getDeclaredMethod("withReset", String.class, String.class);
-        withResetMethod.setAccessible(true);
-        assertEquals("test", withResetMethod.invoke(null, "test", "test"));
-        assertEquals("no_section", withResetMethod.invoke(null, "no_section", "other"));
-        assertEquals("colored" + SECTION + "a" + SECTION + "r", withResetMethod.invoke(null, "colored" + SECTION + "a", "other"));
-
-        // Test interpolateStops coverage
-        java.lang.reflect.Method interpMethod = GradientExpander.class.getDeclaredMethod("interpolateStops", java.util.List.class, float.class);
-        interpMethod.setAccessible(true);
-        java.util.List<int[]> twoColors = java.util.List.of(new int[]{0, 0, 0}, new int[]{255, 255, 255});
-        int[] rgb0 = (int[]) interpMethod.invoke(null, twoColors, 0.0f);
-        assertEquals(0, rgb0[0]);
-        int[] rgb1 = (int[]) interpMethod.invoke(null, twoColors, 1.0f);
-        assertEquals(255, rgb1[0]);
-        int[] mid = (int[]) interpMethod.invoke(null, twoColors, 0.5f);
-        assertTrue(mid[0] > 0 && mid[0] < 255);
-
-        // Test with negative and > 1.0 phase
-        String outNegPhase = GradientExpander.expand("<gradient:#ff0000:#0000ff:-0.25>Hello World</gradient>");
-        assertTrue(outNegPhase.contains(SECTION + "x"), outNegPhase);
-
-        String outPosPhase = GradientExpander.expand("<gradient:#ff0000:#0000ff:0.75>Hello World</gradient>");
-        assertTrue(outPosPhase.contains(SECTION + "x"), outPosPhase);
-
-        // Test multi-stop gradient (3 colors)
-        java.util.List<int[]> threeColors = java.util.List.of(new int[]{255, 0, 0}, new int[]{0, 255, 0}, new int[]{0, 0, 255});
-        int[] midFirstHalf = (int[]) interpMethod.invoke(null, threeColors, 0.25f);
-        assertTrue(midFirstHalf[0] > 0 || midFirstHalf[1] > 0);
-        int[] midSecondHalf = (int[]) interpMethod.invoke(null, threeColors, 0.75f);
-        assertTrue(midSecondHalf[1] > 0 || midSecondHalf[2] > 0);
     }
 
     @Test

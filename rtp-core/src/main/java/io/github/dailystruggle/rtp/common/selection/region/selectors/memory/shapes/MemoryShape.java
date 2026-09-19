@@ -1,13 +1,10 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.anvil.StorageLatencyProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.residency.StrideGroupResidencyManager;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.HybridHazardTable;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -756,59 +753,22 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Optional rotating residency manager for stride-group residency and dynamic bin swapping.
-   */
-  protected volatile StrideGroupResidencyManager residencyManager;
-
-  /**
-   * Returns the attached stride-group residency manager, or {@code null}.
-   */
-  public StrideGroupResidencyManager getResidencyManager() {
-    return residencyManager;
-  }
-
-  /**
-   * Attaches or detaches a stride-group residency manager for rotating bad location caching.
-   */
-  public void setResidencyManager(StrideGroupResidencyManager residencyManager) {
-    this.residencyManager = residencyManager;
-  }
-
-  /**
-   * Determines whether the shape should swap bins in memory instead of allocating a full
-   * monolithic hazard table across the domain. Swaps bins if a residency manager is active,
-   * or if JVM heap is overutilized and disk latency times are good enough.
-   *
-   * @return {@code true} if bin swapping should be used instead of a full table
-   */
-  public boolean shouldSwapBins() {
-    if (residencyManager != null) return true;
-    boolean heapOverutilized = HeapPressureMonitor.underPressure();
-    StorageLatencyProbe.Device device = StorageLatencyProbe.classifyByLatency();
-    boolean diskTimesGood = (device != StorageLatencyProbe.Device.HDD && device != StorageLatencyProbe.Device.SLOW);
-    return heapOverutilized && diskTimesGood;
-  }
-
-  /**
    * Returns the parallel hazard mirror table, if initialized and range fits int.
    *
    * @return active {@link HybridHazardTable} mirror, or {@code null}
    */
   public HybridHazardTable getHazardMirror() {
-    if (shouldSwapBins()) return null;
     return ensureHazardMirror();
   }
 
   /**
    * Lazily initializes and returns the hazard mirror table.
-   * Guard: only initialized when {@link #getRange()} fits in positive int (0 < range <= Integer.MAX_VALUE)
-   * and bin swapping is not active.
-   * If range does not fit int or bin swapping is active, leaves null and skips mirroring.
+   * Guard: only initialized when {@link #getRange()} fits in positive int (0 < range <= Integer.MAX_VALUE).
+   * If range does not fit int, leaves null, skips mirroring, and logs a one-time message.
    *
-   * @return the hazard mirror instance, or {@code null} if out of int range bounds or swapping bins
+   * @return the hazard mirror instance, or {@code null} if out of int range bounds
    */
   private HybridHazardTable ensureHazardMirror() {
-    if (shouldSwapBins()) return null;
     HybridHazardTable mirror = hazardMirror;
     if (mirror != null) return mirror;
     long range = getRange();
@@ -970,12 +930,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     ConcurrentHashMap<Long, Long> rebuilding = rebuildingBadLocations;
     if (rebuilding != null && rebuilding.containsKey(location)) return true;
 
-    StrideGroupResidencyManager residency = residencyManager;
-    if (residency != null) {
-      if (residency.isKnownBad(location)) return true;
-    }
-
-    HybridHazardTable mirror = (shouldSwapBins()) ? null : ensureHazardMirror();
+    HybridHazardTable mirror = ensureHazardMirror();
     if (mirror != null) {
       return mirror.isBad(location);
     }
@@ -1889,21 +1844,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     long pendingVal = (ord & 0xFFL) | (epochSec << 8);
     pendingBadLocations.get().put(location, pendingVal);
     badLocationsDirty = true;
-
-    StrideGroupResidencyManager residency = residencyManager;
-    if (residency != null) {
-      // Only locations that can be updated (resident) are updated in memory
-      residency.updateIfResident(location);
-    } else if (!shouldSwapBins()) {
-      writeLock.lock();
-      try {
-        HybridHazardTable mirror = ensureHazardMirror();
-        if (mirror != null) {
-          mirror.markBad(location);
-        }
-      } finally {
-        writeLock.unlock();
+    writeLock.lock();
+    try {
+      HybridHazardTable mirror = ensureHazardMirror();
+      if (mirror != null) {
+        mirror.markBad(location);
       }
+    } finally {
+      writeLock.unlock();
     }
   }
 
@@ -2058,17 +2006,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       writeLock.lock();
       try {
         for (int k = n - 1; k >= idx; k--) sums[k] += delta;
-        StrideGroupResidencyManager residency = residencyManager;
-        if (residency != null) {
+        HybridHazardTable mirror = ensureHazardMirror();
+        if (mirror != null) {
           for (long k = end; k < newEnd; k++) {
-            residency.updateIfResident(k);
-          }
-        } else if (!shouldSwapBins()) {
-          HybridHazardTable mirror = ensureHazardMirror();
-          if (mirror != null) {
-            for (long k = end; k < newEnd; k++) {
-              mirror.markBad(k);
-            }
+            mirror.markBad(k);
           }
         }
       } finally {

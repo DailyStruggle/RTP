@@ -92,8 +92,6 @@ public class RegionConfigLoaderTest {
         return switch (key) {
             case worldBorderOverride -> settings.worldBorderOverride();
             case cacheCap -> settings.cacheCap();
-            case backlogCacheCap -> settings.backlogCacheCap();
-            case networkReserveSize -> settings.networkReserveSize();
             case activeChunkCap -> settings.activeChunkCap();
             case price -> settings.price();
             case spatialResolution -> settings.spatialResolution();
@@ -115,13 +113,7 @@ public class RegionConfigLoaderTest {
                 // Tolerant boolean -> int coercion: true -> 1, false -> 0.
                 Arguments.of(RegionKeys.cacheCap, true, 1L, "Boolean true coerced to 1 for cacheCap"),
                 Arguments.of(RegionKeys.activeChunkCap, true, 1, "Boolean true coerced to 1 for activeChunkCap"),
-                Arguments.of(RegionKeys.shape, null, null, "null for shape"),
-                Arguments.of(RegionKeys.backlogCacheCap, "malformed_cap", 0L, "String instead of Number for backlogCacheCap"),
-                Arguments.of(RegionKeys.networkReserveSize, "bad_num", 0L, "String instead of Number for networkReserveSize"),
-                Arguments.of(RegionKeys.spatialResolution, "not_a_number", 0L, "String instead of Number for spatialResolution"),
-                Arguments.of(RegionKeys.requirePermission, "maybe", false, "Invalid boolean string for requirePermission"),
-                Arguments.of(RegionKeys.requirePermission, 1, true, "Integer 1 for requirePermission"),
-                Arguments.of(RegionKeys.requirePermission, 0, false, "Integer 0 for requirePermission")
+                Arguments.of(RegionKeys.shape, null, null, "null for shape")
         );
     }
 
@@ -396,39 +388,5 @@ public class RegionConfigLoaderTest {
         java.util.Map<String, Object> mapWithMissingCoord = new java.util.HashMap<>();
         mapWithMissingCoord.put("vertices", java.util.List.of(java.util.Map.of("x", 10)));
         RegionConfigLoader.applyPolygonVertices(polygon, mapWithMissingCoord);
-    }
-
-    @org.junit.jupiter.api.Test
-    @org.junit.jupiter.api.DisplayName("load with unknown shape or vert recovers to default without throwing")
-    void testLoadMalformedShapeAndVertRecovery() {
-        ConfigParser<RegionKeys> parser = mock(ConfigParser.class);
-        parser.name = "malformed_shape_vert.yml";
-        setupDefaultMocks(parser);
-
-        // Factory with defaults available
-        io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
-        shapeFactory.add("SQUARE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square());
-        shapeFactory.add("CIRCLE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle_Normal());
-        RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
-
-        io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?>> vertFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
-        vertFactory.add("LINEAR", new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new java.util.ArrayList<>()));
-        RTP.factoryMap.put(RTP.factoryNames.vert, vertFactory);
-
-        // Unknown shape name and invalid data types in shape map
-        java.util.Map<String, Object> malformedShapeMap = new java.util.HashMap<>();
-        malformedShapeMap.put("name", "NON_EXISTENT_SHAPE");
-        malformedShapeMap.put("radius", "invalid_radius");
-        doReturn(malformedShapeMap).when(parser).getConfigValue(eq(RegionKeys.shape), any());
-
-        // Unknown vert name and invalid data types in vert map
-        java.util.Map<String, Object> malformedVertMap = new java.util.HashMap<>();
-        malformedVertMap.put("name", "NON_EXISTENT_VERT");
-        malformedVertMap.put("minY", "invalid_y");
-        doReturn(malformedVertMap).when(parser).getConfigValue(eq(RegionKeys.vert), any());
-
-        RegionSettings settings = assertDoesNotThrow(() -> RegionConfigLoader.load(parser));
-        org.junit.jupiter.api.Assertions.assertNotNull(settings.shape(), "Shape should fall back to default shape");
-        org.junit.jupiter.api.Assertions.assertNotNull(settings.vert(), "Vert should fall back to default adjustor");
     }
 }

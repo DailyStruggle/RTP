@@ -79,8 +79,8 @@ graph. These are instruction / branch percentages, not estimates.
 | `metrics-api` | 18.8 | 18.9 | 506 | Pure SPI, 8 classes. Should be ~100%. |
 | `commands-api` | 93.5 | 80.1 | 163 | Decoupled from Bukkit, pure Java + Brigadier library. Strict 90/80 JaCoCo gate enforced. |
 | `rtp-api` | 95.7 | 81.3 | 422 | Fully tested public API models, facades, and delegates. Strict 90/80 JaCoCo gate enforced. |
-| `rtp-core` | 80.7 | 65.2 | 27,953 | The dominant mass. Detail in section 2.3. Refreshed 2026-09-15 (was 59.6/45.8/56,583 on 2026-09-10). |
-| `rtp-proxy-common` | 82.2 | 69.1 | 3,303 | Raised from 59.0/44.1 via comprehensive unit suites; PIT mutation testing at 79% (375/474 killed). Floor ratcheted to 0.78/0.65. |
+| `rtp-core` | 59.6 | 45.8 | 56,583 | The dominant mass. Detail in section 2.3. |
+| `rtp-proxy-common` | 59.0 | 44.1 | 7,508 | `transport/redis` at 4.4% is nearly the whole gap. |
 | `maps-api` | 67.6 | 48.6 | 1,505 | `render` 73.8%, `bukkit` binding drags it down. |
 | `anvil-api` | 71.1 | 60.3 | 1,609 | Closest to target of the large modules. |
 | `tags-api` | 84.5 | 74.4 | 203 | Nearly done. |
@@ -104,41 +104,30 @@ largest packages (`effectsapi/fabric`, `effectsapi/bukkit`) are platform binding
 
 ### 2.3 `rtp-core` worst packages by absolute missed instructions
 
-Refreshed 2026-09-15 from a fresh `:rtp-core:jacocoTestReport` run (module now
-80.7% instruction / 65.2% branch; 27,953 missed instructions). Many of the large
-gaps in the 2026-09-10 baseline (`commands/menu` 10,475 -> 2,805, `tools` 5,001
--> 1,418, `commands/test` 1,814@0% -> 667@81.7%) were closed by intervening test
-work; the genuine laggards are now the `RTP` root class and the `commands` root.
-
 | Package (after `...rtp.common.`) | Instr % | Missed |
 |---|---|---|
-| `commands/menu` | 83.7 | 2,805 |
-| `selection/region` | 83.5 | 2,497 |
-| `(root package)` | **28.4** | 2,090 |
-| `selection/region/selectors/memory/shapes` | 91.1 | 1,845 |
-| `configuration` | 79.6 | 1,663 |
-| `commands` | **49.2** | 1,633 |
-| `database/options` | 64.1 | 1,591 |
-| `network` | 77.8 | 1,572 |
-| `tools` | 83.1 | 1,418 |
-| `tasks` | 75.0 | 1,395 |
-| `commands/config` | 65.6 | 891 |
-| `commands/prefab` | 79.8 | 707 |
-| `commands/maps` | 67.6 | 691 |
-| `commands/test` | 81.7 | 667 |
-| `database` | 66.7 | 623 |
-| `selection/region/selectors/memory/table` | 86.9 | 577 |
-| `commands/info` | 60.2 | 401 |
+| `commands/menu` | 39.3 | 10,475 |
+| `selection/region` | 55.5 | 6,681 |
+| `tools` | 39.9 | 5,001 |
+| `network` | 45.9 | 3,820 |
+| `selection/region/selectors/memory/shapes` | 84.6 | 2,975 |
+| `database/options` | 33.6 | 2,936 |
+| `configuration` | 71.7 | 2,306 |
+| `tasks` | 60.3 | 2,210 |
+| `(root package)` | 28.0 | 2,103 |
+| `selection/region/selectors/memory/table` | 57.5 | 1,853 |
+| `commands/test` | **0.0** | 1,814 |
+| `commands` | 46.8 | 1,713 |
+| `tasks/teleport` | 64.6 | 1,073 |
+| `selection/.../shapes/util` | 14.7 | 791 |
+| `effects` (root-level) | **0.0** | 625 |
+| `menu/search` | **0.0** | 470 |
+| `tasks/tick` | 21.4 | 442 |
 
-The single largest remaining target in the root package is the **`RTP` root
-class**, raised 2026-09-15 from 28.4% (2,090 missed) to ~43% (1,643 missed) by
-`RTPApiSurfaceTest` (drives the `RTPAPI` read-only delegates -
-allowed-targets enumeration and per-target status - plus the metrics delegate
-and the YAML->SQL `handleMigration` background task). The remaining `RTP` gap is
-mostly the constructor's server-bound bootstrap lambdas and the SQL-accessor
-branches of migration/shutdown, which need a real DB accessor. `database/options`
-(64.1%) likewise remains partly Docker/Testcontainers-gated for the JDBC error
-paths.
+Single worst class in the repository: **`MenuRedeemSubcommand`, 4,594 missed
+instructions** (13% covered). `MenuWiringSupportInstaller` (833) and
+`VisualizationsSubmenuBuilder` (548) are fully uncovered. These three alone are
+roughly 10% of the `rtp-core` gap.
 
 ### 2.4 Measurement caveats found while taking this baseline
 
@@ -170,8 +159,7 @@ paths.
    simply have not been written against it.
 3. 341 test files already exist in `rtp-core` against 323 main files. The suite is
    broad but shallow - it exercises happy paths and leaves branches uncovered
-   (80.7% instruction vs 65.2% branch is the signature of that; branch coverage
-   is now the harder half of the remaining gap to 90/80).
+   (59.6% instruction vs 45.8% branch is the signature of that).
 
 **Honest carve-outs** that should be excluded from the ratio rather than chased:
 
@@ -363,15 +351,6 @@ paths.
       over the named pipe, so the test task pins `DOCKER_API_VERSION=1.44` when unset
       and the suite runs serially (`maxParallelForks = 1`) since classes share one
       container and scrub a common keyspace.
-      **Expanded (2026-09-15):** Added comprehensive mock-based unit tests for non-Docker
-      environments and edge branches across `rtp-proxy-common` (`DefaultRtpDispatcherEdgeTest`,
-      `HmacVerifierEdgeTest`, `NetworkBindingsEdgeTest`, `SqlNetworkStateSchemaUnitTest`,
-      `SqlNetworkStateBindingDialectTest`, `MetricInputEdgeTest`, `LoadBalancerConfigYamlEdgeTest`,
-      `ReservationTokenReaperEdgeTest`, `NetworkWaitlistDrainerEdgeTest`). Raised module coverage
-      to **82.2% instruction / 69.1% branch** in Docker-less runs (missed instructions halved from
-      7,508 to 3,303). Configured opt-in PIT mutation testing (`-Pmutation`), achieving **79% mutation
-      score** (375 / 474 mutations killed, 90% test strength). JaCoCo floor in `build.gradle` ratcheted
-      from 0.55/0.40 to 0.78/0.65.
 - [x] 18\. `rtp-core` `database/options` (33.6%, 2,936) - error paths, missing-key
       fallbacks, rollback. **Done (2026-09-11):** replaced the mock-based tests that
       copied read/write logic into throwaway `Testable*` subclasses with suites that
@@ -414,17 +393,6 @@ paths.
       and related placeholders are already thoroughly covered by `PlaceholderProviderTest`,
       `RtpOutcomeStatsInfoPlaceholderTest`, and command suites; stale uncommitted
       `.bak` artifacts for `CfDiag` and `PlaceholderProvider` were cleared.
-      **Expanded (2026-09-15):** Raised `tools` package test coverage from 80.1% to **82.5% instruction**
-      (6,930 / 8,397 instructions covered) and **68.2% branch** (551 / 808 branches covered).
-      Deepened test suites across all core tools classes:
-      - `CfDiagTest`: verified rate formatting boundary branches (`>= 1000.0`, `>= 10.0`, `< 10.0`), scheduler start failure reset of `STARTED`, individual counter delta dumps, and log message assertions. Reached **100% instruction and branch coverage**.
-      - `MemoryTrackerTest`: added tests for `activeTickets()` (null accessor/world safe fallback, multi-world sum), `activeTasks()` (unwrapped tasks, `TrackedRTPTask`, `TeleportPipelineTask`), memory ceiling boundaries, and active-GC orphan ticket release diagnostics.
-      - `HeapPressureMonitorTest`: added tests for boundary conditions at 0.0, 100.0, and low-threshold trips with warning throttling.
-      - `ChunkyIntegrationTest`: covered `ChunkyChecker.getChunky()` safe fallback and `ChunkyRTPShape.rand()` fallback returning `badPrefixSumsCache[0]` when iterations exceed 10,000.
-      - `PlaceholderProviderTest`: tested snapshot management helpers (`hasLiveTps()`, `hasLiveMspt()`, `hasDatabaseLatency()`), private `formatPercentile()` edge cases, and regional/world placeholder lookups.
-      - `GradientExpanderTest`: added tests for uppercase `\u00a7R` resets, `parseColor` hex/named/invalid formats, `withReset` boundaries, and multi-stop gradient phase handling.
-      - `ParsePermissionsTest`: tested null sender default handling and multi-value integer permission parsing.
-      Integrated `io.github.dailystruggle.rtp.common.tools.*` into PIT mutation testing configuration in `rtp-core/build.gradle`, lifting package mutation score from **48.6% to 56.4%** (412 / 731 mutations killed, 72.8% test strength).
 - [x] 20\. `rtp-core` `network` (45.9%, 3,820).
       **Done (2026-09-11):** brought `network` package family coverage from 45.9% to
       64.5% overall (`pluginmessage`: 90.0%, `direct`: 74.0%, `network`: 59.7%).
@@ -482,22 +450,17 @@ paths.
       fails the build below the target; a routine `.\gradlew.bat build` never
       resolves the PIT toolchain (mirrors the `-Pcoverage` / `-PstaticAnalysis`
       opt-ins). Run it with `.\gradlew.bat :rtp-core:pitest -Pmutation`.
-      **Strengthened and audited (2026-09-15):**
+      **Strengthened and audited (2026-09-12):**
       - `selection/worldborder`: 125 mutations, 104 killed (**83%**, test strength 89%, line coverage 93%).
-      - `selection/region/cache`: 70 mutations, 57 killed (**81%**, test strength 87%).
-      - `selection/region/selectors/verticalAdjustors`: 282 mutations, 240 killed (**85%**, test strength 87%).
-      - `selection/region/selectors/memory/table`: 261 mutations, 202 killed (**77%**, test strength 81%).
-      - `tasks/teleport`: increased from 26% to **61%** (285 of 465 killed, test strength 72%, exceeding the >=60% threshold)
+      - `selection/region/cache`: 256 mutations, 180 killed (**70%**, test strength 83%).
+      - `selection/region/selectors/verticalAdjustors`: 633 mutations, 303 killed (**48%**, test strength 65%).
+      - `tasks/teleport`: increased from 26% (122 killed) to **50%** (216 of 436 killed, test strength 70%)
         after adding dedicated unit tests:
         * `RTPTeleportCancelTest`: pre/post actions, message dispatch, economy refund, noCancel permission gate.
         * `ReqRtpAdr072ViewDistanceClampTest`: null/negative interval checks, throw tolerance on player methods.
         * `TeleportPipelineTaskPhaseTest`: full setup-to-cleanup lifecycle, location generator transitions,
           missing chunk set loading, arrival platform build triggers, custom `PlatformCreatorRegistry` hook
           delegation, and schematic footprint clear verifiers.
-        * `TeleportPipelineTaskMutationTest`: remaining-delay arithmetic (`toTicks = remainingTime / 50`) and clamping,
-          sync-vs-async scheduling paths for generation results, memory tracker untracking and cancellation cleanup,
-          and fallback transitions.
-      - Selection region subsystem coverage audited: 46,622 / 51,388 instructions (**90.72%**) and 4,483 / 5,561 branches (**80.62%**).
       - PIT tuning: configured `timeoutConstInMillis = 1500`, `timeoutFactor = 1.25`, and added exclusions for
         benchmark/soak suites (`*StressTest*`, `*ComparisonTest*`, `*Throughput*`, `*Cost*`, `*RealWorld*`)
         to prevent minion timeouts during line-coverage calculations.
@@ -816,7 +779,7 @@ on its own, and it matches the evidence-over-adjectives voice the project alread
 
 ---
 
-## 10. Definition-of-done scorecard (audited 2026-09-15)
+## 10. Definition-of-done scorecard (audited 2026-09-12)
 
 Graded against section 9 by reading the repository, not the checklist. Evidence
 column names the file an outside reviewer can open. Update this table (and the date)
@@ -824,21 +787,19 @@ whenever a criterion changes state; never tick a section 4-7 item as a substitut
 
 | # | Criterion (section 9) | Status | Evidence | Remaining work |
 |---|---|---|---|---|
-| 1 | Every platform-neutral module >= 90% instruction / 80% branch, build-gated | **PARTIAL** | `build.gradle` `coverageFloors`: all platform-neutral modules gated (`:metrics-api` 0.95/0.85 [100%/94.6%], `:tags-api` 0.95/0.85 [98.2%/90.9%], `:yaml-api` 0.92/0.80 [97.0%/88.1%], `:rtp-api` 0.90/0.80 [95.7%/81.3%], `:commands-api` 0.90/0.80 [93.5%/80.1%], `:maps-api` 0.90/0.78 [94.7%/82.1%], `:anvil-api` 0.86/0.75 [90.5%/80.5%], `:rtp-core` 0.62/0.47 [67.5%/52.8%, selection/region at 90.72%/80.62%], `:rtp-proxy:rtp-proxy-common` 0.55/0.40 [60.1%/45.5%]). | Ratchet upward with `scripts/ratchet-coverage.py` after each green `-Pcoverage` run until all modules reach 0.90/0.80. 7 of 9 platform-neutral modules (`metrics-api`, `tags-api`, `yaml-api`, `maps-api`, `anvil-api`, `commands-api`, `rtp-api`) meet the target today; `rtp-core` and `rtp-proxy-common` continue to advance. |
-| 2 | Mutation score >= 60% on the safety packages | **MET** | `rtp-core/build.gradle` `-Pmutation` gate, `mutationThreshold = 60`; all safety packages meet or exceed the floor: `selection/worldborder` passed (83%), `selection/region/cache` passed (81%), `selection/region/selectors/verticalAdjustors` passed (85%), `selection/region/selectors/memory/table` passed (77%), `tasks/teleport` passed (61%, 285/465 killed, test strength 72%); `.github/workflows/mutation-testing.yml` wired. | Keep test assertions strong across future refactors so package mutation scores remain >= 60%. |
+| 1 | Every platform-neutral module >= 90% instruction / 80% branch, build-gated | **PARTIAL** | `build.gradle` `coverageFloors`: all platform-neutral modules gated (`:metrics-api` 0.95/0.85 [100%/94.6%], `:tags-api` 0.95/0.85 [98.2%/90.9%], `:yaml-api` 0.92/0.80 [97.0%/88.1%], `:rtp-api` 0.90/0.80 [95.7%/81.3%], `:commands-api` 0.90/0.80 [93.5%/80.1%], `:maps-api` 0.90/0.78 [94.7%/82.1%], `:anvil-api` 0.86/0.75 [90.5%/80.5%], `:rtp-core` 0.62/0.47 [67.5%/52.8%], `:rtp-proxy:rtp-proxy-common` 0.55/0.40 [60.1%/45.5%]). | Ratchet upward with `scripts/ratchet-coverage.py` after each green `-Pcoverage` run until all modules reach 0.90/0.80. 7 of 9 platform-neutral modules (`metrics-api`, `tags-api`, `yaml-api`, `maps-api`, `anvil-api`, `commands-api`, `rtp-api`) meet the target today; `rtp-core` and `rtp-proxy-common` continue to advance. |
+| 2 | Mutation score >= 60% on the safety packages | **PARTIAL** | `rtp-core/build.gradle` `-Pmutation` gate, `mutationThreshold = 60`; `selection/worldborder` passed (83%), `selection/region/cache` passed (70%); `tasks/teleport` strengthened from 26% to 50%; `.github/workflows/mutation-testing.yml` wired. | Continue strengthening remaining `tasks/teleport` and `selection/region` classes to hold all safety subpackages at >= 60%. |
 | 3 | Every S-00x prohibition has an automated rule cited in `TRACEABILITY.md` | **MET** | `RTPArchitectureTest` rules 1-10; `TRACEABILITY.md` REQ-RTP-S-001..S-007 rows. | Keep the rows current when rules move. |
 | 4 | Support matrix distinguishes tested vs best-effort; tested cells re-verified by CI on a schedule | **MET** | `SUPPORT_MATRIX.md`; `.github/workflows/devstack-acceptance.yml` (nightly: Velocity + Paper + Folia + Fabric on modern MC; Java 21 LTS & 25+). | Tested cells in `SUPPORT_MATRIX.md` match automated CI / devstack suites; platforms without scheduled live CI suites (Spigot, NeoForge, BungeeCord, non-LTS Java) are categorized as Best-effort. |
 | 5 | Each release ships SBOM, signed artifacts, checksums, acceptance log | **MET** | `.github/workflows/release.yml`: `cyclonedxBom`, `generateChecksums`, `signDeliverables` (using `SIGNING_KEY` / `SIGNING_PASSWORD`), `attest-build-provenance` wired; `.asc`, `.sha256`, `.sha512`, `bom.json`, and `acceptance-evidence.zip` (retrieved from successful acceptance run) attached to GitHub releases. | Release workflow wires all required assets and attestation. |
 | 6 | API compatibility gated automatically; deprecation policy published | **MET** | `DEPRECATION_POLICY.md` published; `build.gradle` `checkBinaryCompatibility` enforces binary compatibility across all 7 public API modules against baseline release artifact (`japicmpBaselineVersion`, default `3.2.0`) with `richReport` rules and unannounced-break failure verified against `config/binary-compatibility-accepted-breaks.json`; wired into `.github/workflows/gradle.yml` for CI gating on push and pull requests. | Keep `config/binary-compatibility-accepted-breaks.json` updated with rationale whenever announced removals pass the mandatory 2-minor deprecation notice window. |
-| 7 | Zero known CVEs in shipped dependencies, checked automatically | **MET** | `.github/workflows/dependency-check.yml` now gates at `--failOnCVSS 4` with `continue-on-error` removed (an unsuppressed finding fails the run); runs weekly, on push, and on pull requests touching `gradle/libs.versions.toml` / `build.gradle` / `**/build.gradle` / `config/dependency-check-suppressions.xml`; accepted findings require written justification in `config/dependency-check-suppressions.xml`. | Keep suppressions justified and current; revisit the CVSS floor toward 0 as the surface stabilizes. |
+| 7 | Zero known CVEs in shipped dependencies, checked automatically | **PARTIAL** | `.github/workflows/dependency-check.yml` weekly, `--failOnCVSS 8`; `config/dependency-check-suppressions.xml`. | Lower the threshold to fail on any unsuppressed CVE (or CVSS >= 4 with justified suppressions), and run it on pull requests that touch `gradle/libs.versions.toml`. |
 
-**Cross-cutting gap (resolved 2026-09-15):** `.github/workflows/gradle.yml` `build-full`
-now runs `./gradlew build shadowJar -Pcoverage -PstaticAnalysis`, so the JaCoCo floors
-and the PMD gate (including `PreferNonLockingExecution`) run in CI, the `jacoco-coverage`
-artifact is populated, and a `scripts/diff-coverage.py` changed-line gate (80% floor,
-baseline = PR base or previous commit; checkout uses `fetch-depth: 0`) fails the run
-when changed lines regress. `-PfullTests` (the slow/edge/simulation tiers) is still not
-run in CI by default to keep wall time bounded; run it locally or via a scheduled job.
+**Cross-cutting gap:** `.github/workflows/gradle.yml` runs plain `./gradlew build`, so
+the JaCoCo floors, SpotBugs, and ArchUnit rules do gate every push, but nothing in CI
+passes `-Pcoverage` (the `jacoco-coverage` artifact upload is therefore empty),
+`-PstaticAnalysis` (PMD, including `PreferNonLockingExecution`), `-PfullTests`, or
+runs `scripts/diff-coverage.py`. Those gates exist locally only until wired.
 
 **Claim language until all rows read MET:** state the numbers ("rtp-core 60% instruction,
 floors enforced at 0.55/0.42; SBOM + SHA-256/512 + SLSA provenance on every release;
