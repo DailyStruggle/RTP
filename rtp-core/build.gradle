@@ -4,7 +4,7 @@ import com.github.spotbugs.snom.Confidence
 plugins {
     id 'java-library'
     id 'java-test-fixtures'
-    id 'com.github.spotbugs' version '6.4.2'
+    id 'com.github.spotbugs' version '6.0.18'
     // PIT mutation testing (ENTERPRISE_READINESS.md item 22). Declared but NOT
     // applied here; the `-Pmutation` block below applies it on demand so a
     // routine `.\gradlew.bat build` never resolves the PIT toolchain.
@@ -93,10 +93,7 @@ dependencies {
     // above (testRuntimeOnly); MySQL's driver is otherwise absent, so add it for
     // the MySQLDatabaseAccessor Hikari pool to resolve jdbc:mysql:// at test time.
     testRuntimeOnly 'com.mysql:mysql-connector-j:8.4.0'
-    // sb-contrib is the renamed successor of fb-contrib. 7.7.4 is built against the
-    // BCEL bundled by SpotBugs 4.9.x (plugin 6.4.2); the older fb-contrib 7.6.4
-    // aborted analysis with a BCEL BootstrapMethods incompatibility (exit code 3).
-    spotbugsPlugins 'com.mebigfatguy.sb-contrib:sb-contrib:7.7.4'
+    spotbugsPlugins 'com.mebigfatguy.fb-contrib:fb-contrib:7.6.4'
 }
 
 // Keep the main source tree free of unchecked-generics warnings. Every genuinely
@@ -221,15 +218,11 @@ tasks.register('evaluateSimulationBaseline') {
 // Static analysis: SpotBugs catches null-dereference, improper synchronisation,
 // and incorrect volatile/atomic usage - common failure modes in concurrent Java.
 // effort='max' enables the deepest analysis pass.
-// reportLevel='high' gates the build on high-confidence findings; suppressions require written
-// justifications in spotbugs-exclude.xml (ENTERPRISE_READINESS.md item 29). The sb-contrib 7.7.4
-// upgrade (needed to clear the fb-contrib 7.6.4 BCEL BootstrapMethods analysis crash under the
-// modern BCEL bundled by SpotBugs 4.9.x) is far noisier at medium confidence, emitting hundreds of
-// advisory code-idiom findings with no core-SpotBugs correctness findings among them; high confidence
-// keeps the gate meaningful without drowning it in style noise.
+// reportLevel='medium' (ENTERPRISE_READINESS.md item 29) ensures medium- and high-confidence
+// findings gate the build; suppressions require written justifications in spotbugs-exclude.xml.
 spotbugs {
     effort = Effort.valueOf('MAX')
-    reportLevel = Confidence.valueOf('HIGH')
+    reportLevel = Confidence.valueOf('MEDIUM')
     ignoreFailures = false
     excludeFilter = file('spotbugs-exclude.xml')
 }

@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.config.list;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
