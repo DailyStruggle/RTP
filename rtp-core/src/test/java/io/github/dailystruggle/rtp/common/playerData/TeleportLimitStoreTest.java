@@ -35,6 +35,17 @@ class TeleportLimitStoreTest {
   }
 
   @Test
+  void defaultMethod_usesReturnsZero() {
+    TeleportLimitStore store = new TeleportLimitStore() {
+      @Override public boolean isLocked(UUID id, long cap, long resetMillis, long now) { return false; }
+      @Override public void recordSuccess(UUID id, long cap, long resetMillis, long now) {}
+      @Override public long millisUntilReset(UUID id, long cap, long resetMillis, long now) { return 0; }
+      @Override public void reset(UUID id) {}
+    };
+    assertEquals(0L, store.uses(UUID.randomUUID(), 1000L, System.currentTimeMillis()));
+  }
+
+  @Test
   void snapshotRestore_roundTrips() {
     UsageCapTracker tracker = new UsageCapTracker();
     UUID id = UUID.randomUUID();

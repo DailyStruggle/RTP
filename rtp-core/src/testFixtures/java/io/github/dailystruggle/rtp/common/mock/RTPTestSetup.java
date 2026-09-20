@@ -32,6 +32,9 @@ public final class RTPTestSetup {
         // Wire RTP static fields
         RTP.serverAccessor = accessor;
         RTP.scheduler = accessor.getMockScheduler();
+        if (RTP.selectionAPI == null) {
+            RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        }
 
         // Ensure RTP.getInstance() returns a valid instance
         ensureRTPInstance();

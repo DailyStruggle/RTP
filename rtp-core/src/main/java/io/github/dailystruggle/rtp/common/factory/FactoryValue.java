@@ -189,6 +189,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     }
   }
 
+  @NotNull
   @Override
   public FactoryValue<E> clone() {
     try {

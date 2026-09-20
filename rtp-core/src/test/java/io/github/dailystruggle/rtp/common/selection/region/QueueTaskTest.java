@@ -879,4 +879,52 @@ class QueueTaskTest {
         assertTrue(closed.get());
         assertEquals(0, staleWorld.activeChunkTickets.get());
     }
+
+    @Test
+    @DisplayName("QueueTask normal enqueue branch when region is pumped and sender lacks rtp.unqueued")
+    void testNormalEnqueueBranchWhenRegionPumped() throws Exception {
+        CompletableFuture<GenerationResult> result = new CompletableFuture<>();
+
+        // Register region into permRegionLookup so isRegionPumped() returns true
+        RTP.selectionAPI.permRegionLookup.put(region.name, region);
+
+        MockRTPPlayer queuedPlayer = new MockRTPPlayer(
+                UUID.randomUUID(),
+                "QueuedUser",
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 10, 64, 10)) {
+            @Override
+            public boolean hasPermission(String permission) {
+                if ("rtp.unqueued".equals(permission)) return false;
+                return super.hasPermission(permission);
+            }
+        };
+        accessor.addPlayer(queuedPlayer);
+
+        java.util.concurrent.atomic.AtomicBoolean pushNotified = new java.util.concurrent.atomic.AtomicBoolean(false);
+        java.util.function.BiConsumer<Region, UUID> pushListener = (r, u) -> {
+            if (u.equals(queuedPlayer.uuid())) {
+                pushNotified.set(true);
+            }
+        };
+        Region.onPlayerQueuePush.add(pushListener);
+
+        try {
+            QueueTask task = new QueueTask(region, queuedPlayer, queuedPlayer, null, result);
+            task.start();
+
+            GenerationResult gen = result.get(10, TimeUnit.SECONDS);
+            // In the normal enqueue branch, task completes with null while enqueueing the player
+            assertNull(gen);
+            assertTrue(pushNotified.get());
+            assertTrue(region.queueManager.playerQueue.contains(queuedPlayer.uuid()));
+            assertTrue(RTP.getInstance().queuedPlayers.contains(queuedPlayer.uuid()));
+            assertTrue(RTP.getInstance().processingPlayers.contains(queuedPlayer.uuid()));
+            assertNotNull(RTP.getInstance().latestTeleportData.get(queuedPlayer.uuid()));
+        } finally {
+            Region.onPlayerQueuePush.remove(pushListener);
+            RTP.selectionAPI.permRegionLookup.remove(region.name);
+            RTP.getInstance().processingPlayers.remove(queuedPlayer.uuid());
+            RTP.getInstance().queuedPlayers.remove(queuedPlayer.uuid());
+        }
+    }
 }

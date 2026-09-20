@@ -92,17 +92,17 @@ public class Factory<T extends FactoryValue<?>> {
         }
       }
       if (value == null) return null;
-      T clone = (T) value.clone();
-      clone.name = (name.endsWith(".yml")) ? name : name + ".yml";
+      FactoryValue<?> cloned = value.clone();
+      cloned.name = (name.endsWith(".yml")) ? name : name + ".yml";
 
-      if (clone instanceof ConfigParser) {
-        ConfigParser<?> configParser = (ConfigParser<?>) clone;
+      if (cloned instanceof ConfigParser) {
+        ConfigParser<?> configParser = (ConfigParser<?>) cloned;
         // Reuse the template's rename map (e.g. a MultiConfigParser's shared
         // folder-similar `.worlds.lang.yml`) rather than passing null, which
         // would re-auto-resolve to a stray per-file map inside the folder.
         configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
       }
-      value = clone;
+      value = (T) cloned;
     }
     return value.clone();
   }
@@ -126,14 +126,14 @@ public class Factory<T extends FactoryValue<?>> {
       // rather than failing, so callers don't have to pre-check existence.
       return construct(name);
     }
-    T clone = (T) template.clone();
-    clone.name = (name.endsWith(".yml")) ? name : name + ".yml";
-    if (clone instanceof ConfigParser) {
-      ConfigParser<?> configParser = (ConfigParser<?>) clone;
+    FactoryValue<?> cloned = template.clone();
+    cloned.name = (name.endsWith(".yml")) ? name : name + ".yml";
+    if (cloned instanceof ConfigParser) {
+      ConfigParser<?> configParser = (ConfigParser<?>) cloned;
       // Reuse the template's rename map (see construct(String)) instead of null.
       configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
     }
-    return clone.clone();
+    return cloned.clone();
   }
 
   /**

@@ -1,12 +1,12 @@
 package io.github.dailystruggle.rtp.common.commands;
 
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import io.github.dailystruggle.rtp.common.commands.version.VersionCmd;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -103,6 +103,64 @@ public class CoreCommandTreeBuilderTest {
     // Region exists with requirePermission=false by default.
     // Caller without explicit "rtp.regions.default" permission should be permitted.
     assertTrue(regionParam.isRelevant.apply(caller, "default"));
+  }
+
+  @Test
+  void testParametersIsRelevantBranches() {
+    StubRoot root = new StubRoot();
+    StubPlatformParameters platform = new StubPlatformParameters();
+    CoreCommandTreeBuilder.attachCommonParameters(root, platform);
+
+    UUID caller = UUID.randomUUID();
+    RegionParameter regionParam = (RegionParameter) root.getParameterLookup().get("region");
+    assertNotNull(regionParam);
+
+    // null string
+    assertFalse(regionParam.isRelevant.apply(caller, null));
+    // malformed qualified
+    assertFalse(regionParam.isRelevant.apply(caller, ":::"));
+    // unknown region
+    assertFalse(regionParam.isRelevant.apply(caller, "nonexistentRegion"));
+
+    // Nested region parameters: world, price, worldborderoverride, shape, vert
+    Map<String, CommandParameter> subParams = regionParam.subParams("DEFAULT");
+    assertNotNull(subParams);
+
+    CommandParameter worldParam = subParams.get("world");
+    assertNotNull(worldParam);
+    assertFalse(worldParam.isRelevant.apply(caller, "invalidWorld"));
+
+    CommandParameter priceParam = subParams.get("price");
+    assertNotNull(priceParam);
+    assertTrue(priceParam.isRelevant.apply(caller, "123.45"));
+    assertFalse(priceParam.isRelevant.apply(caller, "notANumber"));
+
+    CommandParameter wbParam = subParams.get("worldborderoverride");
+    assertNotNull(wbParam);
+    assertTrue(wbParam.isRelevant.apply(caller, "true"));
+    assertTrue(wbParam.isRelevant.apply(caller, "false"));
+    assertFalse(wbParam.isRelevant.apply(caller, "maybe"));
+
+    CommandParameter shapeParam = subParams.get("shape");
+    assertNotNull(shapeParam);
+    assertFalse(shapeParam.isRelevant.apply(caller, "NON_EXISTENT_SHAPE"));
+
+    CommandParameter vertParam = subParams.get("vert");
+    assertNotNull(vertParam);
+    assertFalse(vertParam.isRelevant.apply(caller, "NON_EXISTENT_VERT"));
+
+    // Biome parameter
+    CommandParameter biomeParam = root.getParameterLookup().get("biome");
+    assertNotNull(biomeParam);
+    assertFalse(biomeParam.isRelevant.apply(caller, null));
+    assertFalse(biomeParam.isRelevant.apply(caller, "unknown_biome"));
+
+    // Toggle target perms parameter
+    CommandParameter toggleParam = root.getParameterLookup().get("toggletargetperms");
+    assertNotNull(toggleParam);
+    assertTrue(toggleParam.isRelevant.apply(caller, "true"));
+    assertTrue(toggleParam.isRelevant.apply(caller, "false"));
+    assertFalse(toggleParam.isRelevant.apply(caller, "invalid"));
   }
 
   /** Minimal concrete {@code /rtp} root for exercising the builder. */
