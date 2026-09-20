@@ -306,7 +306,7 @@ public final class ProxyDirectListener {
                 UUID id = UUID.fromString(payload.trim());
                 Optional<ReservationToken> token =
                         transport.findReservation(id).get(RPC_AWAIT_MS, TimeUnit.MILLISECONDS);
-                if (token != null && token.isPresent()) {
+                if (token.isPresent()) {
                     reply = ProxyDirectWire.encodeToken(token.get());
                 }
             } catch (InterruptedException ie) {

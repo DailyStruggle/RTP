@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
@@ -188,7 +189,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         StringBuilder sb = new StringBuilder();
         sb.append("StressTestRTP run summary\n");
         sb.append("generated: ")
-          .append(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)).append('\n');
+          .append(LocalDateTime.now(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)).append('\n');
         var targetsList = Targets.load(plugin.getConfig(), plugin.getLogger());
         sb.append("target-commands: ").append(Targets.describe(targetsList)).append('\n');
         sb.append("attempts: ").append(rec.totalAttempts())

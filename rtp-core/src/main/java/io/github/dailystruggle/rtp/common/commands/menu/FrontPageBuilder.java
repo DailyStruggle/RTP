@@ -192,7 +192,7 @@ public final class FrontPageBuilder {
             }
         }
         // Drop the "command:&7..." placeholder echo from the picker labels.
-        label = label.replaceAll(":(?:&[0-9A-Fa-fK-Ok-or]|#[0-9A-Fa-f]{6})*\\.\\.\\.", "");
+        label = label.replaceAll(":(?:&[0-9A-Fa-fK-Ok-or]|#[0-9A-Fa-f]{6})*+\\.\\.\\.", "");
         // Strip any color code / whitespace left dangling at the end by the split.
         label = stripTrailingFormatting(label);
         if (label.isEmpty()) label = raw;

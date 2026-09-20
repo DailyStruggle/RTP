@@ -40,8 +40,8 @@ public final class NetworkStatusCache {
         public QueueStatus {
             Objects.requireNonNull(playerId, "playerId");
             Objects.requireNonNull(state, "state");
-            if (serverId == null) serverId = Optional.empty();
-            if (regionKey == null) regionKey = Optional.empty();
+            Objects.requireNonNull(serverId, "serverId");
+            Objects.requireNonNull(regionKey, "regionKey");
             if (positionInQueue < 0) positionInQueue = 0;
         }
 

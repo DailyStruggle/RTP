@@ -6,6 +6,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
 
@@ -185,7 +186,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
 
     /** Roll a new CSV for the next run. Called by {@link StressCommand} on start/burst. */
     public void beginRun() throws IOException {
-        String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        String stamp = LocalDateTime.now(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
         Path dir = getDataFolder().toPath().resolve(getConfig().getString("output-subdir", "runs"));
         Path csv = dir.resolve(stamp + ".csv");
         recorder = new MetricsRecorder(csv);

@@ -21,7 +21,7 @@ public final class RuntimeMockRTPPlayer implements RTPPlayer {
   private final UUID uuid;
   private final String name;
   private volatile RTPLocation location;
-  private volatile boolean online = true;
+  private final java.util.concurrent.atomic.AtomicBoolean online = new java.util.concurrent.atomic.AtomicBoolean(true);
 
   public RuntimeMockRTPPlayer(UUID uuid, String name, RTPLocation initialLocation) {
     this.uuid = uuid;
@@ -46,11 +46,11 @@ public final class RuntimeMockRTPPlayer implements RTPPlayer {
 
   @Override
   public boolean isOnline() {
-    return online;
+    return online.get();
   }
 
   public void setOnline(boolean online) {
-    this.online = online;
+    this.online.set(online);
   }
 
   @Override
@@ -96,7 +96,7 @@ public final class RuntimeMockRTPPlayer implements RTPPlayer {
   @Override
   public RTPCommandSender clone() {
     RuntimeMockRTPPlayer copy = new RuntimeMockRTPPlayer(uuid, name, location);
-    copy.online = this.online;
+    copy.online.set(this.online.get());
     return copy;
   }
 }

@@ -37,8 +37,8 @@ public final class NetworkEnrolmentBuffer {
         public EnrolmentRecord {
             Objects.requireNonNull(playerId, "playerId");
             Objects.requireNonNull(correlationId, "correlationId");
-            if (regionKey == null) regionKey = Optional.empty();
-            if (serverHint == null) serverHint = Optional.empty();
+            Objects.requireNonNull(regionKey, "regionKey");
+            Objects.requireNonNull(serverHint, "serverHint");
         }
     }
 

@@ -122,6 +122,7 @@ public class CoreRtpRoot extends BaseRTPCmdImpl implements RTPCmd {
       senderChecksGuard.acquire();
       senderChecks.add(senderCheck);
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       RTP.log(Level.WARNING, e.getMessage(), e);
     } finally {
       senderChecksGuard.release();

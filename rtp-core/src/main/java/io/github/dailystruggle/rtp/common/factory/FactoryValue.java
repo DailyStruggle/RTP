@@ -209,8 +209,8 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       return clone;
     } catch (CloneNotSupportedException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
+      throw new IllegalStateException("Failed to clone FactoryValue", e);
     }
-    return null;
   }
 
   /**

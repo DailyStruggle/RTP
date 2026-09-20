@@ -1026,13 +1026,13 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public int getMaxHeight() {
-    return world.getMaxHeight();
+    return (world != null) ? world.getMaxHeight() : 320;
   }
 
   @Override
   @RegionThread
   public int getMinHeight() {
-    return world.getMinHeight();
+    return (world != null) ? world.getMinHeight() : -64;
   }
 
   @Override
@@ -1044,6 +1044,6 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public long getSeed() {
-    return world.getSeed();
+    return (world != null) ? world.getSeed() : 0L;
   }
 }

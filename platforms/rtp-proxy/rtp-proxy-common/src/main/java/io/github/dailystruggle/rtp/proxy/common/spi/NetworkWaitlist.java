@@ -86,8 +86,8 @@ public interface NetworkWaitlist {
             Objects.requireNonNull(playerId, "playerId");
             Objects.requireNonNull(correlationId, "correlationId");
             Objects.requireNonNull(originServerId, "originServerId");
-            if (regionKey == null) regionKey = Optional.empty();
-            if (serverHint == null) serverHint = Optional.empty();
+            Objects.requireNonNull(regionKey, "regionKey");
+            Objects.requireNonNull(serverHint, "serverHint");
         }
     }
 

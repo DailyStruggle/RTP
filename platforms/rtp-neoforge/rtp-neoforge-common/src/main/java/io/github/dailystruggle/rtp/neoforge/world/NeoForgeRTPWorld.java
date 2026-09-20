@@ -909,7 +909,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public int getMaxHeight() {
         try {
-            return world.getMaxBuildHeight();
+            return (world != null) ? world.getMaxBuildHeight() : 320;
         } catch (Throwable t) {
             return 320;
         }
@@ -918,7 +918,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public int getMinHeight() {
         try {
-            return world.getMinBuildHeight();
+            return (world != null) ? world.getMinBuildHeight() : -64;
         } catch (Throwable t) {
             return -64;
         }
@@ -927,7 +927,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public long getSeed() {
         try {
-            return world.getSeed();
+            return (world != null) ? world.getSeed() : 0L;
         } catch (Throwable t) {
             return 0L;
         }

@@ -24,6 +24,7 @@ public sealed interface RoutingDecision
      */
     record CrossServer(Optional<String> serverHint,
                        Optional<String> regionKey) implements RoutingDecision {
+        @SuppressWarnings("java:S2789") // Optional null-check normalizes null to Optional.empty()
         public CrossServer {
             if (serverHint == null) serverHint = Optional.empty();
             if (regionKey == null) regionKey = Optional.empty();

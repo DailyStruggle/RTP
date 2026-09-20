@@ -248,7 +248,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
         RTP.log(Level.INFO, notice);
       }
 
-      final int warnBefore = audit.warnCount;
+      final int warnBefore = audit.warnCount.get();
       final java.util.concurrent.atomic.AtomicBoolean successFired =
           new java.util.concurrent.atomic.AtomicBoolean(false);
       final java.util.concurrent.atomic.AtomicBoolean failFired =
@@ -311,7 +311,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
         // subcommand. Recorded here (in the advance hook) so the tally
         // includes warnings produced by async tails that drained via
         // ActiveTestJobs listeners, not just the synchronous dispatch.
-        int delta = Math.max(0, audit.warnCount - warnBefore);
+        int delta = Math.max(0, audit.warnCount.get() - warnBefore);
         audit.stepWarnDeltas.put(subName, delta);
         scheduleNext(callerId, index + 1, audit);
       });
@@ -537,7 +537,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
       long leaks = activeTickets + activeTasks;
       String resultLine =
-          formatResultLine(total, audit.warnCount, leaks, audit.elapsedMillis(), failed);
+          formatResultLine(total, audit.warnCount.get(), leaks, audit.elapsedMillis(), failed);
 
       // Emit to both the caller and the server log so console operators
       // and in-game admins see the same diagnostic block. Multi-line
@@ -787,7 +787,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
   private static final class FullAudit
       implements java.util.function.BiConsumer<java.util.logging.Level, String> {
     final long startTimeNanos = System.nanoTime();
-    volatile int warnCount = 0;
+    final java.util.concurrent.atomic.AtomicInteger warnCount = new java.util.concurrent.atomic.AtomicInteger(0);
     /**
      * Per-subcommand audited-warning delta, captured in {@link #runStep}'s
      * advance hook. Insertion-ordered so {@link #finishSweep}'s summary
@@ -808,7 +808,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       // audited fault; everything below (INFO/CONFIG/FINE/...) is sweep
       // chatter and must not move the needle.
       if (level.intValue() >= java.util.logging.Level.WARNING.intValue()) {
-        warnCount++;
+        warnCount.incrementAndGet();
       }
     }
   }

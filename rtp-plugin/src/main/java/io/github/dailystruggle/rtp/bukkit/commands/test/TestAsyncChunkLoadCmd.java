@@ -147,8 +147,8 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
     long[] copy = arr.clone();
     java.util.Arrays.sort(copy);
     int idx = (int) Math.ceil((pct / 100.0) * copy.length) - 1;
-    if (idx >= copy.length) idx = copy.length - 1;
     if (idx < 0) idx = 0;
+    if (idx >= copy.length) idx = copy.length - 1;
     return copy[idx];
   }
 
@@ -273,6 +273,10 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
       r.chunkKey = key;
     } catch (TimeoutException te) {
       r.notes = "timeout after " + timeoutMs + "ms";
+      return r;
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      r.notes = "interrupted: " + ie;
       return r;
     } catch (Throwable t) {
       r.notes = "future failed: " + t;

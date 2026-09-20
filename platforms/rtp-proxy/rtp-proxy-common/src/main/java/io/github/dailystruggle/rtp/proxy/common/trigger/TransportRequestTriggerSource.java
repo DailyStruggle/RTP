@@ -253,7 +253,7 @@ public final class TransportRequestTriggerSource {
             }
             // Any resolved await (empty or not) clears the stall streak.
             consecutiveTimeouts.set(0L);
-            if (popped == null || popped.isEmpty()) {
+            if (popped.isEmpty()) {
                 // Timeout / empty queue. Loop.
                 continue;
             }

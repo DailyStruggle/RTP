@@ -691,8 +691,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     String[] lines = s.replace("\r\n", "\n").replace("\r", "\n").split("\n", -1);
     StringBuilder sb = new StringBuilder();
     for (String ln : lines) {
-      String t = ln.replaceAll("\\s+$", "");
-      if (t.matches("(?i)\\s*version\\s*:.*")) continue;
+      String t = ln.stripTrailing();
+      if (t.matches("(?i)\\s*+version\\s*+:.*+")) continue;
       sb.append(t).append('\n');
     }
     return sb.toString().trim();
@@ -1463,7 +1463,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
   /** Update the configuration */
   public void update() {
-    RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
+    if (cachedLookup == null) return;
+    Map<String, RtpYamlConfig> lookup = cachedLookup.get();
+    if (lookup == null) return;
+    RtpYamlConfig RtpYamlConfig = lookup.get(name);
     if (RtpYamlConfig == null) return;
 
     // 1. Load existing config into memory to preserve it during rename
@@ -1556,8 +1559,14 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     // document may not have been cached yet (e.g. the first mutation happens
     // before any read), in which case reconnect the file database rather than
     // dereferencing a null document.
-    if (cachedLookup.get() == null || !cachedLookup.get().containsKey(name)) fileDatabase.connect();
-    RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
+    if (cachedLookup == null) return;
+    Map<String, RtpYamlConfig> lookup = cachedLookup.get();
+    if (lookup == null || !lookup.containsKey(name)) {
+      fileDatabase.connect();
+      lookup = cachedLookup.get();
+    }
+    if (lookup == null) return;
+    RtpYamlConfig RtpYamlConfig = lookup.get(name);
     if (RtpYamlConfig == null) return;
     Object yamlKey = language_mapping.get(key.name());
     if (yamlKey == null) yamlKey = key.name();

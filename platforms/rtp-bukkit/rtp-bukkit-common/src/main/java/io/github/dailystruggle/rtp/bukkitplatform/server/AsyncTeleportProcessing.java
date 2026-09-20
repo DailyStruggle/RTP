@@ -81,7 +81,7 @@ public class AsyncTeleportProcessing extends BukkitRunnable {
   }
 
   @Override
-  public void cancel() {
+  public synchronized void cancel() {
     kill();
     super.cancel();
   }

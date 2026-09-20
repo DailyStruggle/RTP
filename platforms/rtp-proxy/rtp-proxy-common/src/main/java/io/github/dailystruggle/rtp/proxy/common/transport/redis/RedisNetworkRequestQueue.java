@@ -356,7 +356,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
             UUID playerId, QueueState next, Optional<String> reason) {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(next, "next");
-        Optional<String> reasonOpt = (reason == null) ? Optional.empty() : reason;
+        Objects.requireNonNull(reason, "reason");
         return runAsync(() -> {
             String statusKey = "rtp:net:wq:status:" + playerId;
             long now = System.currentTimeMillis();
@@ -366,7 +366,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
                         Arrays.asList(statusKey, SEEN_KEY),
                         Arrays.asList(
                                 next.name(),
-                                reasonOpt.orElse(""),
+                                reason.orElse(""),
                                 "", // serverId - not surfaced through SPI today
                                 Long.toString(now),
                                 Integer.toString(ttlSeconds)));

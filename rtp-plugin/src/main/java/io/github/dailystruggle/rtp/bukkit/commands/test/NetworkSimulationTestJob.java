@@ -266,6 +266,12 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
       }
       java.util.concurrent.CompletableFuture.allOf(futures)
               .get(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      safeUnsubscribe(sub);
+      audit(callerId, "FAIL", "publish interrupted: " + ie.getMessage());
+      RTP.log(Level.WARNING, "[RTP test/network] publish", ie);
+      return;
     } catch (Throwable t) {
       safeUnsubscribe(sub);
       audit(callerId, "FAIL", "publish: " + t.getClass().getSimpleName() + ": " + t.getMessage());
@@ -280,6 +286,13 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
     NetworkSnapshot snap;
     try {
       snap = transport.readSnapshot().get(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      safeUnsubscribe(sub);
+      cleanupSynthetic(transport, rows);
+      audit(callerId, "FAIL", "readSnapshot interrupted: " + ie.getMessage());
+      RTP.log(Level.WARNING, "[RTP test/network] readSnapshot", ie);
+      return;
     } catch (Throwable t) {
       safeUnsubscribe(sub);
       cleanupSynthetic(transport, rows);
@@ -362,6 +375,12 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
         try {
           token = transport.claim(serverId, playerId, Duration.ofMillis(ttlMs))
                   .get(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          audit(callerId, "FAIL", "claim interrupted: " + ie.getMessage() + suffix);
+          RTP.log(Level.WARNING, "[RTP test/network/tokens] claim", ie);
+          cleanupSyntheticTokens(transport, mintedTokenIds);
+          return;
         } catch (Throwable t) {
           audit(callerId, "FAIL", "claim threw: "
                   + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
@@ -382,6 +401,13 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
         try {
           found = transport.findReservation(playerId)
                   .get(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          audit(callerId, "FAIL", "findReservation interrupted: "
+                  + ie.getMessage() + suffix);
+          RTP.log(Level.WARNING, "[RTP test/network/tokens] findReservation", ie);
+          cleanupSyntheticTokens(transport, mintedTokenIds);
+          return;
         } catch (Throwable t) {
           audit(callerId, "FAIL", "findReservation(present) threw: "
                   + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
@@ -402,6 +428,13 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
         try {
           transport.release(token.tokenId(), ReleaseReason.TEST_PROBE)
                   .get(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          audit(callerId, "FAIL", "release interrupted: "
+                  + ie.getMessage() + suffix);
+          RTP.log(Level.WARNING, "[RTP test/network/tokens] release", ie);
+          cleanupSyntheticTokens(transport, mintedTokenIds);
+          return;
         } catch (Throwable t) {
           audit(callerId, "FAIL", "release threw: "
                   + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
@@ -416,6 +449,13 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
         try {
           afterRelease = transport.findReservation(playerId)
                   .get(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          audit(callerId, "FAIL", "findReservation(post-release) interrupted: "
+                  + ie.getMessage() + suffix);
+          RTP.log(Level.WARNING, "[RTP test/network/tokens] findReservation post-release", ie);
+          cleanupSyntheticTokens(transport, mintedTokenIds);
+          return;
         } catch (Throwable t) {
           audit(callerId, "FAIL", "findReservation(post-release) threw: "
                   + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
@@ -441,6 +481,13 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
       try {
         doomed = transport.claim(serverId, reapPlayer, Duration.ofMillis(1L))
                 .get(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        audit(callerId, "FAIL", "reap-claim interrupted: "
+                + ie.getMessage() + suffix);
+        RTP.log(Level.WARNING, "[RTP test/network/tokens] reap-claim", ie);
+        cleanupSyntheticTokens(transport, mintedTokenIds);
+        return;
       } catch (Throwable t) {
         audit(callerId, "FAIL", "reap-claim threw: "
                 + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
@@ -464,6 +511,13 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
       try {
         reaped = transport.reapExpired(Instant.now())
                 .get(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        audit(callerId, "FAIL", "reapExpired interrupted: "
+                + ie.getMessage() + suffix);
+        RTP.log(Level.WARNING, "[RTP test/network/tokens] reapExpired", ie);
+        cleanupSyntheticTokens(transport, mintedTokenIds);
+        return;
       } catch (Throwable t) {
         audit(callerId, "FAIL", "reapExpired threw: "
                 + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);

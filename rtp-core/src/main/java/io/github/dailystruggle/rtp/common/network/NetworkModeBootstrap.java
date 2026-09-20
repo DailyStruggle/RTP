@@ -228,6 +228,8 @@ public final class NetworkModeBootstrap {
                 NetworkSnapshot snap = refresherTransport.readSnapshot()
                         .get(2000L, java.util.concurrent.TimeUnit.MILLISECONDS);
                 if (snap != null) this.cachedSnapshot = snap;
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
             } catch (Throwable ignored) {
                 // Defensive: a flaky transport must not crash the refresher.
             }
@@ -368,6 +370,9 @@ public final class NetworkModeBootstrap {
                         }
                     } catch (java.util.concurrent.CompletionException ce) {
                         throw ce;
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new java.util.concurrent.CompletionException(ie);
                     } catch (Throwable err) {
                         throw new java.util.concurrent.CompletionException(err);
                     }
@@ -388,6 +393,9 @@ public final class NetworkModeBootstrap {
                     java.util.List<NetworkRequestQueue.QueueStatus> rows;
                     try {
                         rows = qref.pollStatus(ids).get(2L, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("pollStatus interrupted", ie);
                     } catch (Throwable err) {
                         // S-004: propagate so the cache's pollOnce keeps
                         // the previous snapshot rather than wiping it.
@@ -525,6 +533,10 @@ public final class NetworkModeBootstrap {
                         .get(2000L, java.util.concurrent.TimeUnit.MILLISECONDS);
                 NetworkRegionCollisionWarner.auditAndWarn(
                         bootSnap, serverId, NetworkRegionCollisionWarner.Policy.WARN);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                RTP.log(Level.FINE,
+                        "[RTP] region-collision boot audit interrupted: " + ie.getMessage());
             } catch (Throwable warnFail) {
                 RTP.log(Level.FINE,
                         "[RTP] region-collision boot audit skipped: " + warnFail.getMessage());

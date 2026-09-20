@@ -431,7 +431,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
     }
 
     private static void appendOptString(StringBuilder sb, Optional<String> opt) {
-        if (opt == null || opt.isEmpty()) { sb.append("null"); return; }
+        if (opt.isEmpty()) { sb.append("null"); return; }
         sb.append(jsonString(opt.get()));
     }
 

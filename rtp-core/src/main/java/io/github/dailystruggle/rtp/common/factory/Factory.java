@@ -78,20 +78,28 @@ public class Factory<T extends FactoryValue<?>> {
     // guard constructor
     T value = map.get(comparableName);
     if (value == null) {
-      if (map.containsKey("DEFAULT.YML") || !map.isEmpty()) {
-        value = map.getOrDefault("DEFAULT.YML", map.values().stream().findAny().get());
-        T clone = (T) value.clone();
-        clone.name = (name.endsWith(".yml")) ? name : name + ".yml";
-
-        if (clone instanceof ConfigParser) {
-          ConfigParser<?> configParser = (ConfigParser<?>) clone;
-          // Reuse the template's rename map (e.g. a MultiConfigParser's shared
-          // folder-similar `.worlds.lang.yml`) rather than passing null, which
-          // would re-auto-resolve to a stray per-file map inside the folder.
-          configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
+      if (map.containsKey("DEFAULT.YML")) {
+        value = map.get("DEFAULT.YML");
+      } else {
+        Optional<T> any = map.values().stream().findAny();
+        if (any.isPresent()) {
+          value = any.get();
+        } else {
+          return null;
         }
-        value = clone;
-      } else return null;
+      }
+      if (value == null) return null;
+      T clone = (T) value.clone();
+      clone.name = (name.endsWith(".yml")) ? name : name + ".yml";
+
+      if (clone instanceof ConfigParser) {
+        ConfigParser<?> configParser = (ConfigParser<?>) clone;
+        // Reuse the template's rename map (e.g. a MultiConfigParser's shared
+        // folder-similar `.worlds.lang.yml`) rather than passing null, which
+        // would re-auto-resolve to a stray per-file map inside the folder.
+        configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
+      }
+      value = clone;
     }
     return value.clone();
   }

@@ -84,13 +84,13 @@ public final class Runner {
     private volatile long endEpochMs = 0L;
     private volatile int concurrencyCap = 4;
     private volatile Mode mode = Mode.TIMED;
-    private volatile int burstRemaining = 0;
+    private int burstRemaining = 0;
     private volatile String operatorName = "console";
     private volatile UUID operatorId = null;
 
     // SEQUENCE-mode state: pin one target at a time, with a recovery gap between targets.
     private volatile List<Targets.Entry> seqTargets = null;
-    private volatile int seqIndex = 0;
+    private int seqIndex = 0;
     private volatile long seqPerTargetMs = 0L;
     private volatile long seqGapMs = 0L;
     private volatile long seqPhaseEndMs = 0L; // when current run-phase ends
@@ -106,8 +106,8 @@ public final class Runner {
     private volatile boolean warmupActive = false;
     private volatile long warmupSliceMs = 0L;
     private volatile int warmupCycles = 1;
-    private volatile int warmupCycleIdx = 0;     // 0..warmupCycles-1
-    private volatile int warmupTargetIdx = 0;    // current target within the cycle
+    private int warmupCycleIdx = 0;     // 0..warmupCycles-1
+    private int warmupTargetIdx = 0;    // current target within the cycle
     private volatile long warmupSliceEndMs = 0L; // when the current target's warm-up slice ends
     private volatile int warmupSliceStartTotal = 0; // total attempts at slice start (for log line)
     private volatile long warmupSliceStartEpoch = 0L;
@@ -120,7 +120,7 @@ public final class Runner {
     // dispatches normally. Tracks the last time we observed forward
     // progress (a successful dispatch *or* a successful completion).
     private volatile long lastProgressEpochMs = 0L;
-    private volatile int kickstartCount = 0;
+    private int kickstartCount = 0;
 
     public Runner(Plugin plugin, MetricsRecorder recorder, TeleportProbe probe,
                   TpsMsptHeapSampler sampler, FileConfiguration config) {

@@ -162,8 +162,7 @@ public final class EffectsAPI {
         // (e.g. mid-dispatch where every frame is effects-api's own). Return one
         // so scheduling still has a valid plugin handle; per-plugin listener
         // registration / teardown remains correct regardless.
-        for (Plugin p : STATES.keySet()) return p;
-        return null;
+        return STATES.keySet().stream().findFirst().orElse(null);
     }
 
     @Nullable

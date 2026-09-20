@@ -91,8 +91,8 @@ public interface NetworkCommandHook {
             implements RoutingResult {
       public CrossServer {
         Objects.requireNonNull(correlationId, "correlationId");
-        if (regionKey == null) regionKey = Optional.empty();
-        if (serverHint == null) serverHint = Optional.empty();
+        Objects.requireNonNull(regionKey, "regionKey");
+        Objects.requireNonNull(serverHint, "serverHint");
       }
     }
 

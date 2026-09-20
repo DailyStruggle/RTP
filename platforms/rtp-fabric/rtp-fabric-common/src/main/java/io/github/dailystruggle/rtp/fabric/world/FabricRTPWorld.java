@@ -1170,7 +1170,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                 java.lang.reflect.Field f = null;
                 for (java.lang.reflect.Field cand : sample.getClass().getDeclaredFields()) {
                     if ("chunkMap".equals(cand.getName())
-                        || cand.getType().getSimpleName().equals("ChunkMap")) {
+                        || net.minecraft.server.level.ChunkMap.class.isAssignableFrom(cand.getType())) {
                         f = cand;
                         break;
                     }

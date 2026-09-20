@@ -35,7 +35,7 @@ public final class SparkHook {
     /** Base label of the currently-active phase (without rotation suffix). */
     private volatile String currentPhaseBase = null;
     /** Rotation index within the current phase. 0 = first slice. */
-    private volatile int currentRotation = 0;
+    private final java.util.concurrent.atomic.AtomicInteger currentRotation = new java.util.concurrent.atomic.AtomicInteger(0);
     /** Epoch ms when the current rotation slice started, for {@link #rotateIfDue(long)}. */
     private volatile long lastRotationStartMs = 0L;
 
@@ -97,7 +97,7 @@ public final class SparkHook {
             stopPhase(currentPhaseBase != null ? currentPhaseBase : label);
         }
         currentPhaseBase = label;
-        currentRotation = 0;
+        currentRotation.set(0);
         lastRotationStartMs = System.currentTimeMillis();
         startSliceInternal(label);
     }
@@ -142,14 +142,15 @@ public final class SparkHook {
         if (!sparkAvailable()) return;
         if (!inProfile) {
             currentPhaseBase = null;
-            currentRotation = 0;
+            currentRotation.set(0);
             return;
         }
         // If rotation has been active, the on-disk filename must reflect both
         // the phase and the rotation index so successive slices don't
         // collide. Bare phase-label calls (rotation disabled) are unaffected.
-        String slice = (currentRotation > 0)
-                ? (label == null || label.isEmpty() ? "stresstestrtp" : label) + "-r" + currentRotation
+        int rot = currentRotation.get();
+        String slice = (rot > 0)
+                ? (label == null || label.isEmpty() ? "stresstestrtp" : label) + "-r" + rot
                 : (label == null || label.isEmpty() ? "stresstestrtp" : label);
         String comment = sanitize(slice);
         boolean saveToFile = config.getBoolean("spark.save-to-file", true);
@@ -160,7 +161,7 @@ public final class SparkHook {
         dispatch(sb.toString());
         inProfile = false;
         currentPhaseBase = null;
-        currentRotation = 0;
+        currentRotation.set(0);
         if (log != null) {
             log.info("[StressTestRTP] spark profiler stopped for phase: " + slice
                 + (saveToFile ? " (saved to plugins/spark/profiles/)" : " (uploaded to bytebin)"));
@@ -199,7 +200,8 @@ public final class SparkHook {
         // the new (incremented) rotation index, so each .sparkprofile on
         // disk maps 1:1 with a distinct slice.
         String base = currentPhaseBase;
-        String stoppingSlice = (currentRotation > 0) ? base + "-r" + currentRotation : base;
+        int rot = currentRotation.get();
+        String stoppingSlice = (rot > 0) ? base + "-r" + rot : base;
         String stoppingComment = sanitize(stoppingSlice);
         boolean saveToFile = config.getBoolean("spark.save-to-file", true);
         StringBuilder sb = new StringBuilder("spark profiler stop --comment ").append(stoppingComment);
@@ -213,9 +215,9 @@ public final class SparkHook {
             scheduleSummarise(stoppingSlice);
         }
 
-        currentRotation++;
+        int nextRot = currentRotation.incrementAndGet();
         lastRotationStartMs = nowMs;
-        String nextSlice = base + "-r" + currentRotation;
+        String nextSlice = base + "-r" + nextRot;
         startSliceInternal(nextSlice);
         return true;
     }

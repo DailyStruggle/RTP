@@ -123,7 +123,7 @@ public final class JoinTriggerSource {
                             + ": " + err.getMessage(), err);
             return;
         }
-        if (opt == null || opt.isEmpty()) {
+        if (opt.isEmpty()) {
             // Phase B trace (2026-05-23): explicit no-reservation path. The
             // overwhelming majority of joins land here; logged at INFO
             // because it is the diagnostic anchor for "why did /rtp not run".
@@ -195,7 +195,7 @@ public final class JoinTriggerSource {
         // faking chat commands or triggering parameter permission checks.
         // Regionless requests target the default region; explicit region keys
         // (bare 'nether' or qualified 'server:nether') target the local region.
-        String rawKey = (regionKey != null && regionKey.isPresent()) ? regionKey.get() : null;
+        String rawKey = (regionKey != null) ? regionKey.orElse(null) : null;
         String localRegionName = null;
         if (rawKey != null && !rawKey.isBlank()) {
             int colon = rawKey.indexOf(':');

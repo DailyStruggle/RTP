@@ -109,7 +109,7 @@ public final class LocalTeleportLimitStore implements TeleportLimitStore {
   private static final Object ABSENT = new Object();
 
   private static Object unwrap(Optional<?> opt) {
-    if (opt == null || opt.isEmpty()) return null;
+    if (opt.isEmpty()) return null;
     Object inner = opt.get();
     if (inner instanceof java.util.concurrent.CompletableFuture<?> rawFuture) {
       @SuppressWarnings("unchecked")
