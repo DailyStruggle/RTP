@@ -157,6 +157,14 @@ class FactoryTest {
     }
 
     @Test
+    void construct_twoArg_nullName_returnsNull() {
+        TestValue original = new TestValue("custom.yml");
+        factory.add("custom", original);
+        FactoryValue<?> result = factory.construct(null, "custom");
+        assertNull(result);
+    }
+
+    @Test
     void construct_twoArg_nullFromName_delegatesToSingleArg() {
         TestValue original = new TestValue("default.yml");
         factory.add("default", original);

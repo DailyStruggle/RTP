@@ -117,6 +117,7 @@ public class Factory<T extends FactoryValue<?>> {
   @Nullable
   @SuppressWarnings("unchecked") // clone() returns the runtime type of the stored T template
   public FactoryValue<?> construct(String name, String fromName) {
+    if (name == null) return null;
     if (fromName == null) return construct(name);
     String fromKey = fromName.toUpperCase();
     if (!fromKey.endsWith(".YML")) fromKey = fromKey + ".YML";
