@@ -178,10 +178,30 @@ subprojects {
     apply plugin: 'jacoco'
     jacoco { toolVersion = libs.versions.jacoco.get() }
     if (project.hasProperty('coverage')) {
-        tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
-        jacocoTestReport {
-            dependsOn test
-            reports { html.required = true; xml.required = true }
+        def isPlatformOrAddonProject = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
+                project.projectDir.canonicalPath.contains(File.separator + 'addons' + File.separator) ||
+                project.projectDir.canonicalPath.contains(File.separator + 'helpers' + File.separator) ||
+                project.path.startsWith(':rtp-bukkit') ||
+                project.path.startsWith(':rtp-paper') ||
+                project.path.startsWith(':rtp-folia') ||
+                project.path.startsWith(':rtp-fabric') ||
+                project.path.startsWith(':rtp-neoforge') ||
+                project.path.startsWith(':addons') ||
+                project.path.startsWith(':helpers') ||
+                project.path == ':rtp-plugin' ||
+                project.path == ':rtp-proxy:rtp-proxy-velocity' ||
+                project.path == ':effects-api:effects-api-fabric-unobf'
+
+        if (!isPlatformOrAddonProject) {
+            tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
+            jacocoTestReport {
+                dependsOn test
+                reports { html.required = true; xml.required = true }
+            }
+        } else {
+            jacocoTestReport {
+                reports { html.required = false; xml.required = false }
+            }
         }
     }
 
@@ -865,6 +885,9 @@ sonar {
                 '**/testing/**',
                 '**/mock/**'
         ].join(',')
+        // The root project produces no executable classes/sources; ensure JaCoCo XML report
+        // is not expected or scanned for root.
+        property 'sonar.coverage.jacoco.xmlReportPaths', ''
         // Exclude test fixtures, platform adapters, version shims, unobf carrier mirrors,
         // and platform-specific implementations from cross-module CPD duplication checks.
         property 'sonar.cpd.exclusions', [
@@ -948,7 +971,8 @@ subprojects {
                     project.path.startsWith(':addons') ||
                     project.path.startsWith(':helpers') ||
                     project.path == ':rtp-plugin' ||
-                    project.path == ':rtp-proxy:rtp-proxy-velocity'
+                    project.path == ':rtp-proxy:rtp-proxy-velocity' ||
+                    project.path == ':effects-api:effects-api-fabric-unobf'
 
             if (isPlatformOrAddon) {
                 property 'sonar.coverage.exclusions', '**/*'
@@ -966,6 +990,13 @@ subprojects {
                 def jacocoReport = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile
                 if (jacocoReport.exists()) {
                     property 'sonar.coverage.jacoco.xmlReportPaths', jacocoReport.absolutePath
+                }
+            } else {
+                // Prevent Sonar JaCoCo plugin from falling back to default locations and reporting
+                // unmatched coverage on modules where source coverage is excluded.
+                tasks.matching { it.name == 'jacocoTestReport' }.configureEach {
+                    reports.xml.required = false
+                    reports.html.required = false
                 }
             }
         }

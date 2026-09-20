@@ -468,21 +468,22 @@ public final class RTPCostMetricsCharts {
   static String detectPlatform() {
     try {
       Server s = Bukkit.getServer();
-      String name = (s != null) ? s.getName() : null;
-      String version = (s != null) ? s.getVersion() : null;
+      if (s == null) return "unknown";
+      String name = s.getName();
+      String version = s.getVersion();
       // Folia exposes itself via the server class signature; checking version
       // strings is the lowest-coupling probe we can do here without pulling
       // in a Folia/Paper-specific import (which rtp-plugin shouldn't carry).
       if (version != null && version.toLowerCase().contains("folia")) return "folia";
       // Paper is reliably detected via the presence of Bukkit.getServer().getName()
       // returning "Paper" or by the Paper-specific TPS API; we use the name.
-      if (name != null && name.equalsIgnoreCase("Paper")) return "paper";
-      if (name != null && name.equalsIgnoreCase("Spigot")) return "spigot";
+      if ("Paper".equalsIgnoreCase(name)) return "paper";
+      if ("Spigot".equalsIgnoreCase(name)) return "spigot";
       // Forks (Purpur, Pufferfish, etc.) report their fork name in getName(); the
       // fleet-wide aggregation cares about the upstream family, so we fall back
       // to "paper-fork" / "spigot-fork" when the version line includes "Paper".
       if (version != null && version.toLowerCase().contains("paper")) return "paper-fork";
-      return (name != null) ? name.toLowerCase() : "unknown";
+      return (name == null || name.isBlank()) ? "unknown" : name.toLowerCase();
     } catch (Throwable t) {
       return "unknown";
     }
