@@ -287,14 +287,14 @@ public final class V26_2_R1FabricRTPPlayer implements RTPPlayer,
     public void performCommand(@Nullable RTPPlayer player, String command) {
         ServerPlayer p = handle;
         if (p == null || command == null) return;
-        ServerLevel lvl = (ServerLevel) p.level();
-        MinecraftServer srv = lvl == null ? null : lvl.getServer();
-        if (srv == null) return;
-        try {
-            srv.getCommands().performPrefixedCommand(p.createCommandSourceStack(), command);
-        } catch (Throwable t) {
-            RTP.log(Level.WARNING,
-                    "[RTP][V26_2_R1] performCommand failed for " + name + ": " + t.getMessage());
+        if (p.level() instanceof ServerLevel lvl) {
+            MinecraftServer srv = lvl.getServer();
+            try {
+                srv.getCommands().performPrefixedCommand(p.createCommandSourceStack(), command);
+            } catch (Throwable t) {
+                RTP.log(Level.WARNING,
+                        "[RTP][V26_2_R1] performCommand failed for " + name + ": " + t.getMessage());
+            }
         }
     }
 
@@ -470,8 +470,7 @@ public final class V26_2_R1FabricRTPPlayer implements RTPPlayer,
     public RTPLocation getLocation() {
         ServerPlayer p = handle;
         if (p == null) return null;
-        ServerLevel level = (ServerLevel) p.level();
-        if (level == null) return null;
+        if (!(p.level() instanceof ServerLevel level)) return null;
         // On MC 26.1.2 (verified via javap on the deobf jar) the accessor is
         // dimension() - no `get` prefix - and on this MC release ResourceKey was
         // renamed location() -> identifier(). Direct typed calls because this v26

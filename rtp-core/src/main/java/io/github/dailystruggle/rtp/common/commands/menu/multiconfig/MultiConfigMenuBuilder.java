@@ -37,6 +37,7 @@ public final class MultiConfigMenuBuilder {
      * Constructs a menu builder emitting concrete command actions.
      */
     public MultiConfigMenuBuilder() {
+        // Explicit public constructor
     }
 
     /**
@@ -445,5 +446,6 @@ public final class MultiConfigMenuBuilder {
      */
     @SuppressWarnings("unused")
     private void mintTokens(List<MenuPage> pages, UUID viewer) {
+        // No-op retained for backwards compatibility with call sites
     }
 }

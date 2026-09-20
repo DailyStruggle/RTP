@@ -474,13 +474,14 @@ public final class RTPCostMetricsCharts {
       if (version != null && version.toLowerCase().contains("folia")) return "folia";
       // Paper is reliably detected via the presence of Bukkit.getServer().getName()
       // returning "Paper" or by the Paper-specific TPS API; we use the name.
-      if (name != null && name.equalsIgnoreCase("Paper")) return "paper";
-      if (name != null && name.equalsIgnoreCase("Spigot")) return "spigot";
+      if (name == null) return "unknown";
+      if (name.equalsIgnoreCase("Paper")) return "paper";
+      if (name.equalsIgnoreCase("Spigot")) return "spigot";
       // Forks (Purpur, Pufferfish, etc.) report their fork name in getName(); the
       // fleet-wide aggregation cares about the upstream family, so we fall back
       // to "paper-fork" / "spigot-fork" when the version line includes "Paper".
       if (version != null && version.toLowerCase().contains("paper")) return "paper-fork";
-      return (name == null) ? "unknown" : name.toLowerCase();
+      return name.toLowerCase();
     } catch (Throwable t) {
       return "unknown";
     }

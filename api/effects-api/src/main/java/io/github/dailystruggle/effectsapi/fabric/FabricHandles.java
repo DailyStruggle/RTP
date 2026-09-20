@@ -388,10 +388,12 @@ public final class FabricHandles implements HandleProvider {
 
         @Override
         public void spawnFirework(Map<String, Object> data) {
+            // No-op fallback; firework spawning handled via version adapters or player handles
         }
 
         @Override
         public void playNote(Object instrument, int tone) {
+            // No-op fallback; note block instrument playback handled via version adapters or player handles
         }
 
         @Override

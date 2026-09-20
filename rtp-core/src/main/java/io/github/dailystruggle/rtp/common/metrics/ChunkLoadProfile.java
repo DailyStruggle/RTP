@@ -13,7 +13,9 @@ public final class ChunkLoadProfile {
   public static final ChunkLoadProfile GLOBAL = new ChunkLoadProfile();
 
   /** Constructs an empty profile. Use {@link #GLOBAL} for the shared instance. */
-  public ChunkLoadProfile() {}
+  public ChunkLoadProfile() {
+    // Explicit public constructor for metric profile instance
+  }
 
   /**
    * One generated/ungenerated sub-bucket: cumulative total/count plus a

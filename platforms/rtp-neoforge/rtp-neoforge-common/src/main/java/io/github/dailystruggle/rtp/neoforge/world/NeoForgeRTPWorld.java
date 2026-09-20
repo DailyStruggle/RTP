@@ -236,13 +236,13 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
      * system completes the inner future off-thread.
      */
     private CompletableFuture<Long> loadLiveChunk(int chunkX, int chunkZ, long key) {
-        final MinecraftServer server = world.getServer();
-        if (server == null) {
+        if (world == null) {
             CompletableFuture<Long> failed = new CompletableFuture<>();
             failed.completeExceptionally(new IllegalStateException(
-                    "NeoForgeRTPWorld.getChunkAt: ServerLevel has no MinecraftServer (world=" + name + ")"));
+                    "NeoForgeRTPWorld.getChunkAt: ServerLevel is null (world=" + name + ")"));
             return failed;
         }
+        final MinecraftServer server = world.getServer();
 
         CompletableFuture<Long> existing = inFlightLiveLoads.get(key);
         if (existing != null) return existing;
@@ -440,8 +440,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         if (minY > maxY) return CompletableFuture.completedFuture(null);
         if (!shouldPrefilter(cx, cz)) return CompletableFuture.completedFuture(null);
         ServerLevel level = world;
+        if (level == null) return CompletableFuture.completedFuture(null);
         MinecraftServer server = level.getServer();
-        if (server == null) return CompletableFuture.completedFuture(null);
 
         final java.nio.file.Path worldFolder;
         try {
@@ -488,8 +488,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     public java.util.Map<Long, String> readBiomesInRegionFile(
             int rcx, int rcz, int y) {
         ServerLevel level = world;
+        if (level == null) return java.util.Collections.emptyMap();
         MinecraftServer server = level.getServer();
-        if (server == null) return java.util.Collections.emptyMap();
         final java.nio.file.Path worldFolder;
         try {
             worldFolder = server.getWorldPath(LevelResource.ROOT);
@@ -672,8 +672,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             // Fall through to the data-side probe.
         }
         ServerLevel level = world;
+        if (level == null) return true;
         MinecraftServer server = level.getServer();
-        if (server == null) return true;
 
         final java.nio.file.Path worldFolder;
         try {
@@ -706,10 +706,10 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
-        final MinecraftServer server = world.getServer();
-        if (server == null) {
+        if (world == null) {
             return CompletableFuture.completedFuture(null);
         }
+        final MinecraftServer server = world.getServer();
         final NeoForgeVersionAdapter adapter = NeoForgeVersionAdapterRegistry.peek();
         if (adapter == null) {
             CompletableFuture<Void> failed = new CompletableFuture<>();
@@ -737,8 +737,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public CompletableFuture<Integer> getServerForceLoadedCount() {
+        if (world == null) return CompletableFuture.completedFuture(0);
         final MinecraftServer server = world.getServer();
-        if (server == null) return CompletableFuture.completedFuture(0);
         return server.submit(() -> {
             try {
                 return world.getForcedChunks().size();

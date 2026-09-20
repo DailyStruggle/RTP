@@ -52,6 +52,7 @@ public final class AdminPanelBuilder {
      * commands, so no token registry or TTL is consulted.
      */
     public AdminPanelBuilder() {
+        // Explicit public constructor
     }
 
     /**

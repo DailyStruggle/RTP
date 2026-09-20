@@ -645,7 +645,9 @@ public final class BrigadierCommandAdapter {
     // Suppress unused-import warnings on Suggestions/SuggestionsBuilder when
     // future refactors trim them; they remain referenced by SuggestionProvider.
     @SuppressWarnings("unused")
-    private static void __referenceKeepers(Suggestions s, SuggestionsBuilder b) { }
+    private static void __referenceKeepers(Suggestions s, SuggestionsBuilder b) {
+        // Intentionally empty: retained to preserve import references
+    }
 
     // ------------------------------------------------------------------
     // (The custom WhitespaceTerminatedArgumentType has been removed.

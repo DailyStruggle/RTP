@@ -18,7 +18,7 @@ spotless {
     lineEndings = 'UNIX'
     java {
         target 'rtp-*/**/*.java', 'addons/**/*.java', 'api/**/*.java'
-        targetExclude '**/build/**', '**/.gradle/**', '**/generated/**', '**/target/**'
+        targetExclude '**/build/**', '**/.gradle/**', '**/generated/**', '**/target/**', 'api/**/build/**'
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()
@@ -890,7 +890,11 @@ sonar {
         // - java:S2176: per-version adapter subclasses share common interface/scheduler names.
         // - java:S1452: public SPI return types with wildcard generics (RTPWorld<?>, FactoryValue<?>).
         // - java:S2696: singleton instance initialization updating static fields.
-        property 'sonar.issue.ignore.multicriteria', 's3077,s2975,s2176,s1452,s2696'
+        // - java:S1186: empty methods in test mocks/listeners/stubs.
+        // - java:S1192: repeated string literals across test suites, serialization codecs, and command trees.
+        // - java:S115: YAML/config/message enums intentionally using lowerCamelCase to map directly to YAML/lang keys.
+        // - java:S3776: cognitive complexity across spatial math, polygon verification, chunk scanning, and platform version bridges.
+        property 'sonar.issue.ignore.multicriteria', 's3077,s2975,s2176,s1452,s2696,s1186test,s1192,s115,s3776'
         property 'sonar.issue.ignore.multicriteria.s3077.ruleKey', 'java:S3077'
         property 'sonar.issue.ignore.multicriteria.s3077.resourceKey', '**/*'
         property 'sonar.issue.ignore.multicriteria.s2975.ruleKey', 'java:S2975'
@@ -901,6 +905,14 @@ sonar {
         property 'sonar.issue.ignore.multicriteria.s1452.resourceKey', '**/*'
         property 'sonar.issue.ignore.multicriteria.s2696.ruleKey', 'java:S2696'
         property 'sonar.issue.ignore.multicriteria.s2696.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s1186test.ruleKey', 'java:S1186'
+        property 'sonar.issue.ignore.multicriteria.s1186test.resourceKey', '**/src/test/**/*'
+        property 'sonar.issue.ignore.multicriteria.s1192.ruleKey', 'java:S1192'
+        property 'sonar.issue.ignore.multicriteria.s1192.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s115.ruleKey', 'java:S115'
+        property 'sonar.issue.ignore.multicriteria.s115.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s3776.ruleKey', 'java:S3776'
+        property 'sonar.issue.ignore.multicriteria.s3776.resourceKey', '**/*'
     }
 }
 
@@ -932,9 +944,11 @@ subprojects {
                 property 'sonar.cpd.exclusions', '**/*'
             }
 
-            def jacocoReport = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile
-            if (jacocoReport.exists()) {
-                property 'sonar.coverage.jacoco.xmlReportPaths', jacocoReport.absolutePath
+            if (!isPlatformOrAddon) {
+                def jacocoReport = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile
+                if (jacocoReport.exists()) {
+                    property 'sonar.coverage.jacoco.xmlReportPaths', jacocoReport.absolutePath
+                }
             }
         }
     }

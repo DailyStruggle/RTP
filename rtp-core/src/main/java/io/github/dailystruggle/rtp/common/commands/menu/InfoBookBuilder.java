@@ -33,6 +33,7 @@ public final class InfoBookBuilder {
 
     /** No-arg constructor. Concrete commands emitted directly by renderer. */
     public InfoBookBuilder() {
+        // Explicit public constructor
     }
 
     /**

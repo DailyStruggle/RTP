@@ -578,10 +578,6 @@ public final class FabricRTPPlayer
         // intermediary (method_5682) is missing on 1.21.11 (NoSuchMethodError).
         // ServerLevel#getServer() is mapping-stable and gives us the same handle.
         net.minecraft.server.MinecraftServer srv = target.getServer();
-        if (srv == null) {
-            ServerLevel here = p.serverLevel();
-            srv = here.getServer();
-        }
         final double tx = to.getBlockX() + 0.5;
         final double ty = to.getBlockY();
         final double tz = to.getBlockZ() + 0.5;
@@ -692,10 +688,6 @@ public final class FabricRTPPlayer
         ServerLevel target = fw.level();
         if (target == null) return;
         net.minecraft.server.MinecraftServer srv = target.getServer();
-        if (srv == null) {
-            ServerLevel here = p.serverLevel();
-            srv = here.getServer();
-        }
         final int bx = to.getBlockX();
         final int by = to.getBlockY();
         final int bz = to.getBlockZ();

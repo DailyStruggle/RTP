@@ -110,18 +110,22 @@ public final class NeoForgeHandles implements HandleProvider {
 
         @Override
         public void playSound(Object type, float volume, float pitch) {
+            // No-op fallback on common carrier; version adapters provide concrete playback
         }
 
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
+            // No-op fallback on common carrier; version adapters provide concrete particle spawn
         }
 
         @Override
         public void spawnFirework(Map<String, Object> data) {
+            // No-op fallback on common carrier; version adapters provide concrete firework spawn
         }
 
         @Override
         public void playNote(Object instrument, int tone) {
+            // No-op fallback on common carrier; version adapters provide concrete note playback
         }
 
         @Override
@@ -143,22 +147,27 @@ public final class NeoForgeHandles implements HandleProvider {
 
         @Override
         public void playSound(Object type, float volume, float pitch, double dx, double dy, double dz) {
+            // No-op fallback on common carrier; version adapters provide concrete playback
         }
 
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
+            // No-op fallback on common carrier; version adapters provide concrete particle spawn
         }
 
         @Override
         public void applyPotionEffect(Object type, int duration, int amplifier, boolean ambient, boolean particles, boolean icon) {
+            // No-op fallback on common carrier; version adapters provide concrete potion effect application
         }
 
         @Override
         public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+            // No-op fallback on common carrier; version adapters provide concrete title send
         }
 
         @Override
         public void playNote(Object instrument, int tone) {
+            // No-op fallback on common carrier; version adapters provide concrete note playback
         }
 
         @Override
@@ -177,11 +186,13 @@ public final class NeoForgeHandles implements HandleProvider {
 
         @Override
         public void spawnFirework(Map<String, Object> data) {
+            // No-op fallback on common carrier; version adapters provide concrete firework spawn
         }
 
         @Override
         public void startGlide(int relativeLift, int maxY, int landingTimeoutTicks,
                                boolean allowFireworks, boolean placeOnShutdown, String platformMaterial) {
+            // No-op fallback on common carrier; version adapters provide concrete glide mechanics
         }
 
         @Override

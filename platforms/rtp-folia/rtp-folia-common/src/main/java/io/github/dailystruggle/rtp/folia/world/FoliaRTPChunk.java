@@ -405,5 +405,6 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   @Override
   @RegionThread
   public void unload() {
+    // Folia manages chunk lifecycle and tickets internally; explicit unload is a no-op
   }
 }

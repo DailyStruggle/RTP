@@ -28,6 +28,7 @@ public final class AddonRegistry {
 
   /** Constructs an empty registry. */
   public AddonRegistry() {
+    // Explicit public constructor
   }
 
   private final List<RTPAddon> addons = new CopyOnWriteArrayList<>();

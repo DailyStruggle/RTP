@@ -56,6 +56,7 @@ public final class VisualizationsSubmenuBuilder {
      * TTL is consulted any more.
      */
     public VisualizationsSubmenuBuilder() {
+        // Explicit public constructor
     }
 
     /**

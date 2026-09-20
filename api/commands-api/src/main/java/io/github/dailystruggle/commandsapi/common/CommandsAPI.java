@@ -50,7 +50,7 @@ public class CommandsAPI {
     private static volatile MessageSink messageSink = null;
 
     public CommandsAPI() {
-
+        // Explicit public constructor
     }
 
     /**

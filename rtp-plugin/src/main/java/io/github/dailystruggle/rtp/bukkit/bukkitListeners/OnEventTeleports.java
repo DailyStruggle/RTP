@@ -369,9 +369,8 @@ public class OnEventTeleports implements Listener {
   @EventHandler(priority = EventPriority.LOW)
   public void onPlayerMove(PlayerMoveEvent event) {
     Location to = event.getTo();
-    Location from = event.getFrom();
     if (to == null) return;
-    if (from == null) return;
+    Location from = event.getFrom();
     if (from.distance(to) == 0.0d) return;
     Player player = event.getPlayer();
 

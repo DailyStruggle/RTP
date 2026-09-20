@@ -389,16 +389,6 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             return failed;
         }
         final MinecraftServer server = world.getServer();
-        if (server == null) {
-            // Defensive: a ServerLevel without a server is a torn-down state.
-            // Complete exceptionally rather than throwing on the caller thread
-            // so the pipeline's existing failure-attribution path picks it up
-            // (REQ-RTP-S-004 - no silent discards).
-            CompletableFuture<Long> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IllegalStateException(
-                "FabricRTPWorld.getChunkAt: ServerLevel has no MinecraftServer (world=" + name + ")"));
-            return failed;
-        }
 
         // (1) Per-coordinate de-duplication - concurrent callers for the
         // same (cx,cz) share one in-flight future.
@@ -453,16 +443,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         // 1.20.1 does not park on it), so the tick thread is not blocked.
         // The actual generation completes off-thread on vanilla/C2ME's own
         // worker pool, so we do not reintroduce the ADR-008 deadlock.
-        final MinecraftServer dispatchServer = world.getServer();
-        if (dispatchServer == null) {
-            // Tear-down race: complete the result on the dispatch path so the
-            // single whenComplete cleanup below handles it uniformly. We mark
-            // the gate as not-acquired since we never tried to acquire one.
-            CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> dispatch =
-                    CompletableFuture.completedFuture(null);
-            attachDispatchCompletion(dispatch, key, result, /*acquiredPermit=*/false);
-            return result;
-        }
+        final MinecraftServer dispatchServer = server;
 
         // (4) Concurrency gate - see liveLoadGate javadoc. Tries an immediate
         // permit; if none is available the dispatch is parked on a bounded FIFO
@@ -954,8 +935,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         if (minY > maxY) return CompletableFuture.completedFuture(null);
         if (!shouldPrefilter(cx, cz)) return CompletableFuture.completedFuture(null);
         ServerLevel level = world;
+        if (level == null) return CompletableFuture.completedFuture(null);
         MinecraftServer server = level.getServer();
-        if (server == null) return CompletableFuture.completedFuture(null);
 
         final java.nio.file.Path worldFolder;
         try {
@@ -1022,8 +1003,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
     public java.util.Map<Long, String> readBiomesInRegionFile(
             int rcx, int rcz, int y) {
         ServerLevel level = world;
+        if (level == null) return java.util.Collections.emptyMap();
         MinecraftServer server = level.getServer();
-        if (server == null) return java.util.Collections.emptyMap();
         final java.nio.file.Path worldFolder;
         try {
             worldFolder = server.getWorldPath(LevelResource.ROOT);
@@ -1242,14 +1223,13 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
     public boolean isChunkGenerated(int cx, int cz) {
         try {
             ServerChunkCache cache = world.getChunkSource();
-            // Loaded chunk -> unambiguously generated. Cheapest answer.
             if (cache.hasChunk(cx, cz)) return true;
         } catch (Throwable ignored) {
             // Fall through to the data-side probe.
         }
         ServerLevel level = world;
+        if (level == null) return true;
         MinecraftServer server = level.getServer();
-        if (server == null) return true;
 
         final java.nio.file.Path worldFolder;
         try {
@@ -1314,11 +1294,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      */
     @Override
     protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
-        final MinecraftServer server = world.getServer();
-        if (server == null) {
-            // Torn-down world: complete normally so callers don't block forever.
+        if (world == null) {
             return CompletableFuture.completedFuture(null);
         }
+        final MinecraftServer server = world.getServer();
         // Delegate to the per-MC-version adapter, which issues a non-persistent
         // RTP-owned chunk ticket via DistanceManager#addRegionTicket. We must
         // NOT call ServerLevel#setChunkForced - that writes through to
@@ -1375,8 +1354,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      */
     @Override
     public CompletableFuture<Integer> getServerForceLoadedCount() {
+        if (world == null) return CompletableFuture.completedFuture(0);
         final MinecraftServer server = world.getServer();
-        if (server == null) return CompletableFuture.completedFuture(0);
         return server.submit(() -> {
             try {
                 return world.getForcedChunks().size();

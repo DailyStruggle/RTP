@@ -59,6 +59,7 @@ public class TeleportData implements Cloneable {
       new java.util.concurrent.atomic.AtomicBoolean(false);
 
   public TeleportData() {
+    // Explicit public constructor
   }
 
   /**

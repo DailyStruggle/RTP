@@ -43,6 +43,7 @@ public final class PrefabNonceStore {
 
     /** Production constructor. */
     public PrefabNonceStore() {
+        // Explicit public constructor
     }
 
     /**

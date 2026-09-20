@@ -28,7 +28,9 @@ import java.util.function.Predicate;
 public final class DefaultRTPHooks implements RTPHooks {
 
   /** Constructs a DefaultRTPHooks instance with all registries initialised to their empty state. */
-  public DefaultRTPHooks() {}
+  public DefaultRTPHooks() {
+    // Explicit public default constructor initialising default registries
+  }
 
   private final RegionVerifierRegistry verifierRegistry = new RegionVerifierRegistry() {
     @Override public AutoCloseable register(Class<?> source, Predicate<RTPCoords> verifier) {

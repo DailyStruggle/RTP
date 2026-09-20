@@ -40,6 +40,7 @@ public final class FrontPageBuilder {
      * {@code /rtp menu ...} commands.
      */
     public FrontPageBuilder() {
+        // Explicit public constructor
     }
 
     /**

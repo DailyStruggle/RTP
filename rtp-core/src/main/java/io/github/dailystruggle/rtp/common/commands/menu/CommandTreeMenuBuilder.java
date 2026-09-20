@@ -48,6 +48,7 @@ public final class CommandTreeMenuBuilder {
      * commands, so no token registry or TTL is consulted.
      */
     public CommandTreeMenuBuilder() {
+        // Explicit public constructor
     }
 
     /**

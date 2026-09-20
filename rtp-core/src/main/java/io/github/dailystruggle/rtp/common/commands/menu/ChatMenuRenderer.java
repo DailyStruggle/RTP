@@ -20,7 +20,9 @@ import java.util.UUID;
 public final class ChatMenuRenderer implements MenuRenderer {
 
     /** Constructs a chat menu renderer. Stateless; a single instance may be shared. */
-    public ChatMenuRenderer() {}
+    public ChatMenuRenderer() {
+        // Explicit public constructor
+    }
 
     @Override
     public void render(UUID playerId, MenuModel model) {

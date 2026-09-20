@@ -17,7 +17,9 @@ import org.jetbrains.annotations.Nullable;
 public class Factory<T extends FactoryValue<?>> {
 
   /** Constructs an empty factory. */
-  public Factory() {}
+  public Factory() {
+    // Explicit public default constructor
+  }
 
   /** The backing map of upper-cased {@code .YML}-suffixed names to values. */
   public final ConcurrentHashMap<String, T> map = new ConcurrentHashMap<>();
@@ -124,15 +126,15 @@ public class Factory<T extends FactoryValue<?>> {
       // rather than failing, so callers don't have to pre-check existence.
       return construct(name);
     }
-    T clone = (T) template.clone();
-    if (clone != null) {
-      clone.name = (name.endsWith(".yml")) ? name : name + ".yml";
-      if (clone instanceof ConfigParser) {
-        ConfigParser<?> configParser = (ConfigParser<?>) clone;
+    FactoryValue<?> cloned = template.clone();
+    if (cloned != null) {
+      cloned.name = (name.endsWith(".yml")) ? name : name + ".yml";
+      if (cloned instanceof ConfigParser) {
+        ConfigParser<?> configParser = (ConfigParser<?>) cloned;
         // Reuse the template's rename map (see construct(String)) instead of null.
         configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
       }
-      return clone.clone();
+      return cloned.clone();
     }
     return null;
   }

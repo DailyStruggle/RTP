@@ -19,7 +19,9 @@ import java.util.logging.Level;
 public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Metrics {
 
     /** Constructs a CoreMetrics instance with the NOOP binding. */
-    public CoreMetrics() {}
+    public CoreMetrics() {
+        // Explicit public default constructor initialising default metrics components
+    }
 
     private final PipelineHistogram pipelineHistogram = new PipelineHistogram();
     private final MetricsSnapshotRing snapshotRing = new MetricsSnapshotRing();

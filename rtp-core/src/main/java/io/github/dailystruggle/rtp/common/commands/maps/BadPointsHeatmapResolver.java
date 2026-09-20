@@ -17,6 +17,7 @@ public final class BadPointsHeatmapResolver implements ChartSpecResolver {
 
   /** Constructs a resolver. Stateless; a single instance may be shared. */
   public BadPointsHeatmapResolver() {
+    // Explicit public constructor
   }
 
   /** Resolution of the binned heatmap. Matches the vanilla 128px canvas exactly. */

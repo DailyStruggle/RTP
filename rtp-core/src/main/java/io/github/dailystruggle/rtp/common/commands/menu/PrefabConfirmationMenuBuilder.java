@@ -29,6 +29,7 @@ public final class PrefabConfirmationMenuBuilder {
      * ADR-050: no-arg constructor. Concrete commands emitted without token registry.
      */
     public PrefabConfirmationMenuBuilder() {
+        // Explicit public constructor
     }
 
     /**

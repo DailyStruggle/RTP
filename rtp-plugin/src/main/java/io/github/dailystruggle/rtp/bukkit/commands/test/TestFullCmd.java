@@ -242,7 +242,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       // Subcommand-specific operator notice (e.g. commands-live's
       // intentional WARNING burst per REQ-RTP-S-004).
       String notice = noticeFor(subName);
-      if (notice != null) {
+      if (notice != null && !notice.isEmpty()) {
         if (!callerId.equals(RTPAPI.serverId)) {
           RTP.serverAccessor.sendMessage(callerId, notice);
         }

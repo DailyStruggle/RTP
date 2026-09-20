@@ -83,7 +83,7 @@ class AnvilOccupancyAndPoolTest {
       Object eDiffMtime = ctor.newInstance(bmp1, 200L);
       Object eDiffBmp = ctor.newInstance(new long[]{3L}, 100L);
 
-      assertEquals(e1, e1);
+      assertTrue(e1.equals(e1));
       assertEquals(e1, e2);
       assertEquals(e1.hashCode(), e2.hashCode());
       assertFalse(e1.equals(null));

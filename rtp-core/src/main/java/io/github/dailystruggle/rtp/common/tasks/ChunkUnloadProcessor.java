@@ -10,7 +10,9 @@ import io.github.dailystruggle.rtp.common.RTP;
 public class ChunkUnloadProcessor implements Runnable {
 
   /** Constructs a processor. */
-  public ChunkUnloadProcessor() {}
+  public ChunkUnloadProcessor() {
+    // Explicit public constructor
+  }
   @Override
   public void run() {
     try {

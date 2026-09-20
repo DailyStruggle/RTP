@@ -12,7 +12,9 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 // get queued location
 public final class OnPlayerRespawn implements Listener {
 
-  public OnPlayerRespawn() {}
+  public OnPlayerRespawn() {
+    // Explicit public constructor for event listener
+  }
 
   @EventHandler(priority = EventPriority.HIGH)
   public void onPlayerRespawn(PlayerRespawnEvent event) {

@@ -100,7 +100,6 @@ public final class PaperMetricsBinding implements MetricsBinding {
     private static double safeTpsIndex(int idx) {
         try {
             Server s = Bukkit.getServer();
-            if (s == null) return MetricsSnapshot.UNSAMPLED;
             double[] tps = s.getTPS();
             if (tps == null || idx >= tps.length) return MetricsSnapshot.UNSAMPLED;
             return tps[idx];
@@ -112,7 +111,6 @@ public final class PaperMetricsBinding implements MetricsBinding {
     private static double safeMspt() {
         try {
             Server s = Bukkit.getServer();
-            if (s == null) return MetricsSnapshot.UNSAMPLED;
             return s.getAverageTickTime();
         } catch (Throwable ignored) {
             return MetricsSnapshot.UNSAMPLED;

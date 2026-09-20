@@ -24,6 +24,7 @@ public final class BiomeActivityTracker {
 
   /** Constructs an empty tracker. */
   public BiomeActivityTracker() {
+    // Explicit public constructor
   }
 
   private final ConcurrentHashMap<String, AtomicLong> biomeCounts = new ConcurrentHashMap<>();

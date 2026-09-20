@@ -135,8 +135,12 @@ public final class ConsoleWatcher {
                 if (!matched) return;
                 handleMatch(stripped);
             }
-            @Override public void flush() {}
-            @Override public void close() throws SecurityException {}
+            @Override public void flush() {
+                // In-memory handler without buffering; no flush needed
+            }
+            @Override public void close() throws SecurityException {
+                // In-memory handler without system resources; no close action needed
+            }
         };
         // Attach to the root logger so we see records from any plugin's
         // own Logger (their parents chain up to root). Bukkit's own logger

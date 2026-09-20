@@ -15,7 +15,7 @@ public final class DurationParser {
       Pattern.compile("^\\s*+([+-]?+[0-9]++(?:\\.[0-9]++)?+)(?:\\s*+([a-zA-Z]++))?\\s*+$");
 
   private static final Pattern COMPOSITE_SEGMENT_PATTERN =
-      Pattern.compile("([+-]?+[0-9]++(?:\\.[0-9]++)?+)[ \\t]*+([a-zA-Z]++)");
+      Pattern.compile("([+-]?+[0-9]++(?:\\.[0-9]++)?+)\\s*+([a-zA-Z]++)");
 
   private DurationParser() {}
 
