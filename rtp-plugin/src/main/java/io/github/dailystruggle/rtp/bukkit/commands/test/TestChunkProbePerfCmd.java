@@ -87,6 +87,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
   }
 
   @Override
+  @SuppressWarnings("java:S3516") // Method returns true on async benchmark dispatch
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
@@ -111,7 +112,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
           RTP.serverAccessor.sendMessage(callerId, msg);
         }
         RTP.log(Level.WARNING, msg);
-        return true;
+        return false;
       }
     }
 
@@ -348,7 +349,6 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
     }
     if (bukkit == null) return null;
     File worldFolder = bukkit.getWorldFolder();
-    if (worldFolder == null) return null;
     String dim;
     try {
       switch (bukkit.getEnvironment()) {
@@ -557,6 +557,12 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
     try {
       // Bound the wait. Spigot worst-case is roughly limit × 200 ms; pad it.
       return result.get(samples.size() * 2L + 30L, TimeUnit.SECONDS);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      RTP.log(Level.WARNING,
+          "[RTP test/chunk-probe-perf] full(cpu) interrupted: "
+              + ie.getMessage());
+      return empty;
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
           "[RTP test/chunk-probe-perf] full(cpu) timed out or failed: "
@@ -629,6 +635,9 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
         long[] r = f.get(30L, TimeUnit.SECONDS);
         totalNs += r[0];
         if (r[1] != 0L) fails++;
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        fails++;
       } catch (Throwable t) {
         fails++;
       }

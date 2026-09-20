@@ -106,11 +106,6 @@ public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
                             + request.viewer() + " (no loaded worlds?)");
         }
         MapView view = Bukkit.createMap(world);
-        if (view == null) {
-            throw new IllegalStateException(
-                    "BukkitMapBinding.allocate: Bukkit.createMap returned null for world="
-                            + world.getName());
-        }
         if (request.locking() == MapAllocationRequest.Locking.LOCKED) {
             view.setLocked(true);
         }

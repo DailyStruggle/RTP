@@ -36,7 +36,7 @@ import org.bukkit.command.CommandSender;
 public final class BukkitHelpReplyRenderer implements Function<UUID, Consumer<String>> {
 
   private static final Pattern HELP_SUBCOMMAND_LINE =
-      Pattern.compile("^\\s++-\\s++(/\\S[^\\r\\n]*?)\\s*+(?:\\R.*+)?+$", Pattern.DOTALL);
+      Pattern.compile("^\\s++-\\s++(/\\S[^\r\n]*+)\\s*+(?:\\R.*+)?+$", Pattern.DOTALL);
 
   @Override
   public Consumer<String> apply(UUID senderId) {

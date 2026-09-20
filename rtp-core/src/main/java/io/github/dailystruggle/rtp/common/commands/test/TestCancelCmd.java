@@ -39,6 +39,7 @@ public class TestCancelCmd extends BaseRTPCmdImpl {
   }
 
   @Override
+  @SuppressWarnings("java:S3516") // Method returns boolean per CommandsAPICommand contract; false on permission denied, true on cancel completion
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
@@ -55,7 +56,7 @@ public class TestCancelCmd extends BaseRTPCmdImpl {
           RTP.serverAccessor.sendMessage(callerId, denied);
         }
         RTP.log(Level.WARNING, "[RTP test/cancel] denied 'all' to " + callerId);
-        return true;
+        return false;
       }
       int n = ActiveTestJobs.cancelAll();
       String msg = "[RTP test/cancel] cancelled " + n + " job(s) across all owners";

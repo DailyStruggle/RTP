@@ -580,7 +580,7 @@ public final class FabricRTPPlayer
         net.minecraft.server.MinecraftServer srv = target.getServer();
         if (srv == null) {
             ServerLevel here = p.serverLevel();
-            srv = here == null ? null : here.getServer();
+            srv = here.getServer();
         }
         if (srv == null) {
             return CompletableFuture.completedFuture(false);
@@ -697,7 +697,7 @@ public final class FabricRTPPlayer
         net.minecraft.server.MinecraftServer srv = target.getServer();
         if (srv == null) {
             ServerLevel here = p.serverLevel();
-            srv = here == null ? null : here.getServer();
+            srv = here.getServer();
         }
         if (srv == null) return;
         final int bx = to.getBlockX();

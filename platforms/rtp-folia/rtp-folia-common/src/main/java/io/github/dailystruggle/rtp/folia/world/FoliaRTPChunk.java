@@ -124,9 +124,10 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   @GlobalRegionThread
   public RTPWorld<?> getWorld() {
     if (anvilView != null) {
-      return RTP.serverAccessor.getRTPWorld(anvilWorldId);
+      return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(anvilWorldId) : null;
     }
-    return RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID());
+    if (chunk == null || chunk.getWorld() == null) return null;
+    return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID()) : null;
   }
 
   @Override

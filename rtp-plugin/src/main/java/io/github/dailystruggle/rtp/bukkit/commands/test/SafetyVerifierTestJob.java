@@ -56,6 +56,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
   }
 
   @Override
+  @SuppressWarnings("java:S3516") // Method returns boolean per CommandsAPICommand contract; false on missing serverAccessor, true on probe dispatch
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
@@ -63,7 +64,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
     if (RTP.serverAccessor == null) {
       String msg = "&c[RTP test/safety-verifier] serverAccessor is null; core not yet loaded";
       RTP.log(Level.WARNING, msg);
-      return true;
+      return false;
     }
 
     Result r = runProbe();
@@ -171,6 +172,10 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
                 + " (expected TimeoutException)";
       } catch (TimeoutException te) {
         r.timeoutCaught = true; // expected
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        r.timeoutCaught = false;
+        r.notes = "interrupted waiting for verifier: " + ie.getMessage();
       } catch (Throwable t) {
         r.timeoutCaught = false;
         r.notes = "unexpected exception waiting for verifier: " + t.getClass().getSimpleName();

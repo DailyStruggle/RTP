@@ -720,6 +720,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    *
    * @return the active {@link Random} instance; never {@code null}
    */
+  @SuppressWarnings("java:S1845") // Accessor method name mirrors protected field
   protected final Random rng() {
     return rng != null ? rng : ThreadLocalRandom.current();
   }

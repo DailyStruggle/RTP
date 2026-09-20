@@ -221,6 +221,13 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
                 + ")";
         realAccessor.sendMessage(callerId, msg);
         RTP.log(Level.WARNING, msg);
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        String msg =
+            "[RTP test/async-reply] wait interrupted: "
+                + ie.getMessage();
+        realAccessor.sendMessage(callerId, msg);
+        RTP.log(Level.WARNING, msg, ie);
       } catch (Throwable t) {
         String msg =
             "[RTP test/async-reply] wait failed: "

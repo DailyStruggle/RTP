@@ -54,8 +54,8 @@ public abstract class AbstractFileSchematicPaster implements SchematicPaster {
       if (accessor != null) {
         accessor.log(java.util.logging.Level.WARNING,
             "[RTP] failed to decode schematic '"
-                + (source != null ? String.valueOf(source.path()) : "null")
-                + "' (" + (source != null ? source.formatHint() : "?") + "): "
+                + source.path()
+                + "' (" + source.formatHint() + "): "
                 + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
       }
       return CompletableFuture.completedFuture(null);

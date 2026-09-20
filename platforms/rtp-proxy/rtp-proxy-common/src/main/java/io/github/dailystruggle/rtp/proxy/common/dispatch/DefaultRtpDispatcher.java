@@ -207,7 +207,7 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
         LOG.log(Level.FINE,
                 "[NETWORK][state][proxy] emit: playerId=" + playerId
                         + " state=" + state
-                        + ((reason != null) ? reason.map(r -> " reason=" + r).orElse("") : ""));
+                        + (reason.map(r -> " reason=" + r).orElse("")));
         try {
             statusSink.emit(playerId, state, reason);
         } catch (Throwable sinkErr) {

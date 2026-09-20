@@ -94,7 +94,7 @@ public final class V26_2_R1FabricRTPChunk extends RTPChunk<ChunkAccess> {
             Block block = state.getBlock();
             // MC 26.1.2: ResourceLocation was renamed to Identifier.
             Identifier id = BuiltInRegistries.BLOCK.getKey(block);
-            return (id == null) ? "" : id.toString().toUpperCase(Locale.ROOT);
+            return id.toString().toUpperCase(Locale.ROOT);
         } catch (Throwable t) {
             return "";
         }

@@ -25,7 +25,10 @@ public class ConfigCmd extends BaseRTPCmdImpl {
   public ConfigCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
 
-    RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands, 5));
+    RTP rtp = RTP.getInstance();
+    if (rtp != null && rtp.miscAsyncTasks != null) {
+      rtp.miscAsyncTasks.add(new RTPRunnable(this::addCommands, 5));
+    }
   }
 
   @Override

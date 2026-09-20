@@ -122,7 +122,6 @@ public final class PaperMetricsBinding implements MetricsBinding {
     private static int safePlayerCount() {
         try {
             Server s = Bukkit.getServer();
-            if (s == null) return 0;
             return s.getOnlinePlayers().size();
         } catch (Throwable ignored) {
             return 0;
@@ -132,7 +131,6 @@ public final class PaperMetricsBinding implements MetricsBinding {
     private static int safeMaxPlayers() {
         try {
             Server s = Bukkit.getServer();
-            if (s == null) return 0;
             return s.getMaxPlayers();
         } catch (Throwable ignored) {
             return 0;

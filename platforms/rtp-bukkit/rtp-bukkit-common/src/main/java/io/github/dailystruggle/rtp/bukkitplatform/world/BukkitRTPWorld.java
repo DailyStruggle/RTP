@@ -1020,7 +1020,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   @Override
   public void platform(RTPLocation location) {
     try {
+      if (world == null) return;
       ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      if (safety == null) return;
       int radius = safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
       // Honour the documented "disable platforms" contract from safety.yml (platformRadius: -1).
       // Skip even reading the rest of the config when the operator has opted out entirely.

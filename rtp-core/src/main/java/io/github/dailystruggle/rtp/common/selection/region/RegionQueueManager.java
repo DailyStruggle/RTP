@@ -654,6 +654,8 @@ public class RegionQueueManager {
                 try {
                     RTPLocation loc = future.get();
                     if (loc != null && loc.reservation() != null) loc.reservation().close();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 } catch (Exception ignored) {}
             } else {
                 future.complete(null);

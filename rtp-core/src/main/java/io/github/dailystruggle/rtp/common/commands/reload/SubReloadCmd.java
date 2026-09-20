@@ -80,11 +80,12 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     return false;
   }
 
+  @SuppressWarnings("java:S3516") // Method returns true on reload completion
   public boolean subReloadSingle(UUID senderId, ConfigParser<?> parser) {
     RTPServerAccessor serverAccessor = RTP.serverAccessor;
     Configs configs = RTP.configs;
 
-    if (RTP.configs == null) return true;
+    if (RTP.configs == null) return false;
 
     String msg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.reloading, ""));
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
@@ -99,8 +100,9 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     return true;
   }
 
+  @SuppressWarnings("java:S3516") // Method returns true on reload completion
   public boolean subReloadMulti(UUID senderId, MultiConfigParser<?> parser) {
-    if (RTP.configs == null) return true;
+    if (RTP.configs == null) return false;
 
     RTPServerAccessor serverAccessor = RTP.serverAccessor;
     RTPCommandSender commandSender = serverAccessor.getSender(senderId);

@@ -493,6 +493,7 @@ public class ScanTask extends RTPRunnable {
         try {
           inFlightGate.acquire();
         } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           break outer;
         }
 
@@ -540,7 +541,9 @@ public class ScanTask extends RTPRunnable {
     try {
       inFlightGate.acquire(MAX_PENDING_CHUNKS);
       inFlightGate.release(MAX_PENDING_CHUNKS);
-    } catch (InterruptedException ignored) {}
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
     RTP.log(Level.FINER, "[ScanTask] drain end region=" + region.name
             + " drainMs=" + ((System.nanoTime() - drainStart) / 1_000_000L));
 
@@ -1849,6 +1852,7 @@ public class ScanTask extends RTPRunnable {
     }
   }
 
+  @SuppressWarnings("java:S1845") // Method pause() operates on AtomicBoolean pause flag
   public void pause() {
     RTP.log(Level.FINE, "[ScanTask] pause requested region=" + region.name
             + " inFlight=" + inFlight.get());

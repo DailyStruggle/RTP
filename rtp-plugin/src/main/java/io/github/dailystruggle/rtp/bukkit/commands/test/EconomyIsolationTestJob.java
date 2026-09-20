@@ -186,6 +186,10 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
       }
       RTP.log(Level.WARNING, msg);
       return;
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      reportFailure(callerId, "await", ie);
+      return;
     } catch (Throwable t) {
       // already reported inside syntheticDebit if it originated there;
       // still log any wrapping ExecutionException here for traceability.

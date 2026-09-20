@@ -101,7 +101,7 @@ public final class BukkitTpsSampler implements MetricsBinding {
     public int playerCount() {
         try {
             Server s = Bukkit.getServer();
-            return s == null ? 0 : s.getOnlinePlayers().size();
+            return s.getOnlinePlayers().size();
         } catch (Throwable ignored) {
             return 0;
         }
@@ -111,7 +111,7 @@ public final class BukkitTpsSampler implements MetricsBinding {
     public int softCap() {
         try {
             Server s = Bukkit.getServer();
-            return s == null ? 0 : s.getMaxPlayers();
+            return s.getMaxPlayers();
         } catch (Throwable ignored) {
             return 0;
         }

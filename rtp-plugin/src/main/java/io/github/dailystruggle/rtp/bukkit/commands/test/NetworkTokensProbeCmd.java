@@ -50,6 +50,7 @@ public final class NetworkTokensProbeCmd extends BaseRTPCmdImpl {
   }
 
   @Override
+  @SuppressWarnings("java:S3516") // Method returns true on async probe dispatch
   public boolean onCommand(UUID callerId,
           Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;

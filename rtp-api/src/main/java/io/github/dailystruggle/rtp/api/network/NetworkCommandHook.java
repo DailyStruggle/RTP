@@ -47,6 +47,7 @@ public interface NetworkCommandHook {
     Local LOCAL = new Local();
 
     /** Static factory for the local pass-through outcome. */
+    @SuppressWarnings("java:S1845") // Factory method name mirrors static singleton field
     static Local local() { return LOCAL; }
 
     /**

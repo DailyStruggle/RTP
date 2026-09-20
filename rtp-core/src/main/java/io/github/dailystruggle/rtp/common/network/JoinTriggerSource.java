@@ -195,7 +195,7 @@ public final class JoinTriggerSource {
         // faking chat commands or triggering parameter permission checks.
         // Regionless requests target the default region; explicit region keys
         // (bare 'nether' or qualified 'server:nether') target the local region.
-        String rawKey = (regionKey != null) ? regionKey.orElse(null) : null;
+        String rawKey = regionKey.orElse(null);
         String localRegionName = null;
         if (rawKey != null && !rawKey.isBlank()) {
             int colon = rawKey.indexOf(':');

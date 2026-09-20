@@ -885,9 +885,12 @@ sonar {
         // ADR-094: Ignore java:S3077 (volatile on non-primitive/array) globally across the project.
         // Volatile reference publication is an intentional lock-free pattern used across spatial caches,
         // configuration reloads, and platform handle caches.
-        property 'sonar.issue.ignore.multicriteria', 's3077'
+        // Also ignore java:S2975: public clone() implementations across Cloneable domain models.
+        property 'sonar.issue.ignore.multicriteria', 's3077,s2975'
         property 'sonar.issue.ignore.multicriteria.s3077.ruleKey', 'java:S3077'
         property 'sonar.issue.ignore.multicriteria.s3077.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s2975.ruleKey', 'java:S2975'
+        property 'sonar.issue.ignore.multicriteria.s2975.resourceKey', '**/*'
     }
 }
 

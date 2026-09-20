@@ -482,7 +482,9 @@ final class MenuWiringSupportInstaller {
         }
         final AdminCmd adminCmd = new AdminCmd(rtpRoot, openAdminPanel);
         adminCmd.addSubCommand(new PrefabCommand(adminCmd));
-        rtpRoot.addSubCommand(adminCmd);
+        if (rtpRoot != null) {
+            rtpRoot.addSubCommand(adminCmd);
+        }
     }
 
     private void installConfigSearchHandler(

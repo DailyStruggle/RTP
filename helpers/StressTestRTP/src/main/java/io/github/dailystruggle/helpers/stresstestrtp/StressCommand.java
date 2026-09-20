@@ -29,6 +29,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
     public StressCommand(StressTestRTPPlugin plugin) { this.plugin = plugin; }
 
     @Override
+    @SuppressWarnings("java:S3516") // Bukkit command execution returns true to indicate command was handled
     public boolean onCommand(CommandSender sender, Command command,
                              String label, String[] args) {
         if (!sender.hasPermission("stresstestrtp.admin")) {
@@ -133,6 +134,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    @SuppressWarnings("java:S3516")
     private boolean doStop(CommandSender sender) {
         if (!plugin.runner().isRunning()) {
             sender.sendMessage("StressTestRTP: no run is in progress.");
@@ -143,6 +145,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    @SuppressWarnings("java:S3516")
     private boolean doStatus(CommandSender sender) {
         MetricsRecorder rec = plugin.recorder();
         if (rec == null) {
@@ -163,6 +166,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    @SuppressWarnings("java:S3516")
     private boolean doResetCold(CommandSender sender) {
         List<String> cmds = plugin.getConfig().getStringList("cache-reset-commands");
         if (cmds.isEmpty()) {

@@ -190,7 +190,6 @@ public final class BookMenuRenderer implements MenuRenderer {
 
     private static @Nullable OfflinePlayer resolveViewer(UUID playerId) {
         try {
-            if (Bukkit.getServer() == null) return null;
             return Bukkit.getOfflinePlayer(playerId);
         } catch (Throwable t) {
             return null;

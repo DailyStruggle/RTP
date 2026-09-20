@@ -47,10 +47,11 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
   private static final java.util.concurrent.atomic.AtomicBoolean isProcessing = new java.util.concurrent.atomic.AtomicBoolean(false);
 
   @Override
+  @SuppressWarnings("java:S3516") // Method returns boolean per CommandsAPICommand contract; false on guard failure, true on async dispatch
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
-    if (isProcessing.get()) return true;
+    if (isProcessing.get()) return false;
     isProcessing.set(true);
     try {
       RTPScheduler scheduler = RTP.scheduler;
@@ -60,7 +61,7 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
           RTP.serverAccessor.sendMessage(callerId, msg);
         }
         RTP.log(Level.WARNING, msg);
-        return true;
+        return false;
       }
 
       // Snapshot the caller's location on the calling thread (the command
@@ -160,6 +161,9 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
         RTP.serverAccessor.sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      reportTierFailure(callerId, tier, e);
     } catch (Throwable t) {
       reportTierFailure(callerId, tier, t);
     }

@@ -89,7 +89,9 @@ public class ChunkReservation implements AutoCloseable {
   public void keep(boolean keep) {
     log(Level.FINER, "ChunkReservation keep({0}): world={1}, chunk=({2},{3})",
             keep, worldName(), chunkSet.getX(), chunkSet.getZ());
-    world.setForceLoaded(chunkSet.getX(), chunkSet.getZ(), keep);
+    if (world != null) {
+      world.setForceLoaded(chunkSet.getX(), chunkSet.getZ(), keep);
+    }
   }
 
   /**

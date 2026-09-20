@@ -305,6 +305,12 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      */
     private CompletableFuture<Long> loadLiveChunk(int chunkX, int chunkZ, long key) {
         io.github.dailystruggle.rtp.common.tools.CfDiag.fabricLoadLiveChunk.increment();
+        if (world == null) {
+            CompletableFuture<Long> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new IllegalStateException(
+                "FabricRTPWorldUnobf.getChunkAt: ServerLevel is null (world=" + name + ")"));
+            return failed;
+        }
         final MinecraftServer server = world.getServer();
         if (server == null) {
             // Defensive: a ServerLevel without a server is a torn-down state.
@@ -828,7 +834,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     public boolean isChunkLoaded(int cx, int cz) {
         try {
             ServerChunkCache cache = world.getChunkSource();
-            return cache != null && cache.hasChunk(cx, cz);
+            return cache.hasChunk(cx, cz);
         } catch (Throwable ignored) {
             return false;
         }
@@ -871,7 +877,6 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         if (minY > maxY) return CompletableFuture.completedFuture(null);
         if (!shouldPrefilter(cx, cz)) return CompletableFuture.completedFuture(null);
         ServerLevel level = world;
-        if (level == null) return CompletableFuture.completedFuture(null);
         MinecraftServer server = level.getServer();
         if (server == null) return CompletableFuture.completedFuture(null);
 
@@ -936,7 +941,6 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     public java.util.Map<Long, String> readBiomesInRegionFile(
             int rcx, int rcz, int y) {
         ServerLevel level = world;
-        if (level == null) return java.util.Collections.emptyMap();
         MinecraftServer server = level.getServer();
         if (server == null) return java.util.Collections.emptyMap();
         final java.nio.file.Path worldFolder;
@@ -1158,12 +1162,11 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         try {
             ServerChunkCache cache = world.getChunkSource();
             // Loaded chunk -> unambiguously generated. Cheapest answer.
-            if (cache != null && cache.hasChunk(cx, cz)) return true;
+            if (cache.hasChunk(cx, cz)) return true;
         } catch (Throwable ignored) {
             // Fall through to the data-side probe.
         }
         ServerLevel level = world;
-        if (level == null) return true;
         MinecraftServer server = level.getServer();
         if (server == null) return true;
 
@@ -1230,6 +1233,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      */
     @Override
     protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
+        if (world == null) return CompletableFuture.completedFuture(null);
         final MinecraftServer server = world.getServer();
         if (server == null) {
             // Torn-down world: complete normally so callers don't block forever.

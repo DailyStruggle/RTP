@@ -51,22 +51,14 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
   private static final java.util.concurrent.atomic.AtomicBoolean isProcessing = new java.util.concurrent.atomic.AtomicBoolean(false);
 
   @Override
+  @SuppressWarnings("java:S3516") // Method returns boolean per CommandsAPICommand contract; false on guard failure, true on audit success
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
-    if (isProcessing.get()) return true;
+    if (isProcessing.get()) return false;
     isProcessing.set(true);
     try {
       CommandsAPICommand root = findRoot(this);
-      if (root == null) {
-        String msg = "[RTP test/commands] root command not resolvable; audit aborted";
-        if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, msg);
-        }
-        RTP.log(Level.WARNING, msg);
-        return true;
-      }
-
       AuditReport report = new AuditReport();
       Set<CommandsAPICommand> visited =
           java.util.Collections.newSetFromMap(new IdentityHashMap<>());

@@ -15,7 +15,6 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implements ConfigLoader {
   public final File pluginDirectory;
   public final File myDirectory;
-  public final String name;
   /**
    * ADR-076: the on-disk directory (relative to {@code pluginDirectory}) this parser
    * reads/writes, e.g. {@code definitions/regions}. Decoupled from {@link #name} (the
@@ -267,7 +266,9 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 
   @SuppressWarnings("unchecked") // configParserFactory only ever holds ConfigParser<E> for this parser's E
   public ConfigParser<E> getParser(String name) {
-    name = ConfigParser.sanitizeName(name).toUpperCase();
+    if (name == null) name = "DEFAULT.YML";
+    String sanitized = ConfigParser.sanitizeName(name);
+    name = (sanitized != null ? sanitized : "").toUpperCase();
     if (!name.endsWith(".YML")) name = name + ".YML";
     if (configParserFactory.contains(name)) return configParserFactory.map.get(name);
     else {

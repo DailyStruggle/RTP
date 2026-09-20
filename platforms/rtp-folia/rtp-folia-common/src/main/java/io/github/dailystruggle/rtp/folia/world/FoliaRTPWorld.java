@@ -358,6 +358,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    */
   @RegionThread
   private CompletableFuture<Long> loadLiveChunk(int cx, int cz, long key) {
+    if (world == null) return CompletableFuture.completedFuture(null);
     // Count only actual live chunk-load attempts (post probe-cache miss). The probe
     // entry getChunkAt MUST NOT bump this; see RTPWorld.totalChunkLoads Javadoc.
     totalChunkLoads.incrementAndGet();
@@ -908,6 +909,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     // RegionScheduler. See REQ-RTP-S-005 / Folia threading rules in `Project Guidelines`.
     try {
       ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      if (safety == null || world == null) return;
       int radius = safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
       // Honour the documented "disable platforms" contract from safety.yml (platformRadius: -1).
       // Skip dispatching per-chunk region tasks entirely when the operator has opted out.

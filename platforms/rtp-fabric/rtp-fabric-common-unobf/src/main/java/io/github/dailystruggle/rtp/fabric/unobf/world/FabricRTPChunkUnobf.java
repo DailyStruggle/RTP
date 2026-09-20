@@ -216,7 +216,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
                     (cx << 4) + (x & 0xF), y, (cz << 4) + (z & 0xF)));
             Block block = state.getBlock();
             Identifier id = BuiltInRegistries.BLOCK.getKey(block);
-            return (id == null) ? "" : id.toString().toUpperCase(Locale.ROOT);
+            return id.toString().toUpperCase(Locale.ROOT);
         } catch (Throwable t) {
             return "";
         }
@@ -294,7 +294,6 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
             if (airSet.isEmpty()) return false;
             Block block = state.getBlock();
             Identifier id = BuiltInRegistries.BLOCK.getKey(block);
-            if (id == null) return false;
             return (RTP.serverAccessor != null)
                 ? RTP.serverAccessor.matchesPaletteIdentifier(id.toString(), airSet)
                 : airSet.contains(io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(id.toString()));

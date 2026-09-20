@@ -49,6 +49,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
   }
 
   @Override
+  @SuppressWarnings("java:S3516") // Method returns boolean per command contract; false on missing world, true on probe dispatch
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
@@ -57,7 +58,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
     if (worlds == null || worlds.isEmpty()) {
       Result r = Result.skipped("no RTPWorlds registered on the server accessor");
       emit(callerId, r);
-      return true;
+      return false;
     }
 
     // Optional --samples N for a serial per-chunk latency harness
@@ -147,8 +148,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
     long[] copy = arr.clone();
     java.util.Arrays.sort(copy);
     int idx = (int) Math.ceil((pct / 100.0) * copy.length) - 1;
-    if (idx < 0) idx = 0;
-    if (idx >= copy.length) idx = copy.length - 1;
+    idx = Math.max(0, Math.min(idx, copy.length - 1));
     return copy[idx];
   }
 

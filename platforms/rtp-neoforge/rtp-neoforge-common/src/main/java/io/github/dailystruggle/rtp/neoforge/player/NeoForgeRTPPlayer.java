@@ -359,7 +359,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         net.minecraft.server.MinecraftServer srv = target.getServer();
         if (srv == null) {
             ServerLevel here = resolveServerLevel(p);
-            srv = here == null ? null : here.getServer();
+            srv = here.getServer();
         }
         if (srv == null) {
             return CompletableFuture.completedFuture(false);
@@ -388,7 +388,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         net.minecraft.server.MinecraftServer srv = target.getServer();
         if (srv == null) {
             ServerLevel here = resolveServerLevel(p);
-            srv = here == null ? null : here.getServer();
+            srv = here.getServer();
         }
         if (srv == null) return;
         final int bx = to.getBlockX();

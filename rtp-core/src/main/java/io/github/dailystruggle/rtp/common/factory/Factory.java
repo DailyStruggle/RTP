@@ -73,6 +73,7 @@ public class Factory<T extends FactoryValue<?>> {
   @Nullable
   @SuppressWarnings("unchecked") // clone() returns the runtime type of the stored T template
   public FactoryValue<?> construct(String name) {
+    if (name == null) return null;
     String comparableName = name.toUpperCase();
     if (!comparableName.endsWith(".YML")) comparableName = comparableName + ".YML";
     // guard constructor
@@ -124,6 +125,7 @@ public class Factory<T extends FactoryValue<?>> {
       return construct(name);
     }
     T clone = (T) template.clone();
+    if (clone == null) return null;
     clone.name = (name.endsWith(".yml")) ? name : name + ".yml";
     if (clone instanceof ConfigParser) {
       ConfigParser<?> configParser = (ConfigParser<?>) clone;

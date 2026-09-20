@@ -206,15 +206,16 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         // scan is safe because UUIDs are fixed-format and quoted in ops.json.
         boolean opFallback = false;
         try {
-            ServerLevel lvl = ((ServerLevel) p.level());
-            net.minecraft.server.MinecraftServer srv = lvl == null ? null : lvl.getServer();
-            if (srv != null) {
-                java.io.File opsFile = srv.getPlayerList().getOps().getFile();
-                if (opsFile != null && opsFile.isFile()) {
-                    String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
-                            java.nio.charset.StandardCharsets.UTF_8);
-                    if (body.contains("\"" + uuid.toString() + "\"")) {
-                        opFallback = true;
+            if (p.level() instanceof ServerLevel lvl) {
+                net.minecraft.server.MinecraftServer srv = lvl.getServer();
+                if (srv != null) {
+                    java.io.File opsFile = srv.getPlayerList().getOps().getFile();
+                    if (opsFile != null && opsFile.isFile()) {
+                        String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
+                                java.nio.charset.StandardCharsets.UTF_8);
+                        if (body.contains("\"" + uuid.toString() + "\"")) {
+                            opFallback = true;
+                        }
                     }
                 }
             }
@@ -361,10 +362,11 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         // Reach the MinecraftServer via ServerLevel#getServer() - both p.server
         // (field_13995, IllegalAccessError) and p.getServer() (method_5682,
         // NoSuchMethodError) drift on 1.21.11; ServerLevel#getServer() is stable.
-        ServerLevel lvl = ((ServerLevel) p.level());
-        net.minecraft.server.MinecraftServer srv = lvl == null ? null : lvl.getServer();
-        if (srv == null) return;
-        srv.getCommands().performPrefixedCommand(p.createCommandSourceStack(), command);
+        if (p.level() instanceof ServerLevel lvl) {
+            net.minecraft.server.MinecraftServer srv = lvl.getServer();
+            if (srv == null) return;
+            srv.getCommands().performPrefixedCommand(p.createCommandSourceStack(), command);
+        }
     }
 
     @Override
@@ -406,9 +408,8 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         // intermediary (method_5682) is missing on 1.21.11 (NoSuchMethodError).
         // ServerLevel#getServer() is mapping-stable and gives us the same handle.
         net.minecraft.server.MinecraftServer srv = target.getServer();
-        if (srv == null) {
-            ServerLevel here = ((ServerLevel) p.level());
-            srv = here == null ? null : here.getServer();
+        if (srv == null && p.level() instanceof ServerLevel here) {
+            srv = here.getServer();
         }
         if (srv == null) {
             return CompletableFuture.completedFuture(false);
@@ -435,9 +436,8 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         ServerLevel target = fw.level();
         if (target == null) return;
         net.minecraft.server.MinecraftServer srv = target.getServer();
-        if (srv == null) {
-            ServerLevel here = ((ServerLevel) p.level());
-            srv = here == null ? null : here.getServer();
+        if (srv == null && p.level() instanceof ServerLevel here) {
+            srv = here.getServer();
         }
         if (srv == null) return;
         final int bx = to.getBlockX();

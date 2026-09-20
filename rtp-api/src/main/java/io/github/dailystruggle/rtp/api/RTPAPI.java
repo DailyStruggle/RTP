@@ -100,6 +100,7 @@ public class RTPAPI {
    * @throws IllegalStateException if called before core is loaded (REQ-RTP-S-006)
    */
   @PublicApi
+  @SuppressWarnings("java:S1845") // Public API accessor name mirrors backing field
   public static RTPHooks hooks() {
     RTPHooks h = hooks;
     if (h == null) {

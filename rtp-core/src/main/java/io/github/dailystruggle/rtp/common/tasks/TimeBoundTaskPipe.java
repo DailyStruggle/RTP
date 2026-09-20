@@ -63,7 +63,7 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
 
                 dt = localStop - start;
             } catch (InterruptedException ignored) {
-
+                Thread.currentThread().interrupt();
             } catch (Throwable t) {
                 RTP.log(Level.WARNING, t.getMessage(), t);
             } finally {

@@ -23,8 +23,8 @@ import org.bukkit.event.world.ChunkLoadEvent;
 public class OnChunkLoad implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onChunkLoad(ChunkLoadEvent event) {
+        if (event == null) return;
         Chunk chunk = event.getChunk();
-        if (chunk == null) return;
         RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID());
         if (world == null) return;
         RTP.selectionAPI.observeChunkLoad(world, chunk.getX(), chunk.getZ());

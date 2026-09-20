@@ -92,12 +92,12 @@ final class V26_2_R1FabricEffectDispatchers {
                                      double x, double y, double z,
                                      int count,
                                      double dx, double dy, double dz, double speed) {
-        ServerLevel level = (ServerLevel) recipient.level();
-        if (level == null) return;
-        // 26.1.x targeted overload: 2 booleans (longDistance, overrideLimiter).
-        level.sendParticles(recipient, options,
-                /* longDistance   */ false,
-                /* overrideLimiter*/ false,
-                x, y, z, count, dx, dy, dz, speed);
+        if (recipient.level() instanceof ServerLevel level) {
+            // 26.2 targeted overload: 2 booleans (longDistance, overrideLimiter).
+            level.sendParticles(recipient, options,
+                    /* longDistance   */ false,
+                    /* overrideLimiter*/ false,
+                    x, y, z, count, dx, dy, dz, speed);
+        }
     }
 }

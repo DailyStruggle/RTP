@@ -105,7 +105,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
   }
 
   @Override
-  @SuppressWarnings("unchecked") // parser casts are myClass-guarded; section values are instanceof-checked to Map
+  @SuppressWarnings({"unchecked", "java:S3516"}) // parser casts are myClass-guarded; async dispatch returns true contract
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     // If an intermediate node (nextCommand != null), do nothing and return true so
@@ -422,7 +422,6 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           }
         });
     EnumMap<?, Object> data = fv.getData();
-    if (data == null) return;
     for (Map.Entry<?, Object> e : data.entrySet()) {
       Object keyObj = e.getKey();
       if (keyObj == null) continue;

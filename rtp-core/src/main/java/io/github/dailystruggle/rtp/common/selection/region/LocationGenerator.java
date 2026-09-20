@@ -27,6 +27,7 @@ public class LocationGenerator implements ILocationGenerator {
     static Random rng = null;
 
     /** Returns the active RNG, falling back to {@link ThreadLocalRandom#current()}. */
+    @SuppressWarnings("java:S1845") // Accessor method name mirrors static field
     static Random rng() {
         return rng != null ? rng : ThreadLocalRandom.current();
     }

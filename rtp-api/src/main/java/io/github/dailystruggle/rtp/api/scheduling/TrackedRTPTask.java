@@ -16,6 +16,7 @@ public class TrackedRTPTask extends RTPRunnable {
   /** The underlying task whose execution is being tracked. */
   private final RTPRunnable task;
   /** Unique string key used to register and remove this task in the active-task map. */
+  @SuppressWarnings("java:S2387") // String registry key intentionally distinct from superclass UUID trackingId
   private final String trackingId;
   /** Wall-clock time in milliseconds ({@link System#currentTimeMillis()}) when this task was created. */
   private final long queuedTime;

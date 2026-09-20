@@ -399,7 +399,6 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
             createNativeWorldBorder(Object serverLevel) {
         if (!(serverLevel instanceof ServerLevel sl)) return null;
         net.minecraft.world.level.border.WorldBorder mcBorder = sl.getWorldBorder();
-        if (mcBorder == null) return null;
         return new io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder(
                 () -> {
                     io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape =

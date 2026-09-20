@@ -515,7 +515,7 @@ public final class FabricEventBridge {
                 } catch (Throwable t) {
                     RTP.log(Level.WARNING,
                             "[ADR-023] login reserve refill failed for region '"
-                                    + (region == null ? "null" : region.name) + "': "
+                                    + region.name + "': "
                                     + t.getClass().getSimpleName() + ": " + t.getMessage());
                 }
             }

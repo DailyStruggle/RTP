@@ -161,6 +161,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       Math.max(1L, DRAIN_TIMEOUT_MILLIS / 50L);
 
   @Override
+  @SuppressWarnings("java:S3516") // Method returns true on async umbrella sweep dispatch
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;

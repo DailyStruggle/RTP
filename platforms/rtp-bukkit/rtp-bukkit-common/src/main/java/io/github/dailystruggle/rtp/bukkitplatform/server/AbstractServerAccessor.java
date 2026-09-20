@@ -500,12 +500,6 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     int totalEmpty = 0;
     try {
       Iterable<Tag<Material>> tags = Bukkit.getTags(Tag.REGISTRY_BLOCKS, Material.class);
-      if (tags == null) {
-        log(Level.WARNING,
-            "[RTP] Bukkit.getTags(REGISTRY_BLOCKS, Material.class) returned null — "
-                + "tag-flattening of safety.airBlocks/unsafeBlocks #tag tokens will be skipped");
-        return Collections.emptyMap();
-      }
       for (Tag<Material> tag : tags) {
         totalTags++;
         NamespacedKey key = tag.getKey();
@@ -866,7 +860,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       Player p = Bukkit.getPlayer(player);
       if (p == null) return "";
       World w = p.getWorld();
-      return (w == null) ? "" : w.getName();
+      return w.getName();
     } catch (Throwable t) {
       return "";
     }

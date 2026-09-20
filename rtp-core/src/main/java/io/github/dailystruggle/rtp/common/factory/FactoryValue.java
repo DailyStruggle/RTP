@@ -168,7 +168,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
    * @param desc the description lines
    * @throws IllegalArgumentException if parameters are null
    */
-  public void setDesc(@NotNull E key, @NotNull String[] desc) throws IllegalArgumentException {
+  public void setDesc(E key, String[] desc) throws IllegalArgumentException {
     if (key == null) throw new IllegalArgumentException("null key");
     if (desc == null) throw new IllegalArgumentException("null desc");
     this.desc.put(key, desc.clone());
@@ -181,7 +181,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
    * @param value the value
    * @throws IllegalArgumentException if parameters are null
    */
-  public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
+  public void set(E key, Object value) throws IllegalArgumentException {
     if (key == null) throw new IllegalArgumentException("null key");
     if (value == null) throw new IllegalArgumentException("null value");
     synchronized (dataLock) {

@@ -20,9 +20,6 @@ import org.jetbrains.annotations.Nullable;
 public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E> {
   protected final List<Predicate<RTPCoords>> verifiers;
 
-  /** The name of this adjustor (typically the config file name). */
-  public String name;
-
   /**
    * Constructs a vertical adjustor.
    *

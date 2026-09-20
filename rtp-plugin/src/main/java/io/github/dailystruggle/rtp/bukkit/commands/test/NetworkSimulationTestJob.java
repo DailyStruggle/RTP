@@ -133,6 +133,7 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
    * {@link #dispatchProbe} helper.
    */
   @Override
+  @SuppressWarnings("java:S3516") // Method returns true on async probe dispatch
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
@@ -564,6 +565,9 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
       try {
         transport.release(tokenId, ReleaseReason.TEST_PROBE)
                 .get(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        // Cleanup is best-effort; the reaper will eventually drop the row.
       } catch (Throwable ignored) {
         // Cleanup is best-effort; the reaper will eventually drop the row.
       }

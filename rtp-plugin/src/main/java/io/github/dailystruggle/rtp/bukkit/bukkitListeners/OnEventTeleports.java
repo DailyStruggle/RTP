@@ -206,7 +206,9 @@ public class OnEventTeleports implements Listener {
       if (future.isDone()) {
         try {
           region.queueManager.keptLocations.add(future.get());
-        } catch (InterruptedException | ExecutionException ignored) {
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        } catch (ExecutionException ignored) {
 
         }
       } else {
@@ -240,7 +242,12 @@ public class OnEventTeleports implements Listener {
       RTPLocation location;
       try {
         location = future.get();
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        RTP.log(Level.WARNING, e.getMessage(), e);
+        RTPTeleportCancel.refund(player.getUniqueId());
+        return;
+      } catch (ExecutionException e) {
         RTP.log(Level.WARNING, e.getMessage(), e);
         RTPTeleportCancel.refund(player.getUniqueId());
         return;

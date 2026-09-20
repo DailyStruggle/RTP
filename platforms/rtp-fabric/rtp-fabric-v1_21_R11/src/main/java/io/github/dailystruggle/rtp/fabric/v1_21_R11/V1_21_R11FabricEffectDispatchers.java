@@ -166,7 +166,7 @@ final class V1_21_R11FabricEffectDispatchers {
             try {
                 RTP.log(Level.FINER, "[RTP][Fabric 1.21.11+] particle dispatch #1: "
                         + "optionsClass=" + options.getClass().getName()
-                        + " typeClass=" + (options.getType() == null ? "null" : options.getType().getClass().getName())
+                        + " typeClass=" + options.getType().getClass().getName()
                         + " connectionNull=" + (recipient.connection == null)
                         + " pos=" + x + "," + y + "," + z + " count=" + count
                         + " offset=" + dx + "," + dy + "," + dz + " speed=" + speed);

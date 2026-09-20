@@ -879,6 +879,9 @@ public class PlaceholderProvider {
                                     data.selectedCoords.y(),
                                     data.selectedCoords.z());
                         }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        // Fall through to world-level getter on timeout/error.
                     } catch (Exception ignored) {
                         // Fall through to world-level getter on timeout/error.
                     }

@@ -112,14 +112,6 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         // exactly (incl. the 1.21.11 parsed-name fallback when the reflective
         // identifier accessor returns null).
         String name = NeoForgeRTPWorld.resolveDimensionName(level, false);
-        if (name == null) {
-            // Mapping drift left the dimension id unresolved; fall back to a
-            // by-identity sweep so the ConcurrentHashMap.remove(null) NPE on
-            // shutdown is avoided and the world is still unregistered.
-            worldsByName.values().removeIf(w -> w instanceof NeoForgeRTPWorld nw && nw.level() == level);
-            worldsById.values().removeIf(w -> w instanceof NeoForgeRTPWorld nw && nw.level() == level);
-            return;
-        }
         RTPWorld<?> removed = worldsByName.remove(name);
         if (removed != null) worldsById.remove(removed.id());
     }

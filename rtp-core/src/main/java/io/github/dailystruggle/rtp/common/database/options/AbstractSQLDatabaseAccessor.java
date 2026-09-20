@@ -40,6 +40,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
   }
 
   /** Queue for teleport data write operations */
+  @SuppressWarnings("java:S2387") // Concrete SQL accessor batches TeleportData specifically rather than generic TableObj tuples
   protected final ConcurrentLinkedQueue<TeleportData> writeQueue = new ConcurrentLinkedQueue<>();
 
   /**

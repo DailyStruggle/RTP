@@ -56,6 +56,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
 
         RTP.futures.addAll(futures);
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         RTP.log(Level.WARNING, e.getMessage(), e);
       } finally {
         futuresSemaphore.release();
@@ -117,6 +118,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
       AsyncTaskProcessing.betweenStep.set(betweenStep);
       AsyncTaskProcessing.step.set(step);
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       RTP.log(Level.WARNING, e.getMessage(), e);
       return;
     } finally {

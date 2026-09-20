@@ -39,7 +39,8 @@ public final class GuiMenuConfig {
   }
 
   private int integer(GuiMenuKeys key, int fallback) {
-    Object v = (parser() == null) ? null : parser().getConfigValue(key, fallback);
+    ConfigParser<GuiMenuKeys> p = parser();
+    Object v = (p == null) ? null : p.getConfigValue(key, fallback);
     if (v instanceof Number) return ((Number) v).intValue();
     try {
       return (v == null) ? fallback : Integer.parseInt(String.valueOf(v).trim());
@@ -49,7 +50,8 @@ public final class GuiMenuConfig {
   }
 
   private boolean bool(GuiMenuKeys key, boolean fallback) {
-    Object v = (parser() == null) ? null : parser().getConfigValue(key, fallback);
+    ConfigParser<GuiMenuKeys> p = parser();
+    Object v = (p == null) ? null : p.getConfigValue(key, fallback);
     if (v instanceof Boolean) return (Boolean) v;
     return (v == null) ? fallback : Boolean.parseBoolean(String.valueOf(v).trim());
   }

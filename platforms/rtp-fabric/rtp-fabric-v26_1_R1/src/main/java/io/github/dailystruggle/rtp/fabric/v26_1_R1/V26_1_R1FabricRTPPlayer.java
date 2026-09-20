@@ -167,14 +167,15 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
 
         // FALLBACK: scan ops.json for this UUID. Stable across MC versions.
         try {
-            ServerLevel lvl = (ServerLevel) p.level();
-            MinecraftServer srv = lvl == null ? null : lvl.getServer();
-            if (srv != null) {
-                java.io.File opsFile = srv.getPlayerList().getOps().getFile();
-                if (opsFile != null && opsFile.isFile()) {
-                    String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
-                            java.nio.charset.StandardCharsets.UTF_8);
-                    if (body.contains("\"" + uuid.toString() + "\"")) return true;
+            if (p.level() instanceof ServerLevel lvl) {
+                MinecraftServer srv = lvl.getServer();
+                if (srv != null) {
+                    java.io.File opsFile = srv.getPlayerList().getOps().getFile();
+                    if (opsFile != null && opsFile.isFile()) {
+                        String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
+                                java.nio.charset.StandardCharsets.UTF_8);
+                        if (body.contains("\"" + uuid.toString() + "\"")) return true;
+                    }
                 }
             }
         } catch (Throwable t) {
@@ -324,9 +325,8 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
             return CompletableFuture.completedFuture(false);
         }
         MinecraftServer srv = target.getServer();
-        if (srv == null) {
-            ServerLevel here = (ServerLevel) p.level();
-            srv = here == null ? null : here.getServer();
+        if (srv == null && p.level() instanceof ServerLevel here) {
+            srv = here.getServer();
         }
         if (srv == null) return CompletableFuture.completedFuture(false);
         final double tx = to.getBlockX() + 0.5;
@@ -356,9 +356,8 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
             return;
         }
         MinecraftServer srv = target.getServer();
-        if (srv == null) {
-            ServerLevel here = (ServerLevel) p.level();
-            srv = here == null ? null : here.getServer();
+        if (srv == null && p.level() instanceof ServerLevel here) {
+            srv = here.getServer();
         }
         if (srv == null) return;
         final int bx = to.getBlockX();

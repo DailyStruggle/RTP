@@ -226,8 +226,8 @@ public final class BukkitNetworkBridge implements NetworkBridge {
      * when the layout cannot be resolved.
      */
     private File serverRoot() {
+        if (plugin == null) return null;
         File dataFolder = plugin.getDataFolder();
-        if (dataFolder == null) return null;
         File pluginsDir = dataFolder.getParentFile();
         if (pluginsDir == null) return null;
         return pluginsDir.getParentFile();

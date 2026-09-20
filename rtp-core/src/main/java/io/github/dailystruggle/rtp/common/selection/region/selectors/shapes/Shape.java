@@ -18,8 +18,6 @@ import org.jetbrains.annotations.NotNull;
  * @param <E> enum of available parameters for the shape
  */
 public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
-  public final String name;
-
   protected final List<BiPredicate<GenerationContext, RTPCoords>> verifiers = new ArrayList<>();
   protected final List<BiPredicate<GenerationContext, MutableRTPCoords>> verifiersMutable = new ArrayList<>();
 

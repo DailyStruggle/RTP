@@ -73,6 +73,7 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
   }
 
   @Override
+  @SuppressWarnings("java:S3516") // Method returns boolean per CommandsAPICommand contract; false on missing scheduler, true on async dispatch
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
@@ -83,7 +84,7 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
         RTP.serverAccessor.sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
-      return true;
+      return false;
     }
 
     final int iterations =

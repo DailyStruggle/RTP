@@ -480,7 +480,7 @@ public final class RTPCostMetricsCharts {
       // fleet-wide aggregation cares about the upstream family, so we fall back
       // to "paper-fork" / "spigot-fork" when the version line includes "Paper".
       if (version != null && version.toLowerCase().contains("paper")) return "paper-fork";
-      return name == null ? "unknown" : name.toLowerCase();
+      return name.toLowerCase();
     } catch (Throwable t) {
       return "unknown";
     }
@@ -627,10 +627,6 @@ public final class RTPCostMetricsCharts {
     Map<String, Integer> tally = new HashMap<>();
     try {
       var pm = Bukkit.getPluginManager();
-      if (pm == null) {
-        tally.put("none", 1);
-        return tally;
-      }
       for (String name : KNOWN_ADDON_PLUGINS) {
         try {
           if (pm.isPluginEnabled(name)) tally.put(name, 1);

@@ -60,12 +60,6 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    */
   public String locale = LanguageBootstrap.DEFAULT_LOCALE;
 
-  /** Map for language translations */
-  public Map<String, Object> language_mapping = new ConcurrentHashMap<String, Object>();
-
-  /** Reverse map for language translations */
-  public Map<String, String> reverse_language_mapping = new ConcurrentHashMap<>();
-
   /**
    * ADR-073: records the raw {@code @<file>} reference token a key was configured with,
    * when its value inherits a global default rather than being a literal. Populated as
@@ -248,6 +242,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       this.subDir = "";
     }
     String sn = sanitizeName(norm);
+    if (sn == null) sn = "";
     return sn.endsWith(".yml") ? sn : sn + ".yml";
   }
 

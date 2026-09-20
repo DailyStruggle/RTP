@@ -38,6 +38,14 @@ public class RegionCacheTask extends RTPRunnable {
      */
     private final AtomicBoolean released = new AtomicBoolean(false);
 
+    private static long resolveSelectRadius() {
+        if (RTP.configs == null) return 0L;
+        var parser = RTP.configs.getParser(PerformanceKeys.class);
+        if (parser == null) return 0L;
+        Number num = parser.getNumber(PerformanceKeys.viewDistanceSelect, 0L);
+        return num != null ? num.longValue() : 0L;
+    }
+
     /**
      * Creates a new cache task for the general region queue.
      *
@@ -48,7 +56,7 @@ public class RegionCacheTask extends RTPRunnable {
         super(600000L);
         this.region = region;
         this.playerId = null;
-        this.selectRadius = RTP.configs.getParser(PerformanceKeys.class).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
+        this.selectRadius = resolveSelectRadius();
         this.maxNanos = maxNanos;
         this.observationalOnly = false;
     }
@@ -64,7 +72,7 @@ public class RegionCacheTask extends RTPRunnable {
         super(600000L);
         this.region = region;
         this.playerId = playerId;
-        this.selectRadius = RTP.configs.getParser(PerformanceKeys.class).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
+        this.selectRadius = resolveSelectRadius();
         this.maxNanos = maxNanos;
         this.observationalOnly = false;
     }
@@ -73,7 +81,7 @@ public class RegionCacheTask extends RTPRunnable {
         super(600000L);
         this.region = region;
         this.playerId = null;
-        this.selectRadius = RTP.configs.getParser(PerformanceKeys.class).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
+        this.selectRadius = resolveSelectRadius();
         this.maxNanos = maxNanos;
         this.observationalOnly = observationalOnly;
     }

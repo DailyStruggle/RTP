@@ -39,6 +39,7 @@ public class TestConfigSetCmd extends BaseRTPCmdImpl {
   }
 
   @Override
+  @SuppressWarnings("java:S3516") // Method returns true on async probe dispatch
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
@@ -46,7 +47,7 @@ public class TestConfigSetCmd extends BaseRTPCmdImpl {
     if (RTP.scheduler == null || RTP.configs == null) {
       String msg = "&c[RTP test/config-set] core not yet loaded (scheduler or configs null)";
       report(callerId, msg, Level.WARNING, null);
-      return true;
+      return false;
     }
 
     RTP.scheduler.runTaskAsynchronously(() -> runProbe(callerId));
