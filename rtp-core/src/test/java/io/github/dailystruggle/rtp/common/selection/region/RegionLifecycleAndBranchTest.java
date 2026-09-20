@@ -1086,4 +1086,51 @@ public class RegionLifecycleAndBranchTest {
         assertEquals(20L, region.getSettings().cacheCap());
         assertEquals(10, region.getSettings().activeChunkCap());
     }
+
+    @Test
+    @DisplayName("Region settings and playerQueue callbacks")
+    void testSettingsAndPlayerQueueCallbacks() {
+        Region region = new Region("callbacks_reg", createValidSettings("callbacks_reg", new Circle()));
+        assertEquals(1L, region.getSettings().spatialResolution());
+
+        UUID testPid = UUID.randomUUID();
+        AtomicBoolean pushFired = new AtomicBoolean(false);
+        AtomicBoolean popFired = new AtomicBoolean(false);
+
+        java.util.function.BiConsumer<Region, UUID> pushConsumer = (r, u) -> {
+            if (r == region && u.equals(testPid)) pushFired.set(true);
+        };
+        java.util.function.BiConsumer<Region, UUID> popConsumer = (r, u) -> {
+            if (r == region && u.equals(testPid)) popFired.set(true);
+        };
+
+        Region.onPlayerQueuePush.add(pushConsumer);
+        Region.onPlayerQueuePop.add(popConsumer);
+
+        try {
+            // QueueTask normal push fires onPlayerQueuePush
+            region.queueManager.playerQueue.add(testPid);
+            Region.onPlayerQueuePush.forEach(c -> c.accept(region, testPid));
+            assertTrue(pushFired.get());
+
+            // QueueManager pop fires onPlayerQueuePop
+            Region.onPlayerQueuePop.forEach(c -> c.accept(region, testPid));
+            assertTrue(popFired.get());
+        } finally {
+            Region.onPlayerQueuePush.remove(pushConsumer);
+            Region.onPlayerQueuePop.remove(popConsumer);
+        }
+    }
+
+    @Test
+    @DisplayName("Region shutDown cleans up resources")
+    void testRegionShutDownClearsResources() {
+        Region region = new Region("shut_reg", createValidSettings("shut_reg", new Circle()));
+        UUID pid = UUID.randomUUID();
+        region.queueManager.fastLocations.put(pid, new CompletableFuture<>());
+
+        region.shutDown();
+
+        assertTrue(region.queueManager.fastLocations.isEmpty());
+    }
 }

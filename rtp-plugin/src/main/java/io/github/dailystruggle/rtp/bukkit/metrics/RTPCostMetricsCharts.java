@@ -468,7 +468,6 @@ public final class RTPCostMetricsCharts {
   static String detectPlatform() {
     try {
       Server s = Bukkit.getServer();
-      if (s == null) return "unknown";
       String name = s.getName();
       String version = s.getVersion();
       // Folia exposes itself via the server class signature; checking version

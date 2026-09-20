@@ -127,7 +127,6 @@ public class Factory<T extends FactoryValue<?>> {
       return construct(name);
     }
     FactoryValue<?> cloned = template.clone();
-    if (cloned == null) return null;
     cloned.name = (name.endsWith(".yml")) ? name : name + ".yml";
     if (cloned instanceof ConfigParser) {
       ConfigParser<?> configParser = (ConfigParser<?>) cloned;

@@ -147,6 +147,34 @@ class FactoryTest {
     }
 
     @Test
+    void construct_twoArg_existingTemplate_clonesAndRenames() {
+        TestValue original = new TestValue("custom.yml");
+        factory.add("custom", original);
+        FactoryValue<?> result = factory.construct("clone", "custom");
+        assertNotNull(result);
+        assertEquals("clone.yml", result.name);
+        assertNotSame(original, result);
+    }
+
+    @Test
+    void construct_twoArg_nullFromName_delegatesToSingleArg() {
+        TestValue original = new TestValue("default.yml");
+        factory.add("default", original);
+        FactoryValue<?> result = factory.construct("newname", null);
+        assertNotNull(result);
+        assertEquals("newname.yml", result.name);
+    }
+
+    @Test
+    void construct_twoArg_nonExistentFromName_fallsBackToDefault() {
+        TestValue original = new TestValue("default.yml");
+        factory.add("default", original);
+        FactoryValue<?> result = factory.construct("newname", "missing");
+        assertNotNull(result);
+        assertEquals("newname.yml", result.name);
+    }
+
+    @Test
     void construct_nameWithYmlSuffix_preservesSuffix() {
         TestValue val = new TestValue("default.yml");
         factory.add("default", val);

@@ -3,19 +3,11 @@ package io.github.dailystruggle.rtp.common.selection.region.util;
 import io.github.dailystruggle.rtp.common.RTP;
 import java.util.Locale;
 import java.util.logging.Level;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Robust parser for temporal duration values with optional unit suffixes and auto-interpretation.
  */
 public final class DurationParser {
-
-  private static final Pattern SINGLE_DURATION_PATTERN =
-      Pattern.compile("^\\s*([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]+)?\\s*$");
-
-  private static final Pattern COMPOSITE_SEGMENT_PATTERN =
-      Pattern.compile("([+-]?[0-9]+(?:\\.[0-9]+)?)[ \\t]*([a-zA-Z]+)");
 
   private DurationParser() {}
 
@@ -51,60 +43,127 @@ public final class DurationParser {
     String trimmed = input.trim().replace(',', '.');
     if (trimmed.isEmpty()) return null;
 
-    // Check single token match first
-    Matcher singleMatcher = SINGLE_DURATION_PATTERN.matcher(trimmed);
-    if (singleMatcher.matches()) {
-      double magnitude;
-      try {
-        magnitude = Double.parseDouble(singleMatcher.group(1));
-      } catch (NumberFormatException e) {
-        return null;
+    // Check single token match first: [number][optional-unit]
+    int idx = 0;
+    int len = trimmed.length();
+    // Optional sign
+    if (idx < len && (trimmed.charAt(idx) == '+' || trimmed.charAt(idx) == '-')) {
+      idx++;
+    }
+    int numStart = idx;
+    while (idx < len && Character.isDigit(trimmed.charAt(idx))) {
+      idx++;
+    }
+    if (idx < len && trimmed.charAt(idx) == '.') {
+      idx++;
+      while (idx < len && Character.isDigit(trimmed.charAt(idx))) {
+        idx++;
       }
+    }
+    int numEnd = idx;
 
-      String suffix = singleMatcher.group(2);
-      if (suffix != null && !suffix.isEmpty()) {
-        TemporalUnit parsedUnit = TemporalUnit.fromString(suffix);
-        if (parsedUnit != null) {
-          return new ParsedDuration(magnitude, parsedUnit, true);
-        } else {
+    if (numEnd > numStart) {
+      // We have a number. Skip any horizontal whitespace between number and suffix.
+      while (idx < len && (trimmed.charAt(idx) == ' ' || trimmed.charAt(idx) == '\t')) {
+        idx++;
+      }
+      int suffixStart = idx;
+      while (idx < len && Character.isLetter(trimmed.charAt(idx))) {
+        idx++;
+      }
+      int suffixEnd = idx;
+      // Skip trailing whitespace
+      while (idx < len && Character.isWhitespace(trimmed.charAt(idx))) {
+        idx++;
+      }
+      if (idx == len) {
+        // Entire input was a single token!
+        double magnitude;
+        try {
+          magnitude = Double.parseDouble(trimmed.substring(0, numEnd));
+        } catch (NumberFormatException e) {
           return null;
         }
-      }
 
-      TemporalUnit effectiveUnit = (defaultUnit != null) ? defaultUnit : TemporalUnit.SECOND;
-      return new ParsedDuration(magnitude, effectiveUnit, false);
+        if (suffixEnd > suffixStart) {
+          String suffix = trimmed.substring(suffixStart, suffixEnd);
+          TemporalUnit parsedUnit = TemporalUnit.fromString(suffix);
+          if (parsedUnit != null) {
+            return new ParsedDuration(magnitude, parsedUnit, true);
+          } else {
+            return null;
+          }
+        }
+
+        TemporalUnit effectiveUnit = (defaultUnit != null) ? defaultUnit : TemporalUnit.SECOND;
+        return new ParsedDuration(magnitude, effectiveUnit, false);
+      }
     }
 
     // Attempt composite parsing (e.g. "1d12h", "2h 30m 10s")
-    Matcher compositeMatcher = COMPOSITE_SEGMENT_PATTERN.matcher(trimmed);
     double totalSeconds = 0.0;
     boolean foundSegment = false;
+    idx = 0;
 
-    while (compositeMatcher.find()) {
-      foundSegment = true;
+    while (idx < len) {
+      // Skip whitespace before segment
+      while (idx < len && Character.isWhitespace(trimmed.charAt(idx))) {
+        idx++;
+      }
+      if (idx >= len) break;
+
+      int segNumStart = idx;
+      if (trimmed.charAt(idx) == '+' || trimmed.charAt(idx) == '-') {
+        idx++;
+      }
+      int digitsStart = idx;
+      while (idx < len && Character.isDigit(trimmed.charAt(idx))) {
+        idx++;
+      }
+      if (idx < len && trimmed.charAt(idx) == '.') {
+        idx++;
+        while (idx < len && Character.isDigit(trimmed.charAt(idx))) {
+          idx++;
+        }
+      }
+      int segNumEnd = idx;
+      if (segNumEnd == digitsStart) {
+        // No digits found for segment
+        return null;
+      }
+
+      // Skip whitespace between number and suffix
+      while (idx < len && (trimmed.charAt(idx) == ' ' || trimmed.charAt(idx) == '\t')) {
+        idx++;
+      }
+      int segSuffixStart = idx;
+      while (idx < len && Character.isLetter(trimmed.charAt(idx))) {
+        idx++;
+      }
+      int segSuffixEnd = idx;
+      if (segSuffixEnd == segSuffixStart) {
+        // Composite segments require an explicit suffix
+        return null;
+      }
+
       double segmentValue;
       try {
-        segmentValue = Double.parseDouble(compositeMatcher.group(1));
+        segmentValue = Double.parseDouble(trimmed.substring(segNumStart, segNumEnd));
       } catch (NumberFormatException e) {
         return null;
       }
 
-      String suffix = compositeMatcher.group(2);
+      String suffix = trimmed.substring(segSuffixStart, segSuffixEnd);
       TemporalUnit unit = TemporalUnit.fromString(suffix);
       if (unit == null) {
         return null;
       }
 
       totalSeconds += unit.toSeconds(segmentValue);
+      foundSegment = true;
     }
 
     if (!foundSegment) {
-      return null;
-    }
-
-    // Verify there are no leftover non-whitespace characters
-    String residual = COMPOSITE_SEGMENT_PATTERN.matcher(trimmed).replaceAll("").trim();
-    if (!residual.isEmpty()) {
       return null;
     }
 
