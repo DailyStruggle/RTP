@@ -5,6 +5,7 @@ tmp_*/
 **/tmp/
 **/tmp_*/
 *.tmp
+temp_*
 build/
 *.bin
 *.uniqueid*

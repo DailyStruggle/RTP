@@ -665,14 +665,14 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public boolean isChunkGenerated(int cx, int cz) {
+        ServerLevel level = world;
+        if (level == null) return true;
         try {
-            ServerChunkCache cache = world.getChunkSource();
+            ServerChunkCache cache = level.getChunkSource();
             if (cache.hasChunk(cx, cz)) return true;
         } catch (Throwable ignored) {
             // Fall through to the data-side probe.
         }
-        ServerLevel level = world;
-        if (level == null) return true;
         MinecraftServer server = level.getServer();
 
         final java.nio.file.Path worldFolder;

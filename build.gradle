@@ -894,7 +894,13 @@ sonar {
         // - java:S1192: repeated string literals across test suites, serialization codecs, and command trees.
         // - java:S115: YAML/config/message enums intentionally using lowerCamelCase to map directly to YAML/lang keys.
         // - java:S3776: cognitive complexity across spatial math, polygon verification, chunk scanning, and platform version bridges.
-        property 'sonar.issue.ignore.multicriteria', 's3077,s2975,s2176,s1452,s2696,s1186test,s1192,s115,s3776'
+        // - java:S1181: catching Throwable for multi-platform / multi-version isolation, claim addons, and resilient task loops.
+        // - java:S3011: audited reflection accessibility (setAccessible) across platform bridges and NMS accessors (ADR-026).
+        // - java:S1141: nested try blocks across multi-version fallbacks and deserializers.
+        // - java:S5785: assertEquals/assertNotEquals in test assertions.
+        // - java:S5778: assertThrows single-invocation constraint in test suites.
+        // - java:S2925: Thread.sleep in asynchronous, transport, and benchmark stress tests.
+        property 'sonar.issue.ignore.multicriteria', 's3077,s2975,s2176,s1452,s2696,s1186test,s1192,s115,s3776,s1181,s3011,s1141,s5785test,s5778test,s2925test'
         property 'sonar.issue.ignore.multicriteria.s3077.ruleKey', 'java:S3077'
         property 'sonar.issue.ignore.multicriteria.s3077.resourceKey', '**/*'
         property 'sonar.issue.ignore.multicriteria.s2975.ruleKey', 'java:S2975'
@@ -913,6 +919,18 @@ sonar {
         property 'sonar.issue.ignore.multicriteria.s115.resourceKey', '**/*'
         property 'sonar.issue.ignore.multicriteria.s3776.ruleKey', 'java:S3776'
         property 'sonar.issue.ignore.multicriteria.s3776.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s1181.ruleKey', 'java:S1181'
+        property 'sonar.issue.ignore.multicriteria.s1181.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s3011.ruleKey', 'java:S3011'
+        property 'sonar.issue.ignore.multicriteria.s3011.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s1141.ruleKey', 'java:S1141'
+        property 'sonar.issue.ignore.multicriteria.s1141.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s5785test.ruleKey', 'java:S5785'
+        property 'sonar.issue.ignore.multicriteria.s5785test.resourceKey', '**/src/test/**/*'
+        property 'sonar.issue.ignore.multicriteria.s5778test.ruleKey', 'java:S5778'
+        property 'sonar.issue.ignore.multicriteria.s5778test.resourceKey', '**/src/test/**/*'
+        property 'sonar.issue.ignore.multicriteria.s2925test.ruleKey', 'java:S2925'
+        property 'sonar.issue.ignore.multicriteria.s2925test.resourceKey', '**/src/test/**/*'
     }
 }
 

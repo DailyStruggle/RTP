@@ -18,6 +18,7 @@ import org.bstats.charts.MultiLineChart;
 import org.bstats.charts.SimplePie;
 import org.bstats.charts.SingleLineChart;
 import org.bukkit.Bukkit;
+import org.bukkit.Server;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -466,15 +467,16 @@ public final class RTPCostMetricsCharts {
 
   static String detectPlatform() {
     try {
-      String name = Bukkit.getServer().getName();
-      String version = Bukkit.getServer().getVersion();
+      Server s = Bukkit.getServer();
+      if (s == null) return "unknown";
+      String name = s.getName();
+      String version = s.getVersion();
       // Folia exposes itself via the server class signature; checking version
       // strings is the lowest-coupling probe we can do here without pulling
       // in a Folia/Paper-specific import (which rtp-plugin shouldn't carry).
       if (version != null && version.toLowerCase().contains("folia")) return "folia";
       // Paper is reliably detected via the presence of Bukkit.getServer().getName()
       // returning "Paper" or by the Paper-specific TPS API; we use the name.
-      if (name == null) return "unknown";
       if (name.equalsIgnoreCase("Paper")) return "paper";
       if (name.equalsIgnoreCase("Spigot")) return "spigot";
       // Forks (Purpur, Pufferfish, etc.) report their fork name in getName(); the

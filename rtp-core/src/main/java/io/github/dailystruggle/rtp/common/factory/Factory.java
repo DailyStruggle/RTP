@@ -126,17 +126,14 @@ public class Factory<T extends FactoryValue<?>> {
       // rather than failing, so callers don't have to pre-check existence.
       return construct(name);
     }
-    FactoryValue<?> cloned = template.clone();
-    if (cloned != null) {
-      cloned.name = (name.endsWith(".yml")) ? name : name + ".yml";
-      if (cloned instanceof ConfigParser) {
-        ConfigParser<?> configParser = (ConfigParser<?>) cloned;
-        // Reuse the template's rename map (see construct(String)) instead of null.
-        configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
-      }
-      return cloned.clone();
+    T clone = (T) template.clone();
+    clone.name = (name.endsWith(".yml")) ? name : name + ".yml";
+    if (clone instanceof ConfigParser) {
+      ConfigParser<?> configParser = (ConfigParser<?>) clone;
+      // Reuse the template's rename map (see construct(String)) instead of null.
+      configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
     }
-    return null;
+    return clone.clone();
   }
 
   /**
