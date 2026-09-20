@@ -334,7 +334,7 @@ public class DownsamplingStrideBenchmarkTest {
     long tested = 0;
     long roundTripSuccess = 0;
 
-    for (long k = 0; k * stride < range && tested < 5000; k++) {
+    for (long k = 0; k * stride < range && tested < 5000; k++, tested++) {
       long loc = k * stride;
       shape.locationToXZ(loc, coords);
       long cx = coords.x;
@@ -346,7 +346,6 @@ public class DownsamplingStrideBenchmarkTest {
         assertEquals(loc, backLoc, "Round-trip bijection failed for strided key: " + loc);
         roundTripSuccess++;
       }
-      tested++;
     }
 
     System.out.println("\n[DEBUG_LOG] --- ADR-088 C1: Bijection Verification ---");

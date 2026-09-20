@@ -592,6 +592,7 @@ public class Region extends FactoryValue<RegionKeys> {
           }
           // Second-pass safety verification on Folia region thread or inline.
           // Re-runs vertical adjustor against loaded chunk to ensure valid ground placement.
+          @SuppressWarnings("java:S2093") // ChunkReservation ownership is transferred on successful offer; closing in try-with-resources would invalidate cached chunks
           Runnable verify = () -> {
             try {
               RTP.log(Level.FINER,

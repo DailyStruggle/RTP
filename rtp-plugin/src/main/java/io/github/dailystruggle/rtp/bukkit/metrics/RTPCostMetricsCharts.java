@@ -480,7 +480,7 @@ public final class RTPCostMetricsCharts {
       // fleet-wide aggregation cares about the upstream family, so we fall back
       // to "paper-fork" / "spigot-fork" when the version line includes "Paper".
       if (version != null && version.toLowerCase().contains("paper")) return "paper-fork";
-      return name.toLowerCase();
+      return (name == null) ? "unknown" : name.toLowerCase();
     } catch (Throwable t) {
       return "unknown";
     }

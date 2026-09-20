@@ -147,8 +147,11 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
     if (arr == null || arr.length == 0) return 0L;
     long[] copy = arr.clone();
     java.util.Arrays.sort(copy);
-    int idx = (int) Math.ceil((pct / 100.0) * copy.length) - 1;
-    idx = Math.max(0, Math.min(idx, copy.length - 1));
+    int len = copy.length;
+    if (len == 0) return 0L;
+    int idx = (int) Math.ceil((pct / 100.0) * len) - 1;
+    if (idx < 0) idx = 0;
+    else if (idx >= len) idx = len - 1;
     return copy[idx];
   }
 

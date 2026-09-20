@@ -451,4 +451,39 @@ class ConfigParserCoverageTest {
 
         assertEquals(2, ConfigBackups.listBaks(configFile).size());
     }
+
+    @Test
+    @DisplayName("loadLocalizedDefaults and valueOnlyLocaleMigrationNeeded execution")
+    void testLocalizedDefaultsLoading() throws IOException {
+        ConfigParser<SampleKeys> parser = new ConfigParser<>(
+                SampleKeys.class,
+                "locale_test",
+                "1.0",
+                pluginDir,
+                db
+        ) {
+            @Override
+            public InputStream getResourceFromJar(String filename) {
+                return new ByteArrayInputStream("name: translated_name\ndelay: 10\n".getBytes());
+            }
+        };
+
+        // invoke private methods via reflection to cover loadLocalizedDefaults & valueOnlyLocaleMigrationNeeded
+        try {
+            java.lang.reflect.Method mLoad = ConfigParser.class.getDeclaredMethod("loadLocalizedDefaults");
+            mLoad.setAccessible(true);
+            Object res = mLoad.invoke(parser);
+            assertNotNull(res);
+
+            File onDisk = new File(pluginDir, "locale_test.yml");
+            Files.writeString(onDisk.toPath(), "name: english_name\ndelay: 5\n");
+
+            java.lang.reflect.Method mNeed = ConfigParser.class.getDeclaredMethod("valueOnlyLocaleMigrationNeeded", File.class);
+            mNeed.setAccessible(true);
+            boolean needed = (boolean) mNeed.invoke(parser, onDisk);
+            assertFalse(needed); // because localizedResourceExists() is false by default in test
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

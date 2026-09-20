@@ -167,12 +167,11 @@ class RetainedFootprintBenchmarkTest {
     while (written < BAD_CHUNKS) {
       int originX = rng.nextInt(2 * chunkRadius) - chunkRadius;
       int originZ = rng.nextInt(2 * chunkRadius) - chunkRadius;
-      for (int i = 0; i < perCluster && written < BAD_CHUNKS; i++) {
+      for (int i = 0; i < perCluster && written < BAD_CHUNKS; i++, written++) {
         int cx = originX + (i % CLUSTER_SIDE);
         int cz = originZ + (i / CLUSTER_SIDE);
         out[written][0] = cx * 16 + 8;
         out[written][1] = cz * 16 + 8;
-        written++;
       }
     }
     return out;

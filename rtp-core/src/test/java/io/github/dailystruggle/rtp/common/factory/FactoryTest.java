@@ -410,4 +410,53 @@ class FactoryTest {
         factory.remove("zone.YML");
         assertFalse(factory.contains("zone"), "remove() with .YML suffix should still remove the entry");
     }
+
+    // -----------------------------------------------------------------------
+    // FactoryValue - edge cases (setDesc, set validation, nested FactoryValue, hashCode, etc.)
+    // -----------------------------------------------------------------------
+
+    @Test
+    void factoryValue_setAndSetDesc_validations() {
+        TestValue val = new TestValue("test.yml");
+        assertThrows(IllegalArgumentException.class, () -> val.set(null, "val"));
+        assertThrows(IllegalArgumentException.class, () -> val.set(TestKey.VALUE, null));
+        assertThrows(IllegalArgumentException.class, () -> val.setDesc(null, new String[]{"desc"}));
+        assertThrows(IllegalArgumentException.class, () -> val.setDesc(TestKey.VALUE, null));
+
+        val.setDesc(TestKey.VALUE, new String[]{"line 1", "line 2"});
+        assertEquals("default", val.getData(TestKey.VALUE));
+
+        // Test toYAML with nested FactoryValue and with descriptions
+        enum OuterKey { CHILD }
+        class OuterValue extends FactoryValue<OuterKey> {
+            OuterValue() { super(OuterKey.class, "outer.yml"); }
+            @Override public FactoryValue<OuterKey> clone() {
+                OuterValue copy = new OuterValue();
+                copy.data.putAll(this.data);
+                return copy;
+            }
+        }
+
+        OuterValue outer = new OuterValue();
+        outer.setDesc(OuterKey.CHILD, new String[]{"child field"});
+        outer.set(OuterKey.CHILD, val);
+        String yaml = outer.toYAML();
+        assertTrue(yaml.contains("child field"));
+        assertTrue(yaml.contains("CHILD:"));
+        assertTrue(yaml.contains("VALUE: default"));
+
+        // clone() deep-copy with nested FactoryValue
+        class DeepOuterValue extends FactoryValue<OuterKey> {
+            DeepOuterValue() { super(OuterKey.class, "deep_outer.yml"); }
+        }
+        DeepOuterValue deepOuter = new DeepOuterValue();
+        deepOuter.set(OuterKey.CHILD, val);
+        DeepOuterValue clonedOuter = (DeepOuterValue) deepOuter.clone();
+        assertNotSame(deepOuter.getData(OuterKey.CHILD), clonedOuter.getData(OuterKey.CHILD));
+
+        // hashCode contract
+        int h1 = val.hashCode();
+        int h2 = val.hashCode();
+        assertEquals(h1, h2);
+    }
 }

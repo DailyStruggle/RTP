@@ -193,7 +193,7 @@ public final class EffectsAPI {
                 int end = bukkitVersion.indexOf("-R");
                 if(end < 0) return "1_13_2";
 
-                bukkitVersion = bukkitVersion.substring(0,end).replaceAll("\\.","_");
+                bukkitVersion = bukkitVersion.substring(0,end).replace(".","_");
                 return bukkitVersion;
             }
             else version = versionPattern.matcher( version ).replaceAll( "" );

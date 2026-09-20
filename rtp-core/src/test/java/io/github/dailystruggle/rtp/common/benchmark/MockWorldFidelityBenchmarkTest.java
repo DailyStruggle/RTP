@@ -484,8 +484,7 @@ public class MockWorldFidelityBenchmarkTest {
           RealWorldVerdictMask.load(dir, RealWorldVerdictMask.SHIPPED_UNSAFE_BLOCKS, MAX_REGION_FILES);
       int radius = Math.min(MATCH_RADIUS_CHUNKS, real.inscribedRadius());
       if (radius < 64) continue;
-      matched++;
-      String save = "save " + matched;
+      String save = "save " + (++matched);
 
       Clustering realStats = clustering(real::isOccupied, radius);
       REPORT.add("save fit " + save, "source", "region directory", dir.toString(), Provenance.MEASURED);

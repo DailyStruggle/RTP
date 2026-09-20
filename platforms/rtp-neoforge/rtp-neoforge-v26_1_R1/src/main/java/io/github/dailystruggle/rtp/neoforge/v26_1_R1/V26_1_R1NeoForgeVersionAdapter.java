@@ -534,14 +534,14 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         try {
             java.util.List<net.minecraft.network.chat.Component> pageComponents =
                     new java.util.ArrayList<>(spec.pages().size());
-            for (io.github.dailystruggle.rtp.neoforge.menu.NeoForgeBookSpec.Page page : spec.pages()) {
+            for (io.github.dailystruggle.rtp.api.menu.BookSpec.Page page : spec.pages()) {
                 net.minecraft.network.chat.MutableComponent pageComp =
                         net.minecraft.network.chat.Component.empty();
                 boolean firstLine = true;
-                for (io.github.dailystruggle.rtp.neoforge.menu.NeoForgeBookSpec.Line line : page.lines()) {
+                for (io.github.dailystruggle.rtp.api.menu.BookSpec.Line line : page.lines()) {
                     if (!firstLine) pageComp.append("\n");
                     firstLine = false;
-                    for (io.github.dailystruggle.rtp.neoforge.menu.NeoForgeBookSpec.Fragment frag : line.fragments()) {
+                    for (io.github.dailystruggle.rtp.api.menu.BookSpec.Fragment frag : line.fragments()) {
                         pageComp.append(io.github.dailystruggle.rtp.neoforge.tools.NeoForgeLegacyText.parseInteractive(
                                 frag.text(), frag.hover(), frag.runCommand(),
                                 io.github.dailystruggle.rtp.neoforge.tools.NeoForgeLegacyText.ClickKind.RUN));

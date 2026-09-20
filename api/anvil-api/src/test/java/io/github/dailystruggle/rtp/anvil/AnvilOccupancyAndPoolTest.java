@@ -58,11 +58,45 @@ class AnvilOccupancyAndPoolTest {
 
     // Invalidate
     AnvilRegionOccupancyCache.invalidateAll();
+    assertFalse(AnvilRegionOccupancyCache.isCached(mca));
 
     // File with less than 4096 bytes
     Path tiny = tempDir.resolve("tiny.mca");
     Files.write(tiny, new byte[100]);
     assertFalse(AnvilRegionOccupancyCache.isOccupied(tiny, 0, 0));
+
+    // Repopulate cache and verify isCached
+    assertTrue(AnvilRegionOccupancyCache.isOccupied(mca, 0, 0));
+    assertTrue(AnvilRegionOccupancyCache.isCached(mca));
+    assertFalse(AnvilRegionOccupancyCache.isCached(null));
+    assertFalse(AnvilRegionOccupancyCache.isCached(tempDir.resolve("nonexistent.mca")));
+
+    // Direct reflection test on private record Entry to cover equals/hashCode/toString
+    try {
+      Class<?> entryClass = Class.forName("io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache$Entry");
+      java.lang.reflect.Constructor<?> ctor = entryClass.getDeclaredConstructor(long[].class, long.class);
+      ctor.setAccessible(true);
+      long[] bmp1 = new long[]{1L, 2L};
+      long[] bmp2 = new long[]{1L, 2L};
+      Object e1 = ctor.newInstance(bmp1, 100L);
+      Object e2 = ctor.newInstance(bmp2, 100L);
+      Object eDiffMtime = ctor.newInstance(bmp1, 200L);
+      Object eDiffBmp = ctor.newInstance(new long[]{3L}, 100L);
+
+      assertEquals(e1, e1);
+      assertEquals(e1, e2);
+      assertEquals(e1.hashCode(), e2.hashCode());
+      assertFalse(e1.equals(null));
+      assertFalse(e1.equals("not an entry"));
+      assertFalse(e1.equals(eDiffMtime));
+      assertFalse(e1.equals(eDiffBmp));
+
+      String s = e1.toString();
+      assertTrue(s.contains("Entry[bitmap="));
+      assertTrue(s.contains("mtime=100"));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Test

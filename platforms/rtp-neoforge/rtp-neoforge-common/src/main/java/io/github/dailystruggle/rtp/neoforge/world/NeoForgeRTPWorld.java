@@ -236,12 +236,6 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
      * system completes the inner future off-thread.
      */
     private CompletableFuture<Long> loadLiveChunk(int chunkX, int chunkZ, long key) {
-        if (world == null) {
-            CompletableFuture<Long> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IllegalStateException(
-                    "NeoForgeRTPWorld.getChunkAt: ServerLevel is null (world=" + name + ")"));
-            return failed;
-        }
         final MinecraftServer server = world.getServer();
         if (server == null) {
             CompletableFuture<Long> failed = new CompletableFuture<>();
@@ -712,7 +706,6 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
-        if (world == null) return CompletableFuture.completedFuture(null);
         final MinecraftServer server = world.getServer();
         if (server == null) {
             return CompletableFuture.completedFuture(null);

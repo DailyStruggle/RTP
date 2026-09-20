@@ -1314,7 +1314,6 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      */
     @Override
     protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
-        if (world == null) return CompletableFuture.completedFuture(null);
         final MinecraftServer server = world.getServer();
         if (server == null) {
             // Torn-down world: complete normally so callers don't block forever.
@@ -1376,7 +1375,6 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      */
     @Override
     public CompletableFuture<Integer> getServerForceLoadedCount() {
-        if (world == null) return CompletableFuture.completedFuture(0);
         final MinecraftServer server = world.getServer();
         if (server == null) return CompletableFuture.completedFuture(0);
         return server.submit(() -> {

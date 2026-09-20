@@ -99,13 +99,12 @@ class NetworkSimulationTestJobTest {
     void syntheticPeerRoundTrip() throws Exception {
         InMemoryNetworkStateBinding transport = new InMemoryNetworkStateBinding();
         java.util.Set<String> observed = ConcurrentHashMap.newKeySet();
-        Subscription sub = transport.subscribeBackendHeartbeats(row -> {
+        try (Subscription sub = transport.subscribeBackendHeartbeats(row -> {
             if (row != null && row.serverId() != null
                     && row.serverId().startsWith(NetworkSimulationTestJob.SYNTHETIC_PREFIX)) {
                 observed.add(row.serverId());
             }
-        });
-        try {
+        })) {
             // Publish 3 synthetic READY peers - mirrors runProbe() shape.
             for (int i = 0; i < 3; i++) {
                 BackendHeartbeat row = new BackendHeartbeat(
@@ -132,8 +131,6 @@ class NetworkSimulationTestJobTest {
             }
             assertEquals(3, observed.size(), "subscriber shall observe all 3 synthetic peers");
             assertTrue(observed.contains(NetworkSimulationTestJob.SYNTHETIC_PREFIX + "0-test"));
-        } finally {
-            sub.close();
         }
     }
 
@@ -156,8 +153,7 @@ class NetworkSimulationTestJobTest {
     @Test
     @DisplayName("token round-trip: claim/find/release/findEmpty/reap on in-memory binding")
     void tokenProbeRoundTrip() throws Exception {
-        InMemoryNetworkStateBinding transport = new InMemoryNetworkStateBinding();
-        try {
+        try (InMemoryNetworkStateBinding transport = new InMemoryNetworkStateBinding()) {
             UUID player = new UUID(42L, 99L);
             String serverId = NetworkSimulationTestJob.SYNTHETIC_PREFIX + "tokens-unit";
 
@@ -205,8 +201,6 @@ class NetworkSimulationTestJobTest {
                     .get(2, TimeUnit.SECONDS);
             assertTrue(postReap.isEmpty(),
                     "findReservation after reap shall be empty for the doomed player");
-        } finally {
-            transport.close();
         }
     }
 }

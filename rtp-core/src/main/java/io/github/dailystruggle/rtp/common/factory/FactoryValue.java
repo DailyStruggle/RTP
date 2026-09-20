@@ -249,7 +249,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       // {@code uniquePlacements}) gets 1/0 rather than a thrown NaN.
       res = b ? 1 : 0;
     } else if (resObj instanceof String s) {
-      String coerced = s.replaceAll(",", ".");
+      String coerced = s.replace(",", ".");
       io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance parsedDist =
           io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.parse(coerced, null);
       if (parsedDist != null && parsedDist.explicitUnit()) {
@@ -331,7 +331,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       if (value instanceof FactoryValue<?>) {
         res.append("\n");
         String s = ((FactoryValue<?>) value).toYAML();
-        s = s.replaceAll("\n", "  \n");
+        s = s.replace("\n", "  \n");
         res.append(s);
       } else if (value instanceof Map) {
         ((Map<?, ?>) value)

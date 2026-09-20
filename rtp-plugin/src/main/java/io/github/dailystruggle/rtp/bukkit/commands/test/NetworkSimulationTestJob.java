@@ -182,6 +182,10 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
           }
           default -> runProbe(callerId, transport, peerCount, observeWindowMs);
         }
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        audit(callerId, "FAIL", "probe interrupted: " + ie.getMessage());
+        RTP.log(Level.WARNING, "[RTP test/network] probe interrupted", ie);
       } catch (Throwable t) {
         audit(callerId, "FAIL",
                 "uncaught: " + t.getClass().getSimpleName() + ": " + t.getMessage());

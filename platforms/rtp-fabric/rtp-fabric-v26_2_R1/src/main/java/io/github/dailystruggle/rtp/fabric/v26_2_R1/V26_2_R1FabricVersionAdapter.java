@@ -513,14 +513,14 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
         try {
             java.util.List<net.minecraft.network.chat.Component> pageComponents =
                     new java.util.ArrayList<>(spec.pages().size());
-            for (io.github.dailystruggle.rtp.fabric.menu.FabricBookSpec.Page page : spec.pages()) {
+            for (io.github.dailystruggle.rtp.api.menu.BookSpec.Page page : spec.pages()) {
                 net.minecraft.network.chat.MutableComponent pageComp =
                         net.minecraft.network.chat.Component.empty();
                 boolean firstLine = true;
-                for (io.github.dailystruggle.rtp.fabric.menu.FabricBookSpec.Line line : page.lines()) {
+                for (io.github.dailystruggle.rtp.api.menu.BookSpec.Line line : page.lines()) {
                     if (!firstLine) pageComp.append("\n");
                     firstLine = false;
-                    for (io.github.dailystruggle.rtp.fabric.menu.FabricBookSpec.Fragment frag : line.fragments()) {
+                    for (io.github.dailystruggle.rtp.api.menu.BookSpec.Fragment frag : line.fragments()) {
                         pageComp.append(V26_2_R1FabricLegacyText.parseInteractive(
                                 frag.text(), frag.hover(), frag.runCommand(), true));
                     }

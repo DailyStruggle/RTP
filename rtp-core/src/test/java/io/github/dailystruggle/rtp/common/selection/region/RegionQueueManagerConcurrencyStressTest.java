@@ -104,6 +104,7 @@ class RegionQueueManagerConcurrencyStressTest {
      */
     @Test
     @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    @SuppressWarnings("java:S2093") // In soak test, reservations are intentionally tested for explicit close vs redemption across threads
     void concurrentOperations_allQueueTiers_noDeadlockOrExceptions() throws InterruptedException {
         int threads = 8;
         ExecutorService exec = Executors.newFixedThreadPool(threads);
@@ -195,6 +196,7 @@ class RegionQueueManagerConcurrencyStressTest {
                                 }
                                 successfulOps.incrementAndGet();
                             }
+                            default -> {}
                         }
                     }
                 } catch (Throwable t1) {

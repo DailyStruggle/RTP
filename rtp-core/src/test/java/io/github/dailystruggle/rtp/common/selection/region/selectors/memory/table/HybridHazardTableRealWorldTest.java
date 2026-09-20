@@ -83,6 +83,7 @@ public class HybridHazardTableRealWorldTest {
         case HybridHazardTable.TAG_SOLID_HAZARD -> hazard++;
         case HybridHazardTable.TAG_BITMASK -> bitmask++;
         case HybridHazardTable.TAG_RUNS -> runs++;
+        default -> {}
       }
     }
     System.out.printf("[DEBUG_LOG] Containers: %d Total | Land=%d, Hazard=%d, Runs=%d, Bitmask=%d, Unalloc=%d%n",

@@ -886,11 +886,21 @@ sonar {
         // Volatile reference publication is an intentional lock-free pattern used across spatial caches,
         // configuration reloads, and platform handle caches.
         // Also ignore java:S2975: public clone() implementations across Cloneable domain models.
-        property 'sonar.issue.ignore.multicriteria', 's3077,s2975'
+        // Also ignore architectural patterns:
+        // - java:S2176: per-version adapter subclasses share common interface/scheduler names.
+        // - java:S1452: public SPI return types with wildcard generics (RTPWorld<?>, FactoryValue<?>).
+        // - java:S2696: singleton instance initialization updating static fields.
+        property 'sonar.issue.ignore.multicriteria', 's3077,s2975,s2176,s1452,s2696'
         property 'sonar.issue.ignore.multicriteria.s3077.ruleKey', 'java:S3077'
         property 'sonar.issue.ignore.multicriteria.s3077.resourceKey', '**/*'
         property 'sonar.issue.ignore.multicriteria.s2975.ruleKey', 'java:S2975'
         property 'sonar.issue.ignore.multicriteria.s2975.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s2176.ruleKey', 'java:S2176'
+        property 'sonar.issue.ignore.multicriteria.s2176.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s1452.ruleKey', 'java:S1452'
+        property 'sonar.issue.ignore.multicriteria.s1452.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s2696.ruleKey', 'java:S2696'
+        property 'sonar.issue.ignore.multicriteria.s2696.resourceKey', '**/*'
     }
 }
 

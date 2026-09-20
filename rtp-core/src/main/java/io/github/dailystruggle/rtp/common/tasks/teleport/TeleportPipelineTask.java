@@ -317,6 +317,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     }
   }
 
+  @SuppressWarnings("java:S2093") // ChunkReservation ownership is transferred into this instance; closing in try-with-resources would invalidate chunk reservations
   private void processGenerationResult(GenerationResult res) {
     try {
       RTPPlayer player = context.player();

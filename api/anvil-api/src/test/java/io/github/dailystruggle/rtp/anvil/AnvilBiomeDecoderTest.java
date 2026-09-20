@@ -268,4 +268,34 @@ class AnvilBiomeDecoderTest {
         assertThrows(NullPointerException.class, () -> new BiomePaletteSection(0, null, null));
         assertThrows(IllegalArgumentException.class, () -> new BiomePaletteSection(0, List.of(), null));
     }
+
+    @Test
+    @DisplayName("BiomePaletteSection equals, hashCode, and toString contracts")
+    void biomePaletteSectionObjectMethods() {
+        List<String> palette1 = List.of("minecraft:plains", "minecraft:desert");
+        List<String> palette2 = List.of("minecraft:plains", "minecraft:desert");
+        long[] data1 = new long[]{1L, 2L};
+        long[] data2 = new long[]{1L, 2L};
+
+        BiomePaletteSection sec1 = new BiomePaletteSection(1, palette1, data1);
+        BiomePaletteSection sec2 = new BiomePaletteSection(1, palette2, data2);
+        BiomePaletteSection secDiffY = new BiomePaletteSection(2, palette1, data1);
+        BiomePaletteSection secDiffPalette = new BiomePaletteSection(1, List.of("minecraft:plains"), data1);
+        BiomePaletteSection secDiffData = new BiomePaletteSection(1, palette1, new long[]{3L, 4L});
+
+        assertEquals(sec1, sec1);
+        assertEquals(sec1, sec2);
+        assertEquals(sec1.hashCode(), sec2.hashCode());
+        assertFalse(sec1.equals(null));
+        assertFalse(sec1.equals("not a section"));
+        assertFalse(sec1.equals(secDiffY));
+        assertFalse(sec1.equals(secDiffPalette));
+        assertFalse(sec1.equals(secDiffData));
+
+        String str = sec1.toString();
+        assertTrue(str.contains("BiomePaletteSection["));
+        assertTrue(str.contains("sectionY=1"));
+        assertTrue(str.contains("palette="));
+        assertTrue(str.contains("data="));
+    }
 }

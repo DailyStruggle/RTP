@@ -103,6 +103,7 @@ public final class LuckPermsNeoForgeEnumerator {
      *         the user is uncached, the verdict is {@code UNDEFINED}, or any
      *         reflective call fails. Never throws.
      */
+    @SuppressWarnings("java:S2447") // Tri-state verdict: TRUE, FALSE, or null (undefined / not handled by LuckPerms)
     public static Boolean checkPermission(UUID uuid, String node) {
         if (uuid == null || node == null || node.isEmpty() || !isAvailable()) return null;
         try {

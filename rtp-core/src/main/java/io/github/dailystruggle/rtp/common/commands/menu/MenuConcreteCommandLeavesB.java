@@ -278,7 +278,7 @@ final class MenuConcreteCommandLeavesB {
             // cart surfaced, instead of `dispatchOpenConfigFile` rejecting
             // the slash-bearing name as unknown.
             if (key == null || key.isEmpty()) {
-                if (file.indexOf('/') > 0) {
+                if (file.contains("/")) {
                     return owner.reopenAfterCartOp(c, file, m);
                 }
                 return owner.dispatchOpenConfigFile(c,

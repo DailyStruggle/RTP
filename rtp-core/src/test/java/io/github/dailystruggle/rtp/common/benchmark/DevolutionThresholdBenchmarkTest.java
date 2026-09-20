@@ -150,9 +150,8 @@ class DevolutionThresholdBenchmarkTest {
       pos += gap;
       if (pos >= range) break;
       long runLen = 1L + (long) (rng.nextExponential() * MEAN_RUN);
-      for (long k = 0; k < runLen && pos < range && placed < target && out < keys.length; k++) {
+      for (long k = 0; k < runLen && pos < range && placed < target && out < keys.length; k++, placed++) {
         keys[out++] = pos++;
-        placed++;
       }
     }
     if (out == keys.length) return keys;

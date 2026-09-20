@@ -80,6 +80,7 @@ public final class LoginCacheTask implements Runnable {
                     }
                     return;
                 }
+                @SuppressWarnings("java:S2093") // ChunkReservation ownership is transferred on successful offer; closing in try-with-resources would invalidate cached chunks
                 Runnable verify = () -> {
                     try {
                         // Re-resolve Y via the region's vertical adjustor against the

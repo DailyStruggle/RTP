@@ -421,4 +421,51 @@ class AbstractSQLDatabaseAccessorComprehensiveTest {
         Connection conn = brokenAccessor.connect();
         assertNull(conn);
     }
+
+    @Test
+    void read_and_startup_methods() throws Exception {
+        // Test read() default implementation on AbstractSQLDatabaseAccessor
+        Connection conn = accessor.getConnection();
+        Map.Entry<String, Object> lookup = new AbstractMap.SimpleEntry<>("senderName", "alice");
+        try (Statement st = conn.createStatement()) {
+            st.execute("INSERT INTO rtp_teleport_data (senderName, selectedX, selectedY, selectedZ) "
+                    + "VALUES ('alice', 10, 20, 30)");
+        }
+
+        // Call the real read() implementation by wrapping in subclass that doesn't override read()
+        AbstractSQLDatabaseAccessor realAccessor = new AbstractSQLDatabaseAccessor() {
+            @Override public String name() { return "test"; }
+            @Override public Connection getConnection() { return conn; }
+            @Override protected String getInsertStatement() { return ""; }
+            @Override public void write(Connection connection, String tableName, Map<TableObj, TableObj> keyValuePairs) {}
+        };
+
+        Optional<Map<String, Object>> res = realAccessor.read(conn, "rtp_teleport_data", lookup);
+        assertTrue(res.isPresent());
+        assertEquals("alice", res.get().get("SENDERNAME"));
+
+        // Missed lookup
+        Map.Entry<String, Object> missingLookup = new AbstractMap.SimpleEntry<>("senderName", "bob");
+        Optional<Map<String, Object>> missingRes = realAccessor.read(conn, "rtp_teleport_data", missingLookup);
+        assertFalse(missingRes.isPresent());
+
+        // Table doesn't exist
+        Optional<Map<String, Object>> noTable = realAccessor.read(conn, "nonexistent_table", lookup);
+        assertFalse(noTable.isPresent());
+
+        // Startup test
+        UUID testSender = UUID.randomUUID();
+        try (Statement st = conn.createStatement()) {
+            st.execute("INSERT INTO rtp_teleport_data (senderName, senderId, time, selectedWorldName, selectedX, selectedY, selectedZ, "
+                    + "originalWorldName, originalX, originalY, originalZ, cost) "
+                    + "VALUES ('charlie', '" + testSender + "', 12345, 'world', 1, 2, 3, 'world', 4, 5, 6, 10.5)");
+        }
+
+        realAccessor.startup();
+        TeleportData td = RTP.getInstance().latestTeleportData.get(testSender);
+        assertNotNull(td);
+        assertEquals(12345L, td.time);
+        assertEquals(10.5, td.cost);
+        assertEquals(1, td.selectedCoords.x());
+    }
 }

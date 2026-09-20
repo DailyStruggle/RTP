@@ -328,7 +328,6 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         if (srv == null && p.level() instanceof ServerLevel here) {
             srv = here.getServer();
         }
-        if (srv == null) return CompletableFuture.completedFuture(false);
         final double tx = to.getBlockX() + 0.5;
         final double ty = to.getBlockY();
         final double tz = to.getBlockZ() + 0.5;
@@ -359,7 +358,6 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         if (srv == null && p.level() instanceof ServerLevel here) {
             srv = here.getServer();
         }
-        if (srv == null) return;
         final int bx = to.getBlockX();
         final int by = to.getBlockY();
         final int bz = to.getBlockZ();
