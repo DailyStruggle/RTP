@@ -173,7 +173,7 @@ public class Region extends FactoryValue<RegionKeys> {
       long[] progress = ScanTask.loadProgress(name, cacheKey());
       if (progress != null) {
         long iter = progress[0];
-        if (iter > 0 && iter < (long) ((MemoryShape<?>) this.shape).getRange()) {
+        if (iter > 0 && iter < ((MemoryShape<?>) this.shape).getRange()) {
           MemoryShape<?> ms = (MemoryShape<?>) this.shape;
           ScanTask task = new ScanTask(this, iter);
           RTP.getInstance().scanTasks.put(name, task);
@@ -247,7 +247,7 @@ public class Region extends FactoryValue<RegionKeys> {
       long[] progress = ScanTask.loadProgress(name, cacheKey());
       if (progress != null) {
         long iter = progress[0];
-        if (iter > 0 && iter < (long) ((MemoryShape<?>) this.shape).getRange()) {
+        if (iter > 0 && iter < ((MemoryShape<?>) this.shape).getRange()) {
           MemoryShape<?> ms = (MemoryShape<?>) this.shape;
           ScanTask task = new ScanTask(this, iter);
           RTP.getInstance().scanTasks.put(name, task);

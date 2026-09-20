@@ -41,7 +41,7 @@ jobs:
           cache-dependency-path: docs/requirements.txt
 
       - name: Install docs toolchain
-        run: pip install mkdocs-material==9.5.39 pymdown-extensions==10.14.3 pygments==2.18.0
+        run: pip install --only-binary :all: -r docs/requirements.txt
 
       - name: Build and deploy to gh-pages
         run: mkdocs gh-deploy --force --clean

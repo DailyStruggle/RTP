@@ -273,9 +273,12 @@ public final class RtpYamlConfig extends RtpYamlSection {
             parent.mkdirs();
         }
         if (overwrite && file.exists()) {
-            boolean deleted = file.delete();
-            if (!deleted && file.exists()) {
-                throw new IOException("Failed to delete existing file: " + file.getAbsolutePath());
+            try {
+                Files.delete(file.toPath());
+            } catch (IOException e) {
+                if (file.exists()) {
+                    throw new IOException("Failed to delete existing file: " + file.getAbsolutePath(), e);
+                }
             }
         }
         return file.createNewFile();

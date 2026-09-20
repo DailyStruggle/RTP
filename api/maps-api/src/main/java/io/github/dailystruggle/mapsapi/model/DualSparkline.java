@@ -84,15 +84,18 @@ public record DualSparkline(
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof DualSparkline that)) return false;
-        return Double.compare(that.aMin, aMin) == 0
-                && Double.compare(that.aMax, aMax) == 0
-                && Double.compare(that.bMin, bMin) == 0
-                && Double.compare(that.bMax, bMax) == 0
-                && labelA.equals(that.labelA)
-                && java.util.Arrays.equals(seriesA, that.seriesA)
-                && labelB.equals(that.labelB)
-                && java.util.Arrays.equals(seriesB, that.seriesB);
+        if (!(o instanceof DualSparkline(String thatLabelA, double[] thatSeriesA, double thatAMin, double thatAMax,
+                                         String thatLabelB, double[] thatSeriesB, double thatBMin, double thatBMax))) {
+            return false;
+        }
+        return Double.compare(thatAMin, aMin) == 0
+                && Double.compare(thatAMax, aMax) == 0
+                && Double.compare(thatBMin, bMin) == 0
+                && Double.compare(thatBMax, bMax) == 0
+                && labelA.equals(thatLabelA)
+                && java.util.Arrays.equals(seriesA, thatSeriesA)
+                && labelB.equals(thatLabelB)
+                && java.util.Arrays.equals(seriesB, thatSeriesB);
     }
 
     @Override

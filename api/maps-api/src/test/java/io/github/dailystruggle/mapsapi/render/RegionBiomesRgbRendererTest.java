@@ -47,11 +47,11 @@ class RegionBiomesRgbRendererTest {
     // equals, hashCode, toString
     RegionBiomesRgb same = new RegionBiomesRgb("test-region", 2, 2, new int[] {0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00}, new byte[] {0, 1, 2, 2});
     RegionBiomesRgb diff = new RegionBiomesRgb("diff-region", 2, 2, new int[] {0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00}, new byte[] {0, 1, 2, 2});
-    assertEquals(model, model);
+    org.junit.jupiter.api.Assertions.assertTrue(model.equals(model));
     assertEquals(model, same);
     assertNotEquals(model, diff);
-    assertNotEquals(model, null);
-    assertNotEquals(model, "not a region biomes rgb");
+    org.junit.jupiter.api.Assertions.assertFalse(model.equals(null));
+    org.junit.jupiter.api.Assertions.assertFalse(model.equals("not a region biomes rgb"));
     assertEquals(model.hashCode(), same.hashCode());
     assertNotNull(model.toString());
   }

@@ -125,10 +125,14 @@ public final class ProxyDirectListener {
             accept.start();
             logger.info("RTP proxy-direct listener bound on {}:{} ({}).",
                     bindHost, port, verifier != null ? "HMAC-signed" : "unsigned");
-        } catch (Throwable t) {
-            try { ss.close(); } catch (Throwable ignored) { }
+        } catch (Exception e) {
+            try {
+                ss.close();
+            } catch (Exception ignored) {
+                // Ignore exception on close during rollback
+            }
             running.set(false);
-            throw t;
+            throw e;
         }
     }
 

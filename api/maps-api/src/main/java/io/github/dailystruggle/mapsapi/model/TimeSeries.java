@@ -45,11 +45,13 @@ public record TimeSeries(String label, double[] samples, double yMin, double yMa
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof TimeSeries that)) return false;
-        return Double.compare(that.yMin, yMin) == 0
-                && Double.compare(that.yMax, yMax) == 0
-                && label.equals(that.label)
-                && java.util.Arrays.equals(samples, that.samples);
+        if (!(o instanceof TimeSeries(String thatLabel, double[] thatSamples, double thatYMin, double thatYMax))) {
+            return false;
+        }
+        return Double.compare(thatYMin, yMin) == 0
+                && Double.compare(thatYMax, yMax) == 0
+                && label.equals(thatLabel)
+                && java.util.Arrays.equals(samples, thatSamples);
     }
 
     @Override

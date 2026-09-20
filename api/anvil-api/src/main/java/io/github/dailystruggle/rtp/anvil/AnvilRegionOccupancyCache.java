@@ -35,8 +35,8 @@ public final class AnvilRegionOccupancyCache {
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
-      if (!(o instanceof Entry entry)) return false;
-      return mtime == entry.mtime && java.util.Arrays.equals(bitmap, entry.bitmap);
+      if (!(o instanceof Entry(long[] otherBitmap, long otherMtime))) return false;
+      return mtime == otherMtime && java.util.Arrays.equals(bitmap, otherBitmap);
     }
 
     @Override

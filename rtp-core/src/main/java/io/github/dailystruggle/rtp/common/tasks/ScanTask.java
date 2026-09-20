@@ -385,7 +385,7 @@ public class ScanTask extends RTPRunnable {
     RTPWorld world = region.getWorld();
     WorldBorder border = (WorldBorder) RTP.serverAccessor.getWorldBorder(world.name());
 
-    long range = (long) shape.getRange();
+    long range = shape.getRange();
     long pos;
     long limit = scanIncrement.get();
     long stride = Math.max(1L, (shape instanceof MemoryShape<?> ms) ? ms.minBridgingStride() : shape.spatialResolution());
@@ -1075,10 +1075,11 @@ public class ScanTask extends RTPRunnable {
         dir.listFiles((d, n) -> n.endsWith(suffix) && (n.startsWith(prefix) || n.equals(bare)));
     if (candidates == null) return;
     for (File f : candidates) {
-      if (f.exists()) {
-        boolean deleted = f.delete();
-        if (!deleted && f.exists()) {
-          RTP.log(Level.FINE, "[ScanTask] Could not delete scan progress file: " + f.getName());
+      try {
+        java.nio.file.Files.deleteIfExists(f.toPath());
+      } catch (Exception e) {
+        if (f.exists()) {
+          RTP.log(Level.FINE, "[ScanTask] Could not delete scan progress file: " + f.getName(), e);
         }
       }
     }

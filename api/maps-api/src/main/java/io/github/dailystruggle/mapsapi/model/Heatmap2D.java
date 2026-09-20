@@ -54,12 +54,15 @@ public record Heatmap2D(int width, int height, double[] values,
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof Heatmap2D heatmap2D)) return false;
-        return width == heatmap2D.width
-                && height == heatmap2D.height
-                && Double.compare(heatmap2D.minValue, minValue) == 0
-                && Double.compare(heatmap2D.maxValue, maxValue) == 0
-                && java.util.Arrays.equals(values, heatmap2D.values);
+        if (!(o instanceof Heatmap2D(int thatWidth, int thatHeight, double[] thatValues,
+                                     double thatMinValue, double thatMaxValue))) {
+            return false;
+        }
+        return width == thatWidth
+                && height == thatHeight
+                && Double.compare(thatMinValue, minValue) == 0
+                && Double.compare(thatMaxValue, maxValue) == 0
+                && java.util.Arrays.equals(values, thatValues);
     }
 
     @Override

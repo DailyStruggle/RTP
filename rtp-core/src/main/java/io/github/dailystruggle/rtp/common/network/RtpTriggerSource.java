@@ -6,6 +6,6 @@ package io.github.dailystruggle.rtp.common.network;
  * @deprecated Use {@link io.github.dailystruggle.rtp.api.network.RtpTriggerSource} directly.
  */
 @Deprecated(since = "2.0.0", forRemoval = true)
-@SuppressWarnings("java:S1190") // Backward-compatibility alias for promoted interface
+@SuppressWarnings({"java:S1190", "java:S2176"}) // Backward-compatibility alias for promoted interface
 public interface RtpTriggerSource extends io.github.dailystruggle.rtp.api.network.RtpTriggerSource {
 }

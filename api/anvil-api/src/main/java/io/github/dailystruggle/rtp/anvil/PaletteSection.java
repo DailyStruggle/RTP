@@ -65,10 +65,10 @@ public record PaletteSection(int sectionY, List<String> palette, long[] data) {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof PaletteSection that)) return false;
-        return sectionY == that.sectionY
-                && palette.equals(that.palette)
-                && java.util.Arrays.equals(data, that.data);
+        if (!(o instanceof PaletteSection(int thatSectionY, List<String> thatPalette, long[] thatData))) return false;
+        return sectionY == thatSectionY
+                && palette.equals(thatPalette)
+                && java.util.Arrays.equals(data, thatData);
     }
 
     @Override

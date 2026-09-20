@@ -66,11 +66,13 @@ public record RegionBadLocations(String regionName, int width, int height,
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof RegionBadLocations that)) return false;
-        return width == that.width
-                && height == that.height
-                && regionName.equals(that.regionName)
-                && java.util.Arrays.equals(palette, that.palette);
+        if (!(o instanceof RegionBadLocations(String thatRegionName, int thatWidth, int thatHeight, byte[] thatPalette))) {
+            return false;
+        }
+        return width == thatWidth
+                && height == thatHeight
+                && regionName.equals(thatRegionName)
+                && java.util.Arrays.equals(palette, thatPalette);
     }
 
     @Override

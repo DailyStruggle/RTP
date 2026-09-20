@@ -362,11 +362,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         }
 
         sql = "ALTER TABLE " + tableName + " ADD \"" + key + "\" " + typeStr + ";";
-        try {
-          statement.execute(sql);
-        } catch (SQLException e) {
-          RTP.log(Level.WARNING, e.getMessage(), e);
-        }
+        executeAlterTable(statement, sql);
       }
 
       StringBuilder builder =
@@ -387,6 +383,14 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
       statement.execute(builder.toString());
     } catch (SQLException e) {
       throw new IllegalStateException(e);
+    }
+  }
+
+  private void executeAlterTable(Statement statement, String sql) {
+    try {
+      statement.execute(sql);
+    } catch (SQLException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
     }
   }
 

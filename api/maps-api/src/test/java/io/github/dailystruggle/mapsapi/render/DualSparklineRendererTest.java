@@ -49,11 +49,11 @@ class DualSparklineRendererTest {
     // equals, hashCode, toString
     DualSparkline same = new DualSparkline("MSPT", new double[] {10.0, 20.0, 30.0}, 0.0, 50.0, "Heap", new double[] {100.0, 200.0, 300.0}, 0.0, 500.0);
     DualSparkline diff = new DualSparkline("MSPT2", new double[] {10.0, 20.0, 30.0}, 0.0, 50.0, "Heap", new double[] {100.0, 200.0, 300.0}, 0.0, 500.0);
-    assertEquals(model, model);
+    org.junit.jupiter.api.Assertions.assertTrue(model.equals(model));
     assertEquals(model, same);
     assertNotEquals(model, diff);
-    assertNotEquals(model, null);
-    assertNotEquals(model, "not a sparkline");
+    org.junit.jupiter.api.Assertions.assertFalse(model.equals(null));
+    org.junit.jupiter.api.Assertions.assertFalse(model.equals("not a sparkline"));
     assertEquals(model.hashCode(), same.hashCode());
     assertNotNull(model.toString());
   }
