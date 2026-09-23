@@ -41,7 +41,6 @@ on:
 
 jobs:
   publish:
-    if: false # Temporarily disabled for SonarQube runs
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -24,7 +24,6 @@ on:
 
 jobs:
   release:
-    if: false # Temporarily disabled for SonarQube runs
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -43,13 +43,11 @@ on:
 
 jobs:
   release:
-    # Temporarily disabled for SonarQube runs
-    if: false
-    # if: >
-    #   github.event_name == 'workflow_dispatch' ||
-    #   (github.event.pull_request.merged == true &&
-    #    (startsWith(github.head_ref, 'v') || startsWith(github.head_ref, 'V')) &&
-    #    contains(github.head_ref, '.'))
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       (startsWith(github.head_ref, 'v') || startsWith(github.head_ref, 'V')) &&
+       contains(github.head_ref, '.'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
