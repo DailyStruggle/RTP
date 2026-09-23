@@ -98,9 +98,15 @@ public class RTP {
    * closed (structured {@link io.github.dailystruggle.rtp.api.group.GroupPlacementResult.Reason})
    * when the region/world is not resolvable, so it is safe to reference before core is fully wired.
    */
-  public static final io.github.dailystruggle.rtp.api.group.GroupPlacementService
+  public static volatile io.github.dailystruggle.rtp.api.group.GroupPlacementService
       groupPlacementService =
           new io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher();
+
+  /**
+   * Process-wide entry point for declarative scripted actions (ADR-093).
+   */
+  public static final io.github.dailystruggle.rtp.common.action.ActionManager
+      actionManager = new io.github.dailystruggle.rtp.common.action.ActionManager();
 
   /**
    * Pre-dispatch hook to decide whether {@code /rtp} is served locally,
@@ -192,6 +198,8 @@ public class RTP {
     // internals. See docs/dev/EXTERNAL_HOOKS.md.
     io.github.dailystruggle.rtp.api.RTPAPI.hooks =
         new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
+
+    io.github.dailystruggle.rtp.api.RTPAPI.actionService = actionManager;
 
     // First-class teleport entry point for addons: trigger an RTP for an online
     // player and complete a future with the outcome, without reaching into core

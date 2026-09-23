@@ -1,0 +1,27 @@
+# --- actions/on-join.yml ---
+# Free sample scripted action (ADR-093): first-join / join-event random teleport.
+# This reproduces justRTP's "first join RTP" via an event-triggered action (rtp.onevent.join)
+# rather than a bespoke command. Bind this action id to the join event in your event config.
+
+alias: "firstjoin"
+permission: "rtp.action.onjoin"
+description: "Scatter new players into the world on their first join."
+
+placement:
+  region: "default"
+  profile: "square"
+  anchor: "regionQueue"
+  parameters:
+    subspaceChunkRadius: 4
+    minSeparation: 16
+    elevationTolerance: 8
+
+confinement:
+  boundary: "SUBSPACE"
+  duration: "0s"
+
+lifecycle:
+  onStart:
+    - PLAYER: "msg &aWelcome! You've been dropped somewhere in the wild."
+
+version: "1.0"

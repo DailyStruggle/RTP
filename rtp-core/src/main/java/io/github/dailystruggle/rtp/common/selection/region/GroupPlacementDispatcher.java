@@ -10,8 +10,8 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape;
 
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,15 +80,47 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
 
     final Region fRegion = region;
 
-    // 3. Draw a verified anchor from the region (non-blocking). Empty biome set = any biome.
-    return fRegion
-        .getLocation(Collections.emptySet())
+    // 3. Draw or resolve anchor via AnchorSource (non-blocking). Empty biome set = any biome.
+    return SubspaceAnchorResolver.resolveAnchor(fRegion, request.anchorSource())
         .thenCompose(genResult -> allocate(fRegion, spec, participants, n, genResult))
         .exceptionally(
             ex -> {
               RTP.log(Level.WARNING, "[group] placement failed for region '" + fRegion.name + "'", ex);
               return GroupPlacementResult.failure(GroupPlacementResult.Reason.ERROR, String.valueOf(ex));
             });
+  }
+
+  /**
+   * Resolves a distribution shape mask from the profile's distribution name and lattice units.
+   */
+  @SuppressWarnings("unchecked")
+  private static io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> resolveShape(
+      String distribution, int latticeUnits) {
+    if (distribution == null || distribution.isBlank() || "square".equalsIgnoreCase(distribution)) {
+      return null;
+    }
+    String name = distribution.trim().toLowerCase(java.util.Locale.ROOT);
+    try {
+      io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> factory =
+          (io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>>)
+              RTP.factoryMap.get(RTP.factoryNames.shape);
+      if (factory == null || !factory.contains(name)) {
+        return null;
+      }
+      io.github.dailystruggle.rtp.common.factory.FactoryValue<?> fVal = factory.get(name);
+      if (fVal instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("radius", (long) Math.max(0, latticeUnits));
+        data.put("centerRadius", 0L);
+        data.put("centerX", 0L);
+        data.put("centerZ", 0L);
+        shape.setData(data);
+        return shape;
+      }
+      return null;
+    } catch (Throwable t) {
+      return null;
+    }
   }
 
   /**
@@ -126,14 +158,15 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     final List<RTPLocation> slots;
     try {
       SubspaceShape subspace = new SubspaceShape(anchor, spec.radius(), region);
-      // Stage 1: default (square) lattice; the preset-configured distribution shape is wired in a
-      // later stage. Elevation tolerance is applied against the anchor Y by the selector.
+      int latticeUnits = (subspace.getFootprintBlocks() / 2) / Math.max(1, spec.minSeparation());
+      io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shapeMask =
+          resolveShape(spec.distribution(), latticeUnits);
       slots =
           subspace.selectSafeSlots(
               n,
               spec.minSeparation(),
               spec.elevationTolerance(),
-              null,
+              shapeMask,
               region.candidateValidator());
     } catch (Throwable t) {
       releaseReservation(genResult);
@@ -177,6 +210,14 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
                   new LinkedHashMap<>();
               for (int i = 0; i < n; i++) {
                 if (!verified[i]) {
+                  // Inherit bad location to parent spatial memory: tag failed external claim chunk (ADR-079 / ADR-095)
+                  if (region.getShape() instanceof MemoryShape<?> memShape) {
+                    RTPCoords rejected = candidates.get(i).coords();
+                    int cx = rejected.x() >> 4;
+                    int cz = rejected.z() >> 4;
+                    long loc = memShape.xzToLocation(cx, cz);
+                    memShape.addBadChunk(loc, LocationGenerator.FailTypes.safetyExternal);
+                  }
                   releaseReservation(genResult);
                   return CompletableFuture.completedFuture(
                       GroupPlacementResult.failure(

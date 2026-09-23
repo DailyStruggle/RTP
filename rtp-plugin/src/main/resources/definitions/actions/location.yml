@@ -1,0 +1,33 @@
+# --- actions/location.yml ---
+# Free sample scripted action (ADR-093 + ADR-095): scatter around a named landmark.
+# This reproduces justRTP's `/rtp location <name>` using a fixed anchor coordinate.
+#
+# The anchor is a fixed CoordinateAnchorSource read from the placement parameters below
+# (a live caller may override anchorX/anchorY/anchorZ via invocation context).
+
+alias: "spawnzone"
+permission: "rtp.action.location.spawnzone"
+description: "Teleport to a safe spot around the spawn landmark."
+
+placement:
+  region: "default"
+  profile: "circle"
+  anchor: "fixed"
+  parameters:
+    # Static landmark coordinates for this named location.
+    anchorX: 0
+    anchorY: 64
+    anchorZ: 0
+    subspaceChunkRadius: 4      # ~64 block footprint around the landmark
+    minSeparation: 16
+    elevationTolerance: 8
+
+confinement:
+  boundary: "SUBSPACE"
+  duration: "0s"
+
+lifecycle:
+  onStart:
+    - PLAYER: "msg &aArrived near spawn."
+
+version: "1.0"

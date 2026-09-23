@@ -427,11 +427,18 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
         }
     }
 
+    private final List<String> executedCommands = new CopyOnWriteArrayList<>();
+
+    public List<String> getExecutedCommands() {
+        return Collections.unmodifiableList(executedCommands);
+    }
+
     @Override
     public boolean executeCommand(UUID senderId, String commandLine) {
         if (senderId == null || commandLine == null || commandLine.isBlank()) {
             return false;
         }
+        executedCommands.add(commandLine);
         String[] tokens = commandLine.trim().split("\\s+");
         if (tokens.length == 0) {
             return false;

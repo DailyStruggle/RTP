@@ -311,4 +311,48 @@ public class AnvilRegionBinHazardTableTest {
     assertEquals(-1, AnvilRegionBinHazardTable.FullDiscardedBin.INSTANCE.resolveLocalAccumulate(0));
     assertEquals(-1, AnvilRegionBinHazardTable.FullDiscardedBin.INSTANCE.resolveLocalAccumulate(500));
   }
+
+  @Test
+  void copyBinWords_unallocated_fillsZeros() {
+    AnvilRegionBinHazardTable table = new AnvilRegionBinHazardTable(2048L);
+    long[] dst = new long[16];
+    table.copyBinWords(0, dst);
+    for (long w : dst) {
+      assertEquals(0L, w);
+    }
+  }
+
+  @Test
+  void copyBinWords_fullDiscarded_fillsOnes() {
+    AnvilRegionBinHazardTable table = new AnvilRegionBinHazardTable(2048L);
+    table.discardBin(0);
+    long[] dst = new long[16];
+    table.copyBinWords(0, dst);
+    for (long w : dst) {
+      assertEquals(-1L, w);
+    }
+  }
+
+  @Test
+  void copyBinWords_bitmaskAndRunBin_copiesExactWords() {
+    AnvilRegionBinHazardTable table = new AnvilRegionBinHazardTable(2048L);
+    table.markBad(10L);
+    table.markBad(150L);
+    table.markBad(1000L);
+
+    long[] dst = new long[16];
+    table.copyBinWords(0, dst);
+    assertTrue((dst[10 >>> 6] & (1L << (10 & 63))) != 0L);
+    assertTrue((dst[150 >>> 6] & (1L << (150 & 63))) != 0L);
+    assertTrue((dst[1000 >>> 6] & (1L << (1000 & 63))) != 0L);
+    assertEquals(0L, dst[0] & (1L << 0));
+
+    // Compact into RunBin and copy again
+    table.compact(0L, 0L);
+    long[] dstRun = new long[16];
+    table.copyBinWords(0, dstRun);
+    for (int i = 0; i < 16; i++) {
+      assertEquals(dst[i], dstRun[i], "RunBin unpacking must match Bitmask words exactly");
+    }
+  }
 }

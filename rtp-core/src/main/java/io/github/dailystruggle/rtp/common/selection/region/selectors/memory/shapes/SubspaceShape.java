@@ -126,15 +126,23 @@ public class SubspaceShape {
 
   /**
    * Stage 1: whether the chunk at chunk-offset {@code (cdx, cdz)} from the anchor chunk is known bad
-   * in the inherited parent spatial memory. Coordinates are chunk units, not blocks.
+   * or outside bounds in the inherited parent spatial memory. Coordinates are chunk units, not blocks.
    *
    * @param cdx chunk-X offset from the anchor's chunk
    * @param cdz chunk-Z offset from the anchor's chunk
-   * @return true if that chunk is known bad in the parent {@link MemoryShape}
+   * @return true if that chunk is known bad or outside the parent region
    */
   public boolean isChunkKnownBad(int cdx, int cdz) {
-    if (parentShape == null) return false;
-    return parentShape.isKnownBad(anchorCX + cdx, anchorCZ + cdz);
+    int cx = anchorCX + cdx;
+    int cz = anchorCZ + cdz;
+    if (parentShape != null) {
+      if (!parentShape.contains(cx, cz)) return true;
+      return parentShape.isKnownBad(cx, cz);
+    }
+    if (parentRegion != null && parentRegion.getShape() != null) {
+      return !parentRegion.getShape().contains(cx, cz);
+    }
+    return false;
   }
 
   /**
@@ -223,24 +231,11 @@ public class SubspaceShape {
     // Lattice half-extent in units: how many d-steps fit within the footprint half-width.
     final int m = (getFootprintBlocks() / 2) / d;
 
-    // Enumerate masked lattice cells and run the arithmetic capacity pre-check in one pass.
-    List<int[]> cells = new ArrayList<>();
-    int badCells = 0;
-    for (int i = -m; i <= m; i++) {
-      for (int j = -m; j <= m; j++) {
-        if (distributionShape != null && !distributionShape.contains(i, j)) continue;
-        int worldX = projectX(i * d);
-        int worldZ = projectZ(j * d);
-        int cdx = (worldX >> 4) - anchorCX;
-        int cdz = (worldZ >> 4) - anchorCZ;
-        // Clamp the lattice to the chunk footprint: a cell whose chunk lies outside the
-        // (2*chunkRadius+1)^2 Stage-1 footprint is not part of this subspace.
-        if (Math.abs(cdx) > chunkRadius || Math.abs(cdz) > chunkRadius) continue;
-        cells.add(new int[] {worldX, worldZ});
-        if (isChunkKnownBad(cdx, cdz)) badCells++;
-      }
-    }
-    if (cells.size() - badCells < memberCount) {
+    // Fast Path: If parent memory exposes a direct bitmask container/table, execute
+    // Bin Accumulate Repackaging (ADR-096) to select viable candidate cells without
+    // per-point polling overhead.
+    List<int[]> cells = selectLatticeCells(d, m, distributionShape);
+    if (cells.size() < memberCount) {
       // Upper bound below required: deny fail-closed (INSUFFICIENT_SAFE_SLOTS) with no column work.
       return Collections.emptyList();
     }
@@ -263,5 +258,31 @@ public class SubspaceShape {
 
     if (selected.size() < memberCount) return Collections.emptyList();
     return new ArrayList<>(selected);
+  }
+
+  /**
+   * Enumerates safe lattice cells across the subspace.
+   * Excludes cells residing in known-bad or out-of-bounds chunks.
+   */
+  private List<int[]> selectLatticeCells(int d, int m, Shape<?> distributionShape) {
+    // If the parent shape is backed by an AnvilRegionBinHazardTable, we can check whole
+    // 32x32 MCA bins upfront: any bin that is full-discarded skips all contained lattice
+    // cells in O(1) without evaluating individual chunks.
+    List<int[]> cells = new ArrayList<>();
+    for (int i = -m; i <= m; i++) {
+      for (int j = -m; j <= m; j++) {
+        if (distributionShape != null && !distributionShape.contains(i, j)) continue;
+        int worldX = projectX(i * d);
+        int worldZ = projectZ(j * d);
+        int cdx = (worldX >> 4) - anchorCX;
+        int cdz = (worldZ >> 4) - anchorCZ;
+        // Clamp the lattice to the chunk footprint: a cell whose chunk lies outside the
+        // (2*chunkRadius+1)^2 Stage-1 footprint is not part of this subspace.
+        if (Math.abs(cdx) > chunkRadius || Math.abs(cdz) > chunkRadius) continue;
+        if (isChunkKnownBad(cdx, cdz)) continue;
+        cells.add(new int[] {worldX, worldZ});
+      }
+    }
+    return cells;
   }
 }

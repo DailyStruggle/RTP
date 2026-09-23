@@ -61,6 +61,9 @@ public class RTPAPI {
   /** Eager opt-in per-player dispatcher for {@link PlayerMoveEvent} notifications (ADR-075). */
   public static final PlayerMoveDispatcher playerMoveEvents = new PlayerMoveDispatcher();
 
+  /** Scripted actions service delegate populated by core during {@code onEnable} (ADR-093). */
+  public static volatile io.github.dailystruggle.rtp.api.action.ActionService actionService = null;
+
   /**
    * Sets the platform-specific server accessor (write-once).
    *
@@ -287,5 +290,21 @@ public class RTPAPI {
       return Collections.emptyList();
     }
     return snapshot.foliaRegions;
+  }
+
+  /**
+   * Returns the platform-neutral scripted actions service (ADR-093).
+   *
+   * @return non-null action service
+   * @throws IllegalStateException if called before core is loaded (REQ-RTP-S-006)
+   */
+  @PublicApi
+  public static io.github.dailystruggle.rtp.api.action.ActionService actions() {
+    io.github.dailystruggle.rtp.api.action.ActionService s = actionService;
+    if (s == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot access actions: Core implementation is not loaded.");
+    }
+    return s;
   }
 }
