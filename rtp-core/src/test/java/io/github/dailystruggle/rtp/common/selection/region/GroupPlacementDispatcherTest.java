@@ -25,7 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -396,6 +400,55 @@ class GroupPlacementDispatcherTest {
     }
 
     @Test
+    @DisplayName("Verifier failure records safetyExternal bad chunk to parent MemoryShape")
+    void testGlobalVerifierFailureInheritsBadChunkToMemoryShape() throws Exception {
+        RTPWorld<?> world = RTP.serverAccessor.getRTPWorld("world");
+        Region mockRegion = mock(Region.class);
+        io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> mockMemShape =
+                mock(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape.class);
+        doReturn(mockMemShape).when(mockRegion).getShape();
+        when(mockMemShape.contains(anyInt(), anyInt())).thenReturn(true);
+        when(mockMemShape.isKnownBad(anyInt(), anyInt())).thenReturn(false);
+        when(mockMemShape.xzToLocation(anyLong(), anyLong())).thenReturn(100L);
+
+        ChunkReservation ticket = mock(ChunkReservation.class);
+        GenerationResult genResult = new GenerationResult(
+                new RTPCoords("world", 100, 64, 100),
+                1,
+                null,
+                ticket
+        );
+        doReturn(world).when(mockRegion).getWorld();
+        when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
+        when(mockRegion.candidateValidator()).thenReturn((x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1));
+        RTP.selectionAPI.permRegionLookup.put("verifier_bad_chunk_region", mockRegion);
+
+        // Fail global verifier
+        GlobalRegionVerifiers.addGlobalRegionVerifier(coords -> false);
+
+        try {
+            GroupProfileSpec spec = GroupProfileSpec.of("square", 32, 2, 5, 4);
+            GroupPlacementRequest request = GroupPlacementRequest.of(
+                    "verifier_bad_chunk_region",
+                    spec,
+                    new java.util.ArrayList<>(List.of(UUID.randomUUID()))
+            );
+
+            CompletableFuture<GroupPlacementResult> future = dispatcher.place(request);
+            GroupPlacementResult result = future.get(5, TimeUnit.SECONDS);
+            assertNotNull(result);
+            assertFalse(result.isSuccess());
+            verify(mockMemShape).addBadChunk(
+                    anyLong(),
+                    eq(LocationGenerator.FailTypes.safetyExternal)
+            );
+        } finally {
+            GlobalRegionVerifiers.clearGlobalRegionVerifiers();
+            RTP.selectionAPI.permRegionLookup.remove("verifier_bad_chunk_region");
+        }
+    }
+
+    @Test
     @DisplayName("Returns INVALID_REGION when region lookup throws cyclic or lookup exception")
     void testCyclicOrThrowingRegionLookup() throws Exception {
         io.github.dailystruggle.rtp.common.selection.SelectionAPI originalSelectionAPI = RTP.selectionAPI;
@@ -439,5 +492,48 @@ class GroupPlacementDispatcherTest {
         assertFalse(result.isSuccess());
         assertEquals(GroupPlacementResult.Reason.INVALID_REGION, result.reason());
         assertTrue(result.message().contains("unknown region"));
+    }
+
+    @Test
+    @DisplayName("Places nearplayer using EntityAnchorSource with single participant")
+    void testNearPlayerPlacement() throws Exception {
+        io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+        RTPWorld<?> world = accessor.getRTPWorld("world");
+        Region mockRegion = mock(Region.class);
+        org.mockito.Mockito.doReturn(world).when(mockRegion).getWorld();
+        when(mockRegion.candidateValidator()).thenReturn((x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1));
+        RTP.selectionAPI.permRegionLookup.put("nearplayer_region", mockRegion);
+
+        UUID playerUuid = UUID.randomUUID();
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(playerUuid, "TargetPlayer", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
+        accessor.addPlayer(player);
+
+        try {
+            GroupProfileSpec spec = GroupProfileSpec.of("square", 32, 2, 5, 1);
+            RTPCoords targetPlayerPos = new RTPCoords("world", 500, 64, 500);
+
+            GroupPlacementRequest request = GroupPlacementRequest.of(
+                    "nearplayer_region",
+                    spec,
+                    new java.util.ArrayList<>(List.of(playerUuid)),
+                    io.github.dailystruggle.rtp.api.group.AnchorSource.fixed(targetPlayerPos)
+            );
+
+            CompletableFuture<GroupPlacementResult> future = dispatcher.place(request);
+            GroupPlacementResult result = future.get(5, TimeUnit.SECONDS);
+            assertNotNull(result);
+            assertTrue(result.isSuccess(), "Near-player placement should succeed: " + result.message());
+            assertEquals(1, result.placements().size());
+            io.github.dailystruggle.rtp.api.world.RTPLocation placedLoc = result.placements().get(playerUuid);
+            assertNotNull(placedLoc);
+            // Verify placement is within square profile bounds of target coordinates
+            int dx = Math.abs(placedLoc.x() - targetPlayerPos.x());
+            int dz = Math.abs(placedLoc.z() - targetPlayerPos.z());
+            assertTrue(dx <= 32 && dz <= 32, "Placed spot must be within profile half-extent");
+        } finally {
+            RTP.selectionAPI.permRegionLookup.remove("nearplayer_region");
+        }
     }
 }

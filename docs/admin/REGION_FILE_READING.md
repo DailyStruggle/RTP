@@ -37,7 +37,7 @@ So "falls back to live loading" is a property of the **L2 -> L1 promotion**, not
 #### 2. Linear Format (`.linear`, ADR-077)
 - 8-byte magic header (`0xC370ACDE22013702` or `SUPER\0\0\0`), version byte (`1` or `2`), and header metadata.
 - 1024-entry uncompressed chunk length table and timestamp table.
-- Continuous ZStandard (`zstd`) stream decoded via native `zstd-jni` into the chunk's NBT root.
+- Continuous ZStandard (`zstd`) stream decoded via the built-in pure-Java aircompressor decoder into the chunk's NBT root (no native binaries; built into RTP, no separate addon required).
 
 ### Compression modes understood
 
@@ -74,7 +74,7 @@ The reader has exactly three outcomes: **ACCEPT** (every sampled column is safe 
 - **Region read failed** - the file vanished or could not be read.
 - **Unknown compression mode**, or the **external-file (`0x80`) flag** - a compression variant RTP has not validated.
 - **Corrupt / truncated region entry** - a length prefix, sector span, or Linear header that runs past the end of the file.
-- **Linear native library unavailable** - `zstd-jni` failed to link native binaries (e.g. strict security sandboxes); falls through cleanly.
+- **Linear decoder unavailable** - the ZStandard decoder classes are missing from the classpath; falls through cleanly. (The decoder is pure-Java with no native binaries, so this effectively never happens; the guard is retained defensively.)
 - **Missing `MOTION_BLOCKING_NO_LEAVES` heightmap**, or **no block sections** - a chunk shape the safety check cannot read.
 
 In every one of these cases the outcome is the same: the reader neither accepts nor rejects from disk, so the candidate is passed through to be resolved by the live-load safety check. **A format RTP cannot read never produces an unsafe placement - it only means that candidate is confirmed the slow way instead of screened the fast way.**

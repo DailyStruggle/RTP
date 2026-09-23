@@ -13,9 +13,10 @@ import java.util.logging.Logger;
 /**
  * Thread-safe registry of pluggable region-file formats and readers (ADR-077).
  *
- * <p>Supports standard Anvil ({@code .mca}) by default, and allows external addons
- * or runtime modules (such as Linear format via {@code LeafRTPLinearAddon}) to register
- * custom decoders either programmatically or through {@link ServiceLoader}.</p>
+ * <p>Supports standard Anvil ({@code .mca}) and Linear ({@code .linear} / ZSTD) formats
+ * by default (both built into {@code anvil-api}), and allows external addons or runtime
+ * modules to register additional decoders either programmatically or through
+ * {@link ServiceLoader}.</p>
  */
 public final class RegionFormatRegistry {
 
@@ -26,6 +27,8 @@ public final class RegionFormatRegistry {
     static {
         // Register default vanilla Anvil format
         REGISTRY.put(".mca", AnvilReader.INSTANCE);
+        // Register built-in Linear (.linear / ZSTD) format (ADR-077)
+        REGISTRY.put(".linear", LinearRegionReader.INSTANCE);
         // Discover any SPI providers on classpath
         loadServiceProviders();
     }
@@ -104,11 +107,12 @@ public final class RegionFormatRegistry {
     }
 
     /**
-     * Resets the registry back to default (only built-in {@code .mca}) and re-polls ServiceLoader.
+     * Resets the registry back to defaults (built-in {@code .mca} and {@code .linear}) and re-polls ServiceLoader.
      */
     public static void reset() {
         REGISTRY.clear();
         REGISTRY.put(".mca", AnvilReader.INSTANCE);
+        REGISTRY.put(".linear", LinearRegionReader.INSTANCE);
         loadServiceProviders();
     }
 

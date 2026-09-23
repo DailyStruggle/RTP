@@ -35,7 +35,7 @@ Following the V3 update and micro optimizing the selection process, I've created
 
 <div align="center">
 
-*Paper, Spigot, Folia, Fabric, NeoForge, and Velocity, on Minecraft 1.21.x / 26.x*
+*Paper, Spigot, Folia, Fabric, NeoForge, and Velocity, on Minecraft 1.20.x / 1.21.x / 26.x*
 
 </div>
 
@@ -55,11 +55,13 @@ Measurements show me about 35-65% of a world is "unsafe" for placement, based on
 
 Selections come off a space-filling Archimedean spiral curve, an indexed mapping from 1D to 2D. The math, with distribution plots: [Why LeafRTP exists](https://dailystruggle.github.io/RTP/site/why/).
 
-The spatial mapping enables storing and recalling information about prior selections, including biome and invalidity cause, using segments rather than image compression, as this enables a specific optimization - offset selections. The location selection phase is a constant-time lookup with occasional table rebuilding that excludes invalid locations, e.g. oceans, lava, void. 
+The spatial mapping enables storing and recalling information about prior selections, including biome and invalidity cause, using segments rather than image compression, as this enables a specific optimization - offset selections. The location selection phase is a constant-time lookup with occasional table rebuilding that excludes invalid locations, e.g. oceans, lava, void. Invalidity is held in O(n+m) roaring bitmaps - measured at about 53.5 KB for a 32k square worldborder - and bins are freed automatically, keeping only an integer `invalid` count and rebuilding on demand.
 
-### Anvil pre-filter
+Coordinates come off a CSPRNG, so a client that knows the world seed cannot predict where the next player lands.
 
-An Anvil (`.mca`) pre-filter reads biome and block data straight from the region files on disk, so batches of locations can be filtered if a world is generated and those locations are unloaded. It also helps with reading what the world actually contains, rather than what the generator predicts. The common shortcuts (`getBiome`, `getHighestBlockAt`) answer from the generation noise map, which can disagree with the real terrain once a spot has been edited or carried across a Minecraft version. [Architecture](https://dailystruggle.github.io/RTP/FOR_CONTRIBUTORS/).
+### Anvil / Linear pre-filter
+
+An Anvil (`.mca`) or Linear (`.linear` / ZSTD) pre-filter reads biome and block data straight from the region files on disk, so batches of locations can be filtered if a world is generated and those locations are unloaded. It also helps with reading what the world actually contains, rather than what the generator predicts. The common shortcuts (`getBiome`, `getHighestBlockAt`) answer from the generation noise map, which can disagree with the real terrain once a spot has been edited or carried across a Minecraft version. The Linear (`.linear`) decoder is built into the engine using a pure-Java ZStandard reader (no native binaries), so Leaves / Gale and modded worlds get the same off-tick pre-filter with no extra downloads. [Architecture](https://dailystruggle.github.io/RTP/FOR_CONTRIBUTORS/).
 
 ### Pre-verified cache
 
@@ -75,7 +77,7 @@ Safe destinations are prepared at-rate and a number of them are kept ready in a 
 - **Economy** - charge per `/rtp` (Vault), per-region pricing, auto-refund on cancel.
 - **12 claim integrations** - GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, RedProtect, CrashClaim, KingdomsX, Residence.
 - **PvP / combat-tag gate, PlaceholderAPI, per-player cooldowns & limits, multi-world overrides.**
-- **Cross-server `/rtp`** - Running on Velocity enables cross-server communication via tcp socket, extensible to addons.
+- **Cross-server `/rtp`** - Running on Velocity enables cross-server communication via plugin-messaging, extensible to addons.
 - **Platform-independent engine** - core code runs on pure java and custom implementations, enabling cross-server support via lightweight suppliers
 - **Docs in jar** - in V3 I started including version-specific docs with the jar in case I update the wiki for newer versions
 - **Reproducible benchmarks** with raw CSVs and per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP)
@@ -223,17 +225,17 @@ Visual test suites and benchmarks evaluate candidate dispersion, collision avoid
 ![Circle Comparison Side-by-Side](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/simulation_circle_comparison_side_by_side.png)
 *Side-by-side comparison of circle boundary coverage: ground truth vs. classic polar spiral vs. dual-layer square at varying resolutions.*
 
-##### Full Pipeline Selection Visualizer & L3 Bin Distribution
-![Full L3 State Chart](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/full_l3_state_chart.png)
-*Complete pipeline selection visualizer mapping candidate validation states, active 32x32 L3 bins, and discarded hazard bins across the region.*
+##### Full Pipeline Selection Visualizer & Backlog Bin Distribution
+![Full Backlog State Chart](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/full_l3_state_chart.png)
+*Complete pipeline selection visualizer mapping candidate validation states, active 32x32 backlog bins, and discarded hazard bins across the region.*
 
 ##### Pipeline Candidate Selection Sequence Comparison
 ![Selection Sequence Comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/selection_sequence_comparison_chart.png)
 *Comparative dispatch sequence showing candidate evaluation order, bin walk progression, and spatial dispersion.*
 
-##### Native vs. Unique vs. L3 Cache Candidate Distribution
-![Native vs Unique vs L3 Comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/native_vs_unique_vs_l3_comparison_chart.png)
-*Visual distribution across raw spiral candidates, deduplicated candidates, and binned L3 backlog cache pools.*
+##### Native vs. Unique vs. Backlog Cache Candidate Distribution
+![Native vs Unique vs Backlog Comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/native_vs_unique_vs_l3_comparison_chart.png)
+*Visual distribution across raw spiral candidates, deduplicated candidates, and binned backlog cache pools.*
 
 ##### Path Progression Across Scaled Radii
 ![Path Progression Radii](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/path_progression_radii_chart.png)

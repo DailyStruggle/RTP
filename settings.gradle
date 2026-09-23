@@ -368,10 +368,9 @@ if (!excludeNeoforge) {
 }
 
 include 'addons:LeafRTPCountdownAddon'
-// LeafRTPLinearAddon - provides .linear (ZStandard continuous region format) support
-// off-tick for servers running Leaves, Gale, or the Linear mod (ADR-077). Keeps zstd-jni
-// and its multi-platform native binaries out of the core jar to preserve lightweight footprint.
-include 'addons:LeafRTPLinearAddon'
+// LeafRTPLinearAddon was folded into anvil-api on 2026-09-23 (ADR-077 revised):
+// .linear (ZStandard) decode is now built in, using the pure-Java aircompressor
+// decoder (no native binaries), so no separate addon module is required.
 // LeafRTPRiftAddon - reference demo of effect registration. Registers a single
 // new effects-api prototype ("RIFT", a client-side "world deconstruction" warmup
 // animation) so it joins the built-in effects by name. Fully platform-neutral: the

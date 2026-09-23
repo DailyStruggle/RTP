@@ -780,6 +780,10 @@ public class Configs {
             new MultiConfigParser<>(EffectsGroupKeys.class, "effects", "1.0", pluginDirectory, "definitions/effects", locale);
     newMultiConfigParserMap.put(EffectsGroupKeys.class, effectsGroups);
 
+    // ADR-093: declarative scripted action definitions under definitions/actions/*.yml
+    migrateLegacyMultiDir("actions", "definitions/actions");
+    io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(pluginDirectory, RTP.actionManager);
+
     // ADR-076: region arrival schematics (.schem files, resolved by file presence -
     // see RegionSchematicService) live under advanced/schematics/. A legacy root
     // schematics/ folder left by an older install is relocated (rule 4). There is no

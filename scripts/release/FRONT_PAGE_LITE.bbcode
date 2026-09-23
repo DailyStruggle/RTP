@@ -22,7 +22,7 @@ For v3 I needed to update for modern game versions and modern web platforms. I g
 Following the V3 update and micro optimizing the selection process, I've created a test bench plugin to assist with testing throughput up to 1 [I]rtp[/I] call per gametick (20/s) which has demonstrated performance falloff in the pure reroll model, in every implementation I tested, except this one. I was also able to verify that a common optimization to "use loaded chunks" tends towards placing users in each others' bases to exacerbate either griefing or rerolling depending on claim integration.
 
 [CENTER]
-[I]Paper, Spigot, Folia, Fabric, NeoForge, and Velocity, on Minecraft 1.21.x / 26.x[/I]
+[I]Paper, Spigot, Folia, Fabric, NeoForge, and Velocity, on Minecraft 1.20.x / 1.21.x / 26.x[/I]
 [/CENTER]
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
@@ -41,11 +41,13 @@ Measurements show me about 35-65% of a world is "unsafe" for placement, based on
 
 Selections come off a space-filling Archimedean spiral curve, an indexed mapping from 1D to 2D. The math, with distribution plots: [URL='https://dailystruggle.github.io/RTP/site/why/'][I]Why LeafRTP exists[/I][/URL].
 
-The spatial mapping enables storing and recalling information about prior selections, including biome and invalidity cause, using segments rather than image compression, as this enables a specific optimization - offset selections. The location selection phase is a constant-time lookup with occasional table rebuilding that excludes invalid locations, e.g. oceans, lava, void. 
+The spatial mapping enables storing and recalling information about prior selections, including biome and invalidity cause, using segments rather than image compression, as this enables a specific optimization - offset selections. The location selection phase is a constant-time lookup with occasional table rebuilding that excludes invalid locations, e.g. oceans, lava, void. Invalidity is held in O(n+m) roaring bitmaps - measured at about 53.5 KB for a 32k square worldborder - and bins are freed automatically, keeping only an integer [I]invalid[/I] count and rebuilding on demand.
 
-[SIZE=4][B]Anvil pre-filter[/B][/SIZE]
+Coordinates come off a CSPRNG, so a client that knows the world seed cannot predict where the next player lands.
 
-An Anvil ([I].mca[/I]) pre-filter reads biome and block data straight from the region files on disk, so batches of locations can be filtered if a world is generated and those locations are unloaded. It also helps with reading what the world actually contains, rather than what the generator predicts. The common shortcuts ([I]getBiome[/I], [I]getHighestBlockAt[/I]) answer from the generation noise map, which can disagree with the real terrain once a spot has been edited or carried across a Minecraft version. [URL='https://dailystruggle.github.io/RTP/FOR_CONTRIBUTORS/']Architecture[/URL].
+[SIZE=4][B]Anvil / Linear pre-filter[/B][/SIZE]
+
+An Anvil ([I].mca[/I]) or Linear ([I].linear[/I] / ZSTD) pre-filter reads biome and block data straight from the region files on disk, so batches of locations can be filtered if a world is generated and those locations are unloaded. It also helps with reading what the world actually contains, rather than what the generator predicts. The common shortcuts ([I]getBiome[/I], [I]getHighestBlockAt[/I]) answer from the generation noise map, which can disagree with the real terrain once a spot has been edited or carried across a Minecraft version. The Linear ([I].linear[/I]) decoder is built into the engine using a pure-Java ZStandard reader (no native binaries), so Leaves / Gale and modded worlds get the same off-tick pre-filter with no extra downloads. [URL='https://dailystruggle.github.io/RTP/FOR_CONTRIBUTORS/']Architecture[/URL].
 
 [SIZE=4][B]Pre-verified cache[/B][/SIZE]
 
@@ -62,7 +64,7 @@ Safe destinations are prepared at-rate and a number of them are kept ready in a 
 [*][B]Economy[/B] - charge per [I]/rtp[/I] (Vault), per-region pricing, auto-refund on cancel.
 [*][B]12 claim integrations[/B] - GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, RedProtect, CrashClaim, KingdomsX, Residence.
 [*][B]PvP / combat-tag gate, PlaceholderAPI, per-player cooldowns & limits, multi-world overrides.[/B]
-[*][B]Cross-server [I]/rtp[/I][/B] - Running on Velocity enables cross-server communication via tcp socket, extensible to addons.
+[*][B]Cross-server [I]/rtp[/I][/B] - Running on Velocity enables cross-server communication via plugin-messaging, extensible to addons.
 [*][B]Platform-independent engine[/B] - core code runs on pure java and custom implementations, enabling cross-server support via lightweight suppliers
 [*][B]Docs in jar[/B] - in V3 I started including version-specific docs with the jar in case I update the wiki for newer versions
 [*][B]Reproducible benchmarks[/B] with raw CSVs and per-run analyses: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][B]helpers/StressTestRTP/[/B][/URL]
@@ -185,17 +187,17 @@ Visual test suites and benchmarks evaluate candidate dispersion, collision avoid
 [IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/simulation_circle_comparison_side_by_side.png[/IMG]
 [I]Side-by-side comparison of circle boundary coverage: ground truth vs. classic polar spiral vs. dual-layer square at varying resolutions.[/I]
 
-[B]Full Pipeline Selection Visualizer & L3 Bin Distribution[/B]
+[B]Full Pipeline Selection Visualizer & Backlog Bin Distribution[/B]
 [IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/full_l3_state_chart.png[/IMG]
-[I]Complete pipeline selection visualizer mapping candidate validation states, active 32x32 L3 bins, and discarded hazard bins across the region.[/I]
+[I]Complete pipeline selection visualizer mapping candidate validation states, active 32x32 backlog bins, and discarded hazard bins across the region.[/I]
 
 [B]Pipeline Candidate Selection Sequence Comparison[/B]
 [IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/selection_sequence_comparison_chart.png[/IMG]
 [I]Comparative dispatch sequence showing candidate evaluation order, bin walk progression, and spatial dispersion.[/I]
 
-[B]Native vs. Unique vs. L3 Cache Candidate Distribution[/B]
+[B]Native vs. Unique vs. Backlog Cache Candidate Distribution[/B]
 [IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/native_vs_unique_vs_l3_comparison_chart.png[/IMG]
-[I]Visual distribution across raw spiral candidates, deduplicated candidates, and binned L3 backlog cache pools.[/I]
+[I]Visual distribution across raw spiral candidates, deduplicated candidates, and binned backlog cache pools.[/I]
 
 [B]Path Progression Across Scaled Radii[/B]
 [IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/path_progression_radii_chart.png[/IMG]

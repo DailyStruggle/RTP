@@ -142,12 +142,14 @@ public class CompetitorDeduplicationSimulationTest {
       this.range = square.getRange();
     }
 
-    public synchronized Point2D generateAtomic() {
-      // Bijective Feistel Permutation over domain [0, range - 1]
-      long val = counter.getAndIncrement();
-      long permuted = feistelPermute(val % range, range, secretKey);
-      square.locationToXZ(permuted, coords);
-      return new Point2D((long) coords.x, (long) coords.z);
+    public Point2D generateAtomic() {
+      synchronized (this) {
+        // Bijective Feistel Permutation over domain [0, range - 1]
+        long val = counter.getAndIncrement();
+        long permuted = feistelPermute(val % range, range, secretKey);
+        square.locationToXZ(permuted, coords);
+        return new Point2D((long) coords.x, (long) coords.z);
+      }
     }
 
     private static long feistelPermute(long val, long domainSize, long seed) {
