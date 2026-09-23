@@ -72,7 +72,7 @@ public class RegionSubParameterUpdateTest {
         // Region data with a Shape value under `shape` and a VerticalAdjustor under `vert`,
         // so addParameters() registers ShapeParameter / VertParameter for them.
         regionData = new EnumMap<>(RegionKeys.class);
-        regionData.put(RegionKeys.shape, new Square());
+        regionData.put(RegionKeys.shape, new Square("SQUARE"));
         regionData.put(RegionKeys.vert, new JumpAdjustor(new java.util.ArrayList<>()));
         doReturn(regionData).when(regionConfig).getData();
         when(regionConfig.getConfigValue(any(), any())).thenAnswer(inv -> {
@@ -115,7 +115,7 @@ public class RegionSubParameterUpdateTest {
             shapeFactory = new Factory<>();
             RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
         }
-        shapeFactory.add("SQUARE", new Square());
+        shapeFactory.add("SQUARE", new Square("SQUARE"));
 
         Factory<VerticalAdjustor<?>> vertFactory =
                 (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);

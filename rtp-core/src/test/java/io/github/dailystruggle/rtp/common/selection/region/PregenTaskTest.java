@@ -506,7 +506,7 @@ class PregenTaskTest {
         when(mockVert.maxY()).thenReturn(256);
         when(mockVert.adjust(any())).thenAnswer(inv -> {
             RTPChunk<?> c = inv.getArgument(0);
-            return new io.github.dailystruggle.rtp.api.world.RTPCoords(world.name(), c.x() * 16 + 8, 32, c.z() * 16 + 8);
+            return new io.github.dailystruggle.rtp.api.world.RTPCoords(world.name(), c.x() * 16 + 7, 32, c.z() * 16 + 7);
         });
 
         Region spyRegion = createRegionWithWorld(spyWorld, mockVert);

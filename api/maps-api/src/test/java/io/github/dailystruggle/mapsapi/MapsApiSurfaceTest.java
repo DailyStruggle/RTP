@@ -290,6 +290,114 @@ class MapsApiSurfaceTest {
     }
 
     @Test
+    @DisplayName("RegionBiomesRgb validation, equals, hashCode and toString")
+    void regionBiomesRgbValidations() {
+        assertThrows(NullPointerException.class, () -> new RegionBiomesRgb(null, 2, 2, new int[4], new byte[4]));
+        assertThrows(IllegalArgumentException.class, () -> new RegionBiomesRgb("r", 0, 2, new int[0], new byte[0]));
+        assertThrows(IllegalArgumentException.class, () -> new RegionBiomesRgb("r", 2, 0, new int[0], new byte[0]));
+        assertThrows(NullPointerException.class, () -> new RegionBiomesRgb("r", 2, 2, null, new byte[4]));
+        assertThrows(NullPointerException.class, () -> new RegionBiomesRgb("r", 2, 2, new int[4], null));
+        assertThrows(IllegalArgumentException.class, () -> new RegionBiomesRgb("r", 2, 2, new int[3], new byte[4]));
+        assertThrows(IllegalArgumentException.class, () -> new RegionBiomesRgb("r", 2, 2, new int[4], new byte[3]));
+
+        RegionBiomesRgb r1 = new RegionBiomesRgb("r", 2, 2, new int[]{1, 2, 3, 4}, new byte[]{0, 1, 2, 0});
+        RegionBiomesRgb same = new RegionBiomesRgb("r", 2, 2, new int[]{1, 2, 3, 4}, new byte[]{0, 1, 2, 0});
+        RegionBiomesRgb diffName = new RegionBiomesRgb("other", 2, 2, new int[]{1, 2, 3, 4}, new byte[]{0, 1, 2, 0});
+        RegionBiomesRgb diffRgb = new RegionBiomesRgb("r", 2, 2, new int[]{9, 2, 3, 4}, new byte[]{0, 1, 2, 0});
+        RegionBiomesRgb diffMask = new RegionBiomesRgb("r", 2, 2, new int[]{1, 2, 3, 4}, new byte[]{2, 1, 2, 0});
+
+        assertTrue(r1.equals(r1));
+        assertEquals(r1, same);
+        org.junit.jupiter.api.Assertions.assertNotEquals(r1, diffName);
+        org.junit.jupiter.api.Assertions.assertNotEquals(r1, diffRgb);
+        org.junit.jupiter.api.Assertions.assertNotEquals(r1, diffMask);
+        assertFalse(r1.equals(null));
+        assertFalse(r1.equals("str"));
+        assertEquals(r1.hashCode(), same.hashCode());
+        org.junit.jupiter.api.Assertions.assertNotNull(r1.toString());
+        assertNotSame(r1.rgb(), r1.rgb());
+        assertNotSame(r1.mask(), r1.mask());
+    }
+
+    @Test
+    @DisplayName("RegionBadLocations validation, equals, hashCode and toString")
+    void regionBadLocationsValidations() {
+        assertThrows(NullPointerException.class, () -> new RegionBadLocations(null, 2, 2, new byte[4]));
+        assertThrows(IllegalArgumentException.class, () -> new RegionBadLocations("r", 0, 2, new byte[0]));
+        assertThrows(IllegalArgumentException.class, () -> new RegionBadLocations("r", 2, 0, new byte[0]));
+        assertThrows(NullPointerException.class, () -> new RegionBadLocations("r", 2, 2, null));
+        assertThrows(IllegalArgumentException.class, () -> new RegionBadLocations("r", 2, 2, new byte[3]));
+
+        RegionBadLocations b1 = new RegionBadLocations("r", 2, 2, new byte[]{1, 2, 3, 4});
+        RegionBadLocations same = new RegionBadLocations("r", 2, 2, new byte[]{1, 2, 3, 4});
+        RegionBadLocations diffName = new RegionBadLocations("diff", 2, 2, new byte[]{1, 2, 3, 4});
+        RegionBadLocations diffPalette = new RegionBadLocations("r", 2, 2, new byte[]{1, 2, 3, 5});
+
+        assertTrue(b1.equals(b1));
+        assertEquals(b1, same);
+        org.junit.jupiter.api.Assertions.assertNotEquals(b1, diffName);
+        org.junit.jupiter.api.Assertions.assertNotEquals(b1, diffPalette);
+        assertFalse(b1.equals(null));
+        assertFalse(b1.equals("str"));
+        assertEquals(b1.hashCode(), same.hashCode());
+        org.junit.jupiter.api.Assertions.assertNotNull(b1.toString());
+        assertNotSame(b1.palette(), b1.palette());
+    }
+
+    @Test
+    @DisplayName("TimeSeries validation, equals, hashCode and toString")
+    void timeSeriesValidations() {
+        assertThrows(NullPointerException.class, () -> new TimeSeries(null, new double[]{1.0}, 0.0, 10.0));
+        assertThrows(NullPointerException.class, () -> new TimeSeries("TPS", null, 0.0, 10.0));
+        assertThrows(IllegalArgumentException.class, () -> new TimeSeries("TPS", new double[0], 0.0, 10.0));
+        assertThrows(IllegalArgumentException.class, () -> new TimeSeries("TPS", new double[]{1.0}, 10.0, 10.0));
+        assertThrows(IllegalArgumentException.class, () -> new TimeSeries("TPS", new double[]{1.0}, 15.0, 10.0));
+
+        TimeSeries ts = new TimeSeries("TPS", new double[]{18.5, 20.0}, 0.0, 20.0);
+        assertEquals(18.5, ts.sampleAt(0));
+        assertEquals(20.0, ts.sampleAt(1));
+        assertNotSame(ts.samples(), ts.samples());
+
+        TimeSeries same = new TimeSeries("TPS", new double[]{18.5, 20.0}, 0.0, 20.0);
+        TimeSeries diffLabel = new TimeSeries("MSPT", new double[]{18.5, 20.0}, 0.0, 20.0);
+        TimeSeries diffSamples = new TimeSeries("TPS", new double[]{19.0, 20.0}, 0.0, 20.0);
+
+        assertTrue(ts.equals(ts));
+        assertEquals(ts, same);
+        org.junit.jupiter.api.Assertions.assertNotEquals(ts, diffLabel);
+        org.junit.jupiter.api.Assertions.assertNotEquals(ts, diffSamples);
+        assertFalse(ts.equals(null));
+        assertFalse(ts.equals("str"));
+        assertEquals(ts.hashCode(), same.hashCode());
+        org.junit.jupiter.api.Assertions.assertNotNull(ts.toString());
+    }
+
+    @Test
+    @DisplayName("DualSparkline equals, hashCode, and toString branches")
+    void dualSparklineBranches() {
+        double[] sA = new double[]{10.0, 20.0};
+        double[] sB = new double[]{100.0, 200.0};
+        io.github.dailystruggle.mapsapi.model.DualSparkline ds1 =
+                new io.github.dailystruggle.mapsapi.model.DualSparkline("A", sA, 0.0, 50.0, "B", sB, 0.0, 500.0);
+        io.github.dailystruggle.mapsapi.model.DualSparkline same =
+                new io.github.dailystruggle.mapsapi.model.DualSparkline("A", sA, 0.0, 50.0, "B", sB, 0.0, 500.0);
+        io.github.dailystruggle.mapsapi.model.DualSparkline diffA =
+                new io.github.dailystruggle.mapsapi.model.DualSparkline("DiffA", sA, 0.0, 50.0, "B", sB, 0.0, 500.0);
+        io.github.dailystruggle.mapsapi.model.DualSparkline diffB =
+                new io.github.dailystruggle.mapsapi.model.DualSparkline("A", sA, 0.0, 50.0, "DiffB", sB, 0.0, 500.0);
+
+        assertTrue(ds1.equals(ds1));
+        assertEquals(ds1, same);
+        org.junit.jupiter.api.Assertions.assertNotEquals(ds1, diffA);
+        org.junit.jupiter.api.Assertions.assertNotEquals(ds1, diffB);
+        assertFalse(ds1.equals(null));
+        assertFalse(ds1.equals("str"));
+        assertEquals(ds1.hashCode(), same.hashCode());
+        org.junit.jupiter.api.Assertions.assertNotNull(ds1.toString());
+        assertEquals(2, ds1.sampleCount());
+    }
+
+    @Test
     @DisplayName("Every Stage-1 record is final (sealed-permits hygiene)")
     void everyRecordIsFinal() {
         for (Class<?> sub : ChartModel.class.getPermittedSubclasses()) {

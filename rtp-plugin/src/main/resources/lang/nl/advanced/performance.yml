@@ -99,6 +99,14 @@ controleer_bijChunkLaden: true
 # @default: 0.5
 backlogBijvulDrempel: 0.5
 
+# Strategie voor kandidaatgeneratie in de backlog.
+# FLAT_STRIDE = Gebruikt dezelfde 1D-Hilbert dyadische-stride Feistel-permutatie als live/ongecachete selectie.
+# BINNED_AMORTIZED = Gebruikt regiobestand-gebaseerde PRP met geamortiseerde batchquota en interne dyadische stride.
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+backlogGeneratieStrategie: "FLAT_STRIDE"
+
 # Kans om per poging een niet-gegenereerde chunk te weigeren.
 # 0.0 = geen bias, 1.0 = niet-gegenereerd land mijden. Gegenereerde chunks slagen altijd.
 # @type: number

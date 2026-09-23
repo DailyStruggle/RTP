@@ -32,6 +32,18 @@
 # mode but kept for compatibility with admin-form entries.
 dispatch-as-player: true
 
+# Multi-target safety. When more than one entry is configured under
+# `target-commands`, TIMED mode (`/rtpstress start`) round-robins EVERY arm
+# across the shared roster within a single phase. Because all arms teleport
+# the same players, each arm's `/rtp` cancels the previous arm's in-flight
+# teleport, and the completion of one teleport is attributed to whichever arm
+# dispatched last - contaminated latency and served-mode rows. For a clean
+# head-to-head use `/rtpstress sequence`, which pins ONE target per phase with
+# a recovery gap so the arms never contend. `start` is therefore refused with
+# multiple targets unless you deliberately want an interleaved stress test;
+# set this to true to allow it.
+allow-timed-multi-target: false
+
 # Curated default set (2026-06): the three RTP plugins worth comparing
 # against on modern (1.21+ / 26.x) servers are HuskHomes, BetterRTP, and
 # EzRTP — all actively maintained and independent engines. The entries below
@@ -231,6 +243,49 @@ default-concurrency: 4
 # pressure and you've already verified the server can absorb it.
 per-player-gap-ticks: 30
 
+# Sub-tick override for the per-player gap, in milliseconds. When set to 0 or
+# more this REPLACES per-player-gap-ticks entirely. A tick-granular floor is
+# useless once the plugin under test answers in single-digit ms: the choice
+# becomes 0 ms (fully unthrottled) or 50 ms, with nothing in between. Use this
+# to walk offered load up gradually - e.g. 20, 10, 5 - and find the actual
+# saturation knee. Range 0 .. 5000. -1 (default) means "use the tick form".
+per-player-gap-ms: -1
+
+# Fill a freed concurrency slot the instant an attempt is attributed, instead
+# of waiting for the next run-loop firing (`runner-tick-ms`, default 20 ms).
+# Completion callbacks arrive on a tick/region thread, so the dispatch pass is
+# handed to the async scheduler rather than run inline; passes stay strictly
+# non-overlapping. Turn this off to restore pure timer pacing, e.g. when you
+# want the offered rate itself held constant across arms.
+immediate-redispatch: true
+
+# Dispatch start pacing (milliseconds). Minimum interval between starting
+# points across all players. When 0 (default), attempts fire as fast as
+# concurrency-cap slots open up (maximum throughput). When set to a positive
+# value (e.g. 250 for 4 TP/s or 500 for 2 TP/s), dispatch is paced evenly
+# to maintain a fixed rate of demand across time, ensuring reliable and
+# directly comparable memory, GC, and chunk load metrics.
+dispatch-interval-ms: 0
+
+# Folia-only attribution tuning. Ignored on Spigot/Paper.
+folia:
+  # Attribute a completion by watching the player from a task pinned to the
+  # region that owns them, one tick apart, for the lifetime of the attempt.
+  # Folia does not reliably deliver PlayerTeleportEvent for teleportAsync
+  # (HuskHomes #824, Folia #330), so attribution falls back to comparing the
+  # player's position against the dispatch origin. Driving that comparison
+  # from the async run loop costs one run-loop period PLUS one queued
+  # entity-scheduler hop before the moved player is even looked at - about
+  # 50-100 ms of harness latency charged to a teleport the plugin already
+  # finished, with the concurrency slot held the whole time. The pinned
+  # watcher already holds region context and sees the new position on the
+  # first tick after the teleport. Set false to use the run-loop poll alone.
+  pinned-position-watch: true
+
+  # Planar XZ distance, in blocks, beyond which a watched player is judged to
+  # have been teleported by the command under test rather than to have walked.
+  poll-distance-threshold: 16.0
+
 # No-progress watchdog. If the runner observes no forward progress (no
 # successful dispatch, no completion attribution) for this many ms during
 # a measurement phase — not warm-up, not a sequence gap — it force-clears
@@ -252,6 +307,20 @@ log-failed-teleports: true
 # Burst size for /rtpstress burst — populates the "TPS under 10× burst"
 # column on the front page. The 10× nomenclature is preserved here.
 default-burst: 10
+
+# Fixed per-target dispatched-attempt cap for SEQUENCE mode. 0 (default) leaves
+# each phase governed purely by `sequence.per-target-seconds` (a time window,
+# so a fast arm and a slow arm end a phase with DIFFERENT teleport counts).
+# Set this to a positive count - a power of two such as 4096 is convenient for
+# placement/downsampling analysis - and every arm's phase ends the instant it
+# has been offered exactly that many attempts, then in-flight drains. This is
+# the setting to use when you want an IDENTICAL teleport count across all arms
+# for apples-to-apples placement, timing, and memory (chunk-load allocation)
+# comparison rather than an identical time budget. When set, the phase count
+# governs and `sequence.per-target-seconds` degrades to a SAFETY CEILING so a
+# stalled arm cannot run forever. Counts dispatched attempts (success, failure,
+# or timeout), so the offered load is identical even if success rates differ.
+per-target-count: 0
 
 # Sequence mode (/rtpstress sequence) runs each target-commands entry in turn,
 # isolated from the others, with a recovery gap between targets so the server
@@ -339,6 +408,17 @@ chunk-load-cost-us-folia: 0.0         # 0 = fall back to default
 # resulting peak-heap / p95-MSPT figures will be correspondingly coarser.
 sample-period-ms: 50
 
+# Folia only: cadence (ms) for reading Server#getRegionTPS for the region
+# each online player is standing in. Folia has no server-wide TPS; the `tps`
+# column there is a wall-clock timer on the GLOBAL region (weather, time,
+# console), which is never where a teleport lands, so it can read 20.0 while
+# every player region is saturated. This sampler feeds region_tps_5s_at_dispatch
+# (per attempt) and the region_tps_* phase columns (min / mean over player-
+# region samples, and the fraction at or under a fixed 19.0 TPS). The Folia
+# 5 s window only moves every few ticks, so 250ms is plenty; values below 50
+# are clamped. Ignored on Spigot/Paper, where `tps` already covers the server.
+region-tps-sample-period-ms: 250
+
 # Polling cadence (ms) for the runner's async dispatch loop. Lower values allow
 # the harness to instantly re-dispatch a ready player the moment their prior attempt
 # completes. 50ms (20 Hz / 1 server tick) or sub-tick cadences like 20ms / 10ms
@@ -393,11 +473,64 @@ ticket-footprint-probe:
   # probe chunk. Must sit well outside the radius the run teleports within.
   origin-distance-blocks: 20000
 
-  # Ticks awaited after applying the ticket before the load count is read,
-  # and again after releasing it before the unload count is read. Raise on a
-  # slow disk if ticket_footprint_chunks looks truncated; a value that is too
-  # low under-reports the footprint. Values below 5 are clamped.
+  # Ticks awaited AFTER the ticketed chunk reports loaded before the load
+  # count is read, and again after releasing it before the unload count is
+  # read. The probe first waits (up to 400 ticks) for the chunk itself to
+  # become resident - on a cold start it may need generation, and on Folia a
+  # fresh region thread - and reports NOT MEASURED rather than a zero
+  # footprint if it never does. Raise this on a slow disk if
+  # ticket_footprint_chunks looks truncated; a value that is too low
+  # under-reports the footprint. Values below 5 are clamped.
+  #
+  # If the enable-time probe raced server start-up (typical on Folia), it is
+  # retried automatically at the next /rtpstress start, or on demand with
+  # /rtpstress probe-footprint while no run is active.
   settle-ticks: 40
+
+# Per-plugin allocation profiling via Flight Recorder.
+#
+# The heap series and the GC columns answer "how much did the JVM churn" and
+# "how often did GC run", but on a shared server JVM neither can say WHICH
+# plugin's allocation forced those collections - and a GC pause is a global
+# stop-the-world event that interrupts every plugin equally, no matter who
+# produced the garbage. So the only honest per-plugin quantity is allocation
+# itself, and jdk.ObjectAllocationSample supplies it: a throttled, low-overhead
+# JFR event whose overhead is equal across every arm, so it does not bias the
+# head-to-head.
+#
+# One recording is opened per measurement phase and parsed at the phase
+# boundary (never mid-phase). Each sample's estimated bytes are charged to the
+# first stack frame owned by a known plugin package. Results go to the phase
+# columns jfr_alloc_scope, jfr_alloc_samples, jfr_alloc_sampled_bytes_total,
+# jfr_alloc_target_package, jfr_alloc_target_bytes,
+# jfr_alloc_target_bytes_per_attempt (target = the arm measured this phase),
+# and the full per-package breakdown to a <stamp>-jfr-alloc.csv sidecar so an
+# unmapped plugin's package still surfaces for discovery.
+#
+# Byte figures are the sum of sample WEIGHTS - an estimate of allocated bytes,
+# not an exact total; treat them as cross-arm ratios, not absolutes. Degrades
+# closed: if Flight Recorder is unavailable (disabled at the JVM, an old
+# runtime, or a locked commercial build) every jfr_alloc_* column stays -1.
+jfr-allocation:
+  enabled: true
+
+  # Allocation-sample throttle passed to jdk.ObjectAllocationSample. Higher =
+  # more samples = finer attribution but more overhead. "300/s" is a good
+  # default for a benchmark; raise for short phases, lower on a busy box.
+  throttle: "300/s"
+
+  # Cap on each phase recording's on-disk buffer. A 600 s phase at 300/s is
+  # comfortably under this; raise only if a long phase truncates.
+  max-size-mb: 256
+
+  # label: package.prefix entries MERGED over the built-in defaults
+  # (rtp, ezrtp, betterrtp, huskhomes). Supply packages the defaults do not
+  # know - notably justrtp, whose package was not verifiable from the shipped
+  # jar - or correct a prefix for a repackaged plugin. The label should match
+  # the target's phase label so jfr_alloc_target_bytes resolves for that arm.
+  tracked-packages: {}
+  # tracked-packages:
+  #   justrtp: "me.kotorinet.justrtp"
 
 # Plugin name whose chunk tickets are broken out into
 # peak_target_plugin_tickets. Empty = infer it from `target-commands` when

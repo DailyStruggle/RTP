@@ -340,4 +340,46 @@ class BacklogLocationBufferTest {
     assertEquals(0, cleaned);
     assertEquals(2, b.size());
   }
+
+  @Test
+  @DisplayName("pollRandomValidated nulls slots in place and offerUnverified recycles them")
+  void pollRandomValidatedRecyclesNulledSlots() {
+    BacklogLocationBuffer b = new BacklogLocationBuffer(4);
+    BacklogEntry e0 = b.offerUnverified(loc(0));
+    BacklogEntry e1 = b.offerUnverified(loc(1));
+    BacklogEntry e2 = b.offerUnverified(loc(2));
+    BacklogEntry e3 = b.offerUnverified(loc(3));
+
+    e0.setValidity(Validity.VALIDATED);
+    e1.setValidity(Validity.VALIDATED);
+    e2.setValidity(Validity.UNVERIFIED);
+    e3.setValidity(Validity.VALIDATED);
+
+    assertEquals(4, b.size());
+    assertEquals(3, b.validatedSize());
+
+    // Pull 2 random validated entries
+    List<BacklogEntry> pulled = b.pollRandomValidated(2);
+    assertEquals(2, pulled.size());
+    for (BacklogEntry entry : pulled) {
+      assertEquals(Validity.VALIDATED, entry.validity());
+    }
+
+    // Buffer active count should decrease to 2
+    assertEquals(2, b.size());
+    assertEquals(1, b.validatedSize());
+
+    // Offering a new candidate should recycle one of the 2 nulled slots without exceeding capacity
+    BacklogEntry eNew = b.offerUnverified(loc(99));
+    assertNotNull(eNew);
+    assertEquals(3, b.size());
+
+    // Can insert another to fill the second recycled slot
+    BacklogEntry eNew2 = b.offerUnverified(loc(100));
+    assertNotNull(eNew2);
+    assertEquals(4, b.size());
+
+    // Buffer is now at capacity again
+    assertNull(b.offerUnverified(loc(101)));
+  }
 }

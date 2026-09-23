@@ -88,6 +88,45 @@ public final class Sched {
         Bukkit.getScheduler().runTask(plugin, r);
     }
 
+    /**
+     * Repeating task pinned to the thread that owns {@code player}, at a
+     * period in <em>ticks</em>. {@code body} returns {@code false} to cancel
+     * the repetition.
+     *
+     * <p>Why a pinned repeater rather than a fresh {@link #runOnPlayer} hop
+     * per poll: on Folia each hop is queued onto the owning region and only
+     * runs at that region's next tick, so a poll issued from the async run
+     * loop observes the player one hop late. A repeater already owns the
+     * region context, so it sees the post-teleport position on the very tick
+     * it lands - which is what the attribution timestamp measures.
+     */
+    public static void runOnPlayerTimer(Plugin plugin, Player player,
+                                        java.util.function.BooleanSupplier body,
+                                        long periodTicks) {
+        long period = Math.max(1L, periodTicks);
+        if (isFolia()) {
+            try {
+                Object entSched = player.getClass().getMethod("getScheduler").invoke(player);
+                Method m = entSched.getClass().getMethod(
+                        "runAtFixedRate", Plugin.class, java.util.function.Consumer.class,
+                        Runnable.class, long.class, long.class);
+                m.invoke(entSched, plugin,
+                        (java.util.function.Consumer<Object>) task -> {
+                            if (!body.getAsBoolean()) cancel(task);
+                        },
+                        (Runnable) () -> { /* retired: player offline */ },
+                        period, period);
+                return;
+            } catch (ReflectiveOperationException ignored) {
+                // fall through
+            }
+        }
+        org.bukkit.scheduler.BukkitTask[] handle = new org.bukkit.scheduler.BukkitTask[1];
+        handle[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (!body.getAsBoolean() && handle[0] != null) handle[0].cancel();
+        }, period, period);
+    }
+
     /** Run on the global region (Folia) or main thread (Spigot/Paper). */
     public static void runGlobal(Plugin plugin, Runnable r) {
         if (isFolia()) {

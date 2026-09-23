@@ -41,8 +41,14 @@ import java.util.logging.Level;
  *       then measures) that reports {@code isChunkLoaded() == false}. Up to
  *       {@link #MAX_CANDIDATES} candidates are tried before giving up.</li>
  *   <li>Apply exactly one {@code addPluginChunkTicket} on the thread owning
- *       that chunk, and count {@link ChunkLoadEvent}s within
- *       {@link #COUNT_RADIUS} chunks of it for {@link #settleTicks} ticks.</li>
+ *       that chunk. Wait until the ticketed chunk itself reports loaded -
+ *       a far-from-origin chunk on a cold start may need generation, and on
+ *       Folia a brand-new region thread as well, which can take seconds -
+ *       then count {@link ChunkLoadEvent}s within {@link #COUNT_RADIUS}
+ *       chunks of it for {@link #settleTicks} more ticks. If the chunk has
+ *       not loaded within {@link #MAX_LOAD_WAIT_TICKS} the probe reports NOT
+ *       MEASURED rather than a footprint of zero: a window that closed before
+ *       the load arrived is a timing miss, not a measurement.</li>
  *   <li>Release the ticket and count {@link ChunkUnloadEvent}s over a second
  *       settle window, so retention is shown to be symmetric rather than
  *       assumed to be.</li>
@@ -129,6 +135,29 @@ public final class TicketFootprintProbe implements Listener {
      *  overlap the one finally probed. */
     private static final int CANDIDATE_STRIDE = 32;
 
+    /** Upper bound on the wait for the ticketed chunk to load before the
+     *  probe gives up (20 s). Generous so generation on a cold region is
+     *  covered; bounded so a stuck chunk system cannot hold the probe open. */
+    static final long MAX_LOAD_WAIT_TICKS = 400L;
+
+    /** Poll period, in ticks, for the ticketed chunk's loaded state. */
+    private static final long LOAD_POLL_TICKS = 5L;
+
+    /** Above this many heap bytes per counted chunk the window's growth
+     *  cannot have come from the counted chunks (a fully populated chunk
+     *  with entities is low single-digit MiB), so the heap figures are
+     *  labelled unattributable instead of being divided out per chunk. */
+    static final long MAX_PLAUSIBLE_BYTES_PER_CHUNK = 16L * 1024L * 1024L;
+
+    /** Heap label when the window's growth exceeds what the counted chunks
+     *  can explain: something else allocated concurrently (a plugin warming
+     *  its caches off-tick, for example), and no heap figure from the probe
+     *  is attributable to the ticket. */
+    public static final String HEAP_LABEL_UNATTRIBUTABLE = "UNATTRIBUTABLE_CONCURRENT_ALLOCATION";
+
+    /** Automatic reruns permitted after a NOT MEASURED result. */
+    private static final int MAX_RERUNS = 2;
+
     private final Plugin plugin;
     /** Blocks from origin at which to look for an unloaded probe chunk. */
     private final int originDistanceBlocks;
@@ -167,6 +196,9 @@ public final class TicketFootprintProbe implements Listener {
     private volatile String failureReason = "";
 
     private volatile boolean registered = false;
+    /** True while a probe sequence is in flight, so a rerun cannot overlap. */
+    private volatile boolean probing = false;
+    private volatile int reruns = 0;
     /** Window-local samples, written and read only on tick/region threads in
      *  probe order, then published into the volatile fields above. */
     private long heapBeforeBytes = NO_DATA;
@@ -200,7 +232,29 @@ public final class TicketFootprintProbe implements Listener {
     // Probe sequence
     // -----------------------------------------------------------------
 
+    /**
+     * True when the start-up probe produced no measurement and a rerun is
+     * still permitted. {@code beginRun} uses this to retry once the server
+     * has settled, since the enable-time attempt races start-up traffic.
+     */
+    public boolean needsRerun() {
+        return registered && !everProbed && !probing && reruns < MAX_RERUNS;
+    }
+
+    /** Re-executes the probe from scratch. No-op while one is in flight. */
+    public void rerun() {
+        if (!registered || probing) return;
+        reruns++;
+        plugin.getLogger().info("[StressTestRTP] TicketFootprintProbe: rerun " + reruns
+                + " of " + MAX_RERUNS + " (previous result: "
+                + (failureReason.isEmpty() ? "none" : failureReason) + ").");
+        Sched.runGlobal(plugin, this::beginProbe);
+    }
+
     private void beginProbe() {
+        if (probing) return;
+        probing = true;
+        failureReason = "";
         World world;
         try {
             if (plugin.getServer().getWorlds().isEmpty()) {
@@ -249,7 +303,46 @@ public final class TicketFootprintProbe implements Listener {
                 fail("ticket apply failed: " + t.getClass().getSimpleName());
                 return;
             }
-            Sched.runGlobalLater(plugin, () -> closeLoadWindow(world, cx, cz), settleTicks);
+            // The settle window starts when the ticketed chunk is actually
+            // resident, not when the ticket was applied: generation on a
+            // cold region can outlast any fixed settle period, and a window
+            // that closes first reads as a zero footprint.
+            Sched.runGlobalLater(plugin, () -> awaitCenterLoad(world, cx, cz, 0L), LOAD_POLL_TICKS);
+        });
+    }
+
+    /**
+     * Polls the ticketed chunk's loaded state on its owning region every
+     * {@link #LOAD_POLL_TICKS} until it is resident, then opens the settle
+     * window; gives up after {@link #MAX_LOAD_WAIT_TICKS} and releases the
+     * ticket so a failed probe does not pin a chunk for the session.
+     */
+    private void awaitCenterLoad(World world, int cx, int cz, long waitedTicks) {
+        Sched.runOnRegion(plugin, world, cx, cz, () -> {
+            boolean loaded;
+            try {
+                loaded = world.isChunkLoaded(cx, cz) || windowLoads.get() > 0L;
+            } catch (Throwable t) {
+                loaded = windowLoads.get() > 0L;
+            }
+            if (loaded) {
+                Sched.runGlobalLater(plugin, () -> closeLoadWindow(world, cx, cz), settleTicks);
+                return;
+            }
+            long waited = waitedTicks + LOAD_POLL_TICKS;
+            if (waited >= MAX_LOAD_WAIT_TICKS) {
+                windowPhase = 0;
+                try {
+                    world.removePluginChunkTicket(cx, cz, plugin);
+                } catch (Throwable ignored) {
+                    // best effort: the failure below is the finding
+                }
+                fail("ticketed chunk at " + cx + "," + cz + " did not load within "
+                        + MAX_LOAD_WAIT_TICKS + " ticks (" + windowNoise.get()
+                        + " loads elsewhere); a zero footprint would be a timing miss");
+                return;
+            }
+            Sched.runGlobalLater(plugin, () -> awaitCenterLoad(world, cx, cz, waited), LOAD_POLL_TICKS);
         });
     }
 
@@ -271,6 +364,22 @@ public final class TicketFootprintProbe implements Listener {
     private void closeLoadWindow(World world, int cx, int cz) {
         long loads = windowLoads.get();
         long noise = windowNoise.get();
+        if (loads == 0L) {
+            // The chunk reported loaded but no ChunkLoadEvent reached the
+            // window: the platform loaded it without an event, or it was
+            // already resident. Either way there is nothing to divide by.
+            windowPhase = 0;
+            Sched.runOnRegion(plugin, world, cx, cz, () -> {
+                try {
+                    world.removePluginChunkTicket(cx, cz, plugin);
+                } catch (Throwable ignored) {
+                    // best effort
+                }
+            });
+            fail("chunk at " + cx + "," + cz + " reported loaded but no ChunkLoadEvent was"
+                    + " counted in the window; footprint cannot be measured from events here");
+            return;
+        }
         Runtime rt = Runtime.getRuntime();
         long heapAfter = rt.totalMemory() - rt.freeMemory();
         long heapDelta = (heapBeforeBytes >= 0 && heapAfter >= heapBeforeBytes)
@@ -331,6 +440,7 @@ public final class TicketFootprintProbe implements Listener {
 
         windowPhase = 0;
         everProbed = true;
+        probing = false;
         writeReport();
         plugin.getLogger().info(String.format(Locale.ROOT,
                 "[StressTestRTP] TicketFootprintProbe: one plugin chunk ticket at %s made "
@@ -340,7 +450,26 @@ public final class TicketFootprintProbe implements Listener {
                         + "[%s / %s].",
                 probeCenter, chunksPerTicket, shape, chunksReleased, noiseLoads,
                 heapDeltaBytes, heapRetainedAfterUnloadBytes, heapReclaimedBytes,
-                committedDeltaBytes, windowCollections, reclaimLabel, HEAP_LABEL));
+                committedDeltaBytes, windowCollections, reclaimLabel, heapLabel()));
+    }
+
+    /**
+     * Names what the heap delta is. {@link #HEAP_LABEL} when the growth is
+     * within what the counted chunks could have allocated;
+     * {@link #HEAP_LABEL_UNATTRIBUTABLE} when it is not, because then the
+     * window overlapped someone else's allocation and dividing it per chunk
+     * would publish that allocation as a chunk cost.
+     */
+    public String heapLabel() {
+        return heapAttributable(chunksPerTicket, heapDeltaBytes)
+                ? HEAP_LABEL : HEAP_LABEL_UNATTRIBUTABLE;
+    }
+
+    /** Pure form of {@link #heapLabel()}'s test, for unit coverage. */
+    static boolean heapAttributable(long chunks, long heapDeltaBytes) {
+        if (heapDeltaBytes <= 0L) return true;
+        if (chunks <= 0L) return false;
+        return heapDeltaBytes / chunks <= MAX_PLAUSIBLE_BYTES_PER_CHUNK;
     }
 
     /**
@@ -379,6 +508,7 @@ public final class TicketFootprintProbe implements Listener {
         failureReason = reason;
         everProbed = false;
         windowPhase = 0;
+        probing = false;
         plugin.getLogger().warning("[StressTestRTP] TicketFootprintProbe: not measured (" + reason
                 + "); ticket-footprint columns stay -1.");
         writeReport();
@@ -498,6 +628,7 @@ public final class TicketFootprintProbe implements Listener {
         sb.append("platform: ").append(Sched.isFolia() ? "folia" : "bukkit-family")
                 .append(System.lineSeparator());
         sb.append("server: ").append(plugin.getServer().getVersion()).append(System.lineSeparator());
+        sb.append("reruns: ").append(reruns).append(System.lineSeparator());
         if (!everProbed) {
             sb.append("result: NOT MEASURED (").append(failureReason).append(')')
                     .append(System.lineSeparator());
@@ -524,7 +655,7 @@ public final class TicketFootprintProbe implements Listener {
             sb.append("heap_used_after_unload_bytes: ").append(heapUsedAfterUnloadBytes)
                     .append(System.lineSeparator());
             sb.append("heap_delta_bytes: ").append(heapDeltaBytes)
-                    .append("  label=").append(HEAP_LABEL).append(System.lineSeparator());
+                    .append("  label=").append(heapLabel()).append(System.lineSeparator());
             sb.append("bytes_per_chunk: ").append(bytesPerChunk)
                     .append(System.lineSeparator());
             sb.append("heap_retained_after_unload_bytes: ").append(heapRetainedAfterUnloadBytes)

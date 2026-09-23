@@ -467,5 +467,26 @@ class AbstractSQLDatabaseAccessorComprehensiveTest {
         assertEquals(12345L, td.time);
         assertEquals(10.5, td.cost);
         assertEquals(1, td.selectedCoords.x());
+
+        // Test cacheValue(tableName, map) branches
+        Map<String, Object> mapData = new HashMap<>();
+        mapData.put("senderId", testSender.toString());
+        mapData.put("time", 5555L);
+        mapData.put("delay", 10L);
+        mapData.put("cost", 2.5);
+        mapData.put("attempts", 3L);
+        mapData.put("selectedX", 100);
+        mapData.put("selectedY", 64);
+        mapData.put("selectedZ", 200);
+        mapData.put("selectedWorldName", "world");
+        mapData.put("originalX", 0);
+        mapData.put("originalY", 70);
+        mapData.put("originalZ", 0);
+        mapData.put("originalWorldName", "world");
+        realAccessor.cacheValue("rtp_teleport_data", mapData);
+        assertEquals(1, realAccessor.writeQueue.size());
+
+        // Test cacheValue with other table falling back to super
+        realAccessor.cacheValue("other_table", Map.of("key", "val"));
     }
 }

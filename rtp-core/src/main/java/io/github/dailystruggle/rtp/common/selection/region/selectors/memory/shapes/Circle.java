@@ -70,7 +70,7 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
    * @throws IllegalArgumentException if default parameters are invalid
    */
   public Circle() throws IllegalArgumentException {
-    super(GenericMemoryShapeParams.class, "CIRCLE", defaults);
+    super(GenericMemoryShapeParams.class, "CIRCLE_DEPRECATED_PURE_SPIRAL", defaults);
   }
 
   /**

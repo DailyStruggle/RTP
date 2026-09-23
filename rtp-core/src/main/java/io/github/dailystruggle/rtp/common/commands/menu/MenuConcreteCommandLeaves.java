@@ -97,25 +97,7 @@ final class MenuConcreteCommandLeaves {
         }
 
         private static String[] parsePath(@Nullable Map<String, List<String>> parameterValues) {
-            if (parameterValues == null) return new String[0];
-            List<String> raw = parameterValues.get(PARAM_PATH);
-            if (raw == null || raw.isEmpty()) return new String[0];
-            String value = raw.get(0);
-            if (value == null || value.isEmpty()) return new String[0];
-            // Wire grammar: dot-separated dotted path. Empty segments are
-            // dropped (a leading/trailing/double dot is treated as a typo
-            // by the user, not a structural assertion).
-            String[] parts = value.split("\\.");
-            int kept = 0;
-            for (String p : parts) {
-                if (p != null && !p.isEmpty()) kept++;
-            }
-            String[] out = new String[kept];
-            int i = 0;
-            for (String p : parts) {
-                if (p != null && !p.isEmpty()) out[i++] = p;
-            }
-            return out;
+            return MenuCommandUtils.splitDots(MenuCommandUtils.first(parameterValues, PARAM_PATH));
         }
     }
 

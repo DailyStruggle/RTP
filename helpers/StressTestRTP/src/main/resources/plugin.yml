@@ -18,6 +18,7 @@ commands:
       /rtpstress sequence [perSec] [gapSec] [concurrency] - run each target-commands entry in turn, with a recovery gap between targets
       /rtpstress reset-cold                     - clear caches between cold-start measurements (best-effort)
       /rtpstress export                         - flush CSV and write summary.txt
+      /rtpstress probe-footprint                - re-run the one-ticket chunk footprint probe (idle server only)
     permission: stresstestrtp.admin
     aliases: [rtps]
 

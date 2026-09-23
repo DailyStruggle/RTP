@@ -258,4 +258,16 @@ class ScanTaskTest {
         assertDoesNotThrow(task::run);
         assertFalse(task.isRunning());
     }
+
+    @Test
+    void scanTask_landPercentage_calculatesAccuratelyFromOutcomes() {
+        ScanTask task = new ScanTask(region, 0L);
+        task.scanIncrement.set(50L);
+        task.run();
+
+        // In MockRTPWorld default mock setup, evaluateScanProbe / chunk column returns safe land.
+        // latestLandPercentage must reflect actual tested outcomes and not be 0.00% when land is found.
+        assertTrue(task.latestLandPercentage > 0.0,
+                "Land percentage should be > 0.0% when valid land is found, got: " + task.latestLandPercentage);
+    }
 }

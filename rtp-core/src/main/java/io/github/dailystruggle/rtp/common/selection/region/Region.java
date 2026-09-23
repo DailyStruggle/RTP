@@ -965,11 +965,27 @@ public class Region extends FactoryValue<RegionKeys> {
       // Bounded rejection sampling: cap consecutive pregenPref rejections per pulse.
       final int maxConsecutivePregenRejects = Math.max(16, backlog.capacity());
       int consecutivePregenRejects = 0;
+      boolean binnedStrategy = "BINNED_AMORTIZED".equalsIgnoreCase(readBacklogGenerationStrategy());
+
       while (backlog.size() < backlog.capacity()
           && (System.nanoTime() - startNanos) < refillBudget) {
         int[] sel;
         try {
-          sel = currentShape.select();
+          if (binnedStrategy
+              && currentShape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.AbstractDualLayerShape ds) {
+            long cand = ds.selectL3Candidate();
+            if (cand < 0) {
+              sel = currentShape.select();
+            } else {
+              io.github.dailystruggle.rtp.api.world.MutableRTPCoords mc =
+                  new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(0, 0);
+              ds.locationToXZ(cand, mc);
+              sel = new int[] {mc.x, mc.z};
+            }
+          } else {
+            // Default FLAT_STRIDE: uses identical selection method as uncached/live selection
+            sel = currentShape.select();
+          }
         } catch (Throwable t) {
           break;
         }
@@ -981,8 +997,8 @@ public class Region extends FactoryValue<RegionKeys> {
           continue;
         }
         consecutivePregenRejects = 0;
-        int blockX = (sel[0] << 4) + 8;
-        int blockZ = (sel[1] << 4) + 8;
+        int blockX = (sel[0] << 4) + 7;
+        int blockZ = (sel[1] << 4) + 7;
         RTPCoords coords = new RTPCoords(worldName, blockX, verticalY, blockZ);
         RTPLocation loc = new RTPLocation(coords, 0L);
         BacklogLocationBuffer.BacklogEntry entry = backlog.offerUnverified(loc);
@@ -1047,12 +1063,16 @@ public class Region extends FactoryValue<RegionKeys> {
       backlog.cleanIfHeuristicMet();
     }
 
-    // Drain validated head into unkeptLocations up to cold capacity.
+    // Drain validated entries into unkeptLocations up to cold capacity.
+    // Under FLAT_STRIDE (default): drains contiguous validated head (FIFO), preserving linear dyadic progression.
+    // Under BINNED_AMORTIZED: drains randomly via slot-nulling to de-cluster candidates from the active bin.
     long coldCap = settings.cacheCap();
     long coldFree = Math.max(0L, coldCap - queueManager.unkeptLocations.size());
     if (coldFree > 0L) {
-      List<BacklogLocationBuffer.BacklogEntry> drained =
-          backlog.pollContiguousValidatedHead((int) Math.min(coldFree, Integer.MAX_VALUE));
+      boolean binnedStrategy = "BINNED_AMORTIZED".equalsIgnoreCase(readBacklogGenerationStrategy());
+      List<BacklogLocationBuffer.BacklogEntry> drained = binnedStrategy
+          ? backlog.pollRandomValidated((int) Math.min(coldFree, Integer.MAX_VALUE))
+          : backlog.pollContiguousValidatedHead((int) Math.min(coldFree, Integer.MAX_VALUE));
       for (BacklogLocationBuffer.BacklogEntry e : drained) {
         if (!queueManager.unkeptLocations.offer(e.location())) {
           break;
@@ -1082,6 +1102,22 @@ public class Region extends FactoryValue<RegionKeys> {
       return v;
     } catch (Throwable t) {
       return 0.5d;
+    }
+  }
+
+  private String readBacklogGenerationStrategy() {
+    try {
+      @SuppressWarnings("unchecked")
+      io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
+          (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+      if (perf == null) return "FLAT_STRIDE";
+      Object o = perf.getConfigValue(
+          io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.backlogGenerationStrategy,
+          "FLAT_STRIDE");
+      return (o != null) ? o.toString() : "FLAT_STRIDE";
+    } catch (Throwable t) {
+      return "FLAT_STRIDE";
     }
   }
 

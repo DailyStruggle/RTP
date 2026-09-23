@@ -99,6 +99,14 @@ maxHeapパーセント: 85.0
 # @default: 0.5
 バックログ補充しきい値: 0.5
 
+# バックログの候補生成戦略。
+# FLAT_STRIDE = ライブ/未キャッシュ選択と同じ1Dヒルベルト二進ストライドFeistel置換を使用します。
+# BINNED_AMORTIZED = 償却バッチクォータとビン内二進ストライドを持つリージョンファイル分類PRPを使用します。
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+バックログ生成戦略: "FLAT_STRIDE"
+
 # 試行ごとに未生成チャンクを拒否する確率。
 # 0.0=偏りなし、1.0=未生成の土地を回避。生成済みチャンクは常に通過します。
 # @type: number

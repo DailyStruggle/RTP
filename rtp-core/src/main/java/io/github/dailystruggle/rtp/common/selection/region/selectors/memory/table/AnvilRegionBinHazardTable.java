@@ -157,24 +157,7 @@ public final class AnvilRegionBinHazardTable {
         runs.add(new int[]{curStart, curLen});
       }
 
-      if (minGap > 0L && runs.size() > 1) {
-        List<int[]> merged = new ArrayList<>();
-        int[] cur = runs.get(0);
-        for (int i = 1; i < runs.size(); i++) {
-          int[] next = runs.get(i);
-          long driver = Math.min(cur[1], next[1]);
-          long admissible = Math.max(minGap, Math.min(maxGap, driver));
-
-          if (next[0] <= cur[0] + cur[1] + (int) admissible) {
-            cur[1] = Math.max(cur[1], next[0] + next[1] - cur[0]);
-          } else {
-            merged.add(cur);
-            cur = next;
-          }
-        }
-        merged.add(cur);
-        runs = merged;
-      }
+      runs = HazardTableUtils.mergeRunsWithGap(runs, minGap, maxGap);
 
       // If runs <= 32, RLE takes <= 128 bytes (smaller than bitmask!)
       if (runs.size() <= RLE_BREAKEVEN_RUNS) {
@@ -195,21 +178,7 @@ public final class AnvilRegionBinHazardTable {
 
     @Override
     public int resolveLocalAccumulate(int localRank) {
-      int remaining = localRank;
-      for (int w = 0; w < LONGS_PER_BIN; w++) {
-        long word = words[w];
-        int safeInWord = 64 - Long.bitCount(word);
-        if (remaining < safeInWord) {
-          for (int bit = 0; bit < 64; bit++) {
-            if ((word & (1L << bit)) == 0L) {
-              if (remaining == 0) return (w << 6) | bit;
-              remaining--;
-            }
-          }
-        }
-        remaining -= safeInWord;
-      }
-      return -1;
+      return HazardTableUtils.resolveBitmaskAccumulate(words, LONGS_PER_BIN, localRank);
     }
 
     @Override
@@ -245,18 +214,7 @@ public final class AnvilRegionBinHazardTable {
 
     @Override
     public boolean isBad(int localOffset) {
-      int low = 0, high = starts.length - 1;
-      while (low <= high) {
-        int mid = (low + high) >>> 1;
-        int mStart = starts[mid];
-        if (mStart <= localOffset) {
-          if (localOffset < mStart + lengths[mid]) return true;
-          low = mid + 1;
-        } else {
-          high = mid - 1;
-        }
-      }
-      return false;
+      return HazardTableUtils.isRunBad(starts, lengths, localOffset);
     }
 
     @Override
@@ -284,25 +242,11 @@ public final class AnvilRegionBinHazardTable {
     @Override
     public BinContainer compact(long minGap, long maxGap) {
       if (starts.length <= 1) return this;
-      List<int[]> merged = new ArrayList<>();
-      int curStart = starts[0];
-      int curLen = lengths[0];
-
-      for (int i = 1; i < starts.length; i++) {
-        int nStart = starts[i];
-        int nLen = lengths[i];
-        long driver = Math.min(curLen, nLen);
-        long admissible = Math.max(minGap, Math.min(maxGap, driver));
-
-        if (nStart <= curStart + curLen + (int) admissible) {
-          curLen = Math.max(curLen, nStart + nLen - curStart);
-        } else {
-          merged.add(new int[]{curStart, curLen});
-          curStart = nStart;
-          curLen = nLen;
-        }
+      List<int[]> runs = new ArrayList<>(starts.length);
+      for (int i = 0; i < starts.length; i++) {
+        runs.add(new int[]{starts[i], lengths[i]});
       }
-      merged.add(new int[]{curStart, curLen});
+      List<int[]> merged = HazardTableUtils.mergeRunsWithGap(runs, minGap, maxGap);
 
       char[] nStarts = new char[merged.size()];
       char[] nLens = new char[merged.size()];
@@ -318,23 +262,7 @@ public final class AnvilRegionBinHazardTable {
 
     @Override
     public int resolveLocalAccumulate(int localRank) {
-      int curSafeRank = 0;
-      int prevEnd = 0;
-      for (int i = 0; i < starts.length; i++) {
-        int gapLen = starts[i] - prevEnd;
-        if (gapLen > 0) {
-          if (localRank < curSafeRank + gapLen) {
-            return prevEnd + (localRank - curSafeRank);
-          }
-          curSafeRank += gapLen;
-        }
-        prevEnd = starts[i] + lengths[i];
-      }
-      int trailingGap = CHUNKS_PER_BIN - prevEnd;
-      if (trailingGap > 0 && localRank < curSafeRank + trailingGap) {
-        return prevEnd + (localRank - curSafeRank);
-      }
-      return -1;
+      return HazardTableUtils.resolveRunAccumulate(starts, lengths, CHUNKS_PER_BIN, localRank);
     }
 
     @Override
@@ -369,6 +297,13 @@ public final class AnvilRegionBinHazardTable {
 
   public long totalRange() {
     return totalRange;
+  }
+
+  public int binCapacity(int binIndex) {
+    if (binIndex < 0 || binIndex >= binCount) return 0;
+    return (binIndex == binCount - 1)
+        ? (int) (totalRange - (long) binIndex * CHUNKS_PER_BIN)
+        : CHUNKS_PER_BIN;
   }
 
   public int binCount() {

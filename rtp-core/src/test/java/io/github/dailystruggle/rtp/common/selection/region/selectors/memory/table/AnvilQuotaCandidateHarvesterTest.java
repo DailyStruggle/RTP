@@ -52,4 +52,65 @@ public class AnvilQuotaCandidateHarvesterTest {
     assertFalse(result.quotaMet());
     assertTrue(result.harvestedChunks().isEmpty());
   }
+
+  @Test
+  public void testGaussianStrideQuotaDistribution() {
+    int strideCapacity = 100;
+    long sum = 0;
+    int runs = 1000;
+    for (int i = 0; i < runs; i++) {
+      int quota = AnvilQuotaCandidateHarvester.sampleGaussianStrideQuota(strideCapacity);
+      assertTrue(quota >= 15, "Quota should be >= 15% (was " + quota + ")");
+      assertTrue(quota <= 50, "Quota should be <= 50% (was " + quota + ")");
+      sum += quota;
+    }
+    double mean = (double) sum / runs;
+    // Mean should be centered close to 33% (within [31, 35])
+    assertTrue(mean >= 31.0 && mean <= 35.0, "Gaussian mean should be near 33% (was " + mean + ")");
+  }
+
+  @Test
+  public void testJitteredOffsetsVaryAcrossBins() {
+    AnvilQuotaCandidateHarvester harvester = new AnvilQuotaCandidateHarvester(3, 16);
+    int offsetA = harvester.jitteredOffset(0, 0, 0);
+    int offsetB = harvester.jitteredOffset(0, 5, 10);
+    int offsetC = harvester.jitteredOffset(0, -3, 8);
+
+    assertTrue(offsetA >= 0 && offsetA < 1024);
+    assertTrue(offsetB >= 0 && offsetB < 1024);
+    assertTrue(offsetC >= 0 && offsetC < 1024);
+
+    // Offsets across 16 trials should cover a wide range
+    java.util.Set<Integer> distinctTrials = new java.util.HashSet<>();
+    for (int i = 0; i < 16; i++) {
+      distinctTrials.add(harvester.jitteredOffset(i, 2, 3));
+    }
+    assertTrue(distinctTrials.size() >= 8, "Dyadic jittered trials should produce well-dispersed offsets");
+  }
+
+  @Test
+  public void testSelectNFromMBinSet() {
+    AnvilQuotaCandidateHarvester harvester = new AnvilQuotaCandidateHarvester(3, 16);
+    java.util.List<int[]> validBins = java.util.List.of(
+        new int[]{0, 0},
+        new int[]{1, 0},
+        new int[]{0, 1},
+        new int[]{1, 1}
+    );
+
+    int n = 10;
+    java.util.List<int[]> selected = harvester.selectNFromMBinSet(validBins, n);
+    assertEquals(n, selected.size(), "Should select exactly N points");
+
+    for (int[] chunk : selected) {
+      int cx = chunk[0];
+      int cz = chunk[1];
+      int rx = cx >> 5;
+      int rz = cz >> 5;
+
+      // Assert each selected point falls inside one of the validBins
+      boolean inValidBin = validBins.stream().anyMatch(b -> b[0] == rx && b[1] == rz);
+      assertTrue(inValidBin, "Chunk (" + cx + "," + cz + ") with region (" + rx + "," + rz + ") must be within valid bins");
+    }
+  }
 }

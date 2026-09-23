@@ -64,6 +64,7 @@ public class FullPipelineSelectionVisualizerTest {
     int totalDiscardedBins = 0;
     int totalMixedBins = 0;
     int totalSolidLandBins = 0;
+    BitSet discardedCartesianBins = new BitSet(TOTAL_BINS);
 
     for (int bz = 0; bz < BINS_PER_SIDE; bz++) {
       for (int bx = 0; bx < BINS_PER_SIDE; bx++) {
@@ -81,7 +82,7 @@ public class FullPipelineSelectionVisualizerTest {
         }
 
         if (safeInBin == 0) {
-          binTable.discardBin(binIdx); // 100% ocean/void full bin
+          discardedCartesianBins.set(binIdx); // 100% ocean/void full region file
           totalDiscardedBins++;
         } else if (safeInBin == CHUNKS_PER_BIN) {
           totalSolidLandBins++;
@@ -90,25 +91,23 @@ public class FullPipelineSelectionVisualizerTest {
         }
       }
     }
-    binTable.recomputeGoodPrefixSums();
 
     System.out.printf("[DEBUG_LOG] Bins Summary: Total: %,d | Discarded Full: %,d (%.1f%%) | Solid Land: %,d | Mixed: %,d%n",
         TOTAL_BINS, totalDiscardedBins, 100.0 * totalDiscardedBins / TOTAL_BINS, totalSolidLandBins, totalMixedBins);
-    System.out.printf("[DEBUG_LOG] Usable Safe Ground in World: %,d chunks (%.1f%%)%n",
-        binTable.totalGood(), 100.0 * binTable.totalGood() / totalRange);
 
     // 4. Fill L3 Backlog Queue to full capacity (10,000 candidates)
-    // Calling the REAL production system: square.select() (which invokes shape.rand() + locationToXZ())
-    // Exactly as Region.java lines 968-986 does in the real L3 backlog warming pipeline!
-    System.out.println("[DEBUG_LOG] Populating L3 Backlog Buffer via real production shape.select() (10,000 locations)...");
+    // Calling the REAL production L3 pipeline: square.selectL3Candidate()
+    System.out.println("[DEBUG_LOG] Populating L3 Backlog Buffer via real production shape.selectL3Candidate() (10,000 locations)...");
     List<ChunkPoint> fullL3Candidates = new ArrayList<>(L3_CAPACITY);
     BitSet activeL3Bins = new BitSet(TOTAL_BINS);
+    MutableRTPCoords initCoords = new MutableRTPCoords(0, 0);
 
     while (fullL3Candidates.size() < L3_CAPACITY) {
-      int[] sel = square.select();
-      if (sel == null || sel.length < 2) continue;
-      int cx = sel[0];
-      int cz = sel[1];
+      long cand = square.selectL3Candidate();
+      if (cand < 0) continue;
+      square.locationToXZ(cand, initCoords);
+      int cx = initCoords.x;
+      int cz = initCoords.z;
 
       // Track the bin for diagnostic visualization
       int bx = (cx + R) / 32;
@@ -140,7 +139,7 @@ public class FullPipelineSelectionVisualizerTest {
 
     // 5. Draw Visual Chart 1: The Full L3 State Map
     File l3ChartFile = new File("../full_l3_state_chart.png");
-    drawFullL3Chart(outcomeMap, binTable, fullL3Candidates, activeL3Bins, totalDiscardedBins, l3ChartFile);
+    drawFullL3Chart(outcomeMap, discardedCartesianBins, fullL3Candidates, activeL3Bins, totalDiscardedBins, l3ChartFile);
     System.out.println("[DEBUG_LOG] Exported Full L3 State Chart to: " + l3ChartFile.getAbsolutePath());
 
     // 6. Simulate Selection Sequence: L3 -> L2 Promotion -> Final Teleports (1k, 10k, 100k)
@@ -206,7 +205,7 @@ public class FullPipelineSelectionVisualizerTest {
 
   private static void drawFullL3Chart(
       LosslessChunkOutcomeMap outcomeMap,
-      AnvilRegionBinHazardTable binTable,
+      BitSet discardedCartesianBins,
       List<ChunkPoint> l3Candidates,
       BitSet activeBins,
       int totalDiscardedBins,
@@ -268,13 +267,17 @@ public class FullPipelineSelectionVisualizerTest {
         int ry0 = mapY + (int) ((bz / 64.0) * mapDim);
         int rDim = Math.max(1, (int) (mapDim / 64.0));
 
-        if (binTable.isBinDiscarded(binIdx)) {
-          // Semi-transparent deep navy hash for discarded ocean files
-          g.setColor(new Color(0x0A, 0x18, 0x30, 0x90));
+        if (discardedCartesianBins.get(binIdx)) {
+          // High-contrast semi-transparent red/rust overlay with distinct hatched border for discarded bins
+          g.setColor(new Color(0xD7, 0x3A, 0x49, 0x70));
           g.fillRect(rx0, ry0, rDim, rDim);
+          g.setColor(new Color(0xE0, 0x56, 0x66, 0xD0));
+          g.drawRect(rx0, ry0, rDim - 1, rDim - 1);
+          // Diagonal hatch line across discarded bin
+          g.drawLine(rx0, ry0, rx0 + rDim - 1, ry0 + rDim - 1);
         } else if (activeBins.get(binIdx)) {
-          // Active L3 harvested bin border (Cyan/Purple outline)
-          g.setColor(new Color(0x9B, 0x51, 0xE0, 0xB0));
+          // Active L3 harvested bin border (Bright Cyan/Purple outline)
+          g.setColor(new Color(0x9B, 0x51, 0xE0, 0xD0));
           g.drawRect(rx0, ry0, rDim, rDim);
         }
       }
@@ -363,7 +366,7 @@ public class FullPipelineSelectionVisualizerTest {
     curY += 22;
     drawLegendItem(g, dashX + 20, curY, new Color(0xBB6BD9), "Warmed L3 Candidate Dot (Purple)");
     curY += 22;
-    drawLegendItem(g, dashX + 20, curY, new Color(0x0A, 0x18, 0x30), "Discarded Full Ocean Bin (No Seeks)");
+    drawLegendItem(g, dashX + 20, curY, new Color(0xD7, 0x3A, 0x49), "Discarded Full Ocean Bin (Red Hatched)");
 
     // Architecture Notes
     curY += 40;

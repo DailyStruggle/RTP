@@ -5,10 +5,8 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -45,39 +43,19 @@ final class MenuConcreteCommandLeavesB {
     // -- helpers -----------------------------------------------------------
 
     private static String first(@Nullable Map<String, List<String>> p, String key) {
-        if (p == null) return null;
-        List<String> v = p.get(key);
-        if (v == null || v.isEmpty()) return null;
-        return v.get(0);
+        return MenuCommandUtils.first(p, key);
     }
 
     private static String[] splitDots(@Nullable String dotted) {
-        if (dotted == null || dotted.isEmpty()) return new String[0];
-        String[] parts = dotted.split("\\.");
-        int kept = 0;
-        for (String s : parts) if (s != null && !s.isEmpty()) kept++;
-        String[] out = new String[kept];
-        int i = 0;
-        for (String s : parts) if (s != null && !s.isEmpty()) out[i++] = s;
-        return out;
+        return MenuCommandUtils.splitDots(dotted);
     }
 
     private static CommandParameter freeParam(String perm, String desc) {
-        return new CommandParameter(perm, desc, (uuid, value) -> true) {
-            @Override
-            public Set<String> values() { return Collections.emptySet(); }
-        };
+        return MenuCommandUtils.freeParam(perm, desc);
     }
 
     private static CommandParameter posIntParam(String perm, String desc) {
-        return new CommandParameter(perm, desc, (uuid, value) -> {
-            if (value == null) return false;
-            try { return Integer.parseInt(value) >= 1; }
-            catch (NumberFormatException ignored) { return false; }
-        }) {
-            @Override
-            public Set<String> values() { return Collections.emptySet(); }
-        };
+        return MenuCommandUtils.posIntParam(perm, desc);
     }
 
     // -- /rtp menu picker path=<dotted> param=<name> -----------------------

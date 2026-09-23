@@ -1,7 +1,40 @@
 # ADR-024 — RTP-lite Assembly Variant
 
-**Status:** Accepted (amended 2026-08-14 - lite inherits the Pro `config.yml`, `advanced/*` tuning files, and operator `docs/` for textual parity)
+**Status:** Accepted (amended 2026-09-20 - authoritative lite drop list; PlaceholderAPI and on-event teleports confirmed in lite)
 **Date:** 2026-04-30
+
+## 2026-09-20 amendment - authoritative lite drop list
+
+The "Drops, runtime" list in the original decision below has been amended piecemeal
+since 2026-05 and no longer describes the artifact. Stale copies of it (the lite
+`plugin.yml` header, the `RTPBukkitLitePlugin` javadoc, and the Pro marketplace
+listing) advertised PlaceholderAPI, `rtp.onevent.*` teleports, effect permission
+parsing, and a "visitor mode" as Pro-only. None of that is true: `OnEventTeleports`
+and `BukkitEffectsHandler.setupEffects` were already registered in the lite bootstrap,
+`PAPI_expansion` already shipped in the lite jar (it was merely never `.register()`ed),
+and no visitor-mode wiring exists in either bootstrap.
+
+**What the lite jar drops relative to Pro (source of truth: `shadowLiteJar` excludes in
+`rtp-plugin/build.gradle`):**
+
+- Shaded SQL / Redis drivers (H2, SQLite, MySQL, PostgreSQL, Jedis, HikariCP), the
+  concrete SQL database accessors and `Redis*` classes, and the SQL / Redis
+  `NetworkTransport` subtrees. Lite persists to `YamlFileDatabase` and uses the
+  plugin-message transport only.
+- The login reserve cache (`LoginCacheTask`, ADR-023).
+- The tuned Folia adapter (`platforms/rtp-folia`, `io/github/dailystruggle/rtp/folia/**`).
+  Lite runs on Folia through the basic regionized scheduler.
+- The `tags-api` module output (`io/github/dailystruggle/rtp/tags/**`; formerly named
+  `rtp-tags`). `safety.yml` tag tokens still resolve through the server registry.
+
+Everything else ships in both editions. As of this amendment the lite bootstrap also
+registers `PAPI_expansion` when PlaceholderAPI is present, identically to the full
+bootstrap, and the lite `plugin.yml` lists `PlaceholderAPI` as a softdepend.
+
+Bullets below that list on-event / effect permission parsing, visitor mode,
+`onEventParsing`, or `firstJoinTeleport` as lite drops are superseded by this amendment.
+
+---
 
 ## 2026-08-14 amendment - lite inherits the Pro config and operator docs (textual parity)
 
@@ -68,7 +101,7 @@ Concretely:
 - Because `safety.yml` is no longer a reduced lite baseline, `repackLiteLocales` no longer
   emits a lite-specific `lang/<loc>/safety.yml` locale tree; lite simply reads the base
   `safety.yml` (its values are material/biome tokens, not translated prose).
-- `tags/` and `tagsRefresh.yml` (the `rtp-tags` module) remain excluded from lite.
+- `tags/` and `tagsRefresh.yml` (the `tags-api` module, formerly `rtp-tags`) remain excluded from lite.
 
 Bullets below that describe `safety.yml` as a "flat material allow/deny list (no tag /
 state-predicate sections)", and that list ADR-017 as inactive in lite, are superseded by

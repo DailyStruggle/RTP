@@ -275,8 +275,16 @@ recorded:
    origin-centred teleport radius, so the probe never warms ground the
    run then measures) that reports `isChunkLoaded() == false`.
 2. Apply exactly one `addPluginChunkTicket` on the thread owning that
-   chunk, and count `ChunkLoadEvent`s within 7 chunks of it.
+   chunk, wait for that chunk to actually report loaded (up to 400
+   ticks - on a cold start it may need generation, and on Folia a fresh
+   region thread), then count `ChunkLoadEvent`s within 7 chunks of it
+   for the settle window. A chunk that never loads is reported as NOT
+   MEASURED, not as a zero footprint.
 3. Release the ticket and count the unloads.
+
+If the enable-time probe raced server start-up, it is retried
+automatically at the next `/rtpstress start`, or on demand with
+`/rtpstress probe-footprint` while no run is active.
 
 Used heap and committed heap are sampled at all three boundaries -
 before the ticket, after the load settles, after the release settles -
@@ -299,7 +307,7 @@ Results land in `ticket-footprint.txt` and in these phase columns:
 | `ticket_probe_noise_loads` | loads outside the attribution radius |
 | `ticket_footprint_heap_bytes` | used-heap delta across the window |
 | `ticket_footprint_bytes_per_chunk` | that delta per chunk |
-| `ticket_footprint_heap_label` | `UNCOLLECTED_ALLOCATION_INCLUSIVE` |
+| `ticket_footprint_heap_label` | `UNCOLLECTED_ALLOCATION_INCLUSIVE`, or `UNATTRIBUTABLE_CONCURRENT_ALLOCATION` when growth exceeds 16 MiB per counted chunk (someone else allocated in the window) |
 | `ticket_footprint_heap_used_before_bytes` | used heap before the ticket |
 | `ticket_footprint_heap_used_after_load_bytes` | used heap once the load settled |
 | `ticket_footprint_heap_used_after_unload_bytes` | used heap once the release settled |
@@ -353,6 +361,48 @@ a one-chunk footprint.
 Tunable under `ticket-footprint-probe` in `config.yml`
 (`enabled`, `origin-distance-blocks`, `settle-ticks`). Raise
 `settle-ticks` on a slow disk if the count looks truncated.
+
+---
+
+## Folia: what completed the row, and which TPS you are reading
+
+Two columns exist because Folia's numbers are otherwise easy to misread.
+
+**`attribution_source`** (per attempt) names the observation that set
+`teleport_epoch_ms`: `PLUGIN_EVENT`, `TELEPORT_EVENT`, `POSITION_POLL`,
+`CONSOLE`, or `TIMEOUT`. The external channels (`PlayerTeleportEvent`,
+the pinned position poll) fire on the *destination* region's tick after
+the async chunk load and the cross-region entity handoff, so on Folia
+they read the landing 1-2 ticks (50-100 ms) after the plugin issued the
+teleport. When the plugin under test is LeafRTP, the harness registers
+for its `PreTeleportEvent` / `PostTeleportEvent` by class name (no
+compile dependency) and completes the attempt from `PostTeleportEvent`
+instead - the plugin's own completion instant. `plugin_latency_ms`
+(Post minus Pre) is the teleport call alone. Competitor arms keep the
+external channels and write `-1` there. Compare `latency_ms` across
+arms only within one `attribution_source`.
+
+**`region_tps_*`**. Folia has no server-wide TPS; `Server#getTPS()`
+throws, so the `tps` column there is a wall-clock timer on the *global*
+region, which is never where a teleport lands. It can read 20.0 while
+every player region is saturated, and the dips it does show are
+global-region hiccups. `RegionTpsSampler` reads
+`Server#getRegionTPS(World, cx, cz)` for the region each online player
+stands in, on `region-tps-sample-period-ms`, and writes:
+
+| Column | Meaning |
+|---|---|
+| `region_tps_5s_at_dispatch` (per attempt) | 5 s TPS of the dispatching player's region |
+| `region_tps_scope` (per phase) | `FOLIA_PLAYER_REGIONS`, `SERVER_NATIVE` (Paper: `tps` already covers the server), or `GLOBAL_REGION_TIMER` (Folia build without the API; `tps` is global-region only) |
+| `region_tps_samples` | player-region samples in the phase |
+| `region_tps_5s_min` / `region_tps_5s_mean` | over those samples |
+| `region_tps_1m_min` | lowest 1 m window seen |
+| `region_tps_below_target_fraction` | samples at or under a fixed 19.0 TPS |
+
+These are over player-region *samples*, not distinct regions - the API
+exposes no region id. `-1` means NOT MEASURED (off Folia, or before the
+first sample). Per-region tick durations are not in the public API; use
+the spark integration below for MSPT percentiles on Folia.
 
 ---
 

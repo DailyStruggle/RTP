@@ -29,13 +29,17 @@ class OptimizedShapesRegistrationTest {
     // Register test shapes if not already present
     shapeFactory.add("SQUARE_DEPRECATED_PURE_SPIRAL", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square("SQUARE_DEPRECATED_PURE_SPIRAL"));
     shapeFactory.add("SQUARE_OPTIMIZED_DUAL_LAYER", new SquareOptimizedDualLayer());
+    shapeFactory.add("SQUARE", new SquareOptimizedDualLayer("SQUARE"));
     shapeFactory.add("CIRCLE_DEPRECATED_PURE_SPIRAL", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle("CIRCLE_DEPRECATED_PURE_SPIRAL"));
     shapeFactory.add("CIRCLE_OPTIMIZED_DUAL_LAYER", new CircleOptimizedDualLayer());
+    shapeFactory.add("CIRCLE", new CircleOptimizedDualLayer("CIRCLE"));
 
     assertTrue(shapeFactory.contains("SQUARE_DEPRECATED_PURE_SPIRAL"));
     assertTrue(shapeFactory.contains("SQUARE_OPTIMIZED_DUAL_LAYER"));
+    assertTrue(shapeFactory.contains("SQUARE"));
     assertTrue(shapeFactory.contains("CIRCLE_DEPRECATED_PURE_SPIRAL"));
     assertTrue(shapeFactory.contains("CIRCLE_OPTIMIZED_DUAL_LAYER"));
+    assertTrue(shapeFactory.contains("CIRCLE"));
 
     Shape<?> squareOpt = (Shape<?>) shapeFactory.get("SQUARE_OPTIMIZED_DUAL_LAYER");
     assertNotNull(squareOpt);
@@ -44,6 +48,14 @@ class OptimizedShapesRegistrationTest {
     Shape<?> circleOpt = (Shape<?>) shapeFactory.get("CIRCLE_OPTIMIZED_DUAL_LAYER");
     assertNotNull(circleOpt);
     assertInstanceOf(CircleOptimizedDualLayer.class, circleOpt);
+
+    Shape<?> squareDefault = (Shape<?>) shapeFactory.get("SQUARE");
+    assertNotNull(squareDefault);
+    assertInstanceOf(SquareOptimizedDualLayer.class, squareDefault);
+
+    Shape<?> circleDefault = (Shape<?>) shapeFactory.get("CIRCLE");
+    assertNotNull(circleDefault);
+    assertInstanceOf(CircleOptimizedDualLayer.class, circleDefault);
   }
 
   @Test

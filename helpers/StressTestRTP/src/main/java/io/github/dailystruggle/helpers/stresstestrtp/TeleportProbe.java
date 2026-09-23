@@ -37,9 +37,22 @@ public final class TeleportProbe implements Listener {
      *  or recorded failure) so {@link Runner} can release the in-flight slot
      *  without waiting for the per-attempt timeout. */
     private volatile Consumer<UUID> onAttributed = id -> {};
+    /** When true, only {@link DirectTeleportProbe} (and the timeout reaper)
+     *  may claim an expectation: the position poll and {@code PlayerTeleportEvent}
+     *  become no-ops for attribution. Enabled by {@link DirectTeleportProbe}
+     *  when the plugin under test fires LeafRTP's own teleport events, so a
+     *  cold teleport is attributed at the plugin's completion instant instead
+     *  of losing the race to the poll (which re-adds the ~100 ms Folia
+     *  destination-tick floor). */
+    private volatile boolean directAuthoritative = false;
 
     public void setOnAttributed(Consumer<UUID> cb) {
         this.onAttributed = (cb == null) ? id -> {} : cb;
+    }
+
+    /** See {@link #directAuthoritative}. */
+    public void setDirectAuthoritative(boolean value) {
+        this.directAuthoritative = value;
     }
 
     public TeleportProbe(Plugin plugin, MetricsRecorder recorder) {
@@ -90,15 +103,40 @@ public final class TeleportProbe implements Listener {
      * <p>Returns {@code true} iff an expectation was claimed by this call.
      */
     public boolean attributeByPosition(UUID playerId, double toX, double toZ) {
+        // With direct attribution authoritative, the poll must not claim the
+        // rtp arm: the plugin's PostTeleportEvent is the source of truth and
+        // the timeout reaper is the only other backstop.
+        if (directAuthoritative) return false;
         MetricsRecorder.Attempt attempt = expecting.remove(playerId);
         if (attempt == null) return false;
-        recorder.onComplete(attempt, true, "", toX, toZ);
+        recorder.onComplete(attempt, true, "", toX, toZ,
+                MetricsRecorder.AttributionSource.POSITION_POLL);
+        onAttributed.accept(playerId);
+        return true;
+    }
+
+    /**
+     * Direct attribution from the plugin under test's own completion event
+     * (see {@link DirectTeleportProbe}). Same contract as
+     * {@link #attributeByPosition}: claims the expectation atomically, so a
+     * later {@code PlayerTeleportEvent} or poll for the same player finds
+     * nothing and is ignored.
+     */
+    public boolean attributeDirect(UUID playerId, double toX, double toZ) {
+        MetricsRecorder.Attempt attempt = expecting.remove(playerId);
+        if (attempt == null) return false;
+        recorder.onComplete(attempt, true, "", toX, toZ,
+                MetricsRecorder.AttributionSource.PLUGIN_EVENT);
         onAttributed.accept(playerId);
         return true;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onTeleport(PlayerTeleportEvent event) {
+        // With direct attribution authoritative, leave the expectation for
+        // DirectTeleportProbe; claiming it here would restore the Folia
+        // destination-tick floor this event fires on.
+        if (directAuthoritative) return;
         Player player = event.getPlayer();
         MetricsRecorder.Attempt attempt = expecting.remove(player.getUniqueId());
         if (attempt == null) return; // not ours
@@ -128,11 +166,13 @@ public final class TeleportProbe implements Listener {
 
         Location to = event.getTo();
         if (to == null) {
-            recorder.onComplete(attempt, false, "NULL_TO", 0, 0);
+            recorder.onComplete(attempt, false, "NULL_TO", 0, 0,
+                    MetricsRecorder.AttributionSource.TELEPORT_EVENT);
             onAttributed.accept(player.getUniqueId());
             return;
         }
-        recorder.onComplete(attempt, true, "", to.getX(), to.getZ());
+        recorder.onComplete(attempt, true, "", to.getX(), to.getZ(),
+                MetricsRecorder.AttributionSource.TELEPORT_EVENT);
         onAttributed.accept(player.getUniqueId());
     }
 }

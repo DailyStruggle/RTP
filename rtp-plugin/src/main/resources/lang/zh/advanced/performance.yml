@@ -97,6 +97,14 @@ maxHeap百分比: 85.0
 # @default: 0.5
 积压补充阈值: 0.5
 
+# 积压候选位置生成策略。
+# FLAT_STRIDE = 使用与实时/未缓存选择相同的1D希尔伯特二进跨度Feistel置换。
+# BINNED_AMORTIZED = 使用具有摊销批次配额和箱内二进跨度的区域文件分箱PRP。
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+积压生成策略: "FLAT_STRIDE"
+
 # 每次尝试拒绝未生成区块的概率。
 # 0.0 = 无偏向，1.0 = 避开未生成的地块。已生成的区块始终通过。
 # @type: number

@@ -167,14 +167,14 @@ public class ScanTask extends RTPRunnable {
   private final AtomicLong fullLoadOutcomeSafetyScan = new AtomicLong(0L);
   private final AtomicLong fullLoadOutcomeCrashed = new AtomicLong(0L);
 
-  // Land-percentage accounting. Derives land% from
-  // MemoryShape.getEffectiveBadCount() against the per-batch finalPos1 instead
-  // of carrying parallel scanGoodCount/scanBadCount atomics. The shape's
-  // totalBadCount is already incremented by `addBadChunk` at every reject
-  // exit path in PRESCAN/FULLSCAN, so it is the authoritative reject count;
-  // GENSCAN is suppressed at the call site because its "false" verdict means
-  // "ungenerated chunk to skip", not "land/water reject", and never calls
-  // addBadChunk. See the LAND PERCENTAGE CALCULATION block in wrapUpBatch.
+  // Land-percentage accounting: tracks accept/reject verdicts during PRESCAN
+  // and FULLSCAN to yield an honest accept/(accept+reject) ratio for display.
+  // Not derived from MemoryShape.getEffectiveBadCount() because the shape's
+  // totalBadCount includes gap-bridged runs and outer-ring preimages that can
+  // exceed finalPos1 and clamp land% to 0.00%.
+  private final AtomicLong scanGoodCount = new AtomicLong(0L);
+  private final AtomicLong scanBadCount = new AtomicLong(0L);
+  public volatile double latestLandPercentage = 0.0;
 
   // Tracks whether the "prescan starting" announcement has been emitted for
   // this task instance. Symmetric with the existing "prescan complete; starting
@@ -211,6 +211,9 @@ public class ScanTask extends RTPRunnable {
       // scan skips the transient GENSCAN pre-phase. See PHASE_GENSCAN docs.
       if (progress.length > 4) this.scanPhase.set((int) progress[4]);
     }
+    scanGoodCount.set(0L);
+    scanBadCount.set(0L);
+    latestLandPercentage = 0.0;
 
     if (scanIncrement.get() <= 0) {
       long cpu = Runtime.getRuntime().availableProcessors();
@@ -247,6 +250,9 @@ public class ScanTask extends RTPRunnable {
       if (progress.length > 4) this.scanPhase.set((int) progress[4]);
       if (progress.length > 3) this.currentOffset = progress[3];
     }
+    scanGoodCount.set(0L);
+    scanBadCount.set(0L);
+    latestLandPercentage = 0.0;
 
     if (scanIncrementVal <= 0) {
       long cpu = Runtime.getRuntime().availableProcessors();
@@ -508,9 +514,10 @@ public class ScanTask extends RTPRunnable {
           posFuture.whenComplete((res, err) -> {
             inFlight.decrementAndGet();
             inFlightGate.release();
-            // Land% is now derived from MemoryShape.getEffectiveBadCount() and finalPos1
-            // in wrapUpBatch; rejects already call shape.addBadChunk() at every exit path,
-            // so a separate scanGoodCount/scanBadCount pair is redundant.
+            if (err == null && res != null && scanPhase.get() != PHASE_GENSCAN) {
+              if (res) scanGoodCount.incrementAndGet();
+              else scanBadCount.incrementAndGet();
+            }
           });
         } catch (Exception e) {
           // Failsafe: Release the permit instantly if a synchronous error occurs
@@ -520,6 +527,9 @@ public class ScanTask extends RTPRunnable {
           // deterministic, so re-rolling onto the same chunk produces the same placement and
           // the same failure. Mark the twin spiral index too.
           shape.addBadChunk(currentPos);
+          if (scanPhase.get() != PHASE_GENSCAN) {
+            scanBadCount.incrementAndGet();
+          }
           RTP.log(Level.WARNING, "Synchronous calculation failure at " + currentPos, e);
         }
       }
@@ -563,34 +573,21 @@ public class ScanTask extends RTPRunnable {
       long etaSeconds = getEtaSeconds(range, finalPos1, shape, cps_local);
 
       // --- LAND PERCENTAGE CALCULATION ---
-      // Derived from MemoryShape.getEffectiveBadCount() (which `addBadChunk`
-      // already increments at every PRESCAN/FULLSCAN reject exit path) and
-      // the count of positions scanned so far in this phase (finalPos1).
-      // GENSCAN's testPos returns an isChunkGenerated verdict rather than a
-      // land/water verdict and never calls addBadChunk on the "ungenerated"
-      // branch, so the figure is meaningless mid-GENSCAN -- report 0.00%
-      // there and let the real number appear once PRESCAN/FULLSCAN starts.
+      // Derived from scanGoodCount / (scanGoodCount + scanBadCount) accumulated
+      // during PRESCAN/FULLSCAN. MemoryShape.getEffectiveBadCount() is not used
+      // directly as a numerator or subtractor against finalPos1 because totalBadCount
+      // includes gap-bridged runs and outer-ring preimages that can exceed finalPos1.
       double landPercentage;
       int phaseNow = scanPhase.get();
       if (phaseNow == PHASE_GENSCAN) {
         landPercentage = 0.0;
-      } else if (phaseNow == PHASE_FULLSCAN) {
-        // FULLSCAN re-sweeps every position in the region; bad-count is
-        // cumulative across the full range (carried over from PRESCAN), so
-        // the authoritative denominator is the full region range, not the
-        // per-phase finalPos1.
-        long bad = (region.shape instanceof MemoryShape<?> ms) ? ms.getEffectiveBadCount() : 0L;
-        long denom = Math.max(1L, range);
-        long good = Math.max(0L, denom - bad);
-        landPercentage = (good * 100.0) / denom;
-      } else if (finalPos1 <= 0) {
-        landPercentage = 0.0;
       } else {
-        long bad = (region.shape instanceof MemoryShape<?> ms) ? ms.getEffectiveBadCount() : 0L;
-        long evaluated = Math.max(1L, finalPos1);
-        long good = Math.max(0L, evaluated - bad);
-        landPercentage = (good * 100.0) / evaluated;
+        long good = scanGoodCount.get();
+        long bad = scanBadCount.get();
+        double totalEvaluated = (double) good + bad;
+        landPercentage = (totalEvaluated > 0.0) ? (good * 100.0 / totalEvaluated) : 0.0;
       }
+      this.latestLandPercentage = landPercentage;
       // ------------------------------------
 
       long stride = Math.max(1L, (shape instanceof MemoryShape<?> ms) ? ms.minBridgingStride() : shape.spatialResolution());
@@ -603,14 +600,15 @@ public class ScanTask extends RTPRunnable {
       if (now - lastSaveTime > 5000 || finalPos1 >= range || pause.get() || isCancelled()) {
         shape.flushAndRebuild(shape.spatialResolution());
 
-        // Recalculate land percentage AFTER flushAndRebuild so that pending bad
-        // locations are fully coalesced into the table and in sync with finalPos1.
-        if (phaseNow != PHASE_GENSCAN) {
-          long bad = (region.shape instanceof MemoryShape<?> ms) ? ms.getEffectiveBadCount() : 0L;
-          long denom = (phaseNow == PHASE_FULLSCAN) ? Math.max(1L, range) : Math.max(1L, finalPos1);
-          long good = Math.max(0L, denom - bad);
-          landPercentage = (good * 100.0) / denom;
+        if (phaseNow == PHASE_GENSCAN) {
+          landPercentage = 0.0;
+        } else {
+          long good = scanGoodCount.get();
+          long bad = scanBadCount.get();
+          double totalEvaluated = (double) good + bad;
+          landPercentage = (totalEvaluated > 0.0) ? (good * 100.0 / totalEvaluated) : 0.0;
         }
+        this.latestLandPercentage = landPercentage;
 
         RTP.log(Level.FINE, "[ScanTask] checkpoint region=" + region.name
                 + " pos=" + finalPos1 + "/" + range
@@ -689,6 +687,8 @@ public class ScanTask extends RTPRunnable {
         long ungen = genscanUngeneratedTotal.get();
         int nextPhase = (ungen > 0L) ? PHASE_FULLSCAN : PHASE_PRESCAN;
         scanPhase.set(nextPhase);
+        scanGoodCount.set(0L);
+        scanBadCount.set(0L);
         currentOffset = 0L;
         scanIter.set(0);
         shape.flushAndRebuild(shape.spatialResolution());
@@ -715,6 +715,8 @@ public class ScanTask extends RTPRunnable {
       // safety verification.
       if (scanPhase.get() == PHASE_PRESCAN) {
         scanPhase.set(PHASE_FULLSCAN);
+        scanGoodCount.set(0L);
+        scanBadCount.set(0L);
         currentOffset = 0L;
         scanIter.set(0);
         shape.flushAndRebuild(shape.spatialResolution());

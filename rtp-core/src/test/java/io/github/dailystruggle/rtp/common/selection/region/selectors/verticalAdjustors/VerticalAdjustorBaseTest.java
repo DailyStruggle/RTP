@@ -200,5 +200,15 @@ public class VerticalAdjustorBaseTest {
         // Different class / object
         assertNotEquals(adj1, "not an adjustor");
         assertNotEquals(null, adj1);
+
+        // hashCode contract
+        int h1 = adj1.hashCode();
+        int h2 = adj2.hashCode();
+        assertTrue(h1 != 0);
+
+        // AdjustResult static constants and methods
+        assertSame(VerticalAdjustor.AdjustResult.WINDOW_REJECT, VerticalAdjustor.AdjustResult.WINDOW_REJECT);
+        assertSame(VerticalAdjustor.AdjustResult.LIGHT_GATE_REJECT, VerticalAdjustor.AdjustResult.LIGHT_GATE_REJECT);
+        assertSame(VerticalAdjustor.AdjustResult.SCAN_MISS_REJECT, VerticalAdjustor.AdjustResult.SCAN_MISS_REJECT);
     }
 }

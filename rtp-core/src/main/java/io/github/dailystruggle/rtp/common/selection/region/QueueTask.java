@@ -297,7 +297,7 @@ final class QueueTask {
                         }
                         io.github.dailystruggle.rtp.api.world.RTPLocation targetLoc =
                                 new io.github.dailystruggle.rtp.api.world.RTPLocation(
-                                        world, (cx << 4) + 8, 0, (cz << 4) + 8);
+                                        world, (cx << 4) + 7, 0, (cz << 4) + 7);
                         try {
                             RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
                                 try {

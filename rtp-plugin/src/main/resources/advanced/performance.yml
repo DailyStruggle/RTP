@@ -82,6 +82,14 @@ checkOnChunkLoads: true
 # @default: 0.5
 backlogRefillThreshold: 0.5
 
+# Backlog Candidate Generation Strategy.
+# FLAT_STRIDE = Uses the same 1D Hilbert dyadic-stride Feistel permutation as live/uncached selection.
+# BINNED_AMORTIZED = Uses region-file binned PRP with amortized batch quotas and within-bin dyadic stride.
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+backlogGenerationStrategy: "FLAT_STRIDE"
+
 # Chance to skip new (ungenerated) land. 0 = don't care, 1 = avoid it.
 # @type: number
 # @range: [0.0, 1.0]

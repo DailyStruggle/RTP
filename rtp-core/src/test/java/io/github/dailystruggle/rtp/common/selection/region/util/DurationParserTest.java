@@ -134,6 +134,87 @@ class DurationParserTest {
         DurationParser.autoInterpret(explicit, TemporalUnit.TICK, "queue period");
     assertEquals(TemporalUnit.TICK, notChanged.unit());
     assertEquals(5000.0, notChanged.magnitude());
+
+    // SECOND context autoInterpret
+    DurationParser.ParsedDuration parsedSec = DurationParser.parse("2000", TemporalUnit.SECOND);
+    assertNotNull(parsedSec);
+    DurationParser.ParsedDuration reinterpretedSec =
+        DurationParser.autoInterpret(parsedSec, TemporalUnit.SECOND, "cooldown");
+    assertEquals(TemporalUnit.MILLISECOND, reinterpretedSec.unit());
+    assertEquals(2000.0, reinterpretedSec.magnitude());
+
+    // Null or non-positive
+    assertNull(DurationParser.autoInterpret(null, TemporalUnit.TICK, "ctx"));
+    DurationParser.ParsedDuration zero = new DurationParser.ParsedDuration(0, TemporalUnit.TICK, false);
+    assertSame(zero, DurationParser.autoInterpret(zero, TemporalUnit.TICK, "ctx"));
+
+    // Default return when condition not met
+    DurationParser.ParsedDuration small = new DurationParser.ParsedDuration(50, TemporalUnit.SECOND, false);
+    assertSame(small, DurationParser.autoInterpret(small, TemporalUnit.SECOND, "ctx"));
+  }
+
+  @Test
+  void testCompositeEdgeCases() {
+    // Missing digits in segment
+    assertNull(DurationParser.parse("10s +m", TemporalUnit.SECOND));
+    // Segment without suffix
+    assertNull(DurationParser.parse("10s 20", TemporalUnit.SECOND));
+    // Segment with unknown unit
+    assertNull(DurationParser.parse("10s 20xyz", TemporalUnit.SECOND));
+    // Number format exception branch with malformed number
+    assertNull(DurationParser.parse("..s", TemporalUnit.SECOND));
+    // Default unit null falls back to SECOND in single token
+    DurationParser.ParsedDuration singleNullUnit = DurationParser.parse("25", null);
+    assertNotNull(singleNullUnit);
+    assertEquals(TemporalUnit.SECOND, singleNullUnit.unit());
+    assertEquals(25.0, singleNullUnit.magnitude());
+  }
+
+  @ParameterizedTest(name = "parse fractional single \"{0}\" -> {1} seconds")
+  @CsvSource({
+      "1.5s, 1.5",
+      "0.5m, 30.0",
+      "2.25h, 8100.0",
+      "0.05s, 0.05"
+  })
+  void testFractionalSingleUnitParsing(String input, double expectedSeconds) {
+    DurationParser.ParsedDuration parsed = DurationParser.parse(input, TemporalUnit.SECOND);
+    assertNotNull(parsed, "Failed to parse fractional: " + input);
+    assertTrue(parsed.explicitUnit());
+    assertEquals(expectedSeconds, parsed.toSeconds(), 0.0001);
+  }
+
+  @ParameterizedTest(name = "parse fractional composite \"{0}\" -> {1} seconds")
+  @CsvSource({
+      "1.5h30m, 7200.0",
+      "1d0.5h, 88200.0"
+  })
+  void testFractionalCompositeParsing(String input, double expectedSeconds) {
+    DurationParser.ParsedDuration parsed = DurationParser.parse(input, TemporalUnit.SECOND);
+    assertNotNull(parsed, "Failed to parse fractional composite: " + input);
+    assertTrue(parsed.explicitUnit());
+    assertEquals(expectedSeconds, parsed.toSeconds(), 0.0001);
+  }
+
+  @Test
+  void testWhitespaceSeparatedComposite() {
+    // Whitespace between segments and between number and suffix must be tolerated.
+    DurationParser.ParsedDuration parsed = DurationParser.parse("2h 30m 10s", TemporalUnit.SECOND);
+    assertNotNull(parsed);
+    assertEquals(9010.0, parsed.toSeconds(), 0.0001);
+
+    DurationParser.ParsedDuration spaced = DurationParser.parse("5 s", TemporalUnit.TICK);
+    assertNotNull(spaced);
+    assertTrue(spaced.explicitUnit());
+    assertEquals(5.0, spaced.toSeconds(), 0.0001);
+  }
+
+  @Test
+  void testCommaDecimalNormalized() {
+    // A comma decimal separator is normalized to a dot before parsing.
+    DurationParser.ParsedDuration parsed = DurationParser.parse("1,5s", TemporalUnit.SECOND);
+    assertNotNull(parsed);
+    assertEquals(1.5, parsed.toSeconds(), 0.0001);
   }
 
   @Test

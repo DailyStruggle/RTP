@@ -267,6 +267,52 @@ class RealSQLiteDatabaseAccessorTest {
         assertDoesNotThrow(db::startup);
     }
 
+    @Test
+    void startup_withReferenceData_populatesLatestTeleportData() throws Exception {
+        Connection conn = db.getConnection();
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE IF NOT EXISTS referenceData (UUID TEXT PRIMARY KEY)");
+            st.execute("INSERT INTO referenceData (UUID) VALUES ('" + new UUID(0, 0) + "')");
+        }
+
+        UUID playerUuid = UUID.randomUUID();
+        TeleportData td = teleportData();
+        td.time = 9999L;
+        td.cost = 15.5;
+        td.sender = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(playerUuid, "SqlitePlayer", new io.github.dailystruggle.rtp.api.world.RTPLocation(null, 1, 2, 3));
+        db.cacheValue(td);
+        db.flush();
+
+        db.startup();
+
+        TeleportData loaded = io.github.dailystruggle.rtp.common.RTP.getInstance().latestTeleportData.get(playerUuid);
+        assertNotNull(loaded);
+        assertEquals(9999L, loaded.time);
+        assertEquals(15.5, loaded.cost);
+    }
+
+    @Test
+    void write_typeAlterationsAndValidations() throws Exception {
+        Connection conn = db.getConnection();
+        assertThrows(IllegalStateException.class, () -> db.write(conn, "test_table", null));
+        assertThrows(IllegalStateException.class, () -> db.write(conn, "test_table", java.util.Collections.emptyMap()));
+
+        Map<DatabaseAccessor.TableObj, DatabaseAccessor.TableObj> row = new LinkedHashMap<>();
+        row.put(new DatabaseAccessor.TableObj("UUID"), new DatabaseAccessor.TableObj("id-1"));
+        row.put(new DatabaseAccessor.TableObj("col_text"), new DatabaseAccessor.TableObj("txt"));
+        db.write(conn, "dynamic_table", row);
+
+        // Add additional columns of various types
+        row.put(new DatabaseAccessor.TableObj("col_int"), new DatabaseAccessor.TableObj(10));
+        row.put(new DatabaseAccessor.TableObj("col_real"), new DatabaseAccessor.TableObj(3.14f));
+        row.put(new DatabaseAccessor.TableObj("col_blob"), new DatabaseAccessor.TableObj(new byte[]{1, 2, 3}));
+        db.write(conn, "dynamic_table", row);
+
+        Optional<Map<String, Object>> read = db.read(conn, "dynamic_table", new AbstractMap.SimpleEntry<>("UUID", "id-1"));
+        assertTrue(read.isPresent());
+        assertEquals("txt", read.get().get("col_text"));
+    }
+
     // -------------------------------------------------------------------------
     // connect / disconnect / close
     // -------------------------------------------------------------------------
@@ -289,6 +335,45 @@ class RealSQLiteDatabaseAccessorTest {
         db.close();
         assertTrue(conn.isClosed());
         assertDoesNotThrow(db::close);
+        db = null;
+    }
+
+    @Test
+    void getConnection_afterClose_reopensWithPragmas() throws Exception {
+        Connection first = db.getConnection();
+        db.close();
+        assertTrue(first.isClosed());
+
+        // A subsequent getConnection() must detect the closed handle and reopen it,
+        // re-applying the WAL/synchronous PRAGMAs on the fresh connection.
+        Connection reopened = db.getConnection();
+        assertNotNull(reopened);
+        assertFalse(reopened.isClosed());
+        assertNotSame(first, reopened);
+    }
+
+    @Test
+    void startup_malformedSenderId_isSkippedWithoutThrowing() throws Exception {
+        Connection conn = db.getConnection();
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE IF NOT EXISTS referenceData (UUID TEXT PRIMARY KEY)");
+            st.execute("INSERT INTO referenceData (UUID) VALUES ('" + new UUID(0, 0) + "')");
+            // A corrupted senderId must not abort startup; the malformed-UUID row is ignored.
+            st.execute("INSERT INTO rtp_teleport_data (senderId, time, selectedWorldName, selectedX, "
+                    + "selectedY, selectedZ, originalWorldName, originalX, originalY, originalZ, cost) "
+                    + "VALUES ('not-a-uuid', 1, 'world', 0, 0, 0, 'world', 0, 0, 0, 0.0)");
+        }
+        assertDoesNotThrow(db::startup);
+    }
+
+    @Test
+    void read_onClosedConnection_returnsEmpty() throws Exception {
+        Connection conn = db.getConnection();
+        db.close();
+        // PRAGMA table_info on a closed connection raises SQLException, which read() swallows.
+        Optional<Map<String, Object>> read = db.read(conn, "rtp_cached_locations",
+                new AbstractMap.SimpleEntry<>("UUID", "x"));
+        assertFalse(read.isPresent());
         db = null;
     }
 }

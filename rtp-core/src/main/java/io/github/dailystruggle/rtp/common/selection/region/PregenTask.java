@@ -537,8 +537,8 @@ final class PregenTask implements Runnable {
             select = state.shape.select();
         }
 
-        int blockX = (select[0] << 4) + 8;
-        int blockZ = (select[1] << 4) + 8;
+        int blockX = (select[0] << 4) + 7;
+        int blockZ = (select[1] << 4) + 7;
         if (state.verbose) {
             state.selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
         }
@@ -830,7 +830,7 @@ final class PregenTask implements Runnable {
             RTPChunk<?> chunk, ChunkReservation reservation, int staleRetries) {
         io.github.dailystruggle.rtp.api.world.RTPLocation targetLoc =
                 new io.github.dailystruggle.rtp.api.world.RTPLocation(
-                        state.world, (cx << 4) + 8, 0, (cz << 4) + 8);
+                        state.world, (cx << 4) + 7, 0, (cz << 4) + 7);
         try {
             RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
                 try {

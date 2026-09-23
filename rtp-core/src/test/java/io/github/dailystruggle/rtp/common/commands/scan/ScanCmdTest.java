@@ -951,8 +951,8 @@ public class ScanCmdTest {
 
         // When pos is tested, since its biome is null, testPos should resolve its biome off-tick
         int[] xz = shape.locationToXZ(pos);
-        int blockX = (xz[0] << 4) + 8;
-        int blockZ = (xz[1] << 4) + 8;
+        int blockX = (xz[0] << 4) + 7;
+        int blockZ = (xz[1] << 4) + 7;
         java.util.concurrent.CompletableFuture<Boolean> res = task.testPos(
                 region, pos, blockX, blockZ, 5, new HashSet<>(), new HashSet<>(), false, null);
 

@@ -826,7 +826,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (shouldSwapBins()) return null;
     HybridHazardTable mirror = hazardMirror;
     if (mirror != null) return mirror;
-    long range = getRange();
+    long range = getEffectiveRange();
     if (range <= 0L || range > Integer.MAX_VALUE) {
       if (hazardMirrorLogWarned.compareAndSet(false, true)) {
         RTP.log(
@@ -856,7 +856,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * Rebuilds the hazard mirror from authoritative bad runs.
    */
   private void rebuildHazardMirror() {
-    long range = getRange();
+    long range = getEffectiveRange();
     if (range <= 0L || range > Integer.MAX_VALUE) {
       hazardMirror = null;
       return;
@@ -891,7 +891,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * Clears / drops / recreates the hazard mirror empty.
    */
   private void clearHazardMirror() {
-    long range = getRange();
+    long range = getEffectiveRange();
     if (range <= 0L || range > Integer.MAX_VALUE) {
       hazardMirror = null;
       return;
@@ -1950,7 +1950,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             + " (cause "
             + ((cause == null) ? LocationGenerator.FailTypes.misc : cause)
             + ") - index is outside the addressable domain [0,"
-            + getRange()
+            + getEffectiveRange()
             + "); total refused: "
             + n);
   }

@@ -62,7 +62,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
 
   /** Default constructor for Square */
   public Square() {
-    super(GenericMemoryShapeParams.class, "SQUARE", defaults);
+    super(GenericMemoryShapeParams.class, "SQUARE_DEPRECATED_PURE_SPIRAL", defaults);
   }
 
   /**

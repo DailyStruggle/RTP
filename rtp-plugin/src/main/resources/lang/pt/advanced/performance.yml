@@ -99,6 +99,14 @@ verificarNoCarregamentoChunk: true
 # @default: 0.5
 limiteReabastecimentoBacklog: 0.5
 
+# Estrategia de geracao de candidatos no backlog.
+# FLAT_STRIDE = Usa a mesma permutacao de Feistel com passo diadico Hilbert 1D que a selecao ao vivo.
+# BINNED_AMORTIZED = Usa PRP agrupado por arquivo de regiao com cotas de lote amortizadas e passo diadico interno.
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+estrategiaGeracaoBacklog: "FLAT_STRIDE"
+
 # Probabilidade de rejeitar um chunk não gerado por tentativa.
 # 0.0 = sem viés, 1.0 = evitar terreno não gerado. Chunks gerados sempre passam.
 # @type: number

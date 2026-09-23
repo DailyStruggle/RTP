@@ -86,8 +86,8 @@ defaults:
     name: "CIRCLE"
     mode: "ACCUMULATE"
 
-    # Outer edge, in chunks (256 chunks = 4,096 blocks).
-    radius: 256
+    # Outer edge, in blocks (4096 blocks = 256 chunks).
+    radius: 4096b
 
     # Inner edge / donut hole, in chunks (64 chunks = 1,024 blocks). 0 = no hole.
     centerRadius: 64

@@ -111,7 +111,7 @@ final class CommandTreeMenuBuilderPickerAndNestingTest {
         assertTrue(emptyMapResult.isEmpty());
 
         // 2. FactoryValue flattening
-        Square square = new Square();
+        Square square = new Square("SQUARE");
         square.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.radius, 500L);
 
         @SuppressWarnings("unchecked")

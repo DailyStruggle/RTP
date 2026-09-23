@@ -195,24 +195,7 @@ public final class HybridHazardTable {
       }
 
       // If gap-bridging requested, apply admissible gap
-      if (minGap > 0L && runs.size() > 1) {
-        List<int[]> merged = new ArrayList<>();
-        int[] cur = runs.get(0);
-        for (int i = 1; i < runs.size(); i++) {
-          int[] next = runs.get(i);
-          long driver = Math.min(cur[1], next[1]);
-          long admissible = Math.max(minGap, Math.min(maxGap, driver));
-
-          if (next[0] <= cur[0] + cur[1] + (int) admissible) {
-            cur[1] = Math.max(cur[1], next[0] + next[1] - cur[0]);
-          } else {
-            merged.add(cur);
-            cur = next;
-          }
-        }
-        merged.add(cur);
-        runs = merged;
-      }
+      runs = HazardTableUtils.mergeRunsWithGap(runs, minGap, maxGap);
 
       for (int[] run : runs) {
         run[1] = Math.min(run[1], CHUNKS_PER_CONTAINER - run[0]);
@@ -249,23 +232,7 @@ public final class HybridHazardTable {
 
     @Override
     public int resolveLocalAccumulate(int localRank) {
-      // Find the localRank-th safe chunk using popcount per word
-      int remaining = localRank;
-      for (int w = 0; w < WORDS_PER_BITMASK; w++) {
-        long word = words[w];
-        int safeInWord = 64 - Long.bitCount(word);
-        if (remaining < safeInWord) {
-          // Target chunk is within this 64-bit word
-          for (int bit = 0; bit < 64; bit++) {
-            if ((word & (1L << bit)) == 0L) {
-              if (remaining == 0) return (w << 6) | bit;
-              remaining--;
-            }
-          }
-        }
-        remaining -= safeInWord;
-      }
-      return -1;
+      return HazardTableUtils.resolveBitmaskAccumulate(words, WORDS_PER_BITMASK, localRank);
     }
 
     @Override
@@ -301,21 +268,7 @@ public final class HybridHazardTable {
 
     @Override
     public boolean isBad(int localKey) {
-      int low = 0;
-      int high = starts.length - 1;
-      while (low <= high) {
-        int mid = (low + high) >>> 1;
-        int midStart = starts[mid];
-        if (midStart <= localKey) {
-          if (localKey < midStart + lengths[mid]) {
-            return true;
-          }
-          low = mid + 1;
-        } else {
-          high = mid - 1;
-        }
-      }
-      return false;
+      return HazardTableUtils.isRunBad(starts, lengths, localKey);
     }
 
     @Override
@@ -385,24 +338,7 @@ public final class HybridHazardTable {
 
     @Override
     public int resolveLocalAccumulate(int localRank) {
-      int curSafeRank = 0;
-      int prevEnd = 0;
-      for (int i = 0; i < starts.length; i++) {
-        int gapStart = prevEnd;
-        int gapLen = starts[i] - prevEnd;
-        if (gapLen > 0) {
-          if (localRank < curSafeRank + gapLen) {
-            return gapStart + (localRank - curSafeRank);
-          }
-          curSafeRank += gapLen;
-        }
-        prevEnd = starts[i] + lengths[i];
-      }
-      int trailingGap = CHUNKS_PER_CONTAINER - prevEnd;
-      if (trailingGap > 0 && localRank < curSafeRank + trailingGap) {
-        return prevEnd + (localRank - curSafeRank);
-      }
-      return -1;
+      return HazardTableUtils.resolveRunAccumulate(starts, lengths, CHUNKS_PER_CONTAINER, localRank);
     }
 
     @Override

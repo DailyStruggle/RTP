@@ -14,6 +14,7 @@ viewDistanceRestoreInterval: "интервалВосстановленияВид
 postTeleportQueueing: "очередьПослеТелепорта"
 checkOnChunkLoads: "проверкаПриЗагрузкеЧанка"
 backlogRefillThreshold: "порогПополненияBacklog"
+backlogGenerationStrategy: "стратегияГенерацииBacklog"
 pregeneratedPreference: "предпочтениеПредген"
 loginCacheEnabled: "кэшВходаВключен"
 loginCacheCap: "пределКэшаВхода"

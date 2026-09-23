@@ -12,8 +12,8 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.AbstractVerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys> {
+public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdjustorKeys> {
   protected static final Map<String, CommandParameter> subParameters = new ConcurrentHashMap<>();
 
   /** RNG used for the shuffled (state 4) scan order. Replaceable for deterministic testing. */
@@ -75,31 +75,6 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     return new SafetySnapshot(unsafe, depth);
   }
 
-  /**
-   * Canonicalise an identifier returned by {@link ChunkColumnProbe#blockAt(int)}
-   * (lowercase namespaced, e.g. {@code minecraft:water}) into the upper-case,
-   * namespace-stripped form used by yml-loaded {@code unsafeBlocks} entries
-   * (e.g. {@code WATER}). Mirrors {@code JumpAdjustor.canonicaliseMaterialToken}.
-   */
-  private static String canon(String id) {
-    if (id == null) return null;
-    String s = id.trim();
-    if (s.isEmpty()) return null;
-    // Tag tokens (#namespace:tag) are not material ids - leave them alone so
-    // refreshUnsafeBlocks doesn't silently corrupt them. They simply won't
-    // match a probe-returned id, which mirrors the pre-fix behaviour for
-    // tag-sourced unsafe materials on the probe path (a separate gap, not
-    // this fix's concern).
-    if (s.charAt(0) == '#') return s.toUpperCase(Locale.ROOT);
-    int colon = s.indexOf(':');
-    String local = (colon >= 0) ? s.substring(colon + 1) : s;
-    // Strip ADR-017 state predicate ([waterlogged=true], etc.) - predicate
-    // matching requires BlockData, which the column probe doesn't surface.
-    int bracket = local.indexOf('[');
-    if (bracket >= 0) local = local.substring(0, bracket);
-    return local.toUpperCase(Locale.ROOT);
-  }
-
   private static final List<List<Integer>> testCoords =
       Arrays.asList(
           Arrays.asList(7, 7),
@@ -142,45 +117,6 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     Object o = getData().getOrDefault(GenericVerticalAdjustorKeys.requireSkyLight, false);
     if (o instanceof Boolean b) return b;
     return Boolean.parseBoolean(o.toString());
-  }
-
-  @Override
-  public @Nullable RTPCoords adjust(@NotNull RTPChunk chunk) {
-    MutableRTPCoords output = new MutableRTPCoords(chunk.getWorld().name(), 0, 0, 0);
-    if (adjust(chunk, output)) return output.toImmutable();
-    return null;
-  }
-
-  /**
-   * Sweeps {@code chunk.isSafe} across {@code [1..platformDepth]} cells below the
-   * candidate feet-Y. Mirrors the probe-path ground-column check in
-   * {@link #acceptY} so the live full-load fallback rejects fluids (water/lava)
-   * sitting under a thin solid crust - the crust alone would otherwise pass the
-   * single {@code y-1} check and the player would drop through on landing.
-   * Returns {@code true} when every checked cell is safe.
-   */
-  @SuppressWarnings("unchecked") // raw RTPChunk member calls; adjustor is type-erased over chunk backing
-  private static boolean isGroundSafe(
-      RTPChunk chunk, int x, int y, int z, Set<String> unsafeBlocks, int platformDepth) {
-    int depth = Math.max(1, platformDepth);
-    for (int d = 1; d <= depth; d++) {
-      if (!chunk.isSafe(x, y - d, z, unsafeBlocks)) return false;
-    }
-    return true;
-  }
-
-  /**
-   * Returns highest non-air Y on column {@code (x, z)} derived from block data.
-   * Any {@code y+1 > floor} has unobstructed sky access, avoiding stale light nibbles.
-   * Returns {@link Integer#MIN_VALUE} if column is entirely air.
-   */
-  private static int computeColumnSkyFloor(RTPChunk chunk, int x, int z) {
-    int top = chunk.getWorld().getMaxHeight() - 1;
-    int bottom = chunk.getWorld().getMinHeight();
-    for (int y = top; y >= bottom; y--) {
-      if (!chunk.isAir(x, y, z)) return y;
-    }
-    return Integer.MIN_VALUE;
   }
 
   @Override
@@ -546,20 +482,6 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
       return AdjustResult.ok(out.toImmutable());
     }
     return AdjustResult.SCAN_MISS_REJECT;
-  }
-
-  /**
-   * Returns highest non-air Y on column {@code (lx, lz)} within probe window.
-   * Any {@code y+1 > floor} has unobstructed sky access, avoiding stale light nibbles.
-   * Returns {@link Integer#MIN_VALUE} if column is entirely air.
-   */
-  private static int computeColumnSkyFloor(ChunkColumnProbe probe, int lx, int lz) {
-    int top = probe.maxY();
-    int bottom = probe.minY();
-    for (int y = top; y >= bottom; y--) {
-      if (!probe.isAirAt(lx, lz, y)) return y;
-    }
-    return Integer.MIN_VALUE;
   }
 
   /**

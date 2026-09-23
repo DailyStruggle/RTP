@@ -40,6 +40,14 @@ dependencies {
     // reflectively at runtime so the same JAR drops onto Spigot/Paper/Folia
     // unchanged. This mirrors the helpers/ contract: one JAR, no platform fork.
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+
+    // Pure-logic unit tests (probe classifiers, CSV sentinels). No Bukkit
+    // runtime is exercised; the Spigot API is on the test classpath only so
+    // the classes under test link.
+    testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation platform(libs.junit.bom)
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
 }
 
 test {

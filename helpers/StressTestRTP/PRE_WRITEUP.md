@@ -383,6 +383,38 @@ highest per-attempt main-thread cost, ~99% foreground. Because it self-throttles
 at gap=3, TPS stayed healthy and MSPT smooth - it never stalls, it just cannot
 keep up. Remove the gap and it crashes (section 5.2).
 
+### 5.6 Folia 26.1.2 6GB pinned memory-pressure run - `20260921-134507` (normalized 4,096 attempts)
+
+The first cross-plugin benchmark run under a constrained, pinned heap (`-Xms == -Xmx = 6 GB`) and with a fixed quota of **4,096 attempts** per arm (`per-target-count: 4096`). Evaluated across LeafRTP (`rtp`), EzRTP, and JustRTP on Folia 26.1.2 (3 clients, default dispatch pace). Includes JFR object allocation profiling (`jdk.ObjectAllocationSample`) to isolate per-plugin vs whole-JVM allocation.
+
+| Metric | LeafRTP (`rtp`) | EzRTP | JustRTP |
+|---|---|---|---|
+| Attempts / successes | **4,096 / 4,096 (100%)** | 4,096 / 4,030 (98.4%) | 4,096 / 4,020 (98.1%) |
+| Failures | **0** | 66 (TIMEOUTs / CME) | 76 (TIMEOUTs) |
+| Wall-clock time (4k quota) | **293.9 s (~4.9 min)** | 600.9 s (~10.0 min) | 1,596.1 s (~26.6 min) |
+| Throughput (3 clients) | **13.9 TP/s** | 6.7 TP/s | 2.5 TP/s |
+| Process CPU / attempt (total) | **182.4 ms** | 208.9 ms | 729.0 ms |
+| Main/Region thread CPU / attempt | **7.9 ms (4.3%)** | 21.4 ms (10.2%) | 79.6 ms (10.9%) |
+| Async / worker CPU / attempt | **174.5 ms (95.7%)** | 187.5 ms (89.8%) | 649.4 ms (89.1%) |
+| Chunks loaded / attempt | 26.1 | 22.1 | 75.1 |
+| JFR sampled JVM allocation (total) | **349.6 GB** | 779.7 GB (2.2x) | 2,330.7 GB (6.7x) |
+| JVM allocation / attempt | **85.3 MB** | 190.4 MB | 569.0 MB |
+| Direct plugin package allocation (JFR) | **11.14 GB (2.72 MB/tp)** | 8.87 GB (2.20 MB/tp) | unmapped |
+| Young GC collections (STW) | **126** | 269 (2.1x) | 770 (6.1x) |
+| Old GC collections (STW) | 2 | 1 | 4 |
+| Total GC pause time (phase) | **21.7 s (7.4% wall)** | 47.9 s (8.0% wall) | 138.8 s (8.7% wall) |
+| Region freezes (5 s threshold) | **0** | 0 | 0 |
+| Player-region TPS 5s min / mean | **18.79 / 19.99** | 13.04 / 19.95 | 15.25 / 20.00 |
+| Fraction of region ticks < 19 TPS | **0.03%** | 0.76% (25x worse) | 0.11% |
+
+Findings:
+
+- **LeafRTP completes the identical 4k workload in less than half the time of EzRTP and 1/5th the time of JustRTP with zero failures.** EzRTP lost 66 teleports to timeouts and its un-synchronized `MessageProvider` `ConcurrentModificationException`; JustRTP timed out 76 times.
+- **95.7% of LeafRTP's CPU execution is off-tick**: only 7.9 ms per teleport touches the owning region thread. EzRTP requires 2.7x more on-tick CPU (21.4 ms), and JustRTP requires 10x more (79.6 ms).
+- **Allocation efficiency directly drives GC interruption rate.** On 6 GB heap, LeafRTP's lower per-teleport churn (85.3 MB/attempt vs 190.4 MB for EzRTP and 569.0 MB for JustRTP) triggered only 126 young GCs across 4,096 teleports vs 269 for EzRTP and 770 for JustRTP.
+- **Server pause overhead is drastically reduced**: across the 4,096 teleports, LeafRTP cost the server only 21.7 s of total stop-the-world GC pause time, compared to 47.9 s for EzRTP and 138.8 s (over 2.3 minutes) for JustRTP.
+- **Player-region TPS floor stayed solid**: LeafRTP's 5s minimum TPS remained at 18.79 (only 0.03% of samples below target), whereas EzRTP dropped to 13.04 (0.76% below target).
+
 ---
 
 ## 6. Recorded test parameters
@@ -508,6 +540,36 @@ survive competitor releases. Anything version-pinned belongs in section 5.
 - Genuinely async-looking on Paper (~47% background chunk loads) but does
   **essentially zero** background loading on Folia, loading inline on region
   threads - the section 5.3 watchdog stalls.
+- **Folia main-thread violation, but via `getHighestBlockYAt`, not PaperLib**
+  (observed 2026-09-21, Folia 26.1.2). EzRTP's own `BukkitPlatformWorldAccess.getSurfaceY`
+  calls the synchronous `CraftWorld.getHighestBlockYAt` from a `Folia Region
+  Scheduler Thread` for a chunk owned by a *different* region, so
+  `TickThread.ensureTickThread` throws `IllegalStateException` and the `/rtp`
+  dispatch fails outright with a Bukkit `CommandException` (stack:
+  `LocationFinder.surfaceY` -> `generateCandidateLocationAsync` ->
+  `attemptFindLocation` -> `findSafeLocationAsync` -> `TeleportExecutor.performTeleport`).
+  Distinct root cause from the BetterRTP/HuskHomes vendored-PaperLib
+  `AsyncChunksSync -> CraftWorld.getChunkAt` failure - EzRTP loads no PaperLib -
+  but the same class of bug: a live block-height query issued off the owning
+  region thread. On Folia this is a hard per-attempt failure, not just a stall,
+  and corroborates the section 5.3 "inline on region threads" note above.
+- **Non-thread-safe message formatting and database cache (`ConcurrentModificationException`)**
+  (observed 2026-09-21 and 2026-09-22, Folia 26.1.2, runs `20260921-025943` and `20260922-132724`).
+  Under concurrent `/rtp` dispatch EzRTP's `MessageProvider.format` mutated a shared `HashMap`
+  via `computeIfAbsent` across region threads. Furthermore, during run `20260922-132724`,
+  EzRTP threw `ConcurrentModificationException` in `me.nik.ezrtp.storage.Database.checkCache`
+  (`LinkedHashMap$LinkedHashIterator.nextNode`), followed by `NullPointerException` in
+  `me.nik.ezrtp.manager.CooldownManager.lambda$sendCooldownMessage$0`.
+- **Permanent player command lock-out on unhandled task exception** (observed 2026-09-22, Folia 26.1.2).
+  When `teleport()` crashes from an unhandled exception (`ConcurrentModificationException` in
+  `Database.checkCache`), EzRTP aborts before reaching its in-flight cleanup routine. The player's
+  UUID remains permanently trapped in EzRTP's internal `inTeleport` / queue set. Subsequent `/rtp`
+  commands from that specific player are silently dropped (`inTeleport.contains(uuid) == true`),
+  making EzRTP completely unresponsive to that account while remaining responsive to others.
+  Under sustained multi-account dispatch this defect cascaded across accounts, locking out 2 of
+  the 3 test players consecutively without recovering.
+  Contrasts with LeafRTP's S-004 fail-safe completion guarantees (`CompletableFuture.whenComplete`
+  in `MemoryTracker`), which ensure player state cleanup on all exit paths.
 - **Retains spatial state rather than short-TTL entries.** Its memory of where
   it has already looked is not on a ~minutes timer, so like RTP it belongs in
   the amortizing class of section 4, not the time-expired one: a longer run
@@ -557,6 +619,42 @@ survive competitor releases. Anything version-pinned belongs in section 5.
 - **Verify the TTL from the shipped config before quoting it.** The 15 min
   figure is an operator-side observation; pin it to the actual key and value in
   the tested build's cache config and record both in section 6.
+- **Loose duplicate classification by proximity (within 3 chunks / 48 blocks):**
+  When classifying duplicates by practical player proximity (landing within <= 3 chunks / 48 blocks):
+  - **JustRTP:** Delivered 151 same-chunk collisions (3.75%) and 263 within-3-chunk duplicates (6.53%)
+    across the full 16k border; under 7.5k radius, this spiked to 586 within-3-chunk duplicates (14.40%!).
+  - **EzRTP:** In square mode, center-clustering concentrated landings near spawn (143 block duplicates);
+    in random mode, it generated 3 same-chunk (0.07%) and 166 within-3-chunk (4.05%) landings across an 840M-block circle.
+  - **LeafRTP:** Maintained 1 same-chunk collision (0.02%) and 154 within-3-chunk landings (3.76%)
+    under native 1:1 Feistel sampling (stride S = 1). When `uniquePlacements: 'auto'` is configured in `default.yml`,
+    Dyadic Stride (S = 256) mathematically enforces >= 16-chunk (256-block) inter-arrival spacing,
+    reducing 3-chunk proximity duplicates to 0.0%.
+- **Overlapping and identical placements under concurrency** (observed 2026-09-21, Folia 26.1.2).
+  JustRTP handed out the exact same destination coordinate at the same time to
+  simultaneous `/rtp` requests from separate accounts. Root cause: its cache
+  manager does not atomically reserve or evict candidate locations upon checkout
+  during async chunk preparation; concurrent dispatches on the same tick or
+  within the async validation window read the same un-popped queue head or
+  positive reuse pool entry.
+  *Note on `cross_plugin_destinations_scatter_chart.png`:* while the scatter chart
+  reported "0 duplicates" for JustRTP, that metric was derived from a single-stream
+  sequential benchmark run (`20260921-171738.csv`) where requests were evaluated
+  in staggered series. Under real multi-player concurrent dispatch, "0 duplicates"
+  fails immediately. Relevant to the cache-vs-cache comparison: LeafRTP's
+  `keptLocations`/`unkeptLocations` pop locations atomically via lock-free CAS
+  before dispatching, mathematically guaranteeing that no two players can ever
+  receive the same coordinate even on the exact same tick.
+- **Folia cross-region main-thread violation on cache re-validation** (observed 2026-09-22, Folia 26.1.2).
+  When JustRTP validates or serves a candidate location from its cache via
+  `RTPService.revalidateCachedLocation` -> `SafetyValidator.isLocationAbsolutelySafeAsync`
+  scheduled from `FoliaScheduler` / `FoliaGlobalRegionScheduler`, it invokes
+  `CraftBlock.getType()` / `CraftBlock.getBlockState()` for coordinates across the world
+  (`BlockPos{x=7079, y=153, z=-13948}`) from a thread that does not own that region
+  (`context=[thread=Folia Region Scheduler Thread #0, region={null}]`).
+  Moonrise/Folia's `TickThread.ensureTickThread` intercepts this cross-region read and throws
+  `IllegalStateException: Cannot read world asynchronously`, warning `[JustRTP] Error checking safety async`.
+  This proves JustRTP lacks true Folia region-scheduler affinity: its "async" safety validator
+  relies on naked Bukkit block access without scheduling onto the target location's owning region.
 - **Excluded surfaces.** `/rtp gui`, zones, air RTP, matchmaking queue and
   cross-server are out of scope - the harness drives the plain teleport path
   only. Also: JustRTP registers `/rtp`, so it collides with our own label

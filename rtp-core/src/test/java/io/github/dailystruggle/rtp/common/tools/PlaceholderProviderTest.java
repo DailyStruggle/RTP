@@ -472,7 +472,7 @@ class PlaceholderProviderTest {
         assertNotNull(world);
 
         io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square square =
-                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square();
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square("SQUARE");
         io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor vert =
                 new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(java.util.Collections.emptyList());
         io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings =

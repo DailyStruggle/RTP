@@ -137,7 +137,9 @@ public class UniquePlacementsAndExpandVisualizerTest {
     int panelW = 480;
     int panelH = 480;
     int chartW = panelW * 3 + 80;
-    int chartH = panelH + 540; // Expand chart height to include high-resolution zoom panel
+    int zoomH = 460;
+    int cardH = 125;
+    int chartH = 95 + panelH + 20 + zoomH + 15 + cardH + 25;
 
     BufferedImage img = new BufferedImage(chartW, chartH, BufferedImage.TYPE_INT_RGB);
     Graphics2D g = img.createGraphics();
@@ -169,12 +171,10 @@ public class UniquePlacementsAndExpandVisualizerTest {
 
     // High-Resolution Zoom Panels Section (Bottom)
     int zoomY = 95 + panelH + 20;
-    int zoomH = 260;
     renderHighResolutionZoomSection(g, 25, zoomY, chartW - 50, zoomH, allLandingPoints, outcomeMap);
 
     // Bottom Stats & Architecture Card
     int cardY = zoomY + zoomH + 15;
-    int cardH = 125;
     g.setColor(new Color(25, 33, 44));
     g.fillRoundRect(25, cardY, chartW - 50, cardH, 12, 12);
     g.setColor(new Color(45, 58, 75));
@@ -268,16 +268,20 @@ public class UniquePlacementsAndExpandVisualizerTest {
     g.setColor(new Color(0x68, 0xB0, 0xEE));
     g.drawString(title, x + 8, y + 16);
 
-    int mapX = x + 8;
-    int mapY = y + 24;
-    int mapW = w - 16;
-    int mapH = h - 32;
+    int availW = w - 16;
+    int availH = h - 30;
+    int mapDim = Math.min(availW, availH);
+    int mapX = x + (w - mapDim) / 2;
+    int mapY = y + 22 + (availH - mapDim) / 2;
 
     g.setColor(new Color(10, 22, 34)); // Ocean
-    g.fillRect(mapX, mapY, mapW, mapH);
+    g.fillRect(mapX, mapY, mapDim, mapDim);
 
     int totalSpan = halfSpan * 2;
-    double pixPerChunk = (double) mapW / totalSpan;
+    double pixPerChunk = (double) mapDim / totalSpan;
+
+    java.awt.Shape origClip = g.getClip();
+    g.clipRect(mapX, mapY, mapDim, mapDim);
 
     // Draw background terrain
     for (int cz = centerCz - halfSpan; cz < centerCz + halfSpan; cz++) {
@@ -297,11 +301,11 @@ public class UniquePlacementsAndExpandVisualizerTest {
     g.setColor(new Color(30, 45, 60));
     for (int c = centerCx - halfSpan; c <= centerCx + halfSpan; c += 16) {
       int gx = mapX + (int) ((c - (centerCx - halfSpan)) * pixPerChunk);
-      g.drawLine(gx, mapY, gx, mapY + mapH);
+      g.drawLine(gx, mapY, gx, mapY + mapDim);
     }
     for (int c = centerCz - halfSpan; c <= centerCz + halfSpan; c += 16) {
       int gy = mapY + (int) ((c - (centerCz - halfSpan)) * pixPerChunk);
-      g.drawLine(mapX, gy, mapX + mapW, gy);
+      g.drawLine(mapX, gy, mapX + mapDim, gy);
     }
 
     // Plot landing points and their exclusion footprints
@@ -320,6 +324,10 @@ public class UniquePlacementsAndExpandVisualizerTest {
         g.fillRect(px - 1, py - 1, 3, 3);
       }
     }
+
+    g.setClip(origClip);
+    g.setColor(new Color(40, 52, 68));
+    g.drawRect(mapX, mapY, mapDim, mapDim);
   }
 
   private void renderPanel(Graphics2D g, int x, int y, int w, int h, String title,

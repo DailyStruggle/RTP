@@ -16,6 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
@@ -72,6 +73,9 @@ public class RegionConfigDefaultInheritanceTest {
         assertNotNull(settings.vert(), "vert must resolve");
         assertEquals("CIRCLE", settings.shape().name.toUpperCase(),
                 "shape must inherit config.yml#defaults.shape (CIRCLE), not fall back to SQUARE");
+        assertInstanceOf(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer.class,
+                settings.shape(),
+                "default CIRCLE shape must resolve to CircleOptimizedDualLayer");
         assertEquals("LINEAR", settings.vert().name.toUpperCase(),
                 "vert must inherit config.yml#defaults.vert (LINEAR)");
     }

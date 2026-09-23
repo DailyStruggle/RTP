@@ -312,7 +312,7 @@ public class RegionConfigLoaderTest {
 
         // Mock factoryMap
         io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
-        io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square square = new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square();
+        io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square square = new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square("SQUARE");
         shapeFactory.add("SQUARE", square);
         RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
 

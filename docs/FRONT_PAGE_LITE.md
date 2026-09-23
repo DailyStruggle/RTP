@@ -165,6 +165,36 @@ MSPT p99 leads because throughput saturates: at 1 `/rtp` per gametick the harnes
 
 EzRTP's 7 watchdog stalls (one region unresponsive 20.4 s) are the server's own record of synchronous `World.loadChunk` calls on region threads; LeafRTP issued none. For reference, the Pro Folia adapter cleared the same run at 13.5 TP/s. The shared `rtp-core` engine, not a Pro-only adapter, carries the free build's Folia result.
 
+**Unthrottled Throughput & Memory Stress (Paper 26.1 vs. Folia 26.1, 4,096 teleports per engine)**
+
+Maximum-rate saturation benchmark with zero artificial pacing delays (`dispatch-interval = 0 ms`, `per-player-gap = 0 ms`, `immediate-redispatch = true`) across 4 concurrent slots on a resource-bounded 6 GB server. Square 32,768 x 32,768 boundary with a 1,024-block spawn void. Water platforms disabled on EzRTP so all engines must find dry land.
+
+*Paper 26.1 (Single Main-Thread World Architecture):*
+
+| Plugin | Wall time | TP/s | Median Latency (p50) | Latency p99 | Total Chunks Loaded | Tick-Thread Garbage | Success |
+|---|---|---|---|---|---|---|---|
+| **LeafRTP** | **4.27 min (256 s)** | **15.98** | **82 ms** | **816 ms** | **70,165** | **21.7 GB (5.3 MB/att)** | **4096 / 4096 (100 %)** |
+| EzRTP | 12.86 min (771 s) | 5.31 | 283 ms | 1,009 ms | 103,506 | 77.9 GB (19.1 MB/att) | 4088 / 4096 (99.8 %) |
+| JustRTP | 24.09 min (1445 s) | 2.83 | 926 ms | 2,059 ms | 311,967 | 238.2 GB (58.6 MB/att) | 4064 / 4096 (99.2 %) |
+
+*Folia 26.1 (Multi-Threaded Region Architecture):*
+
+| Plugin | Wall time | TP/s | Median Latency (p50) | Latency p99 | Total Chunks Loaded | Tick-Thread Garbage | Success |
+|---|---|---|---|---|---|---|---|
+| **LeafRTP-Pro (Tuned Folia Adapter)** | **5.17 min (310 s)** | **13.20** | **143 ms** | **851 ms** | **71,845** | **21.8 GB (5.4 MB/att)** | **4096 / 4096 (100 %)** |
+| EzRTP | 9.56 min (573 s) | 7.07 | 308 ms | 654 ms | 91,620 | 61.7 GB (15.4 MB/att) | 4053 / 4096 (98.9 %) |
+| JustRTP | 21.07 min (1264 s) | 3.22 | 799 ms | 1,860 ms | 295,075 | 211.4 GB (52.9 MB/att) | 4077 / 4096 (99.5 %) |
+
+*Folia Adapter Note (Pro vs. Lite):*
+The unthrottled 13.20 TP/s Folia run above was benchmarked with **LeafRTP-Pro**, which bundles the dedicated, tuned Folia adapter (`platforms/rtp-folia`, `io/github/dailystruggle/rtp/folia/**`). The free **LeafRTP Lite** assembly strips the platform-specific Folia adapter to minimize binary footprint (ADR-024) and instead runs on Folia through the Paper adapter's basic regionized scheduler (`FoliaAwareScheduler`). While the shared `rtp-core` pipeline guarantees identical zero-duplicate spatial math, off-tick Anvil prefiltering, and safety across both editions, Lite's basic Folia scheduler operates with slightly lower peak throughput on Folia (~12.5 TP/s vs. Pro's 13.20-13.5 TP/s). On Paper and Spigot, Lite and Pro share identical native adapters and throughput (15.98 TP/s on Paper).
+
+*Spatial distribution and duplicate landings (4,096 teleports per plugin):*
+- **JustRTP:** 167 duplicate block landings (4.11%) and 324 proximity collisions within 48 blocks. Clark-Evans R = 0.8299 (severe clustering).
+- **EzRTP:** 107 proximity collisions within 48 blocks; nearest neighbor dropped to 0.0 blocks (exact chunk collision).
+- **LeafRTP:** **0 duplicate landings (0.00%)** and **0 proximity collisions**. Minimum nearest-neighbor separation across all 4,096 players was **78.4 blocks**, with Clark-Evans R = **1.0427** (ideal Complete Spatial Randomness).
+
+![Cross-plugin destination scatter comparison](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/cross_plugin_destinations_scatter_chart.png)
+
 **Caveats.** Small client counts (2 on Paper, 3 on Folia). The Folia run's EzRTP failure is corroborated by the server's own watchdog log, independent of the harness, and the freeze count reproduced at 7 across two runs (worst freeze 21.0 s and 20.4 s) - that's the part I'd trust most out of all of this. On my own side, the Folia successes include 3 attempts I read as harness attribution races rather than clean teleports, so read 100 % as "nothing I could attribute to the plugin", not as a perfect score. The Paper rows reproduced across two consecutive runs (n=2, about 2.5 % on teleports per second and 1 ms on p99); everything else is n=1. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link.
 
 **What this doesn't claim.** It doesn't claim the other plugins are bad - they're tested at their default queue configuration against LeafRTP at its recommended one, which is what most users actually get, and EzRTP cutting max attempts under heap pressure is a good catch on their part that I'd want to describe more precisely before drawing conclusions from it. It doesn't extrapolate past 2-3 concurrent clients. It doesn't measure correctness, safety, or claim-plugin compatibility - only dispatch-to-arrival latency, per-attempt cost, and success rate.

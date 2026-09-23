@@ -22,7 +22,8 @@ import java.util.logging.Level;
 public final class StressCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = Arrays.asList(
-            "start", "stop", "status", "burst", "sequence", "reset-cold", "export");
+            "start", "stop", "status", "burst", "sequence", "reset-cold", "export",
+            "probe-footprint");
 
     private final StressTestRTPPlugin plugin;
 
@@ -46,6 +47,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
                 case "sequence": return doSequence(sender, args);
                 case "reset-cold": return doResetCold(sender);
                 case "export":  return doExport(sender);
+                case "probe-footprint": return doProbeFootprint(sender);
                 default:
                     sender.sendMessage("StressTestRTP: unknown subcommand. Try: " + SUBS);
                     return true;
@@ -63,6 +65,25 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         FileConfiguration cfg = plugin.getConfig();
+        // Multi-target guard. TIMED mode round-robins EVERY configured target
+        // command across the shared roster within one phase, so co-installed
+        // RTP plugins teleport the same players back-to-back: each arm's
+        // teleport cancels the previous arm's in-flight teleport, and the
+        // completion of one arm's teleport gets attributed to whichever arm
+        // dispatched last (wrong latency/served-mode rows). For a head-to-head
+        // of multiple engines the only correct mode is `sequence`, which pins
+        // one target per phase with a recovery gap. Refuse `start` here rather
+        // than silently producing contaminated numbers. Override with
+        // `allow-timed-multi-target: true` for a deliberate interleave test.
+        var timedTargets = Targets.load(cfg, plugin.getLogger());
+        if (timedTargets.size() > 1 && !cfg.getBoolean("allow-timed-multi-target", false)) {
+            sender.sendMessage("StressTestRTP: " + timedTargets.size() + " target-commands configured; "
+                    + "`start` (timed) round-robins them all against the same players, so the arms "
+                    + "cancel each other's teleports and timings are misattributed.");
+            sender.sendMessage("  Use `/rtpstress sequence` for a clean per-target head-to-head, "
+                    + "or set allow-timed-multi-target: true to force an interleaved run.");
+            return true;
+        }
         int seconds = args.length >= 2 ? safeInt(args[1], (int) cfg.getLong("default-duration-seconds", 60))
                                        : (int) cfg.getLong("default-duration-seconds", 60);
         int concurrency = args.length >= 3 ? safeInt(args[2], (int) cfg.getLong("default-concurrency", 4))
@@ -131,6 +152,28 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         if (warmupSeconds > 0) {
             sender.sendMessage("  warm-up runs first; CSV writes start AFTER warm-up. See <stamp>-warmup.log.");
         }
+        return true;
+    }
+
+    /** Re-runs the one-ticket footprint probe on demand, for when the
+     *  start-up attempt raced server start (a cold Folia start typically
+     *  leaves it NOT MEASURED). Refused mid-run: the probe's window would
+     *  count the run's own chunk traffic. */
+    @SuppressWarnings("java:S3516")
+    private boolean doProbeFootprint(CommandSender sender) {
+        TicketFootprintProbe probe = plugin.ticketFootprintProbe();
+        if (probe == null) {
+            sender.sendMessage("StressTestRTP: ticket-footprint probe is disabled in config.");
+            return true;
+        }
+        if (plugin.runner().isRunning()) {
+            sender.sendMessage("StressTestRTP: refusing to probe during a run; /rtpstress stop first.");
+            return true;
+        }
+        probe.rerun();
+        sender.sendMessage("StressTestRTP: ticket-footprint probe scheduled; result lands in "
+                + "plugins/StressTestRTP/ticket-footprint.txt and the console within ~"
+                + (TicketFootprintProbe.MAX_LOAD_WAIT_TICKS / 20L) + " s.");
         return true;
     }
 

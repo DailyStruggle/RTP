@@ -159,8 +159,8 @@ public class SelectionAPI {
     // Representative column: chunk center, sampled mid-height. Biome data is
     // stored per-(x,z) run, so the exact Y only matters for 3D-biome worlds;
     // the world vertical midpoint is a cheap, stable choice.
-    int bx = (cx << 4) + 8;
-    int bz = (cz << 4) + 8;
+    int bx = (cx << 4) + 7;
+    int bz = (cz << 4) + 7;
     int y = (world.getMinHeight() + world.getMaxHeight()) / 2;
 
     for (Region region : permRegionLookup.values()) {

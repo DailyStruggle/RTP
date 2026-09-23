@@ -15,6 +15,10 @@ LeafRTP unifies all multi-player teleportation into a single spatial primitive:
 
 Scaffold. This module wires configuration and lifecycle; the core `SubspaceShape` and profile dispatch engine are specified in [`REQUIREMENTS.md`](REQUIREMENTS.md) and [`docs/adr/leafrtp-group-addon-ADR-001-subspace-group-teleport.md`](docs/adr/leafrtp-group-addon-ADR-001-subspace-group-teleport.md).
 
+## Pinned: near-player and near-claim targeting
+
+`/rtp nearplayer` and `/rtp nearclaim` are the single-participant case of the subspace model: the Anchor Location is a live entity position or a claim boundary instead of a queued region location, and the Subspace Shape is the `pursuit` ring with one slot. No separate search loop is needed; the anchor source is the only new input. Track the anchor-source SPI here rather than as a separate command feature.
+
 ## Configuration (`definitions/groups/*.yml`)
 
 Each group placement profile is configured as an independent `.yml` file under `definitions/groups/`.

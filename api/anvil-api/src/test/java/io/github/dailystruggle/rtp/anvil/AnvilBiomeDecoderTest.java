@@ -265,6 +265,13 @@ class AnvilBiomeDecoderTest {
         assertThrows(IllegalArgumentException.class, () -> BiomePaletteSection.biomeBitsPerEntry(0));
         assertThrows(IndexOutOfBoundsException.class, () -> BiomePaletteSection.biomeCellIndex(-1, 0, 0));
         assertThrows(IndexOutOfBoundsException.class, () -> BiomePaletteSection.biomeCellIndex(4, 0, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> BiomePaletteSection.biomeCellIndex(0, -1, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> BiomePaletteSection.biomeCellIndex(0, 4, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> BiomePaletteSection.biomeCellIndex(0, 0, -1));
+        assertThrows(IndexOutOfBoundsException.class, () -> BiomePaletteSection.biomeCellIndex(0, 0, 4));
+        assertThrows(IndexOutOfBoundsException.class, () -> bs.biomeIdAt(0, -1, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> bs.biomeIdAt(0, 16, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> bs.biomeIdAt(0, 0, -1));
         assertThrows(NullPointerException.class, () -> new BiomePaletteSection(0, null, null));
         assertThrows(IllegalArgumentException.class, () -> new BiomePaletteSection(0, List.of(), null));
     }

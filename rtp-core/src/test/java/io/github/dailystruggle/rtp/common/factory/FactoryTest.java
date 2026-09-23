@@ -494,5 +494,35 @@ class FactoryTest {
         int h1 = val.hashCode();
         int h2 = val.hashCode();
         assertEquals(h1, h2);
+
+        // Factory.construct edge cases
+        assertNull(factory.construct(null));
+        assertNull(factory.construct(null, "someTemplate"));
+        factory.add("TPL.yml", new TestValue("tpl.yml"));
+        FactoryValue<?> constructedFromNull = factory.construct("target.yml", null);
+        assertNotNull(constructedFromNull);
+        assertEquals("target.yml", constructedFromNull.name);
+        FactoryValue<?> constructedFromUnknown = factory.construct("target2.yml", "unknownTemplate");
+        assertNotNull(constructedFromUnknown);
+        assertEquals("target2.yml", constructedFromUnknown.name);
+        FactoryValue<?> constructedFromKnown = factory.construct("target3.yml", "TPL");
+        assertNotNull(constructedFromKnown);
+        assertEquals("target3.yml", constructedFromKnown.name);
+
+        // FactoryValue character parsing in getNumber
+        val.set(TestKey.VALUE, '7');
+        assertEquals(7, val.getNumber(TestKey.VALUE, 0));
+
+        // FactoryValue non-digit character fallback to def
+        val.set(TestKey.VALUE, 'x');
+        assertEquals(99, val.getNumber(TestKey.VALUE, 99));
+
+        // FactoryValue distance with unit in getNumber
+        val.set(TestKey.VALUE, "32c");
+        assertEquals(32.0, val.getNumber(TestKey.VALUE, 0.0));
+
+        // FactoryValue non-number, non-string, non-char, non-boolean throws IllegalArgumentException
+        val.set(TestKey.VALUE, new Object());
+        assertThrows(IllegalArgumentException.class, () -> val.getNumber(TestKey.VALUE, 0));
     }
 }

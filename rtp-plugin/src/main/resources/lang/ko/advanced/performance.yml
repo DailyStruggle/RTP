@@ -99,6 +99,14 @@ maxHeap백분율: 85.0
 # @default: 0.5
 백로그보충임계값: 0.5
 
+# 백로그 후보 생성 전략.
+# FLAT_STRIDE = 라이브/미캐시 선택과 동일한 1D 힐베르트 2진 보폭 파이스텔 순열을 사용합니다.
+# BINNED_AMORTIZED = 상각 배치 할당량과 빈 내부 2진 보폭을 갖는 리전 파일 분류 PRP를 사용합니다.
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+백로그생성전략: "FLAT_STRIDE"
+
 # 시도마다 미생성 청크를 거부할 확률.
 # 0.0 = 편향 없음, 1.0 = 미생성 지형 회피. 생성된 청크는 항상 통과합니다.
 # @type: number

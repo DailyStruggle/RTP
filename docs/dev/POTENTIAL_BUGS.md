@@ -41,6 +41,24 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
+### 2026-09-23 — PlaceholderProvider scan_landPercentage uses flawed shape count subtraction
 
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** Display bug on paper 26.1.2 (scan status 0.00% land)
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/tools/PlaceholderProvider.java` line 945
+- **Symptom / hypothesis:** `scan_landPercentage` placeholder computes `((denom - bad) * 100.0) / denom` where `denom = ms.getEffectiveGoodCount() + bad`. Since `totalBiomeCount` is only recorded on biomes and bad runs include gap-bridging and twins, this ratio can diverge or clamp to 0.00% instead of reading `ScanTask.latestLandPercentage`.
+- **Impact:** PlaceholderAPI `%rtp_scan_landPercentage%` may display 0.00% or inaccurate percentages during active scans.
+- **Suggested next step:** Update `PlaceholderProvider` to query active `ScanTask` instances for `task.latestLandPercentage`.
+
+### 2026-09-23 — ScanProgressBars replaces scan_landPercentage with progressFraction
+
+- **Severity:** Cosmetic
+- **Status:** Open
+- **Discovered during:** Display bug on paper 26.1.2 (scan status 0.00% land)
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/tasks/tick/ScanProgressBars.java` line 75
+- **Symptom / hypothesis:** `ScanProgressBars.update()` replaces `[scan_landPercentage]` in boss bar template with `String.format("%.1f", progressFraction * 100.0)`, displaying overall scan completion fraction instead of actual land percentage.
+- **Impact:** The boss bar displays scan progress percentage where `[scan_landPercentage]` is placed.
+- **Suggested next step:** Compute average `latestLandPercentage` across active `ScanTask` instances and substitute that into `[scan_landPercentage]`, or add a distinct `[scan_progress]` placeholder.
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

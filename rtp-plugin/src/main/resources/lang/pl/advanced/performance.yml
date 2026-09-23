@@ -85,6 +85,14 @@ sprawdzPrzyZaladowaniuChunka: true
 # @default: 0.5
 progUzupelnieniaBacklog: 0.5
 
+# Strategia generowania kandydatow w backlogu.
+# FLAT_STRIDE = Uzywa tej samej 1D-Hilbertowej permutacja Feistela z krokiem diadycznym, co wybor na zywo.
+# BINNED_AMORTIZED = Uzywa PRP grupowanego wedlug plikow regionu z zamortyzowanymi limitami partii i wewnetrznym krokiem diadycznym.
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+strategiaGenerowaniaBacklog: "FLAT_STRIDE"
+
 # Prawdopodobieństwo odrzucenia niewygenerowanego chunku na próbę.
 # 0.0 = bez stronniczości, 1.0 = unikaj niewygenerowanego terenu. Wygenerowane chunki zawsze przechodzą.
 # @type: number

@@ -12,7 +12,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.AbstractVerticalAdjustor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
+public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
   protected static final Map<String, CommandParameter> subParameters = new ConcurrentHashMap<>();
   protected static final List<String> keys =
       Arrays.stream(GenericMemoryShapeParams.values()).map(Enum::name).collect(Collectors.toList());
@@ -94,11 +94,11 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         if (members == null) continue;
         for (String m : members) {
           if (m == null) continue;
-          sink.add(canonicaliseMaterialToken(m));
+          sink.add(canon(m));
         }
         continue;
       }
-      sink.add(canonicaliseMaterialToken(token));
+      sink.add(canon(token));
     }
   }
 
@@ -142,42 +142,6 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     Object o = getData().getOrDefault(JumpAdjustorKeys.requireSkyLight, false);
     if (o instanceof Boolean b) return b;
     return Boolean.parseBoolean(o.toString());
-  }
-
-  @Override
-  public @Nullable RTPCoords adjust(@NotNull RTPChunk chunk) {
-    MutableRTPCoords output = new MutableRTPCoords(chunk.getWorld().name(), 0, 0, 0);
-    if (adjust(chunk, output)) return output.toImmutable();
-    return null;
-  }
-
-  /**
-   * Sweeps {@code chunk.isSafe} across {@code [1..platformDepth]} cells below the
-   * candidate feet-Y. Mirrors the probe-path ground-column check in
-   * {@link #acceptProbeY} so the live full-load fallback rejects fluids hidden
-   * under a thin solid crust (sand-over-water, magma-under-cobblestone).
-   */
-  @SuppressWarnings("unchecked") // raw RTPChunk member calls; adjustor is type-erased over chunk backing
-  private static boolean isGroundSafe(
-      RTPChunk chunk, int x, int y, int z, Set<String> unsafeBlocks, int platformDepth) {
-    int depth = Math.max(1, platformDepth);
-    for (int d = 1; d <= depth; d++) {
-      if (!chunk.isSafe(x, y - d, z, unsafeBlocks)) return false;
-    }
-    return true;
-  }
-
-  /**
-   * Live-chunk analogue of {@link #computeColumnSkyFloor(ChunkColumnProbe, int, int)}:
-   * highest non-air Y on column {@code (x, z)}. Returns {@link Integer#MIN_VALUE} for fully-air column.
-   */
-  private static int computeColumnSkyFloor(RTPChunk chunk, int x, int z) {
-    int top = chunk.getWorld().getMaxHeight() - 1;
-    int bottom = chunk.getWorld().getMinHeight();
-    for (int y = top; y >= bottom; y--) {
-      if (!chunk.isAir(x, y, z)) return y;
-    }
-    return Integer.MIN_VALUE;
   }
 
   @Override
@@ -359,41 +323,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     return AdjustResult.SCAN_MISS_REJECT;
   }
 
-  /**
-   * Derives highest non-air Y on column {@code (lx, lz)} within probe window.
-   * Any {@code y+1} above this floor has unobstructed sky access.
-   * Walks {@code probe.maxY()} down to {@code probe.minY()}. Returns {@link Integer#MIN_VALUE} if all air.
-   */
-  private static int computeColumnSkyFloor(ChunkColumnProbe probe, int lx, int lz) {
-    int top = probe.maxY();
-    int bottom = probe.minY();
-    for (int y = top; y >= bottom; y--) {
-      if (!probe.isAirAt(lx, lz, y)) return y;
-    }
-    return Integer.MIN_VALUE;
-  }
 
-  /**
-   * Canonicalise a material token to the upper-case, namespace-stripped form
-   * used by {@code Material.name()} and by the reconciled {@code AnvilColumnProbeAdapter}
-   * output. Matches {@code PaletteIdentifierNormalizer.normalize(...)}.
-   */
-  private static String canonicaliseMaterialToken(String raw) {
-    String trimmed = raw.trim();
-    int colon = trimmed.indexOf(':');
-    String local = (colon >= 0) ? trimmed.substring(colon + 1) : trimmed;
-    return local.toUpperCase(Locale.ROOT);
-  }
-
-  /**
-   * Accept {@code y} on column {@code (lx, lz)} iff: y-1 is solid (not vanilla
-   * air and not in {@code airBlocks}); y and y+1 are passable (vanilla air or
-   * in {@code airBlocks}); none of the three cells are in {@code unsafeBlocks}
-   * (unsafe wins on conflict); and when {@code requireSkyLight}, {@code y+1
-   * > columnSkyFloor} (block-data derived; stored sky-light/heightmaps ignored
-   * as unreliable on unticked chunks). Mirrors live {@code chunk.isSafe(...)}
-   * tolerance for walkable non-air (flowers, tall grass, snow, ...).
-   */
   private static boolean acceptProbeY(ChunkColumnProbe probe, int lx, int lz, int y,
                                       boolean requireSkyLight, int columnSkyFloor,
                                       SafetySnapshot snap) {
@@ -405,15 +335,15 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     if (below == null || at == null || above == null) return false;
     // Ground cell must be non-passable.
     if (probe.isAirAt(lx, lz, y - 1)
-        || airBlocks.contains(canonicaliseMaterialToken(below))) return false;
+        || airBlocks.contains(canon(below))) return false;
     // Body and head cells must be passable (vanilla air OR configured air-block).
     if (!probe.isAirAt(lx, lz, y)
-        && !airBlocks.contains(canonicaliseMaterialToken(at))) return false;
+        && !airBlocks.contains(canon(at))) return false;
     if (!probe.isAirAt(lx, lz, y + 1)
-        && !airBlocks.contains(canonicaliseMaterialToken(above))) return false;
+        && !airBlocks.contains(canon(above))) return false;
     // Unsafe set wins over air set on conflicts.
-    String atCanon = canonicaliseMaterialToken(at);
-    String aboveCanon = canonicaliseMaterialToken(above);
+    String atCanon = canon(at);
+    String aboveCanon = canon(above);
     if (unsafeBlocks.contains(atCanon)) return false;
     if (unsafeBlocks.contains(aboveCanon)) return false;
     // Sweep down [1..platformDepth] for hidden fluids/unsafe materials under
@@ -422,7 +352,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     for (int d = 1; d <= depth; d++) {
       String b = probe.blockAt(lx, lz, y - d);
       if (b == null) return false;
-      if (unsafeBlocks.contains(canonicaliseMaterialToken(b))) return false;
+      if (unsafeBlocks.contains(canon(b))) return false;
     }
     // Sky-light gate (block-data only): accept iff y+1 is strictly above the
     // highest non-air block on this column (computeColumnSkyFloor). This

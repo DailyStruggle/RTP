@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.lite;
 import io.github.dailystruggle.rtp.bukkit.BootstrapSupport;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerJoin;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerQuit;
@@ -25,8 +26,9 @@ import java.util.logging.Level;
  * RTP-lite bootstrap (ADR-024) for the lite assembly variant. Mirrors the surviving
  * steps of {@link RTPBukkitPlugin} and OMITS, in this order: the {@code org.sqlite.JDBC}
  * probe (no SQL drivers shipped); {@code BukkitDatabaseHandler.setupDatabase} (lite uses
- * {@code YamlFileDatabase}); the login reserve cache (ADR-023); Folia branching (lite is
- * Spigot/Paper only); PlaceholderAPI registration; and visitor/observation mode wiring.
+ * {@code YamlFileDatabase}); the login reserve cache (ADR-023); and the tuned Folia
+ * adapter (lite runs on Folia through the basic regionized scheduler). Everything else,
+ * including on-event teleports, effects, Vault, PlaceholderAPI, and lang/**, is shared.
  *
  * <p>S-001..S-007 compliance is shared with the full bootstrap: all chunk I/O,
  * MemoryTracker accounting, and stale-chunk guard logic live in {@code rtp-core} and load
@@ -171,11 +173,9 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // Drain startup tasks (region binding etc.); shared helper (ADR-024).
     BootstrapSupport.drainStartupTasks();
 
-    // Register a strict listener subset: join/quit/world-load (region lifecycle) plus
-    // OnEventTeleports (surviving rtp.onevent.* permissions). No PAPI hook, no
-    // visitor-mode listener.
-    // TODO(ADR-024): decide whether rtp.onevent.* stays in lite; if dropped, keep only
-    // the world-load + join/quit listeners required for region lifecycle.
+    // Same listener set as the full bootstrap: join/quit/world-load (region lifecycle)
+    // plus OnEventTeleports (rtp.onevent.*). The login-reserve join-prime inside
+    // OnEventTeleports is inert because LoginCacheTask is not shipped.
     Bukkit.getPluginManager().registerEvents(new OnPlayerJoin(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
     Bukkit.getPluginManager().registerEvents(new OnWorldLoadUnload(), this);
@@ -298,12 +298,23 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       }
     }, 1);
 
-    // Lite OMITS:
-    //   - initLoginReserveCache()                (ADR-023)
-    //   - PlaceholderAPI hook
-    //   - Visitor-mode wiring                    (PerformanceKeys.visitorEnabled)
-    //
-    // Each omission corresponds to a documented support-load source per ADR-024.
+    // PlaceholderAPI expansion, identical to full. PAPI_expansion ships in the lite jar
+    // and carries no driver cost, so %rtp_*% placeholders resolve on both editions.
+    if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+      RTP.log(Level.FINE, "[RTP] onEnable registering PAPI_expansion");
+      try {
+        new PAPI_expansion().register();
+      } catch (Throwable t) {
+        RTP.log(Level.WARNING,
+            "[RTP] Failed to register the PlaceholderAPI expansion; continuing without it.",
+            t);
+      }
+    } else {
+      RTP.log(Level.FINER, "[RTP] onEnable PlaceholderAPI not present -- skipping PAPI_expansion");
+    }
+
+    // Lite OMITS only initLoginReserveCache() (ADR-023): LoginCacheTask is excluded
+    // from the lite jar.
 
     // Bundled operator docs. Lite ships the same `docs/` tree as the Pro
     // edition (config/docs parity) and extracts it through the shared

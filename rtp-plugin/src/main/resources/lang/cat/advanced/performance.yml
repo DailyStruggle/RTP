@@ -82,6 +82,14 @@ check_when_kibble_arrives: true
 # @default: 0.5
 backlog_refill_threshold: 0.5
 
+# Strategy for filling the warm-spot backlog stash.
+# FLAT_STRIDE = Uses the same 1D Hilbert dyadic-stride Feistel pounce as live selection.
+# BINNED_AMORTIZED = Uses region-bin batched sniffing with within-bin dyadic stride.
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+backlog_generation_strategy: "FLAT_STRIDE"
+
 # Odds of turning your nose up at an ungenerated chunk per try.
 # 0.0 = no bias, 1.0 = dodge ungenerated land. Generated chunks always pass.
 # @type: number

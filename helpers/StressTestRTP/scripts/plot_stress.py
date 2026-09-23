@@ -213,7 +213,8 @@ def aggregate_phase_cpu(phase_rows: List[dict]) -> "OrderedDict[str, dict]":
         if not label:
             continue
         slot = agg.setdefault(label, {"process_cpu_ms": 0, "main_cpu_ms": 0,
-                                       "attempts": 0, "have_proc": False, "have_main": False})
+                                       "attempts": 0, "have_proc": False, "have_main": False,
+                                       "chunks_loaded": 0, "have_chunks": False})
         att = to_int(r.get("attempts", ""))
         if att > 0:
             slot["attempts"] += att
@@ -225,10 +226,15 @@ def aggregate_phase_cpu(phase_rows: List[dict]) -> "OrderedDict[str, dict]":
         if main >= 0:
             slot["main_cpu_ms"] += main
             slot["have_main"] = True
+        chunks = to_int(r.get("chunks_loaded", ""))
+        if chunks >= 0:
+            slot["chunks_loaded"] += chunks
+            slot["have_chunks"] = True
     for label, slot in agg.items():
         att = slot["attempts"]
         slot["cpu_per_tp_total"] = (slot["process_cpu_ms"] / att) if (att > 0 and slot["have_proc"]) else float("nan")
         slot["cpu_per_tp_main"]  = (slot["main_cpu_ms"]    / att) if (att > 0 and slot["have_main"]) else float("nan")
+        slot["chunks_inclusive_per_tp"] = (slot["chunks_loaded"] / att) if (att > 0 and slot["have_chunks"]) else float("nan")
     return agg
 
 
@@ -564,13 +570,13 @@ def write_summary_md(groups, out_path: Path, cpu_agg=None) -> None:
     ]
     if have_cpu:
         lines += [
-            "| Target | Attempts | Success% | TP/s | Cold-start | Warm p50 | p95 | p99 | Min TPS | p95 MSPT | Peak heap MB | CPU/TP total ms | CPU/TP main ms |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "| Target | Attempts | Success% | TP/s | Cold-start | Warm p50 | p95 | p99 | Min TPS | p95 MSPT | Peak heap MB | CPU/TP total ms | CPU/TP main ms | Inclusive Chunks/TP |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     else:
         lines += [
-            "| Target | Attempts | Success% | TP/s | Cold-start | Warm p50 | p95 | p99 | Min TPS | p95 MSPT | Peak heap MB |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "| Target | Attempts | Success% | TP/s | Cold-start | Warm p50 | p95 | p99 | Min TPS | p95 MSPT | Peak heap MB | Inclusive Chunks/TP |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     for label, rows in groups.items():
         lats = successful_latencies(rows)
@@ -596,15 +602,24 @@ def write_summary_md(groups, out_path: Path, cpu_agg=None) -> None:
 
         dur = _run_duration_seconds(rows)
         tps_throughput = (s / dur) if dur > 0 else float("nan")
+        slot = cpu_agg.get(label) or {} if cpu_agg else {}
+        incl_chunks = slot.get("chunks_inclusive_per_tp", float("nan"))
+        if math.isnan(incl_chunks):
+            # Fall back to phase chunksLoaded / attempts if available
+            p_chunks = slot.get("chunks_loaded", float("nan"))
+            p_att = slot.get("attempts", float("nan"))
+            if not math.isnan(p_chunks) and not math.isnan(p_att) and p_att > 0:
+                incl_chunks = p_chunks / p_att
         base = (
             f"| {label} | {n} | {sr:.1f} | {f(tps_throughput,2)} | {f(cold,0)} | {f(p50,0)} | {f(p95,0)} | {f(p99,0)} "
             f"| {f(min_tps,1)} | {f(p95_mspt,1)} | {f(peak_heap,0)} |"
         )
         if have_cpu:
-            slot = cpu_agg.get(label) or {}
             cpt = slot.get("cpu_per_tp_total", float("nan"))
             cpm = slot.get("cpu_per_tp_main",  float("nan"))
-            base += f" {f(cpt,1)} | {f(cpm,1)} |"
+            base += f" {f(cpt,1)} | {f(cpm,1)} | {f(incl_chunks,1)} |"
+        else:
+            base += f" {f(incl_chunks,1)} |"
         lines.append(base)
     lines.append("")
     out_path.write_text("\n".join(lines), encoding="utf-8")

@@ -49,6 +49,20 @@ public class MetricsRecorder {
          *  latency. */
         public volatile long commandDispatchedEpochMs = -1L;
         public volatile long teleportEpochMs = -1L;
+        /** Which observation completed this attempt. Recorded because the
+         *  channels have different floors: on Folia the external ones
+         *  ({@code TELEPORT_EVENT}, {@code POSITION_POLL}) land on the
+         *  destination region's tick and read 1-2 ticks after the plugin's own
+         *  completion, while {@code PLUGIN_EVENT} (LeafRTP's PostTeleportEvent)
+         *  is the plugin's completion instant. Never blank once written. */
+        public volatile AttributionSource attributionSource = AttributionSource.NONE;
+        /** LeafRTP PreTeleportEvent / PostTeleportEvent wall timestamps, set
+         *  by {@link DirectTeleportProbe}. {@code -1L} on every other arm. */
+        public volatile long pluginPreTeleportEpochMs = -1L;
+        public volatile long pluginPostTeleportEpochMs = -1L;
+        /** Folia 5 s TPS of the region owning the dispatching player at
+         *  dispatch, from {@link RegionTpsSampler}; {@code -1} off Folia. */
+        public volatile double regionTps5sAtDispatch = -1.0;
         public volatile boolean success = false;
         public volatile String failReason = "";
         public volatile double fromX, fromZ, toX, toZ;
@@ -204,6 +218,30 @@ public class MetricsRecorder {
             long base = commandDispatchedEpochMs > 0 ? commandDispatchedEpochMs : dispatchEpochMs;
             return teleportEpochMs - base;
         }
+
+        /** Post minus Pre from the plugin's own events: the teleport call
+         *  alone, without the selection work before it. {@code -1L} unless
+         *  both were observed. */
+        long pluginLatencyMs() {
+            if (pluginPreTeleportEpochMs < 0 || pluginPostTeleportEpochMs < 0) return -1L;
+            return Math.max(0L, pluginPostTeleportEpochMs - pluginPreTeleportEpochMs);
+        }
+    }
+
+    /** Observation channel that completed an attempt. Written literally. */
+    public enum AttributionSource {
+        /** LeafRTP PostTeleportEvent (plugin's own completion instant). */
+        PLUGIN_EVENT,
+        /** Bukkit PlayerTeleportEvent. */
+        TELEPORT_EVENT,
+        /** Position comparison (Folia fallback). */
+        POSITION_POLL,
+        /** Console line matched a short-circuit failure. */
+        CONSOLE,
+        /** Per-attempt deadline elapsed. */
+        TIMEOUT,
+        /** Not yet completed. */
+        NONE
     }
 
     public static final String CSV_HEADER =
@@ -218,7 +256,11 @@ public class MetricsRecorder {
                     // Region-file read accounting. reads are per 32x32 bin, so
                     // bin_candidates / region_file_reads is the MEASURED batch
                     // size the cost model previously assumed to be 64.
-                    + "region_file_reads,bin_candidates,bin_occupancy_max";
+                    + "region_file_reads,bin_candidates,bin_occupancy_max,"
+                    // Which channel completed the row, the plugin's own
+                    // teleport-call span when it exposes one, and the Folia
+                    // region TPS where the dispatch landed.
+                    + "attribution_source,plugin_latency_ms,region_tps_5s_at_dispatch";
 
     /** No-data sentinel documentation for the columns this recorder writes.
      *  Emitted to a sidecar {@code <stamp>-schema.txt} rather than as a
@@ -237,9 +279,34 @@ public class MetricsRecorder {
             + "served_mode_direct: FAST|COLD, read directly from the plugin under test." + System.lineSeparator()
             + "  Empty for every competitor arm - a competitor's cache state is not" + System.lineSeparator()
             + "  observable and is never inferred as an internal." + System.lineSeparator()
+            + "attribution_source: PLUGIN_EVENT|TELEPORT_EVENT|POSITION_POLL|CONSOLE|TIMEOUT -" + System.lineSeparator()
+            + "  the observation that completed the row and therefore set teleport_epoch_ms." + System.lineSeparator()
+            + "  PLUGIN_EVENT is LeafRTP's own PostTeleportEvent (its completion instant);" + System.lineSeparator()
+            + "  TELEPORT_EVENT and POSITION_POLL are external and on Folia land on the" + System.lineSeparator()
+            + "  destination region's tick, 1-2 ticks after the plugin finished. Compare" + System.lineSeparator()
+            + "  latency_ms across arms only within one source." + System.lineSeparator()
+            + "plugin_latency_ms: PostTeleportEvent minus PreTeleportEvent, the plugin's own" + System.lineSeparator()
+            + "  teleport call without the selection before it. -1 unless both were seen," + System.lineSeparator()
+            + "  which is every competitor arm." + System.lineSeparator()
+            + "region_tps_5s_at_dispatch: Folia only. 5 s TPS of the region owning the" + System.lineSeparator()
+            + "  dispatching player, read from Server#getRegionTPS at dispatch. -1 off Folia" + System.lineSeparator()
+            + "  or before the first sample. The tps column on Folia is the GLOBAL region" + System.lineSeparator()
+            + "  only and does not see player-region load; this column does." + System.lineSeparator()
+            + "phases CSV region_tps_scope / region_tps_samples / region_tps_5s_min /" + System.lineSeparator()
+            + "region_tps_5s_mean / region_tps_1m_min / region_tps_below_target_fraction:" + System.lineSeparator()
+            + "  Folia per-region TPS over PLAYER-REGION SAMPLES (each online player's owning" + System.lineSeparator()
+            + "  region on a fixed async period), not over distinct regions - the API gives" + System.lineSeparator()
+            + "  no region id. below_target counts samples at or under a FIXED 19.0 TPS," + System.lineSeparator()
+            + "  stated here rather than tuned. scope is FOLIA_PLAYER_REGIONS when measured," + System.lineSeparator()
+            + "  SERVER_NATIVE where tps already covers the whole server (Paper), or" + System.lineSeparator()
+            + "  GLOBAL_REGION_TIMER on a Folia build without the region-TPS API - in which" + System.lineSeparator()
+            + "  case the tps column is the global region only. -1 means NOT MEASURED." + System.lineSeparator()
             + "phases CSV mode_threshold_ms / fast_mode_fraction / *_p50|p95|p99_ms: -1" + System.lineSeparator()
             + "  when the phase could not be split. Per-mode percentiles replace any bare" + System.lineSeparator()
             + "  mean over a bimodal population." + System.lineSeparator()
+            + "phases CSV chunks_inclusive_per_attempt: total chunks loaded across the phase" + System.lineSeparator()
+            + "  (attributed loads + background async queue warming loads) divided by attempts." + System.lineSeparator()
+            + "  Accurately reflects the true server chunk-load footprint per teleport." + System.lineSeparator()
             + "chunks_on_tick / chunks_off_tick: foreground/background split of the SAME" + System.lineSeparator()
             + "  loads counted by chunks_loaded_during_attempt (per attempt) and" + System.lineSeparator()
             + "  chunks_loaded_attributed (per phase). On-tick means the load fired on a" + System.lineSeparator()
@@ -360,7 +427,12 @@ public class MetricsRecorder {
             + "ticket_footprint_heap_bytes / ticket_footprint_bytes_per_chunk: used-heap" + System.lineSeparator()
             + "  delta across the probe window and that delta per chunk loaded." + System.lineSeparator()
             + "  ticket_footprint_heap_label states what the figure is:" + System.lineSeparator()
-            + "  UNCOLLECTED_ALLOCATION_INCLUSIVE. No collection is forced, because a" + System.lineSeparator()
+            + "  UNCOLLECTED_ALLOCATION_INCLUSIVE, or UNATTRIBUTABLE_CONCURRENT_ALLOCATION" + System.lineSeparator()
+            + "  when the growth exceeds 16 MiB per counted chunk - then something else" + System.lineSeparator()
+            + "  allocated inside the window and NO heap figure here is the ticket's." + System.lineSeparator()
+            + "  The probe waits for the ticketed chunk to actually load (up to 400 ticks)" + System.lineSeparator()
+            + "  before its settle window opens; a chunk that never loads is NOT MEASURED," + System.lineSeparator()
+            + "  never a 0 / NONE footprint. No collection is forced, because a" + System.lineSeparator()
             + "  System.gc() on a server under measurement would corrupt the GC columns" + System.lineSeparator()
             + "  recorded here, so both figures include transient allocation and are an" + System.lineSeparator()
             + "  UPPER BOUND on retained bytes rather than a settled retained set." + System.lineSeparator()
@@ -403,7 +475,7 @@ public class MetricsRecorder {
                     + "process_cpu_ms,main_thread_cpu_ms,"
                     + "cpu_ms_per_attempt_total,cpu_ms_per_attempt_main,"
                     + "chunks_loaded,chunks_loaded_attributed,chunks_loaded_background,"
-                    + "chunks_per_attempt,"
+                    + "chunks_per_attempt,chunks_inclusive_per_attempt,"
                     + "chunk_load_cost_ms,cpu_ms_with_chunks,cpu_ms_with_chunks_per_attempt,"
                     + "chunks_selection,chunks_selection_per_attempt,"
                     + "mode_threshold_ms,mode_threshold_method,mode_classified_attempts,"
@@ -471,7 +543,25 @@ public class MetricsRecorder {
                     + "ticket_probe_gc_collections,ticket_footprint_reclaim_label,"
                     // Heap-pressure control-loop evidence: the trigger only.
                     + "heap_pressure_events,heap_pressure_first_heap_used_mb,"
-                    + "heap_pressure_first_trigger";
+                    + "heap_pressure_first_trigger,"
+                    // Folia per-region TPS over player-region samples. The scope
+                    // column names what the tps column itself measured, so a
+                    // global-region-only figure is never read as server-wide.
+                    + "region_tps_scope,region_tps_samples,region_tps_5s_min,"
+                    + "region_tps_5s_mean,region_tps_1m_min,region_tps_below_target_fraction,"
+                    // Per-plugin allocation attributed by Flight Recorder
+                    // (jdk.ObjectAllocationSample). A GC pause is a global
+                    // stop-the-world event that no counter can charge to a
+                    // plugin; the honest attributable quantity is the
+                    // allocation that forces those collections, sampled and
+                    // charged to the first stack frame owned by a known plugin
+                    // package. target = the arm measured this phase; total is
+                    // the sampled denominator; the full per-package split lives
+                    // in <stamp>-jfr-alloc.csv. All -1 / empty when the profiler
+                    // is not wired or Flight Recorder is unavailable.
+                    + "jfr_alloc_scope,jfr_alloc_samples,jfr_alloc_sampled_bytes_total,"
+                    + "jfr_alloc_target_package,jfr_alloc_target_bytes,"
+                    + "jfr_alloc_target_bytes_per_attempt";
 
     private final Path csvPath;
     private final Path phasesCsvPath;
@@ -541,11 +631,45 @@ public class MetricsRecorder {
     private volatile StorageProfiler storageProfiler;
     /** Sidecar receiving one storage header block per phase. */
     private final Path storageProfilePath;
+    /** Optional per-plugin allocation profiler (Flight Recorder). May be null,
+     *  in which case every jfr_alloc_* column is the -1 / empty sentinel. */
+    @SuppressWarnings("java:S3077") // Volatile reference publication for monitor component
+    private volatile JfrAllocationProfiler jfrProfiler;
+    /** Sidecar holding the full per-package allocation breakdown per phase. */
+    private final Path jfrAllocPath;
+    /** Parsed JFR result for the phase currently being closed. Set by
+     *  {@link #endPhase} right before the row is built and cleared by
+     *  {@link #beginPhase}; null (not-measured) during partial-phase flushes,
+     *  which must never stop and re-parse the in-flight recording. */
+    @SuppressWarnings("java:S3077") // Volatile reference publication for snapshot record
+    private volatile JfrAllocationProfiler.Result phaseJfrResult;
 
     /** Wires the storage characteriser. The recorder only reads its published
      *  fields and asks it to probe at phase start; all I/O is the profiler's
      *  own, off-tick. */
     public void setStorageProfiler(StorageProfiler profiler) { this.storageProfiler = profiler; }
+
+    /** Wires the per-plugin allocation profiler. Optional: without it every
+     *  jfr_alloc_* column writes the -1 / empty not-measured sentinel and no
+     *  jfr-alloc sidecar is produced. Writes the sidecar header eagerly. */
+    public void setJfrAllocationProfiler(JfrAllocationProfiler profiler) {
+        this.jfrProfiler = profiler;
+        if (profiler != null && profiler.available() && jfrAllocPath != null) {
+            try {
+                Files.writeString(jfrAllocPath,
+                        "phase_label,kind,name,package_prefix,alloc_bytes,alloc_samples"
+                                + System.lineSeparator(),
+                        StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            } catch (IOException ignored) {
+                // Sidecar header failure is diagnostic-only; the phase CSV
+                // columns still carry the target/total figures.
+            }
+        }
+    }
+
+    /** Sidecar path holding the per-phase, per-package allocation breakdown. */
+    public Path jfrAllocPath() { return jfrAllocPath; }
 
     /** Sidecar path holding the per-phase storage header blocks. */
     public Path storageProfilePath() { return storageProfilePath; }
@@ -569,6 +693,7 @@ public class MetricsRecorder {
         this.phasesCsvPath = null;
         this.partialPhaseCsvPath = null;
         this.storageProfilePath = null;
+        this.jfrAllocPath = null;
     }
 
     public MetricsRecorder(Path csvPath) throws IOException {
@@ -584,6 +709,8 @@ public class MetricsRecorder {
         this.partialPhaseCsvPath = csvPath.resolveSibling(partialName);
         this.storageProfilePath = csvPath.resolveSibling(
                 (dot > 0 ? name.substring(0, dot) : name) + "-storage.txt");
+        this.jfrAllocPath = csvPath.resolveSibling(
+                (dot > 0 ? name.substring(0, dot) : name) + "-jfr-alloc.csv");
         Files.createDirectories(csvPath.getParent());
         Files.writeString(csvPath, CSV_HEADER + System.lineSeparator(),
                 StandardCharsets.UTF_8,
@@ -633,6 +760,16 @@ public class MetricsRecorder {
      *  reads its published fields; the probe runs once at plugin enable and is
      *  finished long before any phase begins. */
     public void setTicketFootprintProbe(TicketFootprintProbe probe) { this.ticketProbe = probe; }
+
+    /** Folia per-region TPS sampler. Optional: without it (or off Folia)
+     *  every region_tps_* column writes the -1 not-measured sentinel. */
+    private volatile RegionTpsSampler regionTpsSampler;
+    public void setRegionTpsSampler(RegionTpsSampler sampler) { this.regionTpsSampler = sampler; }
+
+    /** What the {@code tps} column measures on this server; written into
+     *  every phase row as {@code region_tps_scope}. Empty means NOT AVAILABLE. */
+    private volatile String tpsScope = "";
+    public void setTpsScope(String scope) { this.tpsScope = scope == null ? "" : scope; }
 
     /** Wires the heap-pressure trigger recorder. It supplies evidence columns
      *  only; no behavioural response is inferred from a trigger. */
@@ -719,8 +856,15 @@ public class MetricsRecorder {
     /** Called by {@link TeleportProbe} when a PlayerTeleportEvent is attributed. */
     public void onComplete(Attempt a, boolean success, String failReason,
                            double toX, double toZ) {
+        onComplete(a, success, failReason, toX, toZ, AttributionSource.TELEPORT_EVENT);
+    }
+
+    /** Completion with the observation channel stated. */
+    public void onComplete(Attempt a, boolean success, String failReason,
+                           double toX, double toZ, AttributionSource source) {
         if (a.teleportEpochMs > 0) return; // already completed
         a.teleportEpochMs = System.currentTimeMillis();
+        a.attributionSource = source == null ? AttributionSource.NONE : source;
         a.success = success;
         a.failReason = failReason == null ? "" : failReason;
         a.toX = toX;
@@ -750,6 +894,7 @@ public class MetricsRecorder {
     public void onTimeout(Attempt a) {
         if (a.teleportEpochMs > 0) return;
         a.teleportEpochMs = System.currentTimeMillis();
+        a.attributionSource = AttributionSource.TIMEOUT;
         a.success = false;
         a.failReason = "TIMEOUT";
         ChunkLoadCounter cc = chunkCounter;
@@ -809,8 +954,8 @@ public class MetricsRecorder {
                 Long.toString(a.latencyMs()),
                 Boolean.toString(a.success),
                 csv(a.failReason),
-                fmt(a.fromX), fmt(a.fromZ),
-                fmt(a.toX), fmt(a.toZ),
+                coord(a.fromX), coord(a.fromZ),
+                coord(a.toX), coord(a.toZ),
                 fmt(a.distance),
                 fmt(a.tpsAtDispatch),
                 fmt(a.msptAtDispatch),
@@ -839,7 +984,10 @@ public class MetricsRecorder {
                 // written so the batch size is measured, not assumed.
                 Long.toString(a.regionFileReads),
                 Long.toString(a.binCandidates),
-                Long.toString(a.binOccupancyMax));
+                Long.toString(a.binOccupancyMax),
+                a.attributionSource.name(),
+                Long.toString(a.pluginLatencyMs()),
+                a.regionTps5sAtDispatch >= 0 ? fmt(a.regionTps5sAtDispatch) : "-1");
         try (BufferedWriter w = Files.newBufferedWriter(csvPath, StandardCharsets.UTF_8,
                 StandardOpenOption.APPEND)) {
             w.write(row);
@@ -912,10 +1060,18 @@ public class MetricsRecorder {
         if (rm != null) rm.resetPhase();
         GcSampler gs = gcSampler;
         phaseStartGc = gs != null ? gs.snapshot() : null;
+        // Start a fresh per-phase allocation recording and drop any parsed
+        // result from the previous phase; the result for this phase is parsed
+        // once, at endPhase, so partial flushes read the not-measured sentinel.
+        phaseJfrResult = null;
+        JfrAllocationProfiler jfr = jfrProfiler;
+        if (jfr != null) jfr.beginPhase(phaseLabel);
         ResidencySampler resSampler = residencySampler;
         if (resSampler != null) resSampler.resetPhase();
         HeapPressureWatcher hpw = heapPressureWatcher;
         if (hpw != null) hpw.beginPhase(phaseLabel);
+        RegionTpsSampler rts = regionTpsSampler;
+        if (rts != null) rts.resetPhase();
         modeClassifier.reset();
         phaseTickIntervals.set(0L);
         phaseTickIntervalTotalNs.set(0L);
@@ -932,6 +1088,26 @@ public class MetricsRecorder {
         if (!recording) return;
         if (phaseLabel == null) return;
         long endEpoch = System.currentTimeMillis();
+        // Stop and parse this phase's allocation recording exactly once, before
+        // the row is built, so buildPhaseRow reads a real result. The full
+        // per-package breakdown goes to the jfr-alloc sidecar.
+        JfrAllocationProfiler jfr = jfrProfiler;
+        if (jfr != null && jfr.available()) {
+            JfrAllocationProfiler.Result r = jfr.endPhaseAndParse();
+            phaseJfrResult = r;
+            if (r != null && r.available() && jfrAllocPath != null) {
+                List<String> lines = jfr.sidecarLines(phaseLabel, r);
+                if (!lines.isEmpty()) {
+                    try (BufferedWriter w = Files.newBufferedWriter(jfrAllocPath,
+                            StandardCharsets.UTF_8, StandardOpenOption.APPEND)) {
+                        for (String l : lines) { w.write(l); w.newLine(); }
+                    } catch (IOException ignored) {
+                        // Sidecar append failure is diagnostic-only; the phase
+                        // CSV still carries the target/total columns.
+                    }
+                }
+            }
+        }
         String row = buildPhaseRow(endEpoch);
         try (BufferedWriter w = Files.newBufferedWriter(phasesCsvPath, StandardCharsets.UTF_8,
                 StandardOpenOption.APPEND)) {
@@ -1026,6 +1202,8 @@ public class MetricsRecorder {
         // double-counted with concurrent dispatch.
         double chunksPerAtt = (chunksAttributed >= 0 && attempts > 0)
                 ? (double) chunksAttributed / attempts : -1.0;
+        double chunksInclusivePerAtt = (chunksLoaded >= 0 && attempts > 0)
+                ? (double) chunksLoaded / attempts : -1.0;
 
         // Chunk-load cost amendment. When a calibration value is set
         // (chunkLoadCostNs > 0, typically obtained from `/rtp test
@@ -1133,6 +1311,27 @@ public class MetricsRecorder {
         long heapFirstMb = hpw != null ? hpw.phaseFirstHeapUsedMb() : -1L;
         String heapFirstTrigger = hpw != null ? hpw.phaseFirstTrigger() : "";
 
+        // Folia per-region TPS. Read-only accessors; -1 off Folia or before
+        // the first sample, never 0.
+        RegionTpsSampler rts = regionTpsSampler;
+        long rtpsSamples = rts != null ? rts.phaseSamples() : -1L;
+        double rtpsMin5s = rts != null ? rts.phaseMin5s() : -1.0;
+        double rtpsMean5s = rts != null ? rts.phaseMean5s() : -1.0;
+        double rtpsMin1m = rts != null ? rts.phaseMin1m() : -1.0;
+        double rtpsBelow = rts != null ? rts.phaseBelowTargetFraction() : -1.0;
+
+        // Per-plugin allocation (Flight Recorder). phaseJfrResult is set at
+        // endPhase and null during partial flushes, so every column here falls
+        // back to the not-measured sentinel unless a real parse is available.
+        JfrAllocationProfiler.Result jfr = phaseJfrResult;
+        String jfrScope = (jfrProfiler != null) ? jfrProfiler.scope() : "";
+        long jfrSamples = (jfr != null && jfr.available()) ? jfr.samples() : -1L;
+        long jfrTotalBytes = (jfr != null && jfr.available()) ? jfr.totalBytes() : -1L;
+        String jfrTargetPkg = (jfr != null && jfr.available()) ? jfr.targetPackage() : "";
+        long jfrTargetBytes = (jfr != null && jfr.available()) ? jfr.targetBytes() : -1L;
+        double jfrTargetPerAtt = (jfrTargetBytes >= 0 && attempts > 0)
+                ? (double) jfrTargetBytes / attempts : -1.0;
+
         // Storage characterisation of the world directory. Read-only volatile
         // fields, populated by an off-tick probe; every numeric stays -1 until
         // a probe has completed, and UNKNOWN is written literally.
@@ -1161,7 +1360,7 @@ public class MetricsRecorder {
         long tfNoise = tfReady ? tfp.noiseLoads() : -1L;
         long tfHeap = tfReady ? tfp.heapDeltaBytes() : -1L;
         long tfBytesPerChunk = tfReady ? tfp.bytesPerChunk() : -1L;
-        String tfHeapLabel = tfReady ? TicketFootprintProbe.HEAP_LABEL : "";
+        String tfHeapLabel = tfReady ? tfp.heapLabel() : "";
         long tfHeapBefore = tfReady ? tfp.heapUsedBeforeBytes() : -1L;
         long tfHeapAfterLoad = tfReady ? tfp.heapUsedAfterLoadBytes() : -1L;
         long tfHeapAfterUnload = tfReady ? tfp.heapUsedAfterUnloadBytes() : -1L;
@@ -1186,6 +1385,7 @@ public class MetricsRecorder {
                 chunksAttributed >= 0 ? Long.toString(chunksAttributed) : "",
                 chunksBackground >= 0 ? Long.toString(chunksBackground) : "",
                 chunksPerAtt >= 0 ? fmt(chunksPerAtt) : "",
+                chunksInclusivePerAtt >= 0 ? fmt(chunksInclusivePerAtt) : "",
                 chunkLoadCostMs >= 0 ? fmt(chunkLoadCostMs) : "",
                 cpuMsWithChunks >= 0 ? Long.toString(cpuMsWithChunks) : "",
                 cpuWithChunksPerAtt >= 0 ? fmt(cpuWithChunksPerAtt) : "",
@@ -1289,7 +1489,23 @@ public class MetricsRecorder {
                 // Heap-pressure trigger evidence only - no modelled response.
                 Long.toString(heapEvents),
                 Long.toString(heapFirstMb),
-                csv(heapFirstTrigger));
+                csv(heapFirstTrigger),
+                // Folia per-region TPS over player-region samples.
+                csv(tpsScope),
+                Long.toString(rtpsSamples),
+                rtpsMin5s >= 0 ? fmt(rtpsMin5s) : "-1",
+                rtpsMean5s >= 0 ? fmt(rtpsMean5s) : "-1",
+                rtpsMin1m >= 0 ? fmt(rtpsMin1m) : "-1",
+                rtpsBelow >= 0 ? frac(rtpsBelow) : "-1",
+                // Per-plugin allocation (Flight Recorder). null result during a
+                // partial flush -> not-measured sentinels; the final endPhase
+                // row carries the parsed figures for the arm under test.
+                jfrScope,
+                jfrSamples >= 0 ? Long.toString(jfrSamples) : "-1",
+                jfrTotalBytes >= 0 ? Long.toString(jfrTotalBytes) : "-1",
+                csv(jfrTargetPkg),
+                jfrTargetBytes >= 0 ? Long.toString(jfrTargetBytes) : "-1",
+                jfrTargetPerAtt >= 0 ? fmt(jfrTargetPerAtt) : "-1");
         return row;
     }
 
@@ -1316,6 +1532,16 @@ public class MetricsRecorder {
 
     private static String fmt(double d) {
         if (Double.isNaN(d) || d < 0) return "";
+        return String.format(java.util.Locale.ROOT, "%.3f", d);
+    }
+
+    /** Coordinate formatter. Unlike {@link #fmt}, negative values are written
+     *  verbatim: world coordinates are legitimately negative, so treating
+     *  {@code < 0} as a no-data sentinel (fmt's contract for count/duration
+     *  columns) silently blanked every destination in the western/northern
+     *  quadrants. Only {@code NaN} means NOT AVAILABLE here. */
+    private static String coord(double d) {
+        if (Double.isNaN(d)) return "";
         return String.format(java.util.Locale.ROOT, "%.3f", d);
     }
 

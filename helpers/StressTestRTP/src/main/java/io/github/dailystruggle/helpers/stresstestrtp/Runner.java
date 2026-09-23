@@ -56,6 +56,10 @@ public final class Runner {
     private final AtomicBoolean ticking = new AtomicBoolean(false);
     private final AtomicInteger inFlight = new AtomicInteger(0);
     private final AtomicInteger targetCursor = new AtomicInteger(0);
+    /** Round-robin cursor across the roster of online players, preserving fair
+     *  interleaving across run-loop ticks and preventing starvation of players
+     *  at the tail of the roster under rate-pacing or concurrency bounds. */
+    private final AtomicInteger rosterCursor = new AtomicInteger(0);
     /** Cached round-robin target list for non-SEQUENCE modes (TIMED/BURST).
      *  Loaded once at run start so {@link #dispatchOne} does not re-parse the
      *  config and allocate a fresh {@code List<Targets.Entry>} on every single
@@ -95,6 +99,18 @@ public final class Runner {
     private volatile long seqGapMs = 0L;
     private volatile long seqPhaseEndMs = 0L; // when current run-phase ends
     private volatile long seqGapEndMs = 0L;   // when current gap-phase ends (0 if not in gap)
+    /** Optional fixed dispatched-attempt cap per target (config
+     *  {@code per-target-count}). 0 disables it (phases end purely on time).
+     *  When > 0, a measurement phase ends as soon as this many attempts have
+     *  been dispatched to the current target (then in-flight drains), so every
+     *  arm offers an identical teleport count regardless of its speed -
+     *  {@code seqPerTargetMs} then acts only as a safety ceiling so a stuck
+     *  arm cannot run forever. */
+    private volatile long seqPerTargetCount = 0L;
+    /** Attempts dispatched to the current measurement target this phase. Reset
+     *  to 0 at every measurement phase begin; drives the {@code per-target-count}
+     *  cap. Not counted during warm-up. */
+    private volatile int seqPhaseDispatched = 0;
 
     // SEQUENCE warm-up state. When `warmupActive` is true, the run loop cycles
     // every configured target for `warmupSliceMs` each, `warmupCycles` times,
@@ -109,6 +125,7 @@ public final class Runner {
     private int warmupCycleIdx = 0;     // 0..warmupCycles-1
     private int warmupTargetIdx = 0;    // current target within the cycle
     private volatile long warmupSliceEndMs = 0L; // when the current target's warm-up slice ends
+    private volatile long warmupSliceDrainDeadline = 0L; // non-zero while waiting for in-flight warm-up attempts to drain
     private volatile int warmupSliceStartTotal = 0; // total attempts at slice start (for log line)
     private volatile long warmupSliceStartEpoch = 0L;
     private volatile java.io.PrintWriter warmupLog = null;
@@ -120,7 +137,11 @@ public final class Runner {
     // dispatches normally. Tracks the last time we observed forward
     // progress (a successful dispatch *or* a successful completion).
     private volatile long lastProgressEpochMs = 0L;
+    private volatile long lastDispatchStartEpochMs = 0L;
     private int kickstartCount = 0;
+    /** Coalesces immediate re-dispatch kicks so a burst of completions on
+     *  several region threads queues at most one extra dispatch pass. */
+    private final AtomicBoolean kickQueued = new AtomicBoolean(false);
 
     public Runner(Plugin plugin, MetricsRecorder recorder, TeleportProbe probe,
                   TpsMsptHeapSampler sampler, FileConfiguration config) {
@@ -137,6 +158,40 @@ public final class Runner {
         this.spark = spark;
     }
 
+    /** Folia per-region TPS source for the per-attempt
+     *  {@code region_tps_5s_at_dispatch} column. Null leaves it at -1. */
+    private volatile RegionTpsSampler regionTpsSampler;
+    public void setRegionTpsSampler(RegionTpsSampler s) { this.regionTpsSampler = s; }
+
+    /** Direct-attribution probe for the LeafRTP arm. When set (and available),
+     *  {@link #dispatchOne} makes direct attribution authoritative <em>only</em>
+     *  while the arm being dispatched is the LeafRTP arm, so a competitor arm
+     *  keeps the external attribution channels (poll / PlayerTeleportEvent).
+     *  Without this per-arm gating, a permanently-authoritative flag silently
+     *  suppressed all attribution for every non-LeafRTP arm - they logged
+     *  nothing but TIMEOUTs even though the teleport itself succeeded. */
+    private volatile DirectTeleportProbe directProbe;
+    public void setDirectProbe(DirectTeleportProbe p) { this.directProbe = p; }
+
+    /**
+     * True iff {@code entry} dispatches the LeafRTP arm - i.e. the command's
+     * plugin (its {@code pluginName:} prefix, or the bare command name) is the
+     * plugin that owns LeafRTP's teleport events. Only then may the position
+     * poll / {@code PlayerTeleportEvent} be suppressed in favour of
+     * {@link DirectTeleportProbe}; for any other arm those channels are the
+     * only completion signal.
+     */
+    private boolean isDirectArm(Targets.Entry entry) {
+        DirectTeleportProbe dp = directProbe;
+        if (dp == null || !dp.available() || entry == null) return false;
+        String owner = dp.ownerPluginName();
+        if (owner == null || owner.isBlank()) return false;
+        String firstTok = entry.template.trim().split("\\s+", 2)[0];
+        int colon = firstTok.indexOf(':');
+        String name = colon > 0 ? firstTok.substring(0, colon) : firstTok;
+        return name.equalsIgnoreCase(owner);
+    }
+
     public boolean isRunning() { return running.get(); }
 
     /** Called by {@link TeleportProbe} when an attempt completes (success or
@@ -151,6 +206,31 @@ public final class Runner {
             inFlight.decrementAndGet();
         }
         lastProgressEpochMs = System.currentTimeMillis();
+        kickDispatch();
+    }
+
+    /** Run a dispatch pass immediately instead of waiting for the next
+     *  {@code runner-tick-ms} timer firing. Without this, every freed slot
+     *  costs up to a full run-loop period (default 20 ms) of dead time before
+     *  the next command goes out, which caps the offered rate well below what
+     *  a queue-served plugin can absorb. The pass is handed to the async
+     *  scheduler rather than run inline because the caller is a tick/region
+     *  thread and the run loop must never occupy one. {@link #ticking} keeps
+     *  passes strictly non-overlapping. Disable with
+     *  {@code immediate-redispatch: false} to restore pure timer pacing. */
+    private void kickDispatch() {
+        if (!running.get()) return;
+        if (!config.getBoolean("immediate-redispatch", true)) return;
+        if (ticking.get()) return; // a pass is already in flight; it will see the free slot
+        if (!kickQueued.compareAndSet(false, true)) return;
+        try {
+            Sched.runAsync(plugin, () -> {
+                kickQueued.set(false);
+                tick();
+            });
+        } catch (Throwable t) {
+            kickQueued.set(false);
+        }
     }
 
     /** Called by {@link ConsoleWatcher} when a console line matches a
@@ -160,7 +240,8 @@ public final class Runner {
     public void onConsoleFail(UUID playerId, String reason) {
         MetricsRecorder.Attempt a = probe.forget(playerId);
         if (a != null) {
-            recorder.onComplete(a, false, reason == null ? "CONSOLE_FAIL" : reason, 0, 0);
+            recorder.onComplete(a, false, reason == null ? "CONSOLE_FAIL" : reason, 0, 0,
+                    MetricsRecorder.AttributionSource.CONSOLE);
         }
         if (deadlines.remove(playerId) != null) {
             inFlight.decrementAndGet();
@@ -187,6 +268,7 @@ public final class Runner {
         this.endEpochMs = System.currentTimeMillis() + seconds * 1000L;
         this.lastProgressEpochMs = System.currentTimeMillis();
         this.kickstartCount = 0;
+        this.rosterCursor.set(0);
         this.roundRobinTargets = Targets.load(config, plugin.getLogger());
         long timerPeriodMs = Math.max(5L, config.getLong("runner-tick-ms", 20L));
         this.taskId = Sched.runAsyncTimer(plugin, this::tick, timerPeriodMs);
@@ -231,6 +313,8 @@ public final class Runner {
         this.seqIndex = 0;
         this.seqPerTargetMs = Math.max(1L, perTargetSeconds) * 1000L;
         this.seqGapMs = Math.max(0L, gapSeconds) * 1000L;
+        this.seqPerTargetCount = Math.max(0L, config.getLong("per-target-count", 0L));
+        this.seqPhaseDispatched = 0;
         long now = System.currentTimeMillis();
         this.seqPhaseEndMs = now + seqPerTargetMs;
         this.seqGapEndMs = 0L;
@@ -249,9 +333,12 @@ public final class Runner {
         this.warmupActive = totalWarmupMs > 0L && sliceMs > 0L && n > 0;
         this.warmupCycleIdx = 0;
         this.warmupTargetIdx = 0;
+        this.warmupSliceDrainDeadline = 0L;
 
         this.lastProgressEpochMs = now;
+        this.lastDispatchStartEpochMs = 0L;
         this.kickstartCount = 0;
+        this.rosterCursor.set(0);
         if (warmupActive) {
             openWarmupLog();
             // Disable measurement-side persistence for the warm-up duration.
@@ -307,6 +394,7 @@ public final class Runner {
         this.burstRemaining = Math.max(1, n);
         this.endEpochMs = System.currentTimeMillis() + Math.max(30000L,
                 config.getLong("attempt-timeout-ms", 30000L) + 5000L);
+        this.rosterCursor.set(0);
         this.roundRobinTargets = Targets.load(config, plugin.getLogger());
         long timerPeriodMs = Math.max(5L, config.getLong("runner-tick-ms", 20L));
         this.taskId = Sched.runAsyncTimer(plugin, this::tick, timerPeriodMs);
@@ -333,6 +421,7 @@ public final class Runner {
         // run and close the warmup log file.
         if (warmupActive) {
             warmupActive = false;
+            warmupSliceDrainDeadline = 0L;
             recorder.setRecording(true);
             if (warmupLog != null) {
                 logWarmup("warm-up aborted by stop()");
@@ -456,7 +545,12 @@ public final class Runner {
             //      attribute the attempt as a success at the new coordinates.
             //      The location read must happen on the entity's owning
             //      region thread, so we hop via Sched.runOnPlayer.
-            if (Sched.isFolia()) {
+            //      Skipped when the pinned per-attempt watcher is active
+            //      (see startPinnedPositionWatch): that watcher already
+            //      observes the player one tick after the teleport from
+            //      inside the owning region, and duplicating it here only
+            //      queues a redundant hop per expectation per run-loop tick.
+            if (Sched.isFolia() && !config.getBoolean("folia.pinned-position-watch", true)) {
                 double thr = config.getDouble("folia.poll-distance-threshold", 16.0);
                 double thr2 = thr * thr;
                 for (UUID id : probe.expectingIds()) {
@@ -497,8 +591,8 @@ public final class Runner {
                 // Warm-up phase machine: cycle every target for `warmupSliceMs`,
                 // `warmupCycles` times. No CSV, no spark, no gap between slices -
                 // we want sustained dispatch to maximise JIT throughput.
-                if (now >= warmupSliceEndMs) {
-                    // Slice ended: log per-target summary, advance.
+                if (warmupSliceDrainDeadline == 0L && now >= warmupSliceEndMs) {
+                    // Slice ended: log per-target summary once.
                     int attemptsThisSlice = Math.max(0,
                             recorder.totalAttempts() - warmupSliceStartTotal);
                     long wallMs = Math.max(0L, now - warmupSliceStartEpoch);
@@ -506,17 +600,20 @@ public final class Runner {
                     logWarmup(String.format(java.util.Locale.ROOT,
                             "  cycle %d/%d  %-14s  %d ms  %d attempts",
                             warmupCycleIdx + 1, warmupCycles, label, wallMs, attemptsThisSlice));
+                    warmupSliceDrainDeadline = now + 5000L;
+                }
+                if (warmupSliceDrainDeadline > 0L) {
                     // Drain in-flight before advancing so the next target's
                     // slice doesn't measure the prior plugin's stragglers.
                     if (inFlight.get() > 0) {
-                        long warmupDrainDeadline = warmupSliceEndMs + 5000L;
-                        if (now < warmupDrainDeadline) return;
+                        if (now < warmupSliceDrainDeadline) return;
                         for (UUID id : new ArrayList<>(deadlines.keySet())) {
                             MetricsRecorder.Attempt a = probe.forget(id);
                             if (a != null) recorder.onTimeout(a);
                             if (deadlines.remove(id) != null) inFlight.decrementAndGet();
                         }
                     }
+                    warmupSliceDrainDeadline = 0L;
                     warmupTargetIdx++;
                     if (warmupTargetIdx >= seqTargets.size()) {
                         warmupTargetIdx = 0;
@@ -641,17 +738,22 @@ public final class Runner {
                         return;
                     }
                     seqPhaseEndMs = now + seqPerTargetMs;
+                    seqPhaseDispatched = 0;
                     nextDispatchAt.clear();
                     lastProgressEpochMs = now;
                     spark.startPhase(seqTargets.get(seqIndex).label);
                     recorder.beginPhase(seqTargets.get(seqIndex).label);
-                } else if (now >= seqPhaseEndMs) {
+                } else if (now >= seqPhaseEndMs || seqCountCapReached()) {
                     // Run-phase finished; let in-flight drain, then enter gap.
                     // Bounded drain: if attempts are still in flight more than
                     // 5 s after the phase end (e.g. silently rejected with no
                     // console-match and no timeout firing yet), force-timeout
                     // them so the sequence cannot stall here indefinitely.
-                    long drainDeadline = seqPhaseEndMs + 5000L;
+                    // When the phase ended because the count cap was hit (not
+                    // the time ceiling), seqPhaseEndMs is still in the future,
+                    // so base the bounded drain on `now` instead.
+                    long drainBase = (now >= seqPhaseEndMs) ? seqPhaseEndMs : now;
+                    long drainDeadline = drainBase + 5000L;
                     if (inFlight.get() != 0) {
                         if (now >= drainDeadline) {
                             // Force-clear: drop every still-tracked deadline
@@ -696,6 +798,7 @@ public final class Runner {
                         seqIndex++;
                         if (seqIndex >= seqTargets.size()) { stop(); return; }
                         seqPhaseEndMs = now + seqPerTargetMs;
+                        seqPhaseDispatched = 0;
                         nextDispatchAt.clear();
                         lastProgressEpochMs = now;
                         spark.startPhase(seqTargets.get(seqIndex).label);
@@ -712,19 +815,17 @@ public final class Runner {
             List<Player> roster = roster();
             if (roster.isEmpty()) return; // dormant until someone logs in
             long timeoutMs = config.getLong("attempt-timeout-ms", 30000L);
-            int rosterIdx = 0;
+            long dispatchIntervalMs = config.getLong("dispatch-interval-ms", 0L);
+            int attemptsThisTick = 0;
             while (running.get() && inFlight.get() < concurrencyCap) {
                 if (mode == Mode.BURST && burstRemaining <= 0) break;
                 if (mode == Mode.TIMED && now >= endEpochMs) break;
                 if (mode == Mode.SEQUENCE && !warmupActive && now >= seqPhaseEndMs) break;
-                if (mode == Mode.SEQUENCE && warmupActive && now >= warmupSliceEndMs) break;
+                if (mode == Mode.SEQUENCE && !warmupActive && seqCountCapReached()) break;
+                if (mode == Mode.SEQUENCE && warmupActive && (now >= warmupSliceEndMs || warmupSliceDrainDeadline > 0L)) break;
+                if (dispatchIntervalMs > 0L && (now - lastDispatchStartEpochMs) < dispatchIntervalMs) break;
                 int rosterSize = roster.size();
                 if (rosterSize <= 0) break; // roster emptied mid-loop (race)
-                int pickIdx = Math.floorMod(rosterIdx, rosterSize);
-                if (pickIdx < 0 || pickIdx >= rosterSize) break; // defensive
-                Player target = roster.get(pickIdx);
-                rosterIdx++;
-                UUID tid = target.getUniqueId();
                 // Bound the scan: regardless of whether we dispatched on
                 // this iteration, after roster.size()*4 picks we have walked
                 // every player multiple times - if no slot has been filled
@@ -733,13 +834,19 @@ public final class Runner {
                 // as an indefinite freeze with fans revving). The break
                 // MUST run before any `continue` paths below, otherwise the
                 // loop never terminates this tick.
-                if (rosterIdx > rosterSize * 4) break; // everyone is busy this tick
+                if (attemptsThisTick >= rosterSize * 4) break; // everyone is busy this tick
+                int pickIdx = Math.floorMod(rosterCursor.getAndIncrement(), rosterSize);
+                Player target = roster.get(pickIdx);
+                attemptsThisTick++;
+                UUID tid = target.getUniqueId();
                 if (deadlines.containsKey(tid)) continue; // already in flight
                 Long readyAt = nextDispatchAt.get(tid);
                 if (readyAt != null && readyAt > now) continue; // per-player cooldown
                 dispatchOne(target, timeoutMs, pinned);
-                lastProgressEpochMs = System.currentTimeMillis();
+                lastDispatchStartEpochMs = System.currentTimeMillis();
+                lastProgressEpochMs = lastDispatchStartEpochMs;
                 if (mode == Mode.BURST) burstRemaining--;
+                if (mode == Mode.SEQUENCE && !warmupActive) seqPhaseDispatched++;
             }
         } catch (Throwable t) {
             plugin.getLogger().log(Level.WARNING, "StressTestRTP runner tick failed", t);
@@ -768,6 +875,14 @@ public final class Runner {
             }
             chosen = targets.get(Math.floorMod(targetCursor.getAndIncrement(), targets.size()));
         }
+        // Gate direct-attribution authority to the LeafRTP arm only. When this
+        // arm is LeafRTP, its own Pre/PostTeleportEvent are the source of truth
+        // and the poll / PlayerTeleportEvent must not claim the teleport (they
+        // re-add the ~100 ms Folia destination-tick floor). For every other arm
+        // LeafRTP fires no events, so the external channels are the ONLY
+        // completion signal - leaving the flag on would attribute nothing and
+        // produce a wall of TIMEOUTs (the ezrtp/justrtp symptom).
+        probe.setDirectAuthoritative(isDirectArm(chosen));
         MetricsRecorder.Attempt attempt = new MetricsRecorder.Attempt(
                 UUID.randomUUID(),
                 target.getName(),
@@ -776,6 +891,10 @@ public final class Runner {
                 System.currentTimeMillis(),
                 from.getX(), from.getZ(),
                 snap.tps(), snap.mspt(), snap.heapUsedMb());
+        // Folia: TPS of the region the dispatching player is standing in.
+        // The snapshot's tps above is the global region only there.
+        RegionTpsSampler rts = regionTpsSampler;
+        if (rts != null) attempt.regionTps5sAtDispatch = rts.latest5s(target.getUniqueId());
         // Per-attempt chunk-load attribution is now handled inside
         // MetricsRecorder.onDispatch via ChunkLoadCounter#beginAttempt(a):
         // the counter registers this attempt as in-flight and routes
@@ -832,6 +951,8 @@ public final class Runner {
         // measuring raw pipeline cost without permission checks, or for
         // commands like `essentials:sudo` that *must* run from console).
         final boolean asPlayer = config.getBoolean("dispatch-as-player", true);
+        final boolean watchPinned = Sched.isFolia()
+                && config.getBoolean("folia.pinned-position-watch", true);
         Sched.runOnPlayer(plugin, target, () -> {
             attempt.commandDispatchedEpochMs = System.currentTimeMillis();
             // Folia only: this runnable is executing on the thread owning the
@@ -868,7 +989,51 @@ public final class Runner {
                 // arms that behave worst.
                 if (onTick) attempt.recordTickInterval(startNs, System.nanoTime());
             }
+            if (watchPinned) startPinnedPositionWatch(target, attempt, from.getX(), from.getZ());
         });
+    }
+
+    /**
+     * Folia: watch this attempt's player from a task pinned to the owning
+     * region, one tick apart, until the attempt is attributed or the player
+     * leaves. Cancels itself; never outlives the attempt.
+     *
+     * <p>Why: Folia does not reliably deliver {@code PlayerTeleportEvent} for
+     * {@code teleportAsync} (HuskHomes #824, Folia #330), so attribution falls
+     * back to a position comparison. Driving that comparison from the async
+     * run loop costs one run-loop period plus one queued entity-scheduler hop
+     * before the moved player is even observed - roughly 50-100 ms of pure
+     * harness latency stacked on top of a teleport the plugin completed in
+     * single-digit ms, and the in-flight slot stays held for all of it. A
+     * pinned repeater already holds the region context, so it sees the new
+     * position on the first tick after the teleport and releases the slot
+     * there. Set {@code folia.pinned-position-watch: false} to fall back to
+     * the run-loop poll alone.
+     */
+    private void startPinnedPositionWatch(Player target, MetricsRecorder.Attempt attempt,
+                                          double fromX, double fromZ) {
+        UUID tid = target.getUniqueId();
+        double thr = config.getDouble("folia.poll-distance-threshold", 16.0);
+        double thr2 = thr * thr;
+        Sched.runOnPlayerTimer(plugin, target, () -> {
+            try {
+                // Identity check, not a null check: a superseding dispatch for
+                // the same player owns its own watcher, and attributing this
+                // one against that one's baseline would mis-time both.
+                if (probe.peek(tid) != attempt) return false;
+                if (!target.isOnline()) return false;
+                Location loc = target.getLocation();
+                double dx = loc.getX() - fromX;
+                double dz = loc.getZ() - fromZ;
+                if ((dx * dx + dz * dz) < thr2) return true;
+                if (probe.attributeByPosition(tid, loc.getX(), loc.getZ())) {
+                    lastProgressEpochMs = System.currentTimeMillis();
+                }
+                return false;
+            } catch (Throwable t) {
+                return false; // best-effort: a watcher must never wedge a region
+            }
+        }, 1L);
     }
 
     private List<Player> roster() {
@@ -991,13 +1156,29 @@ public final class Runner {
     }
 
     /** Per-player minimum gap between successive dispatches, in ms.
-     *  Configurable via {@code per-player-gap-ticks} (default 3 ticks = 150 ms).
+     *  Configurable via {@code per-player-gap-ticks} (default 3 ticks = 150 ms)
+     *  or, for sub-tick pacing, {@code per-player-gap-ms} which overrides it
+     *  when set to zero or more. A tick-granular floor is meaningless for a
+     *  queue-served plugin that answers in single-digit ms; the ms form lets
+     *  the offered rate be raised without going straight to unthrottled.
      *  Bounded to a sane range so a misconfiguration cannot stall a run. */
     private long perPlayerGapMs() {
+        long ms = config.getLong("per-player-gap-ms", -1L);
+        if (ms >= 0L) return Math.min(ms, 5000L);
         long ticks = config.getLong("per-player-gap-ticks", 3L);
         if (ticks < 0L) ticks = 0L;
         if (ticks > 100L) ticks = 100L;
         return ticks * 50L;
+    }
+
+    /** True when {@code per-target-count} is set and the current measurement
+     *  target has already been dispatched its full quota this phase. Ends the
+     *  phase (and stops further dispatch) so every arm offers an identical
+     *  teleport count; only meaningful in a live SEQUENCE measurement phase. */
+    private boolean seqCountCapReached() {
+        return mode == Mode.SEQUENCE && !warmupActive
+                && seqPerTargetCount > 0L
+                && seqPhaseDispatched >= seqPerTargetCount;
     }
 
     public String operatorName() { return operatorName; }

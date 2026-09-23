@@ -85,6 +85,14 @@ controlloCaricamentoChunk: true
 # @default: 0.5
 sogliaRiempimentoArretrato: 0.5
 
+# Strategia di generazione candidati nell'arretrato.
+# FLAT_STRIDE = Usa la stessa permutazione di Feistel a passo diadico Hilbert 1D della selezione diretta.
+# BINNED_AMORTIZED = Usa PRP raggruppato per file di regione con quote di lotto ammortizzate e passo diadico interno.
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+strategiaGenerazioneArretrato: "FLAT_STRIDE"
+
 # Probabilità di rifiutare un chunk non generato per tentativo.
 # 0.0 = nessun bias, 1.0 = evita terreni non generati. I chunk generati passano sempre.
 # @type: number

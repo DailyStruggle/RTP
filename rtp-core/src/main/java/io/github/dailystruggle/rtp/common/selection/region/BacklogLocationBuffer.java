@@ -124,6 +124,7 @@ public final class BacklogLocationBuffer {
 
   /**
    * Appends a fresh {@link Validity#UNVERIFIED} entry wrapping {@code location}.
+   * Recycles any empty (nulled) slot left by a previous poll before expanding the array.
    *
    * @param location candidate location; never {@code null}
    * @return the newly created entry, or {@code null} if the buffer is at capacity
@@ -133,7 +134,29 @@ public final class BacklogLocationBuffer {
     BacklogEntry entry = new BacklogEntry(location);
     for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
       BacklogEntry[] curr = state.get();
-      if (curr.length >= capacity) return null;
+
+      // First check for a recycled null slot
+      int nullIdx = -1;
+      int activeCount = 0;
+      for (int i = 0; i < curr.length; i++) {
+        if (curr[i] == null) {
+          if (nullIdx < 0) nullIdx = i;
+        } else {
+          activeCount++;
+        }
+      }
+
+      if (nullIdx >= 0) {
+        BacklogEntry[] next = curr.clone();
+        next[nullIdx] = entry;
+        if (state.compareAndSet(curr, next)) {
+          return entry;
+        }
+        continue;
+      }
+
+      if (activeCount >= capacity || curr.length >= capacity) return null;
+
       BacklogEntry[] next = Arrays.copyOf(curr, curr.length + 1);
       next[curr.length] = entry;
       if (state.compareAndSet(curr, next)) {
@@ -141,6 +164,57 @@ public final class BacklogLocationBuffer {
       }
     }
     return null;
+  }
+
+  /**
+   * Polls up to {@code maxN} validated entries chosen at random across the buffer.
+   * Nulls the polled entries in-place so their slots can be refilled without array shrinkage,
+   * completely avoiding array copy-then-swap compaction on the promotion path.
+   *
+   * @param maxN maximum validated entries to return (non-negative)
+   * @return validated entries pulled randomly (never null)
+   */
+  public List<BacklogEntry> pollRandomValidated(int maxN) {
+    if (maxN < 0) throw new IllegalArgumentException("maxN must be non-negative: " + maxN);
+    if (maxN == 0) return Collections.emptyList();
+
+    java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+    for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
+      BacklogEntry[] curr = state.get();
+      if (curr.length == 0) return Collections.emptyList();
+
+      List<Integer> validatedIndices = new ArrayList<>();
+      for (int i = 0; i < curr.length; i++) {
+        BacklogEntry e = curr[i];
+        if (e != null && e.validity() == Validity.VALIDATED) {
+          validatedIndices.add(i);
+        }
+      }
+
+      if (validatedIndices.isEmpty()) return Collections.emptyList();
+
+      int toTake = Math.min(maxN, validatedIndices.size());
+      // Fisher-Yates partial shuffle of candidate indices
+      for (int i = 0; i < toTake; i++) {
+        int swapIdx = i + rng.nextInt(validatedIndices.size() - i);
+        int temp = validatedIndices.get(i);
+        validatedIndices.set(i, validatedIndices.get(swapIdx));
+        validatedIndices.set(swapIdx, temp);
+      }
+
+      List<BacklogEntry> out = new ArrayList<>(toTake);
+      BacklogEntry[] next = curr.clone();
+      for (int i = 0; i < toTake; i++) {
+        int idx = validatedIndices.get(i);
+        out.add(curr[idx]);
+        next[idx] = null; // null slot directly for O(1) recycling
+      }
+
+      if (state.compareAndSet(curr, next)) {
+        return out;
+      }
+    }
+    return Collections.emptyList();
   }
 
   /**
@@ -160,7 +234,10 @@ public final class BacklogLocationBuffer {
       List<BacklogEntry> out = new ArrayList<>(Math.min(maxN, 16));
       while (headIdx < curr.length) {
         BacklogEntry head = curr[headIdx];
-        if (head == null) break;
+        if (head == null) {
+          headIdx++;
+          continue;
+        }
         Validity v = head.validity();
         if (v == Validity.INVALIDATED) {
           headIdx++;
@@ -189,6 +266,15 @@ public final class BacklogLocationBuffer {
   }
 
   /**
+   * Returns a snapshot array of the current entries in the buffer (including nulled slots).
+   *
+   * @return array copy of current internal buffer state
+   */
+  public BacklogEntry[] snapshot() {
+    return state.get().clone();
+  }
+
+  /**
    * Returns the oldest entry whose validity is still {@link Validity#UNVERIFIED},
    * or {@code null} if the buffer contains no such entry. Used to pick
    * the next bin to verify in {@code Region.execute()}.
@@ -204,12 +290,17 @@ public final class BacklogLocationBuffer {
   }
 
   /**
-   * Returns the current entry count, including all validity states.
+   * Returns the current entry count, including all validity states, excluding recycled null slots.
    *
-   * @return current entry count
+   * @return current active entry count
    */
   public int size() {
-    return state.get().length;
+    BacklogEntry[] curr = state.get();
+    int count = 0;
+    for (BacklogEntry e : curr) {
+      if (e != null) count++;
+    }
+    return count;
   }
 
   /**
@@ -251,19 +342,23 @@ public final class BacklogLocationBuffer {
     for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
       BacklogEntry[] curr = state.get();
       int invalidCount = 0;
+      int nullCount = 0;
       for (BacklogEntry e : curr) {
-        if (e != null && e.validity() == Validity.INVALIDATED) {
+        if (e == null) {
+          nullCount++;
+        } else if (e.validity() == Validity.INVALIDATED) {
           invalidCount++;
         }
       }
-      if (invalidCount == 0) return 0;
+      if (invalidCount == 0 && nullCount == 0) return 0;
 
+      int deadCount = invalidCount + nullCount;
       boolean shouldClean = (curr.length >= capacity)
-          || (invalidCount >= Math.max(4, capacity / 4));
+          || (deadCount >= Math.max(4, capacity / 4));
 
       if (!shouldClean) return 0;
 
-      BacklogEntry[] next = new BacklogEntry[curr.length - invalidCount];
+      BacklogEntry[] next = new BacklogEntry[curr.length - deadCount];
       int idx = 0;
       for (BacklogEntry e : curr) {
         if (e != null && e.validity() != Validity.INVALIDATED) {
@@ -279,8 +374,8 @@ public final class BacklogLocationBuffer {
   }
 
   /**
-   * Removes all entries tagged {@link Validity#INVALIDATED} using lock-free copy-then-swap compaction
-   * while preserving the relative FIFO order of surviving entries.
+   * Removes all entries tagged {@link Validity#INVALIDATED} and any nulled slots
+   * using lock-free copy-then-swap compaction while preserving the relative FIFO order of surviving entries.
    *
    * @return number of removed entries
    */
@@ -288,14 +383,18 @@ public final class BacklogLocationBuffer {
     for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
       BacklogEntry[] curr = state.get();
       int invalidCount = 0;
+      int nullCount = 0;
       for (BacklogEntry e : curr) {
-        if (e != null && e.validity() == Validity.INVALIDATED) {
+        if (e == null) {
+          nullCount++;
+        } else if (e.validity() == Validity.INVALIDATED) {
           invalidCount++;
         }
       }
-      if (invalidCount == 0) return 0;
+      if (invalidCount == 0 && nullCount == 0) return 0;
 
-      BacklogEntry[] next = new BacklogEntry[curr.length - invalidCount];
+      int deadCount = invalidCount + nullCount;
+      BacklogEntry[] next = new BacklogEntry[curr.length - deadCount];
       int idx = 0;
       for (BacklogEntry e : curr) {
         if (e != null && e.validity() != Validity.INVALIDATED) {

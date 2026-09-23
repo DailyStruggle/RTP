@@ -265,7 +265,7 @@ public class RegionLifecycleAndBranchTest {
 
     @Test
     void clone_params_and_displayName() {
-        Region region = new Region("clone_reg", createValidSettings("clone_reg", new Circle()));
+        Region region = new Region("clone_reg", createValidSettings("clone_reg", new Circle("CIRCLE")));
 
         Region cloned = region.clone();
         assertNotNull(cloned);

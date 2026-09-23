@@ -279,9 +279,12 @@ public class DistanceParameterTest {
 
     Region executedRegion = RTP.selectionAPI.tempRegions.get(playerId);
     assertNotNull(executedRegion);
-    Square shape = (Square) executedRegion.getShape();
+    Shape<?> shape = executedRegion.getShape();
     assertNotNull(shape);
-    assertEquals(256L, shape.getNumber(GenericMemoryShapeParams.radius, 0L).longValue(),
+    assertInstanceOf(MemoryShape.class, shape);
+    @SuppressWarnings("unchecked")
+    MemoryShape<GenericMemoryShapeParams> memShape = (MemoryShape<GenericMemoryShapeParams>) shape;
+    assertEquals(256L, memShape.getNumber(GenericMemoryShapeParams.radius, 0L).longValue(),
         "4096b must convert to 256 chunks");
   }
 
@@ -309,8 +312,10 @@ public class DistanceParameterTest {
     assertNotNull(executedRegion);
     Shape<?> shape = executedRegion.getShape();
     assertNotNull(shape);
-    assertInstanceOf(Circle.class, shape);
-    assertEquals(256L, ((Circle) shape).getNumber(GenericMemoryShapeParams.radius, 0L).longValue(),
+    assertInstanceOf(MemoryShape.class, shape);
+    @SuppressWarnings("unchecked")
+    MemoryShape<GenericMemoryShapeParams> memShape = (MemoryShape<GenericMemoryShapeParams>) shape;
+    assertEquals(256L, memShape.getNumber(GenericMemoryShapeParams.radius, 0L).longValue(),
         "256c must convert to 256 chunks");
   }
 
@@ -338,8 +343,10 @@ public class DistanceParameterTest {
     assertNotNull(executedRegion);
     Shape<?> shape = executedRegion.getShape();
     assertNotNull(shape);
-    assertInstanceOf(Square.class, shape);
-    assertEquals(128L, ((Square) shape).getNumber(GenericMemoryShapeParams.radius, 0L).longValue(),
+    assertInstanceOf(MemoryShape.class, shape);
+    @SuppressWarnings("unchecked")
+    MemoryShape<GenericMemoryShapeParams> memShape = (MemoryShape<GenericMemoryShapeParams>) shape;
+    assertEquals(128L, memShape.getNumber(GenericMemoryShapeParams.radius, 0L).longValue(),
         "4r must convert to 128 chunks (4 * 32 chunks)");
   }
 
@@ -367,8 +374,10 @@ public class DistanceParameterTest {
     assertNotNull(executedRegion);
     Shape<?> shape = executedRegion.getShape();
     assertNotNull(shape);
-    assertInstanceOf(Circle.class, shape);
-    assertEquals(312.5, ((Circle) shape).getNumber(GenericMemoryShapeParams.radius, 0.0).doubleValue(), 0.001,
+    assertInstanceOf(MemoryShape.class, shape);
+    @SuppressWarnings("unchecked")
+    MemoryShape<GenericMemoryShapeParams> memShape = (MemoryShape<GenericMemoryShapeParams>) shape;
+    assertEquals(312.5, memShape.getNumber(GenericMemoryShapeParams.radius, 0.0).doubleValue(), 0.001,
         "5km (5000 blocks) must convert to 312.5 chunks");
   }
 

@@ -85,6 +85,14 @@ beiChunkLadenPruefen: true
 # @default: 0.5
 rueckstauAuffuellSchwelle: 0.5
 
+# Strategie zur Kandidatengenerierung im Rueckstau-Cache.
+# FLAT_STRIDE = Verwendet dieselbe 1D-Hilbert-Dyadic-Stride-Feistel-Permutation wie die Live-Auswahl.
+# BINNED_AMORTIZED = Verwendet regionsdatei-gebundenes PRP mit amortisierten Batch-Quoten und binneneigenem Dyadic-Stride.
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+rueckstauGenerierungsStrategie: "FLAT_STRIDE"
+
 # Wahrscheinlichkeit, einen ungenerierten Chunk pro Versuch abzulehnen.
 # 0.0 = kein Bias, 1.0 = ungeneriertes Land meiden. Generierte Chunks passieren immer.
 # @type: number

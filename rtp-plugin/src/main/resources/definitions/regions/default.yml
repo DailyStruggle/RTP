@@ -76,7 +76,7 @@ price: 0.0
 #   plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
 #   plugins/RTP/docs/admin/configuration/REGIONS.md
 # Max pre-calculated safe locations. Example override:
-#   cacheCap: 10
+#   cacheCap: 64
 cacheCap: "@config"
 
 # Backlog cache capacity for candidate locations pre-filtered before full safety checks. 0 disables it.
@@ -85,7 +85,7 @@ cacheCap: "@config"
 backlogCacheCap: "@config"
 
 # Max chunks kept loaded for zero-latency. Example override:
-#   activeChunkCap: 64
+#   activeChunkCap: 10
 activeChunkCap: "@config"
 
 # Precision for bad-location tracking (1-5). Example override:

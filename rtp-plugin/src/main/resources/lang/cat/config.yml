@@ -108,7 +108,7 @@ defaults:
     # @source: shape
     name: "CIRCLE"
     mode: "ACCUMULATE"
-    radius: 256
+    radius: 4096b
     centerRadius: 64
     centerX: 0
     centerZ: 0
