@@ -110,7 +110,7 @@ public final class Runner {
     /** Attempts dispatched to the current measurement target this phase. Reset
      *  to 0 at every measurement phase begin; drives the {@code per-target-count}
      *  cap. Not counted during warm-up. */
-    private volatile int seqPhaseDispatched = 0;
+    private final AtomicInteger seqPhaseDispatched = new AtomicInteger(0);
 
     // SEQUENCE warm-up state. When `warmupActive` is true, the run loop cycles
     // every configured target for `warmupSliceMs` each, `warmupCycles` times,
@@ -314,7 +314,7 @@ public final class Runner {
         this.seqPerTargetMs = Math.max(1L, perTargetSeconds) * 1000L;
         this.seqGapMs = Math.max(0L, gapSeconds) * 1000L;
         this.seqPerTargetCount = Math.max(0L, config.getLong("per-target-count", 0L));
-        this.seqPhaseDispatched = 0;
+        this.seqPhaseDispatched.set(0);
         long now = System.currentTimeMillis();
         this.seqPhaseEndMs = now + seqPerTargetMs;
         this.seqGapEndMs = 0L;
@@ -738,7 +738,7 @@ public final class Runner {
                         return;
                     }
                     seqPhaseEndMs = now + seqPerTargetMs;
-                    seqPhaseDispatched = 0;
+                    seqPhaseDispatched.set(0);
                     nextDispatchAt.clear();
                     lastProgressEpochMs = now;
                     spark.startPhase(seqTargets.get(seqIndex).label);
@@ -798,7 +798,7 @@ public final class Runner {
                         seqIndex++;
                         if (seqIndex >= seqTargets.size()) { stop(); return; }
                         seqPhaseEndMs = now + seqPerTargetMs;
-                        seqPhaseDispatched = 0;
+                        seqPhaseDispatched.set(0);
                         nextDispatchAt.clear();
                         lastProgressEpochMs = now;
                         spark.startPhase(seqTargets.get(seqIndex).label);
@@ -846,7 +846,7 @@ public final class Runner {
                 lastDispatchStartEpochMs = System.currentTimeMillis();
                 lastProgressEpochMs = lastDispatchStartEpochMs;
                 if (mode == Mode.BURST) burstRemaining--;
-                if (mode == Mode.SEQUENCE && !warmupActive) seqPhaseDispatched++;
+                if (mode == Mode.SEQUENCE && !warmupActive) seqPhaseDispatched.incrementAndGet();
             }
         } catch (Throwable t) {
             plugin.getLogger().log(Level.WARNING, "StressTestRTP runner tick failed", t);
@@ -1178,7 +1178,7 @@ public final class Runner {
     private boolean seqCountCapReached() {
         return mode == Mode.SEQUENCE && !warmupActive
                 && seqPerTargetCount > 0L
-                && seqPhaseDispatched >= seqPerTargetCount;
+                && seqPhaseDispatched.get() >= seqPerTargetCount;
     }
 
     public String operatorName() { return operatorName; }

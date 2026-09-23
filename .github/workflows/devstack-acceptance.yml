@@ -63,13 +63,7 @@ jobs:
       - name: Install bot dependencies (for roundtrip scenario)
         working-directory: devstack/clients
         run: |
-          # npm ci requires a committed package-lock.json; fall back to npm install
-          # when the lockfile is absent so the nightly harness still provisions deps.
-          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-            npm ci --ignore-scripts
-          else
-            npm install --ignore-scripts --no-audit --no-fund
-          fi
+          npm ci --ignore-scripts
 
       - name: Run devstack acceptance harness
         id: acceptance

@@ -65,6 +65,7 @@ public final class JfrAllocationProfiler {
     private final long maxSizeBytes;
     /** label -> package prefix, e.g. {@code rtp -> io.github.dailystruggle.rtp}. */
     private final Map<String, String> trackedPrefixes;
+    private final Path tempDir;
 
     /** JFR usable at all (probed once). */
     private final boolean capable;
@@ -78,9 +79,19 @@ public final class JfrAllocationProfiler {
                                  String throttle,
                                  long maxSizeBytes,
                                  Map<String, String> trackedPrefixes) {
+        this(log, enabled, throttle, maxSizeBytes, trackedPrefixes, null);
+    }
+
+    public JfrAllocationProfiler(Logger log,
+                                 boolean enabled,
+                                 String throttle,
+                                 long maxSizeBytes,
+                                 Map<String, String> trackedPrefixes,
+                                 Path tempDir) {
         this.log = log;
         this.throttle = (throttle == null || throttle.isBlank()) ? "300/s" : throttle;
         this.maxSizeBytes = maxSizeBytes > 0 ? maxSizeBytes : 256L * 1024 * 1024;
+        this.tempDir = tempDir;
         this.trackedPrefixes = new LinkedHashMap<>();
         if (trackedPrefixes != null) {
             for (Map.Entry<String, String> e : trackedPrefixes.entrySet()) {
@@ -129,9 +140,16 @@ public final class JfrAllocationProfiler {
         if (!capable) return;
         stopQuietly();
         currentLabel = label == null ? "" : label;
+        Path dump = null;
+        Recording rec = null;
         try {
-            Path dump = Files.createTempFile("stressrtp-jfr-", ".jfr");
-            Recording rec = new Recording();
+            Path dir = this.tempDir;
+            if (dir == null) {
+                dir = Path.of("temp");
+            }
+            Files.createDirectories(dir);
+            dump = Files.createTempFile(dir, "stressrtp-jfr-", ".jfr");
+            rec = new Recording();
             rec.enable("jdk.ObjectAllocationSample").with("throttle", throttle);
             rec.setToDisk(true);
             rec.setMaxSize(maxSizeBytes);
@@ -140,6 +158,12 @@ public final class JfrAllocationProfiler {
             this.currentDump = dump;
             this.recording = rec;
         } catch (Throwable t) {
+            if (rec != null) {
+                try { rec.close(); } catch (Throwable ignored) { /* best effort */ }
+            }
+            if (dump != null) {
+                try { Files.deleteIfExists(dump); } catch (Throwable ignored) { /* best effort */ }
+            }
             if (log != null) {
                 log.log(Level.WARNING, "[StressTestRTP] JFR recording failed to start for phase '"
                         + currentLabel + "'; JFR columns not measured this phase: " + t);

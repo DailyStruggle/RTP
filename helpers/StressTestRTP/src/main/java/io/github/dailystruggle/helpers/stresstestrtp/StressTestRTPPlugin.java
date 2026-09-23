@@ -94,7 +94,8 @@ public final class StressTestRTPPlugin extends JavaPlugin {
                     true,
                     getConfig().getString("jfr-allocation.throttle", "300/s"),
                     getConfig().getLong("jfr-allocation.max-size-mb", 256L) * 1024L * 1024L,
-                    resolveTrackedAllocPackages());
+                    resolveTrackedAllocPackages(),
+                    getDataFolder().toPath().resolve("temp"));
             if (jfrProfiler.available()) {
                 getLogger().info("StressTestRTP: per-plugin allocation profiling on "
                         + "(jdk.ObjectAllocationSample); target/total bytes per phase plus "

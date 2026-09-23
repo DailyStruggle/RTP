@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
@@ -198,7 +199,7 @@ public final class TicketFootprintProbe implements Listener {
     private volatile boolean registered = false;
     /** True while a probe sequence is in flight, so a rerun cannot overlap. */
     private volatile boolean probing = false;
-    private volatile int reruns = 0;
+    private final AtomicInteger reruns = new AtomicInteger(0);
     /** Window-local samples, written and read only on tick/region threads in
      *  probe order, then published into the volatile fields above. */
     private long heapBeforeBytes = NO_DATA;
@@ -238,14 +239,14 @@ public final class TicketFootprintProbe implements Listener {
      * has settled, since the enable-time attempt races start-up traffic.
      */
     public boolean needsRerun() {
-        return registered && !everProbed && !probing && reruns < MAX_RERUNS;
+        return registered && !everProbed && !probing && reruns.get() < MAX_RERUNS;
     }
 
     /** Re-executes the probe from scratch. No-op while one is in flight. */
     public void rerun() {
         if (!registered || probing) return;
-        reruns++;
-        plugin.getLogger().info("[StressTestRTP] TicketFootprintProbe: rerun " + reruns
+        int rerunCount = reruns.incrementAndGet();
+        plugin.getLogger().info("[StressTestRTP] TicketFootprintProbe: rerun " + rerunCount
                 + " of " + MAX_RERUNS + " (previous result: "
                 + (failureReason.isEmpty() ? "none" : failureReason) + ").");
         Sched.runGlobal(plugin, this::beginProbe);
@@ -628,7 +629,7 @@ public final class TicketFootprintProbe implements Listener {
         sb.append("platform: ").append(Sched.isFolia() ? "folia" : "bukkit-family")
                 .append(System.lineSeparator());
         sb.append("server: ").append(plugin.getServer().getVersion()).append(System.lineSeparator());
-        sb.append("reruns: ").append(reruns).append(System.lineSeparator());
+        sb.append("reruns: ").append(reruns.get()).append(System.lineSeparator());
         if (!everProbed) {
             sb.append("result: NOT MEASURED (").append(failureReason).append(')')
                     .append(System.lineSeparator());
