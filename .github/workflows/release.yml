@@ -1,8 +1,18 @@
-name: Release rtp-lite to Modrinth
+name: Release rtp-lite to Modrinth, Hangar and GitHub Releases (markdown sites)
 
-# Publishes the lite assembly variant (ADR-024) to the Modrinth project
-# `rtp-lite` (https://modrinth.com/project/rtp-lite) on every tag matching
-# `v*` (e.g. `v1.0.0`, `v1.0.1-beta.1`).
+# Owns the Git / markdown-listing side of a single release: creates and pushes
+# the `v<version>` tag, publishes to Modrinth and Hangar (project body +
+# version), and creates the public GitHub Release. It triggers on the same
+# PR-merge (or workflow_dispatch) event as release-bbb.yml, so the two
+# workflows run independently and each site is published exactly once with no
+# cross-workflow coupling:
+#   - release-bbb.yml: BuiltByBit (Pro + Lite BBCode pages), Spigot.
+#   - release.yml (this file): the `v<version>` tag + Modrinth + Hangar (markdown) + GitHub Releases.
+#
+# Publishes the lite assembly variant (ADR-024, Lite only) to the Modrinth
+# project `rtp-lite` (https://modrinth.com/project/rtp-lite) and the Hangar
+# project `leaf26/LeafRTP` (https://hangar.papermc.io/leaf26/LeafRTP). Pro is
+# never published to nor advertised on Hangar.
 #
 # Release notes are taken from CHANGELOG.md (the section matching the tag's
 # version string), with any bullet tagged `**(Pro)**` stripped out so the
@@ -12,18 +22,26 @@ name: Release rtp-lite to Modrinth
 # top of CHANGELOG.md for the marker contract.
 
 on:
-  push:
-    tags:
-      - 'v*'
+  pull_request:
+    types: [closed]
+    branches:
+      - V3
+      - V2
+      - V1
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag to release (e.g. v1.0.0). Must already exist.'
-        required: true
+      version:
+        description: 'Version string to release (e.g. 3.2.3). If omitted, read from gradle.properties.'
+        required: false
         type: string
 
 jobs:
   release:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       (startsWith(github.head_ref, 'v') || startsWith(github.head_ref, 'V')) &&
+       contains(github.head_ref, '.'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -34,19 +52,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          # workflow_dispatch path: check out the requested tag explicitly.
-          ref: ${{ github.event.inputs.tag || github.ref }}
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Derive version from tag
+      # This workflow owns the tag: derive the version from the merged version
+      # branch name (v3.2.3 -> 3.2.3) or the workflow_dispatch input, falling
+      # back to gradle.properties. The tag is created later, after the build.
+      - name: Determine release version
         id: version
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          RAW_TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          # Strip the `v` prefix (e.g. `v1.0.0` -> `1.0.0`).
-          VERSION="${RAW_TAG#v}"
-          echo "tag=${RAW_TAG}" >> "$GITHUB_OUTPUT"
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          elif [[ "$HEAD_REF" =~ ^[vV]([0-9]+\.[0-9]+.*)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+          else
+            VERSION=$(grep -E '^version=' gradle.properties | cut -d '=' -f 2 | tr -d '[:space:]')
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not determine release version."
+            exit 1
+          fi
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Releasing lite version: ${VERSION} (from tag ${RAW_TAG})"
+          echo "Releasing lite version: ${VERSION} (tag v${VERSION})"
 
       - name: Set up JDK 21
         uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
@@ -197,6 +227,24 @@ jobs:
         with:
           subject-path: ${{ steps.artifact.outputs.lite_jar }}
 
+      # Create and push the release tag now that the build has succeeded. This
+      # workflow owns the tag (it is the one that needs it for the GitHub
+      # Release below). release-bbb.yml does NOT tag.
+      - name: Create and push Git tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists locally or remotely. Skipping tag creation."
+          else
+            echo "Creating and pushing tag ${TAG}..."
+            git tag -a "$TAG" -m "Release ${TAG}"
+            git push origin "$TAG"
+          fi
+
       - name: Publish GitHub Release (Items 37, 39, 42)
         uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d190 # v2.0.8
         with:
@@ -264,3 +312,32 @@ jobs:
           # artifact on Modrinth and contradict S-004 (no silently swallowed
           # failures).
           fail-mode: fail
+
+      - name: Update Modrinth project description
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        run: |
+          python3 scripts/release/update_modrinth_description.py --project-id rtp-lite
+
+      # Hangar (https://hangar.papermc.io/leaf26/LeafRTP) hosts the Lite variant
+      # only; Pro is neither published nor advertised there. mc-publish supports
+      # only CurseForge/Modrinth/GitHub, so Hangar is published directly against
+      # its REST API via a stdlib script. The script targets the Paper platform
+      # (covers Bukkit/Spigot/Paper/Folia) and filters the MC version list to
+      # what Hangar recognizes. It fails closed on any API error (S-004).
+      - name: Publish version to Hangar
+        env:
+          HANGAR_TOKEN: ${{ secrets.HANGAR_TOKEN }}
+        run: |
+          python3 scripts/release/publish_hangar_version.py \
+            --project LeafRTP \
+            --file "${{ steps.artifact.outputs.lite_jar }}" \
+            --version "${{ steps.version.outputs.version }}" \
+            --version-type "${{ contains(steps.version.outputs.version, 'beta') && 'beta' || contains(steps.version.outputs.version, 'alpha') && 'alpha' || 'release' }}" \
+            --changelog-file release-notes.md
+
+      - name: Update Hangar project description
+        env:
+          HANGAR_TOKEN: ${{ secrets.HANGAR_TOKEN }}
+        run: |
+          python3 scripts/release/update_hangar_description.py --project LeafRTP

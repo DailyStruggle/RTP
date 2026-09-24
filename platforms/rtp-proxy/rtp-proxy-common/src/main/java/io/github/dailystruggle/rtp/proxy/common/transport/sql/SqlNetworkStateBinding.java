@@ -395,6 +395,66 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
     }
 
     @Override
+    public CompletableFuture<Void> setLastTeleportTime(UUID playerId, long epochMillis) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.runAsync(() -> setLastTeleportTimeSync(playerId, epochMillis), executor);
+    }
+
+    private void setLastTeleportTimeSync(UUID playerId, long epochMillis) {
+        String sql;
+        switch (dialect) {
+            case MYSQL -> sql = """
+                    INSERT INTO rtp_network_last_teleport (player_id, last_teleport_ms)
+                    VALUES (?, ?)
+                    ON DUPLICATE KEY UPDATE last_teleport_ms = VALUES(last_teleport_ms)
+                    """;
+            case POSTGRES, SQLITE -> sql = """
+                    INSERT INTO rtp_network_last_teleport (player_id, last_teleport_ms)
+                    VALUES (?, ?)
+                    ON CONFLICT (player_id) DO UPDATE SET last_teleport_ms = EXCLUDED.last_teleport_ms
+                    """;
+            case H2, UNKNOWN -> sql = """
+                    MERGE INTO rtp_network_last_teleport (player_id, last_teleport_ms)
+                    KEY (player_id)
+                    VALUES (?, ?)
+                    """;
+            default -> throw new IllegalStateException("Unknown dialect: " + dialect);
+        }
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, playerId.toString());
+            ps.setLong(2, epochMillis);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("SqlNetworkStateBinding.setLastTeleportTime failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public CompletableFuture<Long> getLastTeleportTime(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> getLastTeleportTimeSync(playerId), executor);
+    }
+
+    private long getLastTeleportTimeSync(UUID playerId) {
+        String sql = "SELECT last_teleport_ms FROM rtp_network_last_teleport WHERE player_id = ?";
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, playerId.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong("last_teleport_ms");
+                }
+                return 0L;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("SqlNetworkStateBinding.getLastTeleportTime failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public void close() {
         if (!open.compareAndSet(true, false)) return;
         if (ownsPoller) {

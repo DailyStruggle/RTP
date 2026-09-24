@@ -145,6 +145,7 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
     return Math.min(total - 1, Math.max(0L, candidate));
   }
 
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: double-checked phase-window rotation guards a single-winner batch reseed across atomics
   protected int getOrRotatePhaseOffset(int stride, int bits, long curEpoch) {
     if (activeWindowRemaining.decrementAndGet() <= 0) {
       synchronized (this) {

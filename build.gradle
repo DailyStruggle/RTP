@@ -600,7 +600,6 @@ if (findProject(':rtp-plugin') != null) {
 def executableAddonHelperPaths = [
         ':addons:LeafRTPGuiAddon:rtp-gui',
         ':addons:LeafRTPCountdownAddon',
-        ':addons:LeafRTPLinearAddon',
         ':helpers:PeriodicWorldSaver',
         ':helpers:StressTestRTP',
 ].findAll { findProject(it) != null }

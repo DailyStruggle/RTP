@@ -126,15 +126,23 @@ public class SubspaceShape {
 
   /**
    * Stage 1: whether the chunk at chunk-offset {@code (cdx, cdz)} from the anchor chunk is known bad
-   * in the inherited parent spatial memory. Coordinates are chunk units, not blocks.
+   * or outside bounds in the inherited parent spatial memory. Coordinates are chunk units, not blocks.
    *
    * @param cdx chunk-X offset from the anchor's chunk
    * @param cdz chunk-Z offset from the anchor's chunk
-   * @return true if that chunk is known bad in the parent {@link MemoryShape}
+   * @return true if that chunk is known bad or outside the parent region
    */
   public boolean isChunkKnownBad(int cdx, int cdz) {
-    if (parentShape == null) return false;
-    return parentShape.isKnownBad(anchorCX + cdx, anchorCZ + cdz);
+    int cx = anchorCX + cdx;
+    int cz = anchorCZ + cdz;
+    if (parentShape != null) {
+      if (!parentShape.contains(cx, cz)) return true;
+      return parentShape.isKnownBad(cx, cz);
+    }
+    if (parentRegion != null && parentRegion.getShape() != null) {
+      return !parentRegion.getShape().contains(cx, cz);
+    }
+    return false;
   }
 
   /**
@@ -223,24 +231,11 @@ public class SubspaceShape {
     // Lattice half-extent in units: how many d-steps fit within the footprint half-width.
     final int m = (getFootprintBlocks() / 2) / d;
 
-    // Enumerate masked lattice cells and run the arithmetic capacity pre-check in one pass.
-    List<int[]> cells = new ArrayList<>();
-    int badCells = 0;
-    for (int i = -m; i <= m; i++) {
-      for (int j = -m; j <= m; j++) {
-        if (distributionShape != null && !distributionShape.contains(i, j)) continue;
-        int worldX = projectX(i * d);
-        int worldZ = projectZ(j * d);
-        int cdx = (worldX >> 4) - anchorCX;
-        int cdz = (worldZ >> 4) - anchorCZ;
-        // Clamp the lattice to the chunk footprint: a cell whose chunk lies outside the
-        // (2*chunkRadius+1)^2 Stage-1 footprint is not part of this subspace.
-        if (Math.abs(cdx) > chunkRadius || Math.abs(cdz) > chunkRadius) continue;
-        cells.add(new int[] {worldX, worldZ});
-        if (isChunkKnownBad(cdx, cdz)) badCells++;
-      }
-    }
-    if (cells.size() - badCells < memberCount) {
+    // Fast Path: If parent memory exposes a direct bitmask container/table, execute
+    // Bin Accumulate Repackaging (ADR-096) to select viable candidate cells without
+    // per-point polling overhead.
+    List<int[]> cells = selectLatticeCells(d, m, distributionShape);
+    if (cells.size() < memberCount) {
       // Upper bound below required: deny fail-closed (INSUFFICIENT_SAFE_SLOTS) with no column work.
       return Collections.emptyList();
     }
@@ -263,5 +258,150 @@ public class SubspaceShape {
 
     if (selected.size() < memberCount) return Collections.emptyList();
     return new ArrayList<>(selected);
+  }
+
+  /**
+   * Selects safe landing slots grouped into spatial clusters (e.g. 1v1, 2v2, 1v2, teams).
+   *
+   * <p>Cluster centers are spaced by at least {@code minClusterSeparation} across the subspace.
+   * Members of each cluster are placed tightly within {@code intraClusterRadius} of their
+   * cluster center, satisfying {@code elevationTolerance}.
+   *
+   * @param clusterSizes sizes of each cluster (e.g. [2, 2] for 2v2, [1, 2] for 1v2)
+   * @param minClusterSeparation minimum clearance between different cluster centers
+   * @param intraClusterRadius maximum radius around a cluster center for its members
+   * @param elevationTolerance maximum vertical deviation within each cluster
+   * @param distributionShape optional shape mask
+   * @param validator block-level candidate validator
+   * @return list of slot lists corresponding to each cluster, or empty list if placement fails
+   */
+  public List<List<RTPLocation>> selectSafeClusterSlots(
+      List<Integer> clusterSizes,
+      int minClusterSeparation,
+      int intraClusterRadius,
+      int elevationTolerance,
+      Shape<?> distributionShape,
+      CandidateValidator validator) {
+    Objects.requireNonNull(validator, "validator cannot be null");
+    if (clusterSizes == null || clusterSizes.isEmpty()) return Collections.emptyList();
+
+    int totalMembers = 0;
+    for (int size : clusterSizes) {
+      if (size <= 0) return Collections.emptyList();
+      totalMembers += size;
+    }
+
+    final int d = Math.max(1, minClusterSeparation);
+    final int intraR = Math.max(1, intraClusterRadius);
+    final int anchorY = anchor.coords().y();
+    final int m = (getFootprintBlocks() / 2) / d;
+
+    List<int[]> latticeCells = selectLatticeCells(d, m, distributionShape);
+    if (latticeCells.size() < clusterSizes.size()) {
+      return Collections.emptyList(); // Not enough well-separated cluster centers available
+    }
+
+    Collections.shuffle(latticeCells, ThreadLocalRandom.current());
+
+    // Try finding valid cluster centers and safe columns for each cluster
+    List<List<RTPLocation>> clusteredPlacements = new ArrayList<>(clusterSizes.size());
+    List<int[]> chosenCenters = new ArrayList<>();
+
+    for (int clusterIdx = 0; clusterIdx < clusterSizes.size(); clusterIdx++) {
+      int requiredInCluster = clusterSizes.get(clusterIdx);
+      boolean clusterPlaced = false;
+
+      for (int[] candidateCenter : latticeCells) {
+        // Must be sufficiently separated from already chosen cluster centers
+        boolean separatedFromAll = true;
+        for (int[] chosen : chosenCenters) {
+          long dx = (long) candidateCenter[0] - chosen[0];
+          long dz = (long) candidateCenter[1] - chosen[1];
+          if ((dx * dx + dz * dz) < ((long) minClusterSeparation * minClusterSeparation)) {
+            separatedFromAll = false;
+            break;
+          }
+        }
+        if (!separatedFromAll) continue;
+
+        // Try placing requiredInCluster members around this candidate center
+        List<RTPLocation> memberLocs = new ArrayList<>(requiredInCluster);
+        int centerWorldX = candidateCenter[0];
+        int centerWorldZ = candidateCenter[1];
+
+        // Search columns in expanding concentric spiral/boxes around center
+        int maxSearchRadius = Math.max(intraR, 2 * intraR);
+        Integer clusterAnchorY = null;
+
+        for (int r = 0; r <= maxSearchRadius && memberLocs.size() < requiredInCluster; r++) {
+          for (int ox = -r; ox <= r && memberLocs.size() < requiredInCluster; ox++) {
+            for (int oz = -r; oz <= r && memberLocs.size() < requiredInCluster; oz++) {
+              if (Math.abs(ox) != r && Math.abs(oz) != r) continue; // Boundary only for this radius step
+              if ((ox * ox + oz * oz) > (maxSearchRadius * maxSearchRadius)) continue;
+
+              int colX = centerWorldX + ox;
+              int colZ = centerWorldZ + oz;
+
+              int cdx = (colX >> 4) - anchorCX;
+              int cdz = (colZ >> 4) - anchorCZ;
+              if (Math.abs(cdx) > chunkRadius || Math.abs(cdz) > chunkRadius) continue;
+              if (isChunkKnownBad(cdx, cdz)) continue;
+
+              RTPLocation validated = validator.validate(colX, colZ);
+              if (validated == null || validated.coords() == null) continue;
+
+              int vy = validated.coords().y();
+              if (clusterAnchorY == null) {
+                if (elevationTolerance >= 0 && Math.abs(vy - anchorY) > elevationTolerance * 2) continue;
+                clusterAnchorY = vy;
+              } else {
+                if (elevationTolerance >= 0 && Math.abs(vy - clusterAnchorY) > elevationTolerance) continue;
+              }
+
+              memberLocs.add(validated);
+            }
+          }
+        }
+
+        if (memberLocs.size() == requiredInCluster) {
+          chosenCenters.add(candidateCenter);
+          clusteredPlacements.add(Collections.unmodifiableList(memberLocs));
+          clusterPlaced = true;
+          break;
+        }
+      }
+
+      if (!clusterPlaced) {
+        return Collections.emptyList(); // Fail-closed: cannot place full cluster
+      }
+    }
+
+    return Collections.unmodifiableList(clusteredPlacements);
+  }
+
+  /**
+   * Enumerates safe lattice cells across the subspace.
+   * Excludes cells residing in known-bad or out-of-bounds chunks.
+   */
+  private List<int[]> selectLatticeCells(int d, int m, Shape<?> distributionShape) {
+    // If the parent shape is backed by an AnvilRegionBinHazardTable, we can check whole
+    // 32x32 MCA bins upfront: any bin that is full-discarded skips all contained lattice
+    // cells in O(1) without evaluating individual chunks.
+    List<int[]> cells = new ArrayList<>();
+    for (int i = -m; i <= m; i++) {
+      for (int j = -m; j <= m; j++) {
+        if (distributionShape != null && !distributionShape.contains(i, j)) continue;
+        int worldX = projectX(i * d);
+        int worldZ = projectZ(j * d);
+        int cdx = (worldX >> 4) - anchorCX;
+        int cdz = (worldZ >> 4) - anchorCZ;
+        // Clamp the lattice to the chunk footprint: a cell whose chunk lies outside the
+        // (2*chunkRadius+1)^2 Stage-1 footprint is not part of this subspace.
+        if (Math.abs(cdx) > chunkRadius || Math.abs(cdz) > chunkRadius) continue;
+        if (isChunkKnownBad(cdx, cdz)) continue;
+        cells.add(new int[] {worldX, worldZ});
+      }
+    }
+    return cells;
   }
 }

@@ -1,0 +1,29 @@
+# --- actions/default.yml ---
+# Default scripted action template (ADR-093 + ADR-095).
+# Used as the default action definition and template for newly created actions.
+# Plain random scatter teleport reproducing core /rtp on the unified subspace engine.
+
+alias: "wild"
+permission: "rtp.action.default"
+description: "Default safe scatter teleport."
+
+placement:
+  region: "default"
+  profile: "square"
+  anchor: "regionQueue"
+  retries: 3
+  cacheSize: 0
+  parameters:
+    subspaceChunkRadius: 4
+    minSeparation: 32
+    elevationTolerance: 8
+
+confinement:
+  boundary: "SUBSPACE"
+  duration: "0s"
+
+lifecycle:
+  onStart:
+    - PLAYER: "msg &aTeleported to the wild."
+
+version: "1.0"

@@ -232,4 +232,155 @@ public class SubspaceShapeTest {
     List<RTPLocation> slots = subspace.selectSafeSlots(4, 2, -1, null, rejectAll);
     assertTrue(slots.isEmpty(), "validator rejecting all columns must deny allocation fail-closed");
   }
+
+  @Test
+  @DisplayName("Subspace shape-mask: annular ring placement for nearplayer/nearclaim prevents landing at center")
+  void testAnnularRingDistribution() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    Region region = createDummyRegion(memShape);
+    RTPLocation anchor = new RTPLocation(new RTPCoords("world", 1000, 64, 1000), 1);
+    SubspaceShape subspace = new SubspaceShape(anchor, 64, region);
+
+    Circle circleRing = new Circle();
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("radius", 10L);
+    data.put("centerRadius", 3L);
+    data.put("centerX", 0L);
+    data.put("centerZ", 0L);
+    circleRing.setData(data);
+
+    int minSeparation = 4;
+    List<RTPLocation> slots = subspace.selectSafeSlots(1, minSeparation, -1, circleRing, FLAT_GROUND);
+    assertFalse(slots.isEmpty(), "Should place slot in annular ring");
+    RTPCoords placed = slots.get(0).coords();
+
+    double dist = Math.sqrt(Math.pow(placed.x() - 1000, 2) + Math.pow(placed.z() - 1000, 2));
+    assertTrue(dist >= 3 * minSeparation, "Must be outside centerRadius");
+    assertTrue(dist <= 10 * minSeparation, "Must be within outer radius");
+  }
+
+  @Test
+  @DisplayName("Stage 1 bad-location inheritance: chunks outside parent region bounds are known bad")
+  void testParentRegionBoundsInheritance() {
+    // Memory shape where chunk (6, 12) is valid, but chunk (7, 12) is outside parent region bounds
+    DummyMemoryShape memShape = new DummyMemoryShape() {
+      @Override
+      public boolean contains(int x, int z) {
+        return x <= 6; // chunk X > 6 is outside parent shape
+      }
+    };
+    Region region = createDummyRegion(memShape);
+    RTPLocation anchor = new RTPLocation(new RTPCoords("world", 100, 64, 200), 1); // chunk (6, 12)
+    SubspaceShape subspace = new SubspaceShape(anchor, 32, region);
+
+    assertFalse(subspace.isChunkKnownBad(0, 0), "chunk inside parent region must not be bad");
+    assertTrue(subspace.isChunkKnownBad(1, 0), "chunk outside parent bounds must be known bad");
+  }
+
+  @Test
+  @DisplayName("Optimal selection: lattice cells in known-bad chunks are pruned from candidate set")
+  void testOptimalSelectionExcludesBadChunks() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    // Anchor at (100, 200) -> chunk (6, 12).
+    // Mark neighbour chunk (7, 12) bad.
+    memShape.markBadChunk(7, 12);
+    Region region = createDummyRegion(memShape);
+    RTPLocation anchor = new RTPLocation(new RTPCoords("world", 100, 64, 200), 1);
+    SubspaceShape subspace = new SubspaceShape(anchor, 32, region);
+
+    List<RTPLocation> slots = subspace.selectSafeSlots(3, 8, -1, null, FLAT_GROUND);
+    assertFalse(slots.isEmpty(), "Should select safe slots from good chunks");
+    for (RTPLocation loc : slots) {
+      int cx = loc.coords().x() >> 4;
+      int cz = loc.coords().z() >> 4;
+      assertFalse(memShape.isKnownBad(cx, cz), "Selected slot must never be in a known-bad chunk");
+    }
+  }
+
+  @Test
+  @DisplayName("Multi-bin boundary spanning: anchor near chunk boundary correctly selects safe slots")
+  void testMultiBinBoundarySpanning() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    // Anchor placed near a 32-chunk MCA bin edge (e.g. chunk 31, 31) -> world block (31 * 16, 31 * 16) = (496, 496)
+    Region region = createDummyRegion(memShape);
+    RTPLocation anchor = new RTPLocation(new RTPCoords("world", 496, 64, 496), 1);
+    // Subspace radius of 48 blocks spans across chunk boundary into neighbor bin
+    SubspaceShape subspace = new SubspaceShape(anchor, 48, region);
+
+    List<RTPLocation> slots = subspace.selectSafeSlots(4, 12, -1, null, FLAT_GROUND);
+    assertEquals(4, slots.size(), "Must successfully place 4 participants across bin boundary");
+    for (RTPLocation loc : slots) {
+      assertNotNull(loc.coords());
+      assertEquals(64, loc.coords().y());
+    }
+  }
+
+  @Test
+  @DisplayName("Clustered subspace placement: 2v2 groups teammates tightly and separates opposing clusters")
+  void testSelectSafeClusterSlots2v2() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    Region region = createDummyRegion(memShape);
+    RTPLocation anchor = new RTPLocation(new RTPCoords("world", 1000, 64, 1000), 1);
+    SubspaceShape subspace = new SubspaceShape(anchor, 64, region);
+
+    int minClusterSep = 24;
+    int intraClusterRadius = 4;
+    List<Integer> clusterSizes = List.of(2, 2); // 2v2
+
+    List<List<RTPLocation>> clusters =
+        subspace.selectSafeClusterSlots(clusterSizes, minClusterSep, intraClusterRadius, 8, null, FLAT_GROUND);
+
+    assertEquals(2, clusters.size(), "Must return 2 clusters");
+    assertEquals(2, clusters.get(0).size(), "Cluster 1 must have 2 players");
+    assertEquals(2, clusters.get(1).size(), "Cluster 2 must have 2 players");
+
+    // 1. Verify teammates within cluster 1 are close together
+    RTPCoords c1p1 = clusters.get(0).get(0).coords();
+    RTPCoords c1p2 = clusters.get(0).get(1).coords();
+    double intraDist1 = Math.hypot(c1p1.x() - c1p2.x(), c1p1.z() - c1p2.z());
+    assertTrue(intraDist1 <= intraClusterRadius * 2, "Teammates in cluster 1 must be clustered together: " + intraDist1);
+
+    // 2. Verify teammates within cluster 2 are close together
+    RTPCoords c2p1 = clusters.get(1).get(0).coords();
+    RTPCoords c2p2 = clusters.get(1).get(1).coords();
+    double intraDist2 = Math.hypot(c2p1.x() - c2p2.x(), c2p1.z() - c2p2.z());
+    assertTrue(intraDist2 <= intraClusterRadius * 2, "Teammates in cluster 2 must be clustered together: " + intraDist2);
+
+    // 3. Verify opposing cluster members are separated
+    double interDist = Math.hypot(c1p1.x() - c2p1.x(), c1p1.z() - c2p1.z());
+    assertTrue(interDist >= (minClusterSep - intraClusterRadius * 2),
+        "Opposing cluster members must be separated by minClusterSep margin: " + interDist);
+  }
+
+  @Test
+  @DisplayName("Clustered subspace placement: 1v2 (asymmetric Juggernaut) placement succeeds")
+  void testSelectSafeClusterSlots1v2() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    Region region = createDummyRegion(memShape);
+    RTPLocation anchor = new RTPLocation(new RTPCoords("world", 500, 64, 500), 1);
+    SubspaceShape subspace = new SubspaceShape(anchor, 48, region);
+
+    List<Integer> clusterSizes = List.of(1, 2); // 1v2
+    List<List<RTPLocation>> clusters =
+        subspace.selectSafeClusterSlots(clusterSizes, 20, 3, 8, null, FLAT_GROUND);
+
+    assertEquals(2, clusters.size());
+    assertEquals(1, clusters.get(0).size(), "Juggernaut cluster has 1 player");
+    assertEquals(2, clusters.get(1).size(), "Hunters cluster has 2 players");
+  }
+
+  @Test
+  @DisplayName("Clustered subspace placement: fails closed if validator rejects one cluster")
+  void testSelectSafeClusterSlotsFailsClosed() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    Region region = createDummyRegion(memShape);
+    RTPLocation anchor = new RTPLocation(new RTPCoords("world", 0, 64, 0), 1);
+    SubspaceShape subspace = new SubspaceShape(anchor, 16, region);
+
+    // Tiny subspace cannot fit 2 clusters with 32 block separation
+    List<List<RTPLocation>> clusters =
+        subspace.selectSafeClusterSlots(List.of(2, 2), 32, 4, 8, null, FLAT_GROUND);
+
+    assertTrue(clusters.isEmpty(), "Must fail closed if capacity cannot satisfy clusters");
+  }
 }

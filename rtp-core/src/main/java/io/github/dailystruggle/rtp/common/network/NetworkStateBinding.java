@@ -16,4 +16,29 @@ public interface NetworkStateBinding {
     default NetworkTransport transport() {
         return null;
     }
+
+    /**
+     * Read the last teleport timestamp (epoch milliseconds) for a player across the fleet.
+     * Default delegates to {@link #transport()} if present.
+     */
+    default long getLastTeleportTime(java.util.UUID playerId) {
+        NetworkTransport t = transport();
+        if (t == null) return 0L;
+        try {
+            return t.getLastTeleportTime(playerId).get(200, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
+    /**
+     * Record the last teleport timestamp (epoch milliseconds) for a player across the fleet.
+     * Default delegates to {@link #transport()} if present.
+     */
+    default void setLastTeleportTime(java.util.UUID playerId, long epochMillis) {
+        NetworkTransport t = transport();
+        if (t != null) {
+            t.setLastTeleportTime(playerId, epochMillis);
+        }
+    }
 }

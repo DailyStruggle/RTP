@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 1:1 Anvil Region Bin Hazard Table (ADR-092).
@@ -330,6 +331,50 @@ public final class AnvilRegionBinHazardTable {
     if (binIndex < 0 || binIndex >= binCount) return true;
     synchronized (this) {
       return bins[binIndex] == FullDiscardedBin.INSTANCE || bins[binIndex].badCount() == CHUNKS_PER_BIN;
+    }
+  }
+
+  /**
+   * Copies the 16-long word bitmask (1,024 bits) for the specified bin into {@code dst}.
+   * If the bin is unallocated, fills with 0 (clean land). If full discarded or out-of-range,
+   * fills with -1L (all hazard). If in RunBin format, unpacks directly into bitmask words.
+   *
+   * @param binIndex the index of the bin to copy
+   * @param dst target array of at least 16 longs
+   */
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal table container access synchronization
+  public void copyBinWords(int binIndex, long[] dst) {
+    Objects.requireNonNull(dst, "dst array cannot be null");
+    if (dst.length < LONGS_PER_BIN) {
+      throw new IllegalArgumentException("dst array length must be >= " + LONGS_PER_BIN);
+    }
+    if (binIndex < 0 || binIndex >= binCount) {
+      Arrays.fill(dst, 0, LONGS_PER_BIN, -1L);
+      return;
+    }
+    synchronized (this) {
+      BinContainer container = bins[binIndex];
+      if (container == UnallocatedBin.INSTANCE || container.badCount() == 0) {
+        Arrays.fill(dst, 0, LONGS_PER_BIN, 0L);
+      } else if (container == FullDiscardedBin.INSTANCE || container.badCount() >= CHUNKS_PER_BIN) {
+        Arrays.fill(dst, 0, LONGS_PER_BIN, -1L);
+      } else if (container instanceof BitmaskBin bitmask) {
+        System.arraycopy(bitmask.words, 0, dst, 0, LONGS_PER_BIN);
+      } else if (container instanceof RunBin runBin) {
+        Arrays.fill(dst, 0, LONGS_PER_BIN, 0L);
+        char[] starts = runBin.starts;
+        char[] lengths = runBin.lengths;
+        for (int i = 0; i < starts.length; i++) {
+          int st = starts[i];
+          int len = lengths[i];
+          for (int k = 0; k < len; k++) {
+            int pos = st + k;
+            dst[pos >>> 6] |= (1L << (pos & 63));
+          }
+        }
+      } else {
+        Arrays.fill(dst, 0, LONGS_PER_BIN, 0L);
+      }
     }
   }
 

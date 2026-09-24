@@ -85,6 +85,15 @@ public interface RTPServerAccessor {
   String getPlatform();
 
   /**
+   * Returns the server name or network identity if configured, or {@code null}.
+   *
+   * @return server name or {@code null}
+   */
+  default String getServerName() {
+    return null;
+  }
+
+  /**
    * Returns the coarse {@link PlatformFamily} this server belongs to.
    *
    * <p>Prefer over string-matching {@link #getPlatform()} for runtime gating.
@@ -733,6 +742,15 @@ public interface RTPServerAccessor {
     return "";
   }
 
+  /**
+   * Returns a snapshot collection of currently online RTPPlayer entities.
+   *
+   * @return collection of online players
+   */
+  default java.util.Collection<RTPPlayer> getOnlinePlayers() {
+    return java.util.Collections.emptyList();
+  }
+
   // ---------------------------------------------------------------------------
   // Command registration & execution SPI
   // ---------------------------------------------------------------------------
@@ -756,6 +774,42 @@ public interface RTPServerAccessor {
   default boolean executeCommand(UUID senderId, String commandLine) {
     return false;
   }
+
+  // ---------------------------------------------------------------------------
+  // Per-player WorldBorder packet SPI (ADR-093 confinement visuals)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Sends a clientbound per-player world border packet setting its center and size.
+   *
+   * @param playerId player UUID to receive the world border
+   * @param centerX  center X coordinate
+   * @param centerZ  center Z coordinate
+   * @param size     border diameter (width) in blocks
+   */
+  default void sendWorldBorder(UUID playerId, double centerX, double centerZ, double size) {
+    sendWorldBorder(playerId, centerX, centerZ, size, size, 0L);
+  }
+
+  /**
+   * Sends a clientbound per-player world border packet setting its center and optionally lerping size over time.
+   *
+   * @param playerId       player UUID to receive the world border
+   * @param centerX        center X coordinate
+   * @param centerZ        center Z coordinate
+   * @param oldSize        starting border diameter (width) in blocks
+   * @param newSize        target border diameter (width) in blocks
+   * @param shrinkSeconds  duration in seconds to transition from oldSize to newSize (0 for instant)
+   */
+  default void sendWorldBorder(
+      UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {}
+
+  /**
+   * Resets the player's clientbound world border to match the world's actual border.
+   *
+   * @param playerId player UUID whose world border is to be restored
+   */
+  default void resetWorldBorder(UUID playerId) {}
 
   // ---------------------------------------------------------------------------
   // Palette identifier normalization & reconciliation SPI

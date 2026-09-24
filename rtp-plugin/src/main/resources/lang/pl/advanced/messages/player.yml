@@ -53,6 +53,10 @@ millis: "ms"
 # zmienna: [world] - nazwa świata
 nieprawidlowySwiat: "&7[P0] nie udało się znaleźć świata '[world]'"
 
+brakPoprzedniejLokalizacji: "&c[P0] Nie znaleziono poprzedniej lokalizacji teleportacji."
+
+powrotSukces: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Powrócono do poprzedniej lokalizacji.</gradient>"
+
 # wtyczka nie zawiera polecenia, o które prosił użytkownik
 # zmienna: [arg] - próbowany argument
 nieprawidlowyArgument: "&c[P0] nieprawidłowy argument polecenia [arg]"

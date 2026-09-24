@@ -269,6 +269,10 @@ public abstract class DatabaseAccessor<D> {
       res.put("originalY", originalCoords.y());
       res.put("originalZ", originalCoords.z());
       res.put("originalWorldName", originalCoords.worldName());
+      res.put("originWorldName", (teleportData.originWorldName != null) ? teleportData.originWorldName : originalCoords.worldName());
+      if (teleportData.originServerId != null) {
+        res.put("originServerId", teleportData.originServerId);
+      }
       RTPWorld<?> originalWorld = RTP.serverAccessor.getRTPWorld(originalCoords.worldName());
       if (originalWorld != null) res.put("originalWorldId", originalWorld.id().toString());
 

@@ -57,6 +57,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
     public boolean worldValid = false;
     public boolean messagingValid = false;
     public boolean subsystemValid = false;
+    public boolean worldBorderValid = false;
     public boolean jacocoDumpTriggered = false;
     public String message = "ok";
     public final List<String> details = new ArrayList<>();
@@ -379,6 +380,33 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
       r.details.add("subsystem probe threw: " + t.getMessage());
     }
 
+    // 12. WorldBorder packet & online player confinement SPI probe (ADR-093 / ADR-095)
+    try {
+      java.util.Collection<RTPPlayer> online = RTP.serverAccessor.getOnlinePlayers();
+      if (online != null) {
+        // Probe sendWorldBorder and resetWorldBorder both with synthetic ID and any online player
+        UUID testPlayerId = UUID.randomUUID();
+        RTP.serverAccessor.sendWorldBorder(testPlayerId, 0.0, 0.0, 100.0);
+        RTP.serverAccessor.sendWorldBorder(testPlayerId, 0.0, 0.0, 100.0, 50.0, 5L);
+        RTP.serverAccessor.resetWorldBorder(testPlayerId);
+
+        for (RTPPlayer p : online) {
+          if (p != null && p.uuid() != null) {
+            RTP.serverAccessor.sendWorldBorder(p.uuid(), 0.0, 0.0, 100.0);
+            RTP.serverAccessor.sendWorldBorder(p.uuid(), 0.0, 0.0, 100.0, 50.0, 5L);
+            RTP.serverAccessor.resetWorldBorder(p.uuid());
+          }
+        }
+        r.worldBorderValid = true;
+      } else {
+        r.pass = false;
+        r.details.add("getOnlinePlayers() returned null");
+      }
+    } catch (Throwable t) {
+      r.pass = false;
+      r.details.add("worldborder probe threw: " + t.getMessage());
+    }
+
     r.jacocoDumpTriggered = triggerJacocoDump();
 
     if (!r.pass) {
@@ -438,7 +466,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
     String color = r.pass ? "&a" : "&c";
     String summary =
         String.format(
-            "%s[RTP test/accessor] pass=%s | mats=%s tags=%s sender=%s format=%s thread=%s biome=%s menu=%s ver=%s world=%s msg=%s sub=%s jacocoDump=%s",
+            "%s[RTP test/accessor] pass=%s | mats=%s tags=%s sender=%s format=%s thread=%s biome=%s menu=%s ver=%s world=%s msg=%s sub=%s wb=%s jacocoDump=%s",
             color,
             r.pass,
             r.materialsValid,
@@ -452,6 +480,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
             r.worldValid,
             r.messagingValid,
             r.subsystemValid,
+            r.worldBorderValid,
             r.jacocoDumpTriggered);
 
     if (!callerId.equals(RTPAPI.serverId)) {

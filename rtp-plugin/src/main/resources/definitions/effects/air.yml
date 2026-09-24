@@ -1,0 +1,20 @@
+# --- effects/air.yml ---
+# Free sample effect group: "Air RTP" sky-drop + parachute glide-to-land.
+# This reproduces justRTP's Air RTP as an EFFECT bound to a teleport (or, later, a zone),
+# rather than a bespoke teleport mode. Attach this effect group to an action's teleport.
+#
+# One file = one effect group (filename = group name). See effects/default.yml for the
+# full SOUND / PARTICLE / POTION / GLIDE catalog.
+
+when: postteleport
+effects:
+  # Short elytra glide when you land (built-in, Bukkit 1.9+; no addon needed).
+  - GLIDE.ELYTRA
+  # Parachute-style soft descent so the drop is survivable while gliding in.
+  - POTION.SLOW_FALLING.200.1.false.false.false
+  # Light feedback on arrival.
+  - SOUND.ITEM_ELYTRA_FLYING.80.100.0.0.0
+  - PARTICLE.CLOUD.24
+
+# DO NOT TOUCH VERSION NUMBER
+version: "1.0"

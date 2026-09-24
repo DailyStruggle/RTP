@@ -51,6 +51,10 @@ milissegundos: "ms"
 # espaço reservado: [world] - o nome do mundo
 mundoInvalido: "&7[P0] não foi possível encontrar o mundo '[world]'"
 
+semLocalizacaoAnterior: "&c[P0] Nenhuma localização anterior de teleporte encontrada."
+
+retornoSucesso: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Retornou à localização anterior.</gradient>"
+
 # o plugin não tem o comando que o usuário solicitou
 # espaço reservado: [arg] - o argumento tentado
 argumentoInvalido: "&c[P0] argumento de comando inválido [arg]"

@@ -10,22 +10,39 @@ import java.util.UUID;
 public interface RTPNetworkManager {
 
     /**
-     * Record a per-player cooldown that auto-expires server-side.
+     * Record a per-player last teleport timestamp (epoch milliseconds).
      *
-     * @param playerId               player UUID
-     * @param expirationTimeSeconds  TTL in seconds; the implementation is responsible
-     *                               for atomic write+expire semantics
+     * @param playerId    player UUID
+     * @param epochMillis epoch millisecond timestamp
      */
-    void setCooldown(UUID playerId, long expirationTimeSeconds);
+    void setLastTeleportTime(UUID playerId, long epochMillis);
 
     /**
-     * Read the remaining TTL for a previously-set cooldown.
+     * Read the last teleport timestamp (epoch milliseconds) for a player.
      *
-     * @return remaining seconds, or a non-positive value if absent / expired (the
-     *         exact sentinel mirrors the underlying backend; callers must treat
-     *         {@code <= 0} as "no active cooldown")
+     * @param playerId player UUID
+     * @return epoch milliseconds, or 0 if absent
      */
-    long getCooldown(UUID playerId);
+    long getLastTeleportTime(UUID playerId);
+
+    /**
+     * @deprecated use {@link #setLastTeleportTime(UUID, long)}
+     */
+    @Deprecated
+    default void setCooldown(UUID playerId, long expirationTimeSeconds) {
+        setLastTeleportTime(playerId, System.currentTimeMillis() + expirationTimeSeconds * 1000L);
+    }
+
+    /**
+     * @deprecated use {@link #getLastTeleportTime(UUID)}
+     */
+    @Deprecated
+    default long getCooldown(UUID playerId) {
+        long t = getLastTeleportTime(playerId);
+        if (t <= 0L) return 0L;
+        long diff = (t - System.currentTimeMillis()) / 1000L;
+        return Math.max(0L, diff);
+    }
 
     /**
      * Best-effort fan-out of an opaque JSON payload on the named channel.

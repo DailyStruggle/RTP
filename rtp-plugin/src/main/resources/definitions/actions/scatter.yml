@@ -1,0 +1,31 @@
+# --- actions/scatter.yml ---
+# Free sample scripted action (ADR-093 + ADR-095): plain random scatter teleport.
+# This reproduces justRTP's core `/rtp` on the unified subspace engine, and also serves
+# as a group scatter when triggered with more than one participant (spread by minSeparation).
+#
+# The anchor is the default RegionQueueAnchorSource: a verified spot is drawn from the
+# region's pre-warmed hot/cold caches (no live target, no landmark).
+
+alias: "wild"
+permission: "rtp.action.scatter"
+description: "Random safe teleport (single player or group scatter)."
+
+placement:
+  region: "default"
+  anchor: "regionQueue"
+  shape:
+    name: "SQUARE"
+    radius: 4c
+    centerRadius: 0
+  minSeparation: 32           # min blocks between grouped participants
+  elevationTolerance: 8
+
+confinement:
+  boundary: "SUBSPACE"
+  duration: "0s"
+
+lifecycle:
+  onStart:
+    - PLAYER: "msg &aTeleported to the wild."
+
+version: "1.0"

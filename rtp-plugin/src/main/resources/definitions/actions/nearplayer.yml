@@ -1,0 +1,34 @@
+# --- actions/nearplayer.yml ---
+# Free sample scripted action (ADR-093 + ADR-095): land near a random online player.
+# This reproduces justRTP's `/rtp nearplayer` on the unified subspace engine.
+#
+# The anchor is an EntityAnchorSource: the caller supplies the target player's live
+# coordinates in the invocation context (metadata keys anchorWorld/anchorX/anchorY/anchorZ).
+# Participants are then placed in a ring around that anchor via the CIRCLE distribution.
+# One file = one action (filename = action id).
+
+alias: "nearplayer"
+permission: "rtp.action.nearplayer"
+description: "Teleport near a random online player."
+
+placement:
+  region: "default"
+  # Anchor source: entity -> resolved from live context coordinates supplied at trigger time.
+  anchor: "entity"
+  # Distribution shape that participants are laid out within (circle = ring-capable footprint).
+  shape:
+    name: "CIRCLE"
+    radius: 6c                  # footprint half-width in chunks (~96 blocks)
+    centerRadius: 0
+  minSeparation: 24
+  elevationTolerance: 8
+
+confinement:
+  boundary: "SUBSPACE"
+  duration: "0s"                # 0 = one-shot placement, no live confinement (free tier)
+
+lifecycle:
+  onStart:
+    - PLAYER: "msg &aWhoosh! Dropped near a fellow traveler."
+
+version: "1.0"

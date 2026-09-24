@@ -8,8 +8,8 @@ import java.util.Set;
  * Resolves region file paths and determines the appropriate {@link RegionFileReader}
  * format for a given coordinate (ADR-077).
  *
- * <p>Supports registered format extensions from {@link RegionFormatRegistry} (such as
- * {@code .linear} via {@code LeafRTPLinearAddon}) as well as standard Anvil ({@code .mca}).</p>
+ * <p>Supports registered format extensions from {@link RegionFormatRegistry}, including the
+ * built-in Linear ({@code .linear} / ZSTD) format as well as standard Anvil ({@code .mca}).</p>
  */
 public final class RegionFileResolver {
 
