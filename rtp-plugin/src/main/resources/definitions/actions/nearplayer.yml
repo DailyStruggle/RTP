@@ -13,14 +13,15 @@ description: "Teleport near a random online player."
 
 placement:
   region: "default"
-  # Distribution shape that participants are laid out within (circle = ring-capable footprint).
-  profile: "circle"
   # Anchor source: entity -> resolved from live context coordinates supplied at trigger time.
   anchor: "entity"
-  parameters:
-    subspaceChunkRadius: 6      # footprint half-width in chunks (~96 blocks)
-    minSeparation: 24
-    elevationTolerance: 8
+  # Distribution shape that participants are laid out within (circle = ring-capable footprint).
+  shape:
+    name: "CIRCLE"
+    radius: 6c                  # footprint half-width in chunks (~96 blocks)
+    centerRadius: 0
+  minSeparation: 24
+  elevationTolerance: 8
 
 confinement:
   boundary: "SUBSPACE"

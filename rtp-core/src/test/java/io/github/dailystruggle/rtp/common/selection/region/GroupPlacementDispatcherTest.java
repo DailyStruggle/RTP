@@ -536,4 +536,63 @@ class GroupPlacementDispatcherTest {
             RTP.selectionAPI.permRegionLookup.remove("nearplayer_region");
         }
     }
+
+    @Test
+    @DisplayName("Bounded retries: retries with a fresh anchor when initial placement fails (ADR-097)")
+    void testBoundedPlacementRetriesOnInitialFailure() throws Exception {
+        io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+        RTPWorld<?> world = accessor.getRTPWorld("world");
+        Region mockRegion = mock(Region.class);
+        doReturn(world).when(mockRegion).getWorld();
+
+        UUID playerUuid = UUID.randomUUID();
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(playerUuid, "RetryPlayer", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
+        accessor.addPlayer(player);
+
+        // Sequence of anchors: try 1 at (100, 100), try 2 at (200, 200)
+        GenerationResult anchor1 = new GenerationResult(new RTPCoords("world", 100, 64, 100), 1, null, null);
+        GenerationResult anchor2 = new GenerationResult(new RTPCoords("world", 200, 64, 200), 1, null, null);
+        java.util.concurrent.atomic.AtomicInteger drawCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        when(mockRegion.getLocation(anySet())).thenAnswer(inv -> {
+            int count = drawCount.incrementAndGet();
+            return CompletableFuture.completedFuture(count == 1 ? anchor1 : anchor2);
+        });
+
+        // Candidate validator rejects candidates around (100, 100) but accepts candidates around (200, 200)
+        when(mockRegion.candidateValidator()).thenReturn((x, z) -> {
+            if (Math.abs(x - 100) <= 32 && Math.abs(z - 100) <= 32) {
+                return null; // rejected on attempt 1!
+            }
+            return new RTPLocation(new RTPCoords("world", x, 64, z), 1);
+        });
+
+        RTP.selectionAPI.permRegionLookup.put("retry_region", mockRegion);
+
+        try {
+            // Profile with retries = 3
+            GroupProfileSpec spec = GroupProfileSpec.of("square", 16, 2, 5, 1, 3);
+            GroupPlacementRequest request = GroupPlacementRequest.of(
+                    "retry_region",
+                    spec,
+                    new java.util.ArrayList<>(List.of(playerUuid))
+            );
+
+            CompletableFuture<GroupPlacementResult> future = dispatcher.place(request);
+            GroupPlacementResult result = future.get(5, TimeUnit.SECONDS);
+
+            assertNotNull(result);
+            assertTrue(result.isSuccess(), "Should succeed on second attempt after retry: " + result.message());
+            assertEquals(2, drawCount.get(), "Must have executed 2 anchor draws");
+            io.github.dailystruggle.rtp.api.world.RTPLocation placedLoc = result.placements().get(playerUuid);
+            assertNotNull(placedLoc);
+            // Verify it landed near anchor 2 (around 200, 200)
+            assertTrue(Math.abs(placedLoc.x() - 200) <= 16);
+            assertTrue(Math.abs(placedLoc.z() - 200) <= 16);
+        } finally {
+            RTP.selectionAPI.permRegionLookup.remove("retry_region");
+        }
+    }
 }

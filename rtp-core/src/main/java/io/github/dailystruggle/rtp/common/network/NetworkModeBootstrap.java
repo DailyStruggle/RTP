@@ -55,6 +55,7 @@ public final class NetworkModeBootstrap {
     // boot() did not complete past router wiring.
     private PeerRegionRegistry peerRegionRegistry;
     private BukkitNetworkCommandHook commandHook;
+    private String serverId;
     // ADR-015 / REQ-RTP-NET-015: lobby-side waitlist UX.
     // - notifier: periodic player-facing 'queued, position N' message.
     // - waitlistGuard: sender-check predicate registered on RTPCmdBukkit
@@ -120,6 +121,7 @@ public final class NetworkModeBootstrap {
                             + "refusing to enable network mode (REQ-RTP-NET-002).");
             return;
         }
+        this.serverId = serverId;
 
         RtpYamlSection transportSec = cfg.getConfigurationSection("transport");
         String transportType = transportSec == null ? "in-memory"
@@ -757,6 +759,11 @@ public final class NetworkModeBootstrap {
     /** Visible for tests. Null when network mode is disabled or
      *  wiring failed; otherwise also installed at {@code RTP.networkCommandHook}. */
     public BukkitNetworkCommandHook commandHook() { return commandHook; }
+
+    /**
+     * The configured network server ID for this backend instance.
+     */
+    public String serverId() { return serverId; }
 
     /**
      * Open a {@link NetworkRequestQueue} matching the configured transport kind.

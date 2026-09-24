@@ -31,6 +31,29 @@ public class RedisManager implements RTPNetworkManager {
     }
 
     @Override
+    public void setLastTeleportTime(UUID playerId, long epochMillis) {
+        try (Jedis jedis = pool.getResource()) {
+            String key = "rtp:lastTp:" + playerId.toString();
+            jedis.set(key, String.valueOf(epochMillis));
+        }
+    }
+
+    @Override
+    public long getLastTeleportTime(UUID playerId) {
+        try (Jedis jedis = pool.getResource()) {
+            String key = "rtp:lastTp:" + playerId.toString();
+            String val = jedis.get(key);
+            if (val == null || val.isEmpty()) return 0L;
+            try {
+                return Long.parseLong(val);
+            } catch (NumberFormatException e) {
+                return 0L;
+            }
+        }
+    }
+
+    @Override
+    @Deprecated
     public void setCooldown(UUID playerId, long expirationTimeSeconds) {
         try (Jedis jedis = pool.getResource()) {
             String key = "rtp:cooldown:" + playerId.toString();
@@ -39,6 +62,7 @@ public class RedisManager implements RTPNetworkManager {
     }
 
     @Override
+    @Deprecated
     public long getCooldown(UUID playerId) {
         try (Jedis jedis = pool.getResource()) {
             String key = "rtp:cooldown:" + playerId.toString();

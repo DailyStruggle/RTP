@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.commands;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.admin.ClearCmd;
+import io.github.dailystruggle.rtp.common.commands.back.BackCmd;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
 import io.github.dailystruggle.rtp.common.commands.gui.GuiCmd;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
@@ -55,6 +56,7 @@ public final class CoreCommandTreeBuilder {
    * @param root the {@code /rtp} root command
    */
   public static void attachCommonSubcommands(BaseRTPCmd root) {
+    root.addSubCommand(new BackCmd(root));
     root.addSubCommand(new ReloadCmd(root));
     root.addSubCommand(new GuiCmd(root));
     root.addSubCommand(new ConfigCmd(root));
@@ -64,6 +66,17 @@ public final class CoreCommandTreeBuilder {
     root.addSubCommand(versionCmd);
     root.getCommandLookup().put(VersionCmd.ALIAS.toUpperCase(Locale.ROOT), versionCmd);
     root.addSubCommand(new ClearCmd(root));
+    io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd actionSubCmd =
+        new io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd(root);
+    root.addSubCommand(actionSubCmd);
+    root.getCommandLookup().put("RUN", actionSubCmd);
+    root.getCommandLookup().put("TRIGGER", actionSubCmd);
+
+    io.github.dailystruggle.rtp.common.commands.trigger.TriggerSubCmd triggerSubCmd =
+        new io.github.dailystruggle.rtp.common.commands.trigger.TriggerSubCmd(root);
+    root.addSubCommand(triggerSubCmd);
+    root.getCommandLookup().put("TRIGGERS", triggerSubCmd);
+    root.getCommandLookup().put("PORTAL", triggerSubCmd);
   }
 
   /**

@@ -49,6 +49,7 @@ public final class InMemoryNetworkStateBinding implements NetworkTransport {
     private final ConcurrentHashMap<String, ReservationToken> tokens = new ConcurrentHashMap<>();
     /** Players currently holding a PENDING/CLAIMED token, used to enforce per-player idempotency. */
     private final ConcurrentHashMap<UUID, String> activeByPlayer = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Long> lastTeleportTimes = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<Sub> subscribers = new CopyOnWriteArrayList<>();
     private final ExecutorService executor =
             Executors.newFixedThreadPool(2, r -> {
@@ -277,6 +278,20 @@ public final class InMemoryNetworkStateBinding implements NetworkTransport {
         Sub sub = new Sub(sink);
         subscribers.add(sub);
         return sub;
+    }
+
+    @Override
+    public CompletableFuture<Void> setLastTeleportTime(UUID playerId, long epochMillis) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.runAsync(() -> lastTeleportTimes.put(playerId, epochMillis), executor);
+    }
+
+    @Override
+    public CompletableFuture<Long> getLastTeleportTime(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> lastTeleportTimes.getOrDefault(playerId, 0L), executor);
     }
 
     @Override

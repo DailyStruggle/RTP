@@ -12,12 +12,13 @@ description: "Random safe teleport (single player or group scatter)."
 
 placement:
   region: "default"
-  profile: "square"
   anchor: "regionQueue"
-  parameters:
-    subspaceChunkRadius: 4
-    minSeparation: 32           # min blocks between grouped participants
-    elevationTolerance: 8
+  shape:
+    name: "SQUARE"
+    radius: 4c
+    centerRadius: 0
+  minSeparation: 32           # min blocks between grouped participants
+  elevationTolerance: 8
 
 confinement:
   boundary: "SUBSPACE"

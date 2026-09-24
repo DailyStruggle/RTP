@@ -1,0 +1,96 @@
+# --- actions/arena.yml ---
+# Sample scripted action (ADR-093): 1v1 Arena duel with visual world border confinement,
+# spatial proximity extraction gates, command evaluation gates, and automatic match lifecycle.
+#
+# Confinement:
+#   boundary: "SUBSPACE" or "LEASH" creates a clientbound per-player world border wall
+#   centered on the arena anchor coordinate, automatically removed upon session disarm.
+
+alias: "arena"
+permission: "rtp.action.arena"
+description: "Confined 1v1 arena duel with visual world border and extraction point."
+
+command:
+  name: "duel"
+  permission: "rtp.command.duel"
+  description: "Challenge players to an arena duel"
+  aliases:
+    - "fight"
+    - "arena"
+
+placement:
+  region: "default"
+  anchor: "regionQueue"
+  shape:
+    name: "SQUARE"
+    radius: 4c                  # 4-chunk radius (64 blocks each direction)
+    centerRadius: 0
+  minSeparation: 32             # 32 blocks minimum between opponents
+  elevationTolerance: 8         # Maximum height delta between opponents
+
+confinement:
+  boundary: "LEASH"             # Visual world border wall rendered client-side
+  leashRadius: 48.0             # 48 block radius around anchor (96 block world border)
+  duration: "5m"                # 5-minute match countdown
+  initialSize: 128              # Initial world border width in blocks
+  shrinkTo: 32                  # Final world border width in blocks
+  shrinkOver: "4m"              # Shrink smoothly to 32 blocks over 4 minutes
+
+lifecycle:
+  onStart:
+    # 1. Tag duelists and equip arena gear
+    - FOR_EACH:
+        - CONSOLE: "tag [player] add rtp_session_[session_id]"
+        - CONSOLE: "gamemode adventure [player]"
+        - CONSOLE: "give [player] iron_sword 1"
+        - PLAYER: "title [player] title {\"text\":\"DUEL START!\",\"color\":\"red\"}"
+
+  onBoundaryViolation:
+    # Gate 1: Warning and safe interior pull-back for first violation
+    - gate:
+        scoreboard:
+          objective: "rtp_violations"
+          matches: "< 2"
+      run:
+        - ACTION: PULL_BACK
+        - FOR_EACH:
+            PLAYER: "title [violator] subtitle {\"text\":\"Stay inside the world border!\",\"color\":\"yellow\"}"
+
+    # Gate 2: Disqualification if repeatedly attempting to flee
+    - gate:
+        scoreboard:
+          objective: "rtp_violations"
+          matches: ">= 2"
+      run:
+        - CONSOLE: "broadcast &c[violator] fled the arena and was disqualified!"
+        - ACTION: PULL_BACK
+        - ACTION: DISARM
+
+  onExpire:
+    # Example of a command gate: only broadcast if session members still present
+    - gate:
+        command: "execute if entity @a[tag=rtp_session_[session_id]]"
+      run:
+        - CONSOLE: "broadcast &6Match timed out!"
+    # Example of spatial coordinate gate: check if player reached extraction center
+    - gate:
+        spatial:
+          target: "anchor"
+          distance: "<= 10"
+      run:
+        - FOR_EACH:
+            CONSOLE: "give [player] gold_ingot 5"
+    - FOR_EACH:
+        - CONSOLE: "gamemode survival [player]"
+        - CONSOLE: "tag [player] remove rtp_session_[session_id]"
+    - ACTION: DISARM
+
+  onDeath:
+    - CONSOLE: "broadcast &6[winner] &ehas defeated &c[victim] &ein the arena!"
+    - CONSOLE: "give [winner] diamond 3"
+    - FOR_EACH:
+        - CONSOLE: "gamemode survival [player]"
+        - CONSOLE: "tag [player] remove rtp_session_[session_id]"
+    - ACTION: DISARM
+
+version: "1.0"

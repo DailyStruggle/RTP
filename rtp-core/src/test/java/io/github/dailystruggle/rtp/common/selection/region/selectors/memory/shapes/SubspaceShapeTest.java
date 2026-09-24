@@ -314,4 +314,73 @@ public class SubspaceShapeTest {
       assertEquals(64, loc.coords().y());
     }
   }
+
+  @Test
+  @DisplayName("Clustered subspace placement: 2v2 groups teammates tightly and separates opposing clusters")
+  void testSelectSafeClusterSlots2v2() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    Region region = createDummyRegion(memShape);
+    RTPLocation anchor = new RTPLocation(new RTPCoords("world", 1000, 64, 1000), 1);
+    SubspaceShape subspace = new SubspaceShape(anchor, 64, region);
+
+    int minClusterSep = 24;
+    int intraClusterRadius = 4;
+    List<Integer> clusterSizes = List.of(2, 2); // 2v2
+
+    List<List<RTPLocation>> clusters =
+        subspace.selectSafeClusterSlots(clusterSizes, minClusterSep, intraClusterRadius, 8, null, FLAT_GROUND);
+
+    assertEquals(2, clusters.size(), "Must return 2 clusters");
+    assertEquals(2, clusters.get(0).size(), "Cluster 1 must have 2 players");
+    assertEquals(2, clusters.get(1).size(), "Cluster 2 must have 2 players");
+
+    // 1. Verify teammates within cluster 1 are close together
+    RTPCoords c1p1 = clusters.get(0).get(0).coords();
+    RTPCoords c1p2 = clusters.get(0).get(1).coords();
+    double intraDist1 = Math.hypot(c1p1.x() - c1p2.x(), c1p1.z() - c1p2.z());
+    assertTrue(intraDist1 <= intraClusterRadius * 2, "Teammates in cluster 1 must be clustered together: " + intraDist1);
+
+    // 2. Verify teammates within cluster 2 are close together
+    RTPCoords c2p1 = clusters.get(1).get(0).coords();
+    RTPCoords c2p2 = clusters.get(1).get(1).coords();
+    double intraDist2 = Math.hypot(c2p1.x() - c2p2.x(), c2p1.z() - c2p2.z());
+    assertTrue(intraDist2 <= intraClusterRadius * 2, "Teammates in cluster 2 must be clustered together: " + intraDist2);
+
+    // 3. Verify opposing cluster members are separated
+    double interDist = Math.hypot(c1p1.x() - c2p1.x(), c1p1.z() - c2p1.z());
+    assertTrue(interDist >= (minClusterSep - intraClusterRadius * 2),
+        "Opposing cluster members must be separated by minClusterSep margin: " + interDist);
+  }
+
+  @Test
+  @DisplayName("Clustered subspace placement: 1v2 (asymmetric Juggernaut) placement succeeds")
+  void testSelectSafeClusterSlots1v2() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    Region region = createDummyRegion(memShape);
+    RTPLocation anchor = new RTPLocation(new RTPCoords("world", 500, 64, 500), 1);
+    SubspaceShape subspace = new SubspaceShape(anchor, 48, region);
+
+    List<Integer> clusterSizes = List.of(1, 2); // 1v2
+    List<List<RTPLocation>> clusters =
+        subspace.selectSafeClusterSlots(clusterSizes, 20, 3, 8, null, FLAT_GROUND);
+
+    assertEquals(2, clusters.size());
+    assertEquals(1, clusters.get(0).size(), "Juggernaut cluster has 1 player");
+    assertEquals(2, clusters.get(1).size(), "Hunters cluster has 2 players");
+  }
+
+  @Test
+  @DisplayName("Clustered subspace placement: fails closed if validator rejects one cluster")
+  void testSelectSafeClusterSlotsFailsClosed() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    Region region = createDummyRegion(memShape);
+    RTPLocation anchor = new RTPLocation(new RTPCoords("world", 0, 64, 0), 1);
+    SubspaceShape subspace = new SubspaceShape(anchor, 16, region);
+
+    // Tiny subspace cannot fit 2 clusters with 32 block separation
+    List<List<RTPLocation>> clusters =
+        subspace.selectSafeClusterSlots(List.of(2, 2), 32, 4, 8, null, FLAT_GROUND);
+
+    assertTrue(clusters.isEmpty(), "Must fail closed if capacity cannot satisfy clusters");
+  }
 }

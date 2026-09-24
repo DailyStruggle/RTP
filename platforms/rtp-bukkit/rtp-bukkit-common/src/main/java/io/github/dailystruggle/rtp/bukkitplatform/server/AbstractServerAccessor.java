@@ -866,6 +866,23 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     }
   }
 
+  @Override
+  public java.util.Collection<io.github.dailystruggle.rtp.api.entity.RTPPlayer> getOnlinePlayers() {
+    try {
+      java.util.Collection<? extends Player> players = Bukkit.getOnlinePlayers();
+      if (players == null || players.isEmpty()) return Collections.emptyList();
+      java.util.List<io.github.dailystruggle.rtp.api.entity.RTPPlayer> list = new java.util.ArrayList<>(players.size());
+      for (Player p : players) {
+        if (p == null) continue;
+        io.github.dailystruggle.rtp.api.entity.RTPPlayer rp = getPlayer(p.getUniqueId());
+        if (rp != null) list.add(rp);
+      }
+      return Collections.unmodifiableList(list);
+    } catch (Throwable t) {
+      return Collections.emptyList();
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Command registration & execution SPI
   // ---------------------------------------------------------------------------
@@ -900,6 +917,48 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       if (sender == null) return false;
     }
     return Bukkit.dispatchCommand(sender, commandLine);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Per-player WorldBorder packet SPI (ADR-093 confinement visuals)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void sendWorldBorder(UUID playerId, double centerX, double centerZ, double size) {
+    sendWorldBorder(playerId, centerX, centerZ, size, size, 0L);
+  }
+
+  @Override
+  public void sendWorldBorder(
+      UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+    if (playerId == null) return;
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null || !player.isOnline()) return;
+      org.bukkit.WorldBorder border = Bukkit.createWorldBorder();
+      border.setCenter(centerX, centerZ);
+      double start = Math.max(1.0, oldSize);
+      double end = Math.max(1.0, newSize);
+      border.setSize(start);
+      if (shrinkSeconds > 0L && Double.compare(start, end) != 0) {
+        border.setSize(end, shrinkSeconds);
+      }
+      player.setWorldBorder(border);
+    } catch (Throwable t) {
+      log(Level.FINE, "[RTP] Failed to send per-player world border to " + playerId, t);
+    }
+  }
+
+  @Override
+  public void resetWorldBorder(UUID playerId) {
+    if (playerId == null) return;
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null || !player.isOnline()) return;
+      player.setWorldBorder(null);
+    } catch (Throwable t) {
+      log(Level.FINE, "[RTP] Failed to reset per-player world border for " + playerId, t);
+    }
   }
 
   // ---------------------------------------------------------------------------

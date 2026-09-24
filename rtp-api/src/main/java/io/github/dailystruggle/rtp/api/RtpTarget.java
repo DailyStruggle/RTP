@@ -23,19 +23,35 @@ public final class RtpTarget {
      * Resolve to a region advertised by a peer backend across the network.
      * Dispatched across the cross-server wait queue.
      */
-    NETWORK
+    NETWORK,
+    /**
+     * Resolve to an exact coordinate on a local or remote server (e.g. for {@code /rtp back}).
+     */
+    COORDINATE
   }
 
-  private static final RtpTarget DEFAULT = new RtpTarget(Kind.DEFAULT, null, null);
+  private static final RtpTarget DEFAULT = new RtpTarget(Kind.DEFAULT, null, null, null, 0, 0, 0);
 
   private final Kind kind;
   private final String name;
   private final String serverId;
+  private final String worldName;
+  private final int x;
+  private final int y;
+  private final int z;
 
   private RtpTarget(Kind kind, String name, String serverId) {
+    this(kind, name, serverId, null, 0, 0, 0);
+  }
+
+  private RtpTarget(Kind kind, String name, String serverId, String worldName, int x, int y, int z) {
     this.kind = kind;
     this.name = name;
     this.serverId = serverId;
+    this.worldName = worldName;
+    this.x = x;
+    this.y = y;
+    this.z = z;
   }
 
   /**
@@ -110,6 +126,24 @@ public final class RtpTarget {
   }
 
   /**
+   * Target an exact coordinate on a local or remote server.
+   *
+   * @param serverId destination backend network id (nullable/empty for local)
+   * @param worldName world name; must not be null or blank
+   * @param x x coordinate
+   * @param y y coordinate
+   * @param z z coordinate
+   * @return coordinate-kind target
+   */
+  public static RtpTarget coordinate(String serverId, String worldName, int x, int y, int z) {
+    if (worldName == null || worldName.isBlank()) {
+      throw new IllegalArgumentException("worldName must not be null or blank");
+    }
+    String sId = (serverId == null || serverId.isBlank()) ? null : serverId;
+    return new RtpTarget(Kind.COORDINATE, worldName + ":" + x + "," + y + "," + z, sId, worldName, x, y, z);
+  }
+
+  /**
    * Returns how this target should be resolved.
    *
    * @return the target kind; never {@code null}
@@ -128,13 +162,43 @@ public final class RtpTarget {
   }
 
   /**
-   * Returns the destination backend's network id for a {@link Kind#NETWORK}
+   * Returns the destination backend's network id for a {@link Kind#NETWORK} or remote {@link Kind#COORDINATE}
    * target.
    *
-   * @return the server id, or {@code null} for any non-network target
+   * @return the server id, or {@code null} for any non-network / local target
    */
   public String serverId() {
     return serverId;
+  }
+
+  /**
+   * Returns the destination world name for a {@link Kind#COORDINATE} target.
+   *
+   * @return world name, or {@code null} if not a coordinate target
+   */
+  public String worldName() {
+    return worldName;
+  }
+
+  /**
+   * Returns the X coordinate for a {@link Kind#COORDINATE} target.
+   */
+  public int x() {
+    return x;
+  }
+
+  /**
+   * Returns the Y coordinate for a {@link Kind#COORDINATE} target.
+   */
+  public int y() {
+    return y;
+  }
+
+  /**
+   * Returns the Z coordinate for a {@link Kind#COORDINATE} target.
+   */
+  public int z() {
+    return z;
   }
 
   @Override
@@ -143,19 +207,24 @@ public final class RtpTarget {
     if (!(o instanceof RtpTarget)) return false;
     RtpTarget that = (RtpTarget) o;
     return kind == that.kind
+        && x == that.x
+        && y == that.y
+        && z == that.z
         && Objects.equals(name, that.name)
-        && Objects.equals(serverId, that.serverId);
+        && Objects.equals(serverId, that.serverId)
+        && Objects.equals(worldName, that.worldName);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(kind, name, serverId);
+    return Objects.hash(kind, name, serverId, worldName, x, y, z);
   }
 
   @Override
   public String toString() {
     return "RtpTarget[" + kind
         + (serverId == null ? "" : ":" + serverId)
-        + (name == null ? "" : ":" + name) + ']';
+        + (worldName == null ? "" : ":" + worldName)
+        + (kind == Kind.COORDINATE ? "(" + x + "," + y + "," + z + ")" : (name == null ? "" : ":" + name)) + ']';
   }
 }

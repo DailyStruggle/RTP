@@ -11,16 +11,18 @@ description: "Teleport to a safe spot around the spawn landmark."
 
 placement:
   region: "default"
-  profile: "circle"
   anchor: "fixed"
+  shape:
+    name: "CIRCLE"
+    radius: 4c                  # ~64 block footprint around the landmark
+    centerRadius: 0
+  minSeparation: 16
+  elevationTolerance: 8
   parameters:
     # Static landmark coordinates for this named location.
     anchorX: 0
     anchorY: 64
     anchorZ: 0
-    subspaceChunkRadius: 4      # ~64 block footprint around the landmark
-    minSeparation: 16
-    elevationTolerance: 8
 
 confinement:
   boundary: "SUBSPACE"

@@ -217,6 +217,13 @@ public final class SqlNetworkStateSchema {
             )
             """;
 
+    private static final String DDL_LAST_TELEPORT = """
+            CREATE TABLE IF NOT EXISTS rtp_network_last_teleport (
+                player_id        VARCHAR(36)  NOT NULL PRIMARY KEY,
+                last_teleport_ms BIGINT       NOT NULL
+            )
+            """;
+
     private SqlNetworkStateSchema() { /* static-only */ }
 
     /**
@@ -250,6 +257,7 @@ public final class SqlNetworkStateSchema {
         execIgnoringDuplicate(conn, DDL_WQ_READY_IDX_ORDER);
         execIgnoringDuplicate(conn, DDL_WQ_READY_IDX_PLAYER);
         execIgnoringDuplicate(conn, DDL_WQ_STATUS);
+        execIgnoringDuplicate(conn, DDL_LAST_TELEPORT);
     }
 
     /**

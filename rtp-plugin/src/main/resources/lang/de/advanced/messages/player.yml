@@ -53,6 +53,10 @@ millis: "ms"
 # Platzhalter: [world] - der Weltname
 ungueltigeWelt: "&7[P0] konnte Welt '[world]' nicht finden"
 
+keinVorherigerOrt: "&c[P0] Kein vorheriger Teleport-Ort gefunden."
+
+zurueckErfolg: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Zum vorherigen Ort zurueckgekehrt.</gradient>"
+
 # das Plugin kennt den vom Benutzer angeforderten Befehl nicht
 # Platzhalter: [arg] - das versuchte Argument
 ungueltigesArgument: "&c[P0] ungültiges Befehlsargument [arg]"

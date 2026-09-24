@@ -159,7 +159,7 @@ class ActionManagerTest {
     java.util.Map<String, Object> params = new java.util.HashMap<>(extraParams);
     if (anchor != null) params.put("anchor", anchor);
     ActionDefinition.PlacementSpec placement =
-        new ActionDefinition.PlacementSpec("default", "circle", 4, 16, 8, params);
+        new ActionDefinition.PlacementSpec("default", "CIRCLE", 64, 16, 8, params);
     ActionDefinition def = new ActionDefinition(
         id, id, "rtp.action." + id, "",
         placement,
@@ -199,5 +199,88 @@ class ActionManagerTest {
     assertTrue(res2.failureReason().contains("already in an active session"));
 
     actionManager.disarm(res1.sessionId());
+  }
+
+  @Test
+  @DisplayName("Per-action prevalidated caching: offer, poll, revalidate, and dispatch (ADR-097)")
+  void testPerActionCachingAndRevalidation() {
+    UUID p1 = UUID.randomUUID();
+    ActionDefinition.PlacementSpec pSpec =
+        new ActionDefinition.PlacementSpec("default", "CIRCLE", 64, 16, 8, Map.of(), 3, 2);
+    ActionDefinition def = new ActionDefinition(
+        "cached_action", "cached_action", "rtp.action.cached", "",
+        pSpec,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY);
+    actionManager.registerAction(def);
+
+    // Group service should not be called if cache hit succeeds
+    java.util.concurrent.atomic.AtomicInteger liveCalls = new java.util.concurrent.atomic.AtomicInteger(0);
+    RTP.groupPlacementService = req -> {
+      liveCalls.incrementAndGet();
+      return CompletableFuture.completedFuture(
+          GroupPlacementResult.success(Map.of(p1, new RTPLocation(serverAccessor.getRTPWorld("world"), 100, 64, 100))));
+    };
+
+    // 1. Offer a pre-validated placement
+    RTPLocation cachedLoc = new RTPLocation(serverAccessor.getRTPWorld("world"), 200, 64, 200);
+    ActionManager.PrevalidatedActionPlacement item =
+        new ActionManager.PrevalidatedActionPlacement(Map.of(UUID.randomUUID(), cachedLoc), 200, 200);
+    boolean offered = actionManager.offerCachedPlacement("cached_action", item);
+    assertTrue(offered);
+    assertEquals(1, actionManager.getCachedPlacementCount("cached_action"));
+
+    // 2. Trigger should consume the cached item without calling live group service
+    ActionSessionResult res = actionManager.trigger("cached_action", List.of(p1), ActionContext.EMPTY).join();
+    assertTrue(res.success());
+    assertEquals(0, liveCalls.get(), "Must not call live placement when cache hit succeeds");
+    assertEquals(0, actionManager.getCachedPlacementCount("cached_action"));
+
+    actionManager.disarm(res.sessionId());
+  }
+
+  @Test
+  @DisplayName("Per-action cache revalidation fallback to live placement on block column failure (ADR-097)")
+  void testCacheRevalidationFallbackOnInvalidBlock() {
+    UUID p1 = UUID.randomUUID();
+    ActionDefinition.PlacementSpec pSpec =
+        new ActionDefinition.PlacementSpec("default", "CIRCLE", 64, 16, 8, Map.of(), 3, 2);
+    ActionDefinition def = new ActionDefinition(
+        "fallback_action", "fallback_action", "rtp.action.fallback", "",
+        pSpec,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY);
+    actionManager.registerAction(def);
+
+    // Mock parent region with candidate validator that rejects worldX=999
+    io.github.dailystruggle.rtp.common.selection.region.Region mockRegion =
+        org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.selection.region.Region.class);
+    org.mockito.Mockito.when(mockRegion.candidateValidator()).thenReturn((x, z) -> {
+      if (x == 999) return null; // invalidated!
+      return new io.github.dailystruggle.rtp.common.selection.region.RTPLocation(
+          new io.github.dailystruggle.rtp.api.world.RTPCoords("world", x, 64, z), 1);
+    });
+    RTP.selectionAPI.permRegionLookup.put("default", mockRegion);
+
+    java.util.concurrent.atomic.AtomicInteger liveCalls = new java.util.concurrent.atomic.AtomicInteger(0);
+    RTP.groupPlacementService = req -> {
+      liveCalls.incrementAndGet();
+      return CompletableFuture.completedFuture(
+          GroupPlacementResult.success(Map.of(p1, new RTPLocation(serverAccessor.getRTPWorld("world"), 100, 64, 100))));
+    };
+
+    // Offer cached location at x=999 (which will fail revalidation)
+    RTPLocation invalidLoc = new RTPLocation(serverAccessor.getRTPWorld("world"), 999, 64, 200);
+    ActionManager.PrevalidatedActionPlacement item =
+        new ActionManager.PrevalidatedActionPlacement(Map.of(UUID.randomUUID(), invalidLoc), 999, 200);
+    actionManager.offerCachedPlacement("fallback_action", item);
+
+    // Trigger: cache recheck fails -> falls back to live placement -> succeeds!
+    ActionSessionResult res = actionManager.trigger("fallback_action", List.of(p1), ActionContext.EMPTY).join();
+    assertTrue(res.success());
+    assertEquals(1, liveCalls.get(), "Must fallback to live placement when cached item is invalidated");
+
+    actionManager.disarm(res.sessionId());
+    RTP.selectionAPI.permRegionLookup.remove("default");
   }
 }

@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 public final class ActionPlaceholderSanitizer {
 
   private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\[([a-zA-Z0-9_]+)\\]");
-  private static final Pattern SAFE_TOKEN_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-]+$");
+  private static final Pattern SAFE_TOKEN_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-]+( [a-zA-Z0-9_\\-]+)*$");
 
   private ActionPlaceholderSanitizer() {}
 
@@ -37,9 +37,20 @@ public final class ActionPlaceholderSanitizer {
       String replacement;
       if (val instanceof UUID uuid) {
         replacement = uuid.toString();
+      } else if (val instanceof java.util.Collection<?> coll) {
+        StringBuilder listSb = new StringBuilder();
+        for (Object item : coll) {
+          if (item == null) continue;
+          String s = item.toString().trim();
+          if (SAFE_TOKEN_PATTERN.matcher(s).matches()) {
+            if (!listSb.isEmpty()) listSb.append(' ');
+            listSb.append(s);
+          }
+        }
+        replacement = listSb.toString();
       } else if (val != null) {
         String s = val.toString().trim();
-        // Strict sanitization: allow only alphanumeric, underscores, hyphens
+        // Strict sanitization: allow alphanumeric, underscores, hyphens, and single spaces
         if (SAFE_TOKEN_PATTERN.matcher(s).matches()) {
           replacement = s;
         } else {

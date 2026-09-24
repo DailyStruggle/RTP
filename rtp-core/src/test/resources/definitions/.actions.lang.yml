@@ -1,0 +1,7 @@
+version: "version"
+alias: "alias"
+permission: "permission"
+description: "description"
+placement: "placement"
+confinement: "confinement"
+lifecycle: "lifecycle"

@@ -261,6 +261,125 @@ public class SubspaceShape {
   }
 
   /**
+   * Selects safe landing slots grouped into spatial clusters (e.g. 1v1, 2v2, 1v2, teams).
+   *
+   * <p>Cluster centers are spaced by at least {@code minClusterSeparation} across the subspace.
+   * Members of each cluster are placed tightly within {@code intraClusterRadius} of their
+   * cluster center, satisfying {@code elevationTolerance}.
+   *
+   * @param clusterSizes sizes of each cluster (e.g. [2, 2] for 2v2, [1, 2] for 1v2)
+   * @param minClusterSeparation minimum clearance between different cluster centers
+   * @param intraClusterRadius maximum radius around a cluster center for its members
+   * @param elevationTolerance maximum vertical deviation within each cluster
+   * @param distributionShape optional shape mask
+   * @param validator block-level candidate validator
+   * @return list of slot lists corresponding to each cluster, or empty list if placement fails
+   */
+  public List<List<RTPLocation>> selectSafeClusterSlots(
+      List<Integer> clusterSizes,
+      int minClusterSeparation,
+      int intraClusterRadius,
+      int elevationTolerance,
+      Shape<?> distributionShape,
+      CandidateValidator validator) {
+    Objects.requireNonNull(validator, "validator cannot be null");
+    if (clusterSizes == null || clusterSizes.isEmpty()) return Collections.emptyList();
+
+    int totalMembers = 0;
+    for (int size : clusterSizes) {
+      if (size <= 0) return Collections.emptyList();
+      totalMembers += size;
+    }
+
+    final int d = Math.max(1, minClusterSeparation);
+    final int intraR = Math.max(1, intraClusterRadius);
+    final int anchorY = anchor.coords().y();
+    final int m = (getFootprintBlocks() / 2) / d;
+
+    List<int[]> latticeCells = selectLatticeCells(d, m, distributionShape);
+    if (latticeCells.size() < clusterSizes.size()) {
+      return Collections.emptyList(); // Not enough well-separated cluster centers available
+    }
+
+    Collections.shuffle(latticeCells, ThreadLocalRandom.current());
+
+    // Try finding valid cluster centers and safe columns for each cluster
+    List<List<RTPLocation>> clusteredPlacements = new ArrayList<>(clusterSizes.size());
+    List<int[]> chosenCenters = new ArrayList<>();
+
+    for (int clusterIdx = 0; clusterIdx < clusterSizes.size(); clusterIdx++) {
+      int requiredInCluster = clusterSizes.get(clusterIdx);
+      boolean clusterPlaced = false;
+
+      for (int[] candidateCenter : latticeCells) {
+        // Must be sufficiently separated from already chosen cluster centers
+        boolean separatedFromAll = true;
+        for (int[] chosen : chosenCenters) {
+          long dx = (long) candidateCenter[0] - chosen[0];
+          long dz = (long) candidateCenter[1] - chosen[1];
+          if ((dx * dx + dz * dz) < ((long) minClusterSeparation * minClusterSeparation)) {
+            separatedFromAll = false;
+            break;
+          }
+        }
+        if (!separatedFromAll) continue;
+
+        // Try placing requiredInCluster members around this candidate center
+        List<RTPLocation> memberLocs = new ArrayList<>(requiredInCluster);
+        int centerWorldX = candidateCenter[0];
+        int centerWorldZ = candidateCenter[1];
+
+        // Search columns in expanding concentric spiral/boxes around center
+        int maxSearchRadius = Math.max(intraR, 2 * intraR);
+        Integer clusterAnchorY = null;
+
+        for (int r = 0; r <= maxSearchRadius && memberLocs.size() < requiredInCluster; r++) {
+          for (int ox = -r; ox <= r && memberLocs.size() < requiredInCluster; ox++) {
+            for (int oz = -r; oz <= r && memberLocs.size() < requiredInCluster; oz++) {
+              if (Math.abs(ox) != r && Math.abs(oz) != r) continue; // Boundary only for this radius step
+              if ((ox * ox + oz * oz) > (maxSearchRadius * maxSearchRadius)) continue;
+
+              int colX = centerWorldX + ox;
+              int colZ = centerWorldZ + oz;
+
+              int cdx = (colX >> 4) - anchorCX;
+              int cdz = (colZ >> 4) - anchorCZ;
+              if (Math.abs(cdx) > chunkRadius || Math.abs(cdz) > chunkRadius) continue;
+              if (isChunkKnownBad(cdx, cdz)) continue;
+
+              RTPLocation validated = validator.validate(colX, colZ);
+              if (validated == null || validated.coords() == null) continue;
+
+              int vy = validated.coords().y();
+              if (clusterAnchorY == null) {
+                if (elevationTolerance >= 0 && Math.abs(vy - anchorY) > elevationTolerance * 2) continue;
+                clusterAnchorY = vy;
+              } else {
+                if (elevationTolerance >= 0 && Math.abs(vy - clusterAnchorY) > elevationTolerance) continue;
+              }
+
+              memberLocs.add(validated);
+            }
+          }
+        }
+
+        if (memberLocs.size() == requiredInCluster) {
+          chosenCenters.add(candidateCenter);
+          clusteredPlacements.add(Collections.unmodifiableList(memberLocs));
+          clusterPlaced = true;
+          break;
+        }
+      }
+
+      if (!clusterPlaced) {
+        return Collections.emptyList(); // Fail-closed: cannot place full cluster
+      }
+    }
+
+    return Collections.unmodifiableList(clusteredPlacements);
+  }
+
+  /**
    * Enumerates safe lattice cells across the subspace.
    * Excludes cells residing in known-bad or out-of-bounds chunks.
    */

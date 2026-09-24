@@ -20,6 +20,22 @@ public final class PlayerMoveDispatcher {
 
     private final ConcurrentHashMap<UUID, CopyOnWriteArrayList<Consumer<PlayerMoveEvent>>> watchers =
             new ConcurrentHashMap<>();
+    private final CopyOnWriteArrayList<Consumer<PlayerMoveEvent>> globalWatchers =
+            new CopyOnWriteArrayList<>();
+
+    /**
+     * Registers interest in block-granularity movement across all players.
+     *
+     * @param handler callback for block changes; non-null
+     * @return handle that withdraws interest when closed
+     * @throws IllegalArgumentException if {@code handler} is null
+     */
+    @PublicApi
+    public AutoCloseable watchAll(Consumer<PlayerMoveEvent> handler) {
+        if (handler == null) throw new IllegalArgumentException("handler must not be null");
+        globalWatchers.add(handler);
+        return () -> globalWatchers.remove(handler);
+    }
 
     /**
      * Registers interest in block-granularity movement for {@code player}.
@@ -49,14 +65,23 @@ public final class PlayerMoveDispatcher {
     /**
      * @param player the player to test; a {@code null} player is never watched.
      * @return {@code true} iff at least one handler is currently watching
-     *     {@code player}. Platform adapters gate their per-player movement work
-     *     on this so unwatched players cost nothing.
+     *     {@code player} specifically.
      */
     @PublicApi
     public boolean isWatched(UUID player) {
         if (player == null) return false;
         CopyOnWriteArrayList<Consumer<PlayerMoveEvent>> list = watchers.get(player);
         return list != null && !list.isEmpty();
+    }
+
+    /**
+     * @param player the player to test.
+     * @return {@code true} iff movement events for this player should be sampled
+     *     (either watched specifically or globally).
+     */
+    @PublicApi
+    public boolean shouldSample(UUID player) {
+        return !globalWatchers.isEmpty() || isWatched(player);
     }
 
     /**
@@ -71,7 +96,7 @@ public final class PlayerMoveDispatcher {
      * @return {@code true} iff at least one player is currently watched.
      */
     public boolean hasWatchers() {
-        return !watchers.isEmpty();
+        return !globalWatchers.isEmpty() || !watchers.isEmpty();
     }
 
     /**
@@ -84,6 +109,15 @@ public final class PlayerMoveDispatcher {
      */
     public void fire(PlayerMoveEvent event) {
         if (event == null) return;
+
+        for (Consumer<PlayerMoveEvent> gh : globalWatchers) {
+            try {
+                gh.accept(event);
+            } catch (Throwable ignored) {
+                // intentional: a faulty handler must not break fan-out
+            }
+        }
+
         CopyOnWriteArrayList<Consumer<PlayerMoveEvent>> list = watchers.get(event.playerId());
         if (list == null) return;
         for (Consumer<PlayerMoveEvent> h : list) {

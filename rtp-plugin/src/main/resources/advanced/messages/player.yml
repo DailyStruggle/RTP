@@ -71,6 +71,12 @@ notEnoughMoney: "&7[P0] you need at least $[money] for that."
 # placeholder: [world] - the world name
 invalidWorld: "&7[P0] could not find world '[world]'"
 
+# no previous location saved for /rtp back
+noBackLocation: "&c[P0] No previous teleport location found."
+
+# successfully teleported back
+backSuccess: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Returned to previous location.</gradient>"
+
 # plugin doesn't have the command the user requested
 # placeholder: [arg] - the argument attempted
 badArg: "&c[P0] invalid command argument [arg]"

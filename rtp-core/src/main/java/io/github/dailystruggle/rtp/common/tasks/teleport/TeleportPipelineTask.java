@@ -286,6 +286,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
         teleportData.time = System.currentTimeMillis();
         teleportData.delay = teleportData.sender.delay();
         teleportData.targetRegion = region;
+        teleportData.originWorldName = player.getLocation().world().name();
+        teleportData.originServerId =
+                (io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE != null)
+                        ? io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE.serverId()
+                        : null;
         teleportData.originalCoords =
                 new RTPCoords(
                         player.getLocation().world().name(),
@@ -450,6 +455,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
           teleportData.time = System.currentTimeMillis();
           teleportData.delay = teleportData.sender.delay();
           teleportData.targetRegion = region;
+          teleportData.originWorldName = player.getLocation().world().name();
+          teleportData.originServerId =
+                  (io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE != null)
+                          ? io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE.serverId()
+                          : null;
           teleportData.originalCoords =
                   new RTPCoords(
                           player.getLocation().world().name(),
@@ -771,6 +781,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       teleportData.completed = true;
       teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
+      RTP.updateSharedLastTeleportTime(playerId, teleportData.time);
       RTP.getInstance().processingPlayers.remove(playerId);
 
       // ADR-072: clamp the player's view distance immediately before the teleport so the engine's

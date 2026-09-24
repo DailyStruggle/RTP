@@ -25,7 +25,22 @@ public record ActionGateContext(
     long remainingSeconds,
     int violations,
     boolean inBounds,
-    double distanceSqFromAnchor) {
+    double distanceSqFromAnchor,
+    Double currentX,
+    Double currentY,
+    Double currentZ) {
+
+  public ActionGateContext(
+      UUID sessionId,
+      String actionId,
+      UUID participantId,
+      long elapsedSeconds,
+      long remainingSeconds,
+      int violations,
+      boolean inBounds,
+      double distanceSqFromAnchor) {
+    this(sessionId, actionId, participantId, elapsedSeconds, remainingSeconds, violations, inBounds, distanceSqFromAnchor, null, null, null);
+  }
 
   public ActionGateContext {
     Objects.requireNonNull(sessionId, "sessionId must not be null");

@@ -56,6 +56,10 @@ millisecondi: "ms"
 # segnaposto: [world] - il nome del mondo
 mondoNonValido: "&7[P0] impossibile trovare il mondo '[world]'"
 
+nessunaPosizionePrecedente: "&c[P0] Nessuna posizione di teletrasporto precedente trovata."
+
+ritornoSuccesso: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Tornato alla posizione precedente.</gradient>"
+
 # il plugin non ha il comando richiesto dall'utente
 # segnaposto: [arg] - l'argomento tentato
 argomentoNonValido: "&c[P0] argomento di comando non valido [arg]"

@@ -12,13 +12,14 @@ description: "Teleport near a claimed area's perimeter."
 
 placement:
   region: "default"
-  profile: "circle"
   # Anchor source: claimHazard -> recalled from spatial memory (no foreign API calls).
   anchor: "claimHazard"
-  parameters:
-    subspaceChunkRadius: 3      # tighter ring hugging the perimeter (~48 blocks)
-    minSeparation: 16
-    elevationTolerance: 8
+  shape:
+    name: "CIRCLE"
+    radius: 3c                  # tighter ring hugging the perimeter (~48 blocks)
+    centerRadius: 0
+  minSeparation: 16
+  elevationTolerance: 8
 
 confinement:
   boundary: "SUBSPACE"

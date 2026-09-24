@@ -17,6 +17,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -475,6 +476,49 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
      */
     public Map<String, Object> getRegisteredCommands() {
         return Collections.unmodifiableMap(registeredCommands);
+    }
+
+    // -------------------------------------------------------------------------
+    // Per-player WorldBorder packet tracking
+    // -------------------------------------------------------------------------
+
+    public record SentWorldBorder(
+        UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+      public SentWorldBorder(UUID playerId, double centerX, double centerZ, double size) {
+        this(playerId, centerX, centerZ, size, size, 0L);
+      }
+    }
+
+    private final List<SentWorldBorder> sentWorldBorders = new CopyOnWriteArrayList<>();
+    private final Set<UUID> resetWorldBorders = ConcurrentHashMap.newKeySet();
+
+    @Override
+    public void sendWorldBorder(UUID playerId, double centerX, double centerZ, double size) {
+        sentWorldBorders.add(new SentWorldBorder(playerId, centerX, centerZ, size));
+    }
+
+    @Override
+    public void sendWorldBorder(
+        UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+        sentWorldBorders.add(new SentWorldBorder(playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds));
+    }
+
+    @Override
+    public void resetWorldBorder(UUID playerId) {
+        resetWorldBorders.add(playerId);
+    }
+
+    public List<SentWorldBorder> getSentWorldBorders() {
+        return Collections.unmodifiableList(sentWorldBorders);
+    }
+
+    public Set<UUID> getResetWorldBorders() {
+        return Collections.unmodifiableSet(resetWorldBorders);
+    }
+
+    @Override
+    public Collection<RTPPlayer> getOnlinePlayers() {
+        return Collections.unmodifiableCollection(new ArrayList<RTPPlayer>(playersById.values()));
     }
 
     // -------------------------------------------------------------------------
