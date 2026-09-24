@@ -80,13 +80,43 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
 
     final Region fRegion = region;
 
-    // 3. Draw or resolve anchor via AnchorSource (non-blocking). Empty biome set = any biome.
-    return SubspaceAnchorResolver.resolveAnchor(fRegion, request.anchorSource())
-        .thenCompose(genResult -> allocate(fRegion, spec, participants, n, genResult))
+    // 3. Draw or resolve anchor via AnchorSource (non-blocking). Supports bounded retries (ADR-097).
+    final int maxAttempts = Math.max(1, spec.retries());
+    return attemptPlacement(fRegion, spec, participants, n, request.anchorSource(), 1, maxAttempts)
         .exceptionally(
             ex -> {
               RTP.log(Level.WARNING, "[group] placement failed for region '" + fRegion.name + "'", ex);
               return GroupPlacementResult.failure(GroupPlacementResult.Reason.ERROR, String.valueOf(ex));
+            });
+  }
+
+  /**
+   * Executes a bounded placement attempt sequence. If an attempt fails due to insufficient safe slots
+   * (e.g. land encapsulated by claim verifier rejections), a fresh anchor is drawn and retried off-tick
+   * up to {@code maxAttempts} times.
+   */
+  private CompletableFuture<GroupPlacementResult> attemptPlacement(
+      Region region,
+      GroupProfileSpec spec,
+      List<UUID> participants,
+      int n,
+      io.github.dailystruggle.rtp.api.group.AnchorSource anchorSource,
+      int attempt,
+      int maxAttempts) {
+    return SubspaceAnchorResolver.resolveAnchor(region, anchorSource)
+        .thenCompose(genResult -> allocate(region, spec, participants, n, genResult))
+        .thenCompose(
+            result -> {
+              if (result.isSuccess() || attempt >= maxAttempts) {
+                return CompletableFuture.completedFuture(result);
+              }
+              // Only retry on capacity / verifier rejection failures where new terrain could succeed
+              if (result.reason() == GroupPlacementResult.Reason.INSUFFICIENT_SAFE_SLOTS
+                  || result.reason() == GroupPlacementResult.Reason.NO_ANCHOR) {
+                return attemptPlacement(
+                    region, spec, participants, n, anchorSource, attempt + 1, maxAttempts);
+              }
+              return CompletableFuture.completedFuture(result);
             });
   }
 

@@ -1,0 +1,62 @@
+# --- actions/challenge.yml ---
+# Symmetrical Mutual Challenge Reciprocity (ADR-093).
+# Single command (/challenge <target>) handles both issuing challenges and accepting them.
+#
+# When Alice runs /challenge Bob:
+# - If Bob hasn't challenged Alice yet:
+#     1. Tag Alice with rtp_chal_Bob.
+#     2. Send Bob an interactive click prompt: "Alice challenged you! [Click to Accept]".
+#        The click action executes "/challenge Alice" (or "/rtp action challenge Alice").
+#     3. Auto-cleans the tag after 30s.
+# - If Bob has already challenged Alice:
+#     1. Gate detects Bob has tag rtp_chal_Alice (mutual reciprocity established!).
+#     2. Remove challenge tags from both players.
+#     3. Trigger the duel match with Alice and Bob.
+
+alias: "challenge"
+permission: "rtp.action.challenge"
+description: "Symmetrical duel challenge with clickable chat reciprocity."
+
+command:
+  name: "challenge"
+  permission: "rtp.command.challenge"
+  description: "Challenge a player to a duel, or accept their pending challenge"
+  aliases:
+    - "duelreq"
+
+placement:
+  region: "default"
+  anchor: "regionQueue"
+
+confinement:
+  boundary: "REGION"
+
+lifecycle:
+  onStart:
+    # 1. RECIPROCAL MATCH FOUND: Target already challenged Sender!
+    - gate:
+        command: "execute if entity [target][tag=rtp_chal_[sender]]"
+      run:
+        - CONSOLE: "tag [target] remove rtp_chal_[sender]"
+        - CONSOLE: "tag [sender] remove rtp_chal_[target]"
+        - CONSOLE: "tellraw [sender] [\"\",{\"text\":\"Duel accepted! Teleporting to arena...\",\"color\":\"green\"}]"
+        - CONSOLE: "tellraw [target] [\"\",{\"text\":\"Duel accepted! Teleporting to arena...\",\"color\":\"green\"}]"
+        - CONSOLE: "rtp action arena [sender] [target]"
+
+    # 2. FIRST-TIME CHALLENGE: Target hasn't challenged Sender yet.
+    - gate:
+        command: "execute unless entity [target][tag=rtp_chal_[sender]]"
+      run:
+        - CONSOLE: "tag [sender] add rtp_chal_[target]"
+        - CONSOLE: "tellraw [sender] [\"\",{\"text\":\"Challenge sent to \",\"color\":\"gray\"},{\"text\":\"[target]\",\"color\":\"yellow\"},{\"text\":\"!\",\"color\":\"gray\"}]"
+        # Interactive click prompt that calls the exact same symmetrical command back:
+        - CONSOLE: "tellraw [target] [\"\",{\"text\":\"[sender] has challenged you to a duel! \",\"color\":\"gold\"},{\"text\":\"[CLICK TO ACCEPT]\",\"color\":\"green\",\"bold\":true,\"clickEvent\":{\"action\":\"run_command\",\"value\":\"/challenge [sender]\"},\"hoverEvent\":{\"action\":\"show_text\",\"contents\":{\"text\":\"Click to accept duel with [sender]\",\"color\":\"gray\"}}}]"
+    # Auto-cleanup challenge tag after 30 seconds if never accepted
+    - delay: "30s"
+      gate:
+        command: "execute if entity [sender][tag=rtp_chal_[target]]"
+      run:
+        - CONSOLE: "tag [sender] remove rtp_chal_[target]"
+        - CONSOLE: "tellraw [sender] [\"\",{\"text\":\"Your challenge to [target] expired.\",\"color\":\"red\"}]"
+
+version: "1.0"

@@ -62,6 +62,7 @@ class TestAccessorCmdTest {
     assertTrue(r.worldValid);
     assertTrue(r.messagingValid);
     assertTrue(r.subsystemValid);
+    assertTrue(r.worldBorderValid);
     assertEquals("ok", r.message);
   }
 

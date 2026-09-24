@@ -202,6 +202,27 @@ public interface NetworkTransport extends AutoCloseable {
      */
     Subscription subscribeBackendHeartbeats(Consumer<BackendHeartbeat> sink);
 
+    /**
+     * Record the player's last teleport time across the network fleet.
+     *
+     * @param playerId    player UUID
+     * @param epochMillis timestamp in milliseconds
+     * @return future completed when written
+     */
+    default CompletableFuture<Void> setLastTeleportTime(UUID playerId, long epochMillis) {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    /**
+     * Read the player's last teleport time across the network fleet.
+     *
+     * @param playerId player UUID
+     * @return future completed with timestamp in milliseconds, or 0 if absent
+     */
+    default CompletableFuture<Long> getLastTeleportTime(UUID playerId) {
+        return CompletableFuture.completedFuture(0L);
+    }
+
     @Override
     void close();
 }

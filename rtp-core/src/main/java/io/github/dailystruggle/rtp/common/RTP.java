@@ -109,6 +109,12 @@ public class RTP {
       actionManager = new io.github.dailystruggle.rtp.common.action.ActionManager();
 
   /**
+   * Process-wide manager for physical world triggers (portals, pressure plates, step-in zones) (ADR-093).
+   */
+  public static final io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager
+      triggerManager = new io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager();
+
+  /**
    * Pre-dispatch hook to decide whether {@code /rtp} is served locally,
    * enrolled on cross-server wait queue, or rejected.
    * Defaults to {@link io.github.dailystruggle.rtp.api.network.NetworkCommandHook#LOCAL_ONLY}.
@@ -200,6 +206,7 @@ public class RTP {
         new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
 
     io.github.dailystruggle.rtp.api.RTPAPI.actionService = actionManager;
+    triggerManager.start();
 
     // First-class teleport entry point for addons: trigger an RTP for an online
     // player and complete a future with the outcome, without reaching into core
@@ -224,15 +231,16 @@ public class RTP {
         // cleanup the command path performs) so the alreadyTeleporting guard below
         // does not misfire on a finished teleport.
         TeleportData priorData = getInstance().latestTeleportData.get(uuid);
-        if (priorData != null) {
-          long dt = System.currentTimeMillis() - priorData.time;
+        long lastTpTime = getEffectiveLastTeleportTime(uuid);
+        if (lastTpTime > 0) {
+          long dt = System.currentTimeMillis() - lastTpTime;
           if (dt < 0) dt = Long.MAX_VALUE + dt;
           if (dt < player.cooldown()) {
             future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                 io.github.dailystruggle.rtp.api.RTPResult.Reason.COOLDOWN,
                 "Teleport is on cooldown for this player"));
             return future;
-          } else if (priorData.completed) {
+          } else if (priorData != null && priorData.completed) {
             getInstance().processingPlayers.remove(uuid);
           }
         }
@@ -336,6 +344,76 @@ public class RTP {
             runLocalTeleport(uuid, player, localRegion, future);
           }
           return future;
+        }
+
+        // Coordinate target (e.g. /rtp back to exact coordinate on local or remote server):
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.COORDINATE) {
+          String destServer = target.serverId();
+          String localServer = (io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE != null)
+              ? io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE.serverId() : null;
+          boolean isLocal = (destServer == null || destServer.isEmpty() || destServer.equalsIgnoreCase(localServer));
+          if (isLocal) {
+            String worldName = target.worldName();
+            RTPWorld<?> world = serverAccessor.getRTPWorld(worldName);
+            if (world == null && !serverAccessor.getRTPWorlds().isEmpty()) {
+              world = serverAccessor.getRTPWorlds().get(0);
+            }
+            if (world == null) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                  "World '" + worldName + "' not found"));
+              return future;
+            }
+            io.github.dailystruggle.rtp.api.world.RTPLocation loc =
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(world, target.x(), target.y(), target.z());
+            getInstance().processingPlayers.add(uuid);
+            player.setLocation(loc).whenComplete((success, ex) -> {
+              getInstance().processingPlayers.remove(uuid);
+              if (ex != null || (success != null && !success)) {
+                future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                    io.github.dailystruggle.rtp.api.RTPResult.Reason.ERROR,
+                    ex != null ? ex.getMessage() : "Teleport to coordinate failed"));
+              } else {
+                future.complete(io.github.dailystruggle.rtp.api.RTPResult.success(loc));
+              }
+            });
+            return future;
+          } else {
+            // Remote server coordinate route: dispatch through NetworkCommandHook
+            io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = networkCommandHook;
+            if (hook == null || hook == io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                  "Network mode is not enabled on this server"));
+              return future;
+            }
+            java.util.Map<String, java.util.List<String>> netArgs = new java.util.HashMap<>();
+            netArgs.put("region", java.util.Collections.singletonList(destServer + ":default"));
+            netArgs.put("coords", java.util.Collections.singletonList(target.worldName() + ":" + target.x() + "," + target.y() + "," + target.z()));
+            io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult decision;
+            try {
+              decision = hook.route(uuid, netArgs);
+            } catch (Throwable t) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.ERROR,
+                  "Cross-server routing failed: " + t.getMessage()));
+              return future;
+            }
+            if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.CrossServer cross) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.queued(
+                  "Queued for " + cross.serverHint().orElse(destServer) + " at " + target.worldName()));
+            } else if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.Reject reject) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                  reject.placeholder() == null || reject.placeholder().isEmpty()
+                      ? "Destination unavailable" : reject.placeholder()));
+            } else {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                  "Could not route to destination server " + destServer));
+            }
+            return future;
+          }
         }
 
         Region region;
@@ -679,9 +757,9 @@ public class RTP {
 
         // Remaining cooldown.
         long remaining = 0L;
-        TeleportData d = getInstance().latestTeleportData.get(uuid);
-        if (d != null) {
-          long dt = System.currentTimeMillis() - d.time;
+        long lastTp = getEffectiveLastTeleportTime(uuid);
+        if (lastTp > 0L) {
+          long dt = System.currentTimeMillis() - lastTp;
           if (dt < 0) dt = 0L;
           remaining = Math.max(0L, player.cooldown() - dt);
         }
@@ -816,6 +894,7 @@ public class RTP {
 
   public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();
+
   /**
    * Per-player rolling usage-cap state backing the BetterRTP {@code LockAfter}
    * parity feature ({@code lockAfterUses} / {@code lockAfterResetSeconds}).
@@ -846,6 +925,65 @@ public class RTP {
    * class (ADR-024). Constructed reflectively below when network YAML enables a backend.
    */
   public io.github.dailystruggle.rtp.common.network.RTPNetworkManager networkManager;
+
+  /**
+   * Resolves the effective last teleport timestamp for a player across local and network storage.
+   * Takes {@code max(local, shared)} so network latency or clock skew never shortens the local view.
+   *
+   * @param uuid player UUID
+   * @return epoch milliseconds, or 0 if no teleport recorded
+   */
+  public static long getEffectiveLastTeleportTime(UUID uuid) {
+    if (uuid == null) return 0L;
+    long localTime = 0L;
+    RTP inst = instance;
+    if (inst != null) {
+      TeleportData localData = inst.latestTeleportData.get(uuid);
+      if (localData != null) {
+        localTime = localData.time;
+      }
+    }
+    long sharedTime = 0L;
+    try {
+      if (inst != null && inst.databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+        io.github.dailystruggle.rtp.common.network.NetworkStateBinding binding = sql.getNetworkStateBinding();
+        if (binding != null) {
+          sharedTime = binding.getLastTeleportTime(uuid);
+        }
+      }
+      if (sharedTime <= 0L && inst != null && inst.networkManager != null) {
+        sharedTime = inst.networkManager.getLastTeleportTime(uuid);
+      }
+    } catch (Throwable ignored) {
+      // Defensive: network read failure degrades safely to local time
+    }
+    return Math.max(localTime, sharedTime);
+  }
+
+  /**
+   * Updates the shared last teleport timestamp across the network transport.
+   *
+   * @param uuid player UUID
+   * @param epochMillis timestamp in milliseconds
+   */
+  public static void updateSharedLastTeleportTime(UUID uuid, long epochMillis) {
+    if (uuid == null) return;
+    RTP inst = instance;
+    if (inst == null) return;
+    try {
+      if (inst.databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+        io.github.dailystruggle.rtp.common.network.NetworkStateBinding binding = sql.getNetworkStateBinding();
+        if (binding != null) {
+          binding.setLastTeleportTime(uuid, epochMillis);
+        }
+      }
+      if (inst.networkManager != null) {
+        inst.networkManager.setLastTeleportTime(uuid, epochMillis);
+      }
+    } catch (Throwable t) {
+      log(Level.FINE, "[RTP] updateSharedLastTeleportTime failed: " + t.getMessage());
+    }
+  }
 
   /**
    * Wraps the installed platform {@link #scheduler} in a profiling decorator

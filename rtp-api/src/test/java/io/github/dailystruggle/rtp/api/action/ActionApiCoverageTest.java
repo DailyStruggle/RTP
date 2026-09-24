@@ -65,6 +65,29 @@ class ActionApiCoverageTest {
     assertTrue(nullMeta.metadata().isEmpty());
 
     assertThrows(NullPointerException.class, () -> ActionContext.of(null, "val"));
+
+    // Test clusters and named clusters branches
+    UUID u1 = UUID.randomUUID();
+    UUID u2 = UUID.randomUUID();
+    ActionContext clusterCtx = ActionContext.ofClusters(List.of(List.of(u1, u2)));
+    assertEquals(1, clusterCtx.clusters().size());
+    assertEquals(2, clusterCtx.clusters().get(0).size());
+    assertTrue(clusterCtx.namedClusters().isEmpty());
+
+    ActionContext namedClusterCtx = ActionContext.ofNamedClusters(Map.of("red", List.of(u1), "blue", List.of(u2)));
+    assertEquals(2, namedClusterCtx.clusters().size());
+    assertEquals(2, namedClusterCtx.namedClusters().size());
+    assertEquals(List.of(u1), namedClusterCtx.namedClusters().get("red"));
+
+    // Test clusters() with String UUID parsing, null elements, and fallback to "groups"
+    ActionContext stringClusters = ActionContext.of("groups", List.of(List.of(u1.toString(), "not-a-uuid")));
+    assertEquals(1, stringClusters.clusters().size());
+    assertEquals(1, stringClusters.clusters().get(0).size());
+
+    // Test empty clusters
+    assertTrue(ActionContext.empty().clusters().isEmpty());
+    assertTrue(ActionContext.of("clusters", "not-a-collection").clusters().isEmpty());
+    assertTrue(ActionContext.empty().namedClusters().isEmpty());
   }
 
   @Test
@@ -89,16 +112,29 @@ class ActionApiCoverageTest {
   @DisplayName("ActionDefinition and sub-records accessors")
   void testActionDefinition() {
     ActionDefinition.PlacementSpec placement = new ActionDefinition.PlacementSpec(
-        "world", "duel", 4, 16, 8, Map.of("param", "val"));
+        "world", "SQUARE", 64, 16, 8, Map.of("param", "val", "clusterSeparation", 5));
     assertEquals("world", placement.region());
-    assertEquals("duel", placement.profile());
-    assertEquals(4, placement.subspaceChunkRadius());
+    assertEquals("SQUARE", placement.shapeName());
+    assertEquals(64, placement.radius());
     assertEquals(16, placement.minSeparation());
     assertEquals(8, placement.elevationTolerance());
     assertEquals("val", placement.parameters().get("param"));
+    assertEquals(5, placement.clusterSeparation());
+
+    ActionDefinition.PlacementSpec teammateSep = new ActionDefinition.PlacementSpec(
+        "world", "SQUARE", 64, 16, 8, Map.of("teammateSeparation", 6));
+    assertEquals(6, teammateSep.clusterSeparation());
+
+    ActionDefinition.PlacementSpec groupSep = new ActionDefinition.PlacementSpec(
+        "world", "SQUARE", 64, 16, 8, Map.of("groupSeparation", 7));
+    assertEquals(7, groupSep.clusterSeparation());
+
+    ActionDefinition.PlacementSpec defaultSep = new ActionDefinition.PlacementSpec(
+        "world", "SQUARE", 64, 16, 8, Map.of());
+    assertEquals(4, defaultSep.clusterSeparation());
 
     ActionDefinition.PlacementSpec nullParams = new ActionDefinition.PlacementSpec(
-        "w", "p", 1, 1, 1, null);
+        "w", "CIRCLE", 100, 1, 1, null);
     assertTrue(nullParams.parameters().isEmpty());
 
     ActionDefinition.ConfinementSpec conf = new ActionDefinition.ConfinementSpec(
@@ -146,8 +182,20 @@ class ActionApiCoverageTest {
     ActionDefinition.LifecycleSpec nullLife = new ActionDefinition.LifecycleSpec(null, null, null, null);
     assertTrue(nullLife.onStart().isEmpty());
 
+    ActionDefinition.CommandSpec cmdSpec = new ActionDefinition.CommandSpec(
+        "duel", "rtp.command.duel", "Duel players", List.of("fight"));
+    assertEquals("duel", cmdSpec.name());
+    assertEquals("rtp.command.duel", cmdSpec.permission());
+    assertEquals("Duel players", cmdSpec.description());
+    assertEquals(List.of("fight"), cmdSpec.aliases());
+    assertTrue(cmdSpec.isConfigured());
+
+    ActionDefinition.CommandSpec emptyCmd = new ActionDefinition.CommandSpec(null, null, null, null);
+    assertFalse(emptyCmd.isConfigured());
+    assertTrue(emptyCmd.aliases().isEmpty());
+
     ActionDefinition def = new ActionDefinition(
-        "test", "test_alias", "rtp.action.test", "desc", placement, conf, life);
+        "test", "test_alias", "rtp.action.test", "desc", placement, conf, life, cmdSpec);
     assertEquals("test", def.id());
     assertEquals("test_alias", def.alias());
     assertEquals("rtp.action.test", def.permission());
@@ -155,12 +203,14 @@ class ActionApiCoverageTest {
     assertSame(placement, def.placement());
     assertSame(conf, def.confinement());
     assertSame(life, def.lifecycle());
+    assertSame(cmdSpec, def.command());
 
     ActionDefinition defNulls = new ActionDefinition(
         "test2", null, null, null, null, null, null);
     assertNotNull(defNulls.placement());
     assertNotNull(defNulls.confinement());
     assertNotNull(defNulls.lifecycle());
+    assertNotNull(defNulls.command());
 
     assertThrows(NullPointerException.class, () ->
         new ActionDefinition(null, null, null, null, null, null, null));

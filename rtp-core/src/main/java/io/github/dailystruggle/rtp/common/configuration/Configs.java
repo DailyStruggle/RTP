@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
+import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
@@ -781,8 +782,15 @@ public class Configs {
     newMultiConfigParserMap.put(EffectsGroupKeys.class, effectsGroups);
 
     // ADR-093: declarative scripted action definitions under definitions/actions/*.yml
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/actions/*.yml");
     migrateLegacyMultiDir("actions", "definitions/actions");
-    io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(pluginDirectory, RTP.actionManager);
+    MultiConfigParser<ActionKeys> actions =
+            new MultiConfigParser<>(ActionKeys.class, "actions", "1.0", pluginDirectory, "definitions/actions", locale);
+    newMultiConfigParserMap.put(ActionKeys.class, actions);
+    if (RTP.actionManager != null) {
+      RTP.actionManager.clearDefinitions();
+      io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(actions, RTP.actionManager);
+    }
 
     // ADR-076: region arrival schematics (.schem files, resolved by file presence -
     // see RegionSchematicService) live under advanced/schematics/. A legacy root

@@ -15,6 +15,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -36,16 +37,108 @@ public final class ActionManager implements ActionService {
   private final Map<UUID, ActionSessionImpl> activeSessions = new ConcurrentHashMap<>();
   private final Map<UUID, UUID> participantToSession = new ConcurrentHashMap<>();
   private final Map<String, Predicate<ActionGateContext>> externalPredicates = new ConcurrentHashMap<>();
+  private final Map<String, java.util.Queue<PrevalidatedActionPlacement>> actionCaches = new ConcurrentHashMap<>();
+
+  /** Holds a pre-validated candidate placement awaiting dispatch with live reservations (ADR-097). */
+  public static final class PrevalidatedActionPlacement {
+    final Map<UUID, RTPLocation> placements;
+    final int anchorX;
+    final int anchorZ;
+
+    public PrevalidatedActionPlacement(Map<UUID, RTPLocation> placements, int anchorX, int anchorZ) {
+      this.placements = placements;
+      this.anchorX = anchorX;
+      this.anchorZ = anchorZ;
+    }
+
+    public Map<UUID, RTPLocation> placements() {
+      return placements;
+    }
+
+    public void release() {
+      for (RTPLocation loc : placements.values()) {
+        if (loc != null && loc.getReservation() != null) {
+          try {
+            loc.getReservation().close();
+          } catch (Throwable ignored) {
+          }
+        }
+      }
+    }
+  }
 
   public ActionManager() {}
 
   /**
-   * Registers or updates an action definition in the registry.
+   * Clears and releases all cached pre-validated placements across all actions (ADR-097, S-002).
+   */
+  public void clearCaches() {
+    for (java.util.Queue<PrevalidatedActionPlacement> queue : actionCaches.values()) {
+      PrevalidatedActionPlacement item;
+      while ((item = queue.poll()) != null) {
+        item.release();
+      }
+    }
+    actionCaches.clear();
+  }
+
+  /**
+   * Offers a pre-validated candidate placement into the action's cache if space permits (ADR-097).
+   * If the cache is full, the offered placement is released immediately to prevent ticket leaks (S-002).
+   */
+  public boolean offerCachedPlacement(String actionId, PrevalidatedActionPlacement placement) {
+    if (actionId == null || placement == null) return false;
+    ActionDefinition def = definitions.get(actionId.trim().toLowerCase());
+    int maxCapacity = (def != null) ? def.placement().cacheSize() : 0;
+    if (maxCapacity <= 0) {
+      placement.release();
+      return false;
+    }
+    java.util.Queue<PrevalidatedActionPlacement> queue =
+        actionCaches.computeIfAbsent(actionId.trim().toLowerCase(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>());
+    if (queue.size() < maxCapacity) {
+      return queue.offer(placement);
+    }
+    placement.release();
+    return false;
+  }
+
+  /**
+   * Returns the count of pre-validated placements currently held in cache for the specified action.
+   */
+  public int getCachedPlacementCount(String actionId) {
+    if (actionId == null) return 0;
+    java.util.Queue<PrevalidatedActionPlacement> queue = actionCaches.get(actionId.trim().toLowerCase());
+    return (queue != null) ? queue.size() : 0;
+  }
+
+  /**
+   * Registers or updates an action definition in the registry, and registers its command if configured.
    */
   public void registerAction(ActionDefinition definition) {
     if (definition != null) {
       definitions.put(definition.id().toLowerCase(), definition);
+      if (definition.command().isConfigured() && RTP.serverAccessor != null) {
+        try {
+          io.github.dailystruggle.rtp.common.commands.action.ActionCommand actionCmd =
+              new io.github.dailystruggle.rtp.common.commands.action.ActionCommand(definition);
+          List<String> names = new ArrayList<>();
+          names.add(definition.command().name());
+          names.addAll(definition.command().aliases());
+          RTP.serverAccessor.registerCommands(actionCmd, names.toArray(new String[0]));
+        } catch (Exception e) {
+          RTP.log(Level.WARNING, "[RTP Action] Failed registering command for action " + definition.id() + ": " + e.getMessage());
+        }
+      }
     }
+  }
+
+  /**
+   * Retrieves an action definition by id, if present.
+   */
+  public Optional<ActionDefinition> getAction(String id) {
+    if (id == null) return Optional.empty();
+    return Optional.ofNullable(definitions.get(id.toLowerCase()));
   }
 
   /**
@@ -151,81 +244,239 @@ public final class ActionManager implements ActionService {
           ActionSessionResult.failure("GroupPlacementService is not available"));
     }
 
-    ActionDefinition.PlacementSpec pSpec = def.placement();
-    GroupProfileSpec profile = GroupProfileSpec.of(
-        pSpec.profile(),
-        pSpec.subspaceChunkRadius() * 16,
-        pSpec.minSeparation(),
-        pSpec.elevationTolerance(),
-        Math.max(1, participants.size()));
+    final ActionDefinition.PlacementSpec pSpec = def.placement();
+    final Region parentRegion = (pSpec.region() != null)
+        ? RTP.selectionAPI.getRegion(pSpec.region())
+        : null;
 
-    AnchorSource anchorSource = resolveAnchorSource(pSpec, effectiveContext);
-    GroupPlacementRequest request = GroupPlacementRequest.of(
-        pSpec.region(),
-        profile,
-        participants,
-        anchorSource);
+    // Check if a pre-validated placement is cached for this action (ADR-097)
+    PrevalidatedActionPlacement cached = pollCachedPlacement(actionId, participants.size());
+    if (cached != null) {
+      return revalidateAndApply(cached, def, participants, effectiveContext, parentRegion)
+          .thenCompose(res -> {
+            if (res.success()) {
+              return CompletableFuture.completedFuture(res);
+            }
+            // If cached placement was invalidated upon recheck, fall back to live placement
+            return executeLivePlacement(def, participants, effectiveContext, groupService, parentRegion);
+          });
+    }
 
-    return groupService.place(request).thenApply(result -> {
-      if (!result.isSuccess() || result.placements().isEmpty()) {
-        return ActionSessionResult.failure(
-            "Spatial subspace placement failed: " + result.reason());
+    return executeLivePlacement(def, participants, effectiveContext, groupService, parentRegion);
+  }
+
+  /**
+   * Polls a pre-validated candidate placement from the action cache matching participant count.
+   */
+  private PrevalidatedActionPlacement pollCachedPlacement(String actionId, int participantCount) {
+    java.util.Queue<PrevalidatedActionPlacement> queue = actionCaches.get(actionId.trim().toLowerCase());
+    if (queue == null) return null;
+    PrevalidatedActionPlacement p;
+    while ((p = queue.poll()) != null) {
+      if (p.placements().size() >= participantCount) {
+        return p;
       }
+      // Wrong size or stale, release chunk tickets immediately (S-002)
+      p.release();
+    }
+    return null;
+  }
 
-      UUID sessionId = UUID.randomUUID();
-      Map<UUID, int[]> assignedSlots = new HashMap<>();
-      String worldName = null;
-      int minX = Integer.MAX_VALUE;
-      int minZ = Integer.MAX_VALUE;
-      int maxX = Integer.MIN_VALUE;
-      int maxZ = Integer.MIN_VALUE;
+  /**
+   * Revalidates a cached placement prior to participant dispatch (ADR-097, S-001, S-003, S-005).
+   * Verifies resident block standability and checks live external claim verifiers off-tick.
+   */
+  private CompletableFuture<ActionSessionResult> revalidateAndApply(
+      PrevalidatedActionPlacement cached,
+      ActionDefinition def,
+      List<UUID> participants,
+      ActionContext effectiveContext,
+      Region parentRegion) {
 
-      for (Map.Entry<UUID, RTPLocation> entry : result.placements().entrySet()) {
-        UUID pid = entry.getKey();
-        RTPLocation loc = entry.getValue();
-        if (loc != null && loc.world() != null) {
-          int wx = loc.x();
-          int wy = loc.y();
-          int wz = loc.z();
-          assignedSlots.put(pid, new int[] {wx, wy, wz});
-          worldName = loc.world().name();
-          minX = Math.min(minX, wx);
-          minZ = Math.min(minZ, wz);
-          maxX = Math.max(maxX, wx);
-          maxZ = Math.max(maxZ, wz);
+    List<RTPLocation> locList = new ArrayList<>(cached.placements().values());
+    List<CompletableFuture<Boolean>> verifierChecks = new ArrayList<>(participants.size());
+
+    for (int i = 0; i < participants.size(); i++) {
+      RTPLocation loc = locList.get(i);
+      // 1. Resident block standability recheck
+      if (parentRegion != null && parentRegion.candidateValidator() != null) {
+        try {
+          var standable = parentRegion.candidateValidator().validate(loc.x(), loc.z());
+          if (standable == null || Math.abs(standable.coords().y() - loc.y()) > 1) {
+            cached.release();
+            return CompletableFuture.completedFuture(
+                ActionSessionResult.failure("Cached placement block column invalidated"));
+          }
+        } catch (Throwable t) {
+          cached.release();
+          return CompletableFuture.completedFuture(
+              ActionSessionResult.failure("Candidate validator threw during recheck: " + t.getMessage()));
         }
       }
 
-      int anchorX = (minX + maxX) / 2;
-      int anchorZ = (minZ + maxZ) / 2;
+      // 2. External claim verification recheck (S-003)
+      RTPCoords coords = new RTPCoords(loc.world().name(), loc.x(), loc.y(), loc.z());
+      verifierChecks.add(
+          io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers.checkGlobalRegionVerifiers(coords));
+    }
 
-      Region parentRegion = (pSpec.region() != null)
-          ? RTP.selectionAPI.getRegion(pSpec.region())
-          : null;
+    // Accumulate verifier check results asynchronously without calling .join() (S-005 non-blocking)
+    CompletableFuture<Boolean> allVerifiersPass =
+        CompletableFuture.completedFuture(Boolean.TRUE);
+    for (CompletableFuture<Boolean> check : verifierChecks) {
+      allVerifiersPass =
+          allVerifiersPass.thenCombine(check, (accum, pass) -> accum && Boolean.TRUE.equals(pass));
+    }
 
-      ActionSessionImpl session = new ActionSessionImpl(
-          sessionId,
-          def,
-          participants,
-          effectiveContext,
-          assignedSlots,
-          worldName,
-          anchorX,
-          anchorZ,
-          parentRegion,
-          this::handleDisarm,
-          externalPredicates);
+    return allVerifiersPass
+        .thenApply(
+            passed -> {
+              if (!Boolean.TRUE.equals(passed)) {
+                // Learn claim hazard dynamically in spatial memory (ADR-079, ADR-095)
+                if (parentRegion != null
+                    && parentRegion.getShape()
+                        instanceof
+                        io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes
+                            .MemoryShape<?> memShape) {
+                  for (RTPLocation rejectedLoc : locList) {
+                    int cx = rejectedLoc.x() >> 4;
+                    int cz = rejectedLoc.z() >> 4;
+                    long locKey = memShape.xzToLocation(cx, cz);
+                    memShape.addBadChunk(
+                        locKey,
+                        io.github.dailystruggle.rtp.common.selection.region.LocationGenerator
+                            .FailTypes.safetyExternal);
+                  }
+                }
+                cached.release();
+                return ActionSessionResult.failure("Cached placement slot rejected by verifier");
+              }
 
-      activeSessions.put(sessionId, session);
-      for (UUID pid : participants) {
-        participantToSession.put(pid, sessionId);
-      }
+              // Revalidation passed! Assign cached slots to participants and start session
+              UUID sessionId = UUID.randomUUID();
+              Map<UUID, int[]> assignedSlots = new HashMap<>();
+              String worldName = locList.get(0).world().name();
 
-      session.arm();
-      session.triggerStart();
+              for (int i = 0; i < participants.size(); i++) {
+                UUID pid = participants.get(i);
+                RTPLocation loc = locList.get(i);
+                assignedSlots.put(pid, new int[] {loc.x(), loc.y(), loc.z()});
+              }
 
-      return ActionSessionResult.success(sessionId);
-    });
+              ActionSessionImpl session =
+                  new ActionSessionImpl(
+                      sessionId,
+                      def,
+                      participants,
+                      effectiveContext,
+                      assignedSlots,
+                      worldName,
+                      cached.anchorX,
+                      cached.anchorZ,
+                      parentRegion,
+                      this::handleDisarm,
+                      externalPredicates);
+
+              activeSessions.put(sessionId, session);
+              for (UUID pid : participants) {
+                participantToSession.put(pid, sessionId);
+              }
+
+              session.arm();
+              session.triggerStart();
+              return ActionSessionResult.success(sessionId);
+            })
+        .exceptionally(
+            ex -> {
+              cached.release();
+              return ActionSessionResult.failure("Revalidation error: " + ex.getMessage());
+            });
+  }
+
+  /**
+   * Executes live spatial placement via the subspace group engine with bounded retries.
+   */
+  private CompletableFuture<ActionSessionResult> executeLivePlacement(
+      ActionDefinition def,
+      List<UUID> participants,
+      ActionContext effectiveContext,
+      GroupPlacementService groupService,
+      Region parentRegion) {
+
+    ActionDefinition.PlacementSpec pSpec = def.placement();
+    GroupProfileSpec profile =
+        GroupProfileSpec.of(
+            pSpec.shapeName(),
+            pSpec.radius(),
+            pSpec.minSeparation(),
+            pSpec.elevationTolerance(),
+            Math.max(1, participants.size()),
+            pSpec.retries());
+
+    AnchorSource anchorSource = resolveAnchorSource(pSpec, effectiveContext);
+    GroupPlacementRequest request =
+        GroupPlacementRequest.of(pSpec.region(), profile, participants, anchorSource);
+
+    return groupService
+        .place(request)
+        .thenApply(
+            result -> {
+              if (!result.isSuccess() || result.placements().isEmpty()) {
+                return ActionSessionResult.failure(
+                    "Spatial subspace placement failed: " + result.reason());
+              }
+
+              UUID sessionId = UUID.randomUUID();
+              Map<UUID, int[]> assignedSlots = new HashMap<>();
+              String worldName = null;
+              int minX = Integer.MAX_VALUE;
+              int minZ = Integer.MAX_VALUE;
+              int maxX = Integer.MIN_VALUE;
+              int maxZ = Integer.MIN_VALUE;
+
+              for (Map.Entry<UUID, RTPLocation> entry : result.placements().entrySet()) {
+                UUID pid = entry.getKey();
+                RTPLocation loc = entry.getValue();
+                if (loc != null && loc.world() != null) {
+                  int wx = loc.x();
+                  int wy = loc.y();
+                  int wz = loc.z();
+                  assignedSlots.put(pid, new int[] {wx, wy, wz});
+                  worldName = loc.world().name();
+                  minX = Math.min(minX, wx);
+                  minZ = Math.min(minZ, wz);
+                  maxX = Math.max(maxX, wx);
+                  maxZ = Math.max(maxZ, wz);
+                }
+              }
+
+              int anchorX = (minX + maxX) / 2;
+              int anchorZ = (minZ + maxZ) / 2;
+
+              ActionSessionImpl session =
+                  new ActionSessionImpl(
+                      sessionId,
+                      def,
+                      participants,
+                      effectiveContext,
+                      assignedSlots,
+                      worldName,
+                      anchorX,
+                      anchorZ,
+                      parentRegion,
+                      this::handleDisarm,
+                      externalPredicates);
+
+              activeSessions.put(sessionId, session);
+              for (UUID pid : participants) {
+                participantToSession.put(pid, sessionId);
+              }
+
+              session.arm();
+              session.triggerStart();
+
+              return ActionSessionResult.success(sessionId);
+            });
   }
 
   /**

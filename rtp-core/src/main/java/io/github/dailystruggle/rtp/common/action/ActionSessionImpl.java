@@ -160,12 +160,11 @@ public final class ActionSessionImpl implements ActionSession {
         yield parentRegion.getShape().contains(x, z);
       }
       case SUBSPACE -> {
-        // Footprint radius: subspaceChunkRadius chunks
-        int rBlocks = definition.placement().subspaceChunkRadius() * 16;
+        double rBlocks = currentBoundaryRadius();
         yield Math.abs(x - anchorX) <= rBlocks && Math.abs(z - anchorZ) <= rBlocks;
       }
       case LEASH -> {
-        double leash = definition.confinement().leashRadius();
+        double leash = currentBoundaryRadius();
         double dx = x - anchorX;
         double dz = z - anchorZ;
         yield (dx * dx + dz * dz) <= (leash * leash);
@@ -173,11 +172,111 @@ public final class ActionSessionImpl implements ActionSession {
     };
   }
 
+  /**
+   * Returns the current mathematical boundary radius in blocks, linearly interpolated
+   * if shrinkTo and shrinkOverSeconds are configured.
+   */
+  public double currentBoundaryRadius() {
+    ConfinementBoundary boundary = definition.confinement().boundary();
+    double baseRadius = (boundary == ConfinementBoundary.LEASH)
+        ? definition.confinement().leashRadius()
+        : (double) definition.placement().radius();
+
+    double initialRadius = definition.confinement().initialSize() > 0.0
+        ? definition.confinement().initialSize() / 2.0
+        : baseRadius;
+
+    double shrinkToRadius = definition.confinement().shrinkTo() > 0.0
+        ? definition.confinement().shrinkTo() / 2.0
+        : initialRadius;
+
+    long shrinkOver = definition.confinement().shrinkOverSeconds();
+    if (shrinkOver <= 0L || Math.abs(initialRadius - shrinkToRadius) < 1e-6) {
+      return initialRadius;
+    }
+
+    long elapsed = elapsedSeconds();
+    if (elapsed <= 0L) {
+      return initialRadius;
+    }
+    if (elapsed >= shrinkOver) {
+      return shrinkToRadius;
+    }
+
+    double progress = (double) elapsed / (double) shrinkOver;
+    return initialRadius + progress * (shrinkToRadius - initialRadius);
+  }
+
   public void triggerStart() {
-    executeLifecycleSteps(definition.lifecycle().onStart(), null);
+    sendConfinementWorldBorder();
+    UUID firstParticipant = participants.isEmpty() ? new UUID(0, 0) : participants.get(0);
+    ActionGateContext startGateCtx = new ActionGateContext(
+        sessionId,
+        definition.id(),
+        firstParticipant,
+        0L,
+        durationSeconds,
+        0,
+        true,
+        0.0,
+        (double) anchorX,
+        64.0,
+        (double) anchorZ);
+    executeLifecycleSteps(definition.lifecycle().onStart(), startGateCtx);
+  }
+
+  private void sendConfinementWorldBorder() {
+    if (definition.confinement() == null || definition.confinement().boundary() == null) {
+      return;
+    }
+    double defaultSize;
+    switch (definition.confinement().boundary()) {
+      case SUBSPACE -> {
+        int rBlocks = definition.placement().radius();
+        defaultSize = rBlocks * 2.0;
+      }
+      case LEASH -> {
+        double r = definition.confinement().leashRadius();
+        defaultSize = r * 2.0;
+      }
+      case REGION -> {
+        // Parent region bounding box or default
+        defaultSize = 512.0;
+      }
+      default -> {
+        return;
+      }
+    }
+
+    double initialSize = definition.confinement().initialSize() > 0.0
+        ? definition.confinement().initialSize()
+        : defaultSize;
+    double shrinkTo = definition.confinement().shrinkTo() > 0.0
+        ? definition.confinement().shrinkTo()
+        : initialSize;
+    long shrinkOver = definition.confinement().shrinkOverSeconds();
+
+    RTPServerAccessor accessor = RTP.serverAccessor;
+    if (accessor != null) {
+      for (UUID participant : participants) {
+        accessor.sendWorldBorder(participant, anchorX, anchorZ, initialSize, shrinkTo, shrinkOver);
+      }
+    }
+  }
+
+  private void resetConfinementWorldBorder() {
+    RTPServerAccessor accessor = RTP.serverAccessor;
+    if (accessor != null) {
+      for (UUID participant : participants) {
+        accessor.resetWorldBorder(participant);
+      }
+    }
   }
 
   public void triggerBoundaryViolation(UUID violatorId, int x, int z, int breachCount) {
+    if (violatorId != null) {
+      violations.computeIfAbsent(violatorId, k -> new AtomicInteger(0)).set(breachCount);
+    }
     double distSq = (double) (x - anchorX) * (x - anchorX) + (double) (z - anchorZ) * (z - anchorZ);
     ActionGateContext gateCtx = new ActionGateContext(
         sessionId,
@@ -187,7 +286,10 @@ public final class ActionSessionImpl implements ActionSession {
         remainingSeconds(),
         breachCount,
         false,
-        distSq);
+        distSq,
+        (double) x,
+        64.0,
+        (double) z);
 
     executeLifecycleSteps(definition.lifecycle().onBoundaryViolation(), gateCtx);
   }
@@ -228,6 +330,8 @@ public final class ActionSessionImpl implements ActionSession {
   public void disarm() {
     if (!active.compareAndSet(true, false)) return;
 
+    resetConfinementWorldBorder();
+
     for (AutoCloseable watcher : moveWatchers.values()) {
       try {
         watcher.close();
@@ -259,13 +363,69 @@ public final class ActionSessionImpl implements ActionSession {
       baseTokens.put("violator", gateCtx.participantId());
     }
 
+    // Populate cluster tokens ([cluster_1], [cluster_2], [cluster_<name>], [players])
+    baseTokens.put("players", participants);
+    baseTokens.put("participants", participants);
+
+    if (!participants.isEmpty()) {
+      baseTokens.put("sender", participants.get(0));
+      baseTokens.put("challenger", participants.get(0));
+      if (participants.size() > 1) {
+        baseTokens.put("target", participants.get(1));
+        baseTokens.put("opponent", participants.get(1));
+      }
+    }
+
+    List<List<UUID>> clusters = context.clusters();
+    for (int i = 0; i < clusters.size(); i++) {
+      baseTokens.put("cluster_" + (i + 1), clusters.get(i));
+      baseTokens.put("group_" + (i + 1), clusters.get(i));
+    }
+
+    Map<String, List<UUID>> named = context.namedClusters();
+    for (Map.Entry<String, List<UUID>> entry : named.entrySet()) {
+      baseTokens.put("cluster_" + entry.getKey().toLowerCase(), entry.getValue());
+      baseTokens.put("group_" + entry.getKey().toLowerCase(), entry.getValue());
+    }
+
     for (ActionDefinition.LifecycleStep step : steps) {
       if (gateCtx != null && !GateEvaluator.evaluate(step.gateConfig(), gateCtx, externalPredicates)) {
         continue; // Gate failed; skip step
       }
 
-      for (ActionDefinition.CommandAction cmd : step.actions()) {
-        executeGuardedAction(cmd, baseTokens);
+      if (step.delaySeconds() > 0L) {
+        // Schedule delayed execution
+        long delayTicks = Math.max(1L, step.delaySeconds() * 20L);
+        RTP.scheduler.runTaskLater(() -> {
+          if (!active.get()) return;
+          // Re-evaluate gate if context present (e.g. opt-out check)
+          ActionGateContext currentGateCtx = gateCtx;
+          if (currentGateCtx != null && currentGateCtx.participantId() != null) {
+            int currentViolations = getViolations(currentGateCtx.participantId());
+            currentGateCtx = new ActionGateContext(
+                currentGateCtx.sessionId(),
+                currentGateCtx.actionId(),
+                currentGateCtx.participantId(),
+                elapsedSeconds(),
+                remainingSeconds(),
+                currentViolations,
+                currentGateCtx.inBounds(),
+                currentGateCtx.distanceSqFromAnchor(),
+                currentGateCtx.currentX(),
+                currentGateCtx.currentY(),
+                currentGateCtx.currentZ());
+          }
+          if (currentGateCtx != null && !GateEvaluator.evaluate(step.gateConfig(), currentGateCtx, externalPredicates)) {
+            return;
+          }
+          for (ActionDefinition.CommandAction cmd : step.actions()) {
+            executeGuardedAction(cmd, baseTokens);
+          }
+        }, delayTicks);
+      } else {
+        for (ActionDefinition.CommandAction cmd : step.actions()) {
+          executeGuardedAction(cmd, baseTokens);
+        }
       }
     }
   }

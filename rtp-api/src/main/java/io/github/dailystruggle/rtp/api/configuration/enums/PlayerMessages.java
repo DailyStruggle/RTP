@@ -46,6 +46,10 @@ public enum PlayerMessages {
   notEnoughMoney,
   /** Sent when the specified world name does not match any loaded world. */
   invalidWorld,
+  /** Sent when a player issues {@code /rtp back} with no recorded prior teleport origin. */
+  noBackLocation,
+  /** Sent when a player successfully teleports back to their previous location. */
+  backSuccess,
   // --- Command argument / permission errors ---
   /** Sent when a command argument cannot be parsed or is out of range. */
   badArg,

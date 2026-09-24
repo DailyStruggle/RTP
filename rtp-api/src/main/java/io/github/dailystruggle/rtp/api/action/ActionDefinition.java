@@ -17,32 +17,102 @@ public record ActionDefinition(
     String description,
     PlacementSpec placement,
     ConfinementSpec confinement,
-    LifecycleSpec lifecycle) {
+    LifecycleSpec lifecycle,
+    CommandSpec command) {
+
+  public ActionDefinition(
+      String id,
+      String alias,
+      String permission,
+      String description,
+      PlacementSpec placement,
+      ConfinementSpec confinement,
+      LifecycleSpec lifecycle) {
+    this(id, alias, permission, description, placement, confinement, lifecycle, CommandSpec.EMPTY);
+  }
 
   public ActionDefinition {
     Objects.requireNonNull(id, "id must not be null");
     placement = (placement == null) ? PlacementSpec.DEFAULT : placement;
     confinement = (confinement == null) ? ConfinementSpec.DEFAULT : confinement;
     lifecycle = (lifecycle == null) ? LifecycleSpec.EMPTY : lifecycle;
+    command = (command == null) ? CommandSpec.EMPTY : command;
   }
 
   /**
-   * Spatial placement profile specifications.
+   * Top-level command declaration for the action (ADR-093).
+   */
+  @PublicApi
+  public record CommandSpec(
+      String name,
+      String permission,
+      String description,
+      List<String> aliases) {
+
+    public static final CommandSpec EMPTY =
+        new CommandSpec("", "", "", Collections.emptyList());
+
+    public CommandSpec {
+      name = (name == null) ? "" : name.trim();
+      permission = (permission == null) ? "" : permission.trim();
+      description = (description == null) ? "" : description.trim();
+      aliases = (aliases == null) ? Collections.emptyList() : List.copyOf(aliases);
+    }
+
+    public boolean isConfigured() {
+      return !name.isBlank();
+    }
+  }
+
+  /**
+   * Spatial placement specifications (ADR-093, ADR-095).
    */
   @PublicApi
   public record PlacementSpec(
       String region,
-      String profile,
-      int subspaceChunkRadius,
+      String shapeName,
+      int radius,
       int minSeparation,
       int elevationTolerance,
-      Map<String, Object> parameters) {
+      Map<String, Object> parameters,
+      int retries,
+      int cacheSize) {
 
     public static final PlacementSpec DEFAULT =
-        new PlacementSpec("default", "default", 4, 16, 8, Collections.emptyMap());
+        new PlacementSpec("default", "SQUARE", 64, 16, 8, Collections.emptyMap(), 3, 0);
+
+    public PlacementSpec(
+        String region,
+        String shapeName,
+        int radius,
+        int minSeparation,
+        int elevationTolerance,
+        Map<String, Object> parameters) {
+      this(region, shapeName, radius, minSeparation, elevationTolerance, parameters, 3, 0);
+    }
 
     public PlacementSpec {
+      shapeName = (shapeName == null || shapeName.isBlank()) ? "SQUARE" : shapeName.trim().toUpperCase();
+      radius = Math.max(1, radius);
+      minSeparation = Math.max(1, minSeparation);
+      elevationTolerance = Math.max(0, elevationTolerance);
       parameters = (parameters == null) ? Collections.emptyMap() : Map.copyOf(parameters);
+      retries = Math.max(1, retries);
+      cacheSize = Math.max(0, cacheSize);
+    }
+
+    /**
+     * Spacing between players in the same spatial cluster (teammates).
+     * Defaults to 4 blocks or clamped to {@code minSeparation}.
+     */
+    public int clusterSeparation() {
+      Object v = parameters.get("clusterSeparation");
+      if (v instanceof Number n) return Math.max(1, n.intValue());
+      Object v2 = parameters.get("teammateSeparation");
+      if (v2 instanceof Number n2) return Math.max(1, n2.intValue());
+      Object v3 = parameters.get("groupSeparation");
+      if (v3 instanceof Number n3) return Math.max(1, n3.intValue());
+      return Math.min(minSeparation, 4);
     }
   }
 
@@ -53,14 +123,27 @@ public record ActionDefinition(
   public record ConfinementSpec(
       ConfinementBoundary boundary,
       long durationSeconds,
-      double leashRadius) {
+      double leashRadius,
+      double initialSize,
+      double shrinkTo,
+      long shrinkOverSeconds) {
 
     public static final ConfinementSpec DEFAULT =
-        new ConfinementSpec(ConfinementBoundary.SUBSPACE, 300L, 64.0);
+        new ConfinementSpec(ConfinementBoundary.SUBSPACE, 300L, 64.0, 0.0, 0.0, 0L);
+
+    public ConfinementSpec(
+        ConfinementBoundary boundary,
+        long durationSeconds,
+        double leashRadius) {
+      this(boundary, durationSeconds, leashRadius, 0.0, 0.0, 0L);
+    }
 
     public ConfinementSpec {
       boundary = (boundary == null) ? ConfinementBoundary.SUBSPACE : boundary;
       if (leashRadius <= 0.0) leashRadius = 64.0;
+      if (initialSize < 0.0) initialSize = 0.0;
+      if (shrinkTo < 0.0) shrinkTo = 0.0;
+      if (shrinkOverSeconds < 0L) shrinkOverSeconds = 0L;
     }
   }
 
@@ -86,16 +169,24 @@ public record ActionDefinition(
   }
 
   /**
-   * Individual lifecycle step which may optionally be guarded by a gate.
+   * Individual lifecycle step which may optionally be guarded by a gate and have an execution delay.
    */
   @PublicApi
   public record LifecycleStep(
       Map<String, Object> gateConfig,
-      List<CommandAction> actions) {
+      List<CommandAction> actions,
+      long delaySeconds) {
+
+    public LifecycleStep(
+        Map<String, Object> gateConfig,
+        List<CommandAction> actions) {
+      this(gateConfig, actions, 0L);
+    }
 
     public LifecycleStep {
       gateConfig = (gateConfig == null) ? Collections.emptyMap() : Map.copyOf(gateConfig);
       actions = (actions == null) ? Collections.emptyList() : List.copyOf(actions);
+      if (delaySeconds < 0L) delaySeconds = 0L;
     }
   }
 

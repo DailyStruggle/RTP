@@ -1,0 +1,26 @@
+# --- actions/default.yml ---
+alias: "wild"
+permission: "rtp.action.default"
+description: "Default safe scatter teleport."
+
+placement:
+  region: "default"
+  anchor: "regionQueue"
+  shape:
+    name: "SQUARE"
+    radius: 4c
+    centerRadius: 0
+  minSeparation: 32
+  elevationTolerance: 8
+  retries: 3
+  cacheSize: 0
+
+confinement:
+  boundary: "SUBSPACE"
+  duration: "0s"
+
+lifecycle:
+  onStart:
+    - PLAYER: "msg &aTeleported to the wild."
+
+version: "1.0"

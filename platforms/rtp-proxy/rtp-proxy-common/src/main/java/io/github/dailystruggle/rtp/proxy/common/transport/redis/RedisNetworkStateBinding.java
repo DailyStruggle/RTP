@@ -99,6 +99,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     private static final String PROXY_KEY_PREFIX = "rtp:net:proxy:";
     private static final String TOKEN_KEY_PREFIX = "rtp:net:tok:";
     private static final String TOKEN_ACTIVE_PREFIX = "rtp:net:tokactive:";
+    private static final String LAST_TP_PREFIX = "rtp:lastTp:";
     private static final String BACKEND_CHANNEL = "rtp:net:backend";
 
     /**
@@ -697,6 +698,34 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         } catch (Exception e) {
             throw new RuntimeException("RedisNetworkStateBinding.findReservation failed: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public CompletableFuture<Void> setLastTeleportTime(UUID playerId, long epochMillis) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.runAsync(() -> {
+            try (Jedis jedis = pool.getResource()) {
+                jedis.set(LAST_TP_PREFIX + playerId, String.valueOf(epochMillis));
+            }
+        }, publisherExec);
+    }
+
+    @Override
+    public CompletableFuture<Long> getLastTeleportTime(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            try (Jedis jedis = pool.getResource()) {
+                String val = jedis.get(LAST_TP_PREFIX + playerId);
+                if (val == null || val.isEmpty()) return 0L;
+                try {
+                    return Long.parseLong(val);
+                } catch (NumberFormatException e) {
+                    return 0L;
+                }
+            }
+        }, publisherExec);
     }
 
     @Override

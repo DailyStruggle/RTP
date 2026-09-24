@@ -216,7 +216,7 @@ public class RegionConfigLoader {
     }
 
     @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
-    private static Shape<?> deserializeShape(Map<String, Object> map) {
+    public static Shape<?> deserializeShape(Map<String, Object> map) {
         String shapeName = String.valueOf(map.getOrDefault("name", "CIRCLE")).toUpperCase();
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
         Shape<?> prototype = (Shape<?>) factory.get(shapeName);

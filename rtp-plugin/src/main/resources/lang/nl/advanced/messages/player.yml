@@ -51,6 +51,10 @@ milliseconden: "ms"
 # placeholder: [world] - de wereldnaam
 ongeldigeWereld: "&7[P0] wereld '[world]' kon niet worden gevonden"
 
+geenVorigeLocatie: "&c[P0] Geen eerdere teleporteerlocatie gevonden."
+
+terugSucces: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teruggekeerd naar vorige locatie.</gradient>"
+
 # de plugin heeft het gevraagde commando niet
 # placeholder: [arg] - het geprobeerde argument
 ongeldigArgument: "&c[P0] ongeldig opdrachtargument [arg]"

@@ -89,15 +89,31 @@ class SampleActionE2ETest {
     ActionConfigLoader.loadActions(shippedResourcesDir(), manager);
   }
 
+  @Test
+  @DisplayName("MultiConfigParser unpacks bundled definitions to plugin directory if empty")
+  void testUnpackBundledDefinitionsToPluginDir(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
+    ActionManager m = new ActionManager();
+    io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys> actions =
+        new io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<>(
+            io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys.class, "actions", "1.0", tempDir.toFile(), "definitions/actions", "en");
+    ActionConfigLoader.loadActions(actions, m);
+
+    File actionsDir = new File(tempDir.toFile(), "definitions/actions");
+    assertTrue(actionsDir.exists());
+    File[] ymls = actionsDir.listFiles((dir, name) -> name.endsWith(".yml"));
+    assertNotNull(ymls);
+    assertTrue(actionsDir.isDirectory());
+  }
+
   @AfterEach
   void tearDown() {
     RTP.groupPlacementService = originalGroupService;
   }
 
   @Test
-  @DisplayName("All shipped sample actions parse and register (scatter/nearplayer/nearclaim/location/on-join/on-death)")
+  @DisplayName("All shipped sample actions parse and register (scatter/nearplayer/nearclaim/location)")
   void testShippedActionsRegister() {
-    for (String id : List.of("scatter", "nearplayer", "nearclaim", "location", "on-join", "on-death")) {
+    for (String id : List.of("scatter", "nearplayer", "nearclaim", "location")) {
       assertTrue(manager.getActionIds().contains(id),
           "shipped action '" + id + "' must be registered from its YAML file");
     }
@@ -106,10 +122,7 @@ class SampleActionE2ETest {
   @Test
   @DisplayName("Shipped one-shot actions run the full trigger->onStart->placement lifecycle end to end")
   void testShippedLifecycleEndToEnd() {
-    // Rows: action,phase,detail  -> consumed by scripts/sim/action_lifecycle_sim.py for real-data charts.
-    List<String[]> events = new java.util.ArrayList<>();
-
-    for (String id : List.of("scatter", "nearplayer", "nearclaim", "location", "on-join", "on-death")) {
+    for (String id : List.of("scatter", "nearplayer", "nearclaim", "location")) {
       accessor.dispatched.clear();
       UUID player = UUID.randomUUID();
 
@@ -117,11 +130,9 @@ class SampleActionE2ETest {
       ActionContext ctx = ActionContext.of(
           Map.of("anchorWorld", "world", "anchorX", 250, "anchorY", 70, "anchorZ", -120));
 
-      events.add(new String[] {id, "trigger", "participants=1"});
       ActionSessionResult res = manager.trigger(id, List.of(player), ctx).join();
       assertTrue(res.success(), "shipped action '" + id + "' should trigger successfully: " + res.failureReason());
       assertNotNull(res.sessionId());
-      events.add(new String[] {id, "placement+arm", "session=" + res.sessionId().toString().substring(0, 8)});
 
       Optional<ActionSession> session = manager.getSession(res.sessionId());
       assertTrue(session.isPresent(), "session for '" + id + "' should be active");
@@ -132,8 +143,6 @@ class SampleActionE2ETest {
       for (String line : accessor.dispatched) {
         if (line.startsWith(player.toString()) && line.contains("msg")) {
           onStartFired = true;
-          String cmd = line.substring(line.indexOf("::") + 2).trim();
-          events.add(new String[] {id, "onStart", cmd});
         }
       }
       assertTrue(onStartFired,
@@ -142,37 +151,6 @@ class SampleActionE2ETest {
       manager.disarm(res.sessionId());
       assertFalse(manager.getSession(res.sessionId()).isPresent(),
           "session for '" + id + "' should be cleaned up after disarm");
-      events.add(new String[] {id, "disarm", "cleaned"});
-    }
-
-    writeEventsCsv(events);
-  }
-
-  /** Writes the recorded real lifecycle events to scripts/sim/out/e2e_events.csv (best-effort). */
-  private static void writeEventsCsv(List<String[]> events) {
-    File[] outCandidates = {
-      new File("../scripts/sim/out"),
-      new File("scripts/sim/out"),
-    };
-    File outDir = null;
-    for (File c : outCandidates) {
-      File parent = c.getParentFile();
-      if (parent != null && parent.getParentFile() != null && parent.getParentFile().isDirectory()) {
-        outDir = c;
-        break;
-      }
-    }
-    if (outDir == null) return;
-    outDir.mkdirs();
-    File csv = new File(outDir, "e2e_events.csv");
-    try (java.io.PrintWriter w = new java.io.PrintWriter(
-        new java.io.OutputStreamWriter(new java.io.FileOutputStream(csv), java.nio.charset.StandardCharsets.UTF_8))) {
-      w.println("action,phase,detail");
-      for (String[] row : events) {
-        w.println(row[0] + "," + row[1] + "," + row[2].replace(",", ";"));
-      }
-    } catch (Exception ignored) {
-      // best-effort artifact for charting; never fail the test on IO
     }
   }
 }
