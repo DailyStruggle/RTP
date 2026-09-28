@@ -12,5 +12,7 @@ public enum ActionKeys {
   placement,
   confinement,
   lifecycle,
-  command
+  command,
+  gate,
+  gates
 }

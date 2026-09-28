@@ -70,6 +70,17 @@ public interface AnchorSource {
   }
 
   /**
+   * Anchor source resolved from a stable claim or faction boundary.
+   *
+   * @param boundary the territory claim boundary; must not be {@code null}
+   * @return anchor source bound to the claim boundary
+   */
+  static AnchorSource claimBoundary(io.github.dailystruggle.rtp.api.claim.ClaimBoundary boundary) {
+    Objects.requireNonNull(boundary, "boundary must not be null");
+    return new ClaimBoundaryAnchorSource(boundary);
+  }
+
+  /**
    * Marker singleton for region queue anchor source.
    */
   enum RegionQueueAnchorSource implements AnchorSource {
@@ -90,6 +101,30 @@ public interface AnchorSource {
     @Override
     public CompletableFuture<RTPCoords> resolveAnchor(Object regionContext) {
       return CompletableFuture.completedFuture(null);
+    }
+  }
+
+  /**
+   * Anchor source backed by a {@link io.github.dailystruggle.rtp.api.claim.ClaimBoundary}.
+   */
+  final class ClaimBoundaryAnchorSource implements AnchorSource {
+    private final io.github.dailystruggle.rtp.api.claim.ClaimBoundary boundary;
+
+    public ClaimBoundaryAnchorSource(io.github.dailystruggle.rtp.api.claim.ClaimBoundary boundary) {
+      this.boundary = Objects.requireNonNull(boundary, "boundary must not be null");
+    }
+
+    public io.github.dailystruggle.rtp.api.claim.ClaimBoundary boundary() {
+      return boundary;
+    }
+
+    @Override
+    public CompletableFuture<RTPCoords> resolveAnchor(Object regionContext) {
+      int[] c = boundary.centroid();
+      if (c == null || c.length < 2) {
+        return CompletableFuture.completedFuture(null);
+      }
+      return CompletableFuture.completedFuture(new RTPCoords(boundary.world(), c[0], 64, c[1]));
     }
   }
 }

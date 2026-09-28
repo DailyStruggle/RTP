@@ -21,7 +21,7 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
   @SuppressWarnings("java:S3077") // Volatile publication of immutable SegmentedKeyRunTable snapshot
   protected volatile SegmentedKeyRunTable segmentedTable;
 
-  protected final long feistelSalt = SEED_SOURCE.nextLong();
+  protected volatile long feistelSalt = SEED_SOURCE.nextLong();
   protected final java.util.concurrent.atomic.AtomicLong selectionCounter = new java.util.concurrent.atomic.AtomicLong(0);
   protected final java.util.concurrent.atomic.AtomicLong backlogCounter = new java.util.concurrent.atomic.AtomicLong(0);
 
@@ -112,6 +112,18 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
     phaseProgress.clear();
   }
 
+  @Override
+  public void setRng(java.util.Random rng) {
+    super.setRng(rng);
+    if (rng != null) {
+      this.feistelSalt = rng.nextLong();
+    }
+  }
+
+  public void setFeistelSalt(long salt) {
+    this.feistelSalt = salt;
+  }
+
   protected long getEpochKey(long epoch, long phaseOffset) {
     return feistelSalt ^ (epoch * 0x517CC1B727220A95L) ^ (phaseOffset * 0x9E3779B97F4A7C15L);
   }
@@ -157,7 +169,7 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
           activePhaseIndex.set(nextPhase);
 
           // Sample Gaussian batch window centered at 32 (std dev ~6, bounds [16, 64])
-          int w = (int) Math.round(32.0 + SEED_SOURCE.nextGaussian() * 6.0);
+          int w = (int) Math.round(32.0 + rng().nextGaussian() * 6.0);
           activeWindowRemaining.set(Math.max(16, Math.min(64, w)));
         }
       }

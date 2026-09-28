@@ -71,12 +71,6 @@ public final class CoreCommandTreeBuilder {
     root.addSubCommand(actionSubCmd);
     root.getCommandLookup().put("RUN", actionSubCmd);
     root.getCommandLookup().put("TRIGGER", actionSubCmd);
-
-    io.github.dailystruggle.rtp.common.commands.trigger.TriggerSubCmd triggerSubCmd =
-        new io.github.dailystruggle.rtp.common.commands.trigger.TriggerSubCmd(root);
-    root.addSubCommand(triggerSubCmd);
-    root.getCommandLookup().put("TRIGGERS", triggerSubCmd);
-    root.getCommandLookup().put("PORTAL", triggerSubCmd);
   }
 
   /**

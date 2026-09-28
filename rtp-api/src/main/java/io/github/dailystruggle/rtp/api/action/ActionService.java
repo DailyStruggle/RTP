@@ -51,6 +51,17 @@ public interface ActionService {
   void disarm(UUID sessionId);
 
   /**
+   * Cancels a participant's pending wait-queue entry or active action session.
+   *
+   * @param participantId the participant UUID
+   * @param actionId      optional action ID to restrict cancellation to; if null, cancels across all actions
+   * @return true if an entry or session was cancelled, false if none found
+   */
+  default boolean cancelParticipant(UUID participantId, String actionId) {
+    return false;
+  }
+
+  /**
    * Registers a custom programmatic predicate gate for third-party plugins (ADR-093 Section 3).
    *
    * @param name      the gate identifier (referenced in action configs under {@code predicate: <name>})

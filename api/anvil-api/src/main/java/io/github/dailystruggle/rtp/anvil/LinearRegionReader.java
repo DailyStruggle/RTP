@@ -46,7 +46,7 @@ public final class LinearRegionReader implements RegionFileReader {
         if (!zstdAvailable) return false;
         try {
             // Trigger class load of the pure-Java decoder
-            Class.forName(ZstdInputStream.class.getName());
+            Class.forName("io.airlift.compress.zstd.ZstdInputStream");
             return true;
         } catch (Throwable t) {
             zstdAvailable = false;

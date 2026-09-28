@@ -71,13 +71,13 @@ public final class PrefabDiskIO {
         Objects.requireNonNull(prefab, "prefab");
         Map<String, Map<String, Object>> snapshot = new LinkedHashMap<>();
         if (!prefab.performanceOverlay().isEmpty()) {
-            snapshot.put("performance", readLive(pluginDirectory, "performance"));
+            snapshot.put("advanced/performance", readLive(pluginDirectory, "advanced/performance"));
         }
         if (!prefab.safetyOverlay().isEmpty()) {
             snapshot.put("safety", readLive(pluginDirectory, "safety"));
         }
         for (String regionId : prefab.regionOverlays().keySet()) {
-            String fileId = "regions/" + regionId;
+            String fileId = "definitions/regions/" + regionId;
             snapshot.put(fileId, readLive(pluginDirectory, fileId));
         }
         return snapshot;

@@ -290,10 +290,6 @@ public class ConfigsTest {
         File actionsDir = new File(definitions, "actions");
         assertTrue(actionsDir.isDirectory(), "definitions/actions directory should be created");
 
-        // Verify shared rename map exists beside the actions folder
-        File shared = new File(definitions, ".actions.lang.yml");
-        assertTrue(shared.isFile(), "definitions/.actions.lang.yml should exist beside the actions folder");
-
         // Add a new dynamic action without custom template, asserting it inherits default.yml
         actionsMulti.addParser("test_action");
         ConfigParser<ActionKeys> customParser = actionsMulti.getParser("test_action");

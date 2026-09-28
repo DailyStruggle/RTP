@@ -731,8 +731,15 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param rng the {@link Random} instance to use; pass {@code null} to restore
    *     {@link ThreadLocalRandom} behaviour.
    */
-  public final void setRng(Random rng) {
+  public void setRng(Random rng) {
     this.rng = rng;
+  }
+
+  /**
+   * Returns the explicitly injected RNG, or {@code null} if default behaviour is active.
+   */
+  public Random getRng() {
+    return this.rng;
   }
 
   /**
@@ -960,7 +967,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return true if known bad, false otherwise
    */
   public boolean isKnownBad(int x, int z) {
-    return isKnownBad((long) xzToLocation(x, z));
+    long loc = xzToLocation(x, z);
+    if (loc < 0 || loc >= getEffectiveRange()) return false;
+    return isKnownBad(loc);
   }
 
   /**
@@ -970,7 +979,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return true if known bad, false otherwise
    */
   public boolean isKnownBad(MutableRTPCoords coords) {
-    return isKnownBad((long) xzToLocation(coords));
+    long loc = xzToLocation(coords);
+    if (loc < 0 || loc >= getEffectiveRange()) return false;
+    return isKnownBad(loc);
   }
 
   /**
@@ -1012,6 +1023,33 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
+   * Check if a location is known to be an actual hazard (excluding uniquePlacement marks).
+   * Used by subspace child shapes to inherit base hazard memory without being starved by
+   * unique placement history around the anchor.
+   *
+   * @param x the x coordinate
+   * @param z the z coordinate
+   * @return true if known hazard, false otherwise
+   */
+  public boolean isKnownHazard(int x, int z) {
+    if (!isKnownBad(x, z)) return false;
+    int cause = causeAt(x, z);
+    return cause != LocationGenerator.FailTypes.uniquePlacement.ordinal();
+  }
+
+  /**
+   * Check if a 1D location index is known to be an actual hazard (excluding uniquePlacement marks).
+   *
+   * @param location the location value
+   * @return true if known hazard, false otherwise
+   */
+  public boolean isKnownHazard(long location) {
+    if (!isKnownBad(location)) return false;
+    int cause = causeAt(location);
+    return cause != LocationGenerator.FailTypes.uniquePlacement.ordinal();
+  }
+
+  /**
    * Returns rejection cause for bad-location run containing {@code (x, z)}, or {@code -1}.
    * Non-negative return is a {@link LocationGenerator.FailTypes} ordinal.
    *
@@ -1032,10 +1070,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return {@link LocationGenerator.FailTypes} ordinal, or {@code -1} if not known bad
    */
   public int causeAt(long location) {
-    if (pendingBadLocations.get().containsKey(location)) return MISC_CAUSE & 0xFF;
+    Long pVal = pendingBadLocations.get().get(location);
+    if (pVal != null) return (int) (pVal & 0xFFL);
 
     ConcurrentHashMap<Long, Long> rebuilding = rebuildingBadLocations;
-    if (rebuilding != null && rebuilding.containsKey(location)) return MISC_CAUSE & 0xFF;
+    if (rebuilding != null) {
+      Long rVal = rebuilding.get(location);
+      if (rVal != null) return (int) (rVal & 0xFFL);
+    }
 
     long[] sums = badPrefixSumsCache;
     long[] keys = badKeysCache;

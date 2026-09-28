@@ -279,11 +279,11 @@ class MultiWorldExpanderTest {
     }
 
     @Test
-    @DisplayName("PrefabApplier 3-arg overload synthesises regions/<world> trees in the result")
+    @DisplayName("PrefabApplier 3-arg overload synthesises definitions/regions/<world> trees in the result")
     void applierOverloadIntegration() {
         Map<String, Map<String, Object>> trees = new LinkedHashMap<>();
-        trees.put("performance", new LinkedHashMap<>());
-        trees.put("regions/default", defaultRegion());
+        trees.put("advanced/performance", new LinkedHashMap<>());
+        trees.put("definitions/regions/default", defaultRegion());
 
         PrefabApplier.Result result = PrefabApplier.apply(
                 trees,
@@ -291,52 +291,52 @@ class MultiWorldExpanderTest {
                 List.of("world", "world_nether")
         );
         // The default region already maps to "world", so no duplicate is made.
-        assertFalse(result.newTrees().containsKey("regions/world"));
-        assertTrue(result.newTrees().containsKey("regions/world_nether"));
-        assertEquals("world_nether", result.newTrees().get("regions/world_nether").get("world"));
+        assertFalse(result.newTrees().containsKey("definitions/regions/world"));
+        assertTrue(result.newTrees().containsKey("definitions/regions/world_nether"));
+        assertEquals("world_nether", result.newTrees().get("definitions/regions/world_nether").get("world"));
         // Diff lists every key the synthesis introduced for each new file.
-        assertTrue(result.perFileDiff().containsKey("regions/world_nether"));
+        assertTrue(result.perFileDiff().containsKey("definitions/regions/world_nether"));
         // Source trees untouched.
-        assertNull(trees.get("regions/world_nether"));
+        assertNull(trees.get("definitions/regions/world_nether"));
     }
 
     @Test
-    @DisplayName("PrefabApplier 3-arg overload repoints worlds/<world>.yml region at each synthesised region")
+    @DisplayName("PrefabApplier 3-arg overload repoints definitions/worlds/<world>.yml region at each synthesised region")
     void applierOverloadRepointsWorldFiles() {
         Map<String, Map<String, Object>> trees = new LinkedHashMap<>();
-        trees.put("regions/default", defaultRegion());
+        trees.put("definitions/regions/default", defaultRegion());
         // Existing world file pointing at the shared default region.
         Map<String, Object> netherWorld = new LinkedHashMap<>();
         netherWorld.put("region", "default");
         netherWorld.put("requirePermission", false);
-        trees.put("worlds/world_nether", netherWorld);
+        trees.put("definitions/worlds/world_nether", netherWorld);
 
         PrefabApplier.Result result = PrefabApplier.apply(
                 trees,
                 MultiWorld.INSTANCE,
                 List.of("world", "world_nether", "world_the_end")
         );
-        // Each synthesised world's worlds/<world>.yml points at its own region.
+        // Each synthesised world's definitions/worlds/<world>.yml points at its own region.
         assertEquals("world_nether",
-                result.newTrees().get("worlds/world_nether").get("region"));
+                result.newTrees().get("definitions/worlds/world_nether").get("region"));
         assertEquals("world_the_end",
-                result.newTrees().get("worlds/world_the_end").get("region"));
+                result.newTrees().get("definitions/worlds/world_the_end").get("region"));
         // Existing unrelated key survives the sparse merge.
         assertEquals(false,
-                result.newTrees().get("worlds/world_nether").get("requirePermission"));
+                result.newTrees().get("definitions/worlds/world_nether").get("requirePermission"));
         // The default-mapped overworld is not synthesised, so its world file is untouched.
-        assertFalse(result.newTrees().containsKey("worlds/world"));
+        assertFalse(result.newTrees().containsKey("definitions/worlds/world"));
         // Diff records the repoint.
-        assertTrue(result.perFileDiff().containsKey("worlds/world_nether"));
+        assertTrue(result.perFileDiff().containsKey("definitions/worlds/world_nether"));
         // Source trees untouched.
-        assertEquals("default", trees.get("worlds/world_nether").get("region"));
+        assertEquals("default", trees.get("definitions/worlds/world_nether").get("region"));
     }
 
     @Test
     @DisplayName("PrefabApplier 3-arg overload on a non-expand prefab is equivalent to the 2-arg overload")
     void applierOverloadNonExpandPassthrough() {
         Map<String, Map<String, Object>> trees = new LinkedHashMap<>();
-        trees.put("performance", new LinkedHashMap<>(Map.of("threads", 4)));
+        trees.put("advanced/performance", new LinkedHashMap<>(Map.of("threads", 4)));
 
         PrefabApplier.Result twoArg = PrefabApplier.apply(trees, LowPerformance.INSTANCE);
         PrefabApplier.Result threeArg = PrefabApplier.apply(trees, LowPerformance.INSTANCE, List.of("world"));

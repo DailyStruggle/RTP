@@ -632,7 +632,26 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       sender = Bukkit.getPlayer(senderId);
       if (sender == null) return false;
     }
-    return Bukkit.dispatchCommand(sender, commandLine);
+    try {
+      return Bukkit.dispatchCommand(sender, commandLine);
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP] Command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  @Override
+  public Set<String> getScoreboardTags(UUID playerId) {
+    if (playerId == null) return Collections.emptySet();
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null) return Collections.emptySet();
+      Set<String> tags = player.getScoreboardTags();
+      if (tags == null || tags.isEmpty()) return Collections.emptySet();
+      return Collections.unmodifiableSet(new HashSet<>(tags));
+    } catch (Throwable t) {
+      return Collections.emptySet();
+    }
   }
 
   // ---------------------------------------------------------------------------

@@ -61,10 +61,11 @@ This document connects each requirement to the design decision that motivated it
 |---|---|---|---|---|
 | REQ-API-F-001 | Shape registration | ARCH.md | SelectionAPI | - |
 | REQ-API-F-002 | Vertical adjustors | ARCH.md | VerticalAdjustor | - |
-| REQ-API-F-003 | Validation hooks | DESIGN.md section 2 | GlobalRegionVerifiers | - |
+| REQ-API-F-003 | Validation hooks | DESIGN.md section 2 | GlobalRegionVerifiers, ClaimBoundaryRegistry / ClaimBoundaryProvider | ClaimBoundaryRegistryTest, ClaimBoundaryProviderContractTest |
 | REQ-API-F-004 | Agnostic models | ARCH.md | RTPLocation | - |
 | REQ-API-F-005 | Command contract | commands-api-ADR-001 | commands-api | - |
 | REQ-API-F-006 | Bare-/rtp root action | ADR-056 | RootActionRegistry / DefaultRTPHooks / RTPCmd | ReqApiF006RootActionTest |
+| REQ-API-F-007 | Declarative command parameters, per-parameter permissions, and authoritative defaults (naming a specific player requires the declared parameter permission - closing the arbitrary-teleport hole; the declared `default` `self`/`any`/literal is the single source for the no-argument case; invalid symbolic defaults fail fast at load) | [ADR-098](../adr/ADR-098-declarative-command-parameters-permissions-and-defaults.md) (extends [ADR-093](../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement.md)) | `ParameterType`, `ParameterSpec`, `ActionDefinition.CommandSpec` (`rtp-api`); `ActionConfigLoader.parseParameters`, `ActionCommand` (`rtp-core`); `RTPCommandSender.isRtpAdmin` | `DeclarativeParameterTest` (`rtp-api`), `ActionCommandTest` (`testDeclarativeTargetPermissionDenied`, `testDeclarativeTargetPermissionAllowed`, `testDeclarativeDefaultSelfUnrestricted`), `ActionManagerTest` (open-matchmaking vs targeted reciprocity) |
 | REQ-API-NF-001 | Semantic versioning | `build.gradle` version declarations | — | — |
 | REQ-API-NF-002 | Decoupling | ARCH.md | RTPServerAccessor | RTPArchitectureTest |
 | REQ-API-ARCH-001 | Thread-safe API | DESIGN.md section 2 | FactoryValue | - |

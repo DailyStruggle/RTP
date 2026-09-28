@@ -55,8 +55,8 @@ class PrefabDiskIOTest {
 
     @Test
     void resolveFile_regions_namespacesUnderRegionsDir() {
-        File f = PrefabDiskIO.resolveFile(pluginDir(), "regions/default");
-        assertEquals(new File(new File(pluginDir(), "regions"), "default.yml"), f);
+        File f = PrefabDiskIO.resolveFile(pluginDir(), "definitions/regions/default");
+        assertEquals(new File(new File(new File(pluginDir(), "definitions"), "regions"), "default.yml"), f);
     }
 
     @Test
@@ -110,7 +110,7 @@ class PrefabDiskIOTest {
         // Full reproduction of the reported bug: a sparse overlay touching only
         // a couple of keys under nested `shape` / `vert` must NOT wipe the
         // sibling keys in those sections.
-        File regionsDir = new File(pluginDir(), "regions");
+        File regionsDir = new File(new File(pluginDir(), "definitions"), "regions");
         assertTrue(regionsDir.mkdirs() || regionsDir.isDirectory());
         File def = new File(regionsDir, "default.yml");
         Files.write(def.toPath(), (
@@ -140,12 +140,12 @@ class PrefabDiskIOTest {
 
         Map<String, Map<String, Object>> baseline = PrefabDiskIO.snapshotLive(pluginDir(), overlay);
         PrefabApplier.Result r = PrefabApplier.apply(baseline, overlay);
-        List<PrefabApplier.Change> changes = r.perFileDiff().get("regions/default");
+        List<PrefabApplier.Change> changes = r.perFileDiff().get("definitions/regions/default");
         assertNotNull(changes);
-        PrefabDiskIO.writeWithBackup(pluginDir(), "regions/default",
-                r.newTrees().get("regions/default"), changes, 3);
+        PrefabDiskIO.writeWithBackup(pluginDir(), "definitions/regions/default",
+                r.newTrees().get("definitions/regions/default"), changes, 3);
 
-        Map<String, Object> reread = PrefabDiskIO.readLive(pluginDir(), "regions/default");
+        Map<String, Object> reread = PrefabDiskIO.readLive(pluginDir(), "definitions/regions/default");
         Map<String, Object> shape = (Map<String, Object>) reread.get("shape");
         Map<String, Object> vert = (Map<String, Object>) reread.get("vert");
 
@@ -324,9 +324,10 @@ class PrefabDiskIOTest {
 
     @Test
     void snapshotLive_includesPerfAndEachRegionOverlay() throws IOException {
-        File perf = new File(pluginDir(), "performance.yml");
+        File perf = new File(new File(pluginDir(), "advanced"), "performance.yml");
+        assertTrue(perf.getParentFile().mkdirs() || perf.getParentFile().isDirectory());
         Files.write(perf.toPath(), "p: 1\n".getBytes(StandardCharsets.UTF_8));
-        File regionsDir = new File(pluginDir(), "regions");
+        File regionsDir = new File(new File(pluginDir(), "definitions"), "regions");
         assertTrue(regionsDir.mkdirs() || regionsDir.isDirectory());
         Files.write(new File(regionsDir, "default.yml").toPath(),
                 "world: world\n".getBytes(StandardCharsets.UTF_8));
@@ -341,9 +342,9 @@ class PrefabDiskIOTest {
                 Map.of("default", Map.of("k", "v")),// regionOverlays
                 false);
         Map<String, Map<String, Object>> snap = PrefabDiskIO.snapshotLive(pluginDir(), p);
-        assertTrue(snap.containsKey("performance"));
-        assertTrue(snap.containsKey("regions/default"));
-        assertEquals("world", snap.get("regions/default").get("world"));
+        assertTrue(snap.containsKey("advanced/performance"));
+        assertTrue(snap.containsKey("definitions/regions/default"));
+        assertEquals("world", snap.get("definitions/regions/default").get("world"));
         assertFalse(snap.containsKey("safety"),
                 "empty safetyOverlay must not pull safety.yml into the snapshot");
     }

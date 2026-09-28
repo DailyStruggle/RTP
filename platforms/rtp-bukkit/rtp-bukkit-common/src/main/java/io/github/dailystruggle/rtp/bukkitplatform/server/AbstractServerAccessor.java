@@ -916,7 +916,104 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       sender = Bukkit.getPlayer(senderId);
       if (sender == null) return false;
     }
-    return Bukkit.dispatchCommand(sender, commandLine);
+    try {
+      return Bukkit.dispatchCommand(sender, commandLine);
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP] Command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  @Override
+  public Set<String> getScoreboardTags(UUID playerId) {
+    if (playerId == null) return Collections.emptySet();
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null) return Collections.emptySet();
+      Set<String> tags = player.getScoreboardTags();
+      if (tags == null || tags.isEmpty()) return Collections.emptySet();
+      return Collections.unmodifiableSet(new java.util.HashSet<>(tags));
+    } catch (Throwable t) {
+      return Collections.emptySet();
+    }
+  }
+
+  @Override
+  public boolean addScoreboardTag(UUID playerId, String tag) {
+    if (playerId == null || tag == null || tag.isBlank()) return false;
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null) return false;
+      return player.addScoreboardTag(tag);
+    } catch (Throwable t) {
+      return false;
+    }
+  }
+
+  @Override
+  public boolean removeScoreboardTag(UUID playerId, String tag) {
+    if (playerId == null || tag == null || tag.isBlank()) return false;
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null) return false;
+      return player.removeScoreboardTag(tag);
+    } catch (Throwable t) {
+      return false;
+    }
+  }
+
+  @Override
+  public void ensureScoreboardObjective(String objective, @Nullable String criteria) {
+    if (objective == null || objective.isBlank()) return;
+    try {
+      org.bukkit.scoreboard.ScoreboardManager mgr = Bukkit.getScoreboardManager();
+      if (mgr == null) return;
+      org.bukkit.scoreboard.Scoreboard board = mgr.getMainScoreboard();
+      if (board.getObjective(objective) == null) {
+        String crit = (criteria != null && !criteria.isBlank()) ? criteria : "dummy";
+        board.registerNewObjective(objective, crit, objective);
+      }
+    } catch (Throwable ignored) {
+    }
+  }
+
+  @Override
+  public void setScoreboardScore(UUID playerId, String objective, int score) {
+    if (playerId == null || objective == null || objective.isBlank()) return;
+    try {
+      org.bukkit.scoreboard.ScoreboardManager mgr = Bukkit.getScoreboardManager();
+      if (mgr == null) return;
+      org.bukkit.scoreboard.Scoreboard board = mgr.getMainScoreboard();
+      org.bukkit.scoreboard.Objective obj = board.getObjective(objective);
+      if (obj == null) {
+        obj = board.registerNewObjective(objective, "dummy", objective);
+      }
+      Player player = Bukkit.getPlayer(playerId);
+      String entry = (player != null) ? player.getName() : playerId.toString();
+      obj.getScore(entry).setScore(score);
+    } catch (Throwable ignored) {
+    }
+  }
+
+  @Override
+  public void resetScoreboardScore(UUID playerId, @Nullable String objective) {
+    if (playerId == null) return;
+    try {
+      org.bukkit.scoreboard.ScoreboardManager mgr = Bukkit.getScoreboardManager();
+      if (mgr == null) return;
+      org.bukkit.scoreboard.Scoreboard board = mgr.getMainScoreboard();
+      Player player = Bukkit.getPlayer(playerId);
+      String entry = (player != null) ? player.getName() : playerId.toString();
+      if (objective != null && !objective.isBlank()) {
+        org.bukkit.scoreboard.Objective obj = board.getObjective(objective);
+        if (obj != null) {
+          board.resetScores(entry);
+        }
+      } else {
+        board.resetScores(entry);
+      }
+    } catch (Throwable ignored) {
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -931,6 +1028,19 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public void sendWorldBorder(
       UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+    sendWorldBorder(playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds, 0.0, 0.0);
+  }
+
+  @Override
+  public void sendWorldBorder(
+      UUID playerId,
+      double centerX,
+      double centerZ,
+      double oldSize,
+      double newSize,
+      long shrinkSeconds,
+      double damageAmount,
+      double damageBuffer) {
     if (playerId == null) return;
     try {
       Player player = Bukkit.getPlayer(playerId);
@@ -943,9 +1053,46 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       if (shrinkSeconds > 0L && Double.compare(start, end) != 0) {
         border.setSize(end, shrinkSeconds);
       }
+      if (damageAmount > 0.0) {
+        try {
+          border.setDamageAmount(damageAmount);
+          border.setDamageBuffer(damageBuffer);
+        } catch (Throwable ignored) {}
+      }
       player.setWorldBorder(border);
     } catch (Throwable t) {
       log(Level.FINE, "[RTP] Failed to send per-player world border to " + playerId, t);
+    }
+  }
+
+  @Override
+  public void damagePlayer(UUID playerId, double amount) {
+    if (playerId == null || amount <= 0.0) return;
+    try {
+      io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer = getPlayer(playerId);
+      if (rtpPlayer == null || !rtpPlayer.isOnline()) return;
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null || !player.isOnline()) return;
+
+      io.github.dailystruggle.rtp.common.tasks.RTPRunnable damageTask =
+          new io.github.dailystruggle.rtp.common.tasks.RTPRunnable() {
+            @Override
+            public void run() {
+              try {
+                if (player.isOnline() && !player.isDead()) {
+                  player.damage(amount);
+                }
+              } catch (Throwable ignored) {}
+            }
+          };
+
+      if (io.github.dailystruggle.rtp.common.RTP.scheduler != null) {
+        io.github.dailystruggle.rtp.common.RTP.scheduler.runTaskForPlayer(rtpPlayer, damageTask, 0L);
+      } else {
+        damageTask.run();
+      }
+    } catch (Throwable t) {
+      log(Level.FINE, "[RTP] Failed to apply damage to player " + playerId, t);
     }
   }
 

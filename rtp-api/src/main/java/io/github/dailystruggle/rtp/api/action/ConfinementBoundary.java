@@ -20,5 +20,10 @@ public enum ConfinementBoundary {
   /**
    * Confined radially to a leash distance from the session anchor coordinate.
    */
-  LEASH
+  LEASH,
+
+  /**
+   * Confined to a custom shape geometry centered at the session anchor coordinate.
+   */
+  SHAPE
 }

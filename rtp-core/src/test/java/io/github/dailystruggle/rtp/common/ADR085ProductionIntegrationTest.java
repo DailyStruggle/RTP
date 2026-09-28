@@ -59,9 +59,7 @@ class ADR085ProductionIntegrationTest {
     java.io.File tempDir = java.nio.file.Files.createTempDirectory("rtp_v3_test").toFile();
     try {
       io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-          new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir);
-      io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
-      io.github.dailystruggle.rtp.api.RTPAPI.setServerAccessor(accessor);
+          io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir);
 
       SquareOptimizedDualLayer shape = new SquareOptimizedDualLayer("SQUARE_V5_TEST", 16);
       shape.addBadLocation(100L);

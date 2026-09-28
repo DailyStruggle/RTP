@@ -108,8 +108,11 @@ public class BackCmd extends BaseRTPCmdImpl {
         data.time = System.currentTimeMillis();
         RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.backSuccess);
       } else {
-        String msg = (result != null && result.message() != null) ? result.message() : "Teleport failed";
-        RTP.serverAccessor.sendMessage(senderId, senderId, msg);
+        if (result != null && result.message() != null && !result.message().isBlank()) {
+          RTP.serverAccessor.sendMessage(senderId, senderId, result.message());
+        } else {
+          RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.teleportCancel);
+        }
       }
     });
 

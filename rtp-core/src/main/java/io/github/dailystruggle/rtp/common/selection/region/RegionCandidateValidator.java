@@ -7,9 +7,11 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.AbstractVerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -63,55 +65,126 @@ final class RegionCandidateValidator implements CandidateValidator {
 
       int cx = worldX >> 4;
       int cz = worldZ >> 4;
-      int lx = worldX & 15;
-      int lz = worldZ & 15;
+      int nominalLx = worldX & 15;
+      int nominalLz = worldZ & 15;
 
       // Non-blocking: only read chunks already resident. The caller warms the bounded footprint.
       RTPChunk<?> center = world.getCachedChunk(packChunkKey(cx, cz));
       if (center == null) return null;
 
-      // Stage: resolve a real standable Y on the requested column. Fail-closed if the adjustor
-      // cannot resolve this specific column (S-004) - never fabricate a Y.
-      RTPCoords resolved = vert.adjustColumn(center, lx, lz);
-      if (resolved == null) return null;
-
       int safe = Math.max(0, readSafetyRadius());
       Set<String> unsafeBlocks = readUnsafeBlocks();
       int L = safe * 2 + 1;
-
-      // Assemble the neighbour grid the shared SafetyScan expects from resident chunks only.
-      RTPChunk<?>[] localChunks = new RTPChunk<?>[L * L];
       int centerChunkX = center.x();
       int centerChunkZ = center.z();
-      for (int bx = resolved.x() - safe; bx <= resolved.x() + safe; bx++) {
-        int chunkX = bx >> 4;
-        int dcX = chunkX - centerChunkX;
-        for (int bz = resolved.z() - safe; bz <= resolved.z() + safe; bz++) {
-          int chunkZ = bz >> 4;
-          int dcZ = chunkZ - centerChunkZ;
-          int index = (dcX + safe) * L + (dcZ + safe);
-          if (index < 0 || index >= localChunks.length || localChunks[index] != null) continue;
-          if (chunkX == centerChunkX && chunkZ == centerChunkZ) {
-            localChunks[index] = center;
-          } else {
-            RTPChunk<?> neighbour = world.getCachedChunk(packChunkKey(chunkX, chunkZ));
-            if (neighbour == null) return null; // fail-closed: required chunk not resident
-            localChunks[index] = neighbour;
-          }
-        }
+
+      // Candidate columns to probe: nominal column first, followed by alternate quadrant columns
+      // from AbstractVerticalAdjustor.TEST_COORDS ((7,7), (2,2), (12,12), (2,12), (12,2)) in the same chunk.
+      List<int[]> probeColumns = new ArrayList<>(6);
+      probeColumns.add(new int[] {nominalLx, nominalLz});
+      for (List<Integer> coord : AbstractVerticalAdjustor.TEST_COORDS) {
+        int qx = coord.get(0);
+        int qz = coord.get(1);
+        if (qx == nominalLx && qz == nominalLz) continue;
+        probeColumns.add(new int[] {qx, qz});
       }
 
-      boolean pass = SafetyScan.isColumnSafe(
-          resolved, world, localChunks, L, centerChunkX, centerChunkZ, safe, unsafeBlocks);
-      if (!pass) return null;
+      for (int[] col : probeColumns) {
+        int lx = col[0];
+        int lz = col[1];
 
-      // Claim / global-verifier stage (S-003, ADR-026) is applied asynchronously by the caller;
-      // see class Javadoc. This method returns the safety-verified candidate only.
-      return new RTPLocation(resolved, 1L, null);
+        // Stage: resolve a real standable Y on the candidate column.
+        RTPCoords resolved = vert.adjustColumn(center, lx, lz);
+        if (resolved == null) continue;
+
+        // Assemble the neighbour grid the shared SafetyScan expects from resident chunks only.
+        RTPChunk<?>[] localChunks = new RTPChunk<?>[L * L];
+        boolean neighbourMissing = false;
+        for (int bx = resolved.x() - safe; bx <= resolved.x() + safe; bx++) {
+          int chunkX = bx >> 4;
+          int dcX = chunkX - centerChunkX;
+          for (int bz = resolved.z() - safe; bz <= resolved.z() + safe; bz++) {
+            int chunkZ = bz >> 4;
+            int dcZ = chunkZ - centerChunkZ;
+            int index = (dcX + safe) * L + (dcZ + safe);
+            if (index < 0 || index >= localChunks.length || localChunks[index] != null) continue;
+            if (chunkX == centerChunkX && chunkZ == centerChunkZ) {
+              localChunks[index] = center;
+            } else {
+              RTPChunk<?> neighbour = world.getCachedChunk(packChunkKey(chunkX, chunkZ));
+              if (neighbour == null) {
+                neighbourMissing = true;
+                break;
+              }
+              localChunks[index] = neighbour;
+            }
+          }
+          if (neighbourMissing) break;
+        }
+
+        if (neighbourMissing) continue;
+
+        boolean pass = SafetyScan.isColumnSafe(
+            resolved, world, localChunks, L, centerChunkX, centerChunkZ, safe, unsafeBlocks);
+        if (!pass) continue;
+
+        // Claim / global-verifier stage (S-003, ADR-026) is applied asynchronously by the caller;
+        // see class Javadoc. This method returns the safety-verified candidate only.
+        return new RTPLocation(resolved, 1L, null);
+      }
+
+      return null;
     } catch (Throwable t) {
       // Fail-closed on any error (S-004): a validation error is a rejection, never a silent pass.
       RTP.log(Level.WARNING, "[RTP] RegionCandidateValidator failed: " + t, t);
       return null;
+    }
+  }
+
+  @Override
+  public java.util.concurrent.CompletableFuture<RTPLocation> validateAsync(int worldX, int worldZ) {
+    try {
+      RTPWorld<?> world = region.getWorld();
+      VerticalAdjustor<?> vert = region.getVert();
+      if (world == null || vert == null) {
+        return java.util.concurrent.CompletableFuture.completedFuture(null);
+      }
+
+      int cx = worldX >> 4;
+      int cz = worldZ >> 4;
+      int baseWorldX = cx << 4;
+      int baseWorldZ = cz << 4;
+
+      int safe = Math.max(0, readSafetyRadius());
+      int minChunkX = (baseWorldX - safe) >> 4;
+      int maxChunkX = (baseWorldX + 15 + safe) >> 4;
+      int minChunkZ = (baseWorldZ - safe) >> 4;
+      int maxChunkZ = (baseWorldZ + 15 + safe) >> 4;
+
+      // Collect futures for on-demand chunk loading without blocking or failing on cache misses (S-005)
+      java.util.List<java.util.concurrent.CompletableFuture<?>> chunkFutures = new ArrayList<>();
+      for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+        for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+          if (world.getCachedChunk(packChunkKey(chunkX, chunkZ)) == null) {
+            chunkFutures.add(world.getChunkAt(chunkX, chunkZ));
+          }
+        }
+      }
+
+      if (chunkFutures.isEmpty()) {
+        // Fast path: all needed chunks already resident in cache
+        return java.util.concurrent.CompletableFuture.completedFuture(validate(worldX, worldZ));
+      }
+
+      return java.util.concurrent.CompletableFuture.allOf(chunkFutures.toArray(new java.util.concurrent.CompletableFuture[0]))
+          .thenApply(v -> validate(worldX, worldZ))
+          .exceptionally(ex -> {
+            RTP.log(Level.WARNING, "[RTP] Async candidate validation failed: " + ex, ex);
+            return null;
+          });
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[RTP] RegionCandidateValidator validateAsync setup failed: " + t, t);
+      return java.util.concurrent.CompletableFuture.completedFuture(null);
     }
   }
 

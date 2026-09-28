@@ -272,6 +272,11 @@ if (!excludeJdk25) {
 if (!excludeJdk25) {
     include 'rtp-fabric:rtp-fabric-v26_2_R1'
 }
+// v26_3_R1 -- MC 26.3 release. Same deobf regime as v26_1_R1/v26_2_R1
+// (Loom 1.15, JDK 25, no mappings). See rtp-fabric-ADR-015.
+if (!excludeJdk25) {
+    include 'rtp-fabric:rtp-fabric-v26_3_R1'
+}
 
 // Relocate the grouped platforms/ adapters on disk while keeping their flat
 // Gradle project paths (see the comment block above the platform include lines).
@@ -306,6 +311,7 @@ if (!excludeJdk25) {
     project(':rtp-fabric:rtp-fabric-common-unobf').projectDir = file('platforms/rtp-fabric/rtp-fabric-common-unobf')
     project(':rtp-fabric:rtp-fabric-v26_1_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_1_R1')
     project(':rtp-fabric:rtp-fabric-v26_2_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_2_R1')
+    project(':rtp-fabric:rtp-fabric-v26_3_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_3_R1')
 }
 
 // Multi-server proxy support — umbrella ADR-036 Accepted 2026-05-14.

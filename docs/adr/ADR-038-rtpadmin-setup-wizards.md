@@ -1,7 +1,7 @@
-# ADR-038 — `/rtpadmin` Setup Wizards (Book-Menu Driven, Config-Transaction Backed)
+# ADR-038 — `/rtp admin setup` & Setup Wizards (Book-Menu & Console-Driven, Recipe & Prefab Chaining)
 
 **Status:** Proposed
-**Date:** 2026-05-13
+**Date:** 2026-05-13 (Amended: 2026-09-24)
 **Target release:** `3.0.0-beta.4`
 
 ## Context
@@ -19,16 +19,16 @@ This ADR is intentionally narrow: the wizards are a *driver* over ADR-035 and AD
 
 ## Decision
 
-Add a `/rtpadmin wizard <flow>` command surface in `rtp-core` that renders book-based menus (ADR-035) whose `ClickEvent.runCommand` redeems mutate config via `ConfigTransaction` (ADR-037). Ship a fixed initial catalog of flows in beta.4; admit further flows in later releases without ADR churn so long as they obey the contracts below.
+Add `/rtp admin setup` (and its generalized underlying command surface `/rtpadmin wizard <flow>`) in `rtp-core` that renders book-based menus (ADR-035) and fully equivalent console/chat CLI prompts. User choices across worlds, styles, performance, actions, and addons are compiled into an ordered pipeline of sparse prefab overlays (ADR-016/ADR-037/ADR-038) and applied atomically via `ConfigTransaction` with `.bak` backups. Ship a fixed initial catalog of flows and recipes in beta.4; admit further flows in later releases without ADR churn so long as they obey the contracts below.
 
 ### Module placement (Architecture Boundaries)
 
 - **`rtp-core`** — wizard flow definitions, page-flow state machine, `WizardSession` registry, and the `/rtpadmin wizard` subcommand tree. No platform imports. The state machine is a pure function over `(WizardSession, ClickToken) → (NextPage, ConfigTransaction?)`.
 - **Adapter layer (`rtp-paper`/`rtp-folia`/`rtp-bukkit`/`rtp-fabric`)** — none. Rendering is delegated entirely to ADR-035's `MenuRenderer`; the wizard never constructs a `Book` or `Component` directly.
 - **`rtp-api`** — no surface change. Wizard flows are not extensible by addons in beta.4 (deferred; see *What this ADR is not*).
-- **`commands-api`** — no surface change. `/rtpadmin wizard <flow>` is an ordinary subcommand routed through the Brigadier bridge ([commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md)).
+- **`commands-api`** — no surface change. `/rtpadmin wizard <flow>` and `/rtp admin setup` are ordinary subcommands routed through the Brigadier bridge ([commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md)).
 
-### The seven contracts
+### The nine contracts
 
 1. **Composition only, no duplication.** The wizard layer contributes page flow, page rendering models, and session state. It does **not** re-implement validation, persistence, rollback, audit emission, message resolution, permission checks, or grammar parsing. Every such concern is delegated to ADR-037's `ConfigParameterValidator` / `ConfigTransaction` / `ConfigAuditRecord` / `ConfigParameterGrammar` and to ADR-035's `MenuRenderer` / token registry. A reviewer who finds the wizard layer parsing a parameter value or writing YAML directly should reject the change.
 
@@ -38,11 +38,15 @@ Add a `/rtpadmin wizard <flow>` command surface in `rtp-core` that renders book-
 
 4. **Preview before commit (composes ADR-037 contract 3).** The penultimate page of every flow renders the full pending diff via `ConfigTransaction#preview()` (the `--dry-run` primitive). Admin sees `path: oldValue → newValue` for every mutation about to land, then clicks "Apply" or "Cancel." No flow commits without an explicit final confirm click. Configurable via `messages.yml → wizard.preview.*` and `wizard.confirm.*` (REQ-RTP-F-013).
 
-5. **Resumable across disconnect within a TTL.** `WizardSession` is keyed by `(playerUuid, flowId)` and persists in-memory with a TTL (default 10 minutes, config `commands.wizard.sessionTtlSeconds`). A reconnecting admin running `/rtpadmin wizard <flow>` resumes at the last completed page rather than restarting. On TTL expiry the underlying `ConfigTransaction` is rolled back and the session evicted. Sessions are **not** persisted to disk in beta.4 (no cross-restart resume); rationale in *Alternatives*.
+5. **Resumable across disconnect within a TTL.** `WizardSession` is keyed by `(callerUuid, flowId)` (with a deterministic virtual UUID for the server console) and persists in-memory with a TTL (default 10 minutes, config `commands.wizard.sessionTtlSeconds`). A reconnecting admin running `/rtp admin setup` or `/rtpadmin wizard <flow>` resumes at the last completed page rather than restarting. On TTL expiry the underlying `ConfigTransaction` is rolled back and the session evicted. Sessions are **not** persisted to disk in beta.4 (no cross-restart resume); rationale in *Alternatives*.
 
 6. **Audit through ADR-037's stream.** Each page commit emits the standard `ConfigAuditRecord` via `RTP.log` (ADR-037 contract 4) augmented with `wizardFlowId` and `wizardPageId`. Wizard-level events (`start`, `cancel`, `timeout`, `commit`, `rollback`) emit one additional record per event through the same formatter. No separate wizard log file (same reasoning as ADR-037's audit-file alternative rejection).
 
 7. **Cross-server posture matches ADR-036 reservation tokens.** When ADR-036's network mode is active, wizards run **origin-server-only**: the book is opened on the backend the admin is currently on, mutations land in that backend's local config, and replication to other backends happens through whatever config-sync mechanism ADR-036 / a follow-up establishes — the wizard does not invent its own cross-server config replication. In beta.4 this means `/rtpadmin wizard` is functionally single-server even when the proxy is online, with a configurable `wizard.crossServerNotice` rendered when network mode is active. A future ADR may layer cross-server semantics on top.
+
+8. **Recipe & Prefab Chaining.** For multi-domain flows (specifically `/rtp admin setup`), the wizard layer does not hardcode per-key mutations. Instead, user selections across worlds, gameplay styles, performance profiles, and addon/effect toggles are resolved into an ordered sequence of sparse prefab overlays (e.g. `[world-multi] -> [action-arena] -> [folia-tuned] -> [effects-cinematic]`). The resulting recipe is compiled into the session's single `ConfigTransaction`.
+
+9. **Dual-Surface Execution Parity (Book & Console).** Every wizard page, prompt, and choice must have a 1:1 human-readable and console-executable command equivalent (e.g. `/rtp admin setup pick <stage> <choice>`). In-game book pages render buttons that execute these exact commands via `ClickEvent.runCommand`, while console and non-book chat environments print structured textual prompts with runnable command hints. No setup action may be book-only.
 
 ### Initial flow catalog (beta.4)
 
@@ -50,29 +54,41 @@ Exactly four flows ship in beta.4. Each is implemented as a `WizardFlow` enum en
 
 | `flowId` | Purpose | Pages | Notes |
 |----------|---------|-------|-------|
+| `setup` (alias `firstrun`) | Guided setup: world topology (single/all), gameplay style & action templates (survival/arena/pvp/skyblock), performance profile, addon/effects toggles, dry-run diff preview. Auto-suggested on first plugin start when no regions exist. | 5 | Composes modular prefabs/recipes into a single transaction; accessible via `/rtp admin setup` or `/rtpadmin wizard setup`. |
 | `region.create` | Create a new region: name, world, shape (rectangle/ellipse/polygon), shape params, biome/material safety lists, optional per-player visibility. | 6 | Polygon path enforces ADR-034's `expand=false` invariant at validator time, not at sample time. |
 | `region.edit` | Edit an existing region: pick region → page through its parameter sections. | 3 + N (N = number of parameter sections touched) | Identical validator surface as `region.create`. |
 | `performance.tune` | Walk an admin through cache caps (kept / unkept / backlog / login), pipeline bounds, anvil pre-filter toggle. | 4 | The single most-asked support topic; flow exists to short-circuit the "tune this for my server size" question. |
-| `firstrun` | First-time setup: pick default world, create one region, set core safety lists, set messages locale. Auto-suggested on first plugin start when no regions exist. | 5 | Composes the other flows' validators; does not call them directly (avoids re-entrancy on a single `WizardSession`). |
 
 Out of scope for beta.4 and explicitly deferred: `network.setup` (waits on ADR-036 implementation), `hooks.configure` (waits on a hook-config surface broad enough to justify a wizard; today's `EXTERNAL_HOOKS.md` toggles are too few), `migration.fromOldYaml` (one-off and better served by a non-interactive importer).
 
-### `/rtpadmin wizard` command grammar
+### Command grammar (`/rtp admin setup` & `/rtpadmin wizard`)
 
 ```
-/rtpadmin wizard list                       → render available flowIds to the admin
-/rtpadmin wizard start <flowId>             → open a session, render page 1
-/rtpadmin wizard cancel                     → rollback the current session
-/rtpadmin wizard resume                     → re-render current page (if a session exists)
-/rtpadmin wizard <internal-token>           → menu-redeem path (ADR-035 token format)
+# Primary setup entrance (maps directly to the setup/firstrun flow):
+/rtp admin setup                              → start or resume interactive setup (book or console)
+/rtp admin setup status                       → print current answers, progress, and pending pipeline
+/rtp admin setup pick <stage> <choice>        → select an option (e.g. world single, style arena, perf folia)
+/rtp admin setup toggle <category> <key>      → toggle addon integration or effect feature
+/rtp admin setup back                         → step back to previous question
+/rtp admin setup preview                      → render dry-run diff of pending prefab recipe
+/rtp admin setup confirm                      → apply the recipe atomically with .bak backups
+/rtp admin setup cancel                       → abort setup and rollback in-flight draft
+
+# General wizard command grammar:
+/rtpadmin wizard list                         → render available flowIds to the admin
+/rtpadmin wizard start <flowId>               → open a session, render page 1
+/rtpadmin wizard cancel                       → rollback the current session
+/rtpadmin wizard resume                       → re-render current page (if a session exists)
+/rtpadmin wizard <internal-token>             → menu-redeem path (ADR-035 token format)
 ```
 
-The `<internal-token>` form is what `ClickEvent.runCommand` issues; it is opaque, single-use, TTL-bound, and player-bound (ADR-035 contract). It is not documented for admin typing.
+The `<internal-token>` form is what `ClickEvent.runCommand` issues for internal navigation; however, per Contract 9, every setup choice also maps to the human-readable `/rtp admin setup pick ...` syntax so that the console and non-book environments have full functional parity.
 
 ### Permissions
 
 - `rtp.admin.wizard` — start any wizard.
 - `rtp.admin.wizard.<flowId>` — start that specific flow. Permission resolution prefers most-specific (ADR-037 contract 6).
+- `rtp.admin.setup` — access `/rtp admin setup` (aliases to `rtp.admin.wizard.setup`).
 - Per-page mutations also require the underlying `rtp.config.set.<section>` node from ADR-037; the wizard does **not** elevate. An admin without `rtp.config.set.regions` cannot complete `region.create` even with `rtp.admin.wizard.region.create`, and the failing page renders the standard `NO_PERMISSION` `reasonCode` message.
 
 ### Concrete affected classes (informational; final shape decided during implementation)
@@ -81,9 +97,12 @@ The `<internal-token>` form is what `ClickEvent.runCommand` issues; it is opaque
   - `WizardCmd`, `WizardStartCmd`, `WizardCancelCmd`, `WizardResumeCmd`, `WizardListCmd`.
   - `WizardSession`, `WizardSessionRegistry` (TTL-evicting `ConcurrentHashMap`).
   - `WizardFlow` (enum), `WizardPage`, `WizardChoice` (POJO render models).
-  - `flows/RegionCreateFlow`, `flows/RegionEditFlow`, `flows/PerformanceTuneFlow`, `flows/FirstRunFlow`.
-- `rtp-core/.../commands/RtpAdminCmd.java` (existing) — registers the `wizard` subtree.
-- `messages.yml` — new `wizard.<flowId>.*`, `wizard.preview.*`, `wizard.confirm.*`, `wizard.timeout`, `wizard.cancel`, `wizard.crossServerNotice`, `wizard.resume` keys. All REQ-RTP-F-013.
+  - `flows/RegionCreateFlow`, `flows/RegionEditFlow`, `flows/PerformanceTuneFlow`, `flows/SetupFlow`.
+- `rtp-core/.../commands/setup/` (new package or nested in wizard):
+  - `SetupCmd`, `SetupPickCmd`, `SetupConfirmCmd`, `SetupPreviewCmd`, `SetupCancelCmd`.
+  - `SetupSession`, `SetupRecipe` (compiles choices into ordered `List<Prefab>` overlays).
+- `rtp-core/.../commands/admin/AdminCmd.java` (existing) — registers `/rtp admin setup` and the `wizard` subtree.
+- `messages.yml` — new `setup.*`, `wizard.<flowId>.*`, `wizard.preview.*`, `wizard.confirm.*`, `wizard.timeout`, `wizard.cancel`, `wizard.crossServerNotice`, `wizard.resume` keys. All REQ-RTP-F-013.
 - Tests: `WizardSessionTtlRollbackTest`, `WizardRegionCreatePolygonInvariantTest`, `WizardPreviewMatchesCommitDiffTest`, `WizardBackPopsLastMutationTest`, `WizardPermissionScopeRespectedTest`, `WizardCrossServerNoticeWhenNetworkModeActiveTest`. Traceability rows added per [TRACEABILITY.md](../dev/TRACEABILITY.md).
 
 ### What this ADR is **not**
@@ -145,9 +164,9 @@ The `<internal-token>` form is what `ClickEvent.runCommand` issues; it is opaque
 
 ## Migration / Rollout
 
-- Beta.4 ships the wizard surface, the four initial flows, the new `messages.yml` keys, and the `commands.wizard.*` config keys. The `/rtpadmin wizard` subcommand is gated behind `rtp.admin.wizard`; servers that do not grant the node see no behavioral change.
-- New config keys: `commands.wizard.sessionTtlSeconds` (default `600`), `commands.wizard.firstRunAutoSuggest` (default `true`, controls whether `firstrun` is auto-offered when no regions exist), `commands.wizard.crossServerNoticeOnNetworkMode` (default `true`).
-- New `messages.yml` sections: `wizard.<flowId>.*`, `wizard.preview.*`, `wizard.confirm.*`, `wizard.timeout`, `wizard.cancel`, `wizard.resume`, `wizard.crossServerNotice`, `wizard.fabricNotice`. Reasonable English defaults; downstream translation expands at the usual cadence.
+- Beta.4 ships the wizard surface, the four initial flows (including the `/rtp admin setup` entry point), the new `messages.yml` keys, and the `commands.wizard.*` config keys. The `/rtp admin setup` command is gated behind `rtp.admin.setup` (or `rtp.admin.wizard.setup`); servers that do not grant the node see no behavioral change.
+- New config keys: `commands.wizard.sessionTtlSeconds` (default `600`), `commands.wizard.firstRunAutoSuggest` (default `true`, controls whether `/rtp admin setup` is auto-offered when no regions exist), `commands.wizard.crossServerNoticeOnNetworkMode` (default `true`).
+- New `messages.yml` sections: `setup.*`, `wizard.<flowId>.*`, `wizard.preview.*`, `wizard.confirm.*`, `wizard.timeout`, `wizard.cancel`, `wizard.resume`, `wizard.crossServerNotice`, `wizard.fabricNotice`. Reasonable English defaults; downstream translation expands at the usual cadence.
 - No breaking changes. Direct `/rtp config …` commands continue to work identically. Existing permission nodes are unchanged; the new `rtp.admin.wizard.*` nodes are additive.
 - Traceability ([TRACEABILITY.md](../dev/TRACEABILITY.md)): add rows for `WizardSessionTtlRollbackTest`, `WizardRegionCreatePolygonInvariantTest`, `WizardPreviewMatchesCommitDiffTest`, `WizardBackPopsLastMutationTest`, `WizardPermissionScopeRespectedTest`, `WizardCrossServerNoticeWhenNetworkModeActiveTest`. The polygon-invariant test ties to the relevant ADR-034 row; the preview/commit-diff test ties to ADR-037's dry-run row; the permission test ties to ADR-037's scoped-permission row.
 - Changelog: no entry until implementation lands, per the CHANGELOG hygiene rule in `AGENTS.md`.

@@ -140,6 +140,31 @@ public class RegionQueueManagerTest {
     }
 
     // -----------------------------------------------------------------------
+    // poll - null uuid (group/anchor draw). ConcurrentHashMap rejects null keys,
+    // so poll(null) must not throw; it falls through to the shared kept queue.
+    // Regression: a swallowed NPE here silently stalled group placement.
+    // -----------------------------------------------------------------------
+
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    void poll_nullUuid_returnsNullWhenEmptyWithoutThrowing() {
+        assertNull(qm.poll(null), "poll(null) on an empty region must return null, not throw");
+    }
+
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    void poll_nullUuid_drawsFromKeptQueue() {
+        MockRTPWorld world = (MockRTPWorld) region.getWorld();
+        RTPLocation expected = loc(world, 7, 7);
+        qm.keptLocations.offer(expected);
+
+        CompletableFuture<RTPLocation> future = qm.poll(null);
+        assertNotNull(future, "poll(null) must draw the shared kept queue for group anchors");
+        assertEquals(expected, future.join());
+        assertTrue(qm.keptLocations.isEmpty());
+    }
+
+    // -----------------------------------------------------------------------
     // poll - perPlayerLocationQueue path
     // -----------------------------------------------------------------------
 

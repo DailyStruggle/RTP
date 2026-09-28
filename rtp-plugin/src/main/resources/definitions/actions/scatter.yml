@@ -18,7 +18,7 @@ placement:
     radius: 4c
     centerRadius: 0
   minSeparation: 32           # min blocks between grouped participants
-  elevationTolerance: 8
+  elevationTolerance: 256
 
 confinement:
   boundary: "SUBSPACE"
@@ -26,6 +26,6 @@ confinement:
 
 lifecycle:
   onStart:
-    - PLAYER: "msg &aTeleported to the wild."
+    - CONSOLE: "tellraw [player_name] [\"\",{\"text\":\"Teleported to the wild.\",\"color\":\"green\"}]"
 
 version: "1.0"

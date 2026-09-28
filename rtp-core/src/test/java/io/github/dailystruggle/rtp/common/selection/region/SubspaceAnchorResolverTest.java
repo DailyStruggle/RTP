@@ -59,6 +59,7 @@ class SubspaceAnchorResolverTest {
     @Override public int[] select() { return new int[]{0, 0}; }
     @Override public long rand() { return 0; }
     @Override public boolean contains(int x, int z) { return true; }
+    @Override public boolean isKnownHazard(int x, int z) { return isKnownBad(x, z); }
   }
 
   private Region createDummyRegion(DummyMemoryShape shape) {
@@ -137,5 +138,24 @@ class SubspaceAnchorResolverTest {
     assertEquals(248, res.coords().x());
     assertEquals(328, res.coords().z());
     assertEquals("test_world", res.coords().worldName());
+  }
+
+  @Test
+  @DisplayName("ClaimBoundary AnchorSource resolves anchor via ClaimAnchoredRegionTracker with center preservation")
+  void testClaimBoundaryAnchorSource() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    Region region = createDummyRegion(memShape);
+
+    io.github.dailystruggle.rtp.api.claim.ClaimBoundary boundary =
+        new io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTrackerTest.RectangularClaimBoundary(
+            "test_faction", "test_world", 100, 200, 300, 400);
+
+    AnchorSource source = AnchorSource.claimBoundary(boundary);
+    GenerationResult res = SubspaceAnchorResolver.resolveAnchor(region, source).join();
+    assertNotNull(res);
+    assertEquals("test_world", res.coords().worldName());
+    // Centroid of [100..300, 200..400] is (200, 300)
+    assertEquals(200, res.coords().x());
+    assertEquals(300, res.coords().z());
   }
 }

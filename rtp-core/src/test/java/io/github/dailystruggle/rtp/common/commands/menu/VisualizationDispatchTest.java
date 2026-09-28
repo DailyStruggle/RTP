@@ -282,8 +282,13 @@ class VisualizationDispatchTest {
         assertTrue(cmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod));
         assertTrue(capturedMessages.stream().anyMatch(m -> m.contains("Usage: /rtp visualization export")));
 
-        // Test ExportTypeCmd without scheduler returns false
+        // Test ExportAllCmd without scheduler returns false
         RTP.scheduler = null;
+        MenuConcreteCommandLeaves.VisualizationExportCmd.ExportAllCmd allCmd =
+                new MenuConcreteCommandLeaves.VisualizationExportCmd.ExportAllCmd();
+        assertFalse(allCmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod));
+
+        // Test ExportTypeCmd without scheduler returns false
         MenuConcreteCommandLeaves.VisualizationExportCmd.ExportTypeCmd typeCmd =
                 new MenuConcreteCommandLeaves.VisualizationExportCmd.ExportTypeCmd(
                         "pipeline", ChartSpec.Kind.REGION_COMPOSITE);
@@ -292,6 +297,18 @@ class VisualizationDispatchTest {
         // Test with synchronous scheduler execution
         RTP.scheduler = ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).getMockScheduler();
 
+        // Parameter values check on ExportAllCmd
+        assertNotNull(allCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION));
+        assertNotNull(allCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values());
+        assertNotNull(allCmd.getParameterLookup().get("size"));
+        assertNotNull(allCmd.getParameterLookup().get("width"));
+        assertNotNull(allCmd.getParameterLookup().get("height"));
+        assertNotNull(allCmd.getParameterLookup().get("zoom"));
+
+        // Execute allCmd with mock region setup
+        capturedMessages.clear();
+        allCmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod);
+
         // When no resolver is registered
         capturedMessages.clear();
         typeCmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod);
@@ -299,12 +316,83 @@ class VisualizationDispatchTest {
         // Parameter values check
         assertNotNull(typeCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION));
         assertNotNull(typeCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values());
+        assertNotNull(typeCmd.getParameterLookup().get("size"));
+        assertNotNull(typeCmd.getParameterLookup().get("zoom"));
 
         // Test with ChartSpecResolver registered to execute async export path
         io.github.dailystruggle.mapsapi.render.ChartRenderer renderer = mock(io.github.dailystruggle.mapsapi.render.ChartRenderer.class);
         io.github.dailystruggle.mapsapi.model.ChartModel dummyModel = new io.github.dailystruggle.mapsapi.model.Heatmap2D(4, 4, new double[16], 0.0, 1.0);
         ChartSpecResolver.Resolution resolution = new ChartSpecResolver.Resolution(renderer, dummyModel);
         ChartSpecResolvers.register(ChartSpec.Kind.REGION_COMPOSITE, spec -> resolution);
+
+        // Test ExportComprehensiveCmd
+        MenuConcreteCommandLeaves.VisualizationExportCmd.ExportComprehensiveCmd compCmd =
+                new MenuConcreteCommandLeaves.VisualizationExportCmd.ExportComprehensiveCmd();
+        assertNotNull(compCmd.getParameterLookup().get("size"));
+        assertNotNull(compCmd.getParameterLookup().get("zoom"));
+        capturedMessages.clear();
+        compCmd.onCommand(adminViewer, java.util.Collections.singletonMap("size", java.util.Collections.singletonList("8k")), null, messageMethod);
+
+        // Test ExportAllCmd executes each visualization with arbitrary size and zoom parameters
+        capturedMessages.clear();
+        java.util.Map<String, java.util.List<String>> allParams = new java.util.HashMap<>();
+        allParams.put("size", java.util.Collections.singletonList("8k"));
+        allParams.put("zoom", java.util.Collections.singletonList("2.0"));
+        assertTrue(allCmd.onCommand(adminViewer, allParams, null, messageMethod));
+
+        // Test metric units and unrestricted sizing inputs (kilo = 1000px, 16k = 16000px)
+        java.util.Map<String, java.util.List<String>> metricParams = new java.util.HashMap<>();
+        metricParams.put("size", java.util.Collections.singletonList("16k"));
+        assertTrue(allCmd.onCommand(adminViewer, metricParams, null, messageMethod));
+
+        metricParams.put("size", java.util.Collections.singletonList("8kilo"));
+        assertTrue(allCmd.onCommand(adminViewer, metricParams, null, messageMethod));
+
+        metricParams.put("width", java.util.Collections.singletonList("12000"));
+        metricParams.put("height", java.util.Collections.singletonList("10k"));
+        assertTrue(allCmd.onCommand(adminViewer, metricParams, null, messageMethod));
+
+        // Test k, kpx, m, mpx inputs (both bare and with coefficients)
+        metricParams.clear();
+        metricParams.put("size", java.util.Collections.singletonList("k"));
+        assertTrue(allCmd.onCommand(adminViewer, metricParams, null, messageMethod));
+
+        metricParams.put("size", java.util.Collections.singletonList("kpx"));
+        assertTrue(allCmd.onCommand(adminViewer, metricParams, null, messageMethod));
+
+        metricParams.put("size", java.util.Collections.singletonList("8kpx"));
+        assertTrue(allCmd.onCommand(adminViewer, metricParams, null, messageMethod));
+
+        metricParams.put("size", java.util.Collections.singletonList("m"));
+        assertTrue(allCmd.onCommand(adminViewer, metricParams, null, messageMethod));
+
+        metricParams.put("size", java.util.Collections.singletonList("mpx"));
+        assertTrue(allCmd.onCommand(adminViewer, metricParams, null, messageMethod));
+
+        metricParams.put("size", java.util.Collections.singletonList("2mpx"));
+        assertTrue(allCmd.onCommand(adminViewer, metricParams, null, messageMethod));
+
+        // Test ExportTypeCmd with metric units
+        java.util.Map<String, java.util.List<String>> typeParams = new java.util.HashMap<>();
+        typeParams.put("size", java.util.Collections.singletonList("4kpx"));
+        assertTrue(typeCmd.onCommand(adminViewer, typeParams, null, messageMethod));
+
+        // Test ExportTypeCmd with walk and walk-path
+        MenuConcreteCommandLeaves.VisualizationExportCmd.ExportTypeCmd walkCmd =
+                new MenuConcreteCommandLeaves.VisualizationExportCmd.ExportTypeCmd(
+                        "walk", ChartSpec.Kind.REGION_WALK_PATH);
+        assertTrue(walkCmd.onCommand(adminViewer, typeParams, null, messageMethod));
+
+        // Test ExportTypeCmd with heatmap and selection-heatmap
+        MenuConcreteCommandLeaves.VisualizationExportCmd.ExportTypeCmd heatmapCmd =
+                new MenuConcreteCommandLeaves.VisualizationExportCmd.ExportTypeCmd(
+                        "heatmap", ChartSpec.Kind.SELECTION_HEATMAP);
+        assertTrue(heatmapCmd.onCommand(adminViewer, typeParams, null, messageMethod));
+
+        MenuConcreteCommandLeaves.VisualizationExportCmd.ExportTypeCmd selectionHeatmapCmd =
+                new MenuConcreteCommandLeaves.VisualizationExportCmd.ExportTypeCmd(
+                        "selection-heatmap", ChartSpec.Kind.SELECTION_HEATMAP);
+        assertTrue(selectionHeatmapCmd.onCommand(adminViewer, typeParams, null, messageMethod));
     }
 
     @Test

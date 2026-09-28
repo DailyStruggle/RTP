@@ -538,12 +538,16 @@ public class RegionQueueManager {
      * @return future location or null if unavailable
      */
     public CompletableFuture<RTPLocation> poll(UUID uuid) {
-        if (fastLocations.containsKey(uuid)) {
-            return fastLocations.remove(uuid);
-        }
+        // Group/anchor draws poll with a null uuid (no owning player). ConcurrentHashMap rejects
+        // null keys, so guard the per-player lookups and fall through to the shared kept queue;
+        // otherwise poll(null) throws an NPE that is swallowed upstream, stalling group placement.
+        if (uuid != null) {
+            if (fastLocations.containsKey(uuid)) {
+                return fastLocations.remove(uuid);
+            }
 
-        ConcurrentLinkedQueue<RTPLocation> playerLocationQueue = perPlayerLocationQueue.get(uuid);
-        if (playerLocationQueue != null && !playerLocationQueue.isEmpty()) {
+            ConcurrentLinkedQueue<RTPLocation> playerLocationQueue = perPlayerLocationQueue.get(uuid);
+            if (playerLocationQueue != null && !playerLocationQueue.isEmpty()) {
             RTPLocation loc = playerLocationQueue.poll();
             if (loc != null) {
                 // Consume the personal-queue entry from the cache (it is about to be
@@ -558,6 +562,7 @@ public class RegionQueueManager {
                     RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, loc);
                 }
                 return CompletableFuture.completedFuture(loc);
+            }
             }
         }
 

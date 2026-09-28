@@ -22,8 +22,12 @@ import java.util.List;
  */
 public class ActionSubCmd extends BaseRTPCmdImpl {
 
+  private final ActionCancelCmd cancelCmd;
+
   public ActionSubCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
+    this.cancelCmd = new ActionCancelCmd(this);
+    commandLookup.put("CANCEL", cancelCmd);
   }
 
   @Override
@@ -44,7 +48,7 @@ public class ActionSubCmd extends BaseRTPCmdImpl {
   @Override
   public boolean onCommand(
       UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-    if (nextCommand != null) return nextCommand.onCommand(senderId, parameterValues, null);
+    if (nextCommand != null) return true;
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
     if (!sender.hasPermission("rtp.action") && !sender.hasPermission("rtp.*")) {
@@ -56,14 +60,30 @@ public class ActionSubCmd extends BaseRTPCmdImpl {
     return true;
   }
 
-  public void syncActions() {
-    ActionService service = RTPAPI.actions();
-    if (service instanceof ActionManager manager) {
-      for (String actionId : service.getActionIds()) {
+  public synchronized void syncActions() {
+    ActionService effectiveService = RTPAPI.actions();
+    if (effectiveService == null && RTP.actionManager != null) {
+      effectiveService = RTP.actionManager;
+    }
+    if (effectiveService instanceof ActionManager manager) {
+      final ActionService finalService = effectiveService;
+      // Remove any previously registered ActionCommands whose actions no longer exist
+      commandLookup.entrySet().removeIf(entry -> {
+        if (entry.getValue() instanceof ActionCommand ac) {
+          return !finalService.getActionIds().contains(ac.definition().id().toLowerCase(Locale.ROOT));
+        }
+        return false;
+      });
+
+      for (String actionId : effectiveService.getActionIds()) {
         Optional<ActionDefinition> defOpt = manager.getAction(actionId);
-        if (defOpt.isPresent() && !commandLookup.containsKey(actionId.toUpperCase(Locale.ROOT))) {
-          ActionCommand cmd = new ActionCommand(this, defOpt.get());
-          addSubCommand(cmd);
+        if (defOpt.isPresent()) {
+          ActionDefinition def = defOpt.get();
+          ActionCommand cmd = new ActionCommand(this, def);
+          commandLookup.put(def.id().toUpperCase(Locale.ROOT), cmd);
+          if (def.alias() != null && !def.alias().isBlank()) {
+            commandLookup.put(def.alias().toUpperCase(Locale.ROOT), cmd);
+          }
         }
       }
     }

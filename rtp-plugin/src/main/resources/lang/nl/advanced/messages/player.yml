@@ -6,6 +6,7 @@
 # Sectie 2: Teletransport
 # ###############################################################################
 alTeletransporteert: "&7[P0] ⚡ je wordt al geteletransporteerd!"
+alInSessie: "&c[P0] [player] zit al in een actieve sessie."
 
 # als de plugin momenteel wordt herladen
 teletransportGeweigerdHerladen: "&7[P0] teletransports zijn tijdelijk uitgeschakeld terwijl de plugin herlaadt. Probeer het over een ogenblik opnieuw."

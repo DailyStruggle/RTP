@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Set;
@@ -17,13 +18,14 @@ import org.jetbrains.annotations.Nullable;
  */
 public abstract class AbstractVerticalAdjustor<T extends Enum<T>> extends VerticalAdjustor<T> {
 
-  protected static final List<List<Integer>> TEST_COORDS =
-      Arrays.asList(
-          Arrays.asList(7, 7),
-          Arrays.asList(2, 2),
-          Arrays.asList(12, 12),
-          Arrays.asList(2, 12),
-          Arrays.asList(12, 2));
+  public static final List<List<Integer>> TEST_COORDS =
+      Collections.unmodifiableList(
+          Arrays.asList(
+              Collections.unmodifiableList(Arrays.asList(7, 7)),
+              Collections.unmodifiableList(Arrays.asList(2, 2)),
+              Collections.unmodifiableList(Arrays.asList(12, 12)),
+              Collections.unmodifiableList(Arrays.asList(2, 12)),
+              Collections.unmodifiableList(Arrays.asList(12, 2))));
 
   protected AbstractVerticalAdjustor(
       Class<T> clazz, String name, List<Predicate<RTPCoords>> verifiers, EnumMap<T, Object> data) {

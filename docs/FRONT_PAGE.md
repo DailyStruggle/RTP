@@ -241,6 +241,7 @@ Safety-critical packages inside `rtp-core` carry higher floors on top of the mod
 
 - **In-game menus** - two books (Paper / Folia; chat-paginated elsewhere). `/rtp menu` is the player side: teleport, or pick a region, world, or biome. `/rtp admin` is the operator side: config editor with search, setup prefabs, region and MSPT/heap visualizations, scan control, diagnostics. Gated on `rtp.menu.admin`. The book is a read-only UI with the same permission checks as a typed command, so there is no inventory-click exploit surface; a chest-GUI picker ships as a bundled addon for operators who want one.
 - **Regions** - any number per world; shape (Square, Circle, Rectangle, Polygon), radius, center, curve weighting, vertical bounds, world override, permission gate, price. Vertical adjustors (Linear, Jump, Fixed) for sky islands, void worlds, Nether ceilings. `worlds.yml` `override` redirects a Nether or End `/rtp` to a safe world.
+- **Scripted actions & arenas** - multi-player placement, event orchestration, and confinement without custom minigame code. Author duels, battle royales, and parkour in YAML (`definitions/actions/<name>.yml`): minimum player spacing, elevation tolerance, moving or static world borders, leash radius, continuous breach verification with damage, and lifecycle triggers (`onStart`, `onBoundaryViolation`, `onExpire`, `onDeath`). Vanilla scoreboards (`rtp_violations`, `rtp_time_left`, `rtp_in_bounds`) are kept updated automatically for command-block or datapack hooks.
 - **Per-player queues** alongside the global queue (`rtp.personalqueue`), so one player's bad luck does not starve another's teleport.
 - **Effects engine** - particles, sounds, fireworks, potions, titles on every teleport phase, gated by `rtp.effects.<name>`. The Rift addon under `addons/` in the repo is a worked example.
 - **Per-region arrival schematics** - drop a Sponge `.schem` named after a region into `plugins/RTP/advanced/schematics/` and every teleport into that region pastes it centered on the landing spot. Decoded in-house, no WorldEdit required, claim-aware.
@@ -282,6 +283,7 @@ Start here: [**Quick start**](https://dailystruggle.github.io/RTP/admin/QUICK_ST
 | `/rtp world:<world>` | Teleport within a specific world | `rtp.world` / `rtp.worlds.*` |
 | `/rtp player:<name>` | Teleport another player | `rtp.other` |
 | `/rtp biome:<biome>` | Teleport to a chosen biome | `rtp.biome` / `rtp.biome.*` |
+| `/rtp action:<name> [players]` | Trigger a scripted action or arena | `rtp.action` / `rtp.action.<name>` |
 | `/rtp centerx=<x> centerz=<z> radius=<r>` | Ephemeral per-call overrides | `rtp.params` |
 | `/rtp menu` | Player book menu | `rtp.use` |
 | `/rtp admin` | Operator book menu | `rtp.menu.admin` |
@@ -312,6 +314,7 @@ Start here: [**Quick start**](https://dailystruggle.github.io/RTP/admin/QUICK_ST
 | `economy.yml` | Vault pricing | `price`, `priceOther`, `biomePrice`, `balanceFloor`, `refundOnCancel` |
 | `language.yml` | Locale selection | `language` |
 | `definitions/regions/<name>.yml` | Per-region shape, radius, center, queue, price, gates | `shape`, `vert`, `radius`, `cacheCap`, `price`, `requirePermission` |
+| `definitions/actions/<name>.yml` | Scripted actions & arenas | `placement.playerSeparation`, `confinement.initialSize`, `confinement.damage`, `lifecycle` |
 | `definitions/worlds/<name>.yml` | Per-world region routing and overrides | `region`, `override`, `requirePermission` |
 | `definitions/effects/<name>.yml` | Lifecycle effects | per-phase effect definitions |
 | `advanced/database.yml` | SQL / Redis persistence | `database.type`, connection settings |

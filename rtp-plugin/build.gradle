@@ -68,6 +68,14 @@ configurations {
             attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
         }
     }
+    fabric263Bytecode {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+        attributes {
+            attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
+        }
+    }
     // Bytecode-only configuration for the JDK-25 / unobf-Loom-compiled
     // `rtp-fabric-common-unobf` carrier. Same variant-incompatibility
     // story as `fabric26Bytecode` above: the module's published variant
@@ -197,6 +205,10 @@ dependencies {
     // runtime (RTPFabricMod#adapterFqnFor), merged post-remap like v26_1_R1.
     // See rtp-fabric-ADR-014.
     fabric262Bytecode project(':rtp-fabric:rtp-fabric-v26_2_R1')
+
+    // MC 26.3 adapter. Resolved by FQN at runtime (RTPFabricMod#adapterFqnFor),
+    // merged post-remap like v26_2_R1. See rtp-fabric-ADR-015.
+    fabric263Bytecode project(':rtp-fabric:rtp-fabric-v26_3_R1')
 
     // Sibling to fabric26Bytecode above. The unobf carrier hosts the
     // Mojang-named NM-typed surfaces (FabricEffectsHandlerUnobf, the
@@ -966,12 +978,14 @@ ext.mergeNeoForgeBytecodeIntoJar = { File out, String editionLabel, List<File> c
 remapJar {
     dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-v26_2_R1:jar'
+    dependsOn ':rtp-fabric:rtp-fabric-v26_3_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-common-unobf:jar'
     // Resolve carrier jars and capture the merge closure at configuration
     // time so doLast does not invoke Task.project at execution time
     // (deprecated in Gradle 9, fatal in Gradle 10).
     def v26Jar = project.configurations.fabric26Bytecode
     def v262Jar = project.configurations.fabric262Bytecode
+    def v263Jar = project.configurations.fabric263Bytecode
     def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
     def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
     def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
@@ -984,7 +998,7 @@ remapJar {
     // stays UP-TO-DATE, its doLast never re-runs, and the shipped jar keeps
     // stale carrier bytecode. Declare the carrier configurations as inputs so
     // any carrier change re-triggers the remap+merge.
-    inputs.files(v26Jar, v262Jar, commonUnobfJar, effectsUnobfJar)
+    inputs.files(v26Jar, v262Jar, v263Jar, commonUnobfJar, effectsUnobfJar)
             .withPropertyName('fabricUnobfCarrierBytecode')
     // NeoForge merge (unified single-jar): resolve the NeoForge carrier jars and
     // the merge closure at configuration time. Present only when the NeoForge
@@ -1034,6 +1048,9 @@ remapJar {
         // check), so only the v26_2_R1 adapter classes are added.
         mergeFn(remapJar.archiveFile.get().asFile, 'Pro (26.2)',
                 v262Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
+        // Third pass merges the 26.3 adapter.
+        mergeFn(remapJar.archiveFile.get().asFile, 'Pro (26.3)',
+                v263Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
         // Final pass merges the NeoForge platform carriers + neoforge.mods.toml
         // so the same LeafRTP-Pro jar loads on NeoForge too. Skipped entirely
         // when NeoForge was excluded from the build graph.
@@ -1416,6 +1433,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     dependsOn tasks.named('shadowLiteJar')
     dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-v26_2_R1:jar'
+    dependsOn ':rtp-fabric:rtp-fabric-v26_3_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-common-unobf:jar'
     dependsOn ':effects-api:effects-api-fabric-unobf:jar'
 
@@ -1429,6 +1447,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     // (deprecated in Gradle 9, fatal in Gradle 10).
     def v26Jar = project.configurations.fabric26Bytecode
     def v262Jar = project.configurations.fabric262Bytecode
+    def v263Jar = project.configurations.fabric263Bytecode
     def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
     def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
     def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
@@ -1436,7 +1455,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     // doLast and are not part of inputFile (shadowLiteJar). Declare them as
     // inputs so a carrier-only change re-triggers the remap+merge instead of
     // leaving stale carrier bytecode in an UP-TO-DATE lite jar.
-    inputs.files(v26Jar, v262Jar, commonUnobfJar, effectsUnobfJar)
+    inputs.files(v26Jar, v262Jar, v263Jar, commonUnobfJar, effectsUnobfJar)
             .withPropertyName('fabricUnobfCarrierBytecode')
     // NeoForge merge for the lite jar (same rationale as Pro's remapJar): the
     // single LeafRTP jar must also carry META-INF/neoforge.mods.toml + the
@@ -1487,6 +1506,9 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
         // present from the first pass are skipped). See rtp-fabric-ADR-014.
         mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite (26.2)',
                 v262Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
+        // Third pass merges the 26.3 adapter. See rtp-fabric-ADR-015.
+        mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite (26.3)',
+                v263Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
         // Final pass merges the NeoForge platform carriers + neoforge.mods.toml
         // so the same LeafRTP (lite) jar loads on NeoForge too. Skipped entirely
         // when NeoForge was excluded from the build graph.

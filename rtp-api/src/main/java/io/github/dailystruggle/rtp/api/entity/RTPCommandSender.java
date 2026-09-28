@@ -26,6 +26,17 @@ public interface RTPCommandSender extends Cloneable {
   boolean hasPermission(String permission);
 
   /**
+   * Returns whether this sender holds the RTP super-permission ({@code rtp.*}) and therefore bypasses
+   * per-node and per-parameter permission checks. Centralizes the wildcard-admin test so callers do not
+   * hardcode the literal node.
+   *
+   * @return {@code true} if the sender has {@code rtp.*}
+   */
+  default boolean isRtpAdmin() {
+    return hasPermission("rtp.*");
+  }
+
+  /**
    * Sends a message to this command sender.
    *
    * @param message the message to send; must not be {@code null}

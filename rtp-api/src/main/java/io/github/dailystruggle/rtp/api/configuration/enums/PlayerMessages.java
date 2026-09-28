@@ -12,6 +12,8 @@ public enum PlayerMessages {
   // --- Teleport lifecycle ---
   /** Sent when a player issues {@code /rtp} while a teleport is already in progress for them. */
   alreadyTeleporting,
+  /** Sent when a player issues an action or teleport while they or a participant are already in an active session. */
+  alreadyInSession,
   /** Sent when a player issues {@code /rtp} while the plugin is reloading its configuration. */
   teleportDeniedReloading,
   /** Sent to the player during the countdown before the teleport fires. */

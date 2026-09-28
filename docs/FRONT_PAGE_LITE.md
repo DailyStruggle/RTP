@@ -73,6 +73,7 @@ Safe destinations are prepared at-rate and a number of them are kept ready in a 
 
 - **In-game menus** - two separate books (Paper / Folia; chat-paginated elsewhere). `/rtp menu` is the player side: teleport, or pick a region, world, or biome. `/rtp admin` is the operator side: config editor with search, setup prefabs, region and MSPT/heap visualizations, scan control, diagnostics. It's gated on `rtp.menu.admin`, and for anyone holding that it also shows up as an extra row inside `/rtp menu`.
 - **Effects engine** - particles, sounds, fireworks, potions, titles on every teleport phase.
+- **Scripted actions & arenas** - multi-player placement and boundary confinement in YAML (`definitions/actions/`). Handles player spacing, shrinking world borders, border damage, and lifecycle command hooks without bespoke minigame code.
 - **Live map heatmaps** - `/rtp scan` paints region safety onto a real held map.
 - **Economy** - charge per `/rtp` (Vault), per-region pricing, auto-refund on cancel.
 - **12 claim integrations** - GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, RedProtect, CrashClaim, KingdomsX, Residence.

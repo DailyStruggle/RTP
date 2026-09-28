@@ -194,8 +194,14 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 
   /**
    * Discovers and extracts all bundled .yml resources from the jar/classpath for this directory.
+   * Extraction only triggers if default.yml does not exist on disk.
    */
   private void extractBundledResources() {
+    File defaultFile = new File(myDirectory, "default.yml");
+    if (defaultFile.exists()) {
+      return;
+    }
+
     boolean extractedAny = false;
     try {
       String dirPath = this.directory.replace('\\', '/');
