@@ -42,4 +42,10 @@ public interface RTPHooks {
   /** @return the arrival platform-creator registry; never {@code null}. */
   @PublicApi
   PlatformCreatorRegistry platformCreator();
+
+  /** @return the claim boundary provider registry; never {@code null}. */
+  @PublicApi
+  default ClaimBoundaryRegistry claimBoundaries() {
+    throw new UnsupportedOperationException();
+  }
 }

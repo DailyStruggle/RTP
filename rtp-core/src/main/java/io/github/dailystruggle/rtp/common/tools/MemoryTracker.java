@@ -316,6 +316,14 @@ public class MemoryTracker {
                           }
                           return true;
                         }
+
+                        if (actualTask instanceof io.github.dailystruggle.rtp.api.action.ActionSession session) {
+                          log(Level.WARNING,
+                              "[RTP][GC] Force-disarming stalled ActionSession label={0} ageOverBudgetMs={1}",
+                              label, leakDuration);
+                          session.disarm();
+                          return true;
+                        }
                       }
                       return false;
                     });

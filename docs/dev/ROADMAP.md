@@ -144,14 +144,10 @@ reproducible by readers".
   [`addons/LeafRTPTetherAddon/REQUIREMENTS.md`](../../addons/LeafRTPTetherAddon/REQUIREMENTS.md) and
   [leafrtp-tether-addon-ADR-001](../../addons/LeafRTPTetherAddon/docs/adr/leafrtp-tether-addon-ADR-001-cross-platform-region-confinement.md)
   (Proposed).
-- [ ] **Platform-neutral player-move event SPI (core, D-005 gated).** A normalized block-granularity
-  move signal in `rtp-api`, dispatched by `rtp-core`, implemented per adapter (Bukkit `PlayerMoveEvent`,
-  Fabric/NeoForge server-tick position diff), with opt-in per-player subscription so cost scales with
-  watched players rather than total. Unblocks the tether addon above and is a reusable primitive for
-  future move-driven features, with no WorldGuard dependency. Proposed in
-  [`docs/dev/PROPOSAL-tether-and-move-event-spi.md`](PROPOSAL-tether-and-move-event-spi.md) and
-  [ADR-075](../adr/ADR-075-platform-neutral-player-move-event-spi.md) (Proposed) - awaiting approval
-  before any core code lands.
+- [x] ~~**Platform-neutral player-move event SPI (core, D-005 gated).**~~ **Complete:**
+  `PlayerMoveDispatcher` and `PlayerMoveEvent` landed in `rtp-api`, exposed via
+  `RTPAPI.playerMoveEvents` and `RTPAPI.watchPlayerMove(...)` with per-player subscription scaling
+  and comprehensive unit tests (`PlayerMoveDispatcherTest`). (ADR-075).
 - [ ] **Investigate: spectator-during-wait (deferred, low priority).** Some competitor plugins place
   a player in spectator mode while a destination is resolved. This is a poor architectural fit here -
   the default model is search-and-serve-else-queue (destinations are prepared ahead of time, so there
@@ -174,10 +170,9 @@ reproducible by readers".
     co-located rather than spread across `config.yml`, `safety.yml`, `economy.yml`, `regions.yml`, etc.
     Evaluate a logical/virtual grouping (in-menu and in docs) that does not necessarily require
     physically merging the YAML files, so the on-disk parity contract and per-file comments stay intact.
-  - **`messages.yml` reorganization.** `messages.yml` has outgrown a single flat file since the menu
-    work landed; plan a sectioned/sub-grouped layout (or documented sub-files) so message keys are
-    findable. Any restructure must round-trip through the locale TSV pipeline and keep
-    `LocaleParityTest` green across all 12 locales (see *Locale Config TSV Pipeline* in `AGENTS.md`).
+  - [x] ~~**`messages.yml` reorganization.**~~ Complete: `messages.yml` was split into
+    `advanced/messages/{commands, network, placeholders, player, system}.yml` with full 12-locale
+    round-trip TSV synchronization and green `LocaleParityTest` in CI.
   - **Constraints.** Honor [ADR-020](../adr/ADR-020-language-bootstrap-and-locale-aware-configparser.md) (locale
     bootstrap), keep config-key re-keying intact, and ship a migration path for existing installs
     rather than silently relocating keys. The in-game search/prefab surface is the near-term mitigation;
@@ -217,31 +212,10 @@ reproducible by readers".
   `database/regionData/debug/<region>.json` on every scan). `MemoryShape.learnedStateSummary()`
   feeds new `regionInfo` placeholders `[memCoveragePct]`, `[memBadPct]`, `[memBadCount]`,
   `[memTopCause]`, `[memTopCausePct]`; documented in `docs/admin/COMMANDS.md`.
-- [ ] **(v3.2) Region-sampled scan: region-major traversal + Hilbert-within-region.** Planned for
-  `3.2`. A full `/rtp scan` over a large world is expensive in both pregeneration cost and in the
-  storage/memory footprint of the persisted bad-location map. Two related changes, to be settled in
-  a D-005 ADR before implementation:
-  - **Region-major traversal.** Today the spiral index is the primary scan unit and `.mca` binning
-    (`ScanTask` PR-14, `key = (cursor.x >> 5) << 32 | (cursor.z >> 5)`) is a per-batch cache
-    optimization layered on top. Invert this so a whole `r.X.Z.mca` region is the primary unit (and
-    can be *sampled* - scan a representative subset of regions rather than all of them), bounding the
-    working-set memory to one region's bins at a time instead of the 6-10 files the spiral frontier
-    can straddle.
-  - **Hilbert curve within each region.** Walk the 32x32 chunks of a region along a Hilbert curve so
-    consecutive scan steps are spatially adjacent. The motivation is the storage/memory win: the
-    `MemoryShape` bad-location map is run-length / prefix-sum encoded over the traversal order, so a
-    locality-preserving walk clusters safe/unsafe runs and compresses far better than spiral order.
-  - **Constraints carried over from the design discussion.** The existing `spatialResolution` field
-    already drives a coarse-to-fine stride (`ScanTask` line ~442: `stride = max(1, spatialResolution)`
-    with the `currentOffset` / `range` multi-pass), so the cheap "scan less" lever exists today and
-    can ship first by surfacing resolution on the `/rtp scan` verb with no format change. The bigger
-    change must keep verdicts recorded under the spiral index the live selector draws (or it changes
-    the teleport distribution guaranteed by [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md));
-    decide explicitly whether the bitmap *storage* becomes region-major (compression win, selector
-    contract in scope) or only the *traversal* order changes (selector untouched). The `.scan`
-    persistence format (`ScanTask.save`/`loadProgress`: `scanIter | spatialResolution | currentOffset
-    | isFine | scanPhase`) needs a versioned region-major cursor, and rim regions only partially
-    inside the shape/world border still need the existing per-position border math.
+- [x] ~~**(v3.2) Region-sampled scan: region-major traversal + Hilbert-within-region.**~~ Superseded
+  by the dual-layer spiral-addressed Hilbert model (ADR-085, ADR-088, CircleOptimizedDualLayer,
+  SquareOptimizedDualLayer, SegmentedKeyRunTable). Compacts run tables and guarantees spatial
+  cache locality without disrupting 1D spiral bijections.
 - [ ] **Anvil PRESCAN accuracy measurement → conditional FULLSCAN retirement.** Instrument the
   Anvil PRESCAN correct-rejection rate against the authoritative FULLSCAN verdict, then use the
   measured rate to decide whether the FULLSCAN trimming pass can be dropped from the scan path.
@@ -415,44 +389,15 @@ reproducible by readers".
   and route detection through `RTPHooks` so the chat renderer and unsupported carriers degrade
   cleanly. Fabric 1.20.x stays on the chat renderer (book renderer off there for performance
   reasons) and therefore opts out of this feature.
-- [ ] **Claim/faction-anchored RTP (`/rtp faction`-style).** EzRTP exposes RTP around a selected
-  faction/claim center; this is the one EzRTP destination feature with no RTP equivalent (named
-  centers, GUI selector, and `/rtp fake` are deliberately out of scope or already covered).
-  Settled design (pending a D-005 ADR before implementation):
-  - **Pin the center on first use.** Resolve the faction's claim centroid once, snap it to a usable
-    center, and cache it keyed by faction ID. Reuse on every later request; recompute only on a real
-    faction-change event (claim/unclaim/sethome/disband) or a cheap lazy fingerprint mismatch, not
-    per call. Evict via a capped LRU so thousands of factions cannot grow unbounded (evicted ones
-    re-pin on next use).
-  - **Keep full `MemoryShape`, not a memoryless variant.** Because the center is pinned (no drift),
-    the persisted bad-sector / biome index stays valid and drift-aware learning is retained.
-  - **Vary outer radius freely; never the center point or inner/center radius.** The Archimedean
-    spiral 1D mapping keys each (x,z) off the center + parameterization, so growing/shrinking the
-    outer `getRange()` bound only appends/truncates the tail of the same 1D sequence: every key,
-    prefix sum, and `.bin` run keeps its meaning. The radius can therefore track the faction's claim
-    extent dynamically with no remap. A center move or disband is the only event that forces a full
-    rebuild (rare, by design).
-  - Reuses the existing `RegionQueueManager` caches (kept/unkept/backlog) and the `rtp-anvil`
-    prefilter unchanged; route faction lookup through `RTPHooks` soft-depend per
-    [ADR-026](../adr/ADR-026-external-hook-api-surface.md), keeping the selection path free of a hard
-    faction-plugin dependency (S-003 / [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)).
-  - **Out of scope for this item:** transferring bad-location memory across overlapping regions. It
-    is mechanically possible on overlap but not common enough in practice to be worth the
-    complexity; the pinned-center model above avoids needing it.
-- [ ] **Cross-platform destination-selector seam + bundled default menu.** EzRTP ships an inventory
-  GUI world selector and BetterRTP relies on third-party menu plugins built against it; RTP should
-  lower that operator burden by shipping its own menu rather than outsourcing it. Two deliverables:
-  - **(1) Platform-neutral selector API** (`rtp-api` / `commands-api`): expose the
-    world/destination choice + `RTP`-side resolution path so a server or addon can render selection
-    in any UI (chat, book, inventory, web, external). This is the single source of truth both the
-    bundled menu and any third-party UI bind to, so they cannot drift apart.
-  - **(2) Bundled, opt-in default destination menu** built on the existing book/chat
-    `CommandTreeMenuBuilder` (and the Fabric 1.21+ book renderer): lists the worlds/regions a player
-    may RTP into with price/cooldown shown, click-to-teleport, working cross-platform out of the box
-    with no second plugin. Because the menu foundation already exists, this is largely a new view
-    over data we already model (worlds, regions, permissions, prices), not new infrastructure.
-  RTP should *not* bundle or endorse an inventory GUI; inventory-GUI rendering, if anyone wants it,
-  lives in an addon against deliverable (1), never in core.
+- [x] ~~**Claim/faction-anchored RTP (`/rtp faction`-style).**~~ **Shipped:**
+  - `ClaimBoundary`, `ClaimBoundaryProvider`, and `ClaimBoundaryRegistry` SPI in `rtp-api` and `DefaultRTPHooks`.
+  - `ClaimAnchoredRegionTracker` in `rtp-core` with pinned center stability within claim boundaries, recomputation cooldowns, and cross-region hazard memory ingestion into `SubspaceShape`.
+  - `AnchorSource.claimBoundary(...)` and `SubspaceAnchorResolver` integration.
+  - `ActionManager` automated claim boundary resolution for `anchor: faction` / `anchor: claimboundary`.
+  - `LeafRTPClaimAddon` v1.1.0 boundary providers for Towny Advanced, GriefPrevention, and SaberFactions/FactionsUUID.
+- [x] ~~**Cross-platform destination-selector seam + bundled default menu.**~~ Shipped:
+  `SelectionMenuBuilder` provides cross-platform curated selection pages (`/rtp menu world|region|biome|prefab`)
+  in `rtp-core` delegating cleanly without inventory GUIs.
 - [ ] **BetterRTP API compatibility shim (absorb the inventory-GUI menu ecosystem).** Inventory-GUI
   menu plugins (which capture more admin attention than book menus) are commonly built against
   BetterRTP. Rather than rebuild that ecosystem, RTP can register a stand-in for BetterRTP's public
@@ -473,16 +418,10 @@ reproducible by readers".
     [ADR-026](../adr/ADR-026-external-hook-api-surface.md); emulating a competitor's API is a
     cross-module, D-005-gated decision requiring a dedicated ADR before implementation. Complements
     (does not replace) the selector seam + bundled menu item above.
-- [ ] **BetterRTP parity: cooldown usage cap (`LockAfter` equivalent).** BetterRTP can lock a player
-  in an indefinite cooldown after a configured number of RTPs. Adds a per-player success counter to
-  the existing cooldown surface; reset semantics (per session, per day, never) are the real design
-  question, not the counter itself. Usability is debatable (see analysis below); implement only
-  behind a default-off knob, with a configurable reset window so it is a rate cap rather than a
-  permanent ban. Pairs with `messages.yml` (REQ-RTP-F-013).
-- [ ] **BetterRTP parity: persist RTP destination as a permanent spawn anchor (`SetAsRespawn`
-  equivalent).** On a first-join (or any configured event) RTP, optionally set the landed location as
-  the player's persistent spawn/bed anchor, not just the respawn-event location. Default off; one
-  config flag. Minor, low-risk.
+- [x] ~~**BetterRTP parity: cooldown usage cap (`LockAfter` equivalent).**~~ Shipped:
+  `UsageCapTracker`, `TeleportLimitStore`, `ConfigKeys.lockAfterUses`, and `ClearLimitCmd`.
+- [x] ~~**BetterRTP parity: persist RTP destination as a permanent spawn anchor (`SetAsRespawn`
+  equivalent).**~~ Shipped: `ConfigKeys.setAsRespawn`.
 - [ ] **BetterRTP parity: widen built-in claim-plugin coverage.** BetterRTP ships ~18 respect-targets
   out of the box; RTP ships 12 (`ClaimIntegrations`: SaberFactions, FactionsBridge, GriefDefender,
   GriefPrevention, Lands, RedProtect, Residence, CrashClaim, HuskClaims, KingdomsX, TownyAdvanced,

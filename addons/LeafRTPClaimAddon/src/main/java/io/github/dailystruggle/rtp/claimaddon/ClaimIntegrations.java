@@ -1,11 +1,15 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider;
+import io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry;
 import io.github.dailystruggle.rtp.api.hooks.RegionVerifierRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
+import java.util.ArrayList;
+import java.util.List;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
@@ -22,6 +26,8 @@ import org.bukkit.plugin.Plugin;
  */
 public final class ClaimIntegrations {
   private ClaimIntegrations() {}
+
+  private static final List<AutoCloseable> registeredProviders = new ArrayList<>();
 
   /**
    * Load {@code integrations.yml}, install the reload hook, and register each enabled verifier.
@@ -40,9 +46,11 @@ public final class ClaimIntegrations {
     Configs.onReload(() -> {
       RTP.configs.putParser(buildParser(resourceLoader));
       registerVerifiers();
+      registerBoundaryProviders();
     });
 
     registerVerifiers();
+    registerBoundaryProviders();
   }
 
   private static ConfigParser<IntegrationsKeys> buildParser(ClassLoader resourceLoader) {
@@ -152,6 +160,54 @@ public final class ClaimIntegrations {
     Object v = parser.getConfigValue(key, false);
     if (v instanceof Boolean) return (Boolean) v;
     return Boolean.parseBoolean(String.valueOf(v));
+  }
+
+  @SuppressWarnings("unchecked")
+  private static void registerBoundaryProviders() {
+    ConfigParser<IntegrationsKeys> parser =
+        (ConfigParser<IntegrationsKeys>) RTP.configs.getParser(IntegrationsKeys.class);
+    if (parser == null) return;
+
+    ClaimBoundaryRegistry registry = RTPAPI.hooks().claimBoundaries();
+    if (registry == null) return;
+
+    // Unregister previously registered providers
+    for (AutoCloseable handle : registeredProviders) {
+      try {
+        handle.close();
+      } catch (Throwable ignored) {
+      }
+    }
+    registeredProviders.clear();
+
+    registerProvider(parser, registry, IntegrationsKeys.rerollTownyAdvanced, "Towny", TownyBoundaryProvider::new);
+    registerProvider(parser, registry, IntegrationsKeys.rerollGriefPrevention, "GriefPrevention", GriefPreventionBoundaryProvider::new);
+    registerProvider(parser, registry, IntegrationsKeys.rerollSaberFactions, "Factions", FactionsBoundaryProvider::new);
+  }
+
+  private static void registerProvider(
+      ConfigParser<IntegrationsKeys> parser,
+      ClaimBoundaryRegistry registry,
+      IntegrationsKeys key,
+      String pluginName,
+      java.util.function.Supplier<ClaimBoundaryProvider> supplier) {
+    if (!flag(parser, key) || !Bukkit.getPluginManager().isPluginEnabled(pluginName)) {
+      return;
+    }
+    try {
+      ClaimBoundaryProvider provider = supplier.get();
+      AutoCloseable handle = registry.register(provider);
+      if (handle != null) {
+        registeredProviders.add(handle);
+      }
+    } catch (Throwable t) {
+      RTP.log(
+          java.util.logging.Level.WARNING,
+          "[RTP] claim boundary provider for "
+              + pluginName
+              + " could not be registered (incompatible plugin version?); skipping it.",
+          t);
+    }
   }
 
   /** A single claim-plugin "is this location claimed?" probe. */

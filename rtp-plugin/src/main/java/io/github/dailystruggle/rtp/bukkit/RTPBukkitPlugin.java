@@ -599,6 +599,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     Bukkit.getPluginManager().registerEvents(new OnPlayerDamage(), this);
     // ADR-055: feed the native PvP combat tracker for the optional combat gate.
     Bukkit.getPluginManager().registerEvents(new OnPlayerCombatTag(), this);
+    Bukkit.getPluginManager().registerEvents(new OnPlayerDeath(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerJoin(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerMove(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);

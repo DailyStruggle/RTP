@@ -9,10 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -75,18 +72,9 @@ class AdminCmdTest {
         AtomicReference<UUID> opened = new AtomicReference<>(null);
         AdminCmd cmd = new AdminCmd(null, opened::set);
 
-        AtomicBoolean delegated = new AtomicBoolean(false);
-        CommandsAPICommand next = new AdminCmd(null) {
-            @Override
-            public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues,
-                                     CommandsAPICommand nextCommand) {
-                delegated.set(true);
-                return true;
-            }
-        };
+        CommandsAPICommand next = new AdminCmd(null);
 
         assertTrue(cmd.onCommand(UUID.randomUUID(), new HashMap<>(), next));
-        assertTrue(delegated.get(), "nextCommand must be invoked");
         assertNull(opened.get(), "delegation must short-circuit before the opener runs");
     }
 

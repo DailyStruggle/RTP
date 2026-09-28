@@ -17,9 +17,9 @@ placement:
   shape:
     name: "CIRCLE"
     radius: 3c                  # tighter ring hugging the perimeter (~48 blocks)
-    centerRadius: 0
+    centerRadius: 1c            # perimeter clearance (~16 blocks)
   minSeparation: 16
-  elevationTolerance: 8
+  elevationTolerance: 256
 
 confinement:
   boundary: "SUBSPACE"
@@ -27,6 +27,6 @@ confinement:
 
 lifecycle:
   onStart:
-    - PLAYER: "msg &aDropped just outside a claimed base."
+    - CONSOLE: "tellraw [player_name] [\"\",{\"text\":\"Dropped just outside a claimed base.\",\"color\":\"green\"}]"
 
 version: "1.0"

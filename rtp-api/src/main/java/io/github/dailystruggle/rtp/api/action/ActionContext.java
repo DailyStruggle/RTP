@@ -8,18 +8,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 /**
  * Caller-provided invocation context when triggering a scripted action (ADR-093).
  *
  * @param metadata custom contextual parameters or tag bindings passed to the script execution
+ * @param gateValidators custom gate validation predicates evaluated before placement/execution
  */
 @PublicApi
-public record ActionContext(Map<String, Object> metadata) {
-  public static final ActionContext EMPTY = new ActionContext(Collections.emptyMap());
+public record ActionContext(
+    Map<String, Object> metadata,
+    List<Predicate<ActionGateContext>> gateValidators) {
+  public static final ActionContext EMPTY = new ActionContext(Collections.emptyMap(), Collections.emptyList());
+
+  public ActionContext(Map<String, Object> metadata) {
+    this(metadata, Collections.emptyList());
+  }
 
   public ActionContext {
     metadata = (metadata == null) ? Collections.emptyMap() : Map.copyOf(metadata);
+    gateValidators = (gateValidators == null) ? Collections.emptyList() : List.copyOf(gateValidators);
   }
 
   public static ActionContext empty() {
@@ -33,6 +42,17 @@ public record ActionContext(Map<String, Object> metadata) {
 
   public static ActionContext of(Map<String, Object> metadata) {
     return new ActionContext(metadata);
+  }
+
+  public static ActionContext ofValidators(List<Predicate<ActionGateContext>> validators) {
+    return new ActionContext(Collections.emptyMap(), validators);
+  }
+
+  public ActionContext withValidator(Predicate<ActionGateContext> validator) {
+    Objects.requireNonNull(validator, "validator must not be null");
+    List<Predicate<ActionGateContext>> updated = new ArrayList<>(this.gateValidators);
+    updated.add(validator);
+    return new ActionContext(this.metadata, updated);
   }
 
   /**

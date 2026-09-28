@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
@@ -13,10 +14,9 @@ import org.bukkit.event.player.PlayerMoveEvent;
 
 public final class OnPlayerMove implements Listener {
 
-    @EventHandler(priority = EventPriority.LOW)
+  @EventHandler(priority = EventPriority.LOW)
   public void onPlayerMove(PlayerMoveEvent event) {
     UUID id = event.getPlayer().getUniqueId();
-    if (RTP.getInstance().queuedPlayers.contains(id)) return;
 
     org.bukkit.Location from = event.getFrom();
     org.bukkit.Location to = event.getTo();
@@ -24,7 +24,28 @@ public final class OnPlayerMove implements Listener {
       return;
     }
 
-    TeleportData data = RTP.getInstance().latestTeleportData.get(id);
+    // Bridge to RTPAPI.playerMoveEvents for watched players (ADR-075 / ADR-093)
+    if (RTPAPI.playerMoveEvents != null
+        && RTPAPI.playerMoveEvents.hasWatchers()
+        && (from.getBlockX() != to.getBlockX() || from.getBlockY() != to.getBlockY() || from.getBlockZ() != to.getBlockZ())) {
+      String worldName = (to.getWorld() != null) ? to.getWorld().getName() : "";
+      RTPAPI.playerMoveEvents.fire(new io.github.dailystruggle.rtp.api.event.PlayerMoveEvent(
+          id,
+          worldName,
+          from.getBlockX(),
+          from.getBlockY(),
+          from.getBlockZ(),
+          to.getBlockX(),
+          to.getBlockY(),
+          to.getBlockZ()));
+    }
+
+    RTP rtp = RTP.getInstance();
+    if (rtp == null) return;
+
+    if (rtp.queuedPlayers.contains(id)) return;
+
+    TeleportData data = rtp.latestTeleportData.get(id);
     if (data == null || data.completed) return;
 
     double cancelDistanceSquared = Math.pow(RTP.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.cancelDistance, 2).doubleValue(), 2);

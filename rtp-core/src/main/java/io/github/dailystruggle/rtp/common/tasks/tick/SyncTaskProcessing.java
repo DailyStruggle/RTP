@@ -32,6 +32,10 @@ public final class SyncTaskProcessing extends RTPRunnable {
 
       RTP.getInstance().cancelTasks.execute(currentAvailableTime - (System.nanoTime() - start));
       RTP.getInstance().miscSyncTasks.execute(currentAvailableTime - (System.nanoTime() - start));
+
+      if (RTP.actionManager != null) {
+        RTP.actionManager.tick();
+      }
     } catch (Throwable t) {
       RTP.log(java.util.logging.Level.WARNING, "Exception during sync task processing", t);
     } finally {

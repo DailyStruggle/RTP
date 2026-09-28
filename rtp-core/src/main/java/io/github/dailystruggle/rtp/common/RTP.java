@@ -109,6 +109,12 @@ public class RTP {
       actionManager = new io.github.dailystruggle.rtp.common.action.ActionManager();
 
   /**
+   * Background task pre-warming candidate placements for registered actions (ADR-097).
+   */
+  public static final io.github.dailystruggle.rtp.common.action.ActionCacheWarmTask
+      actionCacheWarmTask = new io.github.dailystruggle.rtp.common.action.ActionCacheWarmTask(actionManager);
+
+  /**
    * Process-wide manager for physical world triggers (portals, pressure plates, step-in zones) (ADR-093).
    */
   public static final io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager
@@ -1122,6 +1128,10 @@ public class RTP {
     // Bukkit/Fabric/NeoForge, no-op elsewhere); an empty scanBossBar template disables it.
     trackedTasks.add(scheduler.runTaskTimer(
         io.github.dailystruggle.rtp.common.tasks.tick.ScanProgressBars::update, 20, 20));
+
+    // Background action candidate placement warming (ADR-097)
+    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
+        actionCacheWarmTask, 20L, 20L));
 
     long asyncTime = TimeUnit.MILLISECONDS.toNanos(25); // Bumped to 5ms since async has more headroom
     trackedTasks.add(scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1));

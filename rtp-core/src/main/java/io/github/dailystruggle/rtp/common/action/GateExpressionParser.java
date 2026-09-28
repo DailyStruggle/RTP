@@ -20,6 +20,8 @@ public final class GateExpressionParser {
       Pattern.compile("^\\s*(<=|>=|<|>|==|=)\\s*(-?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]*)\\s*$");
   private static final Pattern RANGE_PATTERN =
       Pattern.compile("^\\s*(-?[0-9]+(?:\\.[0-9]+)?)\\s*\\.\\.\\s*(-?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]*)\\s*$");
+  private static final Pattern DURATION_PATTERN =
+      Pattern.compile("^([0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]*)$");
 
   private GateExpressionParser() {}
 
@@ -78,7 +80,7 @@ public final class GateExpressionParser {
   public static long parseDurationSeconds(String text, long defaultVal) {
     if (text == null || text.isBlank()) return defaultVal;
     String trimmed = text.trim();
-    Matcher m = Pattern.compile("^([0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]*)$").matcher(trimmed);
+    Matcher m = DURATION_PATTERN.matcher(trimmed);
     if (!m.matches()) return defaultVal;
     double val = Double.parseDouble(m.group(1));
     double mult = parseMultiplier(m.group(2));

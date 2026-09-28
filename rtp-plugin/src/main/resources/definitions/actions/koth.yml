@@ -1,0 +1,125 @@
+# --- actions/koth.yml ---
+# King of the Hill / Extraction Arena (ADR-093).
+# Multi-player extraction minigame with a shrinking world border.
+# 2 to 4 combatants drop into an arena with an extraction beacon at the center.
+# When the match timer expires, any player inside the center extraction circle
+# secures the zone and extracts with loot!
+
+alias: "koth"
+permission: "rtp.action.koth"
+description: "King of the Hill extraction arena with shrinking world border."
+
+command:
+  name: "koth"
+  permission: "rtp.command.koth"
+  description: "Queue for a King of the Hill extraction match"
+  aliases:
+    - "extraction"
+  subcommands:
+    leave:
+      description: "Forfeit the extraction match"
+      permission: "rtp.command.koth.leave"
+      aliases:
+        - "surrender"
+        - "forfeit"
+      run:
+        - CONSOLE: "kill [player_name]"
+
+placement:
+  region: "default"
+  anchor: "regionQueue"
+  shape:
+    name: "CIRCLE"
+    radius: 4c                  # 4-chunk radius (64 blocks)
+    centerRadius: 1c            # 16-block clearance around the center extraction hill
+  minSeparation: 24
+  elevationTolerance: 128
+
+confinement:
+  boundary: "LEASH"
+  leashRadius: 64.0             # 64-block radius (128-block border width)
+  duration: "3m"                # 3-minute match
+  initialSize: 128              # Start at 128 blocks
+  shrinkTo: 24                  # Shrink to 24-block extraction hill
+  shrinkOver: "2m30s"           # Shrink over 2.5 minutes
+  damage: 2.0
+  damageBuffer: 0.0
+  cancellable: false
+
+gate:
+  - players: ">= 2"
+
+lifecycle:
+  onEnqueue:
+    - FOR_EACH:
+        - MESSAGE: "<gold>Entered King of the Hill matchmaking queue.</gold> <yellow>Waiting for competitors (need 2+)...</yellow>"
+        - MESSAGE: "<gray>Run <click:run_command:'/rtp action cancel'><hover:show_text:'<gray>Click to cancel queue</gray>'><u>/rtp action cancel</u></hover></click> if you wish to leave the queue.</gray>"
+
+  onStart:
+    - FOR_EACH:
+        - CONSOLE: "gamemode adventure [player]"
+        - CONSOLE: "give [player] iron_sword 1"
+        - CONSOLE: "give [player] bow 1"
+        - CONSOLE: "give [player] arrow 16"
+        - PLAYER: "title [player] title {\"text\":\"KING OF THE HILL\",\"color\":\"gold\"}"
+        - PLAYER: "title [player] subtitle {\"text\":\"Reach the center extraction zone before time runs out!\",\"color\":\"yellow\"}"
+        - MESSAGE: "<green><bold>Match started! Secure the center extraction beacon before time expires!</bold></green>"
+
+  onBoundaryViolation:
+    - gate:
+        scoreboard:
+          objective: "rtp_violations"
+          matches: "< 2"
+      run:
+        - ACTION: PULL_BACK
+        - FOR_EACH:
+            - PLAYER: "title [violator] subtitle {\"text\":\"Stay inside the world border!\",\"color\":\"red\"}"
+    - gate:
+        scoreboard:
+          objective: "rtp_violations"
+          matches: ">= 2"
+      run:
+        - CONSOLE: "broadcast &c[violator] was eliminated for leaving the arena!"
+        - ACTION: PULL_BACK
+        - ACTION: DISARM
+
+  onExpire:
+    # 1. Secured extraction: players within 10 blocks of anchor extract with rewards!
+    - gate:
+        spatial:
+          target: "anchor"
+          distance: "<= 10"
+      run:
+        - FOR_EACH:
+            - CONSOLE: "give [player] emerald 5"
+            - CONSOLE: "give [player] diamond 2"
+            - PLAYER: "title [player] title {\"text\":\"ZONE EXTRACTED!\",\"color\":\"green\"}"
+            - PLAYER: "title [player] subtitle {\"text\":\"You successfully extracted with the loot!\",\"color\":\"yellow\"}"
+            - MESSAGE: "<green><bold>SUCCESS: You secured the center extraction zone and escaped with 5 Emeralds & 2 Diamonds!</bold></green>"
+
+    # 2. Failed extraction: players outside 10 blocks failed to reach the extraction hill
+    - gate:
+        spatial:
+          target: "anchor"
+          distance: "> 10"
+      run:
+        - FOR_EACH:
+            - PLAYER: "title [player] title {\"text\":\"EXTRACTION FAILED!\",\"color\":\"red\"}"
+            - PLAYER: "title [player] subtitle {\"text\":\"You failed to reach the center zone in time.\",\"color\":\"gray\"}"
+            - MESSAGE: "<red>Extraction failed: You did not make it to the extraction beacon in time.</red>"
+
+    # 3. Restore survival mode and disarm
+    - FOR_EACH:
+        - CONSOLE: "gamemode survival [player]"
+    - ACTION: DISARM
+
+  onDeath:
+    - CONSOLE: "broadcast &6[victim] &cwas eliminated from the extraction match!"
+    - FOR_EACH:
+        - CONSOLE: "gamemode survival [player]"
+
+  onCancel:
+    - FOR_EACH:
+        - MESSAGE: "<gray>You have left the King of the Hill queue.</gray>"
+
+version: "1.0"

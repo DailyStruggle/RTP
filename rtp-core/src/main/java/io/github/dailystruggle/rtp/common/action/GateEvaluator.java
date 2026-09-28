@@ -3,10 +3,16 @@ package io.github.dailystruggle.rtp.common.action;
 import io.github.dailystruggle.rtp.api.action.ActionGateContext;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Evaluator for declarative MVP gates (ADR-093 Section 3).
@@ -27,6 +33,64 @@ public final class GateEvaluator {
   private GateEvaluator() {}
 
   /**
+   * Checks whether the given gate configuration has conditions requiring more than one participant
+   * (e.g. {@code players: ">= 2"}, {@code participants: "> 1"}).
+   */
+  public static boolean requiresMultipleParticipants(List<Map<String, Object>> gates) {
+    if (gates == null || gates.isEmpty()) return false;
+    for (Map<String, Object> gateConfig : gates) {
+      if (gateConfig == null || gateConfig.isEmpty()) continue;
+      for (Map.Entry<String, Object> entry : gateConfig.entrySet()) {
+        String key = entry.getKey().toLowerCase();
+        if (key.equals("players") || key.equals("participants") || key.equals("queue") || key.equals("participantcount")) {
+          Object val = entry.getValue();
+          String matchExpr = null;
+          if (val instanceof Map<?, ?> m) {
+            Object matches = m.get("matches");
+            if (matches == null) matches = m.get("range");
+            if (matches == null) matches = m.get("count");
+            if (matches != null) matchExpr = matches.toString();
+          } else if (val != null) {
+            matchExpr = val.toString();
+          }
+          if (matchExpr != null && !matchExpr.isBlank()) {
+            if (!GateExpressionParser.matches(matchExpr, 1.0)) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Evaluates a list of gate configuration blocks (AND-ed) against the given context and tokens.
+   */
+  public static boolean evaluateAll(
+      List<Map<String, Object>> gates,
+      ActionGateContext context,
+      Map<String, Predicate<ActionGateContext>> externalPredicates,
+      Map<String, Object> additionalTokens) {
+    if (context != null && context.context() != null) {
+      for (Predicate<ActionGateContext> validator : context.context().gateValidators()) {
+        if (validator != null && !validator.test(context)) {
+          return false;
+        }
+      }
+    }
+    if (gates == null || gates.isEmpty()) {
+      return true;
+    }
+    for (Map<String, Object> gateConfig : gates) {
+      if (!evaluate(gateConfig, context, externalPredicates, additionalTokens)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Evaluates a gate configuration block against the given context.
    *
    * @param gateConfig         the gate definition map from config
@@ -34,11 +98,35 @@ public final class GateEvaluator {
    * @param externalPredicates custom predicates registered via ActionService
    * @return true if all defined conditions pass, false if any fails or an unknown gate is encountered
    */
-  @SuppressWarnings("unchecked")
   public static boolean evaluate(
       Map<String, Object> gateConfig,
       ActionGateContext context,
       Map<String, Predicate<ActionGateContext>> externalPredicates) {
+    return evaluate(gateConfig, context, externalPredicates, Collections.emptyMap());
+  }
+
+  /**
+   * Evaluates a gate configuration block against the given context and tokens.
+   *
+   * @param gateConfig         the gate definition map from config
+   * @param context            the gate context
+   * @param externalPredicates custom predicates registered via ActionService
+   * @param additionalTokens   context tokens for placeholder substitution
+   * @return true if all defined conditions pass, false if any fails or an unknown gate is encountered
+   */
+  @SuppressWarnings("unchecked")
+  public static boolean evaluate(
+      Map<String, Object> gateConfig,
+      ActionGateContext context,
+      Map<String, Predicate<ActionGateContext>> externalPredicates,
+      Map<String, Object> additionalTokens) {
+    if (context != null && context.context() != null) {
+      for (Predicate<ActionGateContext> validator : context.context().gateValidators()) {
+        if (validator != null && !validator.test(context)) {
+          return false;
+        }
+      }
+    }
 
     if (gateConfig == null || gateConfig.isEmpty()) {
       return true;
@@ -56,13 +144,40 @@ public final class GateEvaluator {
           if (matches == null) matches = map.get("range");
           if (objName == null || matches == null) return false;
 
-          // In MVP, rtp_violations is tracked directly in ActionGateContext
+          // ADR-093 §4: Managed action scoreboard objectives
           String objStr = objName.toString().trim();
           double scoreValue = 0.0;
           if ("rtp_violations".equalsIgnoreCase(objStr)) {
             scoreValue = context.violations();
           } else if ("rtp_in_bounds".equalsIgnoreCase(objStr)) {
             scoreValue = context.inBounds() ? 1.0 : 0.0;
+          } else if ("rtp_time_left".equalsIgnoreCase(objStr)) {
+            scoreValue = context.remainingSeconds();
+          } else if ("rtp_dist_sq".equalsIgnoreCase(objStr)) {
+            scoreValue = context.distanceSqFromAnchor();
+          } else if ("rtp_session_id".equalsIgnoreCase(objStr)) {
+            if (context.sessionId() != null) {
+              int rawHash = context.sessionId().hashCode();
+              scoreValue = (rawHash == Integer.MIN_VALUE) ? Integer.MAX_VALUE : Math.abs(rawHash);
+            } else {
+              scoreValue = 0.0;
+            }
+          } else if ("rtp_alive".equalsIgnoreCase(objStr)) {
+            // Count alive session participants via server accessor if available
+            RTPServerAccessor accessor = RTP.serverAccessor;
+            if (accessor != null && io.github.dailystruggle.rtp.api.RTPAPI.actionService != null) {
+              scoreValue = io.github.dailystruggle.rtp.api.RTPAPI.actionService.getSession(context.sessionId())
+                  .map(s -> {
+                    int c = 0;
+                    for (UUID pid : s.participants()) {
+                      io.github.dailystruggle.rtp.api.entity.RTPPlayer p = accessor.getPlayer(pid);
+                      if (p != null && p.isOnline()) c++;
+                    }
+                    return (double) (c > 0 ? c : s.participants().size());
+                  }).orElse(1.0);
+            } else {
+              scoreValue = 1.0;
+            }
           }
           if (!GateExpressionParser.matches(matches.toString(), scoreValue)) {
             return false;
@@ -97,6 +212,19 @@ public final class GateEvaluator {
               actualDist = Math.sqrt(Math.max(0.0, context.distanceSqFromAnchor()));
             }
             if (!GateExpressionParser.matches(map.get("distance").toString(), actualDist)) {
+              return false;
+            }
+          }
+          if (map.containsKey("elevationDelta")) {
+            Double delta = context.elevationDelta();
+            if (delta == null) {
+              if (context.currentY() != null && context.anchorY() != null) {
+                delta = Math.abs(context.currentY() - context.anchorY());
+              } else {
+                delta = 0.0;
+              }
+            }
+            if (!GateExpressionParser.matches(map.get("elevationDelta").toString(), delta)) {
               return false;
             }
           }
@@ -172,29 +300,79 @@ public final class GateEvaluator {
             return false;
           }
         }
+        case "players", "participants", "queue", "participantcount" -> {
+          String matchExpr = null;
+          if (val instanceof Map<?, ?> m) {
+            Object matches = m.get("matches");
+            if (matches == null) matches = m.get("range");
+            if (matches == null) matches = m.get("count");
+            if (matches != null) matchExpr = matches.toString();
+          } else if (val != null) {
+            matchExpr = val.toString();
+          }
+          if (matchExpr == null || matchExpr.isBlank()) return false;
+          int count = (context != null) ? context.participantCount() : 0;
+          if (!GateExpressionParser.matches(matchExpr, count)) {
+            return false;
+          }
+        }
         case "command" -> {
-          String rawCommand = null;
+          List<String> rawCommands = new ArrayList<>();
           if (val instanceof Map<?, ?> map) {
             Object exec = map.get("execute");
             if (exec == null) exec = map.get("run");
-            if (exec != null) rawCommand = exec.toString();
+            if (exec instanceof List<?> list) {
+              for (Object o : list) if (o != null) rawCommands.add(o.toString());
+            } else if (exec != null) {
+              rawCommands.add(exec.toString());
+            }
+          } else if (val instanceof List<?> list) {
+            for (Object o : list) if (o != null) rawCommands.add(o.toString());
           } else if (val instanceof String s) {
-            rawCommand = s;
+            rawCommands.add(s);
           }
-          if (rawCommand == null || rawCommand.isBlank()) return false;
+          if (rawCommands.isEmpty()) return false;
 
           RTPServerAccessor accessor = RTP.serverAccessor;
           if (accessor == null) return false;
 
           Map<String, Object> tokens = new HashMap<>();
+          if (additionalTokens != null && !additionalTokens.isEmpty()) {
+            tokens.putAll(additionalTokens);
+          }
           tokens.put("session_id", context.sessionId().toString().substring(0, 8));
           if (context.participantId() != null) {
             tokens.put("player", context.participantId());
             tokens.put("violator", context.participantId());
           }
-          String substituted = ActionPlaceholderSanitizer.substitute(rawCommand, tokens);
-          boolean success = accessor.executeCommand(new UUID(0, 0), substituted);
-          if (!success) return false;
+
+          for (String cmdTemplate : rawCommands) {
+            if (cmdTemplate == null || cmdTemplate.isBlank()) continue;
+
+            // Check if command references a target token that is empty/unspecified
+            // e.g., name=[target_name_1] where target is empty -> wildcard match (skip command)
+            if (ActionPlaceholderSanitizer.hasMissingTarget(cmdTemplate, tokens)) {
+              continue; // Wildcard target passes this command check
+            }
+
+            String substituted = ActionPlaceholderSanitizer.substitute(cmdTemplate, tokens);
+            if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(substituted, "target")) {
+              continue; // Wildcard unmapped target passes this command check
+            }
+
+            // Reliability: evaluate 'execute if/unless entity @X[name=,tag=]' predicate
+            // checks natively via scoreboard tags. Bukkit's dispatchCommand return value
+            // does not reflect the predicate result for vanilla 'execute if', so trusting
+            // it silently passes/fails gates (and leaks "Test failed" chat feedback).
+            Boolean nativeResult = evaluateEntityPredicate(substituted, accessor);
+            if (nativeResult != null) {
+              if (!nativeResult) return false;
+              continue; // predicate satisfied; do not dispatch the vanilla command
+            }
+
+            boolean success = accessor.executeCommand(new UUID(0, 0), substituted);
+            if (!success) return false;
+          }
         }
         default -> {
           // ADR-093: Unrecognized gate key fails closed (block skipped)
@@ -203,5 +381,73 @@ public final class GateEvaluator {
       }
     }
     return true;
+  }
+
+  private static final Pattern ENTITY_PREDICATE_PATTERN = Pattern.compile(
+      "^execute\\s+(if|unless)\\s+entity\\s+@[aeprs](?:\\[(.*)\\])?\\s*$",
+      Pattern.CASE_INSENSITIVE);
+
+  /**
+   * Natively evaluates a vanilla {@code execute if/unless entity @<selector>[name=,tag=]} predicate
+   * against live player scoreboard tags, returning the predicate outcome.
+   *
+   * <p>This exists because platform command dispatch (e.g. Bukkit {@code dispatchCommand}) returns
+   * {@code true} for a dispatched vanilla {@code execute if entity ...} regardless of whether the
+   * predicate matched, which makes command-gate results unreliable and leaks "Test failed" feedback.
+   *
+   * @param command  the fully-substituted command string
+   * @param accessor server accessor for tag/name lookups
+   * @return {@code TRUE}/{@code FALSE} for a recognized entity predicate, or {@code null} if the
+   *     command is not a recognized {@code execute if/unless entity} tag/name predicate (caller
+   *     should fall back to normal command dispatch)
+   */
+  private static Boolean evaluateEntityPredicate(String command, RTPServerAccessor accessor) {
+    if (command == null || accessor == null) return null;
+    Matcher m = ENTITY_PREDICATE_PATTERN.matcher(command.trim());
+    if (!m.matches()) return null;
+
+    boolean unless = "unless".equalsIgnoreCase(m.group(1));
+    String selector = m.group(2); // selector arguments inside [...], may be null
+
+    String requiredName = null;
+    String requiredTag = null;
+    if (selector != null && !selector.isBlank()) {
+      for (String arg : selector.split(",")) {
+        String[] kv = arg.split("=", 2);
+        if (kv.length != 2) continue;
+        String key = kv[0].trim().toLowerCase();
+        String value = kv[1].trim();
+        if (key.equals("name")) {
+          requiredName = value;
+        } else if (key.equals("tag")) {
+          requiredTag = value;
+        }
+        // Unsupported selector arguments are ignored (name/tag are sufficient for reciprocity gates)
+      }
+    }
+
+    // Only handle tag-based predicates natively; anything else falls back to dispatch.
+    if (requiredTag == null || requiredTag.isBlank()) return null;
+
+    boolean matched = entityMatches(requiredName, requiredTag, accessor);
+    return unless != matched;
+  }
+
+  private static boolean entityMatches(String requiredName, String requiredTag, RTPServerAccessor accessor) {
+    if (requiredName != null && !requiredName.isBlank()) {
+      io.github.dailystruggle.rtp.api.entity.RTPPlayer player = accessor.getPlayer(requiredName);
+      if (player == null) return false;
+      Set<String> tags = accessor.getScoreboardTags(player.uuid());
+      return tags != null && tags.contains(requiredTag);
+    }
+    // No name constraint: match if any online player carries the required tag.
+    for (io.github.dailystruggle.rtp.api.entity.RTPPlayer p : accessor.getOnlinePlayers()) {
+      if (p == null) continue;
+      Set<String> tags = accessor.getScoreboardTags(p.uuid());
+      if (tags != null && tags.contains(requiredTag)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

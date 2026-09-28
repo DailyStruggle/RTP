@@ -88,13 +88,13 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
                     : PrefabDiskIO.snapshotLive(pluginDir, prefab);
             // expandPerWorld prefabs (MultiWorld) carry no baked region
             // overlays so snapshotLive() returns nothing for regions/*. The
-            // MultiWorldExpander requires regions/default in currentTrees to
+            // MultiWorldExpander requires definitions/regions/default in currentTrees to
             // use as the per-world template, so seed it here.
             if (prefab.expandPerWorld() && pluginDir != null
-                    && !baseline.containsKey("regions/" + MultiWorldExpander.DEFAULT_REGION_ID)) {
-                baseline.put("regions/" + MultiWorldExpander.DEFAULT_REGION_ID,
+                    && !baseline.containsKey("definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID)) {
+                baseline.put("definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID,
                         PrefabDiskIO.readLive(pluginDir,
-                                "regions/" + MultiWorldExpander.DEFAULT_REGION_ID));
+                                "definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID));
             }
         } catch (RuntimeException re) {
             RTP.log(Level.WARNING,
@@ -103,7 +103,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
             baseline = new LinkedHashMap<>();
         }
         // Collect live world names so MultiWorldExpander can synthesise a
-        // regions/<world>.yml per loaded world. Ignored when the prefab has
+        // definitions/regions/<world>.yml per loaded world. Ignored when the prefab has
         // expandPerWorld=false (2-arg semantics via the 3-arg overload).
         List<String> worldNames = new ArrayList<>();
         if (RTP.serverAccessor != null) {
@@ -121,16 +121,16 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
             }
         }
         // expandPerWorld prefabs also repoint each synthesised world's
-        // worlds/<world>.yml "region" field at its new per-world region. Every
+        // definitions/worlds/<world>.yml "region" field at its new per-world region. Every
         // loaded world has an in-memory WorldKeys parser by definition (a
-        // worlds/<world>.yml file may not exist on disk when the world runs on
+        // definitions/worlds/<world>.yml file may not exist on disk when the world runs on
         // defaults), so seed the baseline from RTP.configs rather than reading
         // the file. That makes the diff describe the true delta from the live
         // region binding (e.g. "default" -> "<world>") instead of an absent
         // value when the physical file is missing.
         if (prefab.expandPerWorld() && RTP.configs != null) {
             for (String world : worldNames) {
-                String fileId = "worlds/" + world;
+                String fileId = "definitions/worlds/" + world;
                 Map<String, Object> worldTree = new LinkedHashMap<>();
                 try {
                     ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser(world);

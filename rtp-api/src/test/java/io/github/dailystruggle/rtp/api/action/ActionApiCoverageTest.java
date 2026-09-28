@@ -143,6 +143,13 @@ class ActionApiCoverageTest {
     assertEquals(120L, conf.durationSeconds());
     assertEquals(64.0, conf.leashRadius(), "leashRadius <= 0 defaults to 64.0");
 
+    ActionDefinition.ConfinementSpec shapeConf = new ActionDefinition.ConfinementSpec(
+        ConfinementBoundary.SHAPE, 180L, 0.0, 0.0, 0.0, 0L, true, "CIRCLE", 80, 16);
+    assertEquals(ConfinementBoundary.SHAPE, shapeConf.boundary());
+    assertEquals("CIRCLE", shapeConf.shapeName());
+    assertEquals(80, shapeConf.radius());
+    assertEquals(16, shapeConf.centerRadius());
+
     ActionDefinition.CommandAction cmdConsole = ActionDefinition.CommandAction.console("say hi");
     assertEquals(ActionDefinition.ActionType.CONSOLE, cmdConsole.type());
     assertEquals("say hi", cmdConsole.payload());
@@ -173,14 +180,17 @@ class ActionApiCoverageTest {
     assertTrue(nullStep.actions().isEmpty());
 
     ActionDefinition.LifecycleSpec life = new ActionDefinition.LifecycleSpec(
-        List.of(step), List.of(step), List.of(step), List.of(step));
+        List.of(step), List.of(step), List.of(step), List.of(step), List.of(step), List.of(step));
     assertEquals(1, life.onStart().size());
     assertEquals(1, life.onBoundaryViolation().size());
     assertEquals(1, life.onExpire().size());
     assertEquals(1, life.onDeath().size());
+    assertEquals(1, life.onEnqueue().size());
+    assertEquals(1, life.onCancel().size());
 
-    ActionDefinition.LifecycleSpec nullLife = new ActionDefinition.LifecycleSpec(null, null, null, null);
+    ActionDefinition.LifecycleSpec nullLife = new ActionDefinition.LifecycleSpec(null, null, null, null, null, null);
     assertTrue(nullLife.onStart().isEmpty());
+    assertTrue(nullLife.onCancel().isEmpty());
 
     ActionDefinition.CommandSpec cmdSpec = new ActionDefinition.CommandSpec(
         "duel", "rtp.command.duel", "Duel players", List.of("fight"));
@@ -204,7 +214,6 @@ class ActionApiCoverageTest {
     assertSame(conf, def.confinement());
     assertSame(life, def.lifecycle());
     assertSame(cmdSpec, def.command());
-
     ActionDefinition defNulls = new ActionDefinition(
         "test2", null, null, null, null, null, null);
     assertNotNull(defNulls.placement());
@@ -236,6 +245,8 @@ class ActionApiCoverageTest {
         @Override
         public void disarm(UUID sessionId) {}
         @Override
+        public boolean cancelParticipant(UUID participantId, String actionId) { return false; }
+        @Override
         public void registerPredicate(String name, Predicate<ActionGateContext> predicate) {}
         @Override
         public Set<String> getActionIds() { return Collections.emptySet(); }
@@ -243,6 +254,25 @@ class ActionApiCoverageTest {
 
       RTPAPI.actionService = dummy;
       assertSame(dummy, RTPAPI.actions());
+      assertFalse(dummy.cancelParticipant(UUID.randomUUID(), null));
+
+      ActionService defaultImpl = new ActionService() {
+        @Override
+        public CompletableFuture<ActionSessionResult> trigger(String actionId, List<UUID> participants, ActionContext context) {
+          return null;
+        }
+        @Override
+        public Optional<ActionSession> getSession(UUID sessionId) { return Optional.empty(); }
+        @Override
+        public Optional<ActionSession> getSessionForParticipant(UUID participantId) { return Optional.empty(); }
+        @Override
+        public void disarm(UUID sessionId) {}
+        @Override
+        public void registerPredicate(String name, Predicate<ActionGateContext> predicate) {}
+        @Override
+        public Set<String> getActionIds() { return Collections.emptySet(); }
+      };
+      assertFalse(defaultImpl.cancelParticipant(UUID.randomUUID(), "test"));
     } finally {
       RTPAPI.actionService = prev;
     }

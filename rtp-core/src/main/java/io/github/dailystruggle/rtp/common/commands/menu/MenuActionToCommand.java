@@ -221,6 +221,8 @@ public final class MenuActionToCommand {
             case CACHE_OCCUPANCY           -> "cache";
             case METRIC_SPARKLINE          -> "sparkline";
             case REGION_COMPOSITE          -> "composite";
+            case REGION_WALK_PATH          -> "walk-path";
+            case SELECTION_HEATMAP         -> "heatmap";
         };
     }
 }

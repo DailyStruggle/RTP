@@ -58,14 +58,14 @@ class PrefabIdentityOverlayTest {
         perf.put("loginCacheEnabled", true);
         perf.put("postTeleportQueueing", false);
         perf.put("backlogCacheCap", 1000);
-        t.put("performance", perf);
+        t.put("advanced/performance", perf);
 
         Map<String, Object> region = new LinkedHashMap<>();
         region.put("world", "world");
         region.put("cacheCap", 50);
         region.put("activeChunkCap", 20);
         region.put("shape", "square");
-        t.put("regions/default", region);
+        t.put("definitions/regions/default", region);
 
         return t;
     }

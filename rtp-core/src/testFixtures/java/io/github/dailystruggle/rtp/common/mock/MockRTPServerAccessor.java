@@ -170,7 +170,8 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public RTPCommandSender getSender(UUID uuid) {
-        if (uuid.equals(consolePlayer.uuid())) return consolePlayer;
+        if (uuid == null) return consolePlayer;
+        if (uuid.equals(consolePlayer.uuid()) || uuid.equals(new UUID(0, 0))) return consolePlayer;
         RTPPlayer player = playersById.get(uuid);
         if (player != null) return player;
 
@@ -430,8 +431,72 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     private final List<String> executedCommands = new CopyOnWriteArrayList<>();
 
+    /** Scoreboard tag store keyed by player UUID, maintained from {@code tag add/remove} commands. */
+    private final Map<UUID, Set<String>> scoreboardTags = new ConcurrentHashMap<>();
+
     public List<String> getExecutedCommands() {
         return Collections.unmodifiableList(executedCommands);
+    }
+
+    @Override
+    public Set<String> getScoreboardTags(UUID playerId) {
+        if (playerId == null) return Collections.emptySet();
+        Set<String> tags = scoreboardTags.get(playerId);
+        if (tags == null || tags.isEmpty()) return Collections.emptySet();
+        return Collections.unmodifiableSet(new HashSet<>(tags));
+    }
+
+    /**
+     * Resolves a {@code tag} command target (player name or UUID string) to a UUID for tag tracking.
+     */
+    private UUID resolveTagTarget(String target) {
+        if (target == null || target.isBlank()) return null;
+        RTPPlayer byName = playersByName.get(target);
+        if (byName != null) return byName.uuid();
+        try {
+            return UUID.fromString(target);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    @Override
+    public boolean addScoreboardTag(UUID playerId, String tag) {
+        if (playerId == null || tag == null || tag.isBlank()) return false;
+        executedCommands.add("tag " + playerId + " add " + tag);
+        Set<String> tags = scoreboardTags.computeIfAbsent(playerId, k -> ConcurrentHashMap.newKeySet());
+        return tags.add(tag);
+    }
+
+    @Override
+    public boolean removeScoreboardTag(UUID playerId, String tag) {
+        if (playerId == null || tag == null || tag.isBlank()) return false;
+        executedCommands.add("tag " + playerId + " remove " + tag);
+        Set<String> tags = scoreboardTags.get(playerId);
+        return tags != null && tags.remove(tag);
+    }
+
+    @Override
+    public void ensureScoreboardObjective(String objective, @Nullable String criteria) {
+        if (objective == null || objective.isBlank()) return;
+        String crit = (criteria != null && !criteria.isBlank()) ? criteria : "dummy";
+        executedCommands.add("scoreboard objectives add " + objective + " " + crit);
+    }
+
+    @Override
+    public void setScoreboardScore(UUID playerId, String objective, int score) {
+        if (playerId == null || objective == null || objective.isBlank()) return;
+        executedCommands.add("scoreboard players set " + playerId + " " + objective + " " + score);
+    }
+
+    @Override
+    public void resetScoreboardScore(UUID playerId, @Nullable String objective) {
+        if (playerId == null) return;
+        if (objective != null && !objective.isBlank()) {
+            executedCommands.add("scoreboard players reset " + playerId + " " + objective);
+        } else {
+            executedCommands.add("scoreboard players reset " + playerId);
+        }
     }
 
     @Override
@@ -444,6 +509,22 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
         if (tokens.length == 0) {
             return false;
         }
+
+        // Model vanilla 'tag <target> add|remove <tag>' so gate reciprocity checks observe real state.
+        if (tokens.length >= 4 && tokens[0].equalsIgnoreCase("tag")) {
+            String action = tokens[2].toLowerCase(java.util.Locale.ROOT);
+            if (action.equals("add") || action.equals("remove")) {
+                UUID targetId = resolveTagTarget(tokens[1]);
+                String tag = tokens[3];
+                if (targetId == null || tag == null || tag.isBlank()) return false;
+                Set<String> tags = scoreboardTags.computeIfAbsent(targetId, k -> ConcurrentHashMap.newKeySet());
+                if (action.equals("add")) {
+                    return tags.add(tag);
+                }
+                return tags.remove(tag);
+            }
+        }
+
         String label = tokens[0].toLowerCase(java.util.Locale.ROOT);
         Object cmdObj = registeredCommands.get(label);
         if (cmdObj == null) {
@@ -457,13 +538,21 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
             return false;
         }
 
-        if (cmdObj instanceof TreeCommand tree) {
-            tree.onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+        if (cmdObj instanceof CommandsAPICommand cmd) {
+            java.util.concurrent.CompletableFuture<Boolean> res =
+                cmd.onCommand(senderId, sender::hasPermission, sender::sendMessage, args, 0, null);
             CommandsAPI.execute();
+            if (res != null && res.isDone()) {
+                return Boolean.TRUE.equals(res.getNow(false));
+            }
             return true;
-        } else if (cmdObj instanceof CommandsAPICommand cmd) {
-            cmd.onCommand(senderId, sender::hasPermission, sender::sendMessage, args, 0, null);
+        } else if (cmdObj instanceof TreeCommand tree) {
+            java.util.concurrent.CompletableFuture<Boolean> res =
+                tree.onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
             CommandsAPI.execute();
+            if (res != null && res.isDone()) {
+                return Boolean.TRUE.equals(res.getNow(false));
+            }
             return true;
         }
         return false;
@@ -483,13 +572,20 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     // -------------------------------------------------------------------------
 
     public record SentWorldBorder(
-        UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+        UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds,
+        double damageAmount, double damageBuffer) {
       public SentWorldBorder(UUID playerId, double centerX, double centerZ, double size) {
-        this(playerId, centerX, centerZ, size, size, 0L);
+        this(playerId, centerX, centerZ, size, size, 0L, 0.0, 0.0);
+      }
+      public SentWorldBorder(UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+        this(playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds, 0.0, 0.0);
       }
     }
 
+    public record AppliedDamage(UUID playerId, double amount) {}
+
     private final List<SentWorldBorder> sentWorldBorders = new CopyOnWriteArrayList<>();
+    private final List<AppliedDamage> appliedDamages = new CopyOnWriteArrayList<>();
     private final Set<UUID> resetWorldBorders = ConcurrentHashMap.newKeySet();
 
     @Override
@@ -501,6 +597,29 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     public void sendWorldBorder(
         UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
         sentWorldBorders.add(new SentWorldBorder(playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds));
+    }
+
+    @Override
+    public void sendWorldBorder(
+        UUID playerId,
+        double centerX,
+        double centerZ,
+        double oldSize,
+        double newSize,
+        long shrinkSeconds,
+        double damageAmount,
+        double damageBuffer) {
+        sentWorldBorders.add(new SentWorldBorder(
+            playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds, damageAmount, damageBuffer));
+    }
+
+    @Override
+    public void damagePlayer(UUID playerId, double amount) {
+        appliedDamages.add(new AppliedDamage(playerId, amount));
+    }
+
+    public List<AppliedDamage> getAppliedDamages() {
+        return Collections.unmodifiableList(appliedDamages);
     }
 
     @Override

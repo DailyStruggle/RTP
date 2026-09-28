@@ -482,6 +482,12 @@ final class MenuWiringSupportInstaller {
         }
         final AdminCmd adminCmd = new AdminCmd(rtpRoot, openAdminPanel);
         adminCmd.addSubCommand(new PrefabCommand(adminCmd));
+        adminCmd.addSubCommand(new io.github.dailystruggle.rtp.common.commands.setup.SetupCmd(
+                adminCmd,
+                new io.github.dailystruggle.rtp.common.commands.setup.SetupSessionRegistry(),
+                new io.github.dailystruggle.rtp.common.commands.setup.SetupBookMenuBuilder(),
+                menuRenderer
+        ));
         if (rtpRoot != null) {
             rtpRoot.addSubCommand(adminCmd);
         }

@@ -98,6 +98,15 @@ public final class BacklogLocationBuffer {
 
   private final int capacity;
   private final AtomicReference<BacklogEntry[]> state = new AtomicReference<>(EMPTY);
+  private java.util.Random rng = null;
+
+  public void setRng(java.util.Random rng) {
+    this.rng = rng;
+  }
+
+  protected java.util.Random rng() {
+    return rng != null ? rng : java.util.concurrent.ThreadLocalRandom.current();
+  }
 
   /**
    * Constructs a new buffer with the given maximum capacity.
@@ -178,7 +187,7 @@ public final class BacklogLocationBuffer {
     if (maxN < 0) throw new IllegalArgumentException("maxN must be non-negative: " + maxN);
     if (maxN == 0) return Collections.emptyList();
 
-    java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+    java.util.Random activeRng = rng();
     for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
       BacklogEntry[] curr = state.get();
       if (curr.length == 0) return Collections.emptyList();
@@ -196,7 +205,7 @@ public final class BacklogLocationBuffer {
       int toTake = Math.min(maxN, validatedIndices.size());
       // Fisher-Yates partial shuffle of candidate indices
       for (int i = 0; i < toTake; i++) {
-        int swapIdx = i + rng.nextInt(validatedIndices.size() - i);
+        int swapIdx = i + activeRng.nextInt(validatedIndices.size() - i);
         int temp = validatedIndices.get(i);
         validatedIndices.set(i, validatedIndices.get(swapIdx));
         validatedIndices.set(swapIdx, temp);

@@ -4,7 +4,7 @@ plugins {
 group = 'io.github.dailystruggle'
 // LeafRTPClaimAddon carries its OWN version line, independent of the RTP core
 // version: it ships and updates on its own cadence (mirroring LeafRTPGuiAddon).
-version = '1.0.0'
+version = '1.1.0'
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
@@ -51,6 +51,15 @@ dependencies {
         exclude group: 'de.keyle', module: 'mypet'
         exclude group: 'net.ess3', module: 'EssentialsX'
     }
+
+    testImplementation project(':rtp-api')
+    testImplementation project(':rtp-core')
+    testImplementation testFixtures(project(':rtp-core'))
+    testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation 'com.github.TechFortress:GriefPrevention:16.18.1'
+    testImplementation 'com.github.LlmDl:Towny:0.102.0.13'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 test {

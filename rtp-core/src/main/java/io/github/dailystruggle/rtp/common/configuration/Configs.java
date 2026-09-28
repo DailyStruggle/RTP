@@ -790,6 +790,7 @@ public class Configs {
     if (RTP.actionManager != null) {
       RTP.actionManager.clearDefinitions();
       io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(actions, RTP.actionManager);
+      RTP.actionManager.registerAllCommands();
     }
 
     // ADR-076: region arrival schematics (.schem files, resolved by file presence -

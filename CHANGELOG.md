@@ -25,6 +25,15 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ## [Unreleased]
 
+### Added
+
+- **Claim- and faction-anchored RTP destinations with origin center preservation and cross-region memory ingestion.** Introduces platform-neutral destination anchoring on player claims and faction territory:
+  - *`ClaimBoundary` and `ClaimBoundaryProvider` SPI (`rtp-api`):* Public contracts allowing claim and faction plugins to expose territory boundaries, centroids, and bounding chunk coordinates (`ClaimBoundaryProvider`) registered into `RTPHooks#claimBoundaries()` (`ClaimBoundaryRegistry`) with namespace isolation and priority-based fallback resolution.
+  - *Origin center stability and recomputation cooldown (`ClaimAnchoredRegionTracker` in `rtp-core`):* Preserves the pinned origin $(X_0, Z_0)$ for Archimedean spiral and Hilbert 1D mapping stability as long as the coordinate remains within the claim boundary, and enforces a configurable cooldown on centroid recomputations to eliminate drift churn during minor land transactions.
+  - *Cross-region hazard memory ingestion:* Automatically projects known-bad chunks from overlapping parent/world regions into the destination `SubspaceShape`, preventing cold-start latency.
+  - *Action placement and command integration:* Extends `AnchorSource` (`AnchorSource.claimBoundary(...)`), `SubspaceAnchorResolver`, and `ActionManager` (`anchor: faction`, `anchor: claimboundary`) to automatically resolve the player's boundary from registered providers.
+  - *`LeafRTPClaimAddon` v1.1.0 update:* Bundled claim add-on registers territory boundary providers for Towny Advanced, GriefPrevention, and SaberFactions/FactionsUUID.
+
 ---
 
 ## [3.3.0] - 2026-09-23

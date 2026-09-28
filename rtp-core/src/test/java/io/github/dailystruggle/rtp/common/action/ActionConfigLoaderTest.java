@@ -99,6 +99,34 @@ class ActionConfigLoaderTest {
   }
 
   @Test
+  @DisplayName("ActionConfigLoader parses custom confinement shape and radius")
+  void testParseConfinementShape() throws Exception {
+    String yamlText = """
+        alias: "shaped_duel"
+        placement:
+          region: "pvp_world"
+          shape:
+            name: "SQUARE"
+            radius: 4c
+        confinement:
+          duration: 3m
+          shape:
+            name: "CIRCLE"
+            radius: 5c
+            centerRadius: 1c
+        """;
+
+    RtpYamlConfig yaml = RtpYamlConfig.parse(yamlText);
+    ActionDefinition def = ActionConfigLoader.parseDefinition("shaped_duel", yaml);
+
+    assertEquals(ConfinementBoundary.SHAPE, def.confinement().boundary());
+    assertEquals(180L, def.confinement().durationSeconds());
+    assertEquals("CIRCLE", def.confinement().shapeName());
+    assertEquals(80, def.confinement().radius());
+    assertEquals(16, def.confinement().centerRadius());
+  }
+
+  @Test
   @DisplayName("ActionConfigLoader loads actions from MultiConfigParser")
   void testExtractBundledActions(@TempDir Path tempDir) {
     io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
@@ -122,5 +150,137 @@ class ActionConfigLoaderTest {
     assertTrue(actions.listParsers().contains("CUSTOM_ACTION") || actions.listParsers().contains("custom_action"));
     File customFile = new File(actionsDir, "custom_action.yml");
     assertTrue(customFile.exists(), "custom_action.yml should be created from default.yml template");
+  }
+
+  @Test
+  @DisplayName("ActionConfigLoader handles nulls, empty files, and invalid formats safely")
+  void testParseInvalidAndDefaults() {
+    assertNotNull(ActionConfigLoader.parseDefinition("empty", (io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) null));
+
+    RtpYamlConfig emptyYaml = RtpYamlConfig.parse("");
+    ActionDefinition emptyDef = ActionConfigLoader.parseDefinition("empty", emptyYaml);
+    assertEquals("empty", emptyDef.id());
+    assertEquals(ActionDefinition.PlacementSpec.DEFAULT, emptyDef.placement());
+    assertEquals(ActionDefinition.ConfinementSpec.DEFAULT, emptyDef.confinement());
+
+    // Null and empty loader calls
+    ActionConfigLoader.loadActions((File) null, null);
+    ActionConfigLoader.loadActions((File) null, new ActionManager());
+  }
+
+  @Test
+  @DisplayName("ActionConfigLoader parses gate conditions from ConfigParser")
+  void testParseGatesFromConfigParser(@TempDir Path tempDir) {
+    io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+    MultiConfigParser<ActionKeys> actions =
+        new MultiConfigParser<>(ActionKeys.class, "actions", "1.0", tempDir.toFile(), "definitions/actions", "en");
+
+    io.github.dailystruggle.rtp.common.configuration.ConfigParser<ActionKeys> parser = actions.getParser("default");
+    assertNotNull(parser);
+
+    parser.set(ActionKeys.gate, java.util.List.of(java.util.Map.of("players", ">= 2")));
+
+    ActionDefinition def = ActionConfigLoader.parseDefinition("challenge", parser);
+    assertNotNull(def);
+    assertEquals(1, def.gates().size());
+    assertEquals(">= 2", def.gates().get(0).get("players"));
+  }
+
+  @Test
+  @DisplayName("ActionConfigLoader loads bundled challenge gates from MultiConfigParser")
+  void testBundledChallengeGates(@TempDir Path tempDir) {
+    io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+
+    // Copy shipped challenge.yml into tempDir/definitions/actions/
+    File shippedActions = new File("../rtp-plugin/src/main/resources/definitions/actions");
+    if (!shippedActions.exists()) {
+      shippedActions = new File("rtp-plugin/src/main/resources/definitions/actions");
+    }
+    File targetDir = new File(tempDir.toFile(), "definitions/actions");
+    targetDir.mkdirs();
+    File challengeSrc = new File(shippedActions, "challenge.yml");
+    if (challengeSrc.exists()) {
+      try {
+        java.nio.file.Files.copy(challengeSrc.toPath(), new File(targetDir, "challenge.yml").toPath());
+      } catch (Exception ignored) {
+      }
+    }
+
+    ActionManager manager = new ActionManager();
+    MultiConfigParser<ActionKeys> actions =
+        new MultiConfigParser<>(ActionKeys.class, "actions", "1.0", tempDir.toFile(), "definitions/actions", "en");
+    ActionConfigLoader.loadActions(actions, manager);
+
+    ActionDefinition challenge = manager.getAction("challenge").orElse(null);
+    assertNotNull(challenge, "Challenge action should be loaded");
+    assertFalse(challenge.gates().isEmpty(), "Challenge action should have gate conditions loaded");
+    assertTrue(challenge.gates().size() >= 1, "Challenge action should have at least 1 gate");
+    assertEquals(">= 2", challenge.gates().get(0).get("players"));
+  }
+
+  @Test
+  @DisplayName("ActionConfigLoader parses declarative confinement damage fields")
+  void testParseDeclarativeDamage() {
+    String yamlText = """
+        alias: "damage_arena"
+        confinement:
+          boundary: "LEASH"
+          leashRadius: 48.0
+          duration: "5m"
+          initialSize: 128
+          shrinkTo: 32
+          shrinkOver: "4m"
+          damage: 2.5
+          damageBuffer: 1.0
+          damageInterval: 2s
+        """;
+
+    RtpYamlConfig yaml = RtpYamlConfig.parse(yamlText);
+    ActionDefinition def = ActionConfigLoader.parseDefinition("damage_arena", yaml);
+
+    assertEquals(2.5, def.confinement().damageAmount());
+    assertEquals(1.0, def.confinement().damageBuffer());
+    assertEquals(2L, def.confinement().damageIntervalSeconds());
+  }
+
+  @Test
+  @DisplayName("ActionConfigLoader parses declarative maxDistanceOutside")
+  void testParseMaxDistanceOutside() {
+    String yamlText = """
+        alias: "limit_arena"
+        confinement:
+          boundary: "LEASH"
+          leashRadius: 48.0
+          maxDistanceOutside: 8.5
+        """;
+
+    RtpYamlConfig yaml = RtpYamlConfig.parse(yamlText);
+    ActionDefinition def = ActionConfigLoader.parseDefinition("limit_arena", yaml);
+
+    assertEquals(8.5, def.confinement().maxDistanceOutside());
+  }
+
+  @Test
+  @DisplayName("ActionConfigLoader parses declarative outsideActions")
+  void testParseOutsideActions() {
+    String yamlText = """
+        alias: "actions_arena"
+        confinement:
+          boundary: "SUBSPACE"
+          maxDistanceOutside: 12.0
+          outsideActions:
+            - CONSOLE: "kill [player]"
+            - ACTION: PULL_BACK
+        """;
+
+    RtpYamlConfig yaml = RtpYamlConfig.parse(yamlText);
+    ActionDefinition def = ActionConfigLoader.parseDefinition("actions_arena", yaml);
+
+    assertEquals(12.0, def.confinement().maxDistanceOutside());
+    assertEquals(2, def.confinement().outsideActions().size());
+    assertEquals(ActionDefinition.ActionType.CONSOLE, def.confinement().outsideActions().get(0).type());
+    assertEquals("kill [player]", def.confinement().outsideActions().get(0).payload());
+    assertEquals(ActionDefinition.ActionType.ACTION, def.confinement().outsideActions().get(1).type());
+    assertEquals("PULL_BACK", def.confinement().outsideActions().get(1).payload());
   }
 }

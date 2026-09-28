@@ -6,7 +6,7 @@
 # - If Bob hasn't challenged Alice yet:
 #     1. Tag Alice with rtp_chal_Bob.
 #     2. Send Bob an interactive click prompt: "Alice challenged you! [Click to Accept]".
-#        The click action executes "/challenge Alice" (or "/rtp action challenge Alice").
+#        The click action executes "/rtp action challenge player=Alice" (or "/challenge Alice").
 #     3. Auto-cleans the tag after 30s.
 # - If Bob has already challenged Alice:
 #     1. Gate detects Bob has tag rtp_chal_Alice (mutual reciprocity established!).
@@ -23,40 +23,74 @@ command:
   description: "Challenge a player to a duel, or accept their pending challenge"
   aliases:
     - "duelreq"
+  subcommands:
+    leave:
+      description: "Forfeit the duel by taking your own life"
+      permission: "rtp.command.challenge.leave"
+      aliases:
+        - "surrender"
+        - "forfeit"
+      run:
+        - CONSOLE: "kill [player_name]"
+  parameters:
+    # Optional opponent. Naming a specific player requires the permission below; omitting the
+    # target defaults to "any" (open matchmaking: any two open challengers are paired).
+    - name: "player"
+      type: "player"
+      required: false
+      permission: "rtp.command.challenge.target"
+      default: "any"
 
 placement:
   region: "default"
   anchor: "regionQueue"
+  shape:
+    name: "SQUARE"
+    radius: 4c
+  minSeparation: 24
+  elevationTolerance: 64
 
 confinement:
-  boundary: "REGION"
+  duration: "3m"
+  shape:
+    name: "SQUARE"
+    radius: 5c
+  cancellable: false
+
+gate:
+  - players: ">= 2"
+  # Targeted reciprocity: each side must have challenged the other by name. When a challenger has no
+  # target (open matchmaking), [target_name_N] is unresolved and the missing-target wildcard skips the
+  # reciprocity check, so open challengers pair purely on the players count above.
+  - command:
+      - "execute if entity @a[name=[sender_name_1],tag=rtp_chal_[target_name_1]]"
+      - "execute if entity @a[name=[sender_name_2],tag=rtp_chal_[target_name_2]]"
 
 lifecycle:
-  onStart:
-    # 1. RECIPROCAL MATCH FOUND: Target already challenged Sender!
-    - gate:
-        command: "execute if entity [target][tag=rtp_chal_[sender]]"
-      run:
-        - CONSOLE: "tag [target] remove rtp_chal_[sender]"
-        - CONSOLE: "tag [sender] remove rtp_chal_[target]"
-        - CONSOLE: "tellraw [sender] [\"\",{\"text\":\"Duel accepted! Teleporting to arena...\",\"color\":\"green\"}]"
-        - CONSOLE: "tellraw [target] [\"\",{\"text\":\"Duel accepted! Teleporting to arena...\",\"color\":\"green\"}]"
-        - CONSOLE: "rtp action arena [sender] [target]"
+  onEnqueue:
+    - CONSOLE: "tag [sender_name] add rtp_chal_[target_name]"
+    - MESSAGE: "<gray>Challenge sent to <yellow>[target_name]</yellow>! Waiting for response...</gray>"
+    - MESSAGE: "<gold>[sender_name] has challenged you to a duel! </gold><green><bold><click:run_command:'/rtp action challenge player=[sender_name]'><hover:show_text:'<gray>Click to accept duel with [sender_name]</gray>'>[CLICK TO ACCEPT]</hover></click></bold></green>"
 
-    # 2. FIRST-TIME CHALLENGE: Target hasn't challenged Sender yet.
-    - gate:
-        command: "execute unless entity [target][tag=rtp_chal_[sender]]"
-      run:
-        - CONSOLE: "tag [sender] add rtp_chal_[target]"
-        - CONSOLE: "tellraw [sender] [\"\",{\"text\":\"Challenge sent to \",\"color\":\"gray\"},{\"text\":\"[target]\",\"color\":\"yellow\"},{\"text\":\"!\",\"color\":\"gray\"}]"
-        # Interactive click prompt that calls the exact same symmetrical command back:
-        - CONSOLE: "tellraw [target] [\"\",{\"text\":\"[sender] has challenged you to a duel! \",\"color\":\"gold\"},{\"text\":\"[CLICK TO ACCEPT]\",\"color\":\"green\",\"bold\":true,\"clickEvent\":{\"action\":\"run_command\",\"value\":\"/challenge [sender]\"},\"hoverEvent\":{\"action\":\"show_text\",\"contents\":{\"text\":\"Click to accept duel with [sender]\",\"color\":\"gray\"}}}]"
-    # Auto-cleanup challenge tag after 30 seconds if never accepted
-    - delay: "30s"
-      gate:
-        command: "execute if entity [sender][tag=rtp_chal_[target]]"
-      run:
-        - CONSOLE: "tag [sender] remove rtp_chal_[target]"
-        - CONSOLE: "tellraw [sender] [\"\",{\"text\":\"Your challenge to [target] expired.\",\"color\":\"red\"}]"
+  onStart:
+    - CONSOLE: "tag [sender_name_1] remove rtp_chal_[sender_name_2]"
+    - CONSOLE: "tag [sender_name_2] remove rtp_chal_[sender_name_1]"
+    - FOR_EACH:
+        - MESSAGE: "<green><bold>Duel match started! Prepare to fight!</bold></green>"
+
+  onExpire:
+    - FOR_EACH:
+        - MESSAGE: "<yellow><bold>Duel match ended in a draw! Time expired.</bold></yellow>"
+    - ACTION: "DISARM"
+
+  onDeath:
+    - FOR_EACH:
+        - MESSAGE: "<red>[player_name] was defeated in the duel!</red>"
+    - ACTION: "DISARM"
+
+  onCancel:
+    - CONSOLE: "tag [sender_name] remove rtp_chal_[target_name]"
+    - MESSAGE: "<gray>Challenge to <yellow>[target_name]</yellow> was cancelled.</gray>"
+    - MESSAGE: "<gray>Challenge from <yellow>[sender_name]</yellow> was cancelled.</gray>"
 
 version: "1.0"

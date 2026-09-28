@@ -62,5 +62,124 @@ public class BackCmdTest {
         // When no instance exists, returns 0 safely without NPE
         assertEquals(0L, RTP.getEffectiveLastTeleportTime(id));
         assertEquals(0L, RTP.getEffectiveLastTeleportTime(null));
+
+        RTP.updateSharedLastTeleportTime(null, 1000L);
+        RTP.updateSharedLastTeleportTime(id, 1000L);
+    }
+
+    @Test
+    @DisplayName("RTPAPI.teleport with COORDINATE target teleports locally")
+    void testCoordinateTargetLocalTeleport(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
+        io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
+                io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = accessor.getRTPWorld("world");
+        UUID playerId = UUID.randomUUID();
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+                        playerId, "CoordUser", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
+        accessor.addPlayer(player);
+
+        // Coordinate target on local server
+        RtpTarget target = RtpTarget.coordinate(null, "world", 100, 75, 200);
+        java.util.concurrent.CompletableFuture<io.github.dailystruggle.rtp.api.RTPResult> future =
+                io.github.dailystruggle.rtp.api.RTPAPI.teleport(playerId, target);
+
+        assertNotNull(future);
+        io.github.dailystruggle.rtp.api.RTPResult res = future.join();
+        assertTrue(res.isSuccess(), "Coordinate teleport must succeed: " + res);
+        assertEquals(100, player.getLocation().getBlockX());
+        assertEquals(75, player.getLocation().getBlockY());
+        assertEquals(200, player.getLocation().getBlockZ());
+
+        // Target status check covers getEffectiveLastTeleportTime
+        TeleportData td = new TeleportData();
+        td.time = System.currentTimeMillis();
+        td.completed = true;
+        RTP.getInstance().latestTeleportData.put(playerId, td);
+        assertEquals(td.time, RTP.getEffectiveLastTeleportTime(playerId));
+
+        io.github.dailystruggle.rtp.api.RtpTargetStatus status =
+                io.github.dailystruggle.rtp.api.RTPAPI.getTargetStatus(playerId, RtpTarget.region("default"));
+        assertNotNull(status);
+    }
+
+    @Test
+    @DisplayName("RTPAPI.teleport with remote COORDINATE target routes or rejects")
+    void testCoordinateTargetRemoteRouting(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
+        io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
+                io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = accessor.getRTPWorld("world");
+        UUID playerId = UUID.randomUUID();
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+                        playerId, "RemoteCoordUser", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
+        accessor.addPlayer(player);
+
+        // Without network hook: fails with INVALID_TARGET
+        RtpTarget remoteTarget = RtpTarget.coordinate("remote-node", "world_nether", 50, 70, 50);
+        io.github.dailystruggle.rtp.api.RTPResult res1 = io.github.dailystruggle.rtp.api.RTPAPI.teleport(playerId, remoteTarget).join();
+        assertFalse(res1.isSuccess());
+
+        // With cross-server hook: returns queued
+        RTP.networkCommandHook = (pId, args) ->
+                io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.crossServer(
+                        UUID.randomUUID(), "default", "remote-node");
+        io.github.dailystruggle.rtp.api.RTPResult res2 = io.github.dailystruggle.rtp.api.RTPAPI.teleport(playerId, remoteTarget).join();
+        assertTrue(res2.isQueued());
+
+        // With reject hook: returns failure
+        RTP.networkCommandHook = (pId, args) ->
+                io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.reject("server_full", "Server full");
+        io.github.dailystruggle.rtp.api.RTPResult res3 = io.github.dailystruggle.rtp.api.RTPAPI.teleport(playerId, remoteTarget).join();
+        assertEquals(io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET, res3.reason());
+
+        // With local fallback: returns failure on unexpected routing
+        RTP.networkCommandHook = (pId, args) ->
+                io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.local();
+        io.github.dailystruggle.rtp.api.RTPResult res4 = io.github.dailystruggle.rtp.api.RTPAPI.teleport(playerId, remoteTarget).join();
+        assertEquals(io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET, res4.reason());
+
+        RTP.networkCommandHook = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
+    }
+
+    @Test
+    @DisplayName("BackCmd onCommand handles console, no perm, no back location, and successful back teleport")
+    void testBackCmdExecution(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
+        io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
+                io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = accessor.getRTPWorld("world");
+        BackCmd cmd = new BackCmd(null);
+
+        // 1. Console execution rejected
+        UUID consoleId = UUID.randomUUID();
+        MockRTPCommandSender console = new MockRTPCommandSender(consoleId, "CONSOLE");
+        accessor.addSender(console);
+        assertTrue(cmd.onCommand(consoleId, java.util.Map.of(), null));
+
+        // 2. Player without permission
+        UUID pId = UUID.randomUUID();
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+                        pId, "TestP", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 10, 64, 10));
+        player.setPermission("rtp.back", false);
+        player.setPermission("rtp.*", false);
+        accessor.addPlayer(player);
+        assertTrue(cmd.onCommand(pId, java.util.Map.of(), null));
+
+        // 3. Player with permission but no previous back location
+        player.setPermission("rtp.back", true);
+        assertTrue(cmd.onCommand(pId, java.util.Map.of(), null));
+
+        // 4. Player with back location and cooldown bypass
+        TeleportData td = new TeleportData();
+        td.originalCoords = new RTPCoords("world", 50, 70, 50);
+        td.completed = true;
+        RTP.getInstance().latestTeleportData.put(pId, td);
+
+        assertTrue(cmd.onCommand(pId, java.util.Map.of(), null));
+        // Verify coordinates updated to originalCoords
+        assertEquals(50, player.getLocation().getBlockX());
+        assertEquals(70, player.getLocation().getBlockY());
+        assertEquals(50, player.getLocation().getBlockZ());
     }
 }

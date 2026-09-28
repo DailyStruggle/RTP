@@ -185,6 +185,32 @@ RTPAPI.hooks().platformCreator().bind(new PlatformCreator() {
 
 ---
 
+### 9. Claim boundary provider - `RTPHooks#claimBoundaries()`
+
+| | |
+|---|---|
+| **API symbol** | `io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry` |
+| **Provider type** | `io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider` |
+| **Data model** | `io.github.dailystruggle.rtp.api.claim.ClaimBoundary` |
+| **Behavior modified** | Resolves a player's territory boundary, centroid, and bounding chunk coordinates for claim/faction-anchored destinations (`AnchorSource.claimBoundary(...)`, `anchor: faction` / `anchor: claimboundary`). |
+| **When invoked** | `ActionManager` when resolving action placement anchors; `SubspaceAnchorResolver` when resolving `ClaimBoundaryAnchorSource`. |
+| **Threading** | Queries are invoked during action and anchor resolution; implementations shall be non-blocking and thread-safe (REQ-API-ARCH-001). |
+| **Failure mode** | A throwing provider is logged at WARNING and treated as an empty boundary (fail-safe, REQ-RTP-S-004); exceptions do not crash teleports or other providers. |
+| **Producers (today)** | `addons/LeafRTPClaimAddon` (`TownyBoundaryProvider`, `GriefPreventionBoundaryProvider`, `FactionsBoundaryProvider`). |
+| **REQ / S-rule** | REQ-RTP-S-004, REQ-API-F-003, REQ-API-ARCH-001. |
+
+```java
+RTPAPI.hooks().claimBoundaries().register(new ClaimBoundaryProvider() {
+  @Override public String namespace() { return "myclaims"; }
+  @Override public int priority() { return 10; }
+  @Override public Optional<ClaimBoundary> getBoundary(UUID playerId, String worldName) {
+    return Optional.ofNullable(findBoundary(playerId, worldName));
+  }
+});
+```
+
+---
+
 ## Hooks not (yet) routed through `RTPHooks`
 
 The following sites also accommodate third-party plugins but are **not** routed through `RTPHooks` for the reasons listed. They are documented here for completeness.

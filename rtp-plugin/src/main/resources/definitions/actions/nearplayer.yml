@@ -19,9 +19,9 @@ placement:
   shape:
     name: "CIRCLE"
     radius: 6c                  # footprint half-width in chunks (~96 blocks)
-    centerRadius: 0
+    centerRadius: 1c            # exclusion ring around target entity (~16 blocks)
   minSeparation: 24
-  elevationTolerance: 8
+  elevationTolerance: 256
 
 confinement:
   boundary: "SUBSPACE"
@@ -29,6 +29,6 @@ confinement:
 
 lifecycle:
   onStart:
-    - PLAYER: "msg &aWhoosh! Dropped near a fellow traveler."
+    - CONSOLE: "tellraw [player_name] [\"\",{\"text\":\"Whoosh! Dropped near a fellow traveler.\",\"color\":\"green\"}]"
 
 version: "1.0"

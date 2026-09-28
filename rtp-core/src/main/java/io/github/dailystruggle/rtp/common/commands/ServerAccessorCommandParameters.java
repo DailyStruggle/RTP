@@ -25,10 +25,11 @@ public final class ServerAccessorCommandParameters implements PlatformCommandPar
           RTPPlayer target = RTP.serverAccessor.getPlayer(s);
           if (target == null || !target.name().equalsIgnoreCase(s)) return false;
           RTPCommandSender targetSender = RTP.serverAccessor.getSender(target.uuid());
-          // Console (non-player sender) is exempt from rtp.notme - parity with RTPCmdBukkit.
-          return targetSender == null
-              || !(sender instanceof RTPPlayer)
-              || !targetSender.hasPermission("rtp.notme");
+          // Console (non-player sender) or callers with rtp.* or rtp.notme.bypass are exempt from rtp.notme
+          if (targetSender == null) return true;
+          if (!(sender instanceof RTPPlayer)) return true;
+          if (!targetSender.hasPermission("rtp.notme")) return true;
+          return sender.hasPermission("rtp.*") || sender.hasPermission("rtp.notme.bypass");
         }) {
       @Override
       public Set<String> values() {

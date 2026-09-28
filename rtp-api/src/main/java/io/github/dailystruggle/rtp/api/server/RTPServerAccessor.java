@@ -775,6 +775,69 @@ public interface RTPServerAccessor {
     return false;
   }
 
+  /**
+   * Returns the set of Minecraft scoreboard tags currently applied to the given player.
+   *
+   * <p>Used by declarative action gates to reliably evaluate entity/tag predicates
+   * (e.g. reciprocity checks like {@code execute if entity @a[name=X,tag=Y]}) without
+   * relying on command-dispatch return values, which do not reflect predicate results
+   * on most platforms. Platform adapters back this with the live entity tag set
+   * (e.g. Bukkit {@code Entity#getScoreboardTags()}).
+   *
+   * @param playerId player UUID
+   * @return an unmodifiable set of scoreboard tags; empty if unknown or player offline
+   */
+  default Set<String> getScoreboardTags(UUID playerId) {
+    return java.util.Collections.emptySet();
+  }
+
+  /**
+   * Adds a scoreboard tag to the player.
+   *
+   * @param playerId player UUID
+   * @param tag      the tag to add
+   * @return true if added, false if already present or player offline
+   */
+  default boolean addScoreboardTag(UUID playerId, String tag) {
+    return false;
+  }
+
+  /**
+   * Removes a scoreboard tag from the player.
+   *
+   * @param playerId player UUID
+   * @param tag      the tag to remove
+   * @return true if removed, false if not present or player offline
+   */
+  default boolean removeScoreboardTag(UUID playerId, String tag) {
+    return false;
+  }
+
+  /**
+   * Ensures a scoreboard objective exists.
+   *
+   * @param objective the objective name
+   * @param criteria  the objective criteria (defaults to "dummy" if null)
+   */
+  default void ensureScoreboardObjective(String objective, @Nullable String criteria) {}
+
+  /**
+   * Sets a scoreboard score for the player on a given objective.
+   *
+   * @param playerId  player UUID
+   * @param objective the objective name
+   * @param score     the score value
+   */
+  default void setScoreboardScore(UUID playerId, String objective, int score) {}
+
+  /**
+   * Resets scores for the player on a given objective, or across all objectives if null.
+   *
+   * @param playerId  player UUID
+   * @param objective objective name, or null to reset all
+   */
+  default void resetScoreboardScore(UUID playerId, @Nullable String objective) {}
+
   // ---------------------------------------------------------------------------
   // Per-player WorldBorder packet SPI (ADR-093 confinement visuals)
   // ---------------------------------------------------------------------------
@@ -802,7 +865,39 @@ public interface RTPServerAccessor {
    * @param shrinkSeconds  duration in seconds to transition from oldSize to newSize (0 for instant)
    */
   default void sendWorldBorder(
-      UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {}
+      UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+    sendWorldBorder(playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds, 0.0, 0.0);
+  }
+
+  /**
+   * Sends a clientbound per-player world border packet setting its center, size transition, damage amount, and buffer.
+   *
+   * @param playerId       player UUID to receive the world border
+   * @param centerX        center X coordinate
+   * @param centerZ        center Z coordinate
+   * @param oldSize        starting border diameter (width) in blocks
+   * @param newSize        target border diameter (width) in blocks
+   * @param shrinkSeconds  duration in seconds to transition from oldSize to newSize (0 for instant)
+   * @param damageAmount   damage per block outside buffer
+   * @param damageBuffer   buffer distance in blocks before damage begins
+   */
+  default void sendWorldBorder(
+      UUID playerId,
+      double centerX,
+      double centerZ,
+      double oldSize,
+      double newSize,
+      long shrinkSeconds,
+      double damageAmount,
+      double damageBuffer) {}
+
+  /**
+   * Applies damage to the specified player. Safe across server threads and platform runtimes.
+   *
+   * @param playerId player UUID
+   * @param amount   amount of damage to apply
+   */
+  default void damagePlayer(UUID playerId, double amount) {}
 
   /**
    * Resets the player's clientbound world border to match the world's actual border.

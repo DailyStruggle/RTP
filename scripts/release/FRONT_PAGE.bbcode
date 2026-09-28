@@ -234,6 +234,7 @@ Safety-critical packages inside [I]rtp-core[/I] carry higher floors on top of th
 [LIST]
 [*][B]In-game menus[/B] - two books (Paper / Folia; chat-paginated elsewhere). [I]/rtp menu[/I] is the player side: teleport, or pick a region, world, or biome. [I]/rtp admin[/I] is the operator side: config editor with search, setup prefabs, region and MSPT/heap visualizations, scan control, diagnostics. Gated on [I]rtp.menu.admin[/I]. The book is a read-only UI with the same permission checks as a typed command, so there is no inventory-click exploit surface; a chest-GUI picker ships as a bundled addon for operators who want one.
 [*][B]Regions[/B] - any number per world; shape (Square, Circle, Rectangle, Polygon), radius, center, curve weighting, vertical bounds, world override, permission gate, price. Vertical adjustors (Linear, Jump, Fixed) for sky islands, void worlds, Nether ceilings. [I]worlds.yml[/I] [I]override[/I] redirects a Nether or End [I]/rtp[/I] to a safe world.
+[*][B]Scripted actions & arenas[/B] - multi-player placement, event orchestration, and confinement without custom minigame code. Author duels, battle royales, and parkour in YAML ([I]definitions/actions/<name>.yml[/I]): minimum player spacing, elevation tolerance, moving or static world borders, leash radius, continuous breach verification with damage, and lifecycle triggers ([I]onStart[/I], [I]onBoundaryViolation[/I], [I]onExpire[/I], [I]onDeath[/I]). Vanilla scoreboards ([I]rtp_violations[/I], [I]rtp_time_left[/I], [I]rtp_in_bounds[/I]) are kept updated automatically for command-block or datapack hooks.
 [*][B]Per-player queues[/B] alongside the global queue ([I]rtp.personalqueue[/I]), so one player's bad luck does not starve another's teleport.
 [*][B]Effects engine[/B] - particles, sounds, fireworks, potions, titles on every teleport phase, gated by [I]rtp.effects.<name>[/I]. The Rift addon under [I]addons/[/I] in the repo is a worked example.
 [*][B]Per-region arrival schematics[/B] - drop a Sponge [I].schem[/I] named after a region into [I]plugins/RTP/advanced/schematics/[/I] and every teleport into that region pastes it centered on the landing spot. Decoded in-house, no WorldEdit required, claim-aware.
@@ -278,6 +279,7 @@ Start here: [URL='https://dailystruggle.github.io/RTP/admin/QUICK_START/'][B]Qui
 [TR][TD][I]/rtp world:<world>[/I][/TD][TD]Teleport within a specific world[/TD][TD][I]rtp.world[/I] / [I]rtp.worlds.*[/I][/TD][/TR]
 [TR][TD][I]/rtp player:<name>[/I][/TD][TD]Teleport another player[/TD][TD][I]rtp.other[/I][/TD][/TR]
 [TR][TD][I]/rtp biome:<biome>[/I][/TD][TD]Teleport to a chosen biome[/TD][TD][I]rtp.biome[/I] / [I]rtp.biome.*[/I][/TD][/TR]
+[TR][TD][I]/rtp action:<name> (players)[/I][/TD][TD]Trigger a scripted action or arena[/TD][TD][I]rtp.action[/I] / [I]rtp.action.<name>[/I][/TD][/TR]
 [TR][TD][I]/rtp centerx=<x> centerz=<z> radius=<r>[/I][/TD][TD]Ephemeral per-call overrides[/TD][TD][I]rtp.params[/I][/TD][/TR]
 [TR][TD][I]/rtp menu[/I][/TD][TD]Player book menu[/TD][TD][I]rtp.use[/I][/TD][/TR]
 [TR][TD][I]/rtp admin[/I][/TD][TD]Operator book menu[/TD][TD][I]rtp.menu.admin[/I][/TD][/TR]
@@ -310,6 +312,7 @@ Start here: [URL='https://dailystruggle.github.io/RTP/admin/QUICK_START/'][B]Qui
 [TR][TD][I]economy.yml[/I][/TD][TD]Vault pricing[/TD][TD][I]price[/I], [I]priceOther[/I], [I]biomePrice[/I], [I]balanceFloor[/I], [I]refundOnCancel[/I][/TD][/TR]
 [TR][TD][I]language.yml[/I][/TD][TD]Locale selection[/TD][TD][I]language[/I][/TD][/TR]
 [TR][TD][I]definitions/regions/<name>.yml[/I][/TD][TD]Per-region shape, radius, center, queue, price, gates[/TD][TD][I]shape[/I], [I]vert[/I], [I]radius[/I], [I]cacheCap[/I], [I]price[/I], [I]requirePermission[/I][/TD][/TR]
+[TR][TD][I]definitions/actions/<name>.yml[/I][/TD][TD]Scripted actions & arenas[/TD][TD][I]placement.playerSeparation[/I], [I]confinement.initialSize[/I], [I]confinement.damage[/I], [I]lifecycle[/I][/TD][/TR]
 [TR][TD][I]definitions/worlds/<name>.yml[/I][/TD][TD]Per-world region routing and overrides[/TD][TD][I]region[/I], [I]override[/I], [I]requirePermission[/I][/TD][/TR]
 [TR][TD][I]definitions/effects/<name>.yml[/I][/TD][TD]Lifecycle effects[/TD][TD]per-phase effect definitions[/TD][/TR]
 [TR][TD][I]advanced/database.yml[/I][/TD][TD]SQL / Redis persistence[/TD][TD][I]database.type[/I], connection settings[/TD][/TR]

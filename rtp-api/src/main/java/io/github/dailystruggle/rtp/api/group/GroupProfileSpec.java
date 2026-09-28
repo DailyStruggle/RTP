@@ -19,6 +19,7 @@ public final class GroupProfileSpec {
 
   private final String distribution;
   private final int radius;
+  private final int centerRadius;
   private final int minSeparation;
   private final int elevationTolerance;
   private final int maxGroupSize;
@@ -27,12 +28,14 @@ public final class GroupProfileSpec {
   private GroupProfileSpec(
       String distribution,
       int radius,
+      int centerRadius,
       int minSeparation,
       int elevationTolerance,
       int maxGroupSize,
       int retries) {
     this.distribution = distribution;
     this.radius = radius;
+    this.centerRadius = centerRadius;
     this.minSeparation = minSeparation;
     this.elevationTolerance = elevationTolerance;
     this.maxGroupSize = maxGroupSize;
@@ -56,7 +59,7 @@ public final class GroupProfileSpec {
       int minSeparation,
       int elevationTolerance,
       int maxGroupSize) {
-    return of(distribution, radius, minSeparation, elevationTolerance, maxGroupSize, 1);
+    return of(distribution, radius, 0, minSeparation, elevationTolerance, maxGroupSize, 1);
   }
 
   /**
@@ -78,12 +81,37 @@ public final class GroupProfileSpec {
       int elevationTolerance,
       int maxGroupSize,
       int retries) {
+    return of(distribution, radius, 0, minSeparation, elevationTolerance, maxGroupSize, retries);
+  }
+
+  /**
+   * Builds an inline profile specification with center exclusion radius and bounded retries.
+   *
+   * @param distribution case-insensitive distribution name; must not be {@code null} or blank
+   * @param radius footprint half-width in blocks (clamped to {@code >= 0})
+   * @param centerRadius inner exclusion radius in blocks (clamped to {@code >= 0})
+   * @param minSeparation minimum block distance between participants (clamped to {@code >= 1})
+   * @param elevationTolerance maximum block Y delta between participants (clamped to {@code >= 0})
+   * @param maxGroupSize maximum participant count (clamped to {@code >= 1})
+   * @param retries maximum placement attempts on failure (clamped to {@code >= 1})
+   * @return an immutable profile specification
+   * @throws IllegalArgumentException if {@code distribution} is {@code null} or blank
+   */
+  public static GroupProfileSpec of(
+      String distribution,
+      int radius,
+      int centerRadius,
+      int minSeparation,
+      int elevationTolerance,
+      int maxGroupSize,
+      int retries) {
     if (distribution == null || distribution.isBlank()) {
       throw new IllegalArgumentException("distribution must not be null or blank");
     }
     return new GroupProfileSpec(
         distribution,
         Math.max(0, radius),
+        Math.max(0, centerRadius),
         Math.max(1, minSeparation),
         Math.max(0, elevationTolerance),
         Math.max(1, maxGroupSize),
@@ -102,6 +130,13 @@ public final class GroupProfileSpec {
    */
   public int radius() {
     return radius;
+  }
+
+  /**
+   * @return the inner exclusion radius in blocks
+   */
+  public int centerRadius() {
+    return centerRadius;
   }
 
   /**
@@ -138,6 +173,7 @@ public final class GroupProfileSpec {
     if (!(o instanceof GroupProfileSpec)) return false;
     GroupProfileSpec that = (GroupProfileSpec) o;
     return radius == that.radius
+        && centerRadius == that.centerRadius
         && minSeparation == that.minSeparation
         && elevationTolerance == that.elevationTolerance
         && maxGroupSize == that.maxGroupSize
@@ -149,7 +185,8 @@ public final class GroupProfileSpec {
   public int hashCode() {
     return Objects.hash(
         distribution.toLowerCase(),
-            radius,
+        radius,
+        centerRadius,
         minSeparation,
         elevationTolerance,
         maxGroupSize,
@@ -160,6 +197,7 @@ public final class GroupProfileSpec {
   public String toString() {
     return "GroupProfileSpec[" + distribution
         + ", radius=" + radius
+        + ", centerRadius=" + centerRadius
         + ", minSep=" + minSeparation
         + ", elevTol=" + elevationTolerance
         + ", maxGroup=" + maxGroupSize

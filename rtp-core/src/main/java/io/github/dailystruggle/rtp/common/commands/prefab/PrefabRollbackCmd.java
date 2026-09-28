@@ -83,8 +83,14 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
 
         // Enumerate the file ids the prefab touches: perf overlay + region overlays.
         Set<String> fileIds = new LinkedHashSet<>();
-        if (!prefab.performanceOverlay().isEmpty()) fileIds.add("performance");
-        for (String regionId : prefab.regionOverlays().keySet()) fileIds.add("regions/" + regionId);
+        if (!prefab.performanceOverlay().isEmpty()) {
+            fileIds.add("advanced/performance");
+            fileIds.add("performance");
+        }
+        for (String regionId : prefab.regionOverlays().keySet()) {
+            fileIds.add("definitions/regions/" + regionId);
+            fileIds.add("regions/" + regionId);
+        }
 
         List<String> restored = new ArrayList<>();
         List<String> empty = new ArrayList<>();

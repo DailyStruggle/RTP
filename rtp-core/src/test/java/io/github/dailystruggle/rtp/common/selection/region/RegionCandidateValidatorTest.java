@@ -262,4 +262,172 @@ class RegionCandidateValidatorTest {
         Set<?> unsafe = (Set<?>) mUnsafe.invoke(validator);
         assertNotNull(unsafe);
     }
+
+    @Test
+    @DisplayName("validate falls back from obstructed center column to safe quadrant column")
+    void validateFallbackFromBlockedCenterToSafeQuadrant() {
+        RTPWorld<?> mockWorld = mock(RTPWorld.class);
+        when(mockWorld.name()).thenReturn("world");
+        when(mockWorld.getMinHeight()).thenReturn(-64);
+        when(mockWorld.getMaxHeight()).thenReturn(320);
+
+        RTPChunk<?> mockChunk = mock(RTPChunk.class);
+        when(mockChunk.x()).thenReturn(0);
+        when(mockChunk.z()).thenReturn(0);
+        when(mockChunk.getWorld()).thenReturn((RTPWorld) mockWorld);
+        doReturn(true).when(mockChunk).isSafe(anyInt(), anyInt(), anyInt(), any(Set.class));
+        when(mockWorld.getCachedChunk(anyLong())).thenReturn((RTPChunk) mockChunk);
+
+        // Center column (7, 7) is obstructed (e.g. tree leaves / water / ledge) -> adjustColumn returns null
+        when(mockVert.adjustColumn(any(), eq(7), eq(7))).thenReturn(null);
+
+        // First fallback quadrant column (2, 2) is safe -> returns resolved coords
+        when(mockVert.adjustColumn(any(), eq(2), eq(2))).thenReturn(new RTPCoords("world", 2, 64, 2));
+
+        Region mockRegion = mock(Region.class);
+        doReturn(mockWorld).when(mockRegion).getWorld();
+        doReturn(mockVert).when(mockRegion).getVert();
+
+        RegionCandidateValidator validator = new RegionCandidateValidator(mockRegion);
+        RTPLocation result = validator.validate(7, 7);
+
+        assertNotNull(result);
+        assertEquals(2, result.coords().x());
+        assertEquals(64, result.coords().y());
+        assertEquals(2, result.coords().z());
+    }
+
+    @Test
+    @DisplayName("validate falls back through multiple obstructed quadrants until finding a safe column")
+    void validateFallbackMultipleQuadrants() {
+        RTPWorld<?> mockWorld = mock(RTPWorld.class);
+        when(mockWorld.name()).thenReturn("world");
+        when(mockWorld.getMinHeight()).thenReturn(-64);
+        when(mockWorld.getMaxHeight()).thenReturn(320);
+
+        RTPChunk<?> mockChunk = mock(RTPChunk.class);
+        when(mockChunk.x()).thenReturn(1);
+        when(mockChunk.z()).thenReturn(2);
+        when(mockChunk.getWorld()).thenReturn((RTPWorld) mockWorld);
+        doReturn(true).when(mockChunk).isSafe(anyInt(), anyInt(), anyInt(), any(Set.class));
+        when(mockWorld.getCachedChunk(anyLong())).thenReturn((RTPChunk) mockChunk);
+
+        // Chunk coords cx=1, cz=2 -> world base X=16, Z=32
+        // Test coords are (7,7), (2,2), (12,12), (2,12), (12,2)
+        // (7,7) obstructed
+        when(mockVert.adjustColumn(any(), eq(7), eq(7))).thenReturn(null);
+        // (2,2) obstructed
+        when(mockVert.adjustColumn(any(), eq(2), eq(2))).thenReturn(null);
+        // (12,12) safe
+        when(mockVert.adjustColumn(any(), eq(12), eq(12))).thenReturn(new RTPCoords("world", 16 + 12, 70, 32 + 12));
+
+        Region mockRegion = mock(Region.class);
+        doReturn(mockWorld).when(mockRegion).getWorld();
+        doReturn(mockVert).when(mockRegion).getVert();
+
+        RegionCandidateValidator validator = new RegionCandidateValidator(mockRegion);
+        // Request center column in chunk (1, 2) -> world (16 + 7, 32 + 7) = (23, 39)
+        RTPLocation result = validator.validate(23, 39);
+
+        assertNotNull(result);
+        assertEquals(28, result.coords().x());
+        assertEquals(70, result.coords().y());
+        assertEquals(44, result.coords().z());
+    }
+
+    @Test
+    @DisplayName("validate returns null when nominal and all quadrant columns are obstructed")
+    void validateAllQuadrantsObstructedReturnsNull() {
+        RTPWorld<?> mockWorld = mock(RTPWorld.class);
+        RTPChunk<?> mockChunk = mock(RTPChunk.class);
+        when(mockChunk.x()).thenReturn(0);
+        when(mockChunk.z()).thenReturn(0);
+        when(mockWorld.getCachedChunk(anyLong())).thenReturn((RTPChunk) mockChunk);
+
+        // All columns obstructed
+        when(mockVert.adjustColumn(any(), anyInt(), anyInt())).thenReturn(null);
+
+        Region mockRegion = mock(Region.class);
+        doReturn(mockWorld).when(mockRegion).getWorld();
+        doReturn(mockVert).when(mockRegion).getVert();
+
+        RegionCandidateValidator validator = new RegionCandidateValidator(mockRegion);
+        RTPLocation result = validator.validate(7, 7);
+
+        assertNull(result);
+    }
+
+    @Test
+    @DisplayName("validate falls back to quadrant when center column fails SafetyScan clearance")
+    void validateFallbackWhenCenterFailsSafetyScan() {
+        RTPWorld<?> mockWorld = mock(RTPWorld.class);
+        when(mockWorld.name()).thenReturn("world");
+        when(mockWorld.getMinHeight()).thenReturn(-64);
+        when(mockWorld.getMaxHeight()).thenReturn(320);
+
+        RTPChunk<?> mockChunk = mock(RTPChunk.class);
+        when(mockChunk.x()).thenReturn(0);
+        when(mockChunk.z()).thenReturn(0);
+        when(mockChunk.getWorld()).thenReturn((RTPWorld) mockWorld);
+        when(mockWorld.getCachedChunk(anyLong())).thenReturn((RTPChunk) mockChunk);
+
+        // Center column (7, 7) resolves Y but fails safety (e.g. water / lava)
+        when(mockVert.adjustColumn(any(), eq(7), eq(7))).thenReturn(new RTPCoords("world", 7, 64, 7));
+        doReturn(false).when(mockChunk).isSafe(eq(7), anyInt(), eq(7), any(Set.class));
+
+        // Quadrant column (2, 2) resolves Y and passes safety
+        when(mockVert.adjustColumn(any(), eq(2), eq(2))).thenReturn(new RTPCoords("world", 2, 64, 2));
+        doReturn(true).when(mockChunk).isSafe(eq(2), anyInt(), eq(2), any(Set.class));
+
+        @SuppressWarnings("unchecked")
+        ConfigParser<BlocksKeys> blocksParser = (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+        if (blocksParser != null) {
+            blocksParser.set(BlocksKeys.unsafeBlocks, List.of("WATER", "LAVA"));
+        }
+
+        Region mockRegion = mock(Region.class);
+        doReturn(mockWorld).when(mockRegion).getWorld();
+        doReturn(mockVert).when(mockRegion).getVert();
+
+        RegionCandidateValidator validator = new RegionCandidateValidator(mockRegion);
+        RTPLocation result = validator.validate(7, 7);
+
+        assertNotNull(result);
+        assertEquals(2, result.coords().x());
+        assertEquals(64, result.coords().y());
+        assertEquals(2, result.coords().z());
+    }
+
+    @Test
+    @DisplayName("validateAsync falls back to quadrant column")
+    void validateAsyncFallbackToQuadrant() {
+        RTPWorld<?> mockWorld = mock(RTPWorld.class);
+        when(mockWorld.name()).thenReturn("world");
+        when(mockWorld.getMinHeight()).thenReturn(-64);
+        when(mockWorld.getMaxHeight()).thenReturn(320);
+
+        RTPChunk<?> mockChunk = mock(RTPChunk.class);
+        when(mockChunk.x()).thenReturn(0);
+        when(mockChunk.z()).thenReturn(0);
+        when(mockChunk.getWorld()).thenReturn((RTPWorld) mockWorld);
+        doReturn(true).when(mockChunk).isSafe(anyInt(), anyInt(), anyInt(), any(Set.class));
+        when(mockWorld.getCachedChunk(anyLong())).thenReturn((RTPChunk) mockChunk);
+
+        // Center column (7, 7) obstructed
+        when(mockVert.adjustColumn(any(), eq(7), eq(7))).thenReturn(null);
+        // Quadrant (2, 2) safe
+        when(mockVert.adjustColumn(any(), eq(2), eq(2))).thenReturn(new RTPCoords("world", 2, 64, 2));
+
+        Region mockRegion = mock(Region.class);
+        doReturn(mockWorld).when(mockRegion).getWorld();
+        doReturn(mockVert).when(mockRegion).getVert();
+
+        RegionCandidateValidator validator = new RegionCandidateValidator(mockRegion);
+        RTPLocation result = validator.validateAsync(7, 7).join();
+
+        assertNotNull(result);
+        assertEquals(2, result.coords().x());
+        assertEquals(64, result.coords().y());
+        assertEquals(2, result.coords().z());
+    }
 }
