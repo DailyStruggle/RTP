@@ -443,6 +443,17 @@ if (countdownAddonProject != null) {
     countdownAddonJarProvider = countdownAddonJarTask.flatMap { it.archiveFile }
 }
 
+// Bundled declarative scripted actions addon (LeafRTPActionAddon).
+// Platform-neutral module, plain `jar` (ADR-093, ADR-057). Bundled and self-extracted.
+def actionAddonProject = findProject(':addons:LeafRTPActionAddon')
+def actionAddonJarTask = null
+def actionAddonJarProvider = null
+if (actionAddonProject != null) {
+    evaluationDependsOn(':addons:LeafRTPActionAddon')
+    actionAddonJarTask = actionAddonProject.tasks.named('jar')
+    actionAddonJarProvider = actionAddonJarTask.flatMap { it.archiveFile }
+}
+
 // Appends `srcJar` into `out` (a built RTP jar) as `bundled-addons/<destName>`,
 // keeping it whole. Idempotent: skips if the entry already exists. Used from the
 // remap doLasts so the nested jar lands in the final artifact (shadow strips it).
@@ -1070,6 +1081,11 @@ remapJar {
         // Append the bundled reference/event-hook demo addon jar the same way.
         if (countdownAddonJarFile != null) {
             injectAddonFn(remapJar.archiveFile.get().asFile, countdownAddonJarFile, 'LeafRTPCountdownAddon.jar')
+        }
+        // Append the bundled action addon jar the same way.
+        def actionAddonJarFile = actionAddonJarProvider != null ? actionAddonJarProvider.get().asFile : null
+        if (actionAddonJarFile != null) {
+            injectAddonFn(remapJar.archiveFile.get().asFile, actionAddonJarFile, 'LeafRTPActionAddon.jar')
         }
     }
 }

@@ -1,0 +1,98 @@
+# --- actions/challenge.yml ---
+# Symmetrical Mutual Challenge Reciprocity (ADR-093).
+# Single command (/challenge <target>) handles both issuing challenges and accepting them.
+#
+# When Alice runs /challenge Bob:
+# - If Bob hasn't challenged Alice yet:
+#     1. Tag Alice with rtp_chal_Bob.
+#     2. Send Bob an interactive click prompt: "Alice challenged you! [Click to Accept]".
+#        The click action executes "/rtp action challenge player=Alice" (or "/challenge Alice").
+#     3. Auto-cleans the tag after 30s.
+# - If Bob has already challenged Alice:
+#     1. Gate detects Bob has tag rtp_chal_Alice (mutual reciprocity established!).
+#     2. Remove challenge tags from both players.
+#     3. Trigger the duel match with Alice and Bob.
+
+alias: "challenge"
+permission: "rtp.action.challenge"
+description: "Symmetrical duel challenge with clickable chat reciprocity."
+icon: "DIAMOND_SWORD"
+title: "&c&l1v1 Duel Challenge"
+
+command:
+  name: "challenge"
+  permission: "rtp.command.challenge"
+  description: "Challenge a player to a duel, or accept their pending challenge"
+  aliases:
+    - "duelreq"
+  subcommands:
+    leave:
+      description: "Forfeit the duel by taking your own life"
+      permission: "rtp.command.challenge.leave"
+      aliases:
+        - "surrender"
+        - "forfeit"
+      run:
+        - CONSOLE: "kill [player_name]"
+  parameters:
+    # Optional opponent. Naming a specific player requires the permission below; omitting the
+    # target defaults to "any" (open matchmaking: any two open challengers are paired).
+    - name: "player"
+      type: "player"
+      required: false
+      permission: "rtp.command.challenge.target"
+      default: "any"
+
+placement:
+  region: "default"
+  anchor: "regionQueue"
+  shape:
+    name: "SQUARE"
+    radius: 4c
+  minSeparation: 24
+  elevationTolerance: 64
+
+confinement:
+  duration: "3m"
+  shape:
+    name: "SQUARE"
+    radius: 5c
+  cancellable: false
+
+gate:
+  - players: ">= 2"
+  # Targeted reciprocity: each side must have challenged the other by name. When a challenger has no
+  # target (open matchmaking), [target_name_N] is unresolved and the missing-target wildcard skips the
+  # reciprocity check, so open challengers pair purely on the players count above.
+  - command:
+      - "execute if entity @a[name=[sender_name_1],tag=rtp_chal_[target_name_1]]"
+      - "execute if entity @a[name=[sender_name_2],tag=rtp_chal_[target_name_2]]"
+
+lifecycle:
+  onEnqueue:
+    - CONSOLE: "tag [sender_name] add rtp_chal_[target_name]"
+    - MESSAGE: "<gray>Challenge sent to <yellow>[target_name]</yellow>! Waiting for response...</gray>"
+    - MESSAGE: "<gold>[sender_name] has challenged you to a duel! </gold><green><bold><click:run_command:'/rtp action challenge player=[sender_name]'><hover:show_text:'<gray>Click to accept duel with [sender_name]</gray>'>[CLICK TO ACCEPT]</hover></click></bold></green>"
+
+  onStart:
+    - CONSOLE: "tag [sender_name_1] remove rtp_chal_[sender_name_2]"
+    - CONSOLE: "tag [sender_name_2] remove rtp_chal_[sender_name_1]"
+    - FOR_EACH:
+        - MESSAGE: "<green><bold>Duel match started! Prepare to fight!</bold></green>"
+
+  onExpire:
+    - FOR_EACH:
+        - MESSAGE: "<yellow><bold>Duel match ended in a draw! Time expired.</bold></yellow>"
+    - ACTION: "DISARM"
+
+  onDeath:
+    - FOR_EACH:
+        - MESSAGE: "<red>[player_name] was defeated in the duel!</red>"
+    - ACTION: "DISARM"
+
+  onCancel:
+    - CONSOLE: "tag [sender_name] remove rtp_chal_[target_name]"
+    - MESSAGE: "<gray>Challenge to <yellow>[target_name]</yellow> was cancelled.</gray>"
+    - MESSAGE: "<gray>Challenge from <yellow>[sender_name]</yellow> was cancelled.</gray>"
+
+version: "1.0"

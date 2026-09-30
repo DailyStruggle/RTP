@@ -15,6 +15,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Configuration write / `/rtp config` save path (atomic rename, audit, rollback) | [`../architecture/11-configuration-write-and-persist.md`](../architecture/11-configuration-write-and-persist.md) |
 | Network model diagrams (multi-server / multi-proxy topology, `/rtp` sequence, reservation-token state machine) | [`../architecture/12-network-model.md`](../architecture/12-network-model.md) |
 | Dual-layer shape architecture, spatial memory & L3 backlog selection diagrams | [`../architecture/13-dual-layer-shape-architecture-and-l3-selection.md`](../architecture/13-dual-layer-shape-architecture-and-l3-selection.md) |
+| Action Engine & subspace placement diagrams (anchors, multi-slot separation, confinement) | [`../architecture/14-group-placement-anchor-flow.md`](../architecture/14-group-placement-anchor-flow.md) ([ADR-093](../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement.md), [ADR-095](../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives.md)) |
 | `/rtp config` command semantics + save mechanics (target spec) | [`CONFIG_COMMAND_SPEC.md`](CONFIG_COMMAND_SPEC.md) ([ADR-037](../adr/ADR-037-harden-rtp-config-commands.md) decision, [ADR-041](../adr/ADR-041-config-command-and-save-implementation.md) implementation) |
 | What absolute rules apply? | [`REQUIREMENTS.md section 3`](REQUIREMENTS.md#3-prohibition-requirements) (S-001 … S-007) |
 | Where does my code go? | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
@@ -43,7 +44,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Semantic Versioning (SemVer) contract (public vs internal API) | [`SEMVER.md`](SEMVER.md) |
 | Licensing clarity & Pro/Lite edition split | [`LICENSING.md`](LICENSING.md) |
 | Deprecation and API evolution policy | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) |
-| Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) ([CONFIGURATION.md](../admin/configuration/CONFIGURATION.md), [REGIONS.md](../admin/configuration/REGIONS.md), [CORE_CONFIG.md](../admin/configuration/CORE_CONFIG.md), [PERFORMANCE.md](../admin/configuration/PERFORMANCE.md), [ECONOMY.md](../admin/configuration/ECONOMY.md), [SAFETY.md](../admin/configuration/SAFETY.md)) |
+| Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) ([CONFIGURATION.md](../admin/configuration/CONFIGURATION.md), [REGIONS.md](../admin/configuration/REGIONS.md), [CORE_CONFIG.md](../admin/configuration/CORE_CONFIG.md), [PERFORMANCE.md](../admin/configuration/PERFORMANCE.md), [ECONOMY.md](../admin/configuration/ECONOMY.md), [SAFETY.md](../admin/configuration/SAFETY.md), [ACTIONS.md](../admin/ACTIONS.md)) |
 | Addon author docs | [`../FOR_ADDON_DEVELOPERS.md`](../FOR_ADDON_DEVELOPERS.md) |
 | Build a destination menu / GUI on `rtp-api` | [`ADDON_MENUS.md`](ADDON_MENUS.md) |
 | Offer remote (network-mode) destinations from an addon | [`ADDON_CROSS_SERVER.md`](ADDON_CROSS_SERVER.md) |

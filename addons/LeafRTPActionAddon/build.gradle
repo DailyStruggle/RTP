@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+}
+group = 'io.github.dailystruggle'
+version = '1.0.0'
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+base {
+    archivesName = 'LeafRTPActionAddon'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Platform-agnostic addon: compiles against rtp-api, rtp-core, and commands-api.
+    // No org.bukkit.* / spigot-api, so the produced jar is discoverable via
+    // ServiceLoader on every RTP platform (Paper, Folia, Fabric, NeoForge).
+    compileOnly project(':rtp-api')
+    compileOnly project(':rtp-core')
+    compileOnly project(':commands-api')
+
+    testImplementation project(':rtp-api')
+    testImplementation project(':rtp-core')
+    testImplementation testFixtures(project(':rtp-core'))
+    testImplementation project(':commands-api')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}

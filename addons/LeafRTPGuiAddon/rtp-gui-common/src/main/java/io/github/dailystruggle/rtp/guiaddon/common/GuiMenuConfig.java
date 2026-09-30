@@ -22,10 +22,11 @@ public final class GuiMenuConfig {
   /** Shared instance; all reads are live against the registered parser. */
   public static final GuiMenuConfig INSTANCE = new GuiMenuConfig();
 
-  private GuiMenuConfig() {}
+  GuiMenuConfig() {}
 
   @SuppressWarnings("unchecked")
   private ConfigParser<GuiMenuKeys> parser() {
+    if (RTP.configs == null) return null;
     return (ConfigParser<GuiMenuKeys>) RTP.configs.getParser(GuiMenuKeys.class);
   }
 
@@ -113,6 +114,54 @@ public final class GuiMenuConfig {
 
   public boolean showDashboard() {
     return bool(GuiMenuKeys.showDashboard, true);
+  }
+
+  public boolean showActions() {
+    return bool(GuiMenuKeys.showActions, true);
+  }
+
+  public String titleActionsMenu() {
+    return str(GuiMenuKeys.titleActionsMenu, "&6&lSpecial Teleports");
+  }
+
+  public String titleActionsSelector() {
+    return str(GuiMenuKeys.titleActionsSelector, "&6&lSpecial Teleports...");
+  }
+
+  public String iconActionsSelector() {
+    return str(GuiMenuKeys.iconActionsSelector, "NETHERITE_SWORD");
+  }
+
+  public String iconActionDefault() {
+    return str(GuiMenuKeys.iconActionDefault, "DIAMOND_SWORD");
+  }
+
+  public boolean groupBiomesIntoSubmenu() {
+    return bool(GuiMenuKeys.groupBiomesIntoSubmenu, true);
+  }
+
+  public String titleBiomeMenu() {
+    return str(GuiMenuKeys.titleBiomeMenu, "&1&lSelect Biome");
+  }
+
+  public String titleBiomeSelector() {
+    return str(GuiMenuKeys.titleBiomeSelector, "&a&lSelect Biome...");
+  }
+
+  public String iconBiomeSelector() {
+    return str(GuiMenuKeys.iconBiomeSelector, "OAK_SAPLING");
+  }
+
+  public String iconPreviousPage() {
+    return str(GuiMenuKeys.iconPreviousPage, "ARROW");
+  }
+
+  public String iconNextPage() {
+    return str(GuiMenuKeys.iconNextPage, "ARROW");
+  }
+
+  public String iconBackToMainMenu() {
+    return str(GuiMenuKeys.iconBackToMainMenu, "BARRIER");
   }
 
   public String dashboardIconName() {
@@ -216,8 +265,22 @@ public final class GuiMenuConfig {
       return envBlock;
     }
     switch (kind) {
-      case WORLD:
+      case WORLD: {
+        // If environment was advertised/resolved, use environment block (e.g. GRASS_BLOCK / NETHERRACK / END_STONE)
+        if (envBlock != null) return envBlock;
+        if (target != null && target.name() != null) {
+          String wName = target.name().toUpperCase(java.util.Locale.ROOT);
+          if (wName.contains("NETHER")) return "NETHERRACK";
+          if (wName.contains("END")) return "END_STONE";
+        }
         return str(GuiMenuKeys.iconWorld, "GRASS_BLOCK");
+      }
+      case BIOME: {
+        String biomeOverride = biomeIconOverride(target);
+        if (biomeOverride != null) return biomeOverride;
+        String mappedBiome = defaultBiomeIcon(target != null ? target.name() : null);
+        return str(GuiMenuKeys.iconBiome, mappedBiome != null ? mappedBiome : "OAK_SAPLING");
+      }
       case REGION:
         // Default to the most common overworld surface block (grass) rather than a
         // FILLED_MAP, which does not render in a vanilla client without a mod.
@@ -228,6 +291,71 @@ public final class GuiMenuConfig {
       default:
         return str(GuiMenuKeys.iconDefault, "COMPASS");
     }
+  }
+
+  /**
+   * Resolves the operator-configured per-biome icon override for {@code target}, if any.
+   *
+   * @param target the target
+   * @return material name override, or {@code null}
+   */
+  public String biomeIconOverride(RtpTarget target) {
+    if (target == null || target.name() == null) return null;
+    ConfigParser<GuiMenuKeys> p = parser();
+    if (p == null) return null;
+    java.util.Map<String, Object> overrides = p.getMap(GuiMenuKeys.biomeIcons);
+    if (overrides == null || overrides.isEmpty()) return null;
+    for (java.util.Map.Entry<String, Object> entry : overrides.entrySet()) {
+      if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(target.name())) {
+        if (entry.getValue() != null) {
+          String s = String.valueOf(entry.getValue()).trim();
+          if (!s.isEmpty()) return s;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Default representative icons for vanilla and custom biomes (Saplings / Sand / Snow / etc.).
+   */
+  public static String defaultBiomeIcon(String biomeName) {
+    if (biomeName == null) return "OAK_SAPLING";
+    String upper = biomeName.toUpperCase(java.util.Locale.ROOT);
+    if (upper.contains("DESERT") || upper.contains("BEACH") || upper.contains("BADLANDS")) {
+      return "SAND";
+    }
+    if (upper.contains("SNOW") || upper.contains("ICE") || upper.contains("FROZEN") || upper.contains("GROVE")) {
+      return "SNOW_BLOCK";
+    }
+    if (upper.contains("NETHER") || upper.contains("CRIMSON") || upper.contains("WARPED") || upper.contains("SOUL")) {
+      return "NETHERRACK";
+    }
+    if (upper.contains("END")) {
+      return "END_STONE";
+    }
+    if (upper.contains("JUNGLE")) {
+      return "JUNGLE_SAPLING";
+    }
+    if (upper.contains("SPRUCE") || upper.contains("TAIGA")) {
+      return "SPRUCE_SAPLING";
+    }
+    if (upper.contains("BIRCH")) {
+      return "BIRCH_SAPLING";
+    }
+    if (upper.contains("CHERRY")) {
+      return "CHERRY_SAPLING";
+    }
+    if (upper.contains("DARK_OAK")) {
+      return "DARK_OAK_SAPLING";
+    }
+    if (upper.contains("SWAMP") || upper.contains("MANGROVE")) {
+      return "LILY_PAD";
+    }
+    if (upper.contains("OCEAN") || upper.contains("RIVER")) {
+      return "WATER_BUCKET";
+    }
+    return "OAK_SAPLING";
   }
 
   /**

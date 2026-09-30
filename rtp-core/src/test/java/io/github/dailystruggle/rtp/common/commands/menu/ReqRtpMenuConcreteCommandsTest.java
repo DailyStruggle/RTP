@@ -444,6 +444,85 @@ class ReqRtpMenuConcreteCommandsTest {
         }
     }
 
+    @Nested
+    @DisplayName("VisualizationHeatmap (/rtp visualization heatmap region=<name>)")
+    class VisualizationHeatmap {
+
+        @Test
+        @DisplayName("`heatmap` registers as a child of `/rtp visualization`")
+        void heatmapRegistered() {
+            Fixture f = Fixture.withAllPermissions();
+
+            CommandsAPICommand visualization =
+                    f.root.getCommandLookup().get("VISUALIZATION");
+            assertNotNull(visualization, "/rtp visualization must be registered");
+            Map<String, CommandsAPICommand> children =
+                    ((TreeCommand) visualization).getCommandLookup();
+            assertNotNull(children, "visualization children lookup");
+            assertTrue(children.containsKey("HEATMAP"),
+                    "/rtp visualization heatmap must be registered");
+
+            CommandsAPICommand leaf = children.get("HEATMAP");
+            assertEquals("heatmap", leaf.name());
+            assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                    leaf.permission(),
+                    "heatmap gates on rtp.menu.admin");
+        }
+
+        @Test
+        @DisplayName("`heatmap` declares a typed `region` parameter")
+        void heatmapDeclaresRegionParameter() {
+            Fixture f = Fixture.withAllPermissions();
+
+            TreeCommand leaf = (TreeCommand)
+                    ((TreeCommand) f.root.getCommandLookup().get("VISUALIZATION"))
+                            .getCommandLookup().get("HEATMAP");
+            assertNotNull(leaf.getParameterLookup(), "parameter lookup");
+            assertTrue(leaf.getParameterLookup().containsKey(
+                            MenuConcreteCommandLeaves.PARAM_REGION.toLowerCase()),
+                    "heatmap exposes the `region` parameter");
+        }
+
+        @Test
+        @DisplayName("`heatmap` without region= falls through to the selector")
+        void heatmapWithoutRegionOpensSelector() {
+            Fixture f = Fixture.withAllPermissions();
+
+            CommandsAPICommand leaf =
+                    ((TreeCommand) f.root.getCommandLookup().get("VISUALIZATION"))
+                            .getCommandLookup().get("HEATMAP");
+            UUID viewer = UUID.randomUUID();
+            boolean ok = leaf.onCommand(viewer, new HashMap<>(), null,
+                    (Consumer<String>) f.messages::add);
+
+            assertTrue(ok, "missing region= must open the selector, not reject");
+            assertNotNull(f.rendered.get(), "selector must be rendered");
+            assertEquals("visualization-regions[SELECTION_HEATMAP]",
+                    f.rendered.get().title(),
+                    "bare heatmap opens its kind-scoped region picker");
+        }
+
+        @Test
+        @DisplayName("`heatmap region=<name>` rejects without rtp.menu.admin (S-004)")
+        void heatmapRejectsWithoutAdminPermission() {
+            Fixture f = Fixture.withAdminPermission(false);
+
+            CommandsAPICommand leaf =
+                    ((TreeCommand) f.root.getCommandLookup().get("VISUALIZATION"))
+                            .getCommandLookup().get("HEATMAP");
+            UUID viewer = UUID.randomUUID();
+            Map<String, List<String>> params = new HashMap<>();
+            params.put(MenuConcreteCommandLeaves.PARAM_REGION, List.of("default"));
+            boolean ok = leaf.onCommand(viewer, params, null,
+                    (Consumer<String>) f.messages::add);
+
+            assertFalse(ok,
+                    "missing rtp.menu.admin must reject region-targeted drill-down");
+            assertFalse(f.messages.isEmpty(),
+                    "configurable rejection message must surface (REQ-RTP-F-013)");
+        }
+    }
+
     // ------------------------------------------------------------------------
     // Fixture
     // ------------------------------------------------------------------------

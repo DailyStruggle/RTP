@@ -115,7 +115,10 @@ class SampleActionPlacementChartTest {
 
   private static File shippedResourcesDir() {
     File[] candidates = {
-      new File("../rtp-plugin/src/main/resources"), new File("rtp-plugin/src/main/resources"),
+      new File("../addons/LeafRTPActionAddon/src/main/resources"),
+      new File("addons/LeafRTPActionAddon/src/main/resources"),
+      new File("../rtp-plugin/src/main/resources"),
+      new File("rtp-plugin/src/main/resources"),
     };
     for (File c : candidates) {
       if (new File(c, "definitions/actions").isDirectory()) {

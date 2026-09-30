@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.action.ActionManager;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -17,7 +19,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -124,5 +128,141 @@ class PhysicalTriggerManagerTest {
     UUID otherPlayer = UUID.randomUUID();
     RTPAPI.playerMoveEvents.fire(new PlayerMoveEvent(otherPlayer, "nether", 0, 64, 0, 11, 65, 11));
     assertEquals(1, actionTriggers.get());
+  }
+
+  @Test
+  @DisplayName("Batch trigger accumulates occupants and dispatches wave on interval expiry")
+  void testBatchTriggerWaveAccumulation() {
+    RTPWorld<?> world = serverAccessor.getRTPWorld("world");
+    UUID p1 = UUID.randomUUID();
+    UUID p2 = UUID.randomUUID();
+    MockRTPPlayer player1 = new MockRTPPlayer(p1, "PlayerOne", new RTPLocation(world, 10, 64, 10));
+    MockRTPPlayer player2 = new MockRTPPlayer(p2, "PlayerTwo", new RTPLocation(world, 11, 65, 11));
+    serverAccessor.addPlayer(player1);
+    serverAccessor.addPlayer(player2);
+
+    java.util.concurrent.atomic.AtomicReference<List<UUID>> dispatchedGroup = new java.util.concurrent.atomic.AtomicReference<>();
+
+    RTPAPI.actionService = new io.github.dailystruggle.rtp.api.action.ActionService() {
+      @Override
+      public java.util.concurrent.CompletableFuture<io.github.dailystruggle.rtp.api.action.ActionSessionResult> trigger(
+          String actionId, List<UUID> participants, ActionContext context) {
+        if ("wave_action".equalsIgnoreCase(actionId)) {
+          dispatchedGroup.set(participants);
+        }
+        return java.util.concurrent.CompletableFuture.completedFuture(
+            io.github.dailystruggle.rtp.api.action.ActionSessionResult.success(UUID.randomUUID()));
+      }
+
+      @Override
+      public java.util.Optional<io.github.dailystruggle.rtp.api.action.ActionSession> getSession(UUID sessionId) {
+        return java.util.Optional.empty();
+      }
+
+      @Override
+      public java.util.Optional<io.github.dailystruggle.rtp.api.action.ActionSession> getSessionForParticipant(UUID participantId) {
+        return java.util.Optional.empty();
+      }
+
+      @Override
+      public void disarm(UUID sessionId) {}
+
+      @Override
+      public void registerPredicate(String name, java.util.function.Predicate<io.github.dailystruggle.rtp.api.action.ActionGateContext> predicate) {}
+
+      @Override
+      public java.util.Set<String> getActionIds() {
+        return java.util.Set.of("wave_action");
+      }
+    };
+
+    // Trigger with 3-second batch interval
+    PhysicalTriggerSpec batchTrigger = new PhysicalTriggerSpec(
+        "lobby_zone", PhysicalTriggerSpec.TriggerType.STEP_IN,
+        "world", 10, 64, 10, 12, 66, 12, "wave_action", 5L, 3L);
+    triggerManager.registerTrigger(batchTrigger);
+
+    assertEquals(3L, triggerManager.getWaveRemainingSeconds("lobby_zone"));
+    assertEquals(0, triggerManager.getOccupants("lobby_zone").size());
+
+    // Player 1 steps into trigger zone
+    RTPAPI.playerMoveEvents.fire(new PlayerMoveEvent(p1, "world", 0, 64, 0, 10, 64, 10));
+    assertEquals(1, triggerManager.getOccupants("lobby_zone").size());
+    assertTrue(triggerManager.getOccupants("lobby_zone").contains(p1));
+    assertNull(dispatchedGroup.get(), "Batch trigger should not dispatch immediately");
+
+    // Player 2 steps into trigger zone
+    RTPAPI.playerMoveEvents.fire(new PlayerMoveEvent(p2, "world", 0, 64, 0, 11, 65, 11));
+    assertEquals(2, triggerManager.getOccupants("lobby_zone").size());
+    assertTrue(triggerManager.getOccupants("lobby_zone").contains(p2));
+
+    // Tick 1 (remaining: 2)
+    triggerManager.tickWaveAccumulator();
+    assertEquals(2L, triggerManager.getWaveRemainingSeconds("lobby_zone"));
+    assertNull(dispatchedGroup.get());
+
+    // Tick 2 (remaining: 1)
+    triggerManager.tickWaveAccumulator();
+    assertEquals(1L, triggerManager.getWaveRemainingSeconds("lobby_zone"));
+    assertNull(dispatchedGroup.get());
+
+    // Tick 3 (interval expired: dispatch wave!)
+    triggerManager.tickWaveAccumulator();
+    assertNotNull(dispatchedGroup.get(), "Wave should dispatch when countdown reaches zero");
+    assertEquals(2, dispatchedGroup.get().size());
+    assertTrue(dispatchedGroup.get().contains(p1));
+    assertTrue(dispatchedGroup.get().contains(p2));
+    assertEquals(0, triggerManager.getOccupants("lobby_zone").size());
+    assertEquals(3L, triggerManager.getWaveRemainingSeconds("lobby_zone"));
+  }
+
+  @Test
+  @DisplayName("Batch trigger wave dispatch integrates with ActionManager and handles result ingestion")
+  void testWaveDispatchActionManagerResultIngestion() {
+    ActionManager actionManager = new ActionManager();
+    RTP.actionManager = actionManager;
+
+    RTPWorld<?> world = serverAccessor.getRTPWorld("world");
+    UUID p1 = UUID.randomUUID();
+    UUID p2 = UUID.randomUUID();
+    MockRTPPlayer player1 = new MockRTPPlayer(p1, "PlayerOne", new RTPLocation(world, 10, 64, 10));
+    MockRTPPlayer player2 = new MockRTPPlayer(p2, "PlayerTwo", new RTPLocation(world, 11, 65, 11));
+    serverAccessor.addPlayer(player1);
+    serverAccessor.addPlayer(player2);
+
+    io.github.dailystruggle.rtp.api.action.ActionDefinition def =
+        new io.github.dailystruggle.rtp.api.action.ActionDefinition(
+            "wave_real_action", "wave_real_action", "rtp.action.wave_real_action", "Wave Action",
+            io.github.dailystruggle.rtp.api.action.ActionDefinition.PlacementSpec.DEFAULT,
+            io.github.dailystruggle.rtp.api.action.ActionDefinition.ConfinementSpec.DEFAULT,
+            io.github.dailystruggle.rtp.api.action.ActionDefinition.LifecycleSpec.EMPTY);
+    actionManager.registerAction(def);
+
+    RTP.groupPlacementService = request -> CompletableFuture.completedFuture(
+        io.github.dailystruggle.rtp.api.group.GroupPlacementResult.success(Map.of(
+            p1, new RTPLocation(world, 200, 64, 200),
+            p2, new RTPLocation(world, 205, 64, 200)
+        )));
+
+    PhysicalTriggerSpec trigger = new PhysicalTriggerSpec(
+        "real_lobby", PhysicalTriggerSpec.TriggerType.STEP_IN,
+        "world", 10, 64, 10, 12, 66, 12, "wave_real_action", 5L, 1L);
+    triggerManager.registerTrigger(trigger);
+
+    // Both players step in
+    RTPAPI.playerMoveEvents.fire(new PlayerMoveEvent(p1, "world", 0, 64, 0, 10, 64, 10));
+    RTPAPI.playerMoveEvents.fire(new PlayerMoveEvent(p2, "world", 0, 64, 0, 11, 65, 11));
+    assertEquals(2, triggerManager.getOccupants("real_lobby").size());
+
+    // Tick to expire countdown
+    triggerManager.tickWaveAccumulator();
+
+    // Verify session was created and both players are in session
+    assertTrue(actionManager.getSessionForParticipant(p1).isPresent());
+    assertTrue(actionManager.getSessionForParticipant(p2).isPresent());
+    assertEquals(
+        actionManager.getSessionForParticipant(p1).get().sessionId(),
+        actionManager.getSessionForParticipant(p2).get().sessionId()
+    );
   }
 }

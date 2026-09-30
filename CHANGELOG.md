@@ -27,6 +27,14 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ### Added
 
+- **Foreign configuration and permission migration seam (ADR-066).** Adds automated, non-destructive migration commands and parsers for operators transitioning from competing random teleport plugins:
+  - *`ForeignConfigImporter` SPI and registry in `rtp-core`:* Automated one-shot migration seam reading competitor YAML configs directly off disk with zero plugin dependencies or platform coupling.
+  - *Competitor importers:* Ships built-in importers for `BetterRTP` (`BetterRtpConfigImporter`), `JustRTP` (`JustRtpConfigImporter`), `EzRTP` (`EzRtpConfigImporter`), and `JakesRTP` (`JakesRtpConfigImporter`), cleanly converting world/region boundaries, shapes, coordinates, cooldowns, delays, economy prices, and Gaussian/Normal distributions.
+  - *Database & effect profile translation:* Automatically mirrors MySQL/PostgreSQL/SQLite connection blocks into `advanced/database.yml`, and maps competitor titles, sounds, and arrival potion buffs into declarative effect profiles (`definitions/effects/imported_*`).
+  - *Spatial zone & lobby trigger translation:* Converts JustRTP spatial zones (`rtp_zones.yml`) into native LeafRTP declarative action trigger definitions (`definitions/actions/zone_*.yml`).
+  - *Non-destructive permission migration:* Introduces `PermissionMigrationService` and `/rtp config import permissions` to map competitor permission nodes into LeafRTP equivalents with context preservation.
+  - *Command surface (`/rtp config import [source] [confirm]`):* Supports auto-detection across `plugins/` directories, dry-run previews by default, and safe backup-protected writes.
+
 - **Claim- and faction-anchored RTP destinations with origin center preservation and cross-region memory ingestion.** Introduces platform-neutral destination anchoring on player claims and faction territory:
   - *`ClaimBoundary` and `ClaimBoundaryProvider` SPI (`rtp-api`):* Public contracts allowing claim and faction plugins to expose territory boundaries, centroids, and bounding chunk coordinates (`ClaimBoundaryProvider`) registered into `RTPHooks#claimBoundaries()` (`ClaimBoundaryRegistry`) with namespace isolation and priority-based fallback resolution.
   - *Origin center stability and recomputation cooldown (`ClaimAnchoredRegionTracker` in `rtp-core`):* Preserves the pinned origin $(X_0, Z_0)$ for Archimedean spiral and Hilbert 1D mapping stability as long as the coordinate remains within the claim boundary, and enforces a configurable cooldown on centroid recomputations to eliminate drift churn during minor land transactions.

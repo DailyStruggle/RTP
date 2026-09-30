@@ -1,0 +1,299 @@
+package io.github.dailystruggle.rtp.common.permission;
+
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.CoreCommandTreeBuilder;
+import io.github.dailystruggle.rtp.common.commands.config.ConfigImportPermissionsCmd;
+import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
+import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@DisplayName("PermissionMigrationTest - Phase 5 Parity & Bridging")
+public class PermissionMigrationTest {
+
+    private Path tempDir;
+    private PermissionMigrationService service;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        tempDir = Files.createTempDirectory("rtp-perm-test");
+        service = new PermissionMigrationService();
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (tempDir != null) {
+            try {
+                Files.walk(tempDir)
+                        .sorted(Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(File::delete);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("5.1 & 5.2 - Configurable command templates loaded and substituted properly")
+    void testCommandTemplatesSubstitution() {
+        service.setGroupSetTemplate("pex group [group] add [permission] [contexts]");
+        service.setUserSetTemplate("pex user [user] add [permission] [contexts]");
+
+        String groupCmd = service.formatGroupSet("vip", "rtp.use", true, null);
+        assertEquals("pex group vip add rtp.use", groupCmd);
+
+        String userCmd = service.formatUserSet("Steve", "rtp.world", true, "server=survival");
+        assertEquals("pex user Steve add rtp.world server=survival", userCmd);
+
+        // Default LuckPerms templates
+        service.setGroupSetTemplate(PermissionMigrationService.DEFAULT_GROUP_SET_TEMPLATE);
+        service.setUserSetTemplate(PermissionMigrationService.DEFAULT_USER_SET_TEMPLATE);
+
+        assertEquals("lp group default permission set rtp.use true",
+                service.formatGroupSet("default", "rtp.use", true, null));
+        assertEquals("lp user Alex permission set rtp.use true world=world_nether",
+                service.formatUserSet("Alex", "rtp.use", true, "world=world_nether"));
+    }
+
+    @Test
+    @DisplayName("5.1 - Load templates from integrations.yml")
+    void testLoadTemplatesFromYaml() throws IOException {
+        Path integrations = tempDir.resolve("integrations.yml");
+        String yamlContent = """
+                permissions:
+                  command_templates:
+                    group_set: "custom perm group [group] set [permission] [value] [contexts]"
+                    user_set: "custom perm user [user] set [permission] [value] [contexts]"
+                """;
+        Files.writeString(integrations, yamlContent);
+
+        // Mock RTP serverAccessor directory
+        RTPServerAccessor mockAccessor = new MockRTPServerAccessor(tempDir.toFile());
+        RTP.serverAccessor = mockAccessor;
+
+        service.loadTemplatesFromConfig();
+
+        assertEquals("custom perm group [group] set [permission] [value] [contexts]", service.getGroupSetTemplate());
+        assertEquals("custom perm user [user] set [permission] [value] [contexts]", service.getUserSetTemplate());
+    }
+
+    @Test
+    @DisplayName("5.2 - BetterRTP equivalence mapping table")
+    void testBetterRtpEquivalenceMapping() {
+        assertEquals(List.of("rtp.*"), service.mapPermission("betterrtp.*"));
+        assertEquals(List.of("rtp.use"), service.mapPermission("betterrtp.use"));
+        assertEquals(List.of("rtp.world"), service.mapPermission("betterrtp.world"));
+        assertEquals(List.of("rtp.worlds.world_nether"), service.mapPermission("betterrtp.world.world_nether"));
+        assertEquals(List.of("rtp.worlds.*"), service.mapPermission("betterrtp.world.*"));
+        assertEquals(List.of("rtp.noCooldown"), service.mapPermission("betterrtp.bypass.cooldown"));
+        assertEquals(List.of("rtp.noDelay"), service.mapPermission("betterrtp.bypass.delay"));
+        assertEquals(List.of("rtp.free"), service.mapPermission("betterrtp.bypass.economy"));
+        assertEquals(List.of("rtp.free"), service.mapPermission("betterrtp.bypass.hunger"));
+        assertEquals(List.of("rtp.other"), service.mapPermission("betterrtp.player"));
+        assertEquals(List.of("rtp.biome.*"), service.mapPermission("betterrtp.biome"));
+        assertEquals(List.of("rtp.biome.plains"), service.mapPermission("betterrtp.biome.plains"));
+        assertEquals(List.of("rtp.reload"), service.mapPermission("betterrtp.reload"));
+        assertEquals(List.of("rtp.admin"), service.mapPermission("betterrtp.admin"));
+    }
+
+    @Test
+    @DisplayName("5.2 - JustRTP equivalence mapping table")
+    void testJustRtpEquivalenceMapping() {
+        assertEquals(List.of("rtp.*"), service.mapPermission("justrtp.*"));
+        assertEquals(List.of("rtp.use"), service.mapPermission("justrtp.use"));
+        assertEquals(List.of("rtp.use"), service.mapPermission("justrtp.rtp"));
+        assertEquals(List.of("rtp.world"), service.mapPermission("justrtp.world"));
+        assertEquals(List.of("rtp.worlds.custom_world"), service.mapPermission("justrtp.world.custom_world"));
+        assertEquals(List.of("rtp.worlds.*"), service.mapPermission("justrtp.world.*"));
+        assertEquals(List.of("rtp.biome"), service.mapPermission("justrtp.biome"));
+        assertEquals(List.of("rtp.biome.desert"), service.mapPermission("justrtp.biome.desert"));
+        assertEquals(List.of("rtp.biome.*"), service.mapPermission("justrtp.biome.*"));
+        assertEquals(List.of("rtp.noCooldown"), service.mapPermission("justrtp.bypass.cooldown"));
+        assertEquals(List.of("rtp.noCooldown"), service.mapPermission("justrtp.nocooldown"));
+        assertEquals(List.of("rtp.noDelay"), service.mapPermission("justrtp.bypass.delay"));
+        assertEquals(List.of("rtp.noDelay"), service.mapPermission("justrtp.nodelay"));
+        assertEquals(List.of("rtp.free"), service.mapPermission("justrtp.bypass.cost"));
+        assertEquals(List.of("rtp.free"), service.mapPermission("justrtp.free"));
+        assertEquals(List.of("rtp.other"), service.mapPermission("justrtp.other"));
+        assertEquals(List.of("rtp.admin"), service.mapPermission("justrtp.admin"));
+        assertEquals(List.of("rtp.reload"), service.mapPermission("justrtp.reload"));
+    }
+
+    @Test
+    @DisplayName("5.2 - EzRTP equivalence mapping table")
+    void testEzRtpEquivalenceMapping() {
+        assertEquals(List.of("rtp.*"), service.mapPermission("ezrtp.*"));
+        assertEquals(List.of("rtp.use"), service.mapPermission("ezrtp.use"));
+        assertEquals(List.of("rtp.use"), service.mapPermission("ezrtp.rtp"));
+        assertEquals(List.of("rtp.world"), service.mapPermission("ezrtp.world"));
+        assertEquals(List.of("rtp.worlds.survival"), service.mapPermission("ezrtp.world.survival"));
+        assertEquals(List.of("rtp.worlds.*"), service.mapPermission("ezrtp.world.*"));
+        assertEquals(List.of("rtp.noCooldown"), service.mapPermission("ezrtp.bypass.cooldown"));
+        assertEquals(List.of("rtp.noCooldown"), service.mapPermission("ezrtp.cooldown.bypass"));
+        assertEquals(List.of("rtp.noDelay"), service.mapPermission("ezrtp.bypass.delay"));
+        assertEquals(List.of("rtp.noDelay"), service.mapPermission("ezrtp.delay.bypass"));
+        assertEquals(List.of("rtp.free"), service.mapPermission("ezrtp.bypass.cost"));
+        assertEquals(List.of("rtp.free"), service.mapPermission("ezrtp.cost.bypass"));
+        assertEquals(List.of("rtp.other"), service.mapPermission("ezrtp.other"));
+        assertEquals(List.of("rtp.admin"), service.mapPermission("ezrtp.admin"));
+        assertEquals(List.of("rtp.reload"), service.mapPermission("ezrtp.reload"));
+    }
+
+    @Test
+    @DisplayName("5.2 - JakesRTP equivalence mapping table")
+    void testJakesRtpEquivalenceMapping() {
+        assertEquals(List.of("rtp.*"), service.mapPermission("jakesrtp.*"));
+        assertEquals(List.of("rtp.use"), service.mapPermission("jakesrtp.use"));
+        assertEquals(List.of("rtp.use"), service.mapPermission("jakesrtp.usebyname"));
+        assertEquals(List.of("rtp.noCooldown"), service.mapPermission("jakesrtp.nocooldown"));
+        assertEquals(List.of("rtp.noDelay"), service.mapPermission("jakesrtp.nowarmup"));
+        assertEquals(List.of("rtp.other"), service.mapPermission("jakesrtp.others"));
+        assertEquals(List.of("rtp.other"), service.mapPermission("jakesrtp.forcertp"));
+        assertEquals(List.of("rtp.onEvent.respawn"), service.mapPermission("jakesrtp.rtpondeath"));
+        assertEquals(List.of("rtp.admin"), service.mapPermission("jakesrtp.admin"));
+        assertEquals(List.of("rtp.admin"), service.mapPermission("jakesrtp.permpack.admin"));
+        assertEquals(List.of("rtp.reload"), service.mapPermission("jakesrtp.reload"));
+        assertEquals(List.of("rtp.regions.default-settings"), service.mapPermission("jakesrtp.use.default-settings"));
+        assertEquals(List.of("rtp.noCooldown"), service.mapPermission("jakesrtp.nocooldown.default-settings"));
+        assertEquals(List.of("rtp.noDelay"), service.mapPermission("jakesrtp.nowarmup.default-settings"));
+    }
+
+    @Test
+    @DisplayName("5.2 - Non-destructive append-only logic never unsets competitor nodes and preserves contexts")
+    void testNonDestructiveAppendOnly() {
+        List<PermissionMigrationService.ParsedNode> parsedNodes = List.of(
+                new PermissionMigrationService.ParsedNode("betterrtp.use", true, ""),
+                new PermissionMigrationService.ParsedNode("betterrtp.bypass.cooldown", true, "server=survival"),
+                new PermissionMigrationService.ParsedNode("justrtp.world.nether", true, "world=world_nether server=survival")
+        );
+
+        PermissionMigrationService.MigrationPlan plan = service.planMigration(
+                "group", "members", parsedNodes, null, false);
+
+        assertFalse(plan.isApplied());
+        assertEquals(3, plan.getMappedEntries().size());
+
+        // Verify none of the generated commands unset or revoke competitor permissions
+        for (String cmd : plan.getGeneratedCommands()) {
+            assertFalse(cmd.contains("unset"), "Append-only migration must never unset nodes: " + cmd);
+            assertTrue(cmd.contains("set"), "Migration commands should be set commands: " + cmd);
+            assertTrue(cmd.startsWith("lp group members permission set rtp."), "Commands should target rtp node: " + cmd);
+        }
+
+        // Verify context preservation in generated commands
+        assertTrue(plan.getGeneratedCommands().stream().anyMatch(c -> c.contains("rtp.noCooldown true server=survival")));
+        assertTrue(plan.getGeneratedCommands().stream().anyMatch(c -> c.contains("rtp.worlds.nether true world=world_nether server=survival")));
+
+        // Verify mapped nodes
+        List<String> mappedTargets = plan.getMappedEntries().stream()
+                .map(PermissionMigrationService.PermissionEntry::getTargetPermission)
+                .toList();
+        assertTrue(mappedTargets.contains("rtp.use"));
+        assertTrue(mappedTargets.contains("rtp.noCooldown"));
+        assertTrue(mappedTargets.contains("rtp.worlds.nether"));
+    }
+
+    @Test
+    @DisplayName("5.2 - String parsing group list and permission info output from provider")
+    void testStringParsingProviderOutputs() {
+        // Test parsing group list output
+        List<String> groupLines = List.of(
+                "[LP] Groups:",
+                "- default",
+                "- vip (weight: 10)",
+                "- moderator",
+                "- admin"
+        );
+        List<String> groups = service.parseGroupListOutput(groupLines);
+        assertEquals(List.of("default", "vip", "moderator", "admin"), groups);
+
+        // Test parsing comma-separated group list
+        List<String> commaLines = List.of("Groups: default, vip, admin");
+        assertEquals(List.of("default", "vip", "admin"), service.parseGroupListOutput(commaLines));
+
+        // Test parsing permission info output with contexts
+        List<String> infoLines = List.of(
+                "[LP] default's Permissions:",
+                "> betterrtp.use (true)",
+                "> betterrtp.world.nether (true) (world=nether, server=survival)",
+                "> betterrtp.bypass.cooldown (false) [server=lobby]"
+        );
+        List<PermissionMigrationService.ParsedNode> nodes = service.parsePermissionInfoOutput(infoLines);
+        assertEquals(3, nodes.size());
+
+        assertEquals("betterrtp.use", nodes.get(0).getPermission());
+        assertTrue(nodes.get(0).getValue());
+        assertEquals("", nodes.get(0).getContexts());
+
+        assertEquals("betterrtp.world.nether", nodes.get(1).getPermission());
+        assertTrue(nodes.get(1).getValue());
+        assertEquals("world=nether server=survival", nodes.get(1).getContexts());
+
+        assertEquals("betterrtp.bypass.cooldown", nodes.get(2).getPermission());
+        assertFalse(nodes.get(2).getValue());
+        assertEquals("server=lobby", nodes.get(2).getContexts());
+    }
+
+    @Test
+    @DisplayName("5.3 - ConfigImportPermissionsCmd command execution (dry-run and apply)")
+    void testConfigImportPermissionsCommand() {
+        List<String> dispatchedCommands = new ArrayList<>();
+        MockRTPServerAccessor accessor = new MockRTPServerAccessor(tempDir.toFile()) {
+            @Override
+            public boolean executeCommand(UUID senderId, String commandLine) {
+                dispatchedCommands.add(commandLine);
+                return true;
+            }
+        };
+        RTP.serverAccessor = accessor;
+
+        ConfigImportPermissionsCmd cmd = new ConfigImportPermissionsCmd(null);
+
+        // Dry-run execution
+        Map<String, List<String>> dryRunParams = new HashMap<>();
+        dryRunParams.put("apply", List.of("false"));
+        boolean dryRunResult = cmd.onCommand(RTPAPI.serverId, dryRunParams, null);
+        assertTrue(dryRunResult);
+        assertEquals(0, dispatchedCommands.size(), "Dry-run should not dispatch commands");
+
+        // Apply execution
+        Map<String, List<String>> applyParams = new HashMap<>();
+        applyParams.put("apply", List.of("true"));
+        boolean applyResult = cmd.onCommand(RTPAPI.serverId, applyParams, null);
+        assertTrue(applyResult);
+        assertEquals(1, dispatchedCommands.size(), "Apply should dispatch provider group discovery command");
+        assertEquals("lp listgroups", dispatchedCommands.get(0));
+    }
+
+    @Test
+    @DisplayName("5.3 - PermCmd is not registered in CoreCommandTreeBuilder")
+    void testPermCmdTreeRegistration() {
+        StubRoot root = new StubRoot();
+        CoreCommandTreeBuilder.attachCommonSubcommands(root);
+        assertNull(root.getCommandLookup().get("PERM"));
+    }
+
+    private static final class StubRoot extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+        StubRoot() {
+            super(null);
+        }
+        @Override public String name() { return "rtp"; }
+        @Override public String permission() { return "rtp.use"; }
+        @Override public String description() { return "test root"; }
+        @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
+            return true;
+        }
+    }
+}

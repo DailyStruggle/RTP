@@ -66,11 +66,6 @@ public final class CoreCommandTreeBuilder {
     root.addSubCommand(versionCmd);
     root.getCommandLookup().put(VersionCmd.ALIAS.toUpperCase(Locale.ROOT), versionCmd);
     root.addSubCommand(new ClearCmd(root));
-    io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd actionSubCmd =
-        new io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd(root);
-    root.addSubCommand(actionSubCmd);
-    root.getCommandLookup().put("RUN", actionSubCmd);
-    root.getCommandLookup().put("TRIGGER", actionSubCmd);
   }
 
   /**

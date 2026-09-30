@@ -19,6 +19,8 @@ public final class RtpTarget {
     REGION,
     /** Resolve to the target region of a world; {@link #name()} is the world name. */
     WORLD,
+    /** Resolve to a specific biome within the default or target region; {@link #name()} is the biome name. */
+    BIOME,
     /**
      * Resolve to a region advertised by a peer backend across the network.
      * Dispatched across the cross-server wait queue.
@@ -27,7 +29,12 @@ public final class RtpTarget {
     /**
      * Resolve to an exact coordinate on a local or remote server (e.g. for {@code /rtp back}).
      */
-    COORDINATE
+    COORDINATE,
+    /**
+     * UI or navigation action (e.g. sub-menu transitions, pagination).
+     * Handled by menu/UI layers rather than dispatching a teleport.
+     */
+    ACTION
   }
 
   private static final RtpTarget DEFAULT = new RtpTarget(Kind.DEFAULT, null, null, null, 0, 0, 0);
@@ -126,6 +133,20 @@ public final class RtpTarget {
   }
 
   /**
+   * Target a specific biome.
+   *
+   * @param biomeName the biome name; must not be {@code null} or blank
+   * @return a biome-kind target
+   * @throws IllegalArgumentException if {@code biomeName} is {@code null} or blank
+   */
+  public static RtpTarget biome(String biomeName) {
+    if (biomeName == null || biomeName.isBlank()) {
+      throw new IllegalArgumentException("biomeName must not be null or blank");
+    }
+    return new RtpTarget(Kind.BIOME, biomeName, null);
+  }
+
+  /**
    * Target an exact coordinate on a local or remote server.
    *
    * @param serverId destination backend network id (nullable/empty for local)
@@ -141,6 +162,19 @@ public final class RtpTarget {
     }
     String sId = (serverId == null || serverId.isBlank()) ? null : serverId;
     return new RtpTarget(Kind.COORDINATE, worldName + ":" + x + "," + y + "," + z, sId, worldName, x, y, z);
+  }
+
+  /**
+   * Action target for UI navigation or custom actions.
+   *
+   * @param action the action identifier; must not be {@code null} or blank
+   * @return an action-kind target
+   */
+  public static RtpTarget action(String action) {
+    if (action == null || action.isBlank()) {
+      throw new IllegalArgumentException("action must not be null or blank");
+    }
+    return new RtpTarget(Kind.ACTION, action, null);
   }
 
   /**

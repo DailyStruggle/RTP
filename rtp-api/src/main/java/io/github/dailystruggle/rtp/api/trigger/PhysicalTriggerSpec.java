@@ -7,17 +7,18 @@ import java.util.Objects;
 /**
  * Immutable specification for physical world triggers (ADR-093).
  *
- * @param id              unique trigger identifier
- * @param type            trigger type (PORTAL, PRESSURE_PLATE, STEP_IN)
- * @param worldName       world name
- * @param minX            min X block coordinate
- * @param minY            min Y block coordinate
- * @param minZ            min Z block coordinate
- * @param maxX            max X block coordinate
- * @param maxY            max Y block coordinate
- * @param maxZ            max Z block coordinate
- * @param actionId        target action identifier to execute upon entry
- * @param cooldownSeconds per-player trigger cooldown in seconds
+ * @param id                   unique trigger identifier
+ * @param type                 trigger type (PORTAL, PRESSURE_PLATE, STEP_IN)
+ * @param worldName            world name
+ * @param minX                 min X block coordinate
+ * @param minY                 min Y block coordinate
+ * @param minZ                 min Z block coordinate
+ * @param maxX                 max X block coordinate
+ * @param maxY                 max Y block coordinate
+ * @param maxZ                 max Z block coordinate
+ * @param actionId             target action identifier to execute upon entry
+ * @param cooldownSeconds      per-player trigger cooldown in seconds
+ * @param batchIntervalSeconds interval in seconds for batch wave accumulation (0 for instant trigger)
  */
 @PublicApi
 public record PhysicalTriggerSpec(
@@ -31,7 +32,23 @@ public record PhysicalTriggerSpec(
     int maxY,
     int maxZ,
     String actionId,
-    long cooldownSeconds) {
+    long cooldownSeconds,
+    long batchIntervalSeconds) {
+
+  public PhysicalTriggerSpec(
+      String id,
+      TriggerType type,
+      String worldName,
+      int minX,
+      int minY,
+      int minZ,
+      int maxX,
+      int maxY,
+      int maxZ,
+      String actionId,
+      long cooldownSeconds) {
+    this(id, type, worldName, minX, minY, minZ, maxX, maxY, maxZ, actionId, cooldownSeconds, 0L);
+  }
 
   public PhysicalTriggerSpec {
     Objects.requireNonNull(id, "id must not be null");
@@ -48,6 +65,7 @@ public record PhysicalTriggerSpec(
       int t = minZ; minZ = maxZ; maxZ = t;
     }
     cooldownSeconds = Math.max(0L, cooldownSeconds);
+    batchIntervalSeconds = Math.max(0L, batchIntervalSeconds);
   }
 
   public enum TriggerType {

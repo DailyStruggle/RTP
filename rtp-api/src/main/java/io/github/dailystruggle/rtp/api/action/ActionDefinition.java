@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.api.action;
 
 import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+import io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -20,7 +21,10 @@ public record ActionDefinition(
     ConfinementSpec confinement,
     LifecycleSpec lifecycle,
     CommandSpec command,
-    List<Map<String, Object>> gates) {
+    List<Map<String, Object>> gates,
+    List<PhysicalTriggerSpec> triggers,
+    String icon,
+    String title) {
 
   public ActionDefinition(
       String id,
@@ -30,7 +34,7 @@ public record ActionDefinition(
       PlacementSpec placement,
       ConfinementSpec confinement,
       LifecycleSpec lifecycle) {
-    this(id, alias, permission, description, placement, confinement, lifecycle, CommandSpec.EMPTY, Collections.emptyList());
+    this(id, alias, permission, description, placement, confinement, lifecycle, CommandSpec.EMPTY, Collections.emptyList(), Collections.emptyList(), null, null);
   }
 
   public ActionDefinition(
@@ -42,7 +46,7 @@ public record ActionDefinition(
       ConfinementSpec confinement,
       LifecycleSpec lifecycle,
       CommandSpec command) {
-    this(id, alias, permission, description, placement, confinement, lifecycle, command, Collections.emptyList());
+    this(id, alias, permission, description, placement, confinement, lifecycle, command, Collections.emptyList(), Collections.emptyList(), null, null);
   }
 
   public ActionDefinition(
@@ -56,7 +60,34 @@ public record ActionDefinition(
       CommandSpec command,
       Map<String, Object> gateConfig) {
     this(id, alias, permission, description, placement, confinement, lifecycle, command,
-        (gateConfig == null || gateConfig.isEmpty()) ? Collections.emptyList() : List.of(gateConfig));
+        (gateConfig == null || gateConfig.isEmpty()) ? Collections.emptyList() : List.of(gateConfig), Collections.emptyList(), null, null);
+  }
+
+  public ActionDefinition(
+      String id,
+      String alias,
+      String permission,
+      String description,
+      PlacementSpec placement,
+      ConfinementSpec confinement,
+      LifecycleSpec lifecycle,
+      CommandSpec command,
+      List<Map<String, Object>> gates) {
+    this(id, alias, permission, description, placement, confinement, lifecycle, command, gates, Collections.emptyList(), null, null);
+  }
+
+  public ActionDefinition(
+      String id,
+      String alias,
+      String permission,
+      String description,
+      PlacementSpec placement,
+      ConfinementSpec confinement,
+      LifecycleSpec lifecycle,
+      CommandSpec command,
+      List<Map<String, Object>> gates,
+      List<PhysicalTriggerSpec> triggers) {
+    this(id, alias, permission, description, placement, confinement, lifecycle, command, gates, triggers, null, null);
   }
 
   public ActionDefinition {
@@ -66,6 +97,49 @@ public record ActionDefinition(
     lifecycle = (lifecycle == null) ? LifecycleSpec.EMPTY : lifecycle;
     command = (command == null) ? CommandSpec.EMPTY : command;
     gates = (gates == null) ? Collections.emptyList() : List.copyOf(gates);
+    triggers = (triggers == null) ? Collections.emptyList() : List.copyOf(triggers);
+    icon = (icon != null && !icon.isBlank()) ? icon.trim() : null;
+    title = (title != null && !title.isBlank()) ? title.trim() : null;
+  }
+
+  /**
+   * Returns whether this action is eligible to appear in the interactive GUI destination menu.
+   *
+   * <p>Actions are omitted if:
+   * <ul>
+   *   <li>They require external location inputs (e.g. {@code anchor: "fixed"} or {@code "location"}
+   *       without static {@code anchorX} and {@code anchorZ} coordinates);</li>
+   *   <li>They declare required {@code COORDINATE} parameters without default values;</li>
+   *   <li>They declare other required command parameters without default values;</li>
+   *   <li>Their placement is explicitly disabled.</li>
+   * </ul>
+   */
+  public boolean isGuiEligible() {
+    if (!placement.enabled()) {
+      return false;
+    }
+    // Check anchor requirements
+    Object rawAnchor = placement.parameters().get("anchor");
+    String anchor = (rawAnchor == null) ? "regionqueue" : rawAnchor.toString().trim().toLowerCase(java.util.Locale.ROOT);
+    if ("fixed".equals(anchor) || "location".equals(anchor) || "landmark".equals(anchor)) {
+      Object x = placement.parameters().get("anchorX");
+      Object z = placement.parameters().get("anchorZ");
+      if (x == null || z == null) {
+        return false; // requires external location input!
+      }
+    }
+    // Check command parameters for un-defaulted required inputs or location coordinate inputs
+    if (command != null && command.parameters() != null) {
+      for (ParameterSpec param : command.parameters()) {
+        if (param.type() == ParameterType.COORDINATE && !param.hasDefault()) {
+          return false; // requires coordinate input!
+        }
+        if (param.required() && !param.hasDefault()) {
+          return false; // requires manual argument input!
+        }
+      }
+    }
+    return true;
   }
 
   /**

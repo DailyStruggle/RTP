@@ -28,6 +28,30 @@ public enum GuiMenuKeys {
   menuFiller,
   /** When true, show a server-health (TPS / MSPT / players) tile. */
   showDashboard,
+  /** When true, show special scripted actions hub in GUI if action service is loaded. */
+  showActions,
+  /** Title for the actions sub-menu. Supports '&amp;' color codes. */
+  titleActionsMenu,
+  /** Display title for the action selector button on the main menu. */
+  titleActionsSelector,
+  /** Icon material name for the action selector button on the main menu. */
+  iconActionsSelector,
+  /** Fallback icon material name for actions without an explicit icon. */
+  iconActionDefault,
+  /** When true, groups biomes into a dedicated paginated sub-menu from the main menu. */
+  groupBiomesIntoSubmenu,
+  /** Title for the biomes sub-menu. Supports '&amp;' color codes. */
+  titleBiomeMenu,
+  /** Display title for the biome selector button on the main menu. */
+  titleBiomeSelector,
+  /** Icon material name for the biome selector button on the main menu. */
+  iconBiomeSelector,
+  /** Icon material name for previous page button in paginated menus. */
+  iconPreviousPage,
+  /** Icon material name for next page button in paginated menus. */
+  iconNextPage,
+  /** Icon material name for back to main menu button in sub-menus. */
+  iconBackToMainMenu,
 
   /** Icon material name for the default-region target. */
   iconDefault,
@@ -35,6 +59,8 @@ public enum GuiMenuKeys {
   iconWorld,
   /** Icon material name for a named-region target. */
   iconRegion,
+  /** Icon material name for a biome target. */
+  iconBiome,
   /** Icon material name for a cross-server (network/peer) region target. */
   iconNetwork,
   /**
@@ -45,6 +71,11 @@ public enum GuiMenuKeys {
    * ({@link #iconRegion} / {@link #iconWorld} / {@link #iconNetwork}).
    */
   regionIcons,
+  /**
+   * Per-biome icon override map: a YAML mapping from a biome name (case-insensitive)
+   * to a material name.
+   */
+  biomeIcons,
   /**
    * Consumer-side environment-to-block translation map: a YAML mapping from a
    * world environment string (e.g. {@code NORMAL}, {@code NETHER},

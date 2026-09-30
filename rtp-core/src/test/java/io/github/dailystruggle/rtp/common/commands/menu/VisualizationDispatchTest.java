@@ -160,6 +160,11 @@ class VisualizationDispatchTest {
         assertFalse(dispatch.paintPipeline(adminViewer, null, messageMethod));
         assertFalse(dispatch.paintPipeline(adminViewer, "", messageMethod));
         assertFalse(dispatch.paintPipeline(normalViewer, "default", messageMethod));
+
+        assertFalse(dispatch.paintHeatmap(null, "default", messageMethod));
+        assertFalse(dispatch.paintHeatmap(adminViewer, null, messageMethod));
+        assertFalse(dispatch.paintHeatmap(adminViewer, "", messageMethod));
+        assertFalse(dispatch.paintHeatmap(normalViewer, "default", messageMethod));
     }
 
     @Test
@@ -209,6 +214,30 @@ class VisualizationDispatchTest {
     }
 
     @Test
+    @DisplayName("paintHeatmap input validation and success")
+    void paintHeatmap_lifecycle() {
+        assertFalse(dispatch.paintHeatmap(null, "default", messageMethod));
+        assertFalse(dispatch.paintHeatmap(adminViewer, null, messageMethod));
+        assertFalse(dispatch.paintHeatmap(adminViewer, "", messageMethod));
+        assertFalse(dispatch.paintHeatmap(normalViewer, "default", messageMethod));
+
+        // When MapDispatch throws RuntimeException in paintHeatmap
+        MapDispatch.setMapBinding(new io.github.dailystruggle.mapsapi.MapBinding() {
+            @Override public io.github.dailystruggle.mapsapi.MapHandle allocate(io.github.dailystruggle.mapsapi.MapAllocationRequest request) { throw new RuntimeException("alloc fail"); }
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> void renderEphemeral(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, M model) {}
+            @Override public <M extends io.github.dailystruggle.mapsapi.model.ChartModel> io.github.dailystruggle.mapsapi.Cancellation bindLive(io.github.dailystruggle.mapsapi.MapHandle handle, io.github.dailystruggle.mapsapi.render.ChartRenderer<M> renderer, java.util.function.Supplier<M> modelSupplier) { return null; }
+        });
+        assertFalse(dispatch.paintHeatmap(adminViewer, "default", messageMethod));
+
+        io.github.dailystruggle.mapsapi.render.ChartRenderer renderer = mock(io.github.dailystruggle.mapsapi.render.ChartRenderer.class);
+        ChartSpecResolver.Resolution resolution = new ChartSpecResolver.Resolution(renderer, dummyModel());
+        ChartSpecResolvers.register(ChartSpec.Kind.SELECTION_HEATMAP, spec -> resolution);
+
+        MapDispatch.setMapBinding(new FakeMapBinding());
+        assertTrue(dispatch.paintHeatmap(adminViewer, "default", messageMethod));
+    }
+
+    @Test
     @DisplayName("VisualizationBadLocationsCmd falls back to selector when region is omitted")
     void badLocationsCmd_fallbackToSelector() {
         AtomicBoolean selectorOpened = new AtomicBoolean(false);
@@ -248,6 +277,23 @@ class VisualizationDispatchTest {
         AtomicBoolean selectorOpened = new AtomicBoolean(false);
         MenuConcreteCommandLeaves.VisualizationPipelineCmd cmd =
                 new MenuConcreteCommandLeaves.VisualizationPipelineCmd(
+                        dispatch,
+                        (uuid, msg) -> {
+                            selectorOpened.set(true);
+                            return true;
+                        });
+
+        boolean res = cmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod);
+        assertTrue(res);
+        assertTrue(selectorOpened.get());
+    }
+
+    @Test
+    @DisplayName("VisualizationHeatmapCmd falls back to selector when region is omitted")
+    void heatmapCmd_fallbackToSelector() {
+        AtomicBoolean selectorOpened = new AtomicBoolean(false);
+        MenuConcreteCommandLeaves.VisualizationHeatmapCmd cmd =
+                new MenuConcreteCommandLeaves.VisualizationHeatmapCmd(
                         dispatch,
                         (uuid, msg) -> {
                             selectorOpened.set(true);

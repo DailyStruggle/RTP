@@ -28,6 +28,22 @@ menuFiller: "GRAY_STAINED_GLASS_PANE"
 # Show the server-health (TPS / MSPT / players) tile.
 showDashboard: true
 
+# Show special scripted actions hub in GUI if LeafRTPActionAddon is present.
+showActions: true
+titleActionsMenu: "&6&lSpecial Teleports"
+titleActionsSelector: "&6&lSpecial Teleports..."
+iconActionsSelector: "NETHERITE_SWORD"
+iconActionDefault: "DIAMOND_SWORD"
+
+# Group biomes into a dedicated paginated sub-menu from the main menu.
+groupBiomesIntoSubmenu: true
+titleBiomeMenu: "&1&lSelect Biome"
+titleBiomeSelector: "&a&lSelect Biome..."
+iconBiomeSelector: "OAK_SAPLING"
+iconPreviousPage: "ARROW"
+iconNextPage: "ARROW"
+iconBackToMainMenu: "BARRIER"
+
 # Per-target icon material names. An unknown name falls back to the renderer default.
 # These are the per-kind fallback blocks used when a region has no explicit entry in
 # the 'regionIcons' map below. They default to a representative surface block (grass for

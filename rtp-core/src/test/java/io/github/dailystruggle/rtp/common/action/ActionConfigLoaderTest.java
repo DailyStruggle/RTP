@@ -192,7 +192,13 @@ class ActionConfigLoaderTest {
     io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
 
     // Copy shipped challenge.yml into tempDir/definitions/actions/
-    File shippedActions = new File("../rtp-plugin/src/main/resources/definitions/actions");
+    File shippedActions = new File("../addons/LeafRTPActionAddon/src/main/resources/definitions/actions");
+    if (!shippedActions.exists()) {
+      shippedActions = new File("addons/LeafRTPActionAddon/src/main/resources/definitions/actions");
+    }
+    if (!shippedActions.exists()) {
+      shippedActions = new File("../rtp-plugin/src/main/resources/definitions/actions");
+    }
     if (!shippedActions.exists()) {
       shippedActions = new File("rtp-plugin/src/main/resources/definitions/actions");
     }

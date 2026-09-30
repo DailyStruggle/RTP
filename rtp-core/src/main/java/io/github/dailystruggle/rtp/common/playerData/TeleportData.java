@@ -23,6 +23,12 @@ public class TeleportData implements Cloneable {
   /** The final safe location selected by the generation pipeline. */
   public RTPCoords selectedCoords = null;
 
+  /** Distance in blocks from original location to destination (hypot on x/z). */
+  public double distance = 0.0;
+
+  /** Distance in blocks from region center to destination (hypot on x/z). */
+  public double distanceFromCenter = 0.0;
+
   /** The target region for the teleport. */
   public Region targetRegion;
 
@@ -92,6 +98,8 @@ public class TeleportData implements Cloneable {
       clone.originServerId = originServerId;
       clone.originWorldName = originWorldName;
       clone.selectedCoords = (selectedCoords == null) ? null : selectedCoords;
+      clone.distance = distance;
+      clone.distanceFromCenter = distanceFromCenter;
       clone.targetRegion = targetRegion;
       clone.time = time;
       clone.cost = cost;

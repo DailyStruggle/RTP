@@ -57,8 +57,17 @@ public final class MenuModel {
   public static MenuModel build(UUID playerId, GuiMenuConfig config) {
     List<MenuEntry> entries = new ArrayList<>();
     List<RtpTarget> targets = RTPAPI.getAllowedTargets(playerId);
+    boolean groupBiomes = config.groupBiomesIntoSubmenu();
+    boolean hasBiomes = false;
+
     if (targets != null) {
       for (RtpTarget target : targets) {
+        if (target.kind() == RtpTarget.Kind.BIOME) {
+          hasBiomes = true;
+          if (groupBiomes) {
+            continue; // group into dedicated sub-menu button below
+          }
+        }
         RtpTargetStatus status = RTPAPI.getTargetStatus(playerId, target);
         RtpTargetStatus.Availability availability =
             (status == null) ? RtpTargetStatus.Availability.UNKNOWN : status.availability();
@@ -93,6 +102,46 @@ public final class MenuModel {
       entries.removeIf(e -> !isNetwork(e) && !isSelectable(e));
     }
 
+    // If biomes are grouped and available, add the Biome Selector entry to the main menu
+    if (groupBiomes && hasBiomes) {
+      entries.add(
+          new MenuEntry(
+              RtpTarget.action("menu:biomes:0"),
+              RtpTargetStatus.Availability.READY,
+              config.titleBiomeSelector(),
+              config.iconBiomeSelector(),
+              0L,
+              0.0));
+    }
+
+    // If actions are enabled and action engine is loaded, check for permitted GUI-eligible actions
+    if (config.showActions() && RTPAPI.hasActions()) {
+      io.github.dailystruggle.rtp.api.action.ActionService actionService = RTPAPI.actions();
+      if (actionService != null) {
+        boolean hasActions = false;
+        for (String actionId : actionService.getActionIds()) {
+          var defOpt = actionService.getAction(actionId);
+          if (defOpt.isEmpty()) continue;
+          var def = defOpt.get();
+          if (!def.isGuiEligible()) continue;
+          if (def.permission() == null || def.permission().isBlank() || RTPAPI.checkPermission(playerId, def.permission()) || RTPAPI.checkPermission(playerId, "rtp.action.*")) {
+            hasActions = true;
+            break;
+          }
+        }
+        if (hasActions) {
+          entries.add(
+              new MenuEntry(
+                  RtpTarget.action("menu:actions:0"),
+                  RtpTargetStatus.Availability.READY,
+                  config.titleActionsSelector(),
+                  config.iconActionsSelector(),
+                  0L,
+                  0.0));
+        }
+      }
+    }
+
     MetricsSnapshot metrics = config.showDashboard() ? RTPAPI.getMetricsSnapshot() : null;
     return new MenuModel(
         config.title(),
@@ -101,6 +150,193 @@ public final class MenuModel {
         config.showDashboard(),
         config.dashboardIconName(),
         entries,
+        metrics);
+  }
+
+  /**
+   * Builds the paginated biomes sub-menu model for {@code playerId}.
+   *
+   * @param playerId the viewing player
+   * @param config the resolved menu configuration
+   * @param page zero-based page index
+   * @return an immutable model; never {@code null}
+   */
+  public static MenuModel buildBiomeMenu(UUID playerId, GuiMenuConfig config, int page) {
+    List<MenuEntry> allBiomeEntries = new ArrayList<>();
+    List<RtpTarget> targets = RTPAPI.getAllowedTargets(playerId);
+    if (targets != null) {
+      for (RtpTarget target : targets) {
+        if (target.kind() != RtpTarget.Kind.BIOME) continue;
+        RtpTargetStatus status = RTPAPI.getTargetStatus(playerId, target);
+        RtpTargetStatus.Availability availability =
+            (status == null) ? RtpTargetStatus.Availability.UNKNOWN : status.availability();
+        allBiomeEntries.add(
+            new MenuEntry(
+                target,
+                availability,
+                displayName(target, status),
+                config.iconName(target, status),
+                (status == null) ? 0L : status.remainingCooldownMillis(),
+                (status == null) ? 0.0 : status.cost()));
+      }
+    }
+
+    if (allBiomeEntries.stream().anyMatch(MenuModel::isSelectable)) {
+      allBiomeEntries.removeIf(e -> !isSelectable(e));
+    }
+
+    // Usable inner slots: 7 columns x 3 inner rows = 21 items per page
+    int pageSize = 21;
+    int totalBiomes = allBiomeEntries.size();
+    int maxPage = Math.max(0, (int) Math.ceil(totalBiomes / (double) pageSize) - 1);
+    int currentPage = Math.max(0, Math.min(page, maxPage));
+
+    int startIndex = currentPage * pageSize;
+    int endIndex = Math.min(startIndex + pageSize, totalBiomes);
+    List<MenuEntry> pageEntries = new ArrayList<>();
+    if (startIndex < totalBiomes) {
+      pageEntries.addAll(allBiomeEntries.subList(startIndex, endIndex));
+    }
+
+    // Add navigation buttons:
+    // Previous Page
+    if (currentPage > 0) {
+      pageEntries.add(
+          new MenuEntry(
+              RtpTarget.action("menu:biomes:" + (currentPage - 1)),
+              RtpTargetStatus.Availability.READY,
+              "&e[Previous Page]",
+              config.iconPreviousPage(),
+              0L,
+              0.0));
+    }
+    // Back to main menu
+    pageEntries.add(
+        new MenuEntry(
+            RtpTarget.action("menu:main"),
+            RtpTargetStatus.Availability.READY,
+            "&c[Back to Worlds]",
+            config.iconBackToMainMenu(),
+            0L,
+            0.0));
+    // Next Page
+    if (currentPage < maxPage) {
+      pageEntries.add(
+          new MenuEntry(
+              RtpTarget.action("menu:biomes:" + (currentPage + 1)),
+              RtpTargetStatus.Availability.READY,
+              "&e[Next Page]",
+              config.iconNextPage(),
+              0L,
+              0.0));
+    }
+
+    MetricsSnapshot metrics = config.showDashboard() ? RTPAPI.getMetricsSnapshot() : null;
+    return new MenuModel(
+        config.titleBiomeMenu() + " (" + (currentPage + 1) + "/" + (maxPage + 1) + ")",
+        6,
+        config.fillerName(),
+        config.showDashboard(),
+        config.dashboardIconName(),
+        pageEntries,
+        metrics);
+  }
+
+  /**
+   * Builds the paginated scripted actions sub-menu model for {@code playerId}.
+   *
+   * @param playerId the viewing player
+   * @param config   the resolved menu configuration
+   * @param page     zero-based page index
+   * @return an immutable model; never {@code null}
+   */
+  public static MenuModel buildActionsMenu(UUID playerId, GuiMenuConfig config, int page) {
+    List<MenuEntry> allActionEntries = new ArrayList<>();
+    if (RTPAPI.hasActions()) {
+      var actionService = RTPAPI.actions();
+      if (actionService != null) {
+        List<String> sortedActionIds = new ArrayList<>(actionService.getActionIds());
+        sortedActionIds.sort(String.CASE_INSENSITIVE_ORDER);
+        for (String actionId : sortedActionIds) {
+          var defOpt = actionService.getAction(actionId);
+          if (defOpt.isEmpty()) continue;
+          var def = defOpt.get();
+          if (!def.isGuiEligible()) continue;
+          if (def.permission() != null && !def.permission().isBlank()
+              && !RTPAPI.checkPermission(playerId, def.permission())
+              && !RTPAPI.checkPermission(playerId, "rtp.action.*")) {
+            continue;
+          }
+
+          String title = (def.title() != null && !def.title().isBlank())
+              ? def.title()
+              : (def.alias() != null && !def.alias().isBlank() ? def.alias() : def.id());
+          String icon = (def.icon() != null && !def.icon().isBlank())
+              ? def.icon()
+              : config.iconActionDefault();
+
+          allActionEntries.add(
+              new MenuEntry(
+                  RtpTarget.action("action:trigger:" + def.id()),
+                  RtpTargetStatus.Availability.READY,
+                  title,
+                  icon,
+                  0L,
+                  0.0));
+        }
+      }
+    }
+
+    int pageSize = 21;
+    int totalActions = allActionEntries.size();
+    int maxPage = Math.max(0, (int) Math.ceil(totalActions / (double) pageSize) - 1);
+    int currentPage = Math.max(0, Math.min(page, maxPage));
+
+    int startIndex = currentPage * pageSize;
+    int endIndex = Math.min(startIndex + pageSize, totalActions);
+    List<MenuEntry> pageEntries = new ArrayList<>();
+    if (startIndex < totalActions) {
+      pageEntries.addAll(allActionEntries.subList(startIndex, endIndex));
+    }
+
+    // Add navigation buttons:
+    if (currentPage > 0) {
+      pageEntries.add(
+          new MenuEntry(
+              RtpTarget.action("menu:actions:" + (currentPage - 1)),
+              RtpTargetStatus.Availability.READY,
+              "&e[Previous Page]",
+              config.iconPreviousPage(),
+              0L,
+              0.0));
+    }
+    pageEntries.add(
+        new MenuEntry(
+            RtpTarget.action("menu:main"),
+            RtpTargetStatus.Availability.READY,
+            "&c[Back to Worlds]",
+            config.iconBackToMainMenu(),
+            0L,
+            0.0));
+    if (currentPage < maxPage) {
+      pageEntries.add(
+          new MenuEntry(
+              RtpTarget.action("menu:actions:" + (currentPage + 1)),
+              RtpTargetStatus.Availability.READY,
+              "&e[Next Page]",
+              config.iconNextPage(),
+              0L,
+              0.0));
+    }
+
+    MetricsSnapshot metrics = config.showDashboard() ? RTPAPI.getMetricsSnapshot() : null;
+    return new MenuModel(
+        config.titleActionsMenu() + (maxPage > 0 ? " (" + (currentPage + 1) + "/" + (maxPage + 1) + ")" : ""),
+        6,
+        config.fillerName(),
+        config.showDashboard(),
+        config.dashboardIconName(),
+        pageEntries,
         metrics);
   }
 
@@ -121,7 +357,8 @@ public final class MenuModel {
         && entry.target().kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.NETWORK;
   }
 
-  private static String displayName(RtpTarget target, RtpTargetStatus status) {
+  /** Package-private for testability. */
+  static String displayName(RtpTarget target, RtpTargetStatus status) {
     // Prefer the operator-configured cosmetic label (region displayName for a
     // local target, or the peer-advertised label for a cross-server one). May
     // contain RTP color/gradient codes; the renderer applies color formatting.
@@ -132,10 +369,11 @@ public final class MenuModel {
     switch (target.kind()) {
       case WORLD:
         return "World: " + target.name();
+      case BIOME:
+        return "Biome: " + target.name();
       case REGION:
-        return "Region: " + target.name();
       case NETWORK:
-        return target.serverId() + " - " + target.name();
+        return "Region: " + target.name();
       case DEFAULT:
       default:
         return "Random teleport";

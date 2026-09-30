@@ -87,6 +87,7 @@ nav:
       - What NOT to do: site/what-not-to-do.md
       - Prefabs: admin/PREFABS.md
       - Commands: admin/COMMANDS.md
+      - Actions & arenas: admin/ACTIONS.md
       - FAQ: admin/FAQ.md
       - Common recipes: admin/RECIPES.md
       - Migration guide: admin/MIGRATION.md

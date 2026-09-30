@@ -293,6 +293,36 @@ public class RTPAPI {
   }
 
   /**
+   * Checks whether {@code player} holds {@code permission}.
+   *
+   * @param player     player UUID
+   * @param permission permission string
+   * @return {@code true} if permitted, {@code false} otherwise
+   */
+  @PublicApi
+  public static boolean checkPermission(UUID player, String permission) {
+    if (player == null || permission == null || permission.isBlank()) return false;
+    RTPServerAccessor sa = serverAccessor;
+    if (sa == null) return false;
+    try {
+      var sender = sa.getSender(player);
+      return sender != null && sender.hasPermission(permission);
+    } catch (Throwable t) {
+      return false;
+    }
+  }
+
+  /**
+   * Returns whether the scripted actions engine is loaded and available.
+   *
+   * @return {@code true} if actions service is present
+   */
+  @PublicApi
+  public static boolean hasActions() {
+    return actionService != null;
+  }
+
+  /**
    * Returns the platform-neutral scripted actions service (ADR-093).
    *
    * @return non-null action service

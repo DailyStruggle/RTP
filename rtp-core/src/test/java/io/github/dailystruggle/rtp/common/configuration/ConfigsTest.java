@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -246,7 +245,6 @@ public class ConfigsTest {
         assertNotNull(configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class));
         assertNotNull(configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class));
         assertNotNull(configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class));
-        assertNotNull(configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys.class));
     }
 
     // --- ADR-076 regression: MultiConfigParser children share the folder-similar rename map ---
@@ -275,26 +273,4 @@ public class ConfigsTest {
                         + java.util.Arrays.toString(strays));
     }
 
-    @Test
-    void multiConfigActionsInitializationAndDefaultFallback() throws IOException {
-        Configs configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
-        configs.reloadConfigs();
-
-        FactoryValue<ActionKeys> parser = configs.getParser(ActionKeys.class);
-        assertNotNull(parser, "ActionKeys MultiConfigParser should be registered");
-        assertTrue(parser instanceof MultiConfigParser);
-        MultiConfigParser<ActionKeys> actionsMulti = (MultiConfigParser<ActionKeys>) parser;
-
-        File definitions = new File(tempDir.toFile(), "definitions");
-        File actionsDir = new File(definitions, "actions");
-        assertTrue(actionsDir.isDirectory(), "definitions/actions directory should be created");
-
-        // Add a new dynamic action without custom template, asserting it inherits default.yml
-        actionsMulti.addParser("test_action");
-        ConfigParser<ActionKeys> customParser = actionsMulti.getParser("test_action");
-        assertNotNull(customParser, "getParser should resolve test_action");
-        File customFile = new File(actionsDir, "test_action.yml");
-        assertTrue(customFile.exists(), "test_action.yml should be created on disk from default.yml template");
-    }
 }

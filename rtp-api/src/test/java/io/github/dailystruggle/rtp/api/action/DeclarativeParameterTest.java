@@ -95,4 +95,45 @@ class DeclarativeParameterTest {
     assertNull(legacy.firstParameterOfType(ParameterType.PLAYER));
     assertTrue(ActionDefinition.CommandSpec.EMPTY.parameters().isEmpty());
   }
+
+  @Test
+  @DisplayName("ActionDefinition isGuiEligible returns true for standard actions and false when location input is required")
+  void actionDefinition_isGuiEligible() {
+    // 1. Standard action with regionQueue anchor
+    ActionDefinition standard = new ActionDefinition(
+        "challenge", "Challenge", "rtp.action.challenge", "desc",
+        ActionDefinition.PlacementSpec.DEFAULT,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY,
+        ActionDefinition.CommandSpec.EMPTY,
+        List.of(), List.of(), "DIAMOND_SWORD", "&cDuel");
+    assertTrue(standard.isGuiEligible());
+    assertEquals("DIAMOND_SWORD", standard.icon());
+    assertEquals("&cDuel", standard.title());
+
+    // 2. Fixed anchor without static anchorX/anchorZ coordinates (requires external location input)
+    ActionDefinition.PlacementSpec fixedNoCoords = new ActionDefinition.PlacementSpec(
+        true, "default", "CIRCLE", 64, 0, 16, 64, java.util.Map.of("anchor", "location"), 3, 0);
+    ActionDefinition locationAction = new ActionDefinition(
+        "loc_action", "Location Action", "", "",
+        fixedNoCoords, ActionDefinition.ConfinementSpec.DEFAULT, ActionDefinition.LifecycleSpec.EMPTY);
+    assertFalse(locationAction.isGuiEligible());
+
+    // 3. Fixed anchor with static coordinates
+    ActionDefinition.PlacementSpec fixedWithCoords = new ActionDefinition.PlacementSpec(
+        true, "default", "CIRCLE", 64, 0, 16, 64, java.util.Map.of("anchor", "location", "anchorX", 100, "anchorZ", 200), 3, 0);
+    ActionDefinition staticLocationAction = new ActionDefinition(
+        "static_loc", "Static Loc", "", "",
+        fixedWithCoords, ActionDefinition.ConfinementSpec.DEFAULT, ActionDefinition.LifecycleSpec.EMPTY);
+    assertTrue(staticLocationAction.isGuiEligible());
+
+    // 4. Command requiring un-defaulted COORDINATE input
+    ParameterSpec reqCoord = new ParameterSpec("targetCoord", ParameterType.COORDINATE, true, "", null);
+    ActionDefinition.CommandSpec coordCmd = new ActionDefinition.CommandSpec(
+        "teleportto", "", "", List.of(), List.of(reqCoord));
+    ActionDefinition coordAction = new ActionDefinition(
+        "coord_action", "Coord Action", "", "",
+        ActionDefinition.PlacementSpec.DEFAULT, ActionDefinition.ConfinementSpec.DEFAULT, ActionDefinition.LifecycleSpec.EMPTY, coordCmd);
+    assertFalse(coordAction.isGuiEligible());
+  }
 }

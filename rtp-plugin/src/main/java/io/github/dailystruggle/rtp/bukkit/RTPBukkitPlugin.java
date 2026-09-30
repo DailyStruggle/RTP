@@ -683,6 +683,17 @@ public final class RTPBukkitPlugin extends JavaPlugin {
           "[RTP] Failed to initialize combat-tag integrations; continuing with the native PvP tracker.",
           t);
     }
+
+    // Hologram & floating display integrations (DecentHolograms / HolographicDisplays / native TextDisplay).
+    try {
+      RTP.log(java.util.logging.Level.FINER, "[RTP] setupIntegrations invoking HologramIntegrations.setup");
+      io.github.dailystruggle.rtp.bukkit.tools.softdepends.hologram.HologramIntegrations.setup(this);
+    } catch (Throwable t) {
+      RTP.log(
+          java.util.logging.Level.WARNING,
+          "[RTP] Failed to initialize hologram integrations; continuing with virtual fallback.",
+          t);
+    }
     RTP.log(java.util.logging.Level.FINE, "[RTP] setupIntegrations EXIT");
   }
 }

@@ -31,6 +31,8 @@ alreadyInSession: "&c[P0] [player] is already in an active match session."
 teleportDeniedReloading: "&7[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
 delayMessage: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teleporting in [delay]. Don't move</gradient>"
 chunkLoading: "&7[P0] ⚙ Loading chunks! please wait..."
+# placeholders: [attempts], [processingTime], <distance>, <distance_blocks>
+# example: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleported <distance> blocks away in [attempts] attempts, in [processingTime]</gradient>"
 teleportMessage: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]</gradient>"
 
 # if teleport is cancelled
