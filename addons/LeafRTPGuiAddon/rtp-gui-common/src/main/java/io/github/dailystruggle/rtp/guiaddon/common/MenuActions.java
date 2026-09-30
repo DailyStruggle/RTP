@@ -34,6 +34,62 @@ public final class MenuActions {
       return;
     }
     GuiMenuConfig config = GuiMenuConfig.INSTANCE;
+
+    // Handle UI navigation actions (sub-menus, pagination)
+    if (target.kind() == RtpTarget.Kind.ACTION) {
+      String action = target.name();
+      if (action == null) return;
+      MenuRenderer renderer = GuiRenderers.resolve(config.menuStyle());
+      if (renderer == null || !renderer.isAvailable()) return;
+
+      if ("menu:main".equalsIgnoreCase(action)) {
+        renderer.open(playerId, MenuModel.build(playerId, config));
+        return;
+      }
+      if (action.toLowerCase(java.util.Locale.ROOT).startsWith("menu:biomes:")) {
+        int page = 0;
+        try {
+          page = Integer.parseInt(action.substring("menu:biomes:".length()));
+        } catch (NumberFormatException ignored) {
+        }
+        renderer.open(playerId, MenuModel.buildBiomeMenu(playerId, config, page));
+        return;
+      }
+      if (action.toLowerCase(java.util.Locale.ROOT).startsWith("menu:actions:")) {
+        int page = 0;
+        try {
+          page = Integer.parseInt(action.substring("menu:actions:".length()));
+        } catch (NumberFormatException ignored) {
+        }
+        renderer.open(playerId, MenuModel.buildActionsMenu(playerId, config, page));
+        return;
+      }
+      if (action.toLowerCase(java.util.Locale.ROOT).startsWith("action:trigger:")) {
+        String actionId = action.substring("action:trigger:".length()).trim();
+        if (RTPAPI.hasActions()) {
+          var actionService = RTPAPI.actions();
+          if (actionService != null) {
+            message(playerId, config.textSearching());
+            actionService.trigger(
+                actionId,
+                java.util.List.of(playerId),
+                io.github.dailystruggle.rtp.api.action.ActionContext.EMPTY)
+                .whenComplete((sessionResult, error) -> {
+                  if (error != null) {
+                    message(playerId, config.textFailurePrefix() + error.getMessage());
+                  } else if (sessionResult != null && !sessionResult.success()) {
+                    message(playerId, config.textFailurePrefix() + sessionResult.failureReason());
+                  } else {
+                    message(playerId, config.textSuccess());
+                  }
+                });
+          }
+        }
+        return;
+      }
+      return;
+    }
+
     message(playerId, config.textSearching());
 
     RTPAPI.teleport(playerId, target)

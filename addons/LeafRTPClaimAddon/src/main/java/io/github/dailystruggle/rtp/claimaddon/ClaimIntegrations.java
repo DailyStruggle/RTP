@@ -105,6 +105,8 @@ public final class ClaimIntegrations {
     verifiers.unregisterBySource(ResidenceChecker.class);
     verifiers.unregisterBySource(CrashClaimChecker.class);
     verifiers.unregisterBySource(HuskClaimsChecker.class);
+    verifiers.unregisterBySource(HuskTownsChecker.class);
+    verifiers.unregisterBySource(PlotSquaredChecker.class);
     verifiers.unregisterBySource(KingdomsXChecker.class);
     verifiers.unregisterBySource(TownyAdvancedChecker.class);
     verifiers.unregisterBySource(WorldGuardChecker.class);
@@ -118,6 +120,8 @@ public final class ClaimIntegrations {
     register(parser, verifiers, IntegrationsKeys.rerollResidence, "Residence", ResidenceChecker.class, () -> ResidenceChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollCrashClaim, "CrashClaim", CrashClaimChecker.class, () -> CrashClaimChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollHuskClaims, "HuskClaims", HuskClaimsChecker.class, () -> HuskClaimsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollHuskTowns, "HuskTowns", HuskTownsChecker.class, () -> HuskTownsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollPlotSquared, "PlotSquared", PlotSquaredChecker.class, () -> PlotSquaredChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollKingdomsX, "Kingdoms", KingdomsXChecker.class, () -> KingdomsXChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollTownyAdvanced, "Towny", TownyAdvancedChecker.class, () -> TownyAdvancedChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollWorldGuard, "WorldGuard", WorldGuardChecker.class, () -> WorldGuardChecker::isInClaim);

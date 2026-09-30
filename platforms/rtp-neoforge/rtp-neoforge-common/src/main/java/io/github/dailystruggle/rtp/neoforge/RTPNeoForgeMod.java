@@ -273,6 +273,13 @@ public final class RTPNeoForgeMod {
       }
     }
 
+    // Wire mod-side land protection (OPAC, FTB Chunks per MULTI_PLATFORM_PLAN line 505)
+    try {
+      io.github.dailystruggle.rtp.neoforge.claims.NeoForgeModClaimIntegrations.registerAll();
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP][NeoForge] ModClaimIntegrations registration skipped: " + t.getMessage());
+    }
+
     // Seed <configDir>/rtp/docs/ from the bundled docs/ tree inside the running
     // mod jar. Mirrors RTPBukkitPlugin's `JarUtils.extractDocs(...)` and
     // RTPFabricMod's `FabricJarUtils.extractDocs(...)` so the admin-facing

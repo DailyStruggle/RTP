@@ -40,8 +40,25 @@ public final class ActionConfigLoader {
     for (ConfigParser<ActionKeys> parser : actionsParser.configParserFactory.map.values()) {
       String id = parser.name.replace(".yml", "");
       try {
-        ActionDefinition def = parseDefinition(id, parser);
+        RtpYamlSection root = null;
+        if (parser.pluginDirectory != null && parser.name != null) {
+          File f = new File(parser.pluginDirectory, parser.name);
+          if (!f.exists() && RTP.serverAccessor != null && RTP.serverAccessor.getPluginDirectory() != null) {
+            f = new File(new File(RTP.serverAccessor.getPluginDirectory(), "definitions/actions"), parser.name);
+          }
+          if (f.exists()) {
+            try (Reader reader = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
+              root = RtpYamlConfig.parse(reader);
+            } catch (Exception ignored) {
+            }
+          }
+        }
+        if (root == null) {
+          root = parser.getYamlRoot();
+        }
+        ActionDefinition def = (root != null) ? parseDefinition(id, root) : parseDefinition(id, parser);
         manager.registerAction(def);
+        registerTriggers(def);
         RTP.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
       } catch (Exception e) {
         RTP.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + parser.name, e);
@@ -70,6 +87,7 @@ public final class ActionConfigLoader {
         RtpYamlConfig yaml = RtpYamlConfig.parse(reader);
         ActionDefinition def = parseDefinition(id, yaml);
         manager.registerAction(def);
+        registerTriggers(def);
         RTP.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
       } catch (Exception e) {
         RTP.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + file.getName(), e);
@@ -77,15 +95,40 @@ public final class ActionConfigLoader {
     }
   }
 
+  private static void registerTriggers(ActionDefinition def) {
+    if (def == null || def.triggers().isEmpty() || RTP.triggerManager == null) return;
+    for (io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec trigger : def.triggers()) {
+      try {
+        RTP.triggerManager.registerTrigger(trigger);
+        RTP.log(Level.FINE, "[RTP Action] Registered physical trigger: " + trigger.id() + " -> " + def.id());
+      } catch (Exception e) {
+        RTP.log(Level.WARNING, "[RTP Action] Failed registering trigger " + trigger.id() + ": " + e.getMessage());
+      }
+    }
+  }
+
   /**
    * Parses an ActionDefinition from a {@link ConfigParser<ActionKeys>}.
    */
+  @SuppressWarnings("unchecked")
   public static ActionDefinition parseDefinition(String id, ConfigParser<ActionKeys> parser) {
     if (parser == null) {
       return parseDefinition(id, (RtpYamlSection) null);
     }
 
     RtpYamlSection root = parser.getYamlRoot();
+    if (root == null && parser.pluginDirectory != null && parser.name != null) {
+      File f = new File(parser.pluginDirectory, parser.name);
+      if (!f.exists() && RTP.serverAccessor != null && RTP.serverAccessor.getPluginDirectory() != null) {
+        f = new File(new File(RTP.serverAccessor.getPluginDirectory(), "definitions/actions"), parser.name);
+      }
+      if (f.exists()) {
+        try (Reader reader = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
+          root = RtpYamlConfig.parse(reader);
+        } catch (Exception ignored) {
+        }
+      }
+    }
     if (root != null) {
       return parseDefinition(id, root);
     }
@@ -93,6 +136,10 @@ public final class ActionConfigLoader {
     String alias = String.valueOf(parser.getConfigValue(ActionKeys.alias, id));
     String permission = String.valueOf(parser.getConfigValue(ActionKeys.permission, "rtp.action." + id));
     String description = String.valueOf(parser.getConfigValue(ActionKeys.description, ""));
+    Object rawIcon = parser.getConfigValue(ActionKeys.icon, null);
+    String icon = (rawIcon != null) ? String.valueOf(rawIcon) : null;
+    Object rawTitle = parser.getConfigValue(ActionKeys.title, null);
+    String title = (rawTitle != null) ? String.valueOf(rawTitle) : null;
 
     // 1. Placement
     Map<String, Object> placementMap = parser.getMap(ActionKeys.placement);
@@ -130,12 +177,20 @@ public final class ActionConfigLoader {
       gateList.add(sec.getValues(false));
     }
 
-    return new ActionDefinition(id, alias, permission, description, placement, confinement, lifecycle, command, gateList);
+    // 6. Triggers
+    Object rawTriggers = parser.getData(ActionKeys.trigger);
+    if (rawTriggers == null) rawTriggers = parser.getData(ActionKeys.triggers);
+    if (rawTriggers == null) rawTriggers = parser.getConfigValue(ActionKeys.trigger, null);
+    if (rawTriggers == null) rawTriggers = parser.getConfigValue(ActionKeys.triggers, null);
+    List<io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec> triggerList = parseTriggers(id, rawTriggers);
+
+    return new ActionDefinition(id, alias, permission, description, placement, confinement, lifecycle, command, gateList, triggerList, icon, title);
   }
 
   /**
    * Parses an ActionDefinition from an {@link RtpYamlSection}.
    */
+  @SuppressWarnings("unchecked")
   public static ActionDefinition parseDefinition(String id, RtpYamlSection root) {
     if (root == null) {
       return new ActionDefinition(
@@ -148,6 +203,8 @@ public final class ActionConfigLoader {
     String alias = root.getString("alias", id);
     String permission = root.getString("permission", "rtp.action." + id);
     String description = root.getString("description", "");
+    String icon = root.getString("icon", null);
+    String title = root.getString("title", null);
 
     Object rawPlacement = root.get("placement");
     ActionDefinition.PlacementSpec placement = ActionDefinition.PlacementSpec.DEFAULT;
@@ -202,7 +259,17 @@ public final class ActionConfigLoader {
       }
     }
 
-    return new ActionDefinition(id, alias, permission, description, placement, confinement, lifecycle, command, gateList);
+    // 6. Triggers
+    Object rawTriggers = root.get("trigger");
+    if (rawTriggers == null) rawTriggers = root.get("triggers");
+    if (rawTriggers == null) {
+      RtpYamlSection triggerSec = root.getConfigurationSection("trigger");
+      if (triggerSec == null) triggerSec = root.getConfigurationSection("triggers");
+      if (triggerSec != null) rawTriggers = triggerSec;
+    }
+    List<io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec> triggerList = parseTriggers(id, rawTriggers);
+
+    return new ActionDefinition(id, alias, permission, description, placement, confinement, lifecycle, command, gateList, triggerList, icon, title);
   }
 
   @SuppressWarnings("unchecked")
@@ -725,5 +792,183 @@ public final class ActionConfigLoader {
       }
     }
     return res;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec> parseTriggers(String actionId, Object raw) {
+    if (raw == null) return Collections.emptyList();
+    List<Map<String, Object>> triggerMaps = new ArrayList<>();
+
+    if (raw instanceof List<?> list) {
+      for (Object item : list) {
+        if (item instanceof Map<?, ?> m) {
+          triggerMaps.add((Map<String, Object>) m);
+        } else if (item instanceof RtpYamlSection sec) {
+          triggerMaps.add(sec.getValues(false));
+        }
+      }
+    } else if (raw instanceof Map<?, ?> m) {
+      // Could be a map of triggerName -> triggerConfig, or a single trigger spec map
+      boolean isNested = m.values().stream().anyMatch(v -> v instanceof Map<?, ?> || v instanceof RtpYamlSection);
+      if (isNested) {
+        for (Map.Entry<?, ?> entry : m.entrySet()) {
+          Object val = entry.getValue();
+          Map<String, Object> tMap = null;
+          if (val instanceof Map<?, ?> subMap) {
+            tMap = new LinkedHashMap<>((Map<String, Object>) subMap);
+          } else if (val instanceof RtpYamlSection sec) {
+            tMap = new LinkedHashMap<>(sec.getValues(false));
+          }
+          if (tMap != null) {
+            if (!tMap.containsKey("id") && entry.getKey() != null) {
+              tMap.put("id", entry.getKey().toString());
+            }
+            triggerMaps.add(tMap);
+          }
+        }
+      } else {
+        triggerMaps.add((Map<String, Object>) m);
+      }
+    } else if (raw instanceof RtpYamlSection sec) {
+      Map<String, Object> values = sec.getValues(false);
+      boolean isNested = values.values().stream().anyMatch(v -> v instanceof Map<?, ?> || v instanceof RtpYamlSection);
+      if (isNested) {
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+          Object val = entry.getValue();
+          Map<String, Object> tMap = null;
+          if (val instanceof Map<?, ?> subMap) {
+            tMap = new LinkedHashMap<>((Map<String, Object>) subMap);
+          } else if (val instanceof RtpYamlSection subSec) {
+            tMap = new LinkedHashMap<>(subSec.getValues(false));
+          }
+          if (tMap != null) {
+            if (!tMap.containsKey("id") && entry.getKey() != null) {
+              tMap.put("id", entry.getKey());
+            }
+            triggerMaps.add(tMap);
+          }
+        }
+      } else {
+        triggerMaps.add(values);
+      }
+    }
+
+    if (triggerMaps.isEmpty()) return Collections.emptyList();
+
+    List<io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec> result = new ArrayList<>();
+    int idx = 0;
+    for (Map<String, Object> map : triggerMaps) {
+      idx++;
+      String triggerId = map.containsKey("id") ? String.valueOf(map.get("id")) : (actionId + "_trigger_" + idx);
+
+      // Parse TriggerType
+      io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType type =
+          io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.STEP_IN;
+      if (map.containsKey("type")) {
+        String tStr = String.valueOf(map.get("type")).trim().toUpperCase();
+        try {
+          type = io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.valueOf(tStr);
+        } catch (IllegalArgumentException ignored) {
+        }
+      }
+
+      // World
+      String world = "world";
+      if (map.containsKey("world")) {
+        world = String.valueOf(map.get("world")).trim();
+      } else if (map.containsKey("worldName")) {
+        world = String.valueOf(map.get("worldName")).trim();
+      }
+
+      // Coordinates
+      int minX = 0, minY = 0, minZ = 0;
+      int maxX = 0, maxY = 0, maxZ = 0;
+
+      if (map.containsKey("pos1") && map.containsKey("pos2")) {
+        int[] p1 = parseCoords(map.get("pos1"));
+        int[] p2 = parseCoords(map.get("pos2"));
+        minX = p1[0]; minY = p1[1]; minZ = p1[2];
+        maxX = p2[0]; maxY = p2[1]; maxZ = p2[2];
+      } else if (map.containsKey("min") && map.containsKey("max")) {
+        int[] p1 = parseCoords(map.get("min"));
+        int[] p2 = parseCoords(map.get("max"));
+        minX = p1[0]; minY = p1[1]; minZ = p1[2];
+        maxX = p2[0]; maxY = p2[1]; maxZ = p2[2];
+      } else {
+        minX = getInt(map, "minX", getInt(map, "x1", 0));
+        minY = getInt(map, "minY", getInt(map, "y1", 0));
+        minZ = getInt(map, "minZ", getInt(map, "z1", 0));
+        maxX = getInt(map, "maxX", getInt(map, "x2", minX));
+        maxY = getInt(map, "maxY", getInt(map, "y2", minY));
+        maxZ = getInt(map, "maxZ", getInt(map, "z2", minZ));
+      }
+
+      // Cooldown
+      long cooldown = 0L;
+      if (map.containsKey("cooldown")) {
+        cooldown = ConfigParser.parseDurationSeconds(map.get("cooldown"), 0L);
+      } else if (map.containsKey("cooldownSeconds")) {
+        cooldown = ConfigParser.parseDurationSeconds(map.get("cooldownSeconds"), 0L);
+      }
+      if (cooldown < 0L) cooldown = 0L;
+
+      // Batch Interval
+      long batchInterval = 0L;
+      if (map.containsKey("batchInterval")) {
+        batchInterval = ConfigParser.parseDurationSeconds(map.get("batchInterval"), 0L);
+      } else if (map.containsKey("batch_interval")) {
+        batchInterval = ConfigParser.parseDurationSeconds(map.get("batch_interval"), 0L);
+      } else if (map.containsKey("interval")) {
+        batchInterval = ConfigParser.parseDurationSeconds(map.get("interval"), 0L);
+      }
+      if (batchInterval < 0L) batchInterval = 0L;
+
+      try {
+        result.add(new io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec(
+            triggerId, type, world, minX, minY, minZ, maxX, maxY, maxZ, actionId, cooldown, batchInterval));
+      } catch (Exception e) {
+        RTP.log(Level.WARNING, "[RTP Action] Invalid trigger definition '" + triggerId + "' for action '" + actionId + "': " + e.getMessage());
+      }
+    }
+
+    return result;
+  }
+
+  private static int[] parseCoords(Object obj) {
+    if (obj instanceof Map<?, ?> m) {
+      int x = getInt(m, "x", 0);
+      int y = getInt(m, "y", 0);
+      int z = getInt(m, "z", 0);
+      return new int[]{x, y, z};
+    } else if (obj instanceof RtpYamlSection sec) {
+      int x = sec.getInt("x", 0);
+      int y = sec.getInt("y", 0);
+      int z = sec.getInt("z", 0);
+      return new int[]{x, y, z};
+    } else if (obj instanceof String s) {
+      String[] parts = s.split(",");
+      if (parts.length >= 3) {
+        try {
+          int offset = (parts.length > 3) ? 1 : 0; // if world,x,y,z
+          return new int[]{
+              Integer.parseInt(parts[offset].trim()),
+              Integer.parseInt(parts[offset + 1].trim()),
+              Integer.parseInt(parts[offset + 2].trim())
+          };
+        } catch (NumberFormatException ignored) {}
+      }
+    }
+    return new int[]{0, 0, 0};
+  }
+
+  private static int getInt(Map<?, ?> map, String key, int def) {
+    Object val = map.get(key);
+    if (val instanceof Number n) return n.intValue();
+    if (val instanceof String s) {
+      try {
+        return Integer.parseInt(s.trim());
+      } catch (NumberFormatException ignored) {}
+    }
+    return def;
   }
 }

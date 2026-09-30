@@ -208,6 +208,13 @@ public final class RTPFabricMod implements ModInitializer {
                                 + t.getMessage(), t);
             }
 
+            // Wire mod-side land protection (OPAC, FTB Chunks per MULTI_PLATFORM_PLAN line 505)
+            try {
+                io.github.dailystruggle.rtp.fabric.claims.ModClaimIntegrations.registerAll();
+            } catch (Throwable t) {
+                RTP.log(Level.FINE, "[RTP] ModClaimIntegrations registration skipped: " + t.getMessage());
+            }
+
             // ----------------------------------------------------------------
             // effects-api-ADR-003 - wire the Fabric effects layer.
             // FabricEffectsHandler.setupEffects:

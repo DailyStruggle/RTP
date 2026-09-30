@@ -283,7 +283,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
         ConfigParser<E> parser = (ConfigParser<E>) configParserFactory.getOrDefault("DEFAULT.YML");
         if (parser != null) return parser;
         return new ConfigParser<>(
-            myClass, name, version, myDirectory, langMap, fileDatabase, locale, this.directory);
+            myClass, name, version, myDirectory, langMap, fileDatabase, locale, directory);
       }
 
       ConfigParser<E> parser = (ConfigParser<E>) configParserFactory.getOrDefault(name);

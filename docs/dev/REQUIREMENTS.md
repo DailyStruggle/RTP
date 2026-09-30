@@ -57,6 +57,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 
 ### 1.5 Configuration
 - **REQ-RTP-F-013 — Configurable User Messages:** The system shall allow all user-facing messages to be configurable via the `messages.yml` configuration file.
+- **REQ-RTP-F-014 — Foreign Configuration & Permission Import:** The system shall provide an explicit, non-destructive migration mechanism (`/rtp config import <plugin>`) capable of translating third-party random teleport configurations (BetterRTP, JustRTP, EzRTP, JakesRTP) and permissions into native RTP configuration trees and permissions without modifying or clobbering existing customized configs without confirmation (ADR-066).
 
 ### 1.6 Network / Proxy Support
 

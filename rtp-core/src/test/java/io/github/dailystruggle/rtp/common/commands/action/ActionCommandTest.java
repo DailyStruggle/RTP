@@ -490,7 +490,13 @@ class ActionCommandTest {
     serverAccessor.addPlayer(alice);
     serverAccessor.addPlayer(bob);
 
-    java.io.File actionsDir = new java.io.File("../rtp-plugin/src/main/resources/definitions/actions");
+    java.io.File actionsDir = new java.io.File("../addons/LeafRTPActionAddon/src/main/resources/definitions/actions");
+    if (!actionsDir.exists()) {
+      actionsDir = new java.io.File("addons/LeafRTPActionAddon/src/main/resources/definitions/actions");
+    }
+    if (!actionsDir.exists()) {
+      actionsDir = new java.io.File("../rtp-plugin/src/main/resources/definitions/actions");
+    }
     if (!actionsDir.exists()) {
       actionsDir = new java.io.File("rtp-plugin/src/main/resources/definitions/actions");
     }
@@ -558,7 +564,13 @@ class ActionCommandTest {
         }
       });
 
-      java.io.File actionsDir = new java.io.File("../rtp-plugin/src/main/resources/definitions/actions");
+      java.io.File actionsDir = new java.io.File("../addons/LeafRTPActionAddon/src/main/resources/definitions/actions");
+      if (!actionsDir.exists()) {
+        actionsDir = new java.io.File("addons/LeafRTPActionAddon/src/main/resources/definitions/actions");
+      }
+      if (!actionsDir.exists()) {
+        actionsDir = new java.io.File("../rtp-plugin/src/main/resources/definitions/actions");
+      }
       if (!actionsDir.exists()) {
         actionsDir = new java.io.File("rtp-plugin/src/main/resources/definitions/actions");
       }

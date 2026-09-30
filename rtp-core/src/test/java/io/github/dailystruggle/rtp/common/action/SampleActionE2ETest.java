@@ -74,6 +74,8 @@ class SampleActionE2ETest {
   /** Resolves the shipped resources dir regardless of whether tests run from the module or repo root. */
   private static File shippedResourcesDir() {
     File[] candidates = {
+      new File("../addons/LeafRTPActionAddon/src/main/resources"),
+      new File("addons/LeafRTPActionAddon/src/main/resources"),
       new File("../rtp-plugin/src/main/resources"),
       new File("rtp-plugin/src/main/resources"),
     };
@@ -462,6 +464,7 @@ class SampleActionE2ETest {
     RTP.serverAccessor = bootAccessor;
 
     // 2. Load actions into RTP.actionManager
+    RTP.actionManager = new io.github.dailystruggle.rtp.common.action.ActionManager();
     File actionsDir = shippedResourcesDir();
     io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(actionsDir, RTP.actionManager);
 

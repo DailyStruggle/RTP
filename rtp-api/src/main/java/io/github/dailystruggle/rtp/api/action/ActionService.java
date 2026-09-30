@@ -75,4 +75,14 @@ public interface ActionService {
    * @return immutable set of loaded action IDs
    */
   Set<String> getActionIds();
+
+  /**
+   * Retrieves an action definition by identifier, if loaded.
+   *
+   * @param actionId the action identifier
+   * @return optional containing the definition if found
+   */
+  default Optional<ActionDefinition> getAction(String actionId) {
+    return Optional.empty();
+  }
 }

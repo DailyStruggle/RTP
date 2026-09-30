@@ -208,6 +208,41 @@ The player drops their inventory items (and experience) at their starting origin
 
 ---
 
+## Teleport near a random player (bounty / encounter hunting)
+
+**What you want:** teleport players within a random safe radius of active online players without giving away exact coordinates.
+
+**The LeafRTP way:** enable the bundled `nearplayer` action from the **Action Engine** (`definitions/actions/nearplayer.yml`). It uses `anchor: entity` and a circular footprint (`radius: 6c`, `centerRadius: 1c`) to safely drop the player between 16 and 96 blocks away from a fellow adventurer:
+
+```yaml
+# In definitions/actions/nearplayer.yml
+alias: "nearplayer"
+permission: "rtp.action.nearplayer"
+placement:
+  region: "default"
+  anchor: "entity"
+  shape:
+    name: "CIRCLE"
+    radius: 6c
+    centerRadius: 1c
+  minSeparation: 24
+  elevationTolerance: 256
+```
+
+Grant `rtp.action.nearplayer` and run `/rtp action nearplayer` (or map it to a top-level command). See [Declarative Action Engine](ACTIONS.md).
+
+---
+
+## Symmetrical 1v1 duels & arena battles (subspace placement)
+
+**What you want:** two players challenge each other, get paired symmetrically, and teleport together into a shared arena with bounded confinement and minimum spacing.
+
+**The LeafRTP way:** enable `challenge.yml` from `definitions/actions/challenge.yml`. LeafRTP automatically registers `/challenge <player>` with clickable chat acceptance, pairs mutual challengers off-tick, enforces minimum spacing (`minSeparation: 24`), and confines players to the arena boundary (`confinement.boundary: SUBSPACE`) with automatic pull-backs on boundary breaches.
+
+See [Declarative Action Engine](ACTIONS.md) for full configuration.
+
+---
+
 ## At a glance
 
 | You want RTP to... | LeafRTP-native solution |
@@ -220,6 +255,8 @@ The player drops their inventory items (and experience) at their starting origin
 | Survival restart / drop inventory before RTP | Use `DROP_INVENTORY` (and `DROP_EXP`) on `preteleport` stage or grant `rtp.effect.preteleport.drop_inventory` |
 | Kill player before RTP (death screen) | Use `DEATH` effect on `preteleport` stage or grant `rtp.effect.preteleport.death` |
 | Avoid teleporting into claims | `integrations.yml` `reroll*` toggles |
+| Teleport near another player | Action Engine (`nearplayer.yml`, `anchor: entity`) |
+| Symmetrical duels & squad matchmaking | Action Engine (`challenge.yml`, subspace placement) |
 | Show cooldown / queue / region info | Native `%rtp_*%` PlaceholderAPI expansion |
 | Charge money per teleport | `economy.yml` (+ Vault) |
 | Always have a fast, safe landing spot | `/rtp scan start region=<name>` |

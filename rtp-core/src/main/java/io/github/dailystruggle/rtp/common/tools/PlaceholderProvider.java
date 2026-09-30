@@ -716,6 +716,38 @@ public class PlaceholderProvider {
                     return replacement;
                 });
         placeholders.put(
+                "distance",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0.0";
+                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0.0";
+                    return String.format(java.util.Locale.US, "%.1f", teleportData.distance);
+                });
+        placeholders.put(
+                "distance_blocks",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0";
+                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0";
+                    return String.valueOf(Math.round(teleportData.distance));
+                });
+        placeholders.put(
+                "distance_center",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0.0";
+                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0.0";
+                    return String.format(java.util.Locale.US, "%.1f", teleportData.distanceFromCenter);
+                });
+        placeholders.put(
+                "distance_center_blocks",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0";
+                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0";
+                    return String.valueOf(Math.round(teleportData.distanceFromCenter));
+                });
+        placeholders.put(
                 "spot",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0";
@@ -1260,8 +1292,8 @@ public class PlaceholderProvider {
                 ParseString.keywords(
                         text,
                         placeholders.keySet(),
-                        new HashSet<>(Arrays.asList('[', '%')),
-                        new HashSet<>(Arrays.asList(']', '%')));
+                        new HashSet<>(Arrays.asList('[', '%', '<')),
+                        new HashSet<>(Arrays.asList(']', '%', '>')));
 
         for (String s : keywords) {
             Function<UUID, String> function = placeholders.get(s);
@@ -1272,6 +1304,9 @@ public class PlaceholderProvider {
                     .matcher(text)
                     .replaceAll(quotedValue);
             text = Pattern.compile("%" + s + "%", Pattern.CASE_INSENSITIVE)
+                    .matcher(text)
+                    .replaceAll(quotedValue);
+            text = Pattern.compile("<" + s + ">", Pattern.CASE_INSENSITIVE)
                     .matcher(text)
                     .replaceAll(quotedValue);
         }

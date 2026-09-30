@@ -170,6 +170,12 @@ public final class ActionManager implements ActionService {
     if (RTP.baseCommand != null) {
       io.github.dailystruggle.commandsapi.common.CommandsAPICommand actionSub =
           RTP.baseCommand.getCommandLookup().get("ACTION");
+      if (actionSub == null) {
+        actionSub = new io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd(RTP.baseCommand);
+        RTP.baseCommand.addSubCommand(actionSub);
+        RTP.baseCommand.getCommandLookup().put("RUN", actionSub);
+        RTP.baseCommand.getCommandLookup().put("TRIGGER", actionSub);
+      }
       if (actionSub instanceof io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd subCmd) {
         subCmd.syncActions();
       }
@@ -190,6 +196,7 @@ public final class ActionManager implements ActionService {
   /**
    * Retrieves an action definition by id, if present.
    */
+  @Override
   public Optional<ActionDefinition> getAction(String id) {
     if (id == null) return Optional.empty();
     return Optional.ofNullable(definitions.get(id.toLowerCase()));
@@ -235,6 +242,33 @@ public final class ActionManager implements ActionService {
     if (session != null) {
       session.disarm();
     }
+  }
+
+  /**
+   * Dispatches a group action for the specified players (ADR-093 / ADR-095).
+   *
+   * @param players  list of player UUIDs
+   * @param actionId target action id
+   * @return future completed with session result
+   */
+  public CompletableFuture<ActionSessionResult> dispatchGroupAction(List<UUID> players, String actionId) {
+    return dispatchGroupAction(players, actionId, ActionContext.EMPTY);
+  }
+
+  /**
+   * Dispatches a group action for the specified players with a given context.
+   *
+   * @param players  list of player UUIDs
+   * @param actionId target action id
+   * @param context  action context
+   * @return future completed with session result
+   */
+  public CompletableFuture<ActionSessionResult> dispatchGroupAction(
+      List<UUID> players, String actionId, ActionContext context) {
+    if (players == null || players.isEmpty()) {
+      return CompletableFuture.completedFuture(ActionSessionResult.failure("Players cannot be null or empty"));
+    }
+    return trigger(actionId, players, context);
   }
 
   @Override

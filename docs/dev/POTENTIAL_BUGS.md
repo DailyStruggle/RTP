@@ -61,4 +61,14 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** The boss bar displays scan progress percentage where `[scan_landPercentage]` is placed.
 - **Suggested next step:** Compute average `latestLandPercentage` across active `ScanTask` instances and substitute that into `[scan_landPercentage]`, or add a distinct `[scan_progress]` placeholder.
 
+### 2026-09-29 — ActionCommandTest assumes rtp-plugin resource relative path from rtp-core
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** JakesRTP config importer support
+- **Location:** `rtp-core/src/test/java/io/github/dailystruggle/rtp/common/commands/action/ActionCommandTest.java` lines 497, 565
+- **Symptom / hypothesis:** `ActionCommandTest` constructs file paths relative to `user.dir` assuming the root directory, which fails with `AssertionFailedError: Actions dir must exist: .../rtp-core/rtp-plugin/...` when the test execution runs with `rtp-core` as working directory.
+- **Impact:** Test failure in `ActionCommandTest` during standalone submodule test execution.
+- **Suggested next step:** Resolve path dynamically or search upward for root repository directory before resolving `rtp-plugin/src/main/resources/definitions/actions`.
+
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

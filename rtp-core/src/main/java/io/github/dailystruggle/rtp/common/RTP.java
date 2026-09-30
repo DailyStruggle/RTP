@@ -104,15 +104,17 @@ public class RTP {
 
   /**
    * Process-wide entry point for declarative scripted actions (ADR-093).
+   * Initialized by LeafRTPActionAddon when loaded; null when omitted.
    */
-  public static final io.github.dailystruggle.rtp.common.action.ActionManager
-      actionManager = new io.github.dailystruggle.rtp.common.action.ActionManager();
+  public static volatile io.github.dailystruggle.rtp.common.action.ActionManager
+      actionManager = null;
 
   /**
    * Background task pre-warming candidate placements for registered actions (ADR-097).
+   * Initialized by LeafRTPActionAddon when loaded; null when omitted.
    */
-  public static final io.github.dailystruggle.rtp.common.action.ActionCacheWarmTask
-      actionCacheWarmTask = new io.github.dailystruggle.rtp.common.action.ActionCacheWarmTask(actionManager);
+  public static volatile io.github.dailystruggle.rtp.common.action.ActionCacheWarmTask
+      actionCacheWarmTask = null;
 
   /**
    * Process-wide manager for physical world triggers (portals, pressure plates, step-in zones) (ADR-093).
@@ -211,7 +213,6 @@ public class RTP {
     io.github.dailystruggle.rtp.api.RTPAPI.hooks =
         new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
 
-    io.github.dailystruggle.rtp.api.RTPAPI.actionService = actionManager;
     triggerManager.start();
 
     // First-class teleport entry point for addons: trigger an RTP for an online
@@ -482,9 +483,14 @@ public class RTP {
         };
         getInstance().latestTeleportData.put(uuid, data);
 
+        java.util.Set<String> biomeFilter = null;
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME) {
+          biomeFilter = java.util.Set.of(target.name());
+        }
+
         io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask task =
             new io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask(
-                new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, null),
+                new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, biomeFilter),
                 targetRegion);
         data.nextTask = task;
         getInstance().processingPlayers.add(uuid);
@@ -494,10 +500,9 @@ public class RTP {
         // kept-loaded, so no synchronous chunk I/O happens - S-005 safe), run
         // the pipeline inline instead of deferring to the next async scheduler
         // pulse. This makes a menu/GUI click teleport as immediately as the
-        // /rtp command does. The addon-facing API applies no biome filter, so
-        // the only gate is a ready cached location; any other case (empty
-        // cache, biome-filtered - N/A here) still runs asynchronously.
-        if (targetRegion.hasLocation(uuid)) {
+        // /rtp command does. When a biome filter is specified, bypass fast-path
+        // so pipeline evaluates biomes asynchronously.
+        if (biomeFilter == null && targetRegion.hasLocation(uuid)) {
           task.run();
         } else {
           scheduler.runTaskAsynchronously(task);
@@ -582,6 +587,101 @@ public class RTP {
             continue;
           }
           out.add(io.github.dailystruggle.rtp.api.RtpTarget.region(name));
+        }
+
+        // Configured worlds: enumerate worlds and gate on `rtp.worlds.<world>` / `rtp.worlds.*`
+        // when requirePermission is enabled.
+        java.util.Set<String> worldCandidates = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        if (serverAccessor != null) {
+          try {
+            java.util.List<RTPWorld<?>> rtpWorlds = serverAccessor.getRTPWorlds();
+            if (rtpWorlds != null) {
+              for (RTPWorld<?> w : rtpWorlds) {
+                if (w != null && w.name() != null && !w.name().isBlank()) {
+                  worldCandidates.add(w.name());
+                }
+              }
+            }
+          } catch (Throwable ignored) {
+          }
+        }
+        if (configs != null && configs.multiConfigParserMap != null) {
+          MultiConfigParser<WorldKeys> worldMcp =
+              (MultiConfigParser<WorldKeys>) configs.multiConfigParserMap.get(WorldKeys.class);
+          if (worldMcp != null && worldMcp.configParserFactory != null) {
+            for (String key : worldMcp.configParserFactory.map.keySet()) {
+              if (key == null || key.isBlank()) continue;
+              String clean = key.endsWith(".YML") ? key.substring(0, key.length() - 4) : key;
+              if (clean.equalsIgnoreCase("default")) continue;
+              worldCandidates.add(clean);
+            }
+          }
+        }
+        for (String worldName : worldCandidates) {
+          if (worldName == null || worldName.isBlank()) continue;
+          boolean requirePerm = false;
+          if (configs != null && configs.multiConfigParserMap != null) {
+            MultiConfigParser<WorldKeys> worldMcp =
+                (MultiConfigParser<WorldKeys>) configs.multiConfigParserMap.get(WorldKeys.class);
+            if (worldMcp != null && worldMcp.configParserFactory != null && worldMcp.configParserFactory.contains(worldName)) {
+              ConfigParser<WorldKeys> wp = worldMcp.getParser(worldName);
+              if (wp != null) {
+                requirePerm = Boolean.parseBoolean(String.valueOf(wp.getConfigValue(WorldKeys.requirePermission, false)));
+              }
+            }
+          }
+          if (requirePerm && player != null
+              && !player.hasPermission("rtp.worlds." + worldName)
+              && !player.hasPermission("rtp.worlds.*")) {
+            continue;
+          }
+          out.add(io.github.dailystruggle.rtp.api.RtpTarget.world(worldName));
+        }
+
+        // Configured / observed biomes: enumerate allowed biomes and gate on
+        // `rtp.biome.<biome>` / `rtp.biome.*`.
+        java.util.Set<String> biomeCandidates = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys> biomesParser =
+            (configs != null) ? (ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys>)
+                configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.class) : null;
+        if (biomesParser != null) {
+          Object configuredBiomes = biomesParser.getConfigValue(
+              io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.biomes, null);
+          if (configuredBiomes instanceof java.util.Collection<?> col) {
+            for (Object obj : col) {
+              if (obj != null && !obj.toString().isBlank()) {
+                biomeCandidates.add(obj.toString().trim());
+              }
+            }
+          }
+          java.util.Map<String, Object> weights = biomesParser.getMap(
+              io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.biomeWeights);
+          if (weights != null) {
+            for (String b : weights.keySet()) {
+              if (b != null && !b.isBlank()) {
+                biomeCandidates.add(b.trim());
+              }
+            }
+          }
+        }
+        // Also include observed biomes if available from spatial memory
+        try {
+          if (player != null) {
+            biomeCandidates.addAll(io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.observedBiomes(player.uuid()));
+          } else {
+            biomeCandidates.addAll(io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.observedBiomes(null));
+          }
+        } catch (Throwable ignored) {
+        }
+        for (String biomeName : biomeCandidates) {
+          if (biomeName == null || biomeName.isBlank()) continue;
+          if (player != null
+              && !player.hasPermission("rtp.biome." + biomeName.toLowerCase(Locale.ROOT))
+              && !player.hasPermission("rtp.biome." + biomeName.toUpperCase(Locale.ROOT))
+              && !player.hasPermission("rtp.biome.*")) {
+            continue;
+          }
+          out.add(io.github.dailystruggle.rtp.api.RtpTarget.biome(biomeName));
         }
 
         // Network/peer regions (rtp-proxy-ADR-014): surface the live
@@ -707,33 +807,29 @@ public class RTP {
               0L, 0.0, iconBlock, environment, label);
         }
 
-        Region region;
-        try {
-          region = resolveApiRegion(target, player);
-        } catch (RuntimeException ex) {
-          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
-              io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.DISABLED, 0L, 0.0);
-        }
-        if (region == null || region.getWorld() == null) {
-          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
-              io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.DISABLED, 0L, 0.0);
-        }
-
-        // Permission for the named target (mirrors SelectionAPI gating).
+        // Check target permission first
         boolean noPerm = false;
         switch (target.kind()) {
           case REGION:
-            if (region.getSettings().requirePermission()
-                && !player.hasPermission("rtp.regions." + target.name())) {
-              noPerm = true;
-            }
             break;
           case WORLD: {
-            ConfigParser<WorldKeys> worldParser = configs.getWorldParser(target.name());
-            boolean requirePerm = worldParser != null
-                && Boolean.parseBoolean(
-                    worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
-            if (requirePerm && !player.hasPermission("rtp.worlds." + target.name())) {
+            if (configs != null) {
+              ConfigParser<WorldKeys> worldParser = configs.getWorldParser(target.name());
+              boolean requirePerm = worldParser != null
+                  && Boolean.parseBoolean(
+                      worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
+              if (requirePerm
+                  && !player.hasPermission("rtp.worlds." + target.name())
+                  && !player.hasPermission("rtp.worlds.*")) {
+                noPerm = true;
+              }
+            }
+            break;
+          }
+          case BIOME: {
+            if (!player.hasPermission("rtp.biome." + target.name().toLowerCase(Locale.ROOT))
+                && !player.hasPermission("rtp.biome." + target.name().toUpperCase(Locale.ROOT))
+                && !player.hasPermission("rtp.biome.*")) {
               noPerm = true;
             }
             break;
@@ -741,6 +837,49 @@ public class RTP {
           case DEFAULT:
           default:
             break;
+        }
+
+        Region region;
+        try {
+          region = resolveApiRegion(target, player);
+        } catch (RuntimeException ex) {
+          region = null;
+        }
+        if (region == null || region.getWorld() == null) {
+          // Fall back to default region if resolveApiRegion did not find a region for world or biome
+          try {
+            if (player != null) {
+              region = selectionAPI.getRegion(player);
+            }
+            if (region == null || region.getWorld() == null) {
+              region = selectionAPI.getRegionOrDefault("default");
+            }
+            if (region == null || region.getWorld() == null) {
+              // Try selectionAPI.permRegionLookup
+              for (Region r : selectionAPI.permRegionLookup.values()) {
+                if (r != null && r.getWorld() != null) {
+                  region = r;
+                  break;
+                }
+              }
+            }
+          } catch (Throwable ignored) {
+          }
+        }
+        if (region == null || region.getWorld() == null) {
+          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+              noPerm
+                  ? io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION
+                  : io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.DISABLED,
+              0L, 0.0,
+              null, null, target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME ? "Biome: " + target.name() : null);
+        }
+
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.REGION) {
+          if (region.getSettings().requirePermission()
+              && !player.hasPermission("rtp.regions." + target.name())) {
+            noPerm = true;
+          }
         }
 
         // Cost: region price plus the configured economy base price, unless the
@@ -787,11 +926,16 @@ public class RTP {
         // supply the environment string here (custom-dimension friendly).
         String localEnv = null;
         String localLabel = null;
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME) {
+          localLabel = "Biome: " + target.name();
+        }
         try {
           localEnv = region.getWorld().environment();
-          // Cosmetic display label from the region's configured displayName
-          // (falls back to the region name); the same value /rtp info uses.
-          localLabel = region.displayName();
+          if (localLabel == null) {
+            // Cosmetic display label from the region's configured displayName
+            // (falls back to the region name); the same value /rtp info uses.
+            localLabel = region.displayName();
+          }
         } catch (Throwable ignored) {
           // Defensive: env/label enrichment is a cosmetic hint and must never break status.
         }
@@ -888,6 +1032,19 @@ public class RTP {
             ? "default"
             : worldParser.getConfigValue(WorldKeys.region, "default").toString();
         return selectionAPI.getRegionOrDefault(regionName);
+      }
+      case BIOME: {
+        // Resolve the best region that observes or accommodates this biome
+        String best = io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.bestRegionForBiome(
+            player != null ? player.uuid() : null, target.name(), null);
+        if (best != null) {
+          Region r = selectionAPI.getRegion(best);
+          if (r != null) return r;
+        }
+        if (player != null) {
+          return selectionAPI.getRegion(player);
+        }
+        return selectionAPI.getRegionOrDefault("default");
       }
       case DEFAULT:
       default:
@@ -1128,10 +1285,6 @@ public class RTP {
     // Bukkit/Fabric/NeoForge, no-op elsewhere); an empty scanBossBar template disables it.
     trackedTasks.add(scheduler.runTaskTimer(
         io.github.dailystruggle.rtp.common.tasks.tick.ScanProgressBars::update, 20, 20));
-
-    // Background action candidate placement warming (ADR-097)
-    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
-        actionCacheWarmTask, 20L, 20L));
 
     long asyncTime = TimeUnit.MILLISECONDS.toNanos(25); // Bumped to 5ms since async has more headroom
     trackedTasks.add(scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1));

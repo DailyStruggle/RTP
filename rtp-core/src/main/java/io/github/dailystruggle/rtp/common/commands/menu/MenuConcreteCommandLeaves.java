@@ -265,6 +265,13 @@ final class MenuConcreteCommandLeaves {
                             uuid,
                             io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_COMPOSITE,
                             msg)));
+            // Selection heatmap (ADR-089)
+            addSubCommand(new VisualizationHeatmapCmd(
+                    dispatch,
+                    (uuid, msg) -> owner.dispatchOpenVisualizationRegions(
+                            uuid,
+                            io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.SELECTION_HEATMAP,
+                            msg)));
             // Sparkline is a global chart (no region), so it has no
             // kind-scoped region picker fallback - the leaf paints
             // directly when invoked with no parameters.
@@ -569,6 +576,99 @@ final class MenuConcreteCommandLeaves {
             boolean result = dispatch.paintPipeline(callerId, regionName, messageMethod);
             RTP.log(java.util.logging.Level.FINE,
                     "[viz/pipeline] leaf returning result=" + result);
+            return result;
+        }
+
+        private static @Nullable String firstValue(@Nullable Map<String, List<String>> values,
+                                                   String key) {
+            if (values == null) return null;
+            List<String> raw = values.get(key);
+            if (raw == null || raw.isEmpty()) return null;
+            String first = raw.get(0);
+            return (first == null || first.isEmpty()) ? null : first;
+        }
+
+        private static Set<String> liveRegionNames() {
+            try {
+                if (RTP.selectionAPI == null) return Collections.emptySet();
+                Set<String> names = RTP.selectionAPI.regionNames();
+                if (names == null || names.isEmpty()) return Collections.emptySet();
+                return new LinkedHashSet<>(names);
+            } catch (RuntimeException e) {
+                return Collections.emptySet();
+            }
+        }
+    }
+
+    /**
+     * {@code /rtp visualization heatmap [region=<regionName>]} command.
+     * Draws {@link ChartSpec.Kind#SELECTION_HEATMAP}; falls back to region picker if omitted.
+     * Gates on {@code rtp.menu.admin}.
+     */
+    static final class VisualizationHeatmapCmd
+            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+
+        private final VisualizationDispatch dispatch;
+        private final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener;
+
+        VisualizationHeatmapCmd(
+                VisualizationDispatch dispatch,
+                java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener) {
+            super(null);
+            this.dispatch = java.util.Objects.requireNonNull(dispatch, "dispatch");
+            this.selectorOpener = java.util.Objects.requireNonNull(selectorOpener, "selectorOpener");
+            addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                    "region name (omit to open the visualizations selector)",
+                    (uuid, value) -> value != null && !value.isEmpty()) {
+                @Override
+                public Set<String> values() {
+                    return liveRegionNames();
+                }
+            });
+        }
+
+        @Override
+        public String name() {
+            return "heatmap";
+        }
+
+        @Override
+        public String permission() {
+            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand) {
+            return dispatch(callerId, parameterValues, null);
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand,
+                                 Consumer<String> messageMethod) {
+            return dispatch(callerId, parameterValues, messageMethod);
+        }
+
+        private boolean dispatch(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable Consumer<String> messageMethod) {
+            String regionName = firstValue(parameterValues, PARAM_REGION);
+            RTP.log(java.util.logging.Level.FINE,
+                    "[viz/heatmap] leaf reached: caller=" + callerId
+                            + " region=" + regionName
+                            + " hasMsg=" + (messageMethod != null));
+            if (regionName == null || regionName.isEmpty()) {
+                RTP.log(java.util.logging.Level.FINE,
+                        "[viz/heatmap] no region= -> opening selector");
+                Boolean ok = selectorOpener.apply(callerId, messageMethod);
+                return Boolean.TRUE.equals(ok);
+            }
+            boolean result = dispatch.paintHeatmap(callerId, regionName, messageMethod);
+            RTP.log(java.util.logging.Level.FINE,
+                    "[viz/heatmap] leaf returning result=" + result);
             return result;
         }
 

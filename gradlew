@@ -67,12 +67,60 @@
 # Transparent concurrency serialization for concurrent LLM tasks / processes
 if [ "${RTP_GRADLE_LOCKED:-0}" != "1" ]; then
     export RTP_GRADLE_LOCKED=1
-    LOCK_DIR="${TMPDIR:-/tmp}/rtp_gradle_build.lock"
+
+    # Inspect arguments to extract module target if non-conflicting
+    TARGET_MODULE=""
+    NON_MODULE_TASKS=0
+    MULTIPLE_MODULES=0
+
+    for arg in "$@"; do
+        case "$arg" in
+            -*)
+                # Option/flag, ignore for target module determination
+                ;;
+            :*/*)
+                # Not a standard task notation
+                NON_MODULE_TASKS=1
+                ;;
+            :*)
+                # Extract top-level module: strip leading colon, take up to next colon
+                mod_trimmed="${arg#:}"
+                case "$mod_trimmed" in
+                    *:*)
+                        mod_name="${mod_trimmed%%:*}"
+                        if [ -z "$TARGET_MODULE" ]; then
+                            TARGET_MODULE="$mod_name"
+                        elif [ "$TARGET_MODULE" != "$mod_name" ]; then
+                            MULTIPLE_MODULES=1
+                        fi
+                        ;;
+                    *)
+                        # Root task specified as :task
+                        NON_MODULE_TASKS=1
+                        ;;
+                esac
+                ;;
+            *)
+                # Unscoped task (e.g. "build", "test", "spotlessApply")
+                NON_MODULE_TASKS=1
+                ;;
+        esac
+    done
+
+    LOCK_SUFFIX="build"
+    if [ -n "$TARGET_MODULE" ] && [ "$NON_MODULE_TASKS" -eq 0 ] && [ "$MULTIPLE_MODULES" -eq 0 ]; then
+        LOCK_SUFFIX="mod_${TARGET_MODULE}"
+    fi
 
     # Note: POSIX shells (dash/ash) only support single-digit file descriptors,
     # so the lock is taken via flock's command form instead of "exec 200>file".
     if command -v flock >/dev/null 2>&1; then
-        LOCK_FILE="${TMPDIR:-/tmp}/rtp_gradle_build.flock"
+        GLOBAL_LOCK_FILE="${TMPDIR:-/tmp}/rtp_gradle_build.flock"
+        LOCK_FILE="${TMPDIR:-/tmp}/rtp_gradle_${LOCK_SUFFIX}.flock"
+        if [ "$LOCK_SUFFIX" != "build" ]; then
+            # Verify global build is not currently running before acquiring module lock
+            flock -w 600 "$GLOBAL_LOCK_FILE" true 2>/dev/null
+        fi
         if [ -x "$0" ]; then
             flock -w 600 "$LOCK_FILE" "$0" "$@"
         else
@@ -81,6 +129,7 @@ if [ "${RTP_GRADLE_LOCKED:-0}" != "1" ]; then
         EXIT_CODE=$?
         exit $EXIT_CODE
     else
+        LOCK_DIR="${TMPDIR:-/tmp}/rtp_gradle_${LOCK_SUFFIX}.lock"
         WAIT_SECONDS=0
         TIMEOUT=600
         while ! mkdir "$LOCK_DIR" 2>/dev/null; do
@@ -89,7 +138,7 @@ if [ "${RTP_GRADLE_LOCKED:-0}" != "1" ]; then
                 exit 1
             fi
             WAIT_SECONDS=$((WAIT_SECONDS + 5))
-            echo "[gradlew] Waiting for build lock... (${WAIT_SECONDS}s)" >&2
+            echo "[gradlew] Waiting for lock (${LOCK_SUFFIX})... (${WAIT_SECONDS}s)" >&2
             sleep 5
         done
         trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT INT TERM HUP

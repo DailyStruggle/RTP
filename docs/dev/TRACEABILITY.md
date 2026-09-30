@@ -27,6 +27,7 @@ This document connects each requirement to the design decision that motivated it
 | REQ-RTP-F-011 | Claim integrations | ADR-019 | `GlobalRegionVerifiers` | — |
 | REQ-RTP-F-012 | Admin scan lifecycle | DESIGN.md section 1 | `ScanCmd`, `ScanTask` | `ScanCmdTest` |
 | REQ-RTP-F-013 | Configurable messages | ARCHITECTURE.md | `ConfigParser`, `MessagesKeys`, `LanguageCmd`; menu reject paths preserved across the concrete-command surface ([ADR-050](../adr/ADR-050-concrete-menu-commands-supersede-tokens.md) Stage 1a) by routing `MenuConcreteCommandLeaves` into the existing `MenuRedeemSubcommand.dispatch*` helpers | `ConfigParserLanguageTest`, `LanguageCmdTest`, `ReqRtpMenuConcreteCommandsTest` (ADR-050 Stage 1a: 24 cases - registration / routing / permission gating across `/rtp menu open` `/ admin` `/ front` `/ visualizations` and the root `/rtp visualization` sibling), `MenuActionToCommandTest`, `MenuConcreteCommandLeavesBTest`, `InfoBookBuilderTest`, `VisualizationDispatchTest`, `CommandTreeMenuBuilderTest`, `MenuRedeemAnvilAndBookResponseTest` |
+| REQ-RTP-F-014 | Foreign configuration & permission import (`/rtp config import <plugin>`) | [ADR-066](../adr/ADR-066-foreign-config-importer.md) | `ForeignConfigImporter`, `ForeignConfigImporterRegistry`, `BetterRtpConfigImporter`, `JustRtpConfigImporter`, `EzRtpConfigImporter`, `JakesRtpConfigImporter`, `PermissionMigrationService`, `ConfigImportCmd` | `ConfigImporterTest`, `PermissionMigrationTest` |
 | REQ-RTP-NF-001 | Persistent state | DESIGN.md section 4 | `DatabaseAccessor` | `CachedLocationRoundTripTest` |
 | REQ-RTP-NF-002 | Thread safety | DESIGN.md section 2 | `RTPTaskPipe` | `RTPArchitectureTest` |
 | REQ-RTP-NF-003 | Logic isolation | ADR-003 | `RTPBukkitPlugin` | `RTPArchitectureTest` |
@@ -101,6 +102,7 @@ This document connects each requirement to the design decision that motivated it
 | REQ-CORE-ARCH-009 | Accessor injection | ARCH.md | RTP.java | RTPArchitectureTest |
 | REQ-CORE-ARCH-010 | No platform imports | ARCH.md | rtp-core package | RTPArchitectureTest |
 | REQ-CORE-NF-001 | Shutdown flush | DESIGN.md section 4 | RTP.stop() | MemoryShapeShutdownTest |
+| REQ-CORE-MIG-001 | Foreign config import and migration seam (`/rtp config import <plugin>`) | [ADR-066](../adr/ADR-066-foreign-config-importer.md) | `ForeignConfigImporter`, `ForeignConfigImporterRegistry`, `BetterRtpConfigImporter`, `JustRtpConfigImporter`, `EzRtpConfigImporter`, `JakesRtpConfigImporter`, `PermissionMigrationService`, `ConfigImportCmd` | `ConfigImporterTest`, `PermissionMigrationTest` |
 
 ---
 

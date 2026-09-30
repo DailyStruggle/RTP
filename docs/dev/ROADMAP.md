@@ -454,8 +454,8 @@ reproducible by readers".
     -> translate in `scripts/out/locale-<lang>.tsv` -> `locale-files-from-csv`), must pass
     `LocaleParityTest`, and should prefer native-speaker review over machine translation per
     `TRANSLATION_GUIDE.md`. No architecture change; pure content + parity work.
-- [ ] **Foreign config importer (`rtp config import <plugin>`, one-shot migration aid).** Design
-  settled in [ADR-066](../adr/ADR-066-foreign-config-importer.md) (Proposed, D-005). Lower the
+- [x] **Foreign config importer (`rtp config import <plugin>`, one-shot migration aid).** Design
+  settled in [ADR-066](../adr/ADR-066-foreign-config-importer.md) (Accepted, D-005). Lower the
   switching cost for operators moving off a competitor by translating its on-disk config into RTP's
   config tree. This is a *migration aid*, not the live API shim above: it reads the competitor's YAML
   once, writes our files, and then RTP owns the config. A generic `ConfigImporter` seam (in `rtp-core`,

@@ -14,5 +14,9 @@ public enum ActionKeys {
   lifecycle,
   command,
   gate,
-  gates
+  gates,
+  trigger,
+  triggers,
+  icon,
+  title
 }
