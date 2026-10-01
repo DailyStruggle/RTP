@@ -195,7 +195,7 @@ public final class DefaultRTPHooks implements RTPHooks {
         }
         try {
           Optional<ClaimBoundary> boundary = p.getBoundary(playerId, worldName);
-          if (boundary != null && boundary.isPresent()) {
+          if (boundary.isPresent()) {
             return boundary;
           }
         } catch (Throwable t) {

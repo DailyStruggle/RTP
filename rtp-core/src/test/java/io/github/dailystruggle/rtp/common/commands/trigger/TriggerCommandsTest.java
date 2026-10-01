@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.trigger;
 
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -103,5 +104,37 @@ class TriggerCommandsTest {
     accessor.addSender(sender);
 
     assertTrue(removeCmd.onCommand(senderId, Collections.emptyMap(), null));
+  }
+
+  @Test
+  @DisplayName("BaseTriggerCmd delegates to nextCommand when present")
+  void testNextCommandForwarding() {
+    TriggerListCmd listCmd = new TriggerListCmd(subCmd);
+    TriggerRemoveCmd nextCmd = new TriggerRemoveCmd(subCmd);
+
+    UUID senderId = UUID.randomUUID();
+    MockRTPCommandSender sender = new MockRTPCommandSender(senderId, "Sender");
+    accessor.addSender(sender);
+
+    assertTrue(listCmd.onCommand(senderId, Collections.emptyMap(), nextCmd));
+  }
+
+  @Test
+  @DisplayName("BaseTriggerCmd requirePlayer returns null for console and player for in-game sender")
+  void testRequirePlayerResolution() {
+    UUID consoleId = UUID.randomUUID();
+    MockRTPCommandSender console = new MockRTPCommandSender(consoleId, "CONSOLE");
+    accessor.addSender(console);
+
+    assertNull(subCmd.requirePlayer(consoleId, "Player required"));
+
+    RTPWorld<?> world = accessor.getRTPWorld("world");
+    UUID playerId = UUID.randomUUID();
+    MockRTPPlayer player = new MockRTPPlayer(playerId, "Player1", new RTPLocation(world, 0, 64, 0));
+    accessor.addPlayer(player);
+
+    RTPPlayer resolved = subCmd.requirePlayer(playerId, "Player required");
+    assertNotNull(resolved);
+    assertEquals(playerId, resolved.uuid());
   }
 }

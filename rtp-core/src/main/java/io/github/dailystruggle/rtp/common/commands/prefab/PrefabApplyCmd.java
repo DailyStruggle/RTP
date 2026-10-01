@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -79,29 +80,8 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         }
         Prefab prefab = opt.get();
         // Snapshot the live trees so the diff describes the true delta from the on-disk state.
-        Map<String, Map<String, Object>> baseline;
-        try {
-            java.io.File pluginDir = (RTP.serverAccessor == null) ? null
-                    : RTP.serverAccessor.getPluginDirectory();
-            baseline = (pluginDir == null)
-                    ? new LinkedHashMap<>()
-                    : PrefabDiskIO.snapshotLive(pluginDir, prefab);
-            // expandPerWorld prefabs (MultiWorld) carry no baked region
-            // overlays so snapshotLive() returns nothing for regions/*. The
-            // MultiWorldExpander requires definitions/regions/default in currentTrees to
-            // use as the per-world template, so seed it here.
-            if (prefab.expandPerWorld() && pluginDir != null
-                    && !baseline.containsKey("definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID)) {
-                baseline.put("definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID,
-                        PrefabDiskIO.readLive(pluginDir,
-                                "definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID));
-            }
-        } catch (RuntimeException re) {
-            RTP.log(Level.WARNING,
-                    "[prefab] apply: live snapshot failed for " + prefab.id()
-                            + " - falling back to empty baseline: " + re.getMessage());
-            baseline = new LinkedHashMap<>();
-        }
+        File pluginDir = (RTP.serverAccessor == null) ? null : RTP.serverAccessor.getPluginDirectory();
+        Map<String, Map<String, Object>> baseline = PrefabDiskIO.snapshotLiveBaseline(pluginDir, prefab);
         // Collect live world names so MultiWorldExpander can synthesise a
         // definitions/regions/<world>.yml per loaded world. Ignored when the prefab has
         // expandPerWorld=false (2-arg semantics via the 3-arg overload).
@@ -195,12 +175,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
     }
 
     private static void send(UUID callerId, String msg) {
-        if (callerId == null || RTP.serverAccessor == null) return;
-        try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
-        } catch (RuntimeException ignored) {
-            // Tolerant of test scaffolds without a real sender.
-        }
+        PrefabDiskIO.send(callerId, msg);
     }
 
     /**

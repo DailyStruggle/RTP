@@ -176,37 +176,10 @@ public final class RTPFabricMod implements ModInitializer {
 
             new FabricEventBridge(accessor).register();
 
-            // rtp-fabric-ADR-014: install the Fabric map binding so /rtp
-            // visualization charts render to a vanilla filled-map instead of
-            // bottoming out on NoopMapBinding. Mirrors RTPBukkitPlugin's BukkitMapBinding.
-            try {
-                FabricVersionAdapter mapAdapter = FabricVersionAdapterRegistry.peek();
-                if (mapAdapter != null && mapAdapter.supportsMapCharts()) {
-                    io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding mapBinding =
-                            new io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding();
-                    io.github.dailystruggle.rtp.common.commands.maps.MapDispatch
-                            .setMapBinding(mapBinding);
-                    // REQ-RTP-MAP-003 - release per-viewer map state on disconnect
-                    // (parity with Bukkit's OnPlayerQuit -> MapDispatch.firePlayerQuit).
-                    accessor.getFabricPlayerLifecycleHook().onPlayerQuit(uuid ->
-                            io.github.dailystruggle.rtp.common.commands.maps.MapDispatch
-                                    .firePlayerQuit(uuid));
-                    RTP.log(Level.INFO,
-                            "[RTP] Fabric map binding installed (FabricMapBinding, carrier="
-                                    + mapAdapter.mcVersion() + ").");
-                } else {
-                    RTP.log(Level.INFO,
-                            "[RTP] Fabric map binding NOT installed: version adapter "
-                                    + (mapAdapter == null ? "<none>" : mapAdapter.mcVersion())
-                                    + " does not support map charts; /rtp visualizations will report"
-                                    + " mapBindingMissing (NoopMapBinding active).");
-                }
-            } catch (Throwable t) {
-                RTP.log(Level.WARNING,
-                        "[RTP] onInitialize MapBinding install failed; MapDispatch will fall back"
-                                + " to NoopMapBinding: " + t.getClass().getSimpleName() + ": "
-                                + t.getMessage(), t);
-            }
+            // rtp-fabric-ADR-014: install the Fabric map binding via the accessor layer
+            // so /rtp visualization charts render to a vanilla filled-map instead of
+            // bottoming out on NoopMapBinding.
+            accessor.setupMapBinding();
 
             // Wire mod-side land protection (OPAC, FTB Chunks per MULTI_PLATFORM_PLAN line 505)
             try {

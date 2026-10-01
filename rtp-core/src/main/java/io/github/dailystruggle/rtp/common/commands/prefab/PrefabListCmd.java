@@ -49,11 +49,6 @@ public class PrefabListCmd extends BaseRTPCmdImpl {
     }
 
     private static void send(UUID callerId, String msg) {
-        if (callerId == null || RTP.serverAccessor == null) return;
-        try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
-        } catch (RuntimeException ignored) {
-            // Test scaffolds without a real sender are not fatal here.
-        }
+        PrefabDiskIO.send(callerId, msg);
     }
 }

@@ -227,17 +227,10 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // yields the configurable `mapBindingMissing` message. Lite is Paper-only, so
     // install the plain BukkitMapBinding unconditionally; failure degrades gracefully
     // to the same `mapBindingMissing` UX rather than crashing onEnable.
-    try {
-      io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding binding =
-          new io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding();
-      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
-      RTP.log(Level.FINE,
-          "[RTP] onEnable installed " + binding.getClass().getSimpleName()
-              + " (MapDispatch active binding)");
-    } catch (Throwable t) {
-      RTP.log(Level.WARNING,
-          "[RTP] onEnable MapBinding install failed; MapDispatch will fall back to NoopMapBinding",
-          t);
+    // Install the platform-appropriate MapBinding via the accessor layer
+    // (ADR-047 / REQ-RTP-MAP-006) so MapDispatch can satisfy chart requests.
+    if (RTP.serverAccessor != null) {
+      RTP.serverAccessor.setupMapBinding();
     }
     // Install the Bukkit-family BiomeColorSource so the biomes visualisation
     // asks the server for each biome's native cartography colour (rather

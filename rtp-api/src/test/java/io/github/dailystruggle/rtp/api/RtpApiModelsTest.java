@@ -72,6 +72,10 @@ class RtpApiModelsTest {
     RtpTarget coordLocal = RtpTarget.coordinate(null, "world_nether", 50, 70, 50);
     assertNull(coordLocal.serverId());
     assertEquals("world_nether", coordLocal.worldName());
+    assertTrue(coordLocal.toString().contains("world_nether"));
+    assertTrue(coordLocal.toString().contains("(50,70,50)"));
+    assertTrue(coord.toString().contains("survival-1"));
+    assertTrue(def.toString().contains("DEFAULT"));
 
     // Coordinate equality branches
     RtpTarget coordDiffX = RtpTarget.coordinate("survival-1", "world", 101, 64, -200);

@@ -219,7 +219,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
             java.lang.reflect.Method orElse = result.getClass().getMethod("orElse", Object.class);
             Object v = orElse.invoke(result, (Object) null);
             if (v instanceof ChunkAccess ca) return ca;
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
         }
         try {
             java.lang.reflect.Method left = result.getClass().getMethod("left");
@@ -229,7 +229,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                 Object v = orElse.invoke(opt, (Object) null);
                 if (v instanceof ChunkAccess ca) return ca;
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
         }
         return null;
     }
@@ -251,7 +251,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         try {
             ServerChunkCache cache = world.getChunkSource();
             return cache != null && cache.hasChunk(cx, cz);
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             return false;
         }
     }
@@ -404,7 +404,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                         int cz = (rcz << 5) | rz;
                         long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
                         out.put(key, canonical);
-                    } catch (Throwable ignored) {
+                    } catch (Throwable _) {
                     }
                 }
             }
@@ -461,7 +461,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         if (world == null) return false;
         try {
             if (isChunkLoaded(cx, cz)) return false;
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             return false;
         }
         try {
@@ -473,7 +473,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
             if (raw instanceof Boolean b) return b;
             if (raw != null) return Boolean.parseBoolean(raw.toString());
             return true;
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             return true;
         }
     }
@@ -491,7 +491,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                 if ("the_end".equals(path))    return java.util.List.of(unified, "DIM1");
             }
             return java.util.List.of(unified);
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             return java.util.List.of("");
         }
     }
@@ -504,7 +504,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                     : worldFolder.resolve(c).resolve("region");
             try {
                 if (java.nio.file.Files.isDirectory(regionDir)) return c;
-            } catch (Throwable ignored) {
+            } catch (Throwable _) {
             }
         }
         return candidates.get(0);
@@ -541,6 +541,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public void platform(RTPLocation location) {
+        // Platform block placement is handled via schematic paster or post-teleport actions; no-op here.
     }
 
     private static final io.github.dailystruggle.rtp.api.schematic.SchematicPaster SCHEMATIC_PASTER =
@@ -593,6 +594,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public void save() {
+        // Server manages world save cycles; manual per-world flush is a no-op on Fabric.
     }
 
     @Override

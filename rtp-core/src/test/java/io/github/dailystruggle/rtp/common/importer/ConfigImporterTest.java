@@ -60,7 +60,7 @@ public class ConfigImporterTest {
     }
 
     @Test
-    @DisplayName("EzRtpConfigImporter parses rtp.yml, config.yml, and limits.yml into valid LeafRTP regions and worlds")
+    @DisplayName("UniversalConfigImporter parses EzRTP rtp.yml, config.yml, and limits.yml into valid LeafRTP regions and worlds")
     void testEzRtpImporter() throws IOException {
         Path ezDir = pluginsDir.resolve("EzRTP");
         Files.createDirectories(ezDir);
@@ -135,7 +135,7 @@ public class ConfigImporterTest {
     }
 
     @Test
-    @DisplayName("JustRtpConfigImporter maps per-world radii, shapes ROUND->CIRCLE, SQUARE->SQUARE, and cooldowns")
+    @DisplayName("UniversalConfigImporter maps JustRTP per-world radii, shapes ROUND->CIRCLE, SQUARE->SQUARE, and cooldowns")
     void testJustRtpImporter() throws IOException {
         Path justDir = pluginsDir.resolve("justRTP");
         Files.createDirectories(justDir);
@@ -231,7 +231,7 @@ public class ConfigImporterTest {
     }
 
     @Test
-    @DisplayName("ForeignConfigImporterRegistry accurately detects BetterRTP, EzRTP, and JustRTP")
+    @DisplayName("ForeignConfigImporterRegistry accurately detects competitor configurations")
     void testAutoDetection() throws IOException {
         Path betterDir = pluginsDir.resolve("BetterRTP");
         Files.createDirectories(betterDir);
@@ -239,7 +239,7 @@ public class ConfigImporterTest {
 
         Map<String, Path> detected0 = ForeignConfigImporterRegistry.detectAvailableSources(pluginsDir);
         assertEquals(1, detected0.size());
-        assertTrue(detected0.containsKey("betterrtp"));
+        assertTrue(detected0.containsKey("BetterRTP"));
 
         Path ezDir = pluginsDir.resolve("EzRTP");
         Files.createDirectories(ezDir);
@@ -247,8 +247,8 @@ public class ConfigImporterTest {
 
         Map<String, Path> detected1 = ForeignConfigImporterRegistry.detectAvailableSources(pluginsDir);
         assertEquals(2, detected1.size());
-        assertTrue(detected1.containsKey("betterrtp"));
-        assertTrue(detected1.containsKey("ezrtp"));
+        assertTrue(detected1.containsKey("BetterRTP"));
+        assertTrue(detected1.containsKey("EzRTP"));
 
         Path justDir = pluginsDir.resolve("justRTP");
         Files.createDirectories(justDir);
@@ -256,13 +256,13 @@ public class ConfigImporterTest {
 
         Map<String, Path> detected2 = ForeignConfigImporterRegistry.detectAvailableSources(pluginsDir);
         assertEquals(3, detected2.size());
-        assertTrue(detected2.containsKey("betterrtp"));
-        assertTrue(detected2.containsKey("ezrtp"));
-        assertTrue(detected2.containsKey("justrtp"));
+        assertTrue(detected2.containsKey("BetterRTP"));
+        assertTrue(detected2.containsKey("EzRTP"));
+        assertTrue(detected2.containsKey("justRTP"));
     }
 
     @Test
-    @DisplayName("BetterRtpConfigImporter parses Default, CustomWorlds, Cooldown, and Price into LeafRTP configs")
+    @DisplayName("UniversalConfigImporter parses BetterRTP Default, CustomWorlds, Cooldown, and Price into LeafRTP configs")
     void testBetterRtpImporter() throws IOException {
         Path betterDir = pluginsDir.resolve("BetterRTP");
         Files.createDirectories(betterDir);
@@ -337,14 +337,17 @@ public class ConfigImporterTest {
 
         // Execute auto-detect with no params
         UUID caller = UUID.randomUUID();
-        boolean res = importCmd.onCommand(caller, Collections.emptyMap(), null);
+        Map<String, List<String>> params = new HashMap<>();
+        params.put("overwrite", List.of("true"));
+        boolean res = importCmd.onCommand(caller, params, null);
         assertTrue(res, "Command should succeed on single detected source");
 
-        assertTrue(Files.exists(rtpDir.resolve("regions").resolve("world_region.yml")));
+        assertTrue(Files.exists(rtpDir.resolve("regions").resolve("world_region.yml"))
+                || Files.exists(rtpDir.resolve("definitions").resolve("regions").resolve("world_region.yml")));
     }
 
     @Test
-    @DisplayName("BetterRtpConfigImporter parses list of single-key maps and nested Settings.Cooldown.Time")
+    @DisplayName("UniversalConfigImporter parses list of single-key maps and nested Settings.Cooldown.Time")
     void testBetterRtpSingleKeyMapList() throws IOException {
         Path betterDir = pluginsDir.resolve("BetterRTP");
         Files.createDirectories(betterDir);
@@ -420,7 +423,7 @@ public class ConfigImporterTest {
     }
 
     @Test
-    @DisplayName("JustRtpConfigImporter parses custom_locations.yml and nested settings")
+    @DisplayName("UniversalConfigImporter parses custom_locations.yml and nested settings")
     void testJustRtpCustomLocations() throws IOException {
         Path justDir = pluginsDir.resolve("justRTP");
         Files.createDirectories(justDir);
@@ -494,13 +497,18 @@ public class ConfigImporterTest {
         Map<String, List<String>> params = new HashMap<>();
         params.put("source", List.of("betterrtp"));
         params.put("path", List.of(customDir.toString()));
+        params.put("overwrite", List.of("true"));
 
         UUID caller = UUID.randomUUID();
         boolean res = importCmd.onCommand(caller, params, null);
         assertTrue(res, "Command should succeed with custom path");
 
-        assertTrue(Files.exists(rtpDir.resolve("regions").resolve("world_region.yml")));
-        RtpYamlConfig reg = RtpYamlConfig.load(rtpDir.resolve("regions").resolve("world_region.yml").toFile());
+        Path regFile = rtpDir.resolve("regions").resolve("world_region.yml");
+        if (!Files.exists(regFile)) {
+            regFile = rtpDir.resolve("definitions").resolve("regions").resolve("world_region.yml");
+        }
+        assertTrue(Files.exists(regFile));
+        RtpYamlConfig reg = RtpYamlConfig.load(regFile.toFile());
         assertEquals(3000, reg.getInt("shape.radius"));
         assertEquals(75, reg.getInt("shape.centerRadius"));
     }
@@ -622,7 +630,7 @@ public class ConfigImporterTest {
     }
 
     @Test
-    @DisplayName("Phase 1.3: Competitor effects mirroring for BetterRTP, JustRTP, and EzRTP")
+    @DisplayName("Phase 1.3: Effects mirroring for BetterRTP, JustRTP, and EzRTP configs")
     void testCompetitorEffectsMirroring() throws IOException {
         // BetterRTP effects
         Path bDir = pluginsDir.resolve("BetterRTP_Effects");
@@ -743,7 +751,7 @@ public class ConfigImporterTest {
     }
 
     @Test
-    @DisplayName("Phase 1.4: JustRTP rtp_zones.yml conversion into declarative zone action YAML")
+    @DisplayName("Phase 1.4: JustRTP rtp_zones.yml conversion into declarative zone action YAML via UniversalConfigImporter")
     void testJustRtpZonesImporterSeam() throws IOException {
         Path justDir = pluginsDir.resolve("JustRTP_Zones");
         Files.createDirectories(justDir);
@@ -809,7 +817,7 @@ public class ConfigImporterTest {
     }
 
     @Test
-    @DisplayName("JakesRtpConfigImporter parses config.yml, rtpSettings, and distributions into LeafRTP configs")
+    @DisplayName("UniversalConfigImporter parses JakesRTP config.yml, rtpSettings, and distributions into LeafRTP configs")
     void testJakesRtpImporter() throws IOException {
         Path jakesDir = pluginsDir.resolve("JakesRTP");
         Path rtpSettingsDir = jakesDir.resolve("rtpSettings");
@@ -945,6 +953,499 @@ public class ConfigImporterTest {
 
         // Verify ForeignConfigImporterRegistry resolution
         assertEquals(jakesDir, ForeignConfigImporterRegistry.resolveSourceDir(pluginsDir, "jakesrtp"));
-        assertEquals(importer.getClass(), ForeignConfigImporterRegistry.getImporter("jakesrtp").getClass());
+        assertNotNull(ForeignConfigImporterRegistry.getImporter("jakesrtp"));
+    }
+
+    @Test
+    @DisplayName("GenericSchemaImporter correctly imports AsyncRTP configuration")
+    void testAsyncRtpGenericImport() throws IOException {
+        Path asyncDir = tempDir.resolve("plugins").resolve("AsyncRTP");
+        Files.createDirectories(asyncDir);
+
+        Files.writeString(asyncDir.resolve("config.yml"),
+                "cooldown: 40\n" +
+                "teleport-delay: 3\n" +
+                "worlds:\n" +
+                "  survival:\n" +
+                "    radius: 7500\n" +
+                "    min-radius: 250\n" +
+                "    center:\n" +
+                "      x: 50\n" +
+                "      z: -50\n" +
+                "    min-y: 60\n" +
+                "    max-y: 250\n" +
+                "    shape: circle\n" +
+                "    price: 10.0\n" +
+                "    blacklisted-biomes:\n" +
+                "      - ocean\n" +
+                "      - deep_ocean\n");
+
+        ForeignConfigImporter importer = ForeignConfigImporterRegistry.getImporter("asyncrtp");
+        assertNotNull(importer);
+        assertTrue(importer.canImport(asyncDir));
+
+        Path outDir = tempDir.resolve("async_output");
+        ImportResult result = importer.importConfiguration(asyncDir, outDir, false);
+        assertTrue(result.isSuccess(), "Import should succeed: " + result.getErrors());
+
+        Path regFile = outDir.resolve("regions").resolve("survival_region.yml");
+        assertTrue(Files.exists(regFile));
+        RtpYamlConfig regCfg = RtpYamlConfig.load(regFile.toFile());
+        assertEquals(7500, regCfg.getInt("shape.radius"));
+        assertEquals(250, regCfg.getInt("shape.centerRadius"));
+        assertEquals(50, regCfg.getInt("shape.centerX"));
+        assertEquals(-50, regCfg.getInt("shape.centerZ"));
+        assertEquals(10.0, regCfg.getDouble("price"));
+        assertEquals("CIRCLE", regCfg.getString("shape.name"));
+
+        Path configFile = outDir.resolve("config.yml");
+        assertTrue(Files.exists(configFile));
+        RtpYamlConfig cfg = RtpYamlConfig.load(configFile.toFile());
+        assertEquals(40, cfg.getInt("teleportCooldown"));
+        assertEquals(3, cfg.getInt("teleportDelay"));
+    }
+
+    @Test
+    @DisplayName("GenericSchemaImporter correctly imports AdvancedRTP configuration")
+    void testAdvancedRtpGenericImport() throws IOException {
+        Path advDir = tempDir.resolve("plugins").resolve("AdvancedRTP");
+        Files.createDirectories(advDir);
+
+        Files.writeString(advDir.resolve("config.yml"),
+                "cooldown: 55\n" +
+                "warmup: 4\n" +
+                "worlds:\n" +
+                "  mining:\n" +
+                "    radius: 4000\n" +
+                "    min_radius: 150\n" +
+                "    x: 0\n" +
+                "    z: 0\n" +
+                "    min_y: 10\n" +
+                "    max_y: 180\n" +
+                "    shape: square\n" +
+                "    cost: 5.0\n");
+
+        ForeignConfigImporter importer = ForeignConfigImporterRegistry.getImporter("advancedrtp");
+        assertNotNull(importer);
+        assertTrue(importer.canImport(advDir));
+
+        Path outDir = tempDir.resolve("adv_output");
+        ImportResult result = importer.importConfiguration(advDir, outDir, false);
+        assertTrue(result.isSuccess(), "Import should succeed: " + result.getErrors());
+
+        Path regFile = outDir.resolve("regions").resolve("mining_region.yml");
+        assertTrue(Files.exists(regFile));
+        RtpYamlConfig regCfg = RtpYamlConfig.load(regFile.toFile());
+        assertEquals(4000, regCfg.getInt("shape.radius"));
+        assertEquals(150, regCfg.getInt("shape.centerRadius"));
+        assertEquals("SQUARE", regCfg.getString("shape.name"));
+        assertEquals(5.0, regCfg.getDouble("price"));
+    }
+
+    @Test
+    @DisplayName("UniversalConfigImporter imports across 6 major competitors successfully")
+    void testUniversalImporterAcrossSixCompetitors() throws IOException {
+        UniversalConfigImporter universal = new UniversalConfigImporter();
+        assertEquals("universal", universal.sourceName());
+
+        // 1. BetterRTP via Universal
+        Path betterDir = tempDir.resolve("plugins").resolve("BetterRTP_Uni");
+        Files.createDirectories(betterDir);
+        Files.writeString(betterDir.resolve("config.yml"),
+                "Default:\n" +
+                "  MaxRadius: 6000\n" +
+                "  MinRadius: 200\n" +
+                "CustomWorlds:\n" +
+                "  - world:\n" +
+                "      MaxRadius: 8000\n" +
+                "      MinRadius: 500\n" +
+                "      CenterX: 15\n" +
+                "      CenterZ: -15\n" +
+                "      Shape: 'Circle'\n" +
+                "      Price: 20\n");
+        assertTrue(universal.canImport(betterDir));
+        Path out1 = tempDir.resolve("uni_out_better");
+        ImportResult res1 = universal.importConfiguration(betterDir, out1, false);
+        assertTrue(res1.isSuccess(), "BetterRTP universal import failed: " + res1.getErrors());
+        Path reg1 = out1.resolve("regions").resolve("world_region.yml");
+        assertTrue(Files.exists(reg1));
+        RtpYamlConfig cfg1 = RtpYamlConfig.load(reg1.toFile());
+        assertEquals(8000, cfg1.getInt("shape.radius"));
+        assertEquals(500, cfg1.getInt("shape.centerRadius"));
+        assertEquals(20.0, cfg1.getDouble("price"));
+
+        // 2. EzRTP via Universal
+        Path ezDir = tempDir.resolve("plugins").resolve("EzRTP_Uni");
+        Files.createDirectories(ezDir);
+        Files.writeString(ezDir.resolve("rtp.yml"),
+                "radius:\n" +
+                "  min-distance: 120\n" +
+                "  max-distance: 3600\n" +
+                "center:\n" +
+                "  center-x: 50\n" +
+                "  center-z: -50\n" +
+                "worlds:\n" +
+                "  - world\n");
+        Files.writeString(ezDir.resolve("config.yml"),
+                "world: world\n" +
+                "cost: 12.0\n" +
+                "cooldown: 90\n");
+        assertTrue(universal.canImport(ezDir));
+        Path out2 = tempDir.resolve("uni_out_ez");
+        ImportResult res2 = universal.importConfiguration(ezDir, out2, false);
+        assertTrue(res2.isSuccess(), "EzRTP universal import failed: " + res2.getErrors());
+        Path reg2 = out2.resolve("regions").resolve("world_region.yml");
+        assertTrue(Files.exists(reg2));
+        RtpYamlConfig cfg2 = RtpYamlConfig.load(reg2.toFile());
+        assertEquals(3600, cfg2.getInt("shape.radius"));
+        assertEquals(120, cfg2.getInt("shape.centerRadius"));
+        assertEquals(12.0, cfg2.getDouble("price"));
+
+        // 3. JustRTP via Universal
+        Path justDir = tempDir.resolve("plugins").resolve("JustRTP_Uni");
+        Files.createDirectories(justDir);
+        Files.writeString(justDir.resolve("config.yml"),
+                "teleportation:\n" +
+                "  cooldown: 45\n" +
+                "  delay: 2\n" +
+                "radius: 4200\n" +
+                "min-radius: 300\n" +
+                "center-x: 0\n" +
+                "center-z: 0\n" +
+                "world: world\n");
+        assertTrue(universal.canImport(justDir));
+        Path out3 = tempDir.resolve("uni_out_just");
+        ImportResult res3 = universal.importConfiguration(justDir, out3, false);
+        assertTrue(res3.isSuccess(), "JustRTP universal import failed: " + res3.getErrors());
+        Path reg3 = out3.resolve("regions").resolve("world_region.yml");
+        assertTrue(Files.exists(reg3));
+        RtpYamlConfig cfg3 = RtpYamlConfig.load(reg3.toFile());
+        assertEquals(4200, cfg3.getInt("shape.radius"));
+        assertEquals(300, cfg3.getInt("shape.centerRadius"));
+
+        // 4. JakesRTP via Universal (Multi-file directory topology)
+        Path jakesDir = tempDir.resolve("plugins").resolve("JakesRTP_Uni");
+        Path jakesRtpSettings = jakesDir.resolve("rtpSettings");
+        Files.createDirectories(jakesRtpSettings);
+        Files.writeString(jakesDir.resolve("config.yml"),
+                "rtp-on-first-join:\n" +
+                "  enabled: true\n");
+        Files.writeString(jakesRtpSettings.resolve("survival.yml"),
+                "landing-world: world\n" +
+                "radius: 5500\n" +
+                "min-radius: 400\n" +
+                "center:\n" +
+                "  x: 100\n" +
+                "  z: -100\n" +
+                "cost: 15.0\n");
+        assertTrue(universal.canImport(jakesDir));
+        Path out4 = tempDir.resolve("uni_out_jakes");
+        ImportResult res4 = universal.importConfiguration(jakesDir, out4, false);
+        assertTrue(res4.isSuccess(), "JakesRTP universal import failed: " + res4.getErrors());
+        Path reg4 = out4.resolve("regions").resolve("survival_region.yml");
+        assertTrue(Files.exists(reg4));
+        RtpYamlConfig cfg4 = RtpYamlConfig.load(reg4.toFile());
+        assertEquals(5500, cfg4.getInt("shape.radius"));
+        assertEquals(400, cfg4.getInt("shape.centerRadius"));
+
+        // 5. AsyncRTP via Universal
+        Path asyncDir = tempDir.resolve("plugins").resolve("AsyncRTP_Uni");
+        Files.createDirectories(asyncDir);
+        Files.writeString(asyncDir.resolve("config.yml"),
+                "worlds:\n" +
+                "  nether:\n" +
+                "    radius: 3000\n" +
+                "    min-radius: 100\n" +
+                "    shape: square\n" +
+                "    price: 5.0\n");
+        assertTrue(universal.canImport(asyncDir));
+        Path out5 = tempDir.resolve("uni_out_async");
+        ImportResult res5 = universal.importConfiguration(asyncDir, out5, false);
+        assertTrue(res5.isSuccess(), "AsyncRTP universal import failed: " + res5.getErrors());
+        Path reg5 = out5.resolve("regions").resolve("nether_region.yml");
+        assertTrue(Files.exists(reg5));
+        RtpYamlConfig cfg5 = RtpYamlConfig.load(reg5.toFile());
+        assertEquals(3000, cfg5.getInt("shape.radius"));
+        assertEquals("SQUARE", cfg5.getString("shape.name"));
+
+        // 6. AdvancedRTP via Universal
+        Path advDir = tempDir.resolve("plugins").resolve("AdvancedRTP_Uni");
+        Files.createDirectories(advDir);
+        Files.writeString(advDir.resolve("config.yml"),
+                "cooldown: 75\n" +
+                "worlds:\n" +
+                "  end_world:\n" +
+                "    radius: 6500\n" +
+                "    min_radius: 500\n" +
+                "    cost: 30.0\n");
+        assertTrue(universal.canImport(advDir));
+        Path out6 = tempDir.resolve("uni_out_adv");
+        ImportResult res6 = universal.importConfiguration(advDir, out6, false);
+        assertTrue(res6.isSuccess(), "AdvancedRTP universal import failed: " + res6.getErrors());
+        Path reg6 = out6.resolve("regions").resolve("end_world_region.yml");
+        assertTrue(Files.exists(reg6));
+        RtpYamlConfig cfg6 = RtpYamlConfig.load(reg6.toFile());
+        assertEquals(6500, cfg6.getInt("shape.radius"));
+        assertEquals(500, cfg6.getInt("shape.centerRadius"));
+        assertEquals(30.0, cfg6.getDouble("price"));
+    }
+
+    @Test
+    @DisplayName("UniversalConfigImporter handles full BetterRTP configuration without dedicated importer")
+    void testUniversalImporterHandlesFullBetterRtpConfig() throws IOException {
+        UniversalConfigImporter universal = new UniversalConfigImporter();
+
+        // An unknown plugin directory containing a full real-world BetterRTP config
+        Path unknownPluginDir = tempDir.resolve("plugins").resolve("UnknownRandomTeleport_BetterRTPStructure");
+        Files.createDirectories(unknownPluginDir);
+
+        Files.writeString(unknownPluginDir.resolve("config.yml"),
+                "Language-File: en.yml\n" +
+                "Settings:\n" +
+                "  MaxAttempts: 32\n" +
+                "  RtpOnFirstJoin:\n" +
+                "    Enabled: true\n" +
+                "    SetAsRespawn: true\n" +
+                "  Cooldown:\n" +
+                "    Enabled: true\n" +
+                "    LockAfter: 5\n" +
+                "    Time: 600\n" +
+                "  Delay:\n" +
+                "    Enabled: true\n" +
+                "    Time: 5\n" +
+                "    CancelOnMove: true\n" +
+                "Default:\n" +
+                "  UseWorldBorder: false\n" +
+                "  MaxRadius: 1000\n" +
+                "  MinRadius: 10\n" +
+                "  CenterX: 0\n" +
+                "  CenterZ: 0\n" +
+                "  Shape: square\n" +
+                "DisabledWorlds:\n" +
+                "  - prison\n" +
+                "  - creative\n" +
+                "CustomWorlds:\n" +
+                "  - custom_world_1:\n" +
+                "      MaxRadius: 2500\n" +
+                "      MinRadius: 150\n" +
+                "      Price: 50.0\n" +
+                "      Shape: square\n" +
+                "  - other_custom_world:\n" +
+                "      MaxRadius: 8500\n" +
+                "      MinRadius: 200\n" +
+                "      CenterX: 123\n" +
+                "      CenterZ: -123\n" +
+                "      Price: 0.0\n" +
+                "      Shape: circle\n" +
+                "  - prison:\n" +
+                "      MaxRadius: 500\n" +
+                "      MinRadius: 50\n");
+
+        assertTrue(universal.canImport(unknownPluginDir), "Universal importer should detect unknown folder with RTP markers");
+
+        Path outDir = tempDir.resolve("unknown_better_rtp_out");
+        ImportResult result = universal.importConfiguration(unknownPluginDir, outDir, false);
+
+        assertTrue(result.isSuccess(), "Import must succeed: " + result.getErrors());
+
+        // Verify custom worlds were mapped
+        Path cw1File = outDir.resolve("regions").resolve("custom_world_1_region.yml");
+        Path ocwFile = outDir.resolve("regions").resolve("other_custom_world_region.yml");
+        Path prisonFile = outDir.resolve("regions").resolve("prison_region.yml");
+
+        assertTrue(Files.exists(cw1File), "custom_world_1_region.yml must be created");
+        assertTrue(Files.exists(ocwFile), "other_custom_world_region.yml must be created");
+        assertFalse(Files.exists(prisonFile), "prison_region.yml must NOT be created because prison is in DisabledWorlds");
+
+        RtpYamlConfig cw1Cfg = RtpYamlConfig.load(cw1File.toFile());
+        assertEquals("SQUARE", cw1Cfg.getString("shape.name"));
+        assertEquals(2500, cw1Cfg.getInt("shape.radius"));
+        assertEquals(150, cw1Cfg.getInt("shape.centerRadius"));
+        assertEquals(50.0, cw1Cfg.getDouble("price"));
+
+        RtpYamlConfig ocwCfg = RtpYamlConfig.load(ocwFile.toFile());
+        assertEquals("CIRCLE", ocwCfg.getString("shape.name"));
+        assertEquals(8500, ocwCfg.getInt("shape.radius"));
+        assertEquals(200, ocwCfg.getInt("shape.centerRadius"));
+        assertEquals(123, ocwCfg.getInt("shape.centerX"));
+        assertEquals(-123, ocwCfg.getInt("shape.centerZ"));
+
+        // Verify global destination config.yml extracted nested Settings correctly
+        Path globalFile = outDir.resolve("config.yml");
+        assertTrue(Files.exists(globalFile));
+        RtpYamlConfig globalCfg = RtpYamlConfig.load(globalFile.toFile());
+        assertEquals(600L, globalCfg.getLong("teleportCooldown"));
+        assertEquals(5L, globalCfg.getLong("teleportDelay"));
+        assertEquals(5L, globalCfg.getLong("lockAfterUses"));
+        assertTrue(globalCfg.getBoolean("cancelOnMove"));
+        assertTrue(globalCfg.getBoolean("setRespawnOnTeleport"));
+        assertTrue(globalCfg.getBoolean("rtpOnFirstJoin"));
+    }
+
+    @Test
+    @DisplayName("UniversalConfigImporter imports real-world AdvancedRTP from testServer plugins")
+    void testUniversalImporterWithTestServerAdvancedRtp() throws IOException {
+        Path advTestServerPath = Path.of("C:\\GameServers\\Minecraft\\testServer\\RTP-Paper\\26.3\\plugins\\AdvancedRTP");
+        if (!Files.isDirectory(advTestServerPath)) return;
+
+        UniversalConfigImporter importer = new UniversalConfigImporter();
+        assertTrue(importer.canImport(advTestServerPath));
+
+        Path outDir = tempDir.resolve("advancedrtp_testserver_out");
+        ImportResult result = importer.importConfiguration(advTestServerPath, outDir, false);
+        assertTrue(result.isSuccess(), "Import must succeed: " + result.getErrors());
+        assertEquals("AdvancedRTP", result.getSourceName());
+
+        // Verify default world region was created with AdvancedRTP params
+        Path regFile = outDir.resolve("regions").resolve("world_region.yml");
+        assertTrue(Files.exists(regFile), "world_region.yml must exist");
+        RtpYamlConfig regCfg = RtpYamlConfig.load(regFile.toFile());
+        assertEquals("world", regCfg.getString("world"));
+        assertEquals(2000, regCfg.getInt("shape.radius"));
+        assertEquals(100, regCfg.getInt("shape.centerRadius"));
+        assertEquals(34, regCfg.getInt("vert.minY"));
+        assertEquals(94, regCfg.getInt("vert.maxY"));
+
+        // Verify blacklisted worlds were skipped
+        assertFalse(Files.exists(outDir.resolve("regions").resolve("events_region.yml")));
+        assertFalse(Files.exists(outDir.resolve("regions").resolve("admin_world_region.yml")));
+        assertFalse(Files.exists(outDir.resolve("regions").resolve("dungeon_region.yml")));
+
+        // Verify global config extracted cooldown and delay
+        Path destConfig = outDir.resolve("config.yml");
+        assertTrue(Files.exists(destConfig));
+        RtpYamlConfig cfg = RtpYamlConfig.load(destConfig.toFile());
+        assertEquals(10L, cfg.getLong("teleportCooldown"));
+        assertEquals(3L, cfg.getLong("teleportDelay"));
+        assertEquals(10, cfg.getInt("maxAttempts"));
+    }
+
+    @Test
+    @DisplayName("UniversalConfigImporter imports real-world AsyRTP from testServer plugins")
+    void testUniversalImporterWithTestServerAsyRtp() throws IOException {
+        Path asyTestServerPath = Path.of("C:\\GameServers\\Minecraft\\testServer\\RTP-Paper\\26.3\\plugins\\AsyRTP");
+        if (!Files.isDirectory(asyTestServerPath)) return;
+
+        UniversalConfigImporter importer = new UniversalConfigImporter();
+        assertTrue(importer.canImport(asyTestServerPath));
+
+        Path outDir = tempDir.resolve("asyrtp_testserver_out");
+        ImportResult result = importer.importConfiguration(asyTestServerPath, outDir, false);
+        assertTrue(result.isSuccess(), "Import must succeed: " + result.getErrors());
+        assertEquals("AsyRTP", result.getSourceName());
+
+        // Verify gui.worlds sections were extracted
+        Path worldReg = outDir.resolve("regions").resolve("world_region.yml");
+        Path netherReg = outDir.resolve("regions").resolve("nether_region.yml");
+        Path endReg = outDir.resolve("regions").resolve("end_region.yml");
+
+        assertTrue(Files.exists(worldReg), "world_region.yml must exist");
+        assertTrue(Files.exists(netherReg), "nether_region.yml must exist");
+        assertTrue(Files.exists(endReg), "end_region.yml must exist");
+
+        RtpYamlConfig worldCfg = RtpYamlConfig.load(worldReg.toFile());
+        assertEquals(10000, worldCfg.getInt("shape.radius"));
+        assertEquals(0, worldCfg.getInt("shape.centerRadius"));
+
+        RtpYamlConfig netherCfg = RtpYamlConfig.load(netherReg.toFile());
+        assertEquals(900, netherCfg.getInt("shape.radius"));
+        assertEquals(150, netherCfg.getInt("shape.centerRadius"));
+        assertEquals(3500.0, netherCfg.getDouble("price"));
+
+        RtpYamlConfig endCfg = RtpYamlConfig.load(endReg.toFile());
+        assertEquals(1200, endCfg.getInt("shape.radius"));
+        assertEquals(200, endCfg.getInt("shape.centerRadius"));
+        assertEquals(5000.0, endCfg.getDouble("price"));
+
+        // Verify global config
+        Path destConfig = outDir.resolve("config.yml");
+        assertTrue(Files.exists(destConfig));
+        RtpYamlConfig cfg = RtpYamlConfig.load(destConfig.toFile());
+        assertEquals(60L, cfg.getLong("teleportCooldown"));
+    }
+
+    @Test
+    @DisplayName("UniversalConfigImporter canImport and importConfiguration edge cases")
+    void testUniversalImporterEdgeCases() throws IOException {
+        UniversalConfigImporter importer = new UniversalConfigImporter();
+        assertEquals("universal", importer.sourceName());
+        assertTrue(importer.directoryAliases().contains("universal"));
+        assertTrue(importer.indicatorFiles().contains("config.yml"));
+
+        // Null and non-directory
+        assertFalse(importer.canImport(null));
+        Path notDir = tempDir.resolve("file.txt");
+        Files.writeString(notDir, "hello");
+        assertFalse(importer.canImport(notDir));
+
+        // canImport false on empty directory
+        Path emptyDir = tempDir.resolve("empty");
+        Files.createDirectories(emptyDir);
+        assertFalse(importer.canImport(emptyDir));
+
+        // importConfiguration fails when canImport is false
+        Path outDir = tempDir.resolve("out_empty");
+        ImportResult failResult = importer.importConfiguration(emptyDir, outDir, false);
+        assertFalse(failResult.isSuccess());
+
+        // canImport returns true when indicator file exists
+        Path indicatorDir = tempDir.resolve("indicator");
+        Files.createDirectories(indicatorDir);
+        Files.writeString(indicatorDir.resolve("rtp.yml"), "teleport: true\n");
+        assertTrue(importer.canImport(indicatorDir));
+
+        // canImport returns true when common subdir has yaml
+        Path subDirPlugin = tempDir.resolve("subdir_plugin");
+        Path worldsSub = subDirPlugin.resolve("worlds");
+        Files.createDirectories(worldsSub);
+        Files.writeString(worldsSub.resolve("w.yml"), "radius: 1000\n");
+        assertTrue(importer.canImport(subDirPlugin));
+
+        // canImport returns true when any yml has RTP markers
+        Path markerDir = tempDir.resolve("marker_plugin");
+        Files.createDirectories(markerDir);
+        Files.writeString(markerDir.resolve("custom.yml"), "min_radius: 100\nmax_radius: 5000\n");
+        assertTrue(importer.canImport(markerDir));
+
+        // Test root config with blacklisted_worlds and default_worlds
+        Path customRtpDir = tempDir.resolve("custom_rtp");
+        Files.createDirectories(customRtpDir);
+        Files.writeString(customRtpDir.resolve("config.yml"),
+                "blacklisted_worlds: [dungeon]\n" +
+                "default_worlds: [world]\n" +
+                "min-radius: 50\n" +
+                "max-radius: 1500\n" +
+                "cooldown:\n" +
+                "  duration: 25\n" +
+                "  lockafter: 4\n" +
+                "delay:\n" +
+                "  duration: 2\n" +
+                "  cancel-on-move: true\n" +
+                "settings:\n" +
+                "  cooldown:\n" +
+                "    duration: 30\n" +
+                "    lockafter: 5\n" +
+                "  delay:\n" +
+                "    duration: 4\n" +
+                "    cancel-on-move: true\n" +
+                "  set-respawn: true\n" +
+                "  first-join:\n" +
+                "    enabled: true\n" +
+                "    set-respawn: true\n" +
+                "on-death: true\n");
+
+        Path customOut = tempDir.resolve("custom_out");
+        ImportResult customRes = importer.importConfiguration(customRtpDir, customOut, false);
+        assertTrue(customRes.isSuccess(), "Import should succeed: " + customRes.getErrors());
+        assertTrue(Files.exists(customOut.resolve("regions").resolve("world_region.yml")));
+        assertFalse(Files.exists(customOut.resolve("regions").resolve("dungeon_region.yml")));
+        RtpYamlConfig customCfg = RtpYamlConfig.load(customOut.resolve("config.yml").toFile());
+        assertEquals(30L, customCfg.getLong("teleportCooldown"));
+        assertEquals(4L, customCfg.getLong("teleportDelay"));
+        assertEquals(5L, customCfg.getLong("lockAfterUses"));
+        assertTrue(customCfg.getBoolean("cancelOnMove"));
+        assertTrue(customCfg.getBoolean("setRespawnOnTeleport"));
+        assertTrue(customCfg.getBoolean("rtpOnFirstJoin"));
+        assertTrue(customCfg.getBoolean("rtpOnDeath"));
     }
 }

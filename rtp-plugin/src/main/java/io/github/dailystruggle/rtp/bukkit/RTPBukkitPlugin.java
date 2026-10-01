@@ -208,23 +208,10 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // regions configured for a late-loaded world to never rebind.
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable setupBukkitEvents (synchronous)");
     setupBukkitEvents();
-    // Install the Bukkit-family MapBinding so MapDispatch (ADR-047 / REQ-RTP-MAP-006)
-    // can satisfy chart requests issued from /rtp info etc. Folia gets FoliaMapBinding
-    // (per-viewer EntityScheduler hop available for live charts); other backends get
-    // the plain BukkitMapBinding. Live binding is not yet enabled on either path.
-    try {
-      io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding binding =
-          isFolia()
-              ? new io.github.dailystruggle.rtp.folia.maps.FoliaMapBinding()
-              : new io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding();
-      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
-      RTP.log(java.util.logging.Level.FINE,
-          "[RTP] onEnable installed " + binding.getClass().getSimpleName()
-              + " via MapDispatch");
-    } catch (Throwable t) {
-      RTP.log(java.util.logging.Level.WARNING,
-          "[RTP] onEnable MapBinding install failed; MapDispatch will fall back to NoopMapBinding",
-          t);
+    // Install the platform-appropriate MapBinding via the accessor layer
+    // (ADR-047 / REQ-RTP-MAP-006) so MapDispatch can satisfy chart requests.
+    if (RTP.serverAccessor != null) {
+      RTP.serverAccessor.setupMapBinding();
     }
     // Install the Bukkit-family BiomeColorSource so the biomes visualisation
     // can ask the server for each biome's native cartography colour (rather

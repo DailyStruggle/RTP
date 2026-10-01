@@ -31,6 +31,7 @@ public record ActionContext(
     gateValidators = (gateValidators == null) ? Collections.emptyList() : List.copyOf(gateValidators);
   }
 
+  @SuppressWarnings("java:S1845") // Factory method name empty() mirrors static EMPTY constant for API ergonomics
   public static ActionContext empty() {
     return EMPTY;
   }
@@ -97,7 +98,9 @@ public record ActionContext(
             else if (item != null) {
               try {
                 cluster.add(UUID.fromString(item.toString().trim()));
-              } catch (IllegalArgumentException ignored) {}
+              } catch (IllegalArgumentException ignored) {
+                // Ignore non-UUID formatted strings in cluster collections
+              }
             }
           }
           if (!cluster.isEmpty()) result.add(Collections.unmodifiableList(cluster));
@@ -114,7 +117,9 @@ public record ActionContext(
             else if (item != null) {
               try {
                 cluster.add(UUID.fromString(item.toString().trim()));
-              } catch (IllegalArgumentException ignored) {}
+              } catch (IllegalArgumentException ignored) {
+                // Ignore non-UUID formatted strings in cluster map entries
+              }
             }
           }
           if (!cluster.isEmpty()) result.add(Collections.unmodifiableList(cluster));
@@ -143,7 +148,9 @@ public record ActionContext(
             else if (item != null) {
               try {
                 cluster.add(UUID.fromString(item.toString().trim()));
-              } catch (IllegalArgumentException ignored) {}
+              } catch (IllegalArgumentException ignored) {
+                // Ignore non-UUID formatted strings in named cluster map entries
+              }
             }
           }
           result.put(entry.getKey().toString().trim(), Collections.unmodifiableList(cluster));

@@ -15,6 +15,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 import org.jetbrains.annotations.Nullable;
@@ -43,6 +45,111 @@ final class MenuConcreteCommandLeaves {
      * grammar landed.
      */
     static final String PARAM_REGION = "region";
+
+    /**
+     * Generic, parameterized leaf command class (eliminates duplicated inner leaf classes).
+     */
+    public static class MenuActionLeafCmd extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+        private final String name;
+        private final String permission;
+        private final String description;
+        private final java.util.function.BiConsumer<UUID, Map<String, List<String>>> action;
+        private final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> feedbackAction;
+
+        public MenuActionLeafCmd(@Nullable CommandsAPICommand parent,
+                                 String name,
+                                 String permission,
+                                 String description,
+                                 java.util.function.BiConsumer<UUID, Map<String, List<String>>> action) {
+            super(parent);
+            this.name = java.util.Objects.requireNonNull(name, "name");
+            this.permission = java.util.Objects.requireNonNull(permission, "permission");
+            this.description = description != null ? description : "";
+            this.action = java.util.Objects.requireNonNull(action, "action");
+            this.feedbackAction = null;
+        }
+
+        public MenuActionLeafCmd(@Nullable CommandsAPICommand parent,
+                                 String name,
+                                 String permission,
+                                 String description,
+                                 java.util.function.BiFunction<UUID, Consumer<String>, Boolean> feedbackAction) {
+            super(parent);
+            this.name = java.util.Objects.requireNonNull(name, "name");
+            this.permission = java.util.Objects.requireNonNull(permission, "permission");
+            this.description = description != null ? description : "";
+            this.action = null;
+            this.feedbackAction = java.util.Objects.requireNonNull(feedbackAction, "feedbackAction");
+        }
+
+        @Override
+        public String name() {
+            return name;
+        }
+
+        @Override
+        public String permission() {
+            return permission;
+        }
+
+        @Override
+        public String description() {
+            return description;
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand) {
+            if (feedbackAction != null) {
+                return Boolean.TRUE.equals(feedbackAction.apply(callerId, null));
+            }
+            if (action != null) {
+                action.accept(callerId, parameterValues);
+                return true;
+            }
+            return true;
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand,
+                                 Consumer<String> messageMethod) {
+            if (feedbackAction != null) {
+                return Boolean.TRUE.equals(feedbackAction.apply(callerId, messageMethod));
+            }
+            if (action != null) {
+                action.accept(callerId, parameterValues);
+                return true;
+            }
+            return true;
+        }
+    }
+
+    /**
+     * Factory method to create a parameterized action leaf.
+     */
+    public static MenuActionLeafCmd createLeaf(
+            @Nullable CommandsAPICommand parent,
+            String name,
+            String permission,
+            String description,
+            java.util.function.BiConsumer<UUID, Map<String, List<String>>> action) {
+        return new MenuActionLeafCmd(parent, name, permission, description, action);
+    }
+
+    /**
+     * Factory method to create a parameterized action leaf with message feedback support.
+     */
+    public static MenuActionLeafCmd createLeaf(
+            @Nullable CommandsAPICommand parent,
+            String name,
+            String permission,
+            String description,
+            java.util.function.BiFunction<UUID, Consumer<String>, Boolean> feedbackAction) {
+        return new MenuActionLeafCmd(parent, name, permission, description, feedbackAction);
+    }
 
     /**
      * {@code /rtp menu open [path=<dotted.path>]} - open a menu page at the
@@ -109,38 +216,10 @@ final class MenuConcreteCommandLeaves {
      * {@link MenuRedeemSubcommand#dispatchOpenAdminPanel}; permission gate
      * ({@code rtp.menu.admin}) stays inside the helper.
      */
-    static final class OpenAdminPanelConcreteCmd extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
-
-        private final MenuRedeemSubcommand owner;
-
+    static final class OpenAdminPanelConcreteCmd extends MenuActionLeafCmd {
         OpenAdminPanelConcreteCmd(MenuRedeemSubcommand owner) {
-            super(owner);
-            this.owner = owner;
-        }
-
-        @Override
-        public String name() {
-            return "admin";
-        }
-
-        @Override
-        public String permission() {
-            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand) {
-            return owner.dispatchOpenAdminPanel(callerId, null);
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand,
-                                 Consumer<String> messageMethod) {
-            return owner.dispatchOpenAdminPanel(callerId, messageMethod);
+            super(owner, "admin", MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, "open the curated admin panel",
+                    (java.util.function.BiFunction<UUID, Consumer<String>, Boolean>) (uuid, msg) -> owner.dispatchOpenAdminPanel(uuid, msg));
         }
     }
 
@@ -148,38 +227,10 @@ final class MenuConcreteCommandLeaves {
      * {@code /rtp menu front} - open the curated front page. No permission
      * gate; the front page is the default landing for any menu viewer.
      */
-    static final class OpenFrontPageConcreteCmd extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
-
-        private final MenuRedeemSubcommand owner;
-
+    static final class OpenFrontPageConcreteCmd extends MenuActionLeafCmd {
         OpenFrontPageConcreteCmd(MenuRedeemSubcommand owner) {
-            super(owner);
-            this.owner = owner;
-        }
-
-        @Override
-        public String name() {
-            return "front";
-        }
-
-        @Override
-        public String permission() {
-            return MenuRedeemSubcommand.PERMISSION;
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand) {
-            return owner.dispatchOpenFrontPage(callerId, null);
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand,
-                                 Consumer<String> messageMethod) {
-            return owner.dispatchOpenFrontPage(callerId, messageMethod);
+            super(owner, "front", MenuRedeemSubcommand.PERMISSION, "open the curated front page",
+                    (java.util.function.BiFunction<UUID, Consumer<String>, Boolean>) (uuid, msg) -> owner.dispatchOpenFrontPage(uuid, msg));
         }
     }
 
@@ -188,38 +239,10 @@ final class MenuConcreteCommandLeaves {
      * Gates on {@code rtp.menu.admin} (inside
      * {@link MenuRedeemSubcommand#dispatchOpenVisualizations}).
      */
-    static final class OpenVisualizationsConcreteCmd extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
-
-        private final MenuRedeemSubcommand owner;
-
+    static final class OpenVisualizationsConcreteCmd extends MenuActionLeafCmd {
         OpenVisualizationsConcreteCmd(MenuRedeemSubcommand owner) {
-            super(owner);
-            this.owner = owner;
-        }
-
-        @Override
-        public String name() {
-            return "visualizations";
-        }
-
-        @Override
-        public String permission() {
-            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand) {
-            return owner.dispatchOpenVisualizations(callerId, null);
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand,
-                                 Consumer<String> messageMethod) {
-            return owner.dispatchOpenVisualizations(callerId, messageMethod);
+            super(owner, "visualizations", MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, "open the visualizations selector",
+                    (java.util.function.BiFunction<UUID, Consumer<String>, Boolean>) (uuid, msg) -> owner.dispatchOpenVisualizations(uuid, msg));
         }
     }
 
@@ -317,26 +340,24 @@ final class MenuConcreteCommandLeaves {
     }
 
     /**
-     * {@code /rtp visualization bad-locations [region=<regionName>]} command (ADR-050).
-     * Draws {@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE}; falls back to region picker if omitted.
-     * Gates on {@code rtp.menu.admin}.
+     * Common base command for region-scoped visualization leaves (bad-locations, biomes, pipeline, heatmap).
+     * Eliminates duplicate parameter registration, selector fallback, logging, and dispatching.
      */
-    static final class VisualizationBadLocationsCmd
+    static abstract class AbstractVisualizationRegionCmd
             extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
 
-        private final VisualizationDispatch dispatch;
-        private final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener;
+        protected final VisualizationDispatch dispatch;
+        protected final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener;
+        private final String name;
 
-        VisualizationBadLocationsCmd(
+        AbstractVisualizationRegionCmd(
                 VisualizationDispatch dispatch,
-                java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener) {
-            // Parent is rewritten by addSubCommand on registration under
-            // the `visualization` root - passing null here matches the
-            // pattern used by other concrete leaves attached via
-            // addSubCommand in this package.
+                java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener,
+                String name) {
             super(null);
             this.dispatch = java.util.Objects.requireNonNull(dispatch, "dispatch");
             this.selectorOpener = java.util.Objects.requireNonNull(selectorOpener, "selectorOpener");
+            this.name = java.util.Objects.requireNonNull(name, "name");
             addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
                     "region name (omit to open the visualizations selector)",
                     (uuid, value) -> value != null && !value.isEmpty()) {
@@ -349,7 +370,7 @@ final class MenuConcreteCommandLeaves {
 
         @Override
         public String name() {
-            return "bad-locations";
+            return name;
         }
 
         @Override
@@ -372,31 +393,30 @@ final class MenuConcreteCommandLeaves {
             return dispatch(callerId, parameterValues, messageMethod);
         }
 
+        protected abstract boolean paint(UUID callerId, String regionName, @Nullable Consumer<String> messageMethod);
+
         private boolean dispatch(UUID callerId,
                                  Map<String, List<String>> parameterValues,
                                  @Nullable Consumer<String> messageMethod) {
             String regionName = firstValue(parameterValues, PARAM_REGION);
             RTP.log(java.util.logging.Level.FINE,
-                    "[viz/bad-locations] leaf reached: caller=" + callerId
+                    "[viz/" + name + "] leaf reached: caller=" + callerId
                             + " region=" + regionName
                             + " hasMsg=" + (messageMethod != null));
             if (regionName == null || regionName.isEmpty()) {
-                // No region specified - fall through to the visualizations
-                // selector. This is a menu-side concern, hence the callback
-                // back into MenuRedeemSubcommand#dispatchOpenVisualizations.
                 RTP.log(java.util.logging.Level.FINE,
-                        "[viz/bad-locations] no region= -> opening selector");
+                        "[viz/" + name + "] no region= -> opening selector");
                 Boolean ok = selectorOpener.apply(callerId, messageMethod);
                 return Boolean.TRUE.equals(ok);
             }
-            boolean result = dispatch.paintBadLocations(callerId, regionName, messageMethod);
+            boolean result = paint(callerId, regionName, messageMethod);
             RTP.log(java.util.logging.Level.FINE,
-                    "[viz/bad-locations] leaf returning result=" + result);
+                    "[viz/" + name + "] leaf returning result=" + result);
             return result;
         }
 
-        private static @Nullable String firstValue(@Nullable Map<String, List<String>> values,
-                                                   String key) {
+        static @Nullable String firstValue(@Nullable Map<String, List<String>> values,
+                                           String key) {
             if (values == null) return null;
             List<String> raw = values.get(key);
             if (raw == null || raw.isEmpty()) return null;
@@ -404,7 +424,7 @@ final class MenuConcreteCommandLeaves {
             return (first == null || first.isEmpty()) ? null : first;
         }
 
-        private static Set<String> liveRegionNames() {
+        static Set<String> liveRegionNames() {
             try {
                 if (RTP.selectionAPI == null) return Collections.emptySet();
                 Set<String> names = RTP.selectionAPI.regionNames();
@@ -413,6 +433,24 @@ final class MenuConcreteCommandLeaves {
             } catch (RuntimeException e) {
                 return Collections.emptySet();
             }
+        }
+    }
+
+    /**
+     * {@code /rtp visualization bad-locations [region=<regionName>]} command (ADR-050).
+     * Draws {@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE}; falls back to region picker if omitted.
+     * Gates on {@code rtp.menu.admin}.
+     */
+    static final class VisualizationBadLocationsCmd extends AbstractVisualizationRegionCmd {
+        VisualizationBadLocationsCmd(
+                VisualizationDispatch dispatch,
+                java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener) {
+            super(dispatch, selectorOpener, "bad-locations");
+        }
+
+        @Override
+        protected boolean paint(UUID callerId, String regionName, @Nullable Consumer<String> messageMethod) {
+            return dispatch.paintBadLocations(callerId, regionName, messageMethod);
         }
     }
 
@@ -420,91 +458,16 @@ final class MenuConcreteCommandLeaves {
      * {@code /rtp visualization biomes [region=<regionName>]} command.
      * Draws {@link ChartSpec.Kind#REGION_BIOMES} using cached biome data without chunk I/O (S-005).
      */
-    static final class VisualizationBiomesCmd
-            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
-
-        private final VisualizationDispatch dispatch;
-        private final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener;
-
+    static final class VisualizationBiomesCmd extends AbstractVisualizationRegionCmd {
         VisualizationBiomesCmd(
                 VisualizationDispatch dispatch,
                 java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener) {
-            super(null);
-            this.dispatch = java.util.Objects.requireNonNull(dispatch, "dispatch");
-            this.selectorOpener = java.util.Objects.requireNonNull(selectorOpener, "selectorOpener");
-            addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
-                    "region name (omit to open the visualizations selector)",
-                    (uuid, value) -> value != null && !value.isEmpty()) {
-                @Override
-                public Set<String> values() {
-                    return liveRegionNames();
-                }
-            });
+            super(dispatch, selectorOpener, "biomes");
         }
 
         @Override
-        public String name() {
-            return "biomes";
-        }
-
-        @Override
-        public String permission() {
-            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand) {
-            return dispatch(callerId, parameterValues, null);
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand,
-                                 Consumer<String> messageMethod) {
-            return dispatch(callerId, parameterValues, messageMethod);
-        }
-
-        private boolean dispatch(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable Consumer<String> messageMethod) {
-            String regionName = firstValue(parameterValues, PARAM_REGION);
-            RTP.log(java.util.logging.Level.FINE,
-                    "[viz/biomes] leaf reached: caller=" + callerId
-                            + " region=" + regionName
-                            + " hasMsg=" + (messageMethod != null));
-            if (regionName == null || regionName.isEmpty()) {
-                RTP.log(java.util.logging.Level.FINE,
-                        "[viz/biomes] no region= -> opening selector");
-                Boolean ok = selectorOpener.apply(callerId, messageMethod);
-                return Boolean.TRUE.equals(ok);
-            }
-            boolean result = dispatch.paintBiomes(callerId, regionName, messageMethod);
-            RTP.log(java.util.logging.Level.FINE,
-                    "[viz/biomes] leaf returning result=" + result);
-            return result;
-        }
-
-        private static @Nullable String firstValue(@Nullable Map<String, List<String>> values,
-                                                   String key) {
-            if (values == null) return null;
-            List<String> raw = values.get(key);
-            if (raw == null || raw.isEmpty()) return null;
-            String first = raw.get(0);
-            return (first == null || first.isEmpty()) ? null : first;
-        }
-
-        private static Set<String> liveRegionNames() {
-            try {
-                if (RTP.selectionAPI == null) return Collections.emptySet();
-                Set<String> names = RTP.selectionAPI.regionNames();
-                if (names == null || names.isEmpty()) return Collections.emptySet();
-                return new LinkedHashSet<>(names);
-            } catch (RuntimeException e) {
-                return Collections.emptySet();
-            }
+        protected boolean paint(UUID callerId, String regionName, @Nullable Consumer<String> messageMethod) {
+            return dispatch.paintBiomes(callerId, regionName, messageMethod);
         }
     }
 
@@ -512,91 +475,16 @@ final class MenuConcreteCommandLeaves {
      * {@code /rtp visualization pipeline [region=<regionName>]} command (ADR-089).
      * Draws composite map (desaturated biomes, red hazard wash, queue markers, and L1/L2/L3 health bars).
      */
-    static final class VisualizationPipelineCmd
-            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
-
-        private final VisualizationDispatch dispatch;
-        private final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener;
-
+    static final class VisualizationPipelineCmd extends AbstractVisualizationRegionCmd {
         VisualizationPipelineCmd(
                 VisualizationDispatch dispatch,
                 java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener) {
-            super(null);
-            this.dispatch = java.util.Objects.requireNonNull(dispatch, "dispatch");
-            this.selectorOpener = java.util.Objects.requireNonNull(selectorOpener, "selectorOpener");
-            addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
-                    "region name (omit to open the visualizations selector)",
-                    (uuid, value) -> value != null && !value.isEmpty()) {
-                @Override
-                public Set<String> values() {
-                    return liveRegionNames();
-                }
-            });
+            super(dispatch, selectorOpener, "pipeline");
         }
 
         @Override
-        public String name() {
-            return "pipeline";
-        }
-
-        @Override
-        public String permission() {
-            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand) {
-            return dispatch(callerId, parameterValues, null);
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand,
-                                 Consumer<String> messageMethod) {
-            return dispatch(callerId, parameterValues, messageMethod);
-        }
-
-        private boolean dispatch(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable Consumer<String> messageMethod) {
-            String regionName = firstValue(parameterValues, PARAM_REGION);
-            RTP.log(java.util.logging.Level.FINE,
-                    "[viz/pipeline] leaf reached: caller=" + callerId
-                            + " region=" + regionName
-                            + " hasMsg=" + (messageMethod != null));
-            if (regionName == null || regionName.isEmpty()) {
-                RTP.log(java.util.logging.Level.FINE,
-                        "[viz/pipeline] no region= -> opening selector");
-                Boolean ok = selectorOpener.apply(callerId, messageMethod);
-                return Boolean.TRUE.equals(ok);
-            }
-            boolean result = dispatch.paintPipeline(callerId, regionName, messageMethod);
-            RTP.log(java.util.logging.Level.FINE,
-                    "[viz/pipeline] leaf returning result=" + result);
-            return result;
-        }
-
-        private static @Nullable String firstValue(@Nullable Map<String, List<String>> values,
-                                                   String key) {
-            if (values == null) return null;
-            List<String> raw = values.get(key);
-            if (raw == null || raw.isEmpty()) return null;
-            String first = raw.get(0);
-            return (first == null || first.isEmpty()) ? null : first;
-        }
-
-        private static Set<String> liveRegionNames() {
-            try {
-                if (RTP.selectionAPI == null) return Collections.emptySet();
-                Set<String> names = RTP.selectionAPI.regionNames();
-                if (names == null || names.isEmpty()) return Collections.emptySet();
-                return new LinkedHashSet<>(names);
-            } catch (RuntimeException e) {
-                return Collections.emptySet();
-            }
+        protected boolean paint(UUID callerId, String regionName, @Nullable Consumer<String> messageMethod) {
+            return dispatch.paintPipeline(callerId, regionName, messageMethod);
         }
     }
 
@@ -605,91 +493,16 @@ final class MenuConcreteCommandLeaves {
      * Draws {@link ChartSpec.Kind#SELECTION_HEATMAP}; falls back to region picker if omitted.
      * Gates on {@code rtp.menu.admin}.
      */
-    static final class VisualizationHeatmapCmd
-            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
-
-        private final VisualizationDispatch dispatch;
-        private final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener;
-
+    static final class VisualizationHeatmapCmd extends AbstractVisualizationRegionCmd {
         VisualizationHeatmapCmd(
                 VisualizationDispatch dispatch,
                 java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener) {
-            super(null);
-            this.dispatch = java.util.Objects.requireNonNull(dispatch, "dispatch");
-            this.selectorOpener = java.util.Objects.requireNonNull(selectorOpener, "selectorOpener");
-            addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
-                    "region name (omit to open the visualizations selector)",
-                    (uuid, value) -> value != null && !value.isEmpty()) {
-                @Override
-                public Set<String> values() {
-                    return liveRegionNames();
-                }
-            });
+            super(dispatch, selectorOpener, "heatmap");
         }
 
         @Override
-        public String name() {
-            return "heatmap";
-        }
-
-        @Override
-        public String permission() {
-            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand) {
-            return dispatch(callerId, parameterValues, null);
-        }
-
-        @Override
-        public boolean onCommand(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable CommandsAPICommand nextCommand,
-                                 Consumer<String> messageMethod) {
-            return dispatch(callerId, parameterValues, messageMethod);
-        }
-
-        private boolean dispatch(UUID callerId,
-                                 Map<String, List<String>> parameterValues,
-                                 @Nullable Consumer<String> messageMethod) {
-            String regionName = firstValue(parameterValues, PARAM_REGION);
-            RTP.log(java.util.logging.Level.FINE,
-                    "[viz/heatmap] leaf reached: caller=" + callerId
-                            + " region=" + regionName
-                            + " hasMsg=" + (messageMethod != null));
-            if (regionName == null || regionName.isEmpty()) {
-                RTP.log(java.util.logging.Level.FINE,
-                        "[viz/heatmap] no region= -> opening selector");
-                Boolean ok = selectorOpener.apply(callerId, messageMethod);
-                return Boolean.TRUE.equals(ok);
-            }
-            boolean result = dispatch.paintHeatmap(callerId, regionName, messageMethod);
-            RTP.log(java.util.logging.Level.FINE,
-                    "[viz/heatmap] leaf returning result=" + result);
-            return result;
-        }
-
-        private static @Nullable String firstValue(@Nullable Map<String, List<String>> values,
-                                                   String key) {
-            if (values == null) return null;
-            List<String> raw = values.get(key);
-            if (raw == null || raw.isEmpty()) return null;
-            String first = raw.get(0);
-            return (first == null || first.isEmpty()) ? null : first;
-        }
-
-        private static Set<String> liveRegionNames() {
-            try {
-                if (RTP.selectionAPI == null) return Collections.emptySet();
-                Set<String> names = RTP.selectionAPI.regionNames();
-                if (names == null || names.isEmpty()) return Collections.emptySet();
-                return new LinkedHashSet<>(names);
-            } catch (RuntimeException e) {
-                return Collections.emptySet();
-            }
+        protected boolean paint(UUID callerId, String regionName, @Nullable Consumer<String> messageMethod) {
+            return dispatch.paintHeatmap(callerId, regionName, messageMethod);
         }
     }
 

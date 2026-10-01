@@ -155,7 +155,7 @@ public final class RegionWalkPathRenderer implements ChartRenderer<RegionWalkPat
 
     // VALID: Smooth progression gradient sweeping from Cyan/Blue (0.58f) to Warm Orange/Red (0.0f)
     // matching ComprehensiveRegionImageExporter progressColor()
-    float t = Math.max(0.0f, Math.min(1.0f, step.progress()));
+    float t = Math.clamp(step.progress(), 0.0f, 1.0f);
     float hue = 0.58f - 0.58f * t;
     int rgb = java.awt.Color.HSBtoRGB(hue, 0.85f, 0.95f);
     return rgb & 0xFFFFFF;

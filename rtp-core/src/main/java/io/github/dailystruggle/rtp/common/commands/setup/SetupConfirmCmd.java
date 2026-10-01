@@ -26,7 +26,7 @@ import java.util.logging.Level;
  */
 public class SetupConfirmCmd extends BaseRTPCmdImpl {
 
-    public static final String PERMISSION = "rtp.admin.setup";
+    public static final String CMD_PERMISSION = "rtp.admin.setup";
 
     private final SetupSessionRegistry sessionRegistry;
 
@@ -44,7 +44,7 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
 
     @Override
     public String permission() {
-        return PERMISSION;
+        return CMD_PERMISSION;
     }
 
     @Override
@@ -71,22 +71,7 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
         List<Prefab> recipe = SetupRecipe.compileRecipe(session);
         List<String> worldNames = SetupHandlerSupport.collectWorldNames();
 
-        Map<String, Map<String, Object>> baseline = new LinkedHashMap<>();
-        for (Prefab p : recipe) {
-            Map<String, Map<String, Object>> snap = PrefabDiskIO.snapshotLive(baseDir, p);
-            for (Map.Entry<String, Map<String, Object>> e : snap.entrySet()) {
-                baseline.putIfAbsent(e.getKey(), e.getValue());
-            }
-        }
-        if (!baseline.containsKey("definitions/regions/default")) {
-            Map<String, Object> defRegion = PrefabDiskIO.readLive(baseDir, "definitions/regions/default");
-            if (defRegion.isEmpty()) {
-                defRegion = PrefabDiskIO.readLive(baseDir, "regions/default");
-            }
-            if (!defRegion.isEmpty()) {
-                baseline.put("definitions/regions/default", defRegion);
-            }
-        }
+        Map<String, Map<String, Object>> baseline = SetupHandlerSupport.loadLiveBaseline(baseDir, recipe);
 
         PrefabApplier.Result result = SetupRecipe.applyPipeline(baseline, recipe, worldNames);
         Map<String, List<PrefabApplier.Change>> diff = result.perFileDiff();
@@ -125,6 +110,36 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
             SetupHandlerSupport.sendMessage(callerId, "&a[RTP Setup] Successfully applied setup recipe!");
             SetupHandlerSupport.sendMessage(callerId, "&7Written: &f" + String.join(", ", writtenFiles));
             SetupHandlerSupport.sendMessage(callerId, "&7Created &a" + backups.size() + " &7timestamped .bak backups.");
+
+            boolean reloaded = false;
+            Throwable reloadFailure = null;
+            try {
+                CommandsAPICommand reload = (RTP.baseCommand != null)
+                        ? RTP.baseCommand.getCommandLookup().get("reload")
+                        : null;
+                if (reload != null) {
+                    reloaded = reload.onCommand(callerId, java.util.Collections.emptyMap(), null);
+                } else if (RTP.configs != null) {
+                    RTP.reloading.set(true);
+                    try {
+                        reloaded = RTP.configs.reload();
+                    } finally {
+                        RTP.reloading.set(false);
+                    }
+                }
+            } catch (RuntimeException re) {
+                reloadFailure = re;
+                RTP.reloading.set(false);
+            }
+
+            if (reloaded) {
+                SetupHandlerSupport.sendMessage(callerId, "&a[RTP Setup] Configuration reload completed!");
+            } else if (reloadFailure != null) {
+                SetupHandlerSupport.sendMessage(callerId, "&e[RTP Setup] Config reload failed: "
+                        + reloadFailure.getMessage() + " - try &f/rtp reload&e.");
+            } else {
+                SetupHandlerSupport.sendMessage(callerId, "&7[RTP Setup] Run &f/rtp reload&7 to pick up changes.");
+            }
 
             sessionRegistry.remove(effectiveCaller);
             return true;

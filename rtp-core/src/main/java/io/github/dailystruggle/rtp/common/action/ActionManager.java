@@ -95,7 +95,12 @@ public final class ActionManager implements ActionService {
     }
   }
 
-  public ActionManager() {}
+  /**
+   * Default public constructor for ActionManager.
+   */
+  public ActionManager() {
+    // Intentionally empty; fields initialized at point of declaration
+  }
 
   /**
    * Clears and releases all cached pre-validated placements across all actions (ADR-097, S-002).

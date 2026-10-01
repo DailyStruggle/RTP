@@ -64,7 +64,7 @@ final class V26_3_R1FabricEffectDispatchers {
                                   double x, double y, double z,
                                   float volume, float pitch) {
         Holder<SoundEvent> holder = BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound);
-        ServerLevel sl = (ServerLevel) player.level();
+        ServerLevel sl = player.level();
         long seed = sl.getRandom().nextLong();
         ClientboundSoundPacket pkt = new ClientboundSoundPacket(
                 holder, source, x, y, z, volume, pitch, seed);

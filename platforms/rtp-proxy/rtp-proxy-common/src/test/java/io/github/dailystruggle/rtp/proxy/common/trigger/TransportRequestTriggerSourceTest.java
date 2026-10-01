@@ -326,4 +326,68 @@ class TransportRequestTriggerSourceTest {
         }
         assertEquals(2, src.workerThreads());
     }
+
+    @Test
+    @DisplayName("dispatchEnvelope handles null future and future error callback")
+    void dispatchEnvelopeEdgeCases() throws Exception {
+        ScriptedQueue q = new ScriptedQueue();
+        UUID player1 = UUID.randomUUID();
+        UUID corr1 = UUID.randomUUID();
+        UUID player2 = UUID.randomUUID();
+        UUID corr2 = UUID.randomUUID();
+        q.offer(player1, corr1);
+        q.offer(player2, corr2);
+
+        RtpDispatcher d = new RtpDispatcher() {
+            private int call = 0;
+            @Override
+            public CompletableFuture<DispatchOutcome> dispatch(RtpRequest req) {
+                call++;
+                if (call == 1) {
+                    return null; // null future branch
+                } else {
+                    return CompletableFuture.failedFuture(new RuntimeException("failed-dispatch"));
+                }
+            }
+        };
+
+        TransportRequestTriggerSource src = new TransportRequestTriggerSource(
+                q, d, 1, Duration.ofMillis(100), null, "proxy-test");
+        src.start();
+        try {
+            long deadline = System.currentTimeMillis() + 1500L;
+            while (System.currentTimeMillis() < deadline && src.dispatchedCount() < 2) {
+                Thread.sleep(20L);
+            }
+            assertTrue(src.dispatchedCount() >= 1);
+        } finally {
+            src.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("dequeueReady handles TimeoutException and RuntimeException")
+    void dequeueReadyTimeoutAndRuntimeException() throws Exception {
+        ScriptedQueue q = new ScriptedQueue();
+        q.throwNext = new RuntimeException("runtime-ex");
+        RecordingDispatcher d = new RecordingDispatcher();
+
+        TransportRequestTriggerSource src = new TransportRequestTriggerSource(
+                q, d, 1, Duration.ofMillis(100), null);
+        src.start();
+        try {
+            Thread.sleep(150L);
+            // It recovers and continues
+            UUID p = UUID.randomUUID();
+            UUID c = UUID.randomUUID();
+            q.offer(p, c);
+            long deadline = System.currentTimeMillis() + 1500L;
+            while (System.currentTimeMillis() < deadline && d.seen.isEmpty()) {
+                Thread.sleep(20L);
+            }
+            assertEquals(1, d.seen.size());
+        } finally {
+            src.stop();
+        }
+    }
 }

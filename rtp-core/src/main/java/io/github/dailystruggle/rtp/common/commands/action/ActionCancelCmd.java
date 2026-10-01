@@ -26,7 +26,7 @@ import java.util.UUID;
  */
 public class ActionCancelCmd extends BaseRTPCmdImpl {
 
-  public static final String PERMISSION = "rtp.action.cancel";
+  public static final String CMD_PERMISSION = "rtp.action.cancel";
   public static final String PERMISSION_OTHER = "rtp.action.cancel.other";
 
   @Nullable
@@ -44,7 +44,7 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
       addParameter(
           "action",
           new CommandParameter(
-              PERMISSION, "action ID to cancel (omit for all)", (uuid, s) -> true) {
+              CMD_PERMISSION, "action ID to cancel (omit for all)", (uuid, s) -> true) {
             @Override
             public Set<String> values() {
               ActionService service = RTPAPI.actions();
@@ -66,7 +66,7 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
 
   @Override
   public String permission() {
-    return PERMISSION;
+    return CMD_PERMISSION;
   }
 
   @Override

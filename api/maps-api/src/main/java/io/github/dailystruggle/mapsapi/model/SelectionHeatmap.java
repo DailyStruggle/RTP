@@ -1,5 +1,6 @@
 package io.github.dailystruggle.mapsapi.model;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -93,5 +94,50 @@ public record SelectionHeatmap(
 
   public long boundH() {
     return Math.max(1L, (long) maxZ - minZ);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (!(o instanceof SelectionHeatmap that)) return false;
+    return width == that.width
+        && height == that.height
+        && minX == that.minX
+        && minZ == that.minZ
+        && maxX == that.maxX
+        && maxZ == that.maxZ
+        && Double.compare(maxDensity, that.maxDensity) == 0
+        && Objects.equals(regionName, that.regionName)
+        && Arrays.equals(insideDomain, that.insideDomain)
+        && Arrays.equals(biomeRgb, that.biomeRgb)
+        && Arrays.equals(densityGrid, that.densityGrid)
+        && Objects.equals(points, that.points);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = Objects.hash(regionName, width, height, minX, minZ, maxX, maxZ, maxDensity, points);
+    result = 31 * result + Arrays.hashCode(insideDomain);
+    result = 31 * result + Arrays.hashCode(biomeRgb);
+    result = 31 * result + Arrays.hashCode(densityGrid);
+    return result;
+  }
+
+  @Override
+  public String toString() {
+    return "SelectionHeatmap["
+        + "regionName=" + regionName
+        + ", width=" + width
+        + ", height=" + height
+        + ", minX=" + minX
+        + ", minZ=" + minZ
+        + ", maxX=" + maxX
+        + ", maxZ=" + maxZ
+        + ", insideDomain=" + Arrays.toString(insideDomain)
+        + ", biomeRgb=" + Arrays.toString(biomeRgb)
+        + ", densityGrid=" + Arrays.toString(densityGrid)
+        + ", maxDensity=" + maxDensity
+        + ", points=" + points
+        + ']';
   }
 }

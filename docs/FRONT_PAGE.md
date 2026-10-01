@@ -240,18 +240,22 @@ Safety-critical packages inside `rtp-core` carry higher floors on top of the mod
 ## Features
 
 - **In-game menus** - two books (Paper / Folia; chat-paginated elsewhere). `/rtp menu` is the player side: teleport, or pick a region, world, or biome. `/rtp admin` is the operator side: config editor with search, setup prefabs, region and MSPT/heap visualizations, scan control, diagnostics. Gated on `rtp.menu.admin`. The book is a read-only UI with the same permission checks as a typed command, so there is no inventory-click exploit surface; a chest-GUI picker ships as a bundled addon for operators who want one.
+- **Setup wizard** - `/rtp admin setup` walks you through the same prefabs from console or chat: pick the world and map its border, set gameplay defaults (cooldown, delay, price, safety toggles), tune cache limits and I/O threads, `preview` the result, then `confirm`. Nothing is written until you confirm, and the write backs up the files it touches first.
+- **Import from another rtp plugin** - `/rtp config import` reads the config a competitor left behind in `plugins/` and translates it: worlds, radius and center, shape, cooldowns, prices, database connection blocks, and arrival effects. It auto-detects the source folder, writes new files next to yours, never replaces a file that already exists unless you pass `overwrite=true` (and then it backs the old one up first), and reloads when done. Written against sample configs from BetterRTP, JustRTP, EzRTP, JakesRTP, AsyncRTP, and AdvancedRTP; anything else goes through a generic keyword matcher. `/rtp config import permissions` prints the LuckPerms commands that would mirror their permission nodes onto mine; it does not change your permissions for you.
+- **Units you can read** - region sizes, times, and cache limits accept a suffix instead of a bare number: `radius: 10km`, `radius=625c`, `teleportCooldown: 2h30m`, `cacheCap: 500mb`. Distances take blocks (`b`), chunks (`c`), region files (`r`), km, miles; times take ticks (`t`), ms, s, m, h, d, w; sizes take kb / mb / gb. Plain numbers still mean what they always did.
 - **Regions** - any number per world; shape (Square, Circle, Rectangle, Polygon), radius, center, curve weighting, vertical bounds, world override, permission gate, price. Vertical adjustors (Linear, Jump, Fixed) for sky islands, void worlds, Nether ceilings. `worlds.yml` `override` redirects a Nether or End `/rtp` to a safe world.
 - **Scripted actions & arenas** - multi-player placement, event orchestration, and confinement without custom minigame code. Author duels, battle royales, and parkour in YAML (`definitions/actions/<name>.yml`): minimum player spacing, elevation tolerance, moving or static world borders, leash radius, continuous breach verification with damage, and lifecycle triggers (`onStart`, `onBoundaryViolation`, `onExpire`, `onDeath`). Vanilla scoreboards (`rtp_violations`, `rtp_time_left`, `rtp_in_bounds`) are kept updated automatically for command-block or datapack hooks.
 - **Per-player queues** alongside the global queue (`rtp.personalqueue`), so one player's bad luck does not starve another's teleport.
-- **Effects engine** - particles, sounds, fireworks, potions, titles on every teleport phase, gated by `rtp.effects.<name>`. The Rift addon under `addons/` in the repo is a worked example.
+- **Effects engine** - particles, sounds, fireworks, potions, titles, console or player commands, and holograms on every teleport phase, gated by `rtp.effects.<name>`. Holograms use the 1.19.4+ text display entity directly at the packet level, so no hologram plugin is needed; DecentHolograms and HolographicDisplays are picked up if you already run them. The Rift addon under `addons/` in the repo is a worked example.
 - **Per-region arrival schematics** - drop a Sponge `.schem` named after a region into `plugins/RTP/advanced/schematics/` and every teleport into that region pastes it centered on the landing spot. Decoded in-house, no WorldEdit required, claim-aware.
 - **Economy** - charge per `/rtp` (Vault), per-region pricing, auto-refund on cancel, `rtp.free` bypass.
 - **12 claim integrations** via the bundled claim addon - GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, RedProtect, CrashClaim, KingdomsX, Residence. Claim checks run inside the async pipeline, not on the teleport tick. Add your own through `RegionVerifierRegistry` with one lambda.
+- **Claim- and faction-anchored destinations** - an action can land players relative to their own town, claim, or faction land (`anchor: claimboundary`, `anchor: faction`) instead of a fixed center. Towny, GriefPrevention, and SaberFactions / FactionsUUID expose their boundaries out of the box; other plugins plug in through `ClaimBoundaryProvider`. The anchor stays pinned while it is still inside the claim, with a cooldown on recomputing it, so the spiral does not drift on every land sale, and the anchored region inherits known-bad chunks from the world region it overlaps so the first teleport is not a cold start.
 - **PvP / combat-tag gate** - off by default; refuses or delays `/rtp` for players who recently dealt or took PvP damage. Native tracking, optional PvPManager / CombatLogX / Simple Combat Log integration.
 - **Movement-cancel, damage-cancel, invulnerability-after-teleport timers, landing platform with decay**, countdown and warmup messages.
 - **Cross-server `/rtp`** - Velocity, with SQL / Redis reservation tokens and shared state (Pro) or plugin-messaging (both builds). Validated on the in-repo devstack: 2 Velocity proxies, 2 lobbies, 2 backends behind Redis.
 - **Auto-RTP on events** - join, first join, respawn, world change, move, teleport (`rtp.onevent.*`). Pro adds a login reserve cache so join-time teleports are served from a pre-warmed destination.
-- **Diagnostics** - `/rtp info`: queue depth and growth, pipeline latency percentiles, chunk-ticket leak rate, TPS/MSPT, database latency, per-region Folia table, generation success rate and top rejection cause. `/rtp visualization` paints region and biome maps and bad-location heatmaps onto real map items. No metrics add-on needed.
+- **Diagnostics** - `/rtp info`: queue depth and growth, pipeline latency percentiles, chunk-ticket leak rate, TPS/MSPT, database latency, per-region Folia table, generation success rate and top rejection cause. `/rtp visualization` paints region and biome maps, bad-location heatmaps, and the selector's walk path onto real map items. No metrics add-on needed.
 - **PlaceholderAPI** - queue depth (total / public / personal), last-teleport coordinates, player status.
 - **Hot reload** - `/rtp reload [file]`, or `/rtp config <file> set k=v` which saves and reloads.
 - **Command-block and console ready** - the same parser handles player, console, and command-block callers.
@@ -265,9 +269,9 @@ Safety-critical packages inside `rtp-core` carry higher floors on top of the mod
 
 1. Drop `LeafRTP-Pro-x.y.z.jar` into `plugins/` (or `mods/`). Upgrading from the free build: replace the jar, keep the data folder.
 2. Start the server. A `default` region is written for you.
-3. Type `/rtp`. Change anything in-game via `/rtp admin` or in the YAML under `plugins/RTP/`; both edit the same state and reload at runtime.
-4. **Size the region to your world.** `radius`, `centerX`, and `centerZ` live inside the region's `shape:` block and are measured in **chunks**, not blocks - a `radius` of `625` reaches 10,000 blocks. A radius left in block-think looks like a broken plugin. See [Regions](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/) and [Worlds](https://dailystruggle.github.io/RTP/admin/configuration/WORLDS/).
-5. For SQL / Redis or a proxy network, fill in `advanced/database.yml` and `advanced/network.yml`. Both are inert until enabled.
+3. Type `/rtp`. Change anything in-game via `/rtp admin setup` (guided, from console or chat), `/rtp admin` (config editor book), or the YAML under `plugins/RTP/`; all three edit the same state and reload at runtime. Coming from another rtp plugin: `/rtp config import` reads its config and writes mine next to it, without replacing anything you already have.
+4. **Size the region to your world.** `radius`, `centerX`, and `centerZ` live inside the region's `shape:` block. A bare number is **chunks**, not blocks - a `radius` of `625` reaches 10,000 blocks, and a radius left in block-think looks like a broken plugin. If you would rather say what you mean, write the unit: `radius: 10000b` or `radius: 10km`. See [Regions](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/) and [Worlds](https://dailystruggle.github.io/RTP/admin/configuration/WORLDS/).
+5. For SQL / Redis or a proxy network, fill in `advanced/database.yml` and `advanced/network.yml`. Both are inert until enabled. In network mode `rtp.servers.*` defaults to `true`, so every player can reach an open cross-server region unless you take it away.
 
 Start here: [**Quick start**](https://dailystruggle.github.io/RTP/admin/QUICK_START/) and [**Intended usage**](https://dailystruggle.github.io/RTP/site/intended-usage/).
 
@@ -284,12 +288,17 @@ Start here: [**Quick start**](https://dailystruggle.github.io/RTP/admin/QUICK_ST
 | `/rtp player:<name>` | Teleport another player | `rtp.other` |
 | `/rtp biome:<biome>` | Teleport to a chosen biome | `rtp.biome` / `rtp.biome.*` |
 | `/rtp action:<name> [players]` | Trigger a scripted action or arena | `rtp.action` / `rtp.action.<name>` |
-| `/rtp centerx=<x> centerz=<z> radius=<r>` | Ephemeral per-call overrides | `rtp.params` |
+| `/rtp back` | Return to where you were before the last `/rtp` | `rtp.back` |
+| `/rtp trigger create\|remove\|list` | Cuboid zones that fire an action on entry | `rtp.trigger` |
+| `/rtp centerx=<x> centerz=<z> radius=<r>` | Ephemeral per-call overrides; units allowed (`radius=10km`) | `rtp.params` |
 | `/rtp menu` | Player book menu | `rtp.use` |
 | `/rtp admin` | Operator book menu | `rtp.menu.admin` |
 | `/rtp info` | Operator diagnostics | `rtp.info` |
 | `/rtp reload [file]` | Reload all configuration, or one file | `rtp.reload` |
 | `/rtp config <file> view\|set <k>=<v>` | View or set a config key, then reload | `rtp.config` |
+| `/rtp config import [source] [path=<dir>] [overwrite=true]` | Translate another rtp plugin's config; never overwrites without `overwrite=true` | `rtp.config` |
+| `/rtp config import permissions` | Print the LuckPerms commands that would mirror a competitor's nodes onto `rtp.*` | `rtp.config` |
+| `/rtp admin setup <world\|gameplay\|perf\|preview\|confirm>` | Guided first-time setup from prefabs | `rtp.admin.setup` |
 | `/rtp scan start\|pause\|resume\|reset\|cancel` | Background spatial-memory crawl | `rtp.scan` |
 
 **Permissions** (full set in `plugin.yml`):
@@ -302,7 +311,10 @@ Start here: [**Quick start**](https://dailystruggle.github.io/RTP/admin/QUICK_ST
 | `rtp.params` | `op` | Per-call overrides (`centerx=`, `centerz=`, `radius=`) |
 | `rtp.personalqueue` | `false` | Reserve a per-player pre-warmed location |
 | `rtp.onevent.*` | `false` | Auto-RTP on join / firstjoin / respawn / changeworld / move / teleport |
+| `rtp.back` | `op` | `/rtp back` (not declared in `plugin.yml`; op by server default) |
+| `rtp.servers.*` | `true` | Cross-server destinations in network mode (was `op` before 3.3.0) |
 | `rtp.admin` | `op` | `reload`, `config`, `scan`, `info` |
+| `rtp.admin.setup` | `op` | `/rtp admin setup` wizard |
 | `rtp.*` | `op` | Everything |
 
 **Configuration files** under `plugins/RTP/`. Every file is hot-reloadable and editable in-game. The everyday files sit at the top level; things you author live in `definitions/`, rarely-touched tuning in `advanced/`.

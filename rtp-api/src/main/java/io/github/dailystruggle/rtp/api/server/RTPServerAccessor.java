@@ -955,4 +955,16 @@ public interface RTPServerAccessor {
     String n = reconcilePaletteIdentifier(rawPaletteId);
     return n != null && !n.isEmpty() && reconciledUnsafe.contains(n);
   }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Installs or registers the platform-appropriate map binding for cartography chart delivery.
+   *
+   * <p>Default implementation is a no-op; platform adapters should override to instantiate and
+   * register their platform-specific map binding with the central dispatch.
+   */
+  default void setupMapBinding() {}
 }

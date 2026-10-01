@@ -44,9 +44,9 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
         // authlib's GameProfile is a record on MC 26.x - use name() (record component).
         try {
             return player.getGameProfile().name();
-        } catch (NoSuchMethodError | NoSuchFieldError ignored) {
+        } catch (NoSuchMethodError | NoSuchFieldError _) {
             // fall through
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             // fall through
         }
         return player.getName().getString();
@@ -120,9 +120,9 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
                 if (state == trueVal) return true;
                 if (state == falseVal) return false;
             }
-        } catch (LinkageError | ClassNotFoundException | NoSuchMethodException | NoSuchFieldException ignored) {
+        } catch (LinkageError | ClassNotFoundException | NoSuchMethodException | NoSuchFieldException _) {
             // perms-api jar not on runtime classpath - fall through to ops.json.
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             // defensive
         }
 
@@ -344,7 +344,7 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
                 }
                 if (ok) return c.newInstance(args);
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
         }
         return null;
     }
@@ -358,7 +358,7 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
                     double.class, double.class, double.class, float.class, float.class);
             m.invoke(cur, target, x, y, z, yaw, pitch);
             return true;
-        } catch (NoSuchMethodException ignored) {
+        } catch (NoSuchMethodException _) {
         } catch (Throwable t) {
             RTP.log(Level.FINE,
                     "[RTP][V26_3_R1] reflective teleportTo(6) failed: " + t);
@@ -468,7 +468,7 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
     private static boolean isLoaded(ServerLevel level, int cx, int cz) {
         try {
             return level.getChunkSource() != null && level.getChunkSource().hasChunk(cx, cz);
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             return false;
         }
     }
@@ -498,10 +498,10 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
         @Override public String name() { return name; }
         @Override public boolean hasPermission(String permission) { return false; }
         @Override public Set<String> getEffectivePermissions() { return Collections.emptySet(); }
-        @Override public void sendMessage(String message) { }
+        @Override public void sendMessage(String message) { /* offline */ }
         @Override public long cooldown() { return 0L; }
         @Override public long delay() { return 0L; }
-        @Override public void performCommand(@Nullable RTPPlayer p, String c) { }
+        @Override public void performCommand(@Nullable RTPPlayer p, String c) { /* offline */ }
         @Override public RTPCommandSender clone() { return this; }
         @Override public CompletableFuture<Boolean> setLocation(RTPLocation to) {
             return CompletableFuture.completedFuture(false);

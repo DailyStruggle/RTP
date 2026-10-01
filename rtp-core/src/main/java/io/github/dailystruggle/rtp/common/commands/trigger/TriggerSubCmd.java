@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.commands.trigger;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -13,7 +12,7 @@ import java.util.UUID;
 /**
  * Command for managing physical world triggers (/rtp trigger create/remove/list).
  */
-public class TriggerSubCmd extends BaseRTPCmdImpl {
+public class TriggerSubCmd extends BaseTriggerCmd {
 
   public TriggerSubCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
@@ -28,20 +27,12 @@ public class TriggerSubCmd extends BaseRTPCmdImpl {
   }
 
   @Override
-  public String permission() {
-    return "rtp.trigger";
-  }
-
-  @Override
   public String description() {
     return "Create, remove, or list physical world triggers";
   }
 
   @Override
-  public boolean onCommand(
-      UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-    if (nextCommand != null) return nextCommand.onCommand(senderId, parameterValues, null);
-
+  protected boolean execute(UUID senderId, Map<String, List<String>> parameterValues) {
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
     if (!sender.hasPermission("rtp.trigger") && !sender.hasPermission("rtp.*")) {
       RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] You don't have permission to manage triggers.");

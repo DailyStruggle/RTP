@@ -25,15 +25,30 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ## [Unreleased]
 
+## [3.3.0] (Unreleased)
+
+> **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. Spatial-memory `.bin` files and region cache files upgrade in place on first load (format version 5 and `BIN_VERSION 3`); older builds do not know the new formats, so back up `plugins/RTP/` before upgrading if you may need to roll back.
+
 ### Added
 
-- **Foreign configuration and permission migration seam (ADR-066).** Adds automated, non-destructive migration commands and parsers for operators transitioning from competing random teleport plugins:
-  - *`ForeignConfigImporter` SPI and registry in `rtp-core`:* Automated one-shot migration seam reading competitor YAML configs directly off disk with zero plugin dependencies or platform coupling.
-  - *Competitor importers:* Ships built-in importers for `BetterRTP` (`BetterRtpConfigImporter`), `JustRTP` (`JustRtpConfigImporter`), `EzRTP` (`EzRtpConfigImporter`), and `JakesRTP` (`JakesRtpConfigImporter`), cleanly converting world/region boundaries, shapes, coordinates, cooldowns, delays, economy prices, and Gaussian/Normal distributions.
+- **Declarative action and session engine with conditional gating and physical triggers (`rtp-api`, `rtp-core`, and `LeafRTPActionAddon`).** Introduces an extensible declarative action framework for orchestrating complex multi-stage teleportation sequences, custom game modes, challenges, and dynamic player placement:
+  - *`ActionService`, `ActionDefinition`, and `ActionSession` SPI (`rtp-api`):* Public contracts supporting stateful teleportation workflows with configurable pre-actions, execution steps, post-actions, fail-actions, and timeout handlers.
+  - *Conditional gating engine (`GateEvaluator`):* Evaluates complex boolean expressions, mathematical comparisons, and requirement gates covering permissions, economy balances (`vault`/economy providers), cooldowns, world constraints, biome checks, region membership, server tick metrics, time of day, and Y-coordinate levels.
+  - *Dynamic subspace anchoring & placement (`AnchorSource`, `SubspaceAnchorResolver`, `GroupPlacementDispatcher`):* Anchors teleport selections dynamically around reference entities or locations, including player positions, claims/factions (`anchor: claimboundary`), world centroids, and parent regions.
+  - *Physical location triggers (`PhysicalTriggerManager`):* Detects player entry or movement across physical spatial triggers and cuboid zones, automatically executing bound actions.
+  - *Action command suite:* Introduces `/rtp action [action] [target]`, `/rtp action cancel [session]`, `/rtp action list`, `/rtp back`, and `/rtp trigger [create|remove|list]` for runtime inspection and execution.
+  - *Bundled `LeafRTPActionAddon` v1.0.0 and declarative action presets:* Ships ready-to-use action definitions in `definitions/actions/` including `arena.yml`, `challenge.yml`, `default.yml`, `koth.yml`, `location.yml`, `nearclaim.yml`, `nearplayer.yml`, `quickchallenge.yml`, `scatter.yml`, and `teams.yml`.
+
+- **Foreign configuration and permission migration seam (ADR-066).** Adds automated, non-destructive migration commands and a unified heuristic importer for operators transitioning from competing random teleport plugins:
+  - *Universal configuration importer (`UniversalConfigImporter`, `GenericSchemaImporter` in `rtp-core`):* Single, zero-configuration heuristic migration engine that infers target worlds, bounds, radii, shapes, cooldowns, and prices from arbitrary competitor YAML structures via fuzzy keyword matching off disk, with zero runtime plugin dependencies or platform coupling. Validated and tested across 6 major competitor formats (`BetterRTP`, `JustRTP`, `EzRTP`, `JakesRTP`, `AsyncRTP`, and `AdvancedRTP`).
   - *Database & effect profile translation:* Automatically mirrors MySQL/PostgreSQL/SQLite connection blocks into `advanced/database.yml`, and maps competitor titles, sounds, and arrival potion buffs into declarative effect profiles (`definitions/effects/imported_*`).
   - *Spatial zone & lobby trigger translation:* Converts JustRTP spatial zones (`rtp_zones.yml`) into native LeafRTP declarative action trigger definitions (`definitions/actions/zone_*.yml`).
-  - *Non-destructive permission migration:* Introduces `PermissionMigrationService` and `/rtp config import permissions` to map competitor permission nodes into LeafRTP equivalents with context preservation.
-  - *Command surface (`/rtp config import [source] [confirm]`):* Supports auto-detection across `plugins/` directories, dry-run previews by default, and safe backup-protected writes.
+  - *Permission mapping groundwork:* Introduces `PermissionMigrationService` (competitor node to `rtp.*` mapping table, LuckPerms output parsers, and append-only `set` command planning) and `/rtp config import permissions`, which prints the LuckPerms command templates for mirroring competitor nodes. The command does not yet read the permission provider or apply any node; other providers require hand-written templates under `permissions.command_templates` in `addons/integrations.yml`.
+  - *Command surface (`/rtp config import [source] [path=<dir>] [overwrite=true]`):* Auto-detects competitor folders under `plugins/`, writes translated files immediately, never replaces an existing file unless `overwrite=true` is passed (taking a timestamped `.bak` first), and reloads on success.
+
+- **Prefab-driven setup wizard command suite (`/rtp admin setup`).** Provides a lightweight, interactive console and in-game chat wrapper around built-in configuration prefabs to guide server operators through rapid setup:
+  - *Guided configuration stages:* Steps through `world` selection and boundary mapping, `gameplay` defaults (cooldowns, delays, costs, safety toggles), `perf` tuning (cache limits, I/O thread pools, prefilters), live `preview` summaries, and safe `confirm` writes.
+  - *Interactive controls:* Subcommands (`/rtp admin setup <world|gameplay|perf|preview|confirm|next|back|toggle|cancel|status>`) compose existing prefabs, serializers, and validators with step-by-step navigation, parameter validation, and atomic commits with automatic config backups.
 
 - **Claim- and faction-anchored RTP destinations with origin center preservation and cross-region memory ingestion.** Introduces platform-neutral destination anchoring on player claims and faction territory:
   - *`ClaimBoundary` and `ClaimBoundaryProvider` SPI (`rtp-api`):* Public contracts allowing claim and faction plugins to expose territory boundaries, centroids, and bounding chunk coordinates (`ClaimBoundaryProvider`) registered into `RTPHooks#claimBoundaries()` (`ClaimBoundaryRegistry`) with namespace isolation and priority-based fallback resolution.
@@ -42,13 +57,16 @@ editions. Entries with no marker are assumed to apply to both editions.
   - *Action placement and command integration:* Extends `AnchorSource` (`AnchorSource.claimBoundary(...)`), `SubspaceAnchorResolver`, and `ActionManager` (`anchor: faction`, `anchor: claimboundary`) to automatically resolve the player's boundary from registered providers.
   - *`LeafRTPClaimAddon` v1.1.0 update:* Bundled claim add-on registers territory boundary providers for Towny Advanced, GriefPrevention, and SaberFactions/FactionsUUID.
 
----
+- **Maps API spatial heatmap and walk-path visualization (`maps-api`, `rtp-core`).** Extends map renderer interfaces and diagnostics for visual territory analytics:
+  - *`SelectionHeatmap` and `RegionWalkPath` models and renderers:* Generates visual heatmaps of candidate selection frequency and walk-path vectors with density gradient rendering and bounding-box normalization, drawn onto the in-game map canvas through `/rtp visualization`. External web-map bridges (Dynmap, BlueMap, Pl3xMap) are designed in ADR-086 but not shipped.
 
-## [3.3.0] - 2026-09-23
+- **Hologram integration & modern Bukkit text display providers.** Adds visual status indicators and pre-teleport feedback via holographic displays:
+  - *Bukkit Text Display provider:* Native, packet-level text displays using modern Minecraft 1.19.4+ Display entities with zero external plugin dependencies.
+  - *Soft-depend checker hooks:* Provides out-of-the-box integration adapters for `DecentHolograms` and `HolographicDisplays`.
 
-> **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. Spatial-memory `.bin` files and region cache files upgrade in place on first load (format version 5 and `BIN_VERSION 3`); older builds do not know the new formats, so back up `plugins/RTP/` before upgrading if you may need to roll back.
-
-### Added
+- **Multi-server proxy state bindings and waitlist queue pipelines (`rtp-proxy-common`).** Enhances network mode transport synchronization across distributed BungeeCord and Velocity setups:
+  - *State bindings:* Adds production-tested `RedisNetworkStateBinding`, `SqlNetworkStateBinding` (with H2, SQLite, MySQL, PostgreSQL support), and `InMemoryNetworkStateBinding` for transport-level cluster state sharing.
+  - *Request waitlist & queue pipeline:* Implements `RedisNetworkRequestQueue` and `RedisNetworkWaitlist` for multi-server reservation token queueing, avoiding race conditions during concurrent proxy teleports.
 
 - **Spiral-addressed Hilbert key space and optimized dual-layer shapes (ADR-085).** Introduces a continuous spiral-addressed Hilbert space-filling curve mapping for learned spatial memory, expanding coarse spiral points into intra-point Hilbert traversals matched to travel orientation. Reduces run fragmentation across ring seams and significantly shrinks memory footprint at full chunk precision:
   - *New shape engines (`CIRCLE_OPTIMIZED_DUAL_LAYER`, `SQUARE_OPTIMIZED_DUAL_LAYER`):* Shipped implementations leveraging continuous Hilbert point traversals and hardware-cache segmented secondary tables (`SegmentedKeyRunTable`), delivering up to 5x run reduction and 2x-11x faster candidate selection under `ACCUMULATE` mode.
@@ -79,8 +97,6 @@ editions. Entries with no marker are assumed to apply to both editions.
 - **Off-tick Anvil and Linear region prefilter data structure reuse.** The Anvil and Linear region file prefilter (`AnvilChunkView`, `AnvilRegionByteCache`, and internal read buffers) now aggressively reuses chunk parsing data structures across off-tick scan pulses. This eliminates high-frequency byte array allocations during terrain prefiltering, significantly reducing JVM garbage collection churn on servers with large pre-generation pipelines.
 
 - **Region file freshness checks no longer dominate off-tick prefilter cost.** The cached region-byte lookup used to `stat` the `.mca` / `.linear` file on every probe to detect a chunk-save, which on Windows cost about as much as the entire cached lookup it was guarding - a 1024-probe sweep over one region file paid roughly 68 ms of syscalls. The check now runs at most once per region file per second, so a warm lookup measured 153 ns instead of ~65 us on the same machine. Chunk saves are still picked up promptly, since the default autosave cadence is ~30s.
-
-- **Monolithic `messages.yml` removed in favor of modular category messages.** The legacy flat `messages.yml` has been removed. All user-facing strings are organized under `advanced/messages/` (`commands.yml`, `network.yml`, `placeholders.yml`, `player.yml`, `system.yml`) with co-located dotfile rename maps across all 13 supported locales, ensuring cleaner structure and faster translation audits.
 
 - **Standardized configuration formatting and comment block hygiene across all modules and translations.** Sibling settings across all shipped YAML configurations (`config.yml`, `safety.yml`, `advanced/`, `definitions/`, proxy configs, and bundled add-on configs) now have blank-line separation preceding option comment blocks, guaranteeing clear visual boundaries and deterministic key association under the ADR-042 preservation engine across all 13 locales. Commented-out settings consistently use `# ` spacing to prevent indentation parse errors, and the `defaults.shape` comment in `config.yml` was shortened from 20 lines to a 4-line summary referencing `REGIONS.md` to keep in-game menu tooltips concise.
 
@@ -117,7 +133,7 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 - **`config.yml` is now purely teleport behavior.** The database settings moved to a new `database.yml`, and the redundant `network.redis` block was removed (use the Redis transport settings in `network.yml` instead). Values you customized in the old locations are not migrated automatically - re-set the database in `database.yml` and Redis in `network.yml`. The `config.yml` version was bumped to 3.1.
 
-- **The `plugins/RTP/` folder was reorganized into a cleaner, tiered layout.** The everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) stay at the top level. The definitions you author (regions, worlds, effects, plus the shared shape/vert catalogs) now live under a single `definitions/` folder, and the rarely-edited message files and prefab schematics moved under `advanced/`. On upgrade RTP relocates your files automatically and never overwrites a file already present at the new location. The file contents and keys are unchanged - only their location moved - so no re-tuning is required.
+- **The `plugins/RTP/` folder was reorganized into a cleaner, tiered layout, and `messages.yml` split into modular category files.** The everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) stay at the top level. The definitions you author (regions, worlds, effects, plus the shared shape/vert catalogs) now live under a single `definitions/` folder, and the rarely-edited prefab schematics moved under `advanced/`. The legacy flat `messages.yml` was removed in favor of modular category messages under `advanced/messages/` (`commands.yml`, `network.yml`, `placeholders.yml`, `player.yml`, `system.yml`) with co-located dotfile rename maps across all 13 supported locales, ensuring cleaner structure and faster translation audits. On upgrade RTP relocates your files automatically and never overwrites a file already present at the new location. The keys are unchanged - only their location moved - so no re-tuning is required.
 
 - **Biome-weighting settings moved** from `advanced/performance.yml` to `advanced/biomes.yml`, so every biome-selection option (whitelist/blacklist plus weighting) lives in one file. Behavior is unchanged. A value you customized in `performance.yml` is not migrated automatically - re-set it in `advanced/biomes.yml`.
 
@@ -697,6 +713,7 @@ Earlier versions introduced the multi-module split (`rtp-api` / `rtp-core` / pla
 
 ---
 
+[3.3.0]: https://github.com/DailyStruggle/RTP/compare/v3.2.1...HEAD
 [3.2.1]: https://github.com/DailyStruggle/RTP/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/DailyStruggle/RTP/compare/v3.1.3...v3.2.0
 [3.1.3]: https://github.com/DailyStruggle/RTP/compare/v3.1.2-Lite...v3.1.3

@@ -89,7 +89,7 @@ public final class SelectionHeatmapRenderer implements ChartRenderer<SelectionHe
           canvas.setPixelRgb(x, y, baseRgb);
         } else {
           // Normalized heat t in [0.0 .. 1.0]
-          double t = Math.min(1.0, Math.max(0.0, d / maxDensity));
+          double t = Math.clamp(d / maxDensity, 0.0, 1.0);
           int heatRgb = sampleHeatRamp(t);
 
           // Alpha blend heat over terrain based on intensity (0.45 min alpha to 0.90 max alpha)
@@ -109,7 +109,7 @@ public final class SelectionHeatmapRenderer implements ChartRenderer<SelectionHe
     long boundH = model.boundH();
 
     // Scale marker radius based on canvas resolution (1px for 128px, 2px for 512px, 3px for 1024px+)
-    int markerRadius = Math.max(1, Math.min(5, cw / 256));
+    int markerRadius = Math.clamp(cw / 256, 1, 5);
 
     for (SelectionHeatmap.SelectionPoint pt : model.points()) {
       int px = (int) ((pt.blockX() - bMinX) * (cw - 1) / boundW);
@@ -206,9 +206,9 @@ public final class SelectionHeatmapRenderer implements ChartRenderer<SelectionHe
     int g2 = (rgb2 >> 8) & 0xFF;
     int b2 = rgb2 & 0xFF;
 
-    int r = Math.min(255, Math.max(0, (int) (r1 + (r2 - r1) * t)));
-    int g = Math.min(255, Math.max(0, (int) (g1 + (g2 - g1) * t)));
-    int b = Math.min(255, Math.max(0, (int) (b1 + (b2 - b1) * t)));
+    int r = Math.clamp((int) (r1 + (r2 - r1) * t), 0, 255);
+    int g = Math.clamp((int) (g1 + (g2 - g1) * t), 0, 255);
+    int b = Math.clamp((int) (b1 + (b2 - b1) * t), 0, 255);
 
     return 0xFF000000 | (r << 16) | (g << 8) | b;
   }
@@ -235,8 +235,8 @@ public final class SelectionHeatmapRenderer implements ChartRenderer<SelectionHe
     int b = rgb & 0xFF;
 
     float[] hsb = java.awt.Color.RGBtoHSB(r, g, b, null);
-    hsb[1] = Math.max(0.0f, Math.min(1.0f, hsb[1] * satScale));
-    hsb[2] = Math.max(0.0f, Math.min(1.0f, hsb[2] * brightScale));
+    hsb[1] = Math.clamp(hsb[1] * satScale, 0.0f, 1.0f);
+    hsb[2] = Math.clamp(hsb[2] * brightScale, 0.0f, 1.0f);
 
     return java.awt.Color.HSBtoRGB(hsb[0], hsb[1], hsb[2]);
   }

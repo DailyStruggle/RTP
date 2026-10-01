@@ -62,7 +62,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
 
     @Override
     public String description() {
-        return "import configuration from competing RTP plugins";
+        return "import configuration from foreign RTP plugin directories";
     }
 
     @Override
@@ -142,7 +142,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
             }
         }
 
-        ForeignConfigImporter importer;
+        ForeignConfigImporter importer = null;
         Path sourceDir = null;
 
         // If custom path directly points to a plugin folder that an importer can handle:
@@ -167,6 +167,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
             }
         }
 
+        // Execute auto-detect or resolve source folder
         if (sourceDir == null) {
             if (requestedSource == null || requestedSource.trim().isEmpty()) {
                 // Auto-detection
@@ -203,8 +204,20 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
                     return false;
                 }
             }
-        } else {
+        } else if (importer == null && requestedSource != null) {
             importer = ForeignConfigImporterRegistry.getImporter(requestedSource);
+        }
+
+        if (sourceDir == null) {
+            sendMessage(callerId, "&c[RTP] Could not resolve candidate source directory.");
+            return false;
+        }
+
+        if (importer == null) {
+            importer = ForeignConfigImporterRegistry.getImporter(sourceDir.getFileName().toString());
+        }
+        if (importer == null) {
+            importer = ForeignConfigImporterRegistry.getImporter("universal");
         }
 
         sendMessage(callerId, "&7[RTP] Importing from &f" + sourceDir.getFileName() + "&7 (overwrite=" + overwrite + ")...");
@@ -229,7 +242,38 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
         for (String entity : result.getMappedEntities()) {
             sendMessage(callerId, "  &2✔ &f" + entity);
         }
-        sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size() + "&a file(s). Run &f/rtp reload&a to apply.");
+
+        boolean reloaded = false;
+        Throwable reloadFailure = null;
+        try {
+            CommandsAPICommand reload = (RTP.baseCommand != null)
+                    ? RTP.baseCommand.getCommandLookup().get("reload")
+                    : null;
+            if (reload != null) {
+                reloaded = reload.onCommand(callerId, Collections.emptyMap(), null);
+            } else if (RTP.configs != null) {
+                RTP.reloading.set(true);
+                try {
+                    reloaded = RTP.configs.reload();
+                } finally {
+                    RTP.reloading.set(false);
+                }
+            }
+        } catch (RuntimeException re) {
+            reloadFailure = re;
+            RTP.reloading.set(false);
+        }
+
+        if (reloaded) {
+            sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                    + "&a file(s). Configuration reload completed!");
+        } else if (reloadFailure != null) {
+            sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                    + "&a file(s). &eReload failed: " + reloadFailure.getMessage() + " - run &f/rtp reload&e.");
+        } else {
+            sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                    + "&a file(s). Run &f/rtp reload&a to apply.");
+        }
 
         return true;
     }

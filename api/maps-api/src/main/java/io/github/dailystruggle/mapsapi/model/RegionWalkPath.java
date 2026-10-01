@@ -1,5 +1,6 @@
 package io.github.dailystruggle.mapsapi.model;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -98,5 +99,48 @@ public record RegionWalkPath(
 
   public long boundH() {
     return Math.max(1L, (long) maxZ - minZ);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (!(o instanceof RegionWalkPath that)) return false;
+    return width == that.width
+        && height == that.height
+        && minX == that.minX
+        && minZ == that.minZ
+        && maxX == that.maxX
+        && maxZ == that.maxZ
+        && Objects.equals(regionName, that.regionName)
+        && Arrays.equals(insideDomain, that.insideDomain)
+        && Arrays.equals(biomeRgb, that.biomeRgb)
+        && Arrays.equals(hazardMask, that.hazardMask)
+        && Objects.equals(steps, that.steps);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = Objects.hash(regionName, width, height, minX, minZ, maxX, maxZ, steps);
+    result = 31 * result + Arrays.hashCode(insideDomain);
+    result = 31 * result + Arrays.hashCode(biomeRgb);
+    result = 31 * result + Arrays.hashCode(hazardMask);
+    return result;
+  }
+
+  @Override
+  public String toString() {
+    return "RegionWalkPath["
+        + "regionName=" + regionName
+        + ", width=" + width
+        + ", height=" + height
+        + ", minX=" + minX
+        + ", minZ=" + minZ
+        + ", maxX=" + maxX
+        + ", maxZ=" + maxZ
+        + ", insideDomain=" + Arrays.toString(insideDomain)
+        + ", biomeRgb=" + Arrays.toString(biomeRgb)
+        + ", hazardMask=" + Arrays.toString(hazardMask)
+        + ", steps=" + steps
+        + ']';
   }
 }

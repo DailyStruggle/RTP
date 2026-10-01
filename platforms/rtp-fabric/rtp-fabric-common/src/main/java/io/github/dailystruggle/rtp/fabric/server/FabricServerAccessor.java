@@ -2458,4 +2458,37 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     io.github.dailystruggle.rtp.fabric.commands.FabricCommandRegistrar
         .registerRtpCommand(rootCommand, bridgeCtx, aliases);
   }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void setupMapBinding() {
+    try {
+      io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter mapAdapter =
+          io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+      if (mapAdapter != null && mapAdapter.supportsMapCharts()) {
+        io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding mapBinding =
+            new io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding();
+        io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(mapBinding);
+        getFabricPlayerLifecycleHook().onPlayerQuit(uuid ->
+            io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.firePlayerQuit(uuid));
+        RTP.log(Level.INFO,
+            "[RTP] Fabric map binding installed (FabricMapBinding, carrier="
+                + mapAdapter.mcVersion() + ").");
+      } else {
+        RTP.log(Level.INFO,
+            "[RTP] Fabric map binding NOT installed: version adapter "
+                + (mapAdapter == null ? "<none>" : mapAdapter.mcVersion())
+                + " does not support map charts; /rtp visualizations will report"
+                + " mapBindingMissing (NoopMapBinding active).");
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] onInitialize MapBinding install failed; MapDispatch will fall back"
+              + " to NoopMapBinding: " + t.getClass().getSimpleName() + ": "
+              + t.getMessage(), t);
+    }
+  }
 }

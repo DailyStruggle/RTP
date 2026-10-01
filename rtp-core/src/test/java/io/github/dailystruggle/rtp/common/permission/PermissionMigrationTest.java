@@ -206,6 +206,49 @@ public class PermissionMigrationTest {
     }
 
     @Test
+    @DisplayName("5.1b - Schema-defined dynamic permission migration for AsyncRTP and AdvancedRTP")
+    void testSchemaDynamicPermissionMigration() {
+        // Test AsyncRTP permission mappings
+        List<String> asyncUse = service.mapPermission("asyncrtp.use");
+        assertTrue(asyncUse.contains("rtp.use"));
+
+        List<String> asyncWorld = service.mapPermission("asyncrtp.world.custom_world");
+        assertTrue(asyncWorld.contains("rtp.world.custom_world"));
+
+        List<String> asyncCooldown = service.mapPermission("asyncrtp.bypass.cooldown");
+        assertTrue(asyncCooldown.contains("rtp.nocooldown"));
+
+        // Test AdvancedRTP permission mappings
+        List<String> advRtp = service.mapPermission("advancedrtp.rtp");
+        assertTrue(advRtp.contains("rtp.use"));
+
+        List<String> advWorld = service.mapPermission("advancedrtp.world.mining");
+        assertTrue(advWorld.contains("rtp.world.mining"));
+
+        List<String> advDelay = service.mapPermission("advancedrtp.bypass.delay");
+        assertTrue(advDelay.contains("rtp.nodelay"));
+
+        // Additional generic permission pattern branches
+        assertTrue(service.mapPermission("customrtp.teleport").contains("rtp.use"));
+        assertTrue(service.mapPermission("customrtp.world.*").contains("rtp.worlds.*"));
+        assertTrue(service.mapPermission("customrtp.worlds.survival").contains("rtp.worlds.survival"));
+        assertTrue(service.mapPermission("customrtp.gui.world.hub").contains("rtp.worlds.hub"));
+        assertTrue(service.mapPermission("customrtp.gui.paid.vip_world").contains("rtp.worlds.vip_world"));
+        assertTrue(service.mapPermission("customrtp.biome.*").contains("rtp.biome.*"));
+        assertTrue(service.mapPermission("customrtp.biome.plains").contains("rtp.biome.plains"));
+        assertTrue(service.mapPermission("customrtp.cooldown.bypass").contains("rtp.noCooldown"));
+        assertTrue(service.mapPermission("customrtp.nowarmup").contains("rtp.noDelay"));
+        assertTrue(service.mapPermission("customrtp.free").contains("rtp.free"));
+        assertTrue(service.mapPermission("customrtp.other").contains("rtp.other"));
+        assertTrue(service.mapPermission("customrtp.use.custom_loc").contains("rtp.regions.custom_loc"));
+        assertTrue(service.mapPermission("customrtp.profile.vip_profile").contains("rtp.regions.vip_profile"));
+        assertTrue(service.mapPermission("customrtp.rtpondeath").contains("rtp.onEvent.respawn"));
+        assertTrue(service.mapPermission("customrtp.reload").contains("rtp.reload"));
+        assertTrue(service.mapPermission("customrtp.admin").contains("rtp.admin"));
+        assertTrue(service.mapPermission("customrtp.*").contains("rtp.*"));
+    }
+
+    @Test
     @DisplayName("5.2 - String parsing group list and permission info output from provider")
     void testStringParsingProviderOutputs() {
         // Test parsing group list output

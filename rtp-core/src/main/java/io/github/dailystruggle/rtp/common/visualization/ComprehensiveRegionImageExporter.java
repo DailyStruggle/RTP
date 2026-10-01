@@ -356,10 +356,10 @@ public final class ComprehensiveRegionImageExporter {
       for (int i = 0; i < selectionPath.size() - 1; i++) {
         Point2D p0 = selectionPath.get(i);
         Point2D p1 = selectionPath.get(i + 1);
-        int sx0 = (int) (mapX + ((long) p0.x - minX) * mapW / boundW);
-        int sy0 = (int) (mapY + ((long) p0.z - minZ) * mapH / boundH);
-        int sx1 = (int) (mapX + ((long) p1.x - minX) * mapW / boundW);
-        int sy1 = (int) (mapY + ((long) p1.z - minZ) * mapH / boundH);
+        int sx0 = mapX + MatrixMapping.worldToPixelX(p0.x, minX, boundW, mapW);
+        int sy0 = mapY + MatrixMapping.worldToPixelY(p0.z, minZ, boundH, mapH);
+        int sx1 = mapX + MatrixMapping.worldToPixelX(p1.x, minX, boundW, mapW);
+        int sy1 = mapY + MatrixMapping.worldToPixelY(p1.z, minZ, boundH, mapH);
         g.setColor(progressColor(selectionProgress.get(i)));
         g.drawLine(sx0, sy0, sx1, sy1);
       }
@@ -397,35 +397,8 @@ public final class ComprehensiveRegionImageExporter {
       int minX, int minZ, long boundW, long boundH,
       int mapX, int mapY, int mapW, int mapH
   ) {
-    // Generate image buffer for the map area
-    BufferedImage mapBuffer = new BufferedImage(mapW, mapH, BufferedImage.TYPE_INT_RGB);
-    int[] rgbArray = new int[mapW * mapH];
-
-    for (int py = 0; py < mapH; py++) {
-      int bz = (int) (minZ + (long) py * boundH / (mapH - 1));
-      int rowOffset = py * mapW;
-      for (int px = 0; px < mapW; px++) {
-        int bx = (int) (minX + (long) px * boundW / (mapW - 1));
-        int idx = rowOffset + px;
-
-        if (memoryShape.contains(bx, bz)) {
-          String biomeName = memoryShape.biomeAt(bx, bz);
-          int rawBiome = (biomeName != null) ? (BiomeColorSource.resolve(biomeName) & 0xFFFFFF) : 0x2ECC71;
-          int desat = CanvasDrawing.desaturate(rawBiome, 0.45f);
-
-          int cause = memoryShape.causeAt(bx, bz);
-          if (cause >= 0) {
-            rgbArray[idx] = CanvasDrawing.blend(desat, 0xE74C3C, 0.45f);
-          } else {
-            rgbArray[idx] = desat;
-          }
-        } else {
-          rgbArray[idx] = COLOR_OUTSIDE.getRGB();
-        }
-      }
-    }
-
-    mapBuffer.setRGB(0, 0, mapW, mapH, rgbArray, 0, mapW);
+    BufferedImage mapBuffer = MatrixMapping.renderMapBuffer(
+        memoryShape, minX, minZ, boundW, boundH, mapW, mapH, COLOR_OUTSIDE);
     g.drawImage(mapBuffer, mapX, mapY, null);
   }
 
@@ -438,8 +411,8 @@ public final class ComprehensiveRegionImageExporter {
       int radius
   ) {
     for (Point2D pt : points) {
-      int sx = (int) (mapX + ((long) pt.x - minX) * mapW / boundW);
-      int sy = (int) (mapY + ((long) pt.z - minZ) * mapH / boundH);
+      int sx = mapX + MatrixMapping.worldToPixelX(pt.x, minX, boundW, mapW);
+      int sy = mapY + MatrixMapping.worldToPixelY(pt.z, minZ, boundH, mapH);
 
       // Dark border
       g.setColor(new Color(0, 0, 0, 200));

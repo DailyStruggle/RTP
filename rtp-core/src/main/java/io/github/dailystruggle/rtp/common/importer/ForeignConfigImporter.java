@@ -24,6 +24,26 @@ public interface ForeignConfigImporter {
     String sourceName();
 
     /**
+     * Common directory aliases for this plugin in the server's {@code plugins/} folder.
+     * Used by {@link ForeignConfigImporterRegistry#resolveSourceDir} to auto-discover plugin directories.
+     *
+     * @return list of directory aliases, defaults to {@code [sourceName()]}
+     */
+    default List<String> directoryAliases() {
+        return List.of(sourceName());
+    }
+
+    /**
+     * Key indicator file names that must exist in the candidate directory for this plugin
+     * (e.g. {@code ["config.yml"]}).
+     *
+     * @return list of candidate file names
+     */
+    default List<String> indicatorFiles() {
+        return List.of("config.yml");
+    }
+
+    /**
      * Checks whether this importer can handle the configuration at the given plugin folder.
      *
      * @param sourcePluginDir candidate directory, e.g. {@code plugins/EzRTP}
