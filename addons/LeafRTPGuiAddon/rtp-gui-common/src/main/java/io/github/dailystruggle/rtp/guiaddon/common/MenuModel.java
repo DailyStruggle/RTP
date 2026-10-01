@@ -29,7 +29,7 @@ public final class MenuModel {
   private final List<MenuEntry> entries;
   private final MetricsSnapshot metrics;
 
-  private MenuModel(
+  MenuModel(
       String title,
       int rows,
       String fillerName,
@@ -60,22 +60,46 @@ public final class MenuModel {
     boolean groupBiomes = config.groupBiomesIntoSubmenu();
     boolean hasBiomes = false;
 
+    // Track seen destination keys and display names to deduplicate entries
+    // before displaying (e.g. redundant targets pointing to the same region).
+    java.util.Set<String> seenKeys = new java.util.HashSet<>();
+    java.util.Set<String> seenLabels = new java.util.HashSet<>();
+
     if (targets != null) {
       for (RtpTarget target : targets) {
+        if (target == null) continue;
+        // Regions already cover all destination coordinates, shapes, and worlds;
+        // world selection targets are redundant.
+        if (target.kind() == RtpTarget.Kind.WORLD) {
+          continue;
+        }
         if (target.kind() == RtpTarget.Kind.BIOME) {
           hasBiomes = true;
           if (groupBiomes) {
             continue; // group into dedicated sub-menu button below
           }
         }
+        // Deduplicate targets by their canonical target key
+        String targetKey = target.kind() + ":" + (target.name() == null ? "" : target.name().toLowerCase(java.util.Locale.ROOT));
+        if (!seenKeys.add(targetKey)) {
+          continue;
+        }
+
         RtpTargetStatus status = RTPAPI.getTargetStatus(playerId, target);
         RtpTargetStatus.Availability availability =
             (status == null) ? RtpTargetStatus.Availability.UNKNOWN : status.availability();
+
+        String label = displayName(target, status);
+        String normalizedLabel = label.toLowerCase(java.util.Locale.ROOT).trim();
+        if (!seenLabels.add(normalizedLabel)) {
+          continue; // skip duplicate display label
+        }
+
         entries.add(
             new MenuEntry(
                 target,
                 availability,
-                displayName(target, status),
+                label,
                 config.iconName(target, status),
                 (status == null) ? 0L : status.remainingCooldownMillis(),
                 (status == null) ? 0.0 : status.cost()));
@@ -363,7 +387,11 @@ public final class MenuModel {
     // local target, or the peer-advertised label for a cross-server one). May
     // contain RTP color/gradient codes; the renderer applies color formatting.
     if (status != null && status.label() != null && !status.label().isEmpty()) {
-      return status.label();
+      // Ignore an unconfigured "default" fallback label that leaks from older core
+      // or uncustomized regions, so default targets format with "Random teleport".
+      if (!"default".equalsIgnoreCase(status.label().trim()) || (target != null && target.kind() == RtpTarget.Kind.REGION && "default".equalsIgnoreCase(target.name()))) {
+        return status.label();
+      }
     }
     if (target == null) return "Random teleport";
     switch (target.kind()) {

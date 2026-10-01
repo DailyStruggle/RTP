@@ -67,8 +67,8 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
             return false;
         }
 
-        List<Prefab> recipe = SetupRecipe.compileRecipe(session);
         List<String> worldNames = SetupHandlerSupport.collectWorldNames();
+        List<Prefab> recipe = SetupRecipe.compileRecipe(session, worldNames);
 
         Map<String, Map<String, Object>> baseline = SetupHandlerSupport.loadLiveBaseline(baseDir, recipe);
 
