@@ -147,54 +147,7 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
       }
       final String facId = resolvedFacId;
 
-      return Optional.of(
-          new ClaimBoundary() {
-            @Override
-            public String id() {
-              return facId;
-            }
-
-            @Override
-            public String world() {
-              return worldName;
-            }
-
-            @Override
-            public boolean contains(int x, int z) {
-              return containsChunk(x >> 4, z >> 4);
-            }
-
-            @Override
-            public boolean containsChunk(int cx, int cz) {
-              long key = (((long) cx) << 32) | (cz & 0xFFFFFFFFL);
-              return chunkKeys.contains(key);
-            }
-
-            @Override
-            public int[] centroid() {
-              return new int[] {centroidX, centroidZ};
-            }
-
-            @Override
-            public int minChunkX() {
-              return finalMinX;
-            }
-
-            @Override
-            public int minChunkZ() {
-              return finalMinZ;
-            }
-
-            @Override
-            public int maxChunkX() {
-              return finalMaxX;
-            }
-
-            @Override
-            public int maxChunkZ() {
-              return finalMaxZ;
-            }
-          });
+      return Optional.of(buildBoundary(facId, worldName, chunkKeys, centroidX, centroidZ, finalMinX, finalMinZ, finalMaxX, finalMaxZ));
     } catch (Throwable t) {
       exists = false;
       RTP.log(
@@ -203,5 +156,178 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
           t);
       return Optional.empty();
     }
+  }
+
+  @Override
+  public Optional<ClaimBoundary> getBoundaryAt(String worldName, int x, int z) {
+    if (!exists || worldName == null) {
+      return Optional.empty();
+    }
+    if (Bukkit.getServer() == null || Bukkit.getPluginManager() == null || !Bukkit.getPluginManager().isPluginEnabled("Factions")) {
+      return Optional.empty();
+    }
+
+    try {
+      int cx = x >> 4;
+      int cz = z >> 4;
+
+      Object faction = null;
+      try {
+        Class<?> boardClass = Class.forName("com.massivecraft.factions.Board");
+        Object board = boardClass.getMethod("getInstance").invoke(null);
+        if (board != null) {
+          Class<?> fLocationClass = Class.forName("com.massivecraft.factions.FLocation");
+          Object fLocation = fLocationClass.getConstructor(String.class, int.class, int.class).newInstance(worldName, cx, cz);
+          faction = boardClass.getMethod("getFactionAt", fLocationClass).invoke(board, fLocation);
+        }
+      } catch (Throwable ignored) {
+      }
+
+      if (faction == null) {
+        return AdaptiveClaimProber.probeBoundary(worldName, x, z, SaberFactionsChecker::isInClaim);
+      }
+
+      Method isWilderness = faction.getClass().getMethod("isWilderness");
+      if (Boolean.TRUE.equals(isWilderness.invoke(faction))) {
+        return Optional.empty();
+      }
+
+      Method getAllClaims = null;
+      try {
+        getAllClaims = faction.getClass().getMethod("getAllClaims");
+      } catch (NoSuchMethodException e) {
+        try {
+          getAllClaims = faction.getClass().getMethod("getClaims");
+        } catch (NoSuchMethodException ignored) {
+        }
+      }
+
+      if (getAllClaims == null) {
+        return AdaptiveClaimProber.probeBoundary(worldName, x, z, SaberFactionsChecker::isInClaim);
+      }
+
+      Object rawClaims = getAllClaims.invoke(faction);
+      if (!(rawClaims instanceof Collection<?> claimsCollection) || claimsCollection.isEmpty()) {
+        return Optional.empty();
+      }
+
+      int minChunkX = Integer.MAX_VALUE;
+      int minChunkZ = Integer.MAX_VALUE;
+      int maxChunkX = Integer.MIN_VALUE;
+      int maxChunkZ = Integer.MIN_VALUE;
+      long sumX = 0;
+      long sumZ = 0;
+      int count = 0;
+      Set<Long> chunkKeys = new HashSet<>();
+
+      for (Object fLoc : claimsCollection) {
+        if (fLoc == null) continue;
+        Method getWorldNameMethod = fLoc.getClass().getMethod("getWorldName");
+        Object wNameObj = getWorldNameMethod.invoke(fLoc);
+        if (wNameObj == null || !worldName.equalsIgnoreCase(wNameObj.toString())) {
+          continue;
+        }
+
+        Method getXMethod = fLoc.getClass().getMethod("getX");
+        Method getZMethod = fLoc.getClass().getMethod("getZ");
+        long cxLong = ((Number) getXMethod.invoke(fLoc)).longValue();
+        long czLong = ((Number) getZMethod.invoke(fLoc)).longValue();
+        int chunkX = (int) cxLong;
+        int chunkZ = (int) czLong;
+
+        if (chunkX < minChunkX) minChunkX = chunkX;
+        if (chunkX > maxChunkX) maxChunkX = chunkX;
+        if (chunkZ < minChunkZ) minChunkZ = chunkZ;
+        if (chunkZ > maxChunkZ) maxChunkZ = chunkZ;
+
+        sumX += ((long) chunkX << 4) + 8;
+        sumZ += ((long) chunkZ << 4) + 8;
+        chunkKeys.add((((long) chunkX) << 32) | (chunkZ & 0xFFFFFFFFL));
+        count++;
+      }
+
+      if (count == 0) {
+        return Optional.empty();
+      }
+
+      int centroidX = (int) (sumX / count);
+      int centroidZ = (int) (sumZ / count);
+
+      String resolvedFacId;
+      try {
+        Method getIdMethod = faction.getClass().getMethod("getId");
+        Object idObj = getIdMethod.invoke(faction);
+        resolvedFacId = (idObj != null) ? idObj.toString() : "faction_" + x + "_" + z;
+      } catch (Exception e) {
+        resolvedFacId = "faction_" + x + "_" + z;
+      }
+
+      return Optional.of(buildBoundary(resolvedFacId, worldName, chunkKeys, centroidX, centroidZ, minChunkX, minChunkZ, maxChunkX, maxChunkZ));
+    } catch (Throwable t) {
+      RTP.log(
+          Level.WARNING,
+          "[RTP] Factions integration encountered an error resolving claim boundary at (" + x + "," + z + ").",
+          t);
+      return Optional.empty();
+    }
+  }
+
+  private static ClaimBoundary buildBoundary(
+      String facId,
+      String worldName,
+      Set<Long> chunkKeys,
+      int centroidX,
+      int centroidZ,
+      int minChunkX,
+      int minChunkZ,
+      int maxChunkX,
+      int maxChunkZ) {
+    return new ClaimBoundary() {
+      @Override
+      public String id() {
+        return facId;
+      }
+
+      @Override
+      public String world() {
+        return worldName;
+      }
+
+      @Override
+      public boolean contains(int x, int z) {
+        return containsChunk(x >> 4, z >> 4);
+      }
+
+      @Override
+      public boolean containsChunk(int cx, int cz) {
+        long key = (((long) cx) << 32) | (cz & 0xFFFFFFFFL);
+        return chunkKeys.contains(key);
+      }
+
+      @Override
+      public int[] centroid() {
+        return new int[] {centroidX, centroidZ};
+      }
+
+      @Override
+      public int minChunkX() {
+        return minChunkX;
+      }
+
+      @Override
+      public int minChunkZ() {
+        return minChunkZ;
+      }
+
+      @Override
+      public int maxChunkX() {
+        return maxChunkX;
+      }
+
+      @Override
+      public int maxChunkZ() {
+        return maxChunkZ;
+      }
+    };
   }
 }

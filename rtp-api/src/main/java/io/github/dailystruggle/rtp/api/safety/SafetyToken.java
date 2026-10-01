@@ -28,15 +28,19 @@ public final class SafetyToken {
   private final Kind kind;
   private final String identifier;
   private final List<StatePredicate> predicates;
+  private final List<SafetyToken> subtractions;
   private final String sourceToken;
 
   private SafetyToken(Kind kind, String identifier, List<StatePredicate> predicates,
-                      String sourceToken) {
+                      List<SafetyToken> subtractions, String sourceToken) {
     this.kind = Objects.requireNonNull(kind, "kind");
     this.identifier = Objects.requireNonNull(identifier, "identifier");
     this.predicates = predicates == null || predicates.isEmpty()
         ? Collections.emptyList()
         : Collections.unmodifiableList(List.copyOf(predicates));
+    this.subtractions = subtractions == null || subtractions.isEmpty()
+        ? Collections.emptyList()
+        : Collections.unmodifiableList(List.copyOf(subtractions));
     this.sourceToken = Objects.requireNonNull(sourceToken, "sourceToken");
   }
 
@@ -50,6 +54,20 @@ public final class SafetyToken {
    */
   public static SafetyToken material(String identifier, List<StatePredicate> predicates,
                                      String sourceToken) {
+    return material(identifier, predicates, Collections.emptyList(), sourceToken);
+  }
+
+  /**
+   * Builds a material token with optional subtractions (ADR-017).
+   *
+   * @param identifier   material name or {@link #WILDCARD}
+   * @param predicates   optional state predicates
+   * @param subtractions subtracted tokens
+   * @param sourceToken  original token string
+   * @throws IllegalArgumentException if identifier is empty or bare wildcard without predicates
+   */
+  public static SafetyToken material(String identifier, List<StatePredicate> predicates,
+                                     List<SafetyToken> subtractions, String sourceToken) {
     Objects.requireNonNull(identifier, "identifier");
     if (identifier.isEmpty()) {
       throw new IllegalArgumentException("material identifier must be non-empty");
@@ -61,7 +79,7 @@ public final class SafetyToken {
           "bare wildcard '*' is not a valid safety token; it must carry at least one "
               + "state predicate (e.g. '*[waterlogged=true]'). See ADR-017 \u00a71.");
     }
-    return new SafetyToken(Kind.MATERIAL, identifier, predicates, sourceToken);
+    return new SafetyToken(Kind.MATERIAL, identifier, predicates, subtractions, sourceToken);
   }
 
   /**
@@ -73,12 +91,25 @@ public final class SafetyToken {
    */
   public static SafetyToken tag(String namespaceAndPath, List<StatePredicate> predicates,
                                 String sourceToken) {
+    return tag(namespaceAndPath, predicates, Collections.emptyList(), sourceToken);
+  }
+
+  /**
+   * Build a tag token with optional subtractions (ADR-017).
+   *
+   * @param namespaceAndPath lowercase {@code namespace:path} (no leading {@code #}).
+   * @param predicates optional bracket predicates; may be {@code null} or empty.
+   * @param subtractions subtracted tokens
+   * @param sourceToken original token string, retained for diagnostics.
+   */
+  public static SafetyToken tag(String namespaceAndPath, List<StatePredicate> predicates,
+                                List<SafetyToken> subtractions, String sourceToken) {
     Objects.requireNonNull(namespaceAndPath, "namespaceAndPath");
     if (!namespaceAndPath.contains(":")) {
       throw new IllegalArgumentException(
           "tag identifier must contain a ':' (namespace:path); got '" + namespaceAndPath + "'");
     }
-    return new SafetyToken(Kind.TAG, namespaceAndPath, predicates, sourceToken);
+    return new SafetyToken(Kind.TAG, namespaceAndPath, predicates, subtractions, sourceToken);
   }
 
   /** @return the kind of this token ({@link Kind#MATERIAL} or {@link Kind#TAG}). */
@@ -97,6 +128,16 @@ public final class SafetyToken {
   /** @return unmodifiable list of state predicates; empty for plain material/tag tokens. */
   public List<StatePredicate> predicates() {
     return predicates;
+  }
+
+  /** @return unmodifiable list of subtracted tokens; empty if no subtraction clause. */
+  public List<SafetyToken> subtractions() {
+    return subtractions;
+  }
+
+  /** @return {@code true} iff this token has at least one subtracted token. */
+  public boolean hasSubtractions() {
+    return !subtractions.isEmpty();
   }
 
   /** @return the original token string as read from config, for diagnostics. */
@@ -121,18 +162,20 @@ public final class SafetyToken {
     SafetyToken that = (SafetyToken) o;
     return kind == that.kind
         && identifier.equals(that.identifier)
-        && predicates.equals(that.predicates);
+        && predicates.equals(that.predicates)
+        && subtractions.equals(that.subtractions);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(kind, identifier, predicates);
+    return Objects.hash(kind, identifier, predicates, subtractions);
   }
 
   @Override
   public String toString() {
     return "SafetyToken{" + kind + " " + identifier
         + (predicates.isEmpty() ? "" : predicates)
+        + (subtractions.isEmpty() ? "" : " -" + subtractions)
         + " from='" + sourceToken + "'}";
   }
 }

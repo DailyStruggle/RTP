@@ -241,18 +241,19 @@ class RedisNetworkStateBindingUnitTest {
     @Test
     void lastTeleportTime_setAndGet() throws Exception {
         UUID pid = UUID.randomUUID();
-        when(jedis.get("rtp:net:lasttp:" + pid)).thenReturn("1234567890");
+        // Key shared with rtp-core RedisManager so backend and proxy read the same cooldown row.
+        when(jedis.get("rtp:lastTp:" + pid)).thenReturn("1234567890");
 
         binding.setLastTeleportTime(pid, 1234567890L).get();
-        verify(jedis).set("rtp:net:lasttp:" + pid, "1234567890");
+        verify(jedis).set("rtp:lastTp:" + pid, "1234567890");
 
         long val = binding.getLastTeleportTime(pid).get();
         assertEquals(1234567890L, val);
 
-        when(jedis.get("rtp:net:lasttp:" + pid)).thenReturn(null);
+        when(jedis.get("rtp:lastTp:" + pid)).thenReturn(null);
         assertEquals(0L, binding.getLastTeleportTime(pid).get());
 
-        when(jedis.get("rtp:net:lasttp:" + pid)).thenReturn("invalid-number");
+        when(jedis.get("rtp:lastTp:" + pid)).thenReturn("invalid-number");
         assertEquals(0L, binding.getLastTeleportTime(pid).get());
     }
 
@@ -333,9 +334,11 @@ class RedisNetworkStateBindingUnitTest {
                 "state", "PENDING"));
         assertTrue(binding.findReservation(pid).get().isPresent());
 
-        // Exception -> empty
+        // Transport error -> failed future (S-004; parity with SqlNetworkStateBinding).
+        // Corrupt rows degrade to empty above; a store outage must not masquerade as "no reservation".
         when(jedis.hgetAll("rtp:net:tok:tok-1")).thenThrow(new RuntimeException("hgetall-failed"));
-        assertTrue(binding.findReservation(pid).get().isEmpty());
+        ExecutionException ex = assertThrows(ExecutionException.class, () -> binding.findReservation(pid).get());
+        assertTrue(ex.getCause().getMessage().contains("hgetall-failed"));
     }
 
     @Test
@@ -360,9 +363,11 @@ class RedisNetworkStateBindingUnitTest {
         List<String> res = binding.reapExpired(java.time.Instant.now()).get();
         assertTrue(res.isEmpty());
 
+        // Transport error -> failed future; ReservationTokenReaper logs and retries next interval.
         when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenThrow(new RuntimeException("reap-err"));
-        res = binding.reapExpired(java.time.Instant.now()).get();
-        assertTrue(res.isEmpty());
+        ExecutionException ex = assertThrows(ExecutionException.class,
+                () -> binding.reapExpired(java.time.Instant.now()).get());
+        assertTrue(ex.getCause().getMessage().contains("reap-err"));
     }
 
     @Test

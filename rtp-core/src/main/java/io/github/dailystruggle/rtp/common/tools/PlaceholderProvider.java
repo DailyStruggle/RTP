@@ -977,26 +977,17 @@ public class PlaceholderProvider {
                 "scan_landPercentage",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0.00";
+                    // Read ScanTask's good/(good+bad) tally; MemoryShape bad counts include
+                    // gap-bridged runs and outer-ring preimages, so a shape-derived ratio
+                    // drifts or clamps to 0 mid-scan.
                     Region r = RTP.regionContext.get();
-                    if (r != null && r.getShape() instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> ms) {
-                        long bad = ms.getEffectiveBadCount();
-                        long denom = ms.getEffectiveGoodCount() + bad;
-                        if (denom <= 0) return "0.00";
-                        double pct = ((denom - bad) * 100.0) / denom;
-                        return String.format(java.util.Locale.ROOT, "%.2f", pct);
+                    double pct;
+                    if (r != null) {
+                        ScanTask task = RTP.getInstance().scanTasks.get(r.name);
+                        pct = (task != null) ? task.latestLandPercentage : 0.0;
+                    } else {
+                        pct = averageLandPercentage(RTP.getInstance().scanTasks.values());
                     }
-                    long totalBad = 0;
-                    long totalEvaluated = 0;
-                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                        if (task.region.getShape() instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> ms) {
-                            long bad = ms.getEffectiveBadCount();
-                            long denom = ms.getEffectiveGoodCount() + bad;
-                            totalBad += bad;
-                            totalEvaluated += denom;
-                        }
-                    }
-                    if (totalEvaluated <= 0) return "0.00";
-                    double pct = ((totalEvaluated - totalBad) * 100.0) / totalEvaluated;
                     return String.format(java.util.Locale.ROOT, "%.2f", pct);
                 });
         placeholders.put(
@@ -1285,6 +1276,22 @@ public class PlaceholderProvider {
     public static String formatPercent(double v) {
         if (Double.isNaN(v) || Double.isInfinite(v)) return "N/A";
         return String.format(java.util.Locale.ROOT, "%.2f%%", v);
+    }
+
+    /**
+     * Mean of {@link ScanTask#latestLandPercentage} across {@code tasks}; {@code 0.0} when empty.
+     * Unweighted: each task's figure is already a per-region good/(good+bad) ratio.
+     */
+    public static double averageLandPercentage(java.util.Collection<ScanTask> tasks) {
+        if (tasks == null || tasks.isEmpty()) return 0.0;
+        double sum = 0.0;
+        int n = 0;
+        for (ScanTask task : tasks) {
+            if (task == null) continue;
+            sum += task.latestLandPercentage;
+            n++;
+        }
+        return n == 0 ? 0.0 : sum / n;
     }
 
     public static String fillPlaceholders(String text, UUID uuid) {

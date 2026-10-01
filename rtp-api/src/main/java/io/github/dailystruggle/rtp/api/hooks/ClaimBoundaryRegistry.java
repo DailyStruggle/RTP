@@ -54,6 +54,29 @@ public interface ClaimBoundaryRegistry {
   }
 
   /**
+   * Resolve a claim boundary at the given coordinates.
+   *
+   * @param worldName target world name
+   * @param x         block X coordinate
+   * @param z         block Z coordinate
+   * @param namespace target claim system namespace (e.g. {@code "factions"}), or {@code null}/{@code "auto"} for highest-priority
+   * @return non-null {@link Optional} containing the claim boundary if found
+   */
+  Optional<ClaimBoundary> resolveAt(String worldName, int x, int z, String namespace);
+
+  /**
+   * Resolves a claim boundary at the given coordinates using automatic priority lookup.
+   *
+   * @param worldName target world name
+   * @param x         block X coordinate
+   * @param z         block Z coordinate
+   * @return non-null {@link Optional} containing the claim boundary if found
+   */
+  default Optional<ClaimBoundary> resolveAt(String worldName, int x, int z) {
+    return resolveAt(worldName, x, z, null);
+  }
+
+  /**
    * Unmodifiable snapshot of currently registered providers in descending priority order.
    *
    * @return list of providers

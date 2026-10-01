@@ -193,6 +193,57 @@ class SafetyTokenParserTest {
       assertTrue(t.isWildcard());
       assertEquals(1, t.predicates().get(0).comparisons().size());
     }
+
+    @Test
+    @DisplayName("tag-group with set subtraction parses base and subtracted tokens")
+    void tagGroupSetSubtraction() {
+      SafetyToken t = soleAccepted(SafetyTokenParser.parse("#minecraft:slabs - OAK_SLAB"));
+      assertEquals(SafetyToken.Kind.TAG, t.kind());
+      assertEquals("minecraft:slabs", t.identifier());
+      assertTrue(t.hasSubtractions());
+      assertEquals(1, t.subtractions().size());
+      SafetyToken sub = t.subtractions().get(0);
+      assertEquals(SafetyToken.Kind.MATERIAL, sub.kind());
+      assertEquals("OAK_SLAB", sub.identifier());
+    }
+
+    @Test
+    @DisplayName("multiple set subtractions are parsed in order")
+    void multipleSetSubtractions() {
+      SafetyToken t = soleAccepted(SafetyTokenParser.parse(
+          "#minecraft:leaves - AZALEA_LEAVES - FLOWERING_AZALEA_LEAVES"));
+      assertEquals(SafetyToken.Kind.TAG, t.kind());
+      assertEquals("minecraft:leaves", t.identifier());
+      assertTrue(t.hasSubtractions());
+      assertEquals(2, t.subtractions().size());
+      assertEquals("AZALEA_LEAVES", t.subtractions().get(0).identifier());
+      assertEquals("FLOWERING_AZALEA_LEAVES", t.subtractions().get(1).identifier());
+    }
+
+    @Test
+    @DisplayName("predicated tag with subtraction parses predicates and subtractions")
+    void predicatedTagWithSubtraction() {
+      SafetyToken t = soleAccepted(SafetyTokenParser.parse(
+          "#minecraft:slabs[waterlogged=true] - OAK_SLAB"));
+      assertEquals(SafetyToken.Kind.TAG, t.kind());
+      assertEquals("minecraft:slabs", t.identifier());
+      assertTrue(t.isPredicated());
+      assertEquals("true", t.predicates().get(0).properties().get("waterlogged"));
+      assertTrue(t.hasSubtractions());
+      assertEquals(1, t.subtractions().size());
+      assertEquals("OAK_SLAB", t.subtractions().get(0).identifier());
+    }
+
+    @Test
+    @DisplayName("subtraction with whitespace variants is accepted")
+    void subtractionWhitespaceVariants() {
+      SafetyToken t1 = soleAccepted(SafetyTokenParser.parse("#minecraft:slabs- #minecraft:wooden_slabs"));
+      assertEquals(1, t1.subtractions().size());
+      assertEquals("minecraft:wooden_slabs", t1.subtractions().get(0).identifier());
+
+      SafetyToken t2 = soleAccepted(SafetyTokenParser.parse("#minecraft:slabs -#minecraft:wooden_slabs"));
+      assertEquals(1, t2.subtractions().size());
+    }
   }
 
   @Nested
@@ -310,6 +361,21 @@ class SafetyTokenParserTest {
       Rejection r = soleRejection(SafetyTokenParser.parse("LAVA[level>=2,level>=3]"));
       assertTrue(r.reason().contains("duplicate"),
           () -> "reason: " + r.reason());
+    }
+
+    @Test
+    @DisplayName("malformed subtraction with empty segment is rejected")
+    void malformedSubtractionEmpty() {
+      assertTrue(SafetyTokenParser.parse("#minecraft:slabs - ").hasRejections());
+      assertTrue(SafetyTokenParser.parse(" - OAK_SLAB").hasRejections());
+      assertTrue(SafetyTokenParser.parse("#minecraft:slabs - - OAK_SLAB").hasRejections());
+    }
+
+    @Test
+    @DisplayName("malformed subtraction with invalid identifier is rejected")
+    void malformedSubtractionInvalid() {
+      assertTrue(SafetyTokenParser.parse("#minecraft:slabs - *").hasRejections());
+      assertTrue(SafetyTokenParser.parse("#minecraft:slabs - invalid-name").hasRejections());
     }
   }
 

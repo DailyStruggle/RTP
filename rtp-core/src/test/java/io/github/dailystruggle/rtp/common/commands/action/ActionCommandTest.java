@@ -475,6 +475,23 @@ class ActionCommandTest {
     assertTrue(admin.sentMessages.stream().anyMatch(m -> m.contains("Cancelled action for Bob")));
   }
 
+  // Walks up from user.dir so the lookup is independent of the test JVM's working directory
+  // (repo root, rtp-core, or an IDE-chosen module dir).
+  private static java.io.File locateBundledActionsDir() {
+    String[] candidates = {
+        "addons/LeafRTPActionAddon/src/main/resources/definitions/actions",
+        "rtp-plugin/src/main/resources/definitions/actions"
+    };
+    java.io.File start = new java.io.File(System.getProperty("user.dir")).getAbsoluteFile();
+    for (java.io.File dir = start; dir != null; dir = dir.getParentFile()) {
+      for (String candidate : candidates) {
+        java.io.File f = new java.io.File(dir, candidate);
+        if (f.isDirectory()) return f;
+      }
+    }
+    return new java.io.File(start, candidates[0]);
+  }
+
   @Test
   @DisplayName("Challenge command correctly pauses in wait-queue without premature chunk loading")
   void testChallengeCommandPausesInWaitQueue() {
@@ -490,16 +507,7 @@ class ActionCommandTest {
     serverAccessor.addPlayer(alice);
     serverAccessor.addPlayer(bob);
 
-    java.io.File actionsDir = new java.io.File("../addons/LeafRTPActionAddon/src/main/resources/definitions/actions");
-    if (!actionsDir.exists()) {
-      actionsDir = new java.io.File("addons/LeafRTPActionAddon/src/main/resources/definitions/actions");
-    }
-    if (!actionsDir.exists()) {
-      actionsDir = new java.io.File("../rtp-plugin/src/main/resources/definitions/actions");
-    }
-    if (!actionsDir.exists()) {
-      actionsDir = new java.io.File("rtp-plugin/src/main/resources/definitions/actions");
-    }
+    java.io.File actionsDir = locateBundledActionsDir();
     assertTrue(actionsDir.exists(), "Actions dir must exist: " + actionsDir.getAbsolutePath());
 
     io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(actionsDir.getParentFile().getParentFile(), actionManager);
@@ -564,17 +572,8 @@ class ActionCommandTest {
         }
       });
 
-      java.io.File actionsDir = new java.io.File("../addons/LeafRTPActionAddon/src/main/resources/definitions/actions");
-      if (!actionsDir.exists()) {
-        actionsDir = new java.io.File("addons/LeafRTPActionAddon/src/main/resources/definitions/actions");
-      }
-      if (!actionsDir.exists()) {
-        actionsDir = new java.io.File("../rtp-plugin/src/main/resources/definitions/actions");
-      }
-      if (!actionsDir.exists()) {
-        actionsDir = new java.io.File("rtp-plugin/src/main/resources/definitions/actions");
-      }
-      assertTrue(actionsDir.exists());
+      java.io.File actionsDir = locateBundledActionsDir();
+      assertTrue(actionsDir.exists(), "Actions dir must exist: " + actionsDir.getAbsolutePath());
       io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(actionsDir.getParentFile().getParentFile(), actionManager);
 
       ActionDefinition chalDef = actionManager.getAction("challenge").orElse(null);

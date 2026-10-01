@@ -103,7 +103,7 @@ rerollFactionsBridge: true     # bridges FactionsUUID, SaberFactions, FactionsX,
 rerollGriefPrevention: true
 ```
 
-Supported plugins (full list on the [Integrations](configuration/INTEGRATIONS.md) page): SaberFactions, FactionsBridge, GriefDefender, GriefPrevention, Lands, RedProtect, Residence, CrashClaim, HuskClaims, KingdomsX, Towny Advanced, WorldGuard.
+Supported plugins (full list on the [Integrations](configuration/INTEGRATIONS.md) page and [Claim Compatibility Reference](CLAIM_PLUGIN_COMPATIBILITY.md)): SaberFactions, FactionsBridge, GriefDefender, GriefPrevention, Lands, RedProtect, Residence, CrashClaim, HuskClaims, HuskTowns, KingdomsX, PlotSquared, Towny Advanced, UltimateClaims, MinePlots, WorldGuard (plus FTB Chunks and OpenPartiesAndClaims on Fabric/NeoForge).
 
 !!! note "This is a safety guarantee, not just a convenience"
     Re-rolling out of claims is enforced inside the teleport pipeline itself, so a destination cannot leak into protected land through the menu, the command, or the API. The reroll honours the bounded spiral selector and eventually exhausts attempts (`performance.yml` -> `maxAttempts`) rather than looping forever. See [Safety](configuration/SAFETY.md).

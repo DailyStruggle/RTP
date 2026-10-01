@@ -249,7 +249,7 @@ Safety-critical packages inside `rtp-core` carry higher floors on top of the mod
 - **Effects engine** - particles, sounds, fireworks, potions, titles, console or player commands, and holograms on every teleport phase, gated by `rtp.effects.<name>`. Holograms use the 1.19.4+ text display entity directly at the packet level, so no hologram plugin is needed; DecentHolograms and HolographicDisplays are picked up if you already run them. The Rift addon under `addons/` in the repo is a worked example.
 - **Per-region arrival schematics** - drop a Sponge `.schem` named after a region into `plugins/RTP/advanced/schematics/` and every teleport into that region pastes it centered on the landing spot. Decoded in-house, no WorldEdit required, claim-aware.
 - **Economy** - charge per `/rtp` (Vault), per-region pricing, auto-refund on cancel, `rtp.free` bypass.
-- **12 claim integrations** via the bundled claim addon - GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, RedProtect, CrashClaim, KingdomsX, Residence. Claim checks run inside the async pipeline, not on the teleport tick. Add your own through `RegionVerifierRegistry` with one lambda.
+- **18 claim integrations** (16 Bukkit/Paper/Folia via the bundled claim addon + 2 native mod checkers on Fabric/NeoForge) - GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, HuskTowns, PlotSquared, RedProtect, CrashClaim, KingdomsX, Residence, UltimateClaims, MinePlots, plus FTB Chunks and OpenPartiesAndClaims. Claim checks run inside the async pipeline, not on the teleport tick. Add your own through `RegionVerifierRegistry` with one lambda.
 - **Claim- and faction-anchored destinations** - an action can land players relative to their own town, claim, or faction land (`anchor: claimboundary`, `anchor: faction`) instead of a fixed center. Towny, GriefPrevention, and SaberFactions / FactionsUUID expose their boundaries out of the box; other plugins plug in through `ClaimBoundaryProvider`. The anchor stays pinned while it is still inside the claim, with a cooldown on recomputing it, so the spiral does not drift on every land sale, and the anchored region inherits known-bad chunks from the world region it overlaps so the first teleport is not a cold start.
 - **PvP / combat-tag gate** - off by default; refuses or delays `/rtp` for players who recently dealt or took PvP damage. Native tracking, optional PvPManager / CombatLogX / Simple Combat Log integration.
 - **Movement-cancel, damage-cancel, invulnerability-after-teleport timers, landing platform with decay**, countdown and warmup messages.
@@ -356,16 +356,17 @@ Unknown tags and properties fail open, so a config written for a newer MC versio
 </details>
 
 <details>
-<summary><b>Roadmap</b></summary>
+<summary><b>Roadmap & Planned Features</b></summary>
 
-- **Fully-automatic self-warming** - background spatial-memory accumulation without the `/rtp scan` verb.
-- **Anonymous opt-in telemetry** - reference benchmark sourced from real deployments.
-- **Chunky-driven scan generation** - let a bulk pre-generator lay chunks down first, then scan reads them through the Anvil pre-filter.
-- **Leaner scan path** - measure how accurately the pre-filter alone trims candidates and, where it is accurate enough, skip the full-load verification pass during scans.
-- **Accelerated scan compute (exploration)** - offloading the bulk safety sweep to native SIMD, GPU, or an external generator, with a fallback to the current path.
-- **Native BungeeCord proxy adapter.**
+- **Visual region definition & ecosystem selection bridges** - create and configure regions directly from in-game selections (WorldEdit / FAWE / FTB Chunks) or interactive browser web maps without manual coordinate entry (ADR-099).
+- **External web map raster layers** - zero-chunk-load on-demand raster heatmaps and polygon boundary overlays for Pl3xMap, BlueMap, and Dynmap (ADR-086).
+- **Fully-automatic self-warming** - background spatial-memory accumulation and queue pre-population without running the `/rtp scan` command.
+- **Anvil PRESCAN accuracy measurement & conditional FULLSCAN retirement** - profiling off-tick Anvil pre-filter accuracy to safely bypass live chunk verification during scans.
+- **Chunky-driven scan orchestration** - coordinating with bulk pre-generators like Chunky to populate terrain on disk prior to off-tick Anvil indexing.
+- **Accelerated scan compute (exploration)** - SIMD or hardware-accelerated batch verification of decoded region slices.
+- **Anonymous opt-in telemetry** - reference benchmarks and real-world deployment performance metrics.
 
-File a GitHub issue if you hit something not on the list.
+File a GitHub issue if you hit something not on the list or want to suggest a feature.
 
 </details>
 

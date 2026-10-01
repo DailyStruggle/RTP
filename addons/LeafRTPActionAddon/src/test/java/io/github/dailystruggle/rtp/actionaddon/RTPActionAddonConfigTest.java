@@ -93,15 +93,27 @@ class RTPActionAddonConfigTest {
           portal_alpha:
             type: PORTAL
             world: world
-            pos1: { x: 10, y: 64, z: 10 }
-            pos2: { x: 15, y: 68, z: 15 }
+            pos1:
+              x: 10
+              y: 64
+              z: 10
+            pos2:
+              x: 15
+              y: 68
+              z: 15
             cooldown: 5s
             batchInterval: 10s
           portal_beta:
             type: STEP_IN
             world: world_nether
-            pos1: { x: -50, y: 30, z: -50 }
-            pos2: { x: -45, y: 35, z: -45 }
+            pos1:
+              x: -50
+              y: 30
+              z: -50
+            pos2:
+              x: -45
+              y: 35
+              z: -45
             cooldown: 12s
             batchInterval: 0s
         placement:

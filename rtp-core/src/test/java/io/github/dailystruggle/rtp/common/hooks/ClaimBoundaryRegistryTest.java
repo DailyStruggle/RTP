@@ -127,6 +127,48 @@ class ClaimBoundaryRegistryTest {
     assertEquals("safe", res.get().id());
   }
 
+  @Test
+  @DisplayName("Resolve at coordinates by priority ordering and namespace")
+  void testResolveAtCoordinates() {
+    ClaimBoundary townBoundary = new RectangularClaimBoundary("town_at", "world", 100, 100, 150, 150);
+    ClaimBoundary facBoundary = new RectangularClaimBoundary("fac_at", "world", 100, 100, 150, 150);
+
+    ClaimBoundaryProvider townProvider = new ClaimBoundaryProvider() {
+      @Override public String namespace() { return "towny"; }
+      @Override public int priority() { return 50; }
+      @Override public Optional<ClaimBoundary> getBoundary(UUID playerId, String worldName) { return Optional.empty(); }
+      @Override public Optional<ClaimBoundary> getBoundaryAt(String worldName, int x, int z) {
+        return townBoundary.contains(x, z) ? Optional.of(townBoundary) : Optional.empty();
+      }
+    };
+
+    ClaimBoundaryProvider facProvider = new ClaimBoundaryProvider() {
+      @Override public String namespace() { return "factions"; }
+      @Override public int priority() { return 20; }
+      @Override public Optional<ClaimBoundary> getBoundary(UUID playerId, String worldName) { return Optional.empty(); }
+      @Override public Optional<ClaimBoundary> getBoundaryAt(String worldName, int x, int z) {
+        return facBoundary.contains(x, z) ? Optional.of(facBoundary) : Optional.empty();
+      }
+    };
+
+    registry.register(facProvider);
+    registry.register(townProvider);
+
+    // Auto resolution chooses higher priority towny (50) over factions (20)
+    Optional<ClaimBoundary> resolved = registry.resolveAt("world", 120, 120);
+    assertTrue(resolved.isPresent());
+    assertEquals("town_at", resolved.get().id());
+
+    // Explicit namespace query targets factions
+    resolved = registry.resolveAt("world", 120, 120, "factions");
+    assertTrue(resolved.isPresent());
+    assertEquals("fac_at", resolved.get().id());
+
+    // Coordinates outside bounds return empty
+    resolved = registry.resolveAt("world", 500, 500);
+    assertFalse(resolved.isPresent());
+  }
+
   private ClaimBoundaryProvider createMockProvider(
       String ns,
       int priority,

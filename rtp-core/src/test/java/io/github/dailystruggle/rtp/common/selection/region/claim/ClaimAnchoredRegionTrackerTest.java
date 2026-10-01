@@ -108,6 +108,26 @@ public class ClaimAnchoredRegionTrackerTest {
     public int maxChunkZ() {
       return maxZ >> 4;
     }
+
+    @Override
+    public int minX() {
+      return minX;
+    }
+
+    @Override
+    public int minZ() {
+      return minZ;
+    }
+
+    @Override
+    public int maxX() {
+      return maxX;
+    }
+
+    @Override
+    public int maxZ() {
+      return maxZ;
+    }
   }
 
   @Test
@@ -234,5 +254,50 @@ public class ClaimAnchoredRegionTrackerTest {
     assertEquals(200, subspace.getAnchor().coords().z());
     assertEquals(64, subspace.getBlockRadius());
     assertSame(parentRegion, subspace.getParentRegion());
+  }
+
+  @Test
+  @DisplayName("Single claim hit encapsulates the entire claim envelope in MemoryShape")
+  void testEncapsulateClaimBlanksOutBoundingBox() {
+    Circle circle = new Circle();
+    circle.set(GenericMemoryShapeParams.centerRadius, 0L);
+    circle.set(GenericMemoryShapeParams.radius, 500L);
+    circle.set(GenericMemoryShapeParams.centerX, 0L);
+    circle.set(GenericMemoryShapeParams.centerZ, 0L);
+    circle.set(GenericMemoryShapeParams.expand, false);
+
+    // Register a claim boundary spanning [64, 64] -> [128, 128]
+    RectangularClaimBoundary boundary = new RectangularClaimBoundary("test_claim", "world", 64, 64, 128, 128);
+    io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider provider = new io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider() {
+      @Override public String namespace() { return "test"; }
+      @Override public int priority() { return 100; }
+      @Override public java.util.Optional<ClaimBoundary> getBoundary(java.util.UUID playerId, String worldName) { return java.util.Optional.empty(); }
+      @Override public java.util.Optional<ClaimBoundary> getBoundaryAt(String worldName, int x, int z) {
+        return boundary.contains(x, z) ? java.util.Optional.of(boundary) : java.util.Optional.empty();
+      }
+    };
+
+    io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks hooks = new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
+    hooks.claimBoundaries().register(provider);
+    io.github.dailystruggle.rtp.api.RTPAPI.hooks = hooks;
+
+    // Initially, locations inside claim are not known bad
+    assertFalse(circle.isKnownBad(64, 64));
+    assertFalse(circle.isKnownBad(96, 96));
+    assertFalse(circle.isKnownBad(128, 128));
+
+    // A candidate hit at (80, 80) fails claim verifier -> encapsulateClaim called
+    int marked = ClaimAnchoredRegionTracker.encapsulateClaim(circle, "world", 80, 80, null);
+    assertTrue(marked > 0, "Must have marked at least 1 coordinate");
+
+    // All coordinates/chunks within the claim bounding box must now be known bad!
+    assertTrue(circle.isKnownBad(64, 64), "Min boundary point must be marked bad");
+    assertTrue(circle.isKnownBad(80, 80), "Candidate hit point must be marked bad");
+    assertTrue(circle.isKnownBad(96, 96), "Interior point must be marked bad");
+    assertTrue(circle.isKnownBad(128, 128), "Max boundary point must be marked bad");
+
+    // Coordinates outside the claim bounding box remain unaffected
+    assertFalse(circle.isKnownBad(0, 0), "Point outside claim must remain good");
+    assertFalse(circle.isKnownBad(200, 200), "Point outside claim must remain good");
   }
 }

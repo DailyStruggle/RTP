@@ -276,4 +276,42 @@ class CompiledUnsafeSetTest {
     assertThrows(NullPointerException.class,
         () -> new StatePredicate(null, "src"));
   }
+
+  @Test
+  @DisplayName("tag-group with set subtraction excludes subtracted material in live isUnsafe check")
+  void tagGroupSetSubtractionLiveUnsafe() {
+    CompiledUnsafeSet c = compile("#minecraft:slabs - OAK_SLAB");
+    // Candidate with tag minecraft:slabs and material BIRCH_SLAB -> unsafe
+    assertTrue(c.isUnsafe("BIRCH_SLAB", Collections.singletonList("minecraft:slabs"), null));
+    // Candidate with tag minecraft:slabs and material OAK_SLAB -> safe (subtracted)
+    assertFalse(c.isUnsafe("OAK_SLAB", Collections.singletonList("minecraft:slabs"), null));
+  }
+
+  @Test
+  @DisplayName("tag-group with set subtraction excludes subtracted materials when withTagsExpanded is called")
+  void tagGroupSetSubtractionExpanded() {
+    CompiledUnsafeSet c = compile("#minecraft:leaves - AZALEA_LEAVES - FLOWERING_AZALEA_LEAVES");
+    Map<String, Set<String>> snapshot = Map.of(
+        "minecraft:leaves", Set.of("OAK_LEAVES", "AZALEA_LEAVES", "FLOWERING_AZALEA_LEAVES", "BIRCH_LEAVES")
+    );
+    CompiledUnsafeSet expanded = c.withTagsExpanded(snapshot);
+    assertTrue(expanded.plainMaterials().contains("OAK_LEAVES"));
+    assertTrue(expanded.plainMaterials().contains("BIRCH_LEAVES"));
+    assertFalse(expanded.plainMaterials().contains("AZALEA_LEAVES"));
+    assertFalse(expanded.plainMaterials().contains("FLOWERING_AZALEA_LEAVES"));
+
+    assertTrue(expanded.isUnsafe("OAK_LEAVES", null));
+    assertFalse(expanded.isUnsafe("AZALEA_LEAVES", null));
+    assertFalse(expanded.isUnsafe("FLOWERING_AZALEA_LEAVES", null));
+  }
+
+  @Test
+  @DisplayName("tag subtraction with tag-level predicate respects subtraction")
+  void tagPredicatedSubtraction() {
+    CompiledUnsafeSet c = compile("#minecraft:slabs[waterlogged=true] - OAK_SLAB");
+    // BIRCH_SLAB waterlogged=true -> unsafe
+    assertTrue(c.isUnsafe("BIRCH_SLAB", Collections.singletonList("minecraft:slabs"), props("waterlogged", "true")));
+    // OAK_SLAB waterlogged=true -> safe (subtracted)
+    assertFalse(c.isUnsafe("OAK_SLAB", Collections.singletonList("minecraft:slabs"), props("waterlogged", "true")));
+  }
 }

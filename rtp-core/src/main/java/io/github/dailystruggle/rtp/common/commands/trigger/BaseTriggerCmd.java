@@ -54,8 +54,8 @@ public abstract class BaseTriggerCmd extends BaseRTPCmdImpl {
    */
   @Nullable
   protected RTPPlayer requirePlayer(UUID senderId, String notPlayerMessage) {
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
-    if (!(sender instanceof RTPPlayer player)) {
+    RTPPlayer player = RTP.serverAccessor.getPlayer(senderId);
+    if (player == null) {
       RTP.serverAccessor.sendMessage(senderId, senderId, notPlayerMessage);
       return null;
     }

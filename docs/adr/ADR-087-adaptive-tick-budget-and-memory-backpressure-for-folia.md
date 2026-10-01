@@ -1,6 +1,6 @@
 # ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
 
-**Status:** Proposed  
+**Status:** Proposed
 **Date:** 2026-09-07  
 
 ## Context
