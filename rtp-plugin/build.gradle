@@ -1051,6 +1051,10 @@ remapJar {
     if (countdownAddonJarTask != null) dependsOn countdownAddonJarTask
     def countdownAddonJarFile = countdownAddonJarProvider == null ? null : countdownAddonJarProvider.get().asFile
     if (countdownAddonJarFile != null) inputs.file(countdownAddonJarFile).withPropertyName('bundledCountdownAddonJar')
+    // Bundled action addon jar (parity with the GUI/claim/countdown addons above).
+    if (actionAddonJarTask != null) dependsOn actionAddonJarTask
+    def actionAddonJarFile = actionAddonJarProvider == null ? null : actionAddonJarProvider.get().asFile
+    if (actionAddonJarFile != null) inputs.file(actionAddonJarFile).withPropertyName('bundledActionAddonJar')
     doLast {
         mergeFn(remapJar.archiveFile.get().asFile, 'Pro',
                 v26Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
@@ -1083,7 +1087,6 @@ remapJar {
             injectAddonFn(remapJar.archiveFile.get().asFile, countdownAddonJarFile, 'LeafRTPCountdownAddon.jar')
         }
         // Append the bundled action addon jar the same way.
-        def actionAddonJarFile = actionAddonJarProvider != null ? actionAddonJarProvider.get().asFile : null
         if (actionAddonJarFile != null) {
             injectAddonFn(remapJar.archiveFile.get().asFile, actionAddonJarFile, 'LeafRTPActionAddon.jar')
         }
@@ -1514,6 +1517,10 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     if (countdownAddonJarTask != null) dependsOn countdownAddonJarTask
     def countdownAddonJarFile = countdownAddonJarProvider == null ? null : countdownAddonJarProvider.get().asFile
     if (countdownAddonJarFile != null) inputs.file(countdownAddonJarFile).withPropertyName('bundledCountdownAddonJar')
+    // Bundled action addon jar (parity with Pro's remapJar).
+    if (actionAddonJarTask != null) dependsOn actionAddonJarTask
+    def actionAddonJarFile = actionAddonJarProvider == null ? null : actionAddonJarProvider.get().asFile
+    if (actionAddonJarFile != null) inputs.file(actionAddonJarFile).withPropertyName('bundledActionAddonJar')
 
     doLast {
         mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite',
@@ -1544,6 +1551,10 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
         // Append the bundled reference/event-hook demo addon jar the same way.
         if (countdownAddonJarFile != null) {
             injectAddonFn(remapLiteJar.archiveFile.get().asFile, countdownAddonJarFile, 'LeafRTPCountdownAddon.jar')
+        }
+        // Append the bundled action addon jar the same way.
+        if (actionAddonJarFile != null) {
+            injectAddonFn(remapLiteJar.archiveFile.get().asFile, actionAddonJarFile, 'LeafRTPActionAddon.jar')
         }
     }
 }

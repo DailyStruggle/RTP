@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.claimaddon;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.claim.ClaimBoundary;
-import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
