@@ -1,7 +1,5 @@
 package io.github.dailystruggle.rtp.common.visualization;
 
-import io.github.dailystruggle.mapsapi.BiomeColorSource;
-import io.github.dailystruggle.mapsapi.render.CanvasDrawing;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;

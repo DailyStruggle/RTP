@@ -1,9 +1,5 @@
 package io.github.dailystruggle.effectsapi.common.volumetric;
 
-import io.github.dailystruggle.effectsapi.common.spi.EffectRuntime;
-import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
-import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
-import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 
 import java.util.ArrayList;
 import java.util.Collection;
