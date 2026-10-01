@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -99,16 +100,14 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             changeCount += changes.size();
         }
 
-        File pluginDir = (RTP.serverAccessor == null) ? null : RTP.serverAccessor.getPluginDirectory();
-        if (pluginDir == null) {
-            RTP.log(Level.WARNING,
-                    "[prefab] confirm rejected NO_PLUGIN_DIR: caller=" + callerId
-                            + " prefab=" + entry.prefabId());
-            send(callerId, "&cConfirm failed: plugin directory unavailable (server not fully initialised).");
+        Optional<File> pluginDirOpt = PrefabDiskIO.resolvePluginDirectory(callerId, "confirm", entry.prefabId(),
+                "&cConfirm failed: plugin directory unavailable (server not fully initialised).");
+        if (pluginDirOpt.isEmpty()) {
             return false;
         }
+        File pluginDir = pluginDirOpt.get();
 
-        int retention = resolveBakRetention();
+        int retention = PrefabDiskIO.resolveBakRetention();
         // expandPerWorld prefabs synthesise a brand-new regions/<world>.yml per
         // loaded world. These are created through the same region-creation path
         // the /rtp config command uses (MultiConfigParser.addParser, which
@@ -213,7 +212,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         send(callerId, "&aPrefab &f" + entry.prefabId() + "&a applied. Wrote "
                 + writtenFiles.size() + " file(s), " + changeCount + " change(s).");
         if (!writtenBaks.isEmpty()) {
-            send(callerId, "&7Backups: &f" + String.join(", ", writtenBaks));
+            send(callerId, PrefabDiskIO.formatBackupSummary(writtenBaks));
         }
         if (!installedSchematics.isEmpty()) {
             send(callerId, "&7Installed schematic(s): &f"

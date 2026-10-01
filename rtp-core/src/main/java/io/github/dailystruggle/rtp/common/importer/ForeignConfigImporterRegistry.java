@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.common.importer;
 
+import io.github.dailystruggle.rtp.common.importer.schema.BuiltinPluginSchemas;
+import io.github.dailystruggle.rtp.common.importer.schema.GenericSchemaImporter;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -10,12 +13,16 @@ import java.util.*;
 public final class ForeignConfigImporterRegistry {
 
     private static final Map<String, ForeignConfigImporter> IMPORTERS = new LinkedHashMap<>();
+    private static final UniversalConfigImporter UNIVERSAL_IMPORTER = new UniversalConfigImporter();
 
     static {
         register(new BetterRtpConfigImporter());
         register(new EzRtpConfigImporter());
         register(new JustRtpConfigImporter());
         register(new JakesRtpConfigImporter());
+        register(new GenericSchemaImporter(BuiltinPluginSchemas.ASYNC_RTP));
+        register(new GenericSchemaImporter(BuiltinPluginSchemas.ADVANCED_RTP));
+        register(UNIVERSAL_IMPORTER);
     }
 
     private ForeignConfigImporterRegistry() {}
@@ -28,7 +35,11 @@ public final class ForeignConfigImporterRegistry {
 
     public static ForeignConfigImporter getImporter(String name) {
         if (name == null) return null;
-        return IMPORTERS.get(name.trim().toLowerCase(Locale.ROOT));
+        String norm = name.trim().toLowerCase(Locale.ROOT);
+        ForeignConfigImporter importer = IMPORTERS.get(norm);
+        if (importer != null) return importer;
+        // Generic fallback: any request maps to the universal importer
+        return UNIVERSAL_IMPORTER;
     }
 
     public static Collection<ForeignConfigImporter> getAllImporters() {
@@ -43,7 +54,7 @@ public final class ForeignConfigImporterRegistry {
      * Resolves the candidate source directory for a given importer in the parent plugins/ directory.
      *
      * @param pluginsDir server's plugins/ directory
-     * @param sourceName name of the importer source
+     * @param sourceName name of the importer source or candidate folder
      * @return Path to the foreign plugin directory if found, or null
      */
     public static Path resolveSourceDir(Path pluginsDir, String sourceName) {
@@ -51,47 +62,27 @@ public final class ForeignConfigImporterRegistry {
         if (sourceName == null) return null;
 
         String norm = sourceName.trim().toLowerCase(Locale.ROOT);
-        if ("betterrtp".equals(norm)) {
-            Path[] candidates = new Path[]{
-                    pluginsDir.resolve("BetterRTP"),
-                    pluginsDir.resolve("betterrtp"),
-                    pluginsDir.resolve("BETTERRTP")
-            };
-            for (Path c : candidates) {
-                if (Files.isDirectory(c)) return c;
-            }
-        } else if ("ezrtp".equals(norm)) {
-            // Check common casing variations
-            Path[] candidates = new Path[]{
-                    pluginsDir.resolve("EzRTP"),
-                    pluginsDir.resolve("ezrtp"),
-                    pluginsDir.resolve("EZRTP")
-            };
-            for (Path c : candidates) {
-                if (Files.isDirectory(c)) return c;
-            }
-        } else if ("justrtp".equals(norm)) {
-            Path[] candidates = new Path[]{
-                    pluginsDir.resolve("justRTP"),
-                    pluginsDir.resolve("JustRTP"),
-                    pluginsDir.resolve("justrtp"),
-                    pluginsDir.resolve("JUSTRTP")
-            };
-            for (Path c : candidates) {
-                if (Files.isDirectory(c)) return c;
-            }
-        } else if ("jakesrtp".equals(norm)) {
-            Path[] candidates = new Path[]{
-                    pluginsDir.resolve("JakesRTP"),
-                    pluginsDir.resolve("jakesrtp"),
-                    pluginsDir.resolve("JAKESRTP")
-            };
-            for (Path c : candidates) {
-                if (Files.isDirectory(c)) return c;
-            }
+
+        // Direct directory checks across casing variations
+        Path[] commonVariations = new Path[]{
+                pluginsDir.resolve(sourceName),
+                pluginsDir.resolve(norm),
+                pluginsDir.resolve(sourceName.toUpperCase(Locale.ROOT)),
+                pluginsDir.resolve(Character.toUpperCase(norm.charAt(0)) + norm.substring(1))
+        };
+        for (Path c : commonVariations) {
+            if (Files.isDirectory(c)) return c;
         }
-        Path direct = pluginsDir.resolve(sourceName);
-        if (Files.isDirectory(direct)) return direct;
+
+        // Search directory contents case-insensitively
+        try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(pluginsDir)) {
+            for (Path p : stream) {
+                if (Files.isDirectory(p) && p.getFileName().toString().equalsIgnoreCase(sourceName)) {
+                    return p;
+                }
+            }
+        } catch (Exception ignored) {}
+
         return null;
     }
 
@@ -99,7 +90,7 @@ public final class ForeignConfigImporterRegistry {
      * Probes the server plugins/ directory for available foreign configurations.
      *
      * @param pluginsDir server's plugins/ directory
-     * @return map of source name -> detected directory
+     * @return map of detected plugin directory name -> directory Path
      */
     public static Map<String, Path> detectAvailableSources(Path pluginsDir) {
         Map<String, Path> detected = new LinkedHashMap<>();
@@ -107,12 +98,20 @@ public final class ForeignConfigImporterRegistry {
             return detected;
         }
 
-        for (ForeignConfigImporter importer : IMPORTERS.values()) {
-            Path dir = resolveSourceDir(pluginsDir, importer.sourceName());
-            if (dir != null && importer.canImport(dir)) {
-                detected.put(importer.sourceName(), dir);
+        try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(pluginsDir)) {
+            for (Path dir : stream) {
+                if (Files.isDirectory(dir)) {
+                    String folderName = dir.getFileName().toString();
+                    if (folderName.equalsIgnoreCase("RTP") || folderName.equalsIgnoreCase("LeafRTP")) {
+                        continue; // skip our own directory
+                    }
+                    if (UNIVERSAL_IMPORTER.canImport(dir)) {
+                        detected.put(folderName, dir);
+                    }
+                }
             }
-        }
+        } catch (Exception ignored) {}
+
         return detected;
     }
 }

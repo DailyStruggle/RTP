@@ -1,17 +1,16 @@
 package io.github.dailystruggle.rtp.common.commands.maps;
 
-import io.github.dailystruggle.mapsapi.BiomeColorSource;
 import io.github.dailystruggle.mapsapi.model.SelectionHeatmap;
 import io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Resolver for {@link ChartSpec.Kind#SELECTION_HEATMAP} (ADR-089, ADR-039).
@@ -20,10 +19,12 @@ import java.util.List;
  *
  * <p>Operates 100% off-tick with zero main-thread chunk I/O (Rule S-005).</p>
  */
-public final class SelectionHeatmapResolver implements ChartSpecResolver {
+public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
 
   private static final int GRID_W = 512;
   private static final int GRID_H = 512;
+  private static final Set<ChartSpec.Kind> SUPPORTED_KINDS =
+      Set.of(ChartSpec.Kind.SELECTION_HEATMAP, ChartSpec.Kind.BAD_POINTS_HEATMAP);
 
   public SelectionHeatmapResolver() {
     // Explicit public constructor
@@ -31,87 +32,25 @@ public final class SelectionHeatmapResolver implements ChartSpecResolver {
 
   @Override
   public Resolution resolve(ChartSpec spec) throws UnresolvableChartSpecException {
-    if (spec == null) {
-      throw new UnresolvableChartSpecException("spec shall not be null");
-    }
-    if (spec.kind() != ChartSpec.Kind.SELECTION_HEATMAP && spec.kind() != ChartSpec.Kind.BAD_POINTS_HEATMAP) {
-      throw new UnresolvableChartSpecException(
-          "SelectionHeatmapResolver handles SELECTION_HEATMAP or BAD_POINTS_HEATMAP, got " + spec.kind());
-    }
-
-    Region region;
-    try {
-      region = RTP.selectionAPI.getRegionOrDefault(spec.regionName());
-    } catch (RuntimeException e) {
-      throw new UnresolvableChartSpecException(
-          "no region resolved for '" + spec.regionName() + "'", e);
-    }
-    if (region == null) {
-      throw new UnresolvableChartSpecException(
-          "no region resolved for '" + spec.regionName() + "'");
-    }
-    if (!(region.shape instanceof MemoryShape<?> memoryShape)) {
-      throw new UnresolvableChartSpecException(
-          "region '" + region.name + "' shape is not a MemoryShape");
-    }
-
+    validateSpec(spec, SUPPORTED_KINDS);
+    Region region = resolveRegion(spec);
+    MemoryShape<?> memoryShape = resolveMemoryShape(region);
     long range = memoryShape.getRange();
-    if (range <= 0) {
-      throw new UnresolvableChartSpecException("region range must be positive");
-    }
 
     // 1. Discover Bounding Box matching ComprehensiveRegionImageExporter
-    int sampleCount = 4096;
-    long boundingStep = Math.max(1L, range / sampleCount);
-    int minX = Integer.MAX_VALUE;
-    int maxX = Integer.MIN_VALUE;
-    int minZ = Integer.MAX_VALUE;
-    int maxZ = Integer.MIN_VALUE;
-    int samples = 0;
-
-    for (long i = 0L; i < range; i += boundingStep) {
-      int[] xz = memoryShape.locationToXZ(i);
-      if (xz == null || xz.length < 2) continue;
-      if (xz[0] < minX) minX = xz[0];
-      if (xz[0] > maxX) maxX = xz[0];
-      if (xz[1] < minZ) minZ = xz[1];
-      if (xz[1] > maxZ) maxZ = xz[1];
-      samples++;
-    }
-
-    if (samples == 0) {
-      minX = -100; maxX = 100;
-      minZ = -100; maxZ = 100;
-    }
-
-    int extentX = maxX - minX;
-    int extentZ = maxZ - minZ;
-    int pad = Math.max(16, Math.max(extentX, extentZ) / 20);
-    minX -= pad; maxX += pad;
-    minZ -= pad; maxZ += pad;
-    long boundW = Math.max(1L, (long) maxX - minX);
-    long boundH = Math.max(1L, (long) maxZ - minZ);
+    RegionBounds bounds = discoverBounds(memoryShape, 4096, 16, 20);
+    int minX = bounds.minX();
+    int maxX = bounds.maxX();
+    int minZ = bounds.minZ();
+    int maxZ = bounds.maxZ();
+    long boundW = bounds.boundW();
+    long boundH = bounds.boundH();
 
     // 2. Compute domain containment and backdrop terrain grid
+    GridDomain domain = sampleDomainGrid(memoryShape, bounds, GRID_W, GRID_H, false);
+    boolean[] insideDomain = domain.insideDomain();
+    int[] biomeRgb = domain.biomeRgb();
     int totalElements = GRID_W * GRID_H;
-    boolean[] insideDomain = new boolean[totalElements];
-    int[] biomeRgb = new int[totalElements];
-
-    for (int py = 0; py < GRID_H; py++) {
-      int bz = (int) (minZ + (long) py * boundH / (GRID_H - 1));
-      int row = py * GRID_W;
-      for (int px = 0; px < GRID_W; px++) {
-        int bx = (int) (minX + (long) px * boundW / (GRID_W - 1));
-        int idx = row + px;
-        if (memoryShape.contains(bx, bz)) {
-          insideDomain[idx] = true;
-          String biomeName = memoryShape.biomeAt(bx, bz);
-          biomeRgb[idx] = (biomeName != null) ? (BiomeColorSource.resolve(biomeName) & 0xFFFFFF) : 0x2ECC71;
-        } else {
-          insideDomain[idx] = false;
-        }
-      }
-    }
 
     // 3. Collect Selection Points & Accumulate Density
     List<SelectionHeatmap.SelectionPoint> points = new ArrayList<>();
@@ -227,7 +166,7 @@ public final class SelectionHeatmapResolver implements ChartSpecResolver {
       int row = z * GRID_W;
       for (int x = startX; x <= endX; x++) {
         int dx = x - gx;
-        double dist2 = dx * dx + dz * dz;
+        double dist2 = (double) dx * (double) dx + (double) dz * (double) dz;
         double g = Math.exp(-dist2 / sigma2);
         density[row + x] += weight * g;
       }

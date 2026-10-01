@@ -62,7 +62,7 @@ public final class V26_3_R1FabricRTPChunk extends RTPChunk<ChunkAccess> {
     public boolean isLoaded() {
         try {
             return level != null && level.getChunkSource().hasChunk(cx, cz);
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             return false;
         }
     }

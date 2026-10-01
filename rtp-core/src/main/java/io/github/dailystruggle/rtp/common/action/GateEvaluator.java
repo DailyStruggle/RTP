@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -364,9 +365,9 @@ public final class GateEvaluator {
             // checks natively via scoreboard tags. Bukkit's dispatchCommand return value
             // does not reflect the predicate result for vanilla 'execute if', so trusting
             // it silently passes/fails gates (and leaks "Test failed" chat feedback).
-            Boolean nativeResult = evaluateEntityPredicate(substituted, accessor);
-            if (nativeResult != null) {
-              if (!nativeResult) return false;
+            Optional<Boolean> nativeResult = evaluateEntityPredicate(substituted, accessor);
+            if (nativeResult.isPresent()) {
+              if (!nativeResult.get()) return false;
               continue; // predicate satisfied; do not dispatch the vanilla command
             }
 
@@ -397,14 +398,14 @@ public final class GateEvaluator {
    *
    * @param command  the fully-substituted command string
    * @param accessor server accessor for tag/name lookups
-   * @return {@code TRUE}/{@code FALSE} for a recognized entity predicate, or {@code null} if the
+   * @return {@code Optional.of(Boolean)} for a recognized entity predicate, or {@code Optional.empty()} if the
    *     command is not a recognized {@code execute if/unless entity} tag/name predicate (caller
    *     should fall back to normal command dispatch)
    */
-  private static Boolean evaluateEntityPredicate(String command, RTPServerAccessor accessor) {
-    if (command == null || accessor == null) return null;
+  private static Optional<Boolean> evaluateEntityPredicate(String command, RTPServerAccessor accessor) {
+    if (command == null || accessor == null) return Optional.empty();
     Matcher m = ENTITY_PREDICATE_PATTERN.matcher(command.trim());
-    if (!m.matches()) return null;
+    if (!m.matches()) return Optional.empty();
 
     boolean unless = "unless".equalsIgnoreCase(m.group(1));
     String selector = m.group(2); // selector arguments inside [...], may be null
@@ -427,10 +428,10 @@ public final class GateEvaluator {
     }
 
     // Only handle tag-based predicates natively; anything else falls back to dispatch.
-    if (requiredTag == null || requiredTag.isBlank()) return null;
+    if (requiredTag == null || requiredTag.isBlank()) return Optional.empty();
 
     boolean matched = entityMatches(requiredName, requiredTag, accessor);
-    return unless != matched;
+    return Optional.of(unless != matched);
   }
 
   private static boolean entityMatches(String requiredName, String requiredTag, RTPServerAccessor accessor) {

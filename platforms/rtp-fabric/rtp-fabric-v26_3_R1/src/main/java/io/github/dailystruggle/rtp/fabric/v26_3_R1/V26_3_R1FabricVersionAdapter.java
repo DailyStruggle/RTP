@@ -155,7 +155,7 @@ public final class V26_3_R1FabricVersionAdapter implements FabricVersionAdapter 
                 java.lang.reflect.Method orElse = either.getClass().getMethod("orElse", Object.class);
                 Object value = orElse.invoke(either, (Object) null);
                 if (value instanceof ChunkAccess ca2) return ca2;
-            } catch (NoSuchMethodException ignored) {
+            } catch (NoSuchMethodException _) {
             }
             java.lang.reflect.Method leftMethod = either.getClass().getMethod("left");
             Object opt = leftMethod.invoke(either);
@@ -423,7 +423,7 @@ public final class V26_3_R1FabricVersionAdapter implements FabricVersionAdapter 
             return false;
         }
         try {
-            ServerLevel level = (ServerLevel) sp.level();
+            ServerLevel level = sp.level();
 
             net.minecraft.world.level.saveddata.maps.MapId id = mapIds.get(chartKey);
             if (id == null) {

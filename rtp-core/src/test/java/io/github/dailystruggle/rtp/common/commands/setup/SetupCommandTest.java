@@ -35,7 +35,7 @@ class SetupCommandTest {
         assertTrue(children.containsKey("STATUS"), "missing status");
 
         for (var sub : children.values()) {
-            assertEquals(SetupCmd.PERMISSION,
+            assertEquals(SetupCmd.CMD_PERMISSION,
                     ((io.github.dailystruggle.commandsapi.common.CommandsAPICommand) sub).permission(),
                     "all setup sub-commands must share rtp.admin.setup");
         }

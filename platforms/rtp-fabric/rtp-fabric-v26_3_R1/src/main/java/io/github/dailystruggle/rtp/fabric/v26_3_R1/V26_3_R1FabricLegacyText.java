@@ -38,18 +38,20 @@ final class V26_3_R1FabricLegacyText {
                 if ((code == 'x' || code == 'X') && i + 13 < n) {
                     StringBuilder hex = new StringBuilder(6);
                     boolean ok = true;
-                    for (int k = 0; k < 6; k++) {
+                    for (int k = 0; k < 6 && ok; k++) {
                         int idx = i + 2 + k * 2;
-                        if (idx + 1 >= n || text.charAt(idx) != SECTION) { ok = false; break; }
-                        char h = text.charAt(idx + 1);
-                        if (!isHex(h)) { ok = false; break; }
-                        hex.append(h);
+                        char h = (idx + 1 < n) ? text.charAt(idx + 1) : '\0';
+                        if (idx + 1 >= n || text.charAt(idx) != SECTION || !isHex(h)) {
+                            ok = false;
+                        } else {
+                            hex.append(h);
+                        }
                     }
                     if (ok) {
                         flush(out, style, buf);
                         try {
                             style = style.withColor(TextColor.fromRgb(Integer.parseInt(hex.toString(), 16)));
-                        } catch (NumberFormatException ignored) { /* gated by isHex */ }
+                        } catch (NumberFormatException _) { /* gated by isHex */ }
                         i += 14;
                         continue;
                     }
@@ -160,7 +162,7 @@ final class V26_3_R1FabricLegacyText {
                 if (clickEv != null) style = style.withClickEvent(clickEv);
             }
             return mut.setStyle(style);
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             return base;
         }
     }
@@ -202,7 +204,7 @@ final class V26_3_R1FabricLegacyText {
             if (HOVER_CTOR_SHOWTEXT != null) {
                 return (HoverEvent) HOVER_CTOR_SHOWTEXT.newInstance(hoverComp);
             }
-        } catch (Throwable ignored) { /* degrade to no hover */ }
+        } catch (Throwable _) { /* degrade to no hover */ }
         return null;
     }
 
@@ -219,7 +221,7 @@ final class V26_3_R1FabricLegacyText {
             if (recordCtor != null) {
                 return (ClickEvent) recordCtor.newInstance(payload);
             }
-        } catch (Throwable ignored) { /* degrade to no click */ }
+        } catch (Throwable _) { /* degrade to no click */ }
         return null;
     }
 
@@ -228,11 +230,11 @@ final class V26_3_R1FabricLegacyText {
             if (HOVER_PROBED) return;
             try {
                 HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Object.class);
-            } catch (Throwable ignored) { /* not on this runtime */ }
+            } catch (Throwable _) { /* not on this runtime */ }
             if (HOVER_CTOR_LEGACY == null) {
                 try {
                     HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Component.class);
-                } catch (Throwable ignored) { /* not on this runtime */ }
+                } catch (Throwable _) { /* not on this runtime */ }
             }
             if (HOVER_CTOR_LEGACY == null) {
                 try {
@@ -243,9 +245,9 @@ final class V26_3_R1FabricLegacyText {
                             ctor.setAccessible(true);
                             HOVER_CTOR_SHOWTEXT = ctor;
                             break;
-                        } catch (NoSuchMethodException ignored) { /* try next */ }
+                        } catch (NoSuchMethodException _) { /* try next */ }
                     }
-                } catch (Throwable ignored) { /* nothing matched */ }
+                } catch (Throwable _) { /* nothing matched */ }
             }
             HOVER_PROBED = true;
         }
@@ -256,7 +258,7 @@ final class V26_3_R1FabricLegacyText {
             if (CLICK_PROBED) return;
             try {
                 CLICK_CTOR_LEGACY = ClickEvent.class.getConstructor(ClickEvent.Action.class, String.class);
-            } catch (Throwable ignored) { /* not on this runtime */ }
+            } catch (Throwable _) { /* not on this runtime */ }
             if (CLICK_CTOR_LEGACY == null) {
                 try {
                     for (Class<?> nested : ClickEvent.class.getDeclaredClasses()) {
@@ -264,7 +266,7 @@ final class V26_3_R1FabricLegacyText {
                         java.lang.reflect.Constructor<?> ctor;
                         try {
                             ctor = nested.getDeclaredConstructor(String.class);
-                        } catch (NoSuchMethodException ignored) {
+                        } catch (NoSuchMethodException _) {
                             continue;
                         }
                         ctor.setAccessible(true);
@@ -276,10 +278,10 @@ final class V26_3_R1FabricLegacyText {
                             } else if (action == ClickEvent.Action.RUN_COMMAND && CLICK_CTOR_RUN == null) {
                                 CLICK_CTOR_RUN = ctor;
                             }
-                        } catch (Throwable ignored) { /* not this one */ }
+                        } catch (Throwable _) { /* not this one */ }
                         if (CLICK_CTOR_SUGGEST != null && CLICK_CTOR_RUN != null) break;
                     }
-                } catch (Throwable ignored) { /* nothing matched */ }
+                } catch (Throwable _) { /* nothing matched */ }
             }
             CLICK_PROBED = true;
         }
@@ -290,7 +292,7 @@ final class V26_3_R1FabricLegacyText {
             try {
                 java.lang.reflect.Method m = clickEvent.getClass().getMethod(name);
                 return m.invoke(clickEvent);
-            } catch (Throwable ignored) { /* try next accessor */ }
+            } catch (Throwable _) { /* try next accessor */ }
         }
         return null;
     }

@@ -5,6 +5,10 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
+import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
+import io.github.dailystruggle.rtp.common.importer.schema.GenericSchemaImporter;
+import io.github.dailystruggle.rtp.common.importer.schema.PluginImportSchema;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -168,201 +172,124 @@ public class PermissionMigrationService {
         String lower = sourcePermission.trim().toLowerCase(Locale.ROOT);
         List<String> mapped = new ArrayList<>();
 
-        // BetterRTP mapping
-        if (lower.startsWith("betterrtp.")) {
-            String suffix = lower.substring("betterrtp.".length());
-            switch (suffix) {
-                case "*":
-                    mapped.add("rtp.*");
-                    break;
-                case "use":
-                    mapped.add("rtp.use");
-                    break;
-                case "world":
-                    mapped.add("rtp.world");
-                    break;
-                case "world.*":
-                    mapped.add("rtp.worlds.*");
-                    break;
-                case "bypass.cooldown":
-                    mapped.add("rtp.noCooldown");
-                    break;
-                case "bypass.delay":
-                    mapped.add("rtp.noDelay");
-                    break;
-                case "bypass.economy":
-                case "bypass.hunger":
-                    mapped.add("rtp.free");
-                    break;
-                case "player":
-                    mapped.add("rtp.other");
-                    break;
-                case "biome":
-                    mapped.add("rtp.biome.*");
-                    break;
-                case "reload":
-                    mapped.add("rtp.reload");
-                    break;
-                case "admin":
-                    mapped.add("rtp.admin");
-                    break;
-                default:
-                    if (suffix.startsWith("world.")) {
-                        String worldName = suffix.substring("world.".length());
-                        mapped.add("rtp.worlds." + worldName);
-                    } else if (suffix.startsWith("biome.")) {
-                        String biomeName = suffix.substring("biome.".length());
-                        mapped.add("rtp.biome." + biomeName);
+        // Schema-defined dynamic plugin mappings (if any registered)
+        for (ForeignConfigImporter importer : ForeignConfigImporterRegistry.getAllImporters()) {
+            if (importer instanceof GenericSchemaImporter gsi) {
+                PluginImportSchema schema = gsi.getSchema();
+                for (Map.Entry<String, String> eq : schema.permissionEquivalences().entrySet()) {
+                    String pattern = eq.getKey().toLowerCase(Locale.ROOT);
+                    String target = eq.getValue();
+                    if (pattern.contains("{world}")) {
+                        String prefix = pattern.substring(0, pattern.indexOf("{world}"));
+                        String post = pattern.substring(pattern.indexOf("{world}") + "{world}".length());
+                        if (lower.startsWith(prefix) && lower.endsWith(post) && lower.length() >= (prefix.length() + post.length())) {
+                            String worldVar = lower.substring(prefix.length(), lower.length() - post.length());
+                            mapped.add(target.replace("{world}", worldVar));
+                        }
+                    } else if (lower.equals(pattern)) {
+                        mapped.add(target);
                     }
-                    break;
+                }
             }
         }
-        // JustRTP mapping
-        else if (lower.startsWith("justrtp.")) {
-            String suffix = lower.substring("justrtp.".length());
+        if (!mapped.isEmpty()) {
+            return Collections.unmodifiableList(mapped);
+        }
+
+        // Generic permission suffix resolution:
+        // Any RTP plugin permission node is structured as <plugin>.<action/target>
+        int firstDot = lower.indexOf('.');
+        if (firstDot > 0 && firstDot < lower.length() - 1) {
+            String suffix = lower.substring(firstDot + 1);
+
             switch (suffix) {
                 case "*":
                     mapped.add("rtp.*");
                     break;
                 case "use":
                 case "rtp":
+                case "teleport":
+                case "usebyname":
                     mapped.add("rtp.use");
                     break;
                 case "world":
                     mapped.add("rtp.world");
                     break;
                 case "world.*":
+                case "worlds.*":
                     mapped.add("rtp.worlds.*");
                     break;
                 case "biome":
-                    mapped.add("rtp.biome");
+                    if (lower.startsWith("justrtp.")) {
+                        mapped.add("rtp.biome");
+                    } else {
+                        mapped.add("rtp.biome.*");
+                    }
                     break;
                 case "biome.*":
+                case "biomes.*":
                     mapped.add("rtp.biome.*");
-                    break;
-                case "bypass.cooldown":
-                case "nocooldown":
-                    mapped.add("rtp.noCooldown");
-                    break;
-                case "bypass.delay":
-                case "nodelay":
-                    mapped.add("rtp.noDelay");
-                    break;
-                case "bypass.cost":
-                case "free":
-                    mapped.add("rtp.free");
-                    break;
-                case "other":
-                    mapped.add("rtp.other");
-                    break;
-                case "admin":
-                    mapped.add("rtp.admin");
-                    break;
-                case "reload":
-                    mapped.add("rtp.reload");
-                    break;
-                default:
-                    if (suffix.startsWith("world.")) {
-                        String worldName = suffix.substring("world.".length());
-                        mapped.add("rtp.worlds." + worldName);
-                    } else if (suffix.startsWith("biome.")) {
-                        String biomeName = suffix.substring("biome.".length());
-                        mapped.add("rtp.biome." + biomeName);
-                    }
-                    break;
-            }
-        }
-        // EzRTP mapping
-        else if (lower.startsWith("ezrtp.")) {
-            String suffix = lower.substring("ezrtp.".length());
-            switch (suffix) {
-                case "*":
-                    mapped.add("rtp.*");
-                    break;
-                case "use":
-                case "rtp":
-                    mapped.add("rtp.use");
-                    break;
-                case "world":
-                    mapped.add("rtp.world");
-                    break;
-                case "world.*":
-                    mapped.add("rtp.worlds.*");
                     break;
                 case "bypass.cooldown":
                 case "cooldown.bypass":
+                case "nocooldown":
                     mapped.add("rtp.noCooldown");
                     break;
                 case "bypass.delay":
                 case "delay.bypass":
-                    mapped.add("rtp.noDelay");
-                    break;
-                case "bypass.cost":
-                case "cost.bypass":
-                    mapped.add("rtp.free");
-                    break;
-                case "other":
-                    mapped.add("rtp.other");
-                    break;
-                case "admin":
-                    mapped.add("rtp.admin");
-                    break;
-                case "reload":
-                    mapped.add("rtp.reload");
-                    break;
-                default:
-                    if (suffix.startsWith("world.")) {
-                        String worldName = suffix.substring("world.".length());
-                        mapped.add("rtp.worlds." + worldName);
-                    } else if (suffix.startsWith("biome.")) {
-                        String biomeName = suffix.substring("biome.".length());
-                        mapped.add("rtp.biome." + biomeName);
-                    }
-                    break;
-            }
-        }
-        // JakesRTP mapping
-        else if (lower.startsWith("jakesrtp.")) {
-            String suffix = lower.substring("jakesrtp.".length());
-            switch (suffix) {
-                case "*":
-                    mapped.add("rtp.*");
-                    break;
-                case "use":
-                case "usebyname":
-                    mapped.add("rtp.use");
-                    break;
-                case "nocooldown":
-                case "bypass.cooldown":
-                    mapped.add("rtp.noCooldown");
-                    break;
+                case "nodelay":
                 case "nowarmup":
                 case "bypass.warmup":
-                case "bypass.delay":
                     mapped.add("rtp.noDelay");
                     break;
-                case "others":
+                case "bypass.economy":
+                case "bypass.cost":
+                case "cost.bypass":
+                case "bypass.hunger":
+                case "free":
+                    mapped.add("rtp.free");
+                    break;
+                case "player":
                 case "other":
+                case "others":
                 case "forcertp":
                     mapped.add("rtp.other");
                     break;
                 case "rtpondeath":
                     mapped.add("rtp.onEvent.respawn");
                     break;
+                case "reload":
+                    mapped.add("rtp.reload");
+                    break;
                 case "admin":
                 case "permpack.admin":
                     mapped.add("rtp.admin");
                     break;
-                case "reload":
-                    mapped.add("rtp.reload");
-                    break;
                 default:
-                    if (suffix.startsWith("use.")) {
+                    if (suffix.startsWith("world.")) {
+                        String worldName = suffix.substring("world.".length());
+                        mapped.add("rtp.worlds." + worldName);
+                    } else if (suffix.startsWith("worlds.")) {
+                        String worldName = suffix.substring("worlds.".length());
+                        mapped.add("rtp.worlds." + worldName);
+                    } else if (suffix.startsWith("gui.world.")) {
+                        String worldName = suffix.substring("gui.world.".length());
+                        mapped.add("rtp.worlds." + worldName);
+                    } else if (suffix.startsWith("gui.paid.")) {
+                        String worldName = suffix.substring("gui.paid.".length());
+                        mapped.add("rtp.worlds." + worldName);
+                    } else if (suffix.startsWith("biome.")) {
+                        String biomeName = suffix.substring("biome.".length());
+                        mapped.add("rtp.biome." + biomeName);
+                    } else if (suffix.startsWith("use.")) {
                         String target = suffix.substring("use.".length());
                         mapped.add("rtp.regions." + target);
-                    } else if (suffix.startsWith("nocooldown.")) {
+                    } else if (suffix.startsWith("profile.")) {
+                        String profile = suffix.substring("profile.".length());
+                        mapped.add("rtp.regions." + profile);
+                    } else if (suffix.startsWith("bypass.cooldown.") || suffix.startsWith("nocooldown.")) {
                         mapped.add("rtp.noCooldown");
-                    } else if (suffix.startsWith("nowarmup.")) {
+                    } else if (suffix.startsWith("bypass.delay.") || suffix.startsWith("nowarmup.")) {
                         mapped.add("rtp.noDelay");
                     }
                     break;

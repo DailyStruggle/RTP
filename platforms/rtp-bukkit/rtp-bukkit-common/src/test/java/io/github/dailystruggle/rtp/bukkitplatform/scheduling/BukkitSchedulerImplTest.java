@@ -89,7 +89,7 @@ class BukkitSchedulerImplTest {
     @Test
     @Timeout(2)
     void runTaskTimer_returnsNonNullBukkitTaskHandle() {
-        Object handle = scheduler.runTaskTimer(() -> {}, 1L, 20L);
+        Object handle = scheduler.runTaskTimer(() -> {/* no-op callback */}, 1L, 20L);
 
         assertNotNull(handle, "runTaskTimer must return a non-null handle");
         assertInstanceOf(BukkitTask.class, handle, "Handle must be a BukkitTask");

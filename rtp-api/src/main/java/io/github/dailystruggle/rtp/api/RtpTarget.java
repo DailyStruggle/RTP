@@ -256,9 +256,18 @@ public final class RtpTarget {
 
   @Override
   public String toString() {
-    return "RtpTarget[" + kind
-        + (serverId == null ? "" : ":" + serverId)
-        + (worldName == null ? "" : ":" + worldName)
-        + (kind == Kind.COORDINATE ? "(" + x + "," + y + "," + z + ")" : (name == null ? "" : ":" + name)) + ']';
+    StringBuilder sb = new StringBuilder("RtpTarget[").append(kind);
+    if (serverId != null) {
+      sb.append(':').append(serverId);
+    }
+    if (worldName != null) {
+      sb.append(':').append(worldName);
+    }
+    if (kind == Kind.COORDINATE) {
+      sb.append('(').append(x).append(',').append(y).append(',').append(z).append(')');
+    } else if (name != null) {
+      sb.append(':').append(name);
+    }
+    return sb.append(']').toString();
   }
 }

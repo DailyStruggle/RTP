@@ -974,6 +974,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         board.registerNewObjective(objective, crit, objective);
       }
     } catch (Throwable ignored) {
+      // Scoreboard objective registration failure ignored on legacy or mocked Bukkit implementations.
     }
   }
 
@@ -992,6 +993,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       String entry = (player != null) ? player.getName() : playerId.toString();
       obj.getScore(entry).setScore(score);
     } catch (Throwable ignored) {
+      // Scoreboard score update failure ignored on legacy or mocked Bukkit implementations.
     }
   }
 
@@ -1013,6 +1015,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         board.resetScores(entry);
       }
     } catch (Throwable ignored) {
+      // Scoreboard score reset failure ignored on legacy or mocked Bukkit implementations.
     }
   }
 
@@ -1057,7 +1060,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         try {
           border.setDamageAmount(damageAmount);
           border.setDamageBuffer(damageBuffer);
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+          // Methods setDamageAmount/setDamageBuffer may not exist on all Bukkit versions.
+        }
       }
       player.setWorldBorder(border);
     } catch (Throwable t) {
@@ -1069,10 +1074,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public void damagePlayer(UUID playerId, double amount) {
     if (playerId == null || amount <= 0.0) return;
     try {
-      io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer = getPlayer(playerId);
-      if (rtpPlayer == null || !rtpPlayer.isOnline()) return;
       Player player = Bukkit.getPlayer(playerId);
       if (player == null || !player.isOnline()) return;
+      io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer = wrapPlayer(player);
 
       io.github.dailystruggle.rtp.common.tasks.RTPRunnable damageTask =
           new io.github.dailystruggle.rtp.common.tasks.RTPRunnable() {
@@ -1082,7 +1086,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
                 if (player.isOnline() && !player.isDead()) {
                   player.damage(amount);
                 }
-              } catch (Throwable ignored) {}
+              } catch (Throwable ignored) {
+                // Player damage may fail if player disconnected or became invalid.
+              }
             }
           };
 
@@ -1122,5 +1128,24 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       // Material lookup threw; fall back to normalizer
     }
     return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void setupMapBinding() {
+    try {
+      io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding binding =
+          new io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding();
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
+      RTP.log(Level.FINE,
+          "[RTP] setupMapBinding installed " + binding.getClass().getSimpleName()
+              + " via MapDispatch");
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] setupMapBinding failed; MapDispatch will fall back to NoopMapBinding", t);
+    }
   }
 }

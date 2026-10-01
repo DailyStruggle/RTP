@@ -442,6 +442,18 @@ class MapsApiSurfaceTest {
         assertEquals(20, fullWp.boundW());
         assertEquals(20, fullWp.boundH());
         io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, fullWp);
+
+        // Test equals, hashCode, toString
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath wpCopy =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("region-wp", 2, 2, wp.insideDomain(), steps);
+        assertEquals(wp, wpCopy);
+        assertEquals(wp.hashCode(), wpCopy.hashCode());
+        assertNotNull(wp.toString());
+        assertTrue(wp.toString().contains("region-wp"));
+        assertTrue(wp.equals(wp));
+        assertFalse(wp.equals(null));
+        assertFalse(wp.equals("other"));
+        org.junit.jupiter.api.Assertions.assertNotEquals(wp, fullWp);
     }
 
     @Test
@@ -535,6 +547,18 @@ class MapsApiSurfaceTest {
         io.github.dailystruggle.mapsapi.model.SelectionHeatmap emptySh =
             new io.github.dailystruggle.mapsapi.model.SelectionHeatmap("reg2", 2, 2, -10, -10, 10, 10, new boolean[]{true, false, false, true}, null, new double[4], 0.0, List.of());
         io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.INSTANCE.render(canvas, emptySh);
+
+        // Test equals, hashCode, toString
+        io.github.dailystruggle.mapsapi.model.SelectionHeatmap shCopy =
+            new io.github.dailystruggle.mapsapi.model.SelectionHeatmap("reg", 2, 2, -10, -10, 10, 10, sh.insideDomain(), biomes, sh.densityGrid(), 5.0, pts);
+        assertEquals(sh, shCopy);
+        assertEquals(sh.hashCode(), shCopy.hashCode());
+        assertNotNull(sh.toString());
+        assertTrue(sh.toString().contains("SelectionHeatmap"));
+        assertTrue(sh.equals(sh));
+        assertFalse(sh.equals(null));
+        assertFalse(sh.equals("other"));
+        org.junit.jupiter.api.Assertions.assertNotEquals(sh, emptySh);
     }
 
     @Test

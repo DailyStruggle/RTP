@@ -14,8 +14,11 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 /**
@@ -23,7 +26,47 @@ import java.util.logging.Level;
  */
 public final class SetupHandlerSupport {
 
+    public static final String CMD_PERMISSION = "rtp.admin.setup";
+
     private SetupHandlerSupport() {
+    }
+
+    public static SetupSession resolveSession(@Nullable UUID callerId, SetupSessionRegistry sessionRegistry) {
+        UUID effectiveCaller = (callerId == null) ? SetupSession.CONSOLE_CALLER_ID : callerId;
+        return sessionRegistry.getOrCreate(effectiveCaller);
+    }
+
+    public static String getFirstParam(Map<String, List<String>> parameterValues, String key) {
+        List<String> args = parameterValues.get(key);
+        return (args != null && !args.isEmpty()) ? args.get(0) : "";
+    }
+
+    public static boolean handleChoice(
+            @Nullable UUID callerId,
+            Map<String, List<String>> parameterValues,
+            SetupSessionRegistry sessionRegistry,
+            SetupBookMenuBuilder bookBuilder,
+            @Nullable MenuRenderer menuRenderer,
+            String usageMessage,
+            String invalidChoicePrefix,
+            Set<String> validChoices,
+            SetupStage nextStage,
+            Consumer<String> onValidChoice) {
+        String choice = getFirstParam(parameterValues, "choice").toLowerCase(Locale.ROOT);
+        if (choice.isEmpty()) {
+            sendMessage(callerId, usageMessage);
+            return false;
+        }
+
+        if (validChoices.contains(choice)) {
+            SetupSession session = resolveSession(callerId, sessionRegistry);
+            onValidChoice.accept(choice);
+            session.setCurrentStage(nextStage);
+            return renderCurrentStage(callerId, session, bookBuilder, menuRenderer);
+        } else {
+            sendMessage(callerId, invalidChoicePrefix + choice + ". Valid: " + String.join(", ", validChoices));
+            return false;
+        }
     }
 
     public static boolean renderCurrentStage(
@@ -31,6 +74,10 @@ public final class SetupHandlerSupport {
             SetupSession session,
             SetupBookMenuBuilder bookBuilder,
             @Nullable MenuRenderer renderer) {
+        if (session == null) {
+            return false;
+        }
+
         if (callerId == null || callerId.equals(SetupSession.CONSOLE_CALLER_ID) || renderer == null) {
             // Render CLI console format
             Map<String, List<PrefabApplier.Change>> diff = null;
@@ -69,25 +116,7 @@ public final class SetupHandlerSupport {
             List<String> worldNames = collectWorldNames();
             List<Prefab> recipe = SetupRecipe.compileRecipe(session);
 
-            Map<String, Map<String, Object>> baseline = new LinkedHashMap<>();
-            if (baseDir != null && baseDir.exists()) {
-                for (Prefab p : recipe) {
-                    Map<String, Map<String, Object>> snap = PrefabDiskIO.snapshotLive(baseDir, p);
-                    for (Map.Entry<String, Map<String, Object>> e : snap.entrySet()) {
-                        baseline.putIfAbsent(e.getKey(), e.getValue());
-                    }
-                }
-                // Ensure default region is in baseline if not yet present
-                if (!baseline.containsKey("definitions/regions/default")) {
-                    Map<String, Object> defRegion = PrefabDiskIO.readLive(baseDir, "definitions/regions/default");
-                    if (defRegion.isEmpty()) {
-                        defRegion = PrefabDiskIO.readLive(baseDir, "regions/default");
-                    }
-                    if (!defRegion.isEmpty()) {
-                        baseline.put("definitions/regions/default", defRegion);
-                    }
-                }
-            }
+            Map<String, Map<String, Object>> baseline = loadLiveBaseline(baseDir, recipe);
 
             var result = SetupRecipe.applyPipeline(baseline, recipe, worldNames);
             return result.perFileDiff();
@@ -95,6 +124,38 @@ public final class SetupHandlerSupport {
             RTP.log(Level.WARNING, "Failed to compute setup diff preview: " + e.getMessage(), e);
             return Map.of();
         }
+    }
+
+    /**
+     * Loads the live baseline configuration trees for the given recipe from the plugin directory.
+     * Takes snapshots of existing configuration files targeted by the prefabs in the recipe
+     * and ensures default region definitions are present.
+     *
+     * @param baseDir the plugin data directory
+     * @param recipe  the compiled recipe prefabs
+     * @return map of configuration file IDs to live config trees
+     */
+    public static Map<String, Map<String, Object>> loadLiveBaseline(@Nullable File baseDir, List<Prefab> recipe) {
+        Map<String, Map<String, Object>> baseline = new LinkedHashMap<>();
+        if (baseDir != null && baseDir.exists()) {
+            for (Prefab p : recipe) {
+                Map<String, Map<String, Object>> snap = PrefabDiskIO.snapshotLive(baseDir, p);
+                for (Map.Entry<String, Map<String, Object>> e : snap.entrySet()) {
+                    baseline.putIfAbsent(e.getKey(), e.getValue());
+                }
+            }
+            // Ensure default region is in baseline if not yet present
+            if (!baseline.containsKey("definitions/regions/default")) {
+                Map<String, Object> defRegion = PrefabDiskIO.readLive(baseDir, "definitions/regions/default");
+                if (defRegion.isEmpty()) {
+                    defRegion = PrefabDiskIO.readLive(baseDir, "regions/default");
+                }
+                if (!defRegion.isEmpty()) {
+                    baseline.put("definitions/regions/default", defRegion);
+                }
+            }
+        }
+        return baseline;
     }
 
     public static List<String> collectWorldNames() {

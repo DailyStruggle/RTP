@@ -328,15 +328,15 @@ public final class ActionSessionImpl implements ActionSession {
       }
       case LEASH -> {
         double leash = currentBoundaryRadius();
-        double dx = x - anchorX;
-        double dz = z - anchorZ;
+        double dx = (double) x - anchorX;
+        double dz = (double) z - anchorZ;
         yield (dx * dx + dz * dz) <= (leash * leash);
       }
       case SHAPE -> {
         double rBlocks = currentBoundaryRadius();
         int centerR = definition.confinement().centerRadius();
-        double dx = x - anchorX;
-        double dz = z - anchorZ;
+        double dx = (double) x - anchorX;
+        double dz = (double) z - anchorZ;
         String sName = definition.confinement().shapeName();
         if ("CIRCLE".equalsIgnoreCase(sName)) {
           double distSq = dx * dx + dz * dz;
@@ -451,7 +451,6 @@ public final class ActionSessionImpl implements ActionSession {
   private void initializeScoreboards() {
     RTPServerAccessor accessor = RTP.serverAccessor;
     if (accessor == null) return;
-    UUID serverId = new UUID(0, 0);
 
     // ADR-093 §4: Ensure dummy objectives exist once per plugin lifecycle
     if (SCOREBOARD_OBJECTIVES_INITIALIZED.compareAndSet(false, true)) {
@@ -508,8 +507,8 @@ public final class ActionSessionImpl implements ActionSession {
       if (p != null && p.isOnline()) {
         io.github.dailystruggle.rtp.api.world.RTPLocation loc = p.getLocation();
         if (loc != null) {
-          double dx = loc.x() - anchorX;
-          double dz = loc.z() - anchorZ;
+          double dx = (double) loc.x() - anchorX;
+          double dz = (double) loc.z() - anchorZ;
           long distSq = (long) (dx * dx + dz * dz);
           accessor.setScoreboardScore(pid, "rtp_dist_sq", (int) Math.min(Integer.MAX_VALUE, distSq));
         }

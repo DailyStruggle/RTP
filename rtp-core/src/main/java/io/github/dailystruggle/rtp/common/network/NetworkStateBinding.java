@@ -26,6 +26,9 @@ public interface NetworkStateBinding {
         if (t == null) return 0L;
         try {
             return t.getLastTeleportTime(playerId).get(200, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return 0L;
         } catch (Exception e) {
             return 0L;
         }

@@ -15,7 +15,7 @@ import java.util.UUID;
  */
 public class SetupStatusCmd extends BaseRTPCmdImpl {
 
-    public static final String PERMISSION = "rtp.admin.setup";
+    public static final String CMD_PERMISSION = "rtp.admin.setup";
 
     private final SetupSessionRegistry sessionRegistry;
 
@@ -33,7 +33,7 @@ public class SetupStatusCmd extends BaseRTPCmdImpl {
 
     @Override
     public String permission() {
-        return PERMISSION;
+        return CMD_PERMISSION;
     }
 
     @Override
@@ -43,8 +43,7 @@ public class SetupStatusCmd extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, @Nullable CommandsAPICommand nextCommand) {
-        UUID effectiveCaller = (callerId == null) ? SetupSession.CONSOLE_CALLER_ID : callerId;
-        SetupSession session = sessionRegistry.getOrCreate(effectiveCaller);
+        SetupSession session = SetupHandlerSupport.resolveSession(callerId, sessionRegistry);
         Map<String, List<io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier.Change>> diff =
                 SetupHandlerSupport.computeDiffPreview(session);
         List<String> lines = SetupConsoleFormatter.formatStatus(session, diff);

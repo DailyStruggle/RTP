@@ -669,4 +669,23 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     }
     return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
   }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void setupMapBinding() {
+    try {
+      io.github.dailystruggle.rtp.folia.maps.FoliaMapBinding binding =
+          new io.github.dailystruggle.rtp.folia.maps.FoliaMapBinding();
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
+      RTP.log(Level.FINE,
+          "[RTP] setupMapBinding installed " + binding.getClass().getSimpleName()
+              + " via MapDispatch");
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] setupMapBinding failed; MapDispatch will fall back to NoopMapBinding", t);
+    }
+  }
 }

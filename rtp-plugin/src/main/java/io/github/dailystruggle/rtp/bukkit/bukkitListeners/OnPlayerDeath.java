@@ -18,8 +18,6 @@ public class OnPlayerDeath implements Listener {
   public void onPlayerDeath(PlayerDeathEvent event) {
     if (RTP.actionManager == null) return;
     Player victim = event.getEntity();
-    if (victim == null) return;
-
     UUID victimId = victim.getUniqueId();
     Player killer = victim.getKiller();
     UUID killerId = (killer != null) ? killer.getUniqueId() : null;

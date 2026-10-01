@@ -18,7 +18,7 @@ import java.util.UUID;
  */
 public class SetupCmd extends BaseRTPCmdImpl {
 
-    public static final String PERMISSION = "rtp.admin.setup";
+    public static final String CMD_PERMISSION = "rtp.admin.setup";
 
     private final SetupSessionRegistry sessionRegistry;
     private final SetupBookMenuBuilder bookBuilder;
@@ -61,7 +61,7 @@ public class SetupCmd extends BaseRTPCmdImpl {
 
     @Override
     public String permission() {
-        return PERMISSION;
+        return CMD_PERMISSION;
     }
 
     @Override
@@ -75,8 +75,7 @@ public class SetupCmd extends BaseRTPCmdImpl {
             return true;
         }
 
-        UUID effectiveCaller = (callerId == null) ? SetupSession.CONSOLE_CALLER_ID : callerId;
-        SetupSession session = sessionRegistry.getOrCreate(effectiveCaller);
+        SetupSession session = SetupHandlerSupport.resolveSession(callerId, sessionRegistry);
 
         return SetupHandlerSupport.renderCurrentStage(callerId, session, bookBuilder, menuRenderer);
     }

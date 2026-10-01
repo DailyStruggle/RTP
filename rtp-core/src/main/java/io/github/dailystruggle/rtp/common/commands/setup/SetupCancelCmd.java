@@ -17,7 +17,7 @@ import java.util.logging.Level;
  */
 public class SetupCancelCmd extends BaseRTPCmdImpl {
 
-    public static final String PERMISSION = "rtp.admin.setup";
+    public static final String CMD_PERMISSION = "rtp.admin.setup";
 
     private final SetupSessionRegistry sessionRegistry;
 
@@ -35,7 +35,7 @@ public class SetupCancelCmd extends BaseRTPCmdImpl {
 
     @Override
     public String permission() {
-        return PERMISSION;
+        return CMD_PERMISSION;
     }
 
     @Override
