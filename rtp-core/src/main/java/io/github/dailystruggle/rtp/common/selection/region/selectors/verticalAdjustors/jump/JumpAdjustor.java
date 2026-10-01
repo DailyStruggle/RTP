@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAd
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
+import io.github.dailystruggle.rtp.api.safety.SafetyToken;
+import io.github.dailystruggle.rtp.api.safety.SafetyTokenParser;
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
@@ -76,7 +78,9 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
    * names. Bare materials are canonicalised; {@code #namespace:tag} tokens are
    * resolved through {@code tagSnapshot} (bare tag ids default to
    * {@code minecraft:}); {@code MATERIAL[prop=val]} state-predicated tokens are
-   * dropped because the probe path has no property map.
+   * dropped because the probe path has no property map. Set subtractions (e.g.
+   * {@code #minecraft:slabs - OAK_SLAB}) are respected by excluding subtracted
+   * materials from the resolved output.
    */
   private static void expandTokens(
       Object raw, Map<String, Set<String>> tagSnapshot, Set<String> sink) {
@@ -85,6 +89,48 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
       if (item == null) continue;
       String token = item.toString().trim();
       if (token.isEmpty()) continue;
+
+      SafetyTokenParser.ParseResult parseResult = SafetyTokenParser.parse(token);
+      if (!parseResult.accepted().isEmpty()) {
+        SafetyToken st = parseResult.accepted().get(0);
+        if (st.hasSubtractions()) {
+          Set<String> subtracted = new HashSet<>();
+          for (SafetyToken sub : st.subtractions()) {
+            if (sub.isPredicated()) continue; // cannot evaluate properties on probe path
+            if (sub.kind() == SafetyToken.Kind.MATERIAL) {
+              subtracted.add(canon(sub.identifier()));
+            } else if (sub.kind() == SafetyToken.Kind.TAG) {
+              Set<String> subMembers = tagSnapshot.get(sub.identifier());
+              if (subMembers != null) {
+                for (String sm : subMembers) {
+                  if (sm != null) subtracted.add(canon(sm));
+                }
+              }
+            }
+          }
+
+          if (st.kind() == SafetyToken.Kind.TAG) {
+            if (!st.isPredicated()) {
+              Set<String> members = tagSnapshot.get(st.identifier());
+              if (members != null) {
+                for (String m : members) {
+                  if (m != null) {
+                    String c = canon(m);
+                    if (!subtracted.contains(c)) sink.add(c);
+                  }
+                }
+              }
+            }
+          } else if (st.kind() == SafetyToken.Kind.MATERIAL) {
+            if (!st.isPredicated()) {
+              String c = canon(st.identifier());
+              if (!subtracted.contains(c)) sink.add(c);
+            }
+          }
+          continue;
+        }
+      }
+
       if (token.indexOf('[') >= 0) continue; // state-predicated - drop on probe path
       if (token.charAt(0) == '#') {
         String tagId = token.substring(1);

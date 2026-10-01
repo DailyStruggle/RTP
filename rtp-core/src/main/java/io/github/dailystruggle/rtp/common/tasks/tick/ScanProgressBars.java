@@ -59,6 +59,7 @@ public final class ScanProgressBars {
     }
 
     String etaStr = PlaceholderProvider.formatEta(maxEta);
+    double landPercentage = PlaceholderProvider.averageLandPercentage(scanTasks.values());
 
     double progressFraction = (totalChunks > 0)
         ? Math.min(1.0, (double) totalChunksDone / totalChunks)
@@ -72,7 +73,8 @@ public final class ScanProgressBars {
         .replace("[scan_chunks]", String.valueOf(totalChunksDone))
         .replace("[scan_totalChunks]", String.valueOf(totalChunks))
         .replace("[scan_cps]", String.valueOf(totalCps))
-        .replace("[scan_landPercentage]", String.format("%.1f", progressFraction * 100.0))
+        .replace("[scan_landPercentage]", String.format(java.util.Locale.ROOT, "%.1f", landPercentage))
+        .replace("[scan_progress]", String.format(java.util.Locale.ROOT, "%.1f", progressFraction * 100.0))
         .replace("[scan_eta]", etaStr);
 
     // Build the desired bar state, one bar per active scan region, and hand it to the platform

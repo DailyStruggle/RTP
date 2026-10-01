@@ -87,57 +87,7 @@ public class GriefPreventionBoundaryProvider implements ClaimBoundaryProvider {
       int centroidZ = minZ + (maxZ - minZ) / 2;
       String claimId = (claim.getID() != null) ? claim.getID().toString() : ("gp_" + playerId);
 
-      return Optional.of(
-          new ClaimBoundary() {
-            @Override
-            public String id() {
-              return claimId;
-            }
-
-            @Override
-            public String world() {
-              return worldName;
-            }
-
-            @Override
-            public boolean contains(int x, int z) {
-              return x >= minX && x <= maxX && z >= minZ && z <= maxZ;
-            }
-
-            @Override
-            public boolean containsChunk(int cx, int cz) {
-              int cMinX = cx << 4;
-              int cMaxX = cMinX + 15;
-              int cMinZ = cz << 4;
-              int cMaxZ = cMinZ + 15;
-              return !(cMaxX < minX || cMinX > maxX || cMaxZ < minZ || cMinZ > maxZ);
-            }
-
-            @Override
-            public int[] centroid() {
-              return new int[] {centroidX, centroidZ};
-            }
-
-            @Override
-            public int minChunkX() {
-              return minChunkX;
-            }
-
-            @Override
-            public int minChunkZ() {
-              return minChunkZ;
-            }
-
-            @Override
-            public int maxChunkX() {
-              return maxChunkX;
-            }
-
-            @Override
-            public int maxChunkZ() {
-              return maxChunkZ;
-            }
-          });
+      return Optional.of(buildBoundary(claimId, worldName, minX, minZ, maxX, maxZ, minChunkX, minChunkZ, maxChunkX, maxChunkZ, centroidX, centroidZ));
     } catch (Throwable t) {
       exists = false;
       RTP.log(
@@ -146,5 +96,142 @@ public class GriefPreventionBoundaryProvider implements ClaimBoundaryProvider {
           t);
       return Optional.empty();
     }
+  }
+
+  @Override
+  public Optional<ClaimBoundary> getBoundaryAt(String worldName, int x, int z) {
+    if (!exists || worldName == null) {
+      return Optional.empty();
+    }
+
+    try {
+      Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin("GriefPrevention");
+      if (!(plugin instanceof GriefPrevention)) {
+        return Optional.empty();
+      }
+
+      DataStore dataStore = GriefPrevention.instance.dataStore;
+      if (dataStore == null) return Optional.empty();
+
+      org.bukkit.World world = Bukkit.getWorld(worldName);
+      if (world == null) return Optional.empty();
+
+      Location loc = new Location(world, x, 64, z);
+      Claim claim = dataStore.getClaimAt(loc, false, null);
+      if (claim == null) {
+        return Optional.empty();
+      }
+
+      Location lesser = claim.getLesserBoundaryCorner();
+      Location greater = claim.getGreaterBoundaryCorner();
+      if (lesser == null || greater == null) return Optional.empty();
+
+      int minX = Math.min(lesser.getBlockX(), greater.getBlockX());
+      int maxX = Math.max(lesser.getBlockX(), greater.getBlockX());
+      int minZ = Math.min(lesser.getBlockZ(), greater.getBlockZ());
+      int maxZ = Math.max(lesser.getBlockZ(), greater.getBlockZ());
+
+      int minChunkX = minX >> 4;
+      int maxChunkX = maxX >> 4;
+      int minChunkZ = minZ >> 4;
+      int maxChunkZ = maxZ >> 4;
+
+      int centroidX = minX + (maxX - minX) / 2;
+      int centroidZ = minZ + (maxZ - minZ) / 2;
+      String claimId = (claim.getID() != null) ? claim.getID().toString() : ("gp_" + x + "_" + z);
+
+      return Optional.of(buildBoundary(claimId, worldName, minX, minZ, maxX, maxZ, minChunkX, minChunkZ, maxChunkX, maxChunkZ, centroidX, centroidZ));
+    } catch (Throwable t) {
+      RTP.log(
+          Level.WARNING,
+          "[RTP] GriefPrevention integration encountered an error resolving claim boundary at (" + x + "," + z + ").",
+          t);
+      return Optional.empty();
+    }
+  }
+
+  private static ClaimBoundary buildBoundary(
+      String claimId,
+      String worldName,
+      int minX,
+      int minZ,
+      int maxX,
+      int maxZ,
+      int minChunkX,
+      int minChunkZ,
+      int maxChunkX,
+      int maxChunkZ,
+      int centroidX,
+      int centroidZ) {
+    return new ClaimBoundary() {
+      @Override
+      public String id() {
+        return claimId;
+      }
+
+      @Override
+      public String world() {
+        return worldName;
+      }
+
+      @Override
+      public boolean contains(int x, int z) {
+        return x >= minX && x <= maxX && z >= minZ && z <= maxZ;
+      }
+
+      @Override
+      public boolean containsChunk(int cx, int cz) {
+        int cMinX = cx << 4;
+        int cMaxX = cMinX + 15;
+        int cMinZ = cz << 4;
+        int cMaxZ = cMinZ + 15;
+        return !(cMaxX < minX || cMinX > maxX || cMaxZ < minZ || cMinZ > maxZ);
+      }
+
+      @Override
+      public int[] centroid() {
+        return new int[] {centroidX, centroidZ};
+      }
+
+      @Override
+      public int minChunkX() {
+        return minChunkX;
+      }
+
+      @Override
+      public int minChunkZ() {
+        return minChunkZ;
+      }
+
+      @Override
+      public int maxChunkX() {
+        return maxChunkX;
+      }
+
+      @Override
+      public int maxChunkZ() {
+        return maxChunkZ;
+      }
+
+      @Override
+      public int minX() {
+        return minX;
+      }
+
+      @Override
+      public int minZ() {
+        return minZ;
+      }
+
+      @Override
+      public int maxX() {
+        return maxX;
+      }
+
+      @Override
+      public int maxZ() {
+        return maxZ;
+      }
+    };
   }
 }

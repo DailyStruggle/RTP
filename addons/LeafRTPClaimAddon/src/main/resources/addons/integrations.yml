@@ -73,6 +73,16 @@ rerollTownyAdvanced: false
 # @default: false
 rerollWorldGuard: false
 
+# Reroll the location if it lands inside an UltimateClaims claim.
+# @type: boolean
+# @default: false
+rerollUltimateClaims: false
+
+# Reroll the location if it lands inside a MinePlots plot or claim.
+# @type: boolean
+# @default: false
+rerollMinePlots: false
+
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0
 

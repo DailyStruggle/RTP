@@ -35,4 +35,8 @@ public enum IntegrationsKeys {
   rerollPlotSquared,
   /** Whether to reroll if inside KingdomsX claimed land */
   rerollKingdomsX,
+  /** Whether to reroll if inside an UltimateClaims claim */
+  rerollUltimateClaims,
+  /** Whether to reroll if inside a MinePlots plot or claim */
+  rerollMinePlots,
 }

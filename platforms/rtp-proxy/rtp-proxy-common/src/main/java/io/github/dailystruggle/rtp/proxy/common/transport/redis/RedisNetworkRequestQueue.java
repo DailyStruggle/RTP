@@ -224,7 +224,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
                 if (r.size() == 1) continue;
                 Map<String, String> kv = flattenAlternating(r, 1);
                 UUID pid;
-                try { pid = UUID.fromString(String.valueOf(r.get(0))); }
+                try { pid = UUID.fromString(asString(r.get(0))); }
                 catch (IllegalArgumentException iae) { continue; }
                 QueueState state = parseState(kv.getOrDefault("state", "UNKNOWN"));
                 int pos = parseIntSafe(kv.get("positionInQueue"), 0);
@@ -436,9 +436,15 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
             Object k = flat.get(i);
             Object v = flat.get(i + 1);
             if (k == null) continue;
-            out.put(String.valueOf(k), v == null ? "" : String.valueOf(v));
+            out.put(asString(k), asString(v));
         }
         return out;
+    }
+
+    private static String asString(Object o) {
+        if (o == null) return "";
+        if (o instanceof byte[]) return new String((byte[]) o, java.nio.charset.StandardCharsets.UTF_8);
+        return String.valueOf(o);
     }
 
     private static QueueState parseState(String s) {

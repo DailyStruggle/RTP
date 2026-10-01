@@ -80,4 +80,40 @@ public interface ClaimBoundary {
    * @return max chunk Z
    */
   int maxChunkZ();
+
+  /**
+   * Minimum block X coordinate covering this claim boundary.
+   *
+   * @return min block X
+   */
+  default int minX() {
+    return minChunkX() << 4;
+  }
+
+  /**
+   * Minimum block Z coordinate covering this claim boundary.
+   *
+   * @return min block Z
+   */
+  default int minZ() {
+    return minChunkZ() << 4;
+  }
+
+  /**
+   * Maximum block X coordinate covering this claim boundary.
+   *
+   * @return max block X
+   */
+  default int maxX() {
+    return (maxChunkX() << 4) + 15;
+  }
+
+  /**
+   * Maximum block Z coordinate covering this claim boundary.
+   *
+   * @return max block Z
+   */
+  default int maxZ() {
+    return (maxChunkZ() << 4) + 15;
+  }
 }

@@ -26,7 +26,8 @@ scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunk
 # The bar's color is taken from the first legacy color code in this value:
 #   &c/&4 = red, &e/&6 = yellow, &a/&2 = green, &9/&1/&3/&b = blue,
 #   &5 = purple, &d = pink, &f/&7/&8/&0 = white. Defaults to green if none.
-# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_progress], [scan_eta]
+# [scan_landPercentage] = share of scanned locations that are valid land; [scan_progress] = percent of the scan completed.
 scanBossBar: "&aScanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
 # ###############################################################################

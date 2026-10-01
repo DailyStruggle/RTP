@@ -443,6 +443,48 @@ class MapsApiSurfaceTest {
         assertEquals(20, fullWp.boundH());
         io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, fullWp);
 
+        // Branch tests for RegionWalkPathRenderer
+        assertThrows(IllegalArgumentException.class, () ->
+            io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(null, fullWp));
+        assertThrows(IllegalArgumentException.class, () ->
+            io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, null));
+
+        // Empty steps
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath emptyStepsWp =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("empty", 2, 2, domain, List.of());
+        io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, emptyStepsWp);
+
+        // Backdrop without hazard mask (null hazardMask)
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath noHazardMaskWp =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("no-hazard", 2, 2, -10, -10, 10, 10, domain, biomes, null, steps);
+        io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, noHazardMaskWp);
+
+        // No backdrop, domain with internal boundary edges
+        boolean[] domainWithEdges = new boolean[]{
+            false, false, false, false,
+            false, true,  true,  false,
+            false, true,  false, false,
+            false, false, false, false
+        };
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath edgeWp =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("edges", 4, 4, domainWithEdges, steps);
+        io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, edgeWp);
+
+        // Large step count (>2000 steps)
+        List<io.github.dailystruggle.mapsapi.model.RegionWalkPath.WalkStep> largeSteps = new java.util.ArrayList<>();
+        for (int i = 0; i < 2005; i++) {
+            largeSteps.add(new io.github.dailystruggle.mapsapi.model.RegionWalkPath.WalkStep(
+                i % 10, i % 10,
+                (i % 3 == 0) ? io.github.dailystruggle.mapsapi.model.RegionWalkPath.StepStatus.VALID :
+                (i % 3 == 1) ? io.github.dailystruggle.mapsapi.model.RegionWalkPath.StepStatus.HAZARD :
+                               io.github.dailystruggle.mapsapi.model.RegionWalkPath.StepStatus.OUT_OF_BOUNDS,
+                (float) i / 2005f
+            ));
+        }
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath largeWp =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("large", 2, 2, -10, -10, 10, 10, domain, biomes, hazards, largeSteps);
+        io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, largeWp);
+
         // Test equals, hashCode, toString
         io.github.dailystruggle.mapsapi.model.RegionWalkPath wpCopy =
             new io.github.dailystruggle.mapsapi.model.RegionWalkPath("region-wp", 2, 2, wp.insideDomain(), steps);

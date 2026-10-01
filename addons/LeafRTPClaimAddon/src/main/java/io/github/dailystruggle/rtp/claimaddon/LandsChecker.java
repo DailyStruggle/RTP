@@ -54,4 +54,23 @@ public class LandsChecker {
     }
     return false;
   }
+
+  /**
+   * Resolves the claim boundary for Lands at the given coordinates.
+   * Uses AdaptiveClaimProber against {@link #isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords)}.
+   */
+  public static java.util.Optional<io.github.dailystruggle.rtp.api.claim.ClaimBoundary> getBoundaryAt(String worldName, int x, int z) {
+    if (!exists || landsIntegration == null || worldName == null) {
+      return java.util.Optional.empty();
+    }
+    try {
+      return AdaptiveClaimProber.probeBoundary(worldName, x, z, LandsChecker::isInClaim);
+    } catch (Throwable t) {
+      RTP.log(
+          Level.WARNING,
+          "[RTP] Lands integration encountered an error resolving boundary at (" + x + "," + z + ").",
+          t);
+      return java.util.Optional.empty();
+    }
+  }
 }

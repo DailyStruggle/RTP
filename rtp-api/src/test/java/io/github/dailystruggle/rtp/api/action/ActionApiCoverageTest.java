@@ -45,6 +45,23 @@ class ActionApiCoverageTest {
         new ActionGateContext(null, "duel", pId, 0, 0, 0, true, 0));
     assertThrows(NullPointerException.class, () ->
         new ActionGateContext(sId, null, pId, 0, 0, 0, true, 0));
+
+    // elevationDelta and coordinate constructor branches
+    assertNull(ctx.elevationDelta());
+
+    ActionGateContext ctxCoords = new ActionGateContext(sId, "duel", pId, 10L, 50L, 0, true, 0.0, 10.0, 65.0, 20.0);
+    assertEquals(10.0, ctxCoords.currentX());
+    assertEquals(65.0, ctxCoords.currentY());
+    assertEquals(20.0, ctxCoords.currentZ());
+    assertNull(ctxCoords.elevationDelta());
+
+    ActionGateContext ctxAnchor = new ActionGateContext(sId, "duel", pId, 10L, 50L, 0, true, 0.0, 10.0, 65.0, 20.0, 10.0, 70.0, 20.0);
+    assertEquals(70.0, ctxAnchor.anchorY());
+    assertEquals(5.0, ctxAnchor.elevationDelta());
+
+    ActionGateContext ctxFull = new ActionGateContext(sId, "duel", pId, 10L, 50L, 0, true, 0.0, null, 65.0, null, null, null, null, 2, null);
+    assertNull(ctxFull.elevationDelta());
+    assertNotNull(ctxFull.context());
   }
 
   @Test
@@ -203,6 +220,73 @@ class ActionApiCoverageTest {
     ActionDefinition.CommandSpec emptyCmd = new ActionDefinition.CommandSpec(null, null, null, null);
     assertFalse(emptyCmd.isConfigured());
     assertTrue(emptyCmd.aliases().isEmpty());
+
+    // Additional branches
+    ActionDefinition.ConfinementSpec c1 = new ActionDefinition.ConfinementSpec(
+        null, -10L, -5.0, -1.0, -1.0, -5L, false, null, -2, -2, -1.0, -1.0, 0L, -1.0, null);
+    assertEquals(ConfinementBoundary.SUBSPACE, c1.boundary());
+    assertEquals(64.0, c1.leashRadius());
+    assertEquals(0.0, c1.initialSize());
+    assertEquals(0.0, c1.shrinkTo());
+    assertEquals(0L, c1.shrinkOverSeconds());
+    assertEquals("SQUARE", c1.shapeName());
+    assertEquals(0, c1.radius());
+    assertEquals(0, c1.centerRadius());
+    assertEquals(0.0, c1.damageAmount());
+    assertEquals(0.0, c1.damageBuffer());
+    assertEquals(1L, c1.damageIntervalSeconds());
+    assertEquals(0.0, c1.maxDistanceOutside());
+    assertEquals(1, c1.outsideActions().size());
+
+    ActionDefinition.ConfinementSpec c2 = new ActionDefinition.ConfinementSpec(
+        ConfinementBoundary.LEASH, 100L, 20.0);
+    assertEquals("CIRCLE", c2.shapeName());
+
+    ActionDefinition.ConfinementSpec c3 = new ActionDefinition.ConfinementSpec(
+        ConfinementBoundary.SUBSPACE, 100L, 20.0, 10.0, 5.0, 50L);
+    assertEquals(10.0, c3.initialSize());
+
+    ActionDefinition.ConfinementSpec c4 = new ActionDefinition.ConfinementSpec(
+        ConfinementBoundary.SUBSPACE, 100L, 20.0, 10.0, 5.0, 50L, true, "CIRCLE", 10, 5);
+    assertEquals("CIRCLE", c4.shapeName());
+
+    ActionDefinition.ConfinementSpec c5 = new ActionDefinition.ConfinementSpec(
+        ConfinementBoundary.SUBSPACE, 100L, 20.0, 10.0, 5.0, 50L, true, "CIRCLE", 10, 5, 2.0, 1.0, 2L);
+    assertEquals(2.0, c5.damageAmount());
+
+    ActionDefinition.ConfinementSpec c6 = new ActionDefinition.ConfinementSpec(
+        ConfinementBoundary.SUBSPACE, 100L, 20.0, 10.0, 5.0, 50L, true, "CIRCLE", 10, 5, 2.0, 1.0, 2L, 5.0);
+    assertEquals(5.0, c6.maxDistanceOutside());
+
+    assertThrows(NullPointerException.class, () -> new ActionDefinition.CommandAction(null, "x", null));
+    ActionDefinition.CommandAction forEachAct = ActionDefinition.CommandAction.forEach(List.of(
+        ActionDefinition.CommandAction.console("say hi"),
+        ActionDefinition.CommandAction.player("help"),
+        ActionDefinition.CommandAction.message("hello")
+    ));
+    assertEquals(ActionDefinition.ActionType.FOR_EACH, forEachAct.type());
+    assertEquals(3, forEachAct.subActions().size());
+
+    ActionDefinition.LifecycleStep delayedStep = new ActionDefinition.LifecycleStep(null, null, -5L);
+    assertEquals(0L, delayedStep.delaySeconds());
+    assertTrue(delayedStep.gateConfig().isEmpty());
+    assertTrue(delayedStep.actions().isEmpty());
+
+    ActionDefinition.LifecycleSpec lifeSpec4 = new ActionDefinition.LifecycleSpec(null, null, null, null);
+    assertTrue(lifeSpec4.onStart().isEmpty());
+    assertTrue(lifeSpec4.onEnqueue().isEmpty());
+    assertTrue(lifeSpec4.onCancel().isEmpty());
+
+    ActionDefinition.LifecycleSpec lifeSpec5 = new ActionDefinition.LifecycleSpec(null, null, null, null, null);
+    assertTrue(lifeSpec5.onCancel().isEmpty());
+
+    ActionDefinition.CommandSpec cmdSpecWithParams = new ActionDefinition.CommandSpec(
+        "duel", "perm.duel", "desc", List.of("d"),
+        List.of(new ParameterSpec("p", ParameterType.NUMBER, false, "10", "desc")));
+    assertTrue(cmdSpecWithParams.isConfigured());
+    assertNotNull(cmdSpecWithParams.firstParameterOfType(ParameterType.NUMBER));
+    assertNull(cmdSpecWithParams.firstParameterOfType(ParameterType.STRING));
+    assertNull(cmdSpecWithParams.firstParameterOfType(null));
 
     ActionDefinition def = new ActionDefinition(
         "test", "test_alias", "rtp.action.test", "desc", placement, conf, life, cmdSpec);

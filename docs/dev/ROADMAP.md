@@ -124,26 +124,26 @@ reproducible by readers".
 
 ## Tier 2 — Upcoming features (not caveat-driven)
 
-- [ ] **Multi-entity subspace teleport addon (`LeafRTPGroupAddon`).** Module skeleton landed as a
-  platform-neutral `RTPAddon` (config + lifecycle only; loads as a safe no-op). Replaces separate
+- [x] ~~**Multi-entity subspace teleport addon (`LeafRTPGroupAddon`).**~~ Superseded and folded into
+  the declarative scripted actions architecture ([ADR-093](../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement.md))
+  and implemented via `LeafRTPActionAddon` (`definitions/actions/*.yml`). Replaces separate
   search paths for party, duel, skirmish, and pursuit with a single relative subspace shape that
-  captures spatial memory from the parent region for O(1) candidate selection, denying locations with
-  insufficient safe slots fail-closed. Specified in
-  [`addons/LeafRTPGroupAddon/REQUIREMENTS.md`](../../addons/LeafRTPGroupAddon/REQUIREMENTS.md) and
-  [leafrtp-group-addon-ADR-001](../../addons/LeafRTPGroupAddon/docs/adr/leafrtp-group-addon-ADR-001-subspace-group-teleport.md)
-  (Proposed).
-- [ ] **Region-confinement (tether) addon (`LeafRTPTetherAddon`).** Module skeleton landed as a
-  platform-neutral `RTPAddon` (config + lifecycle only; loads as a safe no-op). Replaces the earlier
-  "named-zone" framing: a "zone" is ~90% just an existing RTP region, so the non-redundant capability
-  is keeping a player *inside* the region they were teleported into - a cross-platform "tether". It
-  uses RTP's own region geometry (chunk-free containment) and teleport events for membership, enforces
-  by safe pull-back (never movement-veto), and optionally persists via the core database. Remaining
-  work is gated on a new core primitive - a platform-neutral player-move event SPI - proposed under
-  D-005 (see below). Any WorldGuard/claim-mod bound stays optional via the rtp-api hook surface
-  (ADR-026), never required. Specified in
-  [`addons/LeafRTPTetherAddon/REQUIREMENTS.md`](../../addons/LeafRTPTetherAddon/REQUIREMENTS.md) and
-  [leafrtp-tether-addon-ADR-001](../../addons/LeafRTPTetherAddon/docs/adr/leafrtp-tether-addon-ADR-001-cross-platform-region-confinement.md)
-  (Proposed).
+  captures spatial memory from the parent region for O(1) candidate selection.
+- [x] ~~**Region-confinement (tether) addon (`LeafRTPTetherAddon`).**~~ Superseded and folded into
+  the active scripted actions and confinement architecture ([ADR-093](../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement.md),
+  [ADR-095](../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives.md)). Confinement
+  is actively functional via the action engine (`confinement.enabled: true`, tether pull-back,
+  `MemoryShape.contains` boundary enforcement) using `PlayerMoveDispatcher` (ADR-075); the stand-alone
+  addon experiment is abandoned.
+- [ ] **Visual region creation & interactive cartography bridges ([ADR-099](../adr/ADR-099-visual-region-creation-and-interactive-cartography-bridges.md)).**
+  Eliminates manual coordinate entry for region setup via three zero-server primitives:
+  - In-game selection bridge (`SelectionBridge` SPI) hooking existing WorldEdit/FAWE (`Polygonal2DRegion`, `CuboidRegion`) across Paper/Folia/Fabric/NeoForge, and FTB Chunks claim contours on modded (`/rtp region fromselection <name>`).
+  - Zero-backend web map vector drawing tool (`leaf-rtp-map-tool.js`) generating one-click clipboard YAML snippets and in-game commands.
+  - Cartography map item visual inspection (`maps-api` `RegionBoundaryRenderer` via `/rtp map create region_boundary`).
+- [ ] **External web map raster layers ([ADR-086](../adr/ADR-086-external-web-map-integration.md)).**
+  Zero-chunk-load on-demand raster heatmaps, coverage layers, and vector polygon overlays for Pl3xMap, BlueMap, and Dynmap.
+- [ ] **Adaptive tick-budget governor ([ADR-087](../adr/ADR-087-tick-budget-governor-and-per-tick-dispatch.md)).**
+  Dynamic backpressure regulation and per-tick dispatch limits across Folia's regional ticking threads.
 - [x] ~~**Platform-neutral player-move event SPI (core, D-005 gated).**~~ **Complete:**
   `PlayerMoveDispatcher` and `PlayerMoveEvent` landed in `rtp-api`, exposed via
   `RTPAPI.playerMoveEvents` and `RTPAPI.watchPlayerMove(...)` with per-player subscription scaling
@@ -216,28 +216,13 @@ reproducible by readers".
   by the dual-layer spiral-addressed Hilbert model (ADR-085, ADR-088, CircleOptimizedDualLayer,
   SquareOptimizedDualLayer, SegmentedKeyRunTable). Compacts run tables and guarantees spatial
   cache locality without disrupting 1D spiral bijections.
-- [ ] **Anvil PRESCAN accuracy measurement → conditional FULLSCAN retirement.** Instrument the
-  Anvil PRESCAN correct-rejection rate against the authoritative FULLSCAN verdict, then use the
-  measured rate to decide whether the FULLSCAN trimming pass can be dropped from the scan path.
-  Scan only *trims the selectable set* (`MemoryShape` bad-location map); it is **not** a placement
-  safety gate, because every teleport still loads and re-verifies the chunk in the L2→L1 flow
-  (S-001 is enforced there, on the real loaded chunk). A PRESCAN miss therefore only costs a later
-  placement-time rejection, never an unsafe landing, so the gate is purely an attempts-per-RTP
-  (yield) question, not a safety one.
-  - **The model.** At an Overworld acceptance rate `p = 1/3` (two thirds of ground unacceptable),
-    a PRESCAN correct-rejection rate `r` leaves a post-trim candidate pool of `1/3` acceptable +
-    `2/3 * (1 - r)` slipped-through, so expected attempts `= (1/3 + 2/3*(1-r)) / (1/3)`. That gives
-    `r = 95% → ~1.10` attempts/RTP (the floor) and `r = 98% → ~1.04` attempts/RTP.
-  - **Decision.** Drop FULLSCAN from the scan path once PRESCAN measures **≥ 98% correct-rejection**
-    (cleanly under 1.1 attempts/RTP). **95% is the minimum acceptable floor** (lands exactly on 1.1
-    at `p = 1/3`). Below 95%, keep FULLSCAN.
-  - **Per-world caveat.** `p` is per-world (ocean-heavy worlds have lower `p`, where the
-    slipped-through term dominates faster and `r` matters more; flat custom worlds have higher `p`).
-    The instrumentation must therefore track *realized* attempts/RTP per region rather than
-    inferring it from `r` alone, and the retirement decision should hold against the lowest-`p`
-    region in scope. Likely surfaced through the existing `/rtp test full` / `FailTypes` telemetry.
+- [x] ~~**Anvil PRESCAN accuracy measurement → conditional FULLSCAN retirement.**~~ Retired:
+  the scan path in `ScanTask` has been streamlined into a single hybrid pass. Generated chunks are
+  probed off-tick via Anvil (`.mca` / `.linear`), while ungenerated chunks route to targeted on-demand
+  generation without globally switching the scan phase or requiring an unconditional Pass 2 FULLSCAN
+  sweep. S-001 safety remains authoritatively enforced at teleport selection time.
 - [ ] **Chunky-driven generation pass for `/rtp scan` (near-term focus, D-005 + ADR gated).** Today
-  the FULLSCAN sub-step of a scan forces generation on an Anvil miss one chunk at a time through the
+  the full-load sub-step of a scan forces generation on an Anvil miss one chunk at a time through the
   server chunk manager (`ScanTask.runFullLoadPath` → `RTPWorld.getOrLoadChunk`). When Chunky (or any
   bulk pre-generator) is present, drive/sequence *it* to lay the region's chunks down on disk first,
   then let scan walk the already-written `.mca` through the cheap off-tick Anvil PRESCAN path instead
@@ -247,7 +232,7 @@ reproducible by readers".
   - **Soft-depend only, no hard dependency.** Reuse the existing Chunky integration seam
     (`ChunkyChecker` / `ChunkyRTPShape`) and route through `RTPHooks` per
     [ADR-026](../adr/ADR-026-external-hook-api-surface.md); degrade cleanly to the current
-    generate-as-you-go FULLSCAN when Chunky is absent. Do not put inline pre-generator calls in the
+    generate-as-you-go full load when Chunky is absent. Do not put inline pre-generator calls in the
     scan pipeline.
   - **One command surface.** Let an admin kick off + size a Chunky pregen for a region and then run
     the scan consistently sized to it, instead of juggling `/chunky` and `/rtp scan` separately
@@ -265,9 +250,9 @@ reproducible by readers".
   kind of project reportedly hitting ~17k cps on CPU alone) are all candidates; the headline is "go
   faster", not "use a GPU". This does **not** require LeafRTP to write a chunk generator: worldgen
   stays the server's / Chunky's job, and this only accelerates LeafRTP's own off-tick verification
-  pass over already-written region files. The accelerable workload is the wide, data-parallel
-  "score N columns against the `unsafeBlocks` / target-biome predicate sets" pass in `rtp-anvil`;
-  the output is the same bad-location bitmap the CPU PRESCAN already produces. Boundaries and
+  pass over already-written region files. Note that profiling shows off-tick scanning is bound by
+  storage I/O and decompression; PCIe bus transmission overhead makes GPU/OpenCL offload
+  economically unfavorable compared to host-side CPU vectorization (AVX-512/SIMD). Boundaries and
   gating:
   - The NBT/`.mca` decode stays on the CPU (branchy, I/O-bound; already parallelized across
     `AnvilIoPool`); only the decoded arrays are handed to the accelerated backend.
@@ -282,7 +267,7 @@ reproducible by readers".
     vectorized pass may close the gap with none of the GPU/IPC dependency cost).
 - [ ] **Safety-list grammar expansion.** The token grammar shipped in `3.0.0-beta.1` is the
   foundation; follow-ups:
-  - [ ] Tag-group composition with set subtraction (`#minecraft:slabs - OAK_SLAB`).
+  - [x] ~~Tag-group composition with set subtraction (`#minecraft:slabs - OAK_SLAB`).~~ — ADR-017 amendment (v3.3.0).
   - [x] ~~Numeric range predicates (`[level>=5]`) for fluids and light levels.~~ — ADR-017 amendment
     (2026-05-30); operators `>=`/`<=`/`>`/`<` with integer bounds, fail-open on absent/non-numeric
     live values.
@@ -293,11 +278,11 @@ reproducible by readers".
     pipeline-injected `_groundDistance` block-state property consumed by the numeric-range grammar
     above; lazily computed (zero cost when unused), bounded probe
     (`safety.yml::groundDistanceMaxProbe`), fail-open, full-edition only.
-- [ ] **Claim-plugin integration audit.** The front page lists seven integrations. Audit each
-  against current upstream releases (Factions forks, GriefDefender 2.x, Lands 7.x, HuskTowns 3.x,
-  TownyAdvanced 0.x, WorldGuard 7.x, GriefPrevention 16.x) and publish
-  `docs/admin/CLAIM_PLUGIN_COMPATIBILITY.md` with per-plugin version matrices. At least one
-  integration is almost certainly lagging.
+- [x] ~~**Claim-plugin integration audit.**~~ **Complete:** Published
+  [`docs/admin/CLAIM_PLUGIN_COMPATIBILITY.md`](../admin/CLAIM_PLUGIN_COMPATIBILITY.md) with complete
+  compatibility and version matrices across all 18 claim checkers (16 Bukkit/Folia claim checkers, boundary providers,
+  and 2 mod-side protection integrations: OPAC, FTB Chunks), verifying fail-closed execution, reflection safety,
+  and Folia threading contracts.
 - [ ] **CI matrix across platforms.** The Jenkinsfile builds, but `rtp test full` should run against
   Spigot + Paper + Folia + Fabric in parallel matrix form, even with mock servers where necessary.
   This is the step that converts `TRACEABILITY.md` from "documented" to "continuously enforced".
@@ -422,16 +407,10 @@ reproducible by readers".
   `UsageCapTracker`, `TeleportLimitStore`, `ConfigKeys.lockAfterUses`, and `ClearLimitCmd`.
 - [x] ~~**BetterRTP parity: persist RTP destination as a permanent spawn anchor (`SetAsRespawn`
   equivalent).**~~ Shipped: `ConfigKeys.setAsRespawn`.
-- [ ] **BetterRTP parity: widen built-in claim-plugin coverage.** BetterRTP ships ~18 respect-targets
-  out of the box; RTP ships 12 (`ClaimIntegrations`: SaberFactions, FactionsBridge, GriefDefender,
-  GriefPrevention, Lands, RedProtect, Residence, CrashClaim, HuskClaims, KingdomsX, TownyAdvanced,
-  WorldGuard). This is integration breadth, not architecture: each new target is a
-  soft-depend adapter on the existing claim-exclusion seam (S-003 /
-  [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)), cataloged in
-  [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per [ADR-026](../adr/ADR-026-external-hook-api-surface.md).
-  Candidate gap list (audit each for current upstream API before adding; already-shipped targets
-  pruned): MinePlots, hClaims, UltimateClaims, Pueblos. Folds into the existing "Claim-plugin
-  integration audit" item above — same workstream, this just sharpens the target list.
+- [x] ~~**BetterRTP parity: widen built-in claim-plugin coverage.**~~ **Complete:** LeafRTP ships 16
+  claim integrations in `addons/LeafRTPClaimAddon` (`ClaimIntegrations`: SaberFactions, FactionsBridge,
+  GriefDefender, GriefPrevention, Lands, RedProtect, Residence, CrashClaim, HuskClaims, HuskTowns,
+  PlotSquared, KingdomsX, TownyAdvanced, WorldGuard, UltimateClaims, MinePlots) with bidirectional `ClaimBoundaryRegistry` anchor support.
 - [ ] **Locale coverage expansion (close the gap with BetterRTP, weighted by real server traffic).**
   RTP ships 12 parity-enforced locales (`en`, `de`, `es`, `fr`, `it`, `ja`, `ko`, `nl`, `pl`, `pt`,
   `ru`, `zh`) plus the `cat` novelty dialect, against BetterRTP's ~21 community-contributed locales.
@@ -491,49 +470,16 @@ reproducible by readers".
     [ADR-066](../adr/ADR-066-foreign-config-importer.md) (Proposed): generic `ConfigImporter` seam
     with BetterRTP first, EzRTP / JakesRTP to follow.
 
-- [ ] **3D Archimedean helix coordinate generator (1.18+ vertical biome targeting).** Extend the
-  existing 1D Archimedean spiral mapping ([ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md))
-  with a vertical pitch term: `y_n = round(c * theta_n + y_start)`, producing a 3D helix that maps
-  directly onto the same 1D index. The original pitch was that combining this with the `rtp-anvil`
-  prefilter ([ADR-016](../adr/ADR-016-anvil-subsystem.md)) would let the helix skip vertical intervals
-  without chunk loads for vertical biomes (Deep Dark, Lush Caves, Sky Islands).
-
-  **Likely redundant - demote/close unless a coverage-loss-tolerant use case is shown.** Two
-  objections, both raised in review, undercut the headline:
-  - **Coverage is already config, not code.** RTP cleanly separates horizontal placement (the shape's
-    1D spiral over X/Z) from vertical placement (`VerticalAdjustor`, which only ever picks a Y inside
-    `[minY(), maxY()]`). "Reach the Deep Dark" vs "reach Sky Islands" is therefore just a
-    `VerticalAdjustor` with a different `miny`/`maxy` window today; N stacked vertical bands over the
-    same footprint = N regions (or adjustor configs). No new generator is needed to *reach* a vertical
-    biome band.
-  - **A Y-coupled index segments the biome.** Because `y_n` is a monotonic function of the index, the
-    helix corkscrews upward as it spirals outward; it only intersects any fixed Y band over the
-    contiguous index slice where `c * theta_n + y_start` falls inside the band, then climbs out of it
-    while X/Z in that band is still unsearched. The result is a thin helical ribbon through the target
-    biome (coverage shrinks as the pitch `c` grows), a coverage regression versus a fixed-`[minY,maxY]`
-    region that searches the whole X/Z footprint at every Y in the band. The "skip" the helix buys is a
-    1D interval skip on the index, and the *win and the bug are the same property* (you only skip the
-    out-of-band indices by accepting the coverage loss). The cheap "is this column's band acceptable"
-    NBT check it claimed is already provided, decoupled from the spiral, by the existing probe fast-path
-    (`VerticalAdjustor.adjustFromProbe`, one NBT column read, no chunk load).
-
-  Net: for coverage, stacked `minY`/`maxY` regions win (no segmentation); for performance, the anvil
-  probe fast-path already wins (same NBT prune, no coverage loss). The only defensible residue is
-  deterministic *sparse sampling* of a vertical biome when full coverage is explicitly not wanted - a
-  niche affordance, not the "vertical biome targeting" headline. Do not open an ADR unless that
-  coverage-loss-tolerant use case is demonstrated and a benchmark shows the per-column vertical scan
-  (not chunk I/O) is the actual bottleneck; the `c` pitch parameter and `y_start` anchor would be
-  per-region configurable if it is ever pursued.
-- [ ] **"Virtual Rift" warmup effects addon (`addons/rtp-effects-rift`).** During the standing
-  warmup countdown, send fake client-side block packets to the player making the surrounding terrain
-  appear to dissolve - processed entirely client-side with zero physical block updates, zero physics
-  checks, and zero chunk loads on any region thread. Delivered as an optional addon under `addons/`
-  depending only on `rtp-api` + a ProtocolLib soft-depend (Paper/Spigot only; Folia requires the
-  entity scheduler for per-player packet sends; Fabric/NeoForge out of scope for this addon). The
-  `effects-api` SPI already provides warmup start/tick/end hooks; the addon must restore original
-  block state (re-send real block packets) on teleport or warmup cancel to avoid visual corruption.
-  Catalog the ProtocolLib soft-depend in [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per
-  [ADR-026](../adr/ADR-026-external-hook-api-surface.md).
+- [x] ~~**3D Archimedean helix coordinate generator (1.18+ vertical biome targeting).**~~ **Declined / Redundant:**
+  Closed as redundant. Mathematical analysis proved that coupling a vertical pitch term $y_n$ to the 1D spiral
+  index segments biomes into thin helical ribbons (causing coverage loss), whereas stacked $[minY, maxY]$ regions
+  provide full horizontal coverage at zero architectural complexity. Vertical interval skipping without chunk loads
+  is already cleanly handled off-tick by the Anvil probe fast-path (`VerticalAdjustor.adjustFromProbe`).
+- [x] ~~**"Virtual Rift" warmup effects addon (`addons/LeafRTPRiftAddon`).**~~ **Complete:**
+  Shipped as a standalone, platform-neutral reference addon in `addons/LeafRTPRiftAddon` (`RTPRiftAddon`,
+  `RiftEffect`). Registers the `RIFT` effect prototype (`RIFT.<radius>.<seconds>`) with `EffectFactory` in
+  `effects-api`, installing an out-of-the-box `effects/rift.yml` demo group. Carves client-side fake air,
+  draws a portal gateway lower shell and obsidian catch-bowl, and snaps the world back on teleport completion or cancellation.
 - [ ] **Adaptive queue demand scaler (in-memory, zero-config).** Track the rate of change of queue
   consumption (dQ/dt) and player connection frequency in-memory using an exponentially-weighted
   moving average. When a surge is detected, dynamically scale up `AnvilIoPool`'s thread count (via

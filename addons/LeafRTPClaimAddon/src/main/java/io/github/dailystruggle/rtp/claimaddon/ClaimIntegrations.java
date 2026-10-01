@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.claim.ClaimBoundary;
 import io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider;
 import io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry;
 import io.github.dailystruggle.rtp.api.hooks.RegionVerifierRegistry;
@@ -110,6 +111,8 @@ public final class ClaimIntegrations {
     verifiers.unregisterBySource(KingdomsXChecker.class);
     verifiers.unregisterBySource(TownyAdvancedChecker.class);
     verifiers.unregisterBySource(WorldGuardChecker.class);
+    verifiers.unregisterBySource(UltimateClaimsChecker.class);
+    verifiers.unregisterBySource(MinePlotsChecker.class);
 
     register(parser, verifiers, IntegrationsKeys.rerollSaberFactions, "Factions", SaberFactionsChecker.class, () -> SaberFactionsChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollFactionsBridge, "FactionsBridge", FactionsBridgeChecker.class, () -> FactionsBridgeChecker::isInClaim);
@@ -125,6 +128,8 @@ public final class ClaimIntegrations {
     register(parser, verifiers, IntegrationsKeys.rerollKingdomsX, "Kingdoms", KingdomsXChecker.class, () -> KingdomsXChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollTownyAdvanced, "Towny", TownyAdvancedChecker.class, () -> TownyAdvancedChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollWorldGuard, "WorldGuard", WorldGuardChecker.class, () -> WorldGuardChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollUltimateClaims, "UltimateClaims", UltimateClaimsChecker.class, () -> UltimateClaimsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollMinePlots, "MinePlots", MinePlotsChecker.class, () -> MinePlotsChecker::isInClaim);
   }
 
   /**
@@ -187,6 +192,27 @@ public final class ClaimIntegrations {
     registerProvider(parser, registry, IntegrationsKeys.rerollTownyAdvanced, "Towny", TownyBoundaryProvider::new);
     registerProvider(parser, registry, IntegrationsKeys.rerollGriefPrevention, "GriefPrevention", GriefPreventionBoundaryProvider::new);
     registerProvider(parser, registry, IntegrationsKeys.rerollSaberFactions, "Factions", FactionsBoundaryProvider::new);
+    registerProvider(parser, registry, IntegrationsKeys.rerollLands, "Lands", () -> new ClaimBoundaryProvider() {
+      @Override
+      public String namespace() {
+        return "lands";
+      }
+
+      @Override
+      public int priority() {
+        return 12;
+      }
+
+      @Override
+      public java.util.Optional<ClaimBoundary> getBoundary(java.util.UUID playerId, String worldName) {
+        return java.util.Optional.empty();
+      }
+
+      @Override
+      public java.util.Optional<ClaimBoundary> getBoundaryAt(String worldName, int x, int z) {
+        return LandsChecker.getBoundaryAt(worldName, x, z);
+      }
+    });
   }
 
   private static void registerProvider(

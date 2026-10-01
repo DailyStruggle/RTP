@@ -38,6 +38,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     private final Map<String, MockRTPWorld> worldsByName = new ConcurrentHashMap<>();
     private final Map<UUID, MockRTPWorld> worldsById = new ConcurrentHashMap<>();
     private final Map<UUID, MockRTPPlayer> playersById = new ConcurrentHashMap<>();
+    private final Map<UUID, RTPCommandSender> sendersById = new ConcurrentHashMap<>();
     private final Map<String, MockRTPPlayer> playersByName = new ConcurrentHashMap<>();
     private final Map<String, Object> registeredCommands = new ConcurrentHashMap<>();
 
@@ -63,7 +64,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
         if (sender instanceof MockRTPPlayer) {
             addPlayer((MockRTPPlayer) sender);
         } else {
-            playersById.put(sender.uuid(), new MockRTPPlayer(sender.uuid(), sender.name(), null) {
+            sendersById.put(sender.uuid(), new MockRTPCommandSender(sender.uuid(), sender.name()) {
                 @Override public void sendMessage(String message) { sender.sendMessage(message); }
                 @Override public boolean hasPermission(String permission) { return sender.hasPermission(permission); }
             });
@@ -172,6 +173,8 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     public RTPCommandSender getSender(UUID uuid) {
         if (uuid == null) return consolePlayer;
         if (uuid.equals(consolePlayer.uuid()) || uuid.equals(new UUID(0, 0))) return consolePlayer;
+        RTPCommandSender sender = sendersById.get(uuid);
+        if (sender != null) return sender;
         RTPPlayer player = playersById.get(uuid);
         if (player != null) return player;
 

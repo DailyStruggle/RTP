@@ -1444,14 +1444,16 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         if (!source.exists()) {
           saveResourceFromJar(diff + File.separator + "default.yml", overwrite);
         }
-        if (!target.exists()) {
-          boolean newFile = target.createNewFile();
-          if (!newFile)
-            throw new IOException("failed to create new file - " + target.getAbsolutePath());
+        if (overwrite || !target.exists()) {
+          if (!target.exists()) {
+            boolean newFile = target.createNewFile();
+            if (!newFile)
+              throw new IOException("failed to create new file - " + target.getAbsolutePath());
+          }
+          if (source.exists()) {
+            Files.copy(source.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+          }
         }
-        FileOutputStream outputStream = new FileOutputStream(target.getPath());
-        Files.copy(source.toPath(), outputStream);
-        outputStream.close();
       }
     }
   }

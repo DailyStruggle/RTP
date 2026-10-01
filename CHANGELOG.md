@@ -31,6 +31,11 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ### Added
 
+- **Tag-group composition with set subtraction in safety configurations (ADR-017).** Operators can now exclude specific materials, predicates, or sub-tags from a tag group in `safety.yml` (e.g. `airBlocks`, `unsafeBlocks`) without manually expanding every variant:
+  - *Grammar & syntax:* Supports subtraction expressions using `token := baseToken ( '-' subtraction )*`, for example `#minecraft:slabs - OAK_SLAB`, `#minecraft:leaves - AZALEA_LEAVES - FLOWERING_AZALEA_LEAVES`, and `#minecraft:slabs[waterlogged=true] - OAK_SLAB`.
+  - *Parsing & validation (`rtp-api`):* `SafetyTokenParser` parses base and subtracted tokens in sequence, rejecting malformed subtraction segments with explanatory warnings (REQ-RTP-S-004 compliance) while keeping `rtp-api` strictly pure and Bukkit-free (ADR-011).
+  - *Compilation & expansion (`rtp-api`, `rtp-core`):* Subtracted items are suppressed from `CompiledUnsafeSet` checks and excluded during tag expansion in `SafetyTokenExpander` and `JumpAdjustor` probe paths.
+
 - **Declarative action and session engine with conditional gating and physical triggers (`rtp-api`, `rtp-core`, and `LeafRTPActionAddon`).** Introduces an extensible declarative action framework for orchestrating complex multi-stage teleportation sequences, custom game modes, challenges, and dynamic player placement:
   - *`ActionService`, `ActionDefinition`, and `ActionSession` SPI (`rtp-api`):* Public contracts supporting stateful teleportation workflows with configurable pre-actions, execution steps, post-actions, fail-actions, and timeout handlers.
   - *Conditional gating engine (`GateEvaluator`):* Evaluates complex boolean expressions, mathematical comparisons, and requirement gates covering permissions, economy balances (`vault`/economy providers), cooldowns, world constraints, biome checks, region membership, server tick metrics, time of day, and Y-coordinate levels.
@@ -105,6 +110,8 @@ editions. Entries with no marker are assumed to apply to both editions.
 - **`ELLIPSE` now refuses `expand: true` with a console warning.** Because an ellipse is inscribed within the circle describing its internal range, expanding past known-bad land pushed selections into outer corners outside the ellipse that the shape itself then rejected. Setting `expand: true` on an ellipse is now automatically forced off with a one-time console warning, matching `POLYGON` behavior. `CIRCLE`, `SQUARE`, and normal variants remain bounded by their range and continue to honor `expand`.
 
 ### Fixed
+
+- **Scan land percentage now shows the real share of valid land.** `%rtp_scan_landPercentage%` could read `0.00` or drift during an active scan, and the scan boss bar was putting the scan's completion percentage where `[scan_landPercentage]` was placed. Both now use the scan's own good/bad tally (averaged across regions when no region is in context). The completion percentage is still available in the boss bar as the new `[scan_progress]` placeholder.
 
 - **MSPT readings on Fabric and NeoForge were stuck near 50 ms and never came back down.** Those two platforms were measuring the gap between server ticks rather than the time actually spent inside a tick. The vanilla server sleeps after each tick to hold 20 TPS, so that gap is always at least 50 ms: a perfectly healthy server reported ~50 ms, and once a lag spike pushed the number up it could only ever settle back to 50, never below. MSPT now comes from the server's own average tick time, so an idle server reads a few milliseconds and the value recovers after a spike like it does on Paper. This also unsticks everything downstream that divides MSPT by 50 to get tick-budget use - the adaptive tick budget and the tick-stress counter were seeing a permanently maxed-out server on Fabric and NeoForge and holding back accordingly. Expect the number in `/rtp info` to drop sharply on these platforms; the old reading was the bug, not the new one. If no tick-time source is reachable, MSPT now reports "unsampled" instead of inventing a value.
 

@@ -241,6 +241,111 @@ public class ClaimAnchoredRegionTracker {
   }
 
   /**
+   * Encapsulates an entire claim envelope in {@link MemoryShape} when a candidate coordinate fails
+   * an external claim verifier (REQ-RTP-S-003).
+   *
+   * <p>Queries {@link io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry#resolveAt(String, int, int)}
+   * to resolve the boundary envelope, converts the bounding box into key-space indices in {@code shape},
+   * and records them as {@link LocationGenerator.FailTypes#safetyExternal} hazard runs with the
+   * configured cause-based TTL (ADR-079). Subsequent candidate selections in this region skip the
+   * claim envelope in $O(\log N)$ time.
+   *
+   * @param shape the memory shape to mark
+   * @param worldName world identifier
+   * @param x hit X block coordinate
+   * @param z hit Z block coordinate
+   * @param failedVerifierClass optional verifier class that failed
+   * @return count of newly marked bad locations/chunks
+   */
+  public static int encapsulateClaim(
+      MemoryShape<?> shape,
+      String worldName,
+      int x,
+      int z,
+      Class<?> failedVerifierClass) {
+    if (shape == null || worldName == null) {
+      return 0;
+    }
+
+    long effectiveTtl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig
+        .resolveTtlSeconds(LocationGenerator.FailTypes.safetyExternal, failedVerifierClass);
+
+    ClaimBoundary boundary = null;
+    try {
+      if (io.github.dailystruggle.rtp.api.RTPAPI.hooks != null) {
+        io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry registry =
+            io.github.dailystruggle.rtp.api.RTPAPI.hooks.claimBoundaries();
+        if (registry != null) {
+          boundary = registry.resolveAt(worldName, x, z).orElse(null);
+        }
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[ClaimAnchoredRegionTracker] Failed to resolve claim boundary at (" + x + "," + z + ")", t);
+    }
+
+    if (boundary == null) {
+      // Fallback: mark single candidate chunk
+      long loc = shape.xzToLocation(x, z);
+      if (loc >= 0) {
+        return shape.addBadChunk(loc, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
+      }
+      return 0;
+    }
+
+    int minCX = boundary.minChunkX();
+    int maxCX = boundary.maxChunkX();
+    int minCZ = boundary.minChunkZ();
+    int maxCZ = boundary.maxChunkZ();
+
+    int bMinX = boundary.minX();
+    int bMaxX = boundary.maxX();
+    int bMinZ = boundary.minZ();
+    int bMaxZ = boundary.maxZ();
+
+    int marked = 0;
+    // Mark all chunk preimages across chunk bounding box
+    for (int cx = minCX; cx <= maxCX; cx++) {
+      for (int cz = minCZ; cz <= maxCZ; cz++) {
+        if (!boundary.containsChunk(cx, cz)) {
+          continue;
+        }
+
+        long[] preimages = shape.chunkToLocations(cx, cz);
+        if (preimages != null && preimages.length > 0) {
+          for (long p : preimages) {
+            if (p >= 0 && p < shape.getEffectiveRange() && !shape.isKnownBad(p)) {
+              shape.addBadLocation(p, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
+              marked++;
+            }
+          }
+        }
+      }
+    }
+
+    // Also mark exact coordinates within bounding box
+    for (int bx = bMinX; bx <= bMaxX; bx++) {
+      for (int bz = bMinZ; bz <= bMaxZ; bz++) {
+        if (boundary.contains(bx, bz)) {
+          long loc = shape.xzToLocation(bx, bz);
+          if (loc >= 0 && loc < shape.getEffectiveRange() && !shape.isKnownBad(loc)) {
+            shape.addBadLocation(loc, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
+            marked++;
+          }
+        }
+      }
+    }
+
+    if (marked > 0) {
+      shape.flushAndRebuildIfNeeded(shape.spatialResolution());
+      RTP.log(Level.FINE, "[ClaimAnchoredRegionTracker] Encapsulated claim boundary '" + boundary.id()
+          + "' [" + bMinX + "," + bMinZ + " -> " + bMaxX + "," + bMaxZ
+          + "], marked " + marked + " locations with TTL " + effectiveTtl + "s");
+    }
+
+    return marked;
+  }
+
+  /**
    * Clear cache entry for a specific claim (e.g. upon faction disband).
    *
    * @param claimId identifier

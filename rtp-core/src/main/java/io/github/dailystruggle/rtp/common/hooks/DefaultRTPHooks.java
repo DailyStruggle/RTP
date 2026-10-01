@@ -206,6 +206,28 @@ public final class DefaultRTPHooks implements RTPHooks {
     }
 
     @Override
+    public Optional<ClaimBoundary> resolveAt(String worldName, int x, int z, String namespace) {
+      if (worldName == null) return Optional.empty();
+      boolean auto = (namespace == null || namespace.trim().isEmpty() || "auto".equalsIgnoreCase(namespace.trim()));
+      String targetNs = (namespace != null) ? namespace.trim().toLowerCase(Locale.ROOT) : "";
+
+      for (ClaimBoundaryProvider p : claimBoundaryProviders) {
+        if (!auto && !targetNs.equals(p.namespace().toLowerCase(Locale.ROOT))) {
+          continue;
+        }
+        try {
+          Optional<ClaimBoundary> boundary = p.getBoundaryAt(worldName, x, z);
+          if (boundary.isPresent()) {
+            return boundary;
+          }
+        } catch (Throwable t) {
+          RTP.log(Level.WARNING, "[RTP API] ClaimBoundaryProvider " + p.namespace() + " threw while resolving boundary at " + worldName + " (" + x + "," + z + ")", t);
+        }
+      }
+      return Optional.empty();
+    }
+
+    @Override
     public List<ClaimBoundaryProvider> providers() {
       return Collections.unmodifiableList(new ArrayList<>(claimBoundaryProviders));
     }

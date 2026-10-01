@@ -1113,12 +1113,8 @@ final class PregenTask implements Runnable {
                         }
                         recordOutcome("safetyExternal[" + className + "] ex=" + (verEx == null ? "null" : verEx.getClass().getSimpleName()));
                         if (state.shape instanceof MemoryShape) {
-                            // addBadChunk: chunk-uniform - within a chunk the per-column
-                            // selection order is deterministic, so the twin spiral index picks
-                            // the same column and the verifier rejects it identically.
-                            long effectiveTtl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(
-                                    LocationGenerator.FailTypes.safetyExternal, failedClass);
-                            ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
+                            io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTracker
+                                    .encapsulateClaim((MemoryShape<?>) state.shape, state.world.name(), finalX, finalZ, failedClass);
                         }
                         closeIfPresent(reservation);
                         continueInline(this::rescheduleNextAttempt);

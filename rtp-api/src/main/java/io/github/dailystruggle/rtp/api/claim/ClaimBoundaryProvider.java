@@ -38,4 +38,16 @@ public interface ClaimBoundaryProvider {
    * @return non-null {@link Optional} containing the claim boundary if the player holds a claim in that world
    */
   Optional<ClaimBoundary> getBoundary(UUID playerId, String worldName);
+
+  /**
+   * Resolves the claim boundary at the specified coordinates in the specified world.
+   *
+   * @param worldName world identifier
+   * @param x         block X coordinate
+   * @param z         block Z coordinate
+   * @return non-null {@link Optional} containing the claim boundary if the coordinates fall in a claim
+   */
+  default Optional<ClaimBoundary> getBoundaryAt(String worldName, int x, int z) {
+    return Optional.empty();
+  }
 }
