@@ -931,10 +931,15 @@ public class RTP {
         }
         try {
           localEnv = region.getWorld().environment();
-          if (localLabel == null) {
+          if (localLabel == null && target.kind() != io.github.dailystruggle.rtp.api.RtpTarget.Kind.WORLD) {
             // Cosmetic display label from the region's configured displayName
-            // (falls back to the region name); the same value /rtp info uses.
-            localLabel = region.displayName();
+            // when it differs from the fallback region name (matching RtpTargetStatus
+            // contract: "or null for default name").
+            String regionDisplayName = region.displayName();
+            if (regionDisplayName != null && !regionDisplayName.isEmpty()
+                && !regionDisplayName.equals(region.name)) {
+              localLabel = regionDisplayName;
+            }
           }
         } catch (Throwable ignored) {
           // Defensive: env/label enrichment is a cosmetic hint and must never break status.

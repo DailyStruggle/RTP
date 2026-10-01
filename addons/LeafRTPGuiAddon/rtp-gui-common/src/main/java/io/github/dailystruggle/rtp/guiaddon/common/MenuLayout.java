@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.guiaddon.common;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -47,41 +48,77 @@ public final class MenuLayout {
   /**
    * Computes the centred, border-framed placement for {@code model}.
    *
+   * <p>Primary destinations (regions/default) and submenus (actions/biome selectors)
+   * are placed on distinct lines so they do not crowd each other. Within each row,
+   * items are evenly spaced if count <= 50% of the inner column width (1..3 items),
+   * and packed contiguously centered if count > 50% (4..7 items).
+   *
    * @param model the pre-resolved, platform-neutral menu contents
    * @return an immutable layout; never {@code null}
    */
   public static MenuLayout compute(MenuModel model) {
-    int entryCount = model.entries().size();
+    List<MenuEntry> destinations = new java.util.ArrayList<>();
+    List<MenuEntry> submenus = new java.util.ArrayList<>();
 
-    // Content lives in the inner area, framed by a one-cell border on every edge.
-    int contentRows = Math.max(1, (int) Math.ceil(entryCount / (double) ITEMS_PER_ROW));
+    for (MenuEntry entry : model.entries()) {
+      if (entry == null) continue;
+      if (entry.target() != null && entry.target().kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.ACTION) {
+        submenus.add(entry);
+      } else {
+        destinations.add(entry);
+      }
+    }
 
-    // Total rows = inner content + top border + bottom border, clamped so the
-    // frame is always present (minimum 3 rows -> at least one inner row).
+    // How many rows needed for destinations and submenus
+    int destRows = Math.max(0, (int) Math.ceil(destinations.size() / (double) ITEMS_PER_ROW));
+    int submenuRows = Math.max(0, (int) Math.ceil(submenus.size() / (double) ITEMS_PER_ROW));
+
+    int contentRows = destRows + submenuRows;
+    if (contentRows == 0) {
+      contentRows = 1;
+    }
+
+    // Total rows = inner content + top border + bottom border, clamped to [3, MAX_ROWS].
     int rows = Math.max(3, Math.min(MAX_ROWS, contentRows + 2));
     int innerRows = rows - 2;
-    contentRows = Math.min(contentRows, innerRows);
 
-    // Vertically centre the content block within the inner rows.
+    // Vertically centre the content block within the inner rows if spare rows exist.
     int topRow = 1 + Math.max(0, (innerRows - contentRows) / 2);
 
     int dashboardSlot = model.showDashboard() ? (rows - 1) * COLUMNS + (COLUMNS / 2) : -1;
-
     Map<Integer, MenuEntry> slotEntries = new LinkedHashMap<>();
-    int maxEntries = contentRows * ITEMS_PER_ROW;
-    int placed = 0;
-    for (MenuEntry entry : model.entries()) {
-      if (placed >= maxEntries) break;
-      int rowIndex = placed / ITEMS_PER_ROW;
-      int rowCount = Math.min(ITEMS_PER_ROW, entryCount - rowIndex * ITEMS_PER_ROW);
-      int colInRow = placed % ITEMS_PER_ROW;
-      // Spread this row's items evenly across the 7-wide inner area, preferring
-      // padding around the edges. A single item lands dead centre; a full row
-      // falls back to a contiguous run.
-      int col = spreadColumn(colInRow, rowCount);
-      int slot = (topRow + rowIndex) * COLUMNS + INNER_FIRST_COL + col;
-      slotEntries.put(slot, entry);
-      placed++;
+
+    // Place destinations on the top content row(s)
+    int currentContentRow = topRow;
+    if (!destinations.isEmpty()) {
+      int placed = 0;
+      for (int r = 0; r < destRows && currentContentRow <= innerRows; r++) {
+        int remaining = destinations.size() - placed;
+        int countInRow = Math.min(ITEMS_PER_ROW, remaining);
+        for (int i = 0; i < countInRow; i++) {
+          MenuEntry entry = destinations.get(placed++);
+          int col = spreadColumn(i, countInRow);
+          int slot = currentContentRow * COLUMNS + INNER_FIRST_COL + col;
+          slotEntries.put(slot, entry);
+        }
+        currentContentRow++;
+      }
+    }
+
+    // Place submenus on the subsequent content row(s)
+    if (!submenus.isEmpty()) {
+      int placed = 0;
+      for (int r = 0; r < submenuRows && currentContentRow <= innerRows; r++) {
+        int remaining = submenus.size() - placed;
+        int countInRow = Math.min(ITEMS_PER_ROW, remaining);
+        for (int i = 0; i < countInRow; i++) {
+          MenuEntry entry = submenus.get(placed++);
+          int col = spreadColumn(i, countInRow);
+          int slot = currentContentRow * COLUMNS + INNER_FIRST_COL + col;
+          slotEntries.put(slot, entry);
+        }
+        currentContentRow++;
+      }
     }
 
     return new MenuLayout(rows, slotEntries, dashboardSlot);
@@ -89,18 +126,39 @@ public final class MenuLayout {
 
   /**
    * Maps the {@code index}-th of {@code count} items to an inner column in
-   * {@code [0, ITEMS_PER_ROW)}, spread evenly with symmetric edge padding.
+   * {@code [0, ITEMS_PER_ROW)}.
    *
-   * <p>The midpoint formula {@code floor((index + 0.5) * width / count)} centres a
-   * lone item, distributes 2+ items with even gaps, and degenerates to a contiguous
-   * run once {@code count} reaches the inner width.
+   * <p>When {@code count <= 50% of column width} (1..3 items), items are distributed
+   * evenly with balanced spacing so destinations are not packed side-by-side.
+   * When {@code count > 50% of column width} (4..7 items), items are packed
+   * contiguously and centered in the row.
    */
-  private static int spreadColumn(int index, int count) {
-    int safeCount = Math.max(1, count);
-    int col = (int) Math.floor((index + 0.5) * ITEMS_PER_ROW / safeCount);
-    if (col < 0) return 0;
-    if (col > ITEMS_PER_ROW - 1) return ITEMS_PER_ROW - 1;
-    return col;
+  public static int spreadColumn(int index, int count) {
+    int safeCount = Math.max(1, Math.min(ITEMS_PER_ROW, count));
+    int safeIndex = Math.max(0, Math.min(index, safeCount - 1));
+
+    // When count <= 50% column width (ITEMS_PER_ROW = 7, so <= 3 items):
+    // Evenly space them:
+    // 1 item -> inner col 3 (center)
+    // 2 items -> inner cols 1, 5
+    // 3 items -> inner cols 1, 3, 5
+    if (safeCount <= ITEMS_PER_ROW / 2) {
+      switch (safeCount) {
+        case 1:
+          return 3;
+        case 2:
+          return (safeIndex == 0) ? 1 : 5;
+        case 3:
+          return (safeIndex == 0) ? 1 : (safeIndex == 1 ? 3 : 5);
+        default:
+          break;
+      }
+    }
+
+    // When count > 50% column width (4..7 items):
+    // Pack contiguously centered in the row.
+    int startCol = (ITEMS_PER_ROW - safeCount) / 2;
+    return startCol + safeIndex;
   }
 
   /** Number of chest rows. */

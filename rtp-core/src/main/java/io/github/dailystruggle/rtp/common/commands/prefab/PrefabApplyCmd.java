@@ -184,16 +184,24 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
     @SuppressWarnings("unchecked")
     private static MultiWorldExpander.RegionOverlayAmender buildDimensionVertAmender(Prefab prefab) {
         if (!prefab.expandPerWorld()) return null;
-        if (RTP.serverAccessor == null || RTP.configs == null) return null;
+        if (RTP.serverAccessor == null || RTP.configs == null) {
+            return MultiWorldExpander.defaultDimensionVertAmender();
+        }
         MultiConfigParser<RegionKeys> regions =
                 (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
-        if (regions == null) return null;
+        if (regions == null) {
+            return MultiWorldExpander.defaultDimensionVertAmender();
+        }
         // getParser(...) assumes a "default" entry exists (it falls back to it
         // for unknown names) and NPEs when the regions tree is empty, so guard
         // on the registered set first.
-        if (!regions.listParsers().contains(MultiWorldExpander.DEFAULT_REGION_ID)) return null;
+        if (!regions.listParsers().contains(MultiWorldExpander.DEFAULT_REGION_ID)) {
+            return MultiWorldExpander.defaultDimensionVertAmender();
+        }
         ConfigParser<RegionKeys> defParser = regions.getParser(MultiWorldExpander.DEFAULT_REGION_ID);
-        if (defParser == null) return null;
+        if (defParser == null) {
+            return MultiWorldExpander.defaultDimensionVertAmender();
+        }
         return (world, overlay) -> {
             try {
                 io.github.dailystruggle.rtp.api.world.RTPWorld<?> rtpWorld =

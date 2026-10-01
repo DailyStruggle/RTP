@@ -114,7 +114,7 @@ public final class SetupHandlerSupport {
         try {
             File baseDir = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPluginDirectory() : null;
             List<String> worldNames = collectWorldNames();
-            List<Prefab> recipe = SetupRecipe.compileRecipe(session);
+            List<Prefab> recipe = SetupRecipe.compileRecipe(session, worldNames);
 
             Map<String, Map<String, Object>> baseline = loadLiveBaseline(baseDir, recipe);
 

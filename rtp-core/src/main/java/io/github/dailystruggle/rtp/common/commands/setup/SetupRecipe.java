@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.setup;
 
+import io.github.dailystruggle.rtp.common.commands.prefab.MultiWorldExpander;
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier;
 import io.github.dailystruggle.rtp.common.commands.prefab.builtin.FoliaTuned;
@@ -27,19 +28,28 @@ public final class SetupRecipe {
 
     /**
      * Resolves the ordered chain of prefabs corresponding to the given setup session.
+     * World names are inferred from the active runtime context if available.
+     */
+    public static List<Prefab> compileRecipe(SetupSession session) {
+        return compileRecipe(session, SetupHandlerSupport.collectWorldNames());
+    }
+
+    /**
+     * Resolves the ordered chain of prefabs corresponding to the given setup session
+     * and list of active worlds.
      * Order of precedence:
-     * 1. Topology (Single world default / MultiWorld expansion)
+     * 1. Topology (Single world default / MultiWorld expansion with dimension vert overrides)
      * 2. Gameplay Style (Survival, Skyblock, OneBlock, Arena)
      * 3. Performance Profile (Low, High, Folia)
      * 4. Addons & Effects overlay
      */
-    public static List<Prefab> compileRecipe(SetupSession session) {
+    public static List<Prefab> compileRecipe(SetupSession session, List<String> worldNames) {
         Objects.requireNonNull(session, "session");
         List<Prefab> recipe = new ArrayList<>();
 
         // Stage 1: World Topology
         if ("multi".equalsIgnoreCase(session.worldChoice())) {
-            recipe.add(MultiWorld.INSTANCE);
+            recipe.add(MultiWorld.createPrefab(worldNames));
         }
 
         // Stage 2: Gameplay Style
@@ -83,9 +93,10 @@ public final class SetupRecipe {
         Objects.requireNonNull(baselineTrees, "baselineTrees");
         Objects.requireNonNull(recipe, "recipe");
 
+        MultiWorldExpander.RegionOverlayAmender amender = MultiWorldExpander.defaultDimensionVertAmender();
         Map<String, Map<String, Object>> currentTrees = baselineTrees;
         for (Prefab p : recipe) {
-            PrefabApplier.Result stepResult = PrefabApplier.apply(currentTrees, p, worldNames, null);
+            PrefabApplier.Result stepResult = PrefabApplier.apply(currentTrees, p, worldNames, amender);
             currentTrees = stepResult.newTrees();
         }
 

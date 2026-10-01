@@ -266,7 +266,7 @@ Safety-critical packages inside [I]rtp-core[/I] carry higher floors on top of th
 [*]Drop [I]LeafRTP-Pro-x.y.z.jar[/I] into [I]plugins/[/I] (or [I]mods/[/I]). Upgrading from the free build: replace the jar, keep the data folder.
 [*]Start the server. A [I]default[/I] region is written for you.
 [*]Type [I]/rtp[/I]. Change anything in-game via [I]/rtp admin setup[/I] (guided, from console or chat), [I]/rtp admin[/I] (config editor book), or the YAML under [I]plugins/RTP/[/I]; all three edit the same state and reload at runtime. Coming from another rtp plugin: [I]/rtp config import[/I] reads its config and writes mine next to it, without replacing anything you already have.
-[*][B]Size the region to your world.[/B] [I]radius[/I], [I]centerX[/I], and [I]centerZ[/I] live inside the region's [I]shape:[/I] block. A bare number is [B]chunks[/B], not blocks - a [I]radius[/I] of [I]625[/I] reaches 10,000 blocks, and a radius left in block-think looks like a broken plugin. If you would rather say what you mean, write the unit: [I]radius: 10000b[/I] or [I]radius: 10km[/I]. See [URL='https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/'][B]Regions[/B][/URL] and [URL='https://dailystruggle.github.io/RTP/admin/configuration/WORLDS/'][B]Worlds[/B][/URL].
+[*][B]Size the region to your world.[/B] Set [I]radius[/I], [I]centerX[/I], and [I]centerZ[/I] in the region's [I]shape:[/I] block. Suffixes specify units directly: [I]radius: 10km[/I], [I]radius: 10000b[/I] (blocks), or [I]radius: 625c[/I] (chunks; default if unit omitted). See [URL='https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/'][B]Regions[/B][/URL] and [URL='https://dailystruggle.github.io/RTP/admin/configuration/WORLDS/'][B]Worlds[/B][/URL].
 [*]For SQL / Redis or a proxy network, fill in [I]advanced/database.yml[/I] and [I]advanced/network.yml[/I]. Both are inert until enabled. In network mode [I]rtp.servers.*[/I] defaults to [I]true[/I], so every player can reach an open cross-server region unless you take it away.
 [/LIST]
 
@@ -397,7 +397,7 @@ A: Biome data comes from the populated [I].mca[/I] files, so [I]/rtp biome:<x>[/
 A: Yes. Region files are read directly, so modded and namespaced IDs are preserved. Un-populated chunks fall through to a live load.
 
 [B]Q: Memory and MSPT - should I worry?[/B]
-A: MSPT, no. Memory, know what you are buying: LeafRTP trades heap for tick time, on purpose. Every cache tier is capacity-limited; about 68 bytes per cached location in the hot buffers and about 26 bytes per known-bad chunk in the compressed spatial segments, so 8 192 cached locations cost well under a megabyte. Background generation pauses under heap pressure ([I]maxHeapPercent[/I]). If you are tight on RAM, lower [I]cacheCap[/I].
+A: MSPT, no. Spatial memory stays compact (~26 bytes per sector segment). In the hot cache, kept locations hold chunk tickets that pin native chunk neighborhoods for instant teleports. Under JVM heap pressure ([I]maxHeapPercent[/I] or <512 MB free), background fill pauses and the engine automatically sheds retained chunk tickets back to cold storage, releasing pinned chunks immediately.
 
 [B]Q: Can I downgrade to the free build?[/B]
 A: Yes. Same configuration, same data files, same commands. Swap the jar; [I]advanced/database.yml[/I] and [I]advanced/network.yml[/I] become inert and SQL-backed state is not read.

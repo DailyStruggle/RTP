@@ -63,4 +63,65 @@ class SetupRecipeTest {
         boolean periodChanged = changes.stream().anyMatch(c -> c.keyPath().equals("period") && ((Number) c.newValue()).intValue() == 60);
         assertTrue(periodChanged, "LowPerformance should set period=60");
     }
+
+    @Test
+    @DisplayName("multiWorld option fixes vert for non-overworld worlds in setup recipe pipeline")
+    void testMultiWorldRepairsVertForNonOverworldWorlds() {
+        SetupSession session = new SetupSession(UUID.randomUUID());
+        session.setWorldChoice("multi");
+        session.setGameplayChoice("survival");
+        session.setPerformanceChoice("high");
+
+        Map<String, Map<String, Object>> baseline = new LinkedHashMap<>();
+        Map<String, Object> defRegion = new LinkedHashMap<>();
+        defRegion.put("world", "world");
+        defRegion.put("shape", Map.of("name", "CIRCLE", "radius", 1000));
+        Map<String, Object> defaultVert = new LinkedHashMap<>();
+        defaultVert.put("name", "LINEAR");
+        defaultVert.put("minY", 32);
+        defaultVert.put("maxY", 255);
+        defaultVert.put("direction", 2);
+        defaultVert.put("requireSkyLight", true);
+        defRegion.put("vert", defaultVert);
+        baseline.put("definitions/regions/default", defRegion);
+
+        List<String> worlds = List.of("world", "world_nether", "world_the_end");
+        List<Prefab> recipe = SetupRecipe.compileRecipe(session, worlds);
+
+        // Verify MultiWorld prefab itself carries per-world regionOverlays for detected non-overworld worlds
+        Prefab multiWorldPrefab = recipe.get(0);
+        assertEquals("multi-world", multiWorldPrefab.id());
+        assertTrue(multiWorldPrefab.regionOverlays().containsKey("world_nether"),
+                "MultiWorld prefab must contain regionOverlay for detected nether world");
+        assertTrue(multiWorldPrefab.regionOverlays().containsKey("world_the_end"),
+                "MultiWorld prefab must contain regionOverlay for detected end world");
+
+        Map<String, Object> netherOverlay = multiWorldPrefab.regionOverlays().get("world_nether");
+        Map<?, ?> netherOverlayVert = (Map<?, ?>) netherOverlay.get("vert");
+        assertNotNull(netherOverlayVert);
+        assertEquals(false, netherOverlayVert.get("requireSkyLight"));
+        assertEquals("LINEAR", netherOverlayVert.get("name"));
+        assertTrue(((Number) netherOverlayVert.get("maxY")).intValue() <= 128);
+
+        // Verify applyPipeline applies dimension vert fixes to synthesised newTrees and diff
+        PrefabApplier.Result result = SetupRecipe.applyPipeline(baseline, recipe, worlds);
+        assertNotNull(result);
+
+        Map<String, Object> netherRegion = result.newTrees().get("definitions/regions/world_nether");
+        assertNotNull(netherRegion, "synthesised nether region must exist in newTrees");
+        assertEquals("world_nether", netherRegion.get("world"));
+        Map<?, ?> netherVert = (Map<?, ?>) netherRegion.get("vert");
+        assertNotNull(netherVert, "nether region must carry vert block");
+        assertEquals(false, netherVert.get("requireSkyLight"), "nether requireSkyLight must be false");
+        assertEquals("LINEAR", netherVert.get("name"), "nether vert name must be LINEAR");
+        assertTrue(((Number) netherVert.get("maxY")).intValue() <= 128, "nether maxY must be <= 128");
+
+        Map<String, Object> endRegion = result.newTrees().get("definitions/regions/world_the_end");
+        assertNotNull(endRegion, "synthesised end region must exist in newTrees");
+        assertEquals("world_the_end", endRegion.get("world"));
+        Map<?, ?> endVert = (Map<?, ?>) endRegion.get("vert");
+        assertNotNull(endVert, "end region must carry vert block");
+        assertEquals(false, endVert.get("requireSkyLight"), "end requireSkyLight must be false");
+        assertEquals("LINEAR", endVert.get("name"), "end vert name must be LINEAR");
+    }
 }

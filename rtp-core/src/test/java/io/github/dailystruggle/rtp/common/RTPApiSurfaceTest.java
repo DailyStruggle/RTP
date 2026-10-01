@@ -151,6 +151,7 @@ class RTPApiSurfaceTest {
         RtpTargetStatus status = RTPAPI.getTargetStatus(id, RtpTarget.world("default"));
         assertNotNull(status);
         assertNotNull(status.availability());
+        assertNull(status.label(), "World target should not inherit fallback region name as its label");
     }
 
     @Test

@@ -12,6 +12,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -342,5 +343,48 @@ class MultiWorldExpanderTest {
         PrefabApplier.Result threeArg = PrefabApplier.apply(trees, LowPerformance.INSTANCE, List.of("world"));
         assertEquals(twoArg.newTrees(), threeArg.newTrees());
         assertEquals(twoArg.perFileDiff().keySet(), threeArg.perFileDiff().keySet());
+    }
+
+    @Test
+    @DisplayName("Prefab with explicit per-world regionOverlays merges over cloned template in MultiWorldExpander")
+    void explicitPerWorldOverlayMergesOverTemplate() {
+        Map<String, Map<String, Object>> regions = currentRegionsWithDefault();
+        Map<String, Object> vertOverlay = new LinkedHashMap<>();
+        vertOverlay.put("requireSkyLight", false);
+        vertOverlay.put("maxY", 128);
+        Map<String, Map<String, Object>> explicitOverlays = Map.of(
+                "world_nether", Map.of("vert", vertOverlay)
+        );
+
+        Prefab prefab = new Prefab(
+                "custom-multi",
+                "custom",
+                "custom",
+                "custom",
+                Map.of(),
+                Map.of(),
+                explicitOverlays,
+                true
+        );
+
+        Map<String, Map<String, Object>> out = MultiWorldExpander.expand(
+                prefab,
+                regions,
+                List.of("world", "world_nether", "world_the_end")
+        );
+
+        assertTrue(out.containsKey("world_nether"));
+        Map<String, Object> nether = out.get("world_nether");
+        assertEquals("world_nether", nether.get("world"), "world key must be set to destination world");
+        assertEquals("CIRCLE", ((Map<?, ?>) nether.get("shape")).get("name"), "cloned template fields must be preserved");
+        Map<?, ?> vert = (Map<?, ?>) nether.get("vert");
+        assertNotNull(vert);
+        assertEquals(false, vert.get("requireSkyLight"), "explicit overlay requireSkyLight must be merged");
+        assertEquals(128, vert.get("maxY"), "explicit overlay maxY must be merged");
+
+        assertTrue(out.containsKey("world_the_end"));
+        Map<String, Object> end = out.get("world_the_end");
+        assertEquals("world_the_end", end.get("world"));
+        assertEquals("CIRCLE", ((Map<?, ?>) end.get("shape")).get("name"));
     }
 }

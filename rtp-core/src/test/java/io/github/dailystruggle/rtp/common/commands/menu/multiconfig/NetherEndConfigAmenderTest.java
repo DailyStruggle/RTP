@@ -111,4 +111,26 @@ class NetherEndConfigAmenderTest {
         assertEquals(List.of("-64"), params.get("miny"));
         assertEquals(List.of("-100"), params.get("maxy"));
     }
+
+    @Test
+    @DisplayName("createDimensionVert returns appropriate vert for nether and end, null for overworld")
+    void createDimensionVert_tests() {
+        Map<String, Object> netherVert = NetherEndConfigAmender.createDimensionVert("world_nether");
+        org.junit.jupiter.api.Assertions.assertNotNull(netherVert);
+        assertEquals("LINEAR", netherVert.get("name"));
+        assertEquals(false, netherVert.get("requireSkyLight"));
+        assertEquals(128, netherVert.get("maxY"));
+        assertEquals(0, netherVert.get("minY"));
+
+        Map<String, Object> endVert = NetherEndConfigAmender.createDimensionVert("world_the_end");
+        org.junit.jupiter.api.Assertions.assertNotNull(endVert);
+        assertEquals("LINEAR", endVert.get("name"));
+        assertEquals(false, endVert.get("requireSkyLight"));
+        assertEquals(255, endVert.get("maxY"));
+        assertEquals(0, endVert.get("minY"));
+
+        org.junit.jupiter.api.Assertions.assertNull(NetherEndConfigAmender.createDimensionVert("world"));
+        org.junit.jupiter.api.Assertions.assertNull(NetherEndConfigAmender.createDimensionVert(null));
+        org.junit.jupiter.api.Assertions.assertNull(NetherEndConfigAmender.createDimensionVert(""));
+    }
 }

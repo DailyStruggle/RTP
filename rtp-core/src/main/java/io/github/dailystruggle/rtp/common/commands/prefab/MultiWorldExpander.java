@@ -108,17 +108,78 @@ public final class MultiWorldExpander {
                 // An existing region already targets this world; leave it alone.
                 continue;
             }
-            if (out.containsKey(world)) {
-                continue;
-            }
+            Map<String, Object> explicitOverlay = out.remove(world);
             Map<String, Object> overlay = deepCopy(template);
             overlay.put("world", world);
+            if (explicitOverlay != null) {
+                mergeInto(overlay, explicitOverlay);
+            }
             if (amender != null) {
                 amender.amend(world, overlay);
             }
             out.put(world, overlay);
         }
         return out;
+    }
+
+    /**
+     * Recursively merges {@code overlay} into {@code base}.
+     */
+    @SuppressWarnings("unchecked")
+    private static void mergeInto(Map<String, Object> base, Map<String, Object> overlay) {
+        if (base == null || overlay == null) return;
+        for (Map.Entry<String, Object> e : overlay.entrySet()) {
+            String key = e.getKey();
+            Object overlayVal = e.getValue();
+            Object baseVal = base.get(key);
+            if (overlayVal instanceof Map<?, ?> overlayMap && baseVal instanceof Map<?, ?> baseMap) {
+                mergeInto((Map<String, Object>) baseMap, (Map<String, Object>) overlayMap);
+            } else {
+                base.put(key, deepCopyValue(overlayVal));
+            }
+        }
+    }
+
+    /**
+     * Returns a default {@link RegionOverlayAmender} that applies dimension-appropriate
+     * vertical adjustor overrides for non-overworld worlds (nether, the_end).
+     */
+    @SuppressWarnings("unchecked")
+    public static RegionOverlayAmender defaultDimensionVertAmender() {
+        return (world, overlay) -> {
+            try {
+                Map<String, Object> vertFix =
+                        io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender
+                                .createDimensionVert(world);
+                if (vertFix == null) return;
+                Object vertObj = overlay.get("vert");
+                Map<String, Object> vert;
+                if (vertObj instanceof Map<?, ?> m) {
+                    vert = (Map<String, Object>) m;
+                } else {
+                    vert = new LinkedHashMap<>();
+                    overlay.put("vert", vert);
+                }
+                for (Map.Entry<String, Object> e : vertFix.entrySet()) {
+                    putVert(vert, e.getKey(), e.getValue());
+                }
+            } catch (RuntimeException re) {
+                io.github.dailystruggle.rtp.common.RTP.log(
+                        java.util.logging.Level.WARNING,
+                        "[prefab] dimension vert repair failed for world " + world
+                                + " - " + re.getMessage());
+            }
+        };
+    }
+
+    private static void putVert(Map<String, Object> vert, String key, Object value) {
+        for (Map.Entry<String, Object> e : vert.entrySet()) {
+            if (e.getKey() != null && e.getKey().equalsIgnoreCase(key)) {
+                e.setValue(value);
+                return;
+            }
+        }
+        vert.put(key, value);
     }
 
     /**

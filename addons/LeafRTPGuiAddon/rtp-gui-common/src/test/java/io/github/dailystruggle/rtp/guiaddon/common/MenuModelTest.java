@@ -79,4 +79,16 @@ public class MenuModelTest {
         assertNotNull(model);
         assertTrue(model.entries().isEmpty() || model.entries().stream().anyMatch(e -> e.displayName().contains("Back")));
     }
+
+    @Test
+    void displayName_defaultFallbackIgnoredForDefaultTarget() {
+        RtpTarget target = RtpTarget.defaultRegion();
+        RtpTargetStatus statusWithDefault = new RtpTargetStatus(
+                RtpTargetStatus.Availability.READY, 0L, 0.0, null, "NORMAL", "default");
+        assertEquals("Random teleport", MenuModel.displayName(target, statusWithDefault));
+
+        RtpTargetStatus statusWithCustom = new RtpTargetStatus(
+                RtpTargetStatus.Availability.READY, 0L, 0.0, null, "NORMAL", "&aWild Overworld");
+        assertEquals("&aWild Overworld", MenuModel.displayName(target, statusWithCustom));
+    }
 }
