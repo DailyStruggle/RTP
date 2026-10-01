@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.action;
 
-import io.github.dailystruggle.rtp.api.action.ActionContext;
 import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.action.ActionSessionResult;
 import io.github.dailystruggle.rtp.api.group.GroupPlacementResult;

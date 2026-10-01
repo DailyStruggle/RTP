@@ -2,7 +2,6 @@ package io.github.dailystruggle.effectsapi.common.hologram;
 
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**

@@ -3,7 +3,6 @@ package io.github.dailystruggle.effectsapi.common.hologram;
 import io.github.dailystruggle.effectsapi.common.volumetric.Vector3d;
 
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Handle to an active platform-rendered hologram / floating text display entity.

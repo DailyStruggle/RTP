@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.bukkit.tools.softdepends.hologram;
 
 import io.github.dailystruggle.effectsapi.common.hologram.HologramHandle;
 import io.github.dailystruggle.effectsapi.common.hologram.HologramRegistry;
-import io.github.dailystruggle.effectsapi.common.volumetric.SpatialBounds;
 import io.github.dailystruggle.effectsapi.common.volumetric.Vector3d;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
