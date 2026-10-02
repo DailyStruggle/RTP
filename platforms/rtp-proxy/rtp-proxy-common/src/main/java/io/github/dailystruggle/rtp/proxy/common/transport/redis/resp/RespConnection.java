@@ -116,7 +116,18 @@ public class RespConnection implements Closeable {
      * e.g. set("key", "val", "NX", "PX", 5000)
      */
     public synchronized String set(String key, String val, String nxxx, String expx, long time) throws IOException {
-        Object res = executeCommand("SET", key, val, nxxx, expx, String.valueOf(time));
+        List<String> cmd = new ArrayList<>(6);
+        cmd.add("SET");
+        cmd.add(key);
+        cmd.add(val);
+        if (nxxx != null && !nxxx.isEmpty()) {
+            cmd.add(nxxx);
+        }
+        if (expx != null && !expx.isEmpty()) {
+            cmd.add(expx);
+            cmd.add(String.valueOf(time));
+        }
+        Object res = executeCommand(cmd.toArray(new String[0]));
         if (res == null) return null;
         if (res instanceof String s) return s;
         return RespProtocol.toUtf8((byte[]) res);

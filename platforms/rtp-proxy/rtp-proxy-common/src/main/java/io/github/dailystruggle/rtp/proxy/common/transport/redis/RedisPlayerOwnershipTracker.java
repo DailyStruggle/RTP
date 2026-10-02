@@ -84,7 +84,7 @@ public final class RedisPlayerOwnershipTracker implements PlayerOwnershipTracker
         }
         return runAsync(() -> {
             try (RespConnection j = pool.getResource()) {
-                j.set(KEY_PREFIX + playerId, thisProxyId, null, "EX", ttlSeconds);
+                j.setex(KEY_PREFIX + playerId, ttlSeconds, thisProxyId);
             } catch (Exception e) {
                 LOG.log(Level.WARNING, "RedisPlayerOwnershipTracker.claim failed for "
                         + playerId + ": " + e.getMessage());

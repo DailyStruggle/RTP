@@ -15,9 +15,10 @@ const host = getArg('--host', '127.0.0.1');
 const port = parseInt(getArg('--port', '25577'), 10);
 const username = getArg('--username', 'RtpAcceptanceBot');
 const timeoutSeconds = parseInt(getArg('--timeout', '35'), 10);
+const mcVersion = getArg('--version', '1.21.11');
 const isLite = args.includes('--lite');
 
-console.log(`[bot] Initializing headless client: ${username} -> ${host}:${port} (timeout: ${timeoutSeconds}s, tier: ${isLite ? 'lite' : 'pro'})`);
+console.log(`[bot] Initializing headless client: ${username} -> ${host}:${port} (version: ${mcVersion}, timeout: ${timeoutSeconds}s, tier: ${isLite ? 'lite' : 'pro'})`);
 
 const timer = setTimeout(() => {
   console.error(`[bot] FAIL - Timeout exceeded (${timeoutSeconds}s) before completing cross-server RTP.`);
@@ -30,6 +31,7 @@ try {
     host: host,
     port: port,
     username: username,
+    version: mcVersion,
     checkTimeoutInterval: 60 * 1000
   });
 } catch (err) {
@@ -110,7 +112,7 @@ function evaluateLanding(pos) {
 }
 
 bot.on('kicked', (reason) => {
-  console.error(`[bot] Kicked from server: ${reason}`);
+  console.error(`[bot] Kicked from server: ${typeof reason === 'object' ? JSON.stringify(reason) : reason}`);
   clearTimeout(timer);
   process.exit(1);
 });
