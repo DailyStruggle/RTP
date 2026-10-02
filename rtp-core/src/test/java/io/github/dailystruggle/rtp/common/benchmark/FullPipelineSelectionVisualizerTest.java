@@ -566,17 +566,23 @@ public class FullPipelineSelectionVisualizerTest {
     int halfBits = bits / 2;
     long halfMask = (1L << halfBits) - 1L;
 
-    long candidate = val;
+    long fullMask = (bits == 64) ? -1L : ((1L << bits) - 1L);
+    long candidate = val & fullMask;
     for (int walk = 0; walk < 100; walk++) {
       long l = (candidate >>> halfBits) & halfMask;
       long r = candidate & halfMask;
 
       for (int round = 0; round < 4; round++) {
-        long roundKey = key ^ (round * 0x9E3779B97F4A7C15L);
-        long f = (r * 0xBF58476D1CE4E5B9L + roundKey);
-        f = ((f >>> 16) ^ f) * 0x94D049BB133111EBL;
+        long roundKey = key ^ (0x9E3779B97F4A7C15L * (round + 1));
+        long v0 = r & halfMask;
+        long v1 = roundKey;
+        v0 += v1; v1 = Long.rotateLeft(v1, 13); v1 ^= v0;
+        v0 = Long.rotateLeft(v0, 32);
+        v1 += v0; v0 = Long.rotateLeft(v0, 17); v0 ^= v1;
+        v1 = Long.rotateLeft(v1, 21);
+        long f = (v0 ^ v1) & halfMask;
         long newL = r;
-        long newR = l ^ (f & halfMask);
+        long newR = (l ^ f) & halfMask;
         l = newL;
         r = newR;
       }

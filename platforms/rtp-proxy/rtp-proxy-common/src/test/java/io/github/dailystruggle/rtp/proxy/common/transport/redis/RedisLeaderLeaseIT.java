@@ -1,11 +1,11 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -34,12 +34,12 @@ class RedisLeaderLeaseIT {
 
     private static final String TEST_KEY = "rtp:net:waitlist:leader:test:" + UUID.randomUUID();
 
-    private JedisPool pool;
+    private RespPool pool;
 
     private void scrub() {
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             j.del(TEST_KEY);
-        }
+        } catch (Exception ignored) {}
     }
 
     @BeforeEach
@@ -59,7 +59,7 @@ class RedisLeaderLeaseIT {
         try (RedisLeaderLease a = new RedisLeaderLease(pool, TEST_KEY, "holder-A")) {
             Boolean ok = a.tryAcquire(Duration.ofSeconds(5)).get(2, TimeUnit.SECONDS);
             assertTrue(ok);
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 assertEquals("holder-A", j.get(TEST_KEY));
                 Long ttl = j.pttl(TEST_KEY);
                 assertTrue(ttl > 0 && ttl <= 5000, "PTTL should be in (0, 5000]: " + ttl);
@@ -74,7 +74,7 @@ class RedisLeaderLeaseIT {
             assertTrue(a.tryAcquire(Duration.ofSeconds(5)).get(2, TimeUnit.SECONDS));
             Boolean bGot = b.tryAcquire(Duration.ofSeconds(5)).get(2, TimeUnit.SECONDS);
             assertFalse(bGot);
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 assertEquals("holder-A", j.get(TEST_KEY));
             }
         }
@@ -86,7 +86,7 @@ class RedisLeaderLeaseIT {
             assertTrue(a.tryAcquire(Duration.ofMillis(800)).get(2, TimeUnit.SECONDS));
             // Re-acquire by same holder extends rather than failing.
             assertTrue(a.tryAcquire(Duration.ofSeconds(5)).get(2, TimeUnit.SECONDS));
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Long ttl = j.pttl(TEST_KEY);
                 assertTrue(ttl > 1000, "Re-acquire should have extended TTL > 1000ms: " + ttl);
             }
@@ -98,7 +98,7 @@ class RedisLeaderLeaseIT {
         try (RedisLeaderLease a = new RedisLeaderLease(pool, TEST_KEY, "holder-A")) {
             assertTrue(a.tryAcquire(Duration.ofSeconds(5)).get(2, TimeUnit.SECONDS));
             a.release().get(2, TimeUnit.SECONDS);
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 assertNull(j.get(TEST_KEY));
             }
         }
@@ -115,7 +115,7 @@ class RedisLeaderLeaseIT {
             assertTrue(b.tryAcquire(Duration.ofSeconds(5)).get(2, TimeUnit.SECONDS));
             // A (the original holder) calls release. Must NOT delete B's lease.
             a.release().get(2, TimeUnit.SECONDS);
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 assertEquals("holder-B", j.get(TEST_KEY),
                         "Stale holder's release must not delete the successor's lease");
             }
@@ -130,7 +130,7 @@ class RedisLeaderLeaseIT {
             assertFalse(b.tryAcquire(Duration.ofSeconds(5)).get(2, TimeUnit.SECONDS));
             Thread.sleep(200);
             assertTrue(b.tryAcquire(Duration.ofSeconds(5)).get(2, TimeUnit.SECONDS));
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 assertEquals("holder-B", j.get(TEST_KEY));
             }
         }

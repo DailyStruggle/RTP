@@ -8,8 +8,8 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue.QueueSta
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -34,14 +34,14 @@ import static org.mockito.Mockito.when;
 
 class RedisNetworkRequestQueueUnitTest {
 
-    private JedisPool pool;
-    private Jedis jedis;
+    private RespPool pool;
+    private RespConnection jedis;
     private RedisNetworkRequestQueue queue;
 
     @BeforeEach
-    void setUp() {
-        pool = mock(JedisPool.class);
-        jedis = mock(Jedis.class);
+    void setUp() throws Exception {
+        pool = mock(RespPool.class);
+        jedis = mock(RespConnection.class);
         when(pool.getResource()).thenReturn(jedis);
         when(jedis.scriptLoad(anyString())).thenAnswer(inv -> {
             String script = inv.getArgument(0);

@@ -55,9 +55,13 @@ public abstract class AbstractVerticalAdjustor<T extends Enum<T>> extends Vertic
   @SuppressWarnings("unchecked")
   protected static boolean isGroundSafe(
       RTPChunk chunk, int x, int y, int z, Set<String> unsafeBlocks, int platformDepth) {
+    if (chunk == null) return false;
+    int worldMin = chunk.getWorld().getMinHeight();
     int depth = Math.max(1, platformDepth);
     for (int d = 1; d <= depth; d++) {
-      if (!chunk.isSafe(x, y - d, z, unsafeBlocks)) return false;
+      int checkY = y - d;
+      if (checkY < worldMin) return false;
+      if (!chunk.isSafe(x, checkY, z, unsafeBlocks)) return false;
     }
     return true;
   }

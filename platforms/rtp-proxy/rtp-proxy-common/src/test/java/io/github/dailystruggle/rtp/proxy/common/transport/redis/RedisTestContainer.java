@@ -1,10 +1,9 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
 
 /**
  * Shared, Docker-gated Redis container for the {@code transport/redis} integration
@@ -69,13 +68,10 @@ final class RedisTestContainer {
     }
 
     /**
-     * @return a fresh {@link JedisPool} bound to the shared container. The caller
+     * @return a fresh {@link RespPool} bound to the shared container. The caller
      * owns the pool and must {@code close()} it.
      */
-    static JedisPool newPool() {
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(8);
-        cfg.setMaxIdle(4);
-        return new JedisPool(cfg, host(), port(), 2000);
+    static RespPool newPool() {
+        return new RespPool(host(), port(), 2000, null, 8);
     }
 }

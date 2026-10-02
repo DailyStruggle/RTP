@@ -32,7 +32,7 @@ class NetherEndConfigAmenderTest {
 
         assertEquals(List.of("LINEAR"), params.get("vert"));
         assertEquals(List.of("false"), params.get("requireskylight"));
-        assertEquals(List.of("0"), params.get("miny"));
+        assertEquals(List.of("32"), params.get("miny"));
         assertEquals(List.of("128"), params.get("maxy"));
     }
 
@@ -48,7 +48,7 @@ class NetherEndConfigAmenderTest {
 
         assertEquals(List.of("LINEAR"), params.get("vert"));
         assertEquals(List.of("false"), params.get("requireskylight"));
-        assertEquals(List.of("0"), params.get("miny"));
+        assertEquals(List.of("32"), params.get("miny"));
         assertEquals(List.of("255"), params.get("maxy"));
     }
 
@@ -120,14 +120,14 @@ class NetherEndConfigAmenderTest {
         assertEquals("LINEAR", netherVert.get("name"));
         assertEquals(false, netherVert.get("requireSkyLight"));
         assertEquals(128, netherVert.get("maxY"));
-        assertEquals(0, netherVert.get("minY"));
+        assertEquals(32, netherVert.get("minY"));
 
         Map<String, Object> endVert = NetherEndConfigAmender.createDimensionVert("world_the_end");
         org.junit.jupiter.api.Assertions.assertNotNull(endVert);
         assertEquals("LINEAR", endVert.get("name"));
         assertEquals(false, endVert.get("requireSkyLight"));
         assertEquals(255, endVert.get("maxY"));
-        assertEquals(0, endVert.get("minY"));
+        assertEquals(32, endVert.get("minY"));
 
         org.junit.jupiter.api.Assertions.assertNull(NetherEndConfigAmender.createDimensionVert("world"));
         org.junit.jupiter.api.Assertions.assertNull(NetherEndConfigAmender.createDimensionVert(null));

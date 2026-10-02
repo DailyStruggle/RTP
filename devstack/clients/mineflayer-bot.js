@@ -15,8 +15,9 @@ const host = getArg('--host', '127.0.0.1');
 const port = parseInt(getArg('--port', '25577'), 10);
 const username = getArg('--username', 'RtpAcceptanceBot');
 const timeoutSeconds = parseInt(getArg('--timeout', '35'), 10);
+const isLite = args.includes('--lite');
 
-console.log(`[bot] Initializing headless client: ${username} -> ${host}:${port} (timeout: ${timeoutSeconds}s)`);
+console.log(`[bot] Initializing headless client: ${username} -> ${host}:${port} (timeout: ${timeoutSeconds}s, tier: ${isLite ? 'lite' : 'pro'})`);
 
 const timer = setTimeout(() => {
   console.error(`[bot] FAIL - Timeout exceeded (${timeoutSeconds}s) before completing cross-server RTP.`);

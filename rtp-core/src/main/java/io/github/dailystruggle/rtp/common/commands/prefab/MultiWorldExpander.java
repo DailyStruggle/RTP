@@ -83,7 +83,7 @@ public final class MultiWorldExpander {
         // Prevents generating duplicate overlays for already-mapped worlds.
         Map<String, Boolean> mappedWorlds = new LinkedHashMap<>();
         for (Map<String, Object> region : currentRegions.values()) {
-            if (region == null) {
+            if (region == null || region.isEmpty()) {
                 continue;
             }
             Object mappedWorld = region.get("world");
@@ -100,7 +100,8 @@ public final class MultiWorldExpander {
             if (world.isEmpty()) {
                 throw new IllegalArgumentException("worldName must not be empty");
             }
-            if (currentRegions.containsKey(world)) {
+            Map<String, Object> existingRegion = currentRegions.get(world);
+            if (existingRegion != null && !existingRegion.isEmpty()) {
                 // Idempotent: an existing per-world region wins; do not overwrite.
                 continue;
             }

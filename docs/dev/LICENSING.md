@@ -1,7 +1,7 @@
 # Licensing and Edition Clarity
 
 > **Scope:** Repository dual-licensing structure, open-core boundaries, and edition differentiation (LeafRTP Lite vs. LeafRTP Pro).
-> **Related:** [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md) (RTP-lite assembly), [ADR-061](../adr/ADR-061-open-core-dual-licensing.md) (Open-Core Dual Licensing), [ADR-069](../adr/ADR-069-claim-integrations-extracted-to-bundled-addon.md) (Claim Addon Extraction), `LICENSE`, `LICENSE-MIT`.
+> **Related:** [ADR-100](../adr/ADR-100-superseding-adr-024-sla-and-support-tier.md) (Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier), [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md) (superseded), [ADR-061](../adr/ADR-061-open-core-dual-licensing.md) (Open-Core Dual Licensing), [ADR-069](../adr/ADR-069-claim-integrations-extracted-to-bundled-addon.md) (Claim Addon Extraction), `LICENSE`, `LICENSE-MIT`.
 
 ---
 
@@ -50,8 +50,8 @@ As detailed in [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md), [ADR-061]
 | **Fabric Support** | Yes | Yes | Supported across 1.20.x, 1.21.x, and MC 26.x unobf carriers. |
 | **NeoForge Support** | Yes | Yes | Supported across 1.21.x and MC 26.x; carrier bytecode merged into both jars. |
 | **Folia Support** | Basic (regionized fallback) | Tuned native adapter | Lite hops via `FoliaAwareScheduler`; Pro includes throughput-optimized `rtp-folia`. |
-| **Storage / Persistence** | Flat-file YAML | SQLite / H2 / MySQL / PostgreSQL / Redis / YAML | Lite strips all SQL/Redis accessors and JDBC/Jedis drivers (uses `YamlFileDatabase`). |
-| **Cross-Server / Network Mode** | Tier-1 Plugin-Message & Proxy-Direct | Tier-1 Plugin-Message + Durable SQL/Redis | Lite supports zero-driver messaging (`auto` proxy detect); Pro adds durable tokens and cluster sync. |
+| **Storage / Persistence** | Full (SQLite / H2 / MySQL / PostgreSQL / Redis / YAML) | Full (SQLite / H2 / MySQL / PostgreSQL / Redis / YAML) | Both editions support the complete database suite and HikariCP connection pooling (ADR-100). |
+| **Cross-Server / Network Mode** | Full (Plugin-Message + Redis / SQL) | Full (Plugin-Message + Redis / SQL) | Both editions support zero-dependency `RespRedisClient` and multi-server proxy synchronization (ADR-100). |
 | **Login Reserve Cache (ADR-023)** | No (stripped) | Yes | Pro pre-warms a dedicated queue for join-time teleports (`rtp.onevent.join`). |
 | **Safety Lists & Predicates** | Standard + Predicates | Standard + Predicates + Dynamic Tag Refresh | Both support base `safety.yml` block tags and predicates; Pro adds `rtp-tags` engine. |
 | **Claim Plugin Integrations** | Yes (bundled addon) | Yes (bundled addon) | Both editions bundle `LeafRTPClaimAddon.jar` in `bundled-addons/` (self-extracting). |
@@ -68,6 +68,6 @@ As detailed in [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md), [ADR-061]
 
 ## 4. Verification and Compliance
 
-- **Build-Time License Auditing:** The Gradle task `:rtp-plugin:liteJarStructureCheck` inspects the built Lite jar to verify that `LICENSE` contains the MIT terms, does not contain PolyForm Noncommercial text, and confirms that no forbidden Pro classes (SQL accessors, JDBC/Jedis drivers, tuned Folia adapter, `LoginCacheTask`, `rtp-tags`) leak into the Lite assembly.
-- **Network Transport Integrity:** The build audit verifies that the tier-1 `PluginMessageNetworkBinding` and proxy auto-detection classes are preserved in Lite, while durable SQL and Redis transport subtrees are excluded.
+- **Build-Time License Auditing:** The Gradle task `:rtp-plugin:liteJarStructureCheck` inspects the built Lite jar to verify that `LICENSE` contains the MIT terms, does not contain PolyForm Noncommercial text, and confirms that forbidden Pro classes (tuned Folia adapter, `LoginCacheTask`, `rtp-tags`) do not leak into the Lite assembly while verifying SQL/Redis parity per ADR-100.
+- **Network Transport Integrity:** The build audit verifies that the tier-1 `PluginMessageNetworkBinding` and proxy auto-detection classes, as well as the native `RespRedisClient` transport bindings, are preserved in Lite per ADR-100.
 - **Third-Party Dependency Compliance:** Shaded third-party libraries (e.g. HikariCP, Jedis, SnakeYAML, SQLite JDBC) are compatible with Apache 2.0, MIT, or BSD licenses and audited via CycloneDX SBOM generation (`bom.json`) on every release.

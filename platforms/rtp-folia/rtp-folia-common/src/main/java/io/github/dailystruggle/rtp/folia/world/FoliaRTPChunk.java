@@ -232,6 +232,10 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   @Override
   @RegionThread
   public boolean isAir(int x, int y, int z) {
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
+    }
     Set<String> airSet = reconciledAirBlocks();
     if (anvilView != null) {
       return anvilView.isAir(x & 0xF, y, z & 0xF, airSet);
@@ -290,6 +294,10 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
       // teleport-commit time remains authoritative for any sky-light gating.
       return 15;
     }
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return 0;
+    }
     return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
   }
 
@@ -309,6 +317,10 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   @Override
   @RegionThread
   public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
+    }
     if (anvilView != null) {
       Set<String> effective = (reconciledUnsafe != null)
           ? reconciledUnsafe
@@ -341,6 +353,11 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   @RegionThread
   public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
     if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
+
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
+    }
 
     if (anvilView != null) {
       Set<String> plain = (reconciledUnsafe != null) ? reconciledUnsafe : unsafeBlocks.plainMaterials();

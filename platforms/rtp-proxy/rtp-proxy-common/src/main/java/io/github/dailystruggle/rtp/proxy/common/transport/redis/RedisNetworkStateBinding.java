@@ -10,13 +10,9 @@ import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.Subscription;
-
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.JedisPubSub;
-import redis.clients.jedis.params.ScanParams;
-import redis.clients.jedis.resps.ScanResult;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPubSub;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -116,7 +112,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
      */
     private static final long REAP_GRACE_SECONDS = 300L;
 
-    private final JedisPool pool;
+    private final RespPool pool;
     private final boolean ownsPool;
     private final long heartbeatIntervalMs;
     private final int ttlSeconds;
@@ -125,7 +121,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     private final AtomicInteger threadCounter = new AtomicInteger();
     private final ExecutorService publisherExec;
     private final Thread subscriberThread;
-    private final JedisPubSub pubSub;
+    private final RespPubSub pubSub;
     private final RedisLuaScripts claimScript;
     private final RedisLuaScripts releaseScript;
     private final RedisLuaScripts reapScript;
@@ -168,25 +164,16 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
      * Pool-injection constructor. The caller retains ownership of the pool
      * unless explicitly closed.
      */
-    public RedisNetworkStateBinding(JedisPool pool, long heartbeatIntervalMs,
+    public RedisNetworkStateBinding(RespPool pool, long heartbeatIntervalMs,
                                     HmacVerifier verifier, int schemaVersion) {
         this(Objects.requireNonNull(pool, "pool"), false, heartbeatIntervalMs, verifier, schemaVersion);
     }
 
-    private static JedisPool buildPool(String host, int port, String password) {
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(8);
-        cfg.setMaxIdle(4);
-        cfg.setMinIdle(1);
-        cfg.setTestOnBorrow(true);
-        if (password != null && !password.isEmpty()) {
-            return new JedisPool(cfg, host, port, 2000, password);
-        } else {
-            return new JedisPool(cfg, host, port, 2000);
-        }
+    private static RespPool buildPool(String host, int port, String password) {
+        return new RespPool(host, port, 2000, password, 8);
     }
 
-    private RedisNetworkStateBinding(JedisPool pool, boolean ownsPool, long heartbeatIntervalMs,
+    private RedisNetworkStateBinding(RespPool pool, boolean ownsPool, long heartbeatIntervalMs,
                                     HmacVerifier verifier, int schemaVersion) {
         this.pool = pool;
         this.ownsPool = ownsPool;
@@ -202,7 +189,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
 
         // Eagerly validate connectivity. A bad host should fail at open() time,
         // not silently in publish loops.
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             j.ping();
         } catch (Exception e) {
             if (ownsPool) pool.close();
@@ -235,7 +222,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         };
         this.publisherExec = Executors.newFixedThreadPool(2, tf);
 
-        this.pubSub = new JedisPubSub() {
+        this.pubSub = new RespPubSub() {
             @Override
             public void onMessage(String channel, String message) {
                 if (!BACKEND_CHANNEL.equals(channel)) return;
@@ -260,8 +247,8 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
 
         this.subscriberThread = new Thread(() -> {
             while (open.get()) {
-                try (Jedis j = pool.getResource()) {
-                    j.subscribe(pubSub, BACKEND_CHANNEL);
+                try (RespConnection j = pool.getResource()) {
+                    pubSub.proceed(j, BACKEND_CHANNEL);
                 } catch (Throwable t) {
                     if (!open.get()) return;
                     LOG.log(Level.WARNING,
@@ -284,7 +271,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         return CompletableFuture.runAsync(() -> {
             String key = PROXY_KEY_PREFIX + row.proxyId();
             Map<String, String> hash = encodeProxy(row);
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 j.hset(key, hash);
                 j.expire(key, ttlSeconds);
             } catch (Exception e) {
@@ -301,7 +288,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
             String key = BACKEND_KEY_PREFIX + row.serverId();
             String encoded = encodeBackend(row);
             Map<String, String> hash = parseFlat(encoded);
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 j.hset(key, hash);
                 j.expire(key, ttlSeconds);
                 j.publish(BACKEND_CHANNEL, encoded);
@@ -326,11 +313,10 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
 
     private NetworkSnapshot readSnapshotSync() {
         Map<String, BackendHeartbeat> backends = new LinkedHashMap<>();
-        try (Jedis j = pool.getResource()) {
-            String cursor = ScanParams.SCAN_POINTER_START;
-            ScanParams params = new ScanParams().match(BACKEND_KEY_PREFIX + "*").count(64);
+        try (RespConnection j = pool.getResource()) {
+            String cursor = "0";
             do {
-                ScanResult<String> res = j.scan(cursor, params);
+                RespConnection.ScanResult res = j.scan(cursor, BACKEND_KEY_PREFIX + "*", 64);
                 for (String key : res.getResult()) {
                     Map<String, String> hash = j.hgetAll(key);
                     if (hash == null || hash.isEmpty()) continue;
@@ -338,7 +324,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                     if (hb != null) backends.put(hb.serverId(), hb);
                 }
                 cursor = res.getCursor();
-            } while (!ScanParams.SCAN_POINTER_START.equals(cursor));
+            } while (!"0".equals(cursor));
         } catch (Exception e) {
             LOG.log(Level.WARNING, "readSnapshot failed: " + e.getMessage());
         }
@@ -399,7 +385,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 Long.toString(now),
                 Long.toString(now));
         Object raw;
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             raw = redeemScript.evalsha(j, keys, args);
         } catch (Exception e) {
             LOG.log(Level.WARNING, "RedisNetworkStateBinding.redeem failed: " + e.getMessage());
@@ -447,11 +433,10 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     private List<ReservationToken> listActiveForServerSync(String serverId) {
         long nowMs = System.currentTimeMillis();
         List<ReservationToken> out = new ArrayList<>();
-        try (Jedis j = pool.getResource()) {
-            String cursor = ScanParams.SCAN_POINTER_START;
-            ScanParams params = new ScanParams().match(TOKEN_KEY_PREFIX + "*").count(64);
+        try (RespConnection j = pool.getResource()) {
+            String cursor = "0";
             do {
-                ScanResult<String> res = j.scan(cursor, params);
+                RespConnection.ScanResult res = j.scan(cursor, TOKEN_KEY_PREFIX + "*", 64);
                 cursor = res.getCursor();
                 for (String key : res.getResult()) {
                     if (!key.startsWith(TOKEN_KEY_PREFIX)) continue;
@@ -502,7 +487,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                     out.add(new ReservationToken(tokenId, rowServerId, playerId, expires, state,
                             hash.get("regionKey")));
                 }
-            } while (!ScanParams.SCAN_POINTER_START.equals(cursor));
+            } while (!"0".equals(cursor));
         } catch (Exception e) {
             LOG.log(Level.WARNING,
                     "RedisNetworkStateBinding.listActiveForServer failed: " + e.getMessage()
@@ -550,7 +535,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 hmacHex,
                 region);
         Object result;
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             result = claimScript.evalsha(j, keys, args);
         } catch (Exception e) {
             throw new RuntimeException("RedisNetworkStateBinding.claim failed: " + e.getMessage(), e);
@@ -574,7 +559,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 terminal,
                 Long.toString(System.currentTimeMillis()),
                 TOKEN_ACTIVE_PREFIX);
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             releaseScript.evalsha(j, keys, args);
             // Idempotent: 0 return is a no-op (missing or already terminal).
         } catch (Exception e) {
@@ -594,7 +579,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 TOKEN_ACTIVE_PREFIX,
                 "100");
         Object result;
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             result = reapScript.evalsha(j, List.of(), args);
         } catch (Exception e) {
             throw new RuntimeException("RedisNetworkStateBinding.reapExpired failed: " + e.getMessage(), e);
@@ -616,7 +601,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     }
 
     private Optional<ReservationToken> findReservationSync(UUID playerId) {
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             // Phase B trace (2026-05-23): the destination backend's
             // JoinTriggerSource.handleLookup observed "no reservation found"
             // ~1s after the proxy successfully claimed a token (well within
@@ -705,8 +690,10 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         Objects.requireNonNull(playerId, "playerId");
         checkOpen();
         return CompletableFuture.runAsync(() -> {
-            try (Jedis jedis = pool.getResource()) {
+            try (RespConnection jedis = pool.getResource()) {
                 jedis.set(LAST_TP_PREFIX + playerId, String.valueOf(epochMillis));
+            } catch (Exception e) {
+                LOG.log(Level.WARNING, "setLastTeleportTime failed: " + e.getMessage());
             }
         }, publisherExec);
     }
@@ -716,7 +703,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         Objects.requireNonNull(playerId, "playerId");
         checkOpen();
         return CompletableFuture.supplyAsync(() -> {
-            try (Jedis jedis = pool.getResource()) {
+            try (RespConnection jedis = pool.getResource()) {
                 String val = jedis.get(LAST_TP_PREFIX + playerId);
                 if (val == null || val.isEmpty()) return 0L;
                 try {
@@ -724,6 +711,9 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 } catch (NumberFormatException e) {
                     return 0L;
                 }
+            } catch (Exception e) {
+                LOG.log(Level.WARNING, "getLastTeleportTime failed: " + e.getMessage());
+                return 0L;
             }
         }, publisherExec);
     }

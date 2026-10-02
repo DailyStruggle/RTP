@@ -89,7 +89,10 @@ param(
   # Attach the JaCoCo runtime agent to backends and lobbies via
   # `docker-compose.coverage.yml`. Execution dumps (.exec) are collected in
   # `./jacoco/` and `./gradlew jacocoServerReport` is generated at the end.
-  [switch]$Coverage
+  [switch]$Coverage,
+  # Run backend-c as a Fabric node via `docker-compose.fabric.yml` instead of Folia,
+  # testing Paper + Folia + Fabric multi-platform parity behind Velocity.
+  [switch]$Fabric
 )
 
 $ErrorActionPreference = 'Stop'
@@ -383,14 +386,15 @@ function Invoke-GradleBuild {
   $backendDsts = @(
     (Join-Path $PSScriptRoot 'backend-a\plugins'),
     (Join-Path $PSScriptRoot 'backend-b\plugins'),
-    (Join-Path $PSScriptRoot 'backend-c\plugins'),
     (Join-Path $PSScriptRoot 'lobby-a\plugins'),
     (Join-Path $PSScriptRoot 'lobby-b\plugins')
   )
-  # backend-c was previously a Fabric node (jar staged into /data/mods). It now
-  # runs Folia like backend-b, so its jar is staged into /data/plugins via
-  # $backendDsts above. No separate Fabric mod-dir staging is required.
-  $fabricModDsts = @()
+  if ($Fabric) {
+    $fabricModDsts = @((Join-Path $PSScriptRoot 'backend-c\mods'))
+  } else {
+    $backendDsts += (Join-Path $PSScriptRoot 'backend-c\plugins')
+    $fabricModDsts = @()
+  }
   foreach ($d in @($pluginStage) + $backendDsts + $fabricModDsts) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
   }
@@ -818,7 +822,9 @@ function Test-Roundtrip {
       Write-Host '[roundtrip] installing client dependencies...' -ForegroundColor Cyan
       & npm --prefix $clientsDir install --silent --no-audit | Out-Null
     }
-    $botOut = & node $botScript --host 127.0.0.1 --port 25577 --timeout 35 2>&1 | Out-String
+    $extraArgs = @()
+    if ($Lite) { $extraArgs += '--lite' }
+    $botOut = & node $botScript --host 127.0.0.1 --port 25577 --timeout 35 @extraArgs 2>&1 | Out-String
     Write-Host $botOut
     if ($botOut -match '"status":"PASS"') {
       Write-Host '[roundtrip] headless client completed teleport successfully.' -ForegroundColor Green

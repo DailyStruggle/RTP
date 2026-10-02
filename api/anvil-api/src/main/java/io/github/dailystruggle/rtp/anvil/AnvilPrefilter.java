@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.UnaryOperator;
@@ -117,18 +118,31 @@ public final class AnvilPrefilter {
    * is {@code null} and the caller falls through to the live-load path. On
    * {@link Verdict#ACCEPT}, the view is the same one used to compute the verdict -
    * reusing it avoids a second region-file read.
+   *
+   * <p>Dispatches onto {@link AnvilIoPool#get()} by default to prevent blocking I/O
+   * starvation on {@link ForkJoinPool#commonPool()}.</p>
    */
   public static CompletableFuture<ProbeResult> probeDetailed(
       Path worldFolder, String dimensionSubpath, int cx, int cz,
       Set<String> rawUnsafeBlocks, UnaryOperator<String> reconciler) {
+    return probeDetailed(worldFolder, dimensionSubpath, cx, cz, rawUnsafeBlocks, reconciler, AnvilIoPool.get());
+  }
+
+  /**
+   * Asynchronously probe a chunk using the specified executor.
+   */
+  public static CompletableFuture<ProbeResult> probeDetailed(
+      Path worldFolder, String dimensionSubpath, int cx, int cz,
+      Set<String> rawUnsafeBlocks, UnaryOperator<String> reconciler, Executor executor) {
     if (worldFolder == null) {
       return CompletableFuture.completedFuture(new ProbeResult(Verdict.UNKNOWN, null));
     }
     final String dim = (dimensionSubpath == null) ? "" : dimensionSubpath;
     final UnaryOperator<String> r = (reconciler == null) ? DEFAULT_RECONCILER : reconciler;
+    final Executor exec = (executor == null) ? AnvilIoPool.get() : executor;
     return CompletableFuture.supplyAsync(
         () -> probeSyncDetailed(worldFolder, dim, cx, cz, rawUnsafeBlocks, r),
-        ForkJoinPool.commonPool());
+        exec);
   }
 
   /**

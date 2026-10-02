@@ -123,31 +123,12 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
                 + t.getMessage());
       }
 
-      // Yaml-only persistence wiring (ADR-024). Mirrors the minimum subset of
-      // BukkitDatabaseHandler.setupDatabase that lite still needs:
-      //   1. Ensure the database/ directory exists (YamlFileDatabase reads/writes there).
-      //   2. Call reloadConfigs() so MultiConfigParser<WorldKeys>/<RegionKeys> are
-      //      registered before any listener fires (otherwise SelectionAPI.getRegion
-      //      NPEs on the first PlayerJoinEvent -- see issue trace).
-      //   3. Construct YamlFileDatabase as the sole DatabaseAccessor.
-      //   4. reloadRegions() + start the database accessor on the next tick.
+      // Database setup (ADR-024 early-access graduation: full SQL/Redis/YAML parity with Pro).
       try {
-        java.io.File databaseDirectory =
-            new java.io.File(RTP.configs.pluginDirectory, "database");
-        //noinspection ResultOfMethodCallIgnored
-        databaseDirectory.mkdirs();
-        RTP.configs.reloadConfigs();
-        rtp.databaseAccessor =
-            new io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase(
-                databaseDirectory);
-        RTP.configs.reloadRegions();
-        RTP.scheduler.runTaskLater(() -> RTP.getInstance().databaseAccessor.startup(), 1);
-        // ADR-060: emergency-platform restore reaper (in-memory only under yaml persistence).
-        RTP.scheduler.runTaskLater(
-            io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager::startGlobal, 2);
+        io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler.setupDatabase(rtp);
       } catch (Exception e) {
         RTP.log(Level.WARNING,
-            "[RTP] yaml-only persistence wiring failed", e);
+            "[RTP] database setup failed", e);
       }
 
       // Boot backend-side network mode (ADR-036). No-op when network.yml is

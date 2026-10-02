@@ -738,4 +738,30 @@ public class MemoryShapeTest {
         assertEquals(140L, shape.getBadKeysCache()[1]);
         assertEquals(200L, shape.getBadSum());
     }
+
+    @Test
+    public void testAtomicSnapshotPublication() {
+        TestShape shape = new TestShape();
+        MemoryShape.BadLocationsSnapshot initial = shape.badLocationsSnapshot;
+        assertEquals(0, initial.keys.length);
+        assertEquals(0, initial.sums.length);
+
+        shape.addBadLocation(10L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety, 3600L);
+        shape.flushAndRebuild(1L);
+
+        MemoryShape.BadLocationsSnapshot snap = shape.badLocationsSnapshot;
+        assertEquals(1, snap.keys.length);
+        assertEquals(10L, snap.keys[0]);
+        assertEquals(1L, snap.sums[0]);
+        assertEquals((byte) io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety.ordinal(), snap.causes[0]);
+        assertTrue(snap.expiries[0] > 0L);
+
+        // Verify absorbIntoAdjacentRun atomically updates snapshot via copy-on-write
+        shape.addBadLocation(11L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety, 3600L);
+        MemoryShape.BadLocationsSnapshot absorbedSnap = shape.badLocationsSnapshot;
+        assertNotSame(snap, absorbedSnap);
+        assertEquals(1, absorbedSnap.keys.length);
+        assertEquals(10L, absorbedSnap.keys[0]);
+        assertEquals(2L, absorbedSnap.sums[0]);
+    }
 }

@@ -19,8 +19,8 @@ public class LockFreeLocationBuffer {
     private final AtomicLong head = new AtomicLong(0);
     private final AtomicLong tail = new AtomicLong(0);
 
-    private Consumer<RTPLocation> onAdd = null;
-    private Consumer<RTPLocation> onRemove = null;
+    private volatile Consumer<RTPLocation> onAdd = null;
+    private volatile Consumer<RTPLocation> onRemove = null;
 
     /**
      * Constructs a new buffer with a capacity that is the next power of two

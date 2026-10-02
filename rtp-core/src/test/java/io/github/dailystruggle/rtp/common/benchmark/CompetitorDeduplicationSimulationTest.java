@@ -158,14 +158,20 @@ public class CompetitorDeduplicationSimulationTest {
       int halfBits = (bits + 1) / 2;
       long mask = (1L << halfBits) - 1;
 
-      long cur = val;
+      long fullMask = (bits == 64) ? -1L : ((1L << bits) - 1L);
+      long cur = val & fullMask;
       do {
         long left = cur >>> halfBits;
         long right = cur & mask;
         for (int round = 0; round < 4; round++) {
-          long roundKey = seed ^ (round * 0x9E3779B97F4A7C15L);
-          long f = (right * 0xBF58476D1CE4E5B9L + roundKey) ^ (right >>> 13);
-          f = (f ^ (f >>> 17)) & mask;
+          long roundKey = seed ^ (0x9E3779B97F4A7C15L * (round + 1));
+          long v0 = right & mask;
+          long v1 = roundKey;
+          v0 += v1; v1 = Long.rotateLeft(v1, 13); v1 ^= v0;
+          v0 = Long.rotateLeft(v0, 32);
+          v1 += v0; v0 = Long.rotateLeft(v0, 17); v0 ^= v1;
+          v1 = Long.rotateLeft(v1, 21);
+          long f = (v0 ^ v1) & mask;
           long newRight = left ^ f;
           left = right;
           right = newRight;

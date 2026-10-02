@@ -47,6 +47,8 @@ public final class AnvilRegionByteCache {
    */
   private static final int CAPACITY = 16;
 
+  private static final AtomicLong currentCachedBytes = new AtomicLong();
+
   /**
    * Reusable buffer pool avoiding byte-array reallocations on every cache miss or eviction.
    * Reuse is exact-length only: a returned array's {@code length} is the authoritative region
@@ -64,6 +66,7 @@ public final class AnvilRegionByteCache {
         protected boolean removeEldestEntry(Map.Entry<Path, Entry> eldest) {
           if (size() > CAPACITY) {
             recycleBuffer(eldest.getValue().bytes);
+            currentCachedBytes.addAndGet(-eldest.getValue().length);
             return true;
           }
           return false;
@@ -211,7 +214,21 @@ public final class AnvilRegionByteCache {
     StorageLatencyProbe.record(readNanos, bytes == null ? 0L : bytes.length);
     synchronized (CACHE) {
       if (bytes != null) {
-        CACHE.put(regionFile, new Entry(bytes, bytes.length, mtime, System.nanoTime()));
+        Entry old = CACHE.put(regionFile, new Entry(bytes, bytes.length, mtime, System.nanoTime()));
+        if (old != null) {
+          currentCachedBytes.addAndGet(-old.length);
+          recycleBuffer(old.bytes);
+        }
+        currentCachedBytes.addAndGet(bytes.length);
+        long budget = AnvilIoPool.getMemoryBudgetBytes();
+        while (CACHE.size() > 1 && currentCachedBytes.get() > budget) {
+          var it = CACHE.entrySet().iterator();
+          if (!it.hasNext()) break;
+          var eldest = it.next();
+          it.remove();
+          recycleBuffer(eldest.getValue().bytes);
+          currentCachedBytes.addAndGet(-eldest.getValue().length);
+        }
       }
       INFLIGHT.remove(regionFile);
     }
@@ -242,6 +259,7 @@ public final class AnvilRegionByteCache {
         recycleBuffer(e.bytes);
       }
       CACHE.clear();
+      currentCachedBytes.set(0);
     }
   }
 
@@ -250,7 +268,13 @@ public final class AnvilRegionByteCache {
     synchronized (CACHE) {
       CACHE.clear();
       BUFFER_POOL.clear();
+      currentCachedBytes.set(0);
     }
+  }
+
+  /** Total bytes currently retained in cache. Diagnostic hook. */
+  public static long cachedBytes() {
+    return currentCachedBytes.get();
   }
 
   /**

@@ -582,6 +582,28 @@ shadowJar {
     // survive into the packaged jar.
     exclude 'docs/architecture/**'
 
+    // Compile-time static analysis / annotation processor tooling (Folia thread check)
+    exclude 'META-INF/services/javax.annotation.processing.Processor'
+    exclude 'folia-thread-stubs.astub'
+
+    // Airlift aircompressor: only io.airlift.compress.zstd is used for Linear region format.
+    // Unused codecs (Snappy, Bzip2, LZO, LZ4, Hadoop, Gzip, Deflate) are dropped (~135 KB comp / ~245 KB raw).
+    exclude 'io/airlift/compress/snappy/**'
+    exclude 'io/airlift/compress/bzip2/**'
+    exclude 'io/airlift/compress/lzo/**'
+    exclude 'io/airlift/compress/lz4/**'
+    exclude 'io/airlift/compress/hadoop/**'
+    exclude 'io/airlift/compress/gzip/**'
+    exclude 'io/airlift/compress/deflate/**'
+
+    // lz4-java native binaries for architectures Minecraft servers never run on
+    // (saves ~160 KB comp / ~275 KB raw). Safe pure-Java/JNI fallback exists in lz4-java.
+    exclude 'linux/i386/**'
+    exclude 'linux/s390x/**'
+    exclude 'linux/ppc64le/**'
+    exclude 'linux/mips64/**'
+    exclude 'linux/riscv64/**'
+
     relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
     // commands-api and effects-api are RTP's public addon SPIs and ship
     // UNRELOCATED: addons depend on them `compileOnly` and resolve
@@ -1252,14 +1274,8 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
             !(dep.group == 'org.spongepowered') &&
             !(dep.group == 'org.slf4j') &&
             !(dep.group == 'net.minecrell') &&
-            // ADR-024 specific: SQL/Redis drivers.
-            !(dep.group == 'com.h2database') &&
-            !(dep.group == 'org.xerial' && dep.name == 'sqlite-jdbc') &&
-            !(dep.group == 'mysql') &&
-            !(dep.group == 'org.postgresql') &&
-            !(dep.group == 'redis.clients') &&
-            !(dep.group == 'com.zaxxer') &&
-            // Loom/Mojang networking transitives -- not used by lite runtime.
+            // SQL/Redis persistence drivers and accessors are retained in lite
+            // for complete backend parity (retroactive early-access graduation).
             !(dep.group == 'org.apache.httpcomponents') &&
             // org.lz4:lz4-java is REQUIRED at runtime by rtp-anvil's chunk
             // decompression path (compression mode 4 in r.X.Z.mca). rtp-anvil
@@ -1293,14 +1309,8 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
         exclude(dependency('net.fabricmc:fabric-loader'))
         exclude(dependency('net.fabricmc.fabric-api:.*'))
         exclude(dependency('net.fabricmc:.*'))
-        // ADR-024:
+        // Mojang/Loom logging/console strips
         exclude(dependency('net.minecrell:.*'))
-        exclude(dependency('com.h2database:.*'))
-        exclude(dependency('org.xerial:sqlite-jdbc'))
-        exclude(dependency('mysql:.*'))
-        exclude(dependency('org.postgresql:.*'))
-        exclude(dependency('redis.clients:.*'))
-        exclude(dependency('com.zaxxer:.*'))
         exclude(dependency('org.apache.httpcomponents:.*'))
         // org.lz4:lz4-java retained -- see comment in configurations filter above.
         exclude(dependency('org.jline:.*'))
@@ -1345,33 +1355,27 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     exclude 'org/jetbrains/annotations/**'
     exclude 'org/intellij/lang/annotations/**'
     exclude 'META-INF/maven/**'
-    exclude 'io/github/dailystruggle/rtp/common/database/options/H2*.class'
-    exclude 'io/github/dailystruggle/rtp/common/database/options/SQLite*.class'
-    exclude 'io/github/dailystruggle/rtp/common/database/options/MySQL*.class'
-    exclude 'io/github/dailystruggle/rtp/common/database/options/Postgre*.class'
-    // AbstractSQLDatabaseAccessor is INTENTIONALLY KEPT in lite: RTP.java references it via
-    // `instanceof` in a scheduled flush task. Excluding it caused NoClassDefFoundError at
-    // runtime. The concrete H2/SQLite/MySQL/Postgres subclasses remain excluded, so the
-    // instanceof check is always false in lite.
-    exclude 'io/github/dailystruggle/rtp/common/network/Redis*.class'
-    // ADR-024 2026-06-12 amendment (plugin-message tier-1 default): the durable
-    // Redis/SQL NetworkTransport bindings live in rtp-proxy-common's transport
-    // subpackages and are pulled in transitively via rtp-core. They stay Pro --
-    // drop the whole redis/ and sql/ transport subtrees from lite. The
-    // plugin-message tier (common/network/pluginmessage/**), the shared codec,
-    // the in-memory binding, NetworkBindings, and ReservationTokenReaper are
-    // intentionally KEPT (the plugin-message binding rides them; no driver).
-    // NetworkModeBootstrap (rtp-core) imports RedisNetworkStateBinding directly,
-    // but lite defaults to transport.type=auto/plugin-message so the redis/sql
-    // code paths are never linked at runtime -- same lazy-link pattern as the
-    // excluded H2/SQLite/MySQL/Postgres concrete database options above.
-    exclude 'io/github/dailystruggle/rtp/proxy/common/transport/redis/**'
-    exclude 'io/github/dailystruggle/rtp/proxy/common/transport/sql/**'
+
+    // Airlift aircompressor: only io.airlift.compress.zstd is used for Linear region format.
+    // Unused codecs (Snappy, Bzip2, LZO, LZ4, Hadoop, Gzip, Deflate) are dropped (~135 KB comp / ~245 KB raw).
+    exclude 'io/airlift/compress/snappy/**'
+    exclude 'io/airlift/compress/bzip2/**'
+    exclude 'io/airlift/compress/lzo/**'
+    exclude 'io/airlift/compress/lz4/**'
+    exclude 'io/airlift/compress/hadoop/**'
+    exclude 'io/airlift/compress/gzip/**'
+    exclude 'io/airlift/compress/deflate/**'
+
+    // lz4-java native binaries for architectures Minecraft servers never run on
+    // (saves ~160 KB comp / ~275 KB raw). Safe pure-Java/JNI fallback exists in lz4-java.
+    exclude 'linux/i386/**'
+    exclude 'linux/s390x/**'
+    exclude 'linux/ppc64le/**'
+    exclude 'linux/mips64/**'
+    exclude 'linux/riscv64/**'
+    // Concrete SQL database options and Redis transport are INTENTIONALLY KEPT in lite
+    // for full storage and network parity (early-access graduation).
     exclude 'io/github/dailystruggle/rtp/common/selection/region/LoginCacheTask.class'
-    // HikariCP -- pulled in transitively but only used by SQL accessors which lite drops.
-    exclude 'com/zaxxer/hikari/**'
-    exclude 'io/github/dailystruggle/rtp/hikari/**'
-    exclude 'META-INF/maven/com.zaxxer/**'
     // Resources dropped from lite.
     // lang/** and language.yml are INTENTIONALLY KEPT in lite as of 2026-05-11
     // (ADR-024 language-options amendment): multilingual support / locale switching
@@ -1577,20 +1581,7 @@ tasks.register('liteJarStructureCheck') {
             // Fabric (rtp/fabric/**) intentionally retained in lite as of the 2026-05-07
             // ADR-024 amendment -- see shadowLiteJar comment.
             ~'^io/github/dailystruggle/rtp/bukkit/RTPBukkitPlugin\\$?.*\\.class$',
-            ~'^io/github/dailystruggle/rtp/common/database/options/H2.*\\.class$',
-            ~'^io/github/dailystruggle/rtp/common/database/options/SQLite.*\\.class$',
-            ~'^io/github/dailystruggle/rtp/common/database/options/MySQL.*\\.class$',
-            ~'^io/github/dailystruggle/rtp/common/database/options/Postgre.*\\.class$',
-            ~'^io/github/dailystruggle/rtp/common/network/Redis.*\\.class$',
-            // ADR-024 2026-06-12 amendment: durable Redis/SQL NetworkTransport
-            // bindings stay Pro; assert the whole redis/ and sql/ transport
-            // subtrees are absent from lite. The plugin-message tier, the shared
-            // codec, and the in-memory binding are permitted (asserted present
-            // below).
-            ~'^io/github/dailystruggle/rtp/proxy/common/transport/redis/.*$',
-            ~'^io/github/dailystruggle/rtp/proxy/common/transport/sql/.*$',
-            ~'^com/zaxxer/hikari/.*$',
-            ~'^io/github/dailystruggle/rtp/hikari/.*$',
+            // SQL accessors, HikariCP, and Redis transports are now retained in lite (early-access graduation).
             ~'^io/github/dailystruggle/rtp/common/selection/region/LoginCacheTask\\.class$',
             // lang/** and language.yml intentionally present in lite as of the
             // 2026-05-11 ADR-024 language-options amendment -- see shadowLiteJar comment.
@@ -1604,10 +1595,6 @@ tasks.register('liteJarStructureCheck') {
             // amendment -- lite ships the same operator docs as Pro.
             ~'^README\\.md$',
             ~'^CHANGELOG\\.md$',
-            ~'^org/h2/.*$',
-            ~'^org/sqlite/.*$',
-            ~'^com/mysql/.*$',
-            ~'^org/postgresql/.*$',
             ~'^redis/clients/.*$',
             // ADR-024 Phase B audit: assert no Mojang asset stubs / Loom leftovers.
             ~'^version\\.json$',

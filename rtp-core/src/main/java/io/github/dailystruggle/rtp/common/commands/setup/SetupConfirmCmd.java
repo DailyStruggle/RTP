@@ -83,6 +83,7 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
 
         List<String> writtenFiles = new ArrayList<>();
         List<Path> backups = new ArrayList<>();
+        String defaultRegionFileId = "definitions/regions/" + io.github.dailystruggle.rtp.common.commands.prefab.MultiWorldExpander.DEFAULT_REGION_ID;
 
         try {
             for (Map.Entry<String, List<PrefabApplier.Change>> entry : diff.entrySet()) {
@@ -90,13 +91,16 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
                 Map<String, Object> newTree = result.newTrees().get(fileId);
                 if (newTree == null) continue;
 
+                String templateFileId = (fileId.startsWith("definitions/regions/") && !fileId.equals(defaultRegionFileId))
+                        ? defaultRegionFileId : null;
+
                 Path bak = PrefabDiskIO.writeWithBackup(
                         baseDir,
                         fileId,
                         newTree,
                         entry.getValue(),
                         PrefabDiskIO.DEFAULT_BAK_RETENTION,
-                        null
+                        templateFileId
                 );
                 writtenFiles.add(fileId + ".yml");
                 if (bak != null) {

@@ -387,4 +387,44 @@ class MultiWorldExpanderTest {
         assertEquals("world_the_end", end.get("world"));
         assertEquals("CIRCLE", ((Map<?, ?>) end.get("shape")).get("name"));
     }
+
+    @Test
+    @DisplayName("empty placeholder in currentRegions does not prevent full per-world synthesis")
+    void emptyPlaceholderInCurrentRegionsDoesNotPreventSynthesis() {
+        Map<String, Map<String, Object>> regions = currentRegionsWithDefault();
+        // Simulate a placeholder entry from snapshotLive on a non-existent file
+        regions.put("world_the_end", new LinkedHashMap<>());
+
+        Map<String, Object> vertOverlay = new LinkedHashMap<>();
+        vertOverlay.put("requireSkyLight", false);
+        Map<String, Map<String, Object>> explicitOverlays = Map.of(
+                "world_the_end", Map.of("vert", vertOverlay)
+        );
+
+        Prefab prefab = new Prefab(
+                "custom-multi",
+                "custom",
+                "custom",
+                "custom",
+                Map.of(),
+                Map.of(),
+                explicitOverlays,
+                true
+        );
+
+        Map<String, Map<String, Object>> out = MultiWorldExpander.expand(
+                prefab,
+                regions,
+                List.of("world", "world_the_end")
+        );
+
+        assertTrue(out.containsKey("world_the_end"), "must synthesise overlay for world_the_end");
+        Map<String, Object> end = out.get("world_the_end");
+        assertEquals("world_the_end", end.get("world"), "world key must be set to destination world");
+        assertNotNull(end.get("shape"), "shape must not be omitted");
+        assertEquals("CIRCLE", ((Map<?, ?>) end.get("shape")).get("name"), "cloned template shape must be present");
+        Map<?, ?> vert = (Map<?, ?>) end.get("vert");
+        assertNotNull(vert, "vert must be present");
+        assertEquals(false, vert.get("requireSkyLight"), "merged vert override must take effect");
+    }
 }

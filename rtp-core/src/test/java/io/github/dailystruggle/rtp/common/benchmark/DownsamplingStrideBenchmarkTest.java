@@ -2583,7 +2583,8 @@ public class DownsamplingStrideBenchmarkTest {
     int halfBits = bits / 2;
     long halfMask = (1L << halfBits) - 1L;
 
-    long candidate = val;
+    long fullMask = (bits == 64) ? -1L : ((1L << bits) - 1L);
+    long candidate = val & fullMask;
     // Cycle-walking: if candidate >= domainSize, encrypt again until < domainSize
     do {
       long l = (candidate >>> halfBits) & halfMask;
@@ -2591,13 +2592,13 @@ public class DownsamplingStrideBenchmarkTest {
 
       for (int round = 0; round < 4; round++) {
         long roundKey = seed ^ (0x9E3779B97F4A7C15L * (round + 1));
-        // Round function F(r, key)
-        long f = (r ^ roundKey);
-        f ^= (f >>> 16);
-        f *= 0x85ebca6b;
-        f ^= (f >>> 13);
-        f *= 0xc2b2ae35;
-        f ^= (f >>> 16);
+        long v0 = r & halfMask;
+        long v1 = roundKey;
+        v0 += v1; v1 = Long.rotateLeft(v1, 13); v1 ^= v0;
+        v0 = Long.rotateLeft(v0, 32);
+        v1 += v0; v0 = Long.rotateLeft(v0, 17); v0 ^= v1;
+        v1 = Long.rotateLeft(v1, 21);
+        long f = (v0 ^ v1) & halfMask;
         long newL = r;
         long newR = (l ^ f) & halfMask;
         l = newL;
