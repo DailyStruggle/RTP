@@ -922,7 +922,9 @@ sonar {
         // - java:S5785: assertEquals/assertNotEquals in test assertions.
         // - java:S5778: assertThrows single-invocation constraint in test suites.
         // - java:S2925: Thread.sleep in asynchronous, transport, and benchmark stress tests.
-        property 'sonar.issue.ignore.multicriteria', 's3077,s2975,s2176,s1452,s2696,s1186test,s1192,s115,s3776,s1181,s3011,s1141,s5785test,s5778test,s2925test'
+        // - java:S3516: onCommand and command handler methods intentionally returning boolean success flag.
+        // - java:S1845: command permission constants and static factory methods.
+        property 'sonar.issue.ignore.multicriteria', 's3077,s2975,s2176,s1452,s2696,s1186test,s1192,s115,s3776,s1181,s3011,s1141,s5785test,s5778test,s2925test,s3516,s1845'
         property 'sonar.issue.ignore.multicriteria.s3077.ruleKey', 'java:S3077'
         property 'sonar.issue.ignore.multicriteria.s3077.resourceKey', '**/*'
         property 'sonar.issue.ignore.multicriteria.s2975.ruleKey', 'java:S2975'
@@ -953,6 +955,10 @@ sonar {
         property 'sonar.issue.ignore.multicriteria.s5778test.resourceKey', '**/src/test/**/*'
         property 'sonar.issue.ignore.multicriteria.s2925test.ruleKey', 'java:S2925'
         property 'sonar.issue.ignore.multicriteria.s2925test.resourceKey', '**/src/test/**/*'
+        property 'sonar.issue.ignore.multicriteria.s3516.ruleKey', 'java:S3516'
+        property 'sonar.issue.ignore.multicriteria.s3516.resourceKey', '**/*'
+        property 'sonar.issue.ignore.multicriteria.s1845.ruleKey', 'java:S1845'
+        property 'sonar.issue.ignore.multicriteria.s1845.resourceKey', '**/*'
     }
 }
 

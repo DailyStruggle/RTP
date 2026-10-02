@@ -131,7 +131,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
             }
         }
 
-        if (customPathStr != null && !customPathStr.trim().isEmpty()) {
+        if (customPathStr != null && !customPathStr.isBlank()) {
             Path customPath = Path.of(customPathStr.trim());
             if (java.nio.file.Files.isDirectory(customPath)) {
                 // Determine whether customPath is the plugins root or a specific plugin's folder
@@ -169,7 +169,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
 
         // Execute auto-detect or resolve source folder
         if (sourceDir == null) {
-            if (requestedSource == null || requestedSource.trim().isEmpty()) {
+            if (requestedSource == null || requestedSource.isBlank()) {
                 // Auto-detection
                 Map<String, Path> detected = ForeignConfigImporterRegistry.detectAvailableSources(pluginsDir);
                 if (detected.isEmpty()) {

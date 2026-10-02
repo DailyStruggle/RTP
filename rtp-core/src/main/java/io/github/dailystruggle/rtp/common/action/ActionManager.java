@@ -332,14 +332,12 @@ public final class ActionManager implements ActionService {
     UUID sessionId = participantToSession.get(participantId);
     if (sessionId != null) {
       ActionSessionImpl session = activeSessions.get(sessionId);
-      if (session != null) {
-        if (actionId == null || actionId.isBlank() || session.actionId().equalsIgnoreCase(actionId.trim())) {
-          ActionDefinition def = definitions.get(session.actionId().toLowerCase());
-          boolean isCancellable = (def == null) || def.confinement().cancellable();
-          if (isCancellable) {
-            session.triggerCancel(participantId);
-            cancelled = true;
-          }
+      if (session != null && (actionId == null || actionId.isBlank() || session.actionId().equalsIgnoreCase(actionId.trim()))) {
+        ActionDefinition def = definitions.get(session.actionId().toLowerCase());
+        boolean isCancellable = (def == null) || def.confinement().cancellable();
+        if (isCancellable) {
+          session.triggerCancel(participantId);
+          cancelled = true;
         }
       }
     }
@@ -355,19 +353,17 @@ public final class ActionManager implements ActionService {
     UUID sessionId = participantToSession.get(participantId);
     if (sessionId != null) {
       ActionSessionImpl session = activeSessions.get(sessionId);
-      if (session != null) {
-        if (actionId == null || actionId.isBlank() || session.actionId().equalsIgnoreCase(actionId.trim())) {
-          // Identify opponent/winner if 2 participants
-          UUID killerId = null;
-          for (UUID pid : session.participants()) {
-            if (!pid.equals(participantId)) {
-              killerId = pid;
-              break;
-            }
+      if (session != null && (actionId == null || actionId.isBlank() || session.actionId().equalsIgnoreCase(actionId.trim()))) {
+        // Identify opponent/winner if 2 participants
+        UUID killerId = null;
+        for (UUID pid : session.participants()) {
+          if (!pid.equals(participantId)) {
+            killerId = pid;
+            break;
           }
-          session.triggerDeath(participantId, killerId);
-          return true;
         }
+        session.triggerDeath(participantId, killerId);
+        return true;
       }
     }
     return false;

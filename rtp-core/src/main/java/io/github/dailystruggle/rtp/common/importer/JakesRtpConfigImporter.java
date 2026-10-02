@@ -16,7 +16,7 @@ import java.util.*;
  * radii, cooldown, warmup, cost, bounds, and cache settings into LeafRTP Region, World,
  * and global configs.
  */
-public class JakesRtpConfigImporter implements ForeignConfigImporter {
+public class JakesRtpConfigImporter extends AbstractForeignConfigImporter {
 
     @Override
     public String sourceName() {
@@ -428,126 +428,5 @@ public class JakesRtpConfigImporter implements ForeignConfigImporter {
         regionYaml.set("version", "1.0");
 
         return regionYaml;
-    }
-
-    private RtpYamlConfig createWorldYaml(String defaultRegion) {
-        RtpYamlConfig worldYaml = new RtpYamlConfig();
-        worldYaml.set("name", defaultRegion);
-        worldYaml.set("override", "[0,0]");
-        worldYaml.set("requirePermission", false);
-        worldYaml.set("nearShape", "CIRCLE");
-        worldYaml.set("nearRadius", 64);
-        worldYaml.set("nearCenterRadius", 0);
-        worldYaml.set("nearMinY", 48);
-        worldYaml.set("nearMaxY", 96);
-        worldYaml.set("version", "1.0");
-        return worldYaml;
-    }
-
-    private RtpYamlConfig loadYamlSafe(Path file, List<String> warnings) {
-        return loadForeignYaml(file, warnings);
-    }
-
-    private RtpYamlSection getSectionCaseInsensitive(RtpYamlSection parent, String... candidateKeys) {
-        if (parent == null) return null;
-        for (String ck : candidateKeys) {
-            for (String key : parent.getKeys(false)) {
-                if (key.equalsIgnoreCase(ck)) {
-                    Object val = parent.get(key);
-                    if (val instanceof RtpYamlSection sec) return sec;
-                    if (val instanceof Map<?, ?> m) {
-                        RtpYamlConfig sub = new RtpYamlConfig();
-                        for (Map.Entry<?, ?> entry : m.entrySet()) {
-                            if (entry.getKey() != null) {
-                                sub.set(entry.getKey().toString(), entry.getValue());
-                            }
-                        }
-                        return sub;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private String getStringCaseInsensitive(RtpYamlSection parent, String defaultVal, String... candidateKeys) {
-        if (parent == null) return defaultVal;
-        for (String ck : candidateKeys) {
-            for (String key : parent.getKeys(false)) {
-                if (key.equalsIgnoreCase(ck)) {
-                    Object val = parent.get(key);
-                    if (val != null) return val.toString().trim();
-                }
-            }
-        }
-        return defaultVal;
-    }
-
-    private int getIntCaseInsensitive(RtpYamlSection parent, int defaultVal, String... candidateKeys) {
-        if (parent == null) return defaultVal;
-        for (String ck : candidateKeys) {
-            for (String key : parent.getKeys(false)) {
-                if (key.equalsIgnoreCase(ck)) {
-                    Object val = parent.get(key);
-                    if (val instanceof Number n) return n.intValue();
-                    if (val != null) {
-                        try {
-                            return Integer.parseInt(val.toString().trim());
-                        } catch (NumberFormatException ignored) {}
-                    }
-                }
-            }
-        }
-        return defaultVal;
-    }
-
-    private long getLongCaseInsensitive(RtpYamlSection parent, long defaultVal, String... candidateKeys) {
-        if (parent == null) return defaultVal;
-        for (String ck : candidateKeys) {
-            for (String key : parent.getKeys(false)) {
-                if (key.equalsIgnoreCase(ck)) {
-                    Object val = parent.get(key);
-                    if (val instanceof Number n) return n.longValue();
-                    if (val != null) {
-                        try {
-                            return Long.parseLong(val.toString().trim());
-                        } catch (NumberFormatException ignored) {}
-                    }
-                }
-            }
-        }
-        return defaultVal;
-    }
-
-    private double getDoubleCaseInsensitive(RtpYamlSection parent, double defaultVal, String... candidateKeys) {
-        if (parent == null) return defaultVal;
-        for (String ck : candidateKeys) {
-            for (String key : parent.getKeys(false)) {
-                if (key.equalsIgnoreCase(ck)) {
-                    Object val = parent.get(key);
-                    if (val instanceof Number n) return n.doubleValue();
-                    if (val != null) {
-                        try {
-                            return Double.parseDouble(val.toString().trim());
-                        } catch (NumberFormatException ignored) {}
-                    }
-                }
-            }
-        }
-        return defaultVal;
-    }
-
-    private boolean getBooleanCaseInsensitive(RtpYamlSection parent, boolean defaultVal, String... candidateKeys) {
-        if (parent == null) return defaultVal;
-        for (String ck : candidateKeys) {
-            for (String key : parent.getKeys(false)) {
-                if (key.equalsIgnoreCase(ck)) {
-                    Object val = parent.get(key);
-                    if (val instanceof Boolean b) return b;
-                    if (val != null) return Boolean.parseBoolean(val.toString().trim());
-                }
-            }
-        }
-        return defaultVal;
     }
 }

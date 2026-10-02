@@ -186,7 +186,7 @@ public final class DefaultRTPHooks implements RTPHooks {
     @Override
     public Optional<ClaimBoundary> resolve(UUID playerId, String worldName, String namespace) {
       if (playerId == null || worldName == null) return Optional.empty();
-      boolean auto = (namespace == null || namespace.trim().isEmpty() || "auto".equalsIgnoreCase(namespace.trim()));
+      boolean auto = (namespace == null || namespace.isBlank() || "auto".equalsIgnoreCase(namespace.trim()));
       String targetNs = (namespace != null) ? namespace.trim().toLowerCase(Locale.ROOT) : "";
 
       for (ClaimBoundaryProvider p : claimBoundaryProviders) {
@@ -208,7 +208,7 @@ public final class DefaultRTPHooks implements RTPHooks {
     @Override
     public Optional<ClaimBoundary> resolveAt(String worldName, int x, int z, String namespace) {
       if (worldName == null) return Optional.empty();
-      boolean auto = (namespace == null || namespace.trim().isEmpty() || "auto".equalsIgnoreCase(namespace.trim()));
+      boolean auto = (namespace == null || namespace.isBlank() || "auto".equalsIgnoreCase(namespace.trim()));
       String targetNs = (namespace != null) ? namespace.trim().toLowerCase(Locale.ROOT) : "";
 
       for (ClaimBoundaryProvider p : claimBoundaryProviders) {

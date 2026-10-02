@@ -117,7 +117,7 @@ public interface ForeignConfigImporter {
                 if (inside.isEmpty()) {
                     pass1.add(indent + key + (comment != null ? " " + comment.trim() : ""));
                 } else {
-                    pass1.add(indent + key + (comment != null && !comment.trim().isEmpty() ? " " + comment.trim() : ""));
+                    pass1.add(indent + key + (comment != null && !comment.isBlank() ? " " + comment.trim() : ""));
                     String[] items = inside.split(",");
                     for (String it : items) {
                         pass1.add(indent + "  - " + it.trim());

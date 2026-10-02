@@ -116,19 +116,23 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
   }
 
   @Override
-  public synchronized void setRng(java.util.Random rng) {
-    super.setRng(rng);
-    if (rng != null) {
-      setFeistelSalt(rng.nextLong());
+  public void setRng(java.util.Random rng) {
+    synchronized (this) {
+      super.setRng(rng);
+      if (rng != null) {
+        setFeistelSalt(rng.nextLong());
+      }
     }
   }
 
-  public synchronized void setFeistelSalt(long salt) {
-    this.feistelSalt = salt;
-    this.selectionCounter.set(0);
-    this.backlogCounter.set(0);
-    this.activeWindowRemaining.set(0);
-    this.phaseProgress.clear();
+  public void setFeistelSalt(long salt) {
+    synchronized (this) {
+      this.feistelSalt = salt;
+      this.selectionCounter.set(0);
+      this.backlogCounter.set(0);
+      this.activeWindowRemaining.set(0);
+      this.phaseProgress.clear();
+    }
   }
 
   protected long getEpochKey(long epoch, long phaseOffset) {

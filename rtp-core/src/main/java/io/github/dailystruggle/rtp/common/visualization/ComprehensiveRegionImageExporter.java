@@ -111,7 +111,9 @@ public final class ComprehensiveRegionImageExporter {
       outputDirectory.mkdirs();
     }
 
-    String timestamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(new Date());
+    String timestamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT)
+        .withZone(java.time.ZoneId.systemDefault())
+        .format(java.time.Instant.now());
     String baseName = region.name + "_all_" + timestamp;
     File imageFile = new File(outputDirectory, baseName + ".png");
     File jsonFile = new File(outputDirectory, baseName + ".json");

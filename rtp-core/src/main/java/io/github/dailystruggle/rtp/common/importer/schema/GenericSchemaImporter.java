@@ -118,7 +118,7 @@ public class GenericSchemaImporter extends AbstractForeignConfigImporter {
 
             String shapeName = normalizeShape(shapeRaw);
             String worldName = getStringCaseInsensitive(sec, targetName, "world", "World", "name");
-            if (worldName == null || worldName.trim().isEmpty()) worldName = targetName;
+            if (worldName == null || worldName.isBlank()) worldName = targetName;
 
             discoveredList.add(new DiscoveredWorldRegion(
                     targetName, worldName, shapeName, minRadius, maxRadius, centerX, centerZ, minY, maxY, price, biomes

@@ -13,7 +13,7 @@ import java.util.*;
  * Reads plugins/justRTP/config.yml (and cache.yml if present).
  * Maps per-world radii, shapes (ROUND -> CIRCLE, SQUARE -> SQUARE), and cooldowns into LeafRTP Region and World configs.
  */
-public class JustRtpConfigImporter implements ForeignConfigImporter {
+public class JustRtpConfigImporter extends AbstractForeignConfigImporter {
 
     @Override
     public String sourceName() {
@@ -171,7 +171,7 @@ public class JustRtpConfigImporter implements ForeignConfigImporter {
             if (guiWorldsObj instanceof RtpYamlSection guiSec) {
                 for (String key : guiSec.getKeys(false)) {
                     String wName = guiSec.getString(key + ".world_name", key);
-                    if (wName != null && !wName.trim().isEmpty()) {
+                    if (wName != null && !wName.isBlank()) {
                         worldEntries.put(wName, new WorldConfigEntry(
                                 wName, globalShape, globalMinRadius, globalMaxRadius,
                                 globalCenterX, globalCenterZ, globalCooldown, globalCost, globalCacheCap));
@@ -390,168 +390,6 @@ public class JustRtpConfigImporter implements ForeignConfigImporter {
 
         boolean success = errors.isEmpty() && !written.isEmpty();
         return new ImportResult(success, sourceName(), written, warnings, errors, mapped);
-    }
-
-    private void mirrorDatabaseConfig(RtpYamlConfig sourceConfig, Path destinationDir, boolean overwrite,
-                                      List<String> mapped, List<Path> written, List<String> warnings) {
-        RtpYamlSection dbSec = getSectionCaseInsensitive(sourceConfig, "database");
-        if (dbSec == null) return;
-
-        String rawType = getStringCaseInsensitive(dbSec, "sqlite", "type", "Type", "database");
-        String type = rawType.toLowerCase(Locale.ROOT);
-        if (type.contains("mysql")) type = "mysql";
-        else if (type.contains("postgre")) type = "postgresql";
-        else type = "sqlite";
-
-        String host = getStringCaseInsensitive(dbSec, "127.0.0.1", "host", "Host", "server", "ip");
-        int port = getIntCaseInsensitive(dbSec, 3306, "port", "Port");
-        String dbName = getStringCaseInsensitive(dbSec, "rtp", "name", "Name", "database", "Database", "db");
-        String user = getStringCaseInsensitive(dbSec, "root", "user", "User", "username", "Username");
-        String password = getStringCaseInsensitive(dbSec, "password", "password", "Password", "pass");
-        boolean useSSL = getBooleanCaseInsensitive(dbSec, false, "ssl", "SSL", "useSSL", "usessl");
-
-        Path advancedDir = destinationDir.resolve("advanced");
-        Path targetDbFile = advancedDir.resolve("database.yml");
-        Path rootDbFile = destinationDir.resolve("database.yml");
-
-        List<Path> targets = new ArrayList<>();
-        targets.add(targetDbFile);
-        if (Files.exists(rootDbFile)) {
-            targets.add(rootDbFile);
-        }
-
-        for (Path target : targets) {
-            if (Files.exists(target) && !overwrite) {
-                warnings.add("Skipping database config (already exists and overwrite=false): " + target);
-                continue;
-            }
-
-            try {
-                Files.createDirectories(target.getParent());
-                RtpYamlConfig dbConfig = new RtpYamlConfig();
-                RtpYamlSection innerSec = dbConfig.createSection("database");
-                innerSec.set("type", type);
-                innerSec.set("host", host);
-                innerSec.set("port", port);
-                innerSec.set("name", dbName);
-                innerSec.set("username", user);
-                innerSec.set("password", password);
-                innerSec.set("useSSL", useSSL);
-                dbConfig.set("version", 1.1);
-
-                dbConfig.save(target.toFile());
-                written.add(target);
-                mapped.add("Database: type=" + type + ", host=" + host + ", port=" + port + ", name=" + dbName);
-            } catch (IOException e) {
-                warnings.add("Failed to write database config to " + target + ": " + e.getMessage());
-            }
-        }
-    }
-
-    private void mirrorEffectsConfig(RtpYamlConfig sourceConfig, Path destinationDir, boolean overwrite,
-                                     List<String> mapped, List<Path> written, List<String> warnings) {
-        RtpYamlSection effectsSec = getSectionCaseInsensitive(sourceConfig, "effects");
-        if (effectsSec == null) {
-            effectsSec = getSectionCaseInsensitive(sourceConfig, "Effects");
-        }
-
-        List<String> effectTokens = new ArrayList<>();
-
-        // 1. Sounds
-        RtpYamlSection soundSec = effectsSec != null ? getSectionCaseInsensitive(effectsSec, "sound") : null;
-        if (soundSec == null && effectsSec != null) soundSec = getSectionCaseInsensitive(effectsSec, "sounds");
-        if (soundSec == null) soundSec = getSectionCaseInsensitive(sourceConfig, "sound");
-        if (soundSec != null) {
-            String soundName = getStringCaseInsensitive(soundSec, "ENTITY_ENDERMAN_TELEPORT", "name", "sound", "Sound");
-            double volRaw = getDoubleCaseInsensitive(soundSec, 1.0, "volume", "Volume");
-            double pitchRaw = getDoubleCaseInsensitive(soundSec, 1.0, "pitch", "Pitch");
-            int vol = (volRaw > 0 && volRaw <= 1.0) ? (int) Math.round(volRaw * 100) : (int) Math.round(volRaw);
-            int pitch = (pitchRaw > 0 && pitchRaw <= 2.0) ? (int) Math.round(pitchRaw * 100) : (int) Math.round(pitchRaw);
-            if (vol <= 0) vol = 100;
-            if (pitch <= 0) pitch = 100;
-            effectTokens.add("SOUND." + soundName.toUpperCase(Locale.ROOT) + "." + vol + "." + pitch + ".0.0.0");
-        }
-
-        // 2. Titles
-        RtpYamlSection titleSec = effectsSec != null ? getSectionCaseInsensitive(effectsSec, "title") : null;
-        if (titleSec == null) titleSec = getSectionCaseInsensitive(sourceConfig, "title");
-        if (titleSec != null) {
-            String title = getStringCaseInsensitive(titleSec, "", "title", "Title");
-            String subtitle = getStringCaseInsensitive(titleSec, "", "sub_title", "subtitle", "Subtitle");
-            int fadeIn = getIntCaseInsensitive(titleSec, 10, "fade_in", "fadein", "FadeIn");
-            int stay = getIntCaseInsensitive(titleSec, 70, "stay", "Stay");
-            int fadeOut = getIntCaseInsensitive(titleSec, 20, "fade_out", "fadeout", "FadeOut");
-            if (!title.isEmpty() || !subtitle.isEmpty()) {
-                effectTokens.add("TITLE." + title + "." + subtitle + "." + fadeIn + "." + stay + "." + fadeOut);
-            }
-        }
-
-        // 3. Action Bars
-        RtpYamlSection actionSec = effectsSec != null ? getSectionCaseInsensitive(effectsSec, "action_bar") : null;
-        if (actionSec == null && effectsSec != null) actionSec = getSectionCaseInsensitive(effectsSec, "actionbar");
-        if (actionSec == null) actionSec = getSectionCaseInsensitive(sourceConfig, "action_bar");
-        if (actionSec != null) {
-            String msg = getStringCaseInsensitive(actionSec, "", "text", "message", "Message", "Text");
-            if (!msg.isEmpty()) {
-                effectTokens.add("COMMAND.CONSOLE.title [player] actionbar {\"text\":\"" + msg + "\"}");
-            }
-        }
-
-        // 4. Potions / Buffs
-        RtpYamlSection potionSec = effectsSec != null ? getSectionCaseInsensitive(effectsSec, "potions") : null;
-        if (potionSec == null && effectsSec != null) potionSec = getSectionCaseInsensitive(effectsSec, "Potions");
-        if (potionSec != null) {
-            List<String> rawPotions = potionSec.getStringList("list");
-            if (rawPotions == null || rawPotions.isEmpty()) {
-                rawPotions = potionSec.getStringList("List");
-            }
-            if (rawPotions != null) {
-                for (String pot : rawPotions) {
-                    String[] parts = pot.split("[:\\s]+");
-                    if (parts.length >= 1) {
-                        String type = parts[0].toUpperCase(Locale.ROOT);
-                        int duration = (parts.length >= 2) ? parseDurationTicks(parts[1]) : 100;
-                        int amp = (parts.length >= 3) ? parseAmp(parts[2]) : 1;
-                        effectTokens.add("POTION." + type + "." + duration + "." + amp + ".false.false.false");
-                    }
-                }
-            }
-        } else if (effectsSec != null && effectsSec.contains("potions")) {
-            List<String> rawPotions = effectsSec.getStringList("potions");
-            if (rawPotions != null) {
-                for (String pot : rawPotions) {
-                    String[] parts = pot.split("[:\\s]+");
-                    if (parts.length >= 1) {
-                        String type = parts[0].toUpperCase(Locale.ROOT);
-                        int duration = (parts.length >= 2) ? parseDurationTicks(parts[1]) : 100;
-                        int amp = (parts.length >= 3) ? parseAmp(parts[2]) : 1;
-                        effectTokens.add("POTION." + type + "." + duration + "." + amp + ".false.false.false");
-                    }
-                }
-            }
-        }
-
-        if (effectTokens.isEmpty()) return;
-
-        Path targetEffectFile = destinationDir.resolve("definitions/effects/imported_justrtp_teleport.yml");
-        if (Files.exists(targetEffectFile) && !overwrite) {
-            warnings.add("Skipping effect profile (already exists and overwrite=false): " + targetEffectFile);
-            return;
-        }
-
-        try {
-            Files.createDirectories(targetEffectFile.getParent());
-            RtpYamlConfig effectConfig = new RtpYamlConfig();
-            effectConfig.set("version", "1.0");
-            effectConfig.set("when", "postteleport");
-            effectConfig.set("effects", effectTokens);
-            effectConfig.save(targetEffectFile.toFile());
-
-            written.add(targetEffectFile);
-            mapped.add("Effects: imported_justrtp_teleport (" + effectTokens.size() + " tokens)");
-        } catch (IOException e) {
-            warnings.add("Failed to write effect profile to " + targetEffectFile + ": " + e.getMessage());
-        }
     }
 
     private void mirrorZonesConfig(Path sourcePluginDir, Path destinationDir, boolean overwrite,
@@ -844,22 +682,6 @@ public class JustRtpConfigImporter implements ForeignConfigImporter {
         return new WorldConfigEntry(worldKey, shape, minRadius, maxRadius, centerX, centerZ, cooldown, cost, cacheCap);
     }
 
-    private String mapShape(String foreignShape) {
-        if (foreignShape == null) return "CIRCLE";
-        String s = foreignShape.trim().toUpperCase(Locale.ROOT);
-        if (s.contains("SQUARE")) {
-            return "SQUARE";
-        }
-        if (s.contains("ROUND") || s.contains("CIRCLE") || s.contains("RING")) {
-            return "CIRCLE";
-        }
-        return "CIRCLE";
-    }
-
-    private RtpYamlConfig loadYamlSafe(Path path, List<String> warnings) {
-        return loadForeignYaml(path, warnings);
-    }
-
     private static class WorldConfigEntry {
         final String worldName;
         final String shape;
@@ -883,99 +705,5 @@ public class JustRtpConfigImporter implements ForeignConfigImporter {
             this.cost = cost;
             this.cacheCap = cacheCap;
         }
-    }
-
-    private RtpYamlSection getSectionCaseInsensitive(RtpYamlConfig config, String key) {
-        if (config == null) return null;
-        Object direct = config.get(key);
-        if (direct instanceof RtpYamlSection sec) return sec;
-
-        for (String k : config.getKeys(false)) {
-            if (k.equalsIgnoreCase(key)) {
-                Object obj = config.get(k);
-                if (obj instanceof RtpYamlSection sec) return sec;
-            }
-        }
-        return null;
-    }
-
-    private RtpYamlSection getSectionCaseInsensitive(RtpYamlSection config, String key) {
-        if (config == null) return null;
-        Object direct = config.get(key);
-        if (direct instanceof RtpYamlSection sec) return sec;
-
-        for (String k : config.getKeys(false)) {
-            if (k.equalsIgnoreCase(key)) {
-                Object obj = config.get(k);
-                if (obj instanceof RtpYamlSection sec) return sec;
-            }
-        }
-        return null;
-    }
-
-    private String getStringCaseInsensitive(RtpYamlSection section, String def, String... keys) {
-        for (String k : keys) {
-            if (section.contains(k)) {
-                String val = section.getString(k);
-                if (val != null) return val;
-            }
-        }
-        for (String actual : section.getKeys(false)) {
-            for (String target : keys) {
-                if (actual.equalsIgnoreCase(target)) {
-                    String val = section.getString(actual);
-                    if (val != null) return val;
-                }
-            }
-        }
-        return def;
-    }
-
-    private int getIntCaseInsensitive(RtpYamlSection section, int def, String... keys) {
-        for (String k : keys) {
-            if (section.contains(k)) {
-                return section.getInt(k, def);
-            }
-        }
-        for (String actual : section.getKeys(false)) {
-            for (String target : keys) {
-                if (actual.equalsIgnoreCase(target)) {
-                    return section.getInt(actual, def);
-                }
-            }
-        }
-        return def;
-    }
-
-    private double getDoubleCaseInsensitive(RtpYamlSection section, double def, String... keys) {
-        for (String k : keys) {
-            if (section.contains(k)) {
-                return section.getDouble(k, def);
-            }
-        }
-        for (String actual : section.getKeys(false)) {
-            for (String target : keys) {
-                if (actual.equalsIgnoreCase(target)) {
-                    return section.getDouble(actual, def);
-                }
-            }
-        }
-        return def;
-    }
-
-    private boolean getBooleanCaseInsensitive(RtpYamlSection section, boolean def, String... keys) {
-        for (String k : keys) {
-            if (section.contains(k)) {
-                return section.getBoolean(k, def);
-            }
-        }
-        for (String actual : section.getKeys(false)) {
-            for (String target : keys) {
-                if (actual.equalsIgnoreCase(target)) {
-                    return section.getBoolean(actual, def);
-                }
-            }
-        }
-        return def;
     }
 }
