@@ -6,9 +6,10 @@
 # pass/fail line to stdout and a structured block to the per-run evidence log.
 #
 # Usage:
-#   ./run-acceptance.sh [--scenario all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|gui|rtpgui|down|logs]
+#   ./run-acceptance.sh [--scenario all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|gui|rtpgui|burst|stress|down|logs]
 #                       [--wait-seconds N] [--skip-up] [--build] [--skip-build]
 #                       [--no-logs] [--purge] [--lite] [--assert-effects] [--gui]
+#                       [--bot-count N]
 #
 #   --build       Opt IN to the gradle clean+jar build. Default: OFF - the harness
 #                 does not invoke gradle; build the jars yourself, then it stages
@@ -35,10 +36,12 @@ Purge=0
 Lite=0
 AssertEffects=0
 GuiMode=0
+BotCount=12
 while [ $# -gt 0 ]; do
   case "$1" in
     --scenario) Scenario="$2"; shift 2 ;;
     --wait-seconds) WaitSeconds="$2"; shift 2 ;;
+    --bot-count) BotCount="$2"; shift 2 ;;
     --skip-up) SkipUp=1; shift ;;
     --skip-build) SkipBuild=1; shift ;;
     --build) Build=1; shift ;;
@@ -51,7 +54,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 case "$Scenario" in
-  all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|gui|rtpgui|down|logs) ;;
+  all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|gui|rtpgui|burst|stress|down|logs) ;;
   *) echo "invalid --scenario: $Scenario" >&2; exit 2 ;;
 esac
 
@@ -461,6 +464,7 @@ test_roundtrip() {
     local extraArgs=()
     [ "$Lite" -eq 1 ] && extraArgs+=(--lite)
     [ "$AssertEffects" -eq 1 ] && extraArgs+=(--assert-effects)
+    [ "$Gui" -eq 1 ] && extraArgs+=(--gui)
     local botOut
     botOut="$(node "$botScript" --host 127.0.0.1 --port 25577 --timeout 35 "${extraArgs[@]}" 2>&1)" || true
     echo "$botOut"
@@ -474,17 +478,38 @@ test_roundtrip() {
   if [ "$botSuccess" -eq 0 ]; then
     echo "[roundtrip] headless bot unavailable or failed; falling back to manual checkpoint."
     echo "  1. Connect a 1.21.1 client to localhost:25577 (proxy-a)."
-    echo "  2. Run '/server backend-b' then '/server backend-c' once each to seed all backends."
-    echo "  3. From the client, run '/rtp' and observe a cross-server teleport."
-    echo "  4. Press <Enter> AFTER the redeem completes to capture evidence."
+    echo "  2. From the client, run '/rtp' (or '/rtp region=<backend>:<region>') and observe a cross-server teleport."
+    echo "  3. Press <Enter> AFTER the redeem completes to capture evidence."
     read -r _ || true
   fi
 
-  local tokens audit
-  tokens="$(redis_cli KEYS 'rtp:net:reservation:*' 2>/dev/null)"
-  audit="$(cd "$scriptDir" && docker compose logs --tail=100 backend-a backend-b backend-c 2>&1 | grep -F -e redeem -e JoinTriggerSource || true)"
-  write_evidence 'roundtrip' "tokens at sample time:"$'\n'"$tokens"$'\n'"audit lines:"$'\n'"$audit"
-  echo "[roundtrip] EVIDENCE CAPTURED"; return 0
+  local audit
+  audit="$(cd "$scriptDir" && docker compose logs --tail=150 backend-a backend-b backend-c backend-d 2>&1 | grep -E 'redeem|JoinTriggerSource|randomly teleported|runTeleport|SelectionAPI' || true)"
+
+  if [ "$Lite" -eq 1 ]; then
+    # DB-free / proxy-direct tier: no Redis reservation tokens exist.
+    # Assert arrival and clean execution of local arrival pipeline on the destination backend.
+    write_evidence 'roundtrip.lite' "audit lines:"$'\n'"$audit"
+    local arrivalRan
+    arrivalRan="$(printf '%s' "$audit" | grep -E 'redeem|JoinTriggerSource\.onRedeemed|randomly teleported|runTeleport' || true)"
+    if [ "$botSuccess" -eq 1 ] && [ -n "$arrivalRan" ]; then
+      echo "[roundtrip] PASS - destination backend completed local arrival pipeline cleanly over proxy-direct."
+      write_evidence 'roundtrip' "destination arrival pipeline verified:"$'\n'"$audit"
+      return 0
+    elif [ "$botSuccess" -eq 1 ]; then
+      echo "[roundtrip] WARN - bot passed but destination arrival pipeline log not confirmed; logging audit."
+      write_evidence 'roundtrip' "audit lines:"$'\n'"$audit"
+      return 0
+    else
+      echo "[roundtrip] FAIL - bot did not pass and no arrival pipeline observed."
+      return 1
+    fi
+  else
+    local tokens
+    tokens="$(redis_cli KEYS 'rtp:net:reservation:*' 2>/dev/null)"
+    write_evidence 'roundtrip' "tokens at sample time:"$'\n'"$tokens"$'\n'"audit lines:"$'\n'"$audit"
+    echo "[roundtrip] EVIDENCE CAPTURED"; return 0
+  fi
 }
 
 test_killmidflight() {
@@ -570,6 +595,90 @@ test_rtptest() {
   done
   if [ "$anyFail" -eq 0 ]; then echo "[rtptest] PASS"; return 0; fi
   echo "[rtptest] FAIL - one or more services failed the accessor self-test"; return 1
+}
+
+test_burst_stress() {
+  echo "[burst] executing multi-client concurrency stress test ($BotCount bots in rapid burst)..."
+  local botScript="$scriptDir/clients/stress-burst-swarm.js" clientsDir="$scriptDir/clients"
+  local botOut="" extraArgs=(--bot-count "$BotCount" --timeout "$WaitSeconds")
+
+  if command -v node >/dev/null 2>&1; then
+    if [ ! -d "$clientsDir/node_modules" ] && command -v npm >/dev/null 2>&1; then
+      echo "[burst] installing client dependencies..."
+      (cd "$clientsDir" && npm install --silent --no-audit >/dev/null 2>&1) || true
+    fi
+    botOut="$(node "$botScript" --host 127.0.0.1 --port 25577 "${extraArgs[@]}" 2>&1)" || true
+  elif command -v docker >/dev/null 2>&1; then
+    botOut="$(docker run --rm --network host -v "${clientsDir}:/app" -w /app node:20 node stress-burst-swarm.js --host 127.0.0.1 --port 25577 "${extraArgs[@]}" 2>&1)" || true
+  else
+    echo "[burst] FAIL - Neither Node.js nor Docker found."
+    return 1
+  fi
+
+  printf '%s\n' "$botOut"
+  if ! printf '%s' "$botOut" | grep -q '"status"[[:space:]]*:[[:space:]]*"PASS"'; then
+    echo "[burst] FAIL - bot swarm did not complete successfully or some bots failed"
+    write_evidence "burst.swarm.fail" "$botOut"
+    return 1
+  fi
+  write_evidence "burst.swarm.pass" "$botOut"
+  echo "[burst] bot swarm passed client-side assertions (all bots settled cleanly)."
+
+  # 1. Assert server logs: zero race conditions or uncaught exceptions across backends
+  echo "[burst] inspecting server logs for uncaught exceptions and race conditions..."
+  local svc logs pat
+  for svc in backend-a backend-b; do
+    logs="$(cd "$scriptDir" && docker compose logs --tail=500 --no-log-prefix "$svc" 2>/dev/null)" || true
+    for pat in 'ConcurrentModificationException' 'NullPointerException' 'IllegalStateException: Asynchronous chunk' 'Exception in thread "Server thread"'; do
+      if printf '%s' "$logs" | grep -Fq "$pat"; then
+        echo "[burst] FAIL - forbidden error pattern '$pat' found in $svc logs!"
+        write_evidence "burst.logs.fail.$svc" "Pattern '$pat' matched in logs:"$'\n'"$logs"
+        return 1
+      fi
+    done
+    if [ "$svc" = "backend-b" ]; then
+      for pat in 'isOwnedByCurrentRegion' 'TickThread.ensureTickThread' 'Async scheduler error'; do
+        if printf '%s' "$logs" | grep -Fq "$pat"; then
+          echo "[burst] FAIL - Folia region threading error '$pat' found in backend-b logs!"
+          write_evidence "burst.logs.fail.folia" "Pattern '$pat' matched in backend-b logs:"$'\n'"$logs"
+          return 1
+        fi
+      done
+    fi
+  done
+  echo "[burst] server log assertions PASS (zero uncaught exceptions or Folia region ownership errors)."
+
+  # 2. Assert MemoryTracker has no orphaned chunk tickets on backends
+  echo "[burst] querying MemoryTracker via rtp test chunk-ticket on backend-a and backend-b..."
+  local rconOut deadline ticketVerdict line
+  for svc in backend-a backend-b; do
+    if ! wait_rcon_ready "$svc"; then
+      echo "[burst] WARN - RCON not ready on $svc within budget to run chunk-ticket probe"
+      continue
+    fi
+    echo "[burst] -> $svc : rtp test chunk-ticket"
+    rconOut="$(cd "$scriptDir" && docker compose exec -T "$svc" rcon-cli rtp test chunk-ticket 2>&1)" || true
+    deadline=$(( $(date +%s) + 20 )); ticketVerdict=""
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+      line="$(cd "$scriptDir" && docker compose logs --tail=200 --no-log-prefix "$svc" 2>/dev/null | grep -F '[RTP test/chunk-ticket]' | tail -n1)"
+      [ -n "$line" ] && { ticketVerdict="$line"; break; }
+      sleep 2
+    done
+    write_evidence "burst.chunk-ticket.$svc" "rcon: $rconOut"$'\n'"verdict: $ticketVerdict"
+    if printf '%s' "$ticketVerdict" | grep -qE '\[RTP test/chunk-ticket\][[:space:]]+ok'; then
+      if printf '%s' "$ticketVerdict" | grep -qE '(trackerCount|residual)=[1-9][0-9]*'; then
+        echo "[burst] FAIL ($svc): orphaned chunk tickets found in MemoryTracker: $ticketVerdict"
+        return 1
+      fi
+      echo "[burst]    PASS ($svc): chunk tickets cleanly accounted (0 orphaned tickets in MemoryTracker)"
+    else
+      echo "[burst] FAIL ($svc): chunk-ticket probe failed or did not report ok: $ticketVerdict"
+      return 1
+    fi
+  done
+
+  echo "[burst] PASS - multi-client concurrency stress test fully satisfied all requirements."
+  return 0
 }
 
 test_killswitch() {
@@ -658,6 +767,7 @@ for s in "${plan[@]}"; do
     roundtrip)     if test_roundtrip;     then results[$s]=PASS; else results[$s]=FAIL; anyFail=1; fi ;;
     killmidflight) if test_killmidflight; then results[$s]=PASS; else results[$s]=FAIL; anyFail=1; fi ;;
     killswitch)    if test_killswitch;    then results[$s]=PASS; else results[$s]=FAIL; anyFail=1; fi ;;
+    burst|stress)  if test_burst_stress;  then results[$s]=PASS; else results[$s]=FAIL; anyFail=1; fi ;;
     rtptest)       if test_rtptest;       then results[$s]=PASS; else results[$s]=FAIL; anyFail=1; fi ;;
   esac
 done

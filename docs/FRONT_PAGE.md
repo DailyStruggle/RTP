@@ -98,6 +98,16 @@ Safe destinations are prepared at-rate and a number of them are kept ready per r
 
 Candidate selection uses a keyed 4-round Feistel permutation over a space-filling Hilbert curve with a hardened ARX PRF round function (SipRound style) and tiny-domain masking. The permutation is a strict bijection: every candidate chunk across the region is visited exactly once before any repeats, yielding 0 duplicate chunk landings without storing visited keys. Dyadic bit-reversal phase bisection leaps consecutive teleports across opposite quadrants (averaging ~4,600 blocks per hop on a 4k border), bounding consecutive arrivals to a minimum floor of >= sqrt(S) chunks (128 blocks at S=64, 256 blocks at S=256). The entire selection state is an advancing 64-bit integer counter: no entity distance loops, no recent-location history sets, and zero heap allocation per draw.
 
+### In-house, zero-dependency engineering
+
+Most rtp plugins are thin glue over heavy third-party enterprise jars: bundled MySQL drivers, shaded Redis clients, external connection pools, and generic parsers. That is why a 200-line script ships in a 6.5 MB jar where 93 % of the bytecode belongs to someone else. When those upstream dependencies break, shift class paths, or conflict with another plugin on the server, the author cannot fix it.
+
+LeafRTP takes the opposite trade:
+- **No shaded database or networking bloat:** we do not shade 6 MB of external MySQL drivers or Jedis. SQL connection pooling (`MiniConnectionPool`), cross-server network messaging, and persistence run on in-house code and standard Java primitives.
+- **Zero classloader collisions:** without shaded third-party dependency trees, LeafRTP cannot collide with other plugins over HikariCP, Protobuf, or Commons Pool versions.
+- **In-house off-tick parsers:** Anvil (`.mca`) and Linear (`.linear` / ZStandard) region decompression run off-tick through our own lightweight readers, with no native binary bloat or JNI crashes.
+- **Immunity to platform drift:** config parsing, command routing, and spatial math do not depend on Bukkit's or Paper's internal library choices.
+
 ### Chunk loading, by platform
 
 - **Paper** and forks (Purpur, Pufferfish, Leaf, Leaves, DivineMC, ...) - `World#getChunkAtAsync`, no main-thread fallback. Linear-format servers get the `.linear` pre-filter.
@@ -367,6 +377,7 @@ Unknown tags and properties fail open, so a config written for a newer MC versio
 - **Automated first-boot environment calibration** - detect threads, memory, vanilla world borders, and pre-generation on cold boot to auto-tune queues and worker pools.
 - **Single-prompt competitor migration gating** - one-time first-boot detection and prompt for legacy installations (BetterRTP, JustRTP, EzRTP) that stays silent once configured.
 - **Visual region definition & ecosystem selection bridges** - create and configure regions directly from in-game selections (WorldEdit / FAWE / FTB Chunks) or interactive browser web maps without manual coordinate entry (ADR-099).
+- **Seamless loading-screen-free Velocity transfers** - in-play backend pipe swapping and pre-loaded destination chunk streaming to eliminate the "Downloading terrain..." loading screen during cross-server transfers (rtp-proxy-ADR-021).
 - **External web map raster layers** - zero-chunk-load on-demand raster heatmaps and polygon boundary overlays for Pl3xMap, BlueMap, and Dynmap (ADR-086).
 - **Fully-automatic self-warming** - background spatial-memory accumulation and queue pre-population without running the `/rtp scan` command.
 

@@ -279,4 +279,53 @@ class SetupCommandTest {
         assertTrue(netherContent.contains("vert:"), "world_nether.yml must contain vert key");
         assertTrue(netherContent.contains("requireSkyLight: false"), "world_nether.yml vert must have requireSkyLight: false");
     }
+
+    @Test
+    @DisplayName("SetupBookMenuBuilder builds menu pages across all wizard stages")
+    void testSetupBookMenuBuilderAllStages() {
+        SetupBookMenuBuilder builder = new SetupBookMenuBuilder();
+        SetupSession session = new SetupSession(UUID.randomUUID());
+
+        // 1. World page - single vs multi
+        session.setCurrentStage(SetupStage.WORLD);
+        session.setWorldChoice("single");
+        var m1 = builder.build(session, Map.of());
+        assertNotNull(m1);
+        assertEquals("RTP Setup: World Topology", m1.title());
+
+        session.setWorldChoice("multi");
+        var m1Multi = builder.build(session, Map.of());
+        assertNotNull(m1Multi);
+
+        // 2. Gameplay page - survival, arena, skyblock, oneblock
+        session.setCurrentStage(SetupStage.GAMEPLAY);
+        for (String style : List.of("survival", "arena", "skyblock", "oneblock")) {
+            session.setGameplayChoice(style);
+            var m = builder.build(session, Map.of());
+            assertNotNull(m);
+            assertEquals("RTP Setup: Gameplay Style", m.title());
+        }
+
+        // 3. Performance page - high, low, folia
+        session.setCurrentStage(SetupStage.PERFORMANCE);
+        for (String perf : List.of("high", "low", "folia")) {
+            session.setPerformanceChoice(perf);
+            var m = builder.build(session, Map.of());
+            assertNotNull(m);
+            assertEquals("RTP Setup: Performance", m.title());
+        }
+
+        // 4. Addons page - toggles
+        session.setCurrentStage(SetupStage.ADDONS);
+        session.setToggle("claimIntegrations", true);
+        session.setToggle("cinematicEffects", true);
+        var mAddons = builder.build(session, Map.of());
+        assertNotNull(mAddons);
+        assertEquals("RTP Setup: Addons & Effects", mAddons.title());
+
+        session.setToggle("claimIntegrations", false);
+        session.setToggle("cinematicEffects", false);
+        var mAddons2 = builder.build(session, Map.of());
+        assertNotNull(mAddons2);
+    }
 }

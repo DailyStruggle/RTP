@@ -61,7 +61,6 @@ dependencies {
     compileOnly 'com.google.code.gson:gson:2.10.1'
     testImplementation 'com.google.code.gson:gson:2.10.1'
     testRuntimeOnly 'com.google.code.gson:gson:2.10.1'
-    implementation 'com.zaxxer:HikariCP:5.1.0'
     // PostgreSQL driver is loaded at runtime via JDBC ServiceLoader; no org.postgresql.*
     // imports exist in core source, so 'compileOnly' correctly excludes it from the
     // bundled JAR.  Servers that need PostgreSQL supply the driver independently.

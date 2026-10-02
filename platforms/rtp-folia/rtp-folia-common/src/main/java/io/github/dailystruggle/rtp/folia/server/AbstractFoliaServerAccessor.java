@@ -676,7 +676,6 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       return false;
     }
     org.bukkit.command.CommandSender console = Bukkit.getConsoleSender();
-    if (console == null) return false;
     org.bukkit.command.CommandSender capturingSender = createCapturingConsoleSender(console, lineConsumer);
     if (Bukkit.isGlobalTickThread()) {
       try {

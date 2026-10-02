@@ -55,6 +55,9 @@ public final class Nbt {
     public static final byte TAG_INT_ARRAY  = 11;
     public static final byte TAG_LONG_ARRAY = 12;
 
+    /** Maximum allowed array elements in corrupt/untrusted NBT payloads (16M). */
+    public static final int MAX_ARRAY_LENGTH = 16 * 1024 * 1024;
+
     private Nbt() {}
 
     /**
@@ -114,6 +117,9 @@ public final class Nbt {
             case TAG_DOUBLE:     return in.readDouble();
             case TAG_BYTE_ARRAY: {
                 int n = in.readInt();
+                if (n < 0 || n > MAX_ARRAY_LENGTH) {
+                    throw new IOException("Malformed TAG_Byte_Array length: " + n);
+                }
                 byte[] a = new byte[n];
                 in.readFully(a);
                 return a;
@@ -122,6 +128,9 @@ public final class Nbt {
             case TAG_LIST: {
                 byte elemType = in.readByte();
                 int n = in.readInt();
+                if (n < 0 || n > MAX_ARRAY_LENGTH) {
+                    throw new IOException("Malformed TAG_List length: " + n);
+                }
                 List<Object> items = new ArrayList<>(Math.max(0, n));
                 if (elemType == TAG_END) {
                     if (n > 0) throw new IOException("TAG_List declared TAG_End element type with nonzero length " + n);
@@ -142,12 +151,18 @@ public final class Nbt {
             }
             case TAG_INT_ARRAY: {
                 int n = in.readInt();
+                if (n < 0 || n > MAX_ARRAY_LENGTH) {
+                    throw new IOException("Malformed TAG_Int_Array length: " + n);
+                }
                 int[] a = new int[n];
                 for (int i = 0; i < n; i++) a[i] = in.readInt();
                 return a;
             }
             case TAG_LONG_ARRAY: {
                 int n = in.readInt();
+                if (n < 0 || n > MAX_ARRAY_LENGTH) {
+                    throw new IOException("Malformed TAG_Long_Array length: " + n);
+                }
                 long[] a = new long[n];
                 for (int i = 0; i < n; i++) a[i] = in.readLong();
                 return a;
@@ -359,6 +374,9 @@ public final class Nbt {
             DataInput in, ArrayList<String> path, SelectiveFilter filter) throws IOException {
         byte elemType = in.readByte();
         int n = in.readInt();
+        if (n < 0 || n > MAX_ARRAY_LENGTH) {
+            throw new IOException("Malformed TAG_List length: " + n);
+        }
         List<Object> items = new ArrayList<>(Math.max(0, n));
         if (elemType == TAG_END) {
             if (n > 0) throw new IOException("TAG_List declared TAG_End element type with nonzero length " + n);

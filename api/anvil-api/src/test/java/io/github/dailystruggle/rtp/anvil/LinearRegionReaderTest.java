@@ -102,6 +102,68 @@ class LinearRegionReaderTest {
     }
 
     @Test
+    @DisplayName("Synthetically generated Linear v1 region file decodes cleanly")
+    void testSyntheticLinearV1RegionFile() throws IOException {
+        long[] heightmap = new long[37];
+        Arrays.fill(heightmap, 0x0123456789ABCDEFL);
+
+        List<String> palette = Arrays.asList("minecraft:stone");
+        List<LinkedHashMap<String, Object>> sections = new ArrayList<>();
+        sections.add(createSection((byte) 0, palette));
+
+        LinkedHashMap<String, Object> root0 = createChunkRoot(
+                DataVersionSupport.MC_1_20_DATA_VERSION, heightmap, sections);
+        byte[] chunk0Nbt = Nbt.writeNamedRoot("", root0);
+
+        int chunks = LinearRegionReader.CHUNKS_PER_REGION;
+        int[] chunkLengths = new int[chunks];
+        chunkLengths[0] = chunk0Nbt.length;
+
+        ByteArrayOutputStream uncompressedStream = new ByteArrayOutputStream();
+        uncompressedStream.write(chunk0Nbt);
+        byte[] uncompressedBytes = uncompressedStream.toByteArray();
+        byte[] compressedZstd = Zstd.compress(uncompressedBytes, 3);
+
+        int headerSize = 22;
+        int chunkLengthsSize = chunks * 4;
+        int timestampsSize = chunks * 4; // v1 format: 4 bytes per timestamp
+        int totalHeaderSize = headerSize + chunkLengthsSize + timestampsSize;
+
+        ByteBuffer buffer = ByteBuffer.allocate(totalHeaderSize + compressedZstd.length);
+        buffer.putLong(LinearRegionReader.LINEAR_MAGIC_V1);
+        buffer.put((byte) 1); // Version 1
+        buffer.putLong(System.currentTimeMillis() / 1000L);
+        buffer.put((byte) 3);
+        buffer.putInt(compressedZstd.length);
+
+        for (int len : chunkLengths) {
+            buffer.putInt(len);
+        }
+        for (int i = 0; i < chunks; i++) {
+            buffer.putInt(0); // v1: 4-byte timestamps
+        }
+        buffer.put(compressedZstd);
+        byte[] linearV1Region = buffer.array();
+
+        assertTrue(LinearRegionReader.INSTANCE.isChunkGenerated(linearV1Region, 0, 0));
+        AnvilReader.ChunkEntry entry = LinearRegionReader.INSTANCE.readChunk(linearV1Region, 0, 0);
+        assertNotNull(entry);
+    }
+
+    @Test
+    @DisplayName("LinearRegionReader handles out-of-range coords and unsupported version")
+    void testLinearEdgeCases() {
+        byte[] dummy = new byte[100];
+        assertThrows(IllegalArgumentException.class, () -> LinearRegionReader.INSTANCE.readChunk(dummy, -1, 0));
+        assertThrows(IllegalArgumentException.class, () -> LinearRegionReader.INSTANCE.readChunk(dummy, 0, 32));
+
+        ByteBuffer buf = ByteBuffer.allocate(100);
+        buf.putLong(LinearRegionReader.LINEAR_MAGIC_V1);
+        buf.put((byte) 99); // unsupported version
+        assertThrows(UnsupportedAnvilFormatException.class, () -> LinearRegionReader.INSTANCE.readChunk(buf.array(), 0, 0));
+    }
+
+    @Test
     @DisplayName("RegionFileResolver prefers registered .linear over .mca when present")
     void testRegionFileResolver(@TempDir Path tempDir) throws IOException {
         Path regionDir = tempDir.resolve("region");

@@ -71,6 +71,16 @@ Safe destinations are prepared at-rate and a number of them are kept ready in a 
 
 Candidate selection uses a keyed 4-round Feistel permutation over a space-filling Hilbert curve with a hardened ARX PRF round function (SipRound style) and tiny-domain masking. The permutation is a strict bijection: every candidate chunk across the region is visited exactly once before any repeats, yielding 0 duplicate chunk landings without storing visited keys. Dyadic bit-reversal phase bisection leaps consecutive teleports across opposite quadrants (averaging ~4,600 blocks per hop on a 4k border), bounding consecutive arrivals to a minimum floor of >= sqrt(S) chunks (128 blocks at S=64, 256 blocks at S=256). The entire selection state is an advancing 64-bit integer counter: no entity distance loops, no recent-location history sets, and zero heap allocation per draw.
 
+### In-house, zero-dependency engineering
+
+Most rtp plugins are thin glue over heavy third-party enterprise jars: bundled MySQL drivers, shaded Redis clients, external connection pools, and generic parsers. That is why a 200-line script ships in a 6.5 MB jar where 93 % of the bytecode belongs to someone else. When those upstream dependencies break, shift class paths, or conflict with another plugin on the server, the author cannot fix it.
+
+LeafRTP takes the opposite trade:
+- **No shaded database or networking bloat:** we do not shade 6 MB of external MySQL drivers or Jedis. SQL connection pooling (`MiniConnectionPool`), cross-server network messaging, and persistence run on in-house code and standard Java primitives.
+- **Zero classloader collisions:** without shaded third-party dependency trees, LeafRTP cannot collide with other plugins over HikariCP, Protobuf, or Commons Pool versions.
+- **In-house off-tick parsers:** Anvil (`.mca`) and Linear (`.linear` / ZStandard) region decompression run off-tick through our own lightweight readers, with no native binary bloat or JNI crashes.
+- **Immunity to platform drift:** config parsing, command routing, and spatial math do not depend on Bukkit's or Paper's internal library choices.
+
 ---
 
 ## Features

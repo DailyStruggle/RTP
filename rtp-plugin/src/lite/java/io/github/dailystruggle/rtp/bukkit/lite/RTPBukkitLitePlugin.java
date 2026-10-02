@@ -1,16 +1,21 @@
 package io.github.dailystruggle.rtp.bukkit.lite;
 
+import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.BootstrapSupport;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
+import io.github.dailystruggle.rtp.bukkit.events.*;
+import io.github.dailystruggle.rtp.bukkit.bukkitListeners.*;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
-import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerJoin;
-import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerQuit;
-import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnEventTeleports;
-import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnWorldLoadUnload;
+import io.github.dailystruggle.rtp.bukkit.utils.JarUtils;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.bukkitplatform.server.AsyncTeleportProcessing;
 import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
@@ -18,339 +23,673 @@ import io.github.dailystruggle.rtp.bukkitplatform.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
-import java.util.logging.Level;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * RTP-lite bootstrap (ADR-024) for the lite assembly variant. Mirrors the surviving
- * steps of {@link RTPBukkitPlugin} and OMITS, in this order: the {@code org.sqlite.JDBC}
- * probe (no SQL drivers shipped); {@code BukkitDatabaseHandler.setupDatabase} (lite uses
- * {@code YamlFileDatabase}); the login reserve cache (ADR-023); and the tuned Folia
- * adapter (lite runs on Folia through the basic regionized scheduler). Everything else,
- * including on-event teleports, effects, Vault, PlaceholderAPI, and lang/**, is shared.
- *
- * <p>S-001..S-007 compliance is shared with the full bootstrap: all chunk I/O,
- * MemoryTracker accounting, and stale-chunk guard logic live in {@code rtp-core} and load
- * identically. Shared, branch-free bootstrap steps route through {@code BootstrapSupport}.
- *
- * <p>Intentionally divergent from {@link RTPBukkitPlugin}. Do NOT collapse the two via
- * runtime flags: ADR-024 requires the lite bootstrap to read top-to-bottom with no
- * {@code if (lite)} branches and no dead code paths.
+ * RTP-lite bootstrap for the standard assembly variant.
+ * Provides 100% technical and functional parity with {@link RTPBukkitPlugin} (ADR-100),
+ * differing only in the bStats metric ID and variant tag ("lite" vs "full").
  */
 @SuppressWarnings("unused")
 public final class RTPBukkitLitePlugin extends JavaPlugin {
-
   private static RTPBukkitLitePlugin instance = null;
   private static Metrics metrics;
+  /** Backend-side network mode lifecycle holder; never null after onLoad. */
+  private final NetworkModeBootstrap networkBootstrap = new NetworkModeBootstrap();
+  public BukkitTask commandTimer = null;
+  public BukkitTask commandProcessing = null;
 
   /**
-   * Network-mode bootstrap (ADR-036). Lite ships only the DB-free tiers
-   * (plugin-message / proxy-cache, ADR-024 amendment); the durable SQL/Redis
-   * transports are excluded from the lite jar. Without this the entire
-   * cross-server transport machinery is inert under the lite assembly.
+   * @return the single plugin instance initialized at bukkit startup, faster than bukkit api
    */
-  private final NetworkModeBootstrap networkBootstrap = new NetworkModeBootstrap();
-
-  /** @return the single plugin instance initialized at bukkit startup */
   public static RTPBukkitLitePlugin getInstance() {
     return instance;
   }
 
-  @Override
-  public void onLoad() {
-    // Lite intentionally does NOT probe org.sqlite.JDBC. SQL drivers are not shipped.
-    RTP.log(Level.FINE, "[RTP] onLoad ENTER");
-    RTP.log(Level.FINE, "[RTP] onLoad EXIT (no SQL probe; ADR-024)");
+  /**
+   * bukkit-specific method to find the correct region for the player's location and permissions
+   *
+   * @param player bukkit player
+   * @return region object
+   */
+  public static Region getRegion(Player player) {
+    return RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
+  }
+
+  public boolean isPaper() {
+    try {
+      Class.forName("io.papermc.paper.configuration.PaperConfigurations");
+      return true;
+    } catch (ClassNotFoundException e) {
+      return false;
+    }
+  }
+
+  public boolean isFolia() {
+    try {
+      Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+      return true;
+    } catch (ClassNotFoundException e) {
+      return false;
+    }
   }
 
   @Override
+  public void onLoad() {
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onLoad ENTER -- probing org.sqlite.JDBC");
+    // prepare sqlite capability
+    try {
+      Class.forName("org.sqlite.JDBC");
+      RTP.log(java.util.logging.Level.FINER, "[RTP] onLoad SQLite JDBC driver loaded successfully");
+    } catch (ClassNotFoundException e) {
+      RTP.log(java.util.logging.Level.FINE, "[RTP] onLoad FAIL_FAST -- org.sqlite.JDBC not found");
+      throw new IllegalStateException();
+    }
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onLoad EXIT");
+  }
+
+  /** whenever bukkit feels like enabling this plugin */
+  @Override
   public void onEnable() {
+    // Wire RTP.serverAccessor and RTP.scheduler FIRST (silently) so every subsequent
+    // RTP.log(...) routes through the canonical accessor instead of the JUL bootstrap
+    // fallback. Reflection itself cannot log via RTP.log because the accessor isn't ready.
     if (instance == null) {
       instance = this;
-
-      // Server-model resolve + accessor/scheduler wiring (shared helper, ADR-024).
-      // Lite is Spigot/Paper only: :rtp-folia:** is not on the classpath, so the
-      // Folia code path is never reached even though BukkitServerProvider handles it.
+      // ADR-024: shared helper -- both bootstraps wire serverAccessor + scheduler the same way.
       if (!BootstrapSupport.wireServerAccessorAndScheduler(this, "LIFECYCLE-LITE")) {
         onDisable();
         return;
       }
     }
 
+    // Install the Bukkit implementations of the /rtp test ... umbrella SPI onto RTP.
+    // Doing this once RTP.serverAccessor + RTP.scheduler are wired guarantees both
+    // adapter dependencies are usable. Idempotent: the field is volatile and may be
+    // overwritten on a hot reload.
+    RTP.testUmbrellaContext =
+        new io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext(
+            new io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestUmbrellaSender(),
+            new io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestUmbrellaScheduler(),
+            null);
+
     // bStats: lite uses a distinct pluginId (12277) so lite installs are tracked
     // separately from full (30865), preserving continuity for the lite install base.
-    RTP.log(Level.FINE, "[RTP] onEnable initializing bStats id=12277");
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable ENTER -- initializing bStats Metrics(id=12277)");
     metrics = new Metrics(this, 12277);
-    // Same cost-metrics chart catalogue as the full assembly, with the
-    // assembly_variant pie reporting "lite" so dashboards can split.
+    // Register the RTP cost-metrics chart catalogue. All chart lambdas read
+    // RTP.metrics.snapshot() and bucketise to keep submissions privacy-safe and
+    // low-cardinality.
     io.github.dailystruggle.rtp.bukkit.metrics.RTPCostMetricsCharts.register(metrics, "lite");
 
-    // Install the platform-appropriate MetricsBinding (Paper vs raw Spigot).
-    // The dispatcher's Paper probe is platform-symmetric, so the same call works
-    // as in the full bootstrap. Best-effort.
+    // Install the platform-appropriate MetricsBinding so /rtp info, RTPCostMetricsCharts,
+    // and every other Metrics.snapshot() consumer report live values instead of
+    // UNSAMPLED sentinels. Best-effort; never aborts plugin enable.
     io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.install();
 
     if (RTP.getInstance() == null) {
+      RTP.log(java.util.logging.Level.FINER, "[RTP] onEnable accessor/scheduler wired; starting accessor");
+      RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable RTP.serverAccessor.start(plugin)");
       RTP.serverAccessor.start(this);
-      // Multilingual bootstrap (ADR-020) ships in lite as of the 2026-05-11 ADR-024
-      // language-options amendment. No explicit call is needed here: Configs#reloadConfigs()
-      // invokes LanguageBootstrap.resolve(pluginDirectory) unconditionally, and the lite jar
-      // now ships lang/** plus language.yml so the locale resource lookups succeed.
-      RTP rtp = new RTP();
+      RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable constructing new RTP() -- wires API instance");
+      RTP rtp = new RTP(); // constructor updates API instance
 
-      // Read routing.lobbyMode from network.yml BEFORE regions are loaded
-      // (reloadRegions below constructs Region instances). On a lobby this
-      // skips the local region processing (ScanTask pre-fill, DB hydrate,
-      // Region.execute pulse) so the lobby does not initialise default
-      // regions. The full bootstrap performs this same early-read; omitting
-      // it on lite was the cause of lite lobbies hydrating regions.
-      // Defensive: any failure resolves to lobbyMode=false.
+      // Read routing.lobbyMode from network.yml BEFORE setupDatabase
+      // (which loads regions.yml and constructs Region instances). The flag gates
+      // the per-region ScanTask scheduling, DB hydrate, and steady-state
+      // Region.execute() pulse - all of which would otherwise begin spending CPU
+      // and disk on a backend that should not be holding any local locations.
+      // Defensive: any failure resolves to lobbyMode=false, preserving pre-J
+      // behaviour byte-for-byte on non-lobby deployments.
       try {
         java.io.File earlyNetworkYml = NetworkModeBootstrap.ensureNetworkYml(
             getDataFolder(), RTPBukkitLitePlugin.class);
         RTP.lobbyMode = NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml);
         if (RTP.lobbyMode) {
-          RTP.log(Level.INFO,
-              "[RTP] onEnable routing.lobbyMode=true -- local region"
-                  + " processing skipped; this backend acts as a pure cross-server"
-                  + " dispatcher.");
+          RTP.log(java.util.logging.Level.INFO,
+              "[RTP] onEnable routing.lobbyMode=true -- local region processing"
+                  + " (ScanTask pre-fill, DB hydrate, Region.execute pulse) will be"
+                  + " skipped; this backend acts as a pure cross-server dispatcher.");
         }
       } catch (Throwable t) {
+        // Never block plugin enable on this read.
         RTP.lobbyMode = false;
-        RTP.log(Level.FINE,
+        RTP.log(java.util.logging.Level.FINE,
             "[RTP] onEnable lobbyMode early-read failed; defaulting to false: "
                 + t.getMessage());
       }
 
-      // Database setup (ADR-024 early-access graduation: full SQL/Redis/YAML parity with Pro).
       try {
-        io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler.setupDatabase(rtp);
+        RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable BukkitDatabaseHandler.setupDatabase");
+        BukkitDatabaseHandler.setupDatabase(rtp);
+        RTP.log(java.util.logging.Level.FINER, "[RTP] onEnable database setup complete");
+        // Boot backend-side network mode AFTER the DB is up
+        // (the SQL transport reuses the same accessor's DataSource). Strict
+        // REQ-RTP-NET-002 parity: no-op when network.yml is absent or
+        // network.enabled=false. Failure here is logged but never aborts
+        // plugin enable (network mode is strictly optional).
+        try {
+          java.io.File networkYml = NetworkModeBootstrap.ensureNetworkYml(
+              getDataFolder(), RTPBukkitLitePlugin.class);
+          networkBootstrap.boot(networkYml);
+        } catch (Throwable t) {
+          RTP.log(java.util.logging.Level.WARNING,
+              "[RTP] onEnable network-mode boot failed; continuing without it: " + t.getMessage(), t);
+        }
       } catch (Exception e) {
-        RTP.log(Level.WARNING,
-            "[RTP] database setup failed", e);
-      }
-
-      // Boot backend-side network mode (ADR-036). No-op when network.yml is
-      // absent or network.enabled=false. Lite resolves to the DB-free transport
-      // tiers only (plugin-message / proxy-cache); failure is logged but never
-      // aborts plugin enable (network mode is strictly optional).
-      try {
-        java.io.File networkYml = NetworkModeBootstrap.ensureNetworkYml(
-            getDataFolder(), RTPBukkitLitePlugin.class);
-        networkBootstrap.boot(networkYml);
-      } catch (Throwable t) {
-        RTP.log(Level.WARNING,
-            "[RTP] onEnable network-mode boot failed; continuing without it: "
-                + t.getMessage(), t);
+        RTP.log(java.util.logging.Level.WARNING,
+            "[RTP] onEnable database setup failure -- bailing out via onDisable", e);
+        onDisable();
+        return;
       }
     }
 
-    // Command registration (shared helper, ADR-024). Builds the platform-neutral
-    // CoreRtpRoot (ADR-070) with the Bukkit seams; passing `this` is parity-correct
-    // for both editions.
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable ChunkyBorderChecker.loadChunky");
+    ChunkyBorderChecker.loadChunky();
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable startupTasks drain #1 size="
+        + RTP.getInstance().startupTasks.size());
+    RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
+
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable binding /rtp and /wild executors and tab-completers");
+    // ADR-024: shared helper -- identical command-binding logic between full and lite.
     BootstrapSupport.registerRtpAndWildCommands(this);
 
-    // Drain startup tasks (region binding etc.); shared helper (ADR-024).
-    BootstrapSupport.drainStartupTasks();
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable scheduling deferred startupTasks drain (tick+1)");
+    RTP.scheduler.runTaskLater(
+        () -> {
+          RTP.log(java.util.logging.Level.FINER, "[RTP] deferred startupTasks drain firing size="
+              + RTP.getInstance().startupTasks.size());
+          while (RTP.getInstance().startupTasks.size() > 0) {
+            RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
+          }
+        },
+        1);
 
-    // Same listener set as the full bootstrap: join/quit/world-load (region lifecycle)
-    // plus OnEventTeleports (rtp.onevent.*). The login-reserve join-prime inside
-    // OnEventTeleports is inert because LoginCacheTask is not shipped.
-    Bukkit.getPluginManager().registerEvents(new OnPlayerJoin(), this);
-    Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
-    Bukkit.getPluginManager().registerEvents(new OnWorldLoadUnload(), this);
-    Bukkit.getPluginManager().registerEvents(new OnEventTeleports(), this);
-    OnWorldLoadUnload.rebindFallbackRegionsForAllLoadedWorlds();
-
-    // Cross-server arrival wiring (ADR-036). Registers the network-mode
-    // JoinTriggerSource and the cross-server waitlist quit listener so a
-    // proxied player arriving on this backend redeems their pending RTP.
-    // All no-ops when network mode is disabled (boot() left them null).
-    try {
-      networkBootstrap.registerJoinTriggerSource();
-    } catch (Throwable t) {
-      RTP.log(Level.WARNING,
-          "[RTP] JoinTriggerSource registration failed; continuing: "
-              + t.getMessage(), t);
-    }
-    try {
-      networkBootstrap.registerWaitlistQuitListener();
-      java.util.function.Predicate<io.github.dailystruggle.rtp.api.entity.RTPCommandSender> guard =
-          networkBootstrap.waitlistCommandGuard();
-      if (guard != null
-          && RTP.baseCommand instanceof io.github.dailystruggle.rtp.common.commands.CoreRtpRoot cmd) {
-        // commands-api-ADR-003: sender-check list is Predicate<RTPCommandSender>;
-        // register the neutral guard directly (console senders always pass).
-        cmd.addSenderCheck(rs ->
-            !(rs instanceof io.github.dailystruggle.rtp.api.entity.RTPPlayer) || guard.test(rs));
-      }
-    } catch (Throwable t) {
-      RTP.log(Level.WARNING,
-          "[RTP] waitlist wiring failed; continuing: " + t.getMessage(), t);
-    }
-
-    // Chunk-unload processor (Spigot/Paper only; safe in lite, no Folia branch).
-    RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
-
-    // Database processor. Under yaml-only persistence this is effectively a no-op
-    // flush loop, kept for symmetry so /rtp reload behaves identically to full.
-    DatabaseProcessing.start();
-
-    SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
-
-    // Drain late startup tasks; shared helper (ADR-024).
-    BootstrapSupport.drainStartupTasks();
-
-    // Maps subsystem (ADR-047). The maps-api, BukkitMapBinding, BukkitBiomeColorSource,
-    // and visualization resolvers all ship in the lite jar. Without this install
-    // MapDispatch stays on NoopMapBinding and every `/rtp visualization ...` click
-    // yields the configurable `mapBindingMissing` message. Lite is Paper-only, so
-    // install the plain BukkitMapBinding unconditionally; failure degrades gracefully
-    // to the same `mapBindingMissing` UX rather than crashing onEnable.
+    // Register event listeners synchronously so that WorldLoadEvents fired by
+    // automatic world generators (e.g. Multiverse) during the first tick are not
+    // missed. Previously this ran via runTaskLater(..., 1), which caused dormant
+    // regions configured for a late-loaded world to never rebind.
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable setupBukkitEvents (synchronous)");
+    setupBukkitEvents();
     // Install the platform-appropriate MapBinding via the accessor layer
     // (ADR-047 / REQ-RTP-MAP-006) so MapDispatch can satisfy chart requests.
     if (RTP.serverAccessor != null) {
       RTP.serverAccessor.setupMapBinding();
     }
     // Install the Bukkit-family BiomeColorSource so the biomes visualisation
-    // asks the server for each biome's native cartography colour (rather
-    // than falling back to the built-in 16-entry categorical palette).
+    // can ask the server for each biome's native cartography colour (rather
+    // than mapping biome-name hashes onto the 27-step heat ramp, which made
+    // nether/end render homogeneously and overworld collide on every other
+    // biome). Reflective so this compiles against older Bukkit APIs that
+    // predate Biome#getMapColor; on those runtimes the resolver falls back
+    // to the categorical palette in BiomeColorSource#fallback.
     try {
       io.github.dailystruggle.mapsapi.BiomeColorSource.install(
           new io.github.dailystruggle.rtp.bukkit.maps.BukkitBiomeColorSource());
-      RTP.log(Level.FINE,
+      RTP.log(java.util.logging.Level.FINE,
           "[RTP] onEnable installed BukkitBiomeColorSource");
     } catch (Throwable t) {
-      RTP.log(Level.WARNING,
+      RTP.log(java.util.logging.Level.WARNING,
           "[RTP] onEnable BiomeColorSource install failed;"
               + " biomes viz will use the built-in categorical palette",
           t);
     }
-
-    // Per-permission effects parse, deferred to tick+1 to mirror full. effects-api
-    // is shaded into lite so rtp.effects.<name> fires identically to the full edition.
-    RTP.log(Level.FINE,
-        "[RTP] onEnable scheduling deferred BukkitEffectsHandler.setupEffects (tick+1)");
+    // Catch worlds that were already loaded by the time the listener registered
+    // (either before RTP enabled, or between region config load and listener
+    // registration), so dormant regions for those worlds are activated without
+    // needing another WorldLoadEvent.
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable rebindFallbackRegionsForAllLoadedWorlds");
+    io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnWorldLoadUnload
+        .rebindFallbackRegionsForAllLoadedWorlds();
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable scheduling deferred setupIntegrations (tick+1)");
     RTP.scheduler.runTaskLater(() -> {
-      RTP.log(Level.FINER,
-          "[RTP] deferred BukkitEffectsHandler.setupEffects firing");
-      // The `plugin` parameter is unused inside setupEffects (event dispatch
-      // goes through Bukkit.getPluginManager()), so passing null is safe and
-      // avoids touching the full-edition singleton from the lite bootstrap.
-      BukkitEffectsHandler.setupEffects(null);
+      RTP.log(java.util.logging.Level.FINER, "[RTP] deferred setupIntegrations firing");
+      setupIntegrations();
+    }, 1);
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable scheduling deferred BukkitEffectsHandler.setupEffects (tick+1)");
+    RTP.scheduler.runTaskLater(() -> {
+      RTP.log(java.util.logging.Level.FINER, "[RTP] deferred BukkitEffectsHandler.setupEffects firing");
+      BukkitEffectsHandler.setupEffects(this);
     }, 1);
 
-    // Vault/economy wiring, identical to full: when Vault is present and no economy
-    // provider is bound yet, bind VaultChecker through the public RTPHooks facade.
-    // Lite ships economy.yml, so optional per-region teleport charging works out of
-    // the box (ADR-024).
-    RTP.scheduler.runTaskLater(() -> {
-      try {
-        if (RTP.economy == null
-            && Bukkit.getServer().getPluginManager().getPlugin("Vault") != null) {
-          VaultChecker.setupEconomy();
-          VaultChecker.setupPermissions();
-          if (VaultChecker.getEconomy() != null) {
-            io.github.dailystruggle.rtp.api.RTPAPI.hooks().economy().bind(new VaultChecker());
-          }
-        }
-      } catch (Throwable t) {
-        RTP.log(Level.WARNING,
-            "[RTP] Failed to initialize Vault economy; continuing without it.",
-            t);
-      }
-      // Bundled combat-tag plugin integrations for the optional PvP gate (ADR-055).
-      // Binds the first enabled combat plugin (PvPManager / CombatLogX / Simple Combat
-      // Log) to PvPCombatStateRegistry; no-op when none is present (native fallback).
-      try {
-        io.github.dailystruggle.rtp.bukkit.tools.softdepends.pvp.PvPIntegrations.setup(this);
-      } catch (Throwable t) {
-        RTP.log(Level.WARNING,
-            "[RTP] Failed to initialize combat-tag integrations; continuing with the native PvP tracker.",
-            t);
-      }
-    }, 1);
-
-    // PlaceholderAPI expansion, identical to full. PAPI_expansion ships in the lite jar
-    // and carries no driver cost, so %rtp_*% placeholders resolve on both editions.
-    if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
-      RTP.log(Level.FINE, "[RTP] onEnable registering PAPI_expansion");
-      try {
-        new PAPI_expansion().register();
-      } catch (Throwable t) {
-        RTP.log(Level.WARNING,
-            "[RTP] Failed to register the PlaceholderAPI expansion; continuing without it.",
-            t);
-      }
+    if (!isFolia()) {
+      RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable starting non-Folia ChunkUnloadProcessor timer");
+      RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
     } else {
-      RTP.log(Level.FINER, "[RTP] onEnable PlaceholderAPI not present -- skipping PAPI_expansion");
+      RTP.log(java.util.logging.Level.FINER, "[RTP] onEnable Folia detected -- skipping ChunkUnloadProcessor");
     }
 
-    // Lite OMITS only initLoginReserveCache() (ADR-023): LoginCacheTask is excluded
-    // from the lite jar.
+    // Biome-occupancy sampler (feeds /rtp info biomes). Periodically snapshots
+    // which biomes online players are standing in. Biome reads are location-
+    // bound, so the design splits by platform (the timer primitive itself has no
+    // region/location context):
+    //
+    //  - Folia: an ASYNC timer pulse (runTaskTimerAsynchronously) only enumerates
+    //    the online players and hands them to BiomeActivityTracker.sample, which
+    //    dispatches each per-player biome read onto that player's OWNING region
+    //    thread via RTP.scheduler.runTaskForPlayer. No world/entity state is
+    //    touched on the async pulse thread itself.
+    //
+    //  - Non-Folia: a MAIN-thread timer pulse (runTaskTimer) does the data
+    //    collection inline - the main thread owns every world, so reading each
+    //    online player's biome there is correct and cheap - then hands the
+    //    (trivial) accumulation off to an async task so nothing but the reads
+    //    stays on the main thread.
+    {
+      final long biomeSamplePeriodTicks = 600L; // ~30s at 20 TPS
+      RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable starting biome occupancy sampler timer");
+      if (isFolia()) {
+        RTP.scheduler.runTaskTimerAsynchronously(
+            () -> {
+              try {
+                java.util.List<io.github.dailystruggle.rtp.api.entity.RTPPlayer> players =
+                    new java.util.ArrayList<>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                  io.github.dailystruggle.rtp.api.entity.RTPPlayer rp =
+                      RTP.serverAccessor.getPlayer(p.getUniqueId());
+                  if (rp != null) players.add(rp);
+                }
+                if (!players.isEmpty()) RTP.biomeActivity.sample(players);
+              } catch (Throwable t) {
+                RTP.log(java.util.logging.Level.FINE,
+                    "[RTP] biome occupancy sampler pulse failed", t);
+              }
+            },
+            biomeSamplePeriodTicks,
+            biomeSamplePeriodTicks);
+      } else {
+        RTP.scheduler.runTaskTimer(
+            () -> {
+              try {
+                // Main thread owns every world: read each online player's biome
+                // directly, here and now.
+                java.util.List<String> biomes = new java.util.ArrayList<>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                  io.github.dailystruggle.rtp.api.entity.RTPPlayer rp =
+                      RTP.serverAccessor.getPlayer(p.getUniqueId());
+                  if (rp == null || !rp.isOnline()) continue;
+                  io.github.dailystruggle.rtp.api.world.RTPLocation loc = rp.getLocation();
+                  if (loc == null || loc.world() == null) continue;
+                  String biome = loc.world().getBiome(loc.x(), loc.y(), loc.z());
+                  if (biome != null) biomes.add(biome);
+                }
+                // Hand the accumulation off the main thread.
+                if (!biomes.isEmpty()) {
+                  RTP.scheduler.runTaskAsynchronously(
+                      () -> biomes.forEach(RTP.biomeActivity::record));
+                }
+              } catch (Throwable t) {
+                RTP.log(java.util.logging.Level.FINE,
+                    "[RTP] biome occupancy sampler pulse failed", t);
+              }
+            },
+            biomeSamplePeriodTicks,
+            biomeSamplePeriodTicks);
+      }
+    }
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable DatabaseProcessing.start");
+    DatabaseProcessing.start();
 
-    // Bundled operator docs. Lite ships the same `docs/` tree as the Pro
-    // edition (config/docs parity) and extracts it through the shared
-    // JarUtils.extractDocs, identical to the Pro bootstrap. The docs are
-    // version-stamped and only overwritten on a version change, so
-    // operator-visible reference material stays in sync with the jar.
-    io.github.dailystruggle.rtp.bukkit.utils.JarUtils.extractDocs(
-        getDataFolder(), getDescription().getVersion());
-    RTP.log(Level.INFO,
-        "[RTP] Documentation extracted to "
-            + new java.io.File(getDataFolder(), "docs").getAbsolutePath());
+    SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
+
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable startupTasks drain #2 size="
+        + RTP.getInstance().startupTasks.size());
+    while (RTP.getInstance().startupTasks.size() > 0) {
+      RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
+    }
+
+    if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+      RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable registering PAPI_expansion");
+      new PAPI_expansion().register();
+    } else {
+      RTP.log(java.util.logging.Level.FINER, "[RTP] onEnable PlaceholderAPI not present -- skipping PAPI_expansion");
+    }
+
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable JarUtils.extractDocs version=" + getDescription().getVersion());
+    JarUtils.extractDocs(getDataFolder(), getDescription().getVersion());
+
+    // ADR-023 - Login Reserve Cache: snapshot max-players at startup, allocate
+    // the buffer on the default-world region (Bukkit.getWorlds().get(0)), and
+    // dispatch the startup burst. Decoupled from Region.execute() per ADR-023.
+    initLoginReserveCache();
+
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable EXIT -- plugin enabled");
   }
 
+  /**
+   * ADR-023 - initialise the Login Reserve Cache on the default-world region
+   * if {@code PerformanceKeys.loginCacheEnabled=true}. Sized to
+   * {@code loginCacheCap} (or {@code Bukkit.getMaxPlayers()} when
+   * {@code loginCacheCap=0}). Idempotent: safe to call after reload.
+   */
+  @SuppressWarnings("unchecked")
+  private void initLoginReserveCache() {
+    try {
+      ConfigParser<PerformanceKeys> perf =
+          (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+      if (perf == null) return;
+      Object enabledObj = perf.getConfigValue(PerformanceKeys.loginCacheEnabled, false);
+      boolean enabled = (enabledObj instanceof Boolean)
+          ? (Boolean) enabledObj
+          : Boolean.parseBoolean(String.valueOf(enabledObj));
+      if (!enabled) return;
+
+      long configuredCap = perf.getNumber(PerformanceKeys.loginCacheCap, 0L).longValue();
+      // Read soft cap from the metrics snapshot when a binding is installed; fall
+      // back to Bukkit.getMaxPlayers() only on the NOOP path (snapshot.softCap=0).
+      io.github.dailystruggle.metrics.api.MetricsSnapshot bootSnap =
+          RTP.metrics.snapshot();
+      int snapshotCap = bootSnap.softCap;
+      int cap = (configuredCap > 0)
+          ? (int) Math.min(configuredCap, Integer.MAX_VALUE)
+          : (snapshotCap > 0 ? snapshotCap : Bukkit.getMaxPlayers());
+      if (cap <= 0) return;
+
+      if (Bukkit.getWorlds().isEmpty()) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[ADR-023] login cache enabled but no worlds loaded; skipping");
+        return;
+      }
+      String defaultWorldName = Bukkit.getWorlds().get(0).getName();
+      Region region = RTP.selectionAPI.permRegionLookup.values().stream()
+          .filter(r -> r.getWorld() != null && defaultWorldName.equals(r.getWorld().name()))
+          .findFirst()
+          .orElse(null);
+      if (region == null) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[ADR-023] login cache enabled but no region attached to default world '"
+                + defaultWorldName + "'; skipping");
+        return;
+      }
+
+      region.queueManager.enableLoginCache(cap);
+      RTP.log(java.util.logging.Level.INFO,
+          "[ADR-023] login reserve cache enabled on region '" + region.name
+              + "' cap=" + cap + " (default world '" + defaultWorldName + "')");
+
+      // Startup burst: dispatch up to (cap - currentOnline) async promotions.
+      // Prefer the metrics snapshot when bound; fall back to the Bukkit API on the
+      // NOOP path (snapshot.playerCount=0 on first boot before the sampler has run,
+      // which is also the value Bukkit returns at this lifecycle point, so the two
+      // paths are semantically aligned).
+      io.github.dailystruggle.metrics.api.MetricsSnapshot burstSnap =
+          RTP.metrics.snapshot();
+      int online = (burstSnap.playerCount > 0)
+          ? burstSnap.playerCount
+          : Bukkit.getOnlinePlayers().size();
+      int target = Math.max(0, cap - online);
+      if (target > 0) {
+        new io.github.dailystruggle.rtp.common.selection.region.LoginCacheTask(region)
+            .promoteUpTo(target);
+        RTP.log(java.util.logging.Level.FINE,
+            "[ADR-023] startup burst dispatched count=" + target);
+      }
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[ADR-023] login reserve cache init failed: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+    }
+  }
+
+  /** whenever bukkit feels like disabling this plugin */
   @Override
   public void onDisable() {
-    RTP.log(Level.FINE, "[RTP] onDisable ENTER");
-    // Stop the backend heartbeat publisher + close the network transport
-    // first (reverse-order teardown). Idempotent; safe if network mode was
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onDisable ENTER -- cancelling command timers");
+    // Stop the backend heartbeat publisher + close the network
+    // transport BEFORE any DB shutdown. Reverse-order teardown - publisher
+    // first (so it cannot enqueue more upserts), then transport (releases
+    // any subscribers / poll thread). Idempotent; safe if network mode was
     // never enabled this lifecycle.
     try {
       networkBootstrap.shutdown();
     } catch (Throwable t) {
-      RTP.log(Level.WARNING,
-          "[RTP] onDisable network-mode shutdown failed (continuing): "
-              + t.getMessage(), t);
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] onDisable network-mode shutdown failed (continuing): " + t.getMessage(), t);
     }
-    // Mirror the full-bootstrap metrics teardown so a /reload cycle reinstalls the
-    // binding cleanly. Idempotent.
+    // Tear down the metrics binding and cancel the Spigot tick sampler (if installed)
+    // so a /reload cycle reinstalls cleanly. Idempotent.
     try {
       io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.uninstall();
-    } catch (Throwable ignored) {
+    } catch (NoClassDefFoundError ignored) {
     }
-    // Fan out the host-plugin disable to every registered MapBindingLifecycle
-    // so the active BukkitMapBinding (installed in onEnable above) releases
-    // its cached MapHandles. Idempotent; safe if MapDispatch was never used.
+    // REQ-RTP-MAP-003 - fan out the host-plugin disable to every registered
+    // MapBindingLifecycle so the active BukkitMapBinding (installed in onEnable)
+    // releases its cached MapHandles and the active-GC tracker no longer sees the
+    // binding's entries. Idempotent; safe if MapDispatch was never used this lifecycle.
     try {
       io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.fireDisable();
     } catch (Throwable t) {
-      RTP.log(Level.WARNING,
-          "[RTP] onDisable MapDispatch.fireDisable failed (continuing): "
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] onDisable MapDispatch.fireDisable failed (continuing): " + t.getMessage(), t);
+    }
+    if (commandTimer != null) {
+      RTP.log(java.util.logging.Level.FINER, "[RTP] onDisable commandTimer.cancel()");
+      commandTimer.cancel();
+    }
+    if (commandProcessing != null) {
+      RTP.log(java.util.logging.Level.FINER, "[RTP] onDisable commandProcessing.cancel()");
+      commandProcessing.cancel();
+    }
+
+    try {
+      RTP.log(java.util.logging.Level.FINER, "[RTP] onDisable AsyncTeleportProcessing.kill");
+      AsyncTeleportProcessing.kill();
+    } catch (NoClassDefFoundError ignored) {
+    }
+    try {
+      RTP.log(java.util.logging.Level.FINER, "[RTP] onDisable SyncTeleportProcessing.kill");
+      SyncTeleportProcessing.kill();
+    } catch (NoClassDefFoundError ignored) {
+    }
+    try {
+      RTP.log(java.util.logging.Level.FINER, "[RTP] onDisable ScanTask.kill + clear scan progress bars");
+      io.github.dailystruggle.rtp.common.tasks.ScanTask.kill();
+      io.github.dailystruggle.rtp.common.tasks.tick.ScanProgressBars.clear();
+    } catch (NoClassDefFoundError ignored) {
+    }
+    try {
+      RTP.log(java.util.logging.Level.FINER,
+          "[RTP] onDisable DatabaseProcessing.kill (stops periodic flush task)");
+      DatabaseProcessing.kill();
+    } catch (NoClassDefFoundError ignored) {
+    }
+
+    metrics = null;
+
+    try {
+      RTP.log(java.util.logging.Level.FINE, "[RTP] onDisable RTP.stop() invoking core shutdown");
+      RTP.stop();
+    } catch (NoClassDefFoundError ignored) {
+    }
+
+    List<BukkitTask> pendingTasks =
+        Bukkit.getScheduler().getPendingTasks().stream()
+            .filter(
+                b ->
+                    b.getOwner().getName().equalsIgnoreCase("RTP")
+                        && !b.isSync()
+                        && !b.isCancelled())
+            .collect(Collectors.toList());
+    RTP.log(java.util.logging.Level.FINE,
+        "[RTP] onDisable cancelling pending RTP-owned async Bukkit tasks count="
+            + pendingTasks.size());
+    for (BukkitTask pendingTask : pendingTasks) {
+      RTP.log(java.util.logging.Level.FINER,
+          "[RTP] onDisable cancelling pending Bukkit task id=" + pendingTask.getTaskId());
+      pendingTask.cancel();
+    }
+
+    try {
+      if (RTP.getInstance() != null && RTP.getInstance().databaseAccessor != null) {
+        RTP.log(java.util.logging.Level.FINE,
+            "[RTP] onDisable writing referenceData sentinel + processQueries(MAX) final drain");
+        Map<String, Object> referenceData = new HashMap<>();
+        referenceData.put("time", System.currentTimeMillis());
+        referenceData.put("UUID", new UUID(0, 0).toString());
+        RTP.getInstance().databaseAccessor.setValue("referenceData", referenceData);
+        RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+        RTP.log(java.util.logging.Level.FINER,
+            "[RTP] onDisable referenceData sentinel persisted");
+      } else {
+        RTP.log(java.util.logging.Level.FINER,
+            "[RTP] onDisable referenceData sentinel skipped (instance or accessor null)");
+      }
+    } catch (NoClassDefFoundError ignored) {
+    }
+
+    if (RTP.serverAccessor != null) {
+      RTP.log(java.util.logging.Level.FINE,
+          "[RTP] onDisable releaseAllChunkTickets (S-002 guarantee)");
+      RTP.serverAccessor.releaseAllChunkTickets();
+    } else {
+      RTP.log(java.util.logging.Level.FINER,
+          "[RTP] onDisable releaseAllChunkTickets skipped (serverAccessor null)");
+    }
+
+    // Folia (and Spigot's /reload) does not unregister a plugin's permissions
+    // when the plugin instance is disabled. On re-enable Bukkit re-runs
+    // SimplePluginManager.loadPlugin, which calls addPermission(...) for every
+    // entry under plugin.yml's `permissions:` block; those calls collide with
+    // the still-registered Permission objects from the previous lifecycle and
+    // the server logs a "tried to register permission '...' but it's already
+    // registered" warning per node. Defensively remove our declared permissions
+    // here so the next enable starts from a clean slate.
+    try {
+      org.bukkit.plugin.PluginManager pm = Bukkit.getPluginManager();
+      for (org.bukkit.permissions.Permission perm : getDescription().getPermissions()) {
+        if (pm.getPermission(perm.getName()) != null) {
+          pm.removePermission(perm.getName());
+        }
+      }
+      RTP.log(java.util.logging.Level.FINER,
+          "[RTP] onDisable unregistered declared permissions to silence Folia re-enable warnings");
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.FINER,
+          "[RTP] onDisable permission cleanup skipped: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+    }
+
+    instance = null;
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onDisable EXIT -- plugin disabled");
+    super.onDisable();
+  }
+
+  private void setupBukkitEvents() {
+    RTP.log(java.util.logging.Level.FINE, "[RTP] setupBukkitEvents ENTER");
+    ConfigParser<PerformanceKeys> performance =
+        (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+
+    boolean onEventParsing;
+    Object o = performance.getConfigValue(PerformanceKeys.onEventParsing, false);
+    if (o instanceof Boolean) onEventParsing = (Boolean) o;
+    else onEventParsing = Boolean.parseBoolean(o.toString());
+    RTP.log(java.util.logging.Level.FINER, "[RTP] setupBukkitEvents onEventParsing=" + onEventParsing);
+
+    if (onEventParsing) Bukkit.getPluginManager().registerEvents(new OnEventTeleports(), this);
+    Bukkit.getPluginManager().registerEvents(new OnPlayerChangeWorld(), this);
+    Bukkit.getPluginManager().registerEvents(new OnPlayerDamage(), this);
+    // ADR-055: feed the native PvP combat tracker for the optional combat gate.
+    Bukkit.getPluginManager().registerEvents(new OnPlayerCombatTag(), this);
+    Bukkit.getPluginManager().registerEvents(new OnPlayerDeath(), this);
+    Bukkit.getPluginManager().registerEvents(new OnPlayerJoin(), this);
+    Bukkit.getPluginManager().registerEvents(new OnPlayerMove(), this);
+    Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
+    Bukkit.getPluginManager().registerEvents(new OnPlayerRespawn(), this);
+    // Deprecated external-teleport interceptor; kept wired for one release cycle, slated for
+    // removal. See OnPlayerTeleport class Javadoc.
+    @SuppressWarnings("deprecation")
+    OnPlayerTeleport legacyTeleportListener = new OnPlayerTeleport();
+    Bukkit.getPluginManager().registerEvents(legacyTeleportListener, this);
+    Bukkit.getPluginManager().registerEvents(new OnWorldLoadUnload(), this);
+    // Opportunistic on-load biome harvest (PerformanceKeys.checkOnChunkLoads).
+    // The listener is always registered; the core handler gates O(1) on the
+    // config flag, so a disabled flag costs only a cheap boolean check.
+    Bukkit.getPluginManager().registerEvents(new OnChunkLoad(), this);
+
+    // Hand the network-mode bootstrap a plugin reference so it can register its
+    // JoinTriggerSource alongside the other listeners. No-op when network mode is
+    // disabled (boot() left joinTriggerSource null).
+    try {
+      networkBootstrap.registerJoinTriggerSource();
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] setupBukkitEvents JoinTriggerSource registration failed; continuing: "
               + t.getMessage(), t);
     }
-    // Lite has no shutdown-flush phase (no SQL/Redis backend to drain).
-    // Async/sync teleport processors are stopped via the same hooks the full bootstrap
-    // uses; biomeRecall, MemoryTracker, and queue state are in-memory only and are
-    // released by region/queue manager teardown.
+
+    // ADR-015 / REQ-RTP-NET-015: register the cross-server
+    // waitlist PlayerQuitEvent hook + install the command-lock sender
+    // check on the live command root. Both are no-ops when network mode
+    // is disabled (waitlistQuitListener / waitlistCommandGuard() are
+    // null on the disabled-mode path) and idempotent on re-register.
     try {
-      AsyncTeleportProcessing.kill();
-    } catch (Throwable ignored) {
-      // matches the defensive style in RTPBukkitPlugin.onDisable
+      networkBootstrap.registerWaitlistQuitListener();
+      java.util.function.Predicate<io.github.dailystruggle.rtp.api.entity.RTPCommandSender> guard =
+          networkBootstrap.waitlistCommandGuard();
+      if (guard != null
+          && RTP.baseCommand instanceof io.github.dailystruggle.rtp.common.commands.CoreRtpRoot cmd) {
+        // ADR-049: the guard is platform-neutral (Predicate<RTPCommandSender>).
+        // commands-api-ADR-003 lifted the sender-check list to the same neutral
+        // type, so the guard is registered directly; non-player senders (console)
+        // always pass, matching the prior Bukkit-boundary adapter.
+        cmd.addSenderCheck(rs ->
+            !(rs instanceof io.github.dailystruggle.rtp.api.entity.RTPPlayer) || guard.test(rs));
+      }
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] setupBukkitEvents waitlist wiring failed; continuing: "
+              + t.getMessage(), t);
     }
+
+    EffectsAPI.init(this);
+    RTP.log(java.util.logging.Level.FINE, "[RTP] setupBukkitEvents EXIT -- listeners registered");
+  }
+
+  public void setupIntegrations() {
+    RTP.log(java.util.logging.Level.FINE, "[RTP] setupIntegrations ENTER");
+    if (RTP.economy == null && Bukkit.getServer().getPluginManager().getPlugin("Vault") != null) {
+      VaultChecker.setupEconomy();
+      VaultChecker.setupPermissions();
+      // ADR-026: bind through the public RTPHooks facade rather than poking RTP.economy
+      // directly. The facade also writes RTP.economy for read-path compatibility; see
+      // docs/dev/EXTERNAL_HOOKS.md.
+      if (VaultChecker.getEconomy() != null) {
+        io.github.dailystruggle.rtp.api.RTPAPI.hooks().economy().bind(new VaultChecker());
+      }
+    }
+
+    // Claim-plugin integrations now ship as the bundled LeafRTPClaimAddon
+    // (superseding ADR-019): RTP self-extracts it into <pluginDir>/addons/ on
+    // first run and the addon registers its verifiers via the public hook facade.
+
+    // Bundled combat-tag plugin integrations for the optional PvP gate (ADR-055).
+    // Binds the first enabled combat plugin (PvPManager / CombatLogX / Simple Combat
+    // Log) to PvPCombatStateRegistry; no-op when none is present (native fallback).
     try {
-      SyncTeleportProcessing.kill();
-    } catch (Throwable ignored) {
-      // matches the defensive style in RTPBukkitPlugin.onDisable
+      RTP.log(java.util.logging.Level.FINER, "[RTP] setupIntegrations invoking PvPIntegrations.setup");
+      io.github.dailystruggle.rtp.bukkit.tools.softdepends.pvp.PvPIntegrations.setup(this);
+    } catch (Throwable t) {
+      RTP.log(
+          java.util.logging.Level.WARNING,
+          "[RTP] Failed to initialize combat-tag integrations; continuing with the native PvP tracker.",
+          t);
     }
+
+    // Hologram & floating display integrations (DecentHolograms / HolographicDisplays / native TextDisplay).
     try {
-      DatabaseProcessing.kill();
-    } catch (Throwable ignored) {
-      // yaml flush is synchronous; no shutdown-flush race to manage
+      RTP.log(java.util.logging.Level.FINER, "[RTP] setupIntegrations invoking HologramIntegrations.setup");
+      io.github.dailystruggle.rtp.bukkit.tools.softdepends.hologram.HologramIntegrations.setup(this);
+    } catch (Throwable t) {
+      RTP.log(
+          java.util.logging.Level.WARNING,
+          "[RTP] Failed to initialize hologram integrations; continuing with virtual fallback.",
+          t);
     }
-    instance = null;
-    RTP.log(Level.FINE, "[RTP] onDisable EXIT");
+    RTP.log(java.util.logging.Level.FINE, "[RTP] setupIntegrations EXIT");
   }
 }
