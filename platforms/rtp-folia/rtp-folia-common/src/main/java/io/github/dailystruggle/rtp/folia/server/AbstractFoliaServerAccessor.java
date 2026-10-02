@@ -625,18 +625,47 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public boolean executeCommand(UUID senderId, String commandLine) {
     if (commandLine == null || commandLine.isBlank()) return false;
-    org.bukkit.command.CommandSender sender;
-    if (senderId == null || senderId.equals(RTPAPI.serverId)) {
-      sender = Bukkit.getConsoleSender();
-    } else {
-      sender = Bukkit.getPlayer(senderId);
-      if (sender == null) return false;
-    }
-    try {
-      return Bukkit.dispatchCommand(sender, commandLine);
-    } catch (Throwable t) {
-      log(Level.WARNING, "[RTP] Command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+    if (!(plugin instanceof org.bukkit.plugin.Plugin bukkitPlugin) || !bukkitPlugin.isEnabled()) {
       return false;
+    }
+    if (senderId == null || senderId.equals(RTPAPI.serverId)) {
+      if (Bukkit.isGlobalTickThread()) {
+        try {
+          return Bukkit.dispatchCommand(Bukkit.getConsoleSender(), commandLine);
+        } catch (Throwable t) {
+          log(Level.WARNING, "[RTP] Console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          return false;
+        }
+      } else {
+        Bukkit.getGlobalRegionScheduler().run(bukkitPlugin, task -> {
+          try {
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), commandLine);
+          } catch (Throwable t) {
+            log(Level.WARNING, "[RTP] Console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          }
+        });
+        return true;
+      }
+    } else {
+      Player player = Bukkit.getPlayer(senderId);
+      if (player == null || !player.isOnline()) return false;
+      if (Bukkit.isOwnedByCurrentRegion(player.getLocation())) {
+        try {
+          return Bukkit.dispatchCommand(player, commandLine);
+        } catch (Throwable t) {
+          log(Level.WARNING, "[RTP] Command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          return false;
+        }
+      } else {
+        player.getScheduler().run(bukkitPlugin, task -> {
+          try {
+            Bukkit.dispatchCommand(player, commandLine);
+          } catch (Throwable t) {
+            log(Level.WARNING, "[RTP] Command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          }
+        }, null);
+        return true;
+      }
     }
   }
 

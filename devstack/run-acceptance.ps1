@@ -496,24 +496,25 @@ function Get-CrashedMcServices {
 
 function Clear-StaleWorldDirs {
   # World dirs are host bind mounts (./backend-{a,b}/world) per docker-compose.yml.
-  # `docker compose down` (without -v) leaves them intact, so a prior crashed boot
-  # can persist a stale ./world/session.lock that the next boot can't acquire
-  # (especially if file ownership / file-handle state from the prior run lingers
-  # on Windows/Docker-Desktop). Removing the dirs entirely on every `up` is the
-  # cheapest correct fix: Paper regenerates the world from scratch each run.
-  # Idempotent; silent on first run (dirs don't exist yet).
+  # If a previous run left a stale lock file, clear it. Do NOT remove the whole world
+  # dir if it has pre-generated chunks from seed-pregen-worlds.ps1.
   foreach ($b in @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')) {
     $dir = Join-Path $PSScriptRoot "$b\world"
     if (Test-Path $dir) {
-      try {
-        Remove-Item -Recurse -Force $dir -ErrorAction Stop
-        Write-Evidence 'up' "cleared stale world dir: $dir"
-      } catch {
-        # If a previous container still has the dir open, Remove-Item fails.
-        # Best-effort delete of just the lock file then proceed.
-        $lock = Join-Path $dir 'session.lock'
-        if (Test-Path $lock) {
-          try { Remove-Item -Force $lock -ErrorAction Stop; Write-Evidence 'up' "cleared stale lock: $lock" } catch { Write-Evidence 'up' "WARN could not clear $dir : $_" }
+      $lock = Join-Path $dir 'session.lock'
+      if (Test-Path $lock) {
+        try { Remove-Item -Force $lock -ErrorAction Stop; Write-Evidence 'up' "cleared stale lock: $lock" } catch { Write-Evidence 'up' "WARN could not clear $lock : $_" }
+      }
+    } else {
+      if ($b -match '^backend-') {
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+      }
+    }
+    if ($b -match '^backend-') {
+      foreach ($dim in @('world_nether', 'world_the_end')) {
+        $dimDir = Join-Path $PSScriptRoot "$b\$dim"
+        if (-not (Test-Path $dimDir)) {
+          New-Item -ItemType Directory -Force -Path $dimDir | Out-Null
         }
       }
     }
@@ -669,7 +670,14 @@ function Invoke-RedisCli {
   # reported "no heartbeats" even though the devstack backends were publishing
   # fine to the compose-internal `redis:6379`. Exec-into-container is port-map
   # agnostic and always hits the right Redis.
-  return Invoke-Native { docker compose exec -T redis redis-cli @Args }
+  Push-Location $PSScriptRoot
+  try {
+    $composeFile = Join-Path $PSScriptRoot 'docker-compose.yml'
+    $out = Invoke-Native { docker compose -f $composeFile exec -T redis redis-cli @Args }
+    return ($out -split "`r?`n" | Where-Object { $_ -match '\S' })
+  } finally {
+    Pop-Location
+  }
 }
 
 function Test-Boot {
@@ -756,10 +764,6 @@ function Test-Heartbeat {
   Write-Host '[heartbeat]   polling every 5s; diagnostic snapshot every 30s. Press Ctrl+C if stuck >5min.' -ForegroundColor DarkGray
   $deadline = (Get-Date).AddSeconds($WaitSeconds)
   $pollStart = Get-Date
-  # Emit a baseline diagnostic snapshot immediately so the operator can see
-  # container states from the start (otherwise the first one lands at ~30s,
-  # which feels like a hang on a slow first-run boot).
-  Show-HeartbeatDiagnostics -ElapsedSec 0
   $lastDiagAt = 0
   $earlyDumpDone = $false
   while ((Get-Date) -lt $deadline) {
@@ -781,13 +785,13 @@ function Test-Heartbeat {
       Write-Host "[heartbeat] PASS (backends=$bCount, proxies=$pCount) after ${elapsed}s" -ForegroundColor Green
       return $true
     }
-    $elapsed = [int]((Get-Date) - $pollStart).TotalSeconds
-    Write-Host "[heartbeat]   ${elapsed}s elapsed: backends=$bCount/5 proxies=$pCount/2 (still waiting)" -ForegroundColor DarkGray
     # Diagnostic snapshot every 30s so the operator can decide whether it's genuinely stuck.
-    if (($elapsed - $lastDiagAt) -ge 30) {
+    if ($lastDiagAt -eq 0 -or (($elapsed - $lastDiagAt) -ge 30)) {
       Show-HeartbeatDiagnostics -ElapsedSec $elapsed
       $lastDiagAt = $elapsed
     }
+    $elapsed = [int]((Get-Date) - $pollStart).TotalSeconds
+    Write-Host "[heartbeat]   ${elapsed}s elapsed: backends=$bCount/5 proxies=$pCount/2 (still waiting)" -ForegroundColor DarkGray
     # Early full-log dump: if >=90s have elapsed with zero heartbeats from
     # either side, the boot has almost certainly failed (crash at enable,
     # bad config, missing jar). Dump logs once so the operator doesn't have

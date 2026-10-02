@@ -327,6 +327,61 @@ public class PermissionMigrationTest {
         assertNull(root.getCommandLookup().get("PERM"));
     }
 
+    @Test
+    @DisplayName("5.4 - ConfigImportCmd unifies config and permission import")
+    void testUnifiedConfigImportWithPermissions() throws IOException {
+        List<String> dispatchedCommands = new ArrayList<>();
+        MockRTPServerAccessor accessor = new MockRTPServerAccessor(tempDir.toFile()) {
+            @Override
+            public boolean executeCommand(UUID senderId, String commandLine) {
+                dispatchedCommands.add(commandLine);
+                return true;
+            }
+        };
+        RTP.serverAccessor = accessor;
+
+        Path customDir = tempDir.resolve("external_plugins_unified");
+        Path extBetter = customDir.resolve("BetterRTP");
+        Files.createDirectories(extBetter);
+        Files.writeString(extBetter.resolve("config.yml"), "Default:\n  MinRadius: 50\n  MaxRadius: 2500\n");
+
+        io.github.dailystruggle.rtp.common.commands.config.ConfigImportCmd importCmd =
+                new io.github.dailystruggle.rtp.common.commands.config.ConfigImportCmd(null);
+
+        // 1. Dry-run import with permissions default (true)
+        Map<String, List<String>> dryRunParams = new HashMap<>();
+        dryRunParams.put("source", List.of("betterrtp"));
+        dryRunParams.put("path", List.of(customDir.toString()));
+        dryRunParams.put("overwrite", List.of("false"));
+
+        boolean dryRunResult = importCmd.onCommand(RTPAPI.serverId, dryRunParams, null);
+        assertTrue(dryRunResult);
+        assertEquals(0, dispatchedCommands.size(), "Dry-run import should not dispatch commands to provider");
+
+        // 2. Confirmed import with overwrite=true -> should trigger permission migration dispatch
+        Map<String, List<String>> applyParams = new HashMap<>();
+        applyParams.put("source", List.of("betterrtp"));
+        applyParams.put("path", List.of(customDir.toString()));
+        applyParams.put("overwrite", List.of("true"));
+
+        boolean applyResult = importCmd.onCommand(RTPAPI.serverId, applyParams, null);
+        assertTrue(applyResult);
+        assertTrue(dispatchedCommands.size() >= 1, "Confirmed import should dispatch permission provider commands");
+        assertEquals("lp listgroups", dispatchedCommands.get(0));
+
+        // 3. Confirmed import with permissions=false -> should skip permission migration
+        dispatchedCommands.clear();
+        Map<String, List<String>> skipPermsParams = new HashMap<>();
+        skipPermsParams.put("source", List.of("betterrtp"));
+        skipPermsParams.put("path", List.of(customDir.toString()));
+        skipPermsParams.put("overwrite", List.of("true"));
+        skipPermsParams.put("permissions", List.of("false"));
+
+        boolean skipResult = importCmd.onCommand(RTPAPI.serverId, skipPermsParams, null);
+        assertTrue(skipResult);
+        assertEquals(0, dispatchedCommands.size(), "Import with permissions=false should not dispatch provider commands");
+    }
+
     private static final class StubRoot extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
         StubRoot() {
             super(null);

@@ -250,14 +250,20 @@ lifecycle:
 
 ### Non-Destructive Permission Migration
 
-RTP includes a non-destructive permission migration service to translate permission nodes assigned to groups in your permissions provider (such as LuckPerms).
+RTP integrates non-destructive permission migration directly into `/rtp config import`. When importing configs, competitor permission nodes assigned to groups in your permissions provider (such as LuckPerms) are automatically mapped and applied (unless `permissions=false` is explicitly passed).
 
 #### Command Syntax
 ```
+/rtp config import [source] [overwrite=true|false] [permissions=true|false] [path=<dir>]
 /rtp config import permissions [source] [apply=true|false]
 ```
-- `[source]`: Optional source filter (`betterrtp`, `justrtp`, `ezrtp`, or `jakesrtp`). If omitted, all supported competitor nodes are scanned.
-- `[apply]`: `false` (default) performs a non-destructive **DRY-RUN**, logging planned migrations. `true` executes the appropriate permission set commands directly through your server's command dispatcher.
+- **Unified Import (`/rtp config import`)**:
+  - `[source]`: Competitor plugin to import (`betterrtp`, `justrtp`, `ezrtp`, `jakesrtp`), or omit to auto-detect.
+  - `[overwrite]`: When `true`, writes configuration files and applies permission changes to your permission provider. Defaults to `false` (dry-run preview for both config and permissions).
+  - `[permissions]`: Defaults to `true`. Pass `permissions=false` or `--no-permissions` to skip permission migration.
+- **Standalone Permission Subcommand (`/rtp config import permissions`)**:
+  - `[source]`: Optional source filter (`betterrtp`, `justrtp`, `ezrtp`, or `jakesrtp`). If omitted, all supported competitor nodes are scanned.
+  - `[apply]`: `false` (default) performs a non-destructive **DRY-RUN**, logging planned migrations. `true` executes the appropriate permission set commands directly through your server's command dispatcher.
 
 #### Permission Mapping Table
 

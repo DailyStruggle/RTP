@@ -1,15 +1,17 @@
 name: Release LeafRTP to BuiltByBit (BBCode sites)
 
-# Owns the BBCode-listing side of a single release: publishes jars to
-# BuiltByBit. It does NOT create tags or GitHub Releases -- those are Git /
-# markdown-listing concerns owned by release.yml. Both workflows trigger
-# independently on the same PR-merge (or workflow_dispatch) event, so each site
-# is published exactly once with no cross-workflow coupling:
-#   - release-bbb.yml (this file): BuiltByBit (Pro + Lite BBCode pages), Spigot.
-#   - release.yml:                 Modrinth (markdown) + GitHub Releases + the `v<version>` tag.
+# Owns the commercial/Pro release side: publishes LeafRTP Pro to BuiltByBit
+# and creates the `v<version>` git release tag upon PR merge.
+#
+# Release Staging (ADR-100 section 2.3):
+#   - LeafRTP Pro releases first on PR merge (or manual workflow_dispatch).
+#   - LeafRTP (Lite) is intentionally delayed (e.g. 1-2 weeks until Pro settles)
+#     and is subsequently triggered manually via `release.yml` (workflow_dispatch).
 #
 # Automates the BuiltByBit side on PR merge:
+#   - Creates and pushes the `v<version>` Git tag.
 #   - LeafRTP Pro to BuiltByBit (resource 105418) with full changelog.
+#   - Attests SLSA build provenance for the Pro jar.
 #
 # NOTE: BuiltByBit has no API endpoint to edit a resource's base description /
 # BBCode body (V1/V2 expose only versions/updates), so the BBCode listings
@@ -24,8 +26,8 @@ name: Release LeafRTP to BuiltByBit (BBCode sites)
 #   - LeafRTP-Pro-<version>.jar (uploaded EXCLUSIVELY to BuiltByBit, NOT publicly on GitHub Releases)
 #   - CycloneDX Software Bill of Materials (bom.json)
 #
-# The Lite jar, Modrinth publish, the `v<version>` tag, and the public GitHub
-# Release are handled by release.yml; they are intentionally NOT here.
+# The Lite jar, Modrinth publish, Hangar publish, and the public GitHub Release
+# are handled separately on demand by release.yml after Pro settles.
 #
 # Required repository secrets:
 #   Either:
@@ -70,9 +72,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      # No git tag is created here -- tagging is a Git / GitHub-Release concern
-      # owned by release.yml. This workflow only needs the version string to
-      # name and title the BuiltByBit upload.
+      # Owns the Git release tag when Pro is published on PR merge.
+      # If the tag already exists (e.g. from manual workflow_dispatch), it is preserved.
       - name: Determine release version
         id: version
         env:
@@ -100,6 +101,21 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Prepared release version: ${VERSION} with tag: ${TAG}"
+
+      - name: Create and push Git tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+            echo "Tag ${TAG} already exists locally or remotely. Skipping tag creation."
+          else
+            echo "Creating and pushing tag ${TAG}..."
+            git tag -a "$TAG" -m "Release ${TAG}"
+            git push origin "$TAG"
+          fi
 
       - name: Set up JDK 21 and 25
         uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
