@@ -300,4 +300,74 @@ public class ClaimAnchoredRegionTrackerTest {
     assertFalse(circle.isKnownBad(0, 0), "Point outside claim must remain good");
     assertFalse(circle.isKnownBad(200, 200), "Point outside claim must remain good");
   }
+
+  @Test
+  @DisplayName("resolveAnchor handles boundary cooldown, updates, and edge cases")
+  void testResolveAnchorBranches() {
+    ClaimAnchoredRegionTracker tracker = new ClaimAnchoredRegionTracker(100, TimeUnit.MILLISECONDS);
+    assertThrows(NullPointerException.class, () -> tracker.resolveAnchor(null, 1000L));
+
+    // Centroid null or short
+    ClaimBoundary badCentroid = new ClaimBoundary() {
+      @Override public String id() { return "bad"; }
+      @Override public String world() { return "world"; }
+      @Override public boolean contains(int x, int z) { return true; }
+      @Override public int[] centroid() { return new int[] {1}; }
+      @Override public int minChunkX() { return 0; }
+      @Override public int minChunkZ() { return 0; }
+      @Override public int maxChunkX() { return 0; }
+      @Override public int maxChunkZ() { return 0; }
+    };
+    assertThrows(IllegalArgumentException.class, () -> tracker.resolveAnchor(badCentroid, 1000L));
+
+    RectangularClaimBoundary b = new RectangularClaimBoundary("c1", "world", 10, 10, 50, 50);
+    int[] a1 = tracker.resolveAnchor(b, 1000L);
+    assertEquals(30, a1[0]);
+    assertEquals(30, a1[1]);
+
+    // Move boundary slightly while still containing old center (30, 30), before cooldown elapsed
+    b.updateBounds(15, 15, 55, 55);
+    int[] a2 = tracker.resolveAnchor(b, 1050L);
+    assertEquals(30, a2[0], "Before cooldown elapsed, center should be preserved");
+    assertEquals(30, a2[1]);
+
+    // After cooldown elapsed, updates to new centroid (35, 35)
+    int[] a3 = tracker.resolveAnchor(b, 1150L);
+    assertEquals(35, a3[0], "After cooldown elapsed, center should update");
+    assertEquals(35, a3[1]);
+
+    // Move boundary completely so old center is outside -> immediate update even before cooldown
+    b.updateBounds(100, 100, 200, 200);
+    int[] a4 = tracker.resolveAnchor(b, 1160L);
+    assertEquals(150, a4[0], "Center outside boundary must update immediately");
+    assertEquals(150, a4[1]);
+
+    // Invalidate and clear
+    tracker.invalidate("c1");
+    tracker.invalidate(null);
+    tracker.clear();
+  }
+
+  @Test
+  @DisplayName("encapsulateClaim edge cases: null shape, null world, null boundary fallback")
+  void testEncapsulateClaimEdgeCases() {
+    Circle circle = new Circle();
+    assertEquals(0, ClaimAnchoredRegionTracker.encapsulateClaim(null, "world", 0, 0, null));
+    assertEquals(0, ClaimAnchoredRegionTracker.encapsulateClaim(circle, null, 0, 0, null));
+
+    // When no provider matches, falls back to single candidate chunk
+    io.github.dailystruggle.rtp.api.RTPAPI.hooks = null;
+    int marked = ClaimAnchoredRegionTracker.encapsulateClaim(circle, "world", 16, 16, null);
+    assertTrue(marked >= 0);
+  }
+
+  @Test
+  @DisplayName("ingestMemoryFromRegion edge cases with nulls and non-memory shapes")
+  void testIngestMemoryEdgeCases() {
+    Circle circle = new Circle();
+    RectangularClaimBoundary b = new RectangularClaimBoundary("c2", "world", 0, 0, 16, 16);
+    assertEquals(0, ClaimAnchoredRegionTracker.ingestMemoryFromRegion(null, circle, b));
+    assertEquals(0, ClaimAnchoredRegionTracker.ingestMemoryFromRegion(createTestRegion("w", circle, null), null, b));
+    assertEquals(0, ClaimAnchoredRegionTracker.ingestMemoryFromRegion(createTestRegion("w", circle, null), circle, null));
+  }
 }

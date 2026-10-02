@@ -111,6 +111,7 @@ public class ClaimAnchoredRegionTracker {
    * @param nowMillis current epoch time in milliseconds
    * @return resolved {@code [x, z]} anchor coordinates
    */
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: internal per-ClaimAnchorState synchronization for centroid updates
   public int[] resolveAnchor(ClaimBoundary boundary, long nowMillis) {
     Objects.requireNonNull(boundary, "boundary cannot be null");
     String id = boundary.id();

@@ -198,7 +198,7 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
                     RtpYamlConfig cfg = entry.getValue();
                     if (hasRtpMarkers(cfg)) {
                         String worldName = getStringCaseInsensitive(cfg, "world", "World", "world-name", "name");
-                        if (worldName == null || worldName.trim().isEmpty()) {
+                        if (worldName == null || worldName.isBlank()) {
                             String stem = entry.getKey();
                             int dot = stem.lastIndexOf('.');
                             worldName = dot > 0 ? stem.substring(0, dot) : stem;

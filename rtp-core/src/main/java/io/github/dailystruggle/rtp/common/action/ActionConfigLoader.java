@@ -375,8 +375,6 @@ public final class ActionConfigLoader {
       rawList.addAll(sec.getValues(false).values());
     } else if (raw instanceof Map<?, ?> m) {
       rawList.addAll(m.values());
-    } else if (raw != null) {
-      return parameters;
     } else {
       return parameters;
     }

@@ -394,59 +394,63 @@ public class RegionQueueManager {
      *
      * @param capacity buffer capacity; &lt;= 0 disables the buffer
      */
-    public synchronized void enableLoginCache(int capacity) {
-        if (capacity <= 0) {
-            disableLoginCache();
-            return;
-        }
-        if (this.loginLocations != null) {
-            // Already enabled; reload changes use disable+enable.
-            return;
-        }
-        Consumer<RTPLocation> hotDispose = loc -> {
-            if (loc != null && loc.reservation() != null) {
-                try {
-                    loc.reservation().close();
-                } catch (Throwable t) {
-                    RTP.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
-                }
+    public void enableLoginCache(int capacity) {
+        synchronized (this) {
+            if (capacity <= 0) {
+                disableLoginCache();
+                return;
             }
-        };
-        LockFreeLocationBuffer buffer = new LockFreeLocationBuffer(capacity);
-        RingCacheStage<RTPLocation> stage = new RingCacheStage<>("loginLocations", buffer, hotDispose);
-        HotSink<RTPLocation> sink = new HotSink<>() {
-            @Override public String name() { return "loginLocations"; }
-            @Override public CacheStage<RTPLocation> stage() { return stage; }
-            @Override public CacheStage<?> coldSource() { return unkeptStage; }
-            @Override public boolean accepts(RTPLocation entry) { return checkAccepts(entry); }
-            @Override public boolean hasExtrinsicVerifier() { return false; }
-            @Override public boolean isExternallyLeased() { return false; }
-            @Override public boolean narrowsBeyondColdSource() { return false; }
-            @Override public int chunkCostPerEntry() { return 1; }
-            @Override public long demandWeight() { return 0L; }
-        };
-        this.loginStage = stage;
-        this.loginHotSink = sink;
-        this.loginLocations = buffer;
-        installDatabaseCallbacks();
+            if (this.loginLocations != null) {
+                // Already enabled; reload changes use disable+enable.
+                return;
+            }
+            Consumer<RTPLocation> hotDispose = loc -> {
+                if (loc != null && loc.reservation() != null) {
+                    try {
+                        loc.reservation().close();
+                    } catch (Throwable t) {
+                        RTP.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
+                    }
+                }
+            };
+            LockFreeLocationBuffer buffer = new LockFreeLocationBuffer(capacity);
+            RingCacheStage<RTPLocation> stage = new RingCacheStage<>("loginLocations", buffer, hotDispose);
+            HotSink<RTPLocation> sink = new HotSink<>() {
+                @Override public String name() { return "loginLocations"; }
+                @Override public CacheStage<RTPLocation> stage() { return stage; }
+                @Override public CacheStage<?> coldSource() { return unkeptStage; }
+                @Override public boolean accepts(RTPLocation entry) { return checkAccepts(entry); }
+                @Override public boolean hasExtrinsicVerifier() { return false; }
+                @Override public boolean isExternallyLeased() { return false; }
+                @Override public boolean narrowsBeyondColdSource() { return false; }
+                @Override public int chunkCostPerEntry() { return 1; }
+                @Override public long demandWeight() { return 0L; }
+            };
+            this.loginStage = stage;
+            this.loginHotSink = sink;
+            this.loginLocations = buffer;
+            installDatabaseCallbacks();
+        }
     }
 
     /**
      * Drain {@link #loginLocations} back to {@link #unkeptLocations} (closing
      * reservations) and null the buffer reference. Safe to call multiple times.
      */
-    public synchronized void disableLoginCache() {
-        RingCacheStage<RTPLocation> login = this.loginStage;
-        if (login == null && this.loginLocations == null) return;
-        this.loginStage = null;
-        this.loginLocations = null;
-        this.loginHotSink = null;
-        if (login != null) {
-            Optional<RTPLocation> loc;
-            while ((loc = login.pollSilently()).isPresent()) {
-                demoteToUnkept(loc.get());
+    public void disableLoginCache() {
+        synchronized (this) {
+            RingCacheStage<RTPLocation> login = this.loginStage;
+            if (login == null && this.loginLocations == null) return;
+            this.loginStage = null;
+            this.loginLocations = null;
+            this.loginHotSink = null;
+            if (login != null) {
+                Optional<RTPLocation> loc;
+                while ((loc = login.pollSilently()).isPresent()) {
+                    demoteToUnkept(loc.get());
+                }
+                login.close();
             }
-            login.close();
         }
     }
 

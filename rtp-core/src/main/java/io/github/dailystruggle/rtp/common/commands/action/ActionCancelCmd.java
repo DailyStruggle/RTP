@@ -115,11 +115,9 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
 
     // Permission check for cancelling others
     boolean cancellingSelf = (sender instanceof RTPPlayer player) && player.uuid().equals(targetPlayerId);
-    if (!cancellingSelf) {
-      if (!sender.hasPermission(PERMISSION_OTHER) && !sender.hasPermission("rtp.*")) {
-        RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
-        return true;
-      }
+    if (!cancellingSelf && (!sender.hasPermission(PERMISSION_OTHER) && !sender.hasPermission("rtp.*"))) {
+      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
+      return true;
     }
 
     // Determine target actionId

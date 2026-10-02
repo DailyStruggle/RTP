@@ -585,7 +585,7 @@ final class MenuConcreteCommandLeaves {
         }
 
         private static int parsePixelDimension(String raw, int defaultValue) {
-            if (raw == null || raw.trim().isEmpty()) return defaultValue;
+            if (raw == null || raw.isBlank()) return defaultValue;
             String s = raw.trim().toLowerCase(Locale.ROOT);
             try {
                 // Metric and unit transformations:

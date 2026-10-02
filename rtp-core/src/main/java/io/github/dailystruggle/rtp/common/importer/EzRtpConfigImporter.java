@@ -14,7 +14,7 @@ import java.util.*;
  * Maps radii (min-distance, max-distance), center (center-x, center-z), worlds,
  * shapes (circle -> CIRCLE, square -> SQUARE), and cooldowns into LeafRTP Region and World configs.
  */
-public class EzRtpConfigImporter implements ForeignConfigImporter {
+public class EzRtpConfigImporter extends AbstractForeignConfigImporter {
 
     @Override
     public String sourceName() {
@@ -101,7 +101,7 @@ public class EzRtpConfigImporter implements ForeignConfigImporter {
             }
             if (configCfg.contains("world")) {
                 String w = configCfg.getString("world");
-                if (w != null && !w.trim().isEmpty()) {
+                if (w != null && !w.isBlank()) {
                     worlds.add(w.trim());
                 }
             }
@@ -195,7 +195,7 @@ public class EzRtpConfigImporter implements ForeignConfigImporter {
 
             if (rtpCfg.contains("world")) {
                 String w = rtpCfg.getString("world");
-                if (w != null && !w.trim().isEmpty()) {
+                if (w != null && !w.isBlank()) {
                     worlds.add(w.trim());
                 }
             }
@@ -455,83 +455,6 @@ public class EzRtpConfigImporter implements ForeignConfigImporter {
         } catch (NumberFormatException e) {
             return 1;
         }
-    }
-
-    private RtpYamlSection getSectionCaseInsensitive(RtpYamlSection config, String key) {
-        if (config == null) return null;
-        Object direct = config.get(key);
-        if (direct instanceof RtpYamlSection sec) return sec;
-
-        for (String k : config.getKeys(false)) {
-            if (k.equalsIgnoreCase(key)) {
-                Object obj = config.get(k);
-                if (obj instanceof RtpYamlSection sec) return sec;
-            }
-        }
-        return null;
-    }
-
-    private String getStringCaseInsensitive(RtpYamlSection section, String def, String... keys) {
-        for (String k : keys) {
-            if (section.contains(k)) {
-                String val = section.getString(k);
-                if (val != null) return val;
-            }
-        }
-        for (String actual : section.getKeys(false)) {
-            for (String target : keys) {
-                if (actual.equalsIgnoreCase(target)) {
-                    String val = section.getString(actual);
-                    if (val != null) return val;
-                }
-            }
-        }
-        return def;
-    }
-
-    private int getIntCaseInsensitive(RtpYamlSection section, int def, String... keys) {
-        for (String k : keys) {
-            if (section.contains(k)) {
-                return section.getInt(k, def);
-            }
-        }
-        for (String actual : section.getKeys(false)) {
-            for (String target : keys) {
-                if (actual.equalsIgnoreCase(target)) {
-                    return section.getInt(actual, def);
-                }
-            }
-        }
-        return def;
-    }
-
-    private double getDoubleCaseInsensitive(RtpYamlSection section, double def, String... keys) {
-        for (String k : keys) {
-            if (section.contains(k)) {
-                return section.getDouble(k, def);
-            }
-        }
-        for (String actual : section.getKeys(false)) {
-            for (String target : keys) {
-                if (actual.equalsIgnoreCase(target)) {
-                    return section.getDouble(actual, def);
-                }
-            }
-        }
-        return def;
-    }
-
-    private String mapShape(String foreignShape) {
-        if (foreignShape == null) return "CIRCLE";
-        String s = foreignShape.trim().toUpperCase(Locale.ROOT);
-        if (s.contains("SQUARE")) {
-            return "SQUARE";
-        }
-        return "CIRCLE";
-    }
-
-    private RtpYamlConfig loadYamlSafe(Path path, List<String> warnings) {
-        return loadForeignYaml(path, warnings);
     }
 
     private long getLongFromSections(RtpYamlConfig cfg, String... paths) {

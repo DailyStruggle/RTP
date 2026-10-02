@@ -259,14 +259,16 @@ public final class GateEvaluator {
                 RTPServerAccessor accessor = RTP.serverAccessor;
                 if (accessor != null) {
                   for (io.github.dailystruggle.rtp.api.entity.RTPPlayer p : accessor.getOnlinePlayers()) {
-                    if (p == null) continue;
-                    io.github.dailystruggle.rtp.api.world.RTPLocation loc = p.getLocation();
-                    if (loc == null || loc.world() == null) continue;
-                    if (targetWorld != null && !loc.world().name().equalsIgnoreCase(targetWorld)) continue;
-                    int cx = (int) Math.floor(loc.x() / 16.0);
-                    int cz = (int) Math.floor(loc.z() / 16.0);
-                    if (shape.contains(cx, cz)) {
-                      matchingPlayers++;
+                    if (p != null) {
+                      io.github.dailystruggle.rtp.api.world.RTPLocation loc = p.getLocation();
+                      if (loc != null && loc.world() != null) {
+                        if (targetWorld != null && !loc.world().name().equalsIgnoreCase(targetWorld)) continue;
+                        int cx = (int) Math.floor(loc.x() / 16.0);
+                        int cz = (int) Math.floor(loc.z() / 16.0);
+                        if (shape.contains(cx, cz)) {
+                          matchingPlayers++;
+                        }
+                      }
                     }
                   }
                 }

@@ -97,11 +97,9 @@ public class ActionCommand extends BaseRTPCmdImpl {
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
     String requiredPerm = permission();
-    if (requiredPerm != null && !requiredPerm.isBlank()) {
-      if (!sender.hasPermission(requiredPerm) && !sender.isRtpAdmin()) {
-        RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
-        return true;
-      }
+    if (requiredPerm != null && !requiredPerm.isBlank() && !sender.hasPermission(requiredPerm) && !sender.isRtpAdmin()) {
+      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
+      return true;
     }
 
     // Resolve participants
@@ -157,11 +155,9 @@ public class ActionCommand extends BaseRTPCmdImpl {
               targetPlayerName = target.name();
               targetPlayerUuid = target.uuid();
             }
-            if (!requiresMultiple || !(sender instanceof RTPPlayer)) {
-              if (!participants.contains(target.uuid())) {
-                participants.add(target.uuid());
-                currentCluster.add(target.uuid());
-              }
+            if ((!requiresMultiple || !(sender instanceof RTPPlayer)) && !participants.contains(target.uuid())) {
+              participants.add(target.uuid());
+              currentCluster.add(target.uuid());
             }
           } else if (targetPlayerName == null) {
             targetPlayerName = trimmed;

@@ -60,29 +60,31 @@ public class ActionSubCmd extends BaseRTPCmdImpl {
     return true;
   }
 
-  public synchronized void syncActions() {
-    ActionService effectiveService = RTPAPI.actions();
-    if (effectiveService == null && RTP.actionManager != null) {
-      effectiveService = RTP.actionManager;
-    }
-    if (effectiveService instanceof ActionManager manager) {
-      final ActionService finalService = effectiveService;
-      // Remove any previously registered ActionCommands whose actions no longer exist
-      commandLookup.entrySet().removeIf(entry -> {
-        if (entry.getValue() instanceof ActionCommand ac) {
-          return !finalService.getActionIds().contains(ac.definition().id().toLowerCase(Locale.ROOT));
-        }
-        return false;
-      });
+  public void syncActions() {
+    synchronized (this) {
+      ActionService effectiveService = RTPAPI.actions();
+      if (effectiveService == null && RTP.actionManager != null) {
+        effectiveService = RTP.actionManager;
+      }
+      if (effectiveService instanceof ActionManager manager) {
+        final ActionService finalService = effectiveService;
+        // Remove any previously registered ActionCommands whose actions no longer exist
+        commandLookup.entrySet().removeIf(entry -> {
+          if (entry.getValue() instanceof ActionCommand ac) {
+            return !finalService.getActionIds().contains(ac.definition().id().toLowerCase(Locale.ROOT));
+          }
+          return false;
+        });
 
-      for (String actionId : effectiveService.getActionIds()) {
-        Optional<ActionDefinition> defOpt = manager.getAction(actionId);
-        if (defOpt.isPresent()) {
-          ActionDefinition def = defOpt.get();
-          ActionCommand cmd = new ActionCommand(this, def);
-          commandLookup.put(def.id().toUpperCase(Locale.ROOT), cmd);
-          if (def.alias() != null && !def.alias().isBlank()) {
-            commandLookup.put(def.alias().toUpperCase(Locale.ROOT), cmd);
+        for (String actionId : effectiveService.getActionIds()) {
+          Optional<ActionDefinition> defOpt = manager.getAction(actionId);
+          if (defOpt.isPresent()) {
+            ActionDefinition def = defOpt.get();
+            ActionCommand cmd = new ActionCommand(this, def);
+            commandLookup.put(def.id().toUpperCase(Locale.ROOT), cmd);
+            if (def.alias() != null && !def.alias().isBlank()) {
+              commandLookup.put(def.alias().toUpperCase(Locale.ROOT), cmd);
+            }
           }
         }
       }

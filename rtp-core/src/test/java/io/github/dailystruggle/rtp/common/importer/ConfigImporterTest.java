@@ -344,6 +344,22 @@ public class ConfigImporterTest {
 
         assertTrue(Files.exists(rtpDir.resolve("regions").resolve("world_region.yml"))
                 || Files.exists(rtpDir.resolve("definitions").resolve("regions").resolve("world_region.yml")));
+
+        // Test bad custom path
+        Map<String, List<String>> badPathParams = new HashMap<>();
+        badPathParams.put("path", List.of(tempDir.resolve("non_existent_folder").toString()));
+        assertFalse(importCmd.onCommand(caller, badPathParams, null));
+
+        // Test unknown requested source
+        Map<String, List<String>> unknownSourceParams = new HashMap<>();
+        unknownSourceParams.put("source", List.of("nonexistent_importer_xyz"));
+        assertFalse(importCmd.onCommand(caller, unknownSourceParams, null));
+
+        // Test direct custom path to ezDir
+        Map<String, List<String>> directPathParams = new HashMap<>();
+        directPathParams.put("path", List.of(ezDir.toString()));
+        directPathParams.put("overwrite", List.of("true"));
+        assertTrue(importCmd.onCommand(caller, directPathParams, null));
     }
 
     @Test
