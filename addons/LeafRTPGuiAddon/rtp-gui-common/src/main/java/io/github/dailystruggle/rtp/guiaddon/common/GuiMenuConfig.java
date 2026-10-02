@@ -314,8 +314,6 @@ public final class GuiMenuConfig {
     }
     switch (kind) {
       case WORLD: {
-        // If environment was advertised/resolved, use environment block (e.g. GRASS_BLOCK / NETHERRACK / END_STONE)
-        if (envBlock != null) return envBlock;
         if (target != null && target.name() != null) {
           String wName = target.name().toUpperCase(java.util.Locale.ROOT);
           if (wName.contains("NETHER")) return "NETHERRACK";
@@ -327,7 +325,7 @@ public final class GuiMenuConfig {
         String biomeOverride = biomeIconOverride(target);
         if (biomeOverride != null) return biomeOverride;
         String mappedBiome = defaultBiomeIcon(target != null ? target.name() : null);
-        return str(GuiMenuKeys.iconBiome, mappedBiome != null ? mappedBiome : "OAK_SAPLING");
+        return str(GuiMenuKeys.iconBiome, mappedBiome);
       }
       case REGION:
         // Default to the most common overworld surface block (grass) rather than a

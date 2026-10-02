@@ -561,6 +561,38 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
         return false;
     }
 
+    private final Map<String, List<String>> commandOutputResponses = new ConcurrentHashMap<>();
+
+    /**
+     * Registers simulated output lines for a specific command line.
+     *
+     * @param commandLine the exact command string (or trimmed)
+     * @param lines       simulated lines emitted to the sender
+     */
+    public void registerCommandOutput(String commandLine, List<String> lines) {
+        if (commandLine != null && lines != null) {
+            commandOutputResponses.put(commandLine.trim(), new ArrayList<>(lines));
+        }
+    }
+
+    @Override
+    public boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+        if (commandLine == null || commandLine.isBlank()) {
+            return false;
+        }
+        executedCommands.add(commandLine);
+        List<String> simulatedLines = commandOutputResponses.get(commandLine.trim());
+        if (simulatedLines != null) {
+            if (lineConsumer != null) {
+                for (String line : simulatedLines) {
+                    lineConsumer.accept(line);
+                }
+            }
+            return true;
+        }
+        return executeCommand(io.github.dailystruggle.rtp.api.RTPAPI.serverId, commandLine);
+    }
+
     /**
      * Exposes an unmodifiable view of registered commands for test assertions.
      *

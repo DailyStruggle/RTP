@@ -46,3 +46,9 @@ services:
       JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/lobby-b.exec,includes=io.github.dailystruggle.rtp.*,excludes=io.github.dailystruggle.rtp.guiaddon.fabric.*:io.github.dailystruggle.rtp.guiaddon.neoforge.*,jmx=true,dumponexit=true,output=file"
     volumes:
       - ./jacoco:/jacoco
+
+  backend-d:
+    environment:
+      JVM_XX_OPTS: "-javaagent:/jacoco/jacocoagent.jar=destfile=/jacoco/backend-d.exec,includes=io.github.dailystruggle.rtp.*,excludes=io.github.dailystruggle.rtp.guiaddon.fabric.*:io.github.dailystruggle.rtp.guiaddon.neoforge.*,jmx=true,dumponexit=true,output=file -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UnlockDiagnosticVMOptions -XX:G1SummarizeRSetStatsPeriod=0"
+    volumes:
+      - ./jacoco:/jacoco

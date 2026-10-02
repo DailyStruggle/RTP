@@ -39,6 +39,11 @@ The following ADR numbers are reserved by ADR-036's *Phased Subproject ADR Plan*
 | `rtp-proxy-ADR-014` | `backend-owned-rtp-with-network-queue` | L6 | Accepted (2026-05-21) | Backend-owned `/rtp` + network wait-queue; proxy reduced to dispatch + reservation lifecycle |
 | `rtp-proxy-ADR-015` | `shared-network-waitlist-and-dynamic-batched-dispatch` | L6 | Accepted (2026-05-21) | Shared network waitlist + dynamic batched dispatch (refines ADR-014) |
 | `rtp-proxy-ADR-016` | `plugin-message-default-transport` | (amends ADR-036) | Accepted (2026-06-12) | Tier-1 non-durable `PluginMessageNetworkBinding` + `transport.type: auto`; DB-free cross-server RTP, ships in lite |
+| `rtp-proxy-ADR-017` | `proxy-direct-transport` | (amends ADR-036) | Accepted (2026-06-13) | `transport.type: proxy-direct` player-independent backend->proxy socket |
+| `rtp-proxy-ADR-018` | `proxy-direct-teleport-execution` | (amends ADR-036) | Superseded (by ADR-019) | Bespoke socket opcodes for teleport execution |
+| `rtp-proxy-ADR-019` | `proxy-direct-as-remote-store` | (amends ADR-036) | Accepted (2026-06-13) | `proxy-direct` as remote RPC view of proxy in-memory store |
+| `rtp-proxy-ADR-020` | `direct-database-cross-server-dispatch` | (refines ADR-036) | Proposed | Direct DB cross-server dispatch over SQL/Redis with native proxy Connect messaging |
+| `rtp-proxy-ADR-021` | `seamless-in-play-velocity-transfers` | (refines ADR-036) | Proposed | Seamless loading-screen-free transfers in Velocity with zero-trust packet gating |
 
 Additional ADRs may be inserted at the tail of the series (`-ADR-017`, `-018`, …) as needs arise. **Do not** renumber existing ADRs.
 

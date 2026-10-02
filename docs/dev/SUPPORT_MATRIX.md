@@ -36,7 +36,7 @@ RTP requires Java 21 or higher across all platforms and components (REQ-RTP-SYS-
 
 | Minecraft Version | Paper (+ forks) | Folia | Spigot | Fabric | NeoForge |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **MC 26.x (Snapshot / Experimental)** | **Best-effort** | **Best-effort** | **Best-effort** | **Tested** | **Best-effort** |
+| **MC 26.x (26.1, 26.2, 26.3+)** | **Best-effort** | **Best-effort** | **Best-effort** | **Tested** | **Best-effort** |
 | **MC 1.21.x** (1.21.0 - 1.21.4+) | **Tested** | **Tested** | **Best-effort** | **Tested** | **Best-effort** |
 | **MC 1.20.5 - 1.20.6** | **Tested** | **Tested** | **Best-effort** | **Tested** | **Unsupported** |
 | **MC 1.20.0 - 1.20.4** | **Tested** | **Tested** | **Best-effort** | **Tested** | **Unsupported** |

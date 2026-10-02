@@ -91,6 +91,74 @@ class EffectsApiMultiTenantTest {
         assertTrue(statesMap().containsKey(b), "disable(a) must not touch b's state");
     }
 
+    @Test
+    @DisplayName("getInstance(fallback) behaviors")
+    void getInstanceFallbackBehaviors() {
+        // No plugin registered, fallback null -> throws
+        assertThrows(IllegalStateException.class, () -> EffectsAPI.getInstance(null));
+
+        // When plugin registered, returns registered plugin
+        Plugin registered = mock(Plugin.class);
+        seedState(registered);
+        assertSame(registered, EffectsAPI.getInstance(null));
+        assertSame(registered, EffectsAPI.getInstance(mock(Plugin.class)));
+    }
+
+    @Test
+    @DisplayName("getFireworkSafetyListener and getGlideSafetyListener behavior")
+    void listenerAccessors() {
+        assertNull(EffectsAPI.getFireworkSafetyListener());
+        assertNull(EffectsAPI.getGlideSafetyListener());
+
+        Plugin p = mock(Plugin.class);
+        io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.FireworkSafetyListener fwListener =
+                mock(io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.FireworkSafetyListener.class);
+        io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener glideListener =
+                mock(io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.class);
+        seedStateWithListeners(p, fwListener, glideListener);
+
+        assertSame(fwListener, EffectsAPI.getFireworkSafetyListener());
+        assertSame(glideListener, EffectsAPI.getGlideSafetyListener());
+    }
+
+    @Test
+    @DisplayName("disable(null) is safe no-op")
+    void disableNullPluginSafe() {
+        assertDoesNotThrow(() -> EffectsAPI.disable((Plugin) null));
+    }
+
+    @Test
+    @DisplayName("disable() no-arg clears all registered plugin states")
+    void disableNoArgClearsAll() {
+        Plugin a = mock(Plugin.class);
+        Plugin b = mock(Plugin.class);
+        seedState(a);
+        seedState(b);
+        assertEquals(2, statesMap().size());
+
+        EffectsAPI.disable();
+        assertTrue(statesMap().isEmpty(), "disable() without args must clear all plugin states");
+    }
+
+    @Test
+    @DisplayName("disable(Plugin) calls placeAllOnShutdown on glideSafetyListener")
+    void disableCallsPlaceAllOnShutdown() {
+        Plugin p = mock(Plugin.class);
+        io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener glideListener =
+                mock(io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.class);
+
+        seedStateWithListeners(p, null, glideListener);
+        assertDoesNotThrow(() -> EffectsAPI.disable(p));
+        org.mockito.Mockito.verify(glideListener).placeAllOnShutdown();
+        assertFalse(statesMap().containsKey(p));
+    }
+
+    @Test
+    @DisplayName("init(null) is safe no-op")
+    void initNullSafe() {
+        assertDoesNotThrow(() -> EffectsAPI.init(null));
+    }
+
     // --- reflection helpers (seed STATES with null listeners; init() would
     //     require a live Bukkit server to register events) ---
 
@@ -106,12 +174,19 @@ class EffectsApiMultiTenantTest {
     }
 
     private static void seedState(Plugin plugin) {
+        seedStateWithListeners(plugin, null, null);
+    }
+
+    private static void seedStateWithListeners(
+            Plugin plugin,
+            io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.FireworkSafetyListener fw,
+            io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener glide) {
         try {
             Class<?> stateClass =
                     Class.forName("io.github.dailystruggle.effectsapi.EffectsAPI$PluginState");
             Constructor<?> ctor = stateClass.getDeclaredConstructors()[0];
             ctor.setAccessible(true);
-            statesMap().put(plugin, ctor.newInstance(null, null));
+            statesMap().put(plugin, ctor.newInstance(fw, glide));
         } catch (ReflectiveOperationException e) {
             throw new AssertionError(e);
         }

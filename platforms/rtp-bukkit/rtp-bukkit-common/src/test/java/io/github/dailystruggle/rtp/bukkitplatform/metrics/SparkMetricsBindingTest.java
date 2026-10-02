@@ -174,7 +174,7 @@ class SparkMetricsBindingTest {
 
         // Common Object methods
         assertEquals("RTPSparkMetadataProviderProxy", proxy.toString());
-        assertEquals(proxy, proxy);
+        assertTrue(proxy.equals(proxy));
         assertFalse(proxy.equals(null));
         assertTrue(proxy.hashCode() != 0);
     }

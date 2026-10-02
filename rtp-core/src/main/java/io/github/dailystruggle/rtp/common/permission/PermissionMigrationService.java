@@ -318,11 +318,20 @@ public class PermissionMigrationService {
             String line = cleanAnsiAndColors(raw).trim();
             if (line.isEmpty()) continue;
 
-            // LuckPerms typical: "Groups: default, vip, admin"
-            if (line.toLowerCase(Locale.ROOT).contains("groups:") || line.toLowerCase(Locale.ROOT).contains("groups -")) {
+            // Strip plugin prefixes like "[LP]" or "[LuckPerms]"
+            if (line.startsWith("[") && line.contains("]")) {
+                line = line.substring(line.indexOf(']') + 1).trim();
+            }
+
+            // LuckPerms typical: "Groups: default, vip, admin" (but skip header row "Groups: (name, weight, tracks)")
+            if (line.toLowerCase(Locale.ROOT).startsWith("groups:") || line.toLowerCase(Locale.ROOT).startsWith("groups -")) {
                 int idx = line.indexOf(':');
                 if (idx < 0) idx = line.indexOf('-');
                 String rest = line.substring(idx + 1).trim();
+                // If it is a header row like "(name, weight, tracks)", skip it
+                if (rest.startsWith("(") && rest.contains("weight")) {
+                    continue;
+                }
                 for (String token : rest.split("[,;\\s]+")) {
                     token = cleanToken(token);
                     if (!token.isEmpty()) groups.add(token);
@@ -332,6 +341,17 @@ public class PermissionMigrationService {
                 // If token contains weight or metadata in parens e.g. "vip (weight: 10)", take first word
                 if (token.contains("(")) {
                     token = token.substring(0, token.indexOf('(')).trim();
+                }
+                // If token contains hyphen-separated metadata like "-  default - 0", split and take first non-empty word
+                if (token.contains("-")) {
+                    String[] parts = token.split("-");
+                    for (String part : parts) {
+                        String clean = cleanToken(part);
+                        if (!clean.isEmpty()) {
+                            token = clean;
+                            break;
+                        }
+                    }
                 }
                 token = cleanToken(token);
                 if (!token.isEmpty()) groups.add(token);
@@ -346,7 +366,9 @@ public class PermissionMigrationService {
         // Remove trailing or leading parenthesis, brackets, quotes
         token = token.replaceAll("[()\\[\\]{}:,\"]", "").trim();
         // Skip metadata phrases
-        if (token.equalsIgnoreCase("weight") || token.equalsIgnoreCase("inherited") || token.equalsIgnoreCase("group")) {
+        if (token.equalsIgnoreCase("weight") || token.equalsIgnoreCase("inherited")
+                || token.equalsIgnoreCase("group") || token.equalsIgnoreCase("name")
+                || token.equalsIgnoreCase("tracks") || token.equalsIgnoreCase("displayname")) {
             return "";
         }
         return token;
@@ -634,7 +656,9 @@ public class PermissionMigrationService {
             if (node == null || node.getPermission() == null) continue;
             String lower = node.getPermission().trim().toLowerCase(Locale.ROOT);
 
-            if (sourceFilter != null && !sourceFilter.isBlank()) {
+            if (sourceFilter != null && !sourceFilter.isBlank()
+                    && !sourceFilter.equalsIgnoreCase("all")
+                    && !sourceFilter.equalsIgnoreCase("*")) {
                 String sFilter = sourceFilter.trim().toLowerCase(Locale.ROOT);
                 if (!lower.startsWith(sFilter)) {
                     continue;

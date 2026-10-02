@@ -17,6 +17,30 @@ import java.util.logging.Level;
  */
 public class MinePlotsChecker {
   private static boolean exists = true;
+  private static Boolean available = null;
+
+  private static final String[] CANDIDATE_CLASSES = {
+    "pl.minecodes.plots.api.PlotServiceApi",
+    "pl.themolka.mineplots.MinePlots",
+    "net.mineplots.MinePlots",
+    "me.mineplots.MinePlots",
+    "com.mineplots.MinePlots"
+  };
+
+  private static boolean isAvailable() {
+    if (!exists) return false;
+    if (available != null) return available;
+    for (String cName : CANDIDATE_CLASSES) {
+      try {
+        Class.forName(cName);
+        available = true;
+        return true;
+      } catch (ClassNotFoundException ignored) {
+      }
+    }
+    available = false;
+    return false;
+  }
 
   /**
    * Check if an RTP coordinate is within a MinePlots plot or claim.
@@ -25,11 +49,10 @@ public class MinePlotsChecker {
    * @return true if in a claim or lookup fails while plugin active, false otherwise
    */
   public static Boolean isInClaim(RTPCoords location) {
-    if (!exists || location == null) return false;
-    if (org.bukkit.Bukkit.getServer() == null) return false;
-    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
-    if (world == null) return false;
-    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+    if (!exists || location == null || !isAvailable()) return false;
+    org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
+    if (loc == null) return false;
+    return isInClaim(loc);
   }
 
   /**
@@ -39,18 +62,11 @@ public class MinePlotsChecker {
    * @return true if in a claim or lookup fails while plugin active, false otherwise
    */
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (!exists || location == null || location.getWorld() == null) return false;
+    if (!exists || location == null || location.getWorld() == null || !isAvailable()) return false;
     if (org.bukkit.Bukkit.getServer() == null) return false;
     try {
       Class<?> mainClass = null;
-      String[] candidateClasses = {
-        "pl.minecodes.plots.api.PlotServiceApi",
-        "pl.themolka.mineplots.MinePlots",
-        "net.mineplots.MinePlots",
-        "me.mineplots.MinePlots",
-        "com.mineplots.MinePlots"
-      };
-      for (String cName : candidateClasses) {
+      for (String cName : CANDIDATE_CLASSES) {
         try {
           mainClass = Class.forName(cName);
           break;

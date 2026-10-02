@@ -2,19 +2,12 @@
 
 First-class runtime verification fixture for the cross-server `/rtp` slice
 (CHECKLIST-cross-server-rtp.md L3). Boots 1 Redis + 2 Velocity proxies + 2
-Paper lobbies + 3 backends (Paper / Folia / Folia) on a
+Paper lobbies + 4 backends (Paper / Folia / Fabric / NeoForge) on a
 single docker-compose network and exercises the round-trip, kill-mid-flight,
 and kill-switch scenarios.
 
-The backends are: `backend-a` runs Paper, while `backend-b` and `backend-c`
-run Folia. Mixing Paper and Folia exercises both scheduler families, so a
-Paper-compiles-but-Folia-blows-up regression surfaces here rather than in a
-user report. Every `/rtp` round-trip routes through the `BackendSelector`
+The backends are: `backend-a` runs Paper, `backend-b` runs Folia, `backend-c` runs Fabric, and `backend-d` runs NeoForge. Mixing Paper, Folia, Fabric, and NeoForge exercises all four platform scheduler and modding runtime families simultaneously, so platform regressions surface here immediately rather than in production. Every `/rtp` round-trip routes through the `BackendSelector`
 against these platform adapters at once.
-
-> `backend-c` previously ran Fabric to exercise the `rtp-fabric` adapter; it
-> has been switched to Folia for this run so the stack boots entirely on the
-> Bukkit/Paper-family platforms (no Fabric mod runtime required).
 
 ## Topology
 
@@ -26,7 +19,10 @@ client ---> | proxy-a   |---+--->| lobby-a   |---+--->| backend-a | (Paper)
                             |                    |    | backend-b | (Folia)
             +-----------+   +--->+-----------+   |    +-----------+
 client ---> | proxy-b   |------->| lobby-b   |---+--->+-----------+
-            +-----------+        +-----------+        | backend-c | (Folia)
+            +-----------+        +-----------+   |    | backend-c | (Fabric)
+                                                 |    +-----------+
+                                                 +--->+-----------+
+                                                      | backend-d | (NeoForge)
                                                       +-----------+
                                        \                  /
                                         +---> redis <----+

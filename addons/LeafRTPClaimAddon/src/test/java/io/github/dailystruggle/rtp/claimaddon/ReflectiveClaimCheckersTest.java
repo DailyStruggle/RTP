@@ -49,6 +49,33 @@ class ReflectiveClaimCheckersTest {
   }
 
   @Test
+  @DisplayName("HuskClaimsChecker safely fails-open when HuskClaims is not present")
+  void testHuskClaimsCheckerGracefulAbsent() {
+    RTPCoords coords = new RTPCoords("world", 100, 64, 200);
+    Boolean inClaim = HuskClaimsChecker.isInClaim(coords);
+    assertNotNull(inClaim);
+    assertFalse(inClaim);
+  }
+
+  @Test
+  @DisplayName("CrashClaimChecker safely fails-open when CrashClaim is not present")
+  void testCrashClaimCheckerGracefulAbsent() {
+    RTPCoords coords = new RTPCoords("world", 100, 64, 200);
+    Boolean inClaim = CrashClaimChecker.isInClaim(coords);
+    assertNotNull(inClaim);
+    assertFalse(inClaim);
+  }
+
+  @Test
+  @DisplayName("KingdomsXChecker safely fails-open when KingdomsX is not present")
+  void testKingdomsXCheckerGracefulAbsent() {
+    RTPCoords coords = new RTPCoords("world", 100, 64, 200);
+    Boolean inClaim = KingdomsXChecker.isInClaim(coords);
+    assertNotNull(inClaim);
+    assertFalse(inClaim);
+  }
+
+  @Test
   @DisplayName("UltimateClaimsChecker and MinePlotsChecker fail-closed on error when mock server/world is present")
   void testCheckersFailClosedOnError() {
     // If location is provided with a valid mock or if reflection fails during execution, verify fail-closed

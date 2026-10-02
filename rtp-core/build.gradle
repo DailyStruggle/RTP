@@ -120,7 +120,7 @@ compileJava {
 // configurations and any future tag-based tooling agree with the build.
 test {
     exclude '**/benchmark/**'
-    exclude '**/usability/**'
+    exclude '**/usability/CommandUsabilityBenchmarkTest*'
 
     // ENTERPRISE_READINESS.md item 18: the Docker-gated MySQL/PostgreSQL
     // integration tier reaches the local Docker daemon through docker-java, which

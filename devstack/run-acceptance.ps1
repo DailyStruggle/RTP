@@ -44,9 +44,11 @@
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('all', 'boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'rtptest', 'down', 'logs')]
+  [ValidateSet('all', 'boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'rtptest', 'gui', 'rtpgui', 'down', 'logs')]
   [string]$Scenario = 'all',
   [int]$WaitSeconds = 180,
+  # Run roundtrip in GUI menu mode (clicks chest menu item opened by bare /rtp)
+  [switch]$Gui,
   # Skip the automatic `docker compose up -d` step (use when you already brought
   # the stack up by hand and just want to re-run scenarios against it).
   [switch]$SkipUp,
@@ -92,7 +94,12 @@ param(
   [switch]$Coverage,
   # Run backend-c as a Fabric node via `docker-compose.fabric.yml` instead of Folia,
   # testing Paper + Folia + Fabric multi-platform parity behind Velocity.
-  [switch]$Fabric
+  [switch]$Fabric,
+  # Run backend-d as a NeoForge node via `docker-compose.neoforge.yml`,
+  # testing Paper + Folia + Fabric + NeoForge multi-platform parity behind Velocity.
+  [switch]$NeoForge,
+  # Assert client effect packets (sounds, particles, titles) in headless bot acceptance
+  [switch]$AssertEffects
 )
 
 $ErrorActionPreference = 'Stop'
@@ -389,13 +396,11 @@ function Invoke-GradleBuild {
     (Join-Path $PSScriptRoot 'lobby-a\plugins'),
     (Join-Path $PSScriptRoot 'lobby-b\plugins')
   )
-  if ($Fabric) {
-    $fabricModDsts = @((Join-Path $PSScriptRoot 'backend-c\mods'))
-  } else {
-    $backendDsts += (Join-Path $PSScriptRoot 'backend-c\plugins')
-    $fabricModDsts = @()
-  }
-  foreach ($d in @($pluginStage) + $backendDsts + $fabricModDsts) {
+  $modDsts = @(
+    (Join-Path $PSScriptRoot 'backend-c\mods'),
+    (Join-Path $PSScriptRoot 'backend-d\mods')
+  )
+  foreach ($d in @($pluginStage) + $backendDsts + $modDsts) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
   }
   if (Test-Path $pluginLibs) {
@@ -421,7 +426,7 @@ function Invoke-GradleBuild {
       $variant = 'lite (Pro jar not found - falling back)'
       Write-Host '[build] WARN - LeafRTP-Pro-<ver>.jar not found; falling back to plain LeafRTP jar. Build Pro via the Pro Gradle profile to match the devstack.' -ForegroundColor Yellow
     }
-    foreach ($dst in @($pluginStage) + $backendDsts + $fabricModDsts) {
+    foreach ($dst in @($pluginStage) + $backendDsts + $modDsts) {
       # Only clear the RTP jars we own here. Operator-dropped jars (e.g.
       # FastAsyncWorldEdit in lobby-a/plugins/ for the lobby-world bake
       # workflow - see shared/lobby-world/README.md) must survive a re-run of
@@ -434,7 +439,7 @@ function Invoke-GradleBuild {
         Copy-Item -Path $j.FullName -Destination (Join-Path $dst $j.Name) -Force
       }
     }
-    Write-Host "[build] staged $($pJars.Count) RTP plugin jar(s) [$variant] -> jars/plugin + backend-{a,b,c}/plugins + lobby-{a,b}/plugins" -ForegroundColor Cyan
+    Write-Host "[build] staged $($pJars.Count) RTP plugin jar(s) [$variant] -> jars/plugin + backend-{a,b}/plugins + backend-{c,d}/mods + lobby-{a,b}/plugins" -ForegroundColor Cyan
   }
   # See note above: backend's mc-image-helper AccessDeniedException on dotfiles.
   foreach ($dst in @($pluginStage) + $backendDsts) {
@@ -485,7 +490,7 @@ function Get-CrashedMcServices {
   # bail out (Exited). Anything in 'exited' here is a crash, not a slow boot.
   # backend-c (Folia) is included so a crashed boot is detected and
   # auto-recovered along with the other backends.
-  $services = @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b', 'proxy-a', 'proxy-b')
+  $services = @('backend-a', 'backend-b', 'backend-c', 'backend-d', 'lobby-a', 'lobby-b', 'proxy-a', 'proxy-b')
   $crashed = @()
   foreach ($svc in $services) {
     $state = Invoke-Native { docker compose ps --status exited --services } 2>$null
@@ -498,7 +503,7 @@ function Clear-StaleWorldDirs {
   # World dirs are host bind mounts (./backend-{a,b}/world) per docker-compose.yml.
   # If a previous run left a stale lock file, clear it. Do NOT remove the whole world
   # dir if it has pre-generated chunks from seed-pregen-worlds.ps1.
-  foreach ($b in @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')) {
+  foreach ($b in @('backend-a', 'backend-b', 'backend-c', 'backend-d', 'lobby-a', 'lobby-b')) {
     $dir = Join-Path $PSScriptRoot "$b\world"
     if (Test-Path $dir) {
       $lock = Join-Path $dir 'session.lock'
@@ -758,14 +763,12 @@ function Test-Heartbeat {
     $proxies = Invoke-RedisCli KEYS 'rtp:net:proxy:*'
     $bCount = (@($backends) | Where-Object { $_ -match '\S' }).Count
     $pCount = (@($proxies) | Where-Object { $_ -match '\S' }).Count
-    # 5 backend heartbeats expected: backend-a (Paper), backend-b (Folia),
-    # backend-c (Fabric), lobby-a, lobby-b (lobbies publish as role=backend
+    # 6 backend heartbeats expected: backend-a (Paper), backend-b (Folia),
+    # backend-c (Fabric), backend-d (NeoForge), lobby-a, lobby-b (lobbies publish as role=backend
     # too; their absence of a regions/ dir is a runtime config concern, not
-    # a network-participation concern). Requiring >=5 means a missing Fabric
-    # heartbeat from backend-c is a real failure rather than a silent
-    # degradation - if rtp-fabric is broken enough that backend-c cannot reach
-    # heartbeat publish, the harness fails loudly.
-    if ($bCount -ge 5 -and $pCount -ge 2) {
+    # a network-participation concern). Requiring >=6 means a missing Fabric or NeoForge
+    # heartbeat is a real failure rather than a silent degradation.
+    if ($bCount -ge 6 -and $pCount -ge 2) {
       $body = "backend keys: $bCount`n$backends`nproxy keys: $pCount`n$proxies"
       Write-Evidence 'heartbeat' $body
       $elapsed = [int]((Get-Date) - $pollStart).TotalSeconds
@@ -778,7 +781,7 @@ function Test-Heartbeat {
       $lastDiagAt = $elapsed
     }
     $elapsed = [int]((Get-Date) - $pollStart).TotalSeconds
-    Write-Host "[heartbeat]   ${elapsed}s elapsed: backends=$bCount/5 proxies=$pCount/2 (still waiting)" -ForegroundColor DarkGray
+    Write-Host "[heartbeat]   ${elapsed}s elapsed: backends=$bCount/6 proxies=$pCount/2 (still waiting)" -ForegroundColor DarkGray
     # Early full-log dump: if >=90s have elapsed with zero heartbeats from
     # either side, the boot has almost certainly failed (crash at enable,
     # bad config, missing jar). Dump logs once so the operator doesn't have
@@ -798,6 +801,90 @@ function Test-Heartbeat {
   return $false
 }
 
+function Test-Gui {
+  param(
+    [string]$GuiScenario = 'teleport'
+  )
+  Write-Host "[gui] executing headless Mineflayer chest menu GUI acceptance verification (scenario: $GuiScenario)..." -ForegroundColor Cyan
+
+  # 1. Verify lobby-a configuration and LeafRTPGuiAddon presence
+  $lobbyGuiConfig = Join-Path $PSScriptRoot 'lobby-a\plugins\RTP\addons\guimenu.yml'
+  $lobbyAddonJar = Join-Path $PSScriptRoot 'lobby-a\plugins\RTP\addons\LeafRTPGuiAddon.jar'
+  if (-not (Test-Path $lobbyAddonJar)) {
+    Write-Host "[gui] WARN - $lobbyAddonJar not found on host. Verifying container..." -ForegroundColor Yellow
+  }
+
+  if (Test-Path $lobbyGuiConfig) {
+    $cfgContent = Get-Content -Raw $lobbyGuiConfig
+    if ($cfgContent -match 'menuStyle:\s*"chest"') {
+      Write-Host '[gui] Verified lobby-a guimenu.yml has menuStyle: "chest"' -ForegroundColor Green
+    } else {
+      Write-Host '[gui] WARN - lobby-a guimenu.yml menuStyle is not "chest". Updating to chest...' -ForegroundColor Yellow
+      $cfgContent = $cfgContent -replace 'menuStyle:\s*"[^"]*"', 'menuStyle: "chest"'
+      Set-Content -Path $lobbyGuiConfig -Value $cfgContent -Encoding UTF8
+    }
+  }
+
+  $botScript = Join-Path $PSScriptRoot 'clients\mineflayer-bot.js'
+  $clientsDir = Join-Path $PSScriptRoot 'clients'
+
+  $nodeCmd = Get-Command 'node' -ErrorAction SilentlyContinue
+  $dockerCmd = Get-Command 'docker' -ErrorAction SilentlyContinue
+  if ((-not $nodeCmd -and -not $dockerCmd) -or -not (Test-Path $botScript)) {
+    Write-Host '[gui] FAIL - Neither Node.js nor Docker found, or mineflayer-bot.js missing.' -ForegroundColor Red
+    return $false
+  }
+
+  $nodeModules = Join-Path $clientsDir 'node_modules'
+  $npmCmd = Get-Command 'npm' -ErrorAction SilentlyContinue
+  if ($nodeCmd -and -not (Test-Path $nodeModules) -and $npmCmd) {
+    Write-Host '[gui] installing client dependencies...' -ForegroundColor Cyan
+    & npm --prefix $clientsDir install --silent --no-audit | Out-Null
+  }
+
+  $extraArgs = @('--gui', '--gui-scenario', $GuiScenario)
+  if ($Lite) { $extraArgs += '--lite' }
+  if ($AssertEffects) { $extraArgs += '--assert-effects' }
+
+  Write-Host "[gui] running Node/Mineflayer headless client targeting proxy-a (127.0.0.1:25577) with bare /rtp (scenario: $GuiScenario)..." -ForegroundColor Cyan
+  if ($nodeCmd) {
+    $botOut = & node $botScript --host 127.0.0.1 --port 25577 --timeout $WaitSeconds @extraArgs 2>&1 | Out-String
+  } else {
+    $botOut = & docker run --rm --network host -v "${clientsDir}:/app" -w /app node:20 node mineflayer-bot.js --host 127.0.0.1 --port 25577 --timeout $WaitSeconds @extraArgs 2>&1 | Out-String
+  }
+  Write-Host $botOut
+
+  if ($botOut -match '"status"\s*:\s*"PASS"') {
+    Write-Host "[gui] PASS - headless client completed GUI scenario '$GuiScenario' successfully." -ForegroundColor Green
+    Write-Evidence "gui.bot.$GuiScenario" $botOut
+
+    # Parse and display telemetry details
+    $jsonMatch = [regex]::Match($botOut, '\{"status"\s*:\s*"PASS"[^}]+\}')
+    if ($jsonMatch.Success) {
+      try {
+        $data = $jsonMatch.Value | ConvertFrom-Json
+        Write-Host "  Telemetry summary:" -ForegroundColor Cyan
+        Write-Host "    Scenario            : $($data.scenario)" -ForegroundColor Green
+        Write-Host "    Window open latency : $($data.windowOpenLatencyMs) ms" -ForegroundColor Green
+        if ($data.slotClicked) {
+          Write-Host "    Slot clicked        : $($data.slotClicked) ($($data.itemClicked))" -ForegroundColor Green
+        }
+        if ($data.teleportLatencyMs) {
+          Write-Host "    Teleport latency    : $($data.teleportLatencyMs) ms" -ForegroundColor Green
+          Write-Host "    Destination coords  : ($($data.targetX), $($data.targetY), $($data.targetZ))" -ForegroundColor Green
+        }
+      } catch {
+        # JSON formatting fallback
+      }
+    }
+    return $true
+  } else {
+    Write-Host "[gui] FAIL - chest menu interaction failed for scenario '$GuiScenario'." -ForegroundColor Red
+    Write-Evidence "gui.bot.fail.$GuiScenario" $botOut
+    return $false
+  }
+}
+
 function Test-Roundtrip {
   Write-Host '[roundtrip] executing automated headless client round-trip (ADR-091)...' -ForegroundColor Cyan
   $botScript = Join-Path $PSScriptRoot 'clients\mineflayer-bot.js'
@@ -805,17 +892,24 @@ function Test-Roundtrip {
   $botSuccess = $false
 
   $nodeCmd = Get-Command 'node' -ErrorAction SilentlyContinue
-  if ($nodeCmd -and (Test-Path $botScript)) {
+  $dockerCmd = Get-Command 'docker' -ErrorAction SilentlyContinue
+  if (($nodeCmd -or $dockerCmd) -and (Test-Path $botScript)) {
     Write-Host '[roundtrip] running Node/Mineflayer headless client...' -ForegroundColor Cyan
     $nodeModules = Join-Path $clientsDir 'node_modules'
     $npmCmd = Get-Command 'npm' -ErrorAction SilentlyContinue
-    if (-not (Test-Path $nodeModules) -and $npmCmd) {
+    if ($nodeCmd -and -not (Test-Path $nodeModules) -and $npmCmd) {
       Write-Host '[roundtrip] installing client dependencies...' -ForegroundColor Cyan
       & npm --prefix $clientsDir install --silent --no-audit | Out-Null
     }
     $extraArgs = @()
     if ($Lite) { $extraArgs += '--lite' }
-    $botOut = & node $botScript --host 127.0.0.1 --port 25577 --timeout 35 @extraArgs 2>&1 | Out-String
+    if ($AssertEffects) { $extraArgs += '--assert-effects' }
+    if ($Gui) { $extraArgs += '--gui' }
+    if ($nodeCmd) {
+      $botOut = & node $botScript --host 127.0.0.1 --port 25577 --timeout 35 @extraArgs 2>&1 | Out-String
+    } else {
+      $botOut = & docker run --rm --network host -v "${clientsDir}:/app" -w /app node:20 node mineflayer-bot.js --host 127.0.0.1 --port 25577 --timeout 35 @extraArgs 2>&1 | Out-String
+    }
     Write-Host $botOut
     if ($botOut -match '"status":"PASS"') {
       Write-Host '[roundtrip] headless client completed teleport successfully.' -ForegroundColor Green
@@ -830,7 +924,11 @@ function Test-Roundtrip {
     Write-Host '  2. The default backend is backend-a. Run `/server backend-b` then `/server backend-c` once each to seed all backends.' -ForegroundColor Yellow
     Write-Host '  3. From the client, run `/rtp` and observe a cross-server teleport.' -ForegroundColor Yellow
     Write-Host '  4. Press <Enter> AFTER the redeem completes to capture evidence.' -ForegroundColor Yellow
-    [void](Read-Host 'Press Enter to continue')
+    try {
+      [void](Read-Host 'Press Enter to continue')
+    } catch {
+      Write-Host '[roundtrip] non-interactive session; skipping interactive Read-Host wait.' -ForegroundColor DarkGray
+    }
   }
 
   $tokens = Invoke-RedisCli KEYS 'rtp:net:reservation:*'
@@ -889,10 +987,14 @@ function Wait-RconReady {
   $deadline = (Get-Date).AddSeconds($WaitSeconds)
   Write-Host "[rtptest] waiting for RCON on $Service (budget: ${WaitSeconds}s; first boot generates worlds, can take 1-3 min)..." -ForegroundColor DarkGray
   while ((Get-Date) -lt $deadline) {
-    $ready = & docker compose logs --tail=400 --no-log-prefix $Service 2>$null |
-      Select-String -Pattern 'RCON running on' -SimpleMatch |
-      Select-Object -Last 1
-    if ($ready) { return $true }
+    try {
+      $probe = & docker compose exec -T $Service rcon-cli help 2>&1 | Out-String
+      if ($probe -and $probe -notmatch 'connection refused') {
+        return $true
+      }
+    } catch {
+      # Ignore connection refused while server boots
+    }
     Start-Sleep -Seconds 3
   }
   return $false
@@ -908,7 +1010,7 @@ function Test-RtpTest {
   # the JaCoCo agent so the accessor paths credit server-bound coverage. See
   # platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md.
   Write-Host "[rtptest] dispatching '/rtp test accessor' to backends + lobbies via rcon (per-service budget: 30s)..." -ForegroundColor Cyan
-  $services = @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')
+  $services = @('backend-a', 'backend-b', 'backend-c', 'backend-d', 'lobby-a', 'lobby-b')
   $anyFail = $false
   foreach ($svc in $services) {
     # RCON readiness gate: the Minecraft servers take 1-3 min to boot (fresh
@@ -1131,6 +1233,10 @@ try {
       'killmidflight' { $results[$s] = Test-KillMidFlight }
       'killswitch'    { $results[$s] = Test-KillSwitch }
       'rtptest'       { $results[$s] = Test-RtpTest }
+      'gui'           { $results[$s] = Test-Gui -GuiScenario 'teleport' }
+      'gui-submenu'   { $results[$s] = Test-Gui -GuiScenario 'submenu' }
+      'gui-setup'     { $results[$s] = Test-Gui -GuiScenario 'setup' }
+      'rtpgui'        { $results[$s] = Test-Gui -GuiScenario 'teleport' }
     }
   }
 } finally {
@@ -1158,7 +1264,7 @@ if ($Coverage) {
   # byte-for-byte complete execution data.
   Push-Location $PSScriptRoot
   try {
-    foreach ($svc in @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')) {
+    foreach ($svc in @('backend-a', 'backend-b', 'backend-c', 'backend-d', 'lobby-a', 'lobby-b')) {
       $null = Invoke-Native { docker compose cp "${svc}:/jacoco/${svc}.exec" "jacoco/${svc}.exec" }
     }
   } finally {

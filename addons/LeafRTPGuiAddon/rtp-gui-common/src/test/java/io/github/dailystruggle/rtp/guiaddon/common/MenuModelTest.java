@@ -246,4 +246,22 @@ public class MenuModelTest {
             RTPAPI.serverAccessor = originalAccessor;
         }
     }
+
+    @Test
+    void menuActions_isMenuNavigation_identifiesNavigationActions() {
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("menu:main")));
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("menu:biomes:0")));
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("menu:biomes:1")));
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("menu:actions:0")));
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("menu:operator")));
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("action:operator:reload")));
+
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.action("action:operator:setup")));
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.action("action:operator:import")));
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.action("action:trigger:custom_action")));
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.biome("plains")));
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.region("default")));
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.defaultRegion()));
+        assertFalse(MenuActions.isMenuNavigation(null));
+    }
 }

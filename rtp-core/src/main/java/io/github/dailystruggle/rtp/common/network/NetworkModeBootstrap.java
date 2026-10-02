@@ -56,6 +56,7 @@ public final class NetworkModeBootstrap {
     private PeerRegionRegistry peerRegionRegistry;
     private BukkitNetworkCommandHook commandHook;
     private String serverId;
+    private DispatchMode dispatchMode = DispatchMode.AUTO;
     // ADR-015 / REQ-RTP-NET-015: lobby-side waitlist UX.
     // - notifier: periodic player-facing 'queued, position N' message.
     // - waitlistGuard: sender-check predicate registered on RTPCmdBukkit
@@ -526,6 +527,32 @@ public final class NetworkModeBootstrap {
                     this.publisher, this.lobbyRetryQueue);
             // Pre-seed sticky queued row on cross-server enrolment.
             this.commandHook.setEnrolmentSeeder(this.statusCache::seedLocal);
+
+            // Configure dispatch mode (rtp-proxy-ADR-020: Direct DB Mode).
+            String dispatchModeStr = routing == null ? "auto" : routing.getString("dispatchMode", "auto");
+            DispatchMode configuredDispatchMode = DispatchMode.parse(dispatchModeStr);
+            this.dispatchMode = DispatchMode.resolve(configuredDispatchMode, transportType, this.requestQueue != null);
+
+            if (this.dispatchMode == DispatchMode.DIRECT_DB) {
+                long reservationTtlMs = reservation == null ? 60_000L : reservation.getLong("ttlMs", 60_000L);
+                io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge bridge = openNetworkBridgeOrNull();
+                DirectDatabaseDispatcher directDispatcher = new DirectDatabaseDispatcher(
+                        selected,
+                        () -> this.cachedSnapshot,
+                        this.peerRegionRegistry,
+                        bridge,
+                        serverId,
+                        Duration.ofMillis(reservationTtlMs),
+                        uuid -> {
+                            try { RTP.getInstance().processingPlayers.remove(uuid); } catch (Throwable ignored) {}
+                        }
+                );
+                this.commandHook.setDirectDatabaseDispatcher(directDispatcher);
+                RTP.log(Level.INFO,
+                        "[RTP] Direct DB Mode enabled (rtp-proxy-ADR-020): direct backend cross-server dispatch over "
+                                + transportType + " with native proxy Connect.");
+            }
+
             RTP.networkCommandHook = this.commandHook;
             LIVE = this;
 
@@ -764,6 +791,11 @@ public final class NetworkModeBootstrap {
      * The configured network server ID for this backend instance.
      */
     public String serverId() { return serverId; }
+
+    /**
+     * The effective dispatch mode (rtp-proxy-ADR-020).
+     */
+    public DispatchMode dispatchMode() { return dispatchMode; }
 
     /**
      * Open a {@link NetworkRequestQueue} matching the configured transport kind.

@@ -249,18 +249,14 @@ public final class TeleportPipelineTask extends RTPRunnable {
     }
 
     if (origin != null && this.destination != null) {
-      this.distance = Math.hypot(this.destination.x() - origin.x(), this.destination.z() - origin.z());
+      this.distance = Math.hypot((double) this.destination.x() - origin.x(), (double) this.destination.z() - origin.z());
     } else {
       this.distance = 0.0;
     }
 
     // Distance from region center (for fixed region references)
     double[] center = getRegionCenter(region);
-    if (this.destination != null) {
-      this.distanceFromCenter = Math.hypot(this.destination.x() - center[0], this.destination.z() - center[1]);
-    } else {
-      this.distanceFromCenter = 0.0;
-    }
+    this.distanceFromCenter = Math.hypot((double) this.destination.x() - center[0], (double) this.destination.z() - center[1]);
 
     RTPPlayer player = (context != null) ? context.player() : null;
     UUID playerId = (player != null) ? player.uuid() : null;

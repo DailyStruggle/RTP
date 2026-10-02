@@ -362,13 +362,13 @@ Unknown tags and properties fail open, so a config written for a newer MC versio
 <details>
 <summary><b>Roadmap & Planned Features</b></summary>
 
+- **In-game particle wireframe projections** - client-side shape-aware particle outlines for triggers, subspaces, and region perimeters (`effects-api`).
+- **In-menu telemetry map drawing** - real-time landing scatter plots and queue occupancy micro-graphs rendered on canvas map items in GUI menus (`maps-api`).
+- **Automated first-boot environment calibration** - detect threads, memory, vanilla world borders, and pre-generation on cold boot to auto-tune queues and worker pools.
+- **Single-prompt competitor migration gating** - one-time first-boot detection and prompt for legacy installations (BetterRTP, JustRTP, EzRTP) that stays silent once configured.
 - **Visual region definition & ecosystem selection bridges** - create and configure regions directly from in-game selections (WorldEdit / FAWE / FTB Chunks) or interactive browser web maps without manual coordinate entry (ADR-099).
 - **External web map raster layers** - zero-chunk-load on-demand raster heatmaps and polygon boundary overlays for Pl3xMap, BlueMap, and Dynmap (ADR-086).
 - **Fully-automatic self-warming** - background spatial-memory accumulation and queue pre-population without running the `/rtp scan` command.
-- **Anvil PRESCAN accuracy measurement & conditional FULLSCAN retirement** - profiling off-tick Anvil pre-filter accuracy to safely bypass live chunk verification during scans.
-- **Chunky-driven scan orchestration** - coordinating with bulk pre-generators like Chunky to populate terrain on disk prior to off-tick Anvil indexing.
-- **Accelerated scan compute (exploration)** - SIMD or hardware-accelerated batch verification of decoded region slices.
-- **Anonymous opt-in telemetry** - reference benchmarks and real-world deployment performance metrics.
 
 File a GitHub issue if you hit something not on the list or want to suggest a feature.
 

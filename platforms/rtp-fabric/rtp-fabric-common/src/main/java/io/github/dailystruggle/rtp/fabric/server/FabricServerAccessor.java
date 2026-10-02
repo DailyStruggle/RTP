@@ -2431,6 +2431,71 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     @Override public RTPCommandSender clone() { return new FabricConsoleSender(server); }
   }
 
+  @Override
+  public boolean executeCommand(UUID senderId, String commandLine) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    MinecraftServer s = server;
+    if (s == null) return false;
+    try {
+      if (senderId != null && !senderId.equals(RTPAPI.serverId)) {
+        RTPPlayer player = getPlayer(senderId);
+        if (player != null) {
+          player.performCommand(null, commandLine);
+          return true;
+        }
+      }
+      new FabricConsoleSender(s).performCommand(null, commandLine);
+      return true;
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP][Fabric] executeCommand failed for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  @Override
+  public boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    MinecraftServer s = server;
+    if (s == null) return false;
+    try {
+      // Create capturing console sender and execute
+      RTPCommandSender capturingSender = new FabricCapturingConsoleSender(s, lineConsumer);
+      capturingSender.performCommand(null, commandLine);
+      return true;
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP][Fabric] executeCommandWithCapture failed for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  private static final class FabricCapturingConsoleSender implements RTPCommandSender {
+    private final @Nullable MinecraftServer server;
+    private final java.util.function.Consumer<String> lineConsumer;
+
+    FabricCapturingConsoleSender(@Nullable MinecraftServer server, java.util.function.Consumer<String> lineConsumer) {
+      this.server = server;
+      this.lineConsumer = lineConsumer;
+    }
+
+    @Override public UUID uuid() { return RTPAPI.serverId; }
+    @Override public String name() { return "Console"; }
+    @Override public boolean hasPermission(String permission) { return true; }
+    @Override public Set<String> getEffectivePermissions() {
+      return io.github.dailystruggle.rtp.fabric.player.FabricEffectivePermissionsResolver.resolveConsole();
+    }
+    @Override public long cooldown() { return 0L; }
+    @Override public long delay() { return 0L; }
+    @Override public void performCommand(@Nullable RTPPlayer player, String command) {
+      new FabricConsoleSender(server).performCommand(player, command);
+    }
+    @Override public void sendMessage(String message) {
+      if (message != null && lineConsumer != null) {
+        lineConsumer.accept(message);
+      }
+    }
+    @Override public RTPCommandSender clone() { return new FabricCapturingConsoleSender(server, lineConsumer); }
+  }
+
   // ---------------------------------------------------------------------------
   // Command registration SPI
   // ---------------------------------------------------------------------------

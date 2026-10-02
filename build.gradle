@@ -821,6 +821,7 @@ tasks.register('jacocoServerReport', JacocoReport) {
 
     def execFiles = fileTree(dir: rootDir, includes: [
             '**/devstack/jacoco/*.exec',
+            '**/build/jacoco/*.exec',
             '**/build/jacoco/server*.exec',
             '**/build/jacoco/backend*.exec'
     ]).filter { it.isFile() && it.length() > 50 }

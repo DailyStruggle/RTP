@@ -181,6 +181,14 @@ public final class RTPFabricMod implements ModInitializer {
             // bottoming out on NoopMapBinding.
             accessor.setupMapBinding();
 
+            // bStats metrics telemetry on Fabric
+            try {
+                io.github.dailystruggle.rtp.common.metrics.ModdedBStatsSubmitter.start(
+                        "fabric", accessor.getPluginDirectory());
+            } catch (Throwable t) {
+                RTP.log(Level.FINE, "[RTP][fabric] bStats submitter setup skipped or failed: " + t.getMessage());
+            }
+
             // Wire mod-side land protection (OPAC, FTB Chunks per MULTI_PLATFORM_PLAN line 505)
             try {
                 io.github.dailystruggle.rtp.fabric.claims.ModClaimIntegrations.registerAll();
