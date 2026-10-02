@@ -3,11 +3,13 @@ package io.github.dailystruggle.rtp.common.commands.config;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
 import io.github.dailystruggle.rtp.common.importer.ImportResult;
+import io.github.dailystruggle.rtp.common.permission.PermissionMigrationService;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -24,6 +26,9 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
     public static final String PARAM_SOURCE = "source";
     public static final String PARAM_OVERWRITE = "overwrite";
     public static final String PARAM_PATH = "path";
+    public static final String PARAM_PERMISSIONS = "permissions";
+
+    private final PermissionMigrationService permissionMigrationService = new PermissionMigrationService();
 
     private static volatile long lastScanTimeMs = 0L;
     private static volatile Set<String> cachedSourceSuggestions = Collections.emptySet();
@@ -73,6 +78,9 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
         addParameter(PARAM_OVERWRITE, new BooleanParameter("rtp.config", "whether to overwrite existing files",
                 (uuid, s) -> true));
 
+        addParameter(PARAM_PERMISSIONS, new BooleanParameter("rtp.config", "whether to migrate competitor permissions",
+                (uuid, s) -> true));
+
         addSubCommand(new ConfigImportPermissionsCmd(this));
     }
 
@@ -118,6 +126,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
         }
 
         boolean overwrite = false;
+        boolean migratePermissions = true;
         if (parameterValues != null) {
             if (parameterValues.containsKey(PARAM_OVERWRITE)) {
                 List<String> ovValues = parameterValues.get(PARAM_OVERWRITE);
@@ -130,6 +139,17 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
             // Also check for raw flag style --overwrite
             if (parameterValues.containsKey("--overwrite") || parameterValues.containsKey("-o")) {
                 overwrite = true;
+            }
+
+            if (parameterValues.containsKey(PARAM_PERMISSIONS)) {
+                List<String> permValues = parameterValues.get(PARAM_PERMISSIONS);
+                if (permValues != null && !permValues.isEmpty()) {
+                    migratePermissions = Boolean.parseBoolean(permValues.get(0));
+                }
+            } else if (parameterValues.containsKey("--no-permissions")) {
+                migratePermissions = false;
+            } else if (parameterValues.containsKey("--permissions") || parameterValues.containsKey("-p")) {
+                migratePermissions = true;
             }
         }
 
@@ -301,7 +321,35 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
                     + "&a file(s). Run &f/rtp reload&a to apply.");
         }
 
+        // Unified permission migration step
+        if (migratePermissions) {
+            String sourceFilter = requestedSource != null ? requestedSource.toLowerCase(Locale.ROOT) : null;
+            executePermissionMigration(callerId, sourceFilter, overwrite);
+        }
+
         return true;
+    }
+
+    private void executePermissionMigration(@Nullable UUID callerId, @Nullable String sourceFilter, boolean apply) {
+        permissionMigrationService.loadTemplatesFromConfig();
+
+        sendMessage(callerId, "&7[RTP] Migrating permissions for &f"
+                + (sourceFilter != null ? sourceFilter : "all competitor sources")
+                + " &7[mode=&f" + (apply ? "APPLY" : "DRY-RUN") + "&7]...");
+
+        String groupListCmd = permissionMigrationService.getGroupListTemplate();
+        sendMessage(callerId, "&7[RTP] Permission provider discovery command: &8" + groupListCmd);
+
+        if (apply && RTP.serverAccessor != null) {
+            boolean dispatched = RTP.serverAccessor.executeCommand(RTPAPI.serverId, groupListCmd);
+            if (dispatched) {
+                sendMessage(callerId, "&a✔ Dispatched permission discovery to provider.");
+            } else {
+                sendMessage(callerId, "&e[WARN] Could not dispatch permission command to provider.");
+            }
+        } else if (!apply) {
+            sendMessage(callerId, "&7[DRY-RUN] Permission migration planned. Supply &foverwrite=true&7 to apply permission changes to provider.");
+        }
     }
 
     private void sendMessage(@Nullable UUID callerId, String msg) {

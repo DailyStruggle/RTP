@@ -166,6 +166,23 @@ public final class MenuModel {
       }
     }
 
+    // If operator tools are enabled, check if player has operator permission
+    if (config.showOperatorTools()) {
+      String perm = config.permissionOperatorTools();
+      boolean hasPerm = (perm != null && !perm.isBlank() && RTPAPI.checkPermission(playerId, perm))
+          || RTPAPI.checkPermission(playerId, "rtp.admin");
+      if (hasPerm) {
+        entries.add(
+            new MenuEntry(
+                RtpTarget.action("menu:operator"),
+                RtpTargetStatus.Availability.READY,
+                config.titleOperatorSelector(),
+                config.iconOperatorSelector(),
+                0L,
+                0.0));
+      }
+    }
+
     MetricsSnapshot metrics = config.showDashboard() ? RTPAPI.getMetricsSnapshot() : null;
     return new MenuModel(
         config.title(),
@@ -361,6 +378,121 @@ public final class MenuModel {
         config.showDashboard(),
         config.dashboardIconName(),
         pageEntries,
+        metrics);
+  }
+
+  /**
+   * Builds the operator control hub sub-menu model for {@code playerId}.
+   *
+   * @param playerId the viewing player
+   * @param config the resolved menu configuration
+   * @return an immutable model; never {@code null}
+   */
+  public static MenuModel buildOperatorMenu(UUID playerId, GuiMenuConfig config) {
+    List<MenuEntry> entries = new ArrayList<>();
+
+    // 1. Setup Wizard (rtp.admin.setup)
+    if (RTPAPI.checkPermission(playerId, "rtp.admin.setup") || RTPAPI.checkPermission(playerId, "rtp.admin")) {
+      entries.add(
+          new MenuEntry(
+              RtpTarget.action("action:operator:setup"),
+              RtpTargetStatus.Availability.READY,
+              "&a&lSetup Wizard",
+              config.iconOperatorSetup(),
+              0L,
+              0.0));
+    }
+
+    // 2. Import Foreign Configs (rtp.config)
+    if (RTPAPI.checkPermission(playerId, "rtp.config") || RTPAPI.checkPermission(playerId, "rtp.admin")) {
+      entries.add(
+          new MenuEntry(
+              RtpTarget.action("action:operator:import"),
+              RtpTargetStatus.Availability.READY,
+              "&e&lImport Configs",
+              config.iconOperatorImport(),
+              0L,
+              0.0));
+    }
+
+    // 3. Config Editor (rtp.config)
+    if (RTPAPI.checkPermission(playerId, "rtp.config") || RTPAPI.checkPermission(playerId, "rtp.admin")) {
+      entries.add(
+          new MenuEntry(
+              RtpTarget.action("action:operator:config"),
+              RtpTargetStatus.Availability.READY,
+              "&b&lConfig Editor",
+              config.iconOperatorConfig(),
+              0L,
+              0.0));
+    }
+
+    // 4. Visualizations (rtp.see)
+    if (RTPAPI.checkPermission(playerId, "rtp.see") || RTPAPI.checkPermission(playerId, "rtp.admin")) {
+      entries.add(
+          new MenuEntry(
+              RtpTarget.action("action:operator:visualizations"),
+              RtpTargetStatus.Availability.READY,
+              "&d&lVisualizations",
+              config.iconOperatorVisualizations(),
+              0L,
+              0.0));
+    }
+
+    // 5. Status & Metrics (rtp.info)
+    if (RTPAPI.checkPermission(playerId, "rtp.info") || RTPAPI.checkPermission(playerId, "rtp.admin")) {
+      entries.add(
+          new MenuEntry(
+              RtpTarget.action("action:operator:status"),
+              RtpTargetStatus.Availability.READY,
+              "&f&lStatus & Metrics",
+              config.iconOperatorStatus(),
+              0L,
+              0.0));
+    }
+
+    // 6. Master Admin Book Panel (rtp.menu.admin)
+    if (RTPAPI.checkPermission(playerId, "rtp.menu.admin") || RTPAPI.checkPermission(playerId, "rtp.admin")) {
+      entries.add(
+          new MenuEntry(
+              RtpTarget.action("action:operator:adminbook"),
+              RtpTargetStatus.Availability.READY,
+              "&6&lAdmin Book Panel",
+              config.iconOperatorAdminBook(),
+              0L,
+              0.0));
+    }
+
+    // 7. Quick Reload (rtp.reload)
+    if (RTPAPI.checkPermission(playerId, "rtp.reload") || RTPAPI.checkPermission(playerId, "rtp.admin")) {
+      entries.add(
+          new MenuEntry(
+              RtpTarget.action("action:operator:reload"),
+              RtpTargetStatus.Availability.READY,
+              "&c&lQuick Reload",
+              config.iconOperatorReload(),
+              0L,
+              0.0));
+    }
+
+    // 8. Navigation: Back to main menu
+    entries.add(
+        new MenuEntry(
+            RtpTarget.action("menu:main"),
+            RtpTargetStatus.Availability.READY,
+            "&c[Back to Worlds]",
+            config.iconBackToMainMenu(),
+            0L,
+            0.0));
+
+    MetricsSnapshot metrics = config.showDashboard() ? RTPAPI.getMetricsSnapshot() : null;
+    return new MenuModel(
+        config.titleOperatorMenu(),
+        6,
+        config.fillerName(),
+        config.showDashboard(),
+        config.dashboardIconName(),
+        entries,
         metrics);
   }
 

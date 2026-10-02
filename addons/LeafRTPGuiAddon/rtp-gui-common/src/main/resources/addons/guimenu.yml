@@ -35,6 +35,20 @@ titleActionsSelector: "&6&lSpecial Teleports..."
 iconActionsSelector: "NETHERITE_SWORD"
 iconActionDefault: "DIAMOND_SWORD"
 
+# Show operator control hub in GUI if player has operator permission.
+showOperatorTools: true
+permissionOperatorTools: "rtp.menu.admin"
+titleOperatorMenu: "&6&lOperator Control Hub"
+titleOperatorSelector: "&6&lOperator Tools..."
+iconOperatorSelector: "COMMAND_BLOCK"
+iconOperatorSetup: "NETHER_STAR"
+iconOperatorImport: "HOPPER"
+iconOperatorConfig: "REPEATER"
+iconOperatorVisualizations: "FILLED_MAP"
+iconOperatorStatus: "CLOCK"
+iconOperatorAdminBook: "WRITABLE_BOOK"
+iconOperatorReload: "REDSTONE_TORCH"
+
 # Group biomes into a dedicated paginated sub-menu from the main menu.
 groupBiomesIntoSubmenu: true
 titleBiomeMenu: "&1&lSelect Biome"

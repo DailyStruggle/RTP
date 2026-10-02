@@ -38,6 +38,30 @@ public enum GuiMenuKeys {
   iconActionsSelector,
   /** Fallback icon material name for actions without an explicit icon. */
   iconActionDefault,
+  /** When true, show operator tools button in GUI if player has permission. */
+  showOperatorTools,
+  /** Permission required to view/use the operator tools button. */
+  permissionOperatorTools,
+  /** Title for the operator tools sub-menu. Supports '&amp;' color codes. */
+  titleOperatorMenu,
+  /** Display title for the operator selector button on the main menu. */
+  titleOperatorSelector,
+  /** Icon material name for the operator selector button on the main menu. */
+  iconOperatorSelector,
+  /** Icon material name for the setup wizard button in the operator menu. */
+  iconOperatorSetup,
+  /** Icon material name for the import button in the operator menu. */
+  iconOperatorImport,
+  /** Icon material name for the config editor button in the operator menu. */
+  iconOperatorConfig,
+  /** Icon material name for the visualizations button in the operator menu. */
+  iconOperatorVisualizations,
+  /** Icon material name for the status/metrics button in the operator menu. */
+  iconOperatorStatus,
+  /** Icon material name for the master admin book button in the operator menu. */
+  iconOperatorAdminBook,
+  /** Icon material name for the quick reload button in the operator menu. */
+  iconOperatorReload,
   /** When true, groups biomes into a dedicated paginated sub-menu from the main menu. */
   groupBiomesIntoSubmenu,
   /** Title for the biomes sub-menu. Supports '&amp;' color codes. */

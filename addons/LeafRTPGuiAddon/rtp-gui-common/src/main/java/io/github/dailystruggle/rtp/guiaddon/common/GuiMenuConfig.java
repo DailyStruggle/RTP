@@ -136,6 +136,54 @@ public final class GuiMenuConfig {
     return str(GuiMenuKeys.iconActionDefault, "DIAMOND_SWORD");
   }
 
+  public boolean showOperatorTools() {
+    return bool(GuiMenuKeys.showOperatorTools, true);
+  }
+
+  public String permissionOperatorTools() {
+    return str(GuiMenuKeys.permissionOperatorTools, "rtp.menu.admin");
+  }
+
+  public String titleOperatorMenu() {
+    return str(GuiMenuKeys.titleOperatorMenu, "&6&lOperator Control Hub");
+  }
+
+  public String titleOperatorSelector() {
+    return str(GuiMenuKeys.titleOperatorSelector, "&6&lOperator Tools...");
+  }
+
+  public String iconOperatorSelector() {
+    return str(GuiMenuKeys.iconOperatorSelector, "COMMAND_BLOCK");
+  }
+
+  public String iconOperatorSetup() {
+    return str(GuiMenuKeys.iconOperatorSetup, "NETHER_STAR");
+  }
+
+  public String iconOperatorImport() {
+    return str(GuiMenuKeys.iconOperatorImport, "HOPPER");
+  }
+
+  public String iconOperatorConfig() {
+    return str(GuiMenuKeys.iconOperatorConfig, "REPEATER");
+  }
+
+  public String iconOperatorVisualizations() {
+    return str(GuiMenuKeys.iconOperatorVisualizations, "FILLED_MAP");
+  }
+
+  public String iconOperatorStatus() {
+    return str(GuiMenuKeys.iconOperatorStatus, "CLOCK");
+  }
+
+  public String iconOperatorAdminBook() {
+    return str(GuiMenuKeys.iconOperatorAdminBook, "WRITABLE_BOOK");
+  }
+
+  public String iconOperatorReload() {
+    return str(GuiMenuKeys.iconOperatorReload, "REDSTONE_TORCH");
+  }
+
   public boolean groupBiomesIntoSubmenu() {
     return bool(GuiMenuKeys.groupBiomesIntoSubmenu, true);
   }

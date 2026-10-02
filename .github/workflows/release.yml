@@ -1,13 +1,12 @@
 name: Release rtp-lite to Modrinth, Hangar and GitHub Releases (markdown sites)
 
-# Owns the Git / markdown-listing side of a single release: creates and pushes
-# the `v<version>` tag, publishes to Modrinth and Hangar (project body +
-# version), and creates the public GitHub Release. It triggers on the same
-# PR-merge (or workflow_dispatch) event as release-bbb.yml, so the two
-# workflows run independently and each site is published exactly once with no
-# cross-workflow coupling:
-#   - release-bbb.yml: BuiltByBit (Pro + Lite BBCode pages), Spigot.
-#   - release.yml (this file): the `v<version>` tag + Modrinth + Hangar (markdown) + GitHub Releases.
+# Owns the public/Lite release side: publishes the lite assembly variant to
+# Modrinth, Hangar, and GitHub Releases.
+#
+# Release Staging (ADR-100 section 2.3):
+#   - LeafRTP Pro releases first on PR merge (via release-bbb.yml) and creates the git tag.
+#   - LeafRTP (Lite) is intentionally delayed to allow the Pro release to settle in production.
+#   - This workflow is triggered on demand via `workflow_dispatch` when Pro is verified stable.
 #
 # Publishes the lite assembly variant (ADR-024, Lite only) to the Modrinth
 # project `rtp-lite` (https://modrinth.com/project/rtp-lite) and the Hangar
@@ -22,12 +21,6 @@ name: Release rtp-lite to Modrinth, Hangar and GitHub Releases (markdown sites)
 # top of CHANGELOG.md for the marker contract.
 
 on:
-  pull_request:
-    types: [closed]
-    branches:
-      - V3
-      - V2
-      - V1
   workflow_dispatch:
     inputs:
       version:
@@ -37,11 +30,6 @@ on:
 
 jobs:
   release:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.merged == true &&
-       (startsWith(github.head_ref, 'v') || startsWith(github.head_ref, 'V')) &&
-       contains(github.head_ref, '.'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
