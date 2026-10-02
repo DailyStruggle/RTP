@@ -33,10 +33,12 @@ public final class ParticleRateLimiter {
      *
      * @param tick current tick index
      */
-    public synchronized void updateTick(long tick) {
-        if (tick != this.currentTick) {
-            this.currentTick = tick;
-            this.currentTickParticles.set(0);
+    public void updateTick(long tick) {
+        synchronized (this) {
+            if (tick != this.currentTick) {
+                this.currentTick = tick;
+                this.currentTickParticles.set(0);
+            }
         }
     }
 

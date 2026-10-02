@@ -116,6 +116,7 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
   }
 
   @Override
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: synchronized RNG update and feistel salt derivation
   public void setRng(java.util.Random rng) {
     synchronized (this) {
       super.setRng(rng);
@@ -125,6 +126,7 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
     }
   }
 
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: synchronized feistel salt initialization
   public void setFeistelSalt(long salt) {
     synchronized (this) {
       this.feistelSalt = salt;

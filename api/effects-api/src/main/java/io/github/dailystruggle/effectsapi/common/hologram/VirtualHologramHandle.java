@@ -44,15 +44,19 @@ public class VirtualHologramHandle implements HologramHandle {
     }
 
     @Override
-    public synchronized List<String> lines() {
-        return Collections.unmodifiableList(new ArrayList<>(lines));
+    public List<String> lines() {
+        synchronized (this) {
+            return Collections.unmodifiableList(new ArrayList<>(lines));
+        }
     }
 
     @Override
-    public synchronized void updateLines(List<String> lines) {
-        this.lines.clear();
-        if (lines != null) {
-            this.lines.addAll(lines);
+    public void updateLines(List<String> lines) {
+        synchronized (this) {
+            this.lines.clear();
+            if (lines != null) {
+                this.lines.addAll(lines);
+            }
         }
     }
 

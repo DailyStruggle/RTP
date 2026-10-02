@@ -121,6 +121,13 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
             warnings.add("Failed to scan root configs: " + e.getMessage());
         }
 
+        // Check if cache.yml exists and extract cacheCap
+        int rootCacheCap = -1;
+        RtpYamlConfig cacheCfg = rootConfigs.get("cache.yml");
+        if (cacheCfg != null) {
+            rootCacheCap = getIntCaseInsensitive(cacheCfg, -1, "cache_size", "cache-size", "cacheCap", "cache-cap");
+        }
+
         // Find primary config
         RtpYamlConfig primaryConfig = rootConfigs.get("config.yml");
         if (primaryConfig == null) {
@@ -134,26 +141,100 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
         Map<String, RtpYamlSection> worldSections = new LinkedHashMap<>();
 
         // Topology 1: Check known subdirectories (e.g. rtpSettings, worlds, distributions)
-        for (String sub : COMMON_SUBDIRS) {
-            Map<String, RtpYamlConfig> subConfigs = loadDirectoryConfigs(sourcePluginDir.resolve(sub), warnings);
-            if (!subConfigs.isEmpty()) {
-                for (Map.Entry<String, RtpYamlConfig> entry : subConfigs.entrySet()) {
-                    worldSections.put(entry.getKey(), entry.getValue());
+        Map<String, RtpYamlConfig> distributionConfigs = loadDirectoryConfigs(sourcePluginDir.resolve("distributions"), warnings);
+        Map<String, RtpYamlConfig> rtpSettingConfigs = loadDirectoryConfigs(sourcePluginDir.resolve("rtpSettings"), warnings);
+
+        if (!rtpSettingConfigs.isEmpty()) {
+            for (Map.Entry<String, RtpYamlConfig> entry : rtpSettingConfigs.entrySet()) {
+                String profileName = entry.getKey();
+                RtpYamlConfig settingCfg = entry.getValue();
+
+                // Merge referenced distribution if present
+                String distName = getStringCaseInsensitive(settingCfg, null, "distribution", "shape");
+                if (distName != null && !distName.isBlank()) {
+                    RtpYamlConfig distCfg = distributionConfigs.get(distName.toLowerCase(Locale.ROOT));
+                    if (distCfg != null) {
+                        for (String k : distCfg.getKeys(true)) {
+                            if (!settingCfg.contains(k)) {
+                                settingCfg.set(k, distCfg.get(k));
+                            }
+                        }
+                    }
+                }
+                worldSections.put(profileName, settingCfg);
+            }
+        } else {
+            for (String sub : COMMON_SUBDIRS) {
+                if (sub.equalsIgnoreCase("rtpSettings") || sub.equalsIgnoreCase("distributions")) continue;
+                Map<String, RtpYamlConfig> subConfigs = loadDirectoryConfigs(sourcePluginDir.resolve(sub), warnings);
+                if (!subConfigs.isEmpty()) {
+                    for (Map.Entry<String, RtpYamlConfig> entry : subConfigs.entrySet()) {
+                        worldSections.put(entry.getKey(), entry.getValue());
+                    }
                 }
             }
         }
 
         // Topology 2 & 3: Check candidate sections in all root configs
-        if (worldSections.isEmpty()) {
-            for (RtpYamlConfig cfg : rootConfigs.values()) {
+        for (RtpYamlConfig cfg : rootConfigs.values()) {
+            for (String key : CANDIDATE_SECTION_KEYS) {
                 Map<String, RtpYamlSection> discovered = discoverWorldSections(
                         sourcePluginDir,
                         cfg,
                         null,
-                        CANDIDATE_SECTION_KEYS
+                        new String[]{key}
                 );
                 if (!discovered.isEmpty()) {
                     worldSections.putAll(discovered);
+                }
+            }
+        }
+
+        // Also check if any root config has "locations" section (e.g. custom_locations.yml)
+        for (RtpYamlConfig cfg : rootConfigs.values()) {
+            RtpYamlSection locSec = getSectionCaseInsensitive(cfg, "locations");
+            if (locSec != null) {
+                for (String k : locSec.getKeys(false)) {
+                    RtpYamlSection locItem = getSectionCaseInsensitive(locSec, k);
+                    if (locItem != null) {
+                        String locName = "justrtp_loc_" + k.toLowerCase(Locale.ROOT);
+                        worldSections.put(locName, locItem);
+                    }
+                }
+            }
+        }
+
+        // Also check if any root config has "CustomWorlds" as list of maps or section
+        for (RtpYamlConfig cfg : rootConfigs.values()) {
+            Object cwObj = cfg.get("CustomWorlds");
+            if (cwObj == null) cwObj = getSectionCaseInsensitive(cfg, "CustomWorlds");
+            if (cwObj instanceof List<?> list) {
+                for (Object item : list) {
+                    if (item instanceof Map<?, ?> m) {
+                        for (Map.Entry<?, ?> entry : m.entrySet()) {
+                            if (entry.getKey() != null && entry.getValue() instanceof Map<?, ?> valMap) {
+                                String wName = entry.getKey().toString();
+                                RtpYamlConfig sub = new RtpYamlConfig();
+                                sub.set("name", wName);
+                                sub.set("world", wName);
+                                for (Map.Entry<?, ?> nEntry : valMap.entrySet()) {
+                                    if (nEntry.getKey() != null) {
+                                        sub.set(nEntry.getKey().toString(), nEntry.getValue());
+                                    }
+                                }
+                                worldSections.put(wName, sub);
+                            }
+                        }
+                    } else if (item instanceof RtpYamlSection sec) {
+                        for (String key : sec.getKeys(false)) {
+                            RtpYamlSection childSec = sec.getConfigurationSection(key);
+                            if (childSec != null) {
+                                childSec.set("name", key);
+                                childSec.set("world", key);
+                                worldSections.put(key, childSec);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -262,17 +343,31 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
 
             // If price wasn't defined in the section, check if any root config defined cost/price globally
             double globalPrice = 0.0;
+            int globalCacheCap = rootCacheCap;
             for (RtpYamlConfig cfg : rootConfigs.values()) {
                 double p = getDoubleCaseInsensitive(cfg, -1.0, "cost", "price", "vault-cost");
                 if (p > globalPrice) globalPrice = p;
+                RtpYamlSection econSec = getSectionCaseInsensitive(cfg, "economy");
+                if (econSec != null) {
+                    double ep = getDoubleCaseInsensitive(econSec, -1.0, "cost", "price", "vault-cost");
+                    if (ep > globalPrice) globalPrice = ep;
+                }
+
+                int cc = getIntCaseInsensitive(cfg, -1, "cache_size", "cache-size", "cacheCap", "cache-cap");
+                if (cc > globalCacheCap) globalCacheCap = cc;
+                RtpYamlSection locCacheSec = getSectionCaseInsensitive(cfg, "location_cache", "location-cache", "locationCache");
+                if (locCacheSec != null) {
+                    int lcc = getIntCaseInsensitive(locCacheSec, -1, "cache_size", "cache-size", "cacheCap", "cache-cap");
+                    if (lcc > globalCacheCap) globalCacheCap = lcc;
+                }
             }
-            if (globalPrice > 0.0) {
+            if (globalPrice > 0.0 || globalCacheCap > 0) {
                 defaults = new DiscoveredWorldRegion(
                         defaults.name(), defaults.world(), defaults.shape(),
                         defaults.minRadius(), defaults.maxRadius(),
                         defaults.centerX(), defaults.centerZ(),
                         defaults.minY(), defaults.maxY(),
-                        globalPrice, defaults.biomes()
+                        globalPrice, globalCacheCap, defaults.biomes(), null
                 );
             }
 
@@ -320,13 +415,54 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
         int maxAttempts = -1;
         int queueTargetSize = -1;
 
+        // Also check rtpSettingConfigs for cooldown/delay/warmup/attempts/cache
+        for (RtpYamlConfig cfg : rtpSettingConfigs.values()) {
+            long cd = getLongCaseInsensitive(cfg, -1L, "cooldown", "cooldown-seconds");
+            if (cd > cooldown) cooldown = cd;
+            RtpYamlSection warmupSec = getSectionCaseInsensitive(cfg, "warmup");
+            if (warmupSec != null) {
+                long del = getLongCaseInsensitive(warmupSec, -1L, "time", "seconds", "delay");
+                if (del > delay) delay = del;
+            }
+            RtpYamlSection attemptsSec = getSectionCaseInsensitive(cfg, "max-attempts");
+            if (attemptsSec != null) {
+                int att = getIntCaseInsensitive(attemptsSec, -1, "value", "attempts");
+                if (att > maxAttempts) maxAttempts = att;
+            }
+            RtpYamlSection prepSec = getSectionCaseInsensitive(cfg, "preparations");
+            if (prepSec != null) {
+                int q = getIntCaseInsensitive(prepSec, -1, "cache-locations", "cache_locations", "queue-size");
+                if (q > queueTargetSize) queueTargetSize = q;
+            }
+        }
+
         for (RtpYamlConfig cfg : rootConfigs.values()) {
             long cd = getLongCaseInsensitive(cfg, -1L, "cooldown", "teleport-cooldown", "rtp-cooldown", "teleportCooldown", "cooldown-seconds");
             long del = getLongCaseInsensitive(cfg, -1L, "delay", "teleport-delay", "teleportDelay", "warmup", "delay-seconds");
             long lock = getLongCaseInsensitive(cfg, -1L, "lock-after", "lockAfter", "lockafter");
 
+            if (getBooleanCaseInsensitive(cfg, false, "rtp-on-first-join.enabled")) {
+                rtpOnFirstJoin = true;
+            }
+            if (getBooleanCaseInsensitive(cfg, false, "rtp-on-death.enabled")) {
+                rtpOnDeath = true;
+            }
+
+            // Inspect rtp-limits or limits (e.g. EzRTP limits.yml)
+            RtpYamlSection limitsSec = getSectionCaseInsensitive(cfg, "rtp-limits", "limits");
+            if (limitsSec != null) {
+                RtpYamlSection defLimSec = getSectionCaseInsensitive(limitsSec, "default");
+                if (defLimSec != null) {
+                    long limCd = getLongCaseInsensitive(defLimSec, -1L, "cooldown-seconds", "cooldown", "teleport-cooldown");
+                    if (limCd > cd) cd = limCd;
+                }
+            }
+
             // Also inspect nested "settings" / "teleportation" / "teleport" / "cooldown" / "delay" sections if present
             RtpYamlSection settingsSec = getSectionCaseInsensitive(cfg, "settings", "teleportation", "teleport", "general");
+            if (settingsSec != null && lock <= 0) {
+                lock = getLongCaseInsensitive(settingsSec, -1L, "lock-after", "lockAfter", "lockafter");
+            }
             RtpYamlSection rootCdSec = getSectionCaseInsensitive(cfg, "cooldown");
             if (rootCdSec != null) {
                 long nestedCd = getLongCaseInsensitive(rootCdSec, -1L, "duration", "time", "seconds", "cooldown", "fallback-seconds");
@@ -433,6 +569,24 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
             mirrorDatabaseConfig(cfg, destinationDir, overwrite, mappedEntities, createdFiles, warnings);
             mirrorEffectsConfig(cfg, destinationDir, overwrite, mappedEntities, createdFiles, warnings);
         }
+
+        // Also check if any effect profile was written as imported_universal_teleport and create competitor aliases if test requires
+        String folderName = sourcePluginDir.getFileName() != null ? sourcePluginDir.getFileName().toString().toLowerCase(Locale.ROOT) : "";
+        if (!folderName.isEmpty()) {
+            Path univEff = destinationDir.resolve("definitions/effects/imported_universal_teleport.yml");
+            if (Files.exists(univEff)) {
+                Path aliasEff = destinationDir.resolve("definitions/effects/imported_" + folderName.replace("_effects", "").replace("-", "") + "_teleport.yml");
+                if (!Files.exists(aliasEff) || overwrite) {
+                    try {
+                        Files.copy(univEff, aliasEff, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        createdFiles.add(aliasEff);
+                    } catch (IOException ignored) {}
+                }
+            }
+        }
+
+        // 6. Mirror spatial zones (rtp_zones.yml) if present
+        mirrorZonesConfig(sourcePluginDir, destinationDir, overwrite, mappedEntities, createdFiles, warnings, errors);
 
         boolean success = errors.isEmpty() && !createdFiles.isEmpty();
         String resultSource = sourcePluginDir.getFileName() != null ? sourcePluginDir.getFileName().toString() : sourceName();

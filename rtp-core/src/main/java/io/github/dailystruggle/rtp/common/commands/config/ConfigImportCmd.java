@@ -25,14 +25,40 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
     public static final String PARAM_OVERWRITE = "overwrite";
     public static final String PARAM_PATH = "path";
 
+    private static volatile long lastScanTimeMs = 0L;
+    private static volatile Set<String> cachedSourceSuggestions = Collections.emptySet();
+    private static final long SCAN_CACHE_DURATION_MS = 5000L;
+
     public ConfigImportCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
 
-        addParameter(PARAM_SOURCE, new CommandParameter("rtp.config", "foreign plugin source name",
+        addParameter(PARAM_SOURCE, new CommandParameter("rtp.config", "foreign plugin source or directory name",
                 (uuid, s) -> true) {
             @Override
             public Set<String> values() {
-                return ForeignConfigImporterRegistry.getRegisteredSourceNames();
+                long now = System.currentTimeMillis();
+                if (now - lastScanTimeMs < SCAN_CACHE_DURATION_MS && !cachedSourceSuggestions.isEmpty()) {
+                    return cachedSourceSuggestions;
+                }
+
+                Set<String> suggestions = new LinkedHashSet<>(ForeignConfigImporterRegistry.getRegisteredSourceNames());
+
+                File pluginDir = null;
+                if (RTP.configs != null && RTP.configs.pluginDirectory != null) {
+                    pluginDir = RTP.configs.pluginDirectory;
+                } else if (RTP.serverAccessor != null) {
+                    pluginDir = RTP.serverAccessor.getPluginDirectory();
+                }
+
+                if (pluginDir != null && pluginDir.getParentFile() != null) {
+                    Path pluginsDir = pluginDir.getParentFile().toPath();
+                    Map<String, Path> detected = ForeignConfigImporterRegistry.detectAvailableSources(pluginsDir);
+                    suggestions.addAll(detected.keySet());
+                }
+
+                cachedSourceSuggestions = Collections.unmodifiableSet(suggestions);
+                lastScanTimeMs = now;
+                return cachedSourceSuggestions;
             }
         });
 
