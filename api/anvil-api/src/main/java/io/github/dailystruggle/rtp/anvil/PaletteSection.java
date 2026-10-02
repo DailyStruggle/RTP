@@ -53,6 +53,14 @@ public record PaletteSection(int sectionY, List<String> palette, long[] data) {
             return palette.get(0);
         }
         int idx = PackedPaletteDecoder.entryIndex(lx, ly, lz);
+        int bits = PackedPaletteDecoder.bitsPerEntry(palette.size());
+        int entriesPerLong = 64 / bits;
+        int longIdx = idx / entriesPerLong;
+        if (longIdx < 0 || longIdx >= data.length) {
+            // Defensive: truncated or malformed data array. Fall back to palette[0]
+            // rather than throw, keeping the pre-filter on the safe UNKNOWN path.
+            return palette.get(0);
+        }
         int paletteIdx = PackedPaletteDecoder.decode(data, palette.size(), idx);
         if (paletteIdx < 0 || paletteIdx >= palette.size()) {
             // Defensive: corrupted index bits. Fall back to palette[0] rather than throw

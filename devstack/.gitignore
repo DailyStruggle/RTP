@@ -91,5 +91,7 @@ lobby-b/rtp-config/**
 # -Lite via docker-compose.lite.yml. Per-instance source like network.yml.
 !backend-a/rtp-config/network-lite.yml
 !backend-b/rtp-config/network-lite.yml
+!backend-c/rtp-config/network-lite.yml
+!backend-d/rtp-config/network-lite.yml
 !lobby-a/rtp-config/network-lite.yml
 !lobby-b/rtp-config/network-lite.yml

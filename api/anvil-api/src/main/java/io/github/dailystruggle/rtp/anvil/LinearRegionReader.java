@@ -132,6 +132,10 @@ public final class LinearRegionReader implements RegionFileReader {
         if (targetUncompressedLength <= 0) {
             return null; // Chunk not generated in this region
         }
+        if (targetUncompressedLength > AnvilReader.MAX_DECOMPRESSED_CHUNK_BYTES) {
+            throw new CorruptRegionEntryException("Implausible declared Linear chunk length " + targetUncompressedLength
+                    + " for (" + rx + "," + rz + "); exceeds cap " + AnvilReader.MAX_DECOMPRESSED_CHUNK_BYTES);
+        }
 
         // Calculate offset in uncompressed stream to target chunk
         int uncompressedOffsetToTarget = 0;
@@ -172,10 +176,13 @@ public final class LinearRegionReader implements RegionFileReader {
                 markZstdUnavailable();
                 throw new IOException("ZStandard decoder classes failed to link during Linear decompression", t);
             }
-            if (t instanceof IOException) {
-                throw (IOException) t;
+            if (t instanceof CorruptRegionEntryException) {
+                throw (CorruptRegionEntryException) t;
             }
-            throw new IOException("Failed to decompress Linear chunk payload at (" + rx + "," + rz + ")", t);
+            if (t instanceof IOException) {
+                throw new CorruptRegionEntryException("Corrupted ZSTD stream at (" + rx + "," + rz + "): " + t.getMessage());
+            }
+            throw new CorruptRegionEntryException("Failed to decompress Linear chunk payload at (" + rx + "," + rz + "): " + t.getMessage());
         }
 
         LinkedHashMap<String, Object> root = Nbt.readRootCompound(nbtBytes);

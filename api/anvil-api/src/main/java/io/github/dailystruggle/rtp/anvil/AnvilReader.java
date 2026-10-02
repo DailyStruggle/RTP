@@ -41,6 +41,9 @@ public final class AnvilReader implements RegionFileReader {
     /** Bit flag set on the compression byte when the chunk is stored in an external file. */
     private static final int EXTERNAL_FLAG = 0x80;
 
+    /** Maximum allowed decompressed payload size for a single chunk (32 MiB). */
+    public static final int MAX_DECOMPRESSED_CHUNK_BYTES = 32 * 1024 * 1024;
+
     private AnvilReader() {}
 
     @Override
@@ -58,7 +61,11 @@ public final class AnvilReader implements RegionFileReader {
                 ((regionBytes[locationEntryOffset + 1] & 0xFF) << 8)  |
                  (regionBytes[locationEntryOffset + 2] & 0xFF);
         int sectorCount = regionBytes[locationEntryOffset + 3] & 0xFF;
-        return sectorOffset != 0 && sectorCount != 0;
+        if (sectorOffset < 2 || sectorCount == 0) {
+            return false;
+        }
+        long payloadEnd = (long) sectorOffset * SECTOR_SIZE + (long) sectorCount * SECTOR_SIZE;
+        return payloadEnd <= regionBytes.length;
     }
 
     /**
@@ -120,17 +127,26 @@ public final class AnvilReader implements RegionFileReader {
                 ((regionBytes[locationEntryOffset + 1] & 0xFF) << 8)  |
                  (regionBytes[locationEntryOffset + 2] & 0xFF);
         int sectorCount = regionBytes[locationEntryOffset + 3] & 0xFF;
-        if (sectorOffset == 0 || sectorCount == 0) {
+        if (sectorOffset == 0 && sectorCount == 0) {
             return null;
+        }
+        if (sectorOffset < 2) {
+            throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") sector offset "
+                    + sectorOffset + " overlaps 8 KiB region header (< 2 sectors)");
+        }
+        if (sectorCount == 0) {
+            throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") has sector offset "
+                    + sectorOffset + " but zero sector count");
         }
 
         // long math: sectorOffset is 24-bit, so sectorOffset * SECTOR_SIZE overflows int on corrupt headers.
         long payloadStartLong = (long) sectorOffset * SECTOR_SIZE;
-        int payloadBudget = sectorCount * SECTOR_SIZE;
-        if (payloadStartLong + payloadBudget > regionBytes.length) {
+        long payloadBudgetLong = (long) sectorCount * SECTOR_SIZE;
+        if (payloadStartLong + payloadBudgetLong > regionBytes.length) {
             throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") spans past end of file: start="
-                    + payloadStartLong + " budget=" + payloadBudget + " fileLen=" + regionBytes.length);
+                    + payloadStartLong + " budget=" + payloadBudgetLong + " fileLen=" + regionBytes.length);
         }
+        int payloadBudget = (int) payloadBudgetLong;
         int payloadStart = (int) payloadStartLong;
 
         ByteBuffer bb = ByteBuffer.wrap(regionBytes, payloadStart, payloadBudget);
@@ -185,7 +201,15 @@ public final class AnvilReader implements RegionFileReader {
              java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream(Math.max(1024, len * 4))) {
             byte[] buf = new byte[4096];
             int n;
-            while ((n = in.read(buf)) > 0) baos.write(buf, 0, n);
+            int totalDecompressed = 0;
+            while ((n = in.read(buf)) > 0) {
+                totalDecompressed += n;
+                if (totalDecompressed > MAX_DECOMPRESSED_CHUNK_BYTES) {
+                    throw new CorruptRegionEntryException("Decompressed chunk payload exceeded "
+                            + MAX_DECOMPRESSED_CHUNK_BYTES + " bytes");
+                }
+                baos.write(buf, 0, n);
+            }
             return baos.toByteArray();
         }
     }

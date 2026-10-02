@@ -58,6 +58,9 @@ dependencies {
     testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation 'com.github.TechFortress:GriefPrevention:16.18.1'
     testImplementation 'com.github.LlmDl:Towny:0.102.0.13'
+    testImplementation 'com.sk89q.worldguard:worldguard-bukkit:7.0.12'
+    testImplementation 'com.sk89q.worldedit:worldedit-bukkit:7.2.15'
+    testImplementation 'net.kyori:adventure-api:4.17.0'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

@@ -43,9 +43,6 @@ public final class BukkitTextDisplayHologramProvider implements HologramProvider
 
     @Override
     public HologramHandle spawnHologram(String id, String worldName, Vector3d position, List<String> lines) {
-        if (Bukkit.getServer() == null) {
-            return new io.github.dailystruggle.effectsapi.common.hologram.VirtualHologramHandle(id, worldName, position, lines);
-        }
         World world = Bukkit.getWorld(worldName);
         if (world == null) {
             return new io.github.dailystruggle.effectsapi.common.hologram.VirtualHologramHandle(id, worldName, position, lines);

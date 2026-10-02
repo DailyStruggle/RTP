@@ -23,8 +23,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Bukkit-family instances (all three backends run Paper/Folia).
-TARGETS = ["backend-a", "backend-b", "backend-c", "lobby-a", "lobby-b"]
+# Bukkit-family instances (Paper/Folia backends and lobbies).
+BUKKIT_TARGETS = ["backend-a", "backend-b", "lobby-a", "lobby-b"]
+
+# Modded instances (Fabric on backend-c, NeoForge on backend-d).
+MOD_TARGETS = ["backend-c", "backend-d"]
 
 # plugin.yml declares name: LeafRTPGuiAddon, so any LeafRTPGuiAddon*.jar /
 # rtp-gui-bukkit*.jar is "ours" for the remove pass. Also purge legacy
@@ -46,7 +49,7 @@ def main(argv: list[str]) -> int:
     repo_root = devstack.parent
 
     if args.remove:
-        for t in TARGETS:
+        for t in BUKKIT_TARGETS:
             plugins_dir = devstack / t / "plugins"
             if not plugins_dir.exists():
                 continue
@@ -54,7 +57,15 @@ def main(argv: list[str]) -> int:
                 for jar in plugins_dir.glob(glob):
                     jar.unlink()
                     print(f"removed {jar}")
-        print("LeafRTPGuiAddon removed from devstack Bukkit instances.")
+        for t in MOD_TARGETS:
+            mods_dir = devstack / t / "mods"
+            if not mods_dir.exists():
+                continue
+            for glob in JAR_GLOBS:
+                for jar in mods_dir.glob(glob):
+                    jar.unlink()
+                    print(f"removed {jar}")
+        print("LeafRTPGuiAddon removed from devstack instances.")
         return 0
 
     if not args.skip_build:
@@ -74,7 +85,9 @@ def main(argv: list[str]) -> int:
                          f"Run without --skip-build, or build the module first.")
     jar = jars[0]
 
-    for t in TARGETS:
+    jar_bytes = jar.read_bytes()
+
+    for t in BUKKIT_TARGETS:
         plugins_dir = devstack / t / "plugins"
         plugins_dir.mkdir(parents=True, exist_ok=True)
         # Clear any prior copy so a rename/version bump does not leave two jars.
@@ -82,12 +95,32 @@ def main(argv: list[str]) -> int:
             for old in plugins_dir.glob(glob):
                 old.unlink()
         dest = plugins_dir / "LeafRTPGuiAddon.jar"
-        dest.write_bytes(jar.read_bytes())
+        dest.write_bytes(jar_bytes)
         print(f"installed {jar.name} -> {t}/plugins/LeafRTPGuiAddon.jar")
+
+    for t in MOD_TARGETS:
+        mods_dir = devstack / t / "mods"
+        mods_dir.mkdir(parents=True, exist_ok=True)
+        for glob in JAR_GLOBS:
+            for old in mods_dir.glob(glob):
+                old.unlink()
+        dest = mods_dir / "LeafRTPGuiAddon.jar"
+        dest.write_bytes(jar_bytes)
+        print(f"installed {jar.name} -> {t}/mods/LeafRTPGuiAddon.jar")
+
+        # Stage guimenu.yml into rtp-config/addons if missing
+        addons_dir = devstack / t / "rtp-config" / "addons"
+        addons_dir.mkdir(parents=True, exist_ok=True)
+        cfg_dest = addons_dir / "guimenu.yml"
+        if not cfg_dest.exists():
+            src_cfg = devstack / "lobby-a" / "plugins" / "RTP" / "addons" / "guimenu.yml"
+            if src_cfg.exists():
+                cfg_dest.write_bytes(src_cfg.read_bytes())
+                print(f"staged guimenu.yml -> {t}/rtp-config/addons/guimenu.yml")
 
     print()
     print("Done. Run 'docker compose up' (or restart the instances) to load it.")
-    print("guimenu.yml self-creates on first boot in each instance's plugins/RTP/ folder.")
+    print("guimenu.yml self-creates on first boot in each instance's config/rtp/ or plugins/RTP/ folder.")
     return 0
 
 

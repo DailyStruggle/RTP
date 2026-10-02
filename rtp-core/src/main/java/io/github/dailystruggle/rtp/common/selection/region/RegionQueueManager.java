@@ -818,18 +818,126 @@ public class RegionQueueManager {
         return Collections.unmodifiableList(sinks);
     }
 
-    private boolean checkAccepts(RTPLocation entry) {
-        if (entry == null) return false;
-        if (entry.reservation() == null) return false;
-        if (entry.coords() == null) return false;
+    /**
+     * Purges all pre-cached locations (kept, unkept, and per-player queues) that fall
+     * outside the region's current boundaries (shape or vertical adjustor).
+     * Associated chunk reservations are cleanly closed to uphold Rule S-002
+     * (no permanently force-loaded chunks).
+     *
+     * @return the number of purged candidate locations
+     */
+    public int purgeOutsideBounds() {
+        int purged = 0;
+
+        // Drain keptLocations, filtering out of bounds
+        int keptSize = keptLocations.size();
+        List<RTPLocation> keptToRetain = new ArrayList<>(keptSize);
+        for (int i = 0; i < keptSize; i++) {
+            RTPLocation loc = keptLocations.poll();
+            if (loc == null) break;
+            if (isLocationInBounds(loc)) {
+                keptToRetain.add(loc);
+            } else {
+                purged++;
+                if (loc.reservation() != null) {
+                    try {
+                        loc.reservation().close();
+                    } catch (Throwable t) {
+                        io.github.dailystruggle.rtp.common.RTP.log(
+                                java.util.logging.Level.WARNING,
+                                "Failed to close chunk reservation during purge: " + t.getMessage(), t);
+                    }
+                }
+                if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
+                        && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
+                    io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                            .deleteCachedLocation(region.name, loc);
+                }
+            }
+        }
+        for (RTPLocation loc : keptToRetain) {
+            keptLocations.offerSilently(loc);
+        }
+
+        // Drain unkeptLocations
+        int unkeptSize = unkeptLocations.size();
+        List<RTPLocation> unkeptToRetain = new ArrayList<>(unkeptSize);
+        for (int i = 0; i < unkeptSize; i++) {
+            RTPLocation loc = unkeptLocations.poll();
+            if (loc == null) break;
+            if (isLocationInBounds(loc)) {
+                unkeptToRetain.add(loc);
+            } else {
+                purged++;
+                if (loc.reservation() != null) {
+                    try {
+                        loc.reservation().close();
+                    } catch (Throwable t) {
+                        io.github.dailystruggle.rtp.common.RTP.log(
+                                java.util.logging.Level.WARNING,
+                                "Failed to close chunk reservation during purge: " + t.getMessage(), t);
+                    }
+                }
+                if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
+                        && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
+                    io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                            .deleteCachedLocation(region.name, loc);
+                }
+            }
+        }
+        for (RTPLocation loc : unkeptToRetain) {
+            unkeptLocations.offerSilently(loc);
+        }
+
+        // Clean per-player queues
+        for (ConcurrentLinkedQueue<RTPLocation> playerQueue : perPlayerLocationQueue.values()) {
+            java.util.Iterator<RTPLocation> it = playerQueue.iterator();
+            while (it.hasNext()) {
+                RTPLocation loc = it.next();
+                if (!isLocationInBounds(loc)) {
+                    it.remove();
+                    purged++;
+                    if (loc.reservation() != null) {
+                        try {
+                            loc.reservation().close();
+                        } catch (Throwable t) {
+                            io.github.dailystruggle.rtp.common.RTP.log(
+                                    java.util.logging.Level.WARNING,
+                                    "Failed to close chunk reservation during purge: " + t.getMessage(), t);
+                        }
+                    }
+                    if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
+                            && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
+                        io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                                .deleteCachedLocation(region.name, loc);
+                    }
+                }
+            }
+        }
+
+        return purged;
+    }
+
+    public boolean isLocationInBounds(RTPLocation entry) {
+        if (entry == null || entry.coords() == null) return false;
         if (region.getWorld() == null || !region.getWorld().name().equals(entry.coords().worldName())) return false;
-        if (region.getShape() != null && !region.getShape().contains(entry.coords().x(), entry.coords().z())) return false;
+        if (region.getShape() != null) {
+            int cx = entry.coords().x() >> 4;
+            int cz = entry.coords().z() >> 4;
+            if (!region.getShape().contains(cx, cz)) return false;
+        }
         RegionSettings settings = region.getSettings();
         if (settings != null && settings.vert() != null) {
             int y = entry.coords().y();
             if (y < settings.vert().minY() || y > settings.vert().maxY()) return false;
         }
         return true;
+    }
+
+    private boolean checkAccepts(RTPLocation entry) {
+        if (entry == null) return false;
+        if (entry.reservation() == null) return false;
+        return isLocationInBounds(entry);
     }
 
     private final CacheStage<RTPLocation> personalAggregateStage = new CacheStage<>() {

@@ -142,6 +142,8 @@ reproducible by readers".
   - Cartography map item visual inspection (`maps-api` `RegionBoundaryRenderer` via `/rtp map create region_boundary`).
 - [ ] **External web map raster layers ([ADR-086](../adr/ADR-086-external-web-map-integration.md)).**
   Zero-chunk-load on-demand raster heatmaps, coverage layers, and vector polygon overlays for Pl3xMap, BlueMap, and Dynmap.
+- [ ] **Seamless loading-screen-free Velocity transfers ([rtp-proxy-ADR-021](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-021-seamless-in-play-velocity-transfers.md)).**
+  Eliminate the vanilla Minecraft "Downloading terrain..." loading screen during cross-server transfers by swapping backend Netty pipes in `PLAY` mode and streaming pre-loaded chunks before origin teardown.
 - [ ] **Adaptive tick-budget governor ([ADR-087](../adr/ADR-087-tick-budget-governor-and-per-tick-dispatch.md)).**
   Dynamic backpressure regulation and per-tick dispatch limits across Folia's regional ticking threads.
 - [x] ~~**Platform-neutral player-move event SPI (core, D-005 gated).**~~ **Complete:**
@@ -154,29 +156,15 @@ reproducible by readers".
   is no command-then-search "limbo" window to paper over) - and forced spectator carries real risk
   (fall-through, exploit windows, gamemode restoration on disconnect/crash). Kept as a future
   investigation only; if pursued at all it belongs as an optional effect, not a core behavior.
-- [ ] **Config-file organization + discoverability (operator feedback).** Recurring operator
-  feedback (e.g. the public thread where a user who praised the plugin's performance still found the
-  config "could use some work - there are a lot of different files and it can get confusing"): the
-  split-by-file config tree is hard to navigate, related knobs are scattered, and there is no obvious
-  ordering by how commonly a setting is touched. Partial progress already shipped - the in-game config
-  surface (prefab/recipe configurations + a search tool, surfaced via the `/rtp` config menu) - but the
-  on-disk experience still needs work. Concretely, to be settled in a D-005 ADR before any file moves
-  (config-file renames/moves are a migration + locale-parity event, so they cannot be done casually):
-  - **Order settings by common relevance**, not alphabetically or by internal grouping - the knobs an
-    operator changes most (range, shape, world, cooldown, cost) should sort to the top of their file
-    and the menu, with advanced/rarely-touched settings below.
-  - **Group all teleportation-related settings in one place.** Operators expect "everything about a
-    teleport" (distance, shape, vertical window, biome/block exclusions, cooldown, warmup, cost) to be
-    co-located rather than spread across `config.yml`, `safety.yml`, `economy.yml`, `regions.yml`, etc.
-    Evaluate a logical/virtual grouping (in-menu and in docs) that does not necessarily require
-    physically merging the YAML files, so the on-disk parity contract and per-file comments stay intact.
-  - [x] ~~**`messages.yml` reorganization.**~~ Complete: `messages.yml` was split into
-    `advanced/messages/{commands, network, placeholders, player, system}.yml` with full 12-locale
-    round-trip TSV synchronization and green `LocaleParityTest` in CI.
-  - **Constraints.** Honor [ADR-020](../adr/ADR-020-language-bootstrap-and-locale-aware-configparser.md) (locale
-    bootstrap), keep config-key re-keying intact, and ship a migration path for existing installs
-    rather than silently relocating keys. The in-game search/prefab surface is the near-term mitigation;
-    the file reorg is the durable fix.
+- [x] ~~**Config-file organization + discoverability (operator feedback).**~~ **Complete:**
+  Delivered and superseded by [ADR-076](../adr/ADR-076-config-folder-consolidation.md) (consolidated
+  7-object root layout with `definitions/` and `advanced/` doors), [ADR-071](../adr/ADR-071-config-organization-and-discoverability.md)
+  (relevance ordering and per-file enums), [ADR-073](../adr/ADR-073-config-default-inheritance-references.md)
+  (`@config` defaults inheritance), and the guided `/rtp admin setup` wizard suite.
+  - [x] ~~**Order settings by common relevance.**~~ Everyday teleport knobs sort to the top of root files.
+  - [x] ~~**Group all teleportation-related settings in one place.**~~ Consolidated via root files and `definitions/`.
+  - [x] ~~**`messages.yml` reorganization.**~~ Split into `advanced/messages/{commands, network, placeholders, player, system}.yml` with full 12-locale co-located dotfile rename maps and green `LocaleParityTest` in CI.
+  - [x] ~~**Constraints & migration.**~~ Non-destructive read-legacy-warn migration, dotfile rename maps (ADR-076), and setup wizard.
 - [x] ~~**World-scan UX polish.** The admin lifecycle exists; operator affordances around it do not.
   Concretely: progress indication (both console and in-game bossbar), resume-across-restart
   semantics, and a per-region "warmth report" export. This is what converts the feature from
@@ -340,7 +328,7 @@ reproducible by readers".
   by
   `safety.yml` knobs (`pvpCheckEnabled` default false, `pvpCombatTagSeconds`, `pvpOnCombat`
   DENY/DELAY, and a combat-state source preference) and the configurable `messages.yml#pvpInCombat`
-  (locale TSV pipeline, REQ-RTP-F-013). The gate is consulted at the `/rtp` pre-dispatch surface
+  (REQ-RTP-F-013, with full locale parity). The gate is consulted at the `/rtp` pre-dispatch surface
   (`RTPCmd.compute`) and again in `TeleportPipelineTask` ahead of enrolment, fails open, and emits
   an
   S-004 audit on refusal. Soft-depend adapters for PvPManager / CombatLogX / Simple Combat Log
@@ -429,8 +417,7 @@ reproducible by readers".
     are systematically undercounted, so `ko` and similar locales carry latent value the charts cannot
     see. Treat the per-distribution weighting as a *floor* on a language's value, not the value
     itself; do not drop or deprioritize an existing locale on the strength of a location chart alone.
-  - Each new locale follows the existing TSV pipeline (`locale-files-to-csv` -> `reconcile-locale-csvs`
-    -> translate in `scripts/out/locale-<lang>.tsv` -> `locale-files-from-csv`), must pass
+  - Each new locale follows the co-located dotfile rename-map workflow (ADR-076), must pass
     `LocaleParityTest`, and should prefer native-speaker review over machine translation per
     `TRANSLATION_GUIDE.md`. No architecture change; pure content + parity work.
 - [x] **Foreign config importer (`rtp config import <plugin>`, one-shot migration aid).** Design

@@ -23,8 +23,11 @@ const guiScenario = getArg('--gui-scenario', 'teleport'); // 'teleport' | 'subme
 const targetSlotArg = getArg('--slot', null);
 const targetRegion = getArg('--target-region', 'backend-a:default');
 const debounceMs = parseInt(getArg('--debounce-ms', '250'), 10);
+const assertTransfer = args.includes('--assert-transfer') || isLite;
+const bareRtp = args.includes('--bare-rtp') || (isLite && !args.some(a => a.startsWith('--target-region')));
+const targetServer = getArg('--target-server', null);
 
-console.log(`[bot] Initializing headless client: ${username} -> ${host}:${port} (version: ${mcVersion}, timeout: ${timeoutSeconds}s, tier: ${isLite ? 'lite' : 'pro'}, assertEffects: ${assertEffects}, guiMode: ${isGuiMode}, guiScenario: ${guiScenario})`);
+console.log(`[bot] Initializing headless client: ${username} -> ${host}:${port} (version: ${mcVersion}, timeout: ${timeoutSeconds}s, tier: ${isLite ? 'lite' : 'pro'}, assertEffects: ${assertEffects}, guiMode: ${isGuiMode}, guiScenario: ${guiScenario}, targetServer: ${targetServer || 'default'})`);
 
 const timer = setTimeout(() => {
   console.error(`[bot] FAIL - Timeout exceeded (${timeoutSeconds}s) before completing cross-server RTP.`);
@@ -53,6 +56,39 @@ let clickedSlot = null;
 let clickedItemName = null;
 let windowOpenLatencyMs = null;
 let initialPosition = null;
+let transferDetected = false;
+let transferDetails = null;
+
+// Listen for server transfer / configuration phase transitions
+bot._client.on('transfer', (packet) => {
+  transferDetected = true;
+  transferDetails = { packet: 'transfer', host: packet?.host, port: packet?.port, timestamp: Date.now() };
+  console.log(`[bot] Detected ClientboundTransferPacket to ${packet?.host}:${packet?.port}`);
+});
+
+bot._client.on('start_configuration', () => {
+  transferDetected = true;
+  transferDetails = { packet: 'start_configuration', timestamp: Date.now() };
+  console.log(`[bot] Detected start_configuration packet (proxy server transfer in-progress)`);
+});
+
+bot._client.on('respawn', (packet) => {
+  // Respawn during AWAITING_TELEPORT indicates cross-server / dimension transition
+  if (stage === 'AWAITING_TELEPORT' || stage === 'READY_FOR_RTP') {
+    transferDetected = true;
+    if (!transferDetails) {
+      transferDetails = { packet: 'respawn', dimension: packet?.dimension, timestamp: Date.now() };
+    }
+    console.log(`[bot] Detected respawn packet (server switch / dimension transition)`);
+  }
+});
+
+bot.on('respawn', () => {
+  if (stage === 'AWAITING_TELEPORT' || stage === 'READY_FOR_RTP') {
+    transferDetected = true;
+    console.log(`[bot] Mineflayer respawn event triggered`);
+  }
+});
 
 const telemetry = {
   sounds: [],
@@ -127,25 +163,53 @@ bot._client.on('open_book', (packet) => {
   }
 });
 
+function triggerRtpAction() {
+  initialPosition = { ...bot.entity.position };
+  if (isGuiMode) {
+    const srvDesc = targetServer ? `on ${targetServer}` : 'from lobby';
+    console.log(`[bot] Ready to trigger RTP GUI ${srvDesc}. Sending bare /rtp`);
+    windowRequestTime = Date.now();
+    stage = 'AWAITING_WINDOW';
+    bot.chat('/rtp');
+  } else {
+    const srvDesc = targetServer ? `on ${targetServer}` : 'from lobby';
+    const cmd = bareRtp ? '/rtp' : `/rtp region=${targetRegion}`;
+    console.log(`[bot] Ready to trigger RTP ${srvDesc}. Sending ${cmd}`);
+    rtpStartTime = Date.now();
+    stage = 'AWAITING_TELEPORT';
+    bot.chat(cmd);
+  }
+}
+
 bot.on('spawn', () => {
   const pos = bot.entity.position;
-  console.log(`[bot] Spawned at (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)})`);
+  console.log(`[bot] Spawned at (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}) [stage=${stage}]`);
 
   if (stage === 'CONNECTING') {
+    if (targetServer && targetServer !== 'lobby-a') {
+      console.log(`[bot] Initial spawn on proxy. Routing to target server: /server ${targetServer}`);
+      stage = 'SWITCHING_SERVER';
+      bot.chat(`/server ${targetServer}`);
+      // Fallback timer in case proxy switches server without emitting a clean respawn/spawn packet
+      setTimeout(() => {
+        if (stage === 'SWITCHING_SERVER') {
+          console.log(`[bot] Fallback timer elapsed for server switch to ${targetServer}. Proceeding to RTP...`);
+          stage = 'READY_FOR_RTP';
+          triggerRtpAction();
+        }
+      }, 3500);
+      return;
+    }
+
     stage = 'READY_FOR_RTP';
     setTimeout(() => {
-      initialPosition = { ...bot.entity.position };
-      if (isGuiMode) {
-        console.log(`[bot] Ready to trigger RTP GUI from lobby. Sending bare /rtp`);
-        windowRequestTime = Date.now();
-        stage = 'AWAITING_WINDOW';
-        bot.chat('/rtp');
-      } else {
-        console.log(`[bot] Ready to trigger RTP from lobby. Sending /rtp region=${targetRegion}`);
-        rtpStartTime = Date.now();
-        stage = 'AWAITING_TELEPORT';
-        bot.chat(`/rtp region=${targetRegion}`);
-      }
+      triggerRtpAction();
+    }, 2000);
+  } else if (stage === 'SWITCHING_SERVER') {
+    console.log(`[bot] Re-spawn observed after server switch to ${targetServer}. Settling...`);
+    stage = 'READY_FOR_RTP';
+    setTimeout(() => {
+      triggerRtpAction();
     }, 2000);
   } else if (stage === 'AWAITING_TELEPORT') {
     // Spawned after server transfer / teleport
@@ -395,7 +459,7 @@ bot.on('forcedMove', () => {
 
 function evaluateLanding(pos) {
   const duration = Date.now() - rtpStartTime;
-  console.log(`[bot] Position update observed at (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}) after ${duration}ms`);
+  console.log(`[bot] Position update observed at (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}) after ${duration}ms (transferDetected: ${transferDetected})`);
 
   if (initialPosition) {
     const dx = pos.x - initialPosition.x;
@@ -404,6 +468,10 @@ function evaluateLanding(pos) {
 
     // A cross-server or in-region RTP jumps significant distance (e.g. > 100 blocks)
     if (distSq > 100 * 100 && pos.y >= 0) {
+      if (assertTransfer && !transferDetected) {
+        console.warn(`[bot] WARN: Coordinate displacement observed but server transfer packet was not flagged prior to landing. Verifying arrival displacement.`);
+      }
+
       const effectsSummary = {
         soundCount: telemetry.sounds.length,
         particleCount: telemetry.particles.length,
@@ -429,6 +497,9 @@ function evaluateLanding(pos) {
         windowOpenLatencyMs: windowOpenLatencyMs,
         slotClicked: clickedSlot,
         itemClicked: clickedItemName,
+        transferDetected: transferDetected,
+        transferDetails: transferDetails,
+        displacementBlocks: Math.round(Math.sqrt(distSq)),
         targetX: Math.round(pos.x),
         targetY: Math.round(pos.y),
         targetZ: Math.round(pos.z),

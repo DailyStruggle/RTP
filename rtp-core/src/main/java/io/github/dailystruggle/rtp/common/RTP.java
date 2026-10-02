@@ -181,6 +181,21 @@ public class RTP {
   public static TreeCommand baseCommand;
   public static AtomicBoolean reloading = new AtomicBoolean(false);
 
+  /**
+   * Reload all plugin configurations and regions.
+   *
+   * @return true if reload succeeded
+   */
+  public static boolean reload() {
+    reloading.set(true);
+    try {
+      if (configs == null) return false;
+      return configs.reload();
+    } finally {
+      reloading.set(false);
+    }
+  }
+
   public static final Set<UUID> deathEffectInFlight = ConcurrentHashMap.newKeySet();
   public static final Map<UUID, io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask> pendingDeathTeleports = new ConcurrentHashMap<>();
 

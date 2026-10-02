@@ -6,11 +6,10 @@ and [`CONFIG_COMMENT_STYLE.md`](CONFIG_COMMENT_STYLE.md).
 Goal: identify the shipped baseline YAML resources whose `#` comment blocks
 should be brought into the ADR-064 two-part shape (standalone summary line +
 prose detail + `# @...` directives), ordered so that **the locale translation
-burden stays as small as possible**. Every comment line in a baseline file is
-carried through the locale TSV pipeline into all shipped locales
-(`cat, de, es, fr, it, ja, ko, nl, pl, pt, ru, zh`), so each line edited in a
-baseline is a line a translator may have to re-touch. Fewer, shorter, stable
-first lines == trivial translation updates.
+burden stays as small as possible**. Comment blocks in baseline files are
+mirrored into all shipped locales (`cat, de, es, fr, it, ja, ko, nl, pl, pt, ru, zh`),
+so each line edited in a baseline is a line a translator may have to re-touch.
+Fewer, shorter, stable first lines == trivial translation updates.
 
 ## Scope and triviality model
 
@@ -27,8 +26,7 @@ translator must convey:
   `# @default`, `# @source` directive lines. Directives stay **verbatim** across
   locales (never translated), so adding them is a zero-translation change.
 - Moving an existing sentence to be the standalone first line, without rewording
-  it. The TSV `preceding_comment` cell changes shape but the locale text is
-  reusable.
+  it. The preceding comment changes shape but the locale text is reusable.
 - `version:` sentinel and file-header doc links: never translated.
 
 A comment edit is **non-trivial** (forces real translation work in 13 locales)
@@ -50,7 +48,7 @@ low translation cost (directive-only / first-line-reorder edits).
 | 5 | `integrations.yml` | ~3 | One shared block above many keys | Add a short standalone summary + `# @type: boolean` per `reroll*` key; reuse the existing sentence text. | Low (one sentence, reused) |
 | 6 | `config.yml` | ~68 | Mixed | Reorder so first line is a summary; add directives. Avoid rewording prose. | Mostly trivial |
 | 7 | `safety.yml` | ~110 | Mixed; list-valued options | Add directives (`@type: list<material>`, `@source: material`); keep prose. | Mostly trivial |
-| 8 | `network.yml` | ~138 | Heavy prose; NOT key-translated (no `network.lang.yml`) | Tighten first lines + add directives; comments still flow to locales via TSV. | Low-to-medium |
+| 8 | `network.yml` | ~138 | Heavy prose; NOT key-translated (no `network.lang.yml`) | Tighten first lines + add directives; comments still mirror to locales. | Low-to-medium |
 | 9 | `messages.yml` | ~302 | User-facing **values** are the translated payload here, not comments | Do NOT bulk-touch. Only ensure section-header first lines read standalone. | High if reworded - avoid |
 
 Files intentionally excluded:

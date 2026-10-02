@@ -228,7 +228,7 @@ public final class AnvilPrefilter {
       }
 
       long[] packedHeightmap = AnvilReader.getMotionBlockingNoLeaves(entry.root);
-      if (packedHeightmap == null) {
+      if (packedHeightmap == null || packedHeightmap.length == 0) {
         diagLog("UNKNOWN:missing-heightmap(MOTION_BLOCKING_NO_LEAVES)",
             worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);

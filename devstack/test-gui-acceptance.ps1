@@ -23,6 +23,8 @@ param(
     [string]$Slot = $null,
     [int]$DebounceMs = 250,
     [string]$GuiScenario = 'teleport',
+    [ValidateSet('backend-a', 'backend-b', 'backend-c', 'backend-d', 'lobby-a', 'lobby-b')]
+    [string]$TargetServer = $null,
     [switch]$Lite,
     [switch]$AssertEffects
 )
@@ -31,20 +33,36 @@ $ErrorActionPreference = 'Stop'
 $devstack = $PSScriptRoot
 
 Write-Host "=== LeafRTPGuiAddon Headless Bot Acceptance Test ===" -ForegroundColor Cyan
+if ($TargetServer) {
+    Write-Host "[target] Directed backend platform target: $TargetServer" -ForegroundColor Cyan
+}
 
-# 1. Verify lobby configuration
-$lobbyGuiConfig = Join-Path $devstack 'lobby-a\plugins\RTP\addons\guimenu.yml'
-if (Test-Path $lobbyGuiConfig) {
-    $cfgContent = Get-Content -Raw $lobbyGuiConfig
-    if ($cfgContent -match 'menuStyle:\s*"chest"') {
-        Write-Host "[verify] lobby-a guimenu.yml menuStyle is 'chest' (OK)" -ForegroundColor Green
+# 1. Verify target server and lobby configuration
+$configsToVerify = @()
+if ($TargetServer) {
+    if ($TargetServer -in @('backend-c', 'backend-d')) {
+        $configsToVerify += @{ Server = $TargetServer; Path = (Join-Path $devstack "$TargetServer\rtp-config\addons\guimenu.yml") }
     } else {
-        Write-Host "[verify] lobby-a guimenu.yml menuStyle is not 'chest'. Updating to 'chest'..." -ForegroundColor Yellow
-        $cfgContent = $cfgContent -replace 'menuStyle:\s*"[^"]*"', 'menuStyle: "chest"'
-        Set-Content -Path $lobbyGuiConfig -Value $cfgContent -Encoding UTF8
+        $configsToVerify += @{ Server = $TargetServer; Path = (Join-Path $devstack "$TargetServer\plugins\RTP\addons\guimenu.yml") }
     }
-} else {
-    Write-Host "[verify] Notice: $lobbyGuiConfig not found on host filesystem (using container volume/seed)" -ForegroundColor DarkGray
+}
+$configsToVerify += @{ Server = 'lobby-a'; Path = (Join-Path $devstack 'lobby-a\plugins\RTP\addons\guimenu.yml') }
+
+foreach ($entry in $configsToVerify) {
+    $cfgPath = $entry.Path
+    $srvName = $entry.Server
+    if (Test-Path $cfgPath) {
+        $cfgContent = Get-Content -Raw $cfgPath
+        if ($cfgContent -match 'menuStyle:\s*"chest"') {
+            Write-Host "[verify] $srvName guimenu.yml menuStyle is 'chest' (OK)" -ForegroundColor Green
+        } else {
+            Write-Host "[verify] $srvName guimenu.yml menuStyle is not 'chest'. Updating to 'chest'..." -ForegroundColor Yellow
+            $cfgContent = $cfgContent -replace 'menuStyle:\s*"[^"]*"', 'menuStyle: "chest"'
+            Set-Content -Path $cfgPath -Value $cfgContent -Encoding UTF8
+        }
+    } else {
+        Write-Host "[verify] Notice: $cfgPath not found on host filesystem (using container volume/seed)" -ForegroundColor DarkGray
+    }
 }
 
 # 2. Check Node.js and dependencies
@@ -83,6 +101,9 @@ $botArgs = @(
 
 if ($TargetRegion) {
     $botArgs += @('--target-region', $TargetRegion)
+}
+if ($TargetServer) {
+    $botArgs += @('--target-server', $TargetServer)
 }
 if ($Slot -ne $null -and $Slot -ne '') {
     $botArgs += @('--slot', $Slot)

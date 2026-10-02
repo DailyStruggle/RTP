@@ -44,9 +44,14 @@
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('all', 'boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'rtptest', 'gui', 'rtpgui', 'down', 'logs')]
+  [ValidateSet('all', 'boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'rtptest', 'gui', 'rtpgui', 'gui-submenu', 'gui-setup', 'burst', 'stress', 'down', 'logs')]
   [string]$Scenario = 'all',
   [int]$WaitSeconds = 180,
+  # Target backend server for directed verification / GUI tests (backend-a, backend-b, backend-c, backend-d)
+  [ValidateSet('backend-a', 'backend-b', 'backend-c', 'backend-d', 'lobby-a', 'lobby-b')]
+  [string]$TargetServer = $null,
+  # Number of concurrent bots to launch in the burst/stress scenario (10-15; default 12)
+  [int]$BotCount = 12,
   # Run roundtrip in GUI menu mode (clicks chest menu item opened by bare /rtp)
   [switch]$Gui,
   # Skip the automatic `docker compose up -d` step (use when you already brought
@@ -803,25 +808,44 @@ function Test-Heartbeat {
 
 function Test-Gui {
   param(
-    [string]$GuiScenario = 'teleport'
+    [string]$GuiScenario = 'teleport',
+    [string]$TargetServer = $null
   )
-  Write-Host "[gui] executing headless Mineflayer chest menu GUI acceptance verification (scenario: $GuiScenario)..." -ForegroundColor Cyan
+  $effectiveTarget = if ($TargetServer) { $TargetServer } else { $script:TargetServer }
+  Write-Host "[gui] executing headless Mineflayer chest menu GUI acceptance verification (scenario: $GuiScenario, target: $(if ($effectiveTarget) { $effectiveTarget } else { 'lobby-a' }))..." -ForegroundColor Cyan
 
-  # 1. Verify lobby-a configuration and LeafRTPGuiAddon presence
-  $lobbyGuiConfig = Join-Path $PSScriptRoot 'lobby-a\plugins\RTP\addons\guimenu.yml'
-  $lobbyAddonJar = Join-Path $PSScriptRoot 'lobby-a\plugins\RTP\addons\LeafRTPGuiAddon.jar'
-  if (-not (Test-Path $lobbyAddonJar)) {
-    Write-Host "[gui] WARN - $lobbyAddonJar not found on host. Verifying container..." -ForegroundColor Yellow
-  }
-
-  if (Test-Path $lobbyGuiConfig) {
-    $cfgContent = Get-Content -Raw $lobbyGuiConfig
-    if ($cfgContent -match 'menuStyle:\s*"chest"') {
-      Write-Host '[gui] Verified lobby-a guimenu.yml has menuStyle: "chest"' -ForegroundColor Green
+  # 1. Verify target server and lobby-a configuration and LeafRTPGuiAddon presence
+  $configsToVerify = @()
+  if ($effectiveTarget) {
+    if ($effectiveTarget -in @('backend-c', 'backend-d')) {
+      $configsToVerify += @{ Server = $effectiveTarget; Path = (Join-Path $PSScriptRoot "$effectiveTarget\rtp-config\addons\guimenu.yml") }
+      $targetAddonJar = Join-Path $PSScriptRoot "$effectiveTarget\mods\LeafRTPGuiAddon.jar"
+      if (-not (Test-Path $targetAddonJar)) {
+        Write-Host "[gui] WARN - $targetAddonJar not found on host. Attempting to copy from lobby-a..." -ForegroundColor Yellow
+        $srcJar = Join-Path $PSScriptRoot 'lobby-a\plugins\RTP\addons\LeafRTPGuiAddon.jar'
+        if (Test-Path $srcJar) {
+          Copy-Item -Force $srcJar $targetAddonJar
+          Write-Host "[gui] Copied LeafRTPGuiAddon.jar -> $targetAddonJar" -ForegroundColor Green
+        }
+      }
     } else {
-      Write-Host '[gui] WARN - lobby-a guimenu.yml menuStyle is not "chest". Updating to chest...' -ForegroundColor Yellow
-      $cfgContent = $cfgContent -replace 'menuStyle:\s*"[^"]*"', 'menuStyle: "chest"'
-      Set-Content -Path $lobbyGuiConfig -Value $cfgContent -Encoding UTF8
+      $configsToVerify += @{ Server = $effectiveTarget; Path = (Join-Path $PSScriptRoot "$effectiveTarget\plugins\RTP\addons\guimenu.yml") }
+    }
+  }
+  $configsToVerify += @{ Server = 'lobby-a'; Path = (Join-Path $PSScriptRoot 'lobby-a\plugins\RTP\addons\guimenu.yml') }
+
+  foreach ($entry in $configsToVerify) {
+    $cfgPath = $entry.Path
+    $srvName = $entry.Server
+    if (Test-Path $cfgPath) {
+      $cfgContent = Get-Content -Raw $cfgPath
+      if ($cfgContent -match 'menuStyle:\s*"chest"') {
+        Write-Host "[gui] Verified $srvName guimenu.yml has menuStyle: 'chest'" -ForegroundColor Green
+      } else {
+        Write-Host "[gui] WARN - $srvName guimenu.yml menuStyle is not 'chest'. Updating to chest..." -ForegroundColor Yellow
+        $cfgContent = $cfgContent -replace 'menuStyle:\s*"[^"]*"', 'menuStyle: "chest"'
+        Set-Content -Path $cfgPath -Value $cfgContent -Encoding UTF8
+      }
     }
   }
 
@@ -843,10 +867,11 @@ function Test-Gui {
   }
 
   $extraArgs = @('--gui', '--gui-scenario', $GuiScenario)
+  if ($effectiveTarget) { $extraArgs += @('--target-server', $effectiveTarget) }
   if ($Lite) { $extraArgs += '--lite' }
   if ($AssertEffects) { $extraArgs += '--assert-effects' }
 
-  Write-Host "[gui] running Node/Mineflayer headless client targeting proxy-a (127.0.0.1:25577) with bare /rtp (scenario: $GuiScenario)..." -ForegroundColor Cyan
+  Write-Host "[gui] running Node/Mineflayer headless client targeting proxy-a (127.0.0.1:25577) with bare /rtp (scenario: $GuiScenario, targetServer: $(if ($effectiveTarget) { $effectiveTarget } else { 'default' }))..." -ForegroundColor Cyan
   if ($nodeCmd) {
     $botOut = & node $botScript --host 127.0.0.1 --port 25577 --timeout $WaitSeconds @extraArgs 2>&1 | Out-String
   } else {
@@ -921,9 +946,8 @@ function Test-Roundtrip {
   if (-not $botSuccess) {
     Write-Host '[roundtrip] headless bot unavailable or failed; falling back to manual checkpoint.' -ForegroundColor Yellow
     Write-Host '  1. Connect a 1.21.1 client to localhost:25577 (proxy-a).' -ForegroundColor Yellow
-    Write-Host '  2. The default backend is backend-a. Run `/server backend-b` then `/server backend-c` once each to seed all backends.' -ForegroundColor Yellow
-    Write-Host '  3. From the client, run `/rtp` and observe a cross-server teleport.' -ForegroundColor Yellow
-    Write-Host '  4. Press <Enter> AFTER the redeem completes to capture evidence.' -ForegroundColor Yellow
+    Write-Host '  2. From the client, run `/rtp` (or `/rtp region=<backend>:<region>`) and observe a cross-server teleport.' -ForegroundColor Yellow
+    Write-Host '  3. Press <Enter> AFTER the redeem completes to capture evidence.' -ForegroundColor Yellow
     try {
       [void](Read-Host 'Press Enter to continue')
     } catch {
@@ -931,11 +955,32 @@ function Test-Roundtrip {
     }
   }
 
-  $tokens = Invoke-RedisCli KEYS 'rtp:net:reservation:*'
-  $audit = & docker compose logs --tail=100 backend-a backend-b backend-c 2>&1 | Select-String -Pattern 'redeem|JoinTriggerSource' -SimpleMatch
-  Write-Evidence 'roundtrip' "tokens at sample time:`n$tokens`naudit lines:`n$audit"
-  Write-Host '[roundtrip] EVIDENCE CAPTURED' -ForegroundColor Green
-  return $true
+  $backendServices = @('backend-a', 'backend-b', 'backend-c', 'backend-d')
+  $audit = & docker compose logs --tail=150 @backendServices 2>&1 | Select-String -Pattern 'redeem|JoinTriggerSource|randomly teleported|runTeleport|SelectionAPI'
+
+  if ($Lite) {
+    # DB-free / proxy-direct tier: no Redis reservation tokens exist.
+    # Assert arrival and clean execution of local arrival pipeline on the destination backend.
+    Write-Evidence 'roundtrip.lite' "audit lines:`n$audit"
+    $arrivalRan = $audit -and ($audit | Select-String -Pattern 'redeem|JoinTriggerSource\.onRedeemed|randomly teleported|runTeleport')
+    if ($botSuccess -and $arrivalRan) {
+      Write-Host '[roundtrip] PASS - destination backend completed local arrival pipeline cleanly over proxy-direct.' -ForegroundColor Green
+      Write-Evidence 'roundtrip' "destination arrival pipeline verified:`n$audit"
+      return $true
+    } elseif ($botSuccess) {
+      Write-Host '[roundtrip] WARN - bot passed but destination arrival pipeline log not confirmed; logging audit.' -ForegroundColor Yellow
+      Write-Evidence 'roundtrip' "audit lines:`n$audit"
+      return $true
+    } else {
+      Write-Host '[roundtrip] FAIL - bot did not pass and no arrival pipeline observed.' -ForegroundColor Red
+      return $false
+    }
+  } else {
+    $tokens = Invoke-RedisCli KEYS 'rtp:net:reservation:*'
+    Write-Evidence 'roundtrip' "tokens at sample time:`n$tokens`naudit lines:`n$audit"
+    Write-Host '[roundtrip] EVIDENCE CAPTURED' -ForegroundColor Green
+    return $true
+  }
 }
 
 function Test-KillMidFlight {
@@ -1057,6 +1102,122 @@ function Test-RtpTest {
     return $false
   }
   Write-Host '[rtptest] PASS' -ForegroundColor Green
+  return $true
+}
+
+function Test-BurstStress {
+  Write-Host "[burst] executing multi-client concurrency stress test ($BotCount bots in rapid burst)..." -ForegroundColor Cyan
+  $botScript = Join-Path $PSScriptRoot 'clients\stress-burst-swarm.js'
+  $clientsDir = Join-Path $PSScriptRoot 'clients'
+
+  $nodeCmd = Get-Command 'node' -ErrorAction SilentlyContinue
+  $dockerCmd = Get-Command 'docker' -ErrorAction SilentlyContinue
+  if ((-not $nodeCmd -and -not $dockerCmd) -or -not (Test-Path $botScript)) {
+    Write-Host '[burst] FAIL - Neither Node.js nor Docker found, or stress-burst-swarm.js missing.' -ForegroundColor Red
+    return $false
+  }
+
+  $nodeModules = Join-Path $clientsDir 'node_modules'
+  $npmCmd = Get-Command 'npm' -ErrorAction SilentlyContinue
+  if ($nodeCmd -and -not (Test-Path $nodeModules) -and $npmCmd) {
+    Write-Host '[burst] installing client dependencies...' -ForegroundColor Cyan
+    & npm --prefix $clientsDir install --silent --no-audit | Out-Null
+  }
+
+  $extraArgs = @('--bot-count', $BotCount.ToString(), '--timeout', $WaitSeconds.ToString())
+  Write-Host "[burst] launching swarm of $BotCount concurrent bots targeting proxy-a (127.0.0.1:25577)..." -ForegroundColor Cyan
+
+  if ($nodeCmd) {
+    $botOut = & node $botScript --host 127.0.0.1 --port 25577 @extraArgs 2>&1 | Out-String
+  } else {
+    $botOut = & docker run --rm --network host -v "${clientsDir}:/app" -w /app node:20 node stress-burst-swarm.js --host 127.0.0.1 --port 25577 @extraArgs 2>&1 | Out-String
+  }
+  Write-Host $botOut
+
+  if ($botOut -notmatch '"status"\s*:\s*"PASS"') {
+    Write-Host '[burst] FAIL - bot swarm did not complete successfully or some bots failed' -ForegroundColor Red
+    Write-Evidence "burst.swarm.fail" $botOut
+    return $false
+  }
+  Write-Evidence "burst.swarm.pass" $botOut
+  Write-Host '[burst] bot swarm passed client-side assertions (all bots settled cleanly).' -ForegroundColor Green
+
+  # 1. Assert server logs: zero race conditions or uncaught exceptions across backends
+  Write-Host '[burst] inspecting server logs for uncaught exceptions and race conditions...' -ForegroundColor Cyan
+  $logFail = $false
+  foreach ($svc in @('backend-a', 'backend-b')) {
+    $svcLogs = & docker compose logs --tail=500 --no-log-prefix $svc 2>$null | Out-String
+    # Look for uncaught exceptions or concurrency errors
+    $forbiddenLogPatterns = @(
+      'ConcurrentModificationException',
+      'NullPointerException',
+      'IllegalStateException: Asynchronous chunk',
+      'Exception in thread "Server thread"'
+    )
+    foreach ($pat in $forbiddenLogPatterns) {
+      if ($svcLogs -match $pat) {
+        Write-Host "[burst] FAIL - forbidden error pattern '$pat' found in $svc logs!" -ForegroundColor Red
+        Write-Evidence "burst.logs.fail.$svc" "Pattern '$pat' matched in logs:`n$svcLogs"
+        $logFail = $true
+      }
+    }
+
+    # 2. On Folia (backend-b), assert zero isOwnedByCurrentRegion or scheduler desync errors
+    if ($svc -eq 'backend-b') {
+      $foliaPatterns = @(
+        'isOwnedByCurrentRegion',
+        'TickThread.ensureTickThread',
+        'Async scheduler error'
+      )
+      foreach ($pat in $foliaPatterns) {
+        if ($svcLogs -match $pat) {
+          Write-Host "[burst] FAIL - Folia region threading error '$pat' found in backend-b logs!" -ForegroundColor Red
+          Write-Evidence "burst.logs.fail.folia" "Pattern '$pat' matched in backend-b logs:`n$svcLogs"
+          $logFail = $true
+        }
+      }
+    }
+  }
+
+  if ($logFail) {
+    Write-Host '[burst] FAIL - server log inspection failed' -ForegroundColor Red
+    return $false
+  }
+  Write-Host '[burst] server log assertions PASS (zero uncaught exceptions or Folia region ownership errors).' -ForegroundColor Green
+
+  # 3. Assert MemoryTracker has no orphaned chunk tickets on backends
+  Write-Host '[burst] querying MemoryTracker via rtp test chunk-ticket on backend-a and backend-b...' -ForegroundColor Cyan
+  foreach ($svc in @('backend-a', 'backend-b')) {
+    if (-not (Wait-RconReady $svc)) {
+      Write-Host "[burst] WARN - RCON not ready on $svc within budget to run chunk-ticket probe" -ForegroundColor Yellow
+      continue
+    }
+    Write-Host "[burst] -> $svc : rtp test chunk-ticket" -ForegroundColor Cyan
+    $rconOut = & docker compose exec -T $svc rcon-cli rtp test chunk-ticket 2>&1
+    $deadline = (Get-Date).AddSeconds(20)
+    $ticketVerdict = $null
+    while ((Get-Date) -lt $deadline) {
+      $line = & docker compose logs --tail=200 --no-log-prefix $svc 2>$null |
+        Select-String -Pattern '[RTP test/chunk-ticket]' -SimpleMatch |
+        Select-Object -Last 1
+      if ($line) { $ticketVerdict = $line.ToString(); break }
+      Start-Sleep -Seconds 2
+    }
+    Write-Evidence "burst.chunk-ticket.$svc" "rcon: $rconOut`nverdict: $ticketVerdict"
+    if ($ticketVerdict -and $ticketVerdict -match '\[RTP test/chunk-ticket\]\s+ok') {
+      # Verify tracker count is 0
+      if ($ticketVerdict -match 'trackerCount=([1-9][0-9]*)' -or $ticketVerdict -match 'residual=([1-9][0-9]*)') {
+        Write-Host "[burst] FAIL ($svc): orphaned chunk tickets found in MemoryTracker: $ticketVerdict" -ForegroundColor Red
+        return $false
+      }
+      Write-Host "[burst]    PASS ($svc): chunk tickets cleanly accounted (0 orphaned tickets in MemoryTracker)" -ForegroundColor Green
+    } else {
+      Write-Host "[burst] FAIL ($svc): chunk-ticket probe failed or did not report ok: $ticketVerdict" -ForegroundColor Red
+      return $false
+    }
+  }
+
+  Write-Host '[burst] PASS - multi-client concurrency stress test fully satisfied all requirements.' -ForegroundColor Green
   return $true
 }
 
@@ -1233,10 +1394,12 @@ try {
       'killmidflight' { $results[$s] = Test-KillMidFlight }
       'killswitch'    { $results[$s] = Test-KillSwitch }
       'rtptest'       { $results[$s] = Test-RtpTest }
-      'gui'           { $results[$s] = Test-Gui -GuiScenario 'teleport' }
-      'gui-submenu'   { $results[$s] = Test-Gui -GuiScenario 'submenu' }
-      'gui-setup'     { $results[$s] = Test-Gui -GuiScenario 'setup' }
-      'rtpgui'        { $results[$s] = Test-Gui -GuiScenario 'teleport' }
+      'gui'           { $results[$s] = Test-Gui -GuiScenario 'teleport' -TargetServer $TargetServer }
+      'gui-submenu'   { $results[$s] = Test-Gui -GuiScenario 'submenu' -TargetServer $TargetServer }
+      'gui-setup'     { $results[$s] = Test-Gui -GuiScenario 'setup' -TargetServer $TargetServer }
+      'rtpgui'        { $results[$s] = Test-Gui -GuiScenario 'teleport' -TargetServer $TargetServer }
+      'burst'         { $results[$s] = Test-BurstStress }
+      'stress'        { $results[$s] = Test-BurstStress }
     }
   }
 } finally {

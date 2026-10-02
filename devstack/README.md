@@ -168,14 +168,9 @@ cd devstack
 .\run-acceptance.ps1 -Lite -Scenario roundtrip
 ```
 
-1. Connect a client to `localhost:25577` (proxy-a). You land on `backend-a`.
-2. Run `/server backend-b` then `/server backend-c` once each. This matters on
-   the lite tier specifically: a backend can only emit its heartbeat / complete
-   auto-detection once a player connection exists on it (plugin messages cannot
-   flow on a player-empty backend), so visiting each backend seeds availability
-   gossip. A freshly-idled Fabric/NeoForge backend self-pauses after ~60 s with
-   no players, so its availability reverts to unknown until someone hops back.
-3. From the client, run `/rtp` (or the cross-server region form) and observe the
+1. Connect a client to `localhost:25577` (proxy-a). You land on `lobby-a` (or `backend-a`).
+2. Under `proxy-direct` transport (rtp-proxy-ADR-017), backends dial the proxy companion's TCP port at boot to register their regions automatically—no manual player visits or server hopping required.
+3. From the client, run `/rtp` (or the cross-server region form `/rtp region=<server>:<region>`) and observe the
    player being moved to another backend and teleported there.
 4. Confirm in the destination backend's log window that it ran its local
    teleport pipeline on arrival.

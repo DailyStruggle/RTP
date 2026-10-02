@@ -334,7 +334,22 @@ public class Region extends FactoryValue<RegionKeys> {
       }
       RTP.log(Level.INFO, "[Region:" + name + "] cache key changed (" + oldCacheKey
           + " -> " + newCacheKey + "); shape data invalidated, fresh scan required.");
+      if (this.queueManager != null) {
+        this.queueManager.purgeOutsideBounds();
+      }
     }
+  }
+
+  /**
+   * Purges pre-cached locations outside current shape/vert boundaries from this region's queues.
+   *
+   * @return the number of purged locations
+   */
+  public int purgeOutsideBounds() {
+    if (this.queueManager != null) {
+      return this.queueManager.purgeOutsideBounds();
+    }
+    return 0;
   }
 
   /**
@@ -364,7 +379,8 @@ public class Region extends FactoryValue<RegionKeys> {
     try {
       DatabaseAccessor db = RTP.getInstance().databaseAccessor;
       for (DatabaseAccessor.StoredLocation stored : storedLocations) {
-        if (stored.getSeed() != 0L && stored.getSeed() != currentCacheKey) {
+        if ((stored.getSeed() != 0L && stored.getSeed() != currentCacheKey)
+            || (getShape() != null && !getShape().contains(stored.getX() >> 4, stored.getZ() >> 4))) {
           if (db != null) db.removeCachedLocation(stored.getId());
           continue;
         }

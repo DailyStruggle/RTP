@@ -37,6 +37,9 @@ services:
   backend-c:
     volumes:
       - ./backend-c/rtp-config/network-lite.yml:/seed/network.yml:ro
+  backend-d:
+    volumes:
+      - ./backend-d/rtp-config/network-lite.yml:/seed/network.yml:ro
   lobby-a:
     volumes:
       - ./lobby-a/rtp-config/network-lite.yml:/seed/network.yml:ro
