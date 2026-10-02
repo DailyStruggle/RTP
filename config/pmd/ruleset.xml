@@ -78,6 +78,7 @@
     <!-- DoNotUseThreads and AvoidSynchronizedStatement are superseded by our stricter custom rule below. -->
     <exclude name="DoNotUseThreads"/>
     <exclude name="AvoidSynchronizedStatement"/>
+    <exclude name="AvoidSynchronizedAtMethodLevel"/>
     <exclude name="AvoidUsingVolatile"/>
     <exclude name="UseConcurrentHashMap"/>
     <exclude name="NonThreadSafeSingleton"/>

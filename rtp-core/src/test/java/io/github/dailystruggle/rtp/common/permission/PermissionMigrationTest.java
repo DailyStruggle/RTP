@@ -205,27 +205,27 @@ public class PermissionMigrationTest {
     }
 
     @Test
-    @DisplayName("5.1b - Schema-defined dynamic permission migration for AsyncRTP and AdvancedRTP")
+    @DisplayName("5.1b - Generic dynamic permission migration")
     void testSchemaDynamicPermissionMigration() {
-        // Test AsyncRTP permission mappings
+        // Test AsyncRTP style permission mappings
         List<String> asyncUse = service.mapPermission("asyncrtp.use");
         assertTrue(asyncUse.contains("rtp.use"));
 
         List<String> asyncWorld = service.mapPermission("asyncrtp.world.custom_world");
-        assertTrue(asyncWorld.contains("rtp.world.custom_world"));
+        assertTrue(asyncWorld.contains("rtp.worlds.custom_world"));
 
         List<String> asyncCooldown = service.mapPermission("asyncrtp.bypass.cooldown");
-        assertTrue(asyncCooldown.contains("rtp.nocooldown"));
+        assertTrue(asyncCooldown.contains("rtp.noCooldown"));
 
-        // Test AdvancedRTP permission mappings
+        // Test AdvancedRTP style permission mappings
         List<String> advRtp = service.mapPermission("advancedrtp.rtp");
         assertTrue(advRtp.contains("rtp.use"));
 
         List<String> advWorld = service.mapPermission("advancedrtp.world.mining");
-        assertTrue(advWorld.contains("rtp.world.mining"));
+        assertTrue(advWorld.contains("rtp.worlds.mining"));
 
         List<String> advDelay = service.mapPermission("advancedrtp.bypass.delay");
-        assertTrue(advDelay.contains("rtp.nodelay"));
+        assertTrue(advDelay.contains("rtp.noDelay"));
 
         // Additional generic permission pattern branches
         assertTrue(service.mapPermission("customrtp.teleport").contains("rtp.use"));

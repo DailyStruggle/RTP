@@ -394,6 +394,7 @@ public class RegionQueueManager {
      *
      * @param capacity buffer capacity; &lt;= 0 disables the buffer
      */
+    @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lifecycle buffer allocate/drain synchronization
     public void enableLoginCache(int capacity) {
         synchronized (this) {
             if (capacity <= 0) {
@@ -437,6 +438,7 @@ public class RegionQueueManager {
      * Drain {@link #loginLocations} back to {@link #unkeptLocations} (closing
      * reservations) and null the buffer reference. Safe to call multiple times.
      */
+    @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lifecycle buffer allocate/drain synchronization
     public void disableLoginCache() {
         synchronized (this) {
             RingCacheStage<RTPLocation> login = this.loginStage;

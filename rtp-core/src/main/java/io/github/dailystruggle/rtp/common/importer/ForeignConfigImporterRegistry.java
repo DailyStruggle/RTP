@@ -1,8 +1,5 @@
 package io.github.dailystruggle.rtp.common.importer;
 
-import io.github.dailystruggle.rtp.common.importer.schema.BuiltinPluginSchemas;
-import io.github.dailystruggle.rtp.common.importer.schema.GenericSchemaImporter;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -16,12 +13,6 @@ public final class ForeignConfigImporterRegistry {
     private static final UniversalConfigImporter UNIVERSAL_IMPORTER = new UniversalConfigImporter();
 
     static {
-        register(new BetterRtpConfigImporter());
-        register(new EzRtpConfigImporter());
-        register(new JustRtpConfigImporter());
-        register(new JakesRtpConfigImporter());
-        register(new GenericSchemaImporter(BuiltinPluginSchemas.ASYNC_RTP));
-        register(new GenericSchemaImporter(BuiltinPluginSchemas.ADVANCED_RTP));
         register(UNIVERSAL_IMPORTER);
     }
 

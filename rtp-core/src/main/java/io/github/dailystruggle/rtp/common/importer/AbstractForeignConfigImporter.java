@@ -797,8 +797,8 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
     protected DiscoveredWorldRegion extractWorldRegion(String targetName,
                                                        RtpYamlSection section,
                                                        DiscoveredWorldRegion defaults) {
-        String worldName = getStringCaseInsensitive(section, defaults != null ? defaults.world() : targetName, "world", "World", "world-name", "world_name", "target-world");
-        if (worldName == null || worldName.trim().isEmpty()) {
+        String worldName = getStringCaseInsensitive(section, defaults != null ? defaults.world() : targetName, "world", "World", "world-name", "world_name", "target-world", "landing-world", "landing_world");
+        if (worldName == null || worldName.isBlank()) {
             worldName = targetName;
         }
 
@@ -830,30 +830,56 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
             maxRadius = getIntCaseInsensitive(radiusSec, maxRadius, "max-distance", "max-radius", "max_distance", "max_radius", "max", "radius");
         }
 
-        // If center is a section itself (e.g. center: { center-x: 50, center-z: -50 } or { x: 50, z: -50 })
+        // If center is a section itself (e.g. center: { center-x: 50, center-z: -50 } or { x: 50, z: -50 } or center: { c-custom: { x: 100, z: -150 } })
         RtpYamlSection centerSec = getSectionCaseInsensitive(section, "center", "spawn");
         if (centerSec != null) {
-            centerX = getIntCaseInsensitive(centerSec, centerX, "center-x", "center_x", "x", "centerX");
-            centerZ = getIntCaseInsensitive(centerSec, centerZ, "center-z", "center_z", "z", "centerZ");
+            RtpYamlSection customCenterSec = getSectionCaseInsensitive(centerSec, "c-custom", "custom");
+            if (customCenterSec != null) {
+                centerX = getIntCaseInsensitive(customCenterSec, centerX, "center-x", "center_x", "x", "centerX");
+                centerZ = getIntCaseInsensitive(customCenterSec, centerZ, "center-z", "center_z", "z", "centerZ");
+            } else {
+                centerX = getIntCaseInsensitive(centerSec, centerX, "center-x", "center_x", "x", "centerX");
+                centerZ = getIntCaseInsensitive(centerSec, centerZ, "center-z", "center_z", "z", "centerZ");
+            }
         }
-        int minY = getIntCaseInsensitive(section, defaults != null ? defaults.minY() : 64,
+        int minY = defaults != null ? defaults.minY() : 64;
+        int maxY = defaults != null ? defaults.maxY() : 320;
+
+        // If bounds is a section itself (e.g. bounds: { low: 60, high: 220 })
+        RtpYamlSection boundsSec = getSectionCaseInsensitive(section, "bounds");
+        if (boundsSec != null) {
+            minY = getIntCaseInsensitive(boundsSec, minY, "low", "min-y", "min_y", "bottom");
+            maxY = getIntCaseInsensitive(boundsSec, maxY, "high", "max-y", "max_y", "top");
+        }
+
+        minY = getIntCaseInsensitive(section, minY,
                 "min-y", "min_y", "miny", "minY", "min-y-coordinate", "min_y_coordinate", "bottom-y", "bottom");
-        int maxY = getIntCaseInsensitive(section, defaults != null ? defaults.maxY() : 320,
+        maxY = getIntCaseInsensitive(section, maxY,
                 "max-y", "max_y", "maxy", "maxY", "max-y-coordinate", "max_y_coordinate", "top-y", "top");
 
         String rawShape = getStringCaseInsensitive(section, defaults != null ? defaults.shape() : "CIRCLE", "shape", "landing_shape", "type", "distribution", "pattern");
+        boolean isGaussian = false;
+        RtpYamlSection gaussSec = getSectionCaseInsensitive(section, "gaussian-distribution", "gaussian");
+        if (gaussSec != null) {
+            isGaussian = getBooleanCaseInsensitive(gaussSec, false, "enabled");
+        }
         String shape = mapShape(rawShape);
+        if (isGaussian) {
+            shape = shape.contains("CIRCLE") ? "CIRCLE_NORMAL" : "SQUARE_NORMAL";
+        }
 
         if (price <= 0.0) {
             price = getDoubleCaseInsensitive(section, defaults != null ? defaults.price() : 0.0, "price", "cost", "vault-cost", "economy.cost");
         }
+
+        int cacheCap = getIntCaseInsensitive(section, defaults != null ? defaults.cacheCap() : -1, "cache_size", "cache-size", "cacheCap", "cache-cap", "queueTargetSize");
 
         List<String> biomes = getStringListCaseInsensitive(section, "biomes", "blacklisted-biomes", "blacklisted_biomes", "biomes.blacklist", "disabled-biomes");
         if (biomes.isEmpty() && defaults != null && defaults.biomes() != null) {
             biomes = defaults.biomes();
         }
 
-        return new DiscoveredWorldRegion(targetName, worldName, shape, minRadius, maxRadius, centerX, centerZ, minY, maxY, price, biomes);
+        return new DiscoveredWorldRegion(targetName, worldName, shape, minRadius, maxRadius, centerX, centerZ, minY, maxY, price, cacheCap, biomes);
     }
 
     /**
@@ -865,10 +891,8 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
                                         List<Path> written,
                                         List<String> mapped,
                                         List<String> errors) {
-        Path definitionsDir = destinationDir.resolve("definitions");
-        boolean useDefinitions = Files.isDirectory(definitionsDir);
-        Path regionsDir = useDefinitions ? definitionsDir.resolve("regions") : destinationDir.resolve("regions");
-        Path worldsDir = useDefinitions ? definitionsDir.resolve("worlds") : destinationDir.resolve("worlds");
+        Path regionsDir = destinationDir.resolve("regions");
+        Path worldsDir = destinationDir.resolve("worlds");
 
         try {
             Files.createDirectories(regionsDir);
@@ -883,7 +907,7 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
             if (r.name().endsWith("_region") || r.name().startsWith("justrtp_loc_") || r.name().contains("_loc_")) {
                 regionName = r.name();
             } else {
-                regionName = r.name() + "_region";
+                regionName = r.name().replace("-", "_") + "_region";
             }
             Path regionFile = regionsDir.resolve(regionName + ".yml");
             Path worldFile = worldsDir.resolve(r.world() + ".yml");
@@ -933,7 +957,7 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
 
             if (r.additionalWorlds() != null) {
                 for (String addWorld : r.additionalWorlds()) {
-                    if (addWorld == null || addWorld.trim().isEmpty() || addWorld.equals(r.world())) {
+                    if (addWorld == null || addWorld.isBlank() || addWorld.equals(r.world())) {
                         continue;
                     }
                     if (addWorld.contains("*") || addWorld.contains("?")) {
@@ -1106,5 +1130,142 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
                 } catch (IOException ignored) {}
             }
         } catch (IOException ignored) {}
+    }
+
+    /**
+     * Mirrors spatial trigger/zone action boundaries (e.g. from rtp_zones.yml) into LeafRTP action YAMLs.
+     */
+    protected void mirrorZonesConfig(Path sourcePluginDir, Path destinationDir, boolean overwrite,
+                                     List<String> mapped, List<Path> written, List<String> warnings, List<String> errors) {
+        if (sourcePluginDir == null) return;
+        Path zonesFile = sourcePluginDir.resolve("rtp_zones.yml");
+        if (!Files.exists(zonesFile)) return;
+
+        RtpYamlConfig zonesConfig = loadYamlSafe(zonesFile, warnings);
+        if (zonesConfig == null) return;
+
+        RtpYamlSection rootZonesSec = getSectionCaseInsensitive(zonesConfig, "zones");
+        if (rootZonesSec == null) {
+            rootZonesSec = zonesConfig;
+        }
+
+        Set<String> zoneKeys = rootZonesSec.getKeys(false);
+        if (zoneKeys.isEmpty()) return;
+
+        Path actionsDir = destinationDir.resolve("definitions/actions");
+
+        for (String zoneKey : zoneKeys) {
+            if ("version".equalsIgnoreCase(zoneKey)) continue;
+            RtpYamlSection zoneSec = getSectionCaseInsensitive(rootZonesSec, zoneKey);
+            if (zoneSec == null) continue;
+
+            String zoneId = zoneKey.toLowerCase(Locale.ROOT);
+            Path actionFile = actionsDir.resolve("zone_" + zoneId + ".yml");
+            if (Files.exists(actionFile) && !overwrite) {
+                warnings.add("Skipping zone action (already exists and overwrite=false): " + actionFile);
+                continue;
+            }
+
+            String triggerWorld = getStringCaseInsensitive(zoneSec, "world", "world", "World");
+            String triggerType = getStringCaseInsensitive(zoneSec, "STEP_IN", "type", "Type").toUpperCase(Locale.ROOT);
+            if (triggerType.contains("PORTAL")) triggerType = "PORTAL";
+            else if (triggerType.contains("PLATE")) triggerType = "PRESSURE_PLATE";
+            else triggerType = "STEP_IN";
+
+            int minX = 0, minY = 0, minZ = 0;
+            int maxX = 0, maxY = 0, maxZ = 0;
+
+            RtpYamlSection pos1Sec = getSectionCaseInsensitive(zoneSec, "pos1");
+            RtpYamlSection pos2Sec = getSectionCaseInsensitive(zoneSec, "pos2");
+            if (pos1Sec != null && pos2Sec != null) {
+                int x1 = pos1Sec.getInt("x", 0);
+                int y1 = pos1Sec.getInt("y", 0);
+                int z1 = pos1Sec.getInt("z", 0);
+                int x2 = pos2Sec.getInt("x", 0);
+                int y2 = pos2Sec.getInt("y", 0);
+                int z2 = pos2Sec.getInt("z", 0);
+                minX = Math.min(x1, x2);
+                minY = Math.min(y1, y2);
+                minZ = Math.min(z1, z2);
+                maxX = Math.max(x1, x2);
+                maxY = Math.max(y1, y2);
+                maxZ = Math.max(z1, z2);
+            } else {
+                int x1 = getIntCaseInsensitive(zoneSec, 0, "x1", "minX", "min_x");
+                int y1 = getIntCaseInsensitive(zoneSec, 0, "y1", "minY", "min_y");
+                int z1 = getIntCaseInsensitive(zoneSec, 0, "z1", "minZ", "min_z");
+                int x2 = getIntCaseInsensitive(zoneSec, x1, "x2", "maxX", "max_x");
+                int y2 = getIntCaseInsensitive(zoneSec, y1, "y2", "maxY", "max_y");
+                int z2 = getIntCaseInsensitive(zoneSec, z1, "z2", "maxZ", "max_z");
+                minX = Math.min(x1, x2);
+                minY = Math.min(y1, y2);
+                minZ = Math.min(z1, z2);
+                maxX = Math.max(x1, x2);
+                maxY = Math.max(y1, y2);
+                maxZ = Math.max(z1, z2);
+            }
+
+            int cooldownSec = getIntCaseInsensitive(zoneSec, 5, "cooldown", "cooldown_seconds", "Cooldown");
+            int batchIntervalSec = getIntCaseInsensitive(zoneSec, 0, "interval", "batch_interval", "batchInterval", "wave_interval");
+
+            String targetRegion = getStringCaseInsensitive(zoneSec, "default", "region", "target_region", "Region");
+            String shape = mapShape(getStringCaseInsensitive(zoneSec, "CIRCLE", "shape", "landing_shape"));
+            int radius = getIntCaseInsensitive(zoneSec, 2048, "radius", "max_radius", "max-radius", "max-distance");
+            int minRadius = getIntCaseInsensitive(zoneSec, 64, "min_radius", "min-radius", "min-distance", "centerRadius");
+            int minSeparation = getIntCaseInsensitive(zoneSec, 16, "minSeparation", "min_separation", "separation");
+
+            try {
+                Files.createDirectories(actionFile.getParent());
+                RtpYamlConfig actionYaml = new RtpYamlConfig();
+                actionYaml.set("version", "1.0");
+                actionYaml.set("alias", "zone_" + zoneId);
+                actionYaml.set("permission", "rtp.action.zone." + zoneId);
+                actionYaml.set("description", "Imported spatial zone " + zoneId);
+
+                // Triggers block
+                RtpYamlSection triggersSec = actionYaml.createSection("triggers");
+                RtpYamlSection specSec = triggersSec.createSection("zone_" + zoneId + "_trigger");
+                specSec.set("type", triggerType);
+                specSec.set("world", triggerWorld);
+                RtpYamlSection p1 = specSec.createSection("pos1");
+                p1.set("x", minX);
+                p1.set("y", minY);
+                p1.set("z", minZ);
+                RtpYamlSection p2 = specSec.createSection("pos2");
+                p2.set("x", maxX);
+                p2.set("y", maxY);
+                p2.set("z", maxZ);
+                specSec.set("cooldown", cooldownSec + "s");
+                if (batchIntervalSec > 0) {
+                    specSec.set("batchInterval", batchIntervalSec + "s");
+                }
+
+                // Placement block
+                RtpYamlSection placeSec = actionYaml.createSection("placement");
+                placeSec.set("region", targetRegion);
+                placeSec.set("anchor", "regionQueue");
+                RtpYamlSection shapeSec = placeSec.createSection("shape");
+                shapeSec.set("name", shape);
+                shapeSec.set("radius", radius);
+                shapeSec.set("centerRadius", minRadius);
+                placeSec.set("minSeparation", minSeparation);
+
+                // Lifecycle block
+                RtpYamlSection lifecycleSec = actionYaml.createSection("lifecycle");
+                RtpYamlSection onStartSec = lifecycleSec.createSection("onStart");
+                List<Map<String, Object>> forEachList = new ArrayList<>();
+                Map<String, Object> msgMap = new LinkedHashMap<>();
+                msgMap.put("MESSAGE", "<green>Teleporting via zone " + zoneId + "...</green>");
+                forEachList.add(msgMap);
+                onStartSec.set("FOR_EACH", forEachList);
+
+                actionYaml.save(actionFile.toFile());
+                written.add(actionFile);
+                mapped.add("Zone Action: zone_" + zoneId + " (bounds=[" + minX + "," + minY + "," + minZ + "] to ["
+                        + maxX + "," + maxY + "," + maxZ + "], type=" + triggerType + ")");
+            } catch (IOException e) {
+                errors.add("Failed to write zone action " + actionFile + ": " + e.getMessage());
+            }
+        }
     }
 }
