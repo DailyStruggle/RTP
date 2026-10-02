@@ -55,6 +55,8 @@ public class MySQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         statement.execute(schema);
     } catch (SQLException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
+      close();
+      throw new IllegalStateException("Failed to connect to MySQL database: " + e.getMessage(), e);
     }
   }
 
