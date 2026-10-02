@@ -18,6 +18,19 @@ import java.util.logging.Level;
  */
 public class KingdomsXChecker {
   private static boolean exists = true;
+  private static Boolean available = null;
+
+  private static boolean isAvailable() {
+    if (!exists) return false;
+    if (available != null) return available;
+    try {
+      Class.forName("org.kingdoms.constants.land.location.SimpleChunkLocation");
+      available = true;
+    } catch (Throwable t) {
+      available = false;
+    }
+    return available;
+  }
 
   /**
    * Check if a location is within KingdomsX claimed land.
@@ -26,10 +39,10 @@ public class KingdomsXChecker {
    * @return true if in a claim, false otherwise
    */
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists) return false;
-    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
-    if (world == null) return false;
-    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+    if (!exists || location == null || !isAvailable()) return false;
+    org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
+    if (loc == null) return false;
+    return isInClaim(loc);
   }
 
   /**
@@ -39,7 +52,7 @@ public class KingdomsXChecker {
    * @return true if in a claim, false otherwise
    */
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (!exists) return false;
+    if (!exists || location == null || !isAvailable()) return false;
     try {
       Class<?> chunkClass =
           Class.forName("org.kingdoms.constants.land.location.SimpleChunkLocation");

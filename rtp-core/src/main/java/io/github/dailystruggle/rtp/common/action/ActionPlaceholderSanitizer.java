@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 public final class ActionPlaceholderSanitizer {
 
   private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\[([a-zA-Z0-9_]+)\\]");
-  private static final Pattern SAFE_TOKEN_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-]+( [a-zA-Z0-9_\\-]+)*$");
+  private static final Pattern SAFE_TOKEN_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+(?: [a-zA-Z0-9_-]+)*+$");
 
   private ActionPlaceholderSanitizer() {}
 

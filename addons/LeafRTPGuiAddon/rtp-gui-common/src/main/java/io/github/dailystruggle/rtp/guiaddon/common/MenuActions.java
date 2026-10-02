@@ -23,6 +23,25 @@ public final class MenuActions {
   private MenuActions() {}
 
   /**
+   * Checks whether {@code target} is an in-menu navigation or pagination action
+   * that transitions between GUI screens rather than executing a command or teleport.
+   *
+   * @param target destination/action target
+   * @return {@code true} if clicking this target navigates between menu pages
+   */
+  public static boolean isMenuNavigation(RtpTarget target) {
+    if (target == null || target.kind() != RtpTarget.Kind.ACTION) {
+      return false;
+    }
+    String name = target.name();
+    if (name == null || name.isBlank()) {
+      return false;
+    }
+    String lower = name.toLowerCase(java.util.Locale.ROOT);
+    return lower.startsWith("menu:") || "action:operator:reload".equals(lower);
+  }
+
+  /**
    * Submits a teleport to {@code target} for {@code playerId} and reports the outcome
    * using the configured messages.
    *

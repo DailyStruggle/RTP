@@ -47,6 +47,8 @@ public final class BukkitNetworkBridge implements NetworkBridge {
 
     /** The reserved proxy plugin-messaging channel (modern namespaced form). */
     public static final String CHANNEL = "bungeecord:main";
+    /** Legacy un-namespaced BungeeCord channel for Paper/Spigot legacy translation compatibility. */
+    public static final String LEGACY_CHANNEL = "BungeeCord";
     /** Custom {@code Forward} sub-channel carrying RTP heartbeat payloads. */
     public static final String FORWARD_SUBCHANNEL = "RTPNet";
 
@@ -83,6 +85,9 @@ public final class BukkitNetworkBridge implements NetworkBridge {
             plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL);
             plugin.getServer().getMessenger()
                     .registerIncomingPluginChannel(plugin, CHANNEL, listener);
+            plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, LEGACY_CHANNEL);
+            plugin.getServer().getMessenger()
+                    .registerIncomingPluginChannel(plugin, LEGACY_CHANNEL, listener);
             // Proxy-cache companion channel (best-effort; the bungeecord:main
             // tier still works if this fails to register).
             plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, PROXY_CHANNEL);
@@ -251,6 +256,11 @@ public final class BukkitNetworkBridge implements NetworkBridge {
                 return;
             }
             p.sendPluginMessage(plugin, channel, frame);
+            if (CHANNEL.equals(channel)) {
+                try {
+                    p.sendPluginMessage(plugin, LEGACY_CHANNEL, frame);
+                } catch (Throwable ignored) {}
+            }
         } catch (Throwable t) {
             LOG.log(Level.FINE, "[RTP] " + what + " send failed: " + t.getMessage());
         }
@@ -265,7 +275,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
                 onProxyChannel(message);
                 return;
             }
-            if (!CHANNEL.equals(channel)) return;
+            if (!CHANNEL.equals(channel) && !LEGACY_CHANNEL.equals(channel)) return;
             try {
                 ByteArrayDataInput in = ByteStreams.newDataInput(message);
                 String sub = in.readUTF();

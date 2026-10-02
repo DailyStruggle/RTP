@@ -6,9 +6,9 @@
 # pass/fail line to stdout and a structured block to the per-run evidence log.
 #
 # Usage:
-#   ./run-acceptance.sh [--scenario all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|down|logs]
+#   ./run-acceptance.sh [--scenario all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|gui|rtpgui|down|logs]
 #                       [--wait-seconds N] [--skip-up] [--build] [--skip-build]
-#                       [--no-logs] [--purge] [--lite]
+#                       [--no-logs] [--purge] [--lite] [--assert-effects] [--gui]
 #
 #   --build       Opt IN to the gradle clean+jar build. Default: OFF - the harness
 #                 does not invoke gradle; build the jars yourself, then it stages
@@ -33,6 +33,8 @@ Build=0
 NoLogs=0
 Purge=0
 Lite=0
+AssertEffects=0
+GuiMode=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --scenario) Scenario="$2"; shift 2 ;;
@@ -43,11 +45,13 @@ while [ $# -gt 0 ]; do
     --no-logs) NoLogs=1; shift ;;
     --purge) Purge=1; shift ;;
     --lite) Lite=1; shift ;;
+    --assert-effects) AssertEffects=1; shift ;;
+    --gui) GuiMode=1; shift ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 case "$Scenario" in
-  all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|down|logs) ;;
+  all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|gui|rtpgui|down|logs) ;;
   *) echo "invalid --scenario: $Scenario" >&2; exit 2 ;;
 esac
 
@@ -178,9 +182,9 @@ invoke_gradle_build() {
   local pluginLibs="$repoRoot/rtp-plugin/build/libs"
   local pluginStage="$scriptDir/jars/plugin"
   local backendDsts=("$scriptDir/backend-a/plugins" "$scriptDir/backend-b/plugins" "$scriptDir/lobby-a/plugins" "$scriptDir/lobby-b/plugins")
-  local fabricModDsts=("$scriptDir/backend-c/mods")
+  local modDsts=("$scriptDir/backend-c/mods" "$scriptDir/backend-d/mods")
   local d
-  for d in "$pluginStage" "${backendDsts[@]}" "${fabricModDsts[@]}"; do mkdir -p "$d"; done
+  for d in "$pluginStage" "${backendDsts[@]}" "${modDsts[@]}"; do mkdir -p "$d"; done
   if [ -d "$pluginLibs" ]; then
     local allJars proJars liteJars pJars variant
     mapfile -t allJars < <(find "$pluginLibs" -maxdepth 1 -name 'LeafRTP-*.jar' \
@@ -196,7 +200,7 @@ invoke_gradle_build() {
     elif [ "${#proJars[@]}" -gt 0 ]; then pJars=("${proJars[@]}"); variant="Pro"
     else pJars=("${liteJars[@]}"); variant="lite (Pro jar not found - falling back)"
       echo "[build] WARN - Pro jar not found; falling back to plain LeafRTP jar."; fi
-    for d in "$pluginStage" "${backendDsts[@]}" "${fabricModDsts[@]}"; do
+    for d in "$pluginStage" "${backendDsts[@]}" "${modDsts[@]}"; do
       find "$d" -maxdepth 1 -name 'LeafRTP-*.jar' ! -name '*-dev.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -delete 2>/dev/null || true
       for j in "${pJars[@]:-}"; do [ -n "$j" ] && cp -f "$j" "$d/"; done
     done
@@ -229,7 +233,7 @@ sync_proxy_jars() {
 
 clear_stale_world_dirs() {
   local b dir lock
-  for b in backend-a backend-b backend-c lobby-a lobby-b; do
+  for b in backend-a backend-b backend-c backend-d lobby-a lobby-b; do
     dir="$scriptDir/$b/world"
     if [ -d "$dir" ]; then
       if rm -rf "$dir" 2>/dev/null; then
@@ -245,7 +249,7 @@ clear_stale_world_dirs() {
 get_crashed_services() {
   local exited svc out=""
   exited="$(cd "$scriptDir" && docker compose ps --status exited --services 2>/dev/null)"
-  for svc in backend-a backend-b backend-c lobby-a lobby-b proxy-a proxy-b; do
+  for svc in backend-a backend-b backend-c backend-d lobby-a lobby-b proxy-a proxy-b; do
     if printf '%s\n' "$exited" | grep -qx "$svc"; then out="$out $svc"; fi
   done
   echo "${out# }"
@@ -380,13 +384,13 @@ test_heartbeat() {
     proxies="$(redis_cli KEYS 'rtp:net:proxy:*' 2>/dev/null)"
     bCount="$(printf '%s\n' "$backends" | grep -c '[^[:space:]]' || true)"
     pCount="$(printf '%s\n' "$proxies" | grep -c '[^[:space:]]' || true)"
-    if [ "$bCount" -ge 5 ] && [ "$pCount" -ge 2 ]; then
+    if [ "$bCount" -ge 6 ] && [ "$pCount" -ge 2 ]; then
       write_evidence 'heartbeat' "backend keys: $bCount"$'\n'"$backends"$'\n'"proxy keys: $pCount"$'\n'"$proxies"
       elapsed=$(( $(date +%s) - pollStart ))
       echo "[heartbeat] PASS (backends=$bCount, proxies=$pCount) after ${elapsed}s"; return 0
     fi
     elapsed=$(( $(date +%s) - pollStart ))
-    echo "[heartbeat]   ${elapsed}s elapsed: backends=$bCount/5 proxies=$pCount/2 (still waiting)"
+    echo "[heartbeat]   ${elapsed}s elapsed: backends=$bCount/6 proxies=$pCount/2 (still waiting)"
     if [ $(( elapsed - lastDiag )) -ge 30 ]; then show_heartbeat_diagnostics "$elapsed"; lastDiag=$elapsed; fi
     if [ "$earlyDump" -eq 0 ] && [ "$elapsed" -ge 90 ] && [ "$bCount" -eq 0 ] && [ "$pCount" -eq 0 ]; then
       echo "[heartbeat] no heartbeats after ${elapsed}s - dumping full service logs early:"
@@ -398,6 +402,49 @@ test_heartbeat() {
   [ "$earlyDump" -eq 0 ] && show_full_service_logs 200
   write_evidence 'heartbeat' "timed out after $WaitSeconds s. backends=$backends proxies=$proxies"
   echo "[heartbeat] FAIL - heartbeats did not converge"; return 1
+}
+
+test_gui() {
+  echo "[gui] executing headless Mineflayer chest menu GUI acceptance verification..."
+  local lobbyGuiConfig="$scriptDir/lobby-a/plugins/RTP/addons/guimenu.yml"
+  if [ -f "$lobbyGuiConfig" ]; then
+    if grep -q 'menuStyle: *"chest"' "$lobbyGuiConfig"; then
+      echo "[gui] Verified lobby-a guimenu.yml has menuStyle: \"chest\""
+    else
+      echo "[gui] WARN - lobby-a guimenu.yml menuStyle is not \"chest\". Updating to chest..."
+      sed -i -E 's/menuStyle: *"[^"]*"/menuStyle: "chest"/' "$lobbyGuiConfig"
+    fi
+  fi
+
+  local botScript="$scriptDir/clients/mineflayer-bot.js"
+  if ! command -v node >/dev/null 2>&1 || [ ! -f "$botScript" ]; then
+    echo "[gui] FAIL - Node.js or mineflayer-bot.js not found."
+    return 1
+  fi
+
+  if ( cd "$scriptDir/clients" && [ ! -d "node_modules" ] ) && command -v npm >/dev/null 2>&1; then
+    echo "[gui] installing client dependencies..."
+    ( cd "$scriptDir/clients" && npm install --silent --no-audit ) >/dev/null 2>&1 || true
+  fi
+
+  local extraArgs=(--gui)
+  [ "$Lite" -eq 1 ] && extraArgs+=(--lite)
+  [ "$AssertEffects" -eq 1 ] && extraArgs+=(--assert-effects)
+
+  echo "[gui] running Node/Mineflayer headless client targeting proxy-a (127.0.0.1:25577) with bare /rtp..."
+  local botOut
+  botOut="$(node "$botScript" --host 127.0.0.1 --port 25577 --timeout "$WaitSeconds" "${extraArgs[@]}" 2>&1)" || true
+  echo "$botOut"
+
+  if printf '%s' "$botOut" | grep -q '"status":"PASS"'; then
+    echo "[gui] PASS - headless client opened chest menu, clicked slot, and completed teleport."
+    write_evidence 'gui.bot' "$botOut"
+    return 0
+  else
+    echo "[gui] FAIL - chest menu interaction or teleportation failed."
+    write_evidence 'gui.bot.fail' "$botOut"
+    return 1
+  fi
 }
 
 test_roundtrip() {
@@ -413,6 +460,7 @@ test_roundtrip() {
     fi
     local extraArgs=()
     [ "$Lite" -eq 1 ] && extraArgs+=(--lite)
+    [ "$AssertEffects" -eq 1 ] && extraArgs+=(--assert-effects)
     local botOut
     botOut="$(node "$botScript" --host 127.0.0.1 --port 25577 --timeout 35 "${extraArgs[@]}" 2>&1)" || true
     echo "$botOut"
@@ -494,7 +542,7 @@ test_rtptest() {
   # overlay) flushes the JaCoCo agent so accessor paths credit server-bound
   # coverage. See platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md.
   echo "[rtptest] dispatching '/rtp test accessor' to backends + lobbies via rcon (per-service budget: 30s)..."
-  local services=(backend-a backend-b backend-c lobby-a lobby-b)
+  local services=(backend-a backend-b backend-c backend-d lobby-a lobby-b)
   local anyFail=0 svc rconOut deadline verdict
   for svc in "${services[@]}"; do
     # Gate on RCON readiness so we don't fire rcon-cli before port 25575 is open.

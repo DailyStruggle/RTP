@@ -9,7 +9,6 @@ import io.github.dailystruggle.rtp.guiaddon.common.MenuRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.SimpleMenuProvider;
 
 import java.util.UUID;
 
@@ -141,7 +140,10 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
     if (playerId == null || model == null) {
       return;
     }
-    RTP.scheduler.runTask(() -> {
+    // Defer by 1 tick so that if open() was triggered from an active container
+    // click (sub-menu navigation / pagination), the current click packet finishes
+    // processing completely before the new container screen is opened.
+    RTP.scheduler.runTaskLater(() -> {
       ServerPlayer player = resolvePlayer(playerId);
       if (player == null) {
         RTP.log(java.util.logging.Level.INFO,
@@ -154,9 +156,25 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
       try {
         MenuLayout layout = MenuLayout.compute(model);
         player.openMenu(
-            new SimpleMenuProvider(
-                (id, inv, p) -> new DestinationPickerMenu(id, inv, model, layout),
-                Component.literal(stripTitle(model.title()))));
+            new net.minecraft.world.MenuProvider() {
+              @Override
+              public Component getDisplayName() {
+                return Component.literal(stripTitle(model.title()));
+              }
+
+              @Override
+              public net.minecraft.world.inventory.AbstractContainerMenu createMenu(
+                  int id, net.minecraft.world.entity.player.Inventory inv, net.minecraft.world.entity.player.Player p) {
+                return new DestinationPickerMenu(id, inv, model, layout);
+              }
+
+              @Override
+              public boolean shouldTriggerClientSideContainerClosingOnOpen() {
+                // Prevent NeoForge from sending a container close packet when
+                // transitioning between menus/submenus, keeping the screen seamless.
+                return false;
+              }
+            });
       } catch (Throwable cannotOpen) {
         // The menu could not be displayed (e.g. a screen/menu-type linkage
         // failure on this runtime). Honour the MenuRenderer contract and fall
@@ -167,7 +185,7 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
                 + " threw; falling back to a classic teleport", cannotOpen);
         fallbackTeleport(playerId);
       }
-    });
+    }, 1L);
   }
 
   /**

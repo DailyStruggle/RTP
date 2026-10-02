@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.commands.config;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
-import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.permission.PermissionMigrationService;
@@ -84,9 +83,70 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
         String groupListCmd = migrationService.getGroupListTemplate();
         sendMessage(callerId, "&7[RTP] Provider group discovery command: &8" + groupListCmd);
 
-        // Execute command and inform operator
-        if (apply && RTP.serverAccessor != null) {
-            RTP.serverAccessor.executeCommand(RTPAPI.serverId, groupListCmd);
+        if (RTP.serverAccessor == null) {
+            sendMessage(callerId, "&c[RTP] Server accessor unavailable; cannot execute commands.");
+            return false;
+        }
+
+        // Group Discovery: Dispatch configured group list template with capturing sender
+        List<String> groupLines = new ArrayList<>();
+        boolean groupDispatched = RTP.serverAccessor.executeCommandWithCapture(groupListCmd, groupLines::add);
+        if (!groupDispatched && groupLines.isEmpty()) {
+            sendMessage(callerId, "&e[WARN] Could not capture group list from permission provider.");
+            sendMessage(callerId, "&7Tip: Configured templates map competitor nodes with context preservation:");
+            sendMessage(callerId, "  &7Group query: &f" + migrationService.getGroupGetTemplate());
+            sendMessage(callerId, "  &7Group set:   &f" + migrationService.getGroupSetTemplate());
+            return true;
+        }
+
+        List<String> discoveredGroups = migrationService.parseGroupListOutput(groupLines);
+        if (discoveredGroups.isEmpty()) {
+            sendMessage(callerId, "&7[RTP] No permission groups discovered from output.");
+            return true;
+        }
+
+        sendMessage(callerId, "&a[RTP] Discovered groups: &f" + String.join(", ", discoveredGroups));
+
+        int totalMigrated = 0;
+        int totalPlanned = 0;
+
+        // Node Inspection & Migration: For each group, query permission info and plan/apply migration
+        for (String group : discoveredGroups) {
+            String permInfoCmd = migrationService.formatGroupGet(group);
+            List<String> permLines = new ArrayList<>();
+            RTP.serverAccessor.executeCommandWithCapture(permInfoCmd, permLines::add);
+
+            List<PermissionMigrationService.ParsedNode> parsedNodes =
+                    migrationService.parsePermissionInfoOutput(permLines);
+            if (parsedNodes.isEmpty()) continue;
+
+            PermissionMigrationService.MigrationPlan plan =
+                    migrationService.planMigration("group", group, parsedNodes, sourceFilter, apply);
+
+            totalPlanned += plan.getGeneratedCommands().size();
+            totalMigrated += plan.getExecutedCommands().size();
+
+            if (!apply) {
+                for (PermissionMigrationService.PermissionEntry entry : plan.getMappedEntries()) {
+                    sendMessage(callerId, "  &7[DRY-RUN] &f" + group + "&7: &e" + entry.getSourcePermission()
+                            + " &7-> &a" + entry.getTargetPermission()
+                            + (!entry.getContexts().isEmpty() ? " &8(" + entry.getContexts() + ")" : ""));
+                }
+                for (String cmd : plan.getGeneratedCommands()) {
+                    sendMessage(callerId, "    &8Planned: " + cmd);
+                }
+            }
+        }
+
+        if (apply) {
+            sendMessage(callerId, "&a[RTP] Successfully migrated &f" + totalMigrated
+                    + "&a competitor permission(s) across &f" + discoveredGroups.size() + "&a groups.");
+            RTP.log(Level.INFO, "[RTP] Permission migration applied " + totalMigrated
+                    + " permission set commands across " + discoveredGroups.size() + " groups.");
+        } else {
+            sendMessage(callerId, "&7[RTP] Dry-run complete: &f" + totalPlanned
+                    + "&7 permission(s) planned across &f" + discoveredGroups.size()
+                    + "&7 groups. Pass &fapply=true&7 to execute.");
         }
 
         sendMessage(callerId, "&7Tip: Configured templates map competitor nodes with context preservation:");

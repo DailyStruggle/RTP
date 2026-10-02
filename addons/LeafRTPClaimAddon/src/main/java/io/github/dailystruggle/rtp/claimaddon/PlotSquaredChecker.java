@@ -19,6 +19,19 @@ import java.util.logging.Level;
  */
 public class PlotSquaredChecker {
   private static boolean exists = true;
+  private static Boolean available = null;
+
+  private static boolean isAvailable() {
+    if (!exists) return false;
+    if (available != null) return available;
+    try {
+      Class.forName("com.plotsquared.core.location.Location");
+      available = true;
+    } catch (Throwable t) {
+      available = false;
+    }
+    return available;
+  }
 
   /**
    * Check if an RTP coordinate is within a claimed plot or plot road.
@@ -27,11 +40,10 @@ public class PlotSquaredChecker {
    * @return true if in a claimed plot or road, false otherwise
    */
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists || location == null) return false;
-    if (org.bukkit.Bukkit.getServer() == null) return false;
-    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
-    if (world == null) return false;
-    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+    if (!exists || location == null || !isAvailable()) return false;
+    org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
+    if (loc == null) return false;
+    return isInClaim(loc);
   }
 
   /**
@@ -41,7 +53,7 @@ public class PlotSquaredChecker {
    * @return true if in a claimed plot or road, false otherwise
    */
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (!exists || location == null || location.getWorld() == null) return false;
+    if (!exists || location == null || location.getWorld() == null || !isAvailable()) return false;
     try {
       Class<?> pLocClass = Class.forName("com.plotsquared.core.location.Location");
       Method atMethod = findAtMethod(pLocClass);

@@ -37,10 +37,32 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
      */
     private final LobbyDispatchRetryQueue lobbyRetryQueue;
     /**
+     * Optional direct database dispatcher. When non-null (Direct DB Mode, rtp-proxy-ADR-020),
+     * cross-server routing bypasses enrolmentBuffer and directly claims reservation tokens
+     * and sends native Connect plugin messages.
+     */
+    private volatile DirectDatabaseDispatcher directDatabaseDispatcher;
+    /**
      * Optional lobby enrolment seeder. Pre-seeds sticky {@code QUEUED} in status cache
      * so proxy dropouts time out and release the {@code processingPlayers} lock.
      */
     private volatile java.util.function.Consumer<UUID> enrolmentSeeder = u -> {};
+
+    /**
+     * Install the direct database dispatcher for Direct DB Mode.
+     *
+     * @param dispatcher the direct database dispatcher
+     */
+    public void setDirectDatabaseDispatcher(DirectDatabaseDispatcher dispatcher) {
+        this.directDatabaseDispatcher = dispatcher;
+    }
+
+    /**
+     * Direct database dispatcher getter.
+     */
+    public DirectDatabaseDispatcher directDatabaseDispatcher() {
+        return this.directDatabaseDispatcher;
+    }
 
     /**
      * Install the lobby-side enrolment seeder. See {@link #enrolmentSeeder}.
@@ -210,29 +232,35 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
         if (decision instanceof RoutingDecision.CrossServer cs) {
             UUID correlationId = UUID.randomUUID();
             long now = System.currentTimeMillis();
-            enrolmentBuffer.offer(new NetworkEnrolmentBuffer.EnrolmentRecord(
-                    playerId,
-                    correlationId,
-                    cs.regionKey(),
-                    cs.serverHint(),
-                    now));
-            // Pre-seed the local status cache with a sticky QUEUED row so
-            // anti-spam guards see the player as non-terminal immediately
-            // (before the first proxy roundtrip) AND so a never-responding
-            // proxy times out via the cache's sticky TTL and releases the
-            // processingPlayers lock. Defensive try: a seeder bug must
-            // never break the dispatch.
-            try { enrolmentSeeder.accept(playerId); } catch (Throwable ignored) {}
-            // Record the original (args, messageMethod) on the lobby
-            // retry queue so that if the proxy never produces a
-            // terminal transition (sticky-TTL FAILED), the bootstrap's
-            // terminal listener can auto-re-park the player via
-            // LobbyDispatchRetryQueue.onTerminalFailure(...) instead of
-            // forcing them to retype /rtp. No-op when the queue is null
-            // (non-lobby topology).
-            if (lobbyRetryQueue != null) {
-                try { lobbyRetryQueue.recordEnrolment(playerId, args, null); }
-                catch (Throwable ignored) {}
+
+            if (directDatabaseDispatcher != null) {
+                // Direct DB Mode (rtp-proxy-ADR-020): dispatch directly via database claim + Connect message.
+                directDatabaseDispatcher.dispatch(playerId, cs.regionKey(), cs.serverHint());
+            } else {
+                enrolmentBuffer.offer(new NetworkEnrolmentBuffer.EnrolmentRecord(
+                        playerId,
+                        correlationId,
+                        cs.regionKey(),
+                        cs.serverHint(),
+                        now));
+                // Pre-seed the local status cache with a sticky QUEUED row so
+                // anti-spam guards see the player as non-terminal immediately
+                // (before the first proxy roundtrip) AND so a never-responding
+                // proxy times out via the cache's sticky TTL and releases the
+                // processingPlayers lock. Defensive try: a seeder bug must
+                // never break the dispatch.
+                try { enrolmentSeeder.accept(playerId); } catch (Throwable ignored) {}
+                // Record the original (args, messageMethod) on the lobby
+                // retry queue so that if the proxy never produces a
+                // terminal transition (sticky-TTL FAILED), the bootstrap's
+                // terminal listener can auto-re-park the player via
+                // LobbyDispatchRetryQueue.onTerminalFailure(...) instead of
+                // forcing them to retype /rtp. No-op when the queue is null
+                // (non-lobby topology).
+                if (lobbyRetryQueue != null) {
+                    try { lobbyRetryQueue.recordEnrolment(playerId, args, null); }
+                    catch (Throwable ignored) {}
+                }
             }
             // Bump our local view of the chosen peer's
             // kept count so the next pickMostKept() on this JVM does not

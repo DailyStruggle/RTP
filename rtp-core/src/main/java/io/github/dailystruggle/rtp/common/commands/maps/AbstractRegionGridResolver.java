@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
 
@@ -23,7 +24,33 @@ public abstract class AbstractRegionGridResolver implements ChartSpecResolver {
   /**
    * Container for domain containment, biome colors, and optional hazard masks across a resolution grid.
    */
-  public record GridDomain(int width, int height, boolean[] insideDomain, int[] biomeRgb, boolean[] hazardMask) {}
+  public record GridDomain(int width, int height, boolean[] insideDomain, int[] biomeRgb, boolean[] hazardMask) {
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      GridDomain that = (GridDomain) o;
+      return width == that.width
+          && height == that.height
+          && Arrays.equals(insideDomain, that.insideDomain)
+          && Arrays.equals(biomeRgb, that.biomeRgb)
+          && Arrays.equals(hazardMask, that.hazardMask);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(width, height);
+      result = 31 * result + Arrays.hashCode(insideDomain);
+      result = 31 * result + Arrays.hashCode(biomeRgb);
+      result = 31 * result + Arrays.hashCode(hazardMask);
+      return result;
+    }
+
+    @Override
+    public String toString() {
+      return "GridDomain[width=" + width + ", height=" + height + "]";
+    }
+  }
 
   /**
    * Validates common specification invariants.
@@ -46,18 +73,12 @@ public abstract class AbstractRegionGridResolver implements ChartSpecResolver {
    * Resolves the {@link Region} from the specification.
    */
   protected Region resolveRegion(ChartSpec spec) throws UnresolvableChartSpecException {
-    Region region;
     try {
-      region = RTP.selectionAPI.getRegionOrDefault(spec.regionName());
+      return RTP.selectionAPI.getRegionOrDefault(spec.regionName());
     } catch (RuntimeException e) {
       throw new UnresolvableChartSpecException(
           "no region resolved for '" + spec.regionName() + "'", e);
     }
-    if (region == null) {
-      throw new UnresolvableChartSpecException(
-          "no region resolved for '" + spec.regionName() + "'");
-    }
-    return region;
   }
 
   /**

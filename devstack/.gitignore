@@ -11,6 +11,8 @@ proxy-b/plugins/*.jar
 # race across containers.
 backend-a/plugins/*.jar
 backend-b/plugins/*.jar
+backend-c/mods/*.jar
+backend-d/mods/*.jar
 backend-a/plugins/.paper-remapped/
 backend-b/plugins/.paper-remapped/
 # Paper remap caches for lobby containers (same rationale as backend-*).
@@ -25,11 +27,12 @@ shared/forwarding.secret
 **/logs/
 **/cache/
 # Plugin runtime data dirs (bStats opt-in configs, spark profiler scratch,
-# RTP's own runtime data dir under each container). These are per-container
-# runtime artifacts, not source.
+# LuckPerms runtime DB and translations, RTP's own runtime data dir under
+# each container). These are per-container runtime artifacts, not source.
 **/plugins/bStats/
 **/plugins/spark/
 **/plugins/RTP/
+**/plugins/LuckPerms/
 # Proxy 'rtp/' plugin config dir IS source (Velocity lowercases the plugin
 # name; on case-insensitive filesystems the rule above matches it too, so
 # explicitly unignore it). Backend 'RTP/' stays ignored as runtime data.
@@ -45,6 +48,10 @@ shared/forwarding.secret
 acceptance-evidence.log
 *.evidence.log
 logs/
+# Coverage execution dumps (.exec) collected via docker-compose.coverage.yml
+# while jacocoagent.jar itself is tracked.
+jacoco/*.exec
+*.exec
 # Synced jars fanned out into jars/plugin/<pluginName>/ subdirs by sync step.
 jars/plugin/*/
 # Optional lobby world (see shared/lobby-world/README.md). Schematics are

@@ -776,6 +776,35 @@ public interface RTPServerAccessor {
   }
 
   /**
+   * Executes a console command and captures emitted messages/feedback lines into a consumer.
+   *
+   * @param commandLine  the command string to execute
+   * @param lineConsumer consumer receiving each line of output
+   * @return true if the command was successfully dispatched, false otherwise
+   */
+  default boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+    return false;
+  }
+
+  /**
+   * Executes a console command and captures emitted messages/feedback lines into a CompletableFuture.
+   *
+   * @param commandLine the command string to execute
+   * @return CompletableFuture completing with captured output lines
+   */
+  default java.util.concurrent.CompletableFuture<List<String>> executeCommandWithCapture(String commandLine) {
+    java.util.concurrent.CompletableFuture<List<String>> future = new java.util.concurrent.CompletableFuture<>();
+    List<String> lines = new java.util.concurrent.CopyOnWriteArrayList<>();
+    boolean dispatched = executeCommandWithCapture(commandLine, lines::add);
+    if (!dispatched) {
+      future.complete(java.util.Collections.emptyList());
+    } else {
+      future.complete(lines);
+    }
+    return future;
+  }
+
+  /**
    * Returns the set of Minecraft scoreboard tags currently applied to the given player.
    *
    * <p>Used by declarative action gates to reliably evaluate entity/tag predicates

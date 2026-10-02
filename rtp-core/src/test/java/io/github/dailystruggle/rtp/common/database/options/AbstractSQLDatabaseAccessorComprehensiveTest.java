@@ -199,6 +199,7 @@ class AbstractSQLDatabaseAccessorComprehensiveTest {
         data.put("originalY", 64);
         data.put("originalZ", 0);
         data.put("originalWorldName", "world");
+        data.put("originServerId", "srv-1");
 
         accessor.cacheValue("rtp_teleport_data", data);
         assertEquals(1, accessor.writeQueue.size());
@@ -213,6 +214,8 @@ class AbstractSQLDatabaseAccessorComprehensiveTest {
         assertEquals("world", queued.selectedCoords.worldName());
         assertNotNull(queued.originalCoords);
         assertEquals(0, queued.originalCoords.x());
+        assertEquals("srv-1", queued.originServerId);
+        assertEquals("world", queued.originWorldName);
     }
 
     @Test

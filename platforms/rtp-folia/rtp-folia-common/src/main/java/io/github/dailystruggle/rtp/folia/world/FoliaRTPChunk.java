@@ -240,6 +240,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     if (anvilView != null) {
       return anvilView.isAir(x & 0xF, y, z & 0xF, airSet);
     }
+    if (chunk == null) return false;
     org.bukkit.Material type = chunk.getBlock(x & 0xF, y, z & 0xF).getType();
     if (type.isAir()) return true;
     if (airSet.isEmpty()) return false;
@@ -297,8 +298,9 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     if (chunk != null) {
       org.bukkit.World w = chunk.getWorld();
       if (y < w.getMinHeight() || y >= w.getMaxHeight()) return 0;
+      return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
     }
-    return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
+    return 15;
   }
 
   @Override
@@ -309,6 +311,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     if (anvilView != null) {
       return anvilView.getSurfaceHeight(x, z);
     }
+    if (chunk == null) return 64;
     int globalX = (chunk.getX() << 4) + x;
     int globalZ = (chunk.getZ() << 4) + z;
     return chunk.getWorld().getHighestBlockYAt(globalX, globalZ, HeightMap.MOTION_BLOCKING_NO_LEAVES);
@@ -329,6 +332,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
               : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks));
       return anvilView.isSafe(x & 0xF, y, z & 0xF, effective);
     }
+    if (chunk == null) return true;
     // Callers are required to invoke this on the chunk's owning region thread
     // (enforced upstream in QueueTask.evaluateSafety / Region.execute, which
     // dispatch via RTP.scheduler.runTask(world, cx, cz, ...)). No defensive

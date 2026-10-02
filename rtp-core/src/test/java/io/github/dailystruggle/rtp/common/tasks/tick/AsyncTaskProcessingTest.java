@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -134,5 +135,29 @@ class AsyncTaskProcessingTest {
     void run_withZeroAvailableTime_doesNotThrow() {
         RTP.selectionAPI.permRegionLookup.put("regionA", newRegion("regionA"));
         assertDoesNotThrow(() -> new AsyncTaskProcessing(0L).run());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void run_withPerformanceConfig_executesRegionAndHandlesException() {
+        // Set up mock region that throws an exception during execute to test error handling
+        Region base = newRegion("throwingRegion");
+        Region throwingRegion = new Region("throwingRegion", base.getSettings()) {
+            @Override
+            public void execute(long allottedTime) {
+                throw new RuntimeException("simulated region execute error");
+            }
+        };
+        RTP.selectionAPI.permRegionLookup.put("throwingRegion", throwingRegion);
+
+        // Run pulse, verifying it catches the exception and logs it rather than crashing
+        assertDoesNotThrow(() -> new AsyncTaskProcessing(100_000L).run());
+    }
+
+    @Test
+    @DisplayName("sparkFrameName tag returns rtp_async_task_drain")
+    void testSparkFrameName() {
+        AsyncTaskProcessing proc = new AsyncTaskProcessing(100L);
+        assertEquals("rtp_async_task_drain", proc.sparkFrameName());
     }
 }

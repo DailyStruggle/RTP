@@ -16,6 +16,9 @@ reservation:
   ttlMs: 30000
   reapIntervalMs: 5000
 
+routing:
+  dispatchMode: direct-db
+
 # Load balancer scoring table. Mirrors backend-a / backend-b so the
 # BackendSelector treats all three backends with the same curve weights;
 # differences in observed score will then come from real platform behavior

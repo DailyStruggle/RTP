@@ -299,6 +299,21 @@ public class PermissionMigrationTest {
                 return true;
             }
         };
+        // Register simulated responses
+        accessor.registerCommandOutput("lp listgroups", List.of(
+                "[LP] Showing groups:",
+                "- default (weight: 0)",
+                "- vip (weight: 10)"
+        ));
+        accessor.registerCommandOutput("lp group default permission info", List.of(
+                "[LP] default's Permissions:",
+                "+ betterrtp.use (true)"
+        ));
+        accessor.registerCommandOutput("lp group vip permission info", List.of(
+                "[LP] vip's Permissions:",
+                "+ betterrtp.world.nether (true) [world=world_nether]",
+                "+ betterrtp.bypass.cooldown (true)"
+        ));
         RTP.serverAccessor = accessor;
 
         ConfigImportPermissionsCmd cmd = new ConfigImportPermissionsCmd(null);
@@ -308,15 +323,17 @@ public class PermissionMigrationTest {
         dryRunParams.put("apply", List.of("false"));
         boolean dryRunResult = cmd.onCommand(RTPAPI.serverId, dryRunParams, null);
         assertTrue(dryRunResult);
-        assertEquals(0, dispatchedCommands.size(), "Dry-run should not dispatch commands");
+        assertEquals(0, dispatchedCommands.size(), "Dry-run should not dispatch set commands");
 
         // Apply execution
         Map<String, List<String>> applyParams = new HashMap<>();
         applyParams.put("apply", List.of("true"));
         boolean applyResult = cmd.onCommand(RTPAPI.serverId, applyParams, null);
         assertTrue(applyResult);
-        assertEquals(1, dispatchedCommands.size(), "Apply should dispatch provider group discovery command");
-        assertEquals("lp listgroups", dispatchedCommands.get(0));
+        assertEquals(3, dispatchedCommands.size(), "Apply should dispatch 3 permission set commands across groups");
+        assertTrue(dispatchedCommands.contains("lp group default permission set rtp.use true"));
+        assertTrue(dispatchedCommands.contains("lp group vip permission set rtp.worlds.nether true world=world_nether"));
+        assertTrue(dispatchedCommands.contains("lp group vip permission set rtp.noCooldown true"));
     }
 
     @Test
@@ -338,6 +355,15 @@ public class PermissionMigrationTest {
                 return true;
             }
         };
+        accessor.registerCommandOutput("lp listgroups", List.of(
+                "Groups: default, admin"
+        ));
+        accessor.registerCommandOutput("lp group default permission info", List.of(
+                "+ betterrtp.use (true)"
+        ));
+        accessor.registerCommandOutput("lp group admin permission info", List.of(
+                "+ betterrtp.admin (true)"
+        ));
         RTP.serverAccessor = accessor;
 
         Path customDir = tempDir.resolve("external_plugins_unified");
@@ -366,8 +392,9 @@ public class PermissionMigrationTest {
 
         boolean applyResult = importCmd.onCommand(RTPAPI.serverId, applyParams, null);
         assertTrue(applyResult);
-        assertTrue(dispatchedCommands.size() >= 1, "Confirmed import should dispatch permission provider commands");
-        assertEquals("lp listgroups", dispatchedCommands.get(0));
+        assertEquals(2, dispatchedCommands.size(), "Confirmed import should dispatch permission set commands");
+        assertTrue(dispatchedCommands.contains("lp group default permission set rtp.use true"));
+        assertTrue(dispatchedCommands.contains("lp group admin permission set rtp.admin true"));
 
         // 3. Confirmed import with permissions=false -> should skip permission migration
         dispatchedCommands.clear();
@@ -380,6 +407,73 @@ public class PermissionMigrationTest {
         boolean skipResult = importCmd.onCommand(RTPAPI.serverId, skipPermsParams, null);
         assertTrue(skipResult);
         assertEquals(0, dispatchedCommands.size(), "Import with permissions=false should not dispatch provider commands");
+    }
+
+    @Test
+    @DisplayName("5.5 - Test against variations of competitor configurations from server test directory")
+    void testAgainstRealServerConfigurationVariations() {
+        File serverPluginsDir = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Paper\\26.3\\plugins");
+        if (!serverPluginsDir.isDirectory()) return;
+
+        // Verify competitor directories exist
+        File betterRtpDir = new File(serverPluginsDir, "BetterRTP");
+        File justRtpDir = new File(serverPluginsDir, "JustRTP");
+        File ezRtpDir = new File(serverPluginsDir, "EzRTP");
+        File jakesRtpDir = new File(serverPluginsDir, "JakesRTP");
+
+        assertTrue(betterRtpDir.isDirectory(), "BetterRTP config dir should exist");
+        assertTrue(justRtpDir.isDirectory(), "JustRTP config dir should exist");
+        assertTrue(ezRtpDir.isDirectory(), "EzRTP config dir should exist");
+        assertTrue(jakesRtpDir.isDirectory(), "JakesRTP config dir should exist");
+
+        // Test configuration variations with different providers and permission templates
+        // 1. BetterRTP with custom PEX command templates
+        service.setGroupListTemplate("pex groups");
+        service.setGroupGetTemplate("pex group [group] list");
+        service.setGroupSetTemplate("pex group [group] add [permission] [contexts]");
+
+        List<PermissionMigrationService.ParsedNode> betterNodes = List.of(
+                new PermissionMigrationService.ParsedNode("betterrtp.use", true, ""),
+                new PermissionMigrationService.ParsedNode("betterrtp.world.nether", true, "world=world_nether"),
+                new PermissionMigrationService.ParsedNode("betterrtp.bypass.cooldown", true, ""),
+                new PermissionMigrationService.ParsedNode("betterrtp.biome.plains", true, "")
+        );
+
+        PermissionMigrationService.MigrationPlan betterPlan =
+                service.planMigration("group", "default", betterNodes, "betterrtp", false);
+        assertEquals(4, betterPlan.getGeneratedCommands().size());
+        assertTrue(betterPlan.getGeneratedCommands().contains("pex group default add rtp.use"));
+        assertTrue(betterPlan.getGeneratedCommands().contains("pex group default add rtp.worlds.nether world=world_nether"));
+        assertTrue(betterPlan.getGeneratedCommands().contains("pex group default add rtp.noCooldown"));
+        assertTrue(betterPlan.getGeneratedCommands().contains("pex group default add rtp.biome.plains"));
+
+        // 2. JustRTP with UltraPermissions command templates
+        service.setGroupSetTemplate("upc group [group] addPermission [permission] [contexts]");
+        List<PermissionMigrationService.ParsedNode> justNodes = List.of(
+                new PermissionMigrationService.ParsedNode("justrtp.use", true, ""),
+                new PermissionMigrationService.ParsedNode("justrtp.nocooldown", true, ""),
+                new PermissionMigrationService.ParsedNode("justrtp.admin", true, "")
+        );
+        PermissionMigrationService.MigrationPlan justPlan =
+                service.planMigration("group", "vip", justNodes, "justrtp", false);
+        assertEquals(3, justPlan.getGeneratedCommands().size());
+        assertTrue(justPlan.getGeneratedCommands().contains("upc group vip addPermission rtp.use"));
+        assertTrue(justPlan.getGeneratedCommands().contains("upc group vip addPermission rtp.noCooldown"));
+        assertTrue(justPlan.getGeneratedCommands().contains("upc group vip addPermission rtp.admin"));
+
+        // 3. EzRTP & JakesRTP multi-competitor migration under 'all' source filter
+        service.setGroupSetTemplate(PermissionMigrationService.DEFAULT_GROUP_SET_TEMPLATE);
+        List<PermissionMigrationService.ParsedNode> mixedNodes = List.of(
+                new PermissionMigrationService.ParsedNode("ezrtp.teleport", true, ""),
+                new PermissionMigrationService.ParsedNode("ezrtp.bypass.cooldown", true, ""),
+                new PermissionMigrationService.ParsedNode("jakesrtp.rtp", true, ""),
+                new PermissionMigrationService.ParsedNode("jakesrtp.nocooldown", true, "")
+        );
+        PermissionMigrationService.MigrationPlan mixedPlan =
+                service.planMigration("group", "member", mixedNodes, "all", false);
+        assertEquals(4, mixedPlan.getGeneratedCommands().size());
+        assertTrue(mixedPlan.getGeneratedCommands().contains("lp group member permission set rtp.use true"));
+        assertTrue(mixedPlan.getGeneratedCommands().contains("lp group member permission set rtp.noCooldown true"));
     }
 
     private static final class StubRoot extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
