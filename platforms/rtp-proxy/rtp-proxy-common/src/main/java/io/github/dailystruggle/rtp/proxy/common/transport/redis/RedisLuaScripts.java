@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.exceptions.JedisNoScriptException;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespException;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -65,8 +65,8 @@ final class RedisLuaScripts {
     }
 
     /** Pre-loads the script into Redis's script cache and returns the cached SHA1. */
-    String scriptLoad(JedisPool pool) {
-        try (Jedis j = pool.getResource()) {
+    String scriptLoad(RespPool pool) {
+        try (RespConnection j = pool.getResource()) {
             String cachedSha = j.scriptLoad(scriptBody);
             if (!sha1.equalsIgnoreCase(cachedSha)) {
                 throw new IllegalStateException(
@@ -75,6 +75,8 @@ final class RedisLuaScripts {
                                 + " (script bytes diverged from sidecar; refuse to enable).");
             }
             return cachedSha;
+        } catch (IOException e) {
+            throw new RuntimeException("RedisLuaScripts: failed to load script " + name, e);
         }
     }
 
@@ -83,13 +85,22 @@ final class RedisLuaScripts {
      * if Redis evicted the script from its cache (NOSCRIPT). The fallback also
      * re-primes the cache for the next call.
      */
-    Object evalsha(Jedis j, List<String> keys, List<String> args) {
+    Object evalsha(RespConnection j, List<String> keys, List<String> args) {
         try {
             return j.evalsha(sha1, keys, args);
-        } catch (JedisNoScriptException nse) {
-            // Cache eviction (Redis FLUSH, restart, or replica failover). Re-load and retry.
-            j.scriptLoad(scriptBody);
-            return j.evalsha(sha1, keys, args);
+        } catch (RespException nse) {
+            if (nse.isNoScript()) {
+                // Cache eviction (Redis FLUSH, restart, or replica failover). Re-load and retry.
+                try {
+                    j.scriptLoad(scriptBody);
+                    return j.evalsha(sha1, keys, args);
+                } catch (IOException e) {
+                    throw new RuntimeException("RedisLuaScripts: failed during script reload", e);
+                }
+            }
+            throw nse;
+        } catch (IOException e) {
+            throw new RuntimeException("RedisLuaScripts: I/O error during evalsha", e);
         }
     }
 

@@ -38,6 +38,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Spiral 1D math | [`../adr/ADR-001-archimedean-spiral-1d-mapping.md`](../adr/ADR-001-archimedean-spiral-1d-mapping.md) |
 | Anvil prefilter / biome / shared module | [`../adr/ADR-016-anvil-subsystem.md`](../adr/ADR-016-anvil-subsystem.md) |
 | Block tags / state predicates in safety lists | [`../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md`](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md) |
+| Testing guide (what to test when: unit, mutation, devstack) | [`TESTING_GUIDE.md`](TESTING_GUIDE.md) |
 | Coverage targets | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) |
 | Enterprise readiness (gates, evidence, compatibility matrix) | [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md) |
 | Platform support matrix (Spigot/Paper/Folia/Fabric/NeoForge/Velocity) | [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) |

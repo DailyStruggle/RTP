@@ -411,8 +411,10 @@ test_roundtrip() {
       echo "[roundtrip] installing client dependencies..."
       ( cd "$scriptDir/clients" && npm install --silent --no-audit ) >/dev/null 2>&1 || true
     fi
+    local extraArgs=()
+    [ "$Lite" -eq 1 ] && extraArgs+=(--lite)
     local botOut
-    botOut="$(node "$botScript" --host 127.0.0.1 --port 25577 --timeout 35 2>&1)" || true
+    botOut="$(node "$botScript" --host 127.0.0.1 --port 25577 --timeout 35 "${extraArgs[@]}" 2>&1)" || true
     echo "$botOut"
     if printf '%s' "$botOut" | grep -q '"status":"PASS"'; then
       echo "[roundtrip] headless client completed teleport successfully."

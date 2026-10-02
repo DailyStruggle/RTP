@@ -119,9 +119,48 @@ class SetupRecipeTest {
         Map<String, Object> endRegion = result.newTrees().get("definitions/regions/world_the_end");
         assertNotNull(endRegion, "synthesised end region must exist in newTrees");
         assertEquals("world_the_end", endRegion.get("world"));
+        assertNotNull(endRegion.get("shape"), "synthesised end region must carry shape block");
         Map<?, ?> endVert = (Map<?, ?>) endRegion.get("vert");
         assertNotNull(endVert, "end region must carry vert block");
         assertEquals(false, endVert.get("requireSkyLight"), "end requireSkyLight must be false");
         assertEquals("LINEAR", endVert.get("name"), "end vert name must be LINEAR");
+    }
+
+    @Test
+    @DisplayName("multiWorld synthesises full regions even when baseline contains empty snapshot placeholders")
+    void testMultiWorldSynthesisesFullRegionWithEmptyBaselinePlaceholders() {
+        SetupSession session = new SetupSession(UUID.randomUUID());
+        session.setWorldChoice("multi");
+        session.setGameplayChoice("survival");
+        session.setPerformanceChoice("high");
+
+        Map<String, Map<String, Object>> baseline = new LinkedHashMap<>();
+        Map<String, Object> defRegion = new LinkedHashMap<>();
+        defRegion.put("world", "[0]");
+        defRegion.put("shape", "@config");
+        defRegion.put("vert", "@config");
+        baseline.put("definitions/regions/default", defRegion);
+
+        // Simulate snapshotLive putting empty maps for uncreated files in baseline
+        baseline.put("definitions/regions/world_nether", new LinkedHashMap<>());
+        baseline.put("definitions/regions/world_the_end", new LinkedHashMap<>());
+
+        List<String> worlds = List.of("world", "world_nether", "world_the_end");
+        List<Prefab> recipe = SetupRecipe.compileRecipe(session, worlds);
+
+        PrefabApplier.Result result = SetupRecipe.applyPipeline(baseline, recipe, worlds);
+        assertNotNull(result);
+
+        Map<String, Object> endRegion = result.newTrees().get("definitions/regions/world_the_end");
+        assertNotNull(endRegion, "end region must exist in newTrees");
+        assertEquals("world_the_end", endRegion.get("world"), "world key must be set");
+        assertEquals("@config", endRegion.get("shape"), "shape key must be cloned from default template");
+        assertNotNull(endRegion.get("vert"), "vert block must be present");
+
+        Map<String, Object> netherRegion = result.newTrees().get("definitions/regions/world_nether");
+        assertNotNull(netherRegion, "nether region must exist in newTrees");
+        assertEquals("world_nether", netherRegion.get("world"), "world key must be set");
+        assertEquals("@config", netherRegion.get("shape"), "shape key must be cloned from default template");
+        assertNotNull(netherRegion.get("vert"), "vert block must be present");
     }
 }

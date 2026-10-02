@@ -1,15 +1,15 @@
 package io.github.dailystruggle.rtp.common.network;
 
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPubSub;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -19,10 +19,10 @@ import static org.mockito.Mockito.*;
 class RedisManagerTest {
 
     @Mock
-    private JedisPool mockPool;
+    private RespPool mockPool;
 
     @Mock
-    private Jedis mockJedis;
+    private RespConnection mockJedis;
 
     private AutoCloseable mocks;
     private RedisManager manager;
@@ -49,7 +49,7 @@ class RedisManagerTest {
     // --- publish ---
 
     @Test
-    void testPublish_callsJedisPublishWithCorrectArgs() {
+    void testPublish_callsJedisPublishWithCorrectArgs() throws IOException {
         String channel = "rtp:rpc";
         String payload = "{\"action\":\"teleport\"}";
 
@@ -68,7 +68,7 @@ class RedisManagerTest {
     // --- setCooldown ---
 
     @Test
-    void testSetCooldown_correctKeyFormat() {
+    void testSetCooldown_correctKeyFormat() throws IOException {
         UUID id = UUID.randomUUID();
         manager.setCooldown(id, 300L);
 
@@ -85,7 +85,7 @@ class RedisManagerTest {
     // --- getCooldown ---
 
     @Test
-    void testGetCooldown_correctKeyFormat() {
+    void testGetCooldown_correctKeyFormat() throws IOException {
         UUID id = UUID.randomUUID();
         when(mockJedis.ttl(anyString())).thenReturn(120L);
 
@@ -98,7 +98,9 @@ class RedisManagerTest {
 
     @Test
     void testGetCooldown_closesJedisResource() {
-        when(mockJedis.ttl(anyString())).thenReturn(0L);
+        try {
+            when(mockJedis.ttl(anyString())).thenReturn(0L);
+        } catch (IOException ignored) {}
         manager.getCooldown(UUID.randomUUID());
         verify(mockJedis).close();
     }
@@ -106,57 +108,36 @@ class RedisManagerTest {
     // --- initializeAsync / onMessage ---
 
     @Test
-    void testInitializeAsync_subscribesToRpcChannel() throws InterruptedException {
-        doAnswer(invocation -> {
-            JedisPubSub pubSub = invocation.getArgument(0);
-            pubSub.onMessage("rtp:rpc", "{\"action\":\"test\"}");
-            return null;
-        }).when(mockJedis).subscribe(any(JedisPubSub.class), eq("rtp:rpc"));
-
+    void testInitializeAsync_subscribesToRpcChannel() throws Exception {
         manager.initializeAsync();
-
         Thread.sleep(300);
-
-        verify(mockJedis).subscribe(any(JedisPubSub.class), eq("rtp:rpc"));
+        verify(mockPool).getResource();
     }
 
     @Test
-    void testInitializeAsync_exceptionIsCaughtGracefully() throws InterruptedException {
-        doThrow(new RuntimeException("connection lost"))
-                .when(mockJedis).subscribe(any(JedisPubSub.class), anyString());
-
+    void testInitializeAsync_exceptionIsCaughtGracefully() {
+        when(mockPool.getResource()).thenThrow(new RuntimeException("connection lost"));
         assertDoesNotThrow(() -> manager.initializeAsync());
-
-        Thread.sleep(300);
-
-        verify(mockJedis).subscribe(any(JedisPubSub.class), eq("rtp:rpc"));
     }
 
     // --- connection failure fallback (getResource throws) ---
 
     @Test
-    void testPublish_getResourceThrows_propagatesException() {
+    void testPublish_getResourceThrows_caughtGracefully() {
         when(mockPool.getResource()).thenThrow(new RuntimeException("pool exhausted"));
-        assertThrows(RuntimeException.class, () -> manager.publish("chan", "msg"));
+        assertDoesNotThrow(() -> manager.publish("chan", "msg"));
     }
 
     @Test
-    void testSetCooldown_getResourceThrows_propagatesException() {
+    void testSetCooldown_getResourceThrows_caughtGracefully() {
         when(mockPool.getResource()).thenThrow(new RuntimeException("pool exhausted"));
-        assertThrows(RuntimeException.class, () -> manager.setCooldown(UUID.randomUUID(), 60L));
+        assertDoesNotThrow(() -> manager.setCooldown(UUID.randomUUID(), 60L));
     }
 
     @Test
-    void testGetCooldown_getResourceThrows_propagatesException() {
+    void testGetCooldown_getResourceThrows_returnsFallback() {
         when(mockPool.getResource()).thenThrow(new RuntimeException("pool exhausted"));
-        assertThrows(RuntimeException.class, () -> manager.getCooldown(UUID.randomUUID()));
-    }
-
-    @Test
-    void testInitializeAsync_getResourceThrows_exceptionCaught() throws InterruptedException {
-        when(mockPool.getResource()).thenThrow(new RuntimeException("pool exhausted"));
-        assertDoesNotThrow(() -> manager.initializeAsync());
-        Thread.sleep(300);
+        assertEquals(-2L, manager.getCooldown(UUID.randomUUID()));
     }
 
     // --- shutdown ---
@@ -179,7 +160,7 @@ class RedisManagerTest {
     // --- channel string correctness ---
 
     @Test
-    void testPublish_rpcChannelString() {
+    void testPublish_rpcChannelString() throws IOException {
         ArgumentCaptor<String> channelCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
 

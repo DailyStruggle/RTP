@@ -1,10 +1,8 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
 import io.github.dailystruggle.rtp.proxy.common.spi.PlayerOwnershipTracker;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.params.SetParams;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 
 import java.util.Arrays;
 import java.util.Objects;
@@ -38,23 +36,23 @@ public final class RedisPlayerOwnershipTracker implements PlayerOwnershipTracker
             "if redis.call('GET', KEYS[1]) == ARGV[1] then "
             + "return redis.call('DEL', KEYS[1]) else return 0 end";
 
-    private final JedisPool pool;
+    private final RespPool pool;
     private final boolean ownsPool;
     private final ExecutorService executor;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public RedisPlayerOwnershipTracker(String host, int port, String password) {
-        this(buildPool(host, port, password), true);
+        this(new RespPool(host, port, 2000, password, 2), true);
     }
 
-    public RedisPlayerOwnershipTracker(JedisPool pool) {
+    public RedisPlayerOwnershipTracker(RespPool pool) {
         this(Objects.requireNonNull(pool, "pool"), false);
     }
 
-    private RedisPlayerOwnershipTracker(JedisPool pool, boolean ownsPool) {
+    private RedisPlayerOwnershipTracker(RespPool pool, boolean ownsPool) {
         this.pool = pool;
         this.ownsPool = ownsPool;
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             j.ping();
         } catch (Exception e) {
             if (ownsPool) pool.close();
@@ -68,18 +66,6 @@ public final class RedisPlayerOwnershipTracker implements PlayerOwnershipTracker
             return t;
         };
         this.executor = Executors.newSingleThreadExecutor(tf);
-    }
-
-    private static JedisPool buildPool(String host, int port, String password) {
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(2);
-        cfg.setMaxIdle(1);
-        cfg.setMinIdle(1);
-        cfg.setTestOnBorrow(true);
-        if (password != null && !password.isEmpty()) {
-            return new JedisPool(cfg, host, port, 2000, password);
-        }
-        return new JedisPool(cfg, host, port, 2000);
     }
 
     @Override
@@ -97,13 +83,13 @@ public final class RedisPlayerOwnershipTracker implements PlayerOwnershipTracker
             return f;
         }
         return runAsync(() -> {
-            try (Jedis j = pool.getResource()) {
-                SetParams p = SetParams.setParams().ex(ttlSeconds);
-                j.set(KEY_PREFIX + playerId, thisProxyId, p);
-            } catch (RuntimeException e) {
+            try (RespConnection j = pool.getResource()) {
+                j.set(KEY_PREFIX + playerId, thisProxyId, null, "EX", ttlSeconds);
+            } catch (Exception e) {
                 LOG.log(Level.WARNING, "RedisPlayerOwnershipTracker.claim failed for "
                         + playerId + ": " + e.getMessage());
-                throw e;
+                if (e instanceof RuntimeException re) throw re;
+                throw new RuntimeException(e);
             }
             return null;
         });
@@ -114,14 +100,15 @@ public final class RedisPlayerOwnershipTracker implements PlayerOwnershipTracker
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(thisProxyId, "thisProxyId");
         return runAsync(() -> {
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 j.eval(CAS_DEL_LUA,
                         java.util.Collections.singletonList(KEY_PREFIX + playerId),
                         java.util.Collections.singletonList(thisProxyId));
-            } catch (RuntimeException e) {
+            } catch (Exception e) {
                 LOG.log(Level.WARNING, "RedisPlayerOwnershipTracker.release failed for "
                         + playerId + ": " + e.getMessage());
-                throw e;
+                if (e instanceof RuntimeException re) throw re;
+                throw new RuntimeException(e);
             }
             return null;
         });
@@ -131,7 +118,7 @@ public final class RedisPlayerOwnershipTracker implements PlayerOwnershipTracker
     public CompletableFuture<String> ownerOf(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         return runAsync(() -> {
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 String v = j.get(KEY_PREFIX + playerId);
                 return v == null ? "" : v;
             }

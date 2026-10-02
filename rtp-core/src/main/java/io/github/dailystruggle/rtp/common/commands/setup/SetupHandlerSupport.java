@@ -141,7 +141,9 @@ public final class SetupHandlerSupport {
             for (Prefab p : recipe) {
                 Map<String, Map<String, Object>> snap = PrefabDiskIO.snapshotLive(baseDir, p);
                 for (Map.Entry<String, Map<String, Object>> e : snap.entrySet()) {
-                    baseline.putIfAbsent(e.getKey(), e.getValue());
+                    if (e.getValue() != null && !e.getValue().isEmpty()) {
+                        baseline.putIfAbsent(e.getKey(), e.getValue());
+                    }
                 }
             }
             // Ensure default region is in baseline if not yet present

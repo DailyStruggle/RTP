@@ -1,6 +1,6 @@
 # ADR-024 — RTP-lite Assembly Variant
 
-**Status:** Accepted (amended 2026-09-20 - authoritative lite drop list; PlaceholderAPI and on-event teleports confirmed in lite)
+**Status:** Superseded by [ADR-100](ADR-100-superseding-adr-024-sla-and-support-tier.md) (amended 2026-10-01 - technical engine unified; Pro re-framed as SLA & Support Tier)
 **Date:** 2026-04-30
 
 ## 2026-09-20 amendment - authoritative lite drop list

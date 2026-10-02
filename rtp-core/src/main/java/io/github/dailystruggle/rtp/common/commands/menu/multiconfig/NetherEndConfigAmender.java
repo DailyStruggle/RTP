@@ -48,6 +48,9 @@ public final class NetherEndConfigAmender {
         }
         int maxY = 255;
         int minY = 0;
+        if (isNether || isEnd) {
+            minY = 32;
+        }
 
         Object o = regionParser.getConfigValue(RegionKeys.vert, null);
         if (o instanceof RtpYamlSection) {
@@ -135,7 +138,7 @@ public final class NetherEndConfigAmender {
         int maxHeight = (rtpWorld != null) ? rtpWorld.getMaxHeight() : 255;
         int minHeight = (rtpWorld != null) ? rtpWorld.getMinHeight() : 0;
         int maxY = nether ? Math.min(128, maxHeight) : maxHeight;
-        int minY = Math.min(minHeight, maxY);
+        int minY = Math.min(Math.max(32, minHeight), maxY);
 
         Map<String, Object> vert = new java.util.LinkedHashMap<>();
         vert.put("name", "LINEAR");

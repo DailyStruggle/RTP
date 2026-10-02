@@ -197,4 +197,86 @@ class SetupCommandTest {
         assertTrue(hasApply, "Last page must contain APPLY CONFIG button");
         assertTrue(hasCancel, "Last page must contain CANCEL SETUP button");
     }
+
+    @Test
+    @DisplayName("SetupConfirmCmd writes full per-world region files seeded with comments from default template")
+    void testSetupConfirmWritesFullRegionsWithComments(@org.junit.jupiter.api.io.TempDir java.io.File tempDir) throws Exception {
+        // Setup mock server accessor with temporary directory and worlds
+        io.github.dailystruggle.rtp.api.server.RTPServerAccessor mockAccessor = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.api.server.RTPServerAccessor.class);
+        org.mockito.Mockito.when(mockAccessor.getPluginDirectory()).thenReturn(tempDir);
+
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> overworld = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.api.world.RTPWorld.class);
+        org.mockito.Mockito.when(overworld.name()).thenReturn("world");
+        org.mockito.Mockito.when(overworld.environment()).thenReturn("NORMAL");
+
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> nether = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.api.world.RTPWorld.class);
+        org.mockito.Mockito.when(nether.name()).thenReturn("world_nether");
+        org.mockito.Mockito.when(nether.environment()).thenReturn("NETHER");
+        org.mockito.Mockito.when(nether.getMaxHeight()).thenReturn(128);
+        org.mockito.Mockito.when(nether.getMinHeight()).thenReturn(0);
+
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> end = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.api.world.RTPWorld.class);
+        org.mockito.Mockito.when(end.name()).thenReturn("world_the_end");
+        org.mockito.Mockito.when(end.environment()).thenReturn("THE_END");
+        org.mockito.Mockito.when(end.getMaxHeight()).thenReturn(256);
+        org.mockito.Mockito.when(end.getMinHeight()).thenReturn(0);
+
+        org.mockito.Mockito.when(mockAccessor.getRTPWorlds()).thenReturn(java.util.List.of(overworld, nether, end));
+        org.mockito.Mockito.when(mockAccessor.getRTPWorld("world")).thenReturn((io.github.dailystruggle.rtp.api.world.RTPWorld) overworld);
+        org.mockito.Mockito.when(mockAccessor.getRTPWorld("world_nether")).thenReturn((io.github.dailystruggle.rtp.api.world.RTPWorld) nether);
+        org.mockito.Mockito.when(mockAccessor.getRTPWorld("world_the_end")).thenReturn((io.github.dailystruggle.rtp.api.world.RTPWorld) end);
+
+        io.github.dailystruggle.rtp.common.RTP.serverAccessor = mockAccessor;
+
+        // Create default.yml with comments in definitions/regions/
+        java.io.File defRegionDir = new java.io.File(tempDir, "definitions/regions");
+        defRegionDir.mkdirs();
+        java.io.File defFile = new java.io.File(defRegionDir, "default.yml");
+        String defaultContent = "# --- RTP Default Region ---\n"
+                + "world: \"[0]\"\n"
+                + "# Shape comment\n"
+                + "shape: \"@config\"\n"
+                + "# Vert comment\n"
+                + "vert: \"@config\"\n"
+                + "price: 0.0\n";
+        java.nio.file.Files.writeString(defFile.toPath(), defaultContent, java.nio.charset.StandardCharsets.UTF_8);
+
+        SetupSessionRegistry registry = new SetupSessionRegistry();
+        UUID callerId = UUID.randomUUID();
+        SetupSession session = registry.getOrCreate(callerId);
+        session.setWorldChoice("multi");
+        session.setGameplayChoice("survival");
+        session.setPerformanceChoice("high");
+
+        SetupConfirmCmd confirmCmd = new SetupConfirmCmd(null, registry);
+        boolean confirmed = confirmCmd.onCommand(callerId, Map.of(), null);
+        assertTrue(confirmed, "Confirm command should succeed");
+
+        // Verify definitions/regions/world_the_end.yml exists and has full content
+        java.io.File endFile = new java.io.File(defRegionDir, "world_the_end.yml");
+        assertTrue(endFile.exists(), "world_the_end.yml must be written to disk");
+        String endContent = java.nio.file.Files.readString(endFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+
+        assertTrue(endContent.contains("world: world_the_end") || endContent.contains("world: \"world_the_end\"") || endContent.contains("world: 'world_the_end'"),
+                "world_the_end.yml must contain world key, was: " + endContent);
+        assertTrue(endContent.contains("shape: '@config'") || endContent.contains("shape: \"@config\"") || endContent.contains("shape: @config"),
+                "world_the_end.yml must contain shape key, was: " + endContent);
+        assertTrue(endContent.contains("vert:"), "world_the_end.yml must contain vert key, was: " + endContent);
+        assertTrue(endContent.contains("requireSkyLight: false"), "world_the_end.yml vert must have requireSkyLight: false");
+
+        // Verify comments from default template are preserved
+        assertTrue(endContent.contains("# --- RTP Default Region ---") || endContent.contains("# Shape comment"),
+                "world_the_end.yml should carry comments from default template");
+
+        // Verify definitions/regions/world_nether.yml exists and has full content
+        java.io.File netherFile = new java.io.File(defRegionDir, "world_nether.yml");
+        assertTrue(netherFile.exists(), "world_nether.yml must be written to disk");
+        String netherContent = java.nio.file.Files.readString(netherFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(netherContent.contains("world: world_nether") || netherContent.contains("world: \"world_nether\"") || netherContent.contains("world: 'world_nether'"),
+                "world_nether.yml must contain world key, was: " + netherContent);
+        assertTrue(netherContent.contains("shape: '@config'") || netherContent.contains("shape: \"@config\"") || netherContent.contains("shape: @config"),
+                "world_nether.yml must contain shape key, was: " + netherContent);
+        assertTrue(netherContent.contains("vert:"), "world_nether.yml must contain vert key");
+        assertTrue(netherContent.contains("requireSkyLight: false"), "world_nether.yml vert must have requireSkyLight: false");
+    }
 }

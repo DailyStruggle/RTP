@@ -15,16 +15,15 @@ plugins {
 
 dependencies {
     api project(':rtp-api')
+    compileOnly 'org.slf4j:slf4j-api:2.0.12'
+    testImplementation 'org.slf4j:slf4j-api:2.0.12'
+    testRuntimeOnly 'org.slf4j:slf4j-simple:2.0.12'
     // Phase 2e-SQL slice: SqlNetworkStateBinding uses JDBC + standard DataSource.
     // Production JDBC drivers (MySQL / Postgres) are supplied by the deploying
     // host's database accessor pool (AbstractSQLDatabaseAccessor in rtp-core);
     // we never bundle them. H2 ships as test-only so SqlNetworkStateBindingH2Test
     // can exercise two-instance fan-out without a real DB.
     testRuntimeOnly 'com.h2database:h2:2.2.224'
-    // Phase 2e-Redis A1 slice: RedisNetworkStateBinding uses Jedis (already
-    // pulled in by rtp-core for RedisManager); pinned to the same version
-    // to avoid classpath conflicts when both modules ship in the unified jar.
-    implementation 'redis.clients:jedis:5.1.2'
     // ENTERPRISE_READINESS.md item 17: the transport/redis package is exercised
     // against a real Redis via Testcontainers (not mocks). The container-backed
     // tests are Docker-gated (RedisTestContainer.dockerAvailable) so a routine

@@ -87,8 +87,8 @@ public class RegionQueueManager {
      * <p>Allocated only on default-world region when {@code PerformanceKeys.loginCacheEnabled=true}.
      * Decoupled from {@code Region.execute()} refill loops.
      */
-    public LockFreeLocationBuffer loginLocations;
-    public RingCacheStage<RTPLocation> loginStage;
+    public volatile LockFreeLocationBuffer loginLocations;
+    public volatile RingCacheStage<RTPLocation> loginStage;
 
     /** When reserving/recycling locations for specific players, I want to guard against */
     public final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RTPLocation>>
@@ -97,7 +97,7 @@ public class RegionQueueManager {
 
     private final HotSink<RTPLocation> keptHotSink;
     private final HotSink<RTPLocation> networkKeptHotSink;
-    private HotSink<RTPLocation> loginHotSink;
+    private volatile HotSink<RTPLocation> loginHotSink;
     private final HotSink<RTPLocation> personalHotSink;
 
     /** */
@@ -394,7 +394,7 @@ public class RegionQueueManager {
      *
      * @param capacity buffer capacity; &lt;= 0 disables the buffer
      */
-    public void enableLoginCache(int capacity) {
+    public synchronized void enableLoginCache(int capacity) {
         if (capacity <= 0) {
             disableLoginCache();
             return;
@@ -412,11 +412,11 @@ public class RegionQueueManager {
                 }
             }
         };
-        this.loginLocations = new LockFreeLocationBuffer(capacity);
-        this.loginStage = new RingCacheStage<>("loginLocations", this.loginLocations, hotDispose);
-        this.loginHotSink = new HotSink<>() {
+        LockFreeLocationBuffer buffer = new LockFreeLocationBuffer(capacity);
+        RingCacheStage<RTPLocation> stage = new RingCacheStage<>("loginLocations", buffer, hotDispose);
+        HotSink<RTPLocation> sink = new HotSink<>() {
             @Override public String name() { return "loginLocations"; }
-            @Override public CacheStage<RTPLocation> stage() { return loginStage; }
+            @Override public CacheStage<RTPLocation> stage() { return stage; }
             @Override public CacheStage<?> coldSource() { return unkeptStage; }
             @Override public boolean accepts(RTPLocation entry) { return checkAccepts(entry); }
             @Override public boolean hasExtrinsicVerifier() { return false; }
@@ -425,6 +425,9 @@ public class RegionQueueManager {
             @Override public int chunkCostPerEntry() { return 1; }
             @Override public long demandWeight() { return 0L; }
         };
+        this.loginStage = stage;
+        this.loginHotSink = sink;
+        this.loginLocations = buffer;
         installDatabaseCallbacks();
     }
 
@@ -432,7 +435,7 @@ public class RegionQueueManager {
      * Drain {@link #loginLocations} back to {@link #unkeptLocations} (closing
      * reservations) and null the buffer reference. Safe to call multiple times.
      */
-    public void disableLoginCache() {
+    public synchronized void disableLoginCache() {
         RingCacheStage<RTPLocation> login = this.loginStage;
         if (login == null && this.loginLocations == null) return;
         this.loginStage = null;
@@ -454,10 +457,7 @@ public class RegionQueueManager {
      * @return future location and number of attempts
      */
     public CompletableFuture<RTPLocation> fastQueue(UUID id) {
-        if (fastLocations.containsKey(id)) return fastLocations.get(id);
-        CompletableFuture<RTPLocation> res = new CompletableFuture<>();
-        fastLocations.put(id, res);
-        return res;
+        return fastLocations.computeIfAbsent(id, k -> new CompletableFuture<>());
     }
 
     /**
@@ -542,8 +542,9 @@ public class RegionQueueManager {
         // null keys, so guard the per-player lookups and fall through to the shared kept queue;
         // otherwise poll(null) throws an NPE that is swallowed upstream, stalling group placement.
         if (uuid != null) {
-            if (fastLocations.containsKey(uuid)) {
-                return fastLocations.remove(uuid);
+            CompletableFuture<RTPLocation> fast = fastLocations.remove(uuid);
+            if (fast != null) {
+                return fast;
             }
 
             ConcurrentLinkedQueue<RTPLocation> playerLocationQueue = perPlayerLocationQueue.get(uuid);
@@ -655,16 +656,14 @@ public class RegionQueueManager {
         if (perPlayerStage != null) perPlayerStage.close();
         perPlayerLocationQueue.clear();
         fastLocations.forEach((uuid, future) -> {
-            if (future.isDone()) {
-                try {
-                    RTPLocation loc = future.get();
-                    if (loc != null && loc.reservation() != null) loc.reservation().close();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } catch (Exception ignored) {}
-            } else {
-                future.complete(null);
-            }
+            future.whenComplete((loc, err) -> {
+                if (loc != null && loc.reservation() != null) {
+                    try {
+                        loc.reservation().close();
+                    } catch (Exception ignored) {}
+                }
+            });
+            future.complete(null);
         });
         fastLocations.clear();
         playerQueue.clear();

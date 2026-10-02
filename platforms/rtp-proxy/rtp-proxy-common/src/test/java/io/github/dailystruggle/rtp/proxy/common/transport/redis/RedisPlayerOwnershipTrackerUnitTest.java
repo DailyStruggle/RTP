@@ -1,11 +1,10 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.params.SetParams;
 
 import java.util.Collections;
 import java.util.UUID;
@@ -15,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -22,14 +22,14 @@ import static org.mockito.Mockito.when;
 
 class RedisPlayerOwnershipTrackerUnitTest {
 
-    private JedisPool pool;
-    private Jedis jedis;
+    private RespPool pool;
+    private RespConnection jedis;
     private RedisPlayerOwnershipTracker tracker;
 
     @BeforeEach
     void setUp() {
-        pool = mock(JedisPool.class);
-        jedis = mock(Jedis.class);
+        pool = mock(RespPool.class);
+        jedis = mock(RespConnection.class);
         when(pool.getResource()).thenReturn(jedis);
         tracker = new RedisPlayerOwnershipTracker(pool);
     }
@@ -44,11 +44,11 @@ class RedisPlayerOwnershipTrackerUnitTest {
     @Test
     void claim_validArguments_setsKeyInRedis() throws Exception {
         UUID pid = UUID.randomUUID();
-        when(jedis.set(eq("rtp:net:owner:" + pid), eq("proxy-1"), any(SetParams.class))).thenReturn("OK");
+        when(jedis.set(eq("rtp:net:owner:" + pid), eq("proxy-1"), any(), eq("EX"), anyLong())).thenReturn("OK");
 
         tracker.claim(pid, "proxy-1", 30).get();
 
-        verify(jedis).set(eq("rtp:net:owner:" + pid), eq("proxy-1"), any(SetParams.class));
+        verify(jedis).set(eq("rtp:net:owner:" + pid), eq("proxy-1"), any(), eq("EX"), eq(30L));
     }
 
     @Test
