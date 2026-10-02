@@ -481,7 +481,7 @@ public final class ModdedBStatsSubmitter {
                     String trimmed = line.trim();
                     if (trimmed.startsWith("serverUuid=") || trimmed.startsWith("serverUuid =")) {
                         String[] parts = trimmed.split("=", 2);
-                        if (parts.length == 2 && !parts[1].trim().isEmpty()) {
+                        if (parts.length == 2 && !parts[1].isBlank()) {
                             return parts[1].trim();
                         }
                     }

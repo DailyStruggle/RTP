@@ -150,9 +150,9 @@ class RegionQueueManagerHotSinkLifecycleTest {
         assertFalse(kept.accepts(reservedLoc(otherWorld, 10, 10, resOther)));
         resOther.close();
 
-        // Valid location with reservation in correct world
-        CountingReservation resGood = new CountingReservation(world, 6, 6);
-        RTPLocation goodLoc = reservedLoc(world, 100, 100, resGood);
+        // Valid location with reservation in correct world (within circle [64, 256] chunk radius)
+        CountingReservation resGood = new CountingReservation(world, 100, 100);
+        RTPLocation goodLoc = reservedLoc(world, 1600, 1600, resGood);
         assertTrue(kept.accepts(goodLoc));
         resGood.close();
     }

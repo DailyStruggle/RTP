@@ -192,7 +192,9 @@ public class RegionLifecycleAndBranchTest {
 
     @Test
     void hydrateCacheFromDatabase_filtersMismatchedSeedAndDistributesLocations() {
-        Region region = new Region("hydrate_reg", createValidSettings("hydrate_reg", new Circle()));
+        Circle circle = new Circle();
+        circle.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.centerRadius, 0L);
+        Region region = new Region("hydrate_reg", createValidSettings("hydrate_reg", circle));
         long currentSeed = region.cacheKeyLong();
 
         List<DatabaseAccessor.StoredLocation> stored = new ArrayList<>();

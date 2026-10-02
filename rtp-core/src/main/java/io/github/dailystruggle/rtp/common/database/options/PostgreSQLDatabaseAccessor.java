@@ -54,6 +54,8 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         statement.execute(schema);
     } catch (SQLException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
+      close();
+      throw new IllegalStateException("Failed to connect to PostgreSQL database: " + e.getMessage(), e);
     }
   }
 
