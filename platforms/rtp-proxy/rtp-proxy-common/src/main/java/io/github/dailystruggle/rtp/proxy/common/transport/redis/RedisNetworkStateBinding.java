@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.Subscription;
 import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
 import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespProtocol;
 import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPubSub;
 
 import java.time.Duration;
@@ -391,7 +392,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
             LOG.log(Level.WARNING, "RedisNetworkStateBinding.redeem failed: " + e.getMessage());
             return RedeemOutcome.TRANSPORT_ERROR;
         }
-        String result = raw == null ? "" : raw.toString();
+        String result = raw == null ? "" : (raw instanceof byte[] b ? RespProtocol.toUtf8(b) : raw.toString());
         try {
             return RedeemOutcome.valueOf(result);
         } catch (IllegalArgumentException ex) {

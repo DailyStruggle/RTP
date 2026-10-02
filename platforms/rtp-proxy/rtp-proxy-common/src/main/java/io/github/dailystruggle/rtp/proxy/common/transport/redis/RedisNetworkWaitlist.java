@@ -189,7 +189,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
                                 envelope.correlationId().toString(),
                                 json,
                                 Integer.toString(maxSize)));
-                String s = raw == null ? "" : raw.toString();
+                String s = raw == null ? "" : (raw instanceof byte[] b ? new String(b, java.nio.charset.StandardCharsets.UTF_8) : raw.toString());
                 switch (s) {
                     case "ACCEPTED":
                     case "ACCEPTED_IDEMPOTENT":

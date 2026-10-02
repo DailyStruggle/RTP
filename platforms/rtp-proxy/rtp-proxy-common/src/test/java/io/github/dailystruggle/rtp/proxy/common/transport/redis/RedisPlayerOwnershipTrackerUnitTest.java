@@ -44,11 +44,9 @@ class RedisPlayerOwnershipTrackerUnitTest {
     @Test
     void claim_validArguments_setsKeyInRedis() throws Exception {
         UUID pid = UUID.randomUUID();
-        when(jedis.set(eq("rtp:net:owner:" + pid), eq("proxy-1"), any(), eq("EX"), anyLong())).thenReturn("OK");
-
         tracker.claim(pid, "proxy-1", 30).get();
 
-        verify(jedis).set(eq("rtp:net:owner:" + pid), eq("proxy-1"), any(), eq("EX"), eq(30L));
+        verify(jedis).setex(eq("rtp:net:owner:" + pid), eq(30L), eq("proxy-1"));
     }
 
     @Test
