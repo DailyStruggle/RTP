@@ -983,12 +983,6 @@ subprojects {
                 if (jacocoReport.exists()) {
                     property 'sonar.coverage.jacoco.xmlReportPaths', jacocoReport.absolutePath
                 }
-            } else {
-                // Ensure JaCoCo XML is still produced for local normalized aggregation tools
-                tasks.matching { it.name == 'jacocoTestReport' }.configureEach {
-                    reports.xml.required = true
-                    reports.html.required = true
-                }
             }
         }
     }
