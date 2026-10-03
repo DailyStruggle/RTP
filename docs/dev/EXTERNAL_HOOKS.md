@@ -33,7 +33,7 @@ From `RTPHooks` you reach every behavior-modification registry in one place. Dir
 | **When invoked** | Every per-attempt verification pass (`PregenTask`, `QueueTask`, `ScanTask`). |
 | **Threading** | Sync verifiers run on the verification chain — non-blocking. Async verifiers return a `CompletableFuture` and may do off-thread I/O but shall not block a region/tick thread. *Folia thread-safety caveat:* Synchronous verifiers (`*Checker`s) query third-party or Bukkit APIs (e.g. WorldGuard, GriefPrevention, `Bukkit.getWorld(...)`) directly from the async/region pipeline thread (`GlobalRegionVerifiers.checkGlobalRegionVerifiers`). Because these are in-memory/CPU lookups and do not perform blocking chunk I/O, REQ-RTP-S-005 is not violated; however, querying plugins that are not thread-safe or Folia-aware carries a risk of race conditions if the claim plugin mutates internal state during lookup. Where an external claim plugin exposes an async or region-safe query API, prefer registering via `registerAsync` (or `GlobalRegionVerifiers.addGlobalRegionVerifierAsync`) and hopping to the appropriate regional/global scheduler. |
 | **Failure mode** | A throwing verifier is logged at WARNING and treated as `false` (location rejected). RTP does not silently swallow failures (REQ-RTP-S-004). |
-| **Producers (today)** | `addons/LeafRTPClaimAddon` (`ClaimIntegrations` + the `{SaberFactions,FactionsBridge,GriefDefender,GriefPrevention,Lands,RedProtect,Residence,CrashClaim,HuskClaims,KingdomsX,TownyAdvanced,WorldGuard}Checker`s; bundled inside the RTP jar and self-extracted into `<pluginDir>/addons/` on first run, per [ADR-069](../adr/ADR-069-claim-integrations-extracted-to-bundled-addon.md), superseding ADR-019). `SaberFactionsChecker`, `FactionsBridgeChecker`, `ResidenceChecker`, `CrashClaimChecker`, `HuskClaimsChecker`, and `KingdomsXChecker` resolve their plugin APIs reflectively, so they carry no compile-only dependency. Also `addons/RTP_ExampleAddon`; `addons/RTP_Glide`. |
+| **Producers (today)** | `addons/LeafRTPClaimAddon` (`ClaimIntegrations` + the `{SaberFactions,FactionsBridge,GriefDefender,GriefPrevention,Lands,RedProtect,Residence,CrashClaim,HuskClaims,HuskTowns,PlotSquared,KingdomsX,TownyAdvanced,WorldGuard,UltimateClaims,MinePlots}Checker`s; bundled inside the RTP jar and self-extracted into `<pluginDir>/addons/` on first run, per [ADR-069](../adr/ADR-069-claim-integrations-extracted-to-bundled-addon.md), superseding ADR-019). `SaberFactionsChecker`, `FactionsBridgeChecker`, `ResidenceChecker`, `CrashClaimChecker`, `HuskClaimsChecker`, `HuskTownsChecker`, `PlotSquaredChecker`, `KingdomsXChecker`, `UltimateClaimsChecker`, and `MinePlotsChecker` resolve their plugin APIs reflectively, so they carry no compile-only dependency. On Fabric and NeoForge, mod-side land protection is provided via `OpenPartiesAndClaimsChecker` (OPAC) and `FTBChunksChecker` (`ModClaimIntegrations` / `NeoForgeModClaimIntegrations`) per ADR-026. Also `addons/RTP_ExampleAddon`; `addons/RTP_Glide`. |
 | **REQ / S-rule** | REQ-RTP-S-003, REQ-API-F-003. |
 | **Backward compat** | Legacy static methods on `GlobalRegionVerifiers` continue to work and are bidirectional with the new registry. |
 
@@ -185,6 +185,32 @@ RTPAPI.hooks().platformCreator().bind(new PlatformCreator() {
 
 ---
 
+### 9. Claim boundary provider - `RTPHooks#claimBoundaries()`
+
+| | |
+|---|---|
+| **API symbol** | `io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry` |
+| **Provider type** | `io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider` |
+| **Data model** | `io.github.dailystruggle.rtp.api.claim.ClaimBoundary` |
+| **Behavior modified** | Resolves a player's territory boundary, centroid, and bounding chunk coordinates for claim/faction-anchored destinations (`AnchorSource.claimBoundary(...)`, `anchor: faction` / `anchor: claimboundary`). |
+| **When invoked** | `ActionManager` when resolving action placement anchors; `SubspaceAnchorResolver` when resolving `ClaimBoundaryAnchorSource`. |
+| **Threading** | Queries are invoked during action and anchor resolution; implementations shall be non-blocking and thread-safe (REQ-API-ARCH-001). |
+| **Failure mode** | A throwing provider is logged at WARNING and treated as an empty boundary (fail-safe, REQ-RTP-S-004); exceptions do not crash teleports or other providers. |
+| **Producers (today)** | `addons/LeafRTPClaimAddon` (`TownyBoundaryProvider`, `GriefPreventionBoundaryProvider`, `FactionsBoundaryProvider`). |
+| **REQ / S-rule** | REQ-RTP-S-004, REQ-API-F-003, REQ-API-ARCH-001. |
+
+```java
+RTPAPI.hooks().claimBoundaries().register(new ClaimBoundaryProvider() {
+  @Override public String namespace() { return "myclaims"; }
+  @Override public int priority() { return 10; }
+  @Override public Optional<ClaimBoundary> getBoundary(UUID playerId, String worldName) {
+    return Optional.ofNullable(findBoundary(playerId, worldName));
+  }
+});
+```
+
+---
+
 ## Hooks not (yet) routed through `RTPHooks`
 
 The following sites also accommodate third-party plugins but are **not** routed through `RTPHooks` for the reasons listed. They are documented here for completeness.
@@ -200,6 +226,7 @@ The following sites also accommodate third-party plugins but are **not** routed 
 | **Fabric permissions** (`fabric-permissions-api`) | `me.lucko.fabric.api.permissions.v0.Permissions.check(player, node, 2)` invoked from `FabricRTPPlayer#hasPermission` (and transitively `FabricServerAccessor#announce`, `RTPCmdFabricRoot` suggestion gating). | Per-platform soft-depend (modCompileOnly `me.lucko:fabric-permissions-api`); analogous to Vault on Bukkit. Not a behavior-modification seam — implementations (LuckPerms-Fabric, Cyan, Ledger, …) provide the same permission contract addons already use through `RTPCommandSender#hasPermission`. | `platforms/rtp-fabric/rtp-fabric-common/build.gradle`, `FabricRTPPlayer.java` |
 | **NeoForge permissions** (LuckPerms) | `net.luckperms.api.LuckPermsProvider#get()` reached **reflectively** from `LuckPermsNeoForgeEnumerator` (`grantedNodes(uuid)` / `checkPermission(uuid, node)`), consulted by `NeoForgeRTPPlayer#hasPermission` / `#getEffectivePermissions` and the `NeoForgeEffectivePermissionsResolver`. | Per-platform soft-depend reached purely by reflection (no compile-time dependency on `net.luckperms:api`); analogous to the Fabric permissions row. Not a behavior-modification seam — LuckPerms provides the same permission contract addons already use through `RTPCommandSender#hasPermission`. | `platforms/rtp-neoforge/rtp-neoforge-common/.../player/LuckPermsNeoForgeEnumerator.java`, `NeoForgeRTPPlayer.java` |
 | **Map binding** (cartography chart delivery) | `io.github.dailystruggle.mapsapi.MapBinding` + `MapBindingLifecycle`, slot owned by `MapDispatch.setMapBinding(...)` in `rtp-core`. Concrete impls: `BukkitMapBinding` (Paper/Spigot), `FoliaMapBinding` (extends Bukkit, adds `dispatchToViewerRegion` hook for Stage 3 live charts), `NoopMapBinding` (Lite assembly / unbound). | Not routed through `RTPHooks` because `MapDispatch` already centralises the slot via `AtomicReference<MapBinding>` and ADR-047 owns the orchestration contract; adding a parallel `RTPHooks#mapBinding()` accessor would split the source of truth. Third-party plugins may still override by calling `MapDispatch.setMapBinding(...)` after `RTPBukkitPlugin#onEnable` -- the dispatcher auto-registers any `MapBindingLifecycle` peer and fans `PlayerQuitEvent` / plugin disable through `firePlayerQuit` / `fireDisable`. | [ADR-046](../adr/ADR-046-maps-api-module.md), [ADR-047](../adr/ADR-047-declarative-chart-composition-bridge.md), `CHECKLIST-maps-api.md` Stage 2.1 / 2.3 / 2.6 |
+| **Holograms & floating displays** | `HologramProvider` + `HologramRegistry` in `effects-api` (`io.github.dailystruggle.effectsapi.common.hologram`). Reflective adapters: `DecentHologramsChecker`, `HolographicDisplaysChecker`, and `BukkitTextDisplayHologramProvider` in `rtp-plugin`. | Lives in `effects-api` SPI layer. Probed on startup in `HologramIntegrations.setup()`: hooks DecentHolograms or HolographicDisplays when enabled, falling back to Paper/Folia native vanilla `TextDisplay` entities (1.19.4+) or `VirtualHologramHandle` when headless/unsupported. | `effects-api/.../hologram/HologramRegistry.java`, `rtp-plugin/.../softdepends/hologram/` |
 
 ---
 
@@ -232,6 +259,7 @@ These `Class.forName` / `getMethod` sites exist for **platform compatibility det
 | PvP combat state (PvPManager / CombatLogX / Simple Combat Log) | Each adapter is gated on `Bukkit.getPluginManager().isPluginEnabled(...)`; `PvPIntegrations.setup` binds nothing when none is enabled, so `PvPGate` falls back to `NativePvPCombatTracker`. A reflective failure (API/version drift) disables that adapter for the session (logged once) and the player is treated as not-in-combat. |
 | Fabric permissions (`fabric-permissions-api`) | No implementer registered → `Permissions.check(player, node, 2)` returns the vanilla op-level verdict (op level ≥ 2 grants). On `LinkageError` (perms-api jar genuinely absent at runtime) `FabricRTPPlayer#hasPermission` falls back to `PlayerList#isOp(GameProfile)`, preserving the previous op-only behaviour. |
 | NeoForge permissions (LuckPerms) | LuckPerms absent (reflective probe returns a `null` verdict) → `NeoForgeRTPPlayer#hasPermission` falls back to the `plugin.yml` default table (`NeoForgeDefaultPermissions`) and then the on-disk `ops.json` op-level scan, preserving baseline `rtp.see` / `rtp.use` grants and op-only behaviour. |
+| Holograms & floating displays (DecentHolograms / HolographicDisplays) | Plugin not installed or API missing → `HologramIntegrations.setup()` falls back to native vanilla `TextDisplay` entities on Paper/Folia 1.19.4+, or `VirtualHologramHandle` (no-op in-memory handle, zero entity/packet overhead, zero crashes). |
 
 In every case, RTP shall not silently swallow a failure (REQ-RTP-S-004); fall-back paths log a single line at INFO/WARNING and continue.
 

@@ -1,0 +1,100 @@
+# --- actions/teams.yml ---
+# 2v2 Team Duel Arena (ADR-093).
+# Matchmaking queue for 4 players placed into 2 opposing squads of 2.
+# Teammates spawn together, opposing teams spawn separated across the arena.
+
+alias: "teams"
+permission: "rtp.action.teams"
+description: "2v2 team duel match with cluster placement."
+
+command:
+  name: "teams"
+  permission: "rtp.command.teams"
+  description: "Queue for a 2v2 team duel"
+  aliases:
+    - "teamduel"
+    - "2v2"
+  subcommands:
+    leave:
+      description: "Forfeit the team match"
+      permission: "rtp.command.teams.leave"
+      aliases:
+        - "surrender"
+        - "forfeit"
+      run:
+        - CONSOLE: "kill [player_name]"
+
+placement:
+  region: "default"
+  anchor: "regionQueue"
+  shape:
+    name: "SQUARE"
+    radius: 4c                  # 4-chunk radius (64 blocks each direction)
+    centerRadius: 0
+  minSeparation: 32             # 32 blocks minimum between opposing squads
+  elevationTolerance: 128
+
+confinement:
+  boundary: "LEASH"
+  leashRadius: 56.0             # 56 block radius (112 block world border)
+  duration: "4m"                # 4-minute match
+  initialSize: 112
+  shrinkTo: 32
+  shrinkOver: "3m"
+  damage: 2.0
+  damageBuffer: 0.0
+  cancellable: false
+
+gate:
+  - players: ">= 4"
+
+lifecycle:
+  onEnqueue:
+    - FOR_EACH:
+        - MESSAGE: "<gold>Entered 2v2 team duel matchmaking queue.</gold> <yellow>Waiting for players (need 4)...</yellow>"
+        - MESSAGE: "<gray>Run <click:run_command:'/rtp action cancel'><hover:show_text:'<gray>Click to cancel queue</gray>'><u>/rtp action cancel</u></hover></click> if you wish to leave the queue.</gray>"
+
+  onStart:
+    - FOR_EACH:
+        - CONSOLE: "gamemode adventure [player]"
+        - CONSOLE: "give [player] iron_sword 1"
+        - CONSOLE: "give [player] bow 1"
+        - CONSOLE: "give [player] arrow 32"
+        - PLAYER: "title [player] title {\"text\":\"2v2 TEAM DUEL!\",\"color\":\"gold\"}"
+        - PLAYER: "title [player] subtitle {\"text\":\"Work with your teammate to eliminate the opposing team!\",\"color\":\"yellow\"}"
+        - MESSAGE: "<green><bold>Match started! Fight alongside your teammate!</bold></green>"
+
+  onBoundaryViolation:
+    - gate:
+        scoreboard:
+          objective: "rtp_violations"
+          matches: "< 2"
+      run:
+        - ACTION: PULL_BACK
+        - FOR_EACH:
+            - PLAYER: "title [violator] subtitle {\"text\":\"Stay inside the world border!\",\"color\":\"red\"}"
+    - gate:
+        scoreboard:
+          objective: "rtp_violations"
+          matches: ">= 2"
+      run:
+        - CONSOLE: "broadcast &c[violator] was eliminated for leaving the arena!"
+        - ACTION: PULL_BACK
+        - ACTION: DISARM
+
+  onExpire:
+    - FOR_EACH:
+        - CONSOLE: "gamemode survival [player]"
+        - MESSAGE: "<yellow><bold>Match timed out! 2v2 team duel ended in a draw.</bold></yellow>"
+    - ACTION: DISARM
+
+  onDeath:
+    - CONSOLE: "broadcast &6[victim] &cwas eliminated from the 2v2 duel!"
+    - FOR_EACH:
+        - CONSOLE: "gamemode survival [player]"
+
+  onCancel:
+    - FOR_EACH:
+        - MESSAGE: "<gray>You have left the 2v2 team duel queue.</gray>"
+
+version: "1.0"

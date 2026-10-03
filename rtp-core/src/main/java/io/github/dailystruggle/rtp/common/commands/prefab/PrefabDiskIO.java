@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigBackups;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
@@ -9,10 +11,14 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.logging.Level;
 
 /**
  * On-disk helpers for the prefab pipeline. Pure static methods testable
@@ -29,6 +35,56 @@ public final class PrefabDiskIO {
     public static final String BAK_INFIX = ConfigBackups.BAK_INFIX;
 
     private PrefabDiskIO() {
+    }
+
+    /**
+     * Safely resolve the plugin directory. If absent, logs a warning and informs caller.
+     *
+     * @param callerId recipient UUID (optional / nullable)
+     * @param actionName name of the action being attempted (e.g. "apply", "confirm", "rollback")
+     * @param prefabId id of the target prefab (or empty/null)
+     * @param userFacingFailure optional custom message sent to caller when directory is missing
+     * @return Optional containing the plugin directory, or empty if unavailable.
+     */
+    public static Optional<File> resolvePluginDirectory(UUID callerId,
+                                                        String actionName,
+                                                        String prefabId,
+                                                        String userFacingFailure) {
+        File dir = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPluginDirectory() : null;
+        if (dir == null) {
+            String pId = (prefabId == null) ? "" : prefabId;
+            RTP.log(Level.WARNING,
+                    "[prefab] " + actionName + " rejected NO_PLUGIN_DIR: caller=" + callerId
+                            + (pId.isEmpty() ? "" : " prefab=" + pId));
+            if (userFacingFailure != null && !userFacingFailure.isEmpty()) {
+                send(callerId, userFacingFailure);
+            }
+            return Optional.empty();
+        }
+        return Optional.of(dir);
+    }
+
+    /**
+     * Convenience overload to safely resolve the plugin directory with standard operator notification.
+     *
+     * @param callerId recipient UUID
+     * @return Optional containing the plugin directory, or empty if unavailable.
+     */
+    public static Optional<File> resolvePluginDirectory(UUID callerId) {
+        return resolvePluginDirectory(callerId, "operation", null, "&cPlugin directory unavailable.");
+    }
+
+    /**
+     * Send a message to a caller if server accessor is present.
+     * Tolerant of test scaffolds without a real sender.
+     */
+    public static void send(UUID callerId, String msg) {
+        if (callerId == null || RTP.serverAccessor == null) return;
+        try {
+            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
+        } catch (RuntimeException ignored) {
+            // Tolerant of test scaffolds without a real sender.
+        }
     }
 
     /**
@@ -71,16 +127,44 @@ public final class PrefabDiskIO {
         Objects.requireNonNull(prefab, "prefab");
         Map<String, Map<String, Object>> snapshot = new LinkedHashMap<>();
         if (!prefab.performanceOverlay().isEmpty()) {
-            snapshot.put("performance", readLive(pluginDirectory, "performance"));
+            snapshot.put("advanced/performance", readLive(pluginDirectory, "advanced/performance"));
         }
         if (!prefab.safetyOverlay().isEmpty()) {
             snapshot.put("safety", readLive(pluginDirectory, "safety"));
         }
         for (String regionId : prefab.regionOverlays().keySet()) {
-            String fileId = "regions/" + regionId;
+            String fileId = "definitions/regions/" + regionId;
             snapshot.put(fileId, readLive(pluginDirectory, fileId));
         }
         return snapshot;
+    }
+
+    /**
+     * Snapshot the live baseline configuration for a prefab, handling expandPerWorld template
+     * seeding and fallback safely.
+     *
+     * @param pluginDir the plugin directory (nullable)
+     * @param prefab target prefab
+     * @return map of fileId -> live YAML tree
+     */
+    public static Map<String, Map<String, Object>> snapshotLiveBaseline(File pluginDir, Prefab prefab) {
+        Map<String, Map<String, Object>> baseline;
+        try {
+            baseline = (pluginDir == null)
+                    ? new LinkedHashMap<>()
+                    : snapshotLive(pluginDir, prefab);
+            if (prefab.expandPerWorld() && pluginDir != null
+                    && !baseline.containsKey("definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID)) {
+                baseline.put("definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID,
+                        readLive(pluginDir, "definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID));
+            }
+        } catch (RuntimeException re) {
+            RTP.log(Level.WARNING,
+                    "[prefab] apply: live snapshot failed for " + prefab.id()
+                            + " - falling back to empty baseline: " + re.getMessage());
+            baseline = new LinkedHashMap<>();
+        }
+        return baseline;
     }
 
     /**
@@ -225,9 +309,62 @@ public final class PrefabDiskIO {
         return out;
     }
 
-    // Defensive: keep imports tidy / used.
-    @SuppressWarnings("unused")
-    private static String describeLocale() {
-        return Locale.ROOT.toString();
+    /**
+     * Reads the {@code prefab.bakRetention} knob from {@code advanced/performance.yml} directly.
+     * Falls back to {@link #DEFAULT_BAK_RETENTION} on missing/invalid value.
+     */
+    @SuppressWarnings("unchecked")
+    public static int resolveBakRetention() {
+        try {
+            if (RTP.serverAccessor == null) return DEFAULT_BAK_RETENTION;
+            File pluginDir = RTP.serverAccessor.getPluginDirectory();
+            if (pluginDir == null) return DEFAULT_BAK_RETENTION;
+            Map<String, Object> perf = readLive(pluginDir, "advanced/performance");
+            if (perf.isEmpty()) {
+                perf = readLive(pluginDir, "performance");
+            }
+            Object prefabNode = perf.get("prefab");
+            if (!(prefabNode instanceof Map<?, ?>)) return DEFAULT_BAK_RETENTION;
+            Object raw = ((Map<String, Object>) prefabNode).get("bakRetention");
+            if (raw == null) return DEFAULT_BAK_RETENTION;
+            if (raw instanceof Number n) return Math.max(1, n.intValue());
+            try {
+                return Math.max(1, Integer.parseInt(raw.toString().trim()));
+            } catch (NumberFormatException nfe) {
+                return DEFAULT_BAK_RETENTION;
+            }
+        } catch (RuntimeException re) {
+            return DEFAULT_BAK_RETENTION;
+        }
+    }
+
+    /**
+     * Enumerate all file IDs that a prefab touches across its performance, safety, and region overlays.
+     * Includes fallback legacy paths (e.g. without definitions/ prefix) for rollback restoration checks.
+     */
+    public static Set<String> enumeratePrefabFileIds(Prefab prefab) {
+        Set<String> fileIds = new LinkedHashSet<>();
+        if (!prefab.performanceOverlay().isEmpty()) {
+            fileIds.add("advanced/performance");
+            fileIds.add("performance");
+        }
+        if (!prefab.safetyOverlay().isEmpty()) {
+            fileIds.add("safety");
+        }
+        for (String regionId : prefab.regionOverlays().keySet()) {
+            fileIds.add("definitions/regions/" + regionId);
+            fileIds.add("regions/" + regionId);
+        }
+        return fileIds;
+    }
+
+    /**
+     * Format a summary line for created backup files.
+     */
+    public static String formatBackupSummary(List<String> backupFileNames) {
+        if (backupFileNames == null || backupFileNames.isEmpty()) {
+            return "";
+        }
+        return "&7Backups: &f" + String.join(", ", backupFileNames);
     }
 }

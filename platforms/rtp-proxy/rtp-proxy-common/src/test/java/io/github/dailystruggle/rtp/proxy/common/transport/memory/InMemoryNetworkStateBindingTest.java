@@ -142,4 +142,27 @@ class InMemoryNetworkStateBindingTest {
         assertTrue(ex.getCause() instanceof IllegalStateException,
                 "underlying cause must be IllegalStateException");
     }
+
+    @Test
+    @DisplayName("setLastTeleportTime and getLastTeleportTime round trip")
+    void lastTeleportTimeRoundTrip() throws Exception {
+        UUID player = UUID.randomUUID();
+        assertEquals(0L, binding.getLastTeleportTime(player).get());
+
+        binding.setLastTeleportTime(player, 987654321L).get();
+        assertEquals(987654321L, binding.getLastTeleportTime(player).get());
+
+        // overwrite
+        binding.setLastTeleportTime(player, 12345L).get();
+        assertEquals(12345L, binding.getLastTeleportTime(player).get());
+    }
+
+    @Test
+    @DisplayName("Dump methods and activeSubscriptions reflect state")
+    void dumpAndInspectionAffordances() {
+        assertNotNull(binding.dumpBackends());
+        assertNotNull(binding.dumpProxies());
+        assertNotNull(binding.dumpTokens());
+        assertNotNull(binding.activeSubscriptions());
+    }
 }

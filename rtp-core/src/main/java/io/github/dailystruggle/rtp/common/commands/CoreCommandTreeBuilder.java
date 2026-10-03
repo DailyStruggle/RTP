@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.commands;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.admin.ClearCmd;
+import io.github.dailystruggle.rtp.common.commands.back.BackCmd;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
 import io.github.dailystruggle.rtp.common.commands.gui.GuiCmd;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
@@ -55,6 +56,7 @@ public final class CoreCommandTreeBuilder {
    * @param root the {@code /rtp} root command
    */
   public static void attachCommonSubcommands(BaseRTPCmd root) {
+    root.addSubCommand(new BackCmd(root));
     root.addSubCommand(new ReloadCmd(root));
     root.addSubCommand(new GuiCmd(root));
     root.addSubCommand(new ConfigCmd(root));

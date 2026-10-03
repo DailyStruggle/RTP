@@ -7,6 +7,7 @@
 # ###############################################################################
 # podczas teleportacji wyswietl to
 juzTeleportowany: "&7[P0] ⚡ już jesteś teleportowany!"
+juzWSesji: "&c[P0] [player] już bierze udział w aktywnej sesji."
 
 # gdy wtyczka jest aktualnie przeładowywana
 teleportOdmowaPrzeladowanie: "&7[P0] teleportacje są tymczasowo wyłączone, gdy plugin się przeładowuje. Spróbuj ponownie za chwilę."
@@ -52,6 +53,10 @@ millis: "ms"
 # świat nie istnieje w bukkit
 # zmienna: [world] - nazwa świata
 nieprawidlowySwiat: "&7[P0] nie udało się znaleźć świata '[world]'"
+
+brakPoprzedniejLokalizacji: "&c[P0] Nie znaleziono poprzedniej lokalizacji teleportacji."
+
+powrotSukces: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Powrócono do poprzedniej lokalizacji.</gradient>"
 
 # wtyczka nie zawiera polecenia, o które prosił użytkownik
 # zmienna: [arg] - próbowany argument

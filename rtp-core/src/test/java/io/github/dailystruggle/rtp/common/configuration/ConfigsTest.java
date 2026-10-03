@@ -272,4 +272,5 @@ public class ConfigsTest {
                 "MultiConfigParser child parsers must reuse the shared map; found stray in-folder maps: "
                         + java.util.Arrays.toString(strays));
     }
+
 }

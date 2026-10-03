@@ -19,8 +19,8 @@ public class LockFreeLocationBuffer {
     private final AtomicLong head = new AtomicLong(0);
     private final AtomicLong tail = new AtomicLong(0);
 
-    private Consumer<RTPLocation> onAdd = null;
-    private Consumer<RTPLocation> onRemove = null;
+    private volatile Consumer<RTPLocation> onAdd = null;
+    private volatile Consumer<RTPLocation> onRemove = null;
 
     /**
      * Constructs a new buffer with a capacity that is the next power of two
@@ -146,19 +146,34 @@ public class LockFreeLocationBuffer {
     private RTPLocation poll0(boolean fireCallback) {
         long currentHead;
         RTPLocation location;
+        int slot;
         do {
             currentHead = head.get();
             if (currentHead >= tail.get()) {
                 return null; // Buffer is empty
             }
-            location = buffer.get((int) (currentHead & mask));
+            slot = (int) (currentHead & mask);
+            location = buffer.get(slot);
             // offer() advances tail BEFORE publishing the slot, so a concurrent
             // consumer can observe a non-empty tail with a still-null slot. Spin
             // rather than CAS head forward over the gap - advancing over a null
             // slot would silently drop the producer's in-flight entry.
-        } while (location == null || !head.compareAndSet(currentHead, currentHead + 1));
+            if (location == null) {
+                continue;
+            }
+            // Atomically clear slot BEFORE advancing head. This prevents a fast producer
+            // from wrapping around, placing a new element in `slot`, and then having this
+            // consumer overwrite that new element with null.
+            if (buffer.compareAndSet(slot, location, null)) {
+                if (head.compareAndSet(currentHead, currentHead + 1)) {
+                    break;
+                } else {
+                    // Head CAS failed (multiple consumers). Restore slot and retry.
+                    buffer.compareAndSet(slot, null, location);
+                }
+            }
+        } while (true);
 
-        buffer.set((int) (currentHead & mask), null);
         if (fireCallback && onRemove != null) onRemove.accept(location);
         return location;
     }

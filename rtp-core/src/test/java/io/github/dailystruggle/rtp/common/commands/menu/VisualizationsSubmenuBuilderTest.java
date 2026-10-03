@@ -75,6 +75,8 @@ final class VisualizationsSubmenuBuilderTest {
                 "biomes row must run /rtp visualization biomes");
         assertNotNull(findRunWithArgs(model, "visualization", "sparkline"),
                 "sparkline row must run /rtp visualization sparkline");
+        assertNotNull(findRunWithArgs(model, "visualization", "heatmap"),
+                "heatmap row must run /rtp visualization heatmap");
 
         // Back row is the last clickable fragment and opens the admin panel.
         MenuAction last = lastClickable(model);

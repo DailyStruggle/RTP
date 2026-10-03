@@ -319,6 +319,28 @@ Operator-facing self-test commands that exercise the teleport pipeline, queue, s
 
 ---
 
+## `/rtp action` — Declarative Scripted Actions
+
+Executes a declarative scripted action defined in `definitions/actions/<id>.yml` (`ADR-093`, `ADR-095`). Actions support multi-entity group placements, custom anchor types (`nearplayer`, `nearclaim`, `location`, `scatter`), arena confinement boundaries, scoreboards, and lifecycle automation.
+
+**Syntax**
+```
+/rtp action <actionId> [player=<target>] [parameters...]
+/rtp action cancel [session_id]
+```
+
+**Required permissions:** `rtp.action` plus the action's specific permission (e.g. `rtp.action.nearplayer`).
+
+| Form | Description |
+|---|---|
+| `/rtp action <actionId>` | Execute the named action for the calling player. |
+| `/rtp action <actionId> player=<target>` | Target or pair with another player (when supported by the action). |
+| `/rtp action cancel` | Cancel the caller's active confined action session, running its `onCancel` script. |
+
+Actions with a configured `command:` block are also automatically registered as top-level standalone commands (e.g. `/challenge`, `/duel`, `/nearplayer`). See the dedicated [Action Engine guide](ACTIONS.md) for full configuration details.
+
+---
+
 ## `/rtp help` — Help
 
 Displays a clickable, permission-filtered list of all available `/rtp` sub-commands. Only sub-commands for which the sender holds the required permission **and** which have a matching `MessagesKeys` entry are shown.
@@ -423,6 +445,8 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `rtp.scan` | op | Use all `/rtp scan` sub-commands |
 | `rtp.test` | op | Use all `/rtp test` runtime-test sub-commands |
 | `rtp.params` | op | Override `shape`, `vert`, and `worldBorderOverride` parameters |
+| `rtp.action` | op | Base permission to execute `/rtp action` commands |
+| `rtp.action.<id>` | op | Permission to execute a specific action (e.g. `rtp.action.nearplayer`, `rtp.action.challenge`) |
 | `rtp.unqueued` | op | Teleport without consuming a pre-generated cached location |
 | `rtp.personalqueue` | op | Use a personal (per-player) location queue |
 | `rtp.world` | op | Use the `world` parameter |

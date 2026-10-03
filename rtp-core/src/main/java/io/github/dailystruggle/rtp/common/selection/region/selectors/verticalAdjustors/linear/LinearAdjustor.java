@@ -128,7 +128,11 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
     int minY = getNumber(GenericVerticalAdjustorKeys.minY, 0L).intValue();
     int dir = getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue();
 
-    maxY = Math.min(maxY, chunk.getWorld().getMaxHeight());
+    int worldMin = chunk.getWorld().getMinHeight();
+    int worldMax = chunk.getWorld().getMaxHeight();
+    maxY = Math.min(maxY, worldMax - 1);
+    minY = Math.max(minY, worldMin + 1);
+    if (minY > maxY) return false;
 
     boolean requireSkyLight;
     Object o = getData().getOrDefault(GenericVerticalAdjustorKeys.requireSkyLight, false);
@@ -151,14 +155,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
         case 0:
           { // bottom up
             for (int i = minY; i < maxY; i++) {
-              int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
-              if (!chunk.isAir(x, i - 1, z)
-                  && chunk.isAir(x, i, z)
-                  && chunk.isAir(x, i + 1, z)
-                  && skylight > 7
-                  && chunk.isSafe(x, i, z, unsafeBlocks)
-                  && chunk.isSafe(x, i + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)) {
+              if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(i);
@@ -170,14 +167,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
         case 1:
           { // top down
             for (int i = maxY; i > minY; i--) {
-              int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
-              if (!chunk.isAir(x, i - 1, z)
-                  && chunk.isAir(x, i, z)
-                  && chunk.isAir(x, i + 1, z)
-                  && skylight > 7
-                  && chunk.isSafe(x, i, z, unsafeBlocks)
-                  && chunk.isSafe(x, i + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)) {
+              if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(i);
@@ -194,14 +184,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
             for (int i = 0; i <= maxDistance; i++) {
               // try top
               int y = middle + i;
-              int skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
-              if (!chunk.isAir(x, y - 1, z)
-                  && chunk.isAir(x, y, z)
-                  && chunk.isAir(x, y + 1, z)
-                  && skylight > 7
-                  && chunk.isSafe(x, y, z, unsafeBlocks)
-                  && chunk.isSafe(x, y + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, y, z, unsafeBlocks, platformDepth)) {
+              if (acceptColumnY(chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -210,14 +193,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
 
               // try bottom
               y = middle - i;
-              skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
-              if (!chunk.isAir(x, y - 1, z)
-                  && chunk.isAir(x, y, z)
-                  && chunk.isAir(x, y + 1, z)
-                  && skylight > 7
-                  && chunk.isSafe(x, y, z, unsafeBlocks)
-                  && chunk.isSafe(x, y + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, y, z, unsafeBlocks, platformDepth)) {
+              if (acceptColumnY(chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -234,14 +210,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
             for (int i = maxDistance; i >= 0; i--) {
               // try top
               int y = middle + i;
-              int skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
-              if (!chunk.isAir(x, y - 1, z)
-                  && chunk.isAir(x, y, z)
-                  && chunk.isAir(x, y + 1, z)
-                  && skylight > 7
-                  && chunk.isSafe(x, y, z, unsafeBlocks)
-                  && chunk.isSafe(x, y + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, y, z, unsafeBlocks, platformDepth)) {
+              if (acceptColumnY(chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -250,14 +219,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
 
               // try bottom
               y = middle - i;
-              skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
-              if (!chunk.isAir(x, y - 1, z)
-                  && chunk.isAir(x, y, z)
-                  && chunk.isAir(x, y + 1, z)
-                  && skylight > 7
-                  && chunk.isSafe(x, y, z, unsafeBlocks)
-                  && chunk.isSafe(x, y + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, y, z, unsafeBlocks, platformDepth)) {
+              if (acceptColumnY(chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -270,7 +232,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
           { // random order
             // load up a list of possible vertical indices
             List<Integer> trials = new ArrayList<>(maxY - minY + 1);
-            for (int i = minY; i < maxY; i++) {
+            for (int i = minY; i <= maxY; i++) {
               trials.add(i);
             }
 
@@ -280,14 +242,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
             // try each
             for (int k = 0; k < trials.size(); k++) {
               int i = trials.get(k);
-              int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
-              if (!chunk.isAir(x, i - 1, z)
-                  && chunk.isAir(x, i, z)
-                  && chunk.isAir(x, i + 1, z)
-                  && skylight > 7
-                  && chunk.isSafe(x, i, z, unsafeBlocks)
-                  && chunk.isSafe(x, i + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)) {
+              if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(i);
@@ -316,6 +271,10 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
       int columnSkyFloor,
       Set<String> unsafeBlocks,
       int platformDepth) {
+    if (chunk == null) return false;
+    int worldMin = chunk.getWorld().getMinHeight();
+    int worldMax = chunk.getWorld().getMaxHeight();
+    if (y - 1 < worldMin || y + 1 >= worldMax) return false;
     int skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
     return !chunk.isAir(x, y - 1, z)
         && chunk.isAir(x, y, z)
@@ -341,7 +300,11 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
     int minY = getNumber(GenericVerticalAdjustorKeys.minY, 0L).intValue();
     int dir = getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue();
 
-    maxY = Math.min(maxY, chunk.getWorld().getMaxHeight());
+    int worldMin = chunk.getWorld().getMinHeight();
+    int worldMax = chunk.getWorld().getMaxHeight();
+    maxY = Math.min(maxY, worldMax - 1);
+    minY = Math.max(minY, worldMin + 1);
+    if (minY > maxY) return null;
 
     boolean requireSkyLight;
     Object o = getData().getOrDefault(GenericVerticalAdjustorKeys.requireSkyLight, false);
@@ -418,7 +381,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
       }
       default: { // random order
         List<Integer> trials = new ArrayList<>(Math.max(0, maxY - minY + 1));
-        for (int i = minY; i < maxY; i++) trials.add(i);
+        for (int i = minY; i <= maxY; i++) trials.add(i);
         Collections.shuffle(trials, rng);
         for (int i : trials) {
           if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;

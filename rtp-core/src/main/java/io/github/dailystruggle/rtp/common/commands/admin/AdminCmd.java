@@ -70,7 +70,7 @@ public class AdminCmd extends BaseRTPCmdImpl {
                              Map<String, List<String>> parameterValues,
                              @Nullable CommandsAPICommand nextCommand) {
         if (nextCommand != null) {
-            return nextCommand.onCommand(callerId, parameterValues, null);
+            return true;
         }
         if (openAdminPanel == null) {
             RTP.log(Level.WARNING,

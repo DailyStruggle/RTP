@@ -42,7 +42,7 @@ public class MetricsRecorder {
          *  {@code BukkitScheduler.runTask} which defers to the next tick
          *  boundary (0-50 ms, avg ~25 ms); attributing that wait to the
          *  target plugin would inflate every measurement by up to one tick.
-         *  Set by {@link Runner#dispatchOne}. {@code -1} until the runnable
+         *  Set by {@code Runner#dispatchOne}. {@code -1} until the runnable
          *  fires; {@link #latencyMs()} falls back to {@link #dispatchEpochMs}
          *  in that window so an attempt that completes before the hop runs
          *  (impossible in practice, but defensive) still gets a finite
@@ -156,6 +156,7 @@ public class MetricsRecorder {
         private long tickIntervalCount = 0L;
         private long tickIntervalTotalNs = 0L;
         private long tickIntervalMaxNs = 0L;
+        private final Object intervalLock = new Object();
 
         /**
          * Records one observed span of plugin work on a tick thread. Callers
@@ -170,7 +171,7 @@ public class MetricsRecorder {
         public void recordTickInterval(long startNs, long endNs) {
             long width = endNs - startNs;
             if (width <= 0L) return;
-            synchronized (this) {
+            synchronized (intervalLock) {
                 tickIntervalCount++;
                 tickIntervalTotalNs += width;
                 if (width > tickIntervalMaxNs) tickIntervalMaxNs = width;
@@ -178,19 +179,19 @@ public class MetricsRecorder {
         }
 
         public long tickIntervalCount() {
-            synchronized (this) {
+            synchronized (intervalLock) {
                 return tickIntervalCount;
             }
         }
 
         public long tickIntervalTotalNs() {
-            synchronized (this) {
+            synchronized (intervalLock) {
                 return tickIntervalTotalNs;
             }
         }
 
         public long tickIntervalMaxNs() {
-            synchronized (this) {
+            synchronized (intervalLock) {
                 return tickIntervalMaxNs;
             }
         }

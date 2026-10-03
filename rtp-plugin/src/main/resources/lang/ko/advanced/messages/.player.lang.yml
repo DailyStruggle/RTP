@@ -2,6 +2,7 @@
 # Maps internal baseline keys (left) to user-visible key names (right)
 # used in player.yml. Co-located dotfile sibling (ADR-076).
 alreadyTeleporting: "이미텔레포트중"
+alreadyInSession: "이미세션진행중"
 teleportDeniedReloading: "텔레포트거부_리로드중"
 delayMessage: "지연메시지"
 chunkLoading: "청크로딩중"
@@ -15,6 +16,8 @@ noLocationsQueued: "가능한위치없음"
 queueUpdate: "큐업데이트"
 notEnoughMoney: "잔액부족"
 invalidWorld: "잘못된월드"
+noBackLocation: "이전위치없음"
+backSuccess: "이전위치복귀"
 badArg: "잘못된인수"
 invalidCommand: "invalidCommand"
 noPerms: "권한없음"

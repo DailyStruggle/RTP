@@ -44,6 +44,7 @@ pitest = "1.19.6"
 pitestJunit5 = "1.2.2"
 # jqwik property-based testing (ENTERPRISE_READINESS.md item 23)
 jqwik = "1.9.2"
+jazzer = "0.30.0"
 
 # Build plugins.
 shadow = "8.3.8"
@@ -62,6 +63,7 @@ checker-qual = { module = "org.checkerframework:checker-qual", version.ref = "ch
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }
 jqwik = { module = "net.jqwik:jqwik", version.ref = "jqwik" }
+jazzer-junit = { module = "com.code-intelligence:jazzer-junit", version.ref = "jazzer" }
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

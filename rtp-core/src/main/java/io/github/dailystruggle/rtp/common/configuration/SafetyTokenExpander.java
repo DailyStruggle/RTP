@@ -1,11 +1,14 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import io.github.dailystruggle.rtp.api.safety.SafetyToken;
+import io.github.dailystruggle.rtp.api.safety.SafetyTokenParser;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -116,6 +119,61 @@ public final class SafetyTokenExpander {
             if (item == null) continue;
             String token = item.toString().trim();
             if (token.isEmpty()) continue;
+
+            // Parse token through SafetyTokenParser to handle set subtractions
+            SafetyTokenParser.ParseResult parseResult = SafetyTokenParser.parse(token);
+            if (!parseResult.accepted().isEmpty()) {
+                SafetyToken st = parseResult.accepted().get(0);
+                if (st.hasSubtractions()) {
+                    // Gather subtracted canonical materials
+                    Set<String> subtractedMats = new HashSet<>();
+                    for (SafetyToken sub : st.subtractions()) {
+                        if (sub.kind() == SafetyToken.Kind.MATERIAL) {
+                            subtractedMats.add(canonicalise(sub.identifier()));
+                        } else if (sub.kind() == SafetyToken.Kind.TAG) {
+                            Set<String> subMembers = tagSnapshot.get(sub.identifier());
+                            if (subMembers != null) {
+                                for (String sm : subMembers) {
+                                    subtractedMats.add(canonicalise(sm));
+                                }
+                            }
+                        }
+                    }
+
+                    if (st.kind() == SafetyToken.Kind.TAG) {
+                        Set<String> members = tagSnapshot.get(st.identifier());
+                        if (members != null && !members.isEmpty()) {
+                            tagsExpanded++;
+                            for (String m : members) {
+                                if (m == null) continue;
+                                String canonical = canonicalise(m);
+                                if (!subtractedMats.contains(canonical)) {
+                                    if (st.isPredicated()) {
+                                        // If base tag is predicated, write back predicated token for the material
+                                        String predToken = canonical + token.substring(token.indexOf('['), token.indexOf(']') + 1);
+                                        if (seen.add(predToken)) reapply.add(predToken);
+                                    } else {
+                                        if (seen.add(canonical)) reapply.add(canonical);
+                                    }
+                                }
+                            }
+                        } else {
+                            tagsUnresolved++;
+                            if (seen.add(token)) reapply.add(token);
+                        }
+                    } else if (st.kind() == SafetyToken.Kind.MATERIAL) {
+                        String canonical = canonicalise(st.identifier());
+                        if (!subtractedMats.contains(canonical)) {
+                            if (st.isPredicated()) {
+                                if (seen.add(token)) reapply.add(token);
+                            } else {
+                                if (seen.add(canonical)) reapply.add(canonical);
+                            }
+                        }
+                    }
+                    continue;
+                }
+            }
 
             // State-predicated tokens (MATERIAL[prop=val] or *[prop=val]):
             // preserve verbatim for the compiled-form path.

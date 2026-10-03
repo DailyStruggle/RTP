@@ -1,11 +1,10 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.params.SetParams;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -15,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -22,14 +22,14 @@ import static org.mockito.Mockito.when;
 
 class RedisLeaderLeaseUnitTest {
 
-    private JedisPool pool;
-    private Jedis jedis;
+    private RespPool pool;
+    private RespConnection jedis;
     private RedisLeaderLease lease;
 
     @BeforeEach
     void setUp() {
-        pool = mock(JedisPool.class);
-        jedis = mock(Jedis.class);
+        pool = mock(RespPool.class);
+        jedis = mock(RespConnection.class);
         when(pool.getResource()).thenReturn(jedis);
         lease = new RedisLeaderLease(pool, "test:key", "holder-123");
     }
@@ -43,7 +43,7 @@ class RedisLeaderLeaseUnitTest {
 
     @Test
     void tryAcquire_acquiredFreshLease_returnsTrue() throws Exception {
-        when(jedis.set(eq("test:key"), eq("holder-123"), any(SetParams.class))).thenReturn("OK");
+        when(jedis.set(eq("test:key"), eq("holder-123"), eq("NX"), eq("PX"), anyLong())).thenReturn("OK");
 
         boolean acquired = lease.tryAcquire(Duration.ofSeconds(5)).get();
         assertTrue(acquired);
@@ -51,9 +51,9 @@ class RedisLeaderLeaseUnitTest {
 
     @Test
     void tryAcquire_reextendSameHolder_returnsTrue() throws Exception {
-        when(jedis.set(eq("test:key"), eq("holder-123"), any(SetParams.class))).thenReturn(null);
+        when(jedis.set(eq("test:key"), eq("holder-123"), eq("NX"), eq("PX"), anyLong())).thenReturn(null);
         when(jedis.get("test:key")).thenReturn("holder-123");
-        when(jedis.set(eq("test:key"), eq("holder-123"), any(SetParams.class))).thenReturn("OK");
+        when(jedis.set(eq("test:key"), eq("holder-123"), eq("XX"), eq("PX"), anyLong())).thenReturn("OK");
 
         boolean acquired = lease.tryAcquire(Duration.ofSeconds(5)).get();
         assertTrue(acquired);
@@ -61,7 +61,7 @@ class RedisLeaderLeaseUnitTest {
 
     @Test
     void tryAcquire_differentHolder_returnsFalse() throws Exception {
-        when(jedis.set(eq("test:key"), eq("holder-123"), any(SetParams.class))).thenReturn(null);
+        when(jedis.set(eq("test:key"), eq("holder-123"), eq("NX"), eq("PX"), anyLong())).thenReturn(null);
         when(jedis.get("test:key")).thenReturn("other-holder");
 
         boolean acquired = lease.tryAcquire(Duration.ofSeconds(5)).get();

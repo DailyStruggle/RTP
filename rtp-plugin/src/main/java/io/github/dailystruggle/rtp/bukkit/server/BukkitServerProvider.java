@@ -84,7 +84,12 @@ public class BukkitServerProvider {
      * layers": the plugin instance carries no detection state.
      */
     public static ServerModel resolveServerModel(JavaPlugin plugin) {
-        String version = Bukkit.getBukkitVersion();
+        return resolveServerModel(Bukkit.getBukkitVersion());
+    }
+
+    private static final java.util.regex.Pattern MC26_PATTERN = java.util.regex.Pattern.compile("\\b26\\.[0-9]+");
+
+    public static ServerModel resolveServerModel(String version) {
         String accessorClassName;
         String schedulerClassName;
         // Resolve the server type once, here at the entrypoint, from the same probes
@@ -93,7 +98,7 @@ public class BukkitServerProvider {
         // value when constructing their ServerModel.
         String platform = isPaper() ? "Paper" : "Spigot";
 
-        if (version.contains("26.1")) {
+        if (version.contains("26.") || MC26_PATTERN.matcher(version).find()) {
             if (isFolia()) {
                 return foliaModel(
                         "io.github.dailystruggle.rtp.folia_v26_1_R1.server.ServerAccessorImpl",

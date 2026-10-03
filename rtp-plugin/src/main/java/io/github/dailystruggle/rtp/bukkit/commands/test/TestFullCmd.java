@@ -110,6 +110,8 @@ public class TestFullCmd extends BaseRTPCmdImpl {
               "config-set",
               "full",
               "all",
+              // Visual diagnostic: spawns holograms in player world context.
+              "hologram",
               // Player-context diagnostic: needs the caller's live world + origin
               // chunk to seed the A/B timing; the umbrella sweep fires under
               // RTPAPI.serverId which has no location. Runs on-demand only.

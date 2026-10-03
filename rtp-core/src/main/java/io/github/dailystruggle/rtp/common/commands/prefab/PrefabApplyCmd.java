@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -9,6 +8,7 @@ import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -79,31 +79,10 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         }
         Prefab prefab = opt.get();
         // Snapshot the live trees so the diff describes the true delta from the on-disk state.
-        Map<String, Map<String, Object>> baseline;
-        try {
-            java.io.File pluginDir = (RTP.serverAccessor == null) ? null
-                    : RTP.serverAccessor.getPluginDirectory();
-            baseline = (pluginDir == null)
-                    ? new LinkedHashMap<>()
-                    : PrefabDiskIO.snapshotLive(pluginDir, prefab);
-            // expandPerWorld prefabs (MultiWorld) carry no baked region
-            // overlays so snapshotLive() returns nothing for regions/*. The
-            // MultiWorldExpander requires regions/default in currentTrees to
-            // use as the per-world template, so seed it here.
-            if (prefab.expandPerWorld() && pluginDir != null
-                    && !baseline.containsKey("regions/" + MultiWorldExpander.DEFAULT_REGION_ID)) {
-                baseline.put("regions/" + MultiWorldExpander.DEFAULT_REGION_ID,
-                        PrefabDiskIO.readLive(pluginDir,
-                                "regions/" + MultiWorldExpander.DEFAULT_REGION_ID));
-            }
-        } catch (RuntimeException re) {
-            RTP.log(Level.WARNING,
-                    "[prefab] apply: live snapshot failed for " + prefab.id()
-                            + " - falling back to empty baseline: " + re.getMessage());
-            baseline = new LinkedHashMap<>();
-        }
+        File pluginDir = (RTP.serverAccessor == null) ? null : RTP.serverAccessor.getPluginDirectory();
+        Map<String, Map<String, Object>> baseline = PrefabDiskIO.snapshotLiveBaseline(pluginDir, prefab);
         // Collect live world names so MultiWorldExpander can synthesise a
-        // regions/<world>.yml per loaded world. Ignored when the prefab has
+        // definitions/regions/<world>.yml per loaded world. Ignored when the prefab has
         // expandPerWorld=false (2-arg semantics via the 3-arg overload).
         List<String> worldNames = new ArrayList<>();
         if (RTP.serverAccessor != null) {
@@ -121,16 +100,16 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
             }
         }
         // expandPerWorld prefabs also repoint each synthesised world's
-        // worlds/<world>.yml "region" field at its new per-world region. Every
+        // definitions/worlds/<world>.yml "region" field at its new per-world region. Every
         // loaded world has an in-memory WorldKeys parser by definition (a
-        // worlds/<world>.yml file may not exist on disk when the world runs on
+        // definitions/worlds/<world>.yml file may not exist on disk when the world runs on
         // defaults), so seed the baseline from RTP.configs rather than reading
         // the file. That makes the diff describe the true delta from the live
         // region binding (e.g. "default" -> "<world>") instead of an absent
         // value when the physical file is missing.
         if (prefab.expandPerWorld() && RTP.configs != null) {
             for (String world : worldNames) {
-                String fileId = "worlds/" + world;
+                String fileId = "definitions/worlds/" + world;
                 Map<String, Object> worldTree = new LinkedHashMap<>();
                 try {
                     ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser(world);
@@ -195,12 +174,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
     }
 
     private static void send(UUID callerId, String msg) {
-        if (callerId == null || RTP.serverAccessor == null) return;
-        try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
-        } catch (RuntimeException ignored) {
-            // Tolerant of test scaffolds without a real sender.
-        }
+        PrefabDiskIO.send(callerId, msg);
     }
 
     /**
@@ -210,16 +184,24 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
     @SuppressWarnings("unchecked")
     private static MultiWorldExpander.RegionOverlayAmender buildDimensionVertAmender(Prefab prefab) {
         if (!prefab.expandPerWorld()) return null;
-        if (RTP.serverAccessor == null || RTP.configs == null) return null;
+        if (RTP.serverAccessor == null || RTP.configs == null) {
+            return MultiWorldExpander.defaultDimensionVertAmender();
+        }
         MultiConfigParser<RegionKeys> regions =
                 (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
-        if (regions == null) return null;
+        if (regions == null) {
+            return MultiWorldExpander.defaultDimensionVertAmender();
+        }
         // getParser(...) assumes a "default" entry exists (it falls back to it
         // for unknown names) and NPEs when the regions tree is empty, so guard
         // on the registered set first.
-        if (!regions.listParsers().contains(MultiWorldExpander.DEFAULT_REGION_ID)) return null;
+        if (!regions.listParsers().contains(MultiWorldExpander.DEFAULT_REGION_ID)) {
+            return MultiWorldExpander.defaultDimensionVertAmender();
+        }
         ConfigParser<RegionKeys> defParser = regions.getParser(MultiWorldExpander.DEFAULT_REGION_ID);
-        if (defParser == null) return null;
+        if (defParser == null) {
+            return MultiWorldExpander.defaultDimensionVertAmender();
+        }
         return (world, overlay) -> {
             try {
                 io.github.dailystruggle.rtp.api.world.RTPWorld<?> rtpWorld =

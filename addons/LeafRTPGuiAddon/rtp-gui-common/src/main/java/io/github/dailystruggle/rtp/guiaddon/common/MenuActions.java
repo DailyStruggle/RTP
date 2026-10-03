@@ -23,6 +23,25 @@ public final class MenuActions {
   private MenuActions() {}
 
   /**
+   * Checks whether {@code target} is an in-menu navigation or pagination action
+   * that transitions between GUI screens rather than executing a command or teleport.
+   *
+   * @param target destination/action target
+   * @return {@code true} if clicking this target navigates between menu pages
+   */
+  public static boolean isMenuNavigation(RtpTarget target) {
+    if (target == null || target.kind() != RtpTarget.Kind.ACTION) {
+      return false;
+    }
+    String name = target.name();
+    if (name == null || name.isBlank()) {
+      return false;
+    }
+    String lower = name.toLowerCase(java.util.Locale.ROOT);
+    return lower.startsWith("menu:") || "action:operator:reload".equals(lower);
+  }
+
+  /**
    * Submits a teleport to {@code target} for {@code playerId} and reports the outcome
    * using the configured messages.
    *
@@ -34,6 +53,75 @@ public final class MenuActions {
       return;
     }
     GuiMenuConfig config = GuiMenuConfig.INSTANCE;
+
+    // Handle UI navigation actions (sub-menus, pagination)
+    if (target.kind() == RtpTarget.Kind.ACTION) {
+      String action = target.name();
+      if (action == null) return;
+      MenuRenderer renderer = GuiRenderers.resolve(config.menuStyle());
+      if (renderer == null || !renderer.isAvailable()) return;
+
+      if ("menu:main".equalsIgnoreCase(action)) {
+        renderer.open(playerId, MenuModel.build(playerId, config));
+        return;
+      }
+      if ("menu:operator".equalsIgnoreCase(action)) {
+        String perm = config.permissionOperatorTools();
+        if (hasPerm(playerId, perm)) {
+          renderer.open(playerId, MenuModel.buildOperatorMenu(playerId, config));
+        } else {
+          message(playerId, config.textUnavailable());
+        }
+        return;
+      }
+      if (action.toLowerCase(java.util.Locale.ROOT).startsWith("action:operator:")) {
+        handleOperatorAction(playerId, action, config, renderer);
+        return;
+      }
+      if (action.toLowerCase(java.util.Locale.ROOT).startsWith("menu:biomes:")) {
+        int page = 0;
+        try {
+          page = Integer.parseInt(action.substring("menu:biomes:".length()));
+        } catch (NumberFormatException ignored) {
+        }
+        renderer.open(playerId, MenuModel.buildBiomeMenu(playerId, config, page));
+        return;
+      }
+      if (action.toLowerCase(java.util.Locale.ROOT).startsWith("menu:actions:")) {
+        int page = 0;
+        try {
+          page = Integer.parseInt(action.substring("menu:actions:".length()));
+        } catch (NumberFormatException ignored) {
+        }
+        renderer.open(playerId, MenuModel.buildActionsMenu(playerId, config, page));
+        return;
+      }
+      if (action.toLowerCase(java.util.Locale.ROOT).startsWith("action:trigger:")) {
+        String actionId = action.substring("action:trigger:".length()).trim();
+        if (RTPAPI.hasActions()) {
+          var actionService = RTPAPI.actions();
+          if (actionService != null) {
+            message(playerId, config.textSearching());
+            actionService.trigger(
+                actionId,
+                java.util.List.of(playerId),
+                io.github.dailystruggle.rtp.api.action.ActionContext.EMPTY)
+                .whenComplete((sessionResult, error) -> {
+                  if (error != null) {
+                    message(playerId, config.textFailurePrefix() + error.getMessage());
+                  } else if (sessionResult != null && !sessionResult.success()) {
+                    message(playerId, config.textFailurePrefix() + sessionResult.failureReason());
+                  } else {
+                    message(playerId, config.textSuccess());
+                  }
+                });
+          }
+        }
+        return;
+      }
+      return;
+    }
+
     message(playerId, config.textSearching());
 
     RTPAPI.teleport(playerId, target)
@@ -67,6 +155,80 @@ public final class MenuActions {
     RTP.scheduler.runTask(() -> {
       if (RTP.serverAccessor.getPlayer(playerId) != null) {
         RTP.serverAccessor.sendMessage(playerId, text);
+      }
+    });
+  }
+
+  private static void handleOperatorAction(
+      UUID playerId, String action, GuiMenuConfig config, MenuRenderer renderer) {
+    String lower = action.toLowerCase(java.util.Locale.ROOT);
+    switch (lower) {
+      case "action:operator:setup" -> {
+        if (!hasPerm(playerId, "rtp.admin.setup")) {
+          message(playerId, config.textUnavailable());
+          return;
+        }
+        dispatchCommand(playerId, "rtp admin setup");
+      }
+      case "action:operator:import" -> {
+        if (!hasPerm(playerId, "rtp.config")) {
+          message(playerId, config.textUnavailable());
+          return;
+        }
+        dispatchCommand(playerId, "rtp config import");
+      }
+      case "action:operator:config" -> {
+        if (!hasPerm(playerId, "rtp.config")) {
+          message(playerId, config.textUnavailable());
+          return;
+        }
+        dispatchCommand(playerId, "rtp menu config");
+      }
+      case "action:operator:visualizations" -> {
+        if (!hasPerm(playerId, "rtp.see")) {
+          message(playerId, config.textUnavailable());
+          return;
+        }
+        dispatchCommand(playerId, "rtp visualization");
+      }
+      case "action:operator:status" -> {
+        if (!hasPerm(playerId, "rtp.info")) {
+          message(playerId, config.textUnavailable());
+          return;
+        }
+        dispatchCommand(playerId, "rtp menu info");
+      }
+      case "action:operator:adminbook" -> {
+        if (!hasPerm(playerId, "rtp.menu.admin")) {
+          message(playerId, config.textUnavailable());
+          return;
+        }
+        dispatchCommand(playerId, "rtp menu admin");
+      }
+      case "action:operator:reload" -> {
+        if (!hasPerm(playerId, "rtp.reload")) {
+          message(playerId, config.textUnavailable());
+          return;
+        }
+        dispatchCommand(playerId, "rtp reload");
+        renderer.open(playerId, MenuModel.buildOperatorMenu(playerId, config));
+      }
+      default -> message(playerId, config.textUnavailable());
+    }
+  }
+
+  private static boolean hasPerm(UUID playerId, String perm) {
+    return (perm != null && !perm.isBlank() && RTPAPI.checkPermission(playerId, perm))
+        || RTPAPI.checkPermission(playerId, "rtp.admin");
+  }
+
+  private static void dispatchCommand(UUID playerId, String commandLine) {
+    if (RTP.serverAccessor == null || RTP.serverAccessor.getPlayer(playerId) == null) {
+      return;
+    }
+    RTP.scheduler.runTask(() -> {
+      if (RTP.serverAccessor != null && RTP.serverAccessor.getPlayer(playerId) != null) {
+        RTP.serverAccessor.executeCommand(playerId, commandLine);
       }
     });
   }

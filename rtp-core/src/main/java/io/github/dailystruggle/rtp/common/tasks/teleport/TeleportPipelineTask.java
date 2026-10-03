@@ -25,8 +25,10 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -126,6 +128,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private ChunkReservation reservation;
   private ChunkSet chunkSet;
 
+  public final Map<String, String> placeholderMap = new ConcurrentHashMap<>();
+  private double distance = 0.0;
+  private double distanceFromCenter = 0.0;
+  private RTPLocation destination = null;
+
   /**
    * ADR-058 - region-specific schematic paste. When a {@code schematics/<region>.schem} file
    * is present, {@link #runLoad} (off the region thread) kicks off the decode into this future
@@ -186,6 +193,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     this.currentPhase = Phase.LOAD;
     this.immediateTeleport = true;
     initTracking();
+    computeDistance();
   }
 
   public TeleportPipelineTask(GenerationContext context, Region region, RTPCoords preSelectedCoords, ChunkReservation reservation) {
@@ -199,6 +207,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     // covered separately by the queue-growth audit (section 2b).
     this.immediateTeleport = false;
     initTracking();
+    computeDistance();
   }
 
   /** Spark-profiler frame tag (diagram 01 / 08). See {@link RTPRunnable#sparkFrameName()}. */
@@ -207,6 +216,141 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   public Phase getPhase() {
     return this.currentPhase;
+  }
+
+  public double getDistance() {
+    return distance;
+  }
+
+  public double getDistanceFromCenter() {
+    return distanceFromCenter;
+  }
+
+  public RTPLocation getDestination() {
+    return destination;
+  }
+
+  public Map<String, String> getPlaceholderMap() {
+    return placeholderMap;
+  }
+
+  public void computeDistance() {
+    if (coords == null) return;
+    RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
+    if (world == null && region != null) world = region.getWorld();
+    this.destination = new RTPLocation(world, coords.x(), coords.y(), coords.z(), reservation);
+
+    RTPLocation origin = null;
+    if (teleportData != null && teleportData.originalCoords != null) {
+      RTPWorld<?> origWorld = RTP.serverAccessor.getRTPWorld(teleportData.originalCoords.worldName());
+      origin = new RTPLocation(origWorld, teleportData.originalCoords.x(), teleportData.originalCoords.y(), teleportData.originalCoords.z());
+    } else if (context != null && context.player() != null) {
+      origin = context.player().getLocation();
+    }
+
+    if (origin != null && this.destination != null) {
+      this.distance = Math.hypot((double) this.destination.x() - origin.x(), (double) this.destination.z() - origin.z());
+    } else {
+      this.distance = 0.0;
+    }
+
+    // Distance from region center (for fixed region references)
+    double[] center = getRegionCenter(region);
+    this.distanceFromCenter = Math.hypot((double) this.destination.x() - center[0], (double) this.destination.z() - center[1]);
+
+    RTPPlayer player = (context != null) ? context.player() : null;
+    UUID playerId = (player != null) ? player.uuid() : null;
+    TeleportData targetData = teleportData;
+    if (targetData == null && playerId != null && RTP.getInstance() != null) {
+      targetData = RTP.getInstance().latestTeleportData.get(playerId);
+    }
+
+    if (targetData != null) {
+      targetData.distance = this.distance;
+      targetData.distanceFromCenter = this.distanceFromCenter;
+    }
+
+    updatePlaceholderMap();
+  }
+
+  public static double[] getRegionCenter(Region region) {
+    if (region == null) return new double[] {0.0, 0.0};
+    Object shapeObj = region.getShape();
+    if (shapeObj == null) return new double[] {0.0, 0.0};
+    if (shapeObj instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape subspaceShape) {
+      io.github.dailystruggle.rtp.common.selection.region.RTPLocation anchor = subspaceShape.getAnchor();
+      if (anchor != null) {
+        return new double[] {anchor.coords().x(), anchor.coords().z()};
+      }
+    }
+    if (shapeObj instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape) {
+      double cx = Double.NaN;
+      double cz = Double.NaN;
+      for (Map.Entry<? extends Enum<?>, Object> entry : shape.getData().entrySet()) {
+        String name = entry.getKey().name();
+        if ((name.equalsIgnoreCase("centerX") || name.equalsIgnoreCase("center_x") || name.equalsIgnoreCase("cx"))
+            && entry.getValue() instanceof Number n) {
+          cx = n.doubleValue();
+        } else if ((name.equalsIgnoreCase("centerZ") || name.equalsIgnoreCase("center_z") || name.equalsIgnoreCase("cz"))
+            && entry.getValue() instanceof Number n) {
+          cz = n.doubleValue();
+        }
+      }
+      if (!Double.isNaN(cx) && !Double.isNaN(cz)) {
+        if (shape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?>) {
+          return new double[] {cx * 16.0, cz * 16.0};
+        }
+        return new double[] {cx, cz};
+      }
+    }
+    return new double[] {0.0, 0.0};
+  }
+
+  private void updatePlaceholderMap() {
+    String formattedDistance = String.format(java.util.Locale.US, "%.1f", this.distance);
+    String formattedDistanceBlocks = String.valueOf(Math.round(this.distance));
+    String formattedDistanceCenter = String.format(java.util.Locale.US, "%.1f", this.distanceFromCenter);
+    String formattedDistanceCenterBlocks = String.valueOf(Math.round(this.distanceFromCenter));
+
+    placeholderMap.put("<distance>", formattedDistance);
+    placeholderMap.put("<distance_blocks>", formattedDistanceBlocks);
+    placeholderMap.put("<distance_center>", formattedDistanceCenter);
+    placeholderMap.put("<distance_center_blocks>", formattedDistanceCenterBlocks);
+    placeholderMap.put("distance", formattedDistance);
+    placeholderMap.put("distance_blocks", formattedDistanceBlocks);
+    placeholderMap.put("distance_center", formattedDistanceCenter);
+    placeholderMap.put("distance_center_blocks", formattedDistanceCenterBlocks);
+    placeholderMap.put("[distance]", formattedDistance);
+    placeholderMap.put("[distance_blocks]", formattedDistanceBlocks);
+    placeholderMap.put("%distance%", formattedDistance);
+    placeholderMap.put("%distance_blocks%", formattedDistanceBlocks);
+  }
+
+  private static final String[] ORDERED_TOKENS = new String[] {
+      "<distance_center_blocks>",
+      "[distance_center_blocks]",
+      "%distance_center_blocks%",
+      "<distance_blocks>",
+      "[distance_blocks]",
+      "%distance_blocks%",
+      "<distance_center>",
+      "[distance_center]",
+      "%distance_center%",
+      "<distance>",
+      "[distance]",
+      "%distance%"
+  };
+
+  public String formatWithPlaceholders(String text, UUID playerId) {
+    if (text == null || text.isEmpty()) return text;
+    // Replace delimited tokens first (longer tokens first to avoid partial collision)
+    for (String token : ORDERED_TOKENS) {
+      String val = placeholderMap.get(token);
+      if (val != null) {
+        text = text.replace(token, val);
+      }
+    }
+    return io.github.dailystruggle.rtp.common.tools.PlaceholderProvider.fillPlaceholders(text, playerId);
   }
 
   public void setPhase(Phase phase) {
@@ -286,6 +430,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
         teleportData.time = System.currentTimeMillis();
         teleportData.delay = teleportData.sender.delay();
         teleportData.targetRegion = region;
+        teleportData.originWorldName = player.getLocation().world().name();
+        teleportData.originServerId =
+                (io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE != null)
+                        ? io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE.serverId()
+                        : null;
         teleportData.originalCoords =
                 new RTPCoords(
                         player.getLocation().world().name(),
@@ -368,6 +517,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
         teleportData.selectedCoords = coords;
         teleportData.attempts = attempts;
+        computeDistance();
         success = true;
       } catch (Exception e) {
         SupportLogger.logException(Level.WARNING, "Error in runSetup", e);
@@ -450,6 +600,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
           teleportData.time = System.currentTimeMillis();
           teleportData.delay = teleportData.sender.delay();
           teleportData.targetRegion = region;
+          teleportData.originWorldName = player.getLocation().world().name();
+          teleportData.originServerId =
+                  (io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE != null)
+                          ? io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE.serverId()
+                          : null;
           teleportData.originalCoords =
                   new RTPCoords(
                           player.getLocation().world().name(),
@@ -461,6 +616,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
         teleportData.nextTask = this;
         teleportData.targetRegion = region;
         teleportData.selectedCoords = coords;
+        computeDistance();
       }
 
       if (coords == null && teleportData.selectedCoords != null) {
@@ -665,6 +821,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
     try {
       RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
       if (world == null) world = region.getWorld();
+      if (teleportData != null && teleportData.targetRegion == null && region != null) {
+        teleportData.targetRegion = region;
+      }
       RTPLocation location = new RTPLocation(world, coords.x(), coords.y(), coords.z());
       location.setReservation(reservation);
       boolean buildPlatform = shouldBuildPlatform(world, coords);
@@ -759,11 +918,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
         RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport deathEffect active playerId=" + playerId
             + "; putting teleport on hold until respawn");
         RTP.pendingDeathTeleports.put(playerId, this);
-        teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
-        RTP.getInstance().processingPlayers.remove(playerId);
-        if (RTP.getInstance().databaseAccessor != null) {
-          RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+        if (teleportData != null) {
+          teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
+          if (teleportData.sender != null && RTP.getInstance().databaseAccessor != null) {
+            RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+          }
         }
+        RTP.getInstance().processingPlayers.remove(playerId);
         return;
       }
 
@@ -771,6 +932,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       teleportData.completed = true;
       teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
+      RTP.updateSharedLastTeleportTime(playerId, teleportData.time);
       RTP.getInstance().processingPlayers.remove(playerId);
 
       // ADR-072: clamp the player's view distance immediately before the teleport so the engine's
@@ -800,7 +962,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
                 SupportLogger.logException(Level.SEVERE, "Error in setLocation callback", throwable);
               }
               if (aBoolean != null && aBoolean) {
-                RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
+                computeDistance();
+                String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
+                RTP.serverAccessor.sendMessage(playerId, message);
 
                 // BetterRTP SetAsRespawn parity: anchor the player's respawn to the
                 // landed location. Runs on the teleport completion thread (the owning
@@ -910,7 +1074,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
           teleportData.completed = true;
         }
         if (playerId != null) {
-          RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
+          computeDistance();
+          String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
+          RTP.serverAccessor.sendMessage(playerId, message);
 
           if (ConfigCache.lockAfterUses > 0) {
             RTP.getInstance().teleportLimitStore.recordSuccess(playerId,

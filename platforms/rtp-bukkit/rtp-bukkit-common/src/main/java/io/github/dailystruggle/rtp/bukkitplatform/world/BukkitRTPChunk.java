@@ -241,10 +241,15 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
 
   @Override
   public boolean isAir(int x, int y, int z) {
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
+    }
     Set<String> airSet = reconciledAirBlocks();
     if (anvilView != null) {
       return anvilView.isAir(x & 0xF, y, z & 0xF, airSet);
     }
+    if (chunk == null) return false;
     org.bukkit.Material type = chunk.getBlock(x & 0xF, y, z & 0xF).getType();
     if (type.isAir()) return true;
     if (airSet.isEmpty()) return false;
@@ -290,7 +295,12 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
       // teleport-commit time remains authoritative for any sky-light gating.
       return 15;
     }
-    return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return 0;
+      return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
+    }
+    return 15;
   }
 
   @Override
@@ -300,6 +310,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
     if (anvilView != null) {
       return anvilView.getSurfaceHeight(x, z);
     }
+    if (chunk == null) return 64;
     int globalX = (chunk.getX() << 4) + x;
     int globalZ = (chunk.getZ() << 4) + z;
     return chunk.getWorld().getHighestBlockYAt(globalX, globalZ, HeightMap.MOTION_BLOCKING_NO_LEAVES);
@@ -307,6 +318,10 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
 
   @Override
   public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
+    }
     Set<String> reconciledUnsafeSet = (RTP.serverAccessor != null)
         ? RTP.serverAccessor.reconcilePaletteIdentifiers(unsafeBlocks)
         : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks);
@@ -317,6 +332,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
       Set<String> set = (reconciledUnsafe != null) ? reconciledUnsafe : reconciledUnsafeSet;
       return anvilView.isSafe(x & 0xF, y, z & 0xF, set);
     }
+    if (chunk == null) return true;
     // Live chunk path: reconcile both the block's material name and the raw unsafe
     // set to ensure a canonical comparison, matching the Anvil path's logic.
     String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
@@ -347,6 +363,11 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
   @Override
   public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
     if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
+
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
+    }
 
     if (anvilView != null) {
       // Anvil-backed snapshots evaluate only the plain-material bucket of the

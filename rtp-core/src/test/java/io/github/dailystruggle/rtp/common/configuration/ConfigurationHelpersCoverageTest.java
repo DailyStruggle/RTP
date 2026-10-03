@@ -250,4 +250,52 @@ class ConfigurationHelpersCoverageTest {
         // Test with null parser
         SafetyTokenExpander.expandAndApply(null);
     }
+
+    @Test
+    @DisplayName("SafetyTokenExpander handles set subtractions on tags and materials")
+    void testSafetyTokenExpanderSetSubtraction() throws IOException {
+        YamlFileDatabase db = new YamlFileDatabase(pluginDir);
+        File safetyFile = new File(pluginDir, "safety.yml");
+        Files.writeString(safetyFile.toPath(),
+                "version: \"1.0\"\n" +
+                "airBlocks:\n" +
+                "  - \"#minecraft:leaves - BIRCH_LEAVES\"\n" +
+                "unsafeBlocks:\n" +
+                "  - \"#minecraft:slabs - OAK_SLAB - BIRCH_SLAB\"\n" +
+                "  - \"STONE - STONE\"\n");
+
+        ConfigParser<BlocksKeys> safetyParser = new ConfigParser<>(
+                BlocksKeys.class,
+                "safety",
+                "1.0",
+                pluginDir,
+                db
+        ) {
+            @Override
+            public InputStream getResourceFromJar(String filename) {
+                return new ByteArrayInputStream("version: \"1.0\"\n".getBytes());
+            }
+        };
+
+        Map<String, Set<String>> snapshot = new HashMap<>();
+        snapshot.put("minecraft:leaves", Set.of("minecraft:oak_leaves", "minecraft:birch_leaves"));
+        snapshot.put("minecraft:slabs", Set.of("minecraft:oak_slab", "minecraft:birch_slab", "minecraft:stone_slab"));
+        when(RTP.serverAccessor.blockTagSnapshot()).thenReturn(snapshot);
+
+        SafetyTokenExpander.expandAndApply(safetyParser);
+
+        Object airBlocksObj = safetyParser.getConfigValue(BlocksKeys.airBlocks, null);
+        assertTrue(airBlocksObj instanceof List);
+        List<?> airBlocks = (List<?>) airBlocksObj;
+        assertTrue(airBlocks.contains("OAK_LEAVES"));
+        assertFalse(airBlocks.contains("BIRCH_LEAVES"));
+
+        Object unsafeObj = safetyParser.getConfigValue(BlocksKeys.unsafeBlocks, null);
+        assertTrue(unsafeObj instanceof List);
+        List<?> unsafeBlocks = (List<?>) unsafeObj;
+        assertTrue(unsafeBlocks.contains("STONE_SLAB"));
+        assertFalse(unsafeBlocks.contains("OAK_SLAB"));
+        assertFalse(unsafeBlocks.contains("BIRCH_SLAB"));
+        assertFalse(unsafeBlocks.contains("STONE"));
+    }
 }

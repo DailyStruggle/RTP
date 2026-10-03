@@ -1,0 +1,34 @@
+# --- actions/nearclaim.yml ---
+# Free sample scripted action (ADR-093 + ADR-095): land near a claimed base perimeter.
+# This reproduces justRTP's `/rtp nearclaim` WITHOUT any foreign claim-plugin lookups.
+#
+# The anchor is a ClaimHazardAnchorSource: it recalls claim-boundary chunks that were
+# recorded in spatial memory as FailTypes.safetyExternal (ADR-079) and picks a perimeter
+# coordinate. Participants are then placed in a ring just outside that boundary.
+
+alias: "nearclaim"
+permission: "rtp.action.nearclaim"
+description: "Teleport near a claimed area's perimeter."
+icon: "GOLDEN_HOE"
+title: "&6&lNear Claim"
+
+placement:
+  region: "default"
+  # Anchor source: claimHazard -> recalled from spatial memory (no foreign API calls).
+  anchor: "claimHazard"
+  shape:
+    name: "CIRCLE"
+    radius: 3c                  # tighter ring hugging the perimeter (~48 blocks)
+    centerRadius: 1c            # perimeter clearance (~16 blocks)
+  minSeparation: 16
+  elevationTolerance: 256
+
+confinement:
+  boundary: "SUBSPACE"
+  duration: "0s"
+
+lifecycle:
+  onStart:
+    - CONSOLE: "tellraw [player_name] [\"\",{\"text\":\"Dropped just outside a claimed base.\",\"color\":\"green\"}]"
+
+version: "1.0"

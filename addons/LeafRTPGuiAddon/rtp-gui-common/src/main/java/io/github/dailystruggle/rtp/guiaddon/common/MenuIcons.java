@@ -32,6 +32,76 @@ public final class MenuIcons {
    */
   public static List<String> entryLore(MenuEntry entry) {
     List<String> lore = new ArrayList<>();
+    if (entry.target() != null && entry.target().kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.ACTION) {
+      String name = entry.target().name();
+      if (name != null) {
+        switch (name) {
+          case "action:operator:setup":
+            lore.add("&7Interactive 5-stage setup wizard");
+            lore.add("&7Configure worlds, gameplay & profiles");
+            lore.add("");
+            lore.add("&aClick to launch wizard");
+            return lore;
+          case "action:operator:import":
+            lore.add("&7Import configs from foreign plugins");
+            lore.add("&7Auto-detects BetterRTP and others");
+            lore.add("");
+            lore.add("&aClick to scan & import");
+            return lore;
+          case "action:operator:config":
+            lore.add("&7Edit regions, boundaries & costs");
+            lore.add("");
+            lore.add("&aClick to open editor");
+            return lore;
+          case "action:operator:visualizations":
+            lore.add("&7Map visualizations of search space");
+            lore.add("&7Heatmaps, biomes & bad-location voids");
+            lore.add("");
+            lore.add("&aClick to open visualizations");
+            return lore;
+          case "action:operator:status":
+            lore.add("&7Real-time queues, memory & metrics");
+            lore.add("");
+            lore.add("&aClick to view status");
+            return lore;
+          case "action:operator:adminbook":
+            lore.add("&7Master administrative book panel");
+            lore.add("&7Full command tree & scan crawlers");
+            lore.add("");
+            lore.add("&aClick to open panel");
+            return lore;
+          case "action:operator:reload":
+            lore.add("&7Reload configuration from disk");
+            lore.add("");
+            lore.add("&aClick to reload");
+            return lore;
+          case "menu:operator":
+            lore.add("&7Operator management tools & setup");
+            lore.add("");
+            lore.add("&aClick to open hub");
+            return lore;
+          case "menu:main":
+            lore.add("&7Return to destination menu");
+            lore.add("");
+            lore.add("&aClick to return");
+            return lore;
+          default:
+            if (name.startsWith("menu:biomes:")) {
+              lore.add("&7Browse available destination biomes");
+              lore.add("");
+              lore.add("&aClick to view biomes");
+              return lore;
+            }
+            if (name.startsWith("menu:actions:")) {
+              lore.add("&7Browse special teleport actions");
+              lore.add("");
+              lore.add("&aClick to view actions");
+              return lore;
+            }
+            break;
+        }
+      }
+    }
     RtpTargetStatus.Availability availability = entry.availability();
     lore.add("&7Status: " + statusColor(availability) + availability.name());
     if (availability == RtpTargetStatus.Availability.ON_COOLDOWN

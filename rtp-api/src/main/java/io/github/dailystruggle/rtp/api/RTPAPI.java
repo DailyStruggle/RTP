@@ -61,6 +61,9 @@ public class RTPAPI {
   /** Eager opt-in per-player dispatcher for {@link PlayerMoveEvent} notifications (ADR-075). */
   public static final PlayerMoveDispatcher playerMoveEvents = new PlayerMoveDispatcher();
 
+  /** Scripted actions service delegate populated by core during {@code onEnable} (ADR-093). */
+  public static volatile io.github.dailystruggle.rtp.api.action.ActionService actionService = null;
+
   /**
    * Sets the platform-specific server accessor (write-once).
    *
@@ -287,5 +290,51 @@ public class RTPAPI {
       return Collections.emptyList();
     }
     return snapshot.foliaRegions;
+  }
+
+  /**
+   * Checks whether {@code player} holds {@code permission}.
+   *
+   * @param player     player UUID
+   * @param permission permission string
+   * @return {@code true} if permitted, {@code false} otherwise
+   */
+  @PublicApi
+  public static boolean checkPermission(UUID player, String permission) {
+    if (player == null || permission == null || permission.isBlank()) return false;
+    RTPServerAccessor sa = serverAccessor;
+    if (sa == null) return false;
+    try {
+      var sender = sa.getSender(player);
+      return sender != null && sender.hasPermission(permission);
+    } catch (Throwable t) {
+      return false;
+    }
+  }
+
+  /**
+   * Returns whether the scripted actions engine is loaded and available.
+   *
+   * @return {@code true} if actions service is present
+   */
+  @PublicApi
+  public static boolean hasActions() {
+    return actionService != null;
+  }
+
+  /**
+   * Returns the platform-neutral scripted actions service (ADR-093).
+   *
+   * @return non-null action service
+   * @throws IllegalStateException if called before core is loaded (REQ-RTP-S-006)
+   */
+  @PublicApi
+  public static io.github.dailystruggle.rtp.api.action.ActionService actions() {
+    io.github.dailystruggle.rtp.api.action.ActionService s = actionService;
+    if (s == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot access actions: Core implementation is not loaded.");
+    }
+    return s;
   }
 }

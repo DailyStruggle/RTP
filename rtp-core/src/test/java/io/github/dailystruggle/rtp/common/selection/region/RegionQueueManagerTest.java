@@ -140,6 +140,31 @@ public class RegionQueueManagerTest {
     }
 
     // -----------------------------------------------------------------------
+    // poll - null uuid (group/anchor draw). ConcurrentHashMap rejects null keys,
+    // so poll(null) must not throw; it falls through to the shared kept queue.
+    // Regression: a swallowed NPE here silently stalled group placement.
+    // -----------------------------------------------------------------------
+
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    void poll_nullUuid_returnsNullWhenEmptyWithoutThrowing() {
+        assertNull(qm.poll(null), "poll(null) on an empty region must return null, not throw");
+    }
+
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    void poll_nullUuid_drawsFromKeptQueue() {
+        MockRTPWorld world = (MockRTPWorld) region.getWorld();
+        RTPLocation expected = loc(world, 7, 7);
+        qm.keptLocations.offer(expected);
+
+        CompletableFuture<RTPLocation> future = qm.poll(null);
+        assertNotNull(future, "poll(null) must draw the shared kept queue for group anchors");
+        assertEquals(expected, future.join());
+        assertTrue(qm.keptLocations.isEmpty());
+    }
+
+    // -----------------------------------------------------------------------
     // poll - perPlayerLocationQueue path
     // -----------------------------------------------------------------------
 
@@ -544,5 +569,83 @@ public class RegionQueueManagerTest {
         assertEquals(4L, qm.getTotalQueueLength(id));
         assertEquals(3L, qm.getPublicQueueLength());
         assertEquals(1L, qm.getPersonalQueueLength(id));
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void fastQueue_concurrency_raceConditionSafety() throws InterruptedException {
+        int threads = 8;
+        ExecutorService exec = Executors.newFixedThreadPool(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threads);
+        UUID playerId = UUID.randomUUID();
+
+        CompletableFuture<RTPLocation>[] futures = new CompletableFuture[threads];
+
+        for (int i = 0; i < threads; i++) {
+            final int index = i;
+            exec.submit(() -> {
+                try {
+                    startLatch.await();
+                    futures[index] = qm.fastQueue(playerId);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown();
+        assertTrue(doneLatch.await(3, TimeUnit.SECONDS));
+        exec.shutdown();
+
+        // Every thread must have received the exact same atomic future instance
+        assertNotNull(futures[0]);
+        for (int i = 1; i < threads; i++) {
+            assertSame(futures[0], futures[i], "Concurrent fastQueue calls must return identical CompletableFuture");
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void poll_fastLocations_concurrentRemoval() throws InterruptedException {
+        int threads = 4;
+        ExecutorService exec = Executors.newFixedThreadPool(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threads);
+        UUID playerId = UUID.randomUUID();
+
+        CompletableFuture<RTPLocation> expectedFuture = qm.fastQueue(playerId);
+
+        CompletableFuture<RTPLocation>[] polled = new CompletableFuture[threads];
+
+        for (int i = 0; i < threads; i++) {
+            final int index = i;
+            exec.submit(() -> {
+                try {
+                    startLatch.await();
+                    polled[index] = qm.poll(playerId);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown();
+        assertTrue(doneLatch.await(3, TimeUnit.SECONDS));
+        exec.shutdown();
+
+        // Exactly one thread should win the fast location future, others should get null (since kept is empty)
+        int wonCount = 0;
+        for (int i = 0; i < threads; i++) {
+            if (polled[i] != null) {
+                assertSame(expectedFuture, polled[i]);
+                wonCount++;
+            }
+        }
+        assertEquals(1, wonCount, "Exactly one thread should receive the fast location future without race/stall");
     }
 }

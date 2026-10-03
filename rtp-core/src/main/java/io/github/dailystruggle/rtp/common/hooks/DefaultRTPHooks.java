@@ -1,7 +1,10 @@
 package io.github.dailystruggle.rtp.common.hooks;
 
+import io.github.dailystruggle.rtp.api.claim.ClaimBoundary;
+import io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider;
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry;
+import io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry;
 import io.github.dailystruggle.rtp.api.hooks.EconomyProviderRegistry;
 import io.github.dailystruggle.rtp.api.hooks.PlaceholderProviderRegistry;
 import io.github.dailystruggle.rtp.api.hooks.PlatformCreatorRegistry;
@@ -14,12 +17,20 @@ import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 
 /**
  * Default implementation of {@link RTPHooks} facade for {@code rtp-core} (ADR-026).
@@ -152,4 +163,88 @@ public final class DefaultRTPHooks implements RTPHooks {
   @Override public PvPCombatStateRegistry pvpCombatState() { return pvpRegistry; }
   @Override public RootActionRegistry rootAction() { return rootActionRegistry; }
   @Override public PlatformCreatorRegistry platformCreator() { return platformCreatorRegistry; }
+
+  private final CopyOnWriteArrayList<ClaimBoundaryProvider> claimBoundaryProviders =
+      new CopyOnWriteArrayList<>();
+  private final ClaimBoundaryRegistry claimBoundaryRegistry = new ClaimBoundaryRegistry() {
+    @Override
+    public AutoCloseable register(ClaimBoundaryProvider provider) {
+      if (provider == null) {
+        throw new IllegalArgumentException("[RTP API] claim boundary provider must not be null");
+      }
+      claimBoundaryProviders.add(provider);
+      claimBoundaryProviders.sort(Comparator.comparingInt(ClaimBoundaryProvider::priority).reversed());
+      return () -> unregister(provider);
+    }
+
+    @Override
+    public boolean unregister(ClaimBoundaryProvider provider) {
+      if (provider == null) return false;
+      return claimBoundaryProviders.remove(provider);
+    }
+
+    @Override
+    public Optional<ClaimBoundary> resolve(UUID playerId, String worldName, String namespace) {
+      if (playerId == null || worldName == null) return Optional.empty();
+      boolean auto = (namespace == null || namespace.isBlank() || "auto".equalsIgnoreCase(namespace.trim()));
+      String targetNs = (namespace != null) ? namespace.trim().toLowerCase(Locale.ROOT) : "";
+
+      for (ClaimBoundaryProvider p : claimBoundaryProviders) {
+        if (!auto && !targetNs.equals(p.namespace().toLowerCase(Locale.ROOT))) {
+          continue;
+        }
+        try {
+          Optional<ClaimBoundary> boundary = p.getBoundary(playerId, worldName);
+          if (boundary.isPresent()) {
+            return boundary;
+          }
+        } catch (Throwable t) {
+          RTP.log(Level.WARNING, "[RTP API] ClaimBoundaryProvider " + p.namespace() + " threw while resolving boundary for player " + playerId, t);
+        }
+      }
+      return Optional.empty();
+    }
+
+    @Override
+    public Optional<ClaimBoundary> resolveAt(String worldName, int x, int z, String namespace) {
+      if (worldName == null) return Optional.empty();
+      boolean auto = (namespace == null || namespace.isBlank() || "auto".equalsIgnoreCase(namespace.trim()));
+      String targetNs = (namespace != null) ? namespace.trim().toLowerCase(Locale.ROOT) : "";
+
+      for (ClaimBoundaryProvider p : claimBoundaryProviders) {
+        if (!auto && !targetNs.equals(p.namespace().toLowerCase(Locale.ROOT))) {
+          continue;
+        }
+        try {
+          Optional<ClaimBoundary> boundary = p.getBoundaryAt(worldName, x, z);
+          if (boundary.isPresent()) {
+            return boundary;
+          }
+        } catch (Throwable t) {
+          RTP.log(Level.WARNING, "[RTP API] ClaimBoundaryProvider " + p.namespace() + " threw while resolving boundary at " + worldName + " (" + x + "," + z + ")", t);
+        }
+      }
+      return Optional.empty();
+    }
+
+    @Override
+    public List<ClaimBoundaryProvider> providers() {
+      return Collections.unmodifiableList(new ArrayList<>(claimBoundaryProviders));
+    }
+
+    @Override
+    public void clear() {
+      claimBoundaryProviders.clear();
+    }
+
+    @Override
+    public int size() {
+      return claimBoundaryProviders.size();
+    }
+  };
+
+  @Override
+  public ClaimBoundaryRegistry claimBoundaries() {
+    return claimBoundaryRegistry;
+  }
 }

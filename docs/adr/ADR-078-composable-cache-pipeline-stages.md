@@ -10,7 +10,7 @@
 Location pre-generation and caching in RTP has evolved from simple single-location buffers into multi-stage pipelines and specialized routing pools:
 1. **Core Single-Target Pipelines:** The pipeline operates across candidate generation, off-tick region file screening, cold coordinate storage, and async chunk reservation acquisition (`RegionQueueManager`).
 2. **Specialized Hot Pools:** Multiple specialized consumer sinks branch off the primary engine, including the Login Reserve (`loginLocations`, ADR-023), Personal Buckets (`perPlayerLocationQueue`, ADR-043), and Cross-Server Network Reservations (`networkKeptLocations`, ADR-036).
-3. **Multi-Target / Addon Placements:** Addons such as `LeafRTPGroupAddon` require dedicated caching for composite group subspaces spanning multiple columns and multi-chunk footprints.
+3. **Multi-Target / Addon Placements:** Addons such as `LeafRTPActionAddon` require dedicated caching for composite group subspaces spanning multiple columns and multi-chunk footprints.
 
 Current concrete state in `RegionQueueManager` (single-target engine):
 
@@ -81,7 +81,7 @@ Three architectural challenges have emerged:
 8. **Placement and Module Boundaries**:
    - `rtp-api`: unchanged. Deciding transfer eligibility by recheck requires no new public value types, so no `rtp-api` surface is added and addons keep passing plain `Predicate<T>`.
    - `rtp-core`: `CacheStage<T>`, `KeyedCacheStage<K, T>`, `StageTransition<From, To>`, `CachePipeline`, `HotSink`, `HotBudgetAllocator`. Generic and placement-agnostic - no group/addon domain types.
-   - Addons (`LeafRTPGroupAddon` and future modules): domain entry types, candidate suppliers, screening transitions, footprint-ticket promotion transitions. Addons shall not add fields to `RegionQueueManager`, `RegionSettings`, or `Region`.
+   - Addons (`LeafRTPActionAddon` and future modules): domain entry types, candidate suppliers, screening transitions, footprint-ticket promotion transitions. Addons shall not add fields to `RegionQueueManager`, `RegionSettings`, or `Region`.
 
 ## Detailed Design
 
@@ -150,7 +150,7 @@ public class KeyedCacheStage<K, T> implements AutoCloseable {
 }
 ```
 
-`KeyedCacheStage<UUID, RTPLocation>` replaces the bespoke `perPlayerLocationQueue` handling (ADR-043); `KeyedCacheStage<String, GroupSubspace>` replaces the profile-keyed maps in the group addon.
+`KeyedCacheStage<UUID, RTPLocation>` replaces the bespoke `perPlayerLocationQueue` handling (ADR-043); `KeyedCacheStage<String, SubspacePlacement>` replaces the profile-keyed maps in multi-entity action/subspace placements.
 
 A keyed stage registers as a **single** `HotSink` covering all of its partitions, so it has one sink identity for budgeting and eligibility purposes. Because its entries are leased to a specific key, that sink reports `isExternallyLeased() == true` and is therefore never a transfer source or destination; its partitions are balanced only through the `Cold` promotion gate.
 
@@ -291,7 +291,7 @@ Behavior-preserving, one phase per change set, each independently buildable and 
 
 - **Positive:**
   - Standardizes clear, domain-accurate terminology (`Backlog`, `Cold`, `Hot`) across core and addons.
-  - Enables addons (`LeafRTPGroupAddon`, future arena/team modules) to construct robust caching pipelines by supplying only domain candidate generators and validation logic.
+  - Enables addons (`LeafRTPActionAddon`, future arena/team modules) to construct robust caching pipelines by supplying only domain candidate generators and validation logic.
   - Guarantees S-002 (chunk ticket leak prevention) centrally in `CacheStage.onDispose`, with disposal terminal so no stage can recycle into another during teardown.
   - Zero-I/O transfers between transfer-eligible sinks eliminate chunk thrashing, and eligibility is established by evaluating the destination's own acceptance check rather than by asserting criteria equivalence.
   - Combinatorial superset caching minimizes chunk footprint for variable group sizes.

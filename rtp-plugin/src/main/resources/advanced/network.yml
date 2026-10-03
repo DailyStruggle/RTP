@@ -65,6 +65,15 @@ routing:
   # @default: "local"
   mode: "local"
 
+  # Cross-server dispatch mechanism.
+  # direct-db = direct backend-to-backend dispatch over SQL/Redis with native proxy Connect (no proxy plugin needed).
+  # proxy-broker = enqueue to NetworkRequestQueue; proxy companion dequeues and routes.
+  # auto = auto-select proxy-broker if proxy companion detected or proxy-direct; direct-db if SQL/Redis without proxy companion.
+  # @type: enum
+  # @options: ["auto", "direct-db", "proxy-broker"]
+  # @default: "auto"
+  dispatchMode: "auto"
+
   # true = this server only sends players to other servers.
   # @type: boolean
   # @default: false

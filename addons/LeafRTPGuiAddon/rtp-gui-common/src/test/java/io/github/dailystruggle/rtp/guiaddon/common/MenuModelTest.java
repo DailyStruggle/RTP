@@ -1,0 +1,267 @@
+package io.github.dailystruggle.rtp.guiaddon.common;
+
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.RtpTarget;
+import io.github.dailystruggle.rtp.api.RtpTargetStatus;
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import org.junit.jupiter.api.Test;
+
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class MenuModelTest {
+
+    @Test
+    void displayName_worldTarget_formatsWorldName() {
+        RtpTarget target = RtpTarget.world("world_nether");
+        assertEquals("World: world_nether", MenuModel.displayName(target, null));
+    }
+
+    @Test
+    void displayName_biomeTarget_formatsBiomeName() {
+        RtpTarget target = RtpTarget.biome("plains");
+        assertEquals("Biome: plains", MenuModel.displayName(target, null));
+    }
+
+    @Test
+    void displayName_networkAndRegionTargets_unifiedAsRegion() {
+        RtpTarget local = RtpTarget.region("wild");
+        assertEquals("Region: wild", MenuModel.displayName(local, null));
+
+        RtpTarget net = RtpTarget.network("survival-1", "wild");
+        assertEquals("Region: wild", MenuModel.displayName(net, null));
+    }
+
+    @Test
+    void displayName_customLabelOverridesDefault() {
+        RtpTarget target = RtpTarget.biome("desert");
+        RtpTargetStatus status = new RtpTargetStatus(
+                RtpTargetStatus.Availability.READY, 0L, 0.0, null, "NORMAL", "&6The Hot Desert");
+        assertEquals("&6The Hot Desert", MenuModel.displayName(target, status));
+    }
+
+    @Test
+    void defaultBiomeIcon_mapsCommonBiomes() {
+        assertEquals("SAND", GuiMenuConfig.defaultBiomeIcon("desert"));
+        assertEquals("SAND", GuiMenuConfig.defaultBiomeIcon("badlands"));
+        assertEquals("SNOW_BLOCK", GuiMenuConfig.defaultBiomeIcon("snowy_plains"));
+        assertEquals("NETHERRACK", GuiMenuConfig.defaultBiomeIcon("nether_wastes"));
+        assertEquals("END_STONE", GuiMenuConfig.defaultBiomeIcon("the_end"));
+        assertEquals("JUNGLE_SAPLING", GuiMenuConfig.defaultBiomeIcon("jungle"));
+        assertEquals("SPRUCE_SAPLING", GuiMenuConfig.defaultBiomeIcon("taiga"));
+        assertEquals("OAK_SAPLING", GuiMenuConfig.defaultBiomeIcon("plains"));
+    }
+
+    @Test
+    void iconName_worldAndBiomeDefaults() {
+        GuiMenuConfig config = new GuiMenuConfig();
+        RtpTarget worldNether = RtpTarget.world("world_nether");
+        assertEquals("NETHERRACK", config.iconName(worldNether, (RtpTargetStatus) null));
+
+        RtpTarget worldEnd = RtpTarget.world("world_the_end");
+        assertEquals("END_STONE", config.iconName(worldEnd, (RtpTargetStatus) null));
+
+        RtpTarget worldOverworld = RtpTarget.world("world");
+        assertEquals("GRASS_BLOCK", config.iconName(worldOverworld, (RtpTargetStatus) null));
+
+        RtpTarget biomeDesert = RtpTarget.biome("desert");
+        assertEquals("SAND", config.iconName(biomeDesert, (RtpTargetStatus) null));
+    }
+
+    @Test
+    void actionsMenu_buildsCorrectEntriesAndIcons() {
+        GuiMenuConfig config = new GuiMenuConfig();
+        assertEquals("&6&lSpecial Teleports", config.titleActionsMenu());
+        assertEquals("NETHERITE_SWORD", config.iconActionsSelector());
+        assertEquals("DIAMOND_SWORD", config.iconActionDefault());
+
+        // When actionService is null (optional addon absent), building actions menu produces empty entries cleanly
+        java.util.UUID testPlayer = java.util.UUID.randomUUID();
+        MenuModel model = MenuModel.buildActionsMenu(testPlayer, config, 0);
+        assertNotNull(model);
+        assertTrue(model.entries().isEmpty() || model.entries().stream().anyMatch(e -> e.displayName().contains("Back")));
+    }
+
+    @Test
+    void displayName_defaultFallbackIgnoredForDefaultTarget() {
+        RtpTarget target = RtpTarget.defaultRegion();
+        RtpTargetStatus statusWithDefault = new RtpTargetStatus(
+                RtpTargetStatus.Availability.READY, 0L, 0.0, null, "NORMAL", "default");
+        assertEquals("Random teleport", MenuModel.displayName(target, statusWithDefault));
+
+        RtpTargetStatus statusWithCustom = new RtpTargetStatus(
+                RtpTargetStatus.Availability.READY, 0L, 0.0, null, "NORMAL", "&aWild Overworld");
+        assertEquals("&aWild Overworld", MenuModel.displayName(target, statusWithCustom));
+    }
+
+    @Test
+    void operatorMenu_configDefaults() {
+        GuiMenuConfig config = new GuiMenuConfig();
+        assertTrue(config.showOperatorTools());
+        assertEquals("rtp.menu.admin", config.permissionOperatorTools());
+        assertEquals("&6&lOperator Control Hub", config.titleOperatorMenu());
+        assertEquals("&6&lOperator Tools...", config.titleOperatorSelector());
+        assertEquals("COMMAND_BLOCK", config.iconOperatorSelector());
+        assertEquals("NETHER_STAR", config.iconOperatorSetup());
+        assertEquals("HOPPER", config.iconOperatorImport());
+        assertEquals("REPEATER", config.iconOperatorConfig());
+        assertEquals("FILLED_MAP", config.iconOperatorVisualizations());
+        assertEquals("CLOCK", config.iconOperatorStatus());
+        assertEquals("WRITABLE_BOOK", config.iconOperatorAdminBook());
+        assertEquals("REDSTONE_TORCH", config.iconOperatorReload());
+    }
+
+    @Test
+    void operatorMenu_buildOperatorMenu_containsNavigationButtonWhenNoPerms() {
+        GuiMenuConfig config = new GuiMenuConfig();
+        UUID testPlayer = UUID.randomUUID();
+        MenuModel model = MenuModel.buildOperatorMenu(testPlayer, config);
+        assertNotNull(model);
+        assertEquals(config.titleOperatorMenu(), model.title());
+        // With no serverAccessor/permissions, only the Back to Worlds button is added
+        assertEquals(1, model.entries().size());
+        MenuEntry backEntry = model.entries().get(0);
+        assertEquals("menu:main", backEntry.target().name());
+    }
+
+    @Test
+    void operatorMenu_buildOperatorMenu_withPermittedPlayer() {
+        GuiMenuConfig config = new GuiMenuConfig();
+        UUID testPlayer = UUID.randomUUID();
+
+        RTPServerAccessor originalAccessor = RTPAPI.serverAccessor;
+        try {
+            RTPCommandSender sender = (RTPCommandSender) java.lang.reflect.Proxy.newProxyInstance(
+                    RTPCommandSender.class.getClassLoader(),
+                    new Class<?>[]{RTPCommandSender.class},
+                    (proxy, method, args) -> {
+                        if ("hasPermission".equals(method.getName())) {
+                            return true;
+                        }
+                        return null;
+                    });
+
+            RTPServerAccessor mockAccessor = (RTPServerAccessor) java.lang.reflect.Proxy.newProxyInstance(
+                    RTPServerAccessor.class.getClassLoader(),
+                    new Class<?>[]{RTPServerAccessor.class},
+                    (proxy, method, args) -> {
+                        if ("getSender".equals(method.getName())) {
+                            return sender;
+                        }
+                        return null;
+                    });
+
+            RTPAPI.serverAccessor = mockAccessor;
+
+            MenuModel model = MenuModel.buildOperatorMenu(testPlayer, config);
+            assertNotNull(model);
+            assertEquals(8, model.entries().size());
+            assertTrue(model.entries().stream().anyMatch(e -> "action:operator:setup".equals(e.target().name())));
+            assertTrue(model.entries().stream().anyMatch(e -> "action:operator:import".equals(e.target().name())));
+            assertTrue(model.entries().stream().anyMatch(e -> "action:operator:config".equals(e.target().name())));
+            assertTrue(model.entries().stream().anyMatch(e -> "action:operator:visualizations".equals(e.target().name())));
+            assertTrue(model.entries().stream().anyMatch(e -> "action:operator:status".equals(e.target().name())));
+            assertTrue(model.entries().stream().anyMatch(e -> "action:operator:adminbook".equals(e.target().name())));
+            assertTrue(model.entries().stream().anyMatch(e -> "action:operator:reload".equals(e.target().name())));
+            assertTrue(model.entries().stream().anyMatch(e -> "menu:main".equals(e.target().name())));
+        } finally {
+            RTPAPI.serverAccessor = originalAccessor;
+        }
+    }
+
+    @Test
+    void entryLore_operatorEntries_haveSpecializedLore() {
+        MenuEntry setupEntry = new MenuEntry(
+                RtpTarget.action("action:operator:setup"),
+                RtpTargetStatus.Availability.READY,
+                "Setup Wizard",
+                "NETHER_STAR",
+                0L,
+                0.0);
+        java.util.List<String> setupLore = MenuIcons.entryLore(setupEntry);
+        assertTrue(setupLore.stream().anyMatch(line -> line.contains("wizard")));
+
+        MenuEntry opMenuEntry = new MenuEntry(
+                RtpTarget.action("menu:operator"),
+                RtpTargetStatus.Availability.READY,
+                "Operator Tools",
+                "COMMAND_BLOCK",
+                0L,
+                0.0);
+        java.util.List<String> opLore = MenuIcons.entryLore(opMenuEntry);
+        assertTrue(opLore.stream().anyMatch(line -> line.contains("Operator management")));
+    }
+
+    @Test
+    void menuActions_submitOperatorMenu_opensWhenPermitted() {
+        GuiMenuConfig config = new GuiMenuConfig();
+        UUID testPlayer = UUID.randomUUID();
+
+        AtomicReference<MenuModel> openedModel = new AtomicReference<>();
+        MenuRenderer testRenderer = new MenuRenderer() {
+            @Override
+            public String key() {
+                return "test_renderer";
+            }
+
+            @Override
+            public void open(UUID playerId, MenuModel model) {
+                openedModel.set(model);
+            }
+        };
+
+        GuiRenderers.register(testRenderer);
+        RTPServerAccessor originalAccessor = RTPAPI.serverAccessor;
+        try {
+            RTPCommandSender sender = (RTPCommandSender) java.lang.reflect.Proxy.newProxyInstance(
+                    RTPCommandSender.class.getClassLoader(),
+                    new Class<?>[]{RTPCommandSender.class},
+                    (proxy, method, args) -> {
+                        if ("hasPermission".equals(method.getName())) {
+                            return true;
+                        }
+                        return null;
+                    });
+
+            RTPServerAccessor mockAccessor = (RTPServerAccessor) java.lang.reflect.Proxy.newProxyInstance(
+                    RTPServerAccessor.class.getClassLoader(),
+                    new Class<?>[]{RTPServerAccessor.class},
+                    (proxy, method, args) -> {
+                        if ("getSender".equals(method.getName())) {
+                            return sender;
+                        }
+                        return null;
+                    });
+
+            RTPAPI.serverAccessor = mockAccessor;
+
+            MenuActions.submit(testPlayer, RtpTarget.action("menu:operator"));
+            assertNotNull(openedModel.get());
+            assertEquals(config.titleOperatorMenu(), openedModel.get().title());
+        } finally {
+            GuiRenderers.unregister("test_renderer");
+            RTPAPI.serverAccessor = originalAccessor;
+        }
+    }
+
+    @Test
+    void menuActions_isMenuNavigation_identifiesNavigationActions() {
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("menu:main")));
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("menu:biomes:0")));
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("menu:biomes:1")));
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("menu:actions:0")));
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("menu:operator")));
+        assertTrue(MenuActions.isMenuNavigation(RtpTarget.action("action:operator:reload")));
+
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.action("action:operator:setup")));
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.action("action:operator:import")));
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.action("action:trigger:custom_action")));
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.biome("plains")));
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.region("default")));
+        assertFalse(MenuActions.isMenuNavigation(RtpTarget.defaultRegion()));
+        assertFalse(MenuActions.isMenuNavigation(null));
+    }
+}

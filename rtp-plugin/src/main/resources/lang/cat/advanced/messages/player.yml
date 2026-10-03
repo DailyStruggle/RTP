@@ -7,6 +7,7 @@
 # ###############################################################################
 # already mid-pounce
 already_pouncing: "&7[P0] ⚡ mrrp! you're already pouncing!"
+already_in_session: "&c[P0] [player] is already doing a zoomie session!"
 
 # plugin is grooming itself
 pounce_denied_grooming: "&7[P0] pounces are paused while the kitty grooms. try again after a few licks."
@@ -52,6 +53,10 @@ whisker_twitches: "ms"
 # bukkit-box has no such world
 # placeholder: [world] - the world name
 not_a_real_box: "&7[P0] could not find box '[world]'"
+
+no_prior_box: "&c[P0] no old box to crawl back into."
+
+back_to_old_box: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Back into previous box!</gradient>"
 
 # tall-human asked for a trick the kitty does not know
 # placeholder: [arg] - the argument attempted

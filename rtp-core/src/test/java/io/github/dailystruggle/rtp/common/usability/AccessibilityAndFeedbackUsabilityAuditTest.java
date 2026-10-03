@@ -51,6 +51,70 @@ public class AccessibilityAndFeedbackUsabilityAuditTest {
     }
 
     @Test
+    @DisplayName("Audit 2b: Mathematical WCAG 2.1 Contrast Ratio Compliance on Parchment Background")
+    void auditWcagContrastRatioOnParchment() {
+        // Parchment reference: #F4E8C1
+        final int parchmentRgb = 0xF4E8C1;
+        final double parchmentLuminance = calculateRelativeLuminance(parchmentRgb);
+
+        // Minecraft standard color definitions
+        Map<String, Integer> colorPalette = Map.of(
+                "&0", 0x000000, // Black
+                "&1", 0x0000AA, // Dark Blue
+                "&2", 0x00AA00, // Dark Green
+                "&3", 0x00AAAA, // Dark Aqua
+                "&4", 0xAA0000, // Dark Red
+                "&5", 0xAA00AA, // Dark Purple
+                "&8", 0x555555, // Dark Gray
+                "&e", 0xFFFF55, // Yellow (prohibited)
+                "&6", 0xFFAA00, // Gold (prohibited)
+                "&f", 0xFFFFFF  // White (prohibited)
+        );
+
+        // 1. High-contrast dark tones (&0, &1, &4, &5, &8) achieve WCAG AA contrast ratio (>= 4.5:1) against parchment
+        for (String code : List.of("&0", "&1", "&4", "&5", "&8")) {
+            int rgb = colorPalette.get(code);
+            double lum = calculateRelativeLuminance(rgb);
+            double ratio = calculateContrastRatio(parchmentLuminance, lum);
+            assertTrue(ratio >= 4.5, "Approved code " + code + " failed WCAG AA contrast threshold: ratio = " + ratio);
+        }
+
+        // 2. Secondary dark accent codes (&2 dark green, &3 dark aqua) achieve readable UI contrast (>= 2.2:1)
+        for (String darkCode : List.of("&2", "&3")) {
+            int rgb = colorPalette.get(darkCode);
+            double lum = calculateRelativeLuminance(rgb);
+            double ratio = calculateContrastRatio(parchmentLuminance, lum);
+            assertTrue(ratio >= 2.2, "Dark code " + darkCode + " failed baseline contrast threshold: ratio = " + ratio);
+        }
+
+        // 3. Prohibited codes (&e, &6, &f) must strictly fail the baseline contrast threshold (< 2.0:1)
+        for (String prohibitedCode : List.of("&e", "&6", "&f")) {
+            int rgb = colorPalette.get(prohibitedCode);
+            double lum = calculateRelativeLuminance(rgb);
+            double ratio = calculateContrastRatio(parchmentLuminance, lum);
+            assertTrue(ratio < 2.0, "Prohibited code " + prohibitedCode + " was expected to fail contrast check but got: " + ratio);
+        }
+    }
+
+    private static double calculateRelativeLuminance(int rgb) {
+        double r = ((rgb >> 16) & 0xFF) / 255.0;
+        double g = ((rgb >> 8) & 0xFF) / 255.0;
+        double b = (rgb & 0xFF) / 255.0;
+
+        double rLinear = (r <= 0.03928) ? (r / 12.92) : Math.pow((r + 0.055) / 1.055, 2.4);
+        double gLinear = (g <= 0.03928) ? (g / 12.92) : Math.pow((g + 0.055) / 1.055, 2.4);
+        double bLinear = (b <= 0.03928) ? (b / 12.92) : Math.pow((b + 0.055) / 1.055, 2.4);
+
+        return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+    }
+
+    private static double calculateContrastRatio(double lum1, double lum2) {
+        double l1 = Math.max(lum1, lum2);
+        double l2 = Math.min(lum1, lum2);
+        return (l1 + 0.05) / (l2 + 0.05);
+    }
+
+    @Test
     @DisplayName("Audit 3: Error Feedback Specificity - Distinguishes between unknown world, biome, and region")
     void auditErrorFeedbackSpecificity() {
         // Simulates error feedback strings and computes clarity metrics

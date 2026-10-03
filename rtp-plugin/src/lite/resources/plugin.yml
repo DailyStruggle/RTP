@@ -1,45 +1,31 @@
 # --- RTP-lite Plugin Descriptor ---
 # Distinct from src/main/resources/plugin.yml. The lite shadow JAR ships ONLY
 # this descriptor (the full descriptor is excluded from the lite artifact via
-# DuplicatesStrategy.EXCLUDE). The lite bootstrap class is divergent on purpose;
-# do not point this descriptor at io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin.
-#
-# Lite scope (what the lite jar drops relative to Pro; see ADR-024 amendments):
-#   - No SQL/Redis persistence or durable SQL/Redis network transports
-#     (plugin-message transport is kept); no shutdown flush.
-#   - Basic Folia support (regionized scheduling + async teleport via the Paper
-#     adapter); the tuned rtp-folia adapter remains Pro.
-#   - No login reserve cache (LoginCacheTask is not shipped).
-#   - No tags-api module (block tags in safety.yml resolve through the server registry).
-# Everything else ships in lite: anvil pre-filter, lang/**, Vault, on-event
-# teleports (rtp.onevent.*), effects, PlaceholderAPI, claim addon.
-#
-# Permission nodes that are parsed dynamically (rtp.onevent.*, rtp.effects.*,
-# rtp.biome.*, rtp.scan) are not declared here; they resolve at runtime exactly
-# as in the full descriptor.
+# DuplicatesStrategy.EXCLUDE).
+# Under ADR-100, the lite assembly has 100% technical and functional parity with Pro.
 
 name: RTP
 version: '${version}'
 main: io.github.dailystruggle.rtp.bukkit.lite.RTPBukkitLitePlugin
-api-version: 1.13
+api-version: '1.21'
 prefix: 'RTP'
 authors: [ leaf26 ]
-description: 'Random teleport, lite edition (no SQL; basic Folia support)'
-# Claim-plugin softdepends are included in lite as of 2026-05-11: lite is the
-# small-server target and claim-protection support is a baseline operator
-# expectation there. Vault is included as of 2026-06-01 so optional per-region
-# teleport charging works in lite. PlaceholderAPI is included so the shipped
-# PAPI_expansion can register. Chunky/ChunkyBorder remains Pro-only.
+description: 'a fast and flexible random teleportation plugin'
+
 # CombatLogX / PvPManager / SimpleCombatLog are listed so the PvP gate's bundled
-# combat-tag adapters can resolve those plugins' API classes at runtime
-# (Paper/Folia gates cross-plugin class access behind a declared dependency).
-softdepend: [ Vault, PlaceholderAPI, GriefDefender, GriefPrevention, Towny, Factions, FactionsBridge, Lands, RedProtect, Residence, CrashClaim, HuskClaims, Kingdoms, WorldGuard, CombatLogX, PvPManager, SimpleCombatLog ]
-# Basic Folia support: the free build ships a correctness-first
-# regionized scheduler (FoliaAwareScheduler) + async teleport in the Paper adapter so it
-# runs on Folia. The tuned, throughput-optimized rtp-folia adapter stays a LeafRTP-Pro
-# early-access feature and is not bundled here.
+# combat-tag adapters can load those plugins' API classes at runtime:
+# on Paper/Folia a plugin may only resolve another plugin's classes when it
+# declares a dependency on it, otherwise the CombatLogX/PvPManager adapters hit a
+# NoClassDefFoundError at query time and silently report "not in combat".
+# spark is listed for load-order only: when present it loads before RTP so the
+# spark API is ready when the metrics binding queries it (richer TPS/MSPT than
+# the native server calls). Never required - absence degrades to the native binding.
+softdepend: [ WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder, GriefDefender, GriefPrevention, Towny, Factions, FactionsBridge, Lands, RedProtect, Residence, CrashClaim, HuskClaims, Kingdoms, CombatLogX, PvPManager, SimpleCombatLog, DecentHolograms, HolographicDisplays, FancyHolograms, spark ]
 folia-supported: true
 
+# --- Commands ---
+# Registered command aliases. Argument parsing itself is dispatched through
+# the TreeCommand framework.
 commands:
   rtp:
     description: Teleport randomly
@@ -52,6 +38,17 @@ commands:
     usage: |
       /wild
 
+# --- Permissions ---
+# Grouped by feature area:
+#   rtp.see / rtp.use       - baseline player permissions (default: true)
+#   rtp.free / rtp.no*      - bypasses for delays, cooldowns, cancellation (op)
+#   rtp.other   - allow this player to teleport others
+#   rtp.notme   - prevent this player from being targeted by others
+#   rtp.world(s) / rtp.region(s) - cross-world / cross-region targeting (op)
+#   rtp.onevent.*           - automatic RTP on player events (default: false)
+#   rtp.biome.*             - biome-targeted teleports (op)
+#   rtp.scan / rtp.info / rtp.reload / rtp.config - admin tooling (op)
+#   rtp.*                   - aggregate; grants all of the above
 permissions:
   rtp.see:
     description: allow player to tab for rtp commands
@@ -60,13 +57,16 @@ permissions:
     description: allow player to use /rtp
     default: true
   rtp.free:
-    description: use /rtp for free (bypass the optional Vault economy charge)
+    description: use /rtp for free
     default: op
   rtp.reload:
     description: allow player to use /rtp reload
     default: op
   rtp.config:
     description: allow player to use /rtp config
+    default: op
+  rtp.scan:
+    description: allow player to start scan tasks
     default: op
   rtp.noDelay:
     description: skip the teleport delay
@@ -87,7 +87,7 @@ permissions:
     description: placeholder for custom cooldown values
     default: false
   rtp.other:
-    description: allow player to teleport another player
+    description: allow player to teleport another player.
     default: op
   rtp.notme:
     description: prevent this player from being targeted by another player's /rtp player:<name> (console is exempt)
@@ -131,11 +131,12 @@ permissions:
       rtp.scan: true
       rtp.info: true
   rtp.*:
-    description: access all rtp subcommands available in lite
+    description: grants access to all rtp commands
     default: op
     children:
       rtp.see: true
       rtp.use: true
+      rtp.free: true
       rtp.reload: true
       rtp.config: true
       rtp.noCooldown: true
@@ -152,3 +153,40 @@ permissions:
       rtp.params: true
       rtp.unqueued: true
       rtp.admin: true
+  rtp.biome.*:
+    description: allow player to specify any biome
+    default: op
+  rtp.onevent.*:
+    description: allow player to receive automatic RTP on all supported events
+    default: false
+    children:
+      rtp.onevent.join: true
+      rtp.onevent.respawn: true
+      rtp.onevent.changeWorld: true
+  rtp.onevent.join:
+    description: trigger /rtp when player joins the server
+    default: false
+  rtp.onevent.respawn:
+    description: trigger /rtp when player respawns (after death)
+    default: false
+  rtp.onevent.changeWorld:
+    description: trigger /rtp when player changes worlds
+    default: false
+  rtp.effects.*:
+    description: enable all configured teleport particle and sound effects
+    default: false
+  rtp.select.*:
+    description: access to selection shape overrides
+    default: op
+  rtp.bypass.*:
+    description: bypass all gameplay restrictions (cooldowns, delays, safety checks)
+    default: false
+    children:
+      rtp.noCooldown: true
+      rtp.noDelay: true
+      rtp.noDelay.chunks: true
+      rtp.noCancel: true
+      rtp.free: true
+  rtp.cost.bypass:
+    description: bypass economy charges
+    default: false

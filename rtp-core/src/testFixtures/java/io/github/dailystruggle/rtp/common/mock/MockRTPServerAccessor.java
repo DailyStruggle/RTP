@@ -17,6 +17,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +38,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     private final Map<String, MockRTPWorld> worldsByName = new ConcurrentHashMap<>();
     private final Map<UUID, MockRTPWorld> worldsById = new ConcurrentHashMap<>();
     private final Map<UUID, MockRTPPlayer> playersById = new ConcurrentHashMap<>();
+    private final Map<UUID, RTPCommandSender> sendersById = new ConcurrentHashMap<>();
     private final Map<String, MockRTPPlayer> playersByName = new ConcurrentHashMap<>();
     private final Map<String, Object> registeredCommands = new ConcurrentHashMap<>();
 
@@ -62,7 +64,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
         if (sender instanceof MockRTPPlayer) {
             addPlayer((MockRTPPlayer) sender);
         } else {
-            playersById.put(sender.uuid(), new MockRTPPlayer(sender.uuid(), sender.name(), null) {
+            sendersById.put(sender.uuid(), new MockRTPCommandSender(sender.uuid(), sender.name()) {
                 @Override public void sendMessage(String message) { sender.sendMessage(message); }
                 @Override public boolean hasPermission(String permission) { return sender.hasPermission(permission); }
             });
@@ -169,7 +171,10 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public RTPCommandSender getSender(UUID uuid) {
-        if (uuid.equals(consolePlayer.uuid())) return consolePlayer;
+        if (uuid == null) return consolePlayer;
+        if (uuid.equals(consolePlayer.uuid()) || uuid.equals(new UUID(0, 0))) return consolePlayer;
+        RTPCommandSender sender = sendersById.get(uuid);
+        if (sender != null) return sender;
         RTPPlayer player = playersById.get(uuid);
         if (player != null) return player;
 
@@ -427,15 +432,102 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
         }
     }
 
+    private final List<String> executedCommands = new CopyOnWriteArrayList<>();
+
+    /** Scoreboard tag store keyed by player UUID, maintained from {@code tag add/remove} commands. */
+    private final Map<UUID, Set<String>> scoreboardTags = new ConcurrentHashMap<>();
+
+    public List<String> getExecutedCommands() {
+        return Collections.unmodifiableList(executedCommands);
+    }
+
+    @Override
+    public Set<String> getScoreboardTags(UUID playerId) {
+        if (playerId == null) return Collections.emptySet();
+        Set<String> tags = scoreboardTags.get(playerId);
+        if (tags == null || tags.isEmpty()) return Collections.emptySet();
+        return Collections.unmodifiableSet(new HashSet<>(tags));
+    }
+
+    /**
+     * Resolves a {@code tag} command target (player name or UUID string) to a UUID for tag tracking.
+     */
+    private UUID resolveTagTarget(String target) {
+        if (target == null || target.isBlank()) return null;
+        RTPPlayer byName = playersByName.get(target);
+        if (byName != null) return byName.uuid();
+        try {
+            return UUID.fromString(target);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    @Override
+    public boolean addScoreboardTag(UUID playerId, String tag) {
+        if (playerId == null || tag == null || tag.isBlank()) return false;
+        executedCommands.add("tag " + playerId + " add " + tag);
+        Set<String> tags = scoreboardTags.computeIfAbsent(playerId, k -> ConcurrentHashMap.newKeySet());
+        return tags.add(tag);
+    }
+
+    @Override
+    public boolean removeScoreboardTag(UUID playerId, String tag) {
+        if (playerId == null || tag == null || tag.isBlank()) return false;
+        executedCommands.add("tag " + playerId + " remove " + tag);
+        Set<String> tags = scoreboardTags.get(playerId);
+        return tags != null && tags.remove(tag);
+    }
+
+    @Override
+    public void ensureScoreboardObjective(String objective, @Nullable String criteria) {
+        if (objective == null || objective.isBlank()) return;
+        String crit = (criteria != null && !criteria.isBlank()) ? criteria : "dummy";
+        executedCommands.add("scoreboard objectives add " + objective + " " + crit);
+    }
+
+    @Override
+    public void setScoreboardScore(UUID playerId, String objective, int score) {
+        if (playerId == null || objective == null || objective.isBlank()) return;
+        executedCommands.add("scoreboard players set " + playerId + " " + objective + " " + score);
+    }
+
+    @Override
+    public void resetScoreboardScore(UUID playerId, @Nullable String objective) {
+        if (playerId == null) return;
+        if (objective != null && !objective.isBlank()) {
+            executedCommands.add("scoreboard players reset " + playerId + " " + objective);
+        } else {
+            executedCommands.add("scoreboard players reset " + playerId);
+        }
+    }
+
     @Override
     public boolean executeCommand(UUID senderId, String commandLine) {
         if (senderId == null || commandLine == null || commandLine.isBlank()) {
             return false;
         }
+        executedCommands.add(commandLine);
         String[] tokens = commandLine.trim().split("\\s+");
         if (tokens.length == 0) {
             return false;
         }
+
+        // Model vanilla 'tag <target> add|remove <tag>' so gate reciprocity checks observe real state.
+        if (tokens.length >= 4 && tokens[0].equalsIgnoreCase("tag")) {
+            String action = tokens[2].toLowerCase(java.util.Locale.ROOT);
+            if (action.equals("add") || action.equals("remove")) {
+                UUID targetId = resolveTagTarget(tokens[1]);
+                String tag = tokens[3];
+                if (targetId == null || tag == null || tag.isBlank()) return false;
+                Set<String> tags = scoreboardTags.computeIfAbsent(targetId, k -> ConcurrentHashMap.newKeySet());
+                if (action.equals("add")) {
+                    return tags.add(tag);
+                }
+                return tags.remove(tag);
+            }
+        }
+
         String label = tokens[0].toLowerCase(java.util.Locale.ROOT);
         Object cmdObj = registeredCommands.get(label);
         if (cmdObj == null) {
@@ -449,16 +541,56 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
             return false;
         }
 
-        if (cmdObj instanceof TreeCommand tree) {
-            tree.onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+        if (cmdObj instanceof CommandsAPICommand cmd) {
+            java.util.concurrent.CompletableFuture<Boolean> res =
+                cmd.onCommand(senderId, sender::hasPermission, sender::sendMessage, args, 0, null);
             CommandsAPI.execute();
+            if (res != null && res.isDone()) {
+                return Boolean.TRUE.equals(res.getNow(false));
+            }
             return true;
-        } else if (cmdObj instanceof CommandsAPICommand cmd) {
-            cmd.onCommand(senderId, sender::hasPermission, sender::sendMessage, args, 0, null);
+        } else if (cmdObj instanceof TreeCommand tree) {
+            java.util.concurrent.CompletableFuture<Boolean> res =
+                tree.onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
             CommandsAPI.execute();
+            if (res != null && res.isDone()) {
+                return Boolean.TRUE.equals(res.getNow(false));
+            }
             return true;
         }
         return false;
+    }
+
+    private final Map<String, List<String>> commandOutputResponses = new ConcurrentHashMap<>();
+
+    /**
+     * Registers simulated output lines for a specific command line.
+     *
+     * @param commandLine the exact command string (or trimmed)
+     * @param lines       simulated lines emitted to the sender
+     */
+    public void registerCommandOutput(String commandLine, List<String> lines) {
+        if (commandLine != null && lines != null) {
+            commandOutputResponses.put(commandLine.trim(), new ArrayList<>(lines));
+        }
+    }
+
+    @Override
+    public boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+        if (commandLine == null || commandLine.isBlank()) {
+            return false;
+        }
+        executedCommands.add(commandLine);
+        List<String> simulatedLines = commandOutputResponses.get(commandLine.trim());
+        if (simulatedLines != null) {
+            if (lineConsumer != null) {
+                for (String line : simulatedLines) {
+                    lineConsumer.accept(line);
+                }
+            }
+            return true;
+        }
+        return executeCommand(io.github.dailystruggle.rtp.api.RTPAPI.serverId, commandLine);
     }
 
     /**
@@ -468,6 +600,79 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
      */
     public Map<String, Object> getRegisteredCommands() {
         return Collections.unmodifiableMap(registeredCommands);
+    }
+
+    // -------------------------------------------------------------------------
+    // Per-player WorldBorder packet tracking
+    // -------------------------------------------------------------------------
+
+    public record SentWorldBorder(
+        UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds,
+        double damageAmount, double damageBuffer) {
+      public SentWorldBorder(UUID playerId, double centerX, double centerZ, double size) {
+        this(playerId, centerX, centerZ, size, size, 0L, 0.0, 0.0);
+      }
+      public SentWorldBorder(UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+        this(playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds, 0.0, 0.0);
+      }
+    }
+
+    public record AppliedDamage(UUID playerId, double amount) {}
+
+    private final List<SentWorldBorder> sentWorldBorders = new CopyOnWriteArrayList<>();
+    private final List<AppliedDamage> appliedDamages = new CopyOnWriteArrayList<>();
+    private final Set<UUID> resetWorldBorders = ConcurrentHashMap.newKeySet();
+
+    @Override
+    public void sendWorldBorder(UUID playerId, double centerX, double centerZ, double size) {
+        sentWorldBorders.add(new SentWorldBorder(playerId, centerX, centerZ, size));
+    }
+
+    @Override
+    public void sendWorldBorder(
+        UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+        sentWorldBorders.add(new SentWorldBorder(playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds));
+    }
+
+    @Override
+    public void sendWorldBorder(
+        UUID playerId,
+        double centerX,
+        double centerZ,
+        double oldSize,
+        double newSize,
+        long shrinkSeconds,
+        double damageAmount,
+        double damageBuffer) {
+        sentWorldBorders.add(new SentWorldBorder(
+            playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds, damageAmount, damageBuffer));
+    }
+
+    @Override
+    public void damagePlayer(UUID playerId, double amount) {
+        appliedDamages.add(new AppliedDamage(playerId, amount));
+    }
+
+    public List<AppliedDamage> getAppliedDamages() {
+        return Collections.unmodifiableList(appliedDamages);
+    }
+
+    @Override
+    public void resetWorldBorder(UUID playerId) {
+        resetWorldBorders.add(playerId);
+    }
+
+    public List<SentWorldBorder> getSentWorldBorders() {
+        return Collections.unmodifiableList(sentWorldBorders);
+    }
+
+    public Set<UUID> getResetWorldBorders() {
+        return Collections.unmodifiableSet(resetWorldBorders);
+    }
+
+    @Override
+    public Collection<RTPPlayer> getOnlinePlayers() {
+        return Collections.unmodifiableCollection(new ArrayList<RTPPlayer>(playersById.values()));
     }
 
     // -------------------------------------------------------------------------

@@ -1,10 +1,8 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
-
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -27,7 +25,7 @@ import java.util.logging.Logger;
 /**
  * Redis-backed {@link NetworkRequestQueue}. Wires the
  * four D3 Lua scripts ({@code enqueue_batch}, {@code pollStatus},
- * {@code dequeueReady}, {@code transition}) onto a {@link JedisPool}-managed
+ * {@code dequeueReady}, {@code transition}) onto a {@link RespPool}-managed
  * connection. Mirrors the pool + single-thread async executor pattern of
  * {@link RedisNetworkStateBinding}.
  *
@@ -61,7 +59,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
 
     private static final AtomicInteger THREAD_COUNTER = new AtomicInteger();
 
-    private final JedisPool pool;
+    private final RespPool pool;
     private final boolean ownsPool;
     private final ExecutorService executor;
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -77,7 +75,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
     private static final int OWNED_DEQUEUE_MAX_SCAN = 16;
 
     /**
-     * Production constructor. Opens its own {@link JedisPool} and pre-loads
+     * Production constructor. Opens its own {@link RespPool} and pre-loads
      * the four D3 scripts; SHA1 mismatch refuses to enable (see
      * {@link RedisLuaScripts#load(String)} - build-time defect).
      *
@@ -98,11 +96,11 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
      * retains ownership of the pool and is responsible for closing it; this
      * binding's {@link #close()} only shuts down its executor.
      */
-    public RedisNetworkRequestQueue(JedisPool pool, int ttlSeconds) {
+    public RedisNetworkRequestQueue(RespPool pool, int ttlSeconds) {
         this(Objects.requireNonNull(pool, "pool"), false, ttlSeconds);
     }
 
-    private RedisNetworkRequestQueue(JedisPool pool, boolean ownsPool, int ttlSeconds) {
+    private RedisNetworkRequestQueue(RespPool pool, boolean ownsPool, int ttlSeconds) {
         if (ttlSeconds < 0) {
             throw new IllegalArgumentException("ttlSeconds must be >= 0");
         }
@@ -112,7 +110,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
 
         // Eagerly validate connectivity. A bad host should fail at open() time,
         // not silently in flush loops.
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             j.ping();
         } catch (Exception e) {
             if (ownsPool) pool.close();
@@ -145,16 +143,8 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
         this.executor = Executors.newSingleThreadExecutor(tf);
     }
 
-    private static JedisPool buildPool(String host, int port, String password) {
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(4);
-        cfg.setMaxIdle(2);
-        cfg.setMinIdle(1);
-        cfg.setTestOnBorrow(true);
-        if (password != null && !password.isEmpty()) {
-            return new JedisPool(cfg, host, port, 2000, password);
-        }
-        return new JedisPool(cfg, host, port, 2000);
+    private static RespPool buildPool(String host, int port, String password) {
+        return new RespPool(host, port, 2000, password, 4);
     }
 
     // ---- SPI ------------------------------------------------------------
@@ -185,7 +175,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
                 argv.add(Long.toString(now));
             }
             if (argv.isEmpty()) return EnrolOutcome.ACCEPTED;
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 enqueueBatchScript.evalsha(j, Arrays.asList(READY_KEY, SEEN_KEY), argv);
                 return EnrolOutcome.ACCEPTED;
             } catch (RuntimeException e) {
@@ -209,7 +199,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
             }
             if (argv.isEmpty()) return java.util.Collections.<QueueStatus>emptyList();
             Object raw;
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 raw = pollStatusScript.evalsha(j, java.util.Collections.emptyList(), argv);
             }
             List<QueueStatus> out = new ArrayList<>();
@@ -224,7 +214,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
                 if (r.size() == 1) continue;
                 Map<String, String> kv = flattenAlternating(r, 1);
                 UUID pid;
-                try { pid = UUID.fromString(String.valueOf(r.get(0))); }
+                try { pid = UUID.fromString(asString(r.get(0))); }
                 catch (IllegalArgumentException iae) { continue; }
                 QueueState state = parseState(kv.getOrDefault("state", "UNKNOWN"));
                 int pos = parseIntSafe(kv.get("positionInQueue"), 0);
@@ -248,7 +238,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
         Objects.requireNonNull(blockFor, "blockFor");
         return runAsync(() -> {
             long deadline = System.nanoTime() + Math.max(0L, blockFor.toNanos());
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 while (true) {
                     long now = System.currentTimeMillis();
                     Object raw = dequeueReadyScript.evalsha(j,
@@ -306,7 +296,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
         }
         return runAsync(() -> {
             long deadline = System.nanoTime() + Math.max(0L, blockFor.toNanos());
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 while (true) {
                     long now = System.currentTimeMillis();
                     Object raw = dequeueReadyOwnedScript.evalsha(j,
@@ -361,7 +351,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
             String statusKey = "rtp:net:wq:status:" + playerId;
             long now = System.currentTimeMillis();
             Object raw;
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 raw = transitionScript.evalsha(j,
                         Arrays.asList(statusKey, SEEN_KEY),
                         Arrays.asList(
@@ -436,9 +426,15 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
             Object k = flat.get(i);
             Object v = flat.get(i + 1);
             if (k == null) continue;
-            out.put(String.valueOf(k), v == null ? "" : String.valueOf(v));
+            out.put(asString(k), asString(v));
         }
         return out;
+    }
+
+    private static String asString(Object o) {
+        if (o == null) return "";
+        if (o instanceof byte[]) return new String((byte[]) o, java.nio.charset.StandardCharsets.UTF_8);
+        return String.valueOf(o);
     }
 
     private static QueueState parseState(String s) {

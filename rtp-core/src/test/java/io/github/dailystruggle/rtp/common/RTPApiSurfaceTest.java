@@ -151,6 +151,56 @@ class RTPApiSurfaceTest {
         RtpTargetStatus status = RTPAPI.getTargetStatus(id, RtpTarget.world("default"));
         assertNotNull(status);
         assertNotNull(status.availability());
+        assertNull(status.label(), "World target should not inherit fallback region name as its label");
+    }
+
+    @Test
+    @Timeout(10)
+    void getTargetStatus_biomeTarget_returnsStatusAndLabel() {
+        UUID id = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(
+                id, "BiomeTargetPlayer",
+                new RTPLocation(new MockRTPWorld("default"), 0, 0, 0)) {
+            @Override
+            public boolean hasPermission(String perm) {
+                return "rtp.biome.plains".equalsIgnoreCase(perm) || "rtp.biome.*".equals(perm);
+            }
+        };
+        accessor.addPlayer(player);
+
+        RtpTargetStatus status = RTPAPI.getTargetStatus(id, RtpTarget.biome("plains"));
+        assertNotNull(status);
+        assertNotNull(status.availability());
+        assertEquals("Biome: plains", status.label());
+
+        // Without permission
+        MockRTPPlayer noPermPlayer = playerInWorld(UUID.randomUUID(), "NoPermBiome", "default");
+        RtpTargetStatus noPermStatus = RTPAPI.getTargetStatus(noPermPlayer.uuid(), RtpTarget.biome("plains"));
+        assertNotNull(noPermStatus);
+        // If region is null in this test environment it may be DISABLED, otherwise NO_PERMISSION
+        assertTrue(noPermStatus.availability() == RtpTargetStatus.Availability.NO_PERMISSION
+                || noPermStatus.availability() == RtpTargetStatus.Availability.DISABLED);
+    }
+
+    @Test
+    @Timeout(10)
+    void getAllowedTargets_enumeratesConfiguredWorldsAndBiomes() {
+        UUID id = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(
+                id, "PermPlayer",
+                new RTPLocation(new MockRTPWorld("default"), 0, 0, 0)) {
+            @Override
+            public boolean hasPermission(String perm) {
+                return "rtp.worlds.*".equals(perm) || "rtp.biome.*".equals(perm);
+            }
+        };
+        accessor.addPlayer(player);
+        accessor.addWorld(new MockRTPWorld("custom_nether"));
+
+        List<RtpTarget> targets = RTPAPI.getAllowedTargets(id);
+        assertNotNull(targets);
+        assertTrue(targets.stream().anyMatch(t -> t.kind() == RtpTarget.Kind.WORLD),
+                "Should contain world targets");
     }
 
     @Test

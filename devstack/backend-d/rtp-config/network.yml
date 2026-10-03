@@ -1,0 +1,56 @@
+# Devstack backend-d network.yml. NeoForge 1.21.1.
+network:
+  enabled: true
+  serverId: "backend-d"
+  secretEnv: RTP_NET_SECRET
+transport:
+  type: redis
+  redis:
+    host: redis
+    port: 6379
+    password: ""
+heartbeat:
+  intervalMs: 1000
+  staleAfterMs: 5000
+reservation:
+  ttlMs: 30000
+  reapIntervalMs: 5000
+
+routing:
+  dispatchMode: direct-db
+
+# Load balancer scoring table. Mirrors backend-a / backend-b / backend-c.
+loadBalancer:
+  regionScarcityWeight: 0
+  terms:
+    mspt:
+      input: mspt
+      weight: 1.0
+      curve:
+        type: sigmoid
+        k: 8.0
+        x0: 0.4
+    queue:
+      input: queueDepth
+      weight: 1.0
+      curve:
+        type: exponential
+        k: 3.0
+    heap:
+      input: heapUsed
+      weight: 5.0
+      curve:
+        type: step
+        threshold: 0.85
+    region:
+      input: keptRegion
+      weight: 5.0
+      curve:
+        type: step
+        threshold: 0.95
+    kept:
+      input: keptCount
+      weight: 0.25
+      curve:
+        type: logarithmic
+        k: 9.0

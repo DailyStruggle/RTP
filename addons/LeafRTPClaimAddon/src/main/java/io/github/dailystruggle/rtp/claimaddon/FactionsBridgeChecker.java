@@ -24,10 +24,10 @@ public class FactionsBridgeChecker {
    * @return true if in a claim, false otherwise
    */
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists) return false;
-    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
-    if (world == null) return false;
-    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+    if (!exists || location == null) return false;
+    org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
+    if (loc == null) return false;
+    return isInClaim(loc);
   }
 
   /**

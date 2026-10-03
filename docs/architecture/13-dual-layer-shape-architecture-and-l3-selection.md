@@ -216,7 +216,7 @@ flowchart TD
 
     subgraph FeistelNetwork [4-Round Feistel Pseudorandom Permutation]
         PhaseExhaustion --> KeyDerive["Derive Round Key K_epoch<br/>feistelSalt ^ (epoch * 0x517CC1B727220A95L) ^ (&phi; * 0x9E3779B97F4A7C15L)"]:::async
-        KeyDerive --> Permute[Cycle-Walking Feistel Permutation<br/>Strict Bijection: 0 duplicate chunks across subset]:::async
+        KeyDerive --> Permute["Cycle-Walking ARX PRF Feistel (SipRound)<br/>Tiny-Domain Masking & Strict Bijection"]:::async
         Permute --> KeyCoord[Physical Hilbert Key = permutedK * S + &phi;]:::success
     end
 

@@ -87,8 +87,8 @@ public class RegionQueueManager {
      * <p>Allocated only on default-world region when {@code PerformanceKeys.loginCacheEnabled=true}.
      * Decoupled from {@code Region.execute()} refill loops.
      */
-    public LockFreeLocationBuffer loginLocations;
-    public RingCacheStage<RTPLocation> loginStage;
+    public volatile LockFreeLocationBuffer loginLocations;
+    public volatile RingCacheStage<RTPLocation> loginStage;
 
     /** When reserving/recycling locations for specific players, I want to guard against */
     public final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RTPLocation>>
@@ -97,7 +97,7 @@ public class RegionQueueManager {
 
     private final HotSink<RTPLocation> keptHotSink;
     private final HotSink<RTPLocation> networkKeptHotSink;
-    private HotSink<RTPLocation> loginHotSink;
+    private volatile HotSink<RTPLocation> loginHotSink;
     private final HotSink<RTPLocation> personalHotSink;
 
     /** */
@@ -394,56 +394,65 @@ public class RegionQueueManager {
      *
      * @param capacity buffer capacity; &lt;= 0 disables the buffer
      */
+    @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lifecycle buffer allocate/drain synchronization
     public void enableLoginCache(int capacity) {
-        if (capacity <= 0) {
-            disableLoginCache();
-            return;
-        }
-        if (this.loginLocations != null) {
-            // Already enabled; reload changes use disable+enable.
-            return;
-        }
-        Consumer<RTPLocation> hotDispose = loc -> {
-            if (loc != null && loc.reservation() != null) {
-                try {
-                    loc.reservation().close();
-                } catch (Throwable t) {
-                    RTP.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
-                }
+        synchronized (this) {
+            if (capacity <= 0) {
+                disableLoginCache();
+                return;
             }
-        };
-        this.loginLocations = new LockFreeLocationBuffer(capacity);
-        this.loginStage = new RingCacheStage<>("loginLocations", this.loginLocations, hotDispose);
-        this.loginHotSink = new HotSink<>() {
-            @Override public String name() { return "loginLocations"; }
-            @Override public CacheStage<RTPLocation> stage() { return loginStage; }
-            @Override public CacheStage<?> coldSource() { return unkeptStage; }
-            @Override public boolean accepts(RTPLocation entry) { return checkAccepts(entry); }
-            @Override public boolean hasExtrinsicVerifier() { return false; }
-            @Override public boolean isExternallyLeased() { return false; }
-            @Override public boolean narrowsBeyondColdSource() { return false; }
-            @Override public int chunkCostPerEntry() { return 1; }
-            @Override public long demandWeight() { return 0L; }
-        };
-        installDatabaseCallbacks();
+            if (this.loginLocations != null) {
+                // Already enabled; reload changes use disable+enable.
+                return;
+            }
+            Consumer<RTPLocation> hotDispose = loc -> {
+                if (loc != null && loc.reservation() != null) {
+                    try {
+                        loc.reservation().close();
+                    } catch (Throwable t) {
+                        RTP.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
+                    }
+                }
+            };
+            LockFreeLocationBuffer buffer = new LockFreeLocationBuffer(capacity);
+            RingCacheStage<RTPLocation> stage = new RingCacheStage<>("loginLocations", buffer, hotDispose);
+            HotSink<RTPLocation> sink = new HotSink<>() {
+                @Override public String name() { return "loginLocations"; }
+                @Override public CacheStage<RTPLocation> stage() { return stage; }
+                @Override public CacheStage<?> coldSource() { return unkeptStage; }
+                @Override public boolean accepts(RTPLocation entry) { return checkAccepts(entry); }
+                @Override public boolean hasExtrinsicVerifier() { return false; }
+                @Override public boolean isExternallyLeased() { return false; }
+                @Override public boolean narrowsBeyondColdSource() { return false; }
+                @Override public int chunkCostPerEntry() { return 1; }
+                @Override public long demandWeight() { return 0L; }
+            };
+            this.loginStage = stage;
+            this.loginHotSink = sink;
+            this.loginLocations = buffer;
+            installDatabaseCallbacks();
+        }
     }
 
     /**
      * Drain {@link #loginLocations} back to {@link #unkeptLocations} (closing
      * reservations) and null the buffer reference. Safe to call multiple times.
      */
+    @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: lifecycle buffer allocate/drain synchronization
     public void disableLoginCache() {
-        RingCacheStage<RTPLocation> login = this.loginStage;
-        if (login == null && this.loginLocations == null) return;
-        this.loginStage = null;
-        this.loginLocations = null;
-        this.loginHotSink = null;
-        if (login != null) {
-            Optional<RTPLocation> loc;
-            while ((loc = login.pollSilently()).isPresent()) {
-                demoteToUnkept(loc.get());
+        synchronized (this) {
+            RingCacheStage<RTPLocation> login = this.loginStage;
+            if (login == null && this.loginLocations == null) return;
+            this.loginStage = null;
+            this.loginLocations = null;
+            this.loginHotSink = null;
+            if (login != null) {
+                Optional<RTPLocation> loc;
+                while ((loc = login.pollSilently()).isPresent()) {
+                    demoteToUnkept(loc.get());
+                }
+                login.close();
             }
-            login.close();
         }
     }
 
@@ -454,10 +463,7 @@ public class RegionQueueManager {
      * @return future location and number of attempts
      */
     public CompletableFuture<RTPLocation> fastQueue(UUID id) {
-        if (fastLocations.containsKey(id)) return fastLocations.get(id);
-        CompletableFuture<RTPLocation> res = new CompletableFuture<>();
-        fastLocations.put(id, res);
-        return res;
+        return fastLocations.computeIfAbsent(id, k -> new CompletableFuture<>());
     }
 
     /**
@@ -538,12 +544,17 @@ public class RegionQueueManager {
      * @return future location or null if unavailable
      */
     public CompletableFuture<RTPLocation> poll(UUID uuid) {
-        if (fastLocations.containsKey(uuid)) {
-            return fastLocations.remove(uuid);
-        }
+        // Group/anchor draws poll with a null uuid (no owning player). ConcurrentHashMap rejects
+        // null keys, so guard the per-player lookups and fall through to the shared kept queue;
+        // otherwise poll(null) throws an NPE that is swallowed upstream, stalling group placement.
+        if (uuid != null) {
+            CompletableFuture<RTPLocation> fast = fastLocations.remove(uuid);
+            if (fast != null) {
+                return fast;
+            }
 
-        ConcurrentLinkedQueue<RTPLocation> playerLocationQueue = perPlayerLocationQueue.get(uuid);
-        if (playerLocationQueue != null && !playerLocationQueue.isEmpty()) {
+            ConcurrentLinkedQueue<RTPLocation> playerLocationQueue = perPlayerLocationQueue.get(uuid);
+            if (playerLocationQueue != null && !playerLocationQueue.isEmpty()) {
             RTPLocation loc = playerLocationQueue.poll();
             if (loc != null) {
                 // Consume the personal-queue entry from the cache (it is about to be
@@ -558,6 +569,7 @@ public class RegionQueueManager {
                     RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, loc);
                 }
                 return CompletableFuture.completedFuture(loc);
+            }
             }
         }
 
@@ -650,16 +662,14 @@ public class RegionQueueManager {
         if (perPlayerStage != null) perPlayerStage.close();
         perPlayerLocationQueue.clear();
         fastLocations.forEach((uuid, future) -> {
-            if (future.isDone()) {
-                try {
-                    RTPLocation loc = future.get();
-                    if (loc != null && loc.reservation() != null) loc.reservation().close();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } catch (Exception ignored) {}
-            } else {
-                future.complete(null);
-            }
+            future.whenComplete((loc, err) -> {
+                if (loc != null && loc.reservation() != null) {
+                    try {
+                        loc.reservation().close();
+                    } catch (Exception ignored) {}
+                }
+            });
+            future.complete(null);
         });
         fastLocations.clear();
         playerQueue.clear();
@@ -808,18 +818,126 @@ public class RegionQueueManager {
         return Collections.unmodifiableList(sinks);
     }
 
-    private boolean checkAccepts(RTPLocation entry) {
-        if (entry == null) return false;
-        if (entry.reservation() == null) return false;
-        if (entry.coords() == null) return false;
+    /**
+     * Purges all pre-cached locations (kept, unkept, and per-player queues) that fall
+     * outside the region's current boundaries (shape or vertical adjustor).
+     * Associated chunk reservations are cleanly closed to uphold Rule S-002
+     * (no permanently force-loaded chunks).
+     *
+     * @return the number of purged candidate locations
+     */
+    public int purgeOutsideBounds() {
+        int purged = 0;
+
+        // Drain keptLocations, filtering out of bounds
+        int keptSize = keptLocations.size();
+        List<RTPLocation> keptToRetain = new ArrayList<>(keptSize);
+        for (int i = 0; i < keptSize; i++) {
+            RTPLocation loc = keptLocations.poll();
+            if (loc == null) break;
+            if (isLocationInBounds(loc)) {
+                keptToRetain.add(loc);
+            } else {
+                purged++;
+                if (loc.reservation() != null) {
+                    try {
+                        loc.reservation().close();
+                    } catch (Throwable t) {
+                        io.github.dailystruggle.rtp.common.RTP.log(
+                                java.util.logging.Level.WARNING,
+                                "Failed to close chunk reservation during purge: " + t.getMessage(), t);
+                    }
+                }
+                if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
+                        && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
+                    io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                            .deleteCachedLocation(region.name, loc);
+                }
+            }
+        }
+        for (RTPLocation loc : keptToRetain) {
+            keptLocations.offerSilently(loc);
+        }
+
+        // Drain unkeptLocations
+        int unkeptSize = unkeptLocations.size();
+        List<RTPLocation> unkeptToRetain = new ArrayList<>(unkeptSize);
+        for (int i = 0; i < unkeptSize; i++) {
+            RTPLocation loc = unkeptLocations.poll();
+            if (loc == null) break;
+            if (isLocationInBounds(loc)) {
+                unkeptToRetain.add(loc);
+            } else {
+                purged++;
+                if (loc.reservation() != null) {
+                    try {
+                        loc.reservation().close();
+                    } catch (Throwable t) {
+                        io.github.dailystruggle.rtp.common.RTP.log(
+                                java.util.logging.Level.WARNING,
+                                "Failed to close chunk reservation during purge: " + t.getMessage(), t);
+                    }
+                }
+                if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
+                        && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
+                    io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                            .deleteCachedLocation(region.name, loc);
+                }
+            }
+        }
+        for (RTPLocation loc : unkeptToRetain) {
+            unkeptLocations.offerSilently(loc);
+        }
+
+        // Clean per-player queues
+        for (ConcurrentLinkedQueue<RTPLocation> playerQueue : perPlayerLocationQueue.values()) {
+            java.util.Iterator<RTPLocation> it = playerQueue.iterator();
+            while (it.hasNext()) {
+                RTPLocation loc = it.next();
+                if (!isLocationInBounds(loc)) {
+                    it.remove();
+                    purged++;
+                    if (loc.reservation() != null) {
+                        try {
+                            loc.reservation().close();
+                        } catch (Throwable t) {
+                            io.github.dailystruggle.rtp.common.RTP.log(
+                                    java.util.logging.Level.WARNING,
+                                    "Failed to close chunk reservation during purge: " + t.getMessage(), t);
+                        }
+                    }
+                    if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
+                            && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
+                        io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                                .deleteCachedLocation(region.name, loc);
+                    }
+                }
+            }
+        }
+
+        return purged;
+    }
+
+    public boolean isLocationInBounds(RTPLocation entry) {
+        if (entry == null || entry.coords() == null) return false;
         if (region.getWorld() == null || !region.getWorld().name().equals(entry.coords().worldName())) return false;
-        if (region.getShape() != null && !region.getShape().contains(entry.coords().x(), entry.coords().z())) return false;
+        if (region.getShape() != null) {
+            int cx = entry.coords().x() >> 4;
+            int cz = entry.coords().z() >> 4;
+            if (!region.getShape().contains(cx, cz)) return false;
+        }
         RegionSettings settings = region.getSettings();
         if (settings != null && settings.vert() != null) {
             int y = entry.coords().y();
             if (y < settings.vert().minY() || y > settings.vert().maxY()) return false;
         }
         return true;
+    }
+
+    private boolean checkAccepts(RTPLocation entry) {
+        if (entry == null) return false;
+        if (entry.reservation() == null) return false;
+        return isLocationInBounds(entry);
     }
 
     private final CacheStage<RTPLocation> personalAggregateStage = new CacheStage<>() {

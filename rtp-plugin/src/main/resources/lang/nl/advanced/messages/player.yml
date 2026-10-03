@@ -6,6 +6,7 @@
 # Sectie 2: Teletransport
 # ###############################################################################
 alTeletransporteert: "&7[P0] ⚡ je wordt al geteletransporteerd!"
+alInSessie: "&c[P0] [player] zit al in een actieve sessie."
 
 # als de plugin momenteel wordt herladen
 teletransportGeweigerdHerladen: "&7[P0] teletransports zijn tijdelijk uitgeschakeld terwijl de plugin herlaadt. Probeer het over een ogenblik opnieuw."
@@ -50,6 +51,10 @@ milliseconden: "ms"
 # wereld bestaat niet in bukkit
 # placeholder: [world] - de wereldnaam
 ongeldigeWereld: "&7[P0] wereld '[world]' kon niet worden gevonden"
+
+geenVorigeLocatie: "&c[P0] Geen eerdere teleporteerlocatie gevonden."
+
+terugSucces: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teruggekeerd naar vorige locatie.</gradient>"
 
 # de plugin heeft het gevraagde commando niet
 # placeholder: [arg] - het geprobeerde argument

@@ -80,6 +80,16 @@ public record ChartSpec(
          * Composite pipeline status map (ADR-089): desaturated biomes, red hazard wash,
          * candidate markers & arrival trajectory, and L1/L2/L3 queue capacity health bars.
          */
-        REGION_COMPOSITE
+        REGION_COMPOSITE,
+        /**
+         * Region walk path visualization (ADR-089): discrete step progression shaded
+         * according to validity, shape bounds, and selection order.
+         */
+        REGION_WALK_PATH,
+        /**
+         * Selection density and candidate location heatmap (ADR-089, ADR-039):
+         * High-clarity heatmap showing selection frequency, candidate locations, and density.
+         */
+        SELECTION_HEATMAP
     }
 }

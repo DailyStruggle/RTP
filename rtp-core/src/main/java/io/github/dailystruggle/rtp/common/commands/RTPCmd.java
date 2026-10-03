@@ -564,7 +564,8 @@ public interface RTPCmd extends BaseRTPCmd {
         }
 
         if (toggleTargetPerms) {
-          long dt = System.currentTimeMillis() - data.time;
+          long lastTpTime = RTP.getEffectiveLastTeleportTime(player.uuid());
+          long dt = (lastTpTime > 0) ? (System.currentTimeMillis() - lastTpTime) : (System.currentTimeMillis() - data.time);
           if (dt < 0) dt = Long.MAX_VALUE + dt;
           if (dt < player.cooldown()) {
             RTP.serverAccessor.sendMessage(senderId, player.uuid(), PlayerMessages.cooldownMessage);

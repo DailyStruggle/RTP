@@ -2431,6 +2431,71 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     @Override public RTPCommandSender clone() { return new FabricConsoleSender(server); }
   }
 
+  @Override
+  public boolean executeCommand(UUID senderId, String commandLine) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    MinecraftServer s = server;
+    if (s == null) return false;
+    try {
+      if (senderId != null && !senderId.equals(RTPAPI.serverId)) {
+        RTPPlayer player = getPlayer(senderId);
+        if (player != null) {
+          player.performCommand(null, commandLine);
+          return true;
+        }
+      }
+      new FabricConsoleSender(s).performCommand(null, commandLine);
+      return true;
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP][Fabric] executeCommand failed for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  @Override
+  public boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    MinecraftServer s = server;
+    if (s == null) return false;
+    try {
+      // Create capturing console sender and execute
+      RTPCommandSender capturingSender = new FabricCapturingConsoleSender(s, lineConsumer);
+      capturingSender.performCommand(null, commandLine);
+      return true;
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP][Fabric] executeCommandWithCapture failed for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  private static final class FabricCapturingConsoleSender implements RTPCommandSender {
+    private final @Nullable MinecraftServer server;
+    private final java.util.function.Consumer<String> lineConsumer;
+
+    FabricCapturingConsoleSender(@Nullable MinecraftServer server, java.util.function.Consumer<String> lineConsumer) {
+      this.server = server;
+      this.lineConsumer = lineConsumer;
+    }
+
+    @Override public UUID uuid() { return RTPAPI.serverId; }
+    @Override public String name() { return "Console"; }
+    @Override public boolean hasPermission(String permission) { return true; }
+    @Override public Set<String> getEffectivePermissions() {
+      return io.github.dailystruggle.rtp.fabric.player.FabricEffectivePermissionsResolver.resolveConsole();
+    }
+    @Override public long cooldown() { return 0L; }
+    @Override public long delay() { return 0L; }
+    @Override public void performCommand(@Nullable RTPPlayer player, String command) {
+      new FabricConsoleSender(server).performCommand(player, command);
+    }
+    @Override public void sendMessage(String message) {
+      if (message != null && lineConsumer != null) {
+        lineConsumer.accept(message);
+      }
+    }
+    @Override public RTPCommandSender clone() { return new FabricCapturingConsoleSender(server, lineConsumer); }
+  }
+
   // ---------------------------------------------------------------------------
   // Command registration SPI
   // ---------------------------------------------------------------------------
@@ -2457,5 +2522,38 @@ public final class FabricServerAccessor implements RTPServerAccessor {
             });
     io.github.dailystruggle.rtp.fabric.commands.FabricCommandRegistrar
         .registerRtpCommand(rootCommand, bridgeCtx, aliases);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void setupMapBinding() {
+    try {
+      io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter mapAdapter =
+          io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+      if (mapAdapter != null && mapAdapter.supportsMapCharts()) {
+        io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding mapBinding =
+            new io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding();
+        io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(mapBinding);
+        getFabricPlayerLifecycleHook().onPlayerQuit(uuid ->
+            io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.firePlayerQuit(uuid));
+        RTP.log(Level.INFO,
+            "[RTP] Fabric map binding installed (FabricMapBinding, carrier="
+                + mapAdapter.mcVersion() + ").");
+      } else {
+        RTP.log(Level.INFO,
+            "[RTP] Fabric map binding NOT installed: version adapter "
+                + (mapAdapter == null ? "<none>" : mapAdapter.mcVersion())
+                + " does not support map charts; /rtp visualizations will report"
+                + " mapBindingMissing (NoopMapBinding active).");
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] onInitialize MapBinding install failed; MapDispatch will fall back"
+              + " to NoopMapBinding: " + t.getClass().getSimpleName() + ": "
+              + t.getMessage(), t);
+    }
   }
 }

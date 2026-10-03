@@ -7,8 +7,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 
 import java.time.Duration;
 import java.util.List;
@@ -37,16 +37,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIf("io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisTestContainer#dockerAvailable")
 class RedisNetworkWaitlistIT {
 
-    private JedisPool pool;
+    private RespPool pool;
     private RedisNetworkWaitlist waitlist;
 
-    private static void scrubKeyspace(JedisPool p) {
-        try (Jedis j = p.getResource()) {
-            Set<String> keys = j.keys("rtp:net:waitlist:*");
-            if (keys != null && !keys.isEmpty()) {
-                j.del(keys.toArray(new String[0]));
+    private static void scrubKeyspace(RespPool p) {
+        try (RespConnection j = p.getResource()) {
+            RespConnection.ScanResult res = j.scan("0", "rtp:net:waitlist:*", 100);
+            if (!res.getResult().isEmpty()) {
+                j.del(res.getResult().toArray(new String[0]));
             }
-        }
+        } catch (Exception ignored) {}
     }
 
     @BeforeEach

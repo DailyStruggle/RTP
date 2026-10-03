@@ -596,4 +596,33 @@ public class JumpAdjustorTest {
         JumpAdjustor adj = buildAdjustor(0, 160, 16);
         assertNull(adj.adjust(solidChunk), "Completely solid chunk should return null when step narrowing exceeds range");
     }
+
+    @Test
+    void testMiscJumpAdjustorMethods() {
+        JumpAdjustor adj = buildAdjustor(60, 80, 1);
+        assertEquals(60, adj.minY());
+        assertEquals(80, adj.maxY());
+        assertFalse(adj.requiresSkyLight());
+        assertTrue(adj.keys().contains("minY"));
+        assertNotNull(adj.getParameters());
+
+        adj.set(JumpAdjustorKeys.requireSkyLight, "true");
+        assertTrue(adj.requiresSkyLight());
+
+        // null chunk guards
+        assertThrows(NullPointerException.class, () -> adj.adjust(null));
+        assertThrows(NullPointerException.class, () -> adj.adjustColumn(null, 0, 0));
+
+        // invalid ranges minY > maxY
+        adj.set(JumpAdjustorKeys.minY, 200L);
+        adj.set(JumpAdjustorKeys.maxY, 100L);
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        assertNull(adj.adjust(chunk));
+        assertNull(adj.adjustColumn(chunk, 0, 0));
+
+        // verifiers testPlacement
+        JumpAdjustor adjWithVerifier = new JumpAdjustor(java.util.List.of(coords -> coords.y() > 70));
+        assertTrue(adjWithVerifier.testPlacement(new RTPCoords(null, 0, 75, 0)));
+        assertFalse(adjWithVerifier.testPlacement(new RTPCoords(null, 0, 65, 0)));
+    }
 }

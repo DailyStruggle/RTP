@@ -1,10 +1,8 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist;
-
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -33,7 +31,7 @@ import java.util.logging.Logger;
  * immediately. Design in
  * {@code rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md}.
  *
- * <p>Mirrors {@link RedisNetworkRequestQueue}'s shape: a {@link JedisPool}
+ * <p>Mirrors {@link RedisNetworkRequestQueue}'s shape: a {@link RespPool}
  * is opened on construction (or injected from a host that already owns
  * one), all SPI calls hop onto a private single-thread executor, and the
  * impl is {@link AutoCloseable}. Pre-loads six Lua scripts via
@@ -85,7 +83,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
 
     private static final AtomicInteger THREAD_COUNTER = new AtomicInteger();
 
-    private final JedisPool pool;
+    private final RespPool pool;
     private final boolean ownsPool;
     private final ExecutorService executor;
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -100,7 +98,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
     private final RedisLuaScripts refreshTtlScript;
 
     /**
-     * Production constructor. Opens its own {@link JedisPool} and pre-loads
+     * Production constructor. Opens its own {@link RespPool} and pre-loads
      * all six waitlist scripts.
      *
      * @param host     Redis host
@@ -119,11 +117,11 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
      * pool. The caller retains ownership of the pool; this binding's
      * {@link #close()} only shuts down its executor.
      */
-    public RedisNetworkWaitlist(JedisPool pool, int maxSize) {
+    public RedisNetworkWaitlist(RespPool pool, int maxSize) {
         this(Objects.requireNonNull(pool, "pool"), false, maxSize);
     }
 
-    private RedisNetworkWaitlist(JedisPool pool, boolean ownsPool, int maxSize) {
+    private RedisNetworkWaitlist(RespPool pool, boolean ownsPool, int maxSize) {
         if (maxSize < 0) {
             throw new IllegalArgumentException("maxSize must be >= 0, got " + maxSize);
         }
@@ -132,7 +130,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         this.maxSize = maxSize;
 
         // Eagerly validate connectivity.
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             j.ping();
         } catch (Exception e) {
             if (ownsPool) pool.close();
@@ -169,16 +167,8 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         this.executor = Executors.newSingleThreadExecutor(tf);
     }
 
-    private static JedisPool buildPool(String host, int port, String password) {
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(4);
-        cfg.setMaxIdle(2);
-        cfg.setMinIdle(1);
-        cfg.setTestOnBorrow(true);
-        if (password != null && !password.isEmpty()) {
-            return new JedisPool(cfg, host, port, 2000, password);
-        }
-        return new JedisPool(cfg, host, port, 2000);
+    private static RespPool buildPool(String host, int port, String password) {
+        return new RespPool(host, port, 2000, password, 4);
     }
 
     // ---- SPI ----------------------------------------------------------------
@@ -191,7 +181,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         }
         return runAsync(() -> {
             String json = encode(envelope);
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = enrolScript.evalsha(j,
                         Arrays.asList(LIST_KEY, UUID_KEY, CID_KEY),
                         Arrays.asList(
@@ -199,7 +189,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
                                 envelope.correlationId().toString(),
                                 json,
                                 Integer.toString(maxSize)));
-                String s = raw == null ? "" : raw.toString();
+                String s = raw == null ? "" : (raw instanceof byte[] b ? new String(b, java.nio.charset.StandardCharsets.UTF_8) : raw.toString());
                 switch (s) {
                     case "ACCEPTED":
                     case "ACCEPTED_IDEMPOTENT":
@@ -227,7 +217,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         return runAsync(() -> {
             // 1. Peek head up to globalCap.
             List<String> peeked;
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = peekScript.evalsha(j,
                         Collections.singletonList(LIST_KEY),
                         Collections.singletonList(Integer.toString(globalCap)));
@@ -275,7 +265,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
 
             // 3. Atomically remove the allocated envelopes.
             List<String> removed;
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = drainBatchScript.evalsha(j,
                         Arrays.asList(LIST_KEY, UUID_KEY, CID_KEY),
                         drainArgv);
@@ -323,7 +313,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
     public CompletableFuture<Optional<Integer>> position(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         return runAsync(() -> {
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = positionScript.evalsha(j,
                         Arrays.asList(LIST_KEY, UUID_KEY),
                         Collections.singletonList(playerId.toString()));
@@ -338,7 +328,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(reason, "reason");
         return runAsync(() -> {
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = removeUuidScript.evalsha(j,
                         Arrays.asList(LIST_KEY, UUID_KEY, CID_KEY),
                         Collections.singletonList(playerId.toString()));
@@ -355,7 +345,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         }
         return runAsync(() -> {
             long now = System.currentTimeMillis();
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = reapScript.evalsha(j,
                         Arrays.asList(LIST_KEY, UUID_KEY, CID_KEY),
                         Arrays.asList(Long.toString(now), Long.toString(maxAge.toMillis())));
@@ -367,7 +357,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
     @Override
     public CompletableFuture<Integer> size() {
         return runAsync(() -> {
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Long n = j.llen(LIST_KEY);
                 return n == null ? 0 : n.intValue();
             }
@@ -378,7 +368,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
     public CompletableFuture<Integer> refreshAllTtl() {
         return runAsync(() -> {
             long now = System.currentTimeMillis();
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = refreshTtlScript.evalsha(j,
                         Collections.singletonList(LIST_KEY),
                         Collections.singletonList(Long.toString(now)));

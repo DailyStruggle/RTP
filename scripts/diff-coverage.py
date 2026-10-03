@@ -129,6 +129,8 @@ def changed_lines(baseline: str) -> dict[str, set[int]]:
         ["git", "diff", "--unified=0", "--no-color", baseline, "--", "*.java"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if out.returncode != 0:

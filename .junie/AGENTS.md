@@ -17,7 +17,7 @@ Operational guide for AI agents and human contributors working in the RTP reposi
 7. Before modifying an uncommitted **code** file, create a `.bak` copy beside it. Skip for git-clean files and docs/markdown.
 8. **Stay on task.** Record unrelated potential bugs in [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) and keep going.
 9. **Maintain a task checklist** for any multi-step task to preserve state across interruptions (see *Checklist-Based State Tracking*).
-10. **End any runtime-testable progress with a full build** (`./gradlew build`) before submitting (see *Final Full Build*).
+10. **Run verification proportional to the change** - use targeted module builds/tests for localized edits; reserve full multi-module builds (`./gradlew build`) and runtime devstack acceptance for cross-module, network, or release gates (see *Build & Verification Gates* and [`TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md)).
 11. **Write markdown as UTF-8; never emit mojibake.** If you see sequences like `â€”`, `â€™`, `âœ…`, `Â§`, or ``, stop and re-encode.
 12. **Never run destructive git operations** (`git stash`, `git reset --hard`, `git restore`, `git clean -fd`, `git push --force`) on the working tree (see *Git Safety*).
 13. **Never `git commit` or `git push` unless explicitly requested by the user in the current session.**
@@ -96,7 +96,7 @@ Read only what the task requires. Do not read everything.
 | Scheduling or concurrency changes | [`docs/dev/DESIGN.md`](../docs/dev/DESIGN.md), [`docs/dev/REQUIREMENTS.md section 3`](../docs/dev/REQUIREMENTS.md) |
 | Placing new code in a module | [`docs/dev/ARCHITECTURE.md`](../docs/dev/ARCHITECTURE.md) + *Architecture Boundaries* below |
 | Domain terminology | [`docs/dev/GLOSSARY.md`](../docs/dev/GLOSSARY.md) |
-| Writing or updating tests | [`docs/dev/COVERAGE_PLAN.md`](../docs/dev/COVERAGE_PLAN.md), [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) |
+| Writing or updating tests | [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md) (what to test when), [`docs/dev/COVERAGE_PLAN.md`](../docs/dev/COVERAGE_PLAN.md), [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) |
 | Structural architectural changes | [`docs/adr/README.md`](../docs/adr/README.md) + relevant ADR |
 | Multi-platform feature work | [`docs/dev/MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) |
 | Multi-server / proxy (Velocity, BungeeCord) work | [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md) (ADR-036) |
@@ -248,6 +248,7 @@ Adventure / Paper `Book` pages render on parchment-yellow backgrounds. Never use
 - **Bounded algorithms:** Use Archimedean spiral mapping (ADR-001); no unbounded `while` loops.
 - **Fail-closed contract:** Public `rtp-api` methods throw `IllegalStateException` when called pre-init (S-006).
 - **Traceable tests:** Reference `REQ-*` IDs in test class names or `@DisplayName`; update `TRACEABILITY.md`.
+- **Test tier selection:** Consult [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md). Unit tests are preferred for fast local verification; headless devstack acceptance (`devstack/run-acceptance.ps1`) is scriptable and available for cross-server network, platform parity, and runtime-attested coverage.
 - **No process notes:** Never commit development shorthand (`Slice X`, `Phase 2e`, `CHECKLIST-*`) in source comments, Javadoc, or config comments.
 - **Telegraphic comments:** Prioritize information density over exposition. State *why* and non-obvious invariants in <=8 lines. Do not narrate obvious code.
 
@@ -269,12 +270,13 @@ User strings live in `rtp-plugin/src/main/resources/<file>.yml` (English baselin
 ## Environment & Execution
 
 - **Gradle execution:** Always use the wrapper (`.\gradlew.bat` on Windows/PowerShell, `./gradlew` on Linux/POSIX). Run one command per line without chaining.
-  - Transparent mutex/file-locking serialization is built directly into `gradlew` and `gradlew.bat` so concurrent LLM agent tasks and scripts can execute standard wrapper commands without race conditions or cache lock timeouts.
+  - Transparent mutex/file-locking serialization is built directly into `gradlew` and `gradlew.bat` so concurrent LLM agent tasks and scripts can execute standard wrapper commands without race conditions or cache lock timeouts. Target-aware granular locking automatically allows builds on non-conflicting module targets (e.g. `:rtp-core:...` vs `:commands-api:...`) to run in parallel, while serializing root/multi-module builds under the global build lock.
   - **Never attempt to stop another thread's or agent's Gradle task.** Never run `gradlew --stop`, kill Gradle daemon processes (`Stop-Process`, `kill`, `pkill`), or break Gradle locks when another command or thread is executing. Stopping daemons mid-run causes deadlock, lock corruption, and infinite wait loops across concurrent agents. Wait for the wrapper's built-in mutex to yield or let the active task complete.
 - **Build & test commands:**
   - Full build: `.\gradlew.bat build` (or `./gradlew build`)
   - Module build: `.\gradlew.bat :<module>:build` (e.g. `.\gradlew.bat :rtp-core:build`)
   - Targeted tests: `.\gradlew.bat :<module>:test --tests "<pattern>"`
+  - Acceptance devstack: `.\devstack\run-acceptance.ps1 -Scenario <scenario>` (or `./devstack/run-acceptance.sh --scenario <scenario>`). Headless and scriptable via Mineflayer bot; see [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md) for when to run unit tests vs devstack acceptance.
 - **Search:** Use `search_project` tool with targeted keywords. Never `grep`/`find`.
 - **Directory listing caution:** Treat empty listings as "unknown"; verify file existence with `git status` or `search_project` before overwriting.
 - **Python scripts:** Stdlib-only scripts live in `scripts/`. On Windows, execute via configured Python 3.12+ interpreter alias.
@@ -282,12 +284,34 @@ User strings live in `rtp-plugin/src/main/resources/<file>.yml` (English baselin
 
 ---
 
-## Final Full Build (end any runtime-testable progress with a build)
+## Build & Verification Gates (Conditional Testing Policy)
 
-Any task that produces runtime-testable progress (code, resources, build scripts) **shall end with a full multi-module build** (`./gradlew build` / `.\gradlew.bat build`) before `submit`.
-- Scoped tests are not a substitute for the full multi-module build.
-- Exemptions: pure documentation / markdown changes with no compiled code touched.
-- Cite build outcome in `submit` summary under `### Verification`.
+Verification shall be proportional to the scope and blast radius of the change. Do not run exhaustive whole-repo verification or heavy container stacks when a scoped target satisfies confidence.
+
+### 1. Build Tiers: Scoped vs. Full Multi-Module Build
+- **Targeted module build/test (`.\gradlew.bat :<module>:build` or `:test`):**
+  - **Sufficient for:** Localized changes confined to a single module or leaf adapter (e.g. `commands-api`, `rtp-core` math/cache adjustments, `rtp-plugin` locale updates, single platform adapter bugfix).
+  - Also sufficient for rapid inner-loop iterative feedback while working.
+- **Full multi-module build (`.\gradlew.bat build` / `./gradlew build`):**
+  - **Required for:**
+    1. Cross-module structural changes (e.g. public interfaces in `rtp-api`, SPI refactoring in `commands-api`/`effects-api`, core model signatures).
+    2. Shared build scripts, dependencies, or root Gradle configuration changes (`build.gradle`, `settings.gradle`, `gradle/`).
+    3. Final pre-release verification or when explicitly requested by the user.
+- **Exemptions:** Pure documentation or markdown changes (no compiled source or resource files touched) require no Gradle build or test execution.
+
+### 2. Runtime & Devstack Acceptance: Conditional Triggers
+Runtime acceptance via headless devstack (`devstack/run-acceptance.ps1`) spins up multiple containers (Redis, Velocity proxies, Paper/Folia/Fabric backends) and shall be run conditionally based on subsystem impact:
+- **Runtime Acceptance Required:**
+  - Network-mode changes: proxy packet framing, backend reservation tokens, Redis/SQL state transport, heartbeat gossip, or cross-server handoffs.
+  - Platform bootstrap & adapter lifecycle changes on Paper, Folia, Fabric, or Velocity that cannot be verified in JVM unit mocks.
+  - Multi-server release sign-off and enterprise readiness audit (ADR-036, `docs/dev/ENTERPRISE_READINESS.md`).
+- **Runtime Acceptance NOT Required (Skip Devstack):**
+  - Core algorithm, selection shape, or spiral math changes (verified via `:rtp-core:test`).
+  - Command parsing and permissions within standard trees (verified via `:commands-api:test` / `:rtp-core:test`).
+  - Locale, translation key, and configuration updates (verified via `LocaleParityTest`).
+  - Unit-mockable adapter hooks and standalone utilities.
+
+Cite the verification level executed and rationale in the `submit` summary under `### Verification`.
 
 ---
 

@@ -57,10 +57,10 @@ dependencies {
     // guava is provided by Spigot/Paper/Folia at runtime
     compileOnly 'com.google.guava:guava:33.2.1-jre'
     testRuntimeOnly 'com.google.guava:guava:33.2.1-jre'
-    implementation 'com.zaxxer:HikariCP:5.1.0'
-    // Jedis must remain 'implementation': RedisManager (rtp-core) directly instantiates
-    // JedisPool/Jedis.  Extraction to rtp-persistence-redis is tracked in the backlog.
-    implementation 'redis.clients:jedis:5.1.2'
+    // gson is provided by Spigot/Paper/Folia/Velocity at runtime
+    compileOnly 'com.google.code.gson:gson:2.10.1'
+    testImplementation 'com.google.code.gson:gson:2.10.1'
+    testRuntimeOnly 'com.google.code.gson:gson:2.10.1'
     // PostgreSQL driver is loaded at runtime via JDBC ServiceLoader; no org.postgresql.*
     // imports exist in core source, so 'compileOnly' correctly excludes it from the
     // bundled JAR.  Servers that need PostgreSQL supply the driver independently.
@@ -119,7 +119,7 @@ compileJava {
 // configurations and any future tag-based tooling agree with the build.
 test {
     exclude '**/benchmark/**'
-    exclude '**/usability/**'
+    exclude '**/usability/CommandUsabilityBenchmarkTest*'
 
     // ENTERPRISE_READINESS.md item 18: the Docker-gated MySQL/PostgreSQL
     // integration tier reaches the local Docker daemon through docker-java, which

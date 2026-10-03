@@ -4,8 +4,8 @@ config-version = "2.9"
 bind = "0.0.0.0:25577"
 motd = "<bold><red>RTP devstack proxy-b"
 show-max-players = 20
-online-mode = true
-force-key-authentication = true
+online-mode = false
+force-key-authentication = false
 prevent-client-proxy-connections = false
 player-info-forwarding-mode = "MODERN"
 forwarding-secret-file = "forwarding.secret"
@@ -28,14 +28,14 @@ forced-hosts = {}
 	lobby-b = "lobby-b:25565"
 	backend-a = "backend-a:25565"
 	backend-b = "backend-b:25565"
-	# backend-c: Fabric 1.21.11 (see proxy-a/velocity.toml for rationale).
 	backend-c = "backend-c:25565"
-	try = ["lobby-b", "lobby-a", "backend-b", "backend-a", "backend-c"]
+	backend-d = "backend-d:25565"
+	try = ["lobby-b", "lobby-a", "backend-b", "backend-a", "backend-c", "backend-d"]
 
 [advanced]
 	compression-threshold = 256
 	compression-level = -1
-	login-ratelimit = 3000
+	login-ratelimit = 0
 	connection-timeout = 5000
 	read-timeout = 30000
 	haproxy-protocol = false

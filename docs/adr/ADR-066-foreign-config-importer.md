@@ -33,6 +33,7 @@ Add a one-shot, explicit, non-destructive foreign-config importer behind a new c
 - A `ConfigImporter` SPI keyed by source name, declaring: `sourceName()`, a detection probe (expected on-disk path(s)), `preview()` returning a list of mapping outcomes, and `apply()` performing the backed-up writes.
 - A registry resolves importers by key and powers auto-detection.
 - `BetterRtpConfigImporter` is the first concrete implementation; `ezrtp` / `jakesrtp` follow the same contract.
+- Unified permission migration: `/rtp config import` executes permission migration in tandem with configuration file translation, querying and mapping competitor permission nodes non-destructively through the active permission provider (e.g. LuckPerms) unless explicitly skipped with `permissions=false`. Standalone queries remain available via `/rtp config import permissions`.
 
 ### Module placement
 

@@ -6,6 +6,7 @@
 # Sección 2: Teletransporte
 # ###############################################################################
 yaTeletransportando: "&7[P0] ⚡ ¡ya te estás teletransportando!"
+yaEnSesion: "&c[P0] [player] ya está en una sesión de partida activa."
 
 # si el plugin se está recargando actualmente
 teletransporteDenegadoRecargando: "&7[P0] los teletransportes están desactivados temporalmente mientras el plugin se recarga. Inténtalo de nuevo en unos instantes."
@@ -53,6 +54,10 @@ milisegundos: "ms"
 # el mundo no existe en bukkit
 # marcador: [world] - el nombre del mundo
 mundoInvalido: "&7[P0] no se pudo encontrar el mundo '[world]'"
+
+noBackLocation: "&c[P0] No se encontró una ubicación previa de teletransporte."
+
+backSuccess: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Has vuelto a tu ubicación anterior.</gradient>"
 
 # el plugin no tiene el comando que el usuario solicitó
 # marcador: [arg] - el argumento intentado

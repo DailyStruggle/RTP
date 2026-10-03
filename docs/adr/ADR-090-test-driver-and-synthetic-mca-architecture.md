@@ -1,6 +1,6 @@
 # ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
 
-**Status:** Proposed  
+**Status:** Proposed
 **Date:** 2026-09-08  
 
 ## Context

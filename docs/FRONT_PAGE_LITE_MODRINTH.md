@@ -65,15 +65,20 @@ An Anvil (`.mca`) pre-filter reads biome and block data straight from the region
 
 Safe destinations are prepared at-rate and a number of them are kept ready in a cache per defined region, so serving `/rtp` is handing back a coordinate that's already checked. The numbers are in the Performance section below.
 
+### Non-repetition & player spacing
+
+Candidate selection uses a keyed 4-round Feistel permutation over a space-filling Hilbert curve with a hardened ARX PRF round function (SipRound style) and tiny-domain masking. The permutation is a strict bijection: every candidate chunk across the region is visited exactly once before any repeats, yielding 0 duplicate chunk landings without storing visited keys. Dyadic bit-reversal phase bisection leaps consecutive teleports across opposite quadrants (averaging ~4,600 blocks per hop on a 4k border), bounding consecutive arrivals to a minimum floor of >= sqrt(S) chunks (128 blocks at S=64, 256 blocks at S=256). The entire selection state is an advancing 64-bit integer counter: no entity distance loops, no recent-location history sets, and zero heap allocation per draw.
+
 ---
 
 ## Features
 
 - **In-game menus** - two separate books (Paper / Folia; chat-paginated elsewhere). `/rtp menu` is the player side: teleport, or pick a region, world, or biome. `/rtp admin` is the operator side: config editor with search, setup prefabs, region and MSPT/heap visualizations, scan control, diagnostics. It's gated on `rtp.menu.admin`, and for anyone holding that it also shows up as an extra row inside `/rtp menu`.
 - **Effects engine** - particles, sounds, fireworks, potions, titles on every teleport phase.
+- **Scripted actions & arenas** - multi-player placement and boundary confinement in YAML (`definitions/actions/`). Handles player spacing, shrinking world borders, border damage, and lifecycle command hooks without bespoke minigame code.
 - **Live map heatmaps** - `/rtp scan` paints region safety onto a real held map.
 - **Economy** - charge per `/rtp` (Vault), per-region pricing, auto-refund on cancel.
-- **12 claim integrations** - GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, RedProtect, CrashClaim, KingdomsX, Residence.
+- **18 claim integrations** (16 Bukkit/Paper/Folia via the bundled claim addon + 2 native mod checkers on Fabric/NeoForge) - GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, HuskTowns, PlotSquared, RedProtect, CrashClaim, KingdomsX, Residence, UltimateClaims, MinePlots, plus FTB Chunks and OpenPartiesAndClaims.
 - **PvP / combat-tag gate, PlaceholderAPI, per-player cooldowns & limits, multi-world overrides.**
 - **Cross-server `/rtp`** - Running on Velocity enables cross-server communication via tcp socket, extensible to addons.
 - **Platform-independent engine** - core code runs on pure java and custom implementations, enabling cross-server support via lightweight suppliers
@@ -103,7 +108,7 @@ Safe destinations are prepared at-rate and a number of them are kept ready in a 
 1. Drop `LeafRTP-x.y.z.jar` into `plugins/` (or `mods/`).
 2. Start the server. A `default` region is written for you.
 3. Type `/rtp`. From here there are two routes to change anything: in-game via `/rtp admin` (config editor with search, plus bundled setup prefabs), or the YAML under `plugins/RTP/`. Both edit the same state, and runtime reloads are supported, so you don't have to pick one and stick with it. `/rtp menu` is not a settings screen - it's the player-facing book that teleports you or lets you pick a region, world, or biome.
-4. **Size the region to your world**, and point each world at a region. `radius`, `centerX`, and `centerZ` live *inside* the region's `shape:` block and are measured in **chunks**, not blocks - a `radius` of `625` reaches 10,000 blocks. This is the one that bites people: a radius left in block-think looks like a broken plugin. See [Regions](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/) and [Worlds](https://dailystruggle.github.io/RTP/admin/configuration/WORLDS/).
+4. **Size the region to your world**, and point each world at a region. Set `radius`, `centerX`, and `centerZ` in the region's `shape:` block. Suffixes specify units directly: `radius: 10km`, `radius: 10000b` (blocks), or `radius: 625c` (chunks; default if unit omitted). See [Regions](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/) and [Worlds](https://dailystruggle.github.io/RTP/admin/configuration/WORLDS/).
 
 Start here: [**Quick start**](https://dailystruggle.github.io/RTP/admin/QUICK_START/) and [**Intended usage**](https://dailystruggle.github.io/RTP/site/intended-usage/). The full admin guide is auto-unpacked into `plugins/RTP/docs/` on first run, and lives online at the [**admin guide**](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/).
 
@@ -255,6 +260,9 @@ Visual test suites and benchmarks evaluate candidate dispersion, collision avoid
 <details>
 <summary><b>FAQ</b></summary>
 
+**Q: Will players land on top of each other or in each other's bases?**
+A: No. Selections use a 4-round Feistel permutation over a Hilbert curve, guaranteeing zero duplicate chunk landings across the region. Back-to-back teleports cycle through dyadic bit-reversal offsets that leap across quadrants, enforcing at least an 8-to-16 chunk separation (128-256 blocks) between consecutive arrivals. This is enforced by traversal geometry without checking online player locations and without storing past destinations in memory (just an advancing 64-bit counter).
+
 **Q: How do I stop `/rtp` from lagging my server, and why is LeafRTP faster than other random teleport plugins?**
 A: Most `/rtp` calls serve from a pre-warmed queue - chunks are already loaded and safety-checked before you type the command. Two design choices make that queue cheap to keep full: a **persistent spatial memory** per region (the plugin remembers which sectors of the world failed safety checks, so the spiral selector skips known-bad ground instead of rerolling forever), and an **off-tick async pre-filter** (Anvil region files are read directly to reject unsafe biomes/blocks *before* any chunk is loaded, so candidate verification never blocks the main thread). The pre-warmed queue is just the visible tip - the spatial memory keeps candidate selection bounded, and the async pre-filter keeps verification off the tick loop.
 
@@ -280,7 +288,7 @@ A: There's a native NeoForge adapter for 1.21.x / 26.x, running the same `rtp-co
 A: Run **Arclight** or **Mohist** (officially supported) and use this jar. A native Forge adapter is not planned.
 
 **Q: Memory and MSPT - should I worry?**
-A: MSPT, no. Memory, know what you are buying: LeafRTP trades heap for tick time, on purpose. It is a cache, so it does *not* use less RAM than a plugin that rerolls and keeps nothing. What it does do is stay bounded: every cache tier is capacity-limited, and the per-entry cost is small and measured against the current code - about 68 bytes per cached location in the hot buffers (`cacheCap`), and about 26 bytes per known-bad chunk in the compressed 1D spatial segments, so 8 192 cached locations cost well under a megabyte. An active `MemoryTracker` sweep prevents ticket leaks and chunk bloat, and background chunk generation pauses automatically under heap pressure (`maxHeapPercent`). On a healthy server TPS holds near 20.00. If you are tight on RAM, lower `cacheCap` - you trade queue depth for heap directly. I am deliberately not publishing a cross-plugin heap comparison: my last whole-JVM heap run predates the current allocation and cache-expiry work here, and competitor versions have moved on too, so any figure from it would describe neither this plugin nor the current version of anyone else's.
+A: MSPT, no. Spatial memory stays compact (~26 bytes per sector segment in compressed memory). In the hot queue, kept locations hold chunk tickets that pin native chunk neighborhoods to deliver sub-millisecond teleports. `MemoryTracker` prevents ticket leaks, and under heap pressure (`maxHeapPercent` or <512 MB free), background fill pauses and active chunk tickets are automatically shed to cold storage, releasing pinned chunks immediately. Cross-plugin heap figures are withheld pending updated whole-JVM benchmarks.
 
 **Q: How do I report a bug?**
 A: GitHub issue with server version, LeafRTP version, platform, relevant config files, and the error log section. See the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/) for the full reproduction template.

@@ -778,9 +778,22 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       }
 
       int count = 0;
+      try {
+        java.util.Map<org.bukkit.plugin.Plugin, java.util.Collection<org.bukkit.Chunk>> tickets = world.getPluginChunkTickets();
+        if (tickets != null && tickets.containsKey(plugin)) {
+          java.util.Collection<org.bukkit.Chunk> chunks = tickets.get(plugin);
+          if (chunks != null) {
+            count = chunks.size();
+          }
+        }
+      } catch (Throwable ignored) {
+      }
       for (org.bukkit.Chunk chunk : world.getForceLoadedChunks()) {
-        if (chunk.getPluginChunkTickets().contains(plugin)) {
-          count++;
+        try {
+          if (chunk.getPluginChunkTickets().contains(plugin)) {
+            count++;
+          }
+        } catch (Throwable ignored) {
         }
       }
       future.complete(count);
