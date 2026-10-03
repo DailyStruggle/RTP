@@ -256,6 +256,82 @@ class ActionManagerTest {
   }
 
   @Test
+  @DisplayName("Rejects concurrent trigger while placement is async in progress")
+  void testConcurrentTriggerDuringAsyncPlacement() {
+    UUID p1 = UUID.randomUUID();
+
+    ActionDefinition def = new ActionDefinition(
+        "duel_async", "duel_async", "rtp.action.duel", "A duel",
+        ActionDefinition.PlacementSpec.DEFAULT,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY);
+
+    actionManager.registerAction(def);
+
+    CompletableFuture<GroupPlacementResult> placeFuture = new CompletableFuture<>();
+    RTP.groupPlacementService = request -> placeFuture;
+
+    // Trigger 1 begins async placement and does not complete yet
+    CompletableFuture<ActionSessionResult> trigger1 =
+        actionManager.trigger("duel_async", List.of(p1), ActionContext.EMPTY);
+    assertFalse(trigger1.isDone());
+
+    // Trigger 2 for the same participant must immediately be rejected due to atomic reservation
+    CompletableFuture<ActionSessionResult> trigger2 =
+        actionManager.trigger("duel_async", List.of(p1), ActionContext.EMPTY);
+    assertTrue(trigger2.isDone(), "Second trigger must complete immediately with rejection");
+    ActionSessionResult res2 = trigger2.join();
+    assertFalse(res2.success());
+    assertTrue(res2.failureReason().contains("already in an active session"));
+
+    // Now complete the async placement for trigger 1
+    placeFuture.complete(
+        GroupPlacementResult.success(Map.of(p1, new RTPLocation(serverAccessor.getRTPWorld("world"), 0, 64, 0))));
+
+    ActionSessionResult res1 = trigger1.join();
+    assertTrue(res1.success());
+
+    // Verify session lookup works for p1
+    Optional<ActionSession> sessionOpt = actionManager.getSessionForParticipant(p1);
+    assertTrue(sessionOpt.isPresent());
+    assertEquals(res1.sessionId(), sessionOpt.get().sessionId());
+
+    actionManager.disarm(res1.sessionId());
+    assertFalse(actionManager.getSessionForParticipant(p1).isPresent());
+  }
+
+  @Test
+  @DisplayName("Rolls back atomic participant reservation on placement failure")
+  void testRollbackReservationOnPlacementFailure() {
+    UUID p1 = UUID.randomUUID();
+
+    ActionDefinition def = new ActionDefinition(
+        "duel_fail", "duel_fail", "rtp.action.duel", "A duel",
+        ActionDefinition.PlacementSpec.DEFAULT,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY);
+
+    actionManager.registerAction(def);
+
+    RTP.groupPlacementService = request ->
+        CompletableFuture.completedFuture(
+            GroupPlacementResult.failure(GroupPlacementResult.Reason.INSUFFICIENT_SAFE_SLOTS, "Subspace failure"));
+
+    ActionSessionResult res1 = actionManager.trigger("duel_fail", List.of(p1), ActionContext.EMPTY).join();
+    assertFalse(res1.success());
+
+    // Participant must be cleared from participantToSession so a subsequent trigger is allowed
+    RTP.groupPlacementService = request ->
+        CompletableFuture.completedFuture(
+            GroupPlacementResult.success(Map.of(p1, new RTPLocation(serverAccessor.getRTPWorld("world"), 0, 64, 0))));
+
+    ActionSessionResult res2 = actionManager.trigger("duel_fail", List.of(p1), ActionContext.EMPTY).join();
+    assertTrue(res2.success(), "Subsequent trigger must succeed after earlier failure rolled back reservation");
+
+    actionManager.disarm(res2.sessionId());
+  }
+
+  @Test
   @DisplayName("Per-action prevalidated caching: offer, poll, revalidate, and dispatch (ADR-097)")
   void testPerActionCachingAndRevalidation() {
     UUID p1 = UUID.randomUUID();

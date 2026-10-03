@@ -104,13 +104,11 @@ public final class DirectDatabaseDispatcher {
         String targetServer = serverHint.orElse(null);
         String targetRegion = regionKey.orElse(null);
 
-        if (targetServer == null || targetServer.isBlank()) {
-            if (peerRegionRegistry != null) {
-                Optional<ServerRegion> picked = peerRegionRegistry.pickMostKept();
-                if (picked.isPresent()) {
-                    targetServer = picked.get().serverId();
-                    targetRegion = picked.get().regionKey();
-                }
+        if ((targetServer == null || targetServer.isBlank()) && peerRegionRegistry != null) {
+            Optional<ServerRegion> picked = peerRegionRegistry.pickMostKept();
+            if (picked.isPresent()) {
+                targetServer = picked.get().serverId();
+                targetRegion = picked.get().regionKey();
             }
         }
 

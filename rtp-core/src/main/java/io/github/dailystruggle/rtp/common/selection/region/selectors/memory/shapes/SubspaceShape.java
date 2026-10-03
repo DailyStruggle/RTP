@@ -411,10 +411,9 @@ public class SubspaceShape {
     int[] cell = candidates.get(index);
     return validator.validateAsync(cell[0], cell[1])
         .thenCompose(loc -> {
-          if (loc != null && loc.coords() != null) {
-            if (elevationTolerance < 0 || Math.abs(loc.coords().y() - anchorY) <= elevationTolerance) {
-              acc.add(loc);
-            }
+          if (loc != null && loc.coords() != null
+              && (elevationTolerance < 0 || Math.abs(loc.coords().y() - anchorY) <= elevationTolerance)) {
+            acc.add(loc);
           }
           return evaluateSlotsSequentially(
               candidates, index + 1, required, target, elevationTolerance, anchorY, acc, validator);

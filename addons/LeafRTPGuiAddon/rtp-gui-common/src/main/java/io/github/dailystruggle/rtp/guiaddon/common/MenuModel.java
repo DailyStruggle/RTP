@@ -518,12 +518,9 @@ public final class MenuModel {
     // Prefer the operator-configured cosmetic label (region displayName for a
     // local target, or the peer-advertised label for a cross-server one). May
     // contain RTP color/gradient codes; the renderer applies color formatting.
-    if (status != null && status.label() != null && !status.label().isEmpty()) {
-      // Ignore an unconfigured "default" fallback label that leaks from older core
-      // or uncustomized regions, so default targets format with "Random teleport".
-      if (!"default".equalsIgnoreCase(status.label().trim()) || (target != null && target.kind() == RtpTarget.Kind.REGION && "default".equalsIgnoreCase(target.name()))) {
-        return status.label();
-      }
+    if (status != null && status.label() != null && !status.label().isEmpty()
+        && (!"default".equalsIgnoreCase(status.label().trim()) || (target != null && target.kind() == RtpTarget.Kind.REGION && "default".equalsIgnoreCase(target.name())))) {
+      return status.label();
     }
     if (target == null) return "Random teleport";
     switch (target.kind()) {

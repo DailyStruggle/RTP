@@ -369,9 +369,7 @@ public class LeafRTPClaimAddonRuleS003IntegrationTest {
   @DisplayName("Requirement 2: Teleport pipeline skips/retries candidate coordinates inside protected zones")
   void testTeleportPipelineSkipsCandidateInsideClaim(String provider) throws Exception {
     claimedProviders.add(provider);
-    AutoCloseable hookHandle = registerProviderVerifier(provider);
-
-    try {
+    try (AutoCloseable hookHandle = registerProviderVerifier(provider)) {
       // Candidate 1 is at (50, 64, 50) - inside claim
       rtpWorld.getChunkAt(3, 3).join();
       long chunk1Key = (3L & 0xffffffffL) | (3L << 32);
@@ -418,8 +416,6 @@ public class LeafRTPClaimAddonRuleS003IntegrationTest {
       assertTrue(res1Closed.get(), "Reservation for candidate inside claim must be closed when rejected");
       assertEquals(500, dispatched.coords().x(), "Dispatched destination must NOT be the claimed location");
       assertEquals(500, dispatched.coords().z(), "Dispatched destination must be the valid unclaimed location");
-    } finally {
-      hookHandle.close();
     }
   }
 
@@ -432,9 +428,7 @@ public class LeafRTPClaimAddonRuleS003IntegrationTest {
   @ValueSource(strings = {"griefprevention", "worldguard", "towny", "huskclaims", "husktowns"})
   @DisplayName("Requirement 3: Pre-cached pool sweeps invalidate coordinates on claim registration")
   void testPreCachedPoolSweepInvalidatesNewlyClaimedLocation(String provider) throws Exception {
-    AutoCloseable hookHandle = registerProviderVerifier(provider);
-
-    try {
+    try (AutoCloseable hookHandle = registerProviderVerifier(provider)) {
       // 1. Initial state: wilderness at (64, 64, 64). Pre-cache candidate into kept queue.
       rtpWorld.getChunkAt(4, 4).join();
       long chunkKey = (4L & 0xffffffffL) | (4L << 32);
@@ -490,8 +484,6 @@ public class LeafRTPClaimAddonRuleS003IntegrationTest {
       assertEquals(0, retained.size(), "No invalid locations should be retained");
       assertTrue(resClosed.get(), "Chunk reservation must be closed when cached location is invalidated by pool sweep");
       assertEquals(0, region.queueManager.keptLocations.size(), "Kept queue must be cleared of invalid cached location");
-    } finally {
-      hookHandle.close();
     }
   }
 

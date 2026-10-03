@@ -952,8 +952,12 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
             trackingConsumer.accept(msg);
           }
         }
-        @Override public void flush() {}
-        @Override public void close() throws SecurityException {}
+        @Override public void flush() {
+          // No buffered log records to flush in transient command output listener
+        }
+        @Override public void close() throws SecurityException {
+          // No resource cleanup required for transient log handler
+        }
       };
       rootLogger.addHandler(logHandler);
     } catch (Throwable ignored) {}

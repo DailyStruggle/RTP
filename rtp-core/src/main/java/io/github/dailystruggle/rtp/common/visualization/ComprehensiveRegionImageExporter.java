@@ -292,7 +292,6 @@ public final class ComprehensiveRegionImageExporter {
 
     // 4. Calculate spatial statistics (NN & Clark-Evans)
     double nnMean = 0.0;
-    double nnMin = 0.0;
     double nnP50 = 0.0;
     double clarkEvansR = 1.0;
     if (allPoints.size() >= 2) {
@@ -313,7 +312,6 @@ public final class ComprehensiveRegionImageExporter {
         sumDist += minD;
       }
       Arrays.sort(nearestDists);
-      nnMin = nearestDists[0];
       nnP50 = nearestDists[nearestDists.length / 2];
       nnMean = sumDist / allPoints.size();
 

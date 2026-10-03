@@ -56,7 +56,6 @@ public class GenericSchemaImporter extends AbstractForeignConfigImporter {
     @Override
     public ImportResult importConfiguration(Path sourcePluginDir, Path destinationDir, boolean overwrite) {
         List<Path> createdFiles = new ArrayList<>();
-        List<Path> backedUpFiles = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         List<String> errors = new ArrayList<>();
         List<String> mappedEntities = new ArrayList<>();

@@ -613,15 +613,21 @@ public final class ActionManager implements ActionService {
             + ", gates="
             + def.gates().size());
 
-    // Verify none of the participants are currently in an active action session
+    // Atomically reserve participants up front to prevent concurrent triggers bypassing the active check
+    UUID pendingSessionId = UUID.randomUUID();
+    List<UUID> reserved = new ArrayList<>(participants.size());
     for (UUID pid : participants) {
-      if (participantToSession.containsKey(pid)) {
+      if (participantToSession.putIfAbsent(pid, pendingSessionId) != null) {
+        for (UUID r : reserved) {
+          participantToSession.remove(r, pendingSessionId);
+        }
         io.github.dailystruggle.rtp.api.server.RTPServerAccessor acc = RTP.serverAccessor;
         String pName = (acc != null && acc.getPlayer(pid) != null) ? acc.getPlayer(pid).name() : pid.toString();
         RTP.log(Level.WARNING, "[action] participant " + pName + " (" + pid + ") already in active session");
         return CompletableFuture.completedFuture(
             ActionSessionResult.failure("Participant is already in an active session: " + pName));
       }
+      reserved.add(pid);
     }
 
     // 1. Evaluate pre-execution gate conditions before initiating placement (ADR-093)
@@ -654,7 +660,12 @@ public final class ActionManager implements ActionService {
         Level.FINE,
         "[action] pre-execution gates evaluation for '" + def.id() + "': passed=" + gatePassed);
     if (!gatePassed) {
-      // Action gate condition not met: enqueue invocation into ActionWaitQueue
+      // Action gate condition not met: roll back upfront reservation as players are only waiting
+      for (UUID r : reserved) {
+        participantToSession.remove(r, pendingSessionId);
+      }
+
+      // Enqueue invocation into ActionWaitQueue
       CompletableFuture<ActionSessionResult> waitFuture = new CompletableFuture<>();
       ActionWaitQueueEntry entry = new ActionWaitQueueEntry(participants, effectiveContext, waitFuture);
       waitQueues.computeIfAbsent(def.id().toLowerCase(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).add(entry);
@@ -676,7 +687,7 @@ public final class ActionManager implements ActionService {
       return waitFuture;
     }
 
-    return executeDirect(def, participants, effectiveContext);
+    return executeDirectInternal(def, participants, effectiveContext, pendingSessionId);
   }
 
   private void executeEnqueueSteps(
@@ -809,6 +820,14 @@ public final class ActionManager implements ActionService {
       ActionDefinition def,
       List<UUID> participants,
       ActionContext effectiveContext) {
+    return executeDirectInternal(def, participants, effectiveContext, null);
+  }
+
+  private CompletableFuture<ActionSessionResult> executeDirectInternal(
+      ActionDefinition def,
+      List<UUID> participants,
+      ActionContext effectiveContext,
+      UUID preReservedSessionId) {
 
     RTP.log(
         Level.FINE,
@@ -819,9 +838,28 @@ public final class ActionManager implements ActionService {
             + ", placementEnabled="
             + def.placement().enabled());
 
+    final UUID sessionId;
+    if (preReservedSessionId != null) {
+      sessionId = preReservedSessionId;
+    } else {
+      sessionId = UUID.randomUUID();
+      List<UUID> reserved = new ArrayList<>(participants.size());
+      for (UUID pid : participants) {
+        if (participantToSession.putIfAbsent(pid, sessionId) != null) {
+          for (UUID r : reserved) {
+            participantToSession.remove(r, sessionId);
+          }
+          io.github.dailystruggle.rtp.api.server.RTPServerAccessor acc = RTP.serverAccessor;
+          String pName = (acc != null && acc.getPlayer(pid) != null) ? acc.getPlayer(pid).name() : pid.toString();
+          return CompletableFuture.completedFuture(
+              ActionSessionResult.failure("Participant is already in an active session: " + pName));
+        }
+        reserved.add(pid);
+      }
+    }
+
     // If spatial placement is disabled (e.g. pure-scripting / external orchestrators), bypass GroupPlacementService
     if (!def.placement().enabled()) {
-      UUID sessionId = UUID.randomUUID();
       ActionSessionImpl session =
           new ActionSessionImpl(
               sessionId,
@@ -849,6 +887,7 @@ public final class ActionManager implements ActionService {
     // Spatial Placement via Subspace Group Engine (ADR-095)
     GroupPlacementService groupService = RTP.groupPlacementService;
     if (groupService == null) {
+      rollbackReservation(participants, sessionId);
       return CompletableFuture.completedFuture(
           ActionSessionResult.failure("GroupPlacementService is not available"));
     }
@@ -868,7 +907,19 @@ public final class ActionManager implements ActionService {
         : null;
 
     // Check if a pre-validated placement is cached for this action (ADR-097)
-    return tryCachedOrLivePlacement(def, participants, effectiveContext, groupService, parentRegion);
+    return tryCachedOrLivePlacement(def, participants, effectiveContext, groupService, parentRegion, sessionId)
+        .whenComplete((res, ex) -> {
+          if (ex != null || res == null || !res.success()) {
+            rollbackReservation(participants, sessionId);
+          }
+        });
+  }
+
+  private void rollbackReservation(List<UUID> participants, UUID sessionId) {
+    if (participants == null || sessionId == null) return;
+    for (UUID pid : participants) {
+      participantToSession.remove(pid, sessionId);
+    }
   }
 
   /**
@@ -880,21 +931,22 @@ public final class ActionManager implements ActionService {
       List<UUID> participants,
       ActionContext effectiveContext,
       GroupPlacementService groupService,
-      Region parentRegion) {
+      Region parentRegion,
+      UUID sessionId) {
 
     PrevalidatedActionPlacement cached = pollCachedPlacement(def.id(), participants.size());
     if (cached != null) {
-      return revalidateAndApply(cached, def, participants, effectiveContext, parentRegion)
+      return revalidateAndApply(cached, def, participants, effectiveContext, parentRegion, sessionId)
           .thenCompose(res -> {
             if (res.success()) {
               return CompletableFuture.completedFuture(res);
             }
             // If cached placement was invalidated upon recheck, try next cached or fall back to live placement
-            return tryCachedOrLivePlacement(def, participants, effectiveContext, groupService, parentRegion);
+            return tryCachedOrLivePlacement(def, participants, effectiveContext, groupService, parentRegion, sessionId);
           });
     }
 
-    return executeLivePlacement(def, participants, effectiveContext, groupService, parentRegion);
+    return executeLivePlacement(def, participants, effectiveContext, groupService, parentRegion, sessionId);
   }
 
   /**
@@ -938,7 +990,8 @@ public final class ActionManager implements ActionService {
       ActionDefinition def,
       List<UUID> participants,
       ActionContext effectiveContext,
-      Region parentRegion) {
+      Region parentRegion,
+      UUID sessionId) {
 
     List<RTPLocation> locList = new ArrayList<>(cached.placements().values());
     List<CompletableFuture<Boolean>> revalidationChecks = new ArrayList<>(participants.size());
@@ -995,7 +1048,6 @@ public final class ActionManager implements ActionService {
               }
 
               // Revalidation passed! Assign cached slots to participants, dispatch teleports, and start session
-              UUID sessionId = UUID.randomUUID();
               Map<UUID, int[]> assignedSlots = new HashMap<>();
               String worldName = locList.get(0).world().name();
 
@@ -1077,7 +1129,8 @@ public final class ActionManager implements ActionService {
       List<UUID> participants,
       ActionContext effectiveContext,
       GroupPlacementService groupService,
-      Region parentRegion) {
+      Region parentRegion,
+      UUID sessionId) {
 
     ActionDefinition.PlacementSpec pSpec = def.placement();
     int centerRadius = pSpec.centerRadius();
@@ -1119,20 +1172,19 @@ public final class ActionManager implements ActionService {
               RTP.log(
                   Level.FINE,
                   "[action] live placement result: action="
-                      + def.id()
-                      + ", success="
-                      + result.isSuccess()
-                      + ", placements="
-                      + result.placements().size()
-                      + ", reason="
-                      + result.reason());
+                  + def.id()
+                  + ", success="
+                  + result.isSuccess()
+                  + ", placements="
+                  + result.placements().size()
+                  + ", reason="
+                  + result.reason());
 
               if (!result.isSuccess() || result.placements().isEmpty()) {
                 return ActionSessionResult.failure(
                     "Spatial subspace placement failed: " + result.reason());
               }
 
-              UUID sessionId = UUID.randomUUID();
               Map<UUID, int[]> assignedSlots = new HashMap<>();
               String worldName = null;
               int minX = Integer.MAX_VALUE;
@@ -1352,7 +1404,7 @@ public final class ActionManager implements ActionService {
     ActionSessionImpl session = activeSessions.remove(sessionId);
     if (session != null) {
       for (UUID pid : session.participants()) {
-        participantToSession.remove(pid);
+        participantToSession.remove(pid, sessionId);
       }
     }
   }

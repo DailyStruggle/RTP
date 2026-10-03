@@ -100,8 +100,26 @@ class ModdedBStatsSubmitterTest {
     @Test
     @DisplayName("ModdedBStatsSubmitter start method and submit without error")
     void testStartAndSubmitExecution(@TempDir Path tempDir) {
-        ModdedBStatsSubmitter.start("neoforge", tempDir.toFile());
-        // second call should early return
-        ModdedBStatsSubmitter.start("neoforge", tempDir.toFile());
+        assertDoesNotThrow(() -> {
+            ModdedBStatsSubmitter.start("neoforge", tempDir.toFile());
+            // second call should early return
+            ModdedBStatsSubmitter.start("neoforge", tempDir.toFile());
+        });
+
+        // Test submit() with opted-out submitter
+        Path bstatsDir = tempDir.resolve("bStats");
+        assertDoesNotThrow(() -> {
+            Files.createDirectories(bstatsDir);
+            Files.writeString(bstatsDir.resolve("config.txt"), "enabled=false\n", StandardCharsets.UTF_8);
+            ModdedBStatsSubmitter submitter = new ModdedBStatsSubmitter("neoforge", tempDir.toFile());
+            submitter.submit();
+        });
+
+        // Test submit() with active submitter (invokes gzip and async HTTP safely)
+        assertDoesNotThrow(() -> {
+            Files.writeString(bstatsDir.resolve("config.txt"), "enabled=true\nserverUuid=00000000-0000-0000-0000-000000000000\n", StandardCharsets.UTF_8);
+            ModdedBStatsSubmitter submitter = new ModdedBStatsSubmitter("fabric", tempDir.toFile());
+            submitter.submit();
+        });
     }
 }

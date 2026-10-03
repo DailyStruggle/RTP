@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.commands.menu.MenuConcreteCommandLeave
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 class MenuConcreteCommandLeavesCoverageTest {
@@ -120,5 +121,112 @@ class MenuConcreteCommandLeavesCoverageTest {
         "pipeline", io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_COMPOSITE
     );
     assertEquals("pipeline", cmd.name());
+  }
+
+  @Test
+  void testVisualizationExportSubcommandsAndParsing(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
+    io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+    VisualizationExportCmd exportCmd = new VisualizationExportCmd();
+
+    // Test onCommand with and without messageMethod
+    UUID callerId = UUID.randomUUID();
+    assertTrue(exportCmd.onCommand(callerId, Map.of(), null));
+    java.util.concurrent.atomic.AtomicReference<String> msgRef = new java.util.concurrent.atomic.AtomicReference<>();
+    assertTrue(exportCmd.onCommand(callerId, Map.of(), null, msgRef::set));
+    assertNotNull(msgRef.get());
+    assertTrue(msgRef.get().contains("Usage:"));
+
+    // Step aside if nextCommand is present
+    msgRef.set(null);
+    assertTrue(exportCmd.onCommand(callerId, Map.of(), exportCmd, msgRef::set));
+    assertNull(msgRef.get());
+
+    // Test size and unit variations
+    VisualizationExportCmd.ExportComprehensiveCmd compCmd = new VisualizationExportCmd.ExportComprehensiveCmd();
+    assertEquals("comprehensive", compCmd.name());
+    assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, compCmd.permission());
+    assertNotNull(compCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION));
+    assertNotNull(compCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values());
+
+    // Test various size parsing options
+    Map<String, List<String>> params = new java.util.HashMap<>();
+    params.put("size", List.of("1920x1080"));
+    params.put("zoom", List.of("2.0"));
+    params.put("region", List.of("default"));
+    assertTrue(compCmd.onCommand(callerId, params, null));
+    assertTrue(compCmd.onCommand(callerId, params, null, msg -> {}));
+
+    // Test metric suffixes
+    String[] testSizes = new String[]{
+        "4k", "2kp", "1kpix", "3kpixels", "5kilo", "2kilos",
+        "2m", "1mp", "3mpx", "4mpix", "1mpixels", "2mega",
+        "1g", "2gp", "1gpx", "3gpix", "1gpixels", "2giga",
+        "2kib", "1mib", "500px", "600pix", "800pixels", "invalid_size"
+    };
+    for (String s : testSizes) {
+      Map<String, List<String>> p = Map.of("size", List.of(s), "width", List.of(s), "height", List.of(s), "zoom", List.of("invalid_zoom"));
+      compCmd.onCommand(callerId, p, null, msg -> {});
+    }
+
+    // ExportAllCmd
+    VisualizationExportCmd.ExportAllCmd allCmd = new VisualizationExportCmd.ExportAllCmd();
+    assertTrue(allCmd.onCommand(callerId, params, null));
+    assertTrue(allCmd.onCommand(callerId, params, null, msg -> {}));
+
+    // ExportTypeCmd for each kind
+    VisualizationExportCmd.ExportTypeCmd typeCmd = new VisualizationExportCmd.ExportTypeCmd(
+        "biomes", io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_BIOMES
+    );
+    assertTrue(typeCmd.onCommand(callerId, params, null));
+    assertTrue(typeCmd.onCommand(callerId, params, null, msg -> {}));
+  }
+
+  @Test
+  void testAbstractVisualizationRegionCmdBranches(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
+    io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+    VisualizationDispatch dispatch = new VisualizationDispatch(id -> perm -> true);
+
+    boolean[] selectorCalled = new boolean[]{false};
+    java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selector = (u, m) -> {
+      selectorCalled[0] = true;
+      return true;
+    };
+
+    VisualizationBadLocationsCmd badCmd = new VisualizationBadLocationsCmd(dispatch, selector);
+    assertNotNull(badCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values());
+
+    // Call without region parameter -> triggers selector fallback
+    selectorCalled[0] = false;
+    assertTrue(badCmd.onCommand(UUID.randomUUID(), Map.of(), null));
+    assertTrue(selectorCalled[0]);
+
+    selectorCalled[0] = false;
+    assertTrue(badCmd.onCommand(UUID.randomUUID(), Map.of(), null, msg -> {}));
+    assertTrue(selectorCalled[0]);
+
+    // Call with empty region parameter -> triggers selector fallback
+    selectorCalled[0] = false;
+    assertTrue(badCmd.onCommand(UUID.randomUUID(), Map.of("region", List.of("")), null, msg -> {}));
+    assertTrue(selectorCalled[0]);
+
+    // Call with valid region parameter
+    badCmd.onCommand(UUID.randomUUID(), Map.of("region", List.of("default")), null, msg -> {});
+
+    // BiomesCmd
+    VisualizationBiomesCmd bioCmd = new VisualizationBiomesCmd(dispatch, selector);
+    bioCmd.onCommand(UUID.randomUUID(), Map.of("region", List.of("default")), null, msg -> {});
+
+    // PipelineCmd
+    VisualizationPipelineCmd pipeCmd = new VisualizationPipelineCmd(dispatch, selector);
+    pipeCmd.onCommand(UUID.randomUUID(), Map.of("region", List.of("default")), null, msg -> {});
+
+    // HeatmapCmd
+    VisualizationHeatmapCmd heatCmd = new VisualizationHeatmapCmd(dispatch, selector);
+    heatCmd.onCommand(UUID.randomUUID(), Map.of("region", List.of("default")), null, msg -> {});
+
+    // SparklineCmd
+    VisualizationSparklineCmd sparkCmd = new VisualizationSparklineCmd(dispatch);
+    sparkCmd.onCommand(UUID.randomUUID(), Map.of(), null);
+    sparkCmd.onCommand(UUID.randomUUID(), Map.of(), null, msg -> {});
   }
 }

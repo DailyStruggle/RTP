@@ -195,10 +195,7 @@ class WorldGuardRegionVerifierTest {
         .thenThrow(new RuntimeException("Simulated WG error"));
 
     RTPLocation loc = new RTPLocation(rtpWorld, 150, 64, 150);
-    assertDoesNotThrow(() -> {
-      boolean result = verifier.verify(loc);
-      assertNotNull(result);
-    });
+    assertDoesNotThrow(() -> verifier.verify(loc));
   }
 
   @Test
