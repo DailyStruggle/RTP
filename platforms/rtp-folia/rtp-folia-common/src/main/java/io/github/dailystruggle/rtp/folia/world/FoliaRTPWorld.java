@@ -655,29 +655,9 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
-  @GlobalRegionThread
   public java.util.concurrent.CompletableFuture<Integer> getServerForceLoadedCount() {
-    java.util.concurrent.CompletableFuture<Integer> future = new java.util.concurrent.CompletableFuture<>();
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor.getScheduler().runTask(() -> {
-      org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
-      if (plugin == null) {
-        future.complete(0);
-        return;
-      }
-
-      try {
-        int count = 0;
-        for (org.bukkit.Chunk chunk : world.getForceLoadedChunks()) {
-          if (chunk.getPluginChunkTickets().contains(plugin)) {
-            count++;
-          }
-        }
-        future.complete(count);
-      } catch (Exception e) {
-        future.complete(-1); // Fallback in case of unexpected global region failure
-      }
-    });
-    return future;
+    int count = chunkTickets.values().stream().mapToInt(java.util.concurrent.atomic.AtomicInteger::get).sum();
+    return java.util.concurrent.CompletableFuture.completedFuture(count);
   }
 
   @Override

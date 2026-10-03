@@ -265,4 +265,31 @@ class PhysicalTriggerManagerTest {
         actionManager.getSessionForParticipant(p2).get().sessionId()
     );
   }
+
+  @Test
+  void testTriggerManagerEdgeBranches() {
+    // null and empty lookups
+    assertNull(triggerManager.getTrigger(null));
+    assertFalse(triggerManager.unregisterTrigger(null));
+    assertFalse(triggerManager.unregisterTrigger("nonexistent"));
+    assertEquals(0L, triggerManager.getWaveRemainingSeconds(null));
+    assertEquals(0L, triggerManager.getWaveRemainingSeconds("nonexistent"));
+    assertTrue(triggerManager.getOccupants(null).isEmpty());
+    assertTrue(triggerManager.getOccupants("nonexistent").isEmpty());
+
+    // start called multiple times is idempotent
+    triggerManager.start();
+    triggerManager.start();
+
+    // register with null spec
+    assertThrows(NullPointerException.class, () -> triggerManager.registerTrigger(null));
+
+    PhysicalTriggerSpec spec = new PhysicalTriggerSpec(
+        "dummy", PhysicalTriggerSpec.TriggerType.STEP_IN,
+        "world", 0, 0, 0, 1, 1, 1, "act", 0L);
+    triggerManager.registerTrigger(spec);
+    assertNotNull(triggerManager.getTrigger("dummy"));
+    assertTrue(triggerManager.unregisterTrigger("dummy"));
+    assertNull(triggerManager.getTrigger("dummy"));
+  }
 }

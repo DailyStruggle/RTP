@@ -77,8 +77,16 @@ public final class ForeignConfigImporterRegistry {
         return null;
     }
 
+    private static final Set<String> IGNORED_DIR_NAMES = Set.of(
+            "rtp", "leafrtp", ".git", ".gradle", "build", "target", "out",
+            "node_modules", ".idea", ".vscode", "temp", "tmp", "logs", "cache"
+    );
+    private static final int MAX_PROBED_DIRECTORIES = 64;
+
     /**
      * Probes the server plugins/ directory for available foreign configurations.
+     * Bounds the directory inspection to prevent runaway filesystem walks in
+     * non-server environments (e.g. workspace or OS temp roots).
      *
      * @param pluginsDir server's plugins/ directory
      * @return map of detected plugin directory name -> directory Path
@@ -89,16 +97,34 @@ public final class ForeignConfigImporterRegistry {
             return detected;
         }
 
+        // 1. First probe known registered importer names directly (microsecond lookup)
+        for (ForeignConfigImporter importer : IMPORTERS.values()) {
+            if (importer == UNIVERSAL_IMPORTER) continue;
+            Path resolved = resolveSourceDir(pluginsDir, importer.sourceName());
+            if (resolved != null && importer.canImport(resolved)) {
+                detected.put(resolved.getFileName().toString(), resolved);
+            }
+        }
+
+        // 2. Bound adjacent directory scan for generic/custom sources
+        int inspected = 0;
         try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(pluginsDir)) {
             for (Path dir : stream) {
-                if (Files.isDirectory(dir)) {
-                    String folderName = dir.getFileName().toString();
-                    if (folderName.equalsIgnoreCase("RTP") || folderName.equalsIgnoreCase("LeafRTP")) {
-                        continue; // skip our own directory
-                    }
-                    if (UNIVERSAL_IMPORTER.canImport(dir)) {
-                        detected.put(folderName, dir);
-                    }
+                if (++inspected > MAX_PROBED_DIRECTORIES) {
+                    break;
+                }
+                if (!Files.isDirectory(dir)) {
+                    continue;
+                }
+                String folderName = dir.getFileName().toString();
+                if (folderName.startsWith(".") || IGNORED_DIR_NAMES.contains(folderName.toLowerCase(Locale.ROOT))) {
+                    continue;
+                }
+                if (detected.containsKey(folderName)) {
+                    continue;
+                }
+                if (UNIVERSAL_IMPORTER.canImport(dir)) {
+                    detected.put(folderName, dir);
                 }
             }
         } catch (Exception ignored) {}

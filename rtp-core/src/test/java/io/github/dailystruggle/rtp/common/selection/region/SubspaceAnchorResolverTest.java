@@ -158,4 +158,26 @@ class SubspaceAnchorResolverTest {
     assertEquals(200, res.coords().x());
     assertEquals(300, res.coords().z());
   }
+
+  @Test
+  void testSubspaceAnchorResolverFallbacks() {
+    DummyMemoryShape memShape = new DummyMemoryShape();
+    Region region = createDummyRegion(memShape);
+
+    // Null and empty checks
+    assertNull(SubspaceAnchorResolver.resolveAnchor(null, null).join());
+    assertNotNull(SubspaceAnchorResolver.resolveAnchor(region, null).join());
+
+    // Entity AnchorSource with throwing supplier falls back
+    AnchorSource badEntity = AnchorSource.entity(() -> {
+      throw new RuntimeException("entity gone");
+    });
+    GenerationResult resBadEntity = SubspaceAnchorResolver.resolveAnchor(region, badEntity).join();
+    assertNull(resBadEntity);
+
+    // ClaimHazard AnchorSource with empty hazards falls back
+    AnchorSource emptyHazard = AnchorSource.claimHazard();
+    GenerationResult resEmptyHazard = SubspaceAnchorResolver.resolveAnchor(region, emptyHazard).join();
+    assertNull(resEmptyHazard);
+  }
 }

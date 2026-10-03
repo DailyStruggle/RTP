@@ -165,6 +165,7 @@ botStates.forEach((state, i) => {
       bot.on('message', (jsonMsg) => {
         const text = jsonMsg.toString();
         state.messages.push(text);
+        console.log(`[swarm] [${state.username}] [chat] ${text}`);
         const lower = text.toLowerCase();
 
         // Recognize busy or queue messages (Rule S-007)

@@ -164,6 +164,36 @@ class LinearRegionReaderTest {
     }
 
     @Test
+    @DisplayName("LinearRegionReader edge cases: truncated header, bad magic, implausible length")
+    void testLinearEdgeCorruptions() {
+        // Bad magic header
+        ByteBuffer badMagic = ByteBuffer.allocate(100);
+        badMagic.putLong(0x12345678L);
+        assertThrows(CorruptRegionEntryException.class, () -> LinearRegionReader.INSTANCE.readChunk(badMagic.array(), 0, 0));
+
+        // Truncated before ZSTD payload
+        ByteBuffer truncatedHeader = ByteBuffer.allocate(100);
+        truncatedHeader.putLong(LinearRegionReader.LINEAR_MAGIC_V1);
+        truncatedHeader.put((byte) 2);
+        truncatedHeader.putLong(1000L);
+        truncatedHeader.put((byte) 3);
+        truncatedHeader.putInt(500);
+        assertThrows(CorruptRegionEntryException.class, () -> LinearRegionReader.INSTANCE.readChunk(truncatedHeader.array(), 0, 0));
+
+        // Implausible length > MAX_DECOMPRESSED_CHUNK_BYTES
+        int chunks = LinearRegionReader.CHUNKS_PER_REGION;
+        int totalHeaderSize = 22 + chunks * 4 + chunks * 8;
+        ByteBuffer bigLength = ByteBuffer.allocate(totalHeaderSize + 10);
+        bigLength.putLong(LinearRegionReader.LINEAR_MAGIC_V1);
+        bigLength.put((byte) 2);
+        bigLength.putLong(1000L);
+        bigLength.put((byte) 3);
+        bigLength.putInt(10);
+        bigLength.putInt(AnvilReader.MAX_DECOMPRESSED_CHUNK_BYTES + 100); // chunk 0 length
+        assertThrows(CorruptRegionEntryException.class, () -> LinearRegionReader.INSTANCE.readChunk(bigLength.array(), 0, 0));
+    }
+
+    @Test
     @DisplayName("RegionFileResolver prefers registered .linear over .mca when present")
     void testRegionFileResolver(@TempDir Path tempDir) throws IOException {
         Path regionDir = tempDir.resolve("region");

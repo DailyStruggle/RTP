@@ -216,4 +216,156 @@ class AbstractForeignConfigImporterTest {
         assertTrue(Files.exists(backedUp.get(0)));
         assertEquals("overwritten: true", Files.readString(target));
     }
+
+    @Test
+    void testImportResultMethods() {
+        ImportResult fail = ImportResult.failure("dummy", List.of("err1"), List.of("warn1"));
+        assertFalse(fail.isSuccess());
+        assertEquals("dummy", fail.getSourceName());
+        assertEquals(List.of("err1"), fail.getErrors());
+        assertEquals(List.of("warn1"), fail.getWarnings());
+        assertTrue(fail.getWrittenFiles().isEmpty());
+        assertTrue(fail.getMappedEntities().isEmpty());
+        assertTrue(fail.toString().contains("dummy"));
+    }
+
+    @Test
+    void testHelperMethodsAndFallbacks() {
+        DummyForeignConfigImporter importer = new DummyForeignConfigImporter();
+        RtpYamlConfig cfg = RtpYamlConfig.parse("""
+            num_str: "123.45"
+            bool_yes: "yes"
+            bool_no: "no"
+            bool_one: "1"
+            bool_zero: "0"
+            list_key:
+              - "item1"
+              - null
+              - "item2"
+            bad_num: "not_a_number"
+            """);
+
+        assertEquals(123.45, importer.getDoubleCaseInsensitive(cfg, 0.0, "num_str"));
+        assertEquals(99.0, importer.getDoubleCaseInsensitive(cfg, 99.0, "missing", "bad_num"));
+        assertEquals(0.0, importer.getDoubleCaseInsensitive(null, 0.0, "key"));
+
+        assertTrue(importer.getBooleanCaseInsensitive(cfg, false, "bool_yes"));
+        assertTrue(importer.getBooleanCaseInsensitive(cfg, false, "bool_one"));
+        assertFalse(importer.getBooleanCaseInsensitive(cfg, true, "bool_no"));
+        assertFalse(importer.getBooleanCaseInsensitive(cfg, true, "bool_zero"));
+        assertTrue(importer.getBooleanCaseInsensitive(null, true, "key"));
+
+        List<String> list = importer.getStringListCaseInsensitive(cfg, "list_key");
+        assertEquals(List.of("item1", "item2"), list);
+        assertTrue(importer.getStringListCaseInsensitive(null, "key").isEmpty());
+        assertTrue(importer.getStringListCaseInsensitive(cfg, "missing").isEmpty());
+
+        // createRegionYaml with NORMAL shape and biomes
+        RtpYamlConfig regYaml = importer.createRegionYaml("test_reg", "world", "CIRCLE_NORMAL", 100, 1000, 0, 0, 25.0, List.of("OCEAN"));
+        assertNotNull(regYaml);
+        assertEquals("test_reg", regYaml.getString("displayName").replace("&a", ""));
+        assertEquals(0.5, regYaml.getDouble("shape.mean"));
+    }
+
+    @Test
+    void testNormalizeKeyAndSectionMethods() {
+        DummyForeignConfigImporter importer = new DummyForeignConfigImporter();
+        RtpYamlConfig cfg = RtpYamlConfig.parse("""
+            root_section:
+              sub_section:
+                int_val: 42
+                long_val: 10000000000
+                str_val: "hello"
+                bool_val: true
+            """);
+
+        RtpYamlSection root = importer.getSectionCaseInsensitive(cfg, "root-section");
+        assertNotNull(root);
+        RtpYamlSection sub = importer.getSectionCaseInsensitive(root, "sub_section");
+        assertNotNull(sub);
+
+        assertTrue(importer.containsCaseInsensitive(sub, "int_val"));
+        assertFalse(importer.containsCaseInsensitive(sub, "missing"));
+        assertFalse(importer.containsCaseInsensitive(null, "missing"));
+
+        assertEquals(42, importer.getIntCaseInsensitive(sub, 0, "int_val"));
+        assertEquals(99, importer.getIntCaseInsensitive(sub, 99, "missing"));
+        assertEquals(99, importer.getIntCaseInsensitive(null, 99, "missing"));
+
+        assertEquals(10000000000L, importer.getLongCaseInsensitive(sub, 0L, "long_val"));
+        assertEquals(55L, importer.getLongCaseInsensitive(sub, 55L, "missing"));
+        assertEquals(55L, importer.getLongCaseInsensitive(null, 55L, "missing"));
+
+        assertEquals("hello", importer.getStringCaseInsensitive(sub, "def", "str_val"));
+        assertEquals("def", importer.getStringCaseInsensitive(sub, "def", "missing"));
+        assertEquals("def", importer.getStringCaseInsensitive(null, "def", "missing"));
+    }
+
+    @Test
+    void testMirrorZonesConfig(@TempDir Path tempDir) throws IOException {
+        DummyForeignConfigImporter importer = new DummyForeignConfigImporter();
+        Path src = tempDir.resolve("src");
+        Path dst = tempDir.resolve("dst");
+        Files.createDirectories(src);
+        Files.createDirectories(dst);
+
+        Files.writeString(src.resolve("rtp_zones.yml"), """
+            zones:
+              lobby_portal:
+                world: "world"
+                type: "PORTAL"
+                pos1:
+                  x: 10
+                  y: 60
+                  z: 10
+                pos2:
+                  x: 20
+                  y: 70
+                  z: 20
+                cooldown: 15
+                interval: 2
+                region: "spawn"
+              jump_pad:
+                type: "PRESSURE_PLATE"
+                x1: 50
+                y1: 64
+                z1: 50
+                x2: 52
+                y2: 65
+                z2: 52
+            """);
+
+        List<String> mapped = new ArrayList<>();
+        List<Path> written = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+
+        importer.mirrorZonesConfig(src, dst, true, mapped, written, warnings, errors);
+        assertEquals(2, mapped.size());
+        assertEquals(2, written.size());
+        assertTrue(errors.isEmpty());
+
+        // Call again with overwrite=false to test warning branch
+        importer.mirrorZonesConfig(src, dst, false, mapped, written, warnings, errors);
+        assertFalse(warnings.isEmpty());
+    }
+
+    @Test
+    void testMirrorGlobalSettingsAllOptions(@TempDir Path tempDir) {
+        DummyForeignConfigImporter importer = new DummyForeignConfigImporter();
+        Path dst = tempDir.resolve("dst");
+
+        AbstractForeignConfigImporter.GlobalSettings settings = new AbstractForeignConfigImporter.GlobalSettings(
+            30, 5, 10, true, true, true, true, 20, 100, 50
+        );
+
+        List<String> mapped = new ArrayList<>();
+        List<Path> written = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+
+        importer.updateDestinationConfig(dst, settings, mapped, written, warnings);
+        assertTrue(Files.exists(dst.resolve("config.yml")));
+        assertTrue(Files.exists(dst.resolve("performance.yml")));
+        assertTrue(mapped.size() >= 8);
+    }
 }

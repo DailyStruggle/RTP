@@ -314,4 +314,24 @@ class CompiledUnsafeSetTest {
     // OAK_SLAB waterlogged=true -> safe (subtracted)
     assertFalse(c.isUnsafe("OAK_SLAB", Collections.singletonList("minecraft:slabs"), props("waterlogged", "true")));
   }
+
+  @Test
+  @DisplayName("material subtraction from material token")
+  void materialSubtraction() {
+    CompiledUnsafeSet cSelf = compile("LAVA - LAVA");
+    assertTrue(cSelf.isEmpty());
+
+    CompiledUnsafeSet cSubTag = compile("#minecraft:slabs - #minecraft:wooden_slabs");
+    Map<String, Set<String>> snapshot = Map.of(
+        "minecraft:slabs", Set.of("STONE_SLAB", "OAK_SLAB"),
+        "minecraft:wooden_slabs", Set.of("OAK_SLAB")
+    );
+    CompiledUnsafeSet expanded = cSubTag.withTagsExpanded(snapshot);
+    assertTrue(expanded.plainMaterials().contains("STONE_SLAB"));
+    assertFalse(expanded.plainMaterials().contains("OAK_SLAB"));
+
+    CompiledUnsafeSet cMatSub = compile("STONE - STONE_SLAB");
+    CompiledUnsafeSet expandedMat = cMatSub.withTagsExpanded(snapshot);
+    assertTrue(expandedMat.plainMaterials().contains("STONE"));
+  }
 }

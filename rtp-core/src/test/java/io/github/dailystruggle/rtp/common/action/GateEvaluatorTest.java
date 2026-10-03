@@ -551,6 +551,26 @@ class GateEvaluatorTest {
         "command", "execute unless entity @a[tag=non_existent_tag]");
     assertTrue(GateEvaluator.evaluate(unlessTagGate, ctx, null));
 
+    // Spatial withinBoundary false
+    ActionGateContext outOfBounds = new ActionGateContext(
+        sId, "test", pId, 10L, 290L, 0, false, 0.0);
+    assertTrue(GateEvaluator.evaluate(
+        Map.of("spatial", Map.of("withinBoundary", false)), outOfBounds, null));
+
+    // Spatial shape and region checks
+    Map<String, Object> shapeMap = Map.of(
+        "spatial", Map.of("shape", Map.of("name", "CIRCLE", "radius", 100))
+    );
+    assertTrue(GateEvaluator.evaluate(shapeMap, ctx, null));
+
+    // Spatial playerCount with no shape configured -> false
+    assertFalse(GateEvaluator.evaluate(
+        Map.of("spatial", Map.of("playerCount", ">= 1")), ctx, null));
+
+    // Scoreboard unknown managed objective -> defaults to 0.0
+    assertTrue(GateEvaluator.evaluate(
+        Map.of("scoreboard", Map.of("objective", "custom_objective", "matches", "0")), ctx, null));
+
     // Unrecognized gate fails closed
     assertFalse(GateEvaluator.evaluate(Map.of("unknown_gate_type", 123), ctx, null));
   }

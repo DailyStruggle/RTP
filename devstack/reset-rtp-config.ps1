@@ -52,6 +52,13 @@ foreach ($name in $instances) {
         # network.yml on next boot.
         Write-Host "  del dir plugins\RTP\ (incl. database)"
         Remove-Item $pluginRtp -Recurse -Force
+        # Immediately re-seed advanced/network.yml from seed rtp-config/network.yml
+        $seedNet = Join-Path $scriptDir "$name\rtp-config\network.yml"
+        if (Test-Path $seedNet) {
+            $advDir = Join-Path $pluginRtp 'advanced'
+            New-Item -ItemType Directory -Path $advDir -Force | Out-Null
+            Copy-Item -Path $seedNet -Destination (Join-Path $advDir 'network.yml') -Force
+        }
         continue
     }
 
