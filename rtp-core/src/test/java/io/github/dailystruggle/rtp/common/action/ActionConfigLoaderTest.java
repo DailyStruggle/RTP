@@ -289,4 +289,74 @@ class ActionConfigLoaderTest {
     assertEquals(ActionDefinition.ActionType.ACTION, def.confinement().outsideActions().get(1).type());
     assertEquals("PULL_BACK", def.confinement().outsideActions().get(1).payload());
   }
+
+  @Test
+  @DisplayName("ActionConfigLoader parses triggers from map, list, and nested structures")
+  void testParseTriggersComprehensive() {
+    String yamlText = """
+        alias: "trigger_arena"
+        triggers:
+          portal_trigger:
+            type: "STEP_IN"
+            world: "world_nether"
+            pos1: "10, 64, 20"
+            pos2: "15, 68, 25"
+            cooldown: "30s"
+          interact_trigger:
+            type: "PORTAL"
+            worldName: "world"
+            min: "0, 60, 0"
+            max: "5, 65, 5"
+            cooldownSeconds: 15
+        """;
+
+    RtpYamlConfig yaml = RtpYamlConfig.parse(yamlText);
+    ActionDefinition def = ActionConfigLoader.parseDefinition("trigger_arena", yaml);
+
+    assertEquals(2, def.triggers().size());
+    io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec t1 = def.triggers().get(0);
+    assertEquals("portal_trigger", t1.id());
+    assertEquals(io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.STEP_IN, t1.type());
+    assertEquals("world_nether", t1.worldName());
+    assertEquals(10, t1.minX());
+    assertEquals(25, t1.maxZ());
+    assertEquals(30L, t1.cooldownSeconds());
+
+    io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec t2 = def.triggers().get(1);
+    assertEquals("interact_trigger", t2.id());
+    assertEquals(io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.PORTAL, t2.type());
+    assertEquals("world", t2.worldName());
+    assertEquals(15L, t2.cooldownSeconds());
+  }
+
+  @Test
+  @DisplayName("ActionConfigLoader parseDefinition from ConfigParser directly")
+  void testParseDefinitionFromConfigParserDirect(@TempDir Path tempDir) {
+    io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+    MultiConfigParser<ActionKeys> actions =
+        new MultiConfigParser<>(ActionKeys.class, "actions", "1.0", tempDir.toFile(), "definitions/actions", "en");
+
+    io.github.dailystruggle.rtp.common.configuration.ConfigParser<ActionKeys> parser = actions.getParser("default");
+    assertNotNull(parser);
+
+    parser.set(ActionKeys.alias, "direct_action");
+    parser.set(ActionKeys.description, "direct action test");
+    parser.set(ActionKeys.icon, "COMPASS");
+    parser.set(ActionKeys.title, "Direct Title");
+    parser.set(ActionKeys.trigger, java.util.List.of(java.util.Map.of(
+        "id", "t_step",
+        "type", "STEP_IN",
+        "world", "world",
+        "minX", 10, "minY", 60, "minZ", 10,
+        "maxX", 20, "maxY", 70, "maxZ", 20,
+        "cooldown", 10
+    )));
+
+    ActionDefinition def = ActionConfigLoader.parseDefinition("direct_action", parser);
+    assertNotNull(def);
+    assertEquals("direct_action", def.alias());
+    assertEquals("COMPASS", def.icon());
+    assertEquals("Direct Title", def.title());
+    assertEquals(1, def.triggers().size());
+  }
 }

@@ -23,6 +23,13 @@ public final class RespProtocol {
     public static final byte BULK_STRING = '$';
     public static final byte ARRAY = '*';
 
+    /**
+     * Ceiling on bulk string allocations (16 MiB) to fail closed against
+     * corrupted or hostile stream sizes and memory bombs.
+     */
+    public static final int MAX_BULK_STRING_LENGTH = 16 * 1024 * 1024;
+    public static final int MAX_ARRAY_ELEMENT_COUNT = 100_000;
+
     private static final byte[] CRLF = new byte[]{'\r', '\n'};
 
     private RespProtocol() {}
@@ -98,6 +105,9 @@ public final class RespProtocol {
                 if (length == -1) {
                     return null;
                 }
+                if (length < 0 || length > MAX_BULK_STRING_LENGTH) {
+                    throw new IOException("Malformed RESP stream: bulk string length " + length + " out of bounds");
+                }
                 byte[] data = new byte[length];
                 int totalRead = 0;
                 while (totalRead < length) {
@@ -118,6 +128,9 @@ public final class RespProtocol {
                 int count = Integer.parseInt(readLine(in));
                 if (count == -1) {
                     return null;
+                }
+                if (count < 0 || count > MAX_ARRAY_ELEMENT_COUNT) {
+                    throw new IOException("Malformed RESP stream: array element count " + count + " out of bounds");
                 }
                 List<Object> list = new ArrayList<>(count);
                 for (int i = 0; i < count; i++) {

@@ -18,4 +18,5 @@ dependencies {
     // zstd-jni is a test-only dependency used to author synthetic .linear fixtures;
     // production decode runs on the pure-Java aircompressor decoder above.
     testImplementation 'com.github.luben:zstd-jni:1.5.6-3'
+    testImplementation libs.jazzer.junit
 }

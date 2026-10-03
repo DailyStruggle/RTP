@@ -1,0 +1,67 @@
+name: Fuzz Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Duration for fuzzing each target (e.g. 1m, 5m, 15m)'
+        required: false
+        default: '5m'
+        type: string
+  schedule:
+    # Run weekly on Sunday at 04:00 UTC (staggered after mutation testing at 03:00)
+    - cron: '0 4 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Fuzz (${{ matrix.target.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: anvil-regions
+            project: ':anvil-api:test'
+            testClass: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest'
+          - name: resp-protocol
+            project: ':rtp-proxy:rtp-proxy-common:test'
+            testClass: 'io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespProtocolFuzzTest'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Java 21
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
+
+      - name: Run Jazzer Coverage-Guided Fuzzing
+        env:
+          JAZZER_FUZZ: '1'
+        run: |
+          DURATION="${{ github.event.inputs.duration || '5m' }}"
+          echo "Executing fuzz testing for ${{ matrix.target.name }} with duration ${DURATION}..."
+          ./gradlew ${{ matrix.target.project }} \
+            --tests "${{ matrix.target.testClass }}" \
+            -Djazzer.duration="${DURATION}" \
+            --no-daemon
+
+      - name: Archive Fuzz Crash Artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-${{ matrix.target.name }}
+          path: |
+            **/crash-*
+            **/timeout-*
+            **/slow-unit-*
+            **/build/reports/tests/test/
+          if-no-files-found: ignore

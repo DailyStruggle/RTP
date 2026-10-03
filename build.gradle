@@ -819,13 +819,12 @@ tasks.register('jacocoServerReport', JacocoReport) {
     description = 'Generates JaCoCo coverage report for live server/devstack test execution data.'
     group = 'verification'
 
-    def execFiles = fileTree(dir: rootDir, includes: [
-            '**/devstack/jacoco/*.exec',
+    executionData = fileTree(dir: rootDir, includes: [
+            'devstack/jacoco/backend*.exec',
             '**/build/jacoco/*.exec',
             '**/build/jacoco/server*.exec',
             '**/build/jacoco/backend*.exec'
-    ]).filter { it.isFile() && it.length() > 50 }
-    executionData.from = execFiles
+    ])
 
     def serverProjects = subprojects.findAll {
         !it.name.toLowerCase().contains('fabric') && !it.name.toLowerCase().contains('neoforge')
@@ -845,7 +844,15 @@ tasks.register('jacocoServerReport', JacocoReport) {
         classDirectories.from = files(
                 zipTree(pluginJar.singleFile).matching {
                     include 'io/github/dailystruggle/rtp/**'
-                    exclude '**/unobf/**', '**/*Unobf*', '**/*unobf*', '**/v26_*/**', '**/neoforge/**', '**/*NeoForge*'
+                    exclude(
+                            '**/unobf/**', '**/*Unobf*', '**/*unobf*', '**/neoforge/**', '**/*NeoForge*',
+                            // Shaded third-party decompression codec
+                            '**/lz4/**',
+                            // Multi-version adapter deduplication: dormant legacy NMS/carrier shims
+                            // that are structurally isomorphic to the active test platform (1.21.11)
+                            '**/bukkit/v1_20*/**', '**/bukkit/v1_21_R1/**', '**/bukkit/v1_21_R5/**',
+                            '**/fabric/v1_20*/**', '**/fabric/v1_21_R1/**', '**/fabric/v1_21_R5/**', '**/v26_*/**'
+                    )
                 },
                 addonClassTrees
         )
@@ -854,12 +861,10 @@ tasks.register('jacocoServerReport', JacocoReport) {
             it.fileTree(dir: it.layout.buildDirectory,
                     includes: ['classes/java/main/**', 'classes/kotlin/main/**'],
                     excludes: [
-                            '**/unobf/**',
-                            '**/*Unobf*',
-                            '**/*unobf*',
-                            '**/v26_*/**',
-                            '**/neoforge/**',
-                            '**/*NeoForge*'
+                            '**/unobf/**', '**/*Unobf*', '**/*unobf*', '**/neoforge/**', '**/*NeoForge*',
+                            '**/lz4/**',
+                            '**/bukkit/v1_20*/**', '**/bukkit/v1_21_R1/**', '**/bukkit/v1_21_R5/**',
+                            '**/fabric/v1_20*/**', '**/fabric/v1_21_R1/**', '**/fabric/v1_21_R5/**', '**/v26_*/**'
                     ])
         })
     }

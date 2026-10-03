@@ -30,6 +30,7 @@ dependencies {
     // build on a box without Docker skips them cleanly rather than failing.
     testImplementation platform(libs.testcontainers.bom)
     testImplementation libs.testcontainers.junit
+    testImplementation libs.jazzer.junit
 }
 
 // The Testcontainers-backed transport/redis tier talks to the local Docker

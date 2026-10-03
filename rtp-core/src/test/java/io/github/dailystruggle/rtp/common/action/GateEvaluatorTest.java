@@ -491,4 +491,67 @@ class GateEvaluatorTest {
 
     assertFalse(GateEvaluator.evaluateAll(failingGateList, ctx, null, Collections.emptyMap()));
   }
+
+  @Test
+  @DisplayName("Cover remaining GateEvaluator edge branches and selector tags")
+  void testGateEvaluatorEdgeBranches() {
+    io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
+        new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("target/test"));
+    io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+
+    UUID sId = UUID.randomUUID();
+    UUID pId = UUID.randomUUID();
+    ActionGateContext ctx = new ActionGateContext(
+        sId, "test", pId, 10L, 290L, 0, true, 0.0, 10.0, 64.0, 20.0, 0.0, 64.0, 0.0);
+
+    // Context gateValidators fail check
+    io.github.dailystruggle.rtp.api.action.ActionContext actionCtx =
+        io.github.dailystruggle.rtp.api.action.ActionContext.ofValidators(List.of(c -> false));
+    ActionGateContext failingValidatorCtx = new ActionGateContext(
+        sId, "test", pId, 10L, 290L, 0, true, 0.0, 10.0, 64.0, 20.0, 0.0, 64.0, 0.0, 1, actionCtx);
+    assertFalse(GateEvaluator.evaluate(Map.of(), failingValidatorCtx, null));
+
+    // Spatial coordinate parsing invalid part
+    Map<String, Object> badSpatialTarget = Map.of(
+        "spatial", Map.of("target", "not_a_number,abc", "distance", "< 10"));
+    assertFalse(GateEvaluator.evaluate(badSpatialTarget, ctx, null));
+
+    // Spatial target with single coordinate part (length < 2)
+    Map<String, Object> shortSpatialTarget = Map.of(
+        "spatial", Map.of("target", "100", "distance", "< 10"));
+    assertFalse(GateEvaluator.evaluate(shortSpatialTarget, ctx, null));
+
+    // Spatial elevationDelta when delta is null but currentY/anchorY are present
+    ActionGateContext elevationCtx = new ActionGateContext(
+        sId, "test", pId, 10L, 290L, 0, true, 0.0, 10.0, 70.0, 20.0, 0.0, 60.0, 0.0);
+    assertTrue(GateEvaluator.evaluate(
+        Map.of("spatial", Map.of("elevationDelta", ">= 10")), elevationCtx, null));
+
+    // Participants count gate via map
+    assertTrue(GateEvaluator.evaluate(
+        Map.of("participants", Map.of("matches", ">= 1")), ctx, null));
+    assertTrue(GateEvaluator.evaluate(
+        Map.of("queue", Map.of("range", "1..5")), ctx, null));
+    assertTrue(GateEvaluator.evaluate(
+        Map.of("participantcount", Map.of("count", "1")), ctx, null));
+
+    // Command predicate execute if entity @a[tag=active_tag]
+    accessor.addPlayer(new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+        pId, "TestPlayer", new io.github.dailystruggle.rtp.api.world.RTPLocation(new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("default"), 0, 64, 0)));
+    accessor.addScoreboardTag(pId, "active_tag");
+    Map<String, Object> tagGate = Map.of(
+        "command", "execute if entity @a[tag=active_tag]");
+    assertTrue(GateEvaluator.evaluate(tagGate, ctx, null));
+
+    Map<String, Object> missingTagGate = Map.of(
+        "command", "execute if entity @a[tag=non_existent_tag]");
+    assertFalse(GateEvaluator.evaluate(missingTagGate, ctx, null));
+
+    Map<String, Object> unlessTagGate = Map.of(
+        "command", "execute unless entity @a[tag=non_existent_tag]");
+    assertTrue(GateEvaluator.evaluate(unlessTagGate, ctx, null));
+
+    // Unrecognized gate fails closed
+    assertFalse(GateEvaluator.evaluate(Map.of("unknown_gate_type", 123), ctx, null));
+  }
 }
