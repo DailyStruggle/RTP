@@ -17,11 +17,11 @@ import java.util.regex.Pattern;
 public final class GateExpressionParser {
 
   private static final Pattern OP_PATTERN =
-      Pattern.compile("^\\s*(<=|>=|<|>|==|=)\\s*(-?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]*)\\s*$");
+      Pattern.compile("^(<=|>=|<|>|==|=)\\s*+(-?[0-9]++(?:\\.[0-9]++)?)\\s*+([a-zA-Z]*+)$");
   private static final Pattern RANGE_PATTERN =
-      Pattern.compile("^\\s*(-?[0-9]+(?:\\.[0-9]+)?)\\s*\\.\\.\\s*(-?[0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]*)\\s*$");
+      Pattern.compile("^(-?[0-9]++(?:\\.[0-9]++)?)\\s*+\\.\\.\\s*+(-?[0-9]++(?:\\.[0-9]++)?)\\s*+([a-zA-Z]*+)$");
   private static final Pattern DURATION_PATTERN =
-      Pattern.compile("^([0-9]+(?:\\.[0-9]+)?)\\s*([a-zA-Z]*)$");
+      Pattern.compile("^([0-9]++(?:\\.[0-9]++)?)\\s*+([a-zA-Z]*+)$");
 
   private GateExpressionParser() {}
 

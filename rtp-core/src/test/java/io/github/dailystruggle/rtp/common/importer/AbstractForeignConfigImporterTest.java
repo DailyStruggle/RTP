@@ -187,4 +187,33 @@ class AbstractForeignConfigImporterTest {
         assertTrue(dbContent.contains("mysql"));
         assertTrue(dbContent.contains("db.internal"));
     }
+
+    @Test
+    @DisplayName("Test writeConfigFile overwrite and backup mechanics")
+    void testWriteConfigFileWithBackups(@TempDir Path tempDir) throws IOException {
+        DummyForeignConfigImporter importer = new DummyForeignConfigImporter();
+        Path target = tempDir.resolve("test.yml");
+        List<Path> created = new ArrayList<>();
+        List<Path> backedUp = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+
+        // 1. Initial write
+        boolean ok1 = importer.writeConfigFile(target, "initial: true", false, created, backedUp, warnings);
+        assertTrue(ok1);
+        assertEquals(1, created.size());
+        assertTrue(backedUp.isEmpty());
+        assertTrue(warnings.isEmpty());
+
+        // 2. Write with overwrite=false (should fail with warning)
+        boolean ok2 = importer.writeConfigFile(target, "second: true", false, created, backedUp, warnings);
+        assertFalse(ok2);
+        assertFalse(warnings.isEmpty());
+
+        // 3. Write with overwrite=true (should backup and update)
+        boolean ok3 = importer.writeConfigFile(target, "overwritten: true", true, created, backedUp, warnings);
+        assertTrue(ok3);
+        assertEquals(1, backedUp.size());
+        assertTrue(Files.exists(backedUp.get(0)));
+        assertEquals("overwritten: true", Files.readString(target));
+    }
 }

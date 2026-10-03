@@ -440,7 +440,7 @@ public class PermissionMigrationService {
             }
 
             // Remove LuckPerms shorthand flags like "d " or "g " if present
-            if (line.matches("^[a-z]\\s+.*")) {
+            if (line.matches("^[a-z]\\s++.*+")) {
                 line = line.substring(2).trim();
             }
 

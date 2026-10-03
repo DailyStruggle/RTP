@@ -99,9 +99,9 @@ public interface ForeignConfigImporter {
     static String sanitizeForeignYaml(String raw) {
         if (raw == null || raw.isEmpty()) return "";
         String[] lines = raw.split("\r?\n", -1);
-        Pattern emptyBrackets = Pattern.compile("^(\\s*[^#:\\r\\n]+:)\\s*(\\[\\]|\\{\\})(.*)$");
-        Pattern immediateComment = Pattern.compile("^(\\s*[^#:\\r\\n]+:)\\s+#.*$");
-        Pattern flowSeq = Pattern.compile("^(\\s*)([^#:\\r\\n]+:)\\s*\\[([^\\]]*)\\]\\s*(#.*)?$");
+        Pattern emptyBrackets = Pattern.compile("^(\\s*+[^#:\\r\\n\\s][^#:\\r\\n]*+:)\\s*+(\\[\\]|\\{\\})(.*)$");
+        Pattern immediateComment = Pattern.compile("^(\\s*+[^#:\\r\\n\\s][^#:\\r\\n]*+:)\\s*+#.*$");
+        Pattern flowSeq = Pattern.compile("^(\\s*+)([^#:\\r\\n\\s][^#:\\r\\n]*+:)\\s*+\\[([^\\]]*+)\\]\\s*+(#.*+)?$");
 
         List<String> pass1 = new ArrayList<>();
         for (int i = 0; i < lines.length; i++) {

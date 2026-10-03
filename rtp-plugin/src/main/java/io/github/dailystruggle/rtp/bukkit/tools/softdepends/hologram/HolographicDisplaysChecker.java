@@ -57,12 +57,18 @@ public final class HolographicDisplaysChecker implements HologramProvider {
         }
     }
 
+    private static World resolveWorld(String worldName) {
+        if (worldName == null || worldName.isBlank()) return null;
+        try {
+            return Bukkit.getWorld(worldName);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     @Override
     public HologramHandle spawnHologram(String id, String worldName, Vector3d position, List<String> lines) {
-        World world = null;
-        try {
-            world = (Bukkit.getServer() != null) ? Bukkit.getWorld(worldName) : null;
-        } catch (Throwable ignored) {}
+        World world = resolveWorld(worldName);
         if (world == null) {
             return new io.github.dailystruggle.effectsapi.common.hologram.VirtualHologramHandle(id, worldName, position, lines);
         }
