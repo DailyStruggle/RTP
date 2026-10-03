@@ -904,61 +904,48 @@ sonar {
                 'api/**/*Unobf/**',
                 '**/server/ServerAccessorImpl.java'
         ].join(',')
-        // ADR-094: Ignore java:S3077 (volatile on non-primitive/array) globally across the project.
-        // Volatile reference publication is an intentional lock-free pattern used across spatial caches,
-        // configuration reloads, and platform handle caches.
-        // Also ignore java:S2975: public clone() implementations across Cloneable domain models.
-        // Also ignore architectural patterns:
-        // - java:S2176: per-version adapter subclasses share common interface/scheduler names.
-        // - java:S1452: public SPI return types with wildcard generics (RTPWorld<?>, FactoryValue<?>).
+        // ADR-094: Ignore architectural patterns and intentional conventions globally across Sonar analysis:
+        // - java:S3077: volatile reference publication pattern (spatial caches, config reloads).
+        // - java:S2975: public clone() implementations across Cloneable domain models.
+        // - java:S2176: per-version adapter subclasses sharing common interface/scheduler names.
+        // - java:S1452: public SPI wildcard return types (RTPWorld<?>, FactoryValue<?>).
         // - java:S2696: singleton instance initialization updating static fields.
         // - java:S1186: empty methods in test mocks/listeners/stubs.
-        // - java:S1192: repeated string literals across test suites, serialization codecs, and command trees.
-        // - java:S115: YAML/config/message enums intentionally using lowerCamelCase to map directly to YAML/lang keys.
-        // - java:S3776: cognitive complexity across spatial math, polygon verification, chunk scanning, and platform version bridges.
-        // - java:S1181: catching Throwable for multi-platform / multi-version isolation, claim addons, and resilient task loops.
-        // - java:S3011: audited reflection accessibility (setAccessible) across platform bridges and NMS accessors (ADR-026).
+        // - java:S1192: repeated string literals across test suites, codecs, and command trees.
+        // - java:S115: YAML/config/message enums using lowerCamelCase for YAML key alignment.
+        // - java:S3776: cognitive complexity across spatial math, polygon verification, and version bridges.
+        // - java:S1181: catching Throwable for multi-platform / multi-version isolation and task loops.
+        // - java:S3011: audited reflection accessibility across platform bridges and NMS accessors (ADR-026).
         // - java:S1141: nested try blocks across multi-version fallbacks and deserializers.
         // - java:S5785: assertEquals/assertNotEquals in test assertions.
         // - java:S5778: assertThrows single-invocation constraint in test suites.
         // - java:S2925: Thread.sleep in asynchronous, transport, and benchmark stress tests.
-        // - java:S3516: onCommand and command handler methods intentionally returning boolean success flag.
+        // - java:S3516: onCommand and command handlers intentionally returning boolean flag.
         // - java:S1845: command permission constants and static factory methods.
-        property 'sonar.issue.ignore.multicriteria', 's3077,s2975,s2176,s1452,s2696,s1186test,s1192,s115,s3776,s1181,s3011,s1141,s5785test,s5778test,s2925test,s3516,s1845'
-        property 'sonar.issue.ignore.multicriteria.s3077.ruleKey', 'java:S3077'
-        property 'sonar.issue.ignore.multicriteria.s3077.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s2975.ruleKey', 'java:S2975'
-        property 'sonar.issue.ignore.multicriteria.s2975.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s2176.ruleKey', 'java:S2176'
-        property 'sonar.issue.ignore.multicriteria.s2176.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s1452.ruleKey', 'java:S1452'
-        property 'sonar.issue.ignore.multicriteria.s1452.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s2696.ruleKey', 'java:S2696'
-        property 'sonar.issue.ignore.multicriteria.s2696.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s1186test.ruleKey', 'java:S1186'
-        property 'sonar.issue.ignore.multicriteria.s1186test.resourceKey', '**/src/test/**/*'
-        property 'sonar.issue.ignore.multicriteria.s1192.ruleKey', 'java:S1192'
-        property 'sonar.issue.ignore.multicriteria.s1192.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s115.ruleKey', 'java:S115'
-        property 'sonar.issue.ignore.multicriteria.s115.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s3776.ruleKey', 'java:S3776'
-        property 'sonar.issue.ignore.multicriteria.s3776.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s1181.ruleKey', 'java:S1181'
-        property 'sonar.issue.ignore.multicriteria.s1181.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s3011.ruleKey', 'java:S3011'
-        property 'sonar.issue.ignore.multicriteria.s3011.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s1141.ruleKey', 'java:S1141'
-        property 'sonar.issue.ignore.multicriteria.s1141.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s5785test.ruleKey', 'java:S5785'
-        property 'sonar.issue.ignore.multicriteria.s5785test.resourceKey', '**/src/test/**/*'
-        property 'sonar.issue.ignore.multicriteria.s5778test.ruleKey', 'java:S5778'
-        property 'sonar.issue.ignore.multicriteria.s5778test.resourceKey', '**/src/test/**/*'
-        property 'sonar.issue.ignore.multicriteria.s2925test.ruleKey', 'java:S2925'
-        property 'sonar.issue.ignore.multicriteria.s2925test.resourceKey', '**/src/test/**/*'
-        property 'sonar.issue.ignore.multicriteria.s3516.ruleKey', 'java:S3516'
-        property 'sonar.issue.ignore.multicriteria.s3516.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s1845.ruleKey', 'java:S1845'
-        property 'sonar.issue.ignore.multicriteria.s1845.resourceKey', '**/*'
+        def ignoredRuleExceptions = [
+                s3077: [rule: 'java:S3077'],
+                s2975: [rule: 'java:S2975'],
+                s2176: [rule: 'java:S2176'],
+                s1452: [rule: 'java:S1452'],
+                s2696: [rule: 'java:S2696'],
+                s1186test: [rule: 'java:S1186', resource: '**/src/test/**/*'],
+                s1192: [rule: 'java:S1192'],
+                s115: [rule: 'java:S115'],
+                s3776: [rule: 'java:S3776'],
+                s1181: [rule: 'java:S1181'],
+                s3011: [rule: 'java:S3011'],
+                s1141: [rule: 'java:S1141'],
+                s5785test: [rule: 'java:S5785', resource: '**/src/test/**/*'],
+                s5778test: [rule: 'java:S5778', resource: '**/src/test/**/*'],
+                s2925test: [rule: 'java:S2925', resource: '**/src/test/**/*'],
+                s3516: [rule: 'java:S3516'],
+                s1845: [rule: 'java:S1845']
+        ]
+        property 'sonar.issue.ignore.multicriteria', ignoredRuleExceptions.keySet().join(',')
+        ignoredRuleExceptions.each { key, cfg ->
+            property "sonar.issue.ignore.multicriteria.${key}.ruleKey", cfg.rule
+            property "sonar.issue.ignore.multicriteria.${key}.resourceKey", cfg.resource ?: '**/*'
+        }
     }
 }
 
