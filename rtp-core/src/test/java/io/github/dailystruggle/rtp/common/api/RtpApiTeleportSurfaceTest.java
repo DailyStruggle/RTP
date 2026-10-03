@@ -162,4 +162,78 @@ class RtpApiTeleportSurfaceTest {
         assertTrue(RTPAPI.isWarmingUp(id));
         assertFalse(RTPAPI.isWarmingUp(UUID.randomUUID()));
     }
+
+    // ------------------------------------------------------------------
+    // Core RTPAPI.teleportDelegate live execution tests
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("teleportDelegate offline player returns PLAYER_OFFLINE")
+    void teleportDelegate_offlinePlayer(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        UUID offlineId = UUID.randomUUID();
+        CompletableFuture<RTPResult> future = RTPAPI.teleport(offlineId, RtpTarget.defaultRegion());
+        assertNotNull(future);
+        RTPResult res = future.get();
+        assertFalse(res.isSuccess());
+        assertEquals(RTPResult.Reason.PLAYER_OFFLINE, res.reason());
+    }
+
+    @Test
+    @DisplayName("teleportDelegate network mode target when disabled returns INVALID_TARGET")
+    void teleportDelegate_networkTargetWhenDisabled(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+
+        RtpTarget netTarget = RtpTarget.network("remoteServer", "default");
+        CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, netTarget);
+        assertNotNull(future);
+        RTPResult res = future.get();
+        assertFalse(res.isSuccess());
+        assertEquals(RTPResult.Reason.INVALID_TARGET, res.reason());
+    }
+
+    @Test
+    @DisplayName("teleportDelegate coordinate target local server teleports successfully")
+    void teleportDelegate_coordinateTargetLocal(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+
+        RtpTarget coordTarget = RtpTarget.coordinate(null, "world", 100, 64, 200);
+        CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, coordTarget);
+        assertNotNull(future);
+        RTPResult res = future.get();
+        assertTrue(res.isSuccess());
+        assertNotNull(res.location());
+        assertEquals(100, res.location().x());
+        assertEquals(64, res.location().y());
+        assertEquals(200, res.location().z());
+    }
+
+    @Test
+    @DisplayName("teleportDelegate reloading guard returns RELOADING")
+    void teleportDelegate_reloadingGuard(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+
+        RTP.reloading.set(true);
+        try {
+            CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, RtpTarget.defaultRegion());
+            assertNotNull(future);
+            RTPResult res = future.get();
+            assertFalse(res.isSuccess());
+            assertEquals(RTPResult.Reason.RELOADING, res.reason());
+        } finally {
+            RTP.reloading.set(false);
+        }
+    }
 }

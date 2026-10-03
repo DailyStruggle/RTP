@@ -73,7 +73,6 @@ public class MenuLayoutTest {
                 0L,
                 0.0));
 
-        MenuModel model = MenuModel.buildActionsMenu(java.util.UUID.randomUUID(), config, 0);
         // Construct a model with our custom entries
         MenuModel customModel = new MenuModel(
                 "Teleport",

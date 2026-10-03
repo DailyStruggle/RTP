@@ -107,10 +107,7 @@ class ResidenceRegionVerifierTest {
     when(mockResidenceManager.getByLoc(any(Location.class))).thenThrow(new RuntimeException("Simulated Residence error"));
 
     RTPLocation loc = new RTPLocation(mockRtpWorld, 150, 64, 150);
-    assertDoesNotThrow(() -> {
-      boolean result = verifier.verify(loc);
-      assertNotNull(result);
-    });
+    assertDoesNotThrow(() -> verifier.verify(loc));
   }
 
   @Test

@@ -274,10 +274,10 @@ class RedisNetworkStateBindingUnitTest {
     void publishOperations_handleExceptionsGracefully() throws Exception {
         doThrow(new RuntimeException("redis-down")).when(jedis).hset(anyString(), any(Map.class));
         ProxyHeartbeat ph = new ProxyHeartbeat("p", 1, 0, 0, 0);
-        binding.publishProxyHeartbeat(ph).get(); // does not throw
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> binding.publishProxyHeartbeat(ph).get());
 
         BackendHeartbeat bh = new BackendHeartbeat("s", 1, BackendHeartbeat.PluginState.READY, true, 0, 0, 0, 0, 0, 0, 0, List.of(), List.of());
-        binding.publishBackendHeartbeat(bh).get(); // does not throw
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> binding.publishBackendHeartbeat(bh).get());
     }
 
     @Test

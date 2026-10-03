@@ -194,4 +194,71 @@ public class ActionConfigLoaderExtendedTest {
         assertEquals(ActionDefinition.PlacementSpec.DISABLED, def2.placement());
         assertEquals(ConfinementBoundary.SUBSPACE, def2.confinement().boundary());
     }
+
+    @Test
+    @DisplayName("Parse gate blocks via YAML and ConfigParser")
+    void testParseGateBlocks() {
+        String yamlWithGatesList = """
+                gates:
+                  - type: "PERMISSION"
+                    permission: "vip.access"
+                  - type: "COOLDOWN"
+                    duration: "30s"
+                """;
+        RtpYamlConfig yamlList = RtpYamlConfig.parse(yamlWithGatesList);
+        ActionDefinition defList = ActionConfigLoader.parseDefinition("gates_list", yamlList);
+        assertEquals(2, defList.gates().size());
+
+        String yamlWithSingleGate = """
+                gate:
+                  type: "WORLD"
+                  whitelist:
+                    - "world_nether"
+                """;
+        RtpYamlConfig yamlSingle = RtpYamlConfig.parse(yamlWithSingleGate);
+        ActionDefinition defSingle = ActionConfigLoader.parseDefinition("gate_single", yamlSingle);
+        assertEquals(1, defSingle.gates().size());
+    }
+
+    @Test
+    @DisplayName("Load actions from MultiConfigParser fallback file reads and trigger registration")
+    void testLoadActionsFromFileAndTriggers(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        ActionManager manager = new ActionManager();
+
+        // Write a test action YAML file directly
+        java.io.File actionsDir = new java.io.File(tempDir.toFile(), "definitions/actions");
+        actionsDir.mkdirs();
+        java.io.File actionFile = new java.io.File(actionsDir, "trigger_action.yml");
+        String content = """
+                alias: "trigger_action"
+                triggers:
+                  - id: "trig_plate"
+                    type: "PRESSURE_PLATE"
+                    location: "world,100,64,100"
+                gates:
+                  - type: "PERMISSION"
+                    permission: "test.perm"
+                """;
+        java.nio.file.Files.writeString(actionFile.toPath(), content, java.nio.charset.StandardCharsets.UTF_8);
+
+        // Call loadActions(File, ActionManager)
+        ActionConfigLoader.loadActions(tempDir.toFile(), manager);
+        assertTrue(manager.getAction("trigger_action").isPresent());
+        assertEquals(1, manager.getAction("trigger_action").get().triggers().size());
+
+        // Also test MultiConfigParser loading
+        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys> parser =
+                new io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<>(
+                        io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys.class,
+                        "actions",
+                        "1.0",
+                        tempDir.toFile(),
+                        "definitions/actions",
+                        "en"
+                );
+        ActionManager manager2 = new ActionManager();
+        ActionConfigLoader.loadActions(parser, manager2);
+        assertTrue(manager2.getAction("trigger_action").isPresent());
+    }
 }

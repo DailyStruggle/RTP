@@ -139,11 +139,9 @@ public class ClaimAnchoredRegionTracker {
       }
 
       // Case 2: Pinned center is still inside. Check if cooldown elapsed.
-      if (elapsed >= cooldownMillis) {
-        // Cooldown elapsed: update to new centroid if it moved
-        if (state.getPinnedCenterX() != currentCentroid[0] || state.getPinnedCenterZ() != currentCentroid[1]) {
-          state.updateCenter(currentCentroid[0], currentCentroid[1], nowMillis);
-        }
+      if (elapsed >= cooldownMillis
+          && (state.getPinnedCenterX() != currentCentroid[0] || state.getPinnedCenterZ() != currentCentroid[1])) {
+        state.updateCenter(currentCentroid[0], currentCentroid[1], nowMillis);
       }
 
       // Preserve existing pinned center

@@ -109,23 +109,19 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
             }
           }
 
-          if (st.kind() == SafetyToken.Kind.TAG) {
-            if (!st.isPredicated()) {
-              Set<String> members = tagSnapshot.get(st.identifier());
-              if (members != null) {
-                for (String m : members) {
-                  if (m != null) {
-                    String c = canon(m);
-                    if (!subtracted.contains(c)) sink.add(c);
-                  }
+          if (st.kind() == SafetyToken.Kind.TAG && !st.isPredicated()) {
+            Set<String> members = tagSnapshot.get(st.identifier());
+            if (members != null) {
+              for (String m : members) {
+                if (m != null) {
+                  String c = canon(m);
+                  if (!subtracted.contains(c)) sink.add(c);
                 }
               }
             }
-          } else if (st.kind() == SafetyToken.Kind.MATERIAL) {
-            if (!st.isPredicated()) {
-              String c = canon(st.identifier());
-              if (!subtracted.contains(c)) sink.add(c);
-            }
+          } else if (st.kind() == SafetyToken.Kind.MATERIAL && !st.isPredicated()) {
+            String c = canon(st.identifier());
+            if (!subtracted.contains(c)) sink.add(c);
           }
           continue;
         }

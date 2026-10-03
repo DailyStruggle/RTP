@@ -109,7 +109,7 @@ public final class GeometryPointGenerator {
         if (radiusX <= 0) radiusX = 1.0;
         if (radiusZ <= 0) radiusZ = 1.0;
 
-        double minY = bounds.minY(), maxY = bounds.maxY();
+        double minY = bounds.minY();
         double height = bounds.height();
         if (height <= 0) height = 1.0;
 

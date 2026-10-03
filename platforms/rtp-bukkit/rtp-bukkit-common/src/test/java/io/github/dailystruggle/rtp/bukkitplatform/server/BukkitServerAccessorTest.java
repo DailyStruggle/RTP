@@ -311,12 +311,14 @@ class BukkitServerAccessorTest {
 
         ProgressBar bar = new ProgressBar("&aSearching...", 0.5, "rtp.progress");
 
-        accessor.updateProgressBars(Map.of("bar-1", bar));
-        accessor.clearProgressBars();
+        assertDoesNotThrow(() -> {
+            accessor.updateProgressBars(Map.of("bar-1", bar));
+            accessor.clearProgressBars();
 
-        // Empty / null handling
-        accessor.updateProgressBars(null);
-        accessor.updateProgressBars(Map.of());
+            // Empty / null handling
+            accessor.updateProgressBars(null);
+            accessor.updateProgressBars(Map.of());
+        });
     }
 
     @Test

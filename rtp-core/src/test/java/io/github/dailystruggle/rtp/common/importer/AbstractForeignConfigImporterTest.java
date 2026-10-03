@@ -368,4 +368,82 @@ class AbstractForeignConfigImporterTest {
         assertTrue(Files.exists(dst.resolve("performance.yml")));
         assertTrue(mapped.size() >= 8);
     }
+
+    @Test
+    void testDiscoveredWorldRegionAndGlobalSettingsBuilder() {
+        AbstractForeignConfigImporter.DiscoveredWorldRegion r1 =
+            new AbstractForeignConfigImporter.DiscoveredWorldRegion("r1", "world", "CIRCLE", 10, 100, 0, 0, 15.0);
+        assertEquals(64, r1.minY());
+        assertEquals(320, r1.maxY());
+        assertEquals(-1, r1.cacheCap());
+
+        AbstractForeignConfigImporter.DiscoveredWorldRegion r2 =
+            new AbstractForeignConfigImporter.DiscoveredWorldRegion("r2", "world", "CIRCLE", 10, 100, 0, 0, 15.0, List.of("PLAINS"));
+        assertEquals(List.of("PLAINS"), r2.biomes());
+
+        AbstractForeignConfigImporter.DiscoveredWorldRegion r3 =
+            new AbstractForeignConfigImporter.DiscoveredWorldRegion("r3", "world", "CIRCLE", 10, 100, 0, 0, 50, 200, 15.0, List.of("PLAINS"));
+        assertEquals(50, r3.minY());
+        assertEquals(200, r3.maxY());
+
+        AbstractForeignConfigImporter.DiscoveredWorldRegion r4 =
+            new AbstractForeignConfigImporter.DiscoveredWorldRegion("r4", "world", "CIRCLE", 10, 100, 0, 0, 50, 200, 15.0, 500, List.of("PLAINS"));
+        assertEquals(500, r4.cacheCap());
+
+        AbstractForeignConfigImporter.GlobalSettings.Builder builder = AbstractForeignConfigImporter.GlobalSettings.builder()
+            .cooldown(60)
+            .delay(5)
+            .lockAfter(10)
+            .setAsRespawn(true)
+            .rtpOnFirstJoin(true)
+            .rtpOnDeath(true)
+            .cancelOnMove(true)
+            .maxAttempts(25)
+            .cacheCap(200)
+            .queueTargetSize(100);
+
+        AbstractForeignConfigImporter.GlobalSettings built = builder.build();
+        assertEquals(60, built.cooldown());
+        assertEquals(5, built.delay());
+        assertEquals(10, built.lockAfter());
+        assertTrue(built.setAsRespawn());
+        assertTrue(built.rtpOnFirstJoin());
+        assertTrue(built.rtpOnDeath());
+        assertTrue(built.cancelOnMove());
+        assertEquals(25, built.maxAttempts());
+        assertEquals(200, built.cacheCap());
+        assertEquals(100, built.queueTargetSize());
+    }
+
+    @Test
+    void testMirrorEffectsConfigExistingFile(@TempDir Path tempDir) throws IOException {
+        DummyForeignConfigImporter importer = new DummyForeignConfigImporter();
+        Path src = tempDir.resolve("src");
+        Path dst = tempDir.resolve("dst");
+        Files.createDirectories(src);
+        Files.createDirectories(dst);
+
+        // Create an existing effects.yml in dst
+        Files.writeString(dst.resolve("effects.yml"), "version: 1.0\n");
+
+        RtpYamlConfig cfg = RtpYamlConfig.parse("""
+            teleport_sound: "ENTITY_ENDERMAN_TELEPORT"
+            particles:
+              enabled: true
+              type: "PORTAL"
+              amount: 50
+            potions:
+              list:
+                - "SPEED:200:1"
+                - "BLINDNESS:10:0"
+            """);
+
+        List<String> mapped = new ArrayList<>();
+        List<Path> written = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+
+        importer.mirrorEffectsConfig(cfg, dst, true, mapped, written, warnings);
+        assertTrue(Files.exists(dst.resolve("effects.yml")));
+        assertFalse(mapped.isEmpty());
+    }
 }

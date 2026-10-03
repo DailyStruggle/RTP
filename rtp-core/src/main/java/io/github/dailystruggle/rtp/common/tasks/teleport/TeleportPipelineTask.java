@@ -288,14 +288,12 @@ public final class TeleportPipelineTask extends RTPRunnable {
       double cz = Double.NaN;
       for (Map.Entry<? extends Enum<?>, Object> entry : shape.getData().entrySet()) {
         String name = entry.getKey().name();
-        if (name.equalsIgnoreCase("centerX") || name.equalsIgnoreCase("center_x") || name.equalsIgnoreCase("cx")) {
-          if (entry.getValue() instanceof Number n) {
-            cx = n.doubleValue();
-          }
-        } else if (name.equalsIgnoreCase("centerZ") || name.equalsIgnoreCase("center_z") || name.equalsIgnoreCase("cz")) {
-          if (entry.getValue() instanceof Number n) {
-            cz = n.doubleValue();
-          }
+        if ((name.equalsIgnoreCase("centerX") || name.equalsIgnoreCase("center_x") || name.equalsIgnoreCase("cx"))
+            && entry.getValue() instanceof Number n) {
+          cx = n.doubleValue();
+        } else if ((name.equalsIgnoreCase("centerZ") || name.equalsIgnoreCase("center_z") || name.equalsIgnoreCase("cz"))
+            && entry.getValue() instanceof Number n) {
+          cz = n.doubleValue();
         }
       }
       if (!Double.isNaN(cx) && !Double.isNaN(cz)) {

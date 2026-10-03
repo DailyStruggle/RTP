@@ -125,8 +125,7 @@ class GriefPreventionRegionVerifierTest {
         existsField.set(null, false);
       } catch (Throwable ignored) {
       }
-      boolean result = verifier.verify(loc);
-      assertNotNull(result);
+      verifier.verify(loc);
     });
   }
 

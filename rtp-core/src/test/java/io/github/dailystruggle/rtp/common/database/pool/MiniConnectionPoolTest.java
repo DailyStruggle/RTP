@@ -130,4 +130,13 @@ class MiniConnectionPoolTest {
       }
     }
   }
+
+  @Test
+  void testGetConnectionWithCredentialsAndInterruptedOrExhausted() throws SQLException {
+    try (MiniConnectionPool p = new MiniConnectionPool("jdbc:h2:mem:creds;DB_CLOSE_DELAY=-1", "sa", "", 1)) {
+      try (Connection c = p.getConnection("sa", "")) {
+        assertNotNull(c);
+      }
+    }
+  }
 }

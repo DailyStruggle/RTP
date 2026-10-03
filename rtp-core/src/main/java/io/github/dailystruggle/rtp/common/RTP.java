@@ -890,11 +890,10 @@ public class RTP {
               null, null, target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME ? "Biome: " + target.name() : null);
         }
 
-        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.REGION) {
-          if (region.getSettings().requirePermission()
-              && !player.hasPermission("rtp.regions." + target.name())) {
-            noPerm = true;
-          }
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.REGION
+            && region.getSettings().requirePermission()
+            && !player.hasPermission("rtp.regions." + target.name())) {
+          noPerm = true;
         }
 
         // Cost: region price plus the configured economy base price, unless the

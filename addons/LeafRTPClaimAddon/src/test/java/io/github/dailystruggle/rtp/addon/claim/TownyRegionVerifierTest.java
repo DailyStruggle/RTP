@@ -107,10 +107,7 @@ class TownyRegionVerifierTest {
     when(mockTownyApi.isWilderness(any(Location.class))).thenThrow(new RuntimeException("Simulated Towny error"));
 
     RTPLocation loc = new RTPLocation(mockRtpWorld, 150, 64, 150);
-    assertDoesNotThrow(() -> {
-      boolean result = verifier.verify(loc);
-      assertNotNull(result);
-    });
+    assertDoesNotThrow(() -> verifier.verify(loc));
   }
 
   @Test

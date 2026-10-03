@@ -124,4 +124,40 @@ class ComprehensiveRegionImageExporterTest {
     assertTrue(img.getWidth() <= 4096 + 350, "Canvas width should be within 4096 + side margins");
     assertTrue(img.getHeight() <= 4096 + 200, "Canvas height should be within 4096 + vertical margins");
   }
+
+  @Test
+  @DisplayName("exportAll with custom width only and custom height only")
+  void exportAll_customWidthOnlyAndCustomHeightOnly() throws Exception {
+    SquareOptimizedDualLayer shape = new SquareOptimizedDualLayer("testSquare", 32);
+    shape.set(GenericMemoryShapeParams.radius, 64L);
+    shape.set(GenericMemoryShapeParams.centerRadius, 0L);
+    shape.set(GenericMemoryShapeParams.centerX, 0L);
+    shape.set(GenericMemoryShapeParams.centerZ, 0L);
+
+    LinearAdjustor vert = new LinearAdjustor(new ArrayList<>());
+    RegionSettings settings = new RegionSettings(
+        "dim_region", testWorld, shape, vert,
+        false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false
+    );
+    Region region = new Region("dim_region", settings);
+
+    File outDir = tempDir.toFile();
+    // Width only
+    ComprehensiveRegionImageExporter.ExportResult resW =
+        ComprehensiveRegionImageExporter.exportAll(region, outDir, 800, null, 1.0);
+    assertNotNull(resW);
+    assertTrue(resW.imageFile().exists());
+
+    // Height only
+    ComprehensiveRegionImageExporter.ExportResult resH =
+        ComprehensiveRegionImageExporter.exportAll(region, outDir, null, 600, 1.0);
+    assertNotNull(resH);
+    assertTrue(resH.imageFile().exists());
+
+    // Both dimensions smaller than side panel margins (hits fallback branches 189 and 195)
+    ComprehensiveRegionImageExporter.ExportResult resSmall =
+        ComprehensiveRegionImageExporter.exportAll(region, outDir, 50, 40, 1.0);
+    assertNotNull(resSmall);
+    assertTrue(resSmall.imageFile().exists());
+  }
 }

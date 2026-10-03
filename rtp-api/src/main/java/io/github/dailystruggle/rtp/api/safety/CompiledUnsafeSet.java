@@ -347,18 +347,15 @@ public final class CompiledUnsafeSet {
       if (tok != null && tok.kind() == SafetyToken.Kind.TAG && tok.identifier().equals(tag) && tok.hasSubtractions()) {
         for (SafetyToken sub : tok.subtractions()) {
           if (sub == null) continue;
-          if (sub.kind() == SafetyToken.Kind.MATERIAL) {
-            if (canonicalise(sub.identifier()).equals(canonicalise(materialName))) {
-              if (!sub.isPredicated() || matchesAny(sub.predicates(), liveProperties)) {
-                return true;
-              }
-            }
-          } else if (sub.kind() == SafetyToken.Kind.TAG) {
-            if (liveTagMembership != null && liveTagMembership.contains(sub.identifier())) {
-              if (!sub.isPredicated() || matchesAny(sub.predicates(), liveProperties)) {
-                return true;
-              }
-            }
+          if (sub.kind() == SafetyToken.Kind.MATERIAL
+              && canonicalise(sub.identifier()).equals(canonicalise(materialName))
+              && (!sub.isPredicated() || matchesAny(sub.predicates(), liveProperties))) {
+            return true;
+          } else if (sub.kind() == SafetyToken.Kind.TAG
+              && liveTagMembership != null
+              && liveTagMembership.contains(sub.identifier())
+              && (!sub.isPredicated() || matchesAny(sub.predicates(), liveProperties))) {
+            return true;
           }
         }
       }

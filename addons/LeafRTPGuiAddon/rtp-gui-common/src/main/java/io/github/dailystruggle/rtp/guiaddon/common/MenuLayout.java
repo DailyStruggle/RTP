@@ -92,7 +92,7 @@ public final class MenuLayout {
     int currentContentRow = topRow;
     if (!destinations.isEmpty()) {
       int placed = 0;
-      for (int r = 0; r < destRows && currentContentRow <= innerRows; r++) {
+      for (int r = 0; r < destRows && currentContentRow <= innerRows; r++, currentContentRow++) {
         int remaining = destinations.size() - placed;
         int countInRow = Math.min(ITEMS_PER_ROW, remaining);
         for (int i = 0; i < countInRow; i++) {
@@ -101,14 +101,13 @@ public final class MenuLayout {
           int slot = currentContentRow * COLUMNS + INNER_FIRST_COL + col;
           slotEntries.put(slot, entry);
         }
-        currentContentRow++;
       }
     }
 
     // Place submenus on the subsequent content row(s)
     if (!submenus.isEmpty()) {
       int placed = 0;
-      for (int r = 0; r < submenuRows && currentContentRow <= innerRows; r++) {
+      for (int r = 0; r < submenuRows && currentContentRow <= innerRows; r++, currentContentRow++) {
         int remaining = submenus.size() - placed;
         int countInRow = Math.min(ITEMS_PER_ROW, remaining);
         for (int i = 0; i < countInRow; i++) {
@@ -117,7 +116,6 @@ public final class MenuLayout {
           int slot = currentContentRow * COLUMNS + INNER_FIRST_COL + col;
           slotEntries.put(slot, entry);
         }
-        currentContentRow++;
       }
     }
 

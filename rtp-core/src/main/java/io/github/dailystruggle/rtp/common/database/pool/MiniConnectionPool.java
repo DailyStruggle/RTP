@@ -200,10 +200,12 @@ public class MiniConnectionPool implements DataSource, AutoCloseable {
 
   @Override
   public void setLogWriter(PrintWriter out) {
+    // MiniConnectionPool does not direct its internal connection logging to a custom PrintWriter
   }
 
   @Override
   public void setLoginTimeout(int seconds) {
+    // Login timeout configuration is handled directly via JDBC connection properties / DriverManager
   }
 
   @Override
