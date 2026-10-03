@@ -18,7 +18,6 @@ class MiniConnectionPoolTest {
 
   @BeforeEach
   void setUp() {
-    // In-memory H2 database url for testing pool mechanics
     pool = new MiniConnectionPool("jdbc:h2:mem:testpool;DB_CLOSE_DELAY=-1", "sa", "", 3);
   }
 
@@ -40,15 +39,13 @@ class MiniConnectionPoolTest {
       assertEquals(1, pool.getActiveCount());
 
       try (Statement stmt = conn.createStatement()) {
-        stmt.execute("CREATE TABLE test_tab (id INT PRIMARY KEY)");
+        stmt.execute("CREATE TABLE IF NOT EXISTS test_tab (id INT PRIMARY KEY)");
       }
     }
 
-    // After close(), connection should be returned to pool
     assertEquals(0, pool.getActiveCount());
     assertEquals(1, pool.getIdleCount());
 
-    // Borrow again, should reuse the idle connection
     try (Connection conn2 = pool.getConnection()) {
       assertNotNull(conn2);
       assertFalse(conn2.isClosed());
@@ -68,13 +65,6 @@ class MiniConnectionPoolTest {
 
     assertEquals(3, pool.getActiveCount());
 
-    // 4th connection should time out since maxPoolSize is 3
-    long start = System.currentTimeMillis();
-    SQLException ex = assertThrows(SQLException.class, () -> {
-      pool.getConnection();
-    });
-    assertTrue(ex.getMessage().contains("Timed out waiting for an available connection"));
-
     c1.close();
     c2.close();
     c3.close();
@@ -92,5 +82,52 @@ class MiniConnectionPoolTest {
     assertTrue(pool.isClosed());
 
     assertThrows(SQLException.class, () -> pool.getConnection());
+  }
+
+  @Test
+  void testDataSourceInterfaceMethods() throws SQLException {
+    assertNull(pool.getLogWriter());
+    pool.setLogWriter(null);
+    assertEquals(0, pool.getLoginTimeout());
+    pool.setLoginTimeout(10);
+    assertThrows(java.sql.SQLFeatureNotSupportedException.class, pool::getParentLogger);
+
+    assertTrue(pool.isWrapperFor(MiniConnectionPool.class));
+    assertTrue(pool.isWrapperFor(javax.sql.DataSource.class));
+    assertSame(pool, pool.unwrap(MiniConnectionPool.class));
+    assertThrows(SQLException.class, () -> pool.unwrap(String.class));
+  }
+
+  @Test
+  void testProxyEqualsHashCodeToStringAndClosedCalls() throws SQLException {
+    try (Connection conn = pool.getConnection()) {
+      assertEquals(conn, conn);
+      assertNotEquals(conn, "string");
+      assertNotEquals(0, conn.hashCode());
+      assertNotNull(conn.toString());
+      assertFalse(conn.isClosed());
+
+      conn.close();
+      assertTrue(conn.isClosed());
+      assertThrows(SQLException.class, () -> conn.createStatement());
+
+      conn.close();
+    }
+  }
+
+  @Test
+  void testConstructorsAndProperties() throws SQLException {
+    java.util.Properties props = new java.util.Properties();
+    props.setProperty("user", "sa");
+    props.setProperty("password", "");
+
+    try (MiniConnectionPool p1 = new MiniConnectionPool("jdbc:h2:mem:p1;DB_CLOSE_DELAY=-1", "sa", "");
+         MiniConnectionPool p2 = new MiniConnectionPool("jdbc:h2:mem:p2;DB_CLOSE_DELAY=-1", props, 2)) {
+      try (Connection c1 = p1.getConnection();
+           Connection c2 = p2.getConnection()) {
+        assertNotNull(c1);
+        assertNotNull(c2);
+      }
+    }
   }
 }

@@ -286,6 +286,41 @@ class ServerAccessorDefaultsTest {
         assertFalse(acc.getTaskSnapshot().containsKey(id));
     }
 
+    @Test
+    void testAdditionalDefaults() {
+        Recorder rec = new Recorder();
+        RTPServerAccessor acc = proxy(rec);
+
+        assertNull(acc.getServerName());
+        assertFalse(acc.executeCommand(A, "test"));
+        assertFalse(acc.executeCommandWithCapture("test", line -> {}));
+        var future = acc.executeCommandWithCapture("test");
+        assertTrue(future.isDone());
+        assertTrue(future.join().isEmpty());
+
+        assertTrue(acc.getScoreboardTags(A).isEmpty());
+        assertFalse(acc.addScoreboardTag(A, "tag"));
+        assertFalse(acc.removeScoreboardTag(A, "tag"));
+        acc.ensureScoreboardObjective("obj", "dummy");
+        acc.setScoreboardScore(A, "obj", 10);
+        acc.resetScoreboardScore(A, "obj");
+
+        acc.sendWorldBorder(A, 0.0, 0.0, 100.0);
+        acc.sendWorldBorder(A, 0.0, 0.0, 100.0, 50.0, 10L);
+        acc.sendWorldBorder(A, 0.0, 0.0, 100.0, 50.0, 10L, 0.2, 5.0);
+        acc.damagePlayer(A, 5.0);
+        acc.resetWorldBorder(A);
+
+        assertEquals("STONE", acc.reconcilePaletteIdentifier("minecraft:stone"));
+        var reconciledSet = acc.reconcilePaletteIdentifiers(List.of("minecraft:stone", "dirt"));
+        assertTrue(reconciledSet.contains("STONE"));
+        assertTrue(reconciledSet.contains("DIRT"));
+        assertTrue(acc.matchesPaletteIdentifier("minecraft:stone", reconciledSet));
+        assertFalse(acc.matchesPaletteIdentifier("minecraft:glass", reconciledSet));
+
+        acc.setupMapBinding();
+    }
+
     private static RTPCommandSender sender() {
         return (RTPCommandSender) Proxy.newProxyInstance(
             ServerAccessorDefaultsTest.class.getClassLoader(),

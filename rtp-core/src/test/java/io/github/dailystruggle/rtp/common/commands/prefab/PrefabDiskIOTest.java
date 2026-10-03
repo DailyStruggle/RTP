@@ -370,4 +370,12 @@ class PrefabDiskIOTest {
         assertEquals(-1, snap.get("safety").get("platformRadius"));
         assertFalse(snap.containsKey("performance"));
     }
+
+    @Test
+    void testFormatBackupSummary() {
+        assertEquals("", PrefabDiskIO.formatBackupSummary(List.of()));
+        String summary = PrefabDiskIO.formatBackupSummary(List.of("perf.bak.1", "region.bak.2"));
+        assertTrue(summary.contains("perf.bak.1"));
+        assertTrue(summary.contains("region.bak.2"));
+    }
 }

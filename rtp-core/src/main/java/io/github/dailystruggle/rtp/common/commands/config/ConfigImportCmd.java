@@ -54,7 +54,8 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
                     pluginDir = RTP.serverAccessor.getPluginDirectory();
                 }
 
-                if (pluginDir != null && pluginDir.getParentFile() != null) {
+                // Only perform fast adjacent source detection if pluginDir has a valid parent directory
+                if (pluginDir != null && pluginDir.getParentFile() != null && pluginDir.getParentFile().isDirectory()) {
                     Path pluginsDir = pluginDir.getParentFile().toPath();
                     Map<String, Path> detected = ForeignConfigImporterRegistry.detectAvailableSources(pluginsDir);
                     suggestions.addAll(detected.keySet());

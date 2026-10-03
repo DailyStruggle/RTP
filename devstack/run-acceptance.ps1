@@ -44,7 +44,7 @@
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('all', 'boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'rtptest', 'gui', 'rtpgui', 'gui-submenu', 'gui-setup', 'burst', 'stress', 'down', 'logs')]
+  [ValidateSet('all', 'boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'rtptest', 'gui', 'rtpgui', 'gui-submenu', 'gui-setup', 'burst', 'stress', 'burst-stress', 'down', 'logs')]
   [string]$Scenario = 'all',
   [int]$WaitSeconds = 180,
   # Target backend server for directed verification / GUI tests (backend-a, backend-b, backend-c, backend-d)
@@ -104,7 +104,9 @@ param(
   # testing Paper + Folia + Fabric + NeoForge multi-platform parity behind Velocity.
   [switch]$NeoForge,
   # Assert client effect packets (sounds, particles, titles) in headless bot acceptance
-  [switch]$AssertEffects
+  [switch]$AssertEffects,
+  # Tear down and stop containers/images once testing is complete, freeing CPU and memory
+  [switch]$TearDown
 )
 
 $ErrorActionPreference = 'Stop'
@@ -275,6 +277,8 @@ function Initialize-Secrets {
   Set-Content -Path $envPath -Value (@($kept) + "CFG_VELOCITY_FORWARDING_SECRET=$fwd") -Encoding ascii
 }
 
+$SpawnedLogProcesses = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+
 function Show-LogWindows {
   # Spawn one new PowerShell window per devstack service, each running
   # `docker compose logs -f --tail=100 <svc>` so the operator can watch every
@@ -322,7 +326,8 @@ for (`$i = 10; `$i -gt 0; `$i--) {
       # Use -EncodedCommand to avoid Windows argv-quoting mangling embedded
       # double quotes (which previously broke the "exit=$exit" banner line).
       $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($cmd))
-      Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-EncodedCommand', $encoded) | Out-Null
+      $proc = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-EncodedCommand', $encoded) -PassThru
+      if ($proc) { $SpawnedLogProcesses.Add($proc) }
     } catch {
       Write-Host "[logs] WARN - could not spawn log window for $svc : $_" -ForegroundColor Yellow
     }
@@ -330,6 +335,18 @@ for (`$i = 10; `$i -gt 0; `$i--) {
   Write-Evidence 'logs' "spawned log windows for: $($services -join ', '); per-service files under $RunLogDir"
   Write-Host '[logs] tip: windows auto-close 10s after their container stops; press any key in a window during countdown to keep it open. Re-run `.\run-acceptance.ps1 -Scenario logs` to reopen.' -ForegroundColor DarkGray
   Write-Host "[logs] per-service log files: $RunLogDir" -ForegroundColor DarkGray
+}
+
+function Stop-SpawnedLogWindows {
+  foreach ($p in $SpawnedLogProcesses) {
+    try {
+      if (-not $p.HasExited) {
+        $p.Kill()
+      }
+    } catch {
+      # Ignore race conditions on already exited processes
+    }
+  }
 }
 
 function Get-RepoRoot {
@@ -926,6 +943,33 @@ function Test-Roundtrip {
       Write-Host '[roundtrip] installing client dependencies...' -ForegroundColor Cyan
       & npm --prefix $clientsDir install --silent --no-audit | Out-Null
     }
+    # Wait for proxy port 25577 to be reachable
+    $portReady = $false
+    $deadline = (Get-Date).AddSeconds(60)
+    while ((Get-Date) -lt $deadline) {
+      try {
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        $connect = $tcp.BeginConnect('127.0.0.1', 25577, $null, $null)
+        $success = $connect.AsyncWaitHandle.WaitOne(1000, $false)
+        if ($success -and $tcp.Connected) {
+          $tcp.EndConnect($connect)
+          $tcp.Close()
+          $portReady = $true
+          break
+        }
+        $tcp.Close()
+      } catch {}
+      Start-Sleep -Seconds 2
+    }
+    if (-not $portReady) {
+      Write-Host '[roundtrip] WARN - proxy port 25577 not answering after 60s; proceeding anyway' -ForegroundColor Yellow
+    }
+
+    # Ensure test bot has operator permissions on lobbies and backends so /rtp region=... is authorized
+    foreach ($svc in @('lobby-a', 'lobby-b', 'backend-a', 'backend-b')) {
+      $null = Invoke-Native { docker compose exec -T $svc rcon-cli "op RtpAcceptanceBot" }
+    }
+
     $extraArgs = @()
     if ($Lite) { $extraArgs += '--lite' }
     if ($AssertEffects) { $extraArgs += '--assert-effects' }
@@ -1124,13 +1168,43 @@ function Test-BurstStress {
     & npm --prefix $clientsDir install --silent --no-audit | Out-Null
   }
 
+  # Wait for proxy port 25577 to be reachable
+  $portReady = $false
+  $deadline = (Get-Date).AddSeconds(60)
+  while ((Get-Date) -lt $deadline) {
+    try {
+      $tcp = New-Object System.Net.Sockets.TcpClient
+      $connect = $tcp.BeginConnect('127.0.0.1', 25577, $null, $null)
+      $success = $connect.AsyncWaitHandle.WaitOne(1000, $false)
+      if ($success -and $tcp.Connected) {
+        $tcp.EndConnect($connect)
+        $tcp.Close()
+        $portReady = $true
+        break
+      }
+      $tcp.Close()
+    } catch {}
+    Start-Sleep -Seconds 2
+  }
+  if (-not $portReady) {
+    Write-Host '[burst] WARN - proxy port 25577 not answering after 60s; proceeding anyway' -ForegroundColor Yellow
+  }
+
+  # Ensure test bots have operator permissions on lobbies and backends so /rtp region=... is authorized
+  $testBotNames = @('RtpAcceptanceBot', 'GuiAcceptanceBot') + (0..15 | ForEach-Object { "StressBot_$_" })
+  foreach ($svc in @('lobby-a', 'lobby-b', 'backend-a', 'backend-b')) {
+    foreach ($botName in $testBotNames) {
+      $null = Invoke-Native { docker compose exec -T $svc rcon-cli "op $botName" }
+    }
+  }
+
   $extraArgs = @('--bot-count', $BotCount.ToString(), '--timeout', $WaitSeconds.ToString())
   Write-Host "[burst] launching swarm of $BotCount concurrent bots targeting proxy-a (127.0.0.1:25577)..." -ForegroundColor Cyan
 
   if ($nodeCmd) {
     $botOut = & node $botScript --host 127.0.0.1 --port 25577 @extraArgs 2>&1 | Out-String
   } else {
-    $botOut = & docker run --rm --network host -v "${clientsDir}:/app" -w /app node:20 node stress-burst-swarm.js --host 127.0.0.1 --port 25577 @extraArgs 2>&1 | Out-String
+    $botOut = Invoke-Native { docker run --rm --network host -v "${clientsDir}:/app" -w /app node:20 node stress-burst-swarm.js --host 127.0.0.1 --port 25577 @extraArgs }
   }
   Write-Host $botOut
 
@@ -1400,6 +1474,7 @@ try {
       'rtpgui'        { $results[$s] = Test-Gui -GuiScenario 'teleport' -TargetServer $TargetServer }
       'burst'         { $results[$s] = Test-BurstStress }
       'stress'        { $results[$s] = Test-BurstStress }
+      'burst-stress'  { $results[$s] = Test-BurstStress }
     }
   }
 } finally {
@@ -1443,6 +1518,12 @@ if ($Coverage) {
       Pop-Location
     }
   }
+}
+
+if ($TearDown) {
+  Write-Host '[teardown] -TearDown requested: stopping and closing containers...' -ForegroundColor Cyan
+  Invoke-ComposeDown -IncludeVolumes:$Purge
+  Stop-SpawnedLogWindows
 }
 
 if ($results.Values -contains $false) { exit 1 } else { exit 0 }

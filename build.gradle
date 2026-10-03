@@ -192,16 +192,10 @@ subprojects {
                 project.path == ':rtp-proxy:rtp-proxy-velocity' ||
                 project.path == ':effects-api:effects-api-fabric-unobf'
 
-        if (!isPlatformOrAddonProject) {
-            tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
-            jacocoTestReport {
-                dependsOn test
-                reports { html.required = true; xml.required = true }
-            }
-        } else {
-            jacocoTestReport {
-                reports { html.required = false; xml.required = false }
-            }
+        tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
+        jacocoTestReport {
+            dependsOn test
+            reports { html.required = true; xml.required = true }
         }
     }
 
@@ -1003,11 +997,10 @@ subprojects {
                     property 'sonar.coverage.jacoco.xmlReportPaths', jacocoReport.absolutePath
                 }
             } else {
-                // Prevent Sonar JaCoCo plugin from falling back to default locations and reporting
-                // unmatched coverage on modules where source coverage is excluded.
+                // Ensure JaCoCo XML is still produced for local normalized aggregation tools
                 tasks.matching { it.name == 'jacocoTestReport' }.configureEach {
-                    reports.xml.required = false
-                    reports.html.required = false
+                    reports.xml.required = true
+                    reports.html.required = true
                 }
             }
         }

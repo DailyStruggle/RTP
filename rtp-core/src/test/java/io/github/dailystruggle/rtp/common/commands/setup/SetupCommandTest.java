@@ -328,4 +328,22 @@ class SetupCommandTest {
         var mAddons2 = builder.build(session, Map.of());
         assertNotNull(mAddons2);
     }
+
+    @Test
+    @DisplayName("SetupStatusCmd outputs formatted status")
+    void testSetupStatusCmd() {
+        SetupSessionRegistry registry = new SetupSessionRegistry();
+        SetupStatusCmd statusCmd = new SetupStatusCmd(null, registry);
+        assertEquals("status", statusCmd.name());
+        assertEquals("rtp.admin.setup", statusCmd.permission());
+        assertNotNull(statusCmd.description());
+
+        UUID callerId = UUID.randomUUID();
+        SetupSession session = registry.getOrCreate(callerId);
+        session.setWorldChoice("single");
+        session.setGameplayChoice("survival");
+        session.setPerformanceChoice("high");
+
+        assertTrue(statusCmd.onCommand(callerId, Map.of(), null));
+    }
 }

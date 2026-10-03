@@ -766,4 +766,16 @@ class ActionCommandTest {
     assertFalse(caller.sentMessages.stream().anyMatch(m -> m.contains(PlayerMessages.noPerms.name())),
         "Default (self) path must not require the target permission");
   }
+
+  @Test
+  void testActionCommandNextCommandHandling() {
+    ActionDefinition def = new ActionDefinition(
+        "step_act", "step_act", "perm", "",
+        ActionDefinition.PlacementSpec.DISABLED,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY
+    );
+    ActionCommand cmd = new ActionCommand(def);
+    assertTrue(cmd.onCommand(UUID.randomUUID(), Map.of(), cmd));
+  }
 }

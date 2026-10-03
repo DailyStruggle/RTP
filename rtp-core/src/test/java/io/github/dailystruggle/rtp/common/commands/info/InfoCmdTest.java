@@ -360,4 +360,41 @@ public class InfoCmdTest {
         assertNotNull(infoCmd.getParameterLookup().get("world"));
         assertNotNull(infoCmd.getParameterLookup().get("region"));
     }
+
+    @Test
+    void onCommand_messageTapRoutingAndFormatDoubleEdgeCases() {
+        UUID senderId = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(senderId, "tap-player", null);
+        accessor.addPlayer(player);
+
+        List<String> tappedMessages = new ArrayList<>();
+        RTP.messageTap.set(tappedMessages::add);
+
+        try {
+            boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
+            assertTrue(result);
+            assertFalse(tappedMessages.isEmpty(), "messageTap must intercept emitted lines when active");
+        } finally {
+            RTP.messageTap.remove();
+        }
+    }
+
+    @Test
+    void onCommand_drmFormattingForAdminOrSupport() {
+        UUID senderId = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(senderId, "admin-player", null) {
+            @Override
+            public boolean hasPermission(String permission) {
+                return "rtp.admin".equals(permission) || "rtp.support".equals(permission);
+            }
+        };
+        accessor.addPlayer(player);
+
+        boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
+        assertTrue(result);
+
+        assertTrue(
+                player.sentMessages.stream().anyMatch(s -> s.contains("DRM:")),
+                "Expected DRM line in /rtp info output for admin/support, got: " + player.sentMessages);
+    }
 }

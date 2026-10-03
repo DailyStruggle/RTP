@@ -115,4 +115,32 @@ class ActionPlaceholderSanitizerTest {
     String resUuid = ActionPlaceholderSanitizer.substitute(uuidCmd, Map.of("player", pId));
     assertEquals("tag " + pId + " add test", resUuid, "_uuid suffix should still resolve to raw UUID");
   }
+
+  @Test
+  void testNumberedPlaceholdersAndSenderResolution() {
+    io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
+        new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("."));
+    io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+
+    UUID p1 = UUID.randomUUID();
+    UUID p2 = UUID.randomUUID();
+    accessor.addPlayer(new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+        p1, "PlayerOne", new io.github.dailystruggle.rtp.api.world.RTPLocation(accessor.getRTPWorld("world"), 0, 64, 0)));
+    accessor.addPlayer(new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+        p2, "PlayerTwo", new io.github.dailystruggle.rtp.api.world.RTPLocation(accessor.getRTPWorld("world"), 0, 64, 0)));
+
+    Map<String, Object> tokens = Map.of(
+        "sender_1", p1,
+        "target_1", p2,
+        "victim", p1
+    );
+
+    String cmd = "say [sender_name_1] vs [target_name_1] (uuid: [victim_uuid])";
+    String result = ActionPlaceholderSanitizer.substitute(cmd, tokens);
+    assertEquals("say PlayerOne vs PlayerTwo (uuid: " + p1 + ")", result);
+
+    assertTrue(ActionPlaceholderSanitizer.containsAnyUnresolvedPlaceholder("text with [unresolved]"));
+    assertFalse(ActionPlaceholderSanitizer.containsAnyUnresolvedPlaceholder("plain text"));
+    assertFalse(ActionPlaceholderSanitizer.containsAnyUnresolvedPlaceholder(null));
+  }
 }

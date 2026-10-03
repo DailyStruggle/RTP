@@ -348,6 +348,35 @@ class PrefabCommandTest {
         assertEquals(1, store.size(), "missing-id confirm must not consume the outstanding entry");
     }
 
+    @Test
+    void confirm_nullCaller_rejected() {
+        PrefabNonceStore store = new PrefabNonceStore();
+        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
+        assertFalse(confirm.onCommand(null, Map.of("id", List.of("low-performance")), null));
+    }
+
+    @Test
+    void confirm_withNextCommand_returnsTrue() {
+        PrefabNonceStore store = new PrefabNonceStore();
+        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
+        assertTrue(confirm.onCommand(UUID.randomUUID(), Map.of(), confirm));
+    }
+
+    @Test
+    void confirm_withRealChangesAndExpandPerWorld() throws Exception {
+        PrefabNonceStore store = new PrefabNonceStore();
+        UUID caller = UUID.randomUUID();
+        accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
+        // Mint multi-world
+        store.mint(caller, "multi-world", Map.of(
+            "definitions/regions/default", List.of(new PrefabApplier.Change("radius", 100, 200))
+        ));
+        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
+        Map<String, List<String>> params = new HashMap<>();
+        params.put("id", List.of("multi-world"));
+        assertTrue(confirm.onCommand(caller, params, null));
+    }
+
     // --- PrefabRollbackCmd ---------------------------------------------------
 
     @Test

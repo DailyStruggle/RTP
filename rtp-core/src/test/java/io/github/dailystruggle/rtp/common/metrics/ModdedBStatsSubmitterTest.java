@@ -96,4 +96,12 @@ class ModdedBStatsSubmitterTest {
         assertEquals(0, ModdedBStatsSubmitter.scaledTps(-5.0));
         assertEquals(2500, ModdedBStatsSubmitter.scaledTps(30.0));
     }
+
+    @Test
+    @DisplayName("ModdedBStatsSubmitter start method and submit without error")
+    void testStartAndSubmitExecution(@TempDir Path tempDir) {
+        ModdedBStatsSubmitter.start("neoforge", tempDir.toFile());
+        // second call should early return
+        ModdedBStatsSubmitter.start("neoforge", tempDir.toFile());
+    }
 }
