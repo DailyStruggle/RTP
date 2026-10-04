@@ -105,7 +105,7 @@ RTP uses a structured requirements workflow enforced by CI. If you add or modify
 3. **Update `docs/DESIGN.md`** if the requirement introduces a new architectural decision.
 4. **Write or update a test.** For architectural rules, add a rule to `RTPArchitectureTest.java`. For behavioral requirements, add a unit or integration test. For platform-specific behavior that cannot be automated, note `— (manual)` in the Test column.
 
-The CI `Traceability Check` stage runs `check_traceability.sh` before the build and will fail with a list of untraced IDs if step 2 is skipped.
+The CI `Traceability Check` stage runs `scripts/check_traceability.sh` before the build and will fail with a list of untraced IDs if step 2 is skipped.
 
 For the full ID scheme and category reference, see [REQUIREMENTS.md](docs/dev/REQUIREMENTS.md).
 For term definitions used in requirements, see [GLOSSARY.md](docs/dev/GLOSSARY.md).

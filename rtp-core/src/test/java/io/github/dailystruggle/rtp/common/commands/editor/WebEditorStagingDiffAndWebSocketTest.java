@@ -55,7 +55,7 @@ class WebEditorStagingDiffAndWebSocketTest {
 
         // Copy-to-clipboard fallback
         assertTrue(html.contains("copyApplyCmd"), "Must provide copyApplyCmd fallback");
-        assertTrue(html.contains("/rtp editor apply"), "Must formulate /rtp editor apply command");
+        assertTrue(html.contains("/rtp editor apply token="), "Must formulate /rtp editor apply token= command");
 
         // Unambiguous sidebar display and subcategory pills (avoid duplicate default.yml under definitions)
         assertTrue(html.contains("getConfigDisplay"), "Must have getConfigDisplay function");

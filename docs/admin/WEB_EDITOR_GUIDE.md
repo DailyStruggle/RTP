@@ -133,7 +133,7 @@ Click **[⚡ Hot-Apply / Copy]** in the top navigation bar.
 1. **Direct Outbound Apply (Connected Mode):** If a bi-directional WebSocket session is active between the server and byte store, the changes commit directly. The server reloads regions instantly and logs a diff summary in chat.
 2. **Command Fallback (Token Mode):** If working in a disconnected or air-gapped environment, the workspace displays a copyable token command:
    ```text
-   /rtp editor apply <token>
+   /rtp editor apply token=<token>
    ```
    Paste this command into your Minecraft chat or console to execute the atomic commit.
 

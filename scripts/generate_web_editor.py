@@ -1826,7 +1826,7 @@ def generate_html() -> str:
     <div style="margin:14px 0;">
       <label style="display:block; font-size:0.8rem; color:var(--subtext); margin-bottom:6px;">In-Game / Console Command Fallback (ADR-104 Phase 2):</label>
       <div style="background:var(--dark); padding:10px 14px; border-radius:6px; border:1px solid var(--overlay); font-family:ui-monospace, monospace; font-size:0.9rem; color:var(--green); display:flex; justify-content:space-between; align-items:center;">
-        <span id="apply-cmd">/rtp apply e4d2a90f</span>
+        <span id="apply-cmd">/rtp editor apply e4d2a90f</span>
         <button class="btn" id="btn-copy-cmd" onclick="copyApplyCmd()" style="padding:4px 10px; font-size:0.75rem;">Copy</button>
       </div>
     </div>
@@ -3997,7 +3997,7 @@ let wsClient = null;
 
 function commitChanges() {{
   const token = currentSessionToken;
-  document.getElementById('apply-cmd').textContent = `/rtp apply ${{token}}`;
+  document.getElementById('apply-cmd').textContent = `/rtp editor apply ${{token}}`;
   document.getElementById('token-label').textContent = token;
   const overlay = document.getElementById('modal-overlay');
   if (overlay) overlay.style.display = 'flex';

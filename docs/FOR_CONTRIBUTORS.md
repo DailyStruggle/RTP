@@ -31,7 +31,7 @@ Every new feature or fix must trace to an existing requirement or introduce a ne
 
 ### 6. [TRACEABILITY.md](dev/TRACEABILITY.md)
 The requirement → design decision → implementing class → test matrix.
-The `check_traceability.sh` CI script fails if any `REQ-*` ID lacks a row here — add the row before pushing.
+The `scripts/check_traceability.sh` CI script fails if any `REQ-*` ID lacks a row here — add the row before pushing.
 
 ### 7. [STAKEHOLDERS.md](dev/STAKEHOLDERS.md)
 Actor definitions and their goals. Keeps requirements grounded in real user needs.

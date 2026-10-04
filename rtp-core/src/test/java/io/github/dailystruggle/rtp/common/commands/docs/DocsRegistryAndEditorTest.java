@@ -180,6 +180,9 @@ class DocsRegistryAndEditorTest {
             Map<String, Object> hazards = (Map<String, Object>) payload.get("hazards");
             assertNotNull(hazards.get("rleBase64"));
             assertTrue(((Number) hazards.get("byteSize")).intValue() < 5120);
+            // Verify bounds are derived from shape coordinate extents rather than location count
+            assertTrue((Integer) hazards.get("maxX") < 2000);
+            assertTrue((Integer) hazards.get("minX") > -2000);
 
             Map<String, Object> delta = manager.generateScanDeltaPayload(region);
             assertNotNull(delta);

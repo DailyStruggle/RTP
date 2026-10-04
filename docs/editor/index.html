@@ -823,7 +823,7 @@
         </div>
         <div class="telemetry-card">
           <h4>Connected Players / Cap</h4>
-          <div class="telemetry-val" style="color:var(--mauve);" id="metric-players">42 <span style="font-size:0.9rem; color:var(--subtext);">/ 150 soft cap</span></div>
+          <div class="telemetry-val" style="color:var(--mauve);" id="metric-players">0 <span style="font-size:0.9rem; color:var(--subtext);">/ 150 soft cap</span></div>
           <p class="telemetry-desc">Online players vs configured RTP concurrency soft cap</p>
         </div>
         <div class="telemetry-card">
@@ -1172,7 +1172,7 @@
     <div style="margin:14px 0;">
       <label style="display:block; font-size:0.8rem; color:var(--subtext); margin-bottom:6px;">In-Game / Console Command Fallback (ADR-104 Phase 2):</label>
       <div style="background:var(--dark); padding:10px 14px; border-radius:6px; border:1px solid var(--overlay); font-family:ui-monospace, monospace; font-size:0.9rem; color:var(--green); display:flex; justify-content:space-between; align-items:center;">
-        <span id="apply-cmd">/rtp editor apply e4d2a90f</span>
+        <span id="apply-cmd">/rtp editor apply token=e4d2a90f</span>
         <button class="btn" id="btn-copy-cmd" onclick="copyApplyCmd()" style="padding:4px 10px; font-size:0.75rem;">Copy</button>
       </div>
     </div>
@@ -3573,31 +3573,11 @@ function drawMap() {
   ctx.fillStyle = '#11111b';
   ctx.fillRect(0, 0, cssW, cssH);
 
-  const cx = cssW / 2 + canvasPanX;
-  const cy = cssH / 2 + canvasPanY;
-  
-  // Calculate effective bounding dimensions in blocks
-  const unit = regionState.unit || 'c';
-  const unitMult = (unit === 'c' ? 16 : (unit === 'r' ? 512 : (unit === 'km' ? 1000 : (unit === 'mi' ? 1609 : 1))));
-  const rBlocks = (regionState.radius || 256) * unitMult;
-  const crBlocks = (regionState.centerRadius || 0) * unitMult;
-  let rxBlocks = (regionState.radiusX || regionState.radius || 256) * unitMult;
-  let rzBlocks = (regionState.radiusZ || Math.round((regionState.radius || 256) / 2)) * unitMult;
-
-  // Determine span for auto-scale
-  let maxSpan = Math.max(rBlocks, 4000);
-  if (regionState.shape === 'RECTANGLE' || regionState.shape === 'ELLIPSE') {
-    maxSpan = Math.max(rxBlocks, rzBlocks, 4000);
-  } else if (regionState.shape === 'POLYGON' && regionState.vertices && regionState.vertices.length > 0) {
-    let maxV = 1000;
-    for (const v of regionState.vertices) {
-      maxV = Math.max(maxV, Math.abs(v[0]), Math.abs(v[1]));
-    }
-    maxSpan = Math.max(maxV, 4000);
-  }
-
   const baseScale = (Math.min(cssW, cssH) / 2) / (maxSpan * 1.35);
   const scale = baseScale * canvasZoom;
+
+  const cx = cssW / 2 + canvasPanX + ((regionState.centerX || 0) * scale);
+  const cy = cssH / 2 + canvasPanY + ((regionState.centerZ || 0) * scale);
 
   const showGrid = document.getElementById('chk-grid')?.checked ?? true;
   const showBins = document.getElementById('chk-bins')?.checked ?? true;
@@ -3606,7 +3586,7 @@ function drawMap() {
   const showSpiral = document.getElementById('chk-spiral')?.checked ?? true;
   const showHazards = document.getElementById('chk-hazards')?.checked ?? true;
 
-  // Grid
+  // Grid & Coordinate Labels
   if (showGrid) {
     ctx.strokeStyle = '#1e1e2e';
     ctx.lineWidth = 1;
@@ -3618,6 +3598,24 @@ function drawMap() {
     // World border
     ctx.strokeStyle = '#313244';
     ctx.strokeRect(cx - (WORLD_BORDER_MAX * scale), cy - (WORLD_BORDER_MAX * scale), (WORLD_BORDER_MAX * 2) * scale, (WORLD_BORDER_MAX * 2) * scale);
+
+    // Coordinate markers along axes (every ~1000 or ~5000 blocks depending on scale)
+    const blockStep = scale > 0.05 ? 1000 : (scale > 0.01 ? 5000 : 10000);
+    const pxStep = blockStep * scale;
+    if (pxStep >= 30) {
+      ctx.fillStyle = 'rgba(166, 173, 200, 0.45)';
+      ctx.font = '10px monospace';
+      // X labels along horizontal axis
+      for (let bx = blockStep; cx + bx * scale < cssW; bx += blockStep) {
+        ctx.fillText(`+${bx}`, cx + bx * scale - 12, Math.min(cssH - 6, Math.max(14, cy - 4)));
+        ctx.fillText(`-${bx}`, cx - bx * scale - 14, Math.min(cssH - 6, Math.max(14, cy - 4)));
+      }
+      // Z labels along vertical axis
+      for (let bz = blockStep; cy + bz * scale < cssH; bz += blockStep) {
+        ctx.fillText(`+${bz}`, Math.min(cssW - 40, Math.max(4, cx + 4)), cy + bz * scale + 3);
+        ctx.fillText(`-${bz}`, Math.min(cssW - 40, Math.max(4, cx + 4)), cy - bz * scale + 3);
+      }
+    }
   }
 
   // Dynamic P-Bin derived from PointEdgeSelector
@@ -4603,7 +4601,7 @@ let wsClient = null;
 
 function commitChanges() {
   const token = currentSessionToken;
-  document.getElementById('apply-cmd').textContent = `/rtp editor apply ${token}`;
+  document.getElementById('apply-cmd').textContent = `/rtp editor apply token=${token}`;
   document.getElementById('token-label').textContent = token;
   const overlay = document.getElementById('modal-overlay');
   if (overlay) overlay.style.display = 'flex';
@@ -4614,8 +4612,8 @@ function hotApplyWebSocket() {
   if (!wsClient || wsClient.readyState !== WebSocket.OPEN) {
     if (wsStatus) {
       wsStatus.style.display = 'block';
-      wsStatus.style.color = 'var(--red)';
-      wsStatus.textContent = '❌ WebSocket is not connected. Use command fallback below.';
+      wsStatus.style.color = 'var(--subtext)';
+      wsStatus.textContent = 'ℹ Using byte-store session mode. Copy and run the command below on your server:';
     }
     return;
   }
@@ -4806,7 +4804,7 @@ let currentMetrics = {
   tps1m: 20.00, tps5m: 20.00, tps15m: 20.00,
   msptMean: 12.4, msptMax: 21.8,
   budgetUtil: 24.8,
-  players: 42, playerCap: 150,
+  players: 0, playerCap: 150,
   heapUsedGb: 1.82, heapTotalGb: 4.00,
   platform: 'Paper / Folia Async',
   l1Kept: 16, l1Cap: 16,
@@ -5547,6 +5545,90 @@ changeRegionProfile('default');
 updateDiagnosticsUI(currentMetrics);
 setTimeout(resizeCanvas, 60);
 initWebSocket();
+
+// ADR-104: Auto-detect session token in URL (?token=XYZ or #XYZ) and fetch live payload
+(async function autoLoadSessionFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  let token = params.get('token');
+  if (!token && window.location.hash) {
+    const h = window.location.hash.replace(/^#/, '').trim();
+    if (h && !h.includes('/')) token = h;
+  }
+  const bytebinParam = params.get('bytebin') || 'https://bytebin.lucko.me';
+  if (!token) return;
+
+  currentSessionToken = token;
+  const tokenLabel = document.getElementById('token-label');
+  if (tokenLabel) tokenLabel.textContent = token;
+  const applyCmd = document.getElementById('apply-cmd');
+  if (applyCmd) applyCmd.textContent = `/rtp editor apply token=${token}`;
+
+  const hudMsg = document.getElementById('hud-region');
+  if (hudMsg) hudMsg.textContent = `Loading ${token}...`;
+
+  try {
+    const res = await fetch(`${bytebinParam.replace(/\/+$/, '')}/${token}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+
+    // 1. Ingest files
+    if (payload.files && typeof payload.files === 'object') {
+      Object.assign(configs, payload.files);
+      Object.assign(defaultConfigs, payload.files);
+      populateConfigSidebar();
+      syncRegionProfiles();
+      const firstRegion = Object.keys(regionProfiles)[0] || 'default';
+      changeRegionProfile(firstRegion);
+      selectConfig(currentConfigFile);
+      updateStagingDiff();
+    }
+
+    // 2. Ingest live telemetry
+    if (payload.telemetry && typeof payload.telemetry === 'object') {
+      Object.assign(currentMetrics, payload.telemetry);
+      updateDiagnosticsUI(currentMetrics);
+    } else {
+      // Clear placeholder mock values so zero players doesn't display as 42
+      currentMetrics.players = 0;
+      updateDiagnosticsUI(currentMetrics);
+    }
+
+    // 3. Ingest real region visualization / models if provided in payload
+    if (payload.regionModels && typeof payload.regionModels === 'object') {
+      for (const [rName, rData] of Object.entries(payload.regionModels)) {
+        if (!regionProfiles[rName]) {
+          regionProfiles[rName] = Object.assign({}, regionState, { name: rName });
+        }
+        Object.assign(regionProfiles[rName], rData);
+      }
+      populateRegionSelector();
+      if (payload.regionModels[regionState.name]) {
+        Object.assign(regionState, payload.regionModels[regionState.name]);
+        drawMap();
+      }
+    }
+
+    const badge = document.getElementById('conn-badge');
+    if (badge) {
+      badge.textContent = `● BYTE-STORE (${token.substring(0, 8)})`;
+      badge.style.color = 'var(--green)';
+      badge.style.borderColor = 'rgba(166, 227, 161, 0.4)';
+    }
+    if (hudMsg) hudMsg.textContent = regionState.name || 'default';
+  } catch (err) {
+    console.warn('[RTP Web Editor] Failed to fetch session payload from byte-store:', err);
+    const badge = document.getElementById('conn-badge');
+    if (badge) {
+      badge.textContent = '● FETCH ERROR';
+      badge.style.color = 'var(--red)';
+    }
+    // Reset mock players count anyway
+    currentMetrics.players = 0;
+    updateDiagnosticsUI(currentMetrics);
+  }
+})();
 </script>
 </body>
 </html>

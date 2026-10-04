@@ -107,4 +107,33 @@ class PregenBiomeExtractorTest {
         assertTrue(pregenLand.containsKey("chunks"));
         assertTrue(pregenLand.containsKey("totalGenerated"));
     }
+
+    @Test
+    @DisplayName("resolveRegionFolder scopes search to configured world folder and does not use hardcoded paths")
+    void testResolveRegionFolderScoping() {
+        Square square = new Square();
+        square.set(GenericMemoryShapeParams.radius, 128L);
+        LinearAdjustor vert = new LinearAdjustor(new ArrayList<>());
+        RegionSettings settings = new RegionSettings(
+                "test_scope_reg",
+                world,
+                square,
+                vert,
+                false,
+                false,
+                10L,
+                100L,
+                0L,
+                5,
+                0.0,
+                1L,
+                "",
+                false
+        );
+        Region region = new Region("test_scope_reg", settings);
+
+        // When no region folder exists for "test_world", should safely return null (not fall back to unrelated folders)
+        java.nio.file.Path resolved = PregenBiomeExtractor.resolveRegionFolder(region);
+        assertNull(resolved);
+    }
 }
