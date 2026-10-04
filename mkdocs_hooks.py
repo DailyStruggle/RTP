@@ -143,12 +143,6 @@ def on_config(config):
     if adr_nav is not None and isinstance(config.get("nav"), list):
         config["nav"].append(adr_nav)
 
-    # Automatically generate the ADR-104 Web Editor application from source configs
-    try:
-        from scripts.generate_web_editor import main as generate_editor
-        generate_editor()
-    except Exception as e:
-        print(f"Warning: Failed to generate web editor in mkdocs hook: {e}")
 
     return config
 

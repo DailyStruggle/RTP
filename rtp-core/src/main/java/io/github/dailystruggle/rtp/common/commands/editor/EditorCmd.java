@@ -82,7 +82,7 @@ public class EditorCmd extends BaseRTPCmdImpl {
         .thenAccept(token -> {
             String editorUrl = transport.buildEditorUrl(token);
             sendMessage(callerId, "RTP: Editor session created! Open link to edit: " + editorUrl);
-            sendMessage(callerId, "RTP: Apply changes back when done using: /rtp editor apply " + token);
+            sendMessage(callerId, "RTP: Apply changes back when done using: /rtp editor apply token=" + token);
         }).exceptionally(throwable -> {
             // S-004: Zero silent swallows on HTTP failure
             Throwable cause = (throwable.getCause() != null) ? throwable.getCause() : throwable;

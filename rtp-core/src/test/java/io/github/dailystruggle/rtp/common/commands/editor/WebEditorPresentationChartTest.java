@@ -231,7 +231,7 @@ public class WebEditorPresentationChartTest {
         g.setColor(subtext);
         g.drawString("• Candidate yield: ~81.4% safe terrain", sideX + 32, valY + 120);
         g.setColor(accent);
-        g.drawString("Token: /rtp editor apply 8f3c4e19 (or click Hot-Apply)", sideX + 32, valY + 142);
+        g.drawString("Token: /rtp editor apply token=8f3c4e19 (or click Hot-Apply)", sideX + 32, valY + 142);
 
         g.dispose();
 

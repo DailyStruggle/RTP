@@ -223,7 +223,7 @@ class EditorTransportAndApplyTest {
         boolean editorResult = editorCmd.onCommand(caller, Map.of(), null);
         assertTrue(editorResult);
 
-        // Run /rtp editor apply <token>
+        // Run /rtp editor apply token=<token>
         boolean applyResult = applyCmd.onCommand(caller, Map.of("token", java.util.List.of(expectedKey)), null);
         assertTrue(applyResult);
     }

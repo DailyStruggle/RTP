@@ -35,6 +35,7 @@ public class ApplyCmd extends BaseRTPCmdImpl {
     public ApplyCmd(@Nullable CommandsAPICommand parent, EditorHttpTransport transport) {
         super(parent);
         this.transport = transport;
+        addParameter("token", new EditorTokenParameter(PERMISSION, "session token minted by editor"));
     }
 
     @Override
@@ -80,7 +81,7 @@ public class ApplyCmd extends BaseRTPCmdImpl {
         }
 
         if (token == null || token.isBlank()) {
-            sendMessage(callerId, "RTP: Usage - /rtp editor apply <token>");
+            sendMessage(callerId, "RTP: Usage - /rtp editor apply token=<token>");
             return true;
         }
 

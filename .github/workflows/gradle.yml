@@ -26,10 +26,10 @@ jobs:
           cache: gradle
 
       - name: Grant execute permission for scripts
-        run: chmod +x gradlew check_traceability.sh
+        run: chmod +x gradlew scripts/check_traceability.sh
 
       - name: Check traceability
-        run: ./check_traceability.sh
+        run: ./scripts/check_traceability.sh
 
       - name: Check UTF-8 mojibake
         run: python3 scripts/check-mojibake.py
@@ -67,10 +67,10 @@ jobs:
           cache: gradle
 
       - name: Grant execute permission for scripts
-        run: chmod +x gradlew check_traceability.sh
+        run: chmod +x gradlew scripts/check_traceability.sh
 
       - name: Check traceability
-        run: ./check_traceability.sh
+        run: ./scripts/check_traceability.sh
 
       - name: Check UTF-8 mojibake
         run: python3 scripts/check-mojibake.py

@@ -80,47 +80,28 @@ public final class PregenBiomeExtractor {
             } catch (Exception ignored) {}
         }
 
-        // 2. Search common server paths (e.g. ./world/region, ./world/dimensions/minecraft/overworld/region)
-        List<Path> searchRoots = new ArrayList<>();
-        searchRoots.add(Path.of("."));
-        searchRoots.add(Path.of("world"));
-        searchRoots.add(Path.of("C:\\GameServers\\Minecraft\\testServer\\RTP-Paper\\26.3"));
+        // 2. Search configured world directory (e.g. ./<worldName>/region, ./<worldName>/dimensions/minecraft/overworld/region)
+        Path worldDir = Path.of(worldName);
+        Path found = findRegionDirUnderWorld(worldDir);
+        if (found != null) return found;
 
-        for (Path root : searchRoots) {
-            Path found = findRegionDirUnder(root, worldName);
-            if (found != null) return found;
-        }
+        Path dotWorldDir = Path.of(".", worldName);
+        found = findRegionDirUnderWorld(dotWorldDir);
+        if (found != null) return found;
 
         return null;
     }
 
-    private static Path findRegionDirUnder(Path root, String worldName) {
-        if (!Files.isDirectory(root)) return null;
+    private static Path findRegionDirUnderWorld(Path worldRoot) {
+        if (!Files.isDirectory(worldRoot)) return null;
 
-        // Try direct combinations
         List<Path> candidates = List.of(
-                root.resolve("region"),
-                root.resolve(worldName).resolve("region"),
-                root.resolve("world").resolve("region"),
-                root.resolve(worldName).resolve("dimensions/minecraft/overworld/region"),
-                root.resolve("world/dimensions/minecraft/overworld/region")
+                worldRoot.resolve("region"),
+                worldRoot.resolve("dimensions/minecraft/overworld/region")
         );
         for (Path c : candidates) {
             if (Files.isDirectory(c)) return c;
         }
-
-        // Shallow walk for "region" folder
-        try (DirectoryStream<Path> ds = Files.newDirectoryStream(root)) {
-            for (Path p : ds) {
-                if (Files.isDirectory(p) && "region".equalsIgnoreCase(p.getFileName().toString())) {
-                    return p;
-                }
-                if (Files.isDirectory(p)) {
-                    Path nested = p.resolve("region");
-                    if (Files.isDirectory(nested)) return nested;
-                }
-            }
-        } catch (IOException ignored) {}
 
         return null;
     }
