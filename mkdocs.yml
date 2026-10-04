@@ -93,8 +93,8 @@ nav:
       - Migration guide: admin/MIGRATION.md
   - Operations:
       - Runbook: admin/RUNBOOK.md
-      - Hazard register: admin/HAZARDS.md
-      - Region file reading: admin/REGION_FILE_READING.md
+      - Web Workspace & Editor: admin/WEB_EDITOR_GUIDE.md
+      - Hazard register: dev/HAZARDS.md
       - Addons: admin/ADDONS.md
   - Configuration:
       - Overview: admin/configuration/CONFIGURATION.md
@@ -116,8 +116,8 @@ nav:
   - Proxy mode:
       - Overview: admin/proxies/INDEX.md
       - Configuration (network.yml): admin/proxies/CONFIGURATION.md
-      - Single-backend verification: admin/proxies/SINGLE_BACKEND_VERIFICATION.md
-      - Cross-server verification: admin/proxies/CROSS_SERVER_VERIFICATION.md
+      - Single-backend verification: dev/SINGLE_BACKEND_VERIFICATION.md
+      - Cross-server verification: dev/CROSS_SERVER_VERIFICATION.md
   - Developers:
       - Why LeafRTP exists: site/why.md
       - Shape algorithm testing & charts: site/shape-algorithms.md

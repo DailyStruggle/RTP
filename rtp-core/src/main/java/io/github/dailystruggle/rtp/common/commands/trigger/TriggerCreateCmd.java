@@ -43,8 +43,12 @@ public class TriggerCreateCmd extends BaseTriggerCmd {
 
     String id = "trigger_" + System.currentTimeMillis() % 10000;
     String actionId = "scatter";
-    int minX = loc.getBlockX() - 1, minY = loc.getBlockY() - 1, minZ = loc.getBlockZ() - 1;
-    int maxX = loc.getBlockX() + 1, maxY = loc.getBlockY() + 1, maxZ = loc.getBlockZ() + 1;
+    int minX = loc.getBlockX() - 1;
+    int minY = loc.getBlockY() - 1;
+    int minZ = loc.getBlockZ() - 1;
+    int maxX = loc.getBlockX() + 1;
+    int maxY = loc.getBlockY() + 1;
+    int maxZ = loc.getBlockZ() + 1;
 
     PhysicalTriggerSpec spec = new PhysicalTriggerSpec(
         id, PhysicalTriggerSpec.TriggerType.STEP_IN,

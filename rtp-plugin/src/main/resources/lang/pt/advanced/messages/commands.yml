@@ -216,6 +216,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # Divisores de seção no painel de administração. Sem espaços reservados.
 menuAdminPanelSectionConfig: "&8--- &7configuração &8---"
+menuAdminPanelSectionDocs: "&8--- &7documentação e editor &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7diagnósticos &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7ciclo de vida &8---"
 menuAdminPanelSectionBrowse: "&8--- &7navegar &8---"
@@ -223,6 +224,10 @@ menuAdminPanelSectionBrowse: "&8--- &7navegar &8---"
 # Linhas do painel de administração + tooltips. Sem espaços reservados.
 menuAdminPanelRowConfig: "&b▶ editor de configuração"
 menuAdminPanelHoverConfig: "&7abrir o seletor de configuração curado"
+menuAdminPanelRowDocs: "#5FB3B3▶ documentação"
+menuAdminPanelHoverDocs: "&7abrir os manuais de documentação integrados no jogo"
+menuAdminPanelRowEditor: "#5FB3B3▶ editor web e manual"
+menuAdminPanelHoverEditor: "&7iniciar uma sessão efêmera de editor web com documentação integrada"
 menuAdminPanelRowRegions: "#5FB3B3▶ regiões"
 menuAdminPanelHoverRegions: "&7adicionar, remover ou editar configurações por região"
 menuAdminPanelRowWorlds: "#5FB3B3▶ mundos"
@@ -477,6 +482,11 @@ multiconfigResultNameInvalid: "&co nome '[name]' não é permitido; use letras, 
 # Mensagem de resultado quando uma ADIÇÃO colide com um nome de entrada existente.
 # Espaço reservado: [name].
 multiconfigResultNameTaken: "&cjá existe uma entrada chamada '[name]'."
+
+docsNotFound: "&c[RTP] Tópico de documentação '[topic]' não encontrado. Use /rtp docs list para ver os tópicos disponíveis."
+docsEmpty: "&c[RTP] Não há tópicos de documentação registrados no momento."
+docsExportSuccess: "&a[RTP] Pacote HTML da documentação exportado com sucesso para [path]."
+docsExportFailed: "&c[RTP] Falha ao exportar pacote de documentação: [reason]."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

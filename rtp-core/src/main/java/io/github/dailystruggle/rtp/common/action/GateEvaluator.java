@@ -54,10 +54,8 @@ public final class GateEvaluator {
           } else if (val != null) {
             matchExpr = val.toString();
           }
-          if (matchExpr != null && !matchExpr.isBlank()) {
-            if (!GateExpressionParser.matches(matchExpr, 1.0)) {
-              return true;
-            }
+          if (matchExpr != null && !matchExpr.isBlank() && !GateExpressionParser.matches(matchExpr, 1.0)) {
+            return true;
           }
         }
       }
@@ -284,15 +282,13 @@ public final class GateEvaluator {
         }
         case "time" -> {
           if (!(val instanceof Map<?, ?> map)) return false;
-          if (map.containsKey("elapsed")) {
-            if (!GateExpressionParser.matches(map.get("elapsed").toString(), context.elapsedSeconds())) {
-              return false;
-            }
+          if (map.containsKey("elapsed")
+              && !GateExpressionParser.matches(map.get("elapsed").toString(), context.elapsedSeconds())) {
+            return false;
           }
-          if (map.containsKey("remaining")) {
-            if (!GateExpressionParser.matches(map.get("remaining").toString(), context.remainingSeconds())) {
-              return false;
-            }
+          if (map.containsKey("remaining")
+              && !GateExpressionParser.matches(map.get("remaining").toString(), context.remainingSeconds())) {
+            return false;
           }
         }
         case "predicate" -> {

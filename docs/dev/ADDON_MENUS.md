@@ -212,6 +212,7 @@ re-skin RTP's own pages.
   inventory by holder, not title).
 - Never load chunks or run blocking work on the main thread - the teleport is async and RTP handles
   it.
+- **Book Menu Color Contrast:** Adventure / Paper `Book` pages render on parchment-yellow backgrounds. Never use yellow (`&e`, `&6`) or white (`&f`) in book menus; prefer high-contrast dark colors (`&0` black, `&1`/`&9` blue, `&4`/`&c` red, `&5` purple, `&8` gray). Chat messages (`SendMessage`) are exempt.
 
 ## See also
 

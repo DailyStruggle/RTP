@@ -298,7 +298,6 @@ public class ScanTask extends RTPRunnable {
     // Phase transitions already log in wrapUpBatch; this covers the initial
     // entry into a phase (fresh start, resume after pause, or resume after
     // restart with a persisted phase).
-    int currentPhase = scanPhase.get();
     if (prescanAnnounced.compareAndSet(false, true)) {
       RTP.log(Level.INFO, "[RTP] starting scan (hybrid MCA off-tick / full-load generation) for region=" + region.name);
     }
@@ -1622,11 +1621,9 @@ public class ScanTask extends RTPRunnable {
                                 for (int bx = bMinX; bx <= bMaxX; bx++) {
                                   for (int bz = bMinZ; bz <= bMaxZ; bz++) {
                                     long loc = shape.xzToLocation(bx, bz);
-                                    if (loc >= 0 && loc < shape.getEffectiveRange()) {
-                                      if (!shape.isKnownBad(loc)) {
-                                        shape.addBadLocation(loc, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safetyExternal);
-                                        newlyMarked++;
-                                      }
+                                    if (loc >= 0 && loc < shape.getEffectiveRange() && !shape.isKnownBad(loc)) {
+                                      shape.addBadLocation(loc, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safetyExternal);
+                                      newlyMarked++;
                                     }
                                   }
                                 }

@@ -62,7 +62,7 @@ public class RespPool implements Closeable {
                     try {
                         RespConnection newConn = new RespConnection(host, port, timeoutMs, password);
                         return new PooledConnection(newConn);
-                    } catch (IOException e) {
+                    } catch (Exception e) {
                         createdCount.decrementAndGet();
                         throw new RuntimeException("Could not create Redis connection to " + host + ":" + port, e);
                     }

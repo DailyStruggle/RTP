@@ -18,7 +18,7 @@ class ActionConfigLoaderTest {
 
   @Test
   @DisplayName("ActionConfigLoader parses declarative action definition from YAML")
-  void testParseDefinition() throws Exception {
+  void testParseDefinition() {
     String yamlText = """
         alias: "duel"
         permission: "rtp.action.duel"
@@ -100,7 +100,7 @@ class ActionConfigLoaderTest {
 
   @Test
   @DisplayName("ActionConfigLoader parses custom confinement shape and radius")
-  void testParseConfinementShape() throws Exception {
+  void testParseConfinementShape() {
     String yamlText = """
         alias: "shaped_duel"
         placement:

@@ -631,63 +631,68 @@ public final class ActionManager implements ActionService {
     }
 
     // 1. Evaluate pre-execution gate conditions before initiating placement (ADR-093)
-    UUID firstPid = participants.isEmpty() ? null : participants.get(0);
-    ActionGateContext preGateCtx = new ActionGateContext(
-        UUID.randomUUID(),
-        def.id(),
-        firstPid,
-        0L,
-        def.confinement().durationSeconds(),
-        0,
-        true,
-        0.0,
-        null, null, null, null, null, null,
-        participants.size(),
-        effectiveContext);
+    try {
+      UUID firstPid = participants.isEmpty() ? null : participants.get(0);
+      ActionGateContext preGateCtx = new ActionGateContext(
+          UUID.randomUUID(),
+          def.id(),
+          firstPid,
+          0L,
+          def.confinement().durationSeconds(),
+          0,
+          true,
+          0.0,
+          null, null, null, null, null, null,
+          participants.size(),
+          effectiveContext);
 
-    Map<String, Object> tokens = new HashMap<>(effectiveContext.metadata());
-    if (firstPid != null) {
-      tokens.put("player", firstPid);
-      tokens.put("player_1", firstPid);
-      tokens.put("player_uuid_1", firstPid);
-    }
-    for (Map.Entry<String, Object> mEntry : effectiveContext.metadata().entrySet()) {
-      tokens.put(mEntry.getKey() + "_1", mEntry.getValue());
-    }
-
-    boolean gatePassed = GateEvaluator.evaluateAll(def.gates(), preGateCtx, externalPredicates, tokens);
-    RTP.log(
-        Level.FINE,
-        "[action] pre-execution gates evaluation for '" + def.id() + "': passed=" + gatePassed);
-    if (!gatePassed) {
-      // Action gate condition not met: roll back upfront reservation as players are only waiting
-      for (UUID r : reserved) {
-        participantToSession.remove(r, pendingSessionId);
+      Map<String, Object> tokens = new HashMap<>(effectiveContext.metadata());
+      if (firstPid != null) {
+        tokens.put("player", firstPid);
+        tokens.put("player_1", firstPid);
+        tokens.put("player_uuid_1", firstPid);
+      }
+      for (Map.Entry<String, Object> mEntry : effectiveContext.metadata().entrySet()) {
+        tokens.put(mEntry.getKey() + "_1", mEntry.getValue());
       }
 
-      // Enqueue invocation into ActionWaitQueue
-      CompletableFuture<ActionSessionResult> waitFuture = new CompletableFuture<>();
-      ActionWaitQueueEntry entry = new ActionWaitQueueEntry(participants, effectiveContext, waitFuture);
-      waitQueues.computeIfAbsent(def.id().toLowerCase(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).add(entry);
+      boolean gatePassed = GateEvaluator.evaluateAll(def.gates(), preGateCtx, externalPredicates, tokens);
       RTP.log(
           Level.FINE,
-          "[action] enqueued participants "
-              + participants
-              + " into wait queue for action '"
-              + def.id()
-              + "'");
+          "[action] pre-execution gates evaluation for '" + def.id() + "': passed=" + gatePassed);
+      if (!gatePassed) {
+        // Action gate condition not met: roll back upfront reservation as players are only waiting
+        rollbackReservation(reserved, pendingSessionId);
 
-      // Execute onEnqueue / onWait lifecycle steps if defined (e.g. interactive click prompts or wait notifications)
-      if (def.lifecycle() != null && !def.lifecycle().onEnqueue().isEmpty()) {
-        executeEnqueueSteps(def.lifecycle().onEnqueue(), preGateCtx, tokens, participants);
+        // Enqueue invocation into ActionWaitQueue
+        CompletableFuture<ActionSessionResult> waitFuture = new CompletableFuture<>();
+        ActionWaitQueueEntry entry = new ActionWaitQueueEntry(participants, effectiveContext, waitFuture);
+        waitQueues.computeIfAbsent(def.id().toLowerCase(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).add(entry);
+        RTP.log(
+            Level.FINE,
+            "[action] enqueued participants "
+                + participants
+                + " into wait queue for action '"
+                + def.id()
+                + "'");
+
+        // Execute onEnqueue / onWait lifecycle steps if defined (e.g. interactive click prompts or wait notifications)
+        if (def.lifecycle() != null && !def.lifecycle().onEnqueue().isEmpty()) {
+          executeEnqueueSteps(def.lifecycle().onEnqueue(), preGateCtx, tokens, participants);
+        }
+
+        // Immediately attempt processing the queue in case combined queued entries now satisfy the gate
+        processWaitQueue(def);
+        return waitFuture;
       }
 
-      // Immediately attempt processing the queue in case combined queued entries now satisfy the gate
-      processWaitQueue(def);
-      return waitFuture;
+      return executeDirectInternal(def, participants, effectiveContext, pendingSessionId);
+    } catch (Throwable t) {
+      rollbackReservation(reserved, pendingSessionId);
+      RTP.log(Level.WARNING, "[action] trigger failed for '" + def.id() + "'", t);
+      return CompletableFuture.completedFuture(
+          ActionSessionResult.failure("Action trigger failed: " + t.getMessage()));
     }
-
-    return executeDirectInternal(def, participants, effectiveContext, pendingSessionId);
   }
 
   private void executeEnqueueSteps(
@@ -698,10 +703,9 @@ public final class ActionManager implements ActionService {
     if (steps == null || steps.isEmpty()) return;
     for (ActionDefinition.LifecycleStep step : steps) {
       if (step == null) continue;
-      if (step.gateConfig() != null && !step.gateConfig().isEmpty()) {
-        if (!GateEvaluator.evaluate(step.gateConfig(), context, externalPredicates, tokens)) {
-          continue;
-        }
+      if (step.gateConfig() != null && !step.gateConfig().isEmpty()
+          && !GateEvaluator.evaluate(step.gateConfig(), context, externalPredicates, tokens)) {
+        continue;
       }
       for (ActionDefinition.CommandAction action : step.actions()) {
         executeEnqueueAction(action, context, tokens, participants);
@@ -839,80 +843,86 @@ public final class ActionManager implements ActionService {
             + def.placement().enabled());
 
     final UUID sessionId;
+    List<UUID> localReserved = null;
     if (preReservedSessionId != null) {
       sessionId = preReservedSessionId;
     } else {
       sessionId = UUID.randomUUID();
-      List<UUID> reserved = new ArrayList<>(participants.size());
+      localReserved = new ArrayList<>(participants.size());
       for (UUID pid : participants) {
         if (participantToSession.putIfAbsent(pid, sessionId) != null) {
-          for (UUID r : reserved) {
-            participantToSession.remove(r, sessionId);
-          }
+          rollbackReservation(localReserved, sessionId);
           io.github.dailystruggle.rtp.api.server.RTPServerAccessor acc = RTP.serverAccessor;
           String pName = (acc != null && acc.getPlayer(pid) != null) ? acc.getPlayer(pid).name() : pid.toString();
           return CompletableFuture.completedFuture(
               ActionSessionResult.failure("Participant is already in an active session: " + pName));
         }
-        reserved.add(pid);
+        localReserved.add(pid);
       }
     }
 
-    // If spatial placement is disabled (e.g. pure-scripting / external orchestrators), bypass GroupPlacementService
-    if (!def.placement().enabled()) {
-      ActionSessionImpl session =
-          new ActionSessionImpl(
-              sessionId,
-              def,
-              participants,
-              effectiveContext,
-              Collections.emptyMap(),
-              null,
-              0,
-              0,
-              null,
-              this::handleDisarm,
-              externalPredicates);
+    try {
+      // If spatial placement is disabled (e.g. pure-scripting / external orchestrators), bypass GroupPlacementService
+      if (!def.placement().enabled()) {
+        ActionSessionImpl session =
+            new ActionSessionImpl(
+                sessionId,
+                def,
+                participants,
+                effectiveContext,
+                Collections.emptyMap(),
+                null,
+                0,
+                0,
+                null,
+                this::handleDisarm,
+                externalPredicates);
 
-      activeSessions.put(sessionId, session);
-      for (UUID pid : participants) {
-        participantToSession.put(pid, sessionId);
+        activeSessions.put(sessionId, session);
+        for (UUID pid : participants) {
+          participantToSession.put(pid, sessionId);
+        }
+
+        session.arm();
+        session.triggerStart();
+        return CompletableFuture.completedFuture(ActionSessionResult.success(sessionId));
       }
 
-      session.arm();
-      session.triggerStart();
-      return CompletableFuture.completedFuture(ActionSessionResult.success(sessionId));
-    }
+      // Spatial Placement via Subspace Group Engine (ADR-095)
+      GroupPlacementService groupService = RTP.groupPlacementService;
+      if (groupService == null) {
+        rollbackReservation(participants, sessionId);
+        return CompletableFuture.completedFuture(
+            ActionSessionResult.failure("GroupPlacementService is not available"));
+      }
 
-    // Spatial Placement via Subspace Group Engine (ADR-095)
-    GroupPlacementService groupService = RTP.groupPlacementService;
-    if (groupService == null) {
+      final ActionDefinition.PlacementSpec pSpec = def.placement();
+      String effectiveRegion = pSpec.region();
+      if (pSpec.parameters().containsKey("memoryRegion")) {
+        Object mr = pSpec.parameters().get("memoryRegion");
+        if (mr != null && !mr.toString().isBlank()) effectiveRegion = mr.toString().trim();
+      } else if (pSpec.parameters().containsKey("inheritRegionMemory")) {
+        Object mr = pSpec.parameters().get("inheritRegionMemory");
+        if (mr != null && !mr.toString().isBlank()) effectiveRegion = mr.toString().trim();
+      }
+
+      final Region parentRegion = (effectiveRegion != null && !effectiveRegion.isBlank() && RTP.selectionAPI != null)
+          ? RTP.selectionAPI.getRegion(effectiveRegion)
+          : null;
+
+      // Check if a pre-validated placement is cached for this action (ADR-097)
+      return tryCachedOrLivePlacement(def, participants, effectiveContext, groupService, parentRegion, sessionId)
+          .whenComplete((res, ex) -> {
+            if (ex != null || res == null || !res.success()) {
+              rollbackReservation(participants, sessionId);
+            }
+          });
+    } catch (Throwable t) {
       rollbackReservation(participants, sessionId);
+      RTP.log(Level.WARNING, "[action] executeDirect failed for '" + def.id() + "'", t);
       return CompletableFuture.completedFuture(
-          ActionSessionResult.failure("GroupPlacementService is not available"));
+          ActionSessionResult.failure("Action execution failed: " + t.getMessage()));
     }
-
-    final ActionDefinition.PlacementSpec pSpec = def.placement();
-    String effectiveRegion = pSpec.region();
-    if (pSpec.parameters().containsKey("memoryRegion")) {
-      Object mr = pSpec.parameters().get("memoryRegion");
-      if (mr != null && !mr.toString().isBlank()) effectiveRegion = mr.toString().trim();
-    } else if (pSpec.parameters().containsKey("inheritRegionMemory")) {
-      Object mr = pSpec.parameters().get("inheritRegionMemory");
-      if (mr != null && !mr.toString().isBlank()) effectiveRegion = mr.toString().trim();
-    }
-
-    final Region parentRegion = (effectiveRegion != null && !effectiveRegion.isBlank() && RTP.selectionAPI != null)
-        ? RTP.selectionAPI.getRegion(effectiveRegion)
-        : null;
-
-    // Check if a pre-validated placement is cached for this action (ADR-097)
-    return tryCachedOrLivePlacement(def, participants, effectiveContext, groupService, parentRegion, sessionId)
-        .whenComplete((res, ex) -> {
-          if (ex != null || res == null || !res.success()) {
-            rollbackReservation(participants, sessionId);
-          }
-        });
   }
 
   private void rollbackReservation(List<UUID> participants, UUID sessionId) {

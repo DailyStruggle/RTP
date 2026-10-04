@@ -17,10 +17,11 @@ Operational guide for AI agents and human contributors working in the RTP reposi
 7. Before modifying an uncommitted **code** file, create a `.bak` copy beside it. Skip for git-clean files and docs/markdown.
 8. **Stay on task.** Record unrelated potential bugs in [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) and keep going.
 9. **Maintain a task checklist** for any multi-step task to preserve state across interruptions (see *Checklist-Based State Tracking*).
-10. **Run verification proportional to the change** - use targeted module builds/tests for localized edits; reserve full multi-module builds (`./gradlew build`) and runtime devstack acceptance for cross-module, network, or release gates (see *Build & Verification Gates* and [`TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md)).
-11. **Write markdown as UTF-8; never emit mojibake.** If you see sequences like `â€”`, `â€™`, `âœ…`, `Â§`, or ``, stop and re-encode.
-12. **Never run destructive git operations** (`git stash`, `git reset --hard`, `git restore`, `git clean -fd`, `git push --force`) on the working tree (see *Git Safety*).
-13. **Never `git commit` or `git push` unless explicitly requested by the user in the current session.**
+10. **Discover & refresh governing ADRs** - check `docs/adr/README.md` before planning; refresh/re-read governing ADRs every ~10 turns or across module/phase boundaries to avoid context drift (see *Autonomous ADR Discovery & Context Refresh*).
+11. **Run verification proportional to the change** - use targeted module builds/tests for localized edits; reserve full multi-module builds (`./gradlew build`) and runtime devstack acceptance for cross-module, network, or release gates (see *Build & Verification Gates* and [`TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md)).
+12. **Write markdown as UTF-8; never emit mojibake.** If you see sequences like `â€”`, `â€™`, `âœ…`, `Â§`, or ``, stop and re-encode.
+13. **Never run destructive git operations** (`git stash`, `git reset --hard`, `git restore`, `git clean -fd`, `git push --force`) on the working tree (see *Git Safety*).
+14. **Never `git commit` or `git push` unless explicitly requested by the user in the current session.**
 
 ---
 
@@ -56,10 +57,11 @@ Before generating code or terminal commands, explicitly state and verify:
 1. **Target platform** - Folia, Paper, Spigot, Fabric, or NeoForge.
 2. **Thread context** - on Folia, `Bukkit.isOwnedByCurrentRegion` before scheduling.
 3. **Chunk I/O** - zero synchronous chunk loads or blocking `.get()` on the main thread.
-4. **Terminal** - run Gradle via wrapper; one command per line with correctly-escaped quotes.
-5. **Safety rule** - name the S-00x rule(s) that apply (see table below).
-6. **Backups** - `.bak` copy required only for uncommitted **code** files. Skip for clean files and docs/markdown.
-7. **Architecture** - if multi-class/module, has the proposal been approved? (Rule D-005)
+4. **Governing ADR** - identify active ADR(s) from `docs/adr/README.md` and confirm alignment before planning.
+5. **Terminal** - run Gradle via wrapper; one command per line with correctly-escaped quotes.
+6. **Safety rule** - name the S-00x rule(s) that apply (see table below).
+7. **Backups** - `.bak` copy required only for uncommitted **code** files. Skip for clean files and docs/markdown.
+8. **Architecture** - if multi-class/module, has the proposal been approved? (Rule D-005)
 
 ## Backup Policy
 
@@ -83,6 +85,27 @@ Maintain an explicit markdown checklist (`- [ ]` / `- [x]`) for any multi-step t
 - **Update cadence:** Tick items (`- [x]`) only after verified (passing test, file saved, successful build).
 - **Format:** Each item must be verifiable with evidence (`- [x] 1. <action> - <evidence>`).
 - **Submit:** Reference the completed checklist in the `submit` summary.
+
+---
+
+## Autonomous ADR Discovery & Context Refresh
+
+Long sessions and multi-step tasks suffer from context drift and silent premise decay. Agents shall autonomously discover, align with, and re-read governing ADRs.
+
+### 1. Autonomous ADR Discovery
+Before formulating a plan or modifying code:
+1. **Catalog Scan:** Inspect `docs/adr/README.md` (and `<subproject>/docs/adr/` if touching a subproject/addon).
+2. **Identification:** Match the task against indexed ADR topics and identify governing records and their status (Accepted vs Proposed vs Superseded).
+3. **Pre-Read:** Read the *Context*, *Decision*, and *Consequences* of active governing ADRs before drafting proposals or checklists.
+
+### 2. Autonomous Context Refresh
+Context compresses and degrades over extended tool calls. Re-read the governing ADR(s) under any of the following triggers:
+- **Turn Cadence:** Every ~10–12 substantive tool execution steps in a multi-step task.
+- **Cross-Boundary Handoff:** Moving across architectural boundaries (e.g. from `rtp-core` queue/math logic to platform adapters, Anvil filters, network packets, or config parsing).
+- **D-005 Proposal Boundary:** Immediately before presenting a D-005 proposal or checklist to ensure proposed invariants match the ADR.
+- **Unexpected Roadblock:** When tests fail unexpectedly, an assumption breaks, or refactoring hits friction—re-read before applying ad-hoc workarounds.
+- **Checklist Integration:** In multi-step checklists, embed explicit verification checkpoints:
+  `- [ ] Mid-task checkpoint: Re-read ADR-NNN to verify implementation invariant alignment.`
 
 ---
 
@@ -112,28 +135,7 @@ Full doc catalog: [`docs/dev/INDEX.md`](../docs/dev/INDEX.md).
 
 ## Domain Analogies & Aliases (informal term → canonical symbol)
 
-| Informal alias | Canonical symbol / location | Notes |
-|----------------|-----------------------------|-------|
-| "fast cache" | `RegionQueueManager.fastLocations` (`ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>>`) | Per-player prefilled future for already-online players. Not the general pool. |
-| "kept cache" / "hot queue" / "L1" | `RegionQueueManager.keptLocations` (`LockFreeLocationBuffer`) | General hot region pool with loaded `keep(true)` chunks. Polled by `/rtp`. |
-| "cold cache" / "cold queue" / "L2" | `RegionQueueManager.unkeptLocations` (`LockFreeLocationBuffer`) | Pre-verified locations with released chunks; re-loaded on promotion to L1. |
-| "backlog cache" / "L3" / "binned cache" | `RegionQueueManager.backlogLocations` (`BacklogLocationBuffer`); [ADR-028](../docs/adr/ADR-028-l3-backlog-cache.md) | Unverified FIFO buffer screened one 32x32 bin per pulse. Not persisted to DB. |
-| "login cache" / "login reserve" | `RegionQueueManager.loginLocations` (ADR-023) | Default-world reserve for join-time RTP (`rtp.onevent.join`). |
-| "personal queue" / "personal bucket" | `RegionQueueManager.perPlayerLocationQueue` (ADR-043) | Per-UUID bucket opened under `rtp.personalqueue`. Distinct from waitlist `playerQueue`. |
-| "the pipeline" / "teleport pipeline" | `TeleportPipelineTask` (`rtp-core`) | Full per-attempt pipeline (shape -> chunk -> vert -> biome -> safety). Tracked in `MemoryTracker`. |
-| "memory tracker" / "active GC" | `MemoryTracker` (`rtp-core`); `docs/architecture/04-active-gc-sweep.md` | Tracks tickets and tasks; periodic active reaper. |
-| "scan" / "scan task" | `ScanTask` family + `ScanPauseCmd`; `docs/architecture/05-scan-task-crawler.md` | Safety pre-scanner persisting bad-location bitmaps in `MemoryShape`. Does NOT warm queues. |
-| "spiral" / "spiral math" | Archimedean spiral 1D mapping; [ADR-001](../docs/adr/ADR-001-archimedean-spiral-1d-mapping.md) | Bounded distribution algorithm. |
-| "anvil" / "anvil prefilter" | `rtp-anvil` / `anvil-api` module; [ADR-016](../docs/adr/ADR-016-anvil-subsystem.md), [ADR-077](../docs/adr/ADR-077-multi-format-region-support.md) | NBT pre-filter reading Anvil (`.mca`) and Linear (`.linear` / ZSTD) formats off-tick. |
-| "claim plugin" / "claim integration" | Folded into plugin per [ADR-019](../docs/adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md); S-003 | No inline claim calls in pipeline/commands. |
-| "Brigadier bridge" | `BrigadierCommandAdapter` in `commands-api/` (commands-api-ADR-001) | Command bridge for Paper/Folia, Fabric, NeoForge, and Velocity. |
-| "cat locale" / `lang/cat/` | `rtp-plugin/src/main/resources/lang/cat/` | Internal Internet Cat dialect easter egg (NOT Catalan). Never document in public guides. |
-| "the lite jar" / "lite assembly" | See [ADR-024](../docs/adr/ADR-024-rtp-lite-assembly-variant.md) | Trimmed assembly variant, not a separate codebase. |
-| "obf carrier" / "unobf carrier" | `rtp-fabric-common` vs `rtp-fabric-common-unobf` (ADR-009, effects-api-ADR-006) | Intermediary-remapped (1.20.x/1.21.x) vs Mojmap-unobfuscated (MC 26.x) carrier modules. |
-| "the proxy plan" / "network mode" | [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md); [ADR-036](../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md) | Multi-server cross-proxy architecture and reservation token pipeline. |
-| "devstack" / "proxy devstack" | [`platforms/rtp-proxy/devstack/`](../platforms/rtp-proxy/devstack/) | Multi-server test stack (Redis + Velocity + Paper + Folia + Fabric). See `devstack/README.md`. |
-
-Canonical glossary: [`docs/dev/GLOSSARY.md`](../docs/dev/GLOSSARY.md).
+Informal shorthand and developer nicknames frequently used in code reviews, discussions, and task prompts are mapped to their canonical symbols and architectural locations in [`docs/dev/GLOSSARY.md`](../docs/dev/GLOSSARY.md) (see *Domain Analogies & Informal Aliases* table).
 
 ---
 
@@ -157,11 +159,7 @@ S-005 nuance (Anvil/Linear prefilter, stale-chunk guard): see [ADR-015](../docs/
 
 ## Folia Threading & Scheduler Usage
 
-Backend plugin JVMs (Bukkit / Paper / Folia / Fabric / NeoForge) shall schedule **all** periodic, delayed, or asynchronous work through `RTP.scheduler` (`RTPScheduler` SPI). Never create raw threads (`new Thread()`, `Executors.new*ThreadPool`) in backend code.
-
-- **Folia rules:** Zero main-thread blocking, async chaining (`CompletableFuture`), verify `Bukkit.isOwnedByCurrentRegion` before scheduling, target Entity Scheduler for teleports, and use Count-Bound pipelines (ADR-015).
-- **Canonical async scheduling:** `RTP.scheduler.runTaskTimerAsynchronously(this::tick, periodTicks, periodTicks)` (period in server ticks, clamped to `>= 1L`).
-- **Carve-outs:** Proxy JVMs (`rtp-proxy-*`), scheduler implementations (`FabricScheduler`), `rtp-anvil/AnvilIoPool` (ADR-016), and test code. See [`docs/dev/DESIGN.md`](../docs/dev/DESIGN.md).
+Backend plugin JVMs (Bukkit / Paper / Folia / Fabric / NeoForge) shall schedule **all** periodic, delayed, or asynchronous work through `RTP.scheduler` (`RTPScheduler` SPI). Never create raw threads (`new Thread()`, `Executors.new*ThreadPool`) in backend code. Detailed regional threading invariants and carve-outs are governed by [`docs/dev/RULES.md`](../docs/dev/RULES.md) (Rule F-001..F-003) and [`docs/dev/DESIGN.md#threading`](../docs/dev/DESIGN.md).
 
 ---
 
@@ -228,7 +226,7 @@ All docs and resources are **UTF-8, no BOM, LF line endings**. Never emit mojiba
 
 ## Book Menu Color Contrast
 
-Adventure / Paper `Book` pages render on parchment-yellow backgrounds. Never use yellow (`&e`, `&6`) or white (`&f`) in book menus. Prefer dark colors (`&0` black, `&1`/`&9` blue, `&4`/`&c` red, `&5` purple, `&8` gray). Chat messages (`SendMessage`) are exempt.
+Adventure / Paper `Book` pages render on parchment-yellow backgrounds. Never use yellow (`&e`, `&6`) or white (`&f`) in book menus. Detailed contrast palette rules live in [`docs/dev/ADDON_MENUS.md`](../docs/dev/ADDON_MENUS.md). Chat messages (`SendMessage`) are exempt.
 
 ---
 
@@ -256,14 +254,9 @@ Adventure / Paper `Book` pages render on parchment-yellow backgrounds. Never use
 
 ## Locale Parity Maintenance
 
-User strings live in `rtp-plugin/src/main/resources/<file>.yml` (English baseline) and `lang/<locale>/<file>.yml` with `<file>.lang.yml` key maps (REQ-RTP-F-013, ADR-020, `TRANSLATION_GUIDE.md`).
-
-1. **Mirror every baseline key:** Add new keys to `lang/<file>.lang.yml` and all `lang/<locale>/<file>.yml` in the same change.
-2. **Lookup chain:** `localeLangMap` -> `baselineLangMap` -> identity key.
-3. **CI verification:** Run `./gradlew :rtp-plugin:test --tests "*LocaleParityTest*"` before submitting config changes.
-4. **First-pass translations:** Identity mapping or English baseline with `# TODO(i18n):` is acceptable for untranslated locales.
-5. **Spanish content guards:** Do not edit `ReqRtpF013SpanishLocaleContentTest`.
-6. **No internal shorthand in shipped comments:** Config comments ship to operators; cite only committed `REQ-RTP-*` IDs or top-level `ADR-NNN` references.
+User strings live in `rtp-plugin/src/main/resources/<file>.yml` (English baseline) and `lang/<locale>/<file>.yml` with `<file>.lang.yml` key maps (REQ-RTP-F-013, ADR-020).
+- Mirror every baseline key to `lang/<file>.lang.yml` and all `lang/<locale>/<file>.yml` in the same change.
+- Verify parity with `./gradlew :rtp-plugin:test --tests "*LocaleParityTest*"`. Full lookup order and authoring rules: [`docs/dev/TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md) and [`docs/dev/CONFIG_COMMENT_STYLE.md`](../docs/dev/CONFIG_COMMENT_STYLE.md).
 
 ---
 
@@ -279,37 +272,18 @@ User strings live in `rtp-plugin/src/main/resources/<file>.yml` (English baselin
   - Acceptance devstack: `.\devstack\run-acceptance.ps1 -Scenario <scenario>` (or `./devstack/run-acceptance.sh --scenario <scenario>`). Headless and scriptable via Mineflayer bot; see [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md) for when to run unit tests vs devstack acceptance.
 - **Search:** Use `search_project` tool with targeted keywords. Never `grep`/`find`.
 - **Directory listing caution:** Treat empty listings as "unknown"; verify file existence with `git status` or `search_project` before overwriting.
-- **Python scripts:** Stdlib-only scripts live in `scripts/`. On Windows, execute via configured Python 3.12+ interpreter alias.
+- **Python scripts:** Stdlib-only scripts live in `scripts/`. On Windows, execute via configured Python 3.12+ interpreter alias. Place temporary or ad-hoc analysis scripts in gitignored `scripts/tmp/`.
 - **Runtime:** Java 21+ required (REQ-RTP-SYS-001).
 
 ---
 
 ## Build & Verification Gates (Conditional Testing Policy)
 
-Verification shall be proportional to the scope and blast radius of the change. Do not run exhaustive whole-repo verification or heavy container stacks when a scoped target satisfies confidence.
-
-### 1. Build Tiers: Scoped vs. Full Multi-Module Build
-- **Targeted module build/test (`.\gradlew.bat :<module>:build` or `:test`):**
-  - **Sufficient for:** Localized changes confined to a single module or leaf adapter (e.g. `commands-api`, `rtp-core` math/cache adjustments, `rtp-plugin` locale updates, single platform adapter bugfix).
-  - Also sufficient for rapid inner-loop iterative feedback while working.
-- **Full multi-module build (`.\gradlew.bat build` / `./gradlew build`):**
-  - **Required for:**
-    1. Cross-module structural changes (e.g. public interfaces in `rtp-api`, SPI refactoring in `commands-api`/`effects-api`, core model signatures).
-    2. Shared build scripts, dependencies, or root Gradle configuration changes (`build.gradle`, `settings.gradle`, `gradle/`).
-    3. Final pre-release verification or when explicitly requested by the user.
-- **Exemptions:** Pure documentation or markdown changes (no compiled source or resource files touched) require no Gradle build or test execution.
-
-### 2. Runtime & Devstack Acceptance: Conditional Triggers
-Runtime acceptance via headless devstack (`devstack/run-acceptance.ps1`) spins up multiple containers (Redis, Velocity proxies, Paper/Folia/Fabric backends) and shall be run conditionally based on subsystem impact:
-- **Runtime Acceptance Required:**
-  - Network-mode changes: proxy packet framing, backend reservation tokens, Redis/SQL state transport, heartbeat gossip, or cross-server handoffs.
-  - Platform bootstrap & adapter lifecycle changes on Paper, Folia, Fabric, or Velocity that cannot be verified in JVM unit mocks.
-  - Multi-server release sign-off and enterprise readiness audit (ADR-036, `docs/dev/ENTERPRISE_READINESS.md`).
-- **Runtime Acceptance NOT Required (Skip Devstack):**
-  - Core algorithm, selection shape, or spiral math changes (verified via `:rtp-core:test`).
-  - Command parsing and permissions within standard trees (verified via `:commands-api:test` / `:rtp-core:test`).
-  - Locale, translation key, and configuration updates (verified via `LocaleParityTest`).
-  - Unit-mockable adapter hooks and standalone utilities.
+Verification shall be proportional to the scope and blast radius of the change. Detailed definitions of scoped vs full multi-module builds and conditional triggers for devstack runtime acceptance live in [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md).
+- **Targeted module test (`.\gradlew.bat :<module>:test`):** Sufficient for localized edits to a single module/adapter.
+- **Full build (`.\gradlew.bat build`):** Required for cross-module interface changes (`rtp-api`, SPIs), root Gradle changes, or final release gates.
+- **Devstack acceptance (`.\devstack\run-acceptance.ps1`):** Required only for multi-server, proxy protocol, token lifecycle, or container-level acceptance (see [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md)).
+- **Documentation only:** Markdown and doc changes are exempt from build/test runs.
 
 Cite the verification level executed and rationale in the `submit` summary under `### Verification`.
 
@@ -317,11 +291,7 @@ Cite the verification level executed and rationale in the `submit` summary under
 
 ## Current Development Focus
 
-Active development frontiers:
-1. **Network mode / multi-server proxy (`rtp-proxy-*`):** Velocity/BungeeCord proxy support, Redis/SQL state bindings, token reservation reapers ([ADR-036](../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md), [`MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md)).
-2. **Fabric (`rtp-fabric`):** Parity across 1.20.x, 1.21.x, and MC 26.x via obf/unobf carriers ([rtp-fabric-ADR-009](../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md), [`MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md)).
-3. **NeoForge (`rtp-neoforge`):** Native NeoForge adapter and lifecycle ([ADR-033](../docs/adr/ADR-033-neoforge-platform-in-scope.md), [`platforms/rtp-neoforge/README.md`](../platforms/rtp-neoforge/README.md)).
-4. **Documentation website:** MkDocs Material site at `https://dailystruggle.github.io/RTP/` ([.github/workflows/docs.yml](../.github/workflows/docs.yml)).
+Active multi-platform, proxy, and roadmap development frontiers are indexed in [`docs/dev/INDEX.md`](../docs/dev/INDEX.md) and tracked in [`docs/dev/ROADMAP.md`](../docs/dev/ROADMAP.md), [`docs/dev/MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md), and [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md).
 
 ---
 
@@ -335,11 +305,7 @@ Active development frontiers:
 
 ## Prose Mirroring (external user-facing copy)
 
-When authoring external listings, README, marketing copy, or release notes, mirror the maintainer's established voice:
-- First person, conversational, low ceremony, honest about limits and trade-offs.
-- Evidence over adjectives (concrete benchmark numbers, reproducibility notes; no AI hype buzzwords).
-- Technical specifics plainly stated (spiral math, `.mca` / `.linear` pre-filter, async caching).
-- ASCII punctuation only (hyphens/colons, no em/en dashes). See [`docs/FRONT_PAGE_LITE.md`](../docs/FRONT_PAGE_LITE.md).
+External copy voice, tone, and punctuation rules are codified as Rule D-006 in [`docs/dev/RULES.md`](../docs/dev/RULES.md). Reference example: [`docs/FRONT_PAGE_LITE.md`](../docs/FRONT_PAGE_LITE.md).
 
 ---
 

@@ -24,7 +24,11 @@ public class RespConnection implements Closeable {
     private boolean broken;
 
     public RespConnection(String host, int port, int timeoutMs, String password) throws IOException {
-        this(host, port, timeoutMs, password, true);
+        this.host = host;
+        this.port = port;
+        this.timeoutMs = timeoutMs;
+        this.password = password;
+        connect();
     }
 
     RespConnection(String host, int port, int timeoutMs, String password, boolean connectNow) {

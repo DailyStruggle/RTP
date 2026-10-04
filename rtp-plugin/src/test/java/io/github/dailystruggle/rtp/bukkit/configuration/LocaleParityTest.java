@@ -362,7 +362,7 @@ public class LocaleParityTest {
             // cross-language cognates that are spelled identically in several
             // locales (notably French/English) - a verbatim spelling is the
             // correct translation, so do not flag it as untranslated
-            "configuration", "diagnostics", "type",
+            "configuration", "diagnostics", "type", "documentation",
             // brand + universal "menu" loanword
             "rtpmenu");
 

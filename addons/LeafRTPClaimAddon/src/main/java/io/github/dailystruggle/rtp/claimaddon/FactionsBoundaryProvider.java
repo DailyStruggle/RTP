@@ -82,6 +82,7 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
         try {
           getAllClaims = faction.getClass().getMethod("getClaims");
         } catch (NoSuchMethodException ignored) {
+          // Ignored: neither getAllClaims nor getClaims method exists on faction
         }
       }
 
@@ -181,6 +182,7 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
           faction = boardClass.getMethod("getFactionAt", fLocationClass).invoke(board, fLocation);
         }
       } catch (Throwable ignored) {
+        // Ignored: Board or FLocation reflection lookup failed
       }
 
       if (faction == null) {
@@ -199,6 +201,7 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
         try {
           getAllClaims = faction.getClass().getMethod("getClaims");
         } catch (NoSuchMethodException ignored) {
+          // Ignored: neither getAllClaims nor getClaims method exists on faction
         }
       }
 

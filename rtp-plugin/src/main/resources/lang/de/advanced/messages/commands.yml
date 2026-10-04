@@ -217,6 +217,7 @@ menueAdminPanelHinweis: "&7klicke eine Option; destruktive Aktionen zeigen einen
 
 # Abschnittstrenner im Admin-Panel. Keine Platzhalter.
 menueAdminPanelAbschnittKonfig: "&8--- &7Konfiguration &8---"
+menueAdminPanelAbschnittDokumentation: "&8--- &7Dokumentation & Editor &8---"
 menueAdminPanelAbschnittDiagnose: "&8--- &7Diagnose &8---"
 menueAdminPanelAbschnittLebenszyklus: "&8--- &7Lebenszyklus &8---"
 menueAdminPanelAbschnittDurchsuchen: "&8--- &7Durchsuchen &8---"
@@ -224,6 +225,10 @@ menueAdminPanelAbschnittDurchsuchen: "&8--- &7Durchsuchen &8---"
 # Admin-Panel-Zeilen + Hover-Texte. Keine Platzhalter.
 menueAdminPanelZeileKonfig: "&b▶ Konfigurationseditor"
 menueAdminPanelHoverKonfig: "&7den kuratierten Konfigurations-Selektor öffnen"
+menueAdminPanelZeileDokumentation: "#5FB3B3▶ Dokumentation"
+menueAdminPanelHoverDokumentation: "&7gepackte Dokumentationshandbücher im Spiel öffnen"
+menueAdminPanelZeileEditor: "#5FB3B3▶ Web-Editor & Handbuch"
+menueAdminPanelHoverEditor: "&7flüchtige Web-Editor-Sitzung mit integrierter Dokumentation starten"
 menueAdminPanelZeileRegionen: "#5FB3B3▶ Regionen"
 menueAdminPanelHoverRegionen: "&7regionsbezogene Konfigurationen hinzufügen, entfernen oder bearbeiten"
 menueAdminPanelZeileWelten: "#5FB3B3▶ Welten"
@@ -478,6 +483,11 @@ multikonfigErgebnisNameUngueltig: "&cName '[name]' ist nicht erlaubt; verwende B
 # Ergebnisnachricht, wenn ein HINZUFÜGEN mit einem bestehenden Eintragsnamen kollidiert.
 # Platzhalter: [name].
 multikonfigErgebnisNameVergeben: "&cein Eintrag mit dem Namen '[name]' existiert bereits."
+
+docsNotFound: "&c[RTP] Dokumentationsthema '[topic]' nicht gefunden. Verwende /rtp docs list, um verfügbare Themen anzuzeigen."
+docsEmpty: "&c[RTP] Derzeit sind keine Dokumentationsthemen registriert."
+docsExportSuccess: "&a[RTP] Dokumentations-HTML-Paket erfolgreich nach [path] exportiert."
+docsExportFailed: "&c[RTP] Dokumentationspaket konnte nicht exportiert werden: [reason]."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

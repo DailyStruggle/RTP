@@ -9,6 +9,8 @@ import java.util.logging.Level;
  * Verifier for Open Parties and Claims (OPAC) on NeoForge.
  */
 public class NeoForgeOpenPartiesAndClaimsChecker {
+  private NeoForgeOpenPartiesAndClaimsChecker() {}
+
   private static boolean exists = true;
 
   public static boolean isInClaim(RTPCoords coords) {

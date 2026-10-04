@@ -51,8 +51,8 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Offer remote (network-mode) destinations from an addon | [`ADDON_CROSS_SERVER.md`](ADDON_CROSS_SERVER.md) |
 | How to load / deploy an addon (ServiceLoader, classpath, lifecycle) | [`ADDON_LOADING.md`](ADDON_LOADING.md) (ADR-057) |
 | Flat map of every doc | [`../MAP.md`](../MAP.md) |
-| Hazards and failure modes | [`../admin/HAZARDS.md`](../admin/HAZARDS.md) |
-| Failure detection and responses | [`../admin/HAZARDS.md#failure-modes`](../admin/HAZARDS.md#failure-modes) |
+| Hazards and failure modes | [`HAZARDS.md`](HAZARDS.md) |
+| Failure detection and responses | [`HAZARDS.md#failure-modes`](HAZARDS.md#failure-modes) |
 | External hooks (claim verifiers, economy, placeholders, world border, anvil prefilter) | [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) (ADR-026) |
 | How and why AI tooling is used in this repository | [`AI_USAGE.md`](AI_USAGE.md) |
 

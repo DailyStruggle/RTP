@@ -143,10 +143,8 @@ final class DestinationPickerMenu extends ChestMenu {
       MenuEntry entry = slotEntries.get(slotId);
       if (entry != null) {
         MenuActions.submit(player.getUUID(), entry.target());
-        if (!MenuActions.isMenuNavigation(entry.target())) {
-          if (player instanceof ServerPlayer serverPlayer) {
-            serverPlayer.closeContainer();
-          }
+        if (!MenuActions.isMenuNavigation(entry.target()) && player instanceof ServerPlayer serverPlayer) {
+          serverPlayer.closeContainer();
         }
       }
     }

@@ -221,6 +221,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # Divisori di sezione nel pannello admin. Nessun segnaposto.
 menuAdminPanelSectionConfig: "&8--- &7configurazione &8---"
+menuAdminPanelSectionDocs: "&8--- &7documentazione ed editor &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7diagnostica &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7ciclo di vita &8---"
 menuAdminPanelSectionBrowse: "&8--- &7sfoglia &8---"
@@ -228,6 +229,10 @@ menuAdminPanelSectionBrowse: "&8--- &7sfoglia &8---"
 # Righe del pannello admin + testi al passaggio del mouse. Nessun segnaposto.
 menuAdminPanelRowConfig: "&b▶ editor di configurazione"
 menuAdminPanelHoverConfig: "&7apri il selettore di configurazione curato"
+menuAdminPanelRowDocs: "#5FB3B3▶ documentazione"
+menuAdminPanelHoverDocs: "&7apri i manuali di documentazione integrati nel gioco"
+menuAdminPanelRowEditor: "#5FB3B3▶ editor web e manuale"
+menuAdminPanelHoverEditor: "&7avvia una sessione dell'editor web effimero con documentazione integrata"
 menuAdminPanelRowRegions: "#5FB3B3▶ regioni"
 menuAdminPanelHoverRegions: "&7aggiungi, rimuovi o modifica le configurazioni per regione"
 menuAdminPanelRowWorlds: "#5FB3B3▶ mondi"
@@ -483,6 +488,11 @@ multiconfigResultNameInvalid: "&cil nome '[name]' non è consentito; usa lettere
 # Messaggio di risultato quando un AGGIUNGI entra in conflitto con un nome di voce esistente.
 # Segnaposto: [name].
 multiconfigResultNameTaken: "&cesiste già una voce chiamata '[name]'."
+
+docsNotFound: "&c[RTP] Argomento di documentazione '[topic]' non trovato. Usa /rtp docs list per visualizzare gli argomenti disponibili."
+docsEmpty: "&c[RTP] Nessun argomento di documentazione è attualmente registrato."
+docsExportSuccess: "&a[RTP] Pacchetto HTML della documentazione esportato con successo in [path]."
+docsExportFailed: "&c[RTP] Impossibile esportare il pacchetto della documentazione: [reason]."
 
 # NON MODIFICARE IL NUMERO DI VERSIONE
 version: 1.0

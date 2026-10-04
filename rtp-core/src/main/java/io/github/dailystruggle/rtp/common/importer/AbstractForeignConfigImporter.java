@@ -1172,8 +1172,12 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
             else if (triggerType.contains("PLATE")) triggerType = "PRESSURE_PLATE";
             else triggerType = "STEP_IN";
 
-            int minX = 0, minY = 0, minZ = 0;
-            int maxX = 0, maxY = 0, maxZ = 0;
+            int minX = 0;
+            int minY = 0;
+            int minZ = 0;
+            int maxX = 0;
+            int maxY = 0;
+            int maxZ = 0;
 
             RtpYamlSection pos1Sec = getSectionCaseInsensitive(zoneSec, "pos1");
             RtpYamlSection pos2Sec = getSectionCaseInsensitive(zoneSec, "pos2");

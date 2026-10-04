@@ -22,7 +22,7 @@ class RTPActionAddonConfigTest {
   @TempDir Path tempDir;
 
   @BeforeEach
-  void setUp() throws IOException {
+  void setUp() {
     RTPTestSetup.install(tempDir.toFile());
   }
 
@@ -32,7 +32,7 @@ class RTPActionAddonConfigTest {
   }
 
   @Test
-  void testAddonRegistersActionMultiConfigParserAndDefaultFallback() throws IOException {
+  void testAddonRegistersActionMultiConfigParserAndDefaultFallback() {
     Configs configs = new Configs(tempDir.toFile());
     RTP.configs = configs;
     configs.reloadConfigs();

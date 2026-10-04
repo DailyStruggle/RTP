@@ -252,7 +252,6 @@ public class SubspaceMemoryRepackagingBenchmarkTest {
     int radius = 16;      // Subspace radius: 16 chunks
     int centerRadius = 4; // Annular ring: hollow out center 4 chunks
 
-    PointByPointSelector baseline = new PointByPointSelector();
     BinAccumulateRepackager repackager = new BinAccumulateRepackager();
 
     // 1. Correctness Check

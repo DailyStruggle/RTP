@@ -41,9 +41,12 @@ public final class GeometryPointGenerator {
      */
     public static List<Vector3d> generateOutline(SpatialBounds bounds, double step) {
         List<Vector3d> points = new ArrayList<>();
-        double minX = bounds.minX(), maxX = bounds.maxX();
-        double minY = bounds.minY(), maxY = bounds.maxY();
-        double minZ = bounds.minZ(), maxZ = bounds.maxZ();
+        double minX = bounds.minX();
+        double maxX = bounds.maxX();
+        double minY = bounds.minY();
+        double maxY = bounds.maxY();
+        double minZ = bounds.minZ();
+        double maxZ = bounds.maxZ();
 
         // 4 X-parallel edges
         for (double x = minX; x <= maxX; x += step) {
@@ -77,9 +80,12 @@ public final class GeometryPointGenerator {
      */
     public static List<Vector3d> generateBeam(SpatialBounds bounds, double step, long animationTick) {
         List<Vector3d> points = new ArrayList<>();
-        double minX = bounds.minX(), maxX = bounds.maxX();
-        double minY = bounds.minY(), maxY = bounds.maxY();
-        double minZ = bounds.minZ(), maxZ = bounds.maxZ();
+        double minX = bounds.minX();
+        double maxX = bounds.maxX();
+        double minY = bounds.minY();
+        double maxY = bounds.maxY();
+        double minZ = bounds.minZ();
+        double maxZ = bounds.maxZ();
         Vector3d center = bounds.center();
 
         // Offset beam slightly by animation tick for upward movement
@@ -165,9 +171,12 @@ public final class GeometryPointGenerator {
      */
     public static List<Vector3d> generateDustWall(SpatialBounds bounds, double step) {
         List<Vector3d> points = new ArrayList<>();
-        double minX = bounds.minX(), maxX = bounds.maxX();
-        double minY = bounds.minY(), maxY = bounds.maxY();
-        double minZ = bounds.minZ(), maxZ = bounds.maxZ();
+        double minX = bounds.minX();
+        double maxX = bounds.maxX();
+        double minY = bounds.minY();
+        double maxY = bounds.maxY();
+        double minZ = bounds.minZ();
+        double maxZ = bounds.maxZ();
 
         // North & South walls (Z = minZ, Z = maxZ)
         for (double x = minX; x <= maxX; x += step) {

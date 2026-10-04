@@ -195,13 +195,11 @@ public final class ActionSessionImpl implements ActionSession {
         }
 
         // Declarative damage application when outside border buffer
-        if (damageAmount > 0.0) {
-          if (distOutside > damageBuffer) {
-            long lastDmg = lastDamageSeconds.getOrDefault(pid, 0L);
-            if (nowSec - lastDmg >= damageIntervalSec) {
-              lastDamageSeconds.put(pid, nowSec);
-              accessor.damagePlayer(pid, damageAmount);
-            }
+        if (damageAmount > 0.0 && distOutside > damageBuffer) {
+          long lastDmg = lastDamageSeconds.getOrDefault(pid, 0L);
+          if (nowSec - lastDmg >= damageIntervalSec) {
+            lastDamageSeconds.put(pid, nowSec);
+            accessor.damagePlayer(pid, damageAmount);
           }
         }
       }
@@ -246,15 +244,13 @@ public final class ActionSessionImpl implements ActionSession {
 
       // Declarative damage check on move
       double damageAmount = definition.confinement().damageAmount();
-      if (damageAmount > 0.0) {
-        if (distOutside > definition.confinement().damageBuffer()) {
-          long nowSec = System.currentTimeMillis() / 1000L;
-          long lastDmg = lastDamageSeconds.getOrDefault(pid, 0L);
-          if (nowSec - lastDmg >= definition.confinement().damageIntervalSeconds()) {
-            lastDamageSeconds.put(pid, nowSec);
-            if (RTP.serverAccessor != null) {
-              RTP.serverAccessor.damagePlayer(pid, damageAmount);
-            }
+      if (damageAmount > 0.0 && distOutside > definition.confinement().damageBuffer()) {
+        long nowSec = System.currentTimeMillis() / 1000L;
+        long lastDmg = lastDamageSeconds.getOrDefault(pid, 0L);
+        if (nowSec - lastDmg >= definition.confinement().damageIntervalSeconds()) {
+          lastDamageSeconds.put(pid, nowSec);
+          if (RTP.serverAccessor != null) {
+            RTP.serverAccessor.damagePlayer(pid, damageAmount);
           }
         }
       }

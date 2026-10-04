@@ -4,6 +4,7 @@ tmp/
 tmp_*/
 **/tmp/
 **/tmp_*/
+scripts/tmp/
 *.tmp
 temp_*
 build/

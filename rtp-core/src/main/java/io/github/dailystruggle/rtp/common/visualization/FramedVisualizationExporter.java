@@ -201,13 +201,14 @@ public final class FramedVisualizationExporter {
         g.drawString(String.format(Locale.ROOT, "Range: %,d chunks", ms.getRange()), textX, currY);
         currY += 18;
         g.drawString(String.format(Locale.ROOT, "Hazard density: %.2f%%", badPct), textX, currY);
-        currY += 18;
       }
     }
   }
 
   private static int renderPipelineLegend(Graphics2D g, Region region, int x, int y) {
-    int l1Count = 0, l2Count = 0, l3Count = 0;
+    int l1Count = 0;
+    int l2Count = 0;
+    int l3Count = 0;
     if (region != null && region.queueManager != null) {
       if (region.queueManager.keptLocations != null) l1Count = region.queueManager.keptLocations.size();
       if (region.queueManager.unkeptLocations != null) l2Count = region.queueManager.unkeptLocations.size();

@@ -579,7 +579,7 @@ class SampleActionE2ETest {
         "target_name", "Alice"));
 
     CompletableFuture<ActionSessionResult> fAlice = manager.trigger("challenge", List.of(alice), ctx);
-    CompletableFuture<ActionSessionResult> fBob = manager.trigger("challenge", List.of(bob), bobCtx);
+    manager.trigger("challenge", List.of(bob), bobCtx);
 
     ActionSessionResult res = fAlice.join();
     assertTrue(res.success());
@@ -615,7 +615,7 @@ class SampleActionE2ETest {
         "target_name", "Alice"));
 
     CompletableFuture<ActionSessionResult> fAlice = manager.trigger("challenge", List.of(alice), aliceCtx);
-    CompletableFuture<ActionSessionResult> fBob = manager.trigger("challenge", List.of(bob), bobCtx);
+    manager.trigger("challenge", List.of(bob), bobCtx);
 
     ActionSessionResult res = fAlice.join();
     assertTrue(res.success());
@@ -754,7 +754,7 @@ class SampleActionE2ETest {
     // 1. Enter queue
     CompletableFuture<ActionSessionResult> f1 = manager.trigger("koth", List.of(p1), ActionContext.EMPTY);
     assertFalse(f1.isDone(), "Waiting in queue");
-    CompletableFuture<ActionSessionResult> f2 = manager.trigger("koth", List.of(p2), ActionContext.EMPTY);
+    manager.trigger("koth", List.of(p2), ActionContext.EMPTY);
 
     ActionSessionResult res = f1.join();
     assertTrue(res.success());
@@ -787,11 +787,11 @@ class SampleActionE2ETest {
     accessor.addPlayer(new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(p4, "T2P2", new RTPLocation(world, 0, 64, 0)));
 
     CompletableFuture<ActionSessionResult> f1 = manager.trigger("teams", List.of(p1), ActionContext.EMPTY);
-    CompletableFuture<ActionSessionResult> f2 = manager.trigger("teams", List.of(p2), ActionContext.EMPTY);
-    CompletableFuture<ActionSessionResult> f3 = manager.trigger("teams", List.of(p3), ActionContext.EMPTY);
+    manager.trigger("teams", List.of(p2), ActionContext.EMPTY);
+    manager.trigger("teams", List.of(p3), ActionContext.EMPTY);
     assertFalse(f1.isDone(), "Waiting for 4 players");
 
-    CompletableFuture<ActionSessionResult> f4 = manager.trigger("teams", List.of(p4), ActionContext.EMPTY);
+    manager.trigger("teams", List.of(p4), ActionContext.EMPTY);
     ActionSessionResult res = f1.join();
     assertTrue(res.success(), "2v2 team match must trigger once 4 players queue");
     assertEquals(4, manager.getSession(res.sessionId()).orElseThrow().participants().size());

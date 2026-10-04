@@ -155,7 +155,9 @@ public final class ModdedBStatsSubmitter {
                             }
                         }
                     }
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    // Ignored: failure reading bStats config file, continue checking other locations
+                }
             }
         }
 
@@ -306,7 +308,9 @@ public final class ModdedBStatsSubmitter {
             if (lc.contains("postgres")) return "postgresql";
             if (lc.contains("mysql") || lc.contains("mariadb")) return "mysql";
             return "other";
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            // Ignored: fallback to default database backend when detection fails
+        }
         return "sqlite";
     }
 
@@ -324,7 +328,9 @@ public final class ModdedBStatsSubmitter {
             if (Boolean.parseBoolean(String.valueOf(biome))) on.add("biome_whitelist");
             if (on.isEmpty()) return "default";
             return String.join("+", on);
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            // Ignored: fallback to default safety features on error
+        }
         return "default";
     }
 
@@ -335,7 +341,9 @@ public final class ModdedBStatsSubmitter {
             if (locale == null || locale.isBlank()) return "unknown";
             String lc = locale.toLowerCase(Locale.ROOT);
             return KNOWN_LOCALES.contains(lc) ? lc : "other";
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            // Ignored: fallback to default language on error
+        }
         return "en";
     }
 
@@ -344,6 +352,7 @@ public final class ModdedBStatsSubmitter {
             if (RTP.selectionAPI == null || RTP.selectionAPI.permRegionLookup == null) return 0;
             return RTP.selectionAPI.permRegionLookup.size();
         } catch (Throwable ignored) {
+            // Ignored: return 0 if region lookup is unavailable
             return 0;
         }
     }
@@ -361,10 +370,14 @@ public final class ModdedBStatsSubmitter {
                         label = shape.getClass().getSimpleName().toLowerCase(Locale.ROOT);
                         if (label.isEmpty()) label = "unknown";
                     }
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    // Ignored: shape retrieval failed for region
+                }
                 tally.merge(label, 1, Integer::sum);
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            // Ignored: region lookup failed
+        }
         if (tally.isEmpty()) {
             tally.put("none", 1);
         }
@@ -372,7 +385,10 @@ public final class ModdedBStatsSubmitter {
     }
 
     private double[] computeCacheFillPercentages() {
-        long keptUsed = 0L, keptCap = 0L, unkeptUsed = 0L, unkeptCap = 0L;
+        long keptUsed = 0L;
+        long keptCap = 0L;
+        long unkeptUsed = 0L;
+        long unkeptCap = 0L;
         try {
             if (RTP.selectionAPI != null && RTP.selectionAPI.permRegionLookup != null) {
                 for (var region : RTP.selectionAPI.permRegionLookup.values()) {
@@ -387,7 +403,9 @@ public final class ModdedBStatsSubmitter {
                     }
                 }
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            // Ignored: cache inspection failed
+        }
         double l1 = (keptCap > 0) ? 100.0 * keptUsed / keptCap : 0.0;
         double l2 = (unkeptCap > 0) ? 100.0 * unkeptUsed / unkeptCap : 0.0;
         return new double[] {l1, l2};
@@ -492,7 +510,9 @@ public final class ModdedBStatsSubmitter {
                 Files.writeString(uuidFile.toPath(), content, StandardCharsets.UTF_8);
                 return newUuid;
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            // Ignored: fallback to ephemeral UUID when file IO fails
+        }
         return UUID.randomUUID().toString();
     }
 }

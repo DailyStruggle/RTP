@@ -219,6 +219,7 @@ menuPanelAdminaWskazowka: "&7click an option; destructive actions show a warning
 
 # Separatory sekcji w panelu admina. Brak zmiennych.
 menuPanelAdminaSekcjaKonfig: "&8--- &7konfiguracja &8---"
+menuPanelAdminaSekcjaDokumentacja: "&8--- &7dokumentacja i edytor &8---"
 menuPanelAdminaSekcjaDiagnostyka: "&8--- &7diagnostyka &8---"
 menuPanelAdminaSekcjaCyklZycia: "&8--- &7cykl życia &8---"
 menuPanelAdminaSekcjaPrzegladaj: "&8--- &7przeglądaj &8---"
@@ -226,6 +227,10 @@ menuPanelAdminaSekcjaPrzegladaj: "&8--- &7przeglądaj &8---"
 # Wiersze panelu admina + podpowiedzi. Brak zmiennych.
 menuPanelAdminaWierszKonfig: "&b▶ edytor konfiguracji"
 menuPanelAdminaHoverKonfig: "&7otwórz wyselekcjonowany selektor konfiguracji"
+menuPanelAdminaWierszDokumentacja: "#5FB3B3▶ dokumentacja"
+menuPanelAdminaHoverDokumentacja: "&7otwórz spakowane podręczniki dokumentacji w grze"
+menuPanelAdminaWierszEdytor: "#5FB3B3▶ edytor www i podręcznik"
+menuPanelAdminaHoverEdytor: "&7uruchom sesję efemerycznego edytora www z dokumentacją"
 menuPanelAdminaWierszRegiony: "#5FB3B3▶ regiony"
 menuPanelAdminaHoverRegiony: "&7dodaj, usuń lub edytuj konfiguracje poszczególnych regionów"
 menuPanelAdminaWierszSwiaty: "#5FB3B3▶ światy"
@@ -482,6 +487,11 @@ multikonfigWynikNazwaNieprawidlowa: "&cnazwa '[name]' jest niedozwolona; użyj l
 # Komunikat wyniku, gdy DODANIE koliduje z istniejaca nazwa wpisu.
 # Zmienna: [name].
 multikonfigWynikNazwaZajeta: "&cwpis o nazwie '[name]' już istnieje."
+
+docsNotFound: "&c[RTP] Nie znaleziono tematu dokumentacji '[topic]'. Użyj /rtp docs list, aby zobaczyć dostępne tematy."
+docsEmpty: "&c[RTP] Obecnie nie ma zarejestrowanych tematów dokumentacji."
+docsExportSuccess: "&a[RTP] Pakiet HTML dokumentacji został pomyślnie wyeksportowany do [path]."
+docsExportFailed: "&c[RTP] Nie udało się wyeksportować pakietu dokumentacji: [reason]."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

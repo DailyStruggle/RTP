@@ -50,6 +50,7 @@ public final class ActionConfigLoader {
             try (Reader reader = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
               root = RtpYamlConfig.parse(reader);
             } catch (Exception ignored) {
+              // Ignored: fallback to ConfigParser getYamlRoot() below
             }
           }
         }
@@ -539,7 +540,9 @@ public final class ActionConfigLoader {
     Object shapeObj = map.get("shape");
     Map<String, Object> shapeMap = null;
     if (shapeObj instanceof Map<?, ?> m) {
-      shapeMap = (Map<String, Object>) m;
+      @SuppressWarnings("unchecked")
+      Map<String, Object> casted = (Map<String, Object>) m;
+      shapeMap = casted;
     } else if (shapeObj instanceof RtpYamlSection sec) {
       shapeMap = sec.getValues(false);
     } else if (shapeObj != null) {
@@ -867,6 +870,7 @@ public final class ActionConfigLoader {
         try {
           type = io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.valueOf(tStr);
         } catch (IllegalArgumentException ignored) {
+          // Ignored: fallback to STEP_IN default
         }
       }
 
@@ -879,8 +883,12 @@ public final class ActionConfigLoader {
       }
 
       // Coordinates
-      int minX = 0, minY = 0, minZ = 0;
-      int maxX = 0, maxY = 0, maxZ = 0;
+      int minX = 0;
+      int minY = 0;
+      int minZ = 0;
+      int maxX = 0;
+      int maxY = 0;
+      int maxZ = 0;
 
       if (map.containsKey("pos1") && map.containsKey("pos2")) {
         int[] p1 = parseCoords(map.get("pos1"));
@@ -953,7 +961,9 @@ public final class ActionConfigLoader {
               Integer.parseInt(parts[offset + 1].trim()),
               Integer.parseInt(parts[offset + 2].trim())
           };
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException ignored) {
+          // Ignored: non-numeric coordinate format falls back to {0,0,0}
+        }
       }
     }
     return new int[]{0, 0, 0};
@@ -965,7 +975,9 @@ public final class ActionConfigLoader {
     if (val instanceof String s) {
       try {
         return Integer.parseInt(s.trim());
-      } catch (NumberFormatException ignored) {}
+      } catch (NumberFormatException ignored) {
+        // Ignored: fallback to def value
+      }
     }
     return def;
   }

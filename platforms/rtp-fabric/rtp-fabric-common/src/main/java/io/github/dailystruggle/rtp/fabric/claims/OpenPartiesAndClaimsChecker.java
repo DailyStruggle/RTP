@@ -16,6 +16,8 @@ import java.util.logging.Level;
  * verifier disables itself and gracefully returns false (fail-open, S-003/S-004).
  */
 public class OpenPartiesAndClaimsChecker {
+  private OpenPartiesAndClaimsChecker() {}
+
   private static boolean exists = true;
 
   public static boolean isInClaim(RTPCoords coords) {

@@ -31,7 +31,7 @@ You can create and update regions through:
 | `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum number of **unverified** candidate locations to stage upstream of `cacheCap`. See *Backlog Cache (L3)* below. Set to `0` to disable. |
 | `activeChunkCap` | Integer | `10` | Maximum number of chunks to keep loaded for zero-latency teleports. |
 | `price` | Double | `0.0` | Economy cost to use this specific region (overrides global `price`). |
-| `spatialResolution` | Integer | `3` | Precision for spatial memory (bad location tracking). 1 is coarse, 5 is extremely fine. Values > 1 in dual-layer shapes also dictate dyadic candidate downsampling grids (e.g. 4 -> 4x4 chunk macro-cells, 8 -> 8x8 macro-cells). |
+| `spatialResolution` | Integer / String | `"auto"` | Precision for spatial memory (bad location tracking). Can be `"auto"` or any positive integer (e.g. `1`, `3`, `4`). Values > 1 in dual-layer shapes also dictate dyadic candidate downsampling grids (e.g. 4 -> 4x4 chunk macro-cells, 8 -> 8x8 macro-cells). |
 | `displayName` | String | (region name) | Optional cosmetic display name shown in menus and messages; does not change the region's identity or the permission node. |
 | `biomeWhitelist` / `biomes` | Boolean / List | (inherited from `safety.yml`) | Optional per-region override of the global biome filter. `biomeWhitelist: true` makes `biomes` an allow-list; `false` makes it a block-list. See [SAFETY.md](SAFETY.md). |
 | `version` | String | `"1.1"` | Internal config version. **Do not modify.** |

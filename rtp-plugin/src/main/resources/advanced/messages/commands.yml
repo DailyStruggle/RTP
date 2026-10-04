@@ -226,6 +226,7 @@ menuAdminPanelHint: "&7click an option below"
 
 # Section dividers on the admin panel. No placeholders.
 menuAdminPanelSectionConfig: "&8» &7configuration"
+menuAdminPanelSectionDocs: "&8» &7documentation & editor"
 menuAdminPanelSectionDiagnostics: "&8» &7diagnostics"
 menuAdminPanelSectionLifecycle: "&8» &7lifecycle"
 menuAdminPanelSectionBrowse: "&8» &7browse"
@@ -233,6 +234,10 @@ menuAdminPanelSectionBrowse: "&8» &7browse"
 # Admin-panel rows + hovers. No placeholders.
 menuAdminPanelRowConfig: "#5FB3B3▶ config editor"
 menuAdminPanelHoverConfig: "&7open the curated config selector"
+menuAdminPanelRowDocs: "#5FB3B3▶ documentation"
+menuAdminPanelHoverDocs: "&7open packed in-game documentation manuals"
+menuAdminPanelRowEditor: "#5FB3B3▶ web editor & manual"
+menuAdminPanelHoverEditor: "&7launch ephemeral web editor session with side-by-side docs"
 menuAdminPanelRowRegions: "#5FB3B3▶ regions"
 menuAdminPanelHoverRegions: "&7add, remove, or edit per-region configs"
 menuAdminPanelRowWorlds: "#5FB3B3▶ worlds"
@@ -489,6 +494,22 @@ multiconfigResultNameInvalid: "&cname '[name]' is not allowed; use letters, digi
 # Result message when an ADD collides with an existing entry name.
 # Placeholder: [name].
 multiconfigResultNameTaken: "&can entry named '[name]' already exists."
+
+# --- Documentation viewer and export (ADR-045, ADR-104) ---
+# Sent when a requested documentation topic cannot be found.
+# Placeholder: [topic]
+docsNotFound: "&c[RTP] Documentation topic '[topic]' not found. Use /rtp docs list to see available topics."
+
+# Sent when the documentation registry has no documents loaded.
+docsEmpty: "&c[RTP] No documentation topics are currently registered."
+
+# Sent when offline HTML documentation export completes successfully.
+# Placeholder: [path]
+docsExportSuccess: "&a[RTP] Documentation HTML bundle successfully exported to [path]."
+
+# Sent when offline HTML documentation export fails.
+# Placeholder: [reason]
+docsExportFailed: "&c[RTP] Failed to export documentation bundle: [reason]."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

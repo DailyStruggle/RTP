@@ -18,6 +18,8 @@ import java.util.logging.Level;
  * <p>When PlotSquared is absent or the location is outside any PlotArea, the verifier safely returns false.
  */
 public class PlotSquaredChecker {
+  private PlotSquaredChecker() {}
+
   private static boolean exists = true;
   private static Boolean available = null;
 

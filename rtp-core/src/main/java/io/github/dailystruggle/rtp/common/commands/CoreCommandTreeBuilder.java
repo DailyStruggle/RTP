@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.admin.ClearCmd;
 import io.github.dailystruggle.rtp.common.commands.back.BackCmd;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
+import io.github.dailystruggle.rtp.common.commands.docs.DocsCmd;
+import io.github.dailystruggle.rtp.common.commands.editor.EditorCmd;
 import io.github.dailystruggle.rtp.common.commands.gui.GuiCmd;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.BiomeParameter;
@@ -66,6 +68,8 @@ public final class CoreCommandTreeBuilder {
     root.addSubCommand(versionCmd);
     root.getCommandLookup().put(VersionCmd.ALIAS.toUpperCase(Locale.ROOT), versionCmd);
     root.addSubCommand(new ClearCmd(root));
+    root.addSubCommand(new EditorCmd(root));
+    root.addSubCommand(new DocsCmd(root));
   }
 
   /**

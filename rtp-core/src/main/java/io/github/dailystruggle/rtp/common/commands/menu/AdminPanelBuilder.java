@@ -115,6 +115,28 @@ public final class AdminPanelBuilder {
                 "&8\u00bb &7configuration",
                 configRows);
 
+        // --- Documentation & Web Editor section (ADR-045, ADR-104) ---
+        List<MenuLine> docsRows = new ArrayList<>();
+        addRow(
+                docsRows,
+                lookupMsg(CommandMessages.menuAdminPanelRowDocs, "&b\uD83D\uDCD6 In-game manuals"),
+                lookupMsg(
+                        CommandMessages.menuAdminPanelHoverDocs,
+                        "Open version-matched documentation books."),
+                new MenuAction.RunRtpCommand(new String[]{"docs"}));
+        addRow(
+                docsRows,
+                lookupMsg(CommandMessages.menuAdminPanelRowEditor, "&b\uD83C\uDF10 Web editor & manual"),
+                lookupMsg(
+                        CommandMessages.menuAdminPanelHoverEditor,
+                        "Launch interactive browser editor with side-by-side docs."),
+                new MenuAction.RunRtpCommand(new String[]{"editor"}));
+        appendSection(
+                lines,
+                CommandMessages.menuAdminPanelSectionDocs,
+                "&8\u00bb &7documentation & editor",
+                docsRows);
+
         // --- Diagnostics section ---
         List<MenuLine> diagRows = new ArrayList<>();
         if (hasSubcommand(rtpRoot, "info")) {

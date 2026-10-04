@@ -161,10 +161,10 @@ public abstract class AbstractRegionGridResolver implements ChartSpecResolver {
     long boundH = bounds.boundH();
 
     for (int py = 0; py < gridH; py++) {
-      int bz = (int) (minZ + (long) py * boundH / (gridH - 1));
+      int bz = (int) (minZ + py * boundH / (gridH - 1));
       int row = py * gridW;
       for (int px = 0; px < gridW; px++) {
-        int bx = (int) (minX + (long) px * boundW / (gridW - 1));
+        int bx = (int) (minX + px * boundW / (gridW - 1));
         int idx = row + px;
         if (memoryShape.contains(bx, bz)) {
           insideDomain[idx] = true;

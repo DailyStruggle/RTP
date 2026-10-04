@@ -129,6 +129,7 @@ public final class SparkMetricsBinding implements MetricsBinding {
                     }
                 }
             } catch (Throwable ignored) {
+                // Ignored: SelectionAPI or region queues uninitialized / unavailable
             }
 
             map.put("rtp.queue.l1_ready_count", l1Ready);
@@ -143,22 +144,23 @@ public final class SparkMetricsBinding implements MetricsBinding {
             try {
                 pendingTeleports = io.github.dailystruggle.rtp.common.tools.MemoryTracker.trackedCountByLabel("TeleportPipelineTask");
             } catch (Throwable ignored) {
+                // Ignored: MemoryTracker label query fallback
             }
 
             try {
-                if (io.github.dailystruggle.rtp.common.RTP.metrics instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics) {
-                    io.github.dailystruggle.rtp.common.metrics.CoreMetrics cm =
-                            (io.github.dailystruggle.rtp.common.metrics.CoreMetrics) io.github.dailystruggle.rtp.common.RTP.metrics;
+                if (io.github.dailystruggle.rtp.common.RTP.metrics instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics cm) {
                     avgLatency = cm.pipelineHistogram().mean();
                     slowCount = cm.slowPipelineCount();
                 }
             } catch (Throwable ignored) {
+                // Ignored: CoreMetrics query fallback
             }
 
             map.put("rtp.pipeline.pending_teleports", pendingTeleports);
             map.put("rtp.pipeline.avg_latency_ms", avgLatency);
             map.put("rtp.pipeline.slow_count", slowCount);
         } catch (Throwable ignored) {
+            // Ignored: graceful degradation for overall telemetry collection
         }
         return map;
     }

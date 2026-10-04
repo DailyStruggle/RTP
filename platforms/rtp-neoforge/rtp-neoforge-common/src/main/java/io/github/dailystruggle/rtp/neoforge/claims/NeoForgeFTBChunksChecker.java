@@ -9,6 +9,8 @@ import java.util.logging.Level;
  * Verifier for FTB Chunks on NeoForge.
  */
 public class NeoForgeFTBChunksChecker {
+  private NeoForgeFTBChunksChecker() {}
+
   private static boolean exists = true;
 
   public static boolean isInClaim(RTPCoords coords) {
