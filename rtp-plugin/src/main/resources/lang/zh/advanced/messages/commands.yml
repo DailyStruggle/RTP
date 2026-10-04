@@ -210,6 +210,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # 管理面板上的分区分隔符。无占位符。
 menuAdminPanelSectionConfig: "&8--- &7配置 &8---"
+menuAdminPanelSectionDocs: "&8--- &7文档与编辑器 &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7诊断 &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7生命周期 &8---"
 menuAdminPanelSectionBrowse: "&8--- &7浏览 &8---"
@@ -217,6 +218,10 @@ menuAdminPanelSectionBrowse: "&8--- &7浏览 &8---"
 # 管理面板行 + 悬停文字。无占位符。
 menuAdminPanelRowConfig: "&b▶ 配置编辑器"
 menuAdminPanelHoverConfig: "&7打开精选配置选择器"
+menuAdminPanelRowDocs: "#5FB3B3▶ 文档"
+menuAdminPanelHoverDocs: "&7打开游戏内置的打包文档手册"
+menuAdminPanelRowEditor: "#5FB3B3▶ Web编辑器与手册"
+menuAdminPanelHoverEditor: "&7启动带有集成文档的临时Web编辑器会话"
 menuAdminPanelRowRegions: "#5FB3B3» 区域"
 menuAdminPanelHoverRegions: "&7添加、删除或编辑每区域配置"
 menuAdminPanelRowWorlds: "#5FB3B3▶ 世界"
@@ -463,6 +468,11 @@ multiconfigResultNameInvalid: "&c名称 '[name]' 不合法; 请使用字母、�
 # ADD 与现有条目名称冲突时的结果消息。
 # 占位符: [name]。
 multiconfigResultNameTaken: "&c已存在名为 '[name]' 的条目。"
+
+docsNotFound: "&c[RTP] 未找到文档主题 '[topic]'。请使用 /rtp docs list 查看可用主题。"
+docsEmpty: "&c[RTP] 当前未注册任何文档主题。"
+docsExportSuccess: "&a[RTP] 文档 HTML 离线包已成功导出至 [path]。"
+docsExportFailed: "&c[RTP] 导出文档离线包失败: [reason]。"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

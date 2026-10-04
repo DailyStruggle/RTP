@@ -571,6 +571,10 @@ class GateEvaluatorTest {
     assertTrue(GateEvaluator.evaluate(
         Map.of("scoreboard", Map.of("objective", "custom_objective", "matches", "0")), ctx, null));
 
+    // Managed scoreboard objective rtp_alive
+    assertTrue(GateEvaluator.evaluate(
+        Map.of("scoreboard", Map.of("objective", "rtp_alive", "matches", ">= 1")), ctx, null));
+
     // Unrecognized gate fails closed
     assertFalse(GateEvaluator.evaluate(Map.of("unknown_gate_type", 123), ctx, null));
   }

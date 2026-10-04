@@ -21,7 +21,7 @@ Marketplace listing metadata (current, for SEO reference):
 
 ## Origin
 
-We were all players once, and we've all complained about "lag" on servers. Many of us tried to pinpoint where it came from and tbh in my studies it took days of work just to find out that a random teleport plugin was triggering performance issues. The biggest cost in any profiling tool was never labeled based on who called the api - that part is obscured, so the source of the thousands of extra chunks in memory is misattributed. I went through the "blame the users" phase and wised up to realize that it's better to fix the tool than to tell people not to use it. 
+We were all players once, and we've all complained about "lag" on servers. Many of us tried to pinpoint where it came from and tbh in my studies it took days of work just to find out that a random teleport plugin was triggering performance issues. The biggest cost in any profiling tool was never labeled based on who called the api - that part is obscured, so the source of the thousands of extra chunks in memory is misattributed. I went through the "blame the users" phase and wised up to realize that it's better to fix the tool than to tell people not to use it.
 
 In 2021, this project started as a demonstration of mathematical principles and as a high-difficulty optimization puzzle. I wanted to make something for the community to reference and create a new performance standard, make a name for myself as an obsessive developer. It was received instead as a product and a bunch of features were requested, so I worked on the design elegance so that a few design details resulted in an exponential number of possible configurations. As a result it's a little off-meta but not difficult to fully understand. Measure in chunks, define some regions, and access them via command or api, and anything in between is server design nuance.
 
@@ -29,7 +29,7 @@ In 2021, this project started as a demonstration of mathematical principles and 
 
 I don't like regulating how to use it nor what to use it with, so in V2 I refactored to use more swappable suppliers and consumers, making it easy to programmatically swap safety checks, biome checks, shapes, etc.. There wasn't much optimization to do, so I studied coding practices. Frankly "clean code" is a regret as it increased input latency but the structure gave me a pretty good launch point for reorganization.
 
-For v3 I needed to update for modern game versions and modern web platforms. I got some bright ideas about cache locality optimizations, data access optimizations, cross-platform support via SPI (service provider interface) concepts, and active tracking to catch any "memory leak" that I heard about but could never seem to reproduce on my rig. 
+For v3 I needed to update for modern game versions and modern web platforms. I got some bright ideas about cache locality optimizations, data access optimizations, cross-platform support via SPI (service provider interface) concepts, and active tracking to catch any "memory leak" that I heard about but could never seem to reproduce on my rig.
 
 Following the V3 update and micro optimizing the selection process, I've created a test bench plugin to assist with testing throughput up to 1 `rtp` call per gametick (20/s) which has demonstrated performance falloff in the pure reroll model, in every implementation I tested, except this one. I was also able to verify that a common optimization to "use loaded chunks" tends towards placing users in each others' bases to exacerbate either griefing or rerolling depending on claim integration.
 
@@ -55,7 +55,7 @@ Measurements show me about 35-65% of a world is "unsafe" for placement, based on
 
 Selections come off a space-filling Archimedean spiral curve, an indexed mapping from 1D to 2D. The math, with distribution plots: [Why LeafRTP exists](https://dailystruggle.github.io/RTP/site/why/).
 
-The spatial mapping enables storing and recalling information about prior selections, including biome and invalidity cause, using segments rather than image compression, as this enables a specific optimization - offset selections. The location selection phase is a constant-time lookup with occasional table rebuilding that excludes invalid locations, e.g. oceans, lava, void. 
+The spatial mapping enables storing and recalling information about prior selections, including biome and invalidity cause, using segments rather than image compression, as this enables a specific optimization - offset selections. The location selection phase is a constant-time lookup with occasional table rebuilding that excludes invalid locations, e.g. oceans, lava, void.
 
 ### Anvil pre-filter
 

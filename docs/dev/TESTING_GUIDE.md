@@ -35,6 +35,17 @@ Always run targeted unit tests during implementation to verify bugfixes or new b
 .\gradlew.bat :rtp-plugin:test --tests "*LocaleParityTest*"
 ```
 
+#### Build Tiers: Scoped vs. Full Multi-Module Build
+- **Targeted module build/test (`.\gradlew.bat :<module>:build` or `:test`):**
+  - **Sufficient for:** Localized changes confined to a single module or leaf adapter (e.g. `commands-api`, `rtp-core` math/cache adjustments, `rtp-plugin` locale updates, single platform adapter bugfix).
+  - Also sufficient for rapid inner-loop iterative feedback while working.
+- **Full multi-module build (`.\gradlew.bat build` / `./gradlew build`):**
+  - **Required for:**
+    1. Cross-module structural changes (e.g. public interfaces in `rtp-api`, SPI refactoring in `commands-api`/`effects-api`, core model signatures).
+    2. Shared build scripts, dependencies, or root Gradle configuration changes (`build.gradle`, `settings.gradle`, `gradle/`).
+    3. Final pre-release verification or when explicitly requested by the user.
+- **Exemptions:** Pure documentation or markdown changes (no compiled source or resource files touched) require no Gradle build or test execution.
+
 ### Tier 2: Coverage & Mutation Verification
 When modifying core safety or high-assurance logic:
 * **Coverage Verification:** Enforces module and package JaCoCo minimums.

@@ -17,6 +17,8 @@ import java.util.logging.Level;
  * treating the coordinate as claimed/protected per REQ-RTP-S-003).
  */
 public class UltimateClaimsChecker {
+  private UltimateClaimsChecker() {}
+
   private static boolean exists = true;
   private static Boolean available = null;
 
@@ -34,6 +36,7 @@ public class UltimateClaimsChecker {
         available = true;
         return true;
       } catch (ClassNotFoundException ignored) {
+        // Ignored: probe next candidate class
       }
     }
     available = false;
@@ -69,6 +72,7 @@ public class UltimateClaimsChecker {
           mainClass = Class.forName(cName);
           break;
         } catch (ClassNotFoundException ignored) {
+          // Ignored: continue searching candidate main classes
         }
       }
 
@@ -143,11 +147,11 @@ public class UltimateClaimsChecker {
 
       // Fallback probe for any isClaimed method
       for (Method m : target.getClass().getMethods()) {
-        if (m.getName().equals("isClaimed") || m.getName().equals("isClaim")) {
-          if (m.getParameterCount() == 1 && m.getParameterTypes()[0].isAssignableFrom(org.bukkit.Location.class)) {
-            Object res = m.invoke(target, location);
-            if (res instanceof Boolean b) return b;
-          }
+        if ((m.getName().equals("isClaimed") || m.getName().equals("isClaim"))
+            && m.getParameterCount() == 1
+            && m.getParameterTypes()[0].isAssignableFrom(org.bukkit.Location.class)) {
+          Object res = m.invoke(target, location);
+          if (res instanceof Boolean b) return b;
         }
       }
 

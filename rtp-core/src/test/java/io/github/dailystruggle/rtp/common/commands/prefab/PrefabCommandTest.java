@@ -363,7 +363,7 @@ class PrefabCommandTest {
     }
 
     @Test
-    void confirm_withRealChangesAndExpandPerWorld() throws Exception {
+    void confirm_withRealChangesAndExpandPerWorld() {
         PrefabNonceStore store = new PrefabNonceStore();
         UUID caller = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));

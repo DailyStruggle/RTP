@@ -1014,7 +1014,7 @@ final class MenuConcreteCommandLeaves {
                                                 new io.github.dailystruggle.mapsapi.image.ImageMapCanvas(canvasDims[0], canvasDims[1]);
                                         @SuppressWarnings("unchecked")
                                         io.github.dailystruggle.mapsapi.render.ChartRenderer<io.github.dailystruggle.mapsapi.model.ChartModel> renderer =
-                                                (io.github.dailystruggle.mapsapi.render.ChartRenderer<io.github.dailystruggle.mapsapi.model.ChartModel>) resolution.renderer();
+                                                resolution.renderer();
                                         renderer.render(canvas, resolution.model());
                                         canvas.commit();
 

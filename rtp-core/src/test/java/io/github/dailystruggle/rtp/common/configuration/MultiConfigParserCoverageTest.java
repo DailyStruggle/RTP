@@ -220,7 +220,7 @@ class MultiConfigParserCoverageTest {
         Files.writeString(new File(actionsDir, "default.yml").toPath(), "version: \"1.0\"\n");
 
         // Initialize MultiConfigParser pointing to a directory that has bundled jar files (e.g. definitions/actions)
-        MultiConfigParser<TestRegionKeys> parser = new MultiConfigParser<>(
+        new MultiConfigParser<>(
                 TestRegionKeys.class,
                 "actions",
                 "1.0",

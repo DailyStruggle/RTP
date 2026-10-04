@@ -328,33 +328,21 @@ dependencies {
 }
 
 tasks.register('copyDocs', Copy) {
-    // Ship only audience-A (server admin) docs. Addon-author material
-    // (`FOR_ADDON_DEVELOPERS.md`, `ADDON_QUICKSTART.md`, ...) is API/
-    // developer-facing, not operator runbook content, so it is NOT bundled
-    // in the released jar -- it stays available in the public repository and
-    // is linked from the bundled `MAP.md` via an absolute GitHub URL.
-    // Contributor-facing material (`docs/dev/**`, `docs/adr/**`,
-    // `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `FOR_CONTRIBUTORS.md`,
-    // SpigotMC `*.bbcode` listing sources, `DOCS_OPTIMIZATION_PLAN.md`, ...)
-    // is intentionally NOT bundled — it remains available in the public
-    // repository. The `docs/admin/**` tree stays in the jar so admins who
-    // unzip the release can read Quick Start, Configuration, etc., without
-    // needing GitHub access. The `docs/architecture/**` tree is contributor-
-    // facing internals and is NOT bundled (see the `from` block below).
-    // See CHANGELOG `[3.0.0-beta.2]`.
+    // Ship only essential operator-facing docs for offline reference.
+    // Deep developer/contributor material (`docs/dev/**`, `docs/adr/**`,
+    // `docs/architecture/**`, `docs/site/**`, test verifications, hazards catalogs)
+    // and internal catalogs (`MAP.md`) are NOT bundled in the released jar — they stay
+    // available on the documentation website and public repository.
+    // The operator docs (`docs/admin/**` excluding internal verification runbooks and
+    // hazards) are bundled so admins can access configuration references and quick starts
+    // without internet access.
     from(rootProject.file('docs')) {
-        // Top-level audience landing pages (the ones that actually live under docs/).
-        include 'MAP.md'
         include 'FOR_SERVER_ADMINS.md'
-        // Audience-A: operator-facing server-admin docs only.
         include 'admin/**'
-        // The `architecture/**` tree (per-attempt pipeline internals, chunk-
-        // ticket lifecycle, active-GC sweep, network model, etc.) is
-        // developer/contributor material, not operator runbook content. It is
-        // intentionally NOT bundled in the released jar (size: ~78KB) -- it
-        // stays available in the public repository for contributors. Admins
-        // who unzip the release still get the full `admin/**` operational set
-        // (Quick Start, Configuration, Commands, Hazards, Runbook, proxies...).
+        // Internal test runbooks and risk registers are developer docs, not operator guides:
+        exclude 'admin/HAZARDS.md'
+        exclude 'admin/proxies/*VERIFICATION.md'
+        exclude 'admin/REGION_FILE_READING.md'
     }
     from(rootProject.projectDir) {
         include 'LICENSE'

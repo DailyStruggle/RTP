@@ -17,6 +17,8 @@ import java.util.logging.Level;
  * and the verifier becomes a no-op (honoring REQ-RTP-S-003 and S-004).
  */
 public class HuskTownsChecker {
+  private HuskTownsChecker() {}
+
   private static boolean exists = true;
   private static Boolean available = null;
 

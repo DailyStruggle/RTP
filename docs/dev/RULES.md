@@ -24,6 +24,7 @@ Scan this table first. Read the detailed rule below only if you are touching cod
 | D-003 | Doc    | Single Source of Truth — reference, don't duplicate| self-contained                              |
 | D-004 | Doc    | Write for the audience                             | self-contained                              |
 | D-005 | Doc    | Propose architecture before implementation         | self-contained                              |
+| D-006 | Doc    | Mirror prose voice for external user copy          | self-contained                              |
 
 ## Core Development Rules
 
@@ -85,6 +86,9 @@ These rules govern how project documentation, requirements, and design specifica
 
 - **Rule D-005: Propose Architecture Before Implementation**
   - **Description**: For any refactor or new feature that touches more than one class, crosses a module boundary, or introduces a new command architecture, a written proposal must be presented and approved before any code is written.
+
+- **Rule D-006: Mirror Prose Voice for External User Copy**
+  - **Description**: When authoring external listings, README, marketing copy, or release notes, mirror the maintainer's established voice: first person, conversational, low ceremony, honest about limits and trade-offs. Prefer concrete evidence over adjectives (benchmark numbers, reproducibility notes; no AI hype buzzwords). State technical specifics plainly (spiral math, `.mca` / `.linear` pre-filter, async caching). Use ASCII punctuation only (hyphens/colons, no em/en dashes; see [`docs/FRONT_PAGE_LITE.md`](../FRONT_PAGE_LITE.md)).
 
 ## Maintenance Protocol
 

@@ -61,11 +61,9 @@ public class ActionSubcommandCmd extends BaseRTPCmdImpl {
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
     String perm = permission();
-    if (perm != null && !perm.isBlank()) {
-      if (!sender.hasPermission(perm) && !sender.isRtpAdmin()) {
-        RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
-        return true;
-      }
+    if (perm != null && !perm.isBlank() && !sender.hasPermission(perm) && !sender.isRtpAdmin()) {
+      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
+      return true;
     }
 
     // Build context tokens
@@ -131,14 +129,12 @@ public class ActionSubcommandCmd extends BaseRTPCmdImpl {
       }
       case ACTION -> {
         String actionName = cmd.payload().trim();
-        if ("DISARM".equalsIgnoreCase(actionName)) {
-          if (RTP.actionManager != null) {
-            RTP.actionManager.getSessionForParticipant(senderId).ifPresent(s -> {
-              if (s instanceof ActionSessionImpl sessionImpl) {
-                sessionImpl.disarm();
-              }
-            });
-          }
+        if ("DISARM".equalsIgnoreCase(actionName) && RTP.actionManager != null) {
+          RTP.actionManager.getSessionForParticipant(senderId).ifPresent(s -> {
+            if (s instanceof ActionSessionImpl sessionImpl) {
+              sessionImpl.disarm();
+            }
+          });
         }
       }
       default -> RTP.log(Level.FINE, "[RTP Action] Subcommand unhandled action type: " + cmd.type());

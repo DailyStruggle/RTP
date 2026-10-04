@@ -30,7 +30,8 @@ final class V26_3_R1FabricLegacyText {
         MutableComponent out = Component.empty();
         Style style = Style.EMPTY;
         StringBuilder buf = new StringBuilder();
-        int i = 0, n = text.length();
+        int i = 0;
+        int n = text.length();
         while (i < n) {
             char c = text.charAt(i);
             if (c == SECTION && i + 1 < n) {
@@ -172,7 +173,8 @@ final class V26_3_R1FabricLegacyText {
         if (raw == null || raw.isEmpty()) return "";
         String text = normalise(raw);
         StringBuilder out = new StringBuilder(text.length());
-        int i = 0, n = text.length();
+        int i = 0;
+        int n = text.length();
         while (i < n) {
             char c = text.charAt(i);
             if (c == SECTION && i + 1 < n) {

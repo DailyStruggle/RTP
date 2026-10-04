@@ -47,5 +47,5 @@ Read the relevant ADRs before changing anything the decisions describe.
 
 ## Reference Material
 
-- [HAZARDS.md](admin/HAZARDS.md) — hazard register (also the per-component failure catalog); consult when a change touches chunk loading, scheduling, or memory management, or when writing or reviewing error-handling code.
+- [HAZARDS.md](dev/HAZARDS.md) — hazard register (also the per-component failure catalog); consult when a change touches chunk loading, scheduling, or memory management, or when writing or reviewing error-handling code.
 - [CHANGELOG.md](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md) — release history; follow the existing format when adding an Unreleased entry.

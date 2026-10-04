@@ -421,7 +421,9 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
         if (location == null || handle == null) return null;
         ServerLevel level = resolveLevel(location);
         if (level == null) return null;
-        int x = location.x(), y = location.y(), z = location.z();
+        int x = location.x();
+        int y = location.y();
+        int z = location.z();
         if (!isLoaded(level, x >> 4, z >> 4)) return null;
         try {
             net.minecraft.world.level.block.state.BlockState state =
@@ -444,7 +446,9 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
         if (p == null || p.connection == null) return;
         ServerLevel level = resolveLevel(location);
         if (level == null) return;
-        int x = location.x(), y = location.y(), z = location.z();
+        int x = location.x();
+        int y = location.y();
+        int z = location.z();
         if (!isLoaded(level, x >> 4, z >> 4)) return;
         net.minecraft.world.level.block.state.BlockState state = parseBlockData(level, blockData);
         if (state == null) return;

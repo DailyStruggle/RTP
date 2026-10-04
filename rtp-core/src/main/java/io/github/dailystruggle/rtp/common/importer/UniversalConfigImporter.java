@@ -79,7 +79,9 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
                     if (stream.iterator().hasNext()) {
                         return true;
                     }
-                } catch (IOException ignored) {}
+                } catch (IOException ignored) {
+                    // Ignored: cannot read subdirectory stream
+                }
             }
         }
 

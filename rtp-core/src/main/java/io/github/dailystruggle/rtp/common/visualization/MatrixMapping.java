@@ -38,7 +38,7 @@ public final class MatrixMapping {
    */
   public static int pixelToWorldX(int px, int minX, long boundW, int viewportW) {
     if (viewportW <= 1) return minX;
-    return (int) (minX + (long) px * boundW / (viewportW - 1));
+    return (int) (minX + px * boundW / (viewportW - 1));
   }
 
   /**
@@ -46,7 +46,7 @@ public final class MatrixMapping {
    */
   public static int pixelToWorldZ(int py, int minZ, long boundH, int viewportH) {
     if (viewportH <= 1) return minZ;
-    return (int) (minZ + (long) py * boundH / (viewportH - 1));
+    return (int) (minZ + py * boundH / (viewportH - 1));
   }
 
   /**

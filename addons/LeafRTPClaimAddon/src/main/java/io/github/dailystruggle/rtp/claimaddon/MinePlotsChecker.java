@@ -16,6 +16,8 @@ import java.util.logging.Level;
  * treating the coordinate as claimed/protected per REQ-RTP-S-003).
  */
 public class MinePlotsChecker {
+  private MinePlotsChecker() {}
+
   private static boolean exists = true;
   private static Boolean available = null;
 
@@ -36,6 +38,7 @@ public class MinePlotsChecker {
         available = true;
         return true;
       } catch (ClassNotFoundException ignored) {
+        // Ignored: probe next candidate class
       }
     }
     available = false;
@@ -71,6 +74,7 @@ public class MinePlotsChecker {
           mainClass = Class.forName(cName);
           break;
         } catch (ClassNotFoundException ignored) {
+          // Ignored: continue searching candidate main classes
         }
       }
 
@@ -83,6 +87,7 @@ public class MinePlotsChecker {
         Method loadMethod = org.bukkit.plugin.ServicesManager.class.getMethod("load", Class.class);
         serviceOrPlugin = loadMethod.invoke(org.bukkit.Bukkit.getServicesManager(), serviceClass);
       } catch (Throwable ignored) {
+        // Ignored: ServicesManager lookup optional
       }
 
       if (serviceOrPlugin == null) {
@@ -149,11 +154,11 @@ public class MinePlotsChecker {
 
       // 3. Fallback: isPlot(Location) or isClaimed(Location)
       for (Method m : target.getClass().getMethods()) {
-        if (m.getName().equals("isPlot") || m.getName().equals("isClaimed")) {
-          if (m.getParameterCount() == 1 && m.getParameterTypes()[0].isAssignableFrom(org.bukkit.Location.class)) {
-            Object res = m.invoke(target, location);
-            if (res instanceof Boolean b) return b;
-          }
+        if ((m.getName().equals("isPlot") || m.getName().equals("isClaimed"))
+            && m.getParameterCount() == 1
+            && m.getParameterTypes()[0].isAssignableFrom(org.bukkit.Location.class)) {
+          Object res = m.invoke(target, location);
+          if (res instanceof Boolean b) return b;
         }
       }
 

@@ -38,11 +38,11 @@ Answers to the most common questions: biome filtering, economy integration, clai
 Step-by-step upgrade instructions when moving between major versions.
 Read this before upgrading an existing server.
 
-### 6. [RUNBOOK.md](admin/RUNBOOK.md)
-Incident response for common operational problems: TPS drops, players landing in unsafe locations, plugin failing to enable, fill task stalls, and more.
-Each entry follows the pattern: **Symptom → Diagnosis → Resolution**.
+### 6. [RUNBOOK.md](admin/RUNBOOK.md) & [WEB_EDITOR_GUIDE.md](admin/WEB_EDITOR_GUIDE.md)
+Incident response for common operational problems and guide for the dual-screen visual web workspace (`/rtp editor`).
+Covers symptom diagnosis, 2D vector cartography editing, live staging diffs, and atomic commits.
 
-### 7. [HAZARDS.md](admin/HAZARDS.md)
+### 7. [HAZARDS.md](dev/HAZARDS.md)
 Hazard register with severity ratings and mitigations for risks inherent to the plugin's design (it also absorbs the former failure-mode catalog: detection signals and defined system responses).
 Companion to the Runbook — use this when you know *what* failed but not *why*, and for capacity planning and risk assessment before deploying in production.
 

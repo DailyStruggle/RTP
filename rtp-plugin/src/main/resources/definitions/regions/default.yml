@@ -88,8 +88,8 @@ backlogCacheCap: "@config"
 #   activeChunkCap: 10
 activeChunkCap: "@config"
 
-# Precision for bad-location tracking (1-5). Example override:
-#   spatialResolution: 3
+# Precision for bad-location tracking (any positive integer, or "auto"). Example override:
+#   spatialResolution: "auto"
 spatialResolution: "@config"
 
 # DO NOT TOUCH VERSION NUMBER

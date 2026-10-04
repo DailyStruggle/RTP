@@ -292,4 +292,130 @@ class PhysicalTriggerManagerTest {
     assertTrue(triggerManager.unregisterTrigger("dummy"));
     assertNull(triggerManager.getTrigger("dummy"));
   }
+
+  @Test
+  @DisplayName("Instant trigger execution, rejection, and exception callbacks")
+  void testInstantTriggerCallbacks() {
+    RTPWorld<?> world = serverAccessor.getRTPWorld("world");
+    UUID playerId = UUID.randomUUID();
+    MockRTPPlayer player = new MockRTPPlayer(playerId, "Tester", new RTPLocation(world, 0, 64, 0));
+    serverAccessor.addPlayer(player);
+
+    // 1. Success callback
+    RTPAPI.actionService = new io.github.dailystruggle.rtp.api.action.ActionService() {
+      @Override
+      public CompletableFuture<io.github.dailystruggle.rtp.api.action.ActionSessionResult> trigger(
+          String actionId, List<UUID> participants, ActionContext context) {
+        return CompletableFuture.completedFuture(
+            io.github.dailystruggle.rtp.api.action.ActionSessionResult.success(UUID.randomUUID()));
+      }
+      @Override public java.util.Optional<io.github.dailystruggle.rtp.api.action.ActionSession> getSession(UUID s) { return java.util.Optional.empty(); }
+      @Override public java.util.Optional<io.github.dailystruggle.rtp.api.action.ActionSession> getSessionForParticipant(UUID p) { return java.util.Optional.empty(); }
+      @Override public void disarm(UUID s) {}
+      @Override public void registerPredicate(String n, java.util.function.Predicate<io.github.dailystruggle.rtp.api.action.ActionGateContext> p) {}
+      @Override public java.util.Set<String> getActionIds() { return java.util.Set.of("act_success"); }
+    };
+
+    PhysicalTriggerSpec trigSuccess = new PhysicalTriggerSpec(
+        "trig_success", PhysicalTriggerSpec.TriggerType.PRESSURE_PLATE,
+        "world", 0, 64, 0, 1, 65, 1, "act_success", 0L);
+    triggerManager.registerTrigger(trigSuccess);
+
+    triggerManager.onPlayerMove(new PlayerMoveEvent(playerId, "world", 10, 64, 10, 0, 64, 0));
+
+    // 2. Failure callback
+    RTPAPI.actionService = new io.github.dailystruggle.rtp.api.action.ActionService() {
+      @Override
+      public CompletableFuture<io.github.dailystruggle.rtp.api.action.ActionSessionResult> trigger(
+          String actionId, List<UUID> participants, ActionContext context) {
+        return CompletableFuture.completedFuture(
+            io.github.dailystruggle.rtp.api.action.ActionSessionResult.failure("Custom reject"));
+      }
+      @Override public java.util.Optional<io.github.dailystruggle.rtp.api.action.ActionSession> getSession(UUID s) { return java.util.Optional.empty(); }
+      @Override public java.util.Optional<io.github.dailystruggle.rtp.api.action.ActionSession> getSessionForParticipant(UUID p) { return java.util.Optional.empty(); }
+      @Override public void disarm(UUID s) {}
+      @Override public void registerPredicate(String n, java.util.function.Predicate<io.github.dailystruggle.rtp.api.action.ActionGateContext> p) {}
+      @Override public java.util.Set<String> getActionIds() { return java.util.Set.of("act_fail"); }
+    };
+
+    PhysicalTriggerSpec trigFail = new PhysicalTriggerSpec(
+        "trig_fail", PhysicalTriggerSpec.TriggerType.PRESSURE_PLATE,
+        "world", 5, 64, 5, 6, 65, 6, "act_fail", 0L);
+    triggerManager.registerTrigger(trigFail);
+
+    triggerManager.onPlayerMove(new PlayerMoveEvent(playerId, "world", 10, 64, 10, 5, 64, 5));
+
+    // 3. Exception throw
+    RTPAPI.actionService = new io.github.dailystruggle.rtp.api.action.ActionService() {
+      @Override
+      public CompletableFuture<io.github.dailystruggle.rtp.api.action.ActionSessionResult> trigger(
+          String actionId, List<UUID> participants, ActionContext context) {
+        CompletableFuture<io.github.dailystruggle.rtp.api.action.ActionSessionResult> cf = new CompletableFuture<>();
+        cf.completeExceptionally(new RuntimeException("Trigger explosive err"));
+        return cf;
+      }
+      @Override public java.util.Optional<io.github.dailystruggle.rtp.api.action.ActionSession> getSession(UUID s) { return java.util.Optional.empty(); }
+      @Override public java.util.Optional<io.github.dailystruggle.rtp.api.action.ActionSession> getSessionForParticipant(UUID p) { return java.util.Optional.empty(); }
+      @Override public void disarm(UUID s) {}
+      @Override public void registerPredicate(String n, java.util.function.Predicate<io.github.dailystruggle.rtp.api.action.ActionGateContext> p) {}
+      @Override public java.util.Set<String> getActionIds() { return java.util.Set.of("act_ex"); }
+    };
+
+    PhysicalTriggerSpec trigEx = new PhysicalTriggerSpec(
+        "trig_ex", PhysicalTriggerSpec.TriggerType.PRESSURE_PLATE,
+        "world", 20, 64, 20, 21, 65, 21, "act_ex", 0L);
+    triggerManager.registerTrigger(trigEx);
+
+    triggerManager.onPlayerMove(new PlayerMoveEvent(playerId, "world", 10, 64, 10, 20, 64, 20));
+  }
+
+  @Test
+  @DisplayName("Batch trigger wave dispatch with custom onEnqueue lifecycle steps")
+  void testWaveFeedbackWithLifecycleSteps() {
+    RTPWorld<?> world = serverAccessor.getRTPWorld("world");
+    UUID p1 = UUID.randomUUID();
+    MockRTPPlayer player1 = new MockRTPPlayer(p1, "PlayerLife", new RTPLocation(world, 10, 64, 10));
+    serverAccessor.addPlayer(player1);
+
+    ActionManager actionManager = new ActionManager();
+    RTP.actionManager = actionManager;
+
+    io.github.dailystruggle.rtp.api.action.ActionDefinition.CommandAction cmdMsg =
+        new io.github.dailystruggle.rtp.api.action.ActionDefinition.CommandAction(
+            io.github.dailystruggle.rtp.api.action.ActionDefinition.ActionType.MESSAGE,
+            "Queue tick: [countdown]s remaining",
+            List.of());
+    io.github.dailystruggle.rtp.api.action.ActionDefinition.CommandAction cmdCmd =
+        new io.github.dailystruggle.rtp.api.action.ActionDefinition.CommandAction(
+            io.github.dailystruggle.rtp.api.action.ActionDefinition.ActionType.CONSOLE,
+            "say [player] is waiting in [trigger]",
+            List.of());
+
+    io.github.dailystruggle.rtp.api.action.ActionDefinition.LifecycleStep step =
+        new io.github.dailystruggle.rtp.api.action.ActionDefinition.LifecycleStep(
+            Map.of(), List.of(cmdMsg, cmdCmd), 0L);
+
+    io.github.dailystruggle.rtp.api.action.ActionDefinition def =
+        new io.github.dailystruggle.rtp.api.action.ActionDefinition(
+            "custom_queue_act", "custom_queue_act", "perm", "",
+            io.github.dailystruggle.rtp.api.action.ActionDefinition.PlacementSpec.DEFAULT,
+            io.github.dailystruggle.rtp.api.action.ActionDefinition.ConfinementSpec.DEFAULT,
+            new io.github.dailystruggle.rtp.api.action.ActionDefinition.LifecycleSpec(
+                List.of(), List.of(), List.of(), List.of(), List.of(step), List.of()
+            ));
+    actionManager.registerAction(def);
+
+    PhysicalTriggerSpec trigger = new PhysicalTriggerSpec(
+        "custom_zone", PhysicalTriggerSpec.TriggerType.STEP_IN,
+        "world", 10, 64, 10, 12, 66, 12, "custom_queue_act", 0L, 5L);
+    triggerManager.registerTrigger(trigger);
+
+    // Step in
+    triggerManager.onPlayerMove(new PlayerMoveEvent(p1, "world", 0, 64, 0, 10, 64, 10));
+
+    // Tick wave countdown (remaining: 4)
+    triggerManager.tickWaveAccumulator();
+    assertEquals(4L, triggerManager.getWaveRemainingSeconds("custom_zone"));
+    assertTrue(serverAccessor.getExecutedCommands().stream().anyMatch(c -> c.contains("is waiting in custom_zone")));
+  }
 }

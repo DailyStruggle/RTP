@@ -35,6 +35,7 @@ public final class ClaimLocationResolver {
         }
       }
     } catch (Throwable ignored) {
+      // Ignored: proceed to fallback resolver when server accessor is unavailable
     }
 
     // 2. Fallback to Bukkit server if present and initialized
@@ -46,6 +47,7 @@ public final class ClaimLocationResolver {
         }
       }
     } catch (Throwable ignored) {
+      // Ignored: Bukkit server may be mock or uninitialized during testing
     }
 
     return null;

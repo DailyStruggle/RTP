@@ -207,6 +207,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # 관리자 패널의 섹션 구분선. 자리표시자 없음.
 menuAdminPanelSectionConfig: "&8--- &7설정 &8---"
+menuAdminPanelSectionDocs: "&8--- &7문서 및 편집기 &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7진단 &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7수명 주기 &8---"
 menuAdminPanelSectionBrowse: "&8--- &7탐색 &8---"
@@ -214,6 +215,10 @@ menuAdminPanelSectionBrowse: "&8--- &7탐색 &8---"
 # 관리자 패널 행 + 마우스 오버. 자리표시자 없음.
 menuAdminPanelRowConfig: "&b▶ 설정 편집기"
 menuAdminPanelHoverConfig: "&7선별된 설정 선택기를 엽니다"
+menuAdminPanelRowDocs: "#5FB3B3▶ 문서"
+menuAdminPanelHoverDocs: "&7게임 내 문서 매뉴얼을 엽니다"
+menuAdminPanelRowEditor: "#5FB3B3▶ 웹 편집기 및 매뉴얼"
+menuAdminPanelHoverEditor: "&7문서가 통합된 임시 웹 편집기 세션을 시작합니다"
 menuAdminPanelRowRegions: "#5FB3B3▶ 리전"
 menuAdminPanelHoverRegions: "&7리전별 설정 추가, 제거 또는 편집"
 menuAdminPanelRowWorlds: "#5FB3B3▶ 월드"
@@ -462,6 +467,11 @@ multiconfigResultNameInvalid: "&c이름 '[name]' 은(는) 허용되지 않습니
 # 추가 시 기존 항목 이름과 충돌할 때의 결과 메시지.
 # 자리표시자: [name].
 multiconfigResultNameTaken: "&c'[name]' (이)라는 이름의 항목이 이미 존재합니다."
+
+docsNotFound: "&c[RTP] 문서 주제 '[topic]'을(를) 찾을 수 없습니다. 사용 가능한 주제를 보려면 /rtp docs list를 사용하세요."
+docsEmpty: "&c[RTP] 현재 등록된 문서 주제가 없습니다."
+docsExportSuccess: "&a[RTP] 문서 HTML 번들을 [path]에 성공적으로 내보냈습니다."
+docsExportFailed: "&c[RTP] 문서 번들을 내보내지 못했습니다: [reason]."
 
 # 버전 번호는 변경하지 마세요
 version: 1.0

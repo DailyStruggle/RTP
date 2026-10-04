@@ -214,6 +214,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # Sectiescheiders op het beheerpaneel. Geen plaatshouders.
 menuAdminPanelSectionConfig: "&8--- &7configuratie &8---"
+menuAdminPanelSectionDocs: "&8--- &7documentatie & editor &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7diagnostiek &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7levenscyclus &8---"
 menuAdminPanelSectionBrowse: "&8--- &7bladeren &8---"
@@ -221,6 +222,10 @@ menuAdminPanelSectionBrowse: "&8--- &7bladeren &8---"
 # Rijen + hovers van het beheerpaneel. Geen plaatshouders.
 menuAdminPanelRowConfig: "&b▶ configuratie-editor"
 menuAdminPanelHoverConfig: "&7open de samengestelde configuratiekiezer"
+menuAdminPanelRowDocs: "#5FB3B3▶ documentatie"
+menuAdminPanelHoverDocs: "&7open ingebouwde documentatiehandleidingen in de game"
+menuAdminPanelRowEditor: "#5FB3B3▶ web-editor & handleiding"
+menuAdminPanelHoverEditor: "&7start een tijdelijke web-editorsessie met ingebouwde documentatie"
 menuAdminPanelRowRegions: "#5FB3B3▶ regio's"
 menuAdminPanelHoverRegions: "&7voeg toe, verwijder of bewerk configuraties per regio"
 menuAdminPanelRowWorlds: "#5FB3B3▶ werelden"
@@ -475,6 +480,11 @@ multiconfigResultNameInvalid: "&cnaam '[name]' is niet toegestaan; gebruik lette
 # Resultaatbericht wanneer een TOEVOEGING botst met een bestaande itemnaam.
 # Plaatshouder: [name].
 multiconfigResultNameTaken: "&cer bestaat al een item met de naam '[name]'."
+
+docsNotFound: "&c[RTP] Documentatieonderwerp '[topic]' niet gevonden. Gebruik /rtp docs list om beschikbare onderwerpen te bekijken."
+docsEmpty: "&c[RTP] Er zijn momenteel geen documentatieonderwerpen geregistreerd."
+docsExportSuccess: "&a[RTP] Documentatie HTML-bundel succesvol geëxporteerd naar [path]."
+docsExportFailed: "&c[RTP] Kan documentatiebundel niet exporteren: [reason]."
 
 # RAAK HET VERSIENUMMER NIET AAN
 version: 1.0

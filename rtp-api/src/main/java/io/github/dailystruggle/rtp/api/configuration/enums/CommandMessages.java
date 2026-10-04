@@ -184,6 +184,16 @@ public enum CommandMessages {
   menuAdminPanelRowConfig,
   /** Hover text for the admin-panel config-editor row. No placeholders. */
   menuAdminPanelHoverConfig,
+  /** Admin-panel row: open packed documentation book viewer. No placeholders. */
+  menuAdminPanelRowDocs,
+  /** Hover text for the admin-panel docs row. No placeholders. */
+  menuAdminPanelHoverDocs,
+  /** Admin-panel row: launch ephemeral web editor session. No placeholders. */
+  menuAdminPanelRowEditor,
+  /** Hover text for the admin-panel editor row. No placeholders. */
+  menuAdminPanelHoverEditor,
+  /** Section divider above the Documentation & Editor block on the admin panel. */
+  menuAdminPanelSectionDocs,
   /** Admin-panel row: open the regions multi-config submenu. No placeholders. */
   menuAdminPanelRowRegions,
   /** Hover text for the admin-panel regions row. No placeholders. */
@@ -369,5 +379,14 @@ public enum CommandMessages {
   /** Result message when the proposed entry name is rejected by the sanitiser. {@code [name]} placeholder. */
   multiconfigResultNameInvalid,
   /** Result message when an ADD collides with an existing entry name. {@code [name]} placeholder. */
-  multiconfigResultNameTaken
+  multiconfigResultNameTaken,
+  // --- In-game documentation viewer and export (ADR-045, ADR-104) ---
+  /** Rejection sent when the requested documentation topic does not exist. {@code [topic]} placeholder. */
+  docsNotFound,
+  /** Message sent when the documentation registry is empty or has no topics loaded. No placeholders. */
+  docsEmpty,
+  /** Feedback message sent when HTML documentation bundle export succeeds. {@code [path]} placeholder. */
+  docsExportSuccess,
+  /** Feedback message sent when HTML documentation bundle export fails. {@code [reason]} placeholder. */
+  docsExportFailed
 }

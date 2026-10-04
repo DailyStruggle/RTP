@@ -68,7 +68,6 @@ dependencies {
     testRuntimeOnly 'org.postgresql:postgresql:42.7.2'
     testRuntimeOnly 'com.h2database:h2:2.2.224'
     compileOnly 'org.jetbrains:annotations:24.1.0'
-    testFixturesApi project(':rtp-core')
     testFixturesCompileOnly 'org.jetbrains:annotations:24.1.0'
     compileOnly 'org.popcraft:chunky-common:1.3.111'
     testImplementation 'org.popcraft:chunky-common:1.3.111'
@@ -106,6 +105,8 @@ dependencies {
 // it that way. Scoped to compileJava only so test-source lint noise is not surfaced.
 compileJava {
     options.compilerArgs += ['-Xlint:unchecked']
+    options.fork = true
+    options.forkOptions.jvmArgs += ['-Xss8m']
 }
 
 // The opt-in behavioural-simulation / allocation benchmark tier (ADR-080) lives in
@@ -217,6 +218,13 @@ tasks.register('evaluateSimulationBaseline') {
 // `coverageFloors` map and wired into `check` there
 // (docs/dev/ENTERPRISE_READINESS.md section 4.1 item 3).  Raise the numbers in
 // that map -- never lower them -- as coverage grows; target is 90/80 (section 3).
+
+processResources {
+    from("${rootProject.projectDir}/docs/editor") {
+        include 'index.html'
+        into 'editor'
+    }
+}
 
 // Static analysis: SpotBugs catches null-dereference, improper synchronisation,
 // and incorrect volatile/atomic usage - common failure modes in concurrent Java.

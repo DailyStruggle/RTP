@@ -80,4 +80,72 @@ class ConfigImportCmdExtendedTest {
     );
     assertFalse(cmd.onCommand(UUID.randomUUID(), params, null));
   }
+
+  @Test
+  void testImportSuccessfulExecutionWithAutoDetectAndPermissions(@TempDir Path tempDir) throws IOException {
+    Path rtpDir = setupPluginDir(tempDir);
+    Path pluginsDir = rtpDir.getParent();
+
+    // Create a mock BetterRTP folder in plugins
+    Path betterRtpDir = pluginsDir.resolve("BetterRTP");
+    Files.createDirectories(betterRtpDir);
+    Files.writeString(betterRtpDir.resolve("config.yml"), """
+        Default:
+          UseWorldBorder: true
+          Biomes: []
+          MaxRadius: 1000
+          MinRadius: 100
+          CenterX: 0
+          CenterZ: 0
+          Price: 0
+          Cooldown: 30
+        """);
+
+    ConfigImportCmd cmd = new ConfigImportCmd(null);
+    UUID callerId = UUID.randomUUID();
+
+    // 1. Dry run with auto-detect
+    Map<String, List<String>> params = new HashMap<>();
+    params.put(ConfigImportCmd.PARAM_OVERWRITE, List.of("false"));
+    params.put(ConfigImportCmd.PARAM_PERMISSIONS, List.of("true"));
+    boolean res1 = cmd.onCommand(callerId, params, null);
+    assertTrue(res1);
+
+    // 2. Overwrite run with explicit source
+    params.clear();
+    params.put(ConfigImportCmd.PARAM_SOURCE, List.of("betterrtp"));
+    params.put(ConfigImportCmd.PARAM_OVERWRITE, List.of("true"));
+    params.put(ConfigImportCmd.PARAM_PERMISSIONS, List.of("true"));
+    boolean res2 = cmd.onCommand(callerId, params, null);
+    assertTrue(res2);
+
+    // 3. Custom path pointing directly to BetterRTP folder
+    params.clear();
+    params.put(ConfigImportCmd.PARAM_PATH, List.of(betterRtpDir.toString()));
+    params.put(ConfigImportCmd.PARAM_OVERWRITE, List.of("true"));
+    params.put(ConfigImportCmd.PARAM_PERMISSIONS, List.of("false"));
+    boolean res3 = cmd.onCommand(callerId, params, null);
+    assertTrue(res3);
+  }
+
+  @Test
+  void testImportMultipleDetectedSourcesPrompt(@TempDir Path tempDir) throws IOException {
+    Path rtpDir = setupPluginDir(tempDir);
+    Path pluginsDir = rtpDir.getParent();
+
+    // Create two mock folders
+    Path betterRtpDir = pluginsDir.resolve("BetterRTP");
+    Files.createDirectories(betterRtpDir);
+    Files.writeString(betterRtpDir.resolve("config.yml"), "Default:\n  MaxRadius: 500\n");
+
+    Path wildernessDir = pluginsDir.resolve("Wilderness-TP");
+    Files.createDirectories(wildernessDir);
+    Files.writeString(wildernessDir.resolve("config.yml"), "world:\n  max-x: 500\n");
+
+    ConfigImportCmd cmd = new ConfigImportCmd(null);
+    UUID callerId = UUID.randomUUID();
+
+    // With no source specified, should detect multiple sources and return false with prompt
+    assertFalse(cmd.onCommand(callerId, Map.of(), null));
+  }
 }

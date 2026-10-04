@@ -212,6 +212,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # Divisores de sección en el panel de administración. Sin marcadores.
 menuAdminPanelSectionConfig: "&8--- &7configuración &8---"
+menuAdminPanelSectionDocs: "&8--- &7documentación y editor &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7diagnósticos &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7ciclo de vida &8---"
 menuAdminPanelSectionBrowse: "&8--- &7explorar &8---"
@@ -219,6 +220,10 @@ menuAdminPanelSectionBrowse: "&8--- &7explorar &8---"
 # Filas del panel de administración + textos emergentes. Sin marcadores.
 menuAdminPanelRowConfig: "&b▶ editor de configuración"
 menuAdminPanelHoverConfig: "&7abre el selector de configuración curado"
+menuAdminPanelRowDocs: "#5FB3B3▶ documentación"
+menuAdminPanelHoverDocs: "&7abre los manuales de documentación integrados en el juego"
+menuAdminPanelRowEditor: "#5FB3B3▶ editor web y manual"
+menuAdminPanelHoverEditor: "&7inicia una sesión efímera del editor web con documentación integrada"
 menuAdminPanelRowRegions: "#5FB3B3▶ regiones"
 menuAdminPanelHoverRegions: "&7añade, elimina o edita configuraciones por región"
 menuAdminPanelRowWorlds: "#5FB3B3▶ mundos"
@@ -474,6 +479,11 @@ multiconfigResultNameInvalid: "&cel nombre '[name]' no está permitido; usa letr
 # Mensaje de resultado cuando una acción de AÑADIR entra en conflicto con un nombre de entrada existente.
 # Marcador: [name].
 multiconfigResultNameTaken: "&cya existe una entrada llamada '[name]'."
+
+docsNotFound: "&c[RTP] No se encontró el tema de documentación '[topic]'. Usa /rtp docs list para ver los temas disponibles."
+docsEmpty: "&c[RTP] Actualmente no hay temas de documentación registrados."
+docsExportSuccess: "&a[RTP] Paquete HTML de documentación exportado exitosamente a [path]."
+docsExportFailed: "&c[RTP] Error al exportar el paquete de documentación: [reason]."
 
 # NO MODIFICAR EL NÚMERO DE VERSIÓN
 version: 1.0

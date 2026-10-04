@@ -276,7 +276,6 @@ class ActionSessionAndConfinementTest {
     assertTrue(GateEvaluator.evaluate(lobbyGateConfig, lobbyCtx, null));
 
     // Step D: Countdown step triggered with 3-second delay, gated on playerCount >= 2
-    AtomicBoolean arenaTriggered = new AtomicBoolean(false);
     ActionDefinition.LifecycleSpec lobbyLifecycle = new ActionDefinition.LifecycleSpec(
         List.of(
             new ActionDefinition.LifecycleStep(
@@ -471,7 +470,7 @@ class ActionSessionAndConfinementTest {
 
   @Test
   @DisplayName("Radial Leash Interpolation: Mathematical boundary radius contracts smoothly over time")
-  void testRadialLeashInterpolation() throws InterruptedException {
+  void testRadialLeashInterpolation() {
     UUID p1 = UUID.randomUUID();
     io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = serverAccessor.getRTPWorld("world");
     io.github.dailystruggle.rtp.api.world.RTPLocation loc =
@@ -933,7 +932,6 @@ class ActionSessionAndConfinementTest {
   void testCrossWorldBoundaryBreach() {
     UUID p1 = UUID.randomUUID();
     io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = serverAccessor.getRTPWorld("world");
-    io.github.dailystruggle.rtp.api.world.RTPWorld<?> netherWorld = serverAccessor.getRTPWorld("world_nether");
     io.github.dailystruggle.rtp.api.world.RTPLocation loc =
         new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0);
     io.github.dailystruggle.rtp.common.mock.MockRTPPlayer mockPlayer =

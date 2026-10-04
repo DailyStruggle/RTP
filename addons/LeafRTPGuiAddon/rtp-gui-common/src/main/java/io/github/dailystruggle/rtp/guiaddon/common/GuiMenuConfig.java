@@ -352,11 +352,9 @@ public final class GuiMenuConfig {
     java.util.Map<String, Object> overrides = p.getMap(GuiMenuKeys.biomeIcons);
     if (overrides == null || overrides.isEmpty()) return null;
     for (java.util.Map.Entry<String, Object> entry : overrides.entrySet()) {
-      if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(target.name())) {
-        if (entry.getValue() != null) {
-          String s = String.valueOf(entry.getValue()).trim();
-          if (!s.isEmpty()) return s;
-        }
+      if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(target.name()) && entry.getValue() != null) {
+        String s = String.valueOf(entry.getValue()).trim();
+        if (!s.isEmpty()) return s;
       }
     }
     return null;

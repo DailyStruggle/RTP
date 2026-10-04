@@ -217,6 +217,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # Разделители разделов на панели администратора. Без плейсхолдеров.
 menuAdminPanelSectionConfig: "&8--- &7конфигурация &8---"
+menuAdminPanelSectionDocs: "&8--- &7документация и редактор &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7диагностика &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7жизненный цикл &8---"
 menuAdminPanelSectionBrowse: "&8--- &7обзор &8---"
@@ -224,6 +225,10 @@ menuAdminPanelSectionBrowse: "&8--- &7обзор &8---"
 # Строки панели администратора + подсказки при наведении. Без плейсхолдеров.
 menuAdminPanelRowConfig: "&b▶ редактор конфигурации"
 menuAdminPanelHoverConfig: "&7открыть подобранный селектор настроек"
+menuAdminPanelRowDocs: "#5FB3B3▶ документация"
+menuAdminPanelHoverDocs: "&7открыть встроенные руководства документации в игре"
+menuAdminPanelRowEditor: "#5FB3B3▶ веб-редактор и руководство"
+menuAdminPanelHoverEditor: "&7запустить сессию веб-редактора с интегрированной документацией"
 menuAdminPanelRowRegions: "#5FB3B3▶ регионы"
 menuAdminPanelHoverRegions: "&7добавить, удалить или изменить настройки по регионам"
 menuAdminPanelRowWorlds: "#5FB3B3▶ миры"
@@ -476,6 +481,11 @@ multiconfigResultNameInvalid: "&cимя '[name]' не разрешено; исп
 # Сообщение результата, когда имя при ДОБАВЛЕНИИ конфликтует с существующей записью.
 # Плейсхолдер: [name].
 multiconfigResultNameTaken: "&cзапись с именем '[name]' уже существует."
+
+docsNotFound: "&c[RTP] Тема документации '[topic]' не найдена. Используйте /rtp docs list для просмотра доступных тем."
+docsEmpty: "&c[RTP] В настоящее время нет зарегистрированных тем документации."
+docsExportSuccess: "&a[RTP] HTML-пакет документации успешно экспортирован в [path]."
+docsExportFailed: "&c[RTP] Не удалось экспортировать пакет документации: [reason]."
 
 # НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
 version: 1.0

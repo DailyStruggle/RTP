@@ -778,4 +778,52 @@ class ActionCommandTest {
     ActionCommand cmd = new ActionCommand(def);
     assertTrue(cmd.onCommand(UUID.randomUUID(), Map.of(), cmd));
   }
+
+  @Test
+  @DisplayName("ActionCommand subcommands and cancellation subcommands")
+  void testActionCommandSubcommandsAndCancel() {
+    ActionDefinition.SubcommandSpec subSpec = new ActionDefinition.SubcommandSpec(
+        "status", "rtp.command.duel.status", "Check status", List.of("st"),
+        List.of(new ActionDefinition.CommandAction(ActionDefinition.ActionType.MESSAGE, "Duel Status: active", List.of()))
+    );
+
+    ActionDefinition.CommandSpec cmdSpec = new ActionDefinition.CommandSpec(
+        "duel", "rtp.command.duel", "Duel cmd", List.of(), List.of(),
+        Map.of("status", subSpec)
+    );
+
+    ActionDefinition def = new ActionDefinition(
+        "duel_sub", "duel_sub", "perm", "",
+        ActionDefinition.PlacementSpec.DISABLED,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY,
+        cmdSpec
+    );
+
+    actionManager.registerAction(def);
+
+    RTPWorld<?> world = serverAccessor.getRTPWorld("world");
+    UUID callerId = UUID.randomUUID();
+    MockRTPPlayer caller = new MockRTPPlayer(callerId, "SubCaller", new RTPLocation(world, 0, 64, 0));
+    caller.setPermission("rtp.command.duel", true);
+    caller.setPermission("rtp.command.duel.status", true);
+    serverAccessor.addPlayer(caller);
+
+    ActionCommand cmd = new ActionCommand(def);
+    assertTrue(cmd.getCommandLookup().containsKey("STATUS"));
+    assertTrue(cmd.getCommandLookup().containsKey("ST"));
+    assertTrue(cmd.getCommandLookup().containsKey("CANCEL"));
+
+    // Execute CANCEL subcommand when player is not in queue
+    io.github.dailystruggle.commandsapi.common.CommandsAPICommand cancelCmd = cmd.getCommandLookup().get("CANCEL");
+    assertNotNull(cancelCmd);
+    boolean cancelHandled = cancelCmd.onCommand(callerId, Map.of(), null);
+    assertTrue(cancelHandled);
+
+    // Execute STATUS subcommand
+    io.github.dailystruggle.commandsapi.common.CommandsAPICommand statusCmd = cmd.getCommandLookup().get("STATUS");
+    assertNotNull(statusCmd);
+    boolean statusHandled = statusCmd.onCommand(callerId, Map.of(), null);
+    assertTrue(statusHandled);
+  }
 }

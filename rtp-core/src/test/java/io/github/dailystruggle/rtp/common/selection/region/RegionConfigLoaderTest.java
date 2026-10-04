@@ -118,7 +118,9 @@ public class RegionConfigLoaderTest {
                 Arguments.of(RegionKeys.shape, null, null, "null for shape"),
                 Arguments.of(RegionKeys.backlogCacheCap, "malformed_cap", 0L, "String instead of Number for backlogCacheCap"),
                 Arguments.of(RegionKeys.networkReserveSize, "bad_num", 0L, "String instead of Number for networkReserveSize"),
-                Arguments.of(RegionKeys.spatialResolution, "not_a_number", 0L, "String instead of Number for spatialResolution"),
+                Arguments.of(RegionKeys.spatialResolution, "not_a_number", 1L, "String instead of Number for spatialResolution falls back to 1L"),
+                Arguments.of(RegionKeys.spatialResolution, "auto", 1L, "String 'auto' for spatialResolution resolves to 1L"),
+                Arguments.of(RegionKeys.spatialResolution, 5, 5L, "Positive integer 5 for spatialResolution resolves to 5L"),
                 Arguments.of(RegionKeys.requirePermission, "maybe", false, "Invalid boolean string for requirePermission"),
                 Arguments.of(RegionKeys.requirePermission, 1, true, "Integer 1 for requirePermission"),
                 Arguments.of(RegionKeys.requirePermission, 0, false, "Integer 0 for requirePermission")

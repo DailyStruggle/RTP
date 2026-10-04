@@ -207,6 +207,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # 管理パネル上のセクション区切り。プレースホルダーなし。
 menuAdminPanelSectionConfig: "&8--- &7設定 &8---"
+menuAdminPanelSectionDocs: "&8--- &7ドキュメント & エディタ &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7診断 &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7ライフサイクル &8---"
 menuAdminPanelSectionBrowse: "&8--- &7閲覧 &8---"
@@ -214,6 +215,10 @@ menuAdminPanelSectionBrowse: "&8--- &7閲覧 &8---"
 # 管理パネルの行 + ホバー。プレースホルダーなし。
 menuAdminPanelRowConfig: "&b▶ 設定エディタ"
 menuAdminPanelHoverConfig: "&7厳選された設定セレクターを開く"
+menuAdminPanelRowDocs: "#5FB3B3▶ ドキュメント"
+menuAdminPanelHoverDocs: "&7ゲーム内のドキュメントマニュアルを開く"
+menuAdminPanelRowEditor: "#5FB3B3▶ Webエディタ & マニュアル"
+menuAdminPanelHoverEditor: "&7ドキュメント統合型の一時Webエディタセッションを開始する"
 menuAdminPanelRowRegions: "#5FB3B3▶ リージョン"
 menuAdminPanelHoverRegions: "&7リージョンごとの設定を追加・削除・編集"
 menuAdminPanelRowWorlds: "#5FB3B3▶ ワールド"
@@ -463,6 +468,11 @@ multiconfigResultNameInvalid: "&c名前 '[name]' は使用できません。文�
 # 追加時に既存のエントリ名と衝突したときの結果メッセージ。
 # プレースホルダー: [name]。
 multiconfigResultNameTaken: "&c'[name]' という名前の項目は既に存在します。"
+
+docsNotFound: "&c[RTP] ドキュメントのトピック '[topic]' が見つかりません。利用可能なトピックは /rtp docs list で確認してください。"
+docsEmpty: "&c[RTP] 登録されているドキュメントのトピックはありません。"
+docsExportSuccess: "&a[RTP] ドキュメントのHTMLバンドルが正常に [path] にエクスポートされました。"
+docsExportFailed: "&c[RTP] ドキュメントバンドルのエクスポートに失敗しました: [reason]。"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

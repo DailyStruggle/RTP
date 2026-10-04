@@ -509,7 +509,6 @@ public final class ComprehensiveRegionImageExporter {
     g.drawString(String.format(Locale.ROOT, "Hazard Density: %.2f%%", badPercent), textX, currY);
     currY += 20;
     drawLegendEntry(g, textX, currY, COLOR_HAZARD, "Red Tint: Discarded Hazard");
-    currY += 34;
 
     // Bottom Status Bar
     int barY = mapY + mapH + 20;

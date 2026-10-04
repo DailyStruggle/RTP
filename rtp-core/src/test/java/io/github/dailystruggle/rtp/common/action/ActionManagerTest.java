@@ -332,6 +332,48 @@ class ActionManagerTest {
   }
 
   @Test
+  @DisplayName("Rolls back atomic participant reservation when gate evaluation or setup throws")
+  void testRollbackReservationOnGateException() {
+    UUID p1 = UUID.randomUUID();
+
+    // Register an action with an external predicate gate that throws a RuntimeException
+    Map<String, Object> throwingGate = Map.of("predicate", "throwing_pred");
+    ActionDefinition def = new ActionDefinition(
+        "duel_throw", "duel_throw", "rtp.action.duel", "A duel",
+        ActionDefinition.PlacementSpec.DEFAULT,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY,
+        ActionDefinition.CommandSpec.EMPTY,
+        List.of(throwingGate));
+
+    actionManager.registerAction(def);
+    actionManager.registerPredicate("throwing_pred", ctx -> {
+      throw new RuntimeException("Simulated gate evaluation failure");
+    });
+
+    ActionSessionResult res1 = actionManager.trigger("duel_throw", List.of(p1), ActionContext.EMPTY).join();
+    assertFalse(res1.success());
+    assertTrue(res1.failureReason().contains("Action trigger failed: Simulated gate evaluation failure"));
+
+    // Participant must be unreserved so subsequent actions succeed
+    ActionDefinition normalDef = new ActionDefinition(
+        "duel_normal", "duel_normal", "rtp.action.duel", "A duel",
+        ActionDefinition.PlacementSpec.DEFAULT,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY);
+    actionManager.registerAction(normalDef);
+
+    RTP.groupPlacementService = request ->
+        CompletableFuture.completedFuture(
+            GroupPlacementResult.success(Map.of(p1, new RTPLocation(serverAccessor.getRTPWorld("world"), 0, 64, 0))));
+
+    ActionSessionResult res2 = actionManager.trigger("duel_normal", List.of(p1), ActionContext.EMPTY).join();
+    assertTrue(res2.success(), "Subsequent trigger must succeed after earlier gate exception rolled back reservation");
+
+    actionManager.disarm(res2.sessionId());
+  }
+
+  @Test
   @DisplayName("Per-action prevalidated caching: offer, poll, revalidate, and dispatch (ADR-097)")
   void testPerActionCachingAndRevalidation() {
     UUID p1 = UUID.randomUUID();
@@ -1200,5 +1242,124 @@ class ActionManagerTest {
     // Verify onStart removed the tags with properly substituted sender_name_1 and sender_name_2
     assertTrue(serverAccessor.getExecutedCommands().contains("tag Alice remove rtp_chal_Bob"));
     assertTrue(serverAccessor.getExecutedCommands().contains("tag Bob remove rtp_chal_Alice"));
+  }
+
+  @Test
+  @DisplayName("ActionManager dispatchGroupAction validation, cancelParticipant and surrenderParticipant")
+  void testDispatchGroupActionAndCancellation() {
+    // Null or empty player list returns failure
+    CompletableFuture<ActionSessionResult> fNull = actionManager.dispatchGroupAction(null, "any");
+    assertTrue(fNull.isDone());
+    assertFalse(fNull.join().success());
+
+    CompletableFuture<ActionSessionResult> fEmpty = actionManager.dispatchGroupAction(List.of(), "any");
+    assertTrue(fEmpty.isDone());
+    assertFalse(fEmpty.join().success());
+
+    // Null participant cancellation
+    assertFalse(actionManager.cancelParticipant(null, "any"));
+    assertFalse(actionManager.surrenderParticipant(null, "any"));
+
+    // Player in wait queue
+    UUID p1 = UUID.randomUUID();
+    io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+        new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world");
+    serverAccessor.addPlayer(new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+        p1, "WaitP1", new RTPLocation(world, 0, 64, 0)));
+
+    ActionDefinition def = new ActionDefinition(
+        "queued_act", "queued_act", "perm", "",
+        ActionDefinition.PlacementSpec.DISABLED,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        new ActionDefinition.LifecycleSpec(
+            List.of(), List.of(), List.of(), List.of(), List.of(),
+            List.of(new ActionDefinition.LifecycleStep(Map.of(), List.of(ActionDefinition.CommandAction.console("say cancelled [player]")), 0L))
+        ),
+        ActionDefinition.CommandSpec.EMPTY,
+        List.of(Map.of("players", ">= 2"))
+    );
+    actionManager.registerAction(def);
+
+    CompletableFuture<ActionSessionResult> fQueue = actionManager.trigger("queued_act", List.of(p1), ActionContext.EMPTY);
+    assertFalse(fQueue.isDone());
+
+    assertTrue(actionManager.cancelParticipant(p1, "queued_act"));
+    assertTrue(fQueue.isDone());
+    assertFalse(fQueue.join().success());
+    assertTrue(serverAccessor.getExecutedCommands().stream().anyMatch(c -> c.contains("say cancelled")));
+  }
+
+  @Test
+  @DisplayName("ActionManager predicate registration and gate failure")
+  void testPredicateGateEvaluation() {
+    UUID p1 = UUID.randomUUID();
+    io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+        new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world");
+    serverAccessor.addPlayer(new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+        p1, "PlayerGate", new RTPLocation(world, 0, 64, 0)));
+
+    actionManager.registerPredicate("custom_fail_predicate", ctx -> false);
+
+    ActionDefinition def = new ActionDefinition(
+        "pred_action", "pred_action", "perm", "",
+        ActionDefinition.PlacementSpec.DISABLED,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY,
+        ActionDefinition.CommandSpec.EMPTY,
+        List.of(Map.of("predicate", "custom_fail_predicate"))
+    );
+    actionManager.registerAction(def);
+
+    CompletableFuture<ActionSessionResult> future =
+        actionManager.trigger("pred_action", List.of(p1), ActionContext.EMPTY);
+    // Because gate failed and there's no timeout or other queue match, entry sits in wait queue
+    assertFalse(future.isDone());
+    assertTrue(actionManager.cancelParticipant(p1, "pred_action"));
+  }
+
+  @Test
+  @DisplayName("ActionManager placement failure handling")
+  void testTriggerPlacementFailure() {
+    UUID p1 = UUID.randomUUID();
+    io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+        new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world");
+    serverAccessor.addPlayer(new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+        p1, "PlayerPlaceFail", new RTPLocation(world, 0, 64, 0)));
+
+    ActionDefinition def = new ActionDefinition(
+        "placement_fail_action", "placement_fail_action", "perm", "",
+        ActionDefinition.PlacementSpec.DEFAULT,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY
+    );
+    actionManager.registerAction(def);
+
+    RTP.groupPlacementService = request -> CompletableFuture.completedFuture(
+        GroupPlacementResult.failure(io.github.dailystruggle.rtp.api.group.GroupPlacementResult.Reason.NO_ANCHOR, "Custom placement error")
+    );
+
+    CompletableFuture<ActionSessionResult> future =
+        actionManager.trigger("placement_fail_action", List.of(p1), ActionContext.EMPTY);
+    assertTrue(future.isDone());
+    ActionSessionResult res = future.join();
+    assertFalse(res.success());
+    assertTrue(res.failureReason().contains("NO_ANCHOR"));
+  }
+
+  @Test
+  @DisplayName("ActionManager clearDefinitions and clearCaches")
+  void testClearDefinitionsAndCaches() {
+    ActionDefinition def = new ActionDefinition(
+        "act_to_clear", "act_to_clear", "perm", "",
+        ActionDefinition.PlacementSpec.DISABLED,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY
+    );
+    actionManager.registerAction(def);
+    assertTrue(actionManager.getActionIds().contains("act_to_clear"));
+
+    actionManager.clearCaches();
+    actionManager.clearDefinitions();
+    assertTrue(actionManager.getActionIds().isEmpty());
   }
 }

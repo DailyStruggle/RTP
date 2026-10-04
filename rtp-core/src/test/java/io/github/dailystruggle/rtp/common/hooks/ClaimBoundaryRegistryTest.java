@@ -30,8 +30,8 @@ class ClaimBoundaryRegistryTest {
     ClaimBoundaryProvider highPri = createMockProvider("high", 100, null);
     ClaimBoundaryProvider medPri = createMockProvider("med", 50, null);
 
-    AutoCloseable hLow = registry.register(lowPri);
-    AutoCloseable hHigh = registry.register(highPri);
+    registry.register(lowPri);
+    registry.register(highPri);
     AutoCloseable hMed = registry.register(medPri);
 
     assertEquals(3, registry.size());

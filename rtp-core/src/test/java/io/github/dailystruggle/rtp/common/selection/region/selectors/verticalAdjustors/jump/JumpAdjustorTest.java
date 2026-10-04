@@ -625,4 +625,26 @@ public class JumpAdjustorTest {
         assertTrue(adjWithVerifier.testPlacement(new RTPCoords(null, 0, 75, 0)));
         assertFalse(adjWithVerifier.testPlacement(new RTPCoords(null, 0, 65, 0)));
     }
+
+    @Test
+    void testProbeWindowRejectionAndSkyLightProbe() {
+        JumpAdjustor adj = buildAdjustor(60, 100, 1);
+        adj.set(JumpAdjustorKeys.requireSkyLight, true);
+
+        // Probe window too small (< maxY or > minY - 1)
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe probeSmall =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe(0, 0, 65, 90);
+        assertEquals(io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor.AdjustResult.WINDOW_REJECT,
+                adj.adjustFromProbeWithReason(probeSmall, "test_world"));
+
+        // Probe with valid window and skylight requirement
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe probe =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe(0, 0, 50, 120);
+        probe.setSolidRange(50, 70);
+        probe.setAirRange(71, 120);
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor.AdjustResult res =
+                adj.adjustFromProbeWithReason(probe, "test_world");
+        assertNotNull(res.picked());
+        assertEquals(71, res.picked().y());
+    }
 }

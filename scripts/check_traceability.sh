@@ -3,7 +3,7 @@
 # Fails with exit code 1 if any REQ-* ID found in a REQUIREMENTS.md file
 # is not present as a row in docs/TRACEABILITY.md.
 #
-# Usage: ./check_traceability.sh
+# Usage: ./scripts/check_traceability.sh
 # Run from the project root.
 
 set -euo pipefail
