@@ -822,7 +822,7 @@
         <div id="polygon-vertices-list" style="display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto; padding-right:4px;">
           <!-- Dynamically populated rows -->
         </div>
-        <span style="font-size:0.72rem; color:var(--subtext); margin-top:4px; display:block;">Explicit block coordinates [X, Z]. Drag points on canvas or edit values directly. Min 3 vertices required.</span>
+        <span style="font-size:0.72rem; color:var(--subtext); margin-top:4px; display:block;">Explicit chunk coordinates [X, Z] (1 chunk = 16 blocks; accepts unit suffixes like 125c, 2000b). Drag points on canvas or edit values directly. Min 3 vertices required.</span>
       </div>
       <!-- Biome Breakdown Card -->
       <div class="control-group" id="grp-biomes" style="margin-top:16px;">
@@ -1351,6 +1351,12 @@ let canvasBaseScale = null;
 let canvasNeedsFit = true;
 let activeGridSnap = 16;
 let selectedVertex = -1;
+// Canvas move / resize grip state: live drag (start snapshot) and the grip id under the cursor
+let regionHandleDrag = null;
+let hoverRegionHandle = '';
+const REGION_HANDLE_PX = 5;
+const REGION_HANDLE_HIT_PX = 10;
+const VERTEX_HIT_PX = 12;
 
 function resetCanvasView() {
   canvasZoom = 1.0;
@@ -1865,8 +1871,6 @@ function isInheritedReferenceToken(token) {
 // Chunky shapes included). The page knows no names of its own: without a session, name checks are skipped.
 let serverSchema = null;
 const REGISTRY_LABEL = { shape: 'shape', vert: 'vertical adjustor' };
-// Bounding-square settings a polygon derives from its vertices
-const POLYGON_DERIVED_KEYS = new Set(['radius', 'centerRadius', 'centerX', 'centerZ']);
 // Spatial suffixes (blocks) and duration suffixes accepted by the config parser
 const SPATIAL_UNIT_BLOCKS = { b: 1, c: 16, r: 512, km: 1000, mi: 1609.34 };
 const KNOWN_UNIT_SUFFIXES = new Set(['b', 'c', 'r', 'km', 'mi', 'ms', 's', 'm', 'h', 'd', 't']);
@@ -1915,6 +1919,16 @@ function registryKeys(kind, name) {
   const p = registryParams(kind, name);
   const keys = p ? Object.keys(p) : [];
   return keys.length > 0 ? keys : null;
+}
+
+// Whether a shape block of `shape` keeps `key`: the shape's keys() from the session schema. Without a
+// schema nothing is pruned, except vertices, which only the polygon vertex editor writes
+function shapeTakesKey(shape, key) {
+  const lk = String(key).toLowerCase();
+  if (lk === 'name') return true;
+  const keys = registryKeys('shape', shape);
+  if (!keys) return lk !== 'vertices' || String(shape || '').toUpperCase() === 'POLYGON';
+  return keys.some(k => k.toLowerCase() === lk);
 }
 
 // {type, default?, options?} of one parameter, or null
@@ -2036,11 +2050,12 @@ function diagnoseYaml(file, text) {
 
       const parent = r.path[r.path.length - 1];
       const impl = blockImpl.get(parentPath);
-      if (impl && impl.kind === 'shape' && impl.name.toUpperCase() === 'POLYGON' && POLYGON_DERIVED_KEYS.has(r.key)) {
-        add(r.line, 'warning', `POLYGON infers '${r.key}' from its vertices; this value is ignored`);
-      } else if (impl && r.key !== 'name' && !isInheritedReferenceToken(impl.name) && registryHas(impl.kind, impl.name)) {
+      if (impl && r.key !== 'name' && !isInheritedReferenceToken(impl.name) && registryHas(impl.kind, impl.name)) {
         const regKeys = registryKeys(impl.kind, impl.name);
-        if (regKeys && !regKeys.includes(r.key) && !shippedBlockKeys(impl.kind).has(r.key)) {
+        // Shipped block keys no registered implementation lists are parser-level (requireSkyLight)
+        const parserKey = shippedBlockKeys(impl.kind).has(r.key)
+          && !registryNames(impl.kind).some(n => (registryKeys(impl.kind, n) || []).includes(r.key));
+        if (regKeys && !regKeys.includes(r.key) && !parserKey) {
           add(r.line, 'warning', `'${r.key}' is not a parameter of ${REGISTRY_LABEL[impl.kind]} ${impl.name.toUpperCase()} (expected: ${regKeys.join(', ')})`);
         }
       }
@@ -3503,10 +3518,11 @@ let walkPathStatus = '';
 let walkPathTimer = null;
 let lastWalkPathReq = '';
 
-// {name, key: YAML scalar, vertices: [[x, z], ...]}: the region's shape block (or the block its
-// "@<file>" reference inherits) with the canvas geometry on top
+// {name, key: raw scalar text, vertices: [[x, z], ...] in chunks}: the region's shape block (or the
+// block its "@<file>" reference inherits) with the canvas geometry on top, keys the shape takes only.
+// Values stay unquoted ("256 c", "1,5"): the plugin parses them as it parses the file's scalars.
 function walkPathShapeRequest(region) {
-  const { shape, set, remove } = regionGeometryValues(region);
+  const { shape, set, takes } = regionGeometryValues(region);
   const recs = parseYamlLines(configs[regionFileFor(region.name)] || '');
   const top = recs.find(r => r.key === 'shape' && r.path.length === 0);
   let block = recs.filter(r => r.key && r.path.length === 1 && r.path[0] === 'shape');
@@ -3516,9 +3532,11 @@ function walkPathShapeRequest(region) {
       .filter(r => r.key && r.path.length === 2 && r.path[0] === 'defaults' && r.path[1] === 'shape');
   }
   const out = {};
-  const drop = new Set(remove.concat(Object.keys(set), ['name', 'vertices']).map(k => k.toLowerCase()));
-  for (const r of block) if (r.value && !drop.has(r.key.toLowerCase())) out[r.key] = r.value;
-  for (const [k, v] of Object.entries(set)) out[k] = k === 'vertices' ? (region.vertices || []).map(p => [p[0], p[1]]) : v;
+  const drop = new Set(Object.keys(set).concat(['name', 'vertices']).map(k => k.toLowerCase()));
+  for (const r of block) if (r.value && !drop.has(r.key.toLowerCase()) && takes(r.key)) out[r.key] = r.value;
+  for (const k of Object.keys(set)) {
+    out[k] = k === 'vertices' ? (region.vertices || []).map(p => [p[0], p[1]]) : String(region.settings[k]).trim();
+  }
   out.name = shape;
   return out;
 }
@@ -3538,6 +3556,8 @@ function requestWalkPath(region) {
   }
   const key = region.name + '|' + regionGeometrySig(region);
   if (key === lastWalkPathReq) return;
+  // Live canvas grip drag: geometry changes per mousemove; asked once on mouseup
+  if (regionHandleDrag) return;
   walkPathStatus = 'Walk path: computing on the server...';
   if (walkPathTimer) clearTimeout(walkPathTimer);
   walkPathTimer = setTimeout(() => {
@@ -3578,6 +3598,7 @@ function requestCurveState(region) {
   const name = region.name;
   const sig = regionGeometrySig(region);
   if (curveStateAsked.get(name) === sig) return;
+  if (regionHandleDrag) return;
   curveStateAsked.set(name, sig);
   clearTimeout(curveStateTimers.get(name));
   // Settings typed into the form arrive per keystroke: ask for the last one only
@@ -3712,9 +3733,10 @@ function hazardResync(prof) {
   requestMapRedraw();
 }
 
-// {type:'hazard-delta', region, from, to, add, remove} | {region, to, reset, runs | bytebinKey + sha256}
+// {type:'hazard-delta', region, base, version, add, remove} | {region, version, reset, runs | bytebinKey + sha256}
+// (from/to are channel header fields: plugin fingerprint and recipient, never versions)
 async function ingestHazardDelta(msg) {
-  if (typeof msg.region !== 'string' || !Number.isInteger(msg.to)) return;
+  if (typeof msg.region !== 'string' || !Number.isInteger(msg.version)) return;
   const prof = regionProfiles[msg.region];
   if (!prof || prof.hazardRunsSkipped) return;
   let runs;
@@ -3722,19 +3744,19 @@ async function ingestHazardDelta(msg) {
     runs = typeof msg.runs === 'string' ? msg.runs : null;
     if (runs === null && typeof msg.bytebinKey === 'string' && /^[A-Za-z0-9_\-]{1,64}$/.test(msg.bytebinKey)
         && /^[0-9a-f]{64}$/.test(String(msg.sha256 || ''))) {
-      prof._hazardFetch = msg.to;
+      prof._hazardFetch = msg.version;
       try {
         runs = await fetchHazardHandoff(msg.bytebinKey, msg.sha256);
       } catch (e) {
         runs = null;
       }
-      if (prof._hazardFetch !== msg.to) return; // a newer reset arrived meanwhile
+      if (prof._hazardFetch !== msg.version) return; // a newer reset arrived meanwhile
       prof._hazardFetch = undefined;
     }
     if (runs === null || decodeRunTriples(runs) === null) return hazardResync(prof);
   } else {
     const held = Number.isInteger(prof._hazardVersion) ? prof._hazardVersion : 0;
-    if (!Number.isInteger(msg.from) || held !== msg.from) {
+    if (!Number.isInteger(msg.base) || held !== msg.base) {
       if (held !== -1) hazardResync(prof);
       return;
     }
@@ -3742,11 +3764,12 @@ async function ingestHazardDelta(msg) {
     if (runs === null) return hazardResync(prof);
   }
   prof.hazardRuns = { v: 1, runs };
-  prof._hazardVersion = msg.to;
+  prof._hazardVersion = msg.version;
   requestMapRedraw();
 }
 
-// {type:'land', world, y, palette?, bins: [[rx, rz, level, base64Runs]]}: focus-driven bins
+// {type:'land', world, y, palette, bins: [[rx, rz, level, base64Runs]]}: focus-driven bins; every
+// frame carries the world's whole palette
 function ingestLandPush(msg) {
   if (typeof msg.world !== 'string' || !Array.isArray(msg.bins)) return;
   const store = landStore(msg.world);
@@ -3938,7 +3961,10 @@ function ingestCurveCode(code) {
   if (code && typeof code === 'object') {
     for (const [name, e] of Object.entries(code)) {
       if (e && typeof e === 'object' && typeof e.js === 'string' && typeof e.sha256 === 'string') {
-        curveCodeMap[name] = { js: e.js, sha256: e.sha256.toLowerCase() };
+        // sample: the registered shape's curve block at its defaults, for shapes no region uses yet
+        const s = e.sample;
+        const sample = s && typeof s === 'object' && typeof s.hash === 'string' ? s : null;
+        curveCodeMap[name] = { js: e.js, sha256: e.sha256.toLowerCase(), sample };
       }
     }
   }
@@ -4364,17 +4390,19 @@ function checkCurve(shape, params, state, hash) {
   return p;
 }
 
-// Shape verdict: every snapshot region of the shape reproduces its plugin hash (fail closed)
+// Shape verdict: every snapshot region of the shape reproduces its plugin hash; a shape no region
+// uses checks against the registered shape's sample instead (fail closed without either)
 const curveShapeVerdicts = new Map();
 function curveShapeVerdict(shape) {
   if (curveShapeVerdicts.has(shape)) return curveShapeVerdicts.get(shape);
   const p = (async () => {
     const up = shape.toUpperCase();
-    const snaps = Object.values(regionProfiles).filter(r => r && r.curve && typeof r.curve.hash === 'string'
-      && String(r.curve.shape || '').toUpperCase() === up);
-    if (snaps.length === 0) return { ok: false, reason: 'hash-mismatch' };
-    for (const r of snaps) {
-      const res = await checkCurve(shape, r.curve.params || {}, r.curve.state || {}, r.curve.hash);
+    let refs = Object.values(regionProfiles).filter(r => r && r.curve && typeof r.curve.hash === 'string'
+      && String(r.curve.shape || '').toUpperCase() === up).map(r => r.curve);
+    if (refs.length === 0 && curveCodeMap[shape] && curveCodeMap[shape].sample) refs = [curveCodeMap[shape].sample];
+    if (refs.length === 0) return { ok: false, reason: 'hash-mismatch' };
+    for (const c of refs) {
+      const res = await checkCurve(shape, c.params || {}, c.state || {}, c.hash);
       if (!res.ok) return res;
     }
     return { ok: true };
@@ -4450,12 +4478,11 @@ async function prepareCurveModel(name, m) {
     if (!r.ok) throw curveFailure(r.reason);
     m.range = r.range;
     m.invertible = r.invertible;
-    const n = Math.min(r.range, CURVE_OVERVIEW_SAMPLES);
-    const pos = new Float64Array(n);
-    const step = r.range / Math.max(1, n);
-    for (let i = 0; i < n; i++) pos[i] = r.range <= CURVE_OVERVIEW_SAMPLES ? i : Math.min(r.range - 1, Math.floor(i * step));
+    const stride = curveOverviewStride(r.range);
+    const pos = curveOverviewPositions(r.range, stride);
     const xz = await CurveSandbox.toXZ(shape, params, state, pos);
-    m.overview = { pos, xz };
+    const back = await curveDomainBack(m, xz);
+    m.overview = { pos, xz, stride, pen: curveOverviewPen(xz, back, stride) };
     m.status = 'ready';
     // Verified: the plugin can stop writing this region's path / hazard tiles
     if (exact && !m.inputs.preview) sendPageState();
@@ -4464,6 +4491,65 @@ async function prepareCurveModel(name, m) {
     m.reason = curveReasonOf(e);
   }
   if (curveModels.get(name) === m) requestMapRedraw();
+}
+
+/*
+ * Overview stride: 1 while the range fits CURVE_OVERVIEW_SAMPLES, else the smallest power of 4
+ * that does. Each sample then opens an aligned 4^k block (a whole Hilbert sub-square on tiled
+ * curves), so successive samples stay neighbours along the walk instead of chords across it.
+ */
+function curveOverviewStride(range) {
+  let stride = 1;
+  while (range / stride > CURVE_OVERVIEW_SAMPLES) stride *= 4;
+  return stride;
+}
+
+function curveOverviewPositions(range, stride) {
+  const n = range > 0 ? Math.ceil(range / stride) : 0;
+  const pos = new Float64Array(n);
+  for (let i = 0; i < n; i++) pos[i] = i * stride;
+  return pos;
+}
+
+/*
+ * Pen per overview sample: 0 skip, 1 line to, 2 move to. Skipped: off the curve, or off the region
+ * domain when back (toLoc of each sample's chunk) is given and not finite. A subpath also restarts
+ * when kept samples lie farther apart than stride unit steps (+ rounding) can reach: the walk
+ * jumped between them. back null (no domain check) keeps every on-curve sample.
+ */
+function curveOverviewPen(xz, back, stride) {
+  const n = xz.length >> 1;
+  const pen = new Uint8Array(n);
+  const reach = 2 * stride + 1;
+  let open = false, lx = 0, lz = 0;
+  for (let i = 0; i < n; i++) {
+    const x = xz[2 * i], z = xz[2 * i + 1];
+    if (x !== x || z !== z || (back && !Number.isFinite(back[i]))) { open = false; continue; }
+    pen[i] = open && Math.max(Math.abs(x - lx), Math.abs(z - lz)) <= reach ? 1 : 2;
+    open = true;
+    lx = x; lz = z;
+  }
+  return pen;
+}
+
+// toLoc of each on-curve chunk (NaN = outside the region domain), or null when the helper cannot tell
+async function curveDomainBack(m, xz) {
+  if (!m.invertible) return null;
+  const { shape, params, state } = m.inputs;
+  const n = xz.length >> 1, idx = [];
+  for (let i = 0; i < n; i++) if (xz[2 * i] === xz[2 * i]) idx.push(i);
+  const pairs = new Float64Array(idx.length * 2);
+  idx.forEach((i, j) => { pairs[2 * j] = xz[2 * i]; pairs[2 * j + 1] = xz[2 * i + 1]; });
+  let got;
+  try {
+    got = await CurveSandbox.toLoc(shape, params, state, pairs);
+  } catch (e) {
+    if (curveReasonOf(e) === 'timeout' || curveReasonOf(e) === 'restart') throw e;
+    return null;
+  }
+  const back = new Float64Array(n).fill(NaN);
+  idx.forEach((i, j) => { if (got[j] < m.range) back[i] = got[j]; });
+  return back;
 }
 
 // Visible chunk rectangle, or null when too many chunks for the exact view
@@ -4498,6 +4584,21 @@ async function computeCurveView(m, r) {
   }
   const withNext = on.filter(i => locs[i] + 1 < m.range);
   const next = await CurveSandbox.toXZ(shape, params, state, Float64Array.from(withNext, i => locs[i] + 1));
+  // Both ends on the region domain: next chunks inside the rectangle reuse locs, others go to toLoc
+  const outside = [];
+  for (let j = 0; j < withNext.length; j++) {
+    const x = next[2 * j], z = next[2 * j + 1];
+    if (x !== x) continue;
+    if (x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) {
+      if (!(locs[(z - r.z0) * w + (x - r.x0)] < m.range)) { next[2 * j] = NaN; next[2 * j + 1] = NaN; }
+    } else outside.push(j);
+  }
+  if (outside.length) {
+    const ends = new Float64Array(outside.length * 2);
+    outside.forEach((j, k) => { ends[2 * k] = next[2 * j]; ends[2 * k + 1] = next[2 * j + 1]; });
+    const back = await CurveSandbox.toLoc(shape, params, state, ends);
+    outside.forEach((j, k) => { if (!(back[k] < m.range)) { next[2 * j] = NaN; next[2 * j + 1] = NaN; } });
+  }
   const segs = new Float64Array(withNext.length * 4);
   withNext.forEach((i, j) => {
     segs[4 * j] = r.x0 + (i % w);
@@ -4527,20 +4628,21 @@ function curveViewFor(m, wox, woy, scale, cssW, cssH) {
   return null;
 }
 
+// Follows the model's cached pen flags (curveOverviewPen): no sandbox call per frame
 function strokeCurveOverview(ov, wox, woy, scale, t0) {
-  const xz = ov.xz;
+  const xz = ov.xz, pen = ov.pen;
   const s16 = 16 * scale, ox = wox + 8 * scale, oz = woy + 8 * scale;
   ctx.beginPath();
-  let pen = false, lx = 0, lz = 0;
-  for (let i = 0; i < xz.length; i += 2) {
-    const x = xz[i];
-    if (x !== x) { pen = false; continue; }
-    const px = ox + x * s16, pz = oz + xz[i + 1] * s16;
-    if (!pen) { ctx.moveTo(px, pz); pen = true; lx = px; lz = pz; continue; }
+  let lx = 0, lz = 0;
+  for (let i = 0; i < pen.length; i++) {
+    const p = pen[i];
+    if (p === 0) continue;
+    const px = ox + xz[2 * i] * s16, pz = oz + xz[2 * i + 1] * s16;
+    if (p === 2) { ctx.moveTo(px, pz); lx = px; lz = pz; continue; }
     if (Math.abs(px - lx) < 0.75 && Math.abs(pz - lz) < 0.75) continue;
     ctx.lineTo(px, pz);
     lx = px; lz = pz;
-    if ((i & 16383) === 0 && performance.now() - t0 > CURVE_PATH_BUDGET_MS) break;
+    if ((i & 8191) === 0 && performance.now() - t0 > CURVE_PATH_BUDGET_MS) break;
   }
   ctx.stroke();
 }
@@ -4854,10 +4956,14 @@ function regionContainsLocal(dx, dz, span) {
   if (shape === 'POLYGON') {
     const vs = regionState.vertices || [];
     if (vs.length < 3) return false;
+    // vs are in chunk coordinates; convert local block offset (relative to region center) to chunk
+    const centre = regionCenterBlocks(regionState);
+    const cx = (dx + centre.x - 8) / 16;
+    const cz = (dz + centre.z - 8) / 16;
     let inside = false;
     for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
       const xi = vs[i][0], zi = vs[i][1], xj = vs[j][0], zj = vs[j][1];
-      if (((zi > dz) !== (zj > dz)) && (dx < (xj - xi) * (dz - zi) / ((zj - zi) || 1e-9) + xi)) inside = !inside;
+      if (((zi > cz) !== (zj > cz)) && (cx < (xj - xi) * (cz - zi) / ((zj - zi) || 1e-9) + xi)) inside = !inside;
     }
     return inside;
   }
@@ -4880,7 +4986,7 @@ function regionAreaBlocks(span) {
     const vs = regionState.vertices || [];
     let a = 0;
     for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) a += (vs[j][0] + vs[i][0]) * (vs[j][1] - vs[i][1]);
-    return Math.abs(a / 2);
+    return Math.abs(a / 2) * 256;
   }
   if (shape === 'RECTANGLE') return 4 * span.rxBlocks * span.rzBlocks;
   if (shape === 'ELLIPSE') return Math.PI * span.rxBlocks * span.rzBlocks;
@@ -5152,11 +5258,11 @@ function drawMap() {
     } else if (shape === 'ELLIPSE') {
       ctx.ellipse(cx, cy, rxBlocks * scale, rzBlocks * scale, 0, 0, Math.PI * 2, true);
     } else if (shape === 'POLYGON' && regionState.vertices && regionState.vertices.length >= 3) {
-      // Cut out polygon interior
+      // Cut out polygon interior (vertices are chunk coordinates, offset to chunk center blocks)
       for (let i = regionState.vertices.length - 1; i >= 0; i--) {
         const v = regionState.vertices[i];
-        const vx = wox + v[0] * scale;
-        const vy = woy + v[1] * scale;
+        const vx = wox + (v[0] * 16 + 8) * scale;
+        const vy = woy + (v[1] * 16 + 8) * scale;
         if (i === regionState.vertices.length - 1) ctx.moveTo(vx, vy);
         else ctx.lineTo(vx, vy);
       }
@@ -5200,7 +5306,7 @@ function drawMap() {
       ctx.ellipse(cx, cy, rxBlocks * scale, rzBlocks * scale, 0, 0, Math.PI * 2);
       ctx.stroke();
     } else if (shape === 'POLYGON' && regionState.vertices && regionState.vertices.length >= 3) {
-      // Draw AABB bounding box dashed line (Square base class of Polygon)
+      // Draw AABB bounding box dashed line (Square base class of Polygon in chunk extents)
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
       for (const v of regionState.vertices) {
         minX = Math.min(minX, v[0]);
@@ -5211,15 +5317,15 @@ function drawMap() {
       ctx.save();
       ctx.strokeStyle = 'rgba(137, 180, 250, 0.4)';
       ctx.setLineDash([4, 4]);
-      ctx.strokeRect(wox + minX * scale, woy + minZ * scale, (maxX - minX) * scale, (maxZ - minZ) * scale);
+      ctx.strokeRect(wox + (minX * 16) * scale, woy + (minZ * 16) * scale, ((maxX - minX + 1) * 16) * scale, ((maxZ - minZ + 1) * 16) * scale);
       ctx.restore();
 
       // Draw polygon boundary stroke
       ctx.beginPath();
       for (let i = 0; i < regionState.vertices.length; i++) {
         const v = regionState.vertices[i];
-        const vx = wox + v[0] * scale;
-        const vy = woy + v[1] * scale;
+        const vx = wox + (v[0] * 16 + 8) * scale;
+        const vy = woy + (v[1] * 16 + 8) * scale;
         if (i === 0) ctx.moveTo(vx, vy);
         else ctx.lineTo(vx, vy);
       }
@@ -5229,8 +5335,8 @@ function drawMap() {
       // Vertex drag handles
       for (let i = 0; i < regionState.vertices.length; i++) {
         const v = regionState.vertices[i];
-        const vx = wox + v[0] * scale;
-        const vy = woy + v[1] * scale;
+        const vx = wox + (v[0] * 16 + 8) * scale;
+        const vy = woy + (v[1] * 16 + 8) * scale;
         const active = draggingVertex === i || selectedVertex === i;
         ctx.fillStyle = active ? '#f9e2af' : '#a6e3a1';
         ctx.beginPath();
@@ -5263,6 +5369,9 @@ function drawMap() {
     }
   }
 
+  // Move / resize grips above every layer (screen-px sized, same layout the mouse hit-tests)
+  drawRegionHandles(wox, woy, scale, cssW, cssH);
+
   ctx.restore();
   scheduleBiomeRecompute();
 }
@@ -5287,12 +5396,12 @@ function getRegionSpan(region = regionState) {
   }
   let maxSpan = Math.max(rBlocks, rxBlocks, rzBlocks, 4000);
   if (shape === 'POLYGON') {
-    // Polygon.java infers its bounding square (radius, centre) from the vertices; nothing is stored
+    // Polygon.java infers its bounding square (radius, centre) from the vertices; vertices are in chunks
     const aabb = polygonAabb(region.vertices);
     if (aabb) {
-      rBlocks = rxBlocks = rzBlocks = Math.max(1, aabb.half);
+      rBlocks = rxBlocks = rzBlocks = Math.max(1, aabb.half * 16);
       crBlocks = crxBlocks = crzBlocks = 0;
-      maxSpan = Math.max(Math.abs(aabb.minX), Math.abs(aabb.maxX), Math.abs(aabb.minZ), Math.abs(aabb.maxZ), 4000);
+      maxSpan = Math.max(Math.abs(aabb.minX) * 16, Math.abs(aabb.maxX) * 16, Math.abs(aabb.minZ) * 16, Math.abs(aabb.maxZ) * 16, 4000);
     }
   }
   return { rBlocks, rxBlocks, rzBlocks, crBlocks, crxBlocks, crzBlocks, maxSpan };
@@ -5321,7 +5430,7 @@ function polygonAabb(vertices) {
 function getRegionFit() {
   const aabb = regionState.shape === 'POLYGON' ? polygonAabb(regionState.vertices) : null;
   if (aabb) {
-    return { focusX: aabb.centerX, focusZ: aabb.centerZ, span: Math.max(256, (aabb.maxX - aabb.minX) / 2, (aabb.maxZ - aabb.minZ) / 2) };
+    return { focusX: aabb.centerX * 16 + 8, focusZ: aabb.centerZ * 16 + 8, span: Math.max(256, (aabb.maxX - aabb.minX + 1) * 16 / 2, (aabb.maxZ - aabb.minZ + 1) * 16 / 2) };
   }
   const centre = regionCenterBlocks(regionState);
   return { focusX: centre.x, focusZ: centre.z, span: getRegionSpan().maxSpan };
@@ -5390,6 +5499,371 @@ function snapCoordinate(val) {
   return Math.round(val / activeGridSnap) * activeGridSnap;
 }
 
+// Region grips: a centre move grip and resize grips on the outer / inner edge, sized in screen px.
+// Settings edits go through applyShapeSetting and POLYGON vertex edits through the vertex path, so a
+// drag is staged exactly like a typed edit; walk-path / curve-state requests wait for mouseup.
+// Keys whose unit style a grip copies when the dragged key is absent from the shape block
+const REGION_HANDLE_STYLE_KEYS = {
+  centerx: ['centerZ'], centerz: ['centerX'],
+  radius: ['radius2', 'centerRadius', 'centerRadius2'], radius2: ['radius', 'centerRadius2', 'centerRadius'],
+  centerradius: ['centerRadius2', 'radius', 'radius2'], centerradius2: ['centerRadius', 'radius2', 'radius'],
+  width: ['height'], height: ['width']
+};
+
+function regionShapeFamily(shape) {
+  const s = String(shape || '').toUpperCase();
+  if (s.startsWith('CIRCLE')) return 'circle';
+  if (s.startsWith('SQUARE')) return 'square';
+  if (s === 'RECTANGLE' || s === 'ELLIPSE' || s === 'POLYGON') return s.toLowerCase();
+  return 'other';
+}
+
+// A chunk count in the style of the value it replaces: "4096b" -> blocks, "16c" -> chunks, unitless ->
+// chunks; other units when exact, else "<n>c". fallback styles a value absent from the shape block.
+function formatLikeExisting(existing, chunks, fallback) {
+  const n = Math.round(chunks);
+  const blank = v => v === undefined || v === null || String(v).trim() === '';
+  const src = blank(existing) ? fallback : existing;
+  if (blank(src) || typeof src === 'number') return String(n);
+  const text = String(src).trim();
+  const m = text.replace(/,/g, '.').match(DISTANCE_TOKEN_RE);
+  if (!m || !m[2]) return String(n);
+  const per = DISTANCE_UNIT_ALIAS[m[2].toLowerCase()];
+  if (per === undefined) return String(n);
+  const sep = /[0-9]\s+[a-zA-Z'"]+$/.test(text) ? ' ' : '';
+  const value = n * 16 / per;
+  const num = Number.isInteger(value) ? String(value) : String(Number(value.toFixed(6)));
+  if (/e/i.test(num) || Math.abs(parseFloat(num) * per / 16 - n) > 1e-6) return n + 'c';
+  return num + sep + m[2];
+}
+
+// Dragged value (chunks) clamped: outer >= 1 and above the hole (other = hole), inner in
+// [0, outer - 1] (other = outer), extents >= 1
+function clampHandleChunks(role, value, other) {
+  const v = Math.round(value);
+  if (role === 'inner') return Math.max(0, Math.min(v, Math.ceil(other || 0) - 1));
+  if (role === 'outer') return Math.max(1, v, Math.floor(other || 0) + 1);
+  return Math.max(1, v);
+}
+
+function snapChunks(value, step) {
+  const s = Math.max(1, Math.round(step) || 1);
+  return Math.round(value / s) * s;
+}
+
+// Grip snap in whole chunks: the map's snap grid, never finer than a chunk
+function handleSnapStepChunks() {
+  return Math.max(1, Math.round(activeGridSnap / 16));
+}
+
+// Value (chunks) a resize grip at world (x, z) blocks asks for: distance from the centre along the
+// grip's axis (radial for circles) times its multiplier (2 for full extents such as width / height)
+function handleDragChunks(handle, worldX, worldZ, centre) {
+  const dx = Math.abs(worldX - centre.x), dz = Math.abs(worldZ - centre.z);
+  const d = handle.metric === 'radial' ? Math.hypot(dx, dz) : (handle.axis === 'z' ? dz : dx);
+  return d * (handle.mult || 1) / 16;
+}
+
+/**
+ * Screen-space grips of a region (pure; drawing and hit-testing share it). span from getRegionSpan,
+ * centre in blocks, t = {wox, woy, scale}. Each grip: {id, kind: move | resize, role: outer | inner |
+ * extent | scale, key, axis: x | z | xz, chunks (current value), limit (clamp partner), sx, sy, cursor}.
+ * Edge grips closer to the centre than two hit radii are left out (the move grip wins there).
+ */
+function regionHandleLayout(shape, span, centre, t, opts) {
+  const fam = regionShapeFamily(shape);
+  const sx = t.wox + centre.x * t.scale, sy = t.woy + centre.z * t.scale;
+  const out = [];
+  if (fam === 'other' && !(opts && opts.movable)) return out;
+  out.push({ id: 'move', kind: 'move', polygon: fam === 'polygon', cx: (centre.x - 8) / 16, cz: (centre.z - 8) / 16,
+    centre, sx, sy, cursor: 'move' });
+  if (fam === 'other') return out;
+  const metric = fam === 'circle' ? 'radial' : 'axis';
+  const edge = (role, key, axis, blocks, mult, limitBlocks) => {
+    const d = blocks * t.scale;
+    if (!(d >= REGION_HANDLE_HIT_PX * 2)) return;
+    for (const sgn of [1, -1]) {
+      out.push({ id: role + ':' + key + ':' + axis + (sgn > 0 ? '+' : '-'), kind: 'resize', role, key, axis, metric, mult,
+        chunks: blocks * mult / 16, limit: limitBlocks / 16, centre,
+        sx: axis === 'x' ? sx + sgn * d : sx, sy: axis === 'z' ? sy + sgn * d : sy,
+        cursor: axis === 'x' ? 'ew-resize' : 'ns-resize' });
+    }
+  };
+  if (fam === 'circle' || fam === 'square') {
+    for (const axis of ['x', 'z']) edge('outer', 'radius', axis, span.rBlocks, 1, span.crBlocks);
+    for (const axis of ['x', 'z']) edge('inner', 'centerRadius', axis, span.crBlocks, 1, span.rBlocks);
+  } else if (fam === 'ellipse') {
+    edge('outer', 'radius', 'x', span.rxBlocks, 1, span.crxBlocks);
+    edge('outer', 'radius2', 'z', span.rzBlocks, 1, span.crzBlocks);
+    edge('inner', 'centerRadius', 'x', span.crxBlocks, 1, span.rxBlocks);
+    edge('inner', 'centerRadius2', 'z', span.crzBlocks, 1, span.rzBlocks);
+  } else if (fam === 'rectangle') {
+    edge('extent', 'width', 'x', span.rxBlocks, 2, 0);
+    edge('extent', 'height', 'z', span.rzBlocks, 2, 0);
+    for (const [gx, gz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      out.push({ id: 'extent:corner:' + gx + ':' + gz, kind: 'resize', role: 'extent', key: ['width', 'height'], axis: 'xz',
+        metric: 'axis', mult: 2, chunks: [span.rxBlocks / 8, span.rzBlocks / 8], limit: 0, centre,
+        sx: sx + gx * span.rxBlocks * t.scale, sy: sy + gz * span.rzBlocks * t.scale,
+        cursor: gx === gz ? 'nwse-resize' : 'nesw-resize' });
+    }
+  } else if (fam === 'polygon') {
+    // Polygon.java's bounding-square radius: dragging scales the vertices about the centre
+    for (const axis of ['x', 'z']) edge('scale', 'radius', axis, span.rBlocks, 1, 0);
+  }
+  return out;
+}
+
+function pointInPolygon(x, y, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// Canvas target under (mx, my), screen px: vertex > resize grip > move grip > inside polygon > pan
+function regionHitTest(mx, my, vertexPts, handles, polygonPts) {
+  const pts = vertexPts || [];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    if (Math.hypot(mx - pts[i][0], my - pts[i][1]) <= VERTEX_HIT_PX) return { type: 'vertex', index: i };
+  }
+  const list = handles || [];
+  for (const kind of ['resize', 'move']) {
+    let best = null, bestD = Infinity;
+    for (const h of list) {
+      if (h.kind !== kind) continue;
+      const d = Math.hypot(mx - h.sx, my - h.sy);
+      if (d <= REGION_HANDLE_HIT_PX && d < bestD) { best = h; bestD = d; }
+    }
+    if (best) return { type: 'handle', handle: best };
+  }
+  const move = list.find(h => h.kind === 'move');
+  if (move && polygonPts && polygonPts.length >= 3 && pointInPolygon(mx, my, polygonPts)) return { type: 'inside', handle: move };
+  return { type: 'pan' };
+}
+
+function translatePolygon(vertices, dx, dz) {
+  return vertices.map(v => [v[0] + dx, v[1] + dz]);
+}
+
+// ADR-034 non-self-intersection, the same edge pairs validateGeometry checks
+function polygonSelfIntersects(vertices) {
+  const n = vertices.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      if (segmentsIntersect(vertices[i], vertices[(i + 1) % n], vertices[j], vertices[(j + 1) % n])) return true;
+    }
+  }
+  return false;
+}
+
+// Vertices scaled by s about (cx, cz) chunks, rounded to whole chunks; null when fewer than 3
+// distinct points remain or the result self-intersects (unless the start polygon already did)
+function scalePolygon(vertices, cx, cz, s) {
+  if (!Array.isArray(vertices) || vertices.length < 3 || !(s > 0) || !Number.isFinite(s)) return null;
+  const out = vertices.map(v => [Math.round(cx + (v[0] - cx) * s), Math.round(cz + (v[1] - cz) * s)]);
+  if (new Set(out.map(v => v[0] + ',' + v[1])).size < 3) return null;
+  if (polygonSelfIntersects(out) && !polygonSelfIntersects(vertices)) return null;
+  return out;
+}
+
+// Live value text of a grip, e.g. "radius 260c (4160 b)"
+function regionHandleLabel(h, drag) {
+  const c = v => Number(Number(v).toFixed(2));
+  if (h.kind === 'move') {
+    return (h.polygon ? 'move polygon, centre ' : 'centre ') + `${c(h.cx)}c, ${c(h.cz)}c (${Math.round(h.cx * 16)} b, ${Math.round(h.cz * 16)} b)`;
+  }
+  if (h.axis === 'xz') {
+    return `width ${c(h.chunks[0])}c \u00d7 height ${c(h.chunks[1])}c (${Math.round(h.chunks[0] * 16)} \u00d7 ${Math.round(h.chunks[1] * 16)} b)`;
+  }
+  const scale = drag && drag.scale ? ` \u00d7${drag.scale.toFixed(2)}` : '';
+  return `${h.key} ${c(h.chunks)}c (${Math.round(h.chunks * 16)} b)${scale}`;
+}
+
+// Grips of the selected region on the current view; POLYGON centres on its vertex bounding box
+function currentRegionHandles(t) {
+  const shape = regionState.shape;
+  const fam = regionShapeFamily(shape);
+  if (fam === 'polygon') {
+    const aabb = polygonAabb(regionState.vertices);
+    if (!aabb || regionState.vertices.length < 3) return [];
+    return regionHandleLayout(shape, getRegionSpan(), { x: aabb.centerX * 16 + 8, z: aabb.centerZ * 16 + 8 }, t);
+  }
+  const movable = fam !== 'other' || settingValue(regionState, 'centerX') !== undefined || !!shapeSettingSchema(shape, 'centerX');
+  return regionHandleLayout(shape, getRegionSpan(), regionCenterBlocks(regionState), t, { movable });
+}
+
+function canvasHitTest(mx, my, t) {
+  const poly = regionState.shape === 'POLYGON' && Array.isArray(regionState.vertices)
+    ? regionState.vertices.map(v => [t.wox + (v[0] * 16 + 8) * t.scale, t.woy + (v[1] * 16 + 8) * t.scale]) : [];
+  return regionHitTest(mx, my, poly, currentRegionHandles(t), poly.length >= 3 ? poly : null);
+}
+
+// Move / resize grips and the live value of the hovered or dragged one
+function drawRegionHandles(wox, woy, scale, cssW, cssH) {
+  const handles = currentRegionHandles({ wox, woy, scale });
+  if (handles.length === 0) return;
+  const activeId = regionHandleDrag ? regionHandleDrag.id : hoverRegionHandle;
+  let active = null;
+  ctx.save();
+  for (const h of handles) {
+    const on = h.id === activeId;
+    if (on) active = h;
+    const r = REGION_HANDLE_PX + (on ? 1.5 : 0);
+    ctx.fillStyle = on ? '#f9e2af' : (h.kind === 'move' ? '#89b4fa' : (h.role === 'inner' ? '#f38ba8' : '#cba6f7'));
+    ctx.strokeStyle = '#11111b';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (h.kind === 'move') ctx.arc(h.sx, h.sy, r + 1, 0, Math.PI * 2);
+    else ctx.rect(h.sx - r, h.sy - r, r * 2, r * 2);
+    ctx.fill();
+    ctx.stroke();
+    if (h.kind === 'move') {
+      ctx.beginPath();
+      ctx.moveTo(h.sx - r + 2, h.sy); ctx.lineTo(h.sx + r - 2, h.sy);
+      ctx.moveTo(h.sx, h.sy - r + 2); ctx.lineTo(h.sx, h.sy + r - 2);
+      ctx.stroke();
+    }
+  }
+  if (active) {
+    const text = regionHandleLabel(active, regionHandleDrag);
+    ctx.font = '11px monospace';
+    const w = ctx.measureText(text).width + 10;
+    const x = Math.max(4, Math.min(active.sx + 12, cssW - w - 4));
+    const y = Math.max(4, Math.min(active.sy - 26, cssH - 22));
+    ctx.fillStyle = 'rgba(17, 17, 27, 0.88)';
+    ctx.fillRect(x, y, w, 18);
+    ctx.strokeStyle = 'rgba(249, 226, 175, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, 17);
+    ctx.fillStyle = '#f9e2af';
+    ctx.fillText(text, x + 5, y + 13);
+  }
+  ctx.restore();
+}
+
+function shapeSettingRow(key) {
+  const host = document.getElementById('shape-settings-form');
+  if (!host) return null;
+  const lk = String(key).toLowerCase();
+  return [...host.querySelectorAll('.shape-setting')].find(r => String(r.dataset.key || '').toLowerCase() === lk) || null;
+}
+
+// A grip edit of one setting: written in the value's unit style into its form input, then staged
+// through applyShapeSetting like a typed edit. force re-stages an unchanged value (mouseup).
+function setRegionHandleSetting(key, chunks, force) {
+  const existing = settingValue(regionState, key);
+  const p = shapeSettingSchema(regionState.shape, key);
+  const unitless = !!p && (p.kind === 'integer' || p.kind === 'number');
+  let fallback;
+  for (const k of REGION_HANDLE_STYLE_KEYS[String(key).toLowerCase()] || []) {
+    const v = settingValue(regionState, k);
+    if (v !== undefined) { fallback = v; break; }
+  }
+  const value = unitless ? String(Math.round(chunks)) : formatLikeExisting(existing, chunks, fallback);
+  if (!force && existing !== undefined && String(existing) === value) return value;
+  const row = shapeSettingRow(key);
+  const input = row && row.querySelector('input, select');
+  if (input && input.type !== 'checkbox' && input.tagName !== 'SELECT') {
+    if (input.type === 'number' && !/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value)) input.type = 'text';
+    input.value = value;
+  }
+  applyShapeSetting(key, value, row);
+  return value;
+}
+
+function stageHandleSetting(d, key, chunks) {
+  d.applied.set(key, chunks);
+  setRegionHandleSetting(key, chunks, false);
+}
+
+function setPolygonVertices(next) {
+  for (let i = 0; i < next.length; i++) regionState.vertices[i] = next[i];
+  syncPolygonAABB();
+  drawMap();
+  updateStagingDiff();
+}
+
+function startRegionHandleDrag(h, mx, my, t) {
+  const worldX = (mx - t.wox) / t.scale, worldZ = (my - t.woy) / t.scale;
+  const polygon = regionShapeFamily(regionState.shape) === 'polygon';
+  const setCh = k => settingValue(regionState, k) !== undefined ? settingChunks(regionState, k, 0) : null;
+  regionHandleDrag = {
+    id: h.id, handle: h, polygon, applied: new Map(), scale: 0,
+    startX: worldX, startZ: worldZ, dx: 0, dz: 0,
+    grabDX: (h.sx - t.wox) / t.scale - worldX, grabDZ: (h.sy - t.woy) / t.scale - worldZ,
+    vertices: polygon ? regionState.vertices.map(v => [v[0], v[1]]) : null,
+    aabb: polygon ? polygonAabb(regionState.vertices) : null,
+    startCX: polygon ? setCh('centerX') : null, startCZ: polygon ? setCh('centerZ') : null
+  };
+  canvas.style.cursor = h.cursor;
+  drawMap();
+}
+
+// Live drag: the drawing and the staged YAML follow the cursor; previews wait for mouseup
+function dragRegionHandle(worldX, worldZ) {
+  const d = regionHandleDrag, h = d.handle, step = handleSnapStepChunks();
+  const px = worldX + d.grabDX, pz = worldZ + d.grabDZ;
+  if (h.kind === 'move' && d.polygon) {
+    const dx = snapChunks((worldX - d.startX) / 16, step), dz = snapChunks((worldZ - d.startZ) / 16, step);
+    if (dx === d.dx && dz === d.dz) return;
+    d.dx = dx;
+    d.dz = dz;
+    if (d.startCX !== null) stageHandleSetting(d, 'centerX', d.startCX + dx);
+    if (d.startCZ !== null) stageHandleSetting(d, 'centerZ', d.startCZ + dz);
+    setPolygonVertices(translatePolygon(d.vertices, dx, dz));
+    return;
+  }
+  if (h.kind === 'move') {
+    stageHandleSetting(d, 'centerX', snapChunks(Math.round((px - 8) / 16), step));
+    stageHandleSetting(d, 'centerZ', snapChunks(Math.round((pz - 8) / 16), step));
+    return;
+  }
+  if (h.role === 'scale') {
+    const half = Math.max(0.5, handleDragChunks(h, px, pz, h.centre));
+    const s = half / Math.max(0.5, h.chunks);
+    const next = scalePolygon(d.vertices, d.aabb.centerX, d.aabb.centerZ, s);
+    // Collapsing or self-intersecting scales keep the last valid polygon
+    if (!next) return;
+    d.scale = s;
+    setPolygonVertices(next);
+    return;
+  }
+  const axes = h.axis === 'xz' ? [[h.key[0], 'x'], [h.key[1], 'z']] : [[h.key, h.axis]];
+  for (const [key, axis] of axes) {
+    const raw = handleDragChunks({ axis, metric: h.metric, mult: h.mult }, px, pz, h.centre);
+    stageHandleSetting(d, key, clampHandleChunks(h.role, snapChunks(raw, step), h.limit));
+  }
+}
+
+// mouseup: final values re-staged through applyShapeSetting (and the vertex path), then one redraw
+// with the drag cleared asks for the walk path / curve state of the new geometry
+function endRegionHandleDrag() {
+  const d = regionHandleDrag;
+  if (!d) return false;
+  regionHandleDrag = null;
+  for (const [key, chunks] of d.applied) setRegionHandleSetting(key, chunks, true);
+  if (d.polygon) {
+    renderPolygonVerticesList();
+    syncPolygonAABB();
+  }
+  drawMap();
+  updateStagingDiff();
+  return true;
+}
+
+function updateRegionHandleHover(mx, my, t) {
+  const hit = canvasHitTest(mx, my, t);
+  canvas.style.cursor = hit.type === 'vertex' ? 'grab' : (hit.type === 'handle' ? hit.handle.cursor : (hit.type === 'inside' ? 'move' : ''));
+  const id = hit.type === 'handle' || hit.type === 'inside' ? hit.handle.id : '';
+  if (id !== hoverRegionHandle) {
+    hoverRegionHandle = id;
+    drawMap();
+  }
+}
+
 // Offset (blocks) from the cursor to the grabbed vertex, so a drag never jumps the vertex to the cursor
 let dragGrabDX = 0;
 let dragGrabDZ = 0;
@@ -5414,12 +5888,22 @@ canvas.addEventListener('mousemove', (e) => {
   const worldZ = (my - woy) / scale;
   document.getElementById('hud-coords').textContent = `X: ${Math.round(worldX)}  Z: ${Math.round(worldZ)}`;
 
+  if (regionHandleDrag) {
+    dragRegionHandle(worldX, worldZ);
+    return;
+  }
+  if (draggingVertex < 0) {
+    updateRegionHandleHover(mx, my, { wox, woy, scale });
+    return;
+  }
   if (draggingVertex >= 0 && regionState.vertices && regionState.vertices[draggingVertex]) {
     const snappedX = snapCoordinate(worldX + dragGrabDX);
     const snappedZ = snapCoordinate(worldZ + dragGrabDZ);
+    const chunkX = Math.round((snappedX - 8) / 16);
+    const chunkZ = Math.round((snappedZ - 8) / 16);
     const cur = regionState.vertices[draggingVertex];
-    if (cur[0] === snappedX && cur[1] === snappedZ) return;
-    regionState.vertices[draggingVertex] = [snappedX, snappedZ];
+    if (cur[0] === chunkX && cur[1] === chunkZ) return;
+    regionState.vertices[draggingVertex] = [chunkX, chunkZ];
     syncPolygonAABB();
     drawMap();
     updateStagingDiff();
@@ -5443,29 +5927,41 @@ canvas.addEventListener('mousedown', (e) => {
   }
   if (e.button !== 0) return;
 
-  if (regionState.shape !== 'POLYGON' || !regionState.vertices) return;
-  const { wox, woy, scale } = getCanvasTransform();
-
-  for (let i = regionState.vertices.length - 1; i >= 0; i--) {
+  // Left button: vertex > resize grip > move grip > inside polygon (move) > empty (pan)
+  const t = getCanvasTransform();
+  const { wox, woy, scale } = t;
+  const hit = canvasHitTest(mx, my, t);
+  if (hit.type === 'vertex') {
+    const i = hit.index;
     const v = regionState.vertices[i];
-    const vx = wox + v[0] * scale;
-    const vy = woy + v[1] * scale;
-    if (Math.hypot(mx - vx, my - vy) <= 12) {
-      draggingVertex = i;
-      selectedVertex = i;
-      dragGrabDX = v[0] - (mx - wox) / scale;
-      dragGrabDZ = v[1] - (my - woy) / scale;
-      updateJumpToYamlButton();
-      drawMap();
-      return;
-    }
+    draggingVertex = i;
+    selectedVertex = i;
+    dragGrabDX = (v[0] * 16 + 8) - (mx - wox) / scale;
+    dragGrabDZ = (v[1] * 16 + 8) - (my - woy) / scale;
+    canvas.style.cursor = 'grabbing';
+    updateJumpToYamlButton();
+    drawMap();
+    return;
   }
-  // Click on empty canvas clears the vertex selection
+  if (hit.handle) {
+    startRegionHandleDrag(hit.handle, mx, my, t);
+    return;
+  }
+  // Click on empty canvas clears the vertex selection; dragging it pans
   if (selectedVertex !== -1) {
     selectedVertex = -1;
     updateJumpToYamlButton();
     drawMap();
   }
+  isPanning = true;
+  panStartX = mx;
+  panStartY = my;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (regionHandleDrag || !hoverRegionHandle) return;
+  hoverRegionHandle = '';
+  drawMap();
 });
 
 canvas.addEventListener('auxclick', (e) => {
@@ -5482,11 +5978,13 @@ window.addEventListener('mouseup', () => {
   }
   if (draggingVertex >= 0) {
     draggingVertex = -1;
+    canvas.style.cursor = '';
     renderPolygonVerticesList();
     syncPolygonAABB();
     drawMap();
     updateStagingDiff();
   }
+  endRegionHandleDrag();
 });
 
 // Polygon.java derives its bounding square (radius, centre) from the vertices, so vertex edits only
@@ -5510,21 +6008,32 @@ function renderPolygonVerticesList() {
       <span style="font-size:0.75rem; font-weight:600; color:var(--accent); min-width:24px;">P${i + 1}</span>
       <div style="display:flex; align-items:center; gap:4px; flex:1;">
         <span style="font-size:0.7rem; color:var(--subtext);">X:</span>
-        <input type="number" id="poly-vx-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${Number(v[0]) || 0}" oninput="updateVertexCoord(${i}, 0, this.value)">
+        <input type="text" id="poly-vx-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${v[0] !== undefined ? v[0] : 0}c" placeholder="chunks (c) or units (e.g. 125c, 2000b)" title="Chunks (c); b, r and km suffixes convert" oninput="updateVertexCoord(${i}, 0, this.value)" onchange="updateVertexCoord(${i}, 0, this.value); renderPolygonVerticesList();">
       </div>
       <div style="display:flex; align-items:center; gap:4px; flex:1;">
         <span style="font-size:0.7rem; color:var(--subtext);">Z:</span>
-        <input type="number" id="poly-vz-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${Number(v[1]) || 0}" oninput="updateVertexCoord(${i}, 1, this.value)">
+        <input type="text" id="poly-vz-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${v[1] !== undefined ? v[1] : 0}c" placeholder="chunks (c) or units (e.g. 187c, 3000b)" title="Chunks (c); b, r and km suffixes convert" oninput="updateVertexCoord(${i}, 1, this.value)" onchange="updateVertexCoord(${i}, 1, this.value); renderPolygonVerticesList();">
       </div>
       <button type="button" style="background:${canDelete ? 'rgba(243,139,168,0.2)' : 'rgba(255,255,255,0.05)'}; color:${canDelete ? 'var(--red)' : 'var(--subtext)'}; border:none; border-radius:3px; padding:2px 6px; font-size:0.75rem; cursor:${canDelete ? 'pointer' : 'not-allowed'};" title="${canDelete ? 'Delete Point' : 'At least 3 vertices required'}" ${canDelete ? '' : 'disabled'} onclick="removePolygonVertex(${i})">✕</button>
     </div>
   `).join('');
 }
 
+function parseVertexCoord(value) {
+  if (typeof value === 'number') return Math.round(value);
+  const s = String(value).trim();
+  const norm = normaliseSetting(s);
+  if (typeof norm === 'number' && Number.isFinite(norm)) {
+    return Math.round(norm);
+  }
+  const num = parseInt(s, 10);
+  return isNaN(num) ? 0 : num;
+}
+
 function updateVertexCoord(index, axis, value) {
   if (!regionState.vertices || !regionState.vertices[index]) return;
-  const num = parseInt(value, 10);
-  regionState.vertices[index][axis] = isNaN(num) ? 0 : num;
+  const num = parseVertexCoord(value);
+  regionState.vertices[index][axis] = num;
   syncPolygonAABB();
   drawMap();
   updateStagingDiff();
@@ -5538,11 +6047,11 @@ function addPolygonVertex() {
     // Offset from the closing edge midpoint so the new point is visible and keeps the ring closed
     const last = regionState.vertices[n - 1];
     const first = regionState.vertices[0];
-    newX = Math.round((last[0] + first[0]) / 2) + 200;
-    newZ = Math.round((last[1] + first[1]) / 2) + 200;
+    newX = Math.round((last[0] + first[0]) / 2) + 12;
+    newZ = Math.round((last[1] + first[1]) / 2) + 12;
   } else if (n === 1) {
-    newX = regionState.vertices[0][0] + 1000;
-    newZ = regionState.vertices[0][1] + 1000;
+    newX = regionState.vertices[0][0] + 64;
+    newZ = regionState.vertices[0][1] + 64;
   }
   regionState.vertices.push([newX, newZ]);
   renderPolygonVerticesList();
@@ -5799,13 +6308,15 @@ function syncShapeSpecificControls(region) {
   polyPointsEl.style.display = isPolygon ? 'block' : 'none';
   if (isPolygon) {
     if (!region.vertices || region.vertices.length < 3) {
-      region.vertices = [[-2000, 3000], [2000, 3000], [2000, -3000], [-2000, -3000]];
+      region.vertices = [[-125, 187], [125, 187], [125, -187], [-125, -187]];
     }
     renderPolygonVerticesList();
     syncPolygonAABB();
   }
 }
 
+// Settings the new shape does not take stay in the model (switching back restores them); the
+// writer leaves them out
 function updateRegionShape(val) {
   regionState.shape = val;
   document.getElementById('hud-shape').textContent = val;
@@ -5833,8 +6344,9 @@ function renderShapeSettingsForm(region = regionState) {
   } else {
     entries = Object.keys(region.settings || {}).map(k => [k, { kind: 'text' }]);
   }
-  // Polygon.java derives these from its vertices (edited in the vertex list below)
-  if (shape === 'POLYGON') entries = entries.filter(([k]) => ![...POLYGON_DERIVED_KEYS].some(d => d.toLowerCase() === k.toLowerCase()));
+  // Only keys the shape takes (vertices have their own list below); settings left from a previous
+  // shape are not written
+  entries = entries.filter(([k]) => k.toLowerCase() !== 'vertices' && shapeTakesKey(shape, k));
   const curveKeys = new Set((curveParamsFor(shape) || []).map(k => k.toLowerCase()));
   if (entries.length === 0) {
     const note = document.createElement('span');
@@ -5993,11 +6505,11 @@ function validateGeometry(state) {
 
   if (state.shape === 'POLYGON' && state.vertices && state.vertices.length >= 3) {
     const n = state.vertices.length;
-    // World border checks for vertices
+    // World border checks for vertices (chunk * 16 blocks)
     for (let i = 0; i < n; i++) {
       const v = state.vertices[i];
-      if (Math.abs(v[0]) > WORLD_BORDER_MAX || Math.abs(v[1]) > WORLD_BORDER_MAX) {
-        warnings.push(`Warning: vertex [${v[0]}, ${v[1]}] exceeds vanilla world border boundary`);
+      if (Math.abs(v[0] * 16) > WORLD_BORDER_MAX || Math.abs(v[1] * 16) > WORLD_BORDER_MAX) {
+        warnings.push(`Warning: vertex [${v[0]}, ${v[1]}] (${v[0] * 16}, ${v[1] * 16} blocks) exceeds vanilla world border boundary`);
         break;
       }
     }
@@ -6095,30 +6607,27 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-const isPolygonDerivedKey = (k) => [...POLYGON_DERIVED_KEYS].some(d => d.toLowerCase() === String(k).toLowerCase());
-
 /**
- * Canvas model -> shape-block values: {shape, set: {key: YAML scalar | [list items]}, remove: [keys]}.
- * set holds region.settings the registered shape takes (every setting when no session schema
- * describes it), spelled as in the file; remove holds settings it does not take. POLYGON writes
- * its vertices and drops the bounding-square keys Polygon.java derives from them.
+ * Canvas model -> shape-block values: {shape, set: {key: YAML scalar | [list items]}, remove: [keys],
+ * takes(key)}. set holds region.settings the shape takes (shapeTakesKey), spelled as in the file;
+ * remove holds settings it does not take; takes also decides keys only the file holds. A shape that
+ * takes vertices gets them in chunks with an explicit unit ([xc, zc]); others drop them.
  */
 function regionGeometryValues(region) {
   const shape = String(region.shape || 'CIRCLE').toUpperCase();
-  const regKeys = registryKeys('shape', shape);
-  const takes = (k) => !regKeys || regKeys.some(r => r.toLowerCase() === String(k).toLowerCase());
-  const isPolygon = shape === 'POLYGON';
+  const takes = (k) => shapeTakesKey(shape, k);
   const set = {};
   const remove = [];
   for (const [k, v] of Object.entries(region.settings || {})) {
     const lk = k.toLowerCase();
     if (lk === 'name' || lk === 'vertices' || v === undefined || v === null) continue;
-    if ((isPolygon && isPolygonDerivedKey(k)) || !takes(k)) { remove.push(k); continue; }
+    if (!takes(k)) { remove.push(k); continue; }
     if (String(v).trim() === '') continue;
     set[k] = yamlScalar(v);
   }
-  if (isPolygon) set.vertices = (region.vertices || []).map(v => `[${v[0]}, ${v[1]}]`);
-  return { shape, set, remove };
+  if (takes('vertices')) set.vertices = (region.vertices || []).map(v => `[${v[0]}c, ${v[1]}c]`);
+  else remove.push('vertices');
+  return { shape, set, remove, takes };
 }
 
 /**
@@ -6149,14 +6658,14 @@ function readRegionGeometry(text) {
       g.settings[r.key] = r.value;
     }
   }
-  // vertices: block list ("- [x, z]") or flow list ("[[x, z], ...]")
-  const pairRe = /\[\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\]/g;
+  // vertices: block list ("- [x, z]") or flow list ("[[x, z], ...]") with optional unit suffixes
+  const pairRe = /\[\s*([+-]?[0-9]+(?:\.[0-9]+)?\s*[a-zA-Z]*)\s*,\s*([+-]?[0-9]+(?:\.[0-9]+)?\s*[a-zA-Z]*)\s*\]/g;
   const listPath = path.concat('vertices').join('.');
   const vk = recs.find(r => r.key && r.key.toLowerCase() === 'vertices' && inBlock(r));
   const sources = recs.filter(x => !x.key && x.path.join('.') === listPath).map(x => x.value);
   if (vk && vk.value) sources.push(vk.value);
   for (const src of sources) {
-    for (const m of src.matchAll(pairRe)) g.vertices.push([Math.round(parseFloat(m[1])), Math.round(parseFloat(m[2]))]);
+    for (const m of src.matchAll(pairRe)) g.vertices.push([parseVertexCoord(m[1]), parseVertexCoord(m[2])]);
   }
   return g;
 }
@@ -6176,15 +6685,15 @@ function yamlKeyExtent(lines, rec) {
 
 /**
  * Writes the canvas geometry into a region file's shape block in place: sets `name` and the
- * geometry keys the shape takes, removes geometry keys it does not take (with their comment block),
- * and leaves every other line, comment and key untouched. An inherited or missing shape becomes a
- * local block at the same position.
+ * geometry keys the shape takes, removes every block key it does not take and repeated keys (with
+ * their comment block), and leaves every other line, comment and key untouched. An inherited or
+ * missing shape becomes a local block at the same position.
  */
 function patchRegionShape(text, region) {
   const lines = (text || '').split(/\r?\n/);
   const recs = parseYamlLines(text || '');
   const top = recs.find(r => r.key === 'shape' && r.path.length === 0);
-  const { shape, set, remove } = regionGeometryValues(region);
+  const { shape, set, remove, takes } = regionGeometryValues(region);
   const render = (pad, k, v) => Array.isArray(v) ? [`${pad}${k}:`, ...v.map(i => `${pad}  - ${i}`)] : [`${pad}${k}: ${v}`];
   if (!top || top.value) {
     const block = ['shape:', `  name: "${shape}"`];
@@ -6223,9 +6732,14 @@ function patchRegionShape(text, region) {
     if (rec) replaceKey(rec, render(pad, rec.key, v));
     else inserts.push(...render(pad, k, v));
   }
-  for (const k of remove) {
-    const rec = find(k);
-    if (!rec) continue;
+  // The file's keys decide, not the canvas model: an inherited / switched block may hold keys it lacks
+  const drop = new Set(remove.map(k => k.toLowerCase()));
+  const seen = new Set();
+  for (const rec of direct) {
+    const lk = rec.key.toLowerCase();
+    const keep = !seen.has(lk) && !drop.has(lk) && takes(rec.key);
+    seen.add(lk);
+    if (keep) continue;
     let start = rec.line - 1;
     while (start > 0 && lines[start - 1].trim().startsWith('#')) start--;
     edits.push({ start, count: yamlKeyExtent(lines, rec) - start, insert: [] });
@@ -6273,10 +6787,9 @@ function computeCurrentRegionYaml(region) {
   yml += `worldBorderOverride: false\n\n`;
   yml += `shape:\n`;
   yml += `  name: "${shape}"\n`;
-  // Shipped defaults for keys the settings leave out, only where the registered shape takes them
-  const regKeys = registryKeys('shape', shape);
+  // Shipped defaults for keys the settings leave out, only where the shape takes them
   const has = (k) => Object.keys(set).some(s => s.toLowerCase() === k.toLowerCase());
-  const takes = (k) => !regKeys || regKeys.some(r => r.toLowerCase() === k.toLowerCase());
+  const takes = (k) => shapeTakesKey(shape, k);
   const fill = (k, v) => { if (!has(k) && takes(k)) yml += `  ${k}: ${v}\n`; };
   fill('mode', '"ACCUMULATE"');
   for (const [k, v] of Object.entries(set)) {
@@ -6416,6 +6929,22 @@ async function commitChanges() {
   }
 }
 
+// Text the server holds per file after the last successful Hot-Apply (else the session text)
+const appliedConfigs = {};
+let hotApplyPending = null;
+
+// Every staged YAML file whose text differs from what the server holds (worlds, regions, config...)
+function hotApplyChangedFiles() {
+  const files = {};
+  for (const f of Object.keys(configs).sort()) {
+    const text = configs[f];
+    if (typeof text !== 'string' || !/\.ya?ml$/i.test(f)) continue;
+    const held = appliedConfigs[f] !== undefined ? appliedConfigs[f] : shippedConfigs[f];
+    if (text !== held) files[f] = text;
+  }
+  return files;
+}
+
 // Hot-Apply over the signed channel (ADR-106 §5.3): the plugin runs the full /rtp editor apply
 // pipeline for a trusted browser key and answers apply_ack. No token travels with it.
 function hotApplyWebSocket() {
@@ -6435,20 +6964,21 @@ function hotApplyWebSocket() {
   }
 
   if (currentConfigFile && cfgEditor) configs[currentConfigFile] = cfgEditor.value;
-  const regionTargetFile = stageRegionGeometry(regionState);
-  const body = {
-    region: regionState.name,
-    timestamp: Date.now(),
-    files: {
-      [regionTargetFile]: configs[regionTargetFile]
-    }
-  };
+  stageRegionGeometry(regionState);
+  const files = hotApplyChangedFiles();
+  const names = Object.keys(files);
+  if (!names.length) {
+    show('var(--subtext)', 'ℹ Nothing to apply: every file matches the server copy.');
+    return;
+  }
+  const body = { region: regionState.name, timestamp: Date.now(), files };
   if (!EditorChannelClient.fits('apply', body)) {
-    show('var(--red)', '❌ This change is too large for one live-link frame; run the command below instead.');
+    show('var(--red)', '❌ These changes (' + names.length + ' files) are too large for one live-link frame; run the command below instead.');
     return;
   }
   if (EditorChannelClient.send('apply', body)) {
-    show('var(--green)', '⚡ Commit sent to the server, awaiting confirmation...');
+    hotApplyPending = files;
+    show('var(--green)', '⚡ Commit of ' + names.join(', ') + ' sent to the server, awaiting confirmation...');
   } else {
     show('var(--red)', '❌ The live link is not ready; run the command below instead.');
   }
@@ -6477,7 +7007,7 @@ function copyApplyCmd() {
 function resetStaging() {
   regionState.shape = 'CIRCLE';
   regionState.settings = { radius: '256c', centerRadius: '64c', centerX: '0', centerZ: '0' };
-  regionState.vertices = [[-2000, 3000], [2000, 3000], [2000, -3000], [-2000, -3000]];
+  regionState.vertices = [[-125, 187], [125, 187], [125, -187], [-125, -187]];
   const hudShape = document.getElementById('hud-shape');
   if (hudShape) hudShape.textContent = 'CIRCLE';
   populateShapeSelect('CIRCLE');
@@ -6725,18 +7255,35 @@ function setTxt(id, val) {
 const CHANNEL_MAX_FRAME = 32 * 1024;
 const CHANNEL_RELAY_RE = /^(ws:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d{1,5}\/rtp-editor-ws\?token=[0-9a-fA-F]{32,128}|wss:\/\/[A-Za-z0-9.\-]{1,253}(:\d{1,5})?\/[A-Za-z0-9_\-\/]{1,128})$/;
 const CHANNEL_PING_MS = 30000;
+// The plugin pushes a feed head when it changes and at least every 60 s; none for this long means it stalled
+const CHANNEL_FEED_STALE_MS = 90000;
+// bytesocks counts frames per IP (30 per 2 minutes, page and plugin often sharing one IP) and closes
+// with 1008 over it; on a wss:// relay the page keeps to its share (the plugin keeps to 18).
+const CHANNEL_FRAME_WINDOW_MS = 120000;
+const CHANNEL_PAGE_FRAMES = 10;
+const CHANNEL_MAX_QUEUED = 32;
+// ADR-107 §5.1: undotted core types, dotted <extension>.<type>
+const CHANNEL_TYPE_RE = /^[a-z][a-z0-9_-]{0,31}(\.[a-z][a-z0-9_-]{0,31})?$/;
+// Control frames never travel inside a paced channel's {type:'bundle', items:[..]} frame
+const CHANNEL_CONTROL = new Set(['hello-reply', 'pong', 'bye', 'bundle']);
+// Highest channel protocol this page speaks (ADR-107 §5.2); a snapshot without one is protocol 1
+const CHANNEL_PROTOCOL = 2;
 // var: hoisted, so early drawMap calls see `undefined` instead of a TDZ error
 var EditorChannelClient = (() => {
   const RSA = 'RSASSA-PKCS1-v1_5';
   const enc = new TextEncoder();
   const HEADER = ['type', 'channel', 'seq', 'from', 'to', 'challenge'];
   const handlers = {};
+  // Extension id -> handler of all its <id>.<type> messages
+  const namespaces = {};
   const statusListeners = [];
   const st = {
     cfg: null, status: 'off', reason: '', ws: null, pluginKey: null, pluginFp: '', keys: null, myFp: '', myPub: '',
     persistent: false, challenge: null, seq: 0, pluginSeq: 0, hid: '', nonce: '', nonceExpiresAt: 0,
     retryMs: 1000, retryTimer: null, pingTimer: null, missedPongs: 0, dropped: 0, lastDrop: '',
-    inChain: Promise.resolve(), outChain: Promise.resolve(), stopped: false
+    inChain: Promise.resolve(), outChain: Promise.resolve(), stopped: false,
+    sentAt: [], outQueue: [], pumpTimer: null, feedAt: 0,
+    protocol: null, extensions: [], ignored: 0
   };
 
   const b64 = (buf) => {
@@ -6770,7 +7317,10 @@ var EditorChannelClient = (() => {
       'awaiting-trust': ['● LINK · AWAITING TRUST · ' + (st.nonce || '?'), 'var(--yellow)',
         'Run /rtp editor trust nonce=' + (st.nonce || '<code>') + ' in game (or click the prompt sent to you) if it shows this code.'
           + (st.persistent ? '' : ' This browser cannot store its key, so it must be trusted again next time.')],
-      connected: ['● LINK · CONNECTED', 'var(--green)', 'Signed channel to the plugin: previews and Hot-Apply are live.'],
+      connected: feedStale()
+        ? ['● LINK · FEED STALE (' + Math.round((Date.now() - st.feedAt) / 1000) + 's)', 'var(--yellow)',
+          'Linked, but the server sent no live update for over ' + (CHANNEL_FEED_STALE_MS / 1000) + ' s (it sends one at least every 60 s); its live feed may have stopped. The page keeps working from its snapshot.']
+        : ['● LINK · CONNECTED', 'var(--green)', 'Signed channel to the plugin: previews and Hot-Apply are live.'],
       reconnecting: ['● LINK · RECONNECTING', 'var(--yellow)', 'Channel lost (' + st.reason + '); retrying. The page keeps working from its snapshot.'],
       snapshot: ['● SNAPSHOT ONLY' + (st.reason ? ' (' + st.reason + ')' : ''), 'var(--subtext)', 'No live channel: drawing works from the snapshot.']
     };
@@ -6778,6 +7328,16 @@ var EditorChannelClient = (() => {
     el.textContent = text;
     el.style.color = color;
     el.title = title;
+  }
+
+  function feedStale() {
+    return st.status === 'connected' && st.feedAt > 0 && Date.now() - st.feedAt > CHANNEL_FEED_STALE_MS;
+  }
+
+  function noteFeed() {
+    const wasStale = feedStale();
+    st.feedAt = Date.now();
+    if (wasStale) renderChannelBadge();
   }
 
   function drop(reason) {
@@ -6902,6 +7462,8 @@ var EditorChannelClient = (() => {
     st.stopped = true;
     clearTimeout(st.retryTimer);
     clearInterval(st.pingTimer);
+    clearTimeout(st.pumpTimer);
+    st.outQueue.length = 0;
     const ws = st.ws;
     st.ws = null;
     st.challenge = null;
@@ -6915,7 +7477,33 @@ var EditorChannelClient = (() => {
     return JSON.stringify({ msg, signature: b64(sig) });
   }
 
+  function paced() {
+    return !!(st.cfg && st.cfg.relay.startsWith('wss://'));
+  }
+
+  function pruneSent() {
+    const now = Date.now();
+    while (st.sentAt.length && now - st.sentAt[0] >= CHANNEL_FRAME_WINDOW_MS) st.sentAt.shift();
+    return now;
+  }
+
+  // Queued sends in order, as far as the frame share allows; seq and challenge are bound at send time
+  function pump() {
+    clearTimeout(st.pumpTimer);
+    st.pumpTimer = null;
+    const now = pruneSent();
+    while (st.outQueue.length && (!paced() || st.sentAt.length < CHANNEL_PAGE_FRAMES)) {
+      if (st.status !== 'connected' || !st.ws || !st.challenge) { st.outQueue.length = 0; return; }
+      const q = st.outQueue.shift();
+      const obj = frameFields(q.type, q.body);
+      st.seq = obj.seq;
+      enqueue(obj);
+    }
+    if (st.outQueue.length) st.pumpTimer = setTimeout(pump, Math.max(250, CHANNEL_FRAME_WINDOW_MS - (now - st.sentAt[0]) + 50));
+  }
+
   function enqueue(obj) {
+    st.sentAt.push(Date.now());
     st.outChain = st.outChain.then(async () => {
       const ws = st.ws;
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -6946,10 +7534,35 @@ var EditorChannelClient = (() => {
     if (!Number.isSafeInteger(msg.seq) || msg.seq <= st.pluginSeq) return drop('replayed or out-of-order message');
     st.pluginSeq = msg.seq;
     if (msg.to !== undefined && msg.to !== st.myFp) return; // addressed to another browser on the relay
+    // Any verified plugin frame proves the link: a paced plugin skips pongs right after other traffic
+    st.missedPongs = 0;
     if (msg.type === 'hello-reply') return onHelloReply(msg);
-    if (msg.type === 'pong') { st.missedPongs = 0; return; }
-    const fn = handlers[msg.type];
-    if (fn) fn(msg);
+    if (msg.type === 'pong') return;
+    if (msg.type === 'bundle') {
+      if (!Array.isArray(msg.items) || msg.items.length > 256) return drop('malformed bundle');
+      for (const item of msg.items) {
+        // Any well-formed push type may be bundled (ADR-107 §5.3); control frames never are
+        if (!item || typeof item !== 'object' || typeof item.type !== 'string' || !CHANNEL_TYPE_RE.test(item.type)
+            || CHANNEL_CONTROL.has(item.type)) { drop('bad bundle item'); continue; }
+        dispatch(item);
+      }
+      return;
+    }
+    dispatch(msg);
+  }
+
+  // A well-formed type without a handler (a newer plugin's, an extension this page does not show) is ignored, not dropped
+  function dispatch(m) {
+    if (m.type === 'feed') noteFeed();
+    let fn = handlers[m.type];
+    const dot = m.type.indexOf('.');
+    if (!fn && dot > 0) fn = namespaces[m.type.slice(0, dot)];
+    if (!fn) { st.ignored++; return; }
+    try { fn(m); } catch (e) { drop('handler error: ' + e.message); }
+  }
+
+  function protocolOf(p) {
+    return p && typeof p === 'object' && Number.isSafeInteger(p.channel) ? p.channel : 1;
   }
 
   function onHelloReply(msg) {
@@ -6962,6 +7575,11 @@ var EditorChannelClient = (() => {
     if (!st.challenge) return;
     if (msg.state === 'trusted') {
       st.nonce = '';
+      // A plugin reloaded since the snapshot may speak another protocol or carry other extensions
+      if (msg.protocol && typeof msg.protocol === 'object') st.protocol = msg.protocol;
+      if (Array.isArray(msg.extensions)) st.extensions = msg.extensions.filter(e => e && typeof e.id === 'string');
+      // The stale clock starts at trust: the plugin answers the first focus with a head
+      st.feedAt = Date.now();
       setStatus('connected');
     } else if (msg.state === 'untrusted') {
       st.nonce = typeof msg.nonce === 'string' && /^[a-z0-9]{8}$/.test(msg.nonce) ? msg.nonce : '';
@@ -6975,8 +7593,16 @@ var EditorChannelClient = (() => {
     clearInterval(st.pingTimer);
     st.missedPongs = 0;
     st.pingTimer = setInterval(() => {
+      if (st.status === 'connected') renderChannelBadge(); // ages the feed-stale label
       const ws = st.ws;
       if (!ws || !st.challenge) return;
+      if (paced()) {
+        const now = pruneSent();
+        // Recent traffic already keeps the peer alive; a full frame share must not be overrun by a ping
+        const last = st.sentAt.length ? st.sentAt[st.sentAt.length - 1] : 0;
+        if (st.status === 'connected' && now - last < CHANNEL_PING_MS) return;
+        if (st.sentAt.length >= CHANNEL_PAGE_FRAMES) return;
+      }
       if (++st.missedPongs > 3) { try { ws.close(4000, 'no pong'); } catch (e) { /* closing */ } return; }
       // An expired trust code is useless to the operator: ask for a fresh one
       if (st.status === 'awaiting-trust' && st.nonceExpiresAt && Date.now() > st.nonceExpiresAt) sendHello();
@@ -6995,23 +7621,39 @@ var EditorChannelClient = (() => {
     return utf8Len(JSON.stringify({ msg: JSON.stringify(frameFields(type, body)), signature: '' })) + 344 <= CHANNEL_MAX_FRAME;
   }
 
-  /** Signs and sends {type, ...body}; false when the link is not connected or the message is too large. */
+  /**
+   * Signs and sends {type, ...body}, paced on a relay (a newer focus replaces a queued one); false
+   * when the link is not connected, the message is too large or the queue is full.
+   */
   function send(type, body) {
     if (st.status !== 'connected' || !st.ws || !st.challenge || !fits(type, body)) return false;
-    const obj = frameFields(type, body);
-    st.seq = obj.seq;
-    enqueue(obj);
+    // Extension types only to a plugin that routes them (ADR-107 §5.2)
+    if (type.indexOf('.') > 0 && protocolOf(st.protocol) < 2) return false;
+    if (type === 'focus') {
+      const queued = st.outQueue.find(q => q.type === 'focus');
+      if (queued) { queued.body = body; return true; }
+    }
+    if (st.outQueue.length >= CHANNEL_MAX_QUEUED) return false;
+    st.outQueue.push({ type, body });
+    pump();
     return true;
   }
 
   return {
     start, stop, send, fits,
     on: (type, fn) => { handlers[type] = fn; },
+    onNamespace: (id, fn) => { namespaces[id] = fn; },
+    setProtocol: (p, extensions) => {
+      st.protocol = p && typeof p === 'object' ? p : null;
+      st.extensions = Array.isArray(extensions) ? extensions.filter(e => e && typeof e.id === 'string') : [];
+    },
+    protocol: () => Math.min(protocolOf(st.protocol), CHANNEL_PROTOCOL),
+    extensions: () => st.extensions.slice(),
     onStatus: (fn) => { statusListeners.push(fn); },
     status: () => st.status,
     isConnected: () => st.status === 'connected',
     info: () => ({ status: st.status, reason: st.reason, nonce: st.nonce, fingerprint: st.myFp, persistent: st.persistent,
-      pluginFingerprint: st.pluginFp, dropped: st.dropped, lastDrop: st.lastDrop })
+      pluginFingerprint: st.pluginFp, dropped: st.dropped, lastDrop: st.lastDrop, ignored: st.ignored })
   };
 })();
 
@@ -7019,10 +7661,406 @@ function channelConnected() {
   return !!(EditorChannelClient && EditorChannelClient.isConnected());
 }
 
+// Scalar at a dotted key path of block-style YAML; undefined when absent or a block parent
+function yamlScalarAt(text, path) {
+  const rec = parseYamlLines(text || '').find(r => r.key && [...r.path, r.key].join('.') === path);
+  return rec && rec.value !== '' ? rec.value : undefined;
+}
+
+// Sets the key path `keys` to a YAML scalar in place, keeping every other line and a trailing
+// comment; missing parents are created at the end of the deepest existing one. Never replaces a block.
+function yamlSetScalar(text, keys, scalar) {
+  const lines = (text || '').split(/\r?\n/);
+  const recs = parseYamlLines(text || '');
+  const under = (r, depth) => r.path.length === depth && r.path.every((p, i) => p === keys[i]);
+  const find = (depth) => recs.find(r => r.key === keys[depth] && under(r, depth));
+  const hit = find(keys.length - 1);
+  if (hit) {
+    if (hit.value === '' && yamlKeyExtent(lines, hit) > hit.line) throw new Error(keys.join('.') + ' is a block, not a value');
+    const m = lines[hit.line - 1].match(/^(\s*(?:"[^"]*"|'[^']*'|[^\s:#][^:#]*?)\s*:)\s*(.*)$/);
+    if (!m) throw new Error('cannot edit ' + keys.join('.'));
+    const hash = /^["']/.test(m[2]) ? -1 : m[2].search(/\s#/);
+    lines[hit.line - 1] = m[1] + ' ' + scalar + (hash >= 0 ? m[2].slice(hash) : '');
+    return lines.join('\n');
+  }
+  let have = -1;
+  let parent = null;
+  for (let d = keys.length - 2; d >= 0 && !parent; d--) {
+    parent = find(d) || null;
+    if (parent) have = d;
+  }
+  if (parent && parent.value !== '') throw new Error(keys.slice(0, have + 1).join('.') + ' holds a value, not a block');
+  const kids = parent ? recs.filter(r => r.key && under(r, have + 1)) : [];
+  const indent = parent ? (kids.length ? kids[0].indent : parent.indent + 2) : 0;
+  const block = [];
+  for (let d = have + 1; d < keys.length; d++) {
+    const pad = ' '.repeat(indent + (d - have - 1) * 2);
+    block.push(d === keys.length - 1 ? `${pad}${keys[d]}: ${scalar}` : `${pad}${keys[d]}:`);
+  }
+  let at = parent ? yamlKeyExtent(lines, parent) : lines.length;
+  if (!parent) while (at > 0 && !lines[at - 1].trim()) at--;
+  lines.splice(at, 0, ...block);
+  return lines.join('\n');
+}
+
+// ADR-107 §6.1: addon tabs from declarative descriptors (tier 1). The page renders every widget:
+// text as text, markdown through renderMarkdownToHtml with https:-only links and no images or
+// buttons, colours by palette name. No addon code runs in this origin. Buttons send only the
+// extension's declared inbound types; forms stage YAML of its declared files into `configs`, and
+// only the operator's Hot-Apply writes it, after the addon's own validate (ADR-107 §7).
+const EXT_ID_RE = /^[a-z][a-z0-9-]{1,23}$/;
+const EXT_PALETTE = {
+  green: 'var(--green)', yellow: 'var(--yellow)', red: 'var(--red)', blue: 'var(--blue)', accent: 'var(--accent)',
+  mauve: 'var(--mauve)', teal: 'var(--teal)', text: 'var(--text)', subtext: 'var(--subtext)'
+};
+const EXT_ERRORS = {
+  'descriptor-invalid': 'The server rejected this addon\'s tab description; see the server log.',
+  'snapshot-cap': 'This addon\'s data is over the session size limit; see the server log.',
+  failed: 'This addon failed and was disabled for this session; the rest of the editor keeps working.'
+};
+const EXT_FIELD_RE = {
+  integer: /^[+-]?\d+$/,
+  number: /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/,
+  distance: /^[+-]?\d+(\.\d+)?\s*[a-zA-Z]{0,3}$/
+};
+var EditorExtensionTabs = (() => {
+  const exts = new Map();
+  let installedSig = '';
+  const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+  const el = (tag, style, text) => {
+    const e = document.createElement(tag);
+    if (style) e.style.cssText = style;
+    if (text !== undefined) e.textContent = String(text);
+    return e;
+  };
+  const sig = (list) => list.map(e => e.id + '@' + e.version).sort().join(',');
+
+  // RFC 6901 JSON Pointer; undefined when absent
+  function pointer(root, ptr) {
+    if (ptr === '') return root;
+    if (typeof ptr !== 'string' || ptr[0] !== '/') return undefined;
+    let cur = root;
+    for (const raw of ptr.slice(1).split('/')) {
+      const k = raw.replace(/~1/g, '/').replace(/~0/g, '~');
+      if (cur === null || typeof cur !== 'object' || !Object.prototype.hasOwnProperty.call(cur, k)) return undefined;
+      cur = cur[k];
+    }
+    return cur;
+  }
+
+  // "snapshot:<pointer>" or "state:<pointer>"; the newest <id>.state push is the state root
+  function resolve(ext, source) {
+    const m = typeof source === 'string' ? source.match(/^(snapshot|state):(.*)$/) : null;
+    if (!m) return undefined;
+    const root = m[1] === 'snapshot' ? ext.desc.snapshot : ext.state;
+    return root === undefined || root === null ? undefined : pointer(root, m[2]);
+  }
+
+  function markdown(text) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = renderMarkdownToHtml(String(text || '').slice(0, 20000));
+    tpl.content.querySelectorAll('img, button, script, iframe, object, embed, style, form, input').forEach(n => n.remove());
+    tpl.content.querySelectorAll('a').forEach(a => {
+      if (!/^https:\/\//i.test(a.getAttribute('href') || '')) { a.replaceWith(document.createTextNode(a.textContent)); return; }
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+    });
+    tpl.content.querySelectorAll('*').forEach(n => {
+      for (const at of [...n.attributes]) if (/^on/i.test(at.name)) n.removeAttribute(at.name);
+    });
+    return tpl.content;
+  }
+
+  function fmt(v, format) {
+    if (v === undefined || v === null) return '-';
+    if (format === 'percent' && typeof v === 'number') return (v * 100).toFixed(1) + ' %';
+    if (format === 'number' && typeof v === 'number') return v.toLocaleString();
+    if (format === 'time' && typeof v === 'number') return new Date(v).toLocaleString();
+    if (format === 'bool') return v ? 'yes' : 'no';
+    if (typeof v === 'object') return JSON.stringify(v).slice(0, 200);
+    return String(v).slice(0, 500);
+  }
+
+  function send(ext, local, body, statusEl) {
+    const show = (c, t) => { if (statusEl) { statusEl.style.color = c; statusEl.textContent = t; } };
+    if (!ext.desc.inbound.includes(local)) { show('var(--red)', 'This addon does not accept "' + local + '".'); return false; }
+    if (ext.failed) { show('var(--red)', 'This addon is disabled for this session.'); return false; }
+    if (!channelConnected()) { show('var(--subtext)', 'No live server link.'); return false; }
+    if (EditorChannelClient.protocol() < 2) { show('var(--subtext)', 'The server is too old for addon messages.'); return false; }
+    const ok = EditorChannelClient.send(ext.desc.id + '.' + local, isObj(body) ? body : {});
+    show(ok ? 'var(--green)' : 'var(--red)', ok ? 'Sent.' : 'Not sent: the live link refused it (size or queue).');
+    return ok;
+  }
+
+  function stageField(file, path, scalar) {
+    if (currentConfigFile === file && cfgEditor) configs[file] = cfgEditor.value;
+    const base = configs[file] !== undefined ? configs[file] : (shippedConfigs[file] || '');
+    configs[file] = yamlSetScalar(base, path.split('.'), scalar);
+    if (currentConfigFile === file && cfgEditor) cfgEditor.value = configs[file];
+    updateStagingDiff();
+  }
+
+  function renderForm(ext, p, box) {
+    const file = typeof p.file === 'string' ? p.file : '';
+    if (!ext.desc.files.includes(file)) {
+      box.appendChild(el('div', 'color:var(--red); font-size:0.8rem;', 'This form names a file the addon did not declare: ' + file));
+      return;
+    }
+    const fields = Array.isArray(p.fields)
+      ? p.fields.filter(f => isObj(f) && typeof f.path === 'string' && /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+){0,7}$/.test(f.path)).slice(0, 64)
+      : [];
+    box.appendChild(el('div', 'font-size:0.75rem; color:var(--subtext); margin-bottom:8px;',
+      'Edits are staged into ' + file + '. Hot-Apply writes them once the addon accepts them.'));
+    const text = () => configs[file] !== undefined ? configs[file] : (shippedConfigs[file] || '');
+    for (const f of fields) {
+      const kind = typeof f.kind === 'string' ? f.kind : 'string';
+      const options = Array.isArray(f.options) ? f.options.map(String) : [];
+      const group = el('div');
+      group.className = 'control-group';
+      group.appendChild(el('label', '', f.title || f.path));
+      const current = yamlScalarAt(text(), f.path);
+      let input;
+      if (kind === 'boolean') {
+        input = el('input');
+        input.type = 'checkbox';
+        input.checked = /^(true|yes|on)$/i.test(current || '');
+      } else if (kind === 'enum') {
+        input = el('select');
+        input.className = 'control-input';
+        for (const o of options) {
+          const opt = el('option', '', o);
+          opt.value = o;
+          input.appendChild(opt);
+        }
+        input.value = current || '';
+      } else {
+        input = el('input');
+        input.className = 'control-input';
+        input.value = current === undefined ? '' : current;
+        if (current === undefined) input.placeholder = '(not set)';
+      }
+      const err = el('div', 'color:var(--red); font-size:0.72rem;');
+      input.onchange = () => {
+        const v = kind === 'boolean' ? (input.checked ? 'true' : 'false') : String(input.value).trim();
+        const re = EXT_FIELD_RE[kind];
+        if ((re && !re.test(v)) || (kind === 'enum' && !options.includes(v))) {
+          err.textContent = 'Not a valid ' + kind + '.';
+          input.style.borderColor = 'var(--red)';
+          return;
+        }
+        try {
+          stageField(file, f.path, kind === 'string' || kind === 'enum' ? yamlScalar(v) : v);
+          err.textContent = '';
+          input.style.borderColor = '';
+        } catch (e) {
+          err.textContent = 'Not staged: ' + e.message;
+          input.style.borderColor = 'var(--red)';
+        }
+      };
+      group.append(input, err);
+      if (typeof f.description === 'string') group.appendChild(el('div', 'color:var(--subtext); font-size:0.72rem; margin-top:2px;', f.description));
+      box.appendChild(group);
+    }
+  }
+
+  // Widget kinds of protocol.extensions = 1; any other kind renders as a placeholder
+  const WIDGETS = {
+    markdown(ext, p, box) {
+      box.appendChild(markdown(p.text));
+    },
+    status(ext, p, box, bind) {
+      const val = el('span', 'font-weight:bold; font-family:ui-monospace, monospace;');
+      box.append(el('span', 'color:var(--subtext); margin-right:8px;', p.label || ''), val);
+      bind(() => {
+        const v = resolve(ext, p.source);
+        const level = isObj(p.levels) && v !== undefined ? p.levels[String(v)] : null;
+        val.textContent = '● ' + fmt(v);
+        val.style.color = v === undefined ? 'var(--subtext)' : (EXT_PALETTE[level] || 'var(--text)');
+      });
+    },
+    keyValue(ext, p, box, bind) {
+      const grid = el('div', 'display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; font-size:0.85rem;');
+      box.appendChild(grid);
+      bind(() => {
+        grid.replaceChildren();
+        const v = resolve(ext, p.source);
+        if (!isObj(v)) { grid.appendChild(el('span', 'color:var(--subtext); font-style:italic;', 'No data yet.')); return; }
+        const labels = isObj(p.labels) ? p.labels : {};
+        for (const [k, x] of Object.entries(v).slice(0, 200)) {
+          grid.append(el('span', 'color:var(--subtext);', typeof labels[k] === 'string' ? labels[k] : k), el('span', 'font-family:ui-monospace, monospace;', fmt(x)));
+        }
+      });
+    },
+    table(ext, p, box, bind) {
+      const cols = Array.isArray(p.columns) ? p.columns.filter(c => isObj(c) && typeof c.key === 'string').slice(0, 16) : [];
+      const action = isObj(p.rowAction) && typeof p.rowAction.send === 'string' ? p.rowAction : null;
+      const table = el('table', 'width:100%; border-collapse:collapse; font-size:0.82rem;');
+      const status = el('div', 'font-size:0.75rem; margin-top:4px;');
+      const cell = 'padding:3px 6px; border-bottom:1px solid var(--overlay);';
+      box.append(table, status);
+      bind(() => {
+        table.replaceChildren();
+        const head = el('tr');
+        for (const c of cols) head.appendChild(el('th', 'text-align:left; color:var(--subtext);' + cell, c.title || c.key));
+        if (action) head.appendChild(el('th', cell));
+        table.appendChild(head);
+        const rows = resolve(ext, p.source);
+        if (!Array.isArray(rows) || !rows.length) {
+          const tr = el('tr');
+          const td = el('td', 'color:var(--subtext); font-style:italic;' + cell, 'No rows.');
+          td.colSpan = cols.length + (action ? 1 : 0);
+          tr.appendChild(td);
+          table.appendChild(tr);
+          return;
+        }
+        for (const row of rows.slice(0, 500)) {
+          const tr = el('tr');
+          for (const c of cols) tr.appendChild(el('td', 'font-family:ui-monospace, monospace;' + cell, fmt(isObj(row) ? row[c.key] : undefined, c.format)));
+          if (action) {
+            const td = el('td', cell);
+            const b = el('button', 'padding:2px 8px; font-size:0.72rem;', action.label || action.send);
+            b.className = 'btn';
+            b.onclick = () => {
+              if (typeof action.confirm === 'string' && action.confirm && !confirm(action.confirm)) return;
+              const picked = {};
+              const keys = Array.isArray(action.keys) ? action.keys : cols.map(c => c.key);
+              for (const k of keys) {
+                if (typeof k === 'string' && isObj(row) && row[k] !== undefined && (row[k] === null || typeof row[k] !== 'object')) picked[k] = row[k];
+              }
+              send(ext, action.send, { row: picked }, status);
+            };
+            td.appendChild(b);
+            tr.appendChild(td);
+          }
+          table.appendChild(tr);
+        }
+      });
+    },
+    button(ext, p, box) {
+      const b = el('button', '', p.label || p.send);
+      b.className = 'btn';
+      const status = el('span', 'margin-left:10px; font-size:0.75rem;');
+      b.onclick = () => {
+        if (typeof p.confirm === 'string' && p.confirm && !confirm(p.confirm)) return;
+        send(ext, String(p.send || ''), p.body, status);
+      };
+      box.append(b, status);
+    },
+    form(ext, p, box) {
+      renderForm(ext, p, box);
+    }
+  };
+
+  function widget(ext, w) {
+    const card = el('div', 'background:var(--surface); border:1px solid var(--overlay); border-radius:8px; padding:14px;');
+    const kind = isObj(w) && typeof w.kind === 'string' ? w.kind : '';
+    const props = isObj(w) && isObj(w.props) ? w.props : {};
+    const render = Object.prototype.hasOwnProperty.call(WIDGETS, kind) ? WIDGETS[kind] : null;
+    if (!render) {
+      card.appendChild(el('div', 'color:var(--subtext); font-style:italic; font-size:0.8rem;', 'This part (' + kind.slice(0, 32) + ') needs a newer editor.'));
+      return card;
+    }
+    try {
+      render(ext, props, card, (fn) => { ext.refreshers.push(fn); fn(); });
+    } catch (e) {
+      card.replaceChildren(el('div', 'color:var(--red); font-size:0.8rem;', 'Could not show this part: ' + e.message));
+    }
+    return card;
+  }
+
+  function showBanner(ext, text, transient) {
+    for (const b of ext.banners) {
+      b.textContent = text;
+      b.style.display = '';
+      b.style.color = b.style.borderColor = transient ? 'var(--yellow)' : 'var(--red)';
+      if (transient) setTimeout(() => { if (b.textContent === text) b.style.display = 'none'; }, 8000);
+    }
+  }
+
+  function addTab(ext, t, nav, workspace) {
+    const panelId = 'ext-' + ext.desc.id + '-' + t.id;
+    const icon = typeof t.icon === 'string' && t.icon ? Array.from(t.icon).slice(0, 2).join('') : '🧩';
+    const btn = el('button', '', icon + ' ' + String(t.title || t.id).slice(0, 40));
+    btn.className = 'nav-tab';
+    btn.dataset.extTab = ext.desc.id;
+    btn.title = ext.desc.name + ' (addon)';
+    btn.onclick = () => switchPanel(panelId, btn);
+    nav.appendChild(btn);
+    const panel = el('section', 'overflow-y:auto;');
+    panel.id = panelId;
+    panel.className = 'panel-view';
+    panel.dataset.extTab = ext.desc.id;
+    const body = el('div', 'max-width:1100px; width:100%; margin:0 auto; padding:24px; display:flex; flex-direction:column; gap:14px; box-sizing:border-box;');
+    body.appendChild(el('h2', 'margin:0; font-size:1.15rem; color:var(--text);', String(t.title || t.id)));
+    const banner = el('div', 'display:none; padding:8px 12px; border-radius:6px; border:1px solid var(--red); font-size:0.8rem;');
+    body.appendChild(banner);
+    ext.banners.push(banner);
+    for (const w of (Array.isArray(t.widgets) ? t.widgets : []).slice(0, 64)) body.appendChild(widget(ext, w));
+    panel.appendChild(body);
+    workspace.appendChild(panel);
+  }
+
+  function onMessage(ext, m) {
+    const local = m.type.slice(ext.desc.id.length + 1);
+    if (local === 'state') {
+      ext.state = m.state;
+      for (const fn of ext.refreshers) {
+        try { fn(); } catch (e) { console.warn('[RTP] addon widget refresh failed', e); }
+      }
+    } else if (local === 'error') {
+      if (m.reason === 'failed') { ext.failed = true; showBanner(ext, EXT_ERRORS.failed); }
+      else if (m.reason === 'rate') showBanner(ext, 'Too many requests to this addon; wait a moment and try again.', true);
+    }
+  }
+
+  // The snapshot's extensions[] (ADR-107 §5.2); replaces the tabs of an earlier snapshot
+  function install(list) {
+    const active = document.querySelector('.panel-view.active');
+    const wasExt = !!(active && active.dataset.extTab);
+    document.querySelectorAll('[data-ext-tab]').forEach(n => n.remove());
+    exts.clear();
+    const items = Array.isArray(list) ? list.filter(e => isObj(e) && typeof e.id === 'string' && EXT_ID_RE.test(e.id)) : [];
+    installedSig = sig(items);
+    const nav = document.querySelector('.nav-tabs');
+    const workspace = document.getElementById('workspace');
+    if (nav && workspace) {
+      for (const d of items) {
+        const desc = {
+          id: d.id, version: d.version, name: typeof d.name === 'string' && d.name ? d.name : d.id,
+          tabs: Array.isArray(d.tabs) ? d.tabs.filter(t => isObj(t) && typeof t.id === 'string' && EXT_ID_RE.test(t.id)).slice(0, 8) : [],
+          inbound: Array.isArray(d.inbound) ? d.inbound.filter(t => typeof t === 'string') : [],
+          files: Array.isArray(d.files) ? d.files.filter(f => typeof f === 'string') : [],
+          snapshot: d.snapshot, error: typeof d.error === 'string' ? d.error : null
+        };
+        const ext = { desc, state: undefined, failed: !!desc.error, refreshers: [], banners: [] };
+        exts.set(desc.id, ext);
+        EditorChannelClient.onNamespace(desc.id, (m) => { const e = exts.get(desc.id); if (e) onMessage(e, m); });
+        if (desc.error) {
+          addTab(ext, { id: 'error', title: desc.name, widgets: [] }, nav, workspace);
+          showBanner(ext, EXT_ERRORS[desc.error] || ('This addon is unavailable (' + desc.error.slice(0, 40) + ').'));
+          continue;
+        }
+        for (const t of desc.tabs) addTab(ext, t, nav, workspace);
+      }
+    }
+    if (wasExt && !document.querySelector('.panel-view.active')) switchPanel('panel-regions', document.querySelector('.nav-tab'));
+  }
+
+  // A trusted hello-reply carries the server's current extension set; a plugin reload may change it
+  function checkServerSet() {
+    const now = sig(EditorChannelClient.extensions());
+    if (now === installedSig) return;
+    for (const ext of exts.values()) showBanner(ext, 'The server\'s addons changed since this session opened; run /rtp editor again for current tabs.');
+  }
+
+  EditorChannelClient.onStatus((status) => { if (status === 'connected') checkServerSet(); });
+  return { install, checkServerSet, pointer };
+})();
+
 // Plugin -> page messages; each handler gets a verified message addressed to this browser
 function initWebSocket() {
   EditorChannelClient.on('feed', (msg) => {
-    if (msg.data && typeof msg.data === 'object') window.__rtpLiveFeed(msg.data);
+    if (msg.data && typeof msg.data === 'object') ingestChannelFeed(msg.data);
   });
   EditorChannelClient.on('walkpath', ingestWalkPathReply);
   EditorChannelClient.on('curve-state', ingestCurveStateReply);
@@ -7033,6 +8071,10 @@ function initWebSocket() {
     const wsStatus = document.getElementById('ws-apply-status');
     if (!wsStatus) return;
     wsStatus.style.display = 'block';
+    const sent = hotApplyPending;
+    hotApplyPending = null;
+    // The server now holds the sent text: the next Hot-Apply sends only later edits
+    if (msg.success && sent) Object.assign(appliedConfigs, sent);
     wsStatus.style.color = msg.success ? 'var(--green)' : 'var(--red)';
     wsStatus.textContent = msg.success ? '✔ Hot-Apply committed to the server.' : ('❌ Error: ' + String(msg.error || 'unknown').slice(0, 300));
   });
@@ -7582,6 +8624,9 @@ function ingestSessionPayload(payload) {
   // ADR-106 §4.4: helpers per registered shape name; evaluated only inside CurveSandbox
   ingestCurveCode(payload.curveCode);
   // ADR-106 §5.2: the signed link this snapshot names (loopback locally, relay when hosted)
+  if (EditorChannelClient) EditorChannelClient.setProtocol(payload.protocol, payload.extensions);
+  // ADR-107 §6.1: addon tabs after the core tabs (the docs link addresses the core tabs by index)
+  if (EditorExtensionTabs) EditorExtensionTabs.install(payload.extensions);
   if (payload.channel && typeof payload.channel === 'object' && EditorChannelClient) EditorChannelClient.start(payload.channel);
   ingestWorldBiomes(payload.worldBiomes);
   syncRegionProfiles();
@@ -7699,6 +8744,39 @@ function updateLiveBadge() {
   }
 }
 
+// Feed head fields that need no live directory: telemetry, survey progress, region biome / landing stats
+function applyFeedStats(feed) {
+  if (feed.telemetry && typeof feed.telemetry === 'object') {
+    Object.assign(currentMetrics, feed.telemetry);
+    updateDiagnosticsUI(currentMetrics);
+  }
+  if (Array.isArray(feed.surveys)) {
+    for (const s of feed.surveys) {
+      if (!s || typeof s.world !== 'string') continue;
+      if (Number.isInteger(s.w)) liveWorldByIndex[s.w] = s.world;
+      if (Number(s.y) !== LAND_SAMPLE_Y && landSurveyStatus[s.world]) continue;
+      landSurveyStatus[s.world] = { level: Number(s.level) || 0, progress: Number(s.progress) || 0,
+        filesRead: Number(s.filesRead) || 0, fileTotal: Number(s.fileTotal) || 0, bins: Number(s.bins) || 0,
+        done: !!s.done, listed: !!s.listed, truncated: !!s.truncated };
+    }
+  }
+  if (Array.isArray(feed.regions)) {
+    for (const p of feed.regions) {
+      const profile = p && typeof p.region === 'string' ? regionProfiles[p.region] : null;
+      if (!profile) continue;
+      if (p.biomes && typeof p.biomes === 'object' && Object.keys(p.biomes).length > 0) profile.biomes = normalizeBiomeShares(p.biomes);
+      if (Number.isFinite(Number(p.landings))) profile.landings = Number(p.landings);
+    }
+  }
+}
+
+// A hosted page has no live directory (liveFeed.cfg stays null): the head's tile versions name local
+// files, so only its stats apply; tiles arrive as their own pushes
+function ingestChannelFeed(feed) {
+  if (liveFeed.cfg) window.__rtpLiveFeed(feed);
+  else applyFeedStats(feed);
+}
+
 window.__rtpLiveFeed = function (feed) {
   if (!liveFeed.cfg || !feed || typeof feed !== 'object') return;
   const sid = String(feed.sessionId || '');
@@ -7719,20 +8797,7 @@ window.__rtpLiveFeed = function (feed) {
   liveFeed.lastUpdate = Date.now();
   const gb = Number(feed.groupBins);
   if (Number.isInteger(gb) && gb > 0 && gb <= 256) liveFeed.groupBins = gb;
-  if (feed.telemetry && typeof feed.telemetry === 'object') {
-    Object.assign(currentMetrics, feed.telemetry);
-    updateDiagnosticsUI(currentMetrics);
-  }
-  if (Array.isArray(feed.surveys)) {
-    for (const s of feed.surveys) {
-      if (!s || typeof s.world !== 'string') continue;
-      if (Number.isInteger(s.w)) liveWorldByIndex[s.w] = s.world;
-      if (Number(s.y) !== LAND_SAMPLE_Y && landSurveyStatus[s.world]) continue;
-      landSurveyStatus[s.world] = { level: Number(s.level) || 0, progress: Number(s.progress) || 0,
-        filesRead: Number(s.filesRead) || 0, fileTotal: Number(s.fileTotal) || 0, bins: Number(s.bins) || 0,
-        done: !!s.done, listed: !!s.listed, truncated: !!s.truncated };
-    }
-  }
+  applyFeedStats(feed);
   if (feed.palettes && typeof feed.palettes === 'object') {
     for (const [w, pal] of Object.entries(feed.palettes)) {
       const world = liveWorldByIndex[w];
@@ -7754,11 +8819,6 @@ window.__rtpLiveFeed = function (feed) {
         }
         delete walkPathTiles[p.region];
         liveRegionIds[p.region] = p.r;
-      }
-      const profile = regionProfiles[p.region];
-      if (profile) {
-        if (p.biomes && typeof p.biomes === 'object' && Object.keys(p.biomes).length > 0) profile.biomes = normalizeBiomeShares(p.biomes);
-        if (Number.isFinite(Number(p.landings))) profile.landings = Number(p.landings);
       }
     }
     for (const [name, r] of Object.entries(liveRegionIds)) {
