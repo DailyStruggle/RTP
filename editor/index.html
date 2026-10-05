@@ -3472,6 +3472,8 @@ function drawBinLayer(kind, layerKey, bins, wox, woy, tilePx, vis, colorOf, alph
 
 let focusTimer = null;
 let lastFocusSig = '';
+// Set when a land-ref upload could not be fetched or verified (ingestLandRef)
+let landResyncWanted = false;
 
 // ADR-106 §5.3 focus extras: regions drawn from a verified helper (no tiles needed) and the hazard
 // version each region holds (-1 = lost a delta; the plugin answers another version with a reset)
@@ -3484,7 +3486,11 @@ function focusPageState() {
   for (const [name, prof] of Object.entries(regionProfiles)) {
     if (prof && prof.curve && Object.keys(hazardVersions).length < 256) hazardVersions[name] = Number.isInteger(prof._hazardVersion) ? prof._hazardVersion : 0;
   }
-  return { verified: verified.sort(), hazardVersions };
+  const ps = { verified: verified.sort(), hazardVersions };
+  // A lost land upload: the plugin resends every bin beyond the snapshot (a queued focus replaced by a
+  // newer one still carries it)
+  if (landResyncWanted) ps.landReset = true;
+  return ps;
 }
 
 // Page state alone (no view rectangle), for changes that must reach the plugin while no land is drawn
@@ -3493,7 +3499,9 @@ function sendPageState() {
   if (!channelConnected() || pageStateTimer) return;
   pageStateTimer = setTimeout(() => {
     pageStateTimer = null;
-    if (channelConnected()) EditorChannelClient.send('focus', focusPageState());
+    if (!channelConnected()) return;
+    const ps = focusPageState();
+    if (EditorChannelClient.send('focus', ps) && ps.landReset) landResyncWanted = false;
   }, 250);
 }
 
@@ -3506,9 +3514,12 @@ function sendFocus(world, vis) {
   lastFocusSig = sig;
   if (focusTimer) clearTimeout(focusTimer);
   focusTimer = setTimeout(() => {
-    if (!EditorChannelClient.send('focus', { world, y: LAND_SAMPLE_Y,
+    const body = { world, y: LAND_SAMPLE_Y,
       minRx: vis.minRx, minRz: vis.minRz, maxRx: vis.maxRx, maxRz: vis.maxRz,
-      verified: ps.verified, hazardVersions: ps.hazardVersions })) lastFocusSig = '';
+      verified: ps.verified, hazardVersions: ps.hazardVersions };
+    if (ps.landReset) body.landReset = true;
+    if (!EditorChannelClient.send('focus', body)) lastFocusSig = '';
+    else if (body.landReset) landResyncWanted = false;
   }, 250);
 }
 
@@ -3712,16 +3723,25 @@ function applyRunDelta(beforeB64, addB64, removeB64) {
 }
 
 const HAZARD_HANDOFF_MAX_CHARS = 4 * 1024 * 1024;
-async function fetchHazardHandoff(key, sha256) {
+// Plugin side caps an upload at 3,000,000 run characters plus row and palette overhead
+const LAND_HANDOFF_MAX_CHARS = 8 * 1024 * 1024;
+const BYTEBIN_KEY_RE = /^[A-Za-z0-9_\-]{1,64}$/;
+
+// A plugin hand-off by key: fetched from bytebin, kept only when its SHA-256 matches the signed frame
+async function fetchBytebinVerified(key, sha256, maxChars) {
   const base = (new URLSearchParams(window.location.search).get('bytebin') || 'https://bytebin.lucko.me').replace(/\/+$/, '');
   const res = await fetch(base + '/' + encodeURIComponent(key), { headers: { 'Accept': 'application/json' } });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const text = await res.text();
-  if (text.length > HAZARD_HANDOFF_MAX_CHARS) throw new Error('too large');
+  if (text.length > maxChars) throw new Error('too large');
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
   const hex = Array.from(digest, b => b.toString(16).padStart(2, '0')).join('');
   if (hex !== sha256) throw new Error('sha256');
-  const body = JSON.parse(text);
+  return JSON.parse(text);
+}
+
+async function fetchHazardHandoff(key, sha256) {
+  const body = await fetchBytebinVerified(key, sha256, HAZARD_HANDOFF_MAX_CHARS);
   if (!body || typeof body.runs !== 'string') throw new Error('malformed');
   return body.runs;
 }
@@ -3742,7 +3762,7 @@ async function ingestHazardDelta(msg) {
   let runs;
   if (msg.reset === true) {
     runs = typeof msg.runs === 'string' ? msg.runs : null;
-    if (runs === null && typeof msg.bytebinKey === 'string' && /^[A-Za-z0-9_\-]{1,64}$/.test(msg.bytebinKey)
+    if (runs === null && typeof msg.bytebinKey === 'string' && BYTEBIN_KEY_RE.test(msg.bytebinKey)
         && /^[0-9a-f]{64}$/.test(String(msg.sha256 || ''))) {
       prof._hazardFetch = msg.version;
       try {
@@ -3777,6 +3797,26 @@ function ingestLandPush(msg) {
   ingestLandBinRows(msg.world, msg.bins);
   requestMapRedraw();
   scheduleBiomeRecompute();
+}
+
+// {type:'land-ref', world, y, bins, bytebinKey, sha256}: hosted land by reference (relay frames are
+// counted, not sized). The body is {world, y, palette, bins} as a land frame; the plugin uploads the
+// view's changed bins at most every 30 s. A lost one asks for a resend (landReset with the next focus).
+async function ingestLandRef(msg) {
+  if (typeof msg.world !== 'string' || typeof msg.bytebinKey !== 'string' || !BYTEBIN_KEY_RE.test(msg.bytebinKey)
+      || !/^[0-9a-f]{64}$/.test(String(msg.sha256 || ''))) return;
+  let body;
+  try {
+    body = await fetchBytebinVerified(msg.bytebinKey, msg.sha256, LAND_HANDOFF_MAX_CHARS);
+  } catch (e) {
+    body = null;
+  }
+  if (!body || body.world !== msg.world || !Array.isArray(body.bins)) {
+    landResyncWanted = true;
+    sendPageState();
+    return;
+  }
+  ingestLandPush(body);
 }
 
 function drawWalkPathStatus(cssW, cssH) {
@@ -8113,6 +8153,7 @@ function initWebSocket() {
   EditorChannelClient.on('curve', ingestCurveUpdate);
   EditorChannelClient.on('hazard-delta', (msg) => { ingestHazardDelta(msg).catch(() => {}); });
   EditorChannelClient.on('land', ingestLandPush);
+  EditorChannelClient.on('land-ref', (msg) => { ingestLandRef(msg).catch(() => {}); });
   EditorChannelClient.on('apply_ack', (msg) => {
     const wsStatus = document.getElementById('ws-apply-status');
     if (!wsStatus) return;
