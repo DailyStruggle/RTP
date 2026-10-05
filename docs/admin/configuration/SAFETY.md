@@ -61,15 +61,15 @@ Block filter settings are configured in [`advanced/blocks.yml`](../../admin/conf
 
 The `airBlocks` and `unsafeBlocks` lists use a specific grammar to match blocks and properties.
 
-> **Edition note (Pro only).** The plain-material rows below work in every edition, but the **block-tag and block-state-predicate grammar** (`#namespace:tag`, `MATERIAL[...]`, `*[...]`, including the numeric range predicates) ships only in the full (Pro) edition. The **rtp-lite** build parses `unsafeBlocks` / `airBlocks` as a **flat material allow/deny list** and does not honour any `#tag` token or `[...]` predicate. See the bundled lite docs (`SAFETY.md` inside the lite jar) for the lite-only surface.
+> **Editions.** The full grammar below, including block tags and block-state predicates, works identically in the free and Pro builds. Tags resolve against the server's live block-tag registry when the config loads.
 
 ### Grammar (Token Syntax)
-- `MATERIAL` — Plain material (e.g., `LAVA`). *(All editions.)*
-- **(Pro)** `MATERIAL[prop=val,prop2=val2]` — Match only when block-state properties match (string equality).
-- **(Pro)** `MATERIAL[prop>=n]` — Match only when a numeric block-state property satisfies a range comparison. Operators: `>=`, `<=`, `>`, `<`. The bound `n` must be a whole number (e.g., `LAVA[level<=3]` for near-source lava, `FIRE[age>=10]`).
-- **(Pro)** `#namespace:tag` — Expands to every material in that block tag (e.g., `#minecraft:logs`).
-- **(Pro)** `#namespace:tag[prop=val]` — Tag members only when properties match.
-- **(Pro)** `*[prop=val]` — ANY material when properties match (wildcard, e.g., `*[waterlogged=true]`).
+- `MATERIAL` — Plain material (e.g., `LAVA`).
+- `MATERIAL[prop=val,prop2=val2]` — Match only when block-state properties match (string equality).
+- `MATERIAL[prop>=n]` — Match only when a numeric block-state property satisfies a range comparison. Operators: `>=`, `<=`, `>`, `<`. The bound `n` must be a whole number (e.g., `LAVA[level<=3]` for near-source lava, `FIRE[age>=10]`).
+- `#namespace:tag` — Expands to every material in that block tag (e.g., `#minecraft:logs`).
+- `#namespace:tag[prop=val]` — Tag members only when properties match.
+- `*[prop=val]` — ANY material when properties match (wildcard, e.g., `*[waterlogged=true]`).
 
 #### Predicate notes
 - Multiple predicates inside one `[ ... ]` combine with logical **AND** (e.g., `WATER[falling=true,level>=5]`).

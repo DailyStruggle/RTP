@@ -392,7 +392,8 @@ class EditorTransportAndApplyTest {
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> transport.fetchPayload("expired-token-123").join());
         assertTrue(ex.getMessage().contains("404"), "Message must reference status 404");
-        assertTrue(ex.getMessage().contains("expired-token-123"), "Message must mention failed token");
+        assertTrue(ex.getMessage().contains("expire\u2026"), "Message must name the failed token by its prefix");
+        assertFalse(ex.getMessage().contains("expired-token-123"), "Message must not echo the full token");
     }
 
     @Test

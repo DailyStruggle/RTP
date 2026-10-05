@@ -195,6 +195,31 @@ class AnvilRegionSamplerTest {
   }
 
   @Test
+  @DisplayName("ADR-016: unpadded final sector (region not yet closed) is read by every path")
+  void unpaddedTailChunkReadable() throws IOException {
+    byte[] padded = buildRegion(new int[] {1, 2}, new int[0]);
+    int off = ((padded[8] & 0xFF) << 16) | ((padded[9] & 0xFF) << 8) | (padded[10] & 0xFF);
+    int p = off * 4096;
+    int declared = ((padded[p] & 0xFF) << 24) | ((padded[p + 1] & 0xFF) << 16)
+        | ((padded[p + 2] & 0xFF) << 8) | (padded[p + 3] & 0xFF);
+    byte[] region = java.util.Arrays.copyOf(padded, p + 4 + declared);
+    assertTrue(region.length % 4096 != 0);
+    Map<Long, String> both = Map.of(key(1), "BIOME_1", key(2), "BIOME_2");
+
+    assertTrue(AnvilReader.INSTANCE.isChunkGenerated(region, 2, 0));
+    assertEquals(both, fullRead(region));
+    assertEquals(both, AnvilRegionSampler.sampleBiomes(write(region), RCX, RCZ, Y, new int[] {1, 2}, CANON));
+
+    // One byte short of the declared payload still fails closed on every path.
+    byte[] cut = java.util.Arrays.copyOf(region, region.length - 1);
+    AnvilRegionByteCache.invalidateAll();
+    assertFalse(AnvilReader.INSTANCE.isChunkGenerated(cut, 2, 0));
+    assertEquals(Map.of(key(1), "BIOME_1"), fullRead(cut));
+    assertEquals(Map.of(key(1), "BIOME_1"),
+        AnvilRegionSampler.sampleBiomes(write(cut), RCX, RCZ, Y, new int[] {1, 2}, CANON));
+  }
+
+  @Test
   @DisplayName("ADR-104 4.6: missing file yields empty map and lastModified -1")
   void missingFile() {
     Path f = dir.resolve("r.9.9.mca");

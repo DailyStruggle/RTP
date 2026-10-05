@@ -30,6 +30,18 @@ public final class RespProtocol {
     public static final int MAX_BULK_STRING_LENGTH = 16 * 1024 * 1024;
     public static final int MAX_ARRAY_ELEMENT_COUNT = 100_000;
 
+    /** Ceiling on one CRLF-terminated line (simple string, error, integer, length header): 64 KiB. */
+    public static final int MAX_LINE_LENGTH = 64 * 1024;
+
+    /** Ceiling on array nesting; guards the recursive reader against stack exhaustion. */
+    public static final int MAX_NESTING_DEPTH = 32;
+
+    /**
+     * Ceiling on elements across ALL arrays of one reply (nested included), so
+     * many in-bound nested arrays cannot multiply into an allocation bomb.
+     */
+    public static final int MAX_TOTAL_ELEMENTS = MAX_ARRAY_ELEMENT_COUNT;
+
     private static final byte[] CRLF = new byte[]{'\r', '\n'};
 
     private RespProtocol() {}
@@ -86,6 +98,10 @@ public final class RespProtocol {
      *   - Throws RespException for Redis error replies
      */
     public static Object readReply(InputStream in) throws IOException {
+        return readReply(in, 0, new int[]{0});
+    }
+
+    private static Object readReply(InputStream in, int depth, int[] elementBudgetUsed) throws IOException {
         int b = in.read();
         if (b == -1) {
             throw new EOFException("Unexpected end of Redis stream");
@@ -99,9 +115,13 @@ public final class RespProtocol {
                 throw new RespException(errMsg);
             case INTEGER:
                 String numStr = readLine(in);
-                return Long.parseLong(numStr);
+                try {
+                    return Long.parseLong(numStr);
+                } catch (NumberFormatException nfe) {
+                    throw new IOException("Malformed RESP stream: bad integer reply");
+                }
             case BULK_STRING:
-                int length = Integer.parseInt(readLine(in));
+                int length = parseLength(readLine(in));
                 if (length == -1) {
                     return null;
                 }
@@ -125,16 +145,23 @@ public final class RespProtocol {
                 }
                 return data;
             case ARRAY:
-                int count = Integer.parseInt(readLine(in));
+                int count = parseLength(readLine(in));
                 if (count == -1) {
                     return null;
                 }
                 if (count < 0 || count > MAX_ARRAY_ELEMENT_COUNT) {
                     throw new IOException("Malformed RESP stream: array element count " + count + " out of bounds");
                 }
+                if (depth >= MAX_NESTING_DEPTH) {
+                    throw new IOException("Malformed RESP stream: array nesting deeper than " + MAX_NESTING_DEPTH);
+                }
+                elementBudgetUsed[0] += count;
+                if (elementBudgetUsed[0] > MAX_TOTAL_ELEMENTS) {
+                    throw new IOException("Malformed RESP stream: reply exceeds " + MAX_TOTAL_ELEMENTS + " total elements");
+                }
                 List<Object> list = new ArrayList<>(count);
                 for (int i = 0; i < count; i++) {
-                    list.add(readReply(in));
+                    list.add(readReply(in, depth + 1, elementBudgetUsed));
                 }
                 return Collections.unmodifiableList(list);
             default:
@@ -142,6 +169,15 @@ public final class RespProtocol {
         }
     }
 
+    private static int parseLength(String line) throws IOException {
+        try {
+            return Integer.parseInt(line);
+        } catch (NumberFormatException nfe) {
+            throw new IOException("Malformed RESP stream: bad length header");
+        }
+    }
+
+    /** CRLF-terminated line, bounded by {@link #MAX_LINE_LENGTH} (excluding CRLF). */
     private static String readLine(InputStream in) throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream(32);
         int prev = -1;
@@ -150,6 +186,10 @@ public final class RespProtocol {
             if (prev == '\r' && curr == '\n') {
                 byte[] bytes = buffer.toByteArray();
                 return new String(bytes, 0, bytes.length - 1, StandardCharsets.UTF_8);
+            }
+            // buffer holds the pending '\r' too, hence the +1.
+            if (buffer.size() >= MAX_LINE_LENGTH + 1) {
+                throw new IOException("Malformed RESP stream: line exceeds " + MAX_LINE_LENGTH + " bytes");
             }
             buffer.write(curr);
             prev = curr;

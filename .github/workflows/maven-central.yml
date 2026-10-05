@@ -76,6 +76,7 @@ jobs:
           :commands-api:publishMavenJavaPublicationToCentralStagingRepository
           :yaml-api:publishMavenJavaPublicationToCentralStagingRepository
           :metrics-api:publishMavenJavaPublicationToCentralStagingRepository
+          :bstats-api:publishMavenJavaPublicationToCentralStagingRepository
           :maps-api:publishMavenJavaPublicationToCentralStagingRepository
           :effects-api:publishMavenJavaPublicationToCentralStagingRepository
           :rtp-proxy:rtp-proxy-common:publishMavenJavaPublicationToCentralStagingRepository

@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.sql;
 
+import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
+import io.github.dailystruggle.rtp.proxy.common.transport.CanonicalEnvelopes;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -56,6 +58,13 @@ import java.util.logging.Logger;
  * <p><strong>S-004 contract.</strong> Every failure path completes the
  * returned future exceptionally or with a typed enum; nothing is
  * silently swallowed.</p>
+ *
+ * <p><strong>HMAC envelope (rtp-proxy-ADR-010).</strong> With a verifier,
+ * each READY row carries an {@code hmac} over
+ * {@link CanonicalEnvelopes#canonicalQueueEnvelope}; rows failing
+ * verification at dequeue (NULL, tampered, delimiter-bearing) are deleted
+ * with a WARNING and never returned. A player with an existing READY row
+ * cannot enrol a second correlation id.</p>
  */
 public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
 
@@ -69,6 +78,9 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
     private final ExecutorService executor;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicInteger threadCounter = new AtomicInteger();
+    /** HMAC envelope verifier; {@code null} disables signing and verification. */
+    private final HmacVerifier verifier;
+    private final int schemaVersion;
 
     /**
      * Open the queue against the supplied {@code DataSource}. Schema
@@ -76,7 +88,20 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
      * the two wait-queue tables are created idempotently on first open.
      */
     public SqlNetworkRequestQueue(DataSource dataSource) {
+        this(dataSource, null, 1);
+    }
+
+    /**
+     * Signed constructor (rtp-proxy-ADR-010). Enrolling backends and
+     * dequeuing proxies must share the same secret and {@code schemaVersion}.
+     *
+     * @param verifier      HMAC verifier; {@code null} disables signing
+     * @param schemaVersion schema version passed to {@link HmacVerifier}
+     */
+    public SqlNetworkRequestQueue(DataSource dataSource, HmacVerifier verifier, int schemaVersion) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
+        this.verifier = verifier;
+        this.schemaVersion = schemaVersion;
         SqlNetworkStateBinding.Dialect detected;
         try (Connection c = dataSource.getConnection()) {
             detected = SqlNetworkStateBinding.dialectOf(c);
@@ -101,8 +126,7 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
         Objects.requireNonNull(envelope, "envelope");
         return runAsync(() -> {
             if (closed.get()) return EnrolOutcome.REJECTED;
-            insertOne(envelope);
-            return EnrolOutcome.ACCEPTED;
+            return insertOne(envelope) ? EnrolOutcome.ACCEPTED : EnrolOutcome.REJECTED;
         });
     }
 
@@ -263,9 +287,9 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
 
     // --- internals -----------------------------------------------------------
 
-    private void insertOne(EnrolmentEnvelope env) throws SQLException {
+    private boolean insertOne(EnrolmentEnvelope env) throws SQLException {
         try (Connection c = dataSource.getConnection()) {
-            insertOne(c, env);
+            return insertOne(c, env);
         }
     }
 
@@ -273,26 +297,71 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
      * Insert an envelope into both the ready FIFO and the status row, with
      * correlation-id-as-PK idempotency. Duplicate-key (SQLSTATE 23xxx) is
      * swallowed as "already enqueued, no-op".
+     *
+     * @return {@code false} when the envelope was skipped with a WARNING
+     *         (player already has a READY row under another correlation id,
+     *         or a field carries a canonical-encoding delimiter)
      */
-    private void insertOne(Connection c, EnrolmentEnvelope env) throws SQLException {
+    private boolean insertOne(Connection c, EnrolmentEnvelope env) throws SQLException {
         long now = System.currentTimeMillis();
+        String cid = env.correlationId().toString();
+        String pid = env.playerId().toString();
+        long enqueuedAt = env.createdAtMs() > 0 ? env.createdAtMs() : now;
+        // One pending request per player. Check-then-insert is not atomic
+        // across writers; the dispatcher's in-flight guard covers the race.
+        if (hasOtherReadyRow(c, pid, cid)) {
+            LOG.log(Level.WARNING, "SqlNetworkRequestQueue: player " + pid
+                    + " already has a pending request; skipping correlationId=" + cid + " (REQ-RTP-S-004)");
+            return false;
+        }
+        String hmac;
+        try {
+            if (verifier != null) {
+                hmac = CanonicalEnvelopes.signQueueEnvelope(verifier, schemaVersion, cid, pid,
+                        env.regionKey().orElse(""), env.serverHint().orElse(""), Long.toString(enqueuedAt));
+            } else if (!CanonicalEnvelopes.isSafeField(env.regionKey().orElse(""))
+                    || !CanonicalEnvelopes.isSafeField(env.serverHint().orElse(""))) {
+                throw new IllegalArgumentException("regionKey/serverHint contains a reserved delimiter character");
+            } else {
+                hmac = null;
+            }
+        } catch (IllegalArgumentException iae) {
+            LOG.log(Level.WARNING, "SqlNetworkRequestQueue: dropping envelope for player " + pid
+                    + " (correlationId=" + cid + "): " + iae.getMessage() + " (REQ-RTP-S-004)");
+            return false;
+        }
         // 1. Insert into ready FIFO. PK = correlation_id; duplicate key = idempotent replay.
         String insReady = "INSERT INTO rtp_net_wq_ready "
-                + "(correlation_id, player_id, region_key, server_hint, enqueued_at_ms, state) "
-                + "VALUES (?, ?, ?, ?, ?, 'READY')";
+                + "(correlation_id, player_id, region_key, server_hint, enqueued_at_ms, state, hmac) "
+                + "VALUES (?, ?, ?, ?, ?, 'READY', ?)";
         try (PreparedStatement ps = c.prepareStatement(insReady)) {
-            ps.setString(1, env.correlationId().toString());
-            ps.setString(2, env.playerId().toString());
+            ps.setString(1, cid);
+            ps.setString(2, pid);
             ps.setString(3, env.regionKey().orElse(null));
             ps.setString(4, env.serverHint().orElse(null));
-            ps.setLong(5, env.createdAtMs() > 0 ? env.createdAtMs() : now);
+            ps.setLong(5, enqueuedAt);
+            ps.setString(6, hmac);
             ps.executeUpdate();
         } catch (SQLException ex) {
-            if (isIntegrityConstraintViolation(ex)) return; // idempotent replay
+            if (isIntegrityConstraintViolation(ex)) return true; // idempotent replay
             throw ex;
         }
         // 2. UPSERT the status row to QUEUED. Dialect-aware MERGE / ON CONFLICT.
         upsertStatusQueued(c, env, now);
+        return true;
+    }
+
+    private static boolean hasOtherReadyRow(Connection c, String pid, String cid) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(
+                "SELECT correlation_id FROM rtp_net_wq_ready WHERE player_id = ? AND state = 'READY'")) {
+            ps.setString(1, pid);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    if (!cid.equals(rs.getString(1))) return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void upsertStatusQueued(Connection c, EnrolmentEnvelope env, long now) throws SQLException {
@@ -361,11 +430,11 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
             String pick;
             if (dialect == SqlNetworkStateBinding.Dialect.MYSQL
                     || dialect == SqlNetworkStateBinding.Dialect.SQLITE) {
-                pick = "SELECT correlation_id, player_id, region_key, server_hint, enqueued_at_ms "
+                pick = "SELECT correlation_id, player_id, region_key, server_hint, enqueued_at_ms, hmac "
                         + "FROM rtp_net_wq_ready WHERE state = 'READY' "
                         + "ORDER BY enqueued_at_ms, correlation_id LIMIT 1";
             } else {
-                pick = "SELECT correlation_id, player_id, region_key, server_hint, enqueued_at_ms "
+                pick = "SELECT correlation_id, player_id, region_key, server_hint, enqueued_at_ms, hmac "
                         + "FROM rtp_net_wq_ready WHERE state = 'READY' "
                         + "ORDER BY enqueued_at_ms, correlation_id FETCH FIRST 1 ROWS ONLY";
             }
@@ -374,6 +443,7 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
             String regionKey;
             String serverHint;
             long enqueuedAt;
+            String hmac;
             try (PreparedStatement ps = c.prepareStatement(pick);
                  ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) return Optional.empty();
@@ -382,6 +452,7 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
                 regionKey = rs.getString(3);
                 serverHint = rs.getString(4);
                 enqueuedAt = rs.getLong(5);
+                hmac = rs.getString(6);
             }
             // Try to claim it. UPDATE returns row count; 0 means a
             // peer beat us (no exception, just retry the picker).
@@ -404,14 +475,51 @@ public final class SqlNetworkRequestQueue implements NetworkRequestQueue {
                 ps.setString(1, cid);
                 ps.executeUpdate();
             }
+            // Verify after the claim so a bad row is consumed (deleted) once
+            // rather than re-picked forever. Never handed to the dispatcher.
+            if (!envelopeTrusted(cid, pid, regionKey, serverHint, enqueuedAt, hmac)) {
+                return Optional.empty();
+            }
+            UUID playerUuid;
+            UUID cidUuid;
+            try {
+                playerUuid = UUID.fromString(pid);
+                cidUuid = UUID.fromString(cid);
+            } catch (IllegalArgumentException iae) {
+                LOG.log(Level.WARNING, "SqlNetworkRequestQueue: dropping malformed envelope " + cid
+                        + " (bad ids, REQ-RTP-S-004)");
+                return Optional.empty();
+            }
             return Optional.of(new QueueEnvelope(
-                    UUID.fromString(pid),
-                    UUID.fromString(cid),
+                    playerUuid,
+                    cidUuid,
                     regionKey == null ? Optional.empty() : Optional.of(regionKey),
                     serverHint == null ? Optional.empty() : Optional.of(serverHint),
                     enqueuedAt,
                     now));
         }
+    }
+
+    private boolean envelopeTrusted(String cid, String pid, String regionKey, String serverHint,
+                                    long enqueuedAt, String hmac) {
+        if (verifier != null) {
+            if (hmac == null || hmac.isEmpty() || !CanonicalEnvelopes.verifyQueueEnvelope(
+                    verifier, schemaVersion, cid, pid,
+                    regionKey == null ? "" : regionKey,
+                    serverHint == null ? "" : serverHint,
+                    Long.toString(enqueuedAt), hmac)) {
+                LOG.log(Level.WARNING, "SqlNetworkRequestQueue: HMAC verification failed for envelope "
+                        + cid + "; dropping (REQ-RTP-S-004)");
+                return false;
+            }
+            return true;
+        }
+        if (!CanonicalEnvelopes.isSafeField(regionKey) || !CanonicalEnvelopes.isSafeField(serverHint)) {
+            LOG.log(Level.WARNING, "SqlNetworkRequestQueue: dropping envelope " + cid
+                    + " with delimiter-bearing regionKey/serverHint (REQ-RTP-S-004)");
+            return false;
+        }
+        return true;
     }
 
     private Optional<QueueStatus> selectStatus(Connection c, UUID playerId) throws SQLException {

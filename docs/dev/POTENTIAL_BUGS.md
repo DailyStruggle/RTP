@@ -41,16 +41,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
-### 2026-10-04 — Web editor treats POLYGON vertices as blocks; the plugin reads them as chunks
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** ADR-106 editor curve runner / typed settings form (page side)
-- **Location:** `docs/editor/index.html` (`getRegionSpan` POLYGON branch, vertex drawing / drag, `syncShapeSpecificControls` default `[[-2000, 3000], ...]`) vs `RegionConfigLoader.applyPolygonVertices` -> `Polygon.pointInPolygon(coords.x, coords.z)` on `locationToXZ` chunk coordinates
-- **Symptom / hypothesis:** The page draws, fits and drags polygon vertices in block units, but Java tests membership with the same numbers as chunk coordinates, so the area the plugin uses is 16x larger than the outline the editor shows. The page's helper path (`Polygon.js`, chunk params) and the vertex outline therefore don't line up.
-- **Impact:** Operators drawing a polygon in the editor get a region 16x larger (per axis) than drawn; the path drawn from the helper and the vertex outline disagree on the map.
-- **Suggested next step:** Confirm the intended unit in REGIONS.md, then either convert in the page (draw vertices x16 and accept unit suffixes) or document vertices as chunks; add a page/Java round-trip test for one polygon.
-
 ### 2026-10-04 — `FactoryValueGetNumberConcurrencyTest` fails intermittently in the full suite
 
 - **Severity:** Low

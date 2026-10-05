@@ -11,11 +11,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Thread-safe connection pool for {@link RespConnection}.
  * Replaces JedisPool and Apache Commons Pool2 with a simple bounded ArrayBlockingQueue.
+ *
+ * <p>{@code host} accepts a bare host or a {@code redis://} / {@code rediss://}
+ * URL ({@link RespEndpoint}), so TLS and the ACL username reach every pooled
+ * connection through existing {@code (host, port, password)} call sites.</p>
  */
 public class RespPool implements Closeable {
 
-    private final String host;
-    private final int port;
+    private final RespEndpoint endpoint;
     private final int timeoutMs;
     private final String password;
     private final int maxTotal;
@@ -25,8 +28,11 @@ public class RespPool implements Closeable {
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public RespPool(String host, int port, int timeoutMs, String password, int maxTotal) {
-        this.host = host;
-        this.port = port;
+        this(RespEndpoint.parse(host, port), timeoutMs, password, maxTotal);
+    }
+
+    public RespPool(RespEndpoint endpoint, int timeoutMs, String password, int maxTotal) {
+        this.endpoint = java.util.Objects.requireNonNull(endpoint, "endpoint");
         this.timeoutMs = timeoutMs > 0 ? timeoutMs : 2000;
         this.password = (password != null && !password.isEmpty()) ? password : null;
         this.maxTotal = maxTotal > 0 ? maxTotal : 16;
@@ -60,11 +66,11 @@ public class RespPool implements Closeable {
             if (current < maxTotal) {
                 if (createdCount.compareAndSet(current, current + 1)) {
                     try {
-                        RespConnection newConn = new RespConnection(host, port, timeoutMs, password);
+                        RespConnection newConn = new RespConnection(endpoint, timeoutMs, password);
                         return new PooledConnection(newConn);
                     } catch (Exception e) {
                         createdCount.decrementAndGet();
-                        throw new RuntimeException("Could not create Redis connection to " + host + ":" + port, e);
+                        throw new RuntimeException("Could not create Redis connection to " + endpoint, e);
                     }
                 }
             } else {
@@ -116,6 +122,11 @@ public class RespPool implements Closeable {
         return closed.get();
     }
 
+    /** Connection target (log-safe). */
+    public RespEndpoint endpoint() {
+        return endpoint;
+    }
+
     /**
      * AutoCloseable wrapper that returns the underlying connection to the pool upon close().
      */
@@ -124,7 +135,7 @@ public class RespPool implements Closeable {
         private boolean returned = false;
 
         PooledConnection(RespConnection delegate) {
-            super(host, port, timeoutMs, password, false);
+            super(endpoint, timeoutMs, password, false);
             this.delegate = delegate;
         }
 

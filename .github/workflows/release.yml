@@ -14,11 +14,11 @@ name: Release rtp-lite to Modrinth, Hangar and GitHub Releases (markdown sites)
 # never published to nor advertised on Hangar.
 #
 # Release notes are taken from CHANGELOG.md (the section matching the tag's
-# version string), with any bullet tagged `**(Pro)**` stripped out so the
-# lite notes only describe features that actually ship in rtp-lite. See
-# AGENTS.md `CHANGELOG Hygiene` for the net-delta-from-last-released-tag rule
-# that keeps each section honest, and the `Pro-exclusive tagging rule` at the
-# top of CHANGELOG.md for the marker contract.
+# version string). Both editions ship the same code (ADR-100, ADR-108), so
+# new sections carry no `**(Pro)**` bullets; the strip below only matters when
+# a pre-ADR-108 section is re-published. See AGENTS.md `CHANGELOG Hygiene` for
+# the net-delta-from-last-released-tag rule and the retired marker note at the
+# top of CHANGELOG.md.
 
 on:
   workflow_dispatch:
@@ -41,6 +41,14 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+
+      # The Modrinth / Hangar descriptions below are built here from the single
+      # source docs/publishing/FRONT_PAGE.md into the gitignored
+      # scripts/release/generated/. Fail before building, tagging, or uploading
+      # anything if the source is malformed or a Hangar/Modrinth page carries
+      # promo copy (scripts/release/build_front_pages.py).
+      - name: Build front pages
+        run: python3 scripts/release/build_front_pages.py
 
       # This workflow owns the tag: derive the version from the merged version
       # branch name (v3.2.3 -> 3.2.3) or the workflow_dispatch input, falling
@@ -305,7 +313,8 @@ jobs:
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
         run: |
-          python3 scripts/release/update_modrinth_description.py --project-id rtp-lite
+          python3 scripts/release/update_modrinth_description.py --project-id rtp-lite \
+            --source-file scripts/release/generated/FRONT_PAGE_MODRINTH.md
 
       # Hangar (https://hangar.papermc.io/leaf26/LeafRTP) hosts the Lite variant
       # only; Pro is neither published nor advertised there. mc-publish supports
@@ -328,4 +337,5 @@ jobs:
         env:
           HANGAR_TOKEN: ${{ secrets.HANGAR_TOKEN }}
         run: |
-          python3 scripts/release/update_hangar_description.py --project LeafRTP
+          python3 scripts/release/update_hangar_description.py --project LeafRTP \
+            --source-file scripts/release/generated/FRONT_PAGE_HANGAR.md

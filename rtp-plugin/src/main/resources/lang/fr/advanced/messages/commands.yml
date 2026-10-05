@@ -500,6 +500,13 @@ editorTrustUsage: "&c[P0] Utilisation : /rtp editor trust nonce=<code affiché p
 editorChannelOpened: "&a[P0] Canal de l'éditeur web ouvert. Approuvez votre navigateur lorsque cela vous est demandé pour activer les aperçus et Hot-Apply."
 editorChannelLost: "&e[P1] Canal de l'éditeur web perdu : [reason]. La page continue de fonctionner à partir de son instantané."
 editorChannelExpired: "&7[P0] Le canal de l'éditeur web a expiré après [minutes] minutes. Relancez la commande de l'éditeur pour reprendre."
+editorTrustRateLimited: "&c[P0] Trop de codes de confiance de l'éditeur erronés. Attends une minute, puis réessaie."
+editorUntrustUsage: "&c[P0] Utilisation : /rtp editor untrust key=<préfixe de l'empreinte, au moins 4 caractères | all>"
+editorUntrustRemoved: "&a[P0] Confiance retirée à [count] navigateur(s) de l'éditeur web ; ils devront être de nouveau approuvés pour prévisualiser ou utiliser Hot-Apply."
+editorUntrustNone: "&7[P0] Aucun navigateur approuvé de l'éditeur ne correspond à [key]."
+editorUntrustFailed: "&c[P0] Impossible de mettre à jour la liste des éditeurs approuvés : [reason]"
+editorApplyDigestMissing: "&c[P0] La charge de l'éditeur n'a pas de somme de contrôle sha256, elle n'a donc pas été appliquée. Valide à nouveau depuis une page de l'éditeur à jour."
+editorApplyFileUnreadable: "&e[P1] Le fichier d'application hors ligne est illisible ([reason]) ; tentative via le stockage d'octets."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

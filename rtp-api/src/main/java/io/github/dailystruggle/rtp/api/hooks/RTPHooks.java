@@ -48,4 +48,10 @@ public interface RTPHooks {
   default ClaimBoundaryRegistry claimBoundaries() {
     throw new UnsupportedOperationException();
   }
+
+  /** @return the web editor extension registry (ADR-107); never {@code null}. */
+  @PublicApi
+  default EditorExtensionRegistry editorExtensions() {
+    throw new UnsupportedOperationException();
+  }
 }

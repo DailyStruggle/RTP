@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 /**
@@ -74,8 +73,8 @@ public class EditorLocalSubCmd extends BaseRTPCmdImpl {
         sendMessage(callerId, "RTP: Asynchronously generating standalone local web editor HTML bundle...");
 
         final Path finalTargetPath = targetPath;
-        // S-005: Zero synchronous disk I/O on main thread
-        CompletableFuture.runAsync(() -> {
+        // S-005: Zero synchronous disk I/O on main thread; RTP.scheduler's async pool
+        EditorSecurity.runAsync(() -> {
             try {
                 Map<String, String> configs = EditorSessionManager.getInstance().collectCurrentConfigs();
                 EditorLiveFeed.exportAndStart(finalTargetPath, configs, callerId);

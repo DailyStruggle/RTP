@@ -14,8 +14,9 @@
 -- ARGV[4] = maxScan                         (string, integer; head window cap)
 --
 -- Returns either {} (empty queue, or no eligible head within scan window), or
--- the same alternating field/value array dequeueReady.lua returns plus an
--- extra 'ownerProxy' field carrying the resolved owner ('' when absent).
+-- the same alternating field/value array dequeueReady.lua returns (incl.
+-- 'hmac') plus an extra 'ownerProxy' field carrying the resolved owner ('' when
+-- absent). The player's pending marker is cleared when it names this cid.
 local readyKey = KEYS[1]
 local thisProxy = ARGV[1]
 local nowMs = ARGV[2]
@@ -38,6 +39,7 @@ for idx = 1, #cids do
         local region = ''
         local hint = ''
         local createdAt = ''
+        local hmac = ''
         for j = 1, #env, 2 do
             local k = env[j]
             local v = env[j+1]
@@ -45,6 +47,7 @@ for idx = 1, #cids do
             elseif k == 'regionKey' then region = v
             elseif k == 'serverHint' then hint = v
             elseif k == 'createdAtMs' then createdAt = v
+            elseif k == 'hmac' then hmac = v
             end
         end
         local owner = ''
@@ -65,6 +68,10 @@ for idx = 1, #cids do
                 if ttl > 0 then
                     redis.call('EXPIRE', statusKey, ttl)
                 end
+                local pendingKey = 'rtp:net:wq:pending:' .. pid
+                if redis.call('GET', pendingKey) == cid then
+                    redis.call('DEL', pendingKey)
+                end
             end
             return {
                 'correlationId', cid,
@@ -73,6 +80,7 @@ for idx = 1, #cids do
                 'serverHint', hint,
                 'createdAtMs', createdAt,
                 'dequeuedAtMs', nowMs,
+                'hmac', hmac,
                 'ownerProxy', owner
             }
         end

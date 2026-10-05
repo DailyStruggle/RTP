@@ -134,6 +134,9 @@ exclude_docs: |
   # trees (which are not published); it is meaningless to operators and its
   # links resolve into unpublished pages, so it is kept out of the site.
   /MAP.md
+  # publishing/FRONT_PAGE.md is the tagged storefront source; its edition and
+  # audience blocks are only resolved by scripts/release/build_front_pages.py.
+  /publishing/
 
 # Keep the build honest: internal-only trees are not part of the site, so do
 # not warn about them being absent from nav.
@@ -144,6 +147,3 @@ not_in_nav: |
   /assets/
   /site/README.md
   /site/index.md
-  /FRONT_PAGE*.md
-  /FRONT_PAGE*.bbcode
-  /FRONT_PAGE_LITE_MODRINTH.md

@@ -11,8 +11,8 @@ import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 
 /**
@@ -30,18 +30,24 @@ public class EditorCmd extends BaseRTPCmdImpl {
 
     public static final String PERMISSION = "rtp.editor";
 
-    private final EditorHttpTransport transport;
+    private final Supplier<EditorHttpTransport> transports;
 
+    /** Bytebin and relay URLs from {@code advanced/network.yml editor}, re-read for every session. */
     public EditorCmd(@Nullable CommandsAPICommand parent) {
-        this(parent, new EditorHttpTransport());
+        this(parent, (Supplier<EditorHttpTransport>) EditorHttpTransport::fromConfig);
     }
 
     public EditorCmd(@Nullable CommandsAPICommand parent, EditorHttpTransport transport) {
+        this(parent, () -> transport);
+    }
+
+    private EditorCmd(@Nullable CommandsAPICommand parent, Supplier<EditorHttpTransport> transports) {
         super(parent);
-        this.transport = transport;
+        this.transports = transports;
         addSubCommand(new EditorLocalSubCmd(this));
-        addSubCommand(new ApplyCmd(this, transport));
+        addSubCommand(new ApplyCmd(this, transports));
         addSubCommand(new TrustCmd(this));
+        addSubCommand(new UntrustCmd(this));
     }
 
     @Override
@@ -77,12 +83,18 @@ public class EditorCmd extends BaseRTPCmdImpl {
 
         sendMessage(callerId, "RTP: Generating editor session payload and uploading...");
 
-        // S-005: 100% async scheduling for network and disk I/O. ADR-106 §5.6: the relay channel opens
-        // before the upload so the snapshot can name it; without it (null) the session is snapshot-only.
-        // Composed, never awaited: openHosted completes (with null on failure) within its own timeouts.
+        // S-005: 100% async scheduling for network and disk I/O (the URL settings are read from disk too).
+        // ADR-106 §5.6: the relay channel opens before the upload so the snapshot can name it; without it
+        // (null) the session is snapshot-only. Composed, never awaited: openHosted completes (with null on
+        // failure) within its own timeouts.
+        AtomicReference<EditorHttpTransport> http = new AtomicReference<>();
         AtomicReference<EditorChannel> hosted = new AtomicReference<>();
-        EditorChannelWiring.openHosted(callerId, transport, EditorLiveFeed::active)
-        .thenApplyAsync(ch -> {
+        EditorSecurity.supplyAsync(transports::get)
+        .thenCompose(t -> {
+            http.set(t);
+            return EditorChannelWiring.openHosted(callerId, t, EditorLiveFeed::active);
+        })
+        .thenCompose(ch -> EditorSecurity.supplyAsync(() -> {
             hosted.set(ch);
             try {
                 EditorSessionManager sessions = EditorSessionManager.getInstance();
@@ -91,8 +103,9 @@ public class EditorCmd extends BaseRTPCmdImpl {
                 RTP.log(Level.WARNING, "Failed to create editor session payload: " + e.getMessage(), e);
                 throw new RuntimeException("Failed to prepare payload: " + e.getMessage(), e);
             }
-        }).thenCompose(transport::postPayload)
+        })).thenCompose(json -> http.get().postPayload(json))
         .thenAccept(token -> {
+            EditorHttpTransport transport = http.get();
             EditorChannel ch = hosted.get();
             if (ch != null) {
                 try {
@@ -104,6 +117,8 @@ public class EditorCmd extends BaseRTPCmdImpl {
                     ch.close("live feed failed: " + e.getMessage());
                 }
             }
+            // The operator needs the link; logs only carry a token prefix
+            RTP.log(Level.FINE, "[editor] hosted session " + EditorSecurity.tokenPrefix(token) + " uploaded");
             String editorUrl = transport.buildEditorUrl(token);
             sendMessage(callerId, "RTP: Editor session created! Open link to edit: " + editorUrl);
             sendMessage(callerId, "RTP: Apply changes back when done using: /rtp editor apply token=" + token);

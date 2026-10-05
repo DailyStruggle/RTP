@@ -1,10 +1,11 @@
 package io.github.dailystruggle.rtp.proxy.velocity;
 
+import io.github.dailystruggle.rtp.common.network.pluginmessage.AbstractPluginMessageNetworkBinding;
+import io.github.dailystruggle.rtp.common.network.pluginmessage.PluginMessageEnvelope;
+import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat.PluginState;
-import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -49,6 +50,10 @@ import java.util.function.Supplier;
  */
 public final class VelocityProxyAvailabilityCache {
 
+    /** Upper bound on distinct live server ids (mirrors the backend peer-table cap). */
+    public static final int MAX_LIVE_SERVERS = AbstractPluginMessageNetworkBinding.MAX_TRACKED_SERVERS;
+
+    private final Object admitLock = new Object();
     private final Map<String, List<String>> configuredRegions;
     private final Supplier<? extends Collection<String>> topologyServerIds;
     private final List<String> assumedRegions;
@@ -101,16 +106,43 @@ public final class VelocityProxyAvailabilityCache {
         this.clock = clock == null ? System::currentTimeMillis : clock;
     }
 
-    /** Cache a heartbeat a backend pushed. No-op for null / id-less rows. */
-    public void onPush(BackendHeartbeat hb) {
-        if (hb == null || hb.serverId() == null || hb.serverId().isEmpty()) return;
-        live.put(hb.serverId(), new Live(hb, clock.getAsLong()));
+    /**
+     * Cache a heartbeat a backend pushed. No-op for null / id-less rows. New
+     * ids beyond {@link #MAX_LIVE_SERVERS} are refused after evicting stale rows.
+     *
+     * @return {@code true} when the row was stored
+     */
+    public boolean onPush(BackendHeartbeat hb) {
+        if (hb == null || hb.serverId() == null || hb.serverId().isEmpty()) return false;
+        long now = clock.getAsLong();
+        Live fresh = new Live(hb, now);
+        if (live.computeIfPresent(hb.serverId(), (k, v) -> fresh) != null) return true;
+        synchronized (admitLock) {
+            if (!live.containsKey(hb.serverId()) && live.size() >= MAX_LIVE_SERVERS) {
+                live.entrySet().removeIf(e -> now - e.getValue().seenMs() > staleAfterMs);
+                if (live.size() >= MAX_LIVE_SERVERS) return false;
+            }
+            live.put(hb.serverId(), fresh);
+            return true;
+        }
     }
 
-    /** Decode and cache a raw codec-encoded payload pushed by a backend. */
+    /** Decode and cache an unauthenticated (no-secret) pushed payload. */
     public void onPushPayload(byte[] payload) {
-        if (payload == null || payload.length == 0) return;
-        onPush(BackendHeartbeatCodec.decode(new String(payload, StandardCharsets.UTF_8)));
+        onPushPayload(payload, null);
+    }
+
+    /**
+     * Verify-then-decode a pushed {@link PluginMessageEnvelope} and cache it.
+     * With a verifier, unsigned / tampered rows are rejected (fail closed).
+     *
+     * @return {@code null} when stored, otherwise the rejection reason
+     *         ({@link PluginMessageEnvelope.Rejection#LIMITS} when the live table is full)
+     */
+    public PluginMessageEnvelope.Rejection onPushPayload(byte[] payload, HmacVerifier verifier) {
+        PluginMessageEnvelope.Result r = PluginMessageEnvelope.open(payload, verifier);
+        if (!r.accepted()) return r.rejection();
+        return onPush(r.heartbeat()) ? null : PluginMessageEnvelope.Rejection.LIMITS;
     }
 
     /**
@@ -151,13 +183,28 @@ public final class VelocityProxyAvailabilityCache {
         return new ArrayList<>(out.values());
     }
 
-    /** Encode each snapshot row to its canonical codec payload (one per server). */
+    /** Unsigned envelope per snapshot row (no-secret deployments). */
     public List<byte[]> snapshotPayloads() {
+        return snapshotPayloads(null);
+    }
+
+    /**
+     * Encode each snapshot row as a {@link PluginMessageEnvelope}, signed when
+     * {@code verifier} is non-null so backends can authenticate the reply.
+     * Rows exceeding the envelope size cap are skipped.
+     */
+    public List<byte[]> snapshotPayloads(HmacVerifier verifier) {
         List<byte[]> out = new ArrayList<>();
         for (BackendHeartbeat hb : snapshot()) {
-            out.add(BackendHeartbeatCodec.encode(hb).getBytes(StandardCharsets.UTF_8));
+            byte[] sealed = PluginMessageEnvelope.seal(hb, verifier);
+            if (sealed != null) out.add(sealed);
         }
         return out;
+    }
+
+    /** Visible for tests: distinct live ids currently held (fresh or not-yet-evicted stale). */
+    int liveCount() {
+        return live.size();
     }
 
     private static BackendHeartbeat synthetic(String serverId, List<String> regions, long now) {

@@ -311,12 +311,14 @@ public final class RTPNeoForgeMod {
       RTP.log(Level.FINE, "[RTP][NeoForge] ModClaimIntegrations registration skipped: " + t.getMessage());
     }
 
-    // bStats metrics telemetry on NeoForge
+    // bStats telemetry: shared entry point, default host from core state.
     try {
-      io.github.dailystruggle.rtp.common.metrics.ModdedBStatsSubmitter.start(
-          "neoforge", acc.getPluginDirectory());
+      io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
+          io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStatsCatalogue.Host.of("neoforge"),
+          io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.SERVICE_ID, "full",
+          acc.getPluginDirectory());
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP][NeoForge] bStats submitter setup skipped or failed: " + t.getMessage());
+      RTP.log(Level.FINE, "[RTP][NeoForge] bStats setup skipped or failed: " + t.getMessage());
     }
 
     // Seed <configDir>/rtp/docs/ from the bundled docs/ tree inside the running
@@ -337,6 +339,8 @@ public final class RTPNeoForgeMod {
           "[RTP][NeoForge] NeoForgeJarUtils.extractDocs dispatch failed: "
               + t.getClass().getSimpleName() + ": " + t.getMessage());
     }
+    io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry
+        .rebuildFromDataFolder(acc.getPluginDirectory());
 
     // N2.3 - register the game-bus event bridge (player join/quit, world
     // load/unload). Created here (not in the constructor) because it needs the

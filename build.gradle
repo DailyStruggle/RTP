@@ -227,6 +227,8 @@ subprojects {
             // metrics-api measured: 100% instruction / 94.6% branch.
             // Sits at Stage A target (0.95/0.85). ENTERPRISE_READINESS.md 4.2 item 13.
             ':metrics-api': [instruction: 0.95, branch: 0.85],
+            // bstats-api: new module; floor set at the Stage A strict gate.
+            ':bstats-api': [instruction: 0.90, branch: 0.80],
             // yaml-api measured: 97.0% instruction / 88.1% branch.
             // Sits at 0.92/0.80. ENTERPRISE_READINESS.md 4.2 item 7.
             ':yaml-api': [instruction: 0.92, branch: 0.80],
@@ -354,7 +356,7 @@ subprojects {
 // Closure rationale (transitive `api`/`implementation` project edges):
 //   rtp-api  -> commands-api, yaml-api, metrics-api
 //   rtp-core -> rtp-api, commands-api, yaml-api, effects-api, metrics-api,
-//               maps-api, rtp-proxy:rtp-proxy-common
+//               bstats-api, maps-api, rtp-proxy:rtp-proxy-common
 //   rtp-proxy-common   -> rtp-api
 // Every coordinate that can appear in a generated POM must itself be published,
 // otherwise a consumer's transitive resolution fails. commands-api and
@@ -367,6 +369,7 @@ def publishedModulePaths = [
         ':effects-api',
         ':yaml-api',
         ':metrics-api',
+        ':bstats-api',
         ':maps-api',
         ':rtp-proxy:rtp-proxy-common',
 ]
@@ -840,8 +843,6 @@ tasks.register('jacocoServerReport', JacocoReport) {
                     include 'io/github/dailystruggle/rtp/**'
                     exclude(
                             '**/unobf/**', '**/*Unobf*', '**/*unobf*', '**/neoforge/**', '**/*NeoForge*',
-                            // Shaded third-party decompression codec
-                            '**/lz4/**',
                             // Multi-version adapter deduplication: dormant legacy NMS/carrier shims
                             // that are structurally isomorphic to the active test platform (1.21.11)
                             '**/bukkit/v1_20*/**', '**/bukkit/v1_21_R1/**', '**/bukkit/v1_21_R5/**',
@@ -856,7 +857,6 @@ tasks.register('jacocoServerReport', JacocoReport) {
                     includes: ['classes/java/main/**', 'classes/kotlin/main/**'],
                     excludes: [
                             '**/unobf/**', '**/*Unobf*', '**/*unobf*', '**/neoforge/**', '**/*NeoForge*',
-                            '**/lz4/**',
                             '**/bukkit/v1_20*/**', '**/bukkit/v1_21_R1/**', '**/bukkit/v1_21_R5/**',
                             '**/fabric/v1_20*/**', '**/fabric/v1_21_R1/**', '**/fabric/v1_21_R5/**', '**/v26_*/**'
                     ])

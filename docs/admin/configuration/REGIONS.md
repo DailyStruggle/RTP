@@ -193,7 +193,21 @@ Uses explicit side lengths instead of a radius.
 
 #### `POLYGON`
 An arbitrary closed boundary, including concave ones, defined by a vertex list instead of a radius. It inherits the square sized to the polygon's bounding box for the spiral index and the spatial-memory store, then masks off everything outside the polygon.
-- `vertices`: List of `[x, z]` pairs in traversal order, same format Chunky uses for `/chunky shape polygon`. Needs at least 3 vertices, not all collinear, and no self-intersecting edges - any of those is rejected with a warning and falls back to the bounding square.
+- `vertices`: List of `[x, z]` pairs in traversal order, written Chunky-style - one bracketed pair per list item:
+
+  ```yaml
+  shape:
+    name: POLYGON
+    vertices:
+      - [-125c, 187c]
+      - [2000b, 3000b]
+      - [10, -4]
+  ```
+
+  The single-line form `vertices: [[-125c, 187c], [2000b, 3000b], [10, -4]]` is equivalent. Like other distance and coordinate parameters, each coordinate supports spatial unit suffixes (`b` for blocks, `c` for chunks, `r` for regions, `km`, `m`, etc.). A coordinate **without a suffix is in chunks** (1 chunk = 16 blocks), so `[10, -4]` means `[10c, -4c]`; write explicit units to avoid ambiguity.
+  - Block coordinates (Chunky / world coordinates): e.g. `[-2000b, 3000b]`, `[2000b, 3000b]`. Block values are converted to chunks and rounded to the nearest chunk (`3000b` = 187.5 chunks -> `188c`).
+  - Chunk coordinates: e.g. `[-125c, 187c]` (same as `[-125, 187]`).
+  - Needs at least 3 vertices, not all collinear, and no self-intersecting edges - any of those is rejected with a warning and falls back to the bounding square.
 - `centerX` / `centerZ`: Optional. Defaults to the center of the vertex bounding box.
 - `weight`, `uniquePlacements`, `mode`: Same meaning as `SQUARE`.
 - `expand` is not supported here and is ignored (with a warning if set) - the boundary is yours, and expanding it would push selections outside the polygon you authored.

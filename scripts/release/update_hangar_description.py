@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-Updates the Hangar project main page (description) using docs/FRONT_PAGE_LITE_MODRINTH.md.
+Updates the Hangar project main page (description) using the generated
+scripts/release/generated/FRONT_PAGE_HANGAR.md.
 
 Hangar (https://hangar.papermc.io/leaf26/LeafRTP) hosts the Lite assembly variant
-only (ADR-024). The main page is markdown, so the same source we feed to Modrinth
-is reused here. Pro is never published to nor advertised on Hangar.
+only (ADR-024). Pro is never published to nor advertised on Hangar: the Hangar
+page is built from docs/publishing/FRONT_PAGE.md by
+scripts/release/build_front_pages.py, which drops promo/purchase blocks and fails
+on any leftover promo term.
 
 Usage:
     python scripts/release/update_hangar_description.py [--project LeafRTP] [--dry-run]
@@ -27,14 +30,15 @@ import urllib.parse
 import urllib.request
 
 DEFAULT_PROJECT = "LeafRTP"
-DEFAULT_SOURCE_FILE = os.path.join("docs", "FRONT_PAGE_LITE_MODRINTH.md")
+DEFAULT_SOURCE_FILE = os.path.join("scripts", "release", "generated", "FRONT_PAGE_HANGAR.md")
 API_BASE = "https://hangar.papermc.io/api/v1"
 USER_AGENT = "DailyStruggle/RTP-Release-Pipeline (github.com/dailystruggle/RTP)"
 
 
 def read_description(file_path: str) -> str:
     if not os.path.isfile(file_path):
-        raise FileNotFoundError(f"Source description file not found: {file_path}")
+        raise FileNotFoundError(f"Source description file not found: {file_path} "
+                                "(run python scripts/release/build_front_pages.py first)")
 
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
@@ -104,7 +108,7 @@ def update_hangar(project: str, body: str, jwt: str, dry_run: bool = False) -> N
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Update Hangar main page from docs/FRONT_PAGE_LITE_MODRINTH.md")
+    parser = argparse.ArgumentParser(description="Update Hangar main page from the generated Hangar front page")
     parser.add_argument("--project", default=DEFAULT_PROJECT, help="Hangar project slug or id (default: LeafRTP)")
     parser.add_argument("--source-file", default=DEFAULT_SOURCE_FILE, help="Path to markdown source file")
     parser.add_argument("--dry-run", action="store_true", help="Perform a dry run without sending the request")

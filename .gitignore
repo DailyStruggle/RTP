@@ -179,6 +179,10 @@ __pycache__/
 # of .mca and never part of this repo. Absent -> the use-case test skips itself.
 /testdata-world/
 
+# Storefront pages built from docs/publishing/FRONT_PAGE.md by
+# scripts/release/build_front_pages.py (release.yml builds them before pushing).
+scripts/release/generated/
+
 # MkDocs generated static site output (built from docs/ into ./site by `mkdocs build`).
 # This is the generated artifact, NOT the tracked narrative source under docs/site/.
 /site/

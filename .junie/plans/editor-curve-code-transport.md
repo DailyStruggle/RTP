@@ -118,7 +118,7 @@ The local export (`/rtp editor local`, and the automatic fallback when the uploa
 5. **Fail closed.** The plugin sends `hash32(locationToXZ(s_i))` over 256 fixed sample positions per region. On a mismatch, or on any runner failure, the page draws the sketch (hosted) or the tiles (local).
 6. **Hosted-first, snapshot-carried.** Helpers, settings, state, hash and hazard runs go in the uploaded snapshot. The channel reuses the same format for updates, so the hosted page works fully without a feed.
 7. **LuckPerms-style signed channel over a public relay.**
-   - The plugin creates a bytesocks channel (default `https://bytesocks.lucko.me`, configurable next to the bytebin URL in `EditorHttpTransport`) and joins it over `wss`.
+   - The plugin creates a bytesocks channel (`advanced/network.yml editor.relayUrl`, next to `editor.bytebinUrl`; interim default `https://usersockets.luckperms.net`, since `bytesocks.lucko.me` does not resolve) and joins it over `wss`.
    - The snapshot carries `channel: {relay, id, pluginKey}`. The plugin generates an RSA-2048 key pair per server, persisted in `<dataFolder>/editor/keys/`.
    - The page generates a non-extractable WebCrypto RSA key, kept in IndexedDB so the same browser stays trusted.
    - SHA256withRSA (RSASSA-PKCS1-v1_5) works the same in Java and WebCrypto with no signature-format conversion.

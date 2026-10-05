@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Updates the Modrinth project description (body) using docs/FRONT_PAGE_LITE_MODRINTH.md.
+Updates the Modrinth project description (body) using the generated
+scripts/release/generated/FRONT_PAGE_MODRINTH.md (built from docs/publishing/FRONT_PAGE.md
+by scripts/release/build_front_pages.py).
 Usage:
     python scripts/release/update_modrinth_description.py [--project-id rtp-lite] [--dry-run]
 Environment:
@@ -16,12 +18,13 @@ import urllib.error
 import urllib.request
 
 DEFAULT_PROJECT_ID = "rtp-lite"
-DEFAULT_SOURCE_FILE = os.path.join("docs", "FRONT_PAGE_LITE_MODRINTH.md")
+DEFAULT_SOURCE_FILE = os.path.join("scripts", "release", "generated", "FRONT_PAGE_MODRINTH.md")
 
 
 def read_description(file_path: str) -> str:
     if not os.path.isfile(file_path):
-        raise FileNotFoundError(f"Source description file not found: {file_path}")
+        raise FileNotFoundError(f"Source description file not found: {file_path} "
+                                "(run python scripts/release/build_front_pages.py first)")
 
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
@@ -66,7 +69,7 @@ def update_modrinth(project_id: str, body: str, token: str, dry_run: bool = Fals
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Update Modrinth project description from docs/FRONT_PAGE_LITE_MODRINTH.md")
+    parser = argparse.ArgumentParser(description="Update Modrinth project description from the generated Modrinth front page")
     parser.add_argument("--project-id", default=DEFAULT_PROJECT_ID, help="Modrinth project ID or slug (default: rtp-lite)")
     parser.add_argument("--source-file", default=DEFAULT_SOURCE_FILE, help="Path to markdown source file")
     parser.add_argument("--dry-run", action="store_true", help="Perform a dry run without sending the request")

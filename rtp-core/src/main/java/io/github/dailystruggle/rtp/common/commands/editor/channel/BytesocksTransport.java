@@ -33,6 +33,11 @@ import java.util.regex.Pattern;
  * the transport expires {@code ttlMillis} after it started. Reconnects and expiry are driven by one
  * async {@code RTP.scheduler} timer calling {@link #tick()}. Every create / connect failure, loss,
  * reconnect and the expiry is logged with its reason (S-004).
+ *
+ * <p>bytesocks counts sent frames per IP over fixed 2-minute windows (30 by default, all channels
+ * together) and closes a socket over it with 1008; a channel with no client left is deleted, so a
+ * rejoin then gets HTTP 400. This side therefore declares {@link #FRAMES_PER_WINDOW} (the page keeps
+ * to its own smaller share, the two often sharing one IP) and closes for good on a 400 / 404 rejoin.
  */
 public final class BytesocksTransport implements ChannelTransport {
 
@@ -45,6 +50,13 @@ public final class BytesocksTransport implements ChannelTransport {
     static final int MAX_PENDING_SENDS = 256;
     /** Timer period: 20 ticks = 1 s, the backoff resolution. */
     static final long TICK_PERIOD_TICKS = 20L;
+    /** Plugin share of bytesocks' 30 frames per IP per 2 minutes; the page keeps to 10. */
+    public static final int FRAMES_PER_WINDOW = 18;
+    /**
+     * WebSocket ping control frame this often: the relay's proxy (Cloudflare) drops a socket idle for
+     * about a minute, and bytesocks counts only text frames, so the keepalive costs no frame budget.
+     */
+    static final long PING_MILLIS = 20_000L;
     private static final Pattern KEY = Pattern.compile("[A-Za-z0-9_\\-]{4,64}");
     private static final Pattern JSON_KEY = Pattern.compile("\"key\"\\s*:\\s*\"([^\"]{1,64})\"");
     private static final String USER_AGENT = "RTP-Plugin-Editor/1.0";
@@ -75,6 +87,7 @@ public final class BytesocksTransport implements ChannelTransport {
     private CompletableFuture<Void> sendChain = CompletableFuture.completedFuture(null);
     private int pendingSends;
     private long connects;
+    private long lastPingAt;
 
     /**
      * @param relayUrl {@code http(s)://host[:port]} of the relay ({@code https} joins over {@code wss})
@@ -219,15 +232,27 @@ public final class BytesocksTransport implements ChannelTransport {
         }
         return f.whenComplete((ws, t) -> {
             boolean reconnect;
+            String gone = null;
             synchronized (lock) {
                 connecting = false;
                 if (t != null || closed.get()) {
                     if (ws != null) ws.abort();
-                    // A failed first join is reported by start(); later ones retry
-                    if (t != null && !closed.get() && connects > 0) scheduleRetry("reconnect failed: " + rootMessage(t));
-                    return;
+                    // A failed first join is reported by start(); later ones retry unless the channel is gone
+                    if (t != null && !closed.get() && connects > 0) {
+                        if (channelGone(t)) gone = rootMessage(t);
+                        else scheduleRetry("reconnect failed: " + rootMessage(t));
+                    }
+                    if (gone == null) return;
                 }
+            }
+            if (gone != null) {
+                // Outside the lock: close() notifies the channel and its operator
+                close("the relay no longer has this channel (" + gone + "); run /rtp editor again for a new session");
+                return;
+            }
+            synchronized (lock) {
                 socket = ws;
+                lastPingAt = clock.getAsLong();
                 reconnect = connects++ > 0;
                 backoff = INITIAL_BACKOFF_MILLIS;
                 failures = 0;
@@ -264,6 +289,15 @@ public final class BytesocksTransport implements ChannelTransport {
             if (!expire && socket == null && !connecting && nextAttemptAt > 0 && now >= nextAttemptAt) {
                 connecting = true;
                 attempt = true;
+            }
+            if (!expire && socket != null && now - lastPingAt >= PING_MILLIS) {
+                lastPingAt = now;
+                WebSocket s = socket;
+                // Behind queued text frames: one outstanding send at a time
+                sendChain = sendChain.thenCompose(v -> s.sendPing(ByteBuffer.allocate(0))).handle((ws, t) -> {
+                    if (t != null) RTP.log(Level.FINE, "[editor] relay channel " + id + ": ping failed: " + rootMessage(t));
+                    return null;
+                });
             }
         }
         if (expire) {
@@ -365,6 +399,24 @@ public final class BytesocksTransport implements ChannelTransport {
         RTP.log(Level.INFO, "[editor] relay channel " + id + " closed: " + reason);
         Listener l = listener;
         if (l != null) l.onClosed(reason);
+    }
+
+    /** A rejoin refused with 400 / 404: bytesocks deleted the channel once its last client left. */
+    static boolean channelGone(Throwable t) {
+        for (Throwable c = t; c != null; c = c.getCause() == c ? null : c.getCause()) {
+            if (c instanceof java.net.http.WebSocketHandshakeException h && h.getResponse() != null) {
+                int code = h.getResponse().statusCode();
+                if (code == 400 || code == 404) return true;
+            }
+            String m = c.getMessage();
+            if (m != null && m.matches("(?s).*status code 40[04]\\b.*")) return true;
+        }
+        return false;
+    }
+
+    @Override
+    public int framesPerWindow() {
+        return FRAMES_PER_WINDOW;
     }
 
     private static String rootMessage(Throwable t) {

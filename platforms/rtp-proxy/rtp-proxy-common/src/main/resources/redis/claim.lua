@@ -14,8 +14,9 @@
 -- ARGV[6] = ttlSeconds (string, integer)
 -- ARGV[7] = hmacHex (string, optional - empty string when verifier disabled).
 --           Token envelope: Java pre-computes the HMAC
---           over the canonical token payload (tokenId|serverId|playerId|
---           expiresAtMs|createdAtMs|state=CLAIMED) and passes the hex
+--           over the canonical token payload (tokenSig v2: tokenId|serverId|
+--           playerId|expiresAtMs|createdAtMs|state=CLAIMED|regionKey; see
+--           CanonicalEnvelopes.canonicalToken) and passes the hex
 --           digest in here; Lua stores it opaquely as the 'hmac' HSET
 --           field. Verification is Java-side on read paths.
 -- ARGV[8] = regionKey (string, optional - empty string when the request

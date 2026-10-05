@@ -16,6 +16,13 @@ import java.util.List;
  *       indented child).</li>
  *   <li>Block-style sequences ({@code - item} at consistent indent).</li>
  *   <li>Plain, single-quoted, and double-quoted scalars.</li>
+ *   <li>Single-line flow sequences ({@code key: [a, b]}, {@code - [a, b]},
+ *       nestable as {@code [[1, 2], [3, 4]]}, empty {@code []}) holding
+ *       plain/quoted scalars - Chunky parity for polygon {@code vertices}
+ *       (ADR-034). Only an unquoted {@code [} opens one, so
+ *       {@code "[0]"} stays a string. The result is a
+ *       {@link RtpYamlSequence} with {@link RtpYamlSequence#isFlowStyle()}
+ *       set.</li>
  *   <li>{@code #} comments (whole-line only - inline trailing comments
  *       are also accepted on parse for legacy files, but are dropped
  *       and not written back; this matches ADR-042's block-only
@@ -28,8 +35,11 @@ import java.util.List;
  *   <li>Anchors ({@code &name}) - {@code rtpYaml.unsupported.anchor}</li>
  *   <li>Aliases ({@code *name}) - {@code rtpYaml.unsupported.alias}</li>
  *   <li>Merge keys ({@code <<:}) - {@code rtpYaml.unsupported.mergeKey}</li>
- *   <li>Flow mappings ({@code {a: b}}) - {@code rtpYaml.unsupported.flowMap}</li>
- *   <li>Flow sequences ({@code [a, b]}) - {@code rtpYaml.unsupported.flowSeq}</li>
+ *   <li>Flow mappings ({@code {a: b}}, also inside a flow sequence) - {@code rtpYaml.unsupported.flowMap}</li>
+ *   <li>A flow sequence as a mapping key / document root - {@code rtpYaml.unsupported.flowSeq}</li>
+ *   <li>Malformed flow sequences: unterminated ({@code rtpYaml.syntax.unterminatedFlowSeq}),
+ *       bad separators or empty entries ({@code rtpYaml.syntax.flowSeq}), or text after
+ *       the closing bracket ({@code rtpYaml.syntax.flowTrailing})</li>
  *   <li>Tags ({@code !!str}) - {@code rtpYaml.unsupported.tag}</li>
  *   <li>Document separators ({@code ---}, {@code ...}) - {@code rtpYaml.unsupported.docSep}</li>
  *   <li>Block scalars ({@code |}, {@code >}) - {@code rtpYaml.unsupported.blockScalar}</li>
@@ -263,7 +273,7 @@ public final class RtpYamlReader {
                 // empty-scalar value (null).
                 child = parseChildBlock(ln.indent);
             } else {
-                child = parseInlineScalar(afterColon, ln.lineNo, ln.indent + pk.keyLength + 2);
+                child = parseInlineValue(afterColon, ln.lineNo, ln.indent + pk.keyLength + 2);
             }
             child.setSourcePosition(ln.lineNo, ln.indent);
             child.setBlockComments(attached);
@@ -340,6 +350,10 @@ public final class RtpYamlReader {
             RtpYamlNode item;
             if (after.isEmpty()) {
                 item = parseChildBlock(ln.indent);
+            } else if (after.charAt(0) == '[') {
+                // Flow sequence item ("- [x, z]"); checked before looksLikeKey so a
+                // ':' inside the brackets is reported as a flow error, not a key.
+                item = parseInlineValue(after, ln.lineNo, ln.indent + 2);
             } else if (looksLikeKey(after)) {
                 // List item that's a mapping: rebuild as an inline mapping
                 // entry, plus any indented continuation.
@@ -351,7 +365,7 @@ public final class RtpYamlReader {
                 if (pk.afterColon.isEmpty()) {
                     child = parseChildBlock(ln.indent + 2);
                 } else {
-                    child = parseInlineScalar(pk.afterColon, ln.lineNo, ln.indent + 2 + pk.keyLength + 2);
+                    child = parseInlineValue(pk.afterColon, ln.lineNo, ln.indent + 2 + pk.keyLength + 2);
                 }
                 child.setSourcePosition(ln.lineNo, ln.indent + 2);
                 itemMap.put(pk.key, child);
@@ -359,7 +373,7 @@ public final class RtpYamlReader {
                 parseMappingBody(itemMap, ln.indent + 2);
                 item = itemMap;
             } else {
-                item = parseInlineScalar(after, ln.lineNo, ln.indent + 2);
+                item = parseInlineValue(after, ln.lineNo, ln.indent + 2);
             }
             item.setBlockComments(attachedItem);
             seq.add(item);
@@ -470,6 +484,152 @@ public final class RtpYamlReader {
         return idx == s.length() - 1 || s.charAt(idx + 1) == ' ';
     }
 
+    /**
+     * Inline value after {@code key: } or {@code - }: a flow sequence when the
+     * text opens with an unquoted {@code [}, otherwise a scalar.
+     */
+    private static RtpYamlNode parseInlineValue(String text, int line, int column) {
+        if (!text.isEmpty() && text.charAt(0) == '[') {
+            // Sequence items arrive without inline-comment stripping; mapping
+            // values already had it, and a second pass is a no-op.
+            String body = stripInlineComment(text).stripTrailing();
+            return new FlowParser(body, line, column).parseTop();
+        }
+        return parseInlineScalar(text, line, column);
+    }
+
+    /**
+     * Single-line flow-sequence parser. Items are plain or quoted scalars or
+     * nested flow sequences; flow mappings stay rejected. Multi-line flow
+     * collections are out of the subset (an unclosed {@code [} at end of line
+     * is reported as unterminated). Columns in errors are absolute.
+     */
+    private static final class FlowParser {
+        private final String s;
+        private final int line;
+        private final int column;
+        private int i;
+
+        FlowParser(String s, int line, int column) {
+            this.s = s;
+            this.line = line;
+            this.column = column;
+        }
+
+        RtpYamlSequence parseTop() {
+            RtpYamlSequence seq = parseSequence();
+            skipWs();
+            if (i < s.length()) {
+                throw error("rtpYaml.syntax.flowTrailing",
+                        "unexpected content after flow sequence", i);
+            }
+            return seq;
+        }
+
+        private RtpYamlSequence parseSequence() {
+            int open = i++;
+            RtpYamlSequence seq = new RtpYamlSequence();
+            seq.setFlowStyle(true);
+            seq.setSourcePosition(line, column + open);
+            skipWs();
+            if (i < s.length() && s.charAt(i) == ']') { i++; return seq; }
+            while (true) {
+                skipWs();
+                if (i >= s.length()) throw unterminated(open);
+                seq.add(parseItem());
+                skipWs();
+                if (i >= s.length()) throw unterminated(open);
+                char c = s.charAt(i);
+                if (c == ']') { i++; return seq; }
+                if (c != ',') {
+                    throw error("rtpYaml.syntax.flowSeq",
+                            "expected ',' or ']' in flow sequence", i);
+                }
+                i++;
+                skipWs();
+                // Trailing comma before the close is legal YAML.
+                if (i < s.length() && s.charAt(i) == ']') { i++; return seq; }
+            }
+        }
+
+        private RtpYamlNode parseItem() {
+            char c = s.charAt(i);
+            switch (c) {
+                case '[': return parseSequence();
+                case '{': throw error("rtpYaml.unsupported.flowMap", "flow mappings are not supported", i);
+                case ',':
+                case ']': throw error("rtpYaml.syntax.flowSeq", "empty entry in flow sequence", i);
+                case '&': throw error("rtpYaml.unsupported.anchor", "anchors are not supported", i);
+                case '*': throw error("rtpYaml.unsupported.alias", "aliases are not supported", i);
+                case '!': throw error("rtpYaml.unsupported.tag", "tags are not supported", i);
+                case '|':
+                case '>': throw error("rtpYaml.unsupported.blockScalar", "block scalars are not supported", i);
+                case '"':
+                case '\'': return parseQuoted();
+                default: return parsePlain();
+            }
+        }
+
+        private RtpYamlScalar parseQuoted() {
+            int start = i;
+            char q = s.charAt(i);
+            int j = i + 1;
+            while (j < s.length()) {
+                char ch = s.charAt(j);
+                if (q == '"' && ch == '\\') { j += 2; continue; }
+                if (q == '\'' && ch == '\'' && j + 1 < s.length() && s.charAt(j + 1) == '\'') { j += 2; continue; }
+                if (ch == q) break;
+                j++;
+            }
+            if (j >= s.length()) {
+                throw error("rtpYaml.syntax.unterminatedQuote", "unterminated quoted scalar", start);
+            }
+            String body = s.substring(start + 1, j);
+            i = j + 1;
+            RtpYamlScalar sc = (q == '"')
+                    ? new RtpYamlScalar(unescapeDouble(body), RtpYamlScalar.Style.DOUBLE)
+                    : new RtpYamlScalar(body.replace("''", "'"), RtpYamlScalar.Style.SINGLE);
+            sc.setSourcePosition(line, column + start);
+            return sc;
+        }
+
+        private RtpYamlScalar parsePlain() {
+            int start = i;
+            while (i < s.length()) {
+                char ch = s.charAt(i);
+                if (ch == ',' || ch == ']') break;
+                if (ch == '[' || ch == '{' || ch == '}') {
+                    throw error("rtpYaml.syntax.flowSeq",
+                            "unexpected '" + ch + "' in flow sequence entry", i);
+                }
+                if (ch == ':') {
+                    char next = i + 1 < s.length() ? s.charAt(i + 1) : ' ';
+                    if (next == ' ' || next == ',' || next == ']') {
+                        throw error("rtpYaml.unsupported.flowMap",
+                                "flow mappings are not supported", i);
+                    }
+                }
+                i++;
+            }
+            RtpYamlScalar sc = new RtpYamlScalar(s.substring(start, i).stripTrailing(), RtpYamlScalar.Style.PLAIN);
+            sc.setSourcePosition(line, column + start);
+            return sc;
+        }
+
+        private void skipWs() {
+            while (i < s.length() && (s.charAt(i) == ' ' || s.charAt(i) == '\t')) i++;
+        }
+
+        private RtpYamlParseException unterminated(int open) {
+            return error("rtpYaml.syntax.unterminatedFlowSeq",
+                    "unterminated flow sequence (missing ']')", open);
+        }
+
+        private RtpYamlParseException error(String key, String message, int offset) {
+            return new RtpYamlParseException(key, message, line, column + offset);
+        }
+    }
+
     private static RtpYamlScalar parseInlineScalar(String text, int line, int column) {
         if (text.isEmpty()) return new RtpYamlScalar("", RtpYamlScalar.Style.PLAIN);
         char first = text.charAt(0);
@@ -481,8 +641,6 @@ public final class RtpYamlReader {
                 "tags are not supported", line, column);
         if (first == '{') throw new RtpYamlParseException("rtpYaml.unsupported.flowMap",
                 "flow mappings are not supported", line, column);
-        if (first == '[') throw new RtpYamlParseException("rtpYaml.unsupported.flowSeq",
-                "flow sequences are not supported", line, column);
         if (first == '|' || first == '>') throw new RtpYamlParseException("rtpYaml.unsupported.blockScalar",
                 "block scalars are not supported", line, column);
         if (first == '"' || first == '\'') {

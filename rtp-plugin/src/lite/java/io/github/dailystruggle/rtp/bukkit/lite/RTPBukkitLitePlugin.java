@@ -21,7 +21,6 @@ import io.github.dailystruggle.rtp.bukkitplatform.server.AsyncTeleportProcessing
 import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
-import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -38,7 +37,6 @@ import java.util.stream.Collectors;
 @SuppressWarnings("unused")
 public final class RTPBukkitLitePlugin extends JavaPlugin {
   private static RTPBukkitLitePlugin instance = null;
-  private static Metrics metrics;
   /** Backend-side network mode lifecycle holder; never null after onLoad. */
   private final NetworkModeBootstrap networkBootstrap = new NetworkModeBootstrap();
   public BukkitTask commandTimer = null;
@@ -120,14 +118,15 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
 
     // bStats: lite uses a distinct pluginId (12277) so lite installs are tracked
     // separately from full (30865), preserving continuity for the lite install base.
-    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable ENTER -- initializing bStats Metrics(id=12277)");
-    metrics = new Metrics(this, 12277);
-    // Register the RTP cost-metrics chart catalogue. All chart lambdas read
-    // RTP.metrics.snapshot() and bucketise to keep submissions privacy-safe and
-    // low-cardinality.
-    io.github.dailystruggle.rtp.bukkit.metrics.RTPCostMetricsCharts.register(metrics, "lite");
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable ENTER -- initializing bStats (id=12277)");
+    // Shared bStats entry point (bstats-api client + RTP chart catalogue). All chart
+    // lambdas read RTP.metrics.snapshot() and bucketise to keep submissions
+    // privacy-safe and low-cardinality.
+    io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
+        new io.github.dailystruggle.rtp.bukkit.metrics.BukkitBStatsHost(this),
+        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.LITE_SERVICE_ID, "lite", getDataFolder());
 
-    // Install the platform-appropriate MetricsBinding so /rtp info, RTPCostMetricsCharts,
+    // Install the platform-appropriate MetricsBinding so /rtp info, the bStats charts,
     // and every other Metrics.snapshot() consumer report live values instead of
     // UNSAMPLED sentinels. Best-effort; never aborts plugin enable.
     io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.install();
@@ -352,6 +351,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
 
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable JarUtils.extractDocs version=" + getDescription().getVersion());
     JarUtils.extractDocs(getDataFolder(), getDescription().getVersion());
+    io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry.rebuildFromDataFolder(getDataFolder());
 
     // ADR-023 - Login Reserve Cache: snapshot max-players at startup, allocate
     // the buffer on the default-world region (Bukkit.getWorlds().get(0)), and
@@ -499,7 +499,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     } catch (NoClassDefFoundError ignored) {
     }
 
-    metrics = null;
+    io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.shutdown();
 
     try {
       RTP.log(java.util.logging.Level.FINE, "[RTP] onDisable RTP.stop() invoking core shutdown");

@@ -70,14 +70,18 @@ echo location of your Java installation. 1>&2
 :execute
 @rem Setup the command line
 
-@rem Transparent concurrency serialization: delegate through PowerShell mutex if not already holding lock
-if not "%RTP_GRADLE_LOCKED%"=="1" (
-    set RTP_GRADLE_LOCKED=1
-    set "RTP_GRADLE_RAW_ARGS=%*"
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "$raw = $env:RTP_GRADLE_RAW_ARGS; $rawArgs = if ($raw) { @([regex]::Matches($raw, '\S+') | ForEach-Object { $_.Value }) } else { @() }; $targets = @($rawArgs | Where-Object { $_ -match '^:[a-zA-Z0-9_\-\.:]+' -and $_ -notmatch '^-' }); $topModules = @(); foreach ($t in $targets) { $parts = $t.TrimStart(':').Split(':'); if ($parts.Length -gt 1) { $topModules += $parts[0] } else { $topModules += '__ROOT__' } }; $distinctModules = @($topModules | Select-Object -Unique); $hasNonModuleTasks = @($rawArgs | Where-Object { $_ -notmatch '^-' -and $_ -notmatch '^:' }).Count -gt 0; if ($distinctModules.Count -eq 1 -and -not $hasNonModuleTasks -and $distinctModules[0] -ne '__ROOT__') { $mod = $distinctModules[0]; $globalMutex = [System.Threading.Mutex]::new($false, 'Global\RTP_Gradle_Build_Mutex'); $modMutex = [System.Threading.Mutex]::new($false, ('Global\RTP_Gradle_Lock_' + $mod)); $hasGlobal = $false; $hasMod = $false; try { $waited = 0; while (-not $hasMod) { try { $hasGlobal = $globalMutex.WaitOne(500) } catch [System.Threading.AbandonedMutexException] { $hasGlobal = $true }; if ($hasGlobal) { try { $hasMod = $modMutex.WaitOne(4500) } catch [System.Threading.AbandonedMutexException] { $hasMod = $true }; try { $globalMutex.ReleaseMutex() } catch {}; $hasGlobal = $false }; if ($hasMod) { break }; $waited += 5; [Console]::Out.WriteLine('[gradlew] Waiting for module lock :' + $mod + '... (' + $waited + 's)'); if ($waited -ge 600) { Write-Error ('[gradlew] Timed out waiting for module lock :' + $mod); exit 1 } }; & cmd.exe /c \"\"%~f0\" %*\"; exit $LASTEXITCODE } finally { if ($hasGlobal) { try { $globalMutex.ReleaseMutex() } catch {} }; if ($hasMod) { try { $modMutex.ReleaseMutex() } catch {} }; $globalMutex.Dispose(); $modMutex.Dispose() } } else { $mutex = [System.Threading.Mutex]::new($false, 'Global\RTP_Gradle_Build_Mutex'); $hasLock = $false; try { $waited = 0; while (-not $hasLock) { try { $hasLock = $mutex.WaitOne(5000) } catch [System.Threading.AbandonedMutexException] { $hasLock = $true }; if ($hasLock) { break }; $waited += 5; [Console]::Out.WriteLine('[gradlew] Waiting for global build lock... (' + $waited + 's)'); if ($waited -ge 600) { Write-Error '[gradlew] Timed out waiting for Gradle build lock.'; exit 1 } }; & cmd.exe /c \"\"%~f0\" %*\"; exit $LASTEXITCODE } finally { if ($hasLock) { try { $mutex.ReleaseMutex() } catch {} }; $mutex.Dispose() } }"
-    set "RTP_GRADLE_RAW_ARGS="
-    goto exitWithErrorLevel
-)
+@rem Transparent concurrency serialization: re-run this script under a mutex (gradle\rtp-gradle-lock.ps1)
+@rem unless already holding one. The arguments travel as data in RTP_GRADLE_RAW_ARGS and are never
+@rem spliced into PowerShell source, so quoted arguments such as --tests "*Foo*" survive. Unquoted set
+@rem and no parenthesized block: the arguments' own quotes keep their special characters literal.
+if "%RTP_GRADLE_LOCKED%"=="1" goto runGradle
+set RTP_GRADLE_LOCKED=1
+set RTP_GRADLE_SELF=%~f0
+set RTP_GRADLE_RAW_ARGS=%*
+powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\rtp-gradle-lock.ps1"
+goto exitWithErrorLevel
+
+:runGradle
 
 @rem Execute Gradle
 @rem endlocal doesn't take effect until after the line is parsed and variables are expanded

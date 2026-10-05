@@ -100,9 +100,12 @@ https://dailystruggle.github.io/RTP/editor#e4d2a90f1b2c3d4e
 Click the link to open the workspace in your browser on Screen 2.
 
 - **Panel 1: 🗺 Visual Region Editor**
-  - **Pan & Zoom:** Navigate around world coordinate origins (X: 0, Z: 0).
-  - **Drag Vertices:** Click and drag polygon vertices to adjust region perimeters. Redundant collinear points are simplified dynamically (ADR-099).
-  - **Adjust Donut Rings:** Modify the outer `radius` or inner `centerRadius` (deadzone exclusion).
+  - **Pan & Zoom:** Scroll to zoom; drag empty map space (or right / middle drag, Shift / Ctrl + drag) to pan.
+  - **Move a Region:** Drag the round centre handle to move the region. `centerX` / `centerZ` snap to whole chunks (or the 🧲 Snap grid) and keep the unit you wrote (`4096b` stays in blocks, `256c` / `256` stay in chunks). For a polygon, drag the centre handle or anywhere inside the shape to shift every vertex.
+  - **Resize a Region:** Drag the square handles on the outer edge to change `radius` (`ELLIPSE`: `radius` on the X axis, `radius2` on the Z axis; `RECTANGLE`: `width` / `height` from the edges, both from the corners). Drag the pink handles on the inner ring to change `centerRadius` / `centerRadius2` (the deadzone hole). The hole always stays smaller than the outer edge. For a polygon, the outer handles scale every vertex about the centre, and a scale that would collapse or cross the outline is refused.
+  - **Live Values:** The cursor changes over a handle, and a label shows the value as you drag (e.g. `radius 260c (4160 b)`). The YAML diff updates while you drag; the server path preview is requested once, when you let go.
+  - **Drag Vertices:** Click and drag polygon vertices to adjust region perimeters. Vertices take priority over the move / resize handles. Redundant collinear points are simplified dynamically (ADR-099).
+  - **Type Exact Values:** Every value a handle changes can also be typed in the shape settings form, which uses the same staging path.
   - **Visualization Layers:** Toggle overlays for chunk-resolution pregenerated land (biome data streamed progressively to maintain > 5 FPS), rejected candidate blocks (`bad-locations`), and 1D Archimedean spiral walk traces (ADR-001).
 
 - **Panel 2: 📊 Diagnostics & Telemetry**

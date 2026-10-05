@@ -149,6 +149,10 @@ include 'maps-api'
 // BukkitTpsSampler, FoliaMetricsBinding + FoliaRegionTpsSampler,
 // FabricMetricsBinding) stay in their respective platform adapters.
 include 'metrics-api'
+// bstats-api -- dependency-free bStats v2 client (bstats-api-ADR-001). Pure
+// Java, no RTP-module or platform dependency, so sibling plugins (backend or
+// proxy) can reuse it; hosts supply scheduler + logger through its SPI.
+include 'bstats-api'
 // anvil-api -- platform-neutral vanilla Anvil region-file decode / NBT
 // pre-filter (ADR-016). No RTP-module or platform dependency, so it groups
 // under api/ with the other non-rtp-exclusive modules. Renamed from the
@@ -172,6 +176,7 @@ if (!excludeJdk25) {
 project(':yaml-api').projectDir     = file('api/yaml-api')
 project(':maps-api').projectDir     = file('api/maps-api')
 project(':metrics-api').projectDir  = file('api/metrics-api')
+project(':bstats-api').projectDir   = file('api/bstats-api')
 project(':anvil-api').projectDir    = file('api/anvil-api')
 project(':tags-api').projectDir     = file('api/tags-api')
 

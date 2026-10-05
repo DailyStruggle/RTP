@@ -71,20 +71,18 @@ class NetworkBindingsEdgeTest {
     }
 
     @Test
-    void open_sqlWithUnsetHmacSecret_fallsBackToInMemory() {
+    void open_sqlWithUnsetHmacSecret_failsClosed() {
         DataSource ds = mock(DataSource.class);
         NetworkConfig cfg = configWith("sql", "UNSET_ENV_FOR_TEST_XYZ");
-        try (NetworkTransport transport = NetworkBindings.open(cfg, ds)) {
-            assertInstanceOf(InMemoryNetworkStateBinding.class, transport);
-        }
+        assertThrows(io.github.dailystruggle.rtp.proxy.common.config.NetworkConfigException.class,
+                () -> NetworkBindings.open(cfg, ds));
     }
 
     @Test
-    void open_redisWithUnsetHmacSecret_fallsBackToInMemory() {
+    void open_redisWithUnsetHmacSecret_failsClosed() {
         NetworkConfig cfg = configWith("redis", "UNSET_ENV_FOR_TEST_XYZ");
-        try (NetworkTransport transport = NetworkBindings.open(cfg, null)) {
-            assertInstanceOf(InMemoryNetworkStateBinding.class, transport);
-        }
+        assertThrows(io.github.dailystruggle.rtp.proxy.common.config.NetworkConfigException.class,
+                () -> NetworkBindings.open(cfg, null));
     }
 
     @Test

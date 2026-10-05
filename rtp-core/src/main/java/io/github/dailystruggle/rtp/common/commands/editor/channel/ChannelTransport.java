@@ -12,6 +12,18 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface ChannelTransport {
 
+    /** Window {@link #framesPerWindow()} counts over (any window of this length, not a fixed one). */
+    long FRAME_WINDOW_MILLIS = 120_000L;
+
+    /**
+     * Frames this side may send in any {@link #FRAME_WINDOW_MILLIS}, or 0 for no limit. A relay
+     * that counts frames per IP and closes over its limit (bytesocks: 1008) returns its share here;
+     * {@link EditorChannel} then paces replies and bundles pushes to stay under it.
+     */
+    default int framesPerWindow() {
+        return 0;
+    }
+
     /** Callbacks may run on any thread; keep them short and non-blocking. */
     interface Listener {
         void onFrame(String text);

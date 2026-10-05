@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
 
 /**
  * The proxy-side trigger
@@ -66,6 +67,14 @@ public final class TransportRequestTriggerSource {
      * in-memory transports). See {@code rtp-proxy-ADR-016}.
      */
     private final String thisProxyId;
+    /**
+     * Optional local-presence gate ({@code ProxySender::isConnected} on the
+     * proxy). Dequeued {@code playerId}s come from a shared store; when this
+     * predicate is set, envelopes for players without a session on this
+     * proxy are cancelled and never dispatched. {@code null} defers the
+     * check to the dispatcher.
+     */
+    private final Predicate<UUID> localPresence;
 
     private final List<Thread> workers = new ArrayList<>();
     private volatile boolean running;
@@ -109,6 +118,22 @@ public final class TransportRequestTriggerSource {
                                          Duration pollTimeout,
                                          Logger logger,
                                          String thisProxyId) {
+        this(queue, dispatcher, workerThreads, pollTimeout, logger, thisProxyId, null);
+    }
+
+    /**
+     * Presence-gated constructor. {@code localPresence} answers "does this
+     * proxy currently hold a session for the player?" (Velocity:
+     * {@code sender::isConnected}); {@code null} disables the gate here.
+     */
+    public TransportRequestTriggerSource(NetworkRequestQueue queue,
+                                         RtpDispatcher dispatcher,
+                                         int workerThreads,
+                                         Duration pollTimeout,
+                                         Logger logger,
+                                         String thisProxyId,
+                                         Predicate<UUID> localPresence) {
+        this.localPresence = localPresence;
         this.queue = Objects.requireNonNull(queue, "queue");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
         this.workerThreads = Math.max(1, workerThreads);
@@ -269,6 +294,26 @@ public final class TransportRequestTriggerSource {
     private void dispatchEnvelope(NetworkRequestQueue.QueueEnvelope env) {
         UUID playerId = env.playerId();
         UUID correlationId = env.correlationId();
+        if (localPresence != null && !isLocal(playerId)) {
+            // Not connected here: never act on a shared-store playerId for a
+            // foreign / absent session. Cancel mirrors the dispatcher's
+            // PLAYER_GONE path so the status row does not linger.
+            logger.info("RTP TransportRequestTriggerSource: player {} not connected to this proxy; "
+                    + "skipping dispatch of correlationId={}.", playerId, correlationId);
+            try {
+                queue.cancel(playerId, NetworkRequestQueue.CancelReason.PLAYER_DISCONNECT)
+                        .whenComplete((v, err) -> {
+                            if (err != null) {
+                                logger.warn("RTP TransportRequestTriggerSource: cancel failed for player {}: {}",
+                                        playerId, err.getMessage());
+                            }
+                        });
+            } catch (RuntimeException re) {
+                logger.warn("RTP TransportRequestTriggerSource: cancel threw for player {}: {}",
+                        playerId, re.getMessage());
+            }
+            return;
+        }
         // Phase B trace (2026-05-23): worker has popped an envelope from the
         // queue and is about to hand it to the dispatcher. Logged at INFO so
         // devstack repros can confirm the proxy actually received the
@@ -318,5 +363,16 @@ public final class TransportRequestTriggerSource {
             // Non-fatal outcomes are already emitted by the dispatcher's
             // StatusSink; we deliberately do not double-log.
         });
+    }
+
+    /** Fail closed: a throwing presence predicate counts as "not local". */
+    private boolean isLocal(UUID playerId) {
+        try {
+            return localPresence.test(playerId);
+        } catch (RuntimeException re) {
+            logger.warn("RTP TransportRequestTriggerSource: presence check threw for player {}: {}",
+                    playerId, re.getMessage());
+            return false;
+        }
     }
 }

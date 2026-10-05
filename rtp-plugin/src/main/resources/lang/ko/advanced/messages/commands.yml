@@ -485,5 +485,12 @@ editorTrustUsage: "&c[P0] 사용법: /rtp editor trust nonce=<편집기 페이�
 editorChannelOpened: "&a[P0] 웹 편집기 채널이 열렸습니다. 요청이 오면 브라우저를 신뢰해 미리보기와 Hot-Apply를 켜세요."
 editorChannelLost: "&e[P1] 웹 편집기 채널 연결 끊김: [reason]. 페이지는 스냅샷으로 계속 동작합니다."
 editorChannelExpired: "&7[P0] 웹 편집기 채널이 [minutes]분 후 만료되었습니다. 계속하려면 편집기 명령을 다시 실행하세요."
+editorTrustRateLimited: "&c[P0] 잘못된 에디터 신뢰 코드가 너무 많습니다. 1분 후에 다시 시도하세요."
+editorUntrustUsage: "&c[P0] 사용법: /rtp editor untrust key=<지문 접두사, 4자 이상 | all>"
+editorUntrustRemoved: "&a[P0] 웹 에디터 브라우저 [count]개의 신뢰를 해제했습니다. 미리보기나 Hot-Apply를 하려면 다시 신뢰해야 합니다."
+editorUntrustNone: "&7[P0] [key]와 일치하는 신뢰된 에디터 브라우저가 없습니다."
+editorUntrustFailed: "&c[P0] 신뢰된 에디터 목록을 업데이트할 수 없습니다: [reason]"
+editorApplyDigestMissing: "&c[P0] 에디터 페이로드에 sha256 체크섬이 없어 적용되지 않았습니다. 최신 에디터 페이지에서 다시 커밋하세요."
+editorApplyFileUnreadable: "&e[P1] 오프라인 적용 파일을 읽을 수 없습니다([reason]). 바이트 저장소를 시도합니다."
 
 version: 1.0

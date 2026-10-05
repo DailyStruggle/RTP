@@ -316,7 +316,8 @@ dependencies {
     compileOnly 'com.github.sirblobman.combatlogx:api:11.7-SNAPSHOT'
     compileOnly('me.chancesd.pvpmanager:pvpmanager:4.0.8') { transitive = false }
 
-    implementation 'org.bstats:bstats-bukkit:3.0.3'
+    // bStats: no third-party library; the in-tree :bstats-api client arrives
+    // transitively via rtp-core (bstats-api-ADR-001).
 
     // JDBC drivers (H2, SQLite, MySQL, PostgreSQL) are intentionally NOT bundled.
     // We cannot shade in every database dependency (size, license, native binaries),
@@ -583,19 +584,14 @@ shadowJar {
     exclude 'io/airlift/compress/gzip/**'
     exclude 'io/airlift/compress/deflate/**'
 
-    // lz4-java native binaries for architectures Minecraft servers never run on
-    // (saves ~160 KB comp / ~275 KB raw). Safe pure-Java/JNI fallback exists in lz4-java.
-    exclude 'linux/i386/**'
-    exclude 'linux/s390x/**'
-    exclude 'linux/ppc64le/**'
-    exclude 'linux/mips64/**'
-    exclude 'linux/riscv64/**'
+    // Multi-release module descriptors (e.g. SnakeYAML 2.x) name pre-relocation packages
+    // and are meaningless inside a shaded plugin jar.
+    exclude 'META-INF/versions/*/module-info.class'
 
-    relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
-    // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
-    // Required at runtime by rtp-anvil for LZ4-compressed chunk decode.
-    // Relocate to avoid clashing with other plugins shading the same lib.
-    relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
+    // aircompressor (zstd for .linear regions). Relocated to avoid clashing with other
+    // plugins shading the same lib; the Class.forName probe in LinearRegionReader is a
+    // string constant and is rewritten too.
+    relocate 'io.airlift.compress', 'io.github.dailystruggle.rtp.aircompressor'
 
     // The JDK-25 v26_1_R1 adapter bytecode is INTENTIONALLY NOT merged here.
     //
@@ -613,10 +609,9 @@ shadowJar {
     // Solution: merge v26_1_R1 bytecode AFTER remapJar via the `mergeV26`
     // task below, so its classes survive intact.
     //
-    // NOTE: shadowJar's `minimize()` is deliberately NOT used here. The heavy
-    // shaded libs are either reflectively driven (Jedis pub/sub, lz4 Safe/
-    // Unsafe variant selection) or relocated into our own namespace (Hikari,
-    // bstats), and every published RTP module exposes an addon-facing API plus
+    // NOTE: shadowJar's `minimize()` is deliberately NOT used here. The shaded
+    // libs are relocated into our own namespace (aircompressor), and
+    // every published RTP module exposes an addon-facing API plus
     // descriptor-loaded platform entry points (RTPFabricMod, the Velocity main,
     // plugin.yml main) that static reachability analysis cannot see. Under
     // those constraints minimize() would trim only a few KB of genuinely-unused
@@ -1210,9 +1205,8 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
         // from the Pro source set for config/locale parity -- lite no longer
         // ships reduced overlays of them.
     }
-    // The lite binary is MIT-licensed (ADR-061): ship the MIT text as the
-    // in-jar LICENSE, not the repo-root PolyForm Noncommercial LICENSE (which
-    // governs the Pro-only source). Renamed in-jar to `LICENSE` so existing
+    // Both binaries are MIT-licensed (ADR-108); the lite jar ships LICENSE-MIT
+    // (identical to the root LICENSE) renamed to `LICENSE` so existing
     // consumers/tooling still find it at the conventional path.
     from(rootProject.file('LICENSE-MIT')) {
         rename { 'LICENSE' }
@@ -1257,11 +1251,10 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
             // SQL/Redis persistence drivers and accessors are retained in lite
             // for complete backend parity (retroactive early-access graduation).
             !(dep.group == 'org.apache.httpcomponents') &&
-            // org.lz4:lz4-java is REQUIRED at runtime by rtp-anvil's chunk
-            // decompression path (compression mode 4 in r.X.Z.mca). rtp-anvil
-            // is intentionally kept in lite, so its lz4 transitive must be too.
-            // Stripping it caused NoClassDefFoundError: net/jpountz/lz4/LZ4FrameInputStream
-            // on every Anvil probe of an LZ4-compressed chunk. Relocated below.
+            // lz4-java arrives as a Loom-listed Minecraft library. RTP decodes LZ4
+            // in-house (ADR-016 section 15) and must not ship it.
+            !(dep.group == 'org.lz4') &&
+            !(dep.group == 'at.yawk.lz4') &&
             !(dep.group == 'org.jline') &&
             !(dep.group == 'org.json') &&
             !(dep.group == 'com.mojang')
@@ -1292,7 +1285,8 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
         // Mojang/Loom logging/console strips
         exclude(dependency('net.minecrell:.*'))
         exclude(dependency('org.apache.httpcomponents:.*'))
-        // org.lz4:lz4-java retained -- see comment in configurations filter above.
+        exclude(dependency('org.lz4:.*'))
+        exclude(dependency('at.yawk.lz4:.*'))
         exclude(dependency('org.jline:.*'))
         exclude(dependency('org.json:.*'))
     }
@@ -1300,15 +1294,17 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // Class-level excludes -- ADR-024 drops list (as amended by ADR-100 technical parity).
     // NOTE: rtp-anvil is INTENTIONALLY KEPT in lite (ADR-024 reversal: performance parity
     // with Pro for benchmark comparisons; BukkitRTPWorld hard-references AnvilProbeSupport).
-    // NOTE: Fabric, Folia, SQL, and Redis are INTENTIONALLY KEPT in lite per ADR-100 technical parity.
-    exclude 'io/github/dailystruggle/rtp/tags/**'
+    // NOTE: Fabric, Folia, SQL, Redis, and the safety tag/predicate grammar (rtp-api
+    // SafetyTokenParser + rtp-core SafetyTokenExpander) are INTENTIONALLY KEPT in lite
+    // per ADR-100 / ADR-108 parity. `:tags-api` is a dependency of neither jar.
     // Networking/CLI transitives pulled in by Loom -- unused at runtime in lite.
     exclude 'org/apache/http/**'
     exclude 'org/apache/commons/**'
     exclude 'org/jline/**'
     exclude 'org/json/**'
-    // net/jpountz/** retained -- rtp-anvil needs LZ4FrameInputStream at runtime.
-    // Relocated to io.github.dailystruggle.rtp.lz4 below.
+    // lz4-java classes and JNI binaries (see dependency filter above).
+    exclude 'net/jpountz/**'
+    exclude '**/liblz4-java.*'
     exclude 'mozilla/**'
     exclude 'flightrecorder-config.jfc'
     // ADR-024 Phase B audit: Mojang/MC asset stubs and version manifest leak past
@@ -1342,13 +1338,8 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     exclude 'io/airlift/compress/gzip/**'
     exclude 'io/airlift/compress/deflate/**'
 
-    // lz4-java native binaries for architectures Minecraft servers never run on
-    // (saves ~160 KB comp / ~275 KB raw). Safe pure-Java/JNI fallback exists in lz4-java.
-    exclude 'linux/i386/**'
-    exclude 'linux/s390x/**'
-    exclude 'linux/ppc64le/**'
-    exclude 'linux/mips64/**'
-    exclude 'linux/riscv64/**'
+    // Multi-release module descriptors -- see the matching note in the Pro shadowJar.
+    exclude 'META-INF/versions/*/module-info.class'
     // Concrete SQL database options, LoginCacheTask, and Redis transport are INTENTIONALLY KEPT in lite
     // for full storage, parity, and feature completeness (ADR-100).
     // Resources dropped from lite.
@@ -1401,13 +1392,10 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     // Same relocations as full, minus H2 (not shaded).
-    relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
     // commands-api and effects-api are RTP's public addon SPIs and ship
     // unrelocated so addons (compileOnly against them) link at runtime. See the
     // matching note in the Pro shadowJar relocate block above.
-    // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
-    // Relocate to avoid clashing with any other plugin shading the same lib.
-    relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
+    relocate 'io.airlift.compress', 'io.github.dailystruggle.rtp.aircompressor'
 
     // Lite ships the same operator docs as Pro; copyDocs (a processResources
     // dependency) stages them into the main resources output that this jar
@@ -1549,8 +1537,8 @@ tasks.register('liteJarStructureCheck') {
             throw new GradleException("ADR-024 structure check: lite JAR not found at ${jarFile}")
         }
         def forbidden = [
-            // anvil intentionally retained in lite (see shadowLiteJar comment).
-            ~'^io/github/dailystruggle/rtp/tags/.*$',
+            // anvil and the safety tag/predicate grammar intentionally retained in lite
+            // (see shadowLiteJar comment).
             // Folia intentionally retained in lite as of ADR-100 technical parity.
             // Fabric (rtp/fabric/**) intentionally retained in lite as of the 2026-05-07
             // ADR-024 amendment -- see shadowLiteJar comment.
@@ -1633,24 +1621,24 @@ tasks.register('liteJarStructureCheck') {
                 missingRequired.sort().join('\n  '))
         }
 
-        // ADR-061: the lite binary is MIT-licensed. Assert the in-jar LICENSE
-        // is the MIT text and NOT the repo-root PolyForm Noncommercial license
-        // (which governs the Pro-only source).
+        // ADR-108: the lite binary is MIT-licensed. Assert the in-jar LICENSE is
+        // the MIT text; the PolyForm guard catches a regression to the pre-ADR-108
+        // open-core LICENSE (ADR-061, superseded).
         new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
             def license = zip.getEntry('LICENSE')
             if (license == null) {
-                throw new GradleException("ADR-061 license check: LICENSE missing from lite JAR")
+                throw new GradleException("ADR-108 license check: LICENSE missing from lite JAR")
             }
             def licenseText = zip.getInputStream(license).getText('UTF-8')
             if (!licenseText.contains('MIT License')) {
                 throw new GradleException(
-                    "ADR-061 license check: lite JAR LICENSE is not the MIT text. " +
+                    "ADR-108 license check: lite JAR LICENSE is not the MIT text. " +
                     "Expected the MIT license (LICENSE-MIT), got:\n  " +
                     licenseText.readLines().take(3).join('\n  '))
             }
             if (licenseText.contains('PolyForm Noncommercial')) {
                 throw new GradleException(
-                    "ADR-061 license check: lite JAR LICENSE contains the PolyForm " +
+                    "ADR-108 license check: lite JAR LICENSE contains the PolyForm " +
                     "Noncommercial text. The lite binary must ship the MIT license only.")
             }
         }

@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
+import io.github.dailystruggle.rtp.common.commands.editor.channel.BytesocksTransport;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -8,6 +10,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -74,6 +80,79 @@ class EditorChannelPageContractTest {
     }
 
     @Test
+    @DisplayName("hazard-delta versions are base/version: from/to are the channel's sender and recipient headers")
+    void hazardDeltaFieldsAreNotHeaders() throws IOException {
+        String html = page();
+        int start = html.indexOf("async function ingestHazardDelta(msg)");
+        assertTrue(start > 0, "hazard-delta handler present");
+        String body = html.substring(start, html.indexOf("\n}\n", start));
+        assertTrue(body.contains("msg.version") && body.contains("msg.base"), "versions read from base/version");
+        assertFalse(body.contains("msg.to") || body.contains("msg.from"), "header fields never read as versions");
+    }
+
+    @Test
+    @DisplayName("ADR-107 §5.3 bundle items of any well-formed push type are dispatched; control frames never ride in a bundle")
+    void bundleUnpacking() throws IOException {
+        String html = page();
+        Matcher m = Pattern.compile("const CHANNEL_CONTROL = new Set\\(\\[([^\\]]*)\\]\\);").matcher(html);
+        assertTrue(m.find(), "control type list declared");
+        Set<String> control = new TreeSet<>();
+        Arrays.stream(m.group(1).split(",")).map(s -> s.trim().replace("'", "")).forEach(control::add);
+        assertTrue(control.containsAll(Set.of("hello-reply", "bye", "pong", EditorChannel.BUNDLE_TYPE)), control.toString());
+        for (String t : EditorChannel.BUNDLED) assertFalse(control.contains(t), t + " is a bundled push, not control");
+        assertTrue(html.contains("msg.type === '" + EditorChannel.BUNDLE_TYPE + "'"), "bundle handled in receive");
+        int bundle = html.indexOf("msg.type === 'bundle'");
+        int verify = html.indexOf("crypto.subtle.verify(RSA, st.pluginKey");
+        assertTrue(bundle > verify, "items are dispatched only after the bundle's signature is checked");
+        assertTrue(html.contains("|| CHANNEL_CONTROL.has(item.type)) { drop('bad bundle item'); continue; }"),
+                "no hello-reply / bye / nested bundle inside a bundle");
+        assertTrue(html.contains("!CHANNEL_TYPE_RE.test(item.type)"), "malformed item types dropped");
+
+        Matcher re = Pattern.compile("const CHANNEL_TYPE_RE = /(.*)/;").matcher(html);
+        assertTrue(re.find(), "type grammar declared");
+        Pattern type = Pattern.compile(re.group(1));
+        for (String ok : List.of("feed", "hazard-delta", "leafrtp-action.state", "demo.zones_2")) assertTrue(type.matcher(ok).matches(), ok);
+        for (String bad : List.of("Feed", "a.b.c", ".x", "x.", "x y")) assertFalse(type.matcher(bad).matches(), bad);
+        assertTrue(html.contains("if (!fn) { st.ignored++; return; }"), "a type without a handler is ignored, not dropped");
+        assertTrue(html.contains("if (!fn && dot > 0) fn = namespaces[m.type.slice(0, dot)];"), "extension types reach their namespace");
+        assertTrue(html.contains("if (type.indexOf('.') > 0 && protocolOf(st.protocol) < 2) return false;"),
+                "no extension types to a protocol 1 plugin");
+    }
+
+    @Test
+    @DisplayName("On a wss:// relay the page and plugin frame shares together stay within bytesocks' 30 frames per IP per 2 minutes")
+    void relayFrameShares() throws IOException {
+        String html = page();
+        Matcher m = Pattern.compile("const CHANNEL_PAGE_FRAMES = (\\d+);").matcher(html);
+        assertTrue(m.find(), "page frame share declared");
+        int pageShare = Integer.parseInt(m.group(1));
+        assertTrue(pageShare + BytesocksTransport.FRAMES_PER_WINDOW <= 30,
+                "page " + pageShare + " + plugin " + BytesocksTransport.FRAMES_PER_WINDOW + " frames");
+        assertTrue(html.contains("const CHANNEL_FRAME_WINDOW_MS = 120000;"), "same 2-minute window as the plugin");
+        assertTrue(html.contains("st.cfg.relay.startsWith('wss://')"), "only relays are paced; loopback stays immediate");
+        int enqueue = html.indexOf("function enqueue(obj)");
+        assertTrue(enqueue > 0 && html.indexOf("st.sentAt.push(Date.now());", enqueue) - enqueue < 80,
+                "every outbound frame (hello, ping, queued sends) is counted");
+        assertTrue(html.contains("if (st.sentAt.length >= CHANNEL_PAGE_FRAMES) return;"), "a ping never overruns the share");
+        assertTrue(html.contains("const queued = st.outQueue.find(q => q.type === 'focus');"), "focus updates coalesce");
+    }
+
+    @Test
+    @DisplayName("Hot-Apply sends every staged file that differs from the server copy and advances that baseline on success")
+    void hotApplySendsAllChangedFiles() throws IOException {
+        String html = page();
+        int start = html.indexOf("function hotApplyWebSocket()");
+        String body = html.substring(start, html.indexOf("\n}\n", start));
+        assertTrue(body.contains("const files = hotApplyChangedFiles();"), "files gathered from every staged config");
+        assertFalse(body.contains("[regionTargetFile]"), "not just the active region's file");
+        int changed = html.indexOf("function hotApplyChangedFiles()");
+        String diff = html.substring(changed, html.indexOf("\n}\n", changed));
+        assertTrue(diff.contains("appliedConfigs[f] !== undefined ? appliedConfigs[f] : shippedConfigs[f]"),
+                "compared with the last applied text, else the session text");
+        assertTrue(html.contains("if (msg.success && sent) Object.assign(appliedConfigs, sent);"), "baseline advances on apply_ack");
+    }
+
+    @Test
     @DisplayName("Relay addresses are limited to the token-gated loopback socket or a wss:// relay")
     void relayPattern() throws IOException {
         String html = page();
@@ -85,6 +164,31 @@ class EditorChannelPageContractTest {
         assertFalse(relay.matcher("ws://example.com:4711/rtp-editor-ws?token=0123456789abcdef0123456789abcdef").matches(),
                 "plain ws only to loopback");
         assertFalse(relay.matcher("javascript:alert(1)").matches());
+    }
+
+    @Test
+    @DisplayName("A hosted page applies channel feed heads and marks the link stale only after the plugin's heartbeat plus a bundle gap")
+    void channelFeedIngestAndStaleness() throws IOException {
+        String html = page();
+        assertTrue(html.contains("if (msg.data && typeof msg.data === 'object') ingestChannelFeed(msg.data);"),
+                "channel feed heads go through ingestChannelFeed");
+        int ingest = html.indexOf("function ingestChannelFeed(feed)");
+        String body = html.substring(ingest, html.indexOf("\n}\n", ingest));
+        assertTrue(body.contains("else applyFeedStats(feed);"), "without a live directory (hosted) the stats still apply");
+        int stats = html.indexOf("function applyFeedStats(feed)");
+        String statsBody = html.substring(stats, html.indexOf("\n}\n", stats));
+        assertFalse(statsBody.contains("liveFeed.cfg"), "stats need no local live directory");
+        assertTrue(statsBody.contains("updateDiagnosticsUI(currentMetrics)"), "telemetry reaches Diagnostics");
+
+        Matcher m = Pattern.compile("const CHANNEL_FEED_STALE_MS = (\\d+);").matcher(html);
+        assertTrue(m.find(), "feed-stale threshold declared");
+        long stale = Long.parseLong(m.group(1));
+        assertTrue(stale > EditorLiveFeed.FEED_HEARTBEAT_MILLIS + EditorChannel.BUNDLE_INTERVAL_MILLIS,
+                "an idle plugin's heartbeat (" + EditorLiveFeed.FEED_HEARTBEAT_MILLIS + " ms, bundled within "
+                        + EditorChannel.BUNDLE_INTERVAL_MILLIS + " ms) never reads as stale: " + stale);
+        assertEquals(1, count(html, "noteFeed();"), "one dispatch path: feed heads arriving alone or bundled both reset the stale clock");
+        assertTrue(html.contains("dispatch(item);") && html.contains("dispatch(msg);"), "bundled and single frames share dispatch");
+        assertTrue(html.contains("'\u25cf LINK \u00b7 FEED STALE ('"), "stale state shown on the channel badge");
     }
 
     @Test

@@ -295,5 +295,23 @@ loadBalancer:
         # @default: 9.0
         k: 9.0
 
+# Web editor (/rtp editor) services. Leave blank to use the built-in defaults.
+editor:
+  # Upload store for editor sessions. Default: https://bytebin.lucko.me
+  # @type: string
+  bytebinUrl: ""
+
+  # Live-update relay (bytesocks-compatible). Default: https://usersockets.luckperms.net
+  # Point this at your own bytesocks server to avoid depending on a public one.
+  # @type: string
+  relayUrl: ""
+
+  # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).
+  trust:
+    # Days a browser stays trusted after /rtp editor trust. 0 = never expires.
+    # @type: integer
+    # @default: 0
+    maxAgeDays: 0
+
 # Config schema version (do not edit).
 version: 1.1

@@ -361,7 +361,7 @@ def parse_markdown_docs() -> dict[str, dict[str, str]]:
 ### Supported Shape Engines
 - **`CIRCLE`**: Uniform radial disk bounded by `radius` with inner donut deadzone `centerRadius`.
 - **`SQUARE`**: Square bounding frame extending `radius` chunks per side.
-- **`POLYGON`**: Arbitrary closed polygon boundary defined by `vertices: [[x1, z1], ...]`.
+- **`POLYGON`**: Arbitrary closed polygon boundary defined by `vertices` as Chunky-style `- [x, z]` pairs (e.g. `- [-125c, 187c]`; unitless = chunks).
 - **`ELLIPSE`**: Circle with independent X and Z semi-axes (`radius`, `radius2`) to match rectangular world borders.
 - **`RECTANGLE`**: Explicit side lengths (`width`, `height`) centered on `centerX`/`centerZ`.
 - **`CIRCLE_NORMAL` / `SQUARE_NORMAL`**: Gaussian normal distribution clustering around `mean` with spread `deviation`.
@@ -472,24 +472,28 @@ All distances support spatial unit suffixes:
         },
         "vertices": {
             "title": "vertices",
-            "meta": "Type: List of [X, Z] integer pairs | Min: 3 vertices | Docs: REGIONS.md",
-            "defaultVal": "[[-2000, 3000], [2000, 3000], [2000, -3000], [-2000, -3000]]",
+            "meta": "Type: List of [X, Z] pairs (unit suffix per coordinate, unitless = chunks) | Min: 3 vertices | Docs: REGIONS.md",
+            "defaultVal": "[[-2000b, 3000b], [2000b, 3000b], [2000b, -3000b], [-2000b, -3000b]]",
             "defaultSnippet": """vertices:
-  - [-2000, 3000]
-  - [2000, 3000]
-  - [2000, -3000]
-  - [-2000, -3000]""",
+  - [-2000b, 3000b]
+  - [2000b, 3000b]
+  - [2000b, -3000b]
+  - [-2000b, -3000b]""",
             "markdown": """Ordered boundary coordinate pairs defining an arbitrary closed polygon (when `shape: POLYGON`).
 
 ### Format
-Uses identical syntax to Chunky `/chunky shape polygon`:
+Uses the same bracketed pair syntax as Chunky `/chunky shape polygon`, one `[x, z]` pair per list item:
 ```yaml
 vertices:
-  - [-2000, 3000]
-  - [2000, 3000]
-  - [2000, -3000]
-  - [-2000, -3000]
+  - [-125c, 187c]
+  - [2000b, 3000b]
+  - [10, -4]
 ```
+The inline form `vertices: [[-125c, 187c], [2000b, 3000b], [10, -4]]` is equivalent.
+
+### Units
+- Each coordinate takes a spatial suffix: `b` blocks, `c` chunks, `r` regions, `m`, `km`, ...
+- A coordinate **without a suffix is in chunks** (`[10, -4]` = `[10c, -4c]`). Chunky block coordinates need the `b` suffix (`3000b` = 187.5 chunks, rounded to `188c`).
 
 ### Constraints (ADR-034)
 - Requires at least 3 vertices.

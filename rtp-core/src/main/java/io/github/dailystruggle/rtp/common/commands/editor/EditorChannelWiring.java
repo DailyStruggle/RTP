@@ -10,6 +10,9 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.LoopbackTransport;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.TrustedEditors;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,7 +47,7 @@ final class EditorChannelWiring {
      */
     static CompletableFuture<EditorChannel> openLocal(UUID creator, Supplier<EditorLiveFeed> feed) {
         Path editorDir = editorDir();
-        return open(new LoopbackTransport(), pluginKeys(editorDir), TrustedEditors.load(editorDir.resolve(TRUSTED_FILE)),
+        return open(new LoopbackTransport(), pluginKeys(editorDir), trusted(editorDir),
                 new OperatorNotices(creator), feed, EditorLoopbackApply.forChannel());
     }
 
@@ -75,7 +78,7 @@ final class EditorChannelWiring {
                                 BytesocksTransport.DEFAULT_TTL_MILLIS, System::currentTimeMillis,
                                 BytesocksTransport.schedulerTimer());
                         EditorChannel ch = new EditorChannel(id, pluginKeys(editorDir),
-                                TrustedEditors.load(editorDir.resolve(TRUSTED_FILE)), transport, notices, System::currentTimeMillis);
+                                trusted(editorDir), transport, notices, System::currentTimeMillis);
                         register(ch, feed, EditorLoopbackApply.forChannel(http));
                         return ch.start();
                     } catch (RuntimeException e) {
@@ -133,6 +136,34 @@ final class EditorChannelWiring {
         }
     }
 
+    /** The persisted trusted list under the configured max age. Disk I/O: off the main thread. */
+    static TrustedEditors trusted(Path editorDir) {
+        return TrustedEditors.load(editorDir.resolve(TRUSTED_FILE), trustMaxAgeMillis());
+    }
+
+    /**
+     * {@code advanced/network.yml editor.trust.maxAgeDays} in milliseconds; {@code 0} (never expire)
+     * when unset, negative or unreadable (logged). Reads the file: off the main thread.
+     */
+    static long trustMaxAgeMillis() {
+        File dir = RTP.serverAccessor == null ? null : RTP.serverAccessor.getPluginDirectory();
+        File file = dir == null ? null : new File(dir, "advanced" + File.separator + "network.yml");
+        if (file == null || !file.isFile()) return 0L;
+        try {
+            RtpYamlSection editor = RtpYamlConfig.load(file).getConfigurationSection("editor");
+            RtpYamlSection trust = editor == null ? null : editor.getConfigurationSection("trust");
+            long days = trust == null ? 0L : trust.getLong("maxAgeDays", 0L);
+            if (days < 0L) {
+                RTP.log(Level.WARNING, "[editor] " + file + " editor.trust.maxAgeDays " + days + " is negative; trust never expires");
+                return 0L;
+            }
+            return days > Long.MAX_VALUE / 86_400_000L ? 0L : days * 86_400_000L;
+        } catch (IOException | RuntimeException e) {
+            RTP.log(Level.WARNING, "[editor] could not read " + file + " editor.trust; trust never expires: " + e.getMessage(), e);
+            return 0L;
+        }
+    }
+
     /** Any transport, explicit collaborators (tests drive this with the in-memory pair). */
     static CompletableFuture<EditorChannel> open(ChannelTransport transport, EditorKeys keys, TrustedEditors trusted,
                                                  EditorChannel.Notifier notifier, Supplier<EditorLiveFeed> feed,
@@ -165,6 +196,8 @@ final class EditorChannelWiring {
                         + (ack == null ? "" : ": " + ack), t);
             }
         }));
+        // Addon namespaces, push types and the trusted hello-reply's protocol members (ADR-107)
+        EditorExtensions.attach(ch);
     }
 
     /** Echoes the request's correlation fields so the page can match the error to its request. */
@@ -194,6 +227,22 @@ final class EditorChannelWiring {
         }
     }
 
+    /**
+     * The {@code advanced/messages/commands.yml} value of {@code key} read by name (editor keys without
+     * a {@link CommandMessages} constant), or {@code fallback} before the configs load.
+     */
+    static String message(String key, String fallback) {
+        try {
+            if (RTP.configs == null) return fallback;
+            if (!(RTP.configs.getParser(CommandMessages.class) instanceof ConfigParser<?> parser)) return fallback;
+            RtpYamlSection root = parser.getYamlRoot();
+            String v = root == null ? null : root.getString(key);
+            return v == null ? fallback : v;
+        } catch (RuntimeException e) {
+            return fallback;
+        }
+    }
+
     /** Sends to the session's operator (the console when it ran the command); empty templates are skipped. */
     static void tell(UUID target, String text) {
         if (target == null || text == null || text.isBlank() || RTP.serverAccessor == null) return;
@@ -215,12 +264,12 @@ final class EditorChannelWiring {
         @Override
         public void trustPrompt(String nonce, String fingerprint) {
             if (creator == null || RTP.serverAccessor == null) return;
-            String shortFp = fingerprint.substring(0, 16);
+            // Full fingerprint: a 16-hex prefix is cheap to collide for a look-alike key
             String text = message(CommandMessages.editorTrustPrompt,
                     "[P1] A web editor page asks for access with code [nonce]. If your page shows the same code, click here.")
-                    .replace("[nonce]", nonce).replace("[fingerprint]", shortFp);
+                    .replace("[nonce]", nonce).replace("[fingerprint]", fingerprint);
             String hover = message(CommandMessages.editorTrustPromptHover, "/rtp editor trust nonce=[nonce] (key [fingerprint])")
-                    .replace("[nonce]", nonce).replace("[fingerprint]", shortFp);
+                    .replace("[nonce]", nonce).replace("[fingerprint]", fingerprint);
             if (text.isBlank()) return;
             try {
                 RTPCommandSender sender = RTP.serverAccessor.getSender(creator);

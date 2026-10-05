@@ -8,6 +8,11 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
@@ -22,15 +27,18 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.EnumSet;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
 
 /**
  * The plugin's editor-channel key pair (ADR-106 §5.1): RSA-2048, SHA256withRSA
  * (RSASSA-PKCS1-v1_5), which Java and WebCrypto sign and verify with identical bytes. Persisted
- * under {@code <dataFolder>/editor/keys/} as PKCS#8 / X.509 SPKI DER, owner-only where the file
- * system supports POSIX permissions. A missing or corrupt pair is logged and replaced (S-004).
+ * under {@code <dataFolder>/editor/keys/} as PKCS#8 / X.509 SPKI DER, owner-only through POSIX
+ * permissions or, where those are missing (Windows), an owner-only ACL. A missing or corrupt pair is
+ * logged and replaced (S-004).
  */
 public final class EditorKeys {
 
@@ -106,6 +114,10 @@ public final class EditorKeys {
         Files.deleteIfExists(tmp);
         if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
             Files.createFile(tmp, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+        } else {
+            // Restricted while empty; a same-directory rename keeps the ACL
+            Files.createFile(tmp);
+            restrictToOwner(tmp);
         }
         Files.write(tmp, der);
         try {
@@ -113,6 +125,32 @@ public final class EditorKeys {
         } catch (AtomicMoveNotSupportedException e) {
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
         }
+    }
+
+    /**
+     * Limits {@code file} to the account that owns it: POSIX {@code rw-------}, else an ACL holding a
+     * single owner full-control entry (other and inherited entries dropped). Logs a WARNING and returns
+     * {@code false} when the file system offers neither view.
+     */
+    public static boolean restrictToOwner(Path file) throws IOException {
+        PosixFileAttributeView posix = Files.getFileAttributeView(file, PosixFileAttributeView.class);
+        if (posix != null) {
+            posix.setPermissions(PosixFilePermissions.fromString("rw-------"));
+            return true;
+        }
+        AclFileAttributeView acl = Files.getFileAttributeView(file, AclFileAttributeView.class);
+        if (acl != null) {
+            AclEntry owner = AclEntry.newBuilder()
+                    .setType(AclEntryType.ALLOW)
+                    .setPrincipal(acl.getOwner())
+                    .setPermissions(EnumSet.allOf(AclEntryPermission.class))
+                    .build();
+            acl.setAcl(List.of(owner));
+            return true;
+        }
+        RTP.log(Level.WARNING, "[editor] " + file + ": the file system supports neither POSIX permissions nor ACLs;"
+                + " it is readable by other local accounts");
+        return false;
     }
 
     /** SHA256withRSA over {@code data}. */

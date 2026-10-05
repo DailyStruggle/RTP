@@ -32,10 +32,11 @@ import java.util.UUID;
  * {@code transition}, {@code release}, {@code reapExpired}) are never sent here -
  * they run on the proxy against its own store.</p>
  *
- * <p>Payloads are HMAC-signed when a {@link HmacVerifier} is supplied
- * (rtp-proxy-ADR-010), unsigned otherwise. Verification failure yields
- * {@code null} from {@link #readSignedPayload}, never an exception - the caller
- * drops the row and logs at WARNING (REQ-RTP-S-004).</p>
+ * <p>Every payload is HMAC-signed (rtp-proxy-ADR-010); there is no unsigned
+ * mode. A {@code null} verifier fails closed: writers throw, readers reject
+ * every payload. Verification failure yields {@code null} from
+ * {@link #readSignedPayload}, never an exception - the caller drops the row
+ * and logs at WARNING (REQ-RTP-S-004).</p>
  *
  * <p>Pure I/O glue, no threading; the proxy listener thread and the backend's
  * scheduler-driven calls own their own sockets.</p>
@@ -94,7 +95,26 @@ public final class ProxyDirectWire {
     /** Field delimiter inside a single multi-field payload string. */
     public static final char FS = '\u0001';
 
+    /**
+     * Upper bound on rows in one count-framed list. Sized well above any real
+     * snapshot / batch (servers, queued players, active tokens per backend)
+     * while capping per-connection allocation from a hostile count.
+     */
+    public static final int MAX_LIST_COUNT = 4096;
+
+    /** Characters of a token id kept by {@link #redactToken}. */
+    public static final int TOKEN_LOG_PREFIX = 8;
+
     private ProxyDirectWire() {
+    }
+
+    /**
+     * Log-safe form of a reservation token id: first {@value #TOKEN_LOG_PREFIX}
+     * chars + ellipsis. A full id is a bearer value for redeem.
+     */
+    public static String redactToken(String tokenId) {
+        if (tokenId == null) return "null";
+        return tokenId.length() <= TOKEN_LOG_PREFIX ? tokenId : tokenId.substring(0, TOKEN_LOG_PREFIX) + "...";
     }
 
     // ---- opcode -----------------------------------------------------------
@@ -111,25 +131,34 @@ public final class ProxyDirectWire {
 
     // ---- single signed payload -------------------------------------------
 
-    /** Write one schema-tagged, optionally HMAC-signed payload string. */
+    /**
+     * Write one schema-tagged, HMAC-signed payload string.
+     *
+     * @throws IllegalStateException when {@code verifier} is null (no unsigned mode)
+     */
     public static void writeSignedPayload(DataOutputStream out, String payload,
                                           HmacVerifier verifier, int schemaVersion) throws IOException {
+        if (verifier == null) {
+            throw new IllegalStateException(
+                    "proxy-direct requires an HmacVerifier (network.secretEnv); refusing to send unsigned payload");
+        }
         String p = payload == null ? "" : payload;
         out.writeInt(schemaVersion);
-        out.writeUTF(verifier == null ? "" : verifier.sign(schemaVersion, p));
+        out.writeUTF(verifier.sign(schemaVersion, p));
         out.writeUTF(p);
     }
 
     /**
-     * Read one schema-tagged payload, verifying its HMAC when {@code verifier}
-     * is non-null. Returns {@code null} on a verification failure (caller drops
-     * + logs); throws only on a genuine stream/IO error.
+     * Read one schema-tagged payload and verify its HMAC. Returns {@code null}
+     * on verification failure or when {@code verifier} is null (fail closed:
+     * the frame is still consumed so stream framing stays intact); throws only
+     * on a genuine stream/IO error.
      */
     public static String readSignedPayload(DataInputStream in, HmacVerifier verifier) throws IOException {
         int schemaVersion = in.readInt();
         String hmacHex = in.readUTF();
         String payload = in.readUTF();
-        if (verifier != null && !verifier.verify(schemaVersion, payload, hmacHex)) {
+        if (verifier == null || !verifier.verify(schemaVersion, payload, hmacHex)) {
             return null;
         }
         return payload;
@@ -140,6 +169,10 @@ public final class ProxyDirectWire {
     /** Write a list response/request: a count followed by one signed payload per row. */
     public static void writeList(DataOutputStream out, List<String> payloads,
                                  HmacVerifier verifier, int schemaVersion) throws IOException {
+        if (payloads.size() > MAX_LIST_COUNT) {
+            throw new IOException("proxy-direct list too large: " + payloads.size()
+                    + " > " + MAX_LIST_COUNT);
+        }
         out.writeInt(payloads.size());
         for (String p : payloads) {
             writeSignedPayload(out, p, verifier, schemaVersion);
@@ -153,7 +186,7 @@ public final class ProxyDirectWire {
      */
     public static List<String> readList(DataInputStream in, HmacVerifier verifier) throws IOException {
         int count = in.readInt();
-        if (count < 0 || count > 100_000) {
+        if (count < 0 || count > MAX_LIST_COUNT) {
             throw new IOException("proxy-direct list count out of range: " + count);
         }
         List<String> out = new ArrayList<>(count);

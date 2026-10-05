@@ -18,6 +18,8 @@ public final class InMemoryTransport implements ChannelTransport {
     private volatile boolean closed;
     private final Deque<String> inbox = new ArrayDeque<>();
     private boolean delivering;
+    private volatile int framesPerWindow;
+    private final java.util.concurrent.atomic.AtomicLong sent = new java.util.concurrent.atomic.AtomicLong();
 
     private InMemoryTransport(String relay) {
         this.relay = relay;
@@ -42,8 +44,25 @@ public final class InMemoryTransport implements ChannelTransport {
     public boolean send(String text) {
         Objects.requireNonNull(text, "text");
         if (closed || peer.closed) return false;
+        sent.incrementAndGet();
         peer.deliver(text);
         return true;
+    }
+
+    /** Makes this end declare a relay-style frame limit (pacing tests); 0 = unlimited. */
+    public InMemoryTransport withFramesPerWindow(int frames) {
+        this.framesPerWindow = frames;
+        return this;
+    }
+
+    @Override
+    public int framesPerWindow() {
+        return framesPerWindow;
+    }
+
+    /** Frames sent from this end so far. */
+    public long sentCount() {
+        return sent.get();
     }
 
     private void deliver(String text) {

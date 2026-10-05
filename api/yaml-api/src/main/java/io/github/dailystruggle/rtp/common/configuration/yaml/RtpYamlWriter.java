@@ -17,12 +17,21 @@ import java.util.Map;
  *       ({@link RtpYamlScalar.Style#PLAIN}, {@code SINGLE}, {@code DOUBLE}).
  *       The writer never silently re-quotes a value.</li>
  *   <li>Mapping insertion order is preserved.</li>
- *   <li>Sequences are emitted block-style only ({@code - item} per line).</li>
+ *   <li>Sequences are emitted block-style ({@code - item} per line), except
+ *       flow style ({@code [a, b]}) for a sequence flagged
+ *       {@link RtpYamlSequence#isFlowStyle()} and for a short scalar-only
+ *       sequence nested directly in another sequence (e.g. polygon vertex
+ *       pairs rebuilt from Java lists, ADR-034). Flow output falls back to
+ *       block when an item cannot be written inline (mapping, block comment,
+ *       plain scalar containing flow indicators).</li>
  * </ul>
  */
 public final class RtpYamlWriter {
 
     private static final String NL = "\n";
+
+    /** Max rendered width for auto-flowing an unflagged nested scalar-only sequence. */
+    private static final int AUTO_FLOW_MAX_WIDTH = 80;
 
     private final StringBuilder out = new StringBuilder();
 
@@ -92,8 +101,7 @@ public final class RtpYamlWriter {
                 out.append(NL);
                 writeMapping((RtpYamlMapping) value, indent + 2, false);
             } else if (value instanceof RtpYamlSequence) {
-                out.append(NL);
-                writeSequence((RtpYamlSequence) value, indent + 2);
+                writeSequenceValue((RtpYamlSequence) value, indent + 2);
             } else {
                 out.append(NL);
             }
@@ -136,8 +144,13 @@ public final class RtpYamlWriter {
                     }
                 }
             } else if (item instanceof RtpYamlSequence) {
-                out.append(NL);
-                writeSequence((RtpYamlSequence) item, indent + 2);
+                String flow = flowOrNull((RtpYamlSequence) item, true);
+                if (flow != null) {
+                    out.append(' ').append(flow).append(NL);
+                } else {
+                    out.append(NL);
+                    writeSequence((RtpYamlSequence) item, indent + 2);
+                }
             } else {
                 out.append(NL);
             }
@@ -156,10 +169,87 @@ public final class RtpYamlWriter {
             out.append(NL);
             writeMapping((RtpYamlMapping) value, indent + 2, false);
         } else if (value instanceof RtpYamlSequence) {
-            out.append(NL);
-            writeSequence((RtpYamlSequence) value, indent + 2);
+            writeSequenceValue((RtpYamlSequence) value, indent + 2);
         } else {
             out.append(NL);
+        }
+    }
+
+    /** Sequence as a mapping value: inline flow after {@code key:} when allowed, else a block body. */
+    private void writeSequenceValue(RtpYamlSequence seq, int childIndent) {
+        String flow = flowOrNull(seq, false);
+        if (flow != null) {
+            out.append(' ').append(flow).append(NL);
+        } else {
+            out.append(NL);
+            writeSequence(seq, childIndent);
+        }
+    }
+
+    /**
+     * Flow rendering of {@code seq}, or {@code null} for block output. Flagged
+     * sequences always try flow; unflagged ones only when {@code nested} in a
+     * sequence, non-empty, scalar-only, and short.
+     */
+    private static String flowOrNull(RtpYamlSequence seq, boolean nested) {
+        if (!seq.isFlowStyle()) {
+            if (!nested || seq.size() == 0) return null;
+            for (RtpYamlNode item : seq.items()) {
+                if (!(item instanceof RtpYamlScalar)) return null;
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        if (!appendFlow(seq, sb)) return null;
+        if (!seq.isFlowStyle() && sb.length() > AUTO_FLOW_MAX_WIDTH) return null;
+        return sb.toString();
+    }
+
+    private static boolean appendFlow(RtpYamlSequence seq, StringBuilder sb) {
+        sb.append('[');
+        boolean first = true;
+        for (RtpYamlNode item : seq.items()) {
+            // Flow entries cannot carry block comments; keep them via block output.
+            if (!item.blockComments().isEmpty()) return false;
+            if (!first) sb.append(", ");
+            if (item instanceof RtpYamlScalar) {
+                RtpYamlScalar sc = (RtpYamlScalar) item;
+                if (!isFlowSafe(sc)) return false;
+                sb.append(emitScalar(sc));
+            } else if (item instanceof RtpYamlSequence) {
+                if (!appendFlow((RtpYamlSequence) item, sb)) return false;
+            } else {
+                return false;
+            }
+            first = false;
+        }
+        sb.append(']');
+        return true;
+    }
+
+    /**
+     * True when the scalar re-reads unchanged as a flow entry. Quoted styles
+     * escape everything except a raw newline in SINGLE; PLAIN must be
+     * non-empty and free of flow indicators, quotes, comment and key markers.
+     */
+    private static boolean isFlowSafe(RtpYamlScalar sc) {
+        String v = sc.rawValue();
+        switch (sc.style()) {
+            case DOUBLE: return true;
+            case SINGLE: return v.indexOf('\n') < 0 && v.indexOf('\r') < 0;
+            case PLAIN:
+            default:
+                if (v.isEmpty() || !v.equals(v.strip())) return false;
+                char head = v.charAt(0);
+                if ("&*!|>%@`#".indexOf(head) >= 0) return false;
+                if ((head == '-' || head == '?') && (v.length() == 1 || v.charAt(1) == ' ')) return false;
+                for (int i = 0; i < v.length(); i++) {
+                    char c = v.charAt(i);
+                    if (c == ',' || c == '[' || c == ']' || c == '{' || c == '}'
+                            || c == '"' || c == '\'' || c == '\n' || c == '\r' || c == '\t') return false;
+                    if (c == '#' && i > 0 && v.charAt(i - 1) == ' ') return false;
+                    if (c == ':' && (i + 1 == v.length() || v.charAt(i + 1) == ' ')) return false;
+                }
+                return true;
         }
     }
 
