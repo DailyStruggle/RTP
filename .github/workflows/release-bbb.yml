@@ -15,8 +15,10 @@ name: Release LeafRTP to BuiltByBit (BBCode sites)
 #
 # NOTE: BuiltByBit has no API endpoint to edit a resource's base description /
 # BBCode body (V1/V2 expose only versions/updates), so the BBCode listings
-# (FRONT_PAGE.bbcode / FRONT_PAGE_LITE.bbcode) must be pasted by hand into the
-# BuiltByBit listing editor. Only the version upload is automated here.
+# (scripts/release/generated/FRONT_PAGE_PRO.bbcode / FRONT_PAGE_LITE.bbcode, built
+# from docs/publishing/FRONT_PAGE.md by scripts/release/build_front_pages.py) must
+# be pasted by hand into the BuiltByBit listing editor. Only the version upload is
+# automated here.
 #
 # Trigger:
 #   - PR merged from a version branch matching `v*.*.*` or `V*.*.*` to any `v*` or `V*` branch (e.g. v3.2.2 -> V3, v3, etc.).

@@ -17,7 +17,8 @@ import java.util.function.UnaryOperator;
  *
  * <p>Unlike a whole-region decode, {@link #sampleBiomes} reads the 8 KiB header with a
  * positional read, then only the sector run of each requested chunk
- * ({@code offset * 4096}, {@code sectorCount * 4096}), and decodes just those chunks via
+ * ({@code offset * 4096}, {@code sectorCount * 4096}, clamped to EOF for an unpadded final
+ * sector), and decodes just those chunks via
  * {@link AnvilReader#readChunkViewFromSectors}. When {@link AnvilRegionByteCache} already
  * holds a fresh copy of the file, the cached bytes are used and no disk read happens.
  *
@@ -108,8 +109,9 @@ public final class AnvilRegionSampler {
         int sectorCount = header[entry + 3] & 0xFF;
         if (sectorOffset < 2 || sectorCount == 0) continue;
         long start = (long) sectorOffset * SECTOR_SIZE;
-        int len = sectorCount * SECTOR_SIZE;
-        if (start + len > fileSize) continue;
+        if (start + 5 > fileSize) continue;
+        // Final sector is padded only on region close; decodeSectorPayload bounds the length prefix.
+        int len = (int) Math.min((long) sectorCount * SECTOR_SIZE, fileSize - start);
         try {
           byte[] sectors = new byte[len];
           if (!readFully(channel, ByteBuffer.wrap(sectors), start)) continue;

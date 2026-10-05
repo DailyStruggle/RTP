@@ -179,7 +179,7 @@ Anchor providers define where the center point of the subspace placement is root
 | `entity` | Sourced dynamically from an active entity or target player's live position | Teleporting near an online player (`nearplayer`). |
 | `location` | Fixed coordinates specified in configuration (`x`, `y`, `z`, `world`) | Dropping groups near landmark structures, ruins, or world spawn. |
 | `nearclaim` | Edge perimeter of a claimed territory or protected land | Faction raiding, base exploration, or siege encounters. |
-| `scatter` | Independent random point selected within the world boundary | Standalone one-shot group scatters without requiring a permanent region. |
+| `scatter` | Alias of `regionQueue` (any unrecognised value also falls back to the region queue) | One-shot group scatters drawn from the target region's pre-warmed buffer. |
 
 ---
 

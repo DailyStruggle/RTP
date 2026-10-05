@@ -497,5 +497,12 @@ editorTrustUsage: "&c[P0] Uso: /rtp editor trust nonce=<código que muestra la p
 editorChannelOpened: "&a[P0] Canal del editor web abierto. Confía en tu navegador cuando se te pida para activar las vistas previas y Hot-Apply."
 editorChannelLost: "&e[P1] Canal del editor web perdido: [reason]. La página sigue funcionando con su instantánea."
 editorChannelExpired: "&7[P0] El canal del editor web caducó tras [minutes] minutos. Vuelve a ejecutar el comando del editor para continuar."
+editorTrustRateLimited: "&c[P0] Demasiados códigos de confianza del editor incorrectos. Espera un minuto y vuelve a intentarlo."
+editorUntrustUsage: "&c[P0] Uso: /rtp editor untrust key=<prefijo de la huella, al menos 4 caracteres | all>"
+editorUntrustRemoved: "&a[P0] Se retiró la confianza a [count] navegador(es) del editor web; deberás volver a confiar en ellos para previsualizar o usar Hot-Apply."
+editorUntrustNone: "&7[P0] Ningún navegador de confianza del editor coincide con [key]."
+editorUntrustFailed: "&c[P0] No se pudo actualizar la lista de editores de confianza: [reason]"
+editorApplyDigestMissing: "&c[P0] La carga del editor no tiene suma de comprobación sha256, así que no se aplicó. Vuelve a confirmar desde una página del editor actualizada."
+editorApplyFileUnreadable: "&e[P1] No se pudo leer el archivo de aplicación sin conexión ([reason]); se intentará con el almacén de bytes."
 
 version: 1.0

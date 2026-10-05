@@ -485,6 +485,13 @@ editorTrustUsage: "&c[P0] 用法：/rtp editor trust nonce=<编辑器页面显�
 editorChannelOpened: "&a[P0] 网页编辑器通道已打开。收到请求时信任你的浏览器即可启用预览和 Hot-Apply。"
 editorChannelLost: "&e[P1] 网页编辑器通道已断开：[reason]。页面将继续使用其快照工作。"
 editorChannelExpired: "&7[P0] 网页编辑器通道已在 [minutes] 分钟后过期。请重新运行编辑器命令以继续。"
+editorTrustRateLimited: "&c[P0] 编辑器信任码错误次数过多。请等待一分钟后再试。"
+editorUntrustUsage: "&c[P0] 用法：/rtp editor untrust key=<指纹前缀，至少 4 个字符 | all>"
+editorUntrustRemoved: "&a[P0] 已撤销 [count] 个网页编辑器浏览器的信任；需要重新信任后才能预览或 Hot-Apply。"
+editorUntrustNone: "&7[P0] 没有与 [key] 匹配的受信任编辑器浏览器。"
+editorUntrustFailed: "&c[P0] 无法更新受信任编辑器列表：[reason]"
+editorApplyDigestMissing: "&c[P0] 编辑器数据缺少 sha256 校验和，因此未应用。请从最新的编辑器页面重新提交。"
+editorApplyFileUnreadable: "&e[P1] 无法读取离线应用文件（[reason]）；改为尝试字节存储。"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

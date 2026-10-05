@@ -208,7 +208,7 @@ Do not fix incidental discoveries that are outside the current task. Append a 1-
 ## CHANGELOG Hygiene
 
 - **Diff against last released tag:** Entries describe the net delta against the last released tag (`git diff <last-released-tag> -- <path>`), not intermediate commits. Net-zero changes must not appear.
-- **Pro-exclusive tagging:** Prefix features exclusive to Pro (absent in `rtp-lite`, ADR-024) with `**(Pro)**`.
+- **No edition tagging:** Both editions ship the same MIT code (ADR-100, ADR-108); never make a feature Pro-exclusive and never add the retired `**(Pro)**` marker to new entries.
 - **Absolute phrasing:** Describe the released version's contents in absolute terms without comparing to intermediate unreleased builds.
 
 ---
@@ -305,7 +305,7 @@ Active multi-platform, proxy, and roadmap development frontiers are indexed in [
 
 ## Prose Mirroring (external user-facing copy)
 
-External copy voice, tone, and punctuation rules are codified as Rule D-006 in [`docs/dev/RULES.md`](../docs/dev/RULES.md). Reference example: [`docs/FRONT_PAGE_LITE.md`](../docs/FRONT_PAGE_LITE.md).
+External copy voice, tone, and punctuation rules are codified as Rule D-006 in [`docs/dev/RULES.md`](../docs/dev/RULES.md). Reference example: [`docs/publishing/FRONT_PAGE.md`](../docs/publishing/FRONT_PAGE.md), the single tagged source for every storefront page; edit it, never the generated files, and rebuild with `python scripts/release/build_front_pages.py`.
 
 ---
 

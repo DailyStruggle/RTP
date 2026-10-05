@@ -38,6 +38,11 @@ import java.util.Map;
  * {@code bytes → read → write → read} yields structurally-identical values, and - for
  * compound payloads without embedded {@code TAG_List} of mixed-empty shape - also yields
  * byte-identical output of the raw tag tree (compression is separate, see {@link AnvilReader}).
+ *
+ * <p>Untrusted-input limits: container nesting is capped at {@link #MAX_DEPTH} (vanilla's
+ * {@code NbtAccounter} limit) so crafted nesting fails with {@link IOException} instead of
+ * {@link StackOverflowError}, and every array/list count is checked against the bytes remaining
+ * before allocation, so a few header bytes cannot force a large allocation.
  */
 public final class Nbt {
 
@@ -57,6 +62,9 @@ public final class Nbt {
 
     /** Maximum allowed array elements in corrupt/untrusted NBT payloads (16M). */
     public static final int MAX_ARRAY_LENGTH = 16 * 1024 * 1024;
+
+    /** Maximum nested compound/list depth, matching vanilla {@code NbtAccounter}. */
+    public static final int MAX_DEPTH = 512;
 
     private Nbt() {}
 
@@ -92,7 +100,7 @@ public final class Nbt {
             byte type = in.readByte();
             if (type == TAG_END) return new NamedTag("", null);
             String name = in.readUTF();
-            Object value = readPayload(in, type);
+            Object value = readPayload(in, type, 0);
             return new NamedTag(name, value);
         }
     }
@@ -106,7 +114,11 @@ public final class Nbt {
         return (LinkedHashMap<String, Object>) root.value;
     }
 
-    private static Object readPayload(DataInput in, byte type) throws IOException {
+    /**
+     * {@code in} must be backed by a {@link java.io.ByteArrayInputStream}: {@code available()} is
+     * then the exact remaining length, which {@link #requireRemaining} relies on.
+     */
+    private static Object readPayload(DataInputStream in, byte type, int depth) throws IOException {
         switch (type) {
             case TAG_END:        throw new IOException("Unexpected TAG_End in payload position");
             case TAG_BYTE:       return in.readByte();
@@ -120,32 +132,36 @@ public final class Nbt {
                 if (n < 0 || n > MAX_ARRAY_LENGTH) {
                     throw new IOException("Malformed TAG_Byte_Array length: " + n);
                 }
+                requireRemaining(in, n, 1, "TAG_Byte_Array");
                 byte[] a = new byte[n];
                 in.readFully(a);
                 return a;
             }
             case TAG_STRING:     return in.readUTF();
             case TAG_LIST: {
+                checkDepth(depth);
                 byte elemType = in.readByte();
                 int n = in.readInt();
                 if (n < 0 || n > MAX_ARRAY_LENGTH) {
                     throw new IOException("Malformed TAG_List length: " + n);
                 }
-                List<Object> items = new ArrayList<>(Math.max(0, n));
                 if (elemType == TAG_END) {
                     if (n > 0) throw new IOException("TAG_List declared TAG_End element type with nonzero length " + n);
-                    return new NbtList(elemType, items);
+                    return new NbtList(elemType, new ArrayList<>(0));
                 }
+                requireRemaining(in, n, minPayloadSize(elemType), "TAG_List");
+                List<Object> items = new ArrayList<>(n);
                 for (int i = 0; i < n; i++) {
-                    items.add(readPayload(in, elemType));
+                    items.add(readPayload(in, elemType, depth + 1));
                 }
                 return new NbtList(elemType, items);
             }
             case TAG_COMPOUND: {
+                checkDepth(depth);
                 LinkedHashMap<String, Object> map = new LinkedHashMap<>();
                 for (byte childType = in.readByte(); childType != TAG_END; childType = in.readByte()) {
                     String childName = in.readUTF();
-                    map.put(childName, readPayload(in, childType));
+                    map.put(childName, readPayload(in, childType, depth + 1));
                 }
                 return map;
             }
@@ -154,6 +170,7 @@ public final class Nbt {
                 if (n < 0 || n > MAX_ARRAY_LENGTH) {
                     throw new IOException("Malformed TAG_Int_Array length: " + n);
                 }
+                requireRemaining(in, n, 4, "TAG_Int_Array");
                 int[] a = new int[n];
                 for (int i = 0; i < n; i++) a[i] = in.readInt();
                 return a;
@@ -163,12 +180,42 @@ public final class Nbt {
                 if (n < 0 || n > MAX_ARRAY_LENGTH) {
                     throw new IOException("Malformed TAG_Long_Array length: " + n);
                 }
+                requireRemaining(in, n, 8, "TAG_Long_Array");
                 long[] a = new long[n];
                 for (int i = 0; i < n; i++) a[i] = in.readLong();
                 return a;
             }
             default:
                 throw new IOException("Unknown NBT tag type: " + (type & 0xFF));
+        }
+    }
+
+    private static void checkDepth(int depth) throws IOException {
+        if (depth >= MAX_DEPTH) {
+            throw new IOException("NBT nesting exceeds max depth " + MAX_DEPTH);
+        }
+    }
+
+    /** Rejects {@code n} elements of at least {@code minWidth} bytes each when fewer bytes remain. */
+    private static void requireRemaining(DataInputStream in, int n, int minWidth, String tag) throws IOException {
+        long need = (long) n * minWidth;
+        int left = in.available();
+        if (need > left) {
+            throw new IOException(tag + " length " + n + " needs >= " + need + " bytes, " + left + " remain");
+        }
+    }
+
+    /** Smallest encoded payload width of {@code type}; unknown ids return 1 (the read then fails). */
+    private static int minPayloadSize(byte type) {
+        int fixed = fixedPayloadSize(type);
+        if (fixed > 0) return fixed;
+        switch (type) {
+            case TAG_STRING:     return 2;
+            case TAG_LIST:       return 5;
+            case TAG_BYTE_ARRAY:
+            case TAG_INT_ARRAY:
+            case TAG_LONG_ARRAY: return 4;
+            default:             return 1; // TAG_COMPOUND: a lone TAG_End
         }
     }
 
@@ -190,6 +237,10 @@ public final class Nbt {
      * @throws IOException on malformed input or an unknown tag id (mirrors {@link #readPayload})
      */
     public static void skipPayload(DataInput in, byte type) throws IOException {
+        skipPayload(in, type, 0);
+    }
+
+    private static void skipPayload(DataInput in, byte type, int depth) throws IOException {
         switch (type) {
             case TAG_END:
                 throw new IOException("Unexpected TAG_End in payload position");
@@ -207,6 +258,7 @@ public final class Nbt {
             }
             case TAG_STRING:     in.readUTF();                                  return;
             case TAG_LIST: {
+                checkDepth(depth);
                 byte elemType = in.readByte();
                 int n = in.readInt();
                 if (elemType == TAG_END) {
@@ -221,14 +273,15 @@ public final class Nbt {
                     return;
                 }
                 for (int i = 0; i < n; i++) {
-                    skipPayload(in, elemType);
+                    skipPayload(in, elemType, depth + 1);
                 }
                 return;
             }
             case TAG_COMPOUND: {
+                checkDepth(depth);
                 for (byte childType = in.readByte(); childType != TAG_END; childType = in.readByte()) {
                     in.readUTF(); // child name, discarded
-                    skipPayload(in, childType);
+                    skipPayload(in, childType, depth + 1);
                 }
                 return;
             }
@@ -326,12 +379,13 @@ public final class Nbt {
             }
             in.readUTF(); // root name, discarded
             ArrayList<String> path = new ArrayList<>();
-            return readCompoundSelective(in, path, filter);
+            return readCompoundSelective(in, path, filter, 0);
         }
     }
 
     private static LinkedHashMap<String, Object> readCompoundSelective(
-            DataInput in, ArrayList<String> path, SelectiveFilter filter) throws IOException {
+            DataInputStream in, ArrayList<String> path, SelectiveFilter filter, int depth) throws IOException {
+        checkDepth(depth);
         LinkedHashMap<String, Object> map = new LinkedHashMap<>();
         while (true) {
             byte childType = in.readByte();
@@ -340,76 +394,78 @@ public final class Nbt {
             SelectiveFilter.Decision d = filter.decide(path, childName, childType);
             switch (d) {
                 case SKIP:
-                    skipPayload(in, childType);
+                    skipPayload(in, childType, depth + 1);
                     break;
                 case RECURSE:
                     if (childType == TAG_COMPOUND) {
                         path.add(childName);
                         try {
-                            map.put(childName, readCompoundSelective(in, path, filter));
+                            map.put(childName, readCompoundSelective(in, path, filter, depth + 1));
                         } finally {
                             path.remove(path.size() - 1);
                         }
                     } else if (childType == TAG_LIST) {
                         path.add(childName);
                         try {
-                            map.put(childName, readListSelective(in, path, filter));
+                            map.put(childName, readListSelective(in, path, filter, depth + 1));
                         } finally {
                             path.remove(path.size() - 1);
                         }
                     } else {
                         // RECURSE only meaningful for compound/list; fall back to KEEP.
-                        map.put(childName, readPayload(in, childType));
+                        map.put(childName, readPayload(in, childType, depth + 1));
                     }
                     break;
                 case KEEP:
                 default:
-                    map.put(childName, readPayload(in, childType));
+                    map.put(childName, readPayload(in, childType, depth + 1));
                     break;
             }
         }
     }
 
     private static NbtList readListSelective(
-            DataInput in, ArrayList<String> path, SelectiveFilter filter) throws IOException {
+            DataInputStream in, ArrayList<String> path, SelectiveFilter filter, int depth) throws IOException {
+        checkDepth(depth);
         byte elemType = in.readByte();
         int n = in.readInt();
         if (n < 0 || n > MAX_ARRAY_LENGTH) {
             throw new IOException("Malformed TAG_List length: " + n);
         }
-        List<Object> items = new ArrayList<>(Math.max(0, n));
         if (elemType == TAG_END) {
             if (n > 0) throw new IOException("TAG_List declared TAG_End element type with nonzero length " + n);
-            return new NbtList(elemType, items);
+            return new NbtList(elemType, new ArrayList<>(0));
         }
+        requireRemaining(in, n, minPayloadSize(elemType), "TAG_List");
+        List<Object> items = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
             SelectiveFilter.Decision d = filter.decide(path, "[]", elemType);
             switch (d) {
                 case SKIP:
-                    skipPayload(in, elemType);
+                    skipPayload(in, elemType, depth + 1);
                     break;
                 case RECURSE:
                     if (elemType == TAG_COMPOUND) {
                         path.add("[]");
                         try {
-                            items.add(readCompoundSelective(in, path, filter));
+                            items.add(readCompoundSelective(in, path, filter, depth + 1));
                         } finally {
                             path.remove(path.size() - 1);
                         }
                     } else if (elemType == TAG_LIST) {
                         path.add("[]");
                         try {
-                            items.add(readListSelective(in, path, filter));
+                            items.add(readListSelective(in, path, filter, depth + 1));
                         } finally {
                             path.remove(path.size() - 1);
                         }
                     } else {
-                        items.add(readPayload(in, elemType));
+                        items.add(readPayload(in, elemType, depth + 1));
                     }
                     break;
                 case KEEP:
                 default:
-                    items.add(readPayload(in, elemType));
+                    items.add(readPayload(in, elemType, depth + 1));
                     break;
             }
         }

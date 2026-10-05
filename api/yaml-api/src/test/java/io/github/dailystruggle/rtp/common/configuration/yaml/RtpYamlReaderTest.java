@@ -180,16 +180,133 @@ class RtpYamlReaderTest {
     }
 
     @Test
-    @DisplayName("Flow mappings and flow sequences are rejected (line start and inline)")
-    void flowRejected() {
+    @DisplayName("Flow mappings stay rejected; a flow sequence at line start (key / document root) is rejected")
+    void flowMapAndRootFlowSeqRejected() {
         assertEquals("rtpYaml.unsupported.flowMap",
                 assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("{a: b}\n")).messageKey());
         assertEquals("rtpYaml.unsupported.flowSeq",
                 assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("[a, b]\n")).messageKey());
         assertEquals("rtpYaml.unsupported.flowMap",
                 assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("a: {x: y}\n")).messageKey());
-        assertEquals("rtpYaml.unsupported.flowSeq",
-                assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("a: [1, 2]\n")).messageKey());
+        assertEquals("rtpYaml.unsupported.flowMap",
+                assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("a: [{x: 1}]\n")).messageKey());
+        assertEquals("rtpYaml.unsupported.flowMap",
+                assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("a: [x: 1]\n")).messageKey());
+    }
+
+    @Test
+    @DisplayName("ADR-034: inline flow sequence after key parses as a flow-styled sequence")
+    void inlineFlowSequence() {
+        RtpYamlMapping root = RtpYamlReader.parse("a: [1, two, \"th ree\", 'f,our']\n");
+        RtpYamlSequence seq = (RtpYamlSequence) root.get("a");
+        assertTrue(seq.isFlowStyle());
+        assertEquals(4, seq.size());
+        assertEquals(1, ((RtpYamlScalar) seq.get(0)).value());
+        assertEquals("two", ((RtpYamlScalar) seq.get(1)).value());
+        assertEquals(RtpYamlScalar.Style.DOUBLE, ((RtpYamlScalar) seq.get(2)).style());
+        assertEquals("th ree", ((RtpYamlScalar) seq.get(2)).value());
+        assertEquals(RtpYamlScalar.Style.SINGLE, ((RtpYamlScalar) seq.get(3)).style());
+        assertEquals("f,our", ((RtpYamlScalar) seq.get(3)).value());
+    }
+
+    @Test
+    @DisplayName("ADR-034: nested inline flow sequence [[1, 2], [3, 4]] parses two levels deep")
+    void nestedInlineFlowSequence() {
+        RtpYamlMapping root = RtpYamlReader.parse("vertices: [[1, 2], [3, 4]]\n");
+        RtpYamlSequence outer = (RtpYamlSequence) root.get("vertices");
+        assertTrue(outer.isFlowStyle());
+        assertEquals(2, outer.size());
+        RtpYamlSequence second = (RtpYamlSequence) outer.get(1);
+        assertTrue(second.isFlowStyle());
+        assertEquals(3, ((RtpYamlScalar) second.get(0)).value());
+        assertEquals(4, ((RtpYamlScalar) second.get(1)).value());
+        // Three levels also work.
+        RtpYamlSequence deep = (RtpYamlSequence) RtpYamlReader.parse("d: [[[x]]]\n").get("d");
+        assertEquals("x", ((RtpYamlScalar) ((RtpYamlSequence) ((RtpYamlSequence) deep.get(0)).get(0)).get(0)).value());
+    }
+
+    @Test
+    @DisplayName("ADR-034: block items written as - [x, z] pairs parse (Chunky-style vertices)")
+    void blockItemFlowPairs() {
+        String src = "shape:\n"
+                + "  name: POLYGON\n"
+                + "  vertices:\n"
+                + "    - [-125c, 187c]\n"
+                + "    - [2000b, 3000b]\n"
+                + "    - [10, -4] # trailing comment\n";
+        RtpYamlMapping shape = (RtpYamlMapping) RtpYamlReader.parse(src).get("shape");
+        RtpYamlSequence vertices = (RtpYamlSequence) shape.get("vertices");
+        assertFalse(vertices.isFlowStyle(), "outer list is block style in the source");
+        assertEquals(3, vertices.size());
+        RtpYamlSequence first = (RtpYamlSequence) vertices.get(0);
+        assertTrue(first.isFlowStyle());
+        assertEquals("-125c", ((RtpYamlScalar) first.get(0)).value());
+        assertEquals("187c", ((RtpYamlScalar) first.get(1)).value());
+        RtpYamlSequence third = (RtpYamlSequence) vertices.get(2);
+        assertEquals(10, ((RtpYamlScalar) third.get(0)).value());
+        assertEquals(-4, ((RtpYamlScalar) third.get(1)).value());
+        // Section view coerces to nested Java lists.
+        RtpYamlSection section = new RtpYamlSection(shape);
+        assertEquals(java.util.List.of(java.util.List.of("-125c", "187c"),
+                java.util.List.of("2000b", "3000b"), java.util.List.of(10, -4)), section.getList("vertices"));
+    }
+
+    @Test
+    @DisplayName("Flow sequences tolerate whitespace, empty [] and a trailing comma")
+    void flowWhitespaceEmptyAndTrailingComma() {
+        RtpYamlMapping root = RtpYamlReader.parse("a: [  1 ,2,   3  ]\nb: []\nc: [ ]\nd: [1, 2,]\n");
+        RtpYamlSequence a = (RtpYamlSequence) root.get("a");
+        assertEquals(3, a.size());
+        assertEquals(1, ((RtpYamlScalar) a.get(0)).value());
+        assertEquals(3, ((RtpYamlScalar) a.get(2)).value());
+        assertEquals(0, ((RtpYamlSequence) root.get("b")).size());
+        assertTrue(((RtpYamlSequence) root.get("b")).isFlowStyle());
+        assertEquals(0, ((RtpYamlSequence) root.get("c")).size());
+        assertEquals(2, ((RtpYamlSequence) root.get("d")).size());
+    }
+
+    @Test
+    @DisplayName("Quoted scalars that look like brackets stay strings (world: \"[0]\")")
+    void quotedBracketStaysString() {
+        RtpYamlMapping root = RtpYamlReader.parse("world: \"[0]\"\nother: '[a, b]'\nlist:\n  - \"[1, 2]\"\n");
+        RtpYamlScalar world = (RtpYamlScalar) root.get("world");
+        assertEquals("[0]", world.value());
+        assertEquals(RtpYamlScalar.Style.DOUBLE, world.style());
+        assertEquals("[a, b]", ((RtpYamlScalar) root.get("other")).value());
+        assertEquals("[1, 2]", ((RtpYamlScalar) ((RtpYamlSequence) root.get("list")).get(0)).value());
+        // Brackets that do not open the value are plain text.
+        assertEquals("a [b] c", ((RtpYamlScalar) RtpYamlReader.parse("k: a [b] c\n").get("k")).value());
+    }
+
+    @Test
+    @DisplayName("Malformed flow sequences raise positioned parse errors")
+    void malformedFlowSequence() {
+        RtpYamlParseException unterminated = assertThrows(RtpYamlParseException.class,
+                () -> RtpYamlReader.parse("a: [1, 2\n"));
+        assertEquals("rtpYaml.syntax.unterminatedFlowSeq", unterminated.messageKey());
+        assertEquals(1, unterminated.line());
+        assertEquals(3, unterminated.column(), "column of the opening '['");
+
+        RtpYamlParseException item = assertThrows(RtpYamlParseException.class,
+                () -> RtpYamlReader.parse("v:\n  - [1, 2\n"));
+        assertEquals("rtpYaml.syntax.unterminatedFlowSeq", item.messageKey());
+        assertEquals(2, item.line());
+        assertEquals(4, item.column());
+
+        assertEquals("rtpYaml.syntax.unterminatedFlowSeq",
+                assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("a: [[1, 2]\n")).messageKey());
+        RtpYamlParseException trailing = assertThrows(RtpYamlParseException.class,
+                () -> RtpYamlReader.parse("a: [1, 2] extra\n"));
+        assertEquals("rtpYaml.syntax.flowTrailing", trailing.messageKey());
+        assertEquals(10, trailing.column());
+        assertEquals("rtpYaml.syntax.flowSeq",
+                assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("a: [1, , 2]\n")).messageKey());
+        assertEquals("rtpYaml.syntax.flowSeq",
+                assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("a: [[1] 2]\n")).messageKey());
+        assertEquals("rtpYaml.syntax.unterminatedQuote",
+                assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("a: [\"x, 2]\n")).messageKey());
+        assertEquals("rtpYaml.unsupported.anchor",
+                assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("a: [&x 1]\n")).messageKey());
     }
 
     @Test

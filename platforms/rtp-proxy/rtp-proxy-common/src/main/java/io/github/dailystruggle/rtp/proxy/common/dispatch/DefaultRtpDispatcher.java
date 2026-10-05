@@ -20,7 +20,10 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -98,6 +101,12 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
      * through to {@link BackendSelector#choose(RtpRequest, NetworkSnapshot)}.
      */
     private final RegionAwareSelector regionAwareSelector;
+    /**
+     * Players with a dispatch in flight on this node. One dispatch per
+     * player: a concurrent second request (duplicate / replayed queue entry,
+     * multiple workers) is refused instead of claiming a second token.
+     */
+    private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
 
     public DefaultRtpDispatcher(BackendSelector selector,
                                 NetworkTransport transport,
@@ -221,6 +230,9 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
     public CompletableFuture<DispatchOutcome> dispatch(RtpRequest request) {
         Objects.requireNonNull(request, "request");
 
+        // Presence gate: request.playerId() comes from a shared store, so it
+        // is only acted on when that player holds a session on THIS proxy
+        // (ProxySender.isConnected is the adapter's local-session lookup).
         if (!sender.isConnected(request.playerId())) {
             // Player gone before we even started; nothing to surface.
             emitStatus(request.playerId(), QueueState.CANCELLED, Optional.of(MSG_PLAYER_GONE.key()));
@@ -229,6 +241,35 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
                             MSG_PLAYER_GONE.key()));
         }
 
+        UUID playerId = request.playerId();
+        if (!inFlight.add(playerId)) {
+            // No status emit / message: the in-flight dispatch owns the
+            // player's queue row and UX; this duplicate is audit-logged only.
+            LOG.log(Level.WARNING,
+                    "RTP dispatch: player {0} already has a dispatch in flight; refusing duplicate "
+                            + "(correlationId={1}, REQ-RTP-S-004).",
+                    new Object[]{playerId, request.correlationId()});
+            return CompletableFuture.completedFuture(
+                    new DispatchOutcome.Failed(DispatchOutcome.Failed.Reason.CLAIM_RACE,
+                            MSG_CLAIM_FAILED.key()));
+        }
+        CompletableFuture<DispatchOutcome> result;
+        try {
+            result = dispatchGuarded(request);
+        } catch (RuntimeException e) {
+            inFlight.remove(playerId);
+            throw e;
+        }
+        result.whenComplete((o, err) -> inFlight.remove(playerId));
+        return result;
+    }
+
+    /** Visible for tests: whether {@code playerId} currently has a dispatch in flight. */
+    boolean isInFlight(UUID playerId) {
+        return inFlight.contains(playerId);
+    }
+
+    private CompletableFuture<DispatchOutcome> dispatchGuarded(RtpRequest request) {
         return transport.readSnapshot()
                 .thenComposeAsync(snapshot -> claimAfterSelect(request, snapshot), executor)
                 .thenCompose(this::sendAfterClaim)

@@ -19,6 +19,8 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Reference {@link NetworkRequestQueue} implementation backed by in-process
@@ -36,8 +38,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>Capacity: unbounded. Operators wiring this in production paths should
  * front it with the backend's own {@code queueMaxDepth} guard.</p>
+ *
+ * <p>One pending request per player: a second correlation id for a player
+ * with an undequeued envelope is rejected ({@link #enrol}) or skipped with a
+ * WARNING ({@link #flushPending}). No HMAC: state never leaves this JVM.</p>
  */
 public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
+
+    private static final Logger LOG = Logger.getLogger(InMemoryNetworkRequestQueue.class.getName());
 
     /** FIFO of envelopes awaiting proxy dequeue. */
     private final ConcurrentLinkedDeque<QueueEnvelope> ready = new ConcurrentLinkedDeque<>();
@@ -68,6 +76,7 @@ public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
         Objects.requireNonNull(envelope, "envelope");
         return runAsync(() -> {
             if (closed.get()) return EnrolOutcome.REJECTED;
+            if (hasOtherPending(envelope)) return EnrolOutcome.REJECTED;
             if (!seenCorrelations.add(envelope.correlationId())) {
                 // idempotent replay
                 return EnrolOutcome.ACCEPTED;
@@ -101,6 +110,7 @@ public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
             long now = System.currentTimeMillis();
             for (EnrolmentEnvelope env : batch) {
                 if (env == null) continue;
+                if (hasOtherPending(env)) continue;
                 if (!seenCorrelations.add(env.correlationId())) continue;
                 ready.add(new QueueEnvelope(
                         env.playerId(),
@@ -227,6 +237,19 @@ public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
         ready.clear();
         synchronized (statuses) { statuses.clear(); }
         seenCorrelations.clear();
+    }
+
+    /** {@code true} (WARNING logged) when the player already has an undequeued envelope under another cid. */
+    private boolean hasOtherPending(EnrolmentEnvelope env) {
+        for (QueueEnvelope q : ready) {
+            if (env.playerId().equals(q.playerId()) && !env.correlationId().equals(q.correlationId())) {
+                LOG.log(Level.WARNING, "InMemoryNetworkRequestQueue: player " + env.playerId()
+                        + " already has a pending request; skipping correlationId="
+                        + env.correlationId() + " (REQ-RTP-S-004)");
+                return true;
+            }
+        }
+        return false;
     }
 
     private void putStatus(QueueStatus s) {

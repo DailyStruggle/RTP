@@ -535,5 +535,25 @@ editorChannelOpened: "&a[P0] Web editor channel open. Trust your browser when as
 editorChannelLost: "&e[P1] Web editor channel lost: [reason]. The page keeps working from its snapshot."
 editorChannelExpired: "&7[P0] Web editor channel expired after [minutes] minutes. Run the editor command again to resume."
 
+# Sent when /rtp editor trust is refused after 5 wrong codes in one minute. No placeholders.
+editorTrustRateLimited: "&c[P0] Too many wrong editor trust codes. Wait a minute, then try again."
+
+# Sent when /rtp editor untrust has no valid key. No placeholders.
+editorUntrustUsage: "&c[P0] Usage: /rtp editor untrust key=<fingerprint prefix, at least 4 characters | all>"
+
+# Replies to /rtp editor untrust. [count] - browsers untrusted; [key] - the prefix given;
+# [reason] - why the trusted list could not be written.
+editorUntrustRemoved: "&a[P0] Untrusted [count] web editor browser(s); they must be trusted again to preview or Hot-Apply."
+
+editorUntrustNone: "&7[P0] No trusted editor browser matches [key]."
+
+editorUntrustFailed: "&c[P0] Could not update the trusted editor list: [reason]"
+
+# Sent when a byte-store payload for /rtp editor apply has no sha256 checksum. No placeholders.
+editorApplyDigestMissing: "&c[P0] The editor payload has no sha256 checksum, so it was not applied. Commit again from an up-to-date editor page."
+
+# Sent when the offline apply file (editor/<token>.json) cannot be read. Placeholder: [reason].
+editorApplyFileUnreadable: "&e[P1] The offline apply file could not be read ([reason]); trying the byte store."
+
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

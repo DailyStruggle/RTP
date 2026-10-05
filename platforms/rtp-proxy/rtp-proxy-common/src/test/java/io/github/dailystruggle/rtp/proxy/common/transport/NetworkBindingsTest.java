@@ -66,7 +66,11 @@ class NetworkBindingsTest {
     private NetworkConfig config(String transport, boolean enabled, boolean waitlist) {
         java.util.Map<String, Object> map = new java.util.HashMap<>();
         java.util.Map<String, Object> net = new java.util.HashMap<>();
-        net.put("enabled", enabled);
+        // PATH is set but not a valid Base64 secret: an enabled config would be
+        // rejected at parse time, so the factory tests (which never read
+        // enabled()) parse with enabled=false and still exercise open-time
+        // verifier loading. The `enabled` argument is kept for call-site intent.
+        net.put("enabled", false);
         net.put("secretEnv", "PATH");
         net.put("role", "backend");
         java.util.Map<String, Object> wl = new java.util.HashMap<>();
@@ -109,19 +113,15 @@ class NetworkBindingsTest {
     void open_sql_withAndWithoutDataSource() {
         assertThrows(IllegalArgumentException.class, () -> NetworkBindings.open(config("sql", true, true), null));
 
-        NetworkTransport sql = NetworkBindings.open(config("sql", true, true), ds);
-        // If PATH is not valid Base64 >= 32 bytes, HmacVerifier.loadFromEnv catches NetworkConfigException
-        // and falls back to InMemoryNetworkStateBinding!
-        assertNotNull(sql);
-        sql.close();
+        // PATH is not a >= 32-byte Base64 secret: fail closed, no in-memory swap.
+        assertThrows(io.github.dailystruggle.rtp.proxy.common.config.NetworkConfigException.class,
+                () -> NetworkBindings.open(config("sql", true, true), ds));
     }
 
     @Test
-    void open_redis_withUnreachableHost_fallsBackOrThrows() {
-        // If PATH is not valid Base64, HMAC load fails and falls back to in-memory
-        NetworkTransport redis = NetworkBindings.open(config("redis", true, true), null);
-        assertNotNull(redis);
-        redis.close();
+    void open_redis_withInvalidSecret_failsClosed() {
+        assertThrows(io.github.dailystruggle.rtp.proxy.common.config.NetworkConfigException.class,
+                () -> NetworkBindings.open(config("redis", true, true), null));
     }
 
     @Test
@@ -136,11 +136,19 @@ class NetworkBindingsTest {
 
         assertThrows(IllegalArgumentException.class, () -> NetworkBindings.openRequestQueue(config("sql", true, true), null));
 
-        NetworkRequestQueue sql = NetworkBindings.openRequestQueue(config("sql", true, true), ds);
+        // PATH is not a >= 32-byte Base64 secret: shared queues fail closed (REQ-RTP-PROXY-007).
+        assertThrows(io.github.dailystruggle.rtp.proxy.common.config.NetworkConfigException.class,
+                () -> NetworkBindings.openRequestQueue(config("sql", true, true), ds));
+        assertThrows(io.github.dailystruggle.rtp.proxy.common.config.NetworkConfigException.class,
+                () -> NetworkBindings.openRequestQueue(config("redis", true, true), null));
+
+        io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier v =
+                io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier.forTesting(new byte[32], 1, 1);
+        NetworkRequestQueue sql = NetworkBindings.openRequestQueue(config("sql", true, true), ds, v);
         assertTrue(sql instanceof SqlNetworkRequestQueue);
 
         // Redis unreachable -> falls back to in-memory queue
-        NetworkRequestQueue redisQueue = NetworkBindings.openRequestQueue(config("redis", true, true), null);
+        NetworkRequestQueue redisQueue = NetworkBindings.openRequestQueue(config("redis", true, true), null, v);
         assertTrue(redisQueue instanceof InMemoryNetworkRequestQueue);
 
         assertThrows(IllegalArgumentException.class, () -> NetworkBindings.openRequestQueue(config("unknown", true, true)));

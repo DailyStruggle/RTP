@@ -485,6 +485,13 @@ editorTrustUsage: "&c[P0] 使い方: /rtp editor trust nonce=<エディターペ
 editorChannelOpened: "&a[P0] Webエディターのチャンネルを開きました。求められたらブラウザーを信頼すると、プレビューとHot-Applyが有効になります。"
 editorChannelLost: "&e[P1] Webエディターのチャンネルが切断されました: [reason]。ページはスナップショットで動作を続けます。"
 editorChannelExpired: "&7[P0] Webエディターのチャンネルは [minutes] 分で期限切れになりました。続けるにはエディターコマンドを再実行してください。"
+editorTrustRateLimited: "&c[P0] エディターの信頼コードの誤りが多すぎます。1分待ってから再試行してください。"
+editorUntrustUsage: "&c[P0] 使い方: /rtp editor untrust key=<フィンガープリントの先頭 (4文字以上) | all>"
+editorUntrustRemoved: "&a[P0] Webエディターのブラウザー [count] 件の信頼を取り消しました。プレビューや Hot-Apply には再度信頼が必要です。"
+editorUntrustNone: "&7[P0] [key] に一致する信頼済みエディターブラウザーはありません。"
+editorUntrustFailed: "&c[P0] 信頼済みエディター一覧を更新できませんでした: [reason]"
+editorApplyDigestMissing: "&c[P0] エディターのペイロードに sha256 チェックサムがないため、適用されませんでした。最新のエディターページから再度コミットしてください。"
+editorApplyFileUnreadable: "&e[P1] オフライン適用ファイルを読み込めませんでした ([reason])。バイトストアを試します。"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

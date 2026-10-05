@@ -42,6 +42,9 @@ dependencies {
     // platform adapters and addons keep seeing the effectsapi types transitively.
     api project(':effects-api')
     api project(':metrics-api')
+    // bstats-api (bstats-api-ADR-001): dependency-free bStats client. 'api' so
+    // platform adapters can implement RtpBStatsCatalogue.Host (returns ServerInfo).
+    api project(':bstats-api')
     // maps-api SPI (ADR-046, ADR-047). rtp-core composes ChartSpec -> ChartModel
     // via the ChartSpecResolver registry; concrete platform MapBinding
     // implementations live in rtp-bukkit / rtp-fabric (Stage 2+). 'api' so

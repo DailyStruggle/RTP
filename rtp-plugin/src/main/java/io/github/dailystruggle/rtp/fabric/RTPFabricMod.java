@@ -181,12 +181,14 @@ public final class RTPFabricMod implements ModInitializer {
             // bottoming out on NoopMapBinding.
             accessor.setupMapBinding();
 
-            // bStats metrics telemetry on Fabric
+            // bStats telemetry: shared entry point, default host from core state.
             try {
-                io.github.dailystruggle.rtp.common.metrics.ModdedBStatsSubmitter.start(
-                        "fabric", accessor.getPluginDirectory());
+                io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
+                        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStatsCatalogue.Host.of("fabric"),
+                        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.SERVICE_ID, "full",
+                        accessor.getPluginDirectory());
             } catch (Throwable t) {
-                RTP.log(Level.FINE, "[RTP][fabric] bStats submitter setup skipped or failed: " + t.getMessage());
+                RTP.log(Level.FINE, "[RTP][fabric] bStats setup skipped or failed: " + t.getMessage());
             }
 
             // Wire mod-side land protection (OPAC, FTB Chunks per MULTI_PLATFORM_PLAN line 505)
@@ -664,6 +666,8 @@ public final class RTPFabricMod implements ModInitializer {
                         "[RTP] FabricJarUtils.extractDocs dispatch failed: "
                                 + t.getClass().getSimpleName() + ": " + t.getMessage());
             }
+            io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry
+                    .rebuildFromDataFolder(accessor.getPluginDirectory());
 
             RTP.log(Level.INFO,
                     "[RTP] Fabric entry point initialized — event bridge + /rtp Brigadier root registered.");

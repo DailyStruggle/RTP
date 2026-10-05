@@ -9,10 +9,13 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
 
@@ -22,28 +25,48 @@ import java.util.regex.Pattern;
  * <p>Persisted as {@code <dataFolder>/editor/trusted-editors.json}
  * ({@code {"version":1,"trusted":[{"fingerprint":"..","added":<ms>}]}}) with a tmp-file + atomic
  * replace. A corrupt file is logged and treated as empty; the next successful trust rewrites it.
+ *
+ * <p>With a max age ({@code advanced/network.yml editor.trust.maxAgeDays}) an entry stops being
+ * trusted that long after {@code added}; rows without {@code added} (or {@code 0}) count from load.
  */
 public final class TrustedEditors {
 
     static final int MAX_ENTRIES = 256;
     static final Pattern FINGERPRINT = Pattern.compile("[0-9a-f]{64}");
+    /** {@code all}, or a fingerprint prefix long enough not to match by accident. */
+    private static final Pattern SELECTOR = Pattern.compile("all|[0-9a-f]{4,64}");
 
     private final Path file;
+    private final long maxAgeMillis;
+    private final LongSupplier clock;
     private final Map<String, Long> trusted = new LinkedHashMap<>();
 
-    private TrustedEditors(Path file) {
+    private TrustedEditors(Path file, long maxAgeMillis, LongSupplier clock) {
         this.file = file;
+        this.maxAgeMillis = Math.max(0L, maxAgeMillis);
+        this.clock = clock;
     }
 
     /** Memory only: nothing persisted (tests). */
     public static TrustedEditors inMemory() {
-        return new TrustedEditors(null);
+        return new TrustedEditors(null, 0L, System::currentTimeMillis);
     }
 
     /** Reads {@code file}; missing means empty, corrupt is logged and treated as empty. Off the main thread. */
     public static TrustedEditors load(Path file) {
-        TrustedEditors t = new TrustedEditors(file);
+        return load(file, 0L, System::currentTimeMillis);
+    }
+
+    /** As {@link #load(Path)}; entries older than {@code maxAgeMillis} ({@code <= 0}: never) are not trusted. */
+    public static TrustedEditors load(Path file, long maxAgeMillis) {
+        return load(file, maxAgeMillis, System::currentTimeMillis);
+    }
+
+    static TrustedEditors load(Path file, long maxAgeMillis, LongSupplier clock) {
+        TrustedEditors t = new TrustedEditors(file, maxAgeMillis, clock);
         if (file == null || !Files.isRegularFile(file)) return t;
+        long now = clock.getAsLong();
+        int expired = 0;
         try {
             Object root = EditorLoopbackJson.parse(Files.readString(file, StandardCharsets.UTF_8));
             if (!(root instanceof Map<?, ?> m) || !(m.get("trusted") instanceof List<?> rows)) {
@@ -55,18 +78,71 @@ public final class TrustedEditors {
                     throw new IllegalArgumentException("malformed trusted entry");
                 }
                 long added = r.get("added") instanceof Number n ? n.longValue() : 0L;
+                if (added <= 0L) added = now;
+                if (t.expired(added, now)) {
+                    expired++;
+                    continue;
+                }
                 if (t.trusted.size() < MAX_ENTRIES) t.trusted.put(fp, added);
             }
         } catch (IOException | IllegalArgumentException e) {
             t.trusted.clear();
             RTP.log(Level.WARNING, "[editor] trusted editor list " + file + " is unreadable; treating it as empty: "
                     + e.getMessage());
+            return t;
+        }
+        if (expired > 0) {
+            RTP.log(Level.INFO, "[editor] " + expired + " trusted editor key(s) in " + file + " passed the trust max age"
+                    + " and must be trusted again");
         }
         return t;
     }
 
+    private boolean expired(long added, long now) {
+        return maxAgeMillis > 0L && now - added >= maxAgeMillis;
+    }
+
+    /** Trusted and, with a max age, still inside it (an expired entry is dropped from memory). */
     public synchronized boolean isTrusted(String fingerprint) {
-        return fingerprint != null && trusted.containsKey(fingerprint);
+        Long added = fingerprint == null ? null : trusted.get(fingerprint);
+        if (added == null) return false;
+        if (expired(added, clock.getAsLong())) {
+            trusted.remove(fingerprint);
+            return false;
+        }
+        return true;
+    }
+
+    /** {@code all} or 4-64 lowercase hex characters: what {@link #remove} and {@link #forget} accept. */
+    public static boolean isSelector(String selector) {
+        return selector != null && SELECTOR.matcher(selector).matches();
+    }
+
+    /**
+     * Untrusts every fingerprint starting with {@code selector} (or all for {@code all}) and persists
+     * the list when anything changed.
+     *
+     * @return the removed fingerprints
+     * @throws IOException when the list cannot be written (the keys stay untrusted for this run)
+     */
+    public synchronized Set<String> remove(String selector) throws IOException {
+        Set<String> removed = forget(selector);
+        if (!removed.isEmpty() && file != null) write();
+        return removed;
+    }
+
+    /** As {@link #remove} in memory only: for lists that share their file with a persisted one. */
+    public synchronized Set<String> forget(String selector) {
+        if (!isSelector(selector)) throw new IllegalArgumentException("not a fingerprint prefix or 'all'");
+        Set<String> removed = new LinkedHashSet<>();
+        for (Iterator<String> it = trusted.keySet().iterator(); it.hasNext(); ) {
+            String fp = it.next();
+            if (selector.equals("all") || fp.startsWith(selector)) {
+                removed.add(fp);
+                it.remove();
+            }
+        }
+        return removed;
     }
 
     /**

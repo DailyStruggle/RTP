@@ -4,6 +4,8 @@ import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge;
+import io.github.dailystruggle.rtp.common.network.pluginmessage.PluginMessageEnvelope;
+import io.github.dailystruggle.rtp.common.network.pluginmessage.ThrottledWarning;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -40,6 +42,12 @@ import java.util.logging.Logger;
  * heartbeat retries on the next tick. Reads of {@code spigot.yml} /
  * {@code paper-global.yml} feed the cheap {@link #passiveProbe()} that arms the
  * {@code auto} resolver before any traffic is exchanged.</p>
+ *
+ * <p>Inbound messages arrive on a player connection and are untrusted (a
+ * modded client can inject them). Frames above
+ * {@link PluginMessageEnvelope#MAX_FRAME_BYTES} or with an out-of-range inner
+ * length are dropped before parsing; authenticity is enforced downstream by
+ * the binding's HMAC check.</p>
  */
 public final class BukkitNetworkBridge implements NetworkBridge {
 
@@ -70,6 +78,8 @@ public final class BukkitNetworkBridge implements NetworkBridge {
 
     private final Plugin plugin;
     private final boolean registered;
+    private final ThrottledWarning rejectWarning = new ThrottledWarning(
+            LOG::warning, ThrottledWarning.DEFAULT_INTERVAL_MS, System::currentTimeMillis);
 
     private volatile Consumer<byte[]> heartbeatSink;
     private volatile Consumer<Topology> topologySink;
@@ -118,6 +128,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
 
     @Override
     public void broadcastHeartbeat(byte[] payload) {
+        if (payload == null || payload.length > PluginMessageEnvelope.MAX_PAYLOAD_BYTES) return;
         Optional<UUID> carrier = anyOnlinePlayer();
         if (carrier.isEmpty()) {
             LOG.log(Level.FINE, "[RTP] no carrier player online; heartbeat gossip skipped this tick.");
@@ -150,7 +161,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
 
     @Override
     public void pushHeartbeatToProxy(byte[] payload) {
-        if (payload == null) return;
+        if (payload == null || payload.length > PluginMessageEnvelope.MAX_PAYLOAD_BYTES) return;
         Optional<UUID> carrier = anyOnlinePlayer();
         if (carrier.isEmpty()) {
             LOG.log(Level.FINE, "[RTP] no carrier player online; heartbeat push to proxy skipped.");
@@ -271,6 +282,12 @@ public final class BukkitNetworkBridge implements NetworkBridge {
         @Override
         public void onPluginMessageReceived(String channel, Player player, byte[] message) {
             if (message == null || message.length == 0) return;
+            if (message.length > PluginMessageEnvelope.MAX_FRAME_BYTES) {
+                rejectWarning.report("[RTP] dropped oversized plugin message on '" + channel + "' ("
+                        + message.length + " bytes > " + PluginMessageEnvelope.MAX_FRAME_BYTES
+                        + ") via " + (player == null ? "<none>" : player.getName()) + " (REQ-RTP-S-004).");
+                return;
+            }
             if (PROXY_CHANNEL.equals(channel)) {
                 onProxyChannel(message);
                 return;
@@ -281,11 +298,9 @@ public final class BukkitNetworkBridge implements NetworkBridge {
                 String sub = in.readUTF();
                 switch (sub) {
                     case FORWARD_SUBCHANNEL -> {
-                        short len = in.readShort();
-                        byte[] payload = new byte[Math.max(0, (int) len)];
-                        in.readFully(payload);
+                        byte[] payload = readLengthPrefixed(in, channel);
                         Consumer<byte[]> sink = heartbeatSink;
-                        if (sink != null) sink.accept(payload);
+                        if (payload != null && sink != null) sink.accept(payload);
                     }
                     case "GetServer" -> ownServerId = in.readUTF();
                     case "GetServers" -> {
@@ -319,9 +334,8 @@ public final class BukkitNetworkBridge implements NetworkBridge {
                 ByteArrayDataInput in = ByteStreams.newDataInput(message);
                 byte verb = in.readByte();
                 if (verb == PROXY_SNAPSHOT_RSP) {
-                    short len = in.readShort();
-                    byte[] payload = new byte[Math.max(0, (int) len)];
-                    in.readFully(payload);
+                    byte[] payload = readLengthPrefixed(in, PROXY_CHANNEL);
+                    if (payload == null) return;
                     Consumer<byte[]> sink = heartbeatSink;
                     LOG.log(Level.FINE, "[RTP] received proxy-cache snapshot row (" + payload.length
                             + " bytes); sink " + (sink != null ? "present" : "absent") + ".");
@@ -332,6 +346,19 @@ public final class BukkitNetworkBridge implements NetworkBridge {
             } catch (Throwable t) {
                 LOG.log(Level.FINE, "[RTP] dropping malformed proxy-cache message: " + t.getMessage());
             }
+        }
+
+        /** Read a {@code short}-prefixed payload; {@code null} (logged) when the length is out of range. */
+        private byte[] readLengthPrefixed(ByteArrayDataInput in, String channel) {
+            int len = in.readShort();
+            if (len <= 0 || len > PluginMessageEnvelope.MAX_PAYLOAD_BYTES) {
+                rejectWarning.report("[RTP] dropped plugin message on '" + channel
+                        + "' with invalid payload length " + len + " (REQ-RTP-S-004).");
+                return null;
+            }
+            byte[] payload = new byte[len];
+            in.readFully(payload);
+            return payload;
         }
     }
 }

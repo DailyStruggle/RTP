@@ -504,6 +504,13 @@ editorTrustUsage: "&c[P0] Użycie: /rtp editor trust nonce=<kod pokazany przez s
 editorChannelOpened: "&a[P0] Kanał edytora WWW otwarty. Zaufaj przeglądarce, gdy pojawi się prośba, aby włączyć podglądy i Hot-Apply."
 editorChannelLost: "&e[P1] Utracono kanał edytora WWW: [reason]. Strona nadal działa na podstawie migawki."
 editorChannelExpired: "&7[P0] Kanał edytora WWW wygasł po [minutes] minutach. Uruchom ponownie polecenie edytora, aby kontynuować."
+editorTrustRateLimited: "&c[P0] Zbyt wiele błędnych kodów zaufania edytora. Odczekaj minutę i spróbuj ponownie."
+editorUntrustUsage: "&c[P0] Użycie: /rtp editor untrust key=<początek odcisku klucza, co najmniej 4 znaki | all>"
+editorUntrustRemoved: "&a[P0] Cofnięto zaufanie dla przeglądarek edytora web: [count]; trzeba im ponownie zaufać, aby używać podglądu lub Hot-Apply."
+editorUntrustNone: "&7[P0] Żadna zaufana przeglądarka edytora nie pasuje do [key]."
+editorUntrustFailed: "&c[P0] Nie udało się zaktualizować listy zaufanych edytorów: [reason]"
+editorApplyDigestMissing: "&c[P0] Ładunek edytora nie ma sumy kontrolnej sha256, więc nie został zastosowany. Zatwierdź ponownie z aktualnej strony edytora."
+editorApplyFileUnreadable: "&e[P1] Nie udało się odczytać pliku zastosowania offline ([reason]); próba z magazynem bajtów."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

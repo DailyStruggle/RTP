@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis.resp;
 
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.Closeable;
@@ -9,12 +12,16 @@ import java.net.Socket;
 import java.util.*;
 
 /**
- * Encapsulates a raw TCP connection to a Redis server speaking RESP2.
+ * Encapsulates a TCP (optionally TLS) connection to a Redis server speaking RESP2.
+ *
+ * <p>TLS ({@code rediss://} host form, see {@link RespEndpoint}) uses the JVM
+ * default trust store with hostname verification. With an ACL username the
+ * handshake sends {@code AUTH username password} (Redis 6+), else
+ * {@code AUTH password}. The password is never logged.</p>
  */
 public class RespConnection implements Closeable {
 
-    private final String host;
-    private final int port;
+    private final RespEndpoint endpoint;
     private final int timeoutMs;
     private final String password;
 
@@ -23,17 +30,20 @@ public class RespConnection implements Closeable {
     private BufferedOutputStream out;
     private boolean broken;
 
+    /** {@code host} may be a bare host or a {@code redis://} / {@code rediss://} URL. */
     public RespConnection(String host, int port, int timeoutMs, String password) throws IOException {
-        this.host = host;
-        this.port = port;
+        this(RespEndpoint.parse(host, port), timeoutMs, password);
+    }
+
+    public RespConnection(RespEndpoint endpoint, int timeoutMs, String password) throws IOException {
+        this.endpoint = Objects.requireNonNull(endpoint, "endpoint");
         this.timeoutMs = timeoutMs;
         this.password = password;
         connect();
     }
 
-    RespConnection(String host, int port, int timeoutMs, String password, boolean connectNow) {
-        this.host = host;
-        this.port = port;
+    RespConnection(RespEndpoint endpoint, int timeoutMs, String password, boolean connectNow) {
+        this.endpoint = endpoint;
         this.timeoutMs = timeoutMs;
         this.password = password;
         if (connectNow) {
@@ -46,22 +56,53 @@ public class RespConnection implements Closeable {
     }
 
     private void connect() throws IOException {
-        this.socket = new Socket();
-        this.socket.setTcpNoDelay(true);
-        this.socket.setKeepAlive(true);
-        this.socket.setSoTimeout(timeoutMs);
-        this.socket.connect(new InetSocketAddress(host, port), timeoutMs);
+        Socket plain = new Socket();
+        try {
+            plain.setTcpNoDelay(true);
+            plain.setKeepAlive(true);
+            plain.setSoTimeout(timeoutMs);
+            plain.connect(new InetSocketAddress(endpoint.host(), endpoint.port()), timeoutMs);
+            this.socket = endpoint.tls() ? wrapTls(plain) : plain;
+        } catch (IOException | RuntimeException e) {
+            try { plain.close(); } catch (IOException ignored) {}
+            throw e;
+        }
         this.in = new BufferedInputStream(socket.getInputStream(), 8192);
         this.out = new BufferedOutputStream(socket.getOutputStream(), 8192);
         this.broken = false;
 
         if (password != null && !password.isEmpty()) {
-            auth(password);
+            if (endpoint.username() != null) {
+                auth(endpoint.username(), password);
+            } else {
+                auth(password);
+            }
         }
+    }
+
+    /** TLS over the connected socket; host string drives SNI + hostname verification. */
+    private SSLSocket wrapTls(Socket plain) throws IOException {
+        SSLSocketFactory f = (SSLSocketFactory) SSLSocketFactory.getDefault();
+        SSLSocket ssl = (SSLSocket) f.createSocket(plain, endpoint.host(), endpoint.port(), true);
+        SSLParameters p = ssl.getSSLParameters();
+        p.setEndpointIdentificationAlgorithm("HTTPS");
+        ssl.setSSLParameters(p);
+        ssl.startHandshake();
+        return ssl;
     }
 
     public synchronized void auth(String pwd) throws IOException {
         executeCommand("AUTH", pwd);
+    }
+
+    /** Redis 6+ ACL auth. */
+    public synchronized void auth(String username, String pwd) throws IOException {
+        executeCommand("AUTH", username, pwd);
+    }
+
+    /** Connection target (log-safe). */
+    public RespEndpoint endpoint() {
+        return endpoint;
     }
 
     public synchronized String ping() throws IOException {

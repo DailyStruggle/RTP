@@ -1,7 +1,8 @@
 -- rtp-proxy-common cross-server network wait queue: state transition.
 -- Atomically writes the next QueueState into the player's status HASH. On a
 -- terminal state (COMPLETED / FAILED / CANCELLED) the per-correlationId env
--- HASH is deleted, the seen-correlation entry is scrubbed, and the status
+-- HASH is deleted, the seen-correlation entry is scrubbed, the player's
+-- pending marker is cleared when it names that cid, and the status
 -- HASH itself is evicted (parity with InMemoryNetworkRequestQueue, which
 -- removes the status row on any terminal transition) so a subsequent
 -- pollStatus reports the player as absent. The pre-eviction status snapshot
@@ -46,6 +47,13 @@ if terminal then
     if cid then
         redis.call('DEL', 'rtp:net:wq:env:' .. cid)
         redis.call('SREM', KEYS[2], cid)
+        local pid = redis.call('HGET', statusKey, 'playerId')
+        if pid then
+            local pendingKey = 'rtp:net:wq:pending:' .. pid
+            if redis.call('GET', pendingKey) == cid then
+                redis.call('DEL', pendingKey)
+            end
+        end
     end
     local result = redis.call('HGETALL', statusKey)
     redis.call('DEL', statusKey)

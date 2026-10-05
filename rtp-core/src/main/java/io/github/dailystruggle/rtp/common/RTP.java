@@ -1667,6 +1667,7 @@ public class RTP {
     // it cannot touch a connection mid-shutdown. Persisted rows resume on next startup.
     io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager.stopGlobal();
     io.github.dailystruggle.rtp.common.commands.editor.EditorLiveFeed.stopActive("plugin disabled");
+    io.github.dailystruggle.rtp.common.commands.editor.EditorExtensions.unregisterAll();
 
     if (instance.databaseAccessor != null) {
       if (instance.databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {

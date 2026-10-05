@@ -8,18 +8,14 @@ This is the single changelog for both editions. The full (Pro) edition and the
 rtp-lite assembly variant ([ADR-024](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-024-rtp-lite-assembly-variant.md))
 share this file; there is no separate lite changelog.
 
-**Pro-exclusive tagging rule.** Any entry describing a feature that ships only
-in the full (Pro) edition and is NOT present in rtp-lite shall be prefixed with
-the literal marker `**(Pro)**` immediately after the bullet's `- `. Example:
-
-```
-- **(Pro)** Login reserve cache (ADR-023) ...
-```
-
-The marker lets the rtp-lite Modrinth release workflow
-(`.github/workflows/release.yml`) strip Pro-only bullets from the lite release
-notes automatically, so a single source of truth stays honest for both
-editions. Entries with no marker are assumed to apply to both editions.
+**Edition tagging (retired).** Both editions ship the same MIT-licensed code
+([ADR-100](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-100-superseding-adr-024-sla-and-support-tier.md),
+[ADR-108](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)),
+so every entry applies to both editions and new entries shall not carry the
+`**(Pro)**` marker. Marked entries in released sections below describe the
+edition split as it was at that release; the rtp-lite release workflow
+(`.github/workflows/release.yml`) still drops them if such a section is
+re-published.
 
 ---
 
@@ -48,6 +44,14 @@ editions. Entries with no marker are assumed to apply to both editions.
   - *Physical location triggers (`PhysicalTriggerManager`):* Detects player entry or movement across physical spatial triggers and cuboid zones, automatically executing bound actions.
   - *Action command suite:* Introduces `/rtp action [action] [target]`, `/rtp action cancel [session]`, `/rtp action list`, `/rtp back`, and `/rtp trigger [create|remove|list]` for runtime inspection and execution.
   - *Bundled `LeafRTPActionAddon` v1.0.0 and declarative action presets:* Ships ready-to-use action definitions in `definitions/actions/` including `arena.yml`, `challenge.yml`, `default.yml`, `koth.yml`, `location.yml`, `nearclaim.yml`, `nearplayer.yml`, `quickchallenge.yml`, `scatter.yml`, and `teams.yml`.
+
+- **Addon editor extensions: shared data, addon tabs and protocol negotiation in the web editor (ADR-107).** Addons contribute data, message handlers and tabs to `/rtp editor` through `RTPAPI.hooks().editorExtensions()`, while core keeps the transport, signing, schedule and limits:
+  - *Public API (`rtp-api`, `io.github.dailystruggle.rtp.api.editor`):* `EditorExtension` (snapshot data, polled live state, tab descriptors, namespaced message handlers, addon config files with `validate` / `applied`), `EditorSession`, `EditorMessage`, `EditorDelivery` and the `EditorTab` / `EditorWidget` / `EditorFrame` records. The registry fails closed before core loads (S-006).
+  - *Namespaced, budgeted channel types:* Addon messages travel as `<id>.<type>` on the signed editor channel; undotted types stay reserved for core. Each push type is `latest` or `ordered`, is bundled on paced relays, and is capped per extension (256 KiB/min) and for all extensions together (25 % of the session budget), dropped before core map layers. Inbound addon messages are limited to 20 per second per extension.
+  - *Version negotiation:* The session snapshot and the trusted `hello-reply` carry `protocol {channel, extensions}` and the extension list, so older and newer pages and plugins detect each other's features; the page ignores well-formed frames it has no handler for instead of dropping them.
+  - *Addon tabs:* The editor renders addon tabs after the core tabs from declarative `markdown`, `status`, `keyValue`, `table`, `button` and `form` widgets, with no addon code in the page; unknown widget kinds show a "needs a newer editor" placeholder, and a changed server addon set after reconnect is announced in the tabs.
+  - *Addon YAML through Hot-Apply:* Files an addon declares (outside the plugin folder root and core folders, symlink-checked) join the editor session and are written only by Hot-Apply: structural checks, the addon's own `validate` (any error fails the whole apply with the message in `apply_ack`, S-004), `.bak` copy, atomic write, then `applied` so the addon reloads.
+  - *Isolation:* Every addon call is guarded; exceptions and oversized results are logged at most once a minute, and three failures disable that addon for the session while core and other addons carry on.
 
 - **Foreign configuration and permission migration seam (ADR-066).** Adds automated, non-destructive migration commands and a unified heuristic importer for operators transitioning from competing random teleport plugins:
   - *Universal configuration importer (`UniversalConfigImporter`, `GenericSchemaImporter` in `rtp-core`):* Single, zero-configuration heuristic migration engine that infers target worlds, bounds, radii, shapes, cooldowns, and prices from arbitrary competitor YAML structures via fuzzy keyword matching off disk, with zero runtime plugin dependencies or platform coupling. Validated and tested across 6 major competitor formats (`BetterRTP`, `JustRTP`, `EzRTP`, `JakesRTP`, `AsyncRTP`, and `AdvancedRTP`).
@@ -105,6 +109,8 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ### Changed
 
+- **RTP is now MIT-licensed in full ([ADR-108](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)).** The PolyForm Noncommercial terms that covered non-core source (ADR-061) are withdrawn: all source and both the free and Pro jars are MIT, so commercial use, modification and redistribution need no purchase. Pro is a support tier - priority support, early-access builds and funding for development - and grants no additional licence. Releases published earlier keep the licence they shipped with.
+
 - **Off-tick Anvil and Linear region prefilter data structure reuse.** The Anvil and Linear region file prefilter (`AnvilChunkView`, `AnvilRegionByteCache`, and internal read buffers) now aggressively reuses chunk parsing data structures across off-tick scan pulses. This eliminates high-frequency byte array allocations during terrain prefiltering, significantly reducing JVM garbage collection churn on servers with large pre-generation pipelines.
 
 - **Region file freshness checks no longer dominate off-tick prefilter cost.** The cached region-byte lookup used to `stat` the `.mca` / `.linear` file on every probe to detect a chunk-save, which on Windows cost about as much as the entire cached lookup it was guarding - a 1024-probe sweep over one region file paid roughly 68 ms of syscalls. The check now runs at most once per region file per second, so a warm lookup measured 153 ns instead of ~65 us on the same machine. Chunk saves are still picked up promptly, since the default autosave cadence is ~30s.
@@ -117,11 +123,19 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ### Fixed
 
+- **The last chunk of a region file whose final sector isn't padded out now gets the region-file safety check.** A region file's last 4 KiB sector is padded only when the server closes the file, so the final chunk can end before its sector does. RTP treated that chunk as unreadable or ungenerated and fell back to loading it. A test world had 291 of 5,006 region files in this state. Most of them were in the Nether, where 74% of files were affected. A chunk is now read whenever its own length field shows all of its data is in the file.
+
+- **Worlds saved with `region-file-compression=lz4` now get the region-file safety check.** LZ4-compressed chunks were read in the wrong LZ4 format, so every check on those worlds fell back to loading the chunk. Default (zlib) worlds were not affected.
+
+- **LZ4 region chunks are now decoded by RTP's own code, and the lz4-java library is no longer bundled.** This closes CVE-2025-12183 and CVE-2026-59949, both memory-safety bugs in lz4-java's native and `Unsafe` code. The new decoder is plain Java with bounds checks on every read. It checks each block's size against the 32 MiB chunk limit before allocating memory and verifies each block's checksum, so a corrupt or malicious region file just falls back to a normal chunk load instead of crashing the server. The jar is also about 540 KB smaller without the native LZ4 binaries, and the bundled zstd decoder is moved into RTP's own package so it can't clash with another plugin's copy.
+
 - **Scan land percentage now shows the real share of valid land.** `%rtp_scan_landPercentage%` could read `0.00` or drift during an active scan, and the scan boss bar was putting the scan's completion percentage where `[scan_landPercentage]` was placed. Both now use the scan's own good/bad tally (averaged across regions when no region is in context). The completion percentage is still available in the boss bar as the new `[scan_progress]` placeholder.
 
 - **MSPT readings on Fabric and NeoForge were stuck near 50 ms and never came back down.** Those two platforms were measuring the gap between server ticks rather than the time actually spent inside a tick. The vanilla server sleeps after each tick to hold 20 TPS, so that gap is always at least 50 ms: a perfectly healthy server reported ~50 ms, and once a lag spike pushed the number up it could only ever settle back to 50, never below. MSPT now comes from the server's own average tick time, so an idle server reads a few milliseconds and the value recovers after a spike like it does on Paper. This also unsticks everything downstream that divides MSPT by 50 to get tick-budget use - the adaptive tick budget and the tick-stress counter were seeing a permanently maxed-out server on Fabric and NeoForge and holding back accordingly. Expect the number in `/rtp info` to drop sharply on these platforms; the old reading was the bug, not the new one. If no tick-time source is reachable, MSPT now reports "unsampled" instead of inventing a value.
 
 - **Cross-server regions were invisible to anyone who was not op.** In network mode a peer destination (`/rtp region=<server>:<region>`, and its row in the `/rtp` menu) demanded `rtp.servers.<server>` and `rtp.regions.<region>` unconditionally, while both `rtp.servers.*` and `rtp.regions.*` defaulted to op. Non-op players (e.g. on a lobby server) saw no cross-server destinations at all - even for open regions they could reach freely. `rtp.servers.*` now defaults to `true` in `plugin.yml` so cross-server teleports work for all players by default (servers can still be restricted via negative permissions or permission managers), and a peer region only costs `rtp.regions.<region>` when the owning backend actually configured `requirePermission`. Permission-gated regions stay gated.
+
+- **bStats data from Fabric and NeoForge now reaches bStats, and no bStats library is bundled.** Fabric and NeoForge reports were sent to an invalid address and dropped. They now count under the main LeafRTP page, the `platform` chart tells them apart, and they get the full chart set. On every platform, RTP's own small bStats client replaces the bundled `org.bstats:bstats-bukkit` library. The client ships as the reusable, dependency-free `bstats-api` module ([bstats-api-ADR-001](https://github.com/DailyStruggle/RTP/tree/V3/api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)), so other plugins can reuse it. It sends the same data on the same schedule, honours the same opt-out (`enabled: false` in `plugins/bStats/config.yml`, or `config/bStats/config.txt` on Fabric / NeoForge) and keeps the existing server UUID, so install counts continue.
 
 - **Region shape `mode` handling and bad-location recovery fixes across shapes.**
   - `mode` settings (`nearest`, `reroll`) in shape configurations are now case-insensitive across all shapes (lowercase values on `SQUARE` and `RECTANGLE` previously disabled snapping and rerolling silently).
@@ -131,6 +145,47 @@ editions. Entries with no marker are assumed to apply to both editions.
 - **`uniqueplacements` radius parsing and binary-search scaling.**
   - `SQUARE_NORMAL` regions now parse `uniqueplacements` as a chunk radius instead of a boolean, preventing configured integer radii from being misinterpreted as "off" and subsequently overwritten as `false` in config saves.
   - Selection performance on regions with `uniqueplacements` enabled no longer degrades as bad-location memory grows: nearby marks now fold directly into existing records, sorting and collapsing run in batches rather than on every pick, and known-bad checks use a binary search instead of linear scans (reducing a 40,000-candidate fill from ~6s to ~0.2s).
+
+### Security
+
+> **Network mode upgrade note.** Upgrade every backend and proxy together. Reservation tokens, request-queue entries and plugin-message heartbeats now use a new signed format, so servers on this version and on older builds can't share a store or see each other. Tokens and queue entries are short-lived, so a rolling restart clears the old ones. Network mode over `redis`, `sql` or `proxy-direct` now refuses to start without a Base64 `RTP_NET_SECRET` of at least 32 bytes, instead of quietly falling back to an in-memory store.
+
+- **Web editor uploads no longer contain passwords.** `/rtp editor` used to upload every config file as-is to the public byte store, including the database and Redis passwords in `advanced/database.yml` and `advanced/network.yml`. Values under keys such as `password`, `secret`, `token`, `apikey` and `credentials`, and usernames/passwords inside URLs, are now replaced with `<redacted>` in the hosted upload and the local export. When an edit comes back, `<redacted>` keeps the value already on disk.
+- **`/rtp editor apply` is stricter about what it writes.**
+  - Only relative `.yml`/`.yaml` files outside `editor/` are written, so key files and the trusted-editors list can't be overwritten. Hidden paths, `..` and symlinks that lead outside the plugin folder are refused.
+  - Payloads from the byte store must carry a `sha256` checksum.
+  - Decompressed payloads are capped at 4 MiB.
+  - Byte-store and relay URLs must use `https`/`wss`; plain `http`/`ws` is allowed only for loopback addresses.
+- **Editor trust can be revoked.**
+  - New `/rtp editor untrust key=<fingerprint prefix|all>` removes trusted browser keys, including from open sessions.
+  - New `editor.trust.maxAgeDays` in `advanced/network.yml` makes trust expire (default `0`, never expires).
+  - The trust prompt shows the full key fingerprint.
+  - Wrong trust codes are limited to five a minute.
+- **Editor files and logs leak less.**
+  - The plugin's editor key and the exported local editor page are readable only by their owner on Windows as well as POSIX systems.
+  - Logs show only the first characters of a session token.
+  - Local editor sessions expire after 30 minutes.
+  - Editor export and apply run on RTP's scheduler, and failures that used to be ignored are now logged.
+- **Hosted editor page.**
+  - The page sends no referrer.
+  - It has a Content-Security-Policy.
+  - It removes a `?token=` value from the address bar once it has read it.
+  - Field-doc text and fetched documentation pages pass through the same HTML allow-list as addon markdown before display.
+- **Plugin-message heartbeats are signed.** A modded client could send fake `rtp:net` / `bungeecord:main` heartbeats to a game server and add made-up servers or regions. Heartbeats and proxy-cache snapshot replies are now HMAC-signed with the network secret, and unsigned or tampered payloads are dropped with a rate-limited warning. Payload size and field counts are capped, and each side tracks at most 1,024 servers.
+- **Signed shared-store records.**
+  - Reservation-token signatures now cover the region, so the region on a valid token can't be changed.
+  - Redeeming a token checks its stored signature before using it up.
+  - Cross-server request-queue entries are signed on Redis and SQL; unsigned or tampered entries are dropped.
+  - Signed fields that contain line breaks, `=`, `|` or NUL are rejected.
+- **A proxy only dispatches requests for players connected to it,** one at a time per player, and duplicate requests for a player who already has one pending are refused.
+- **Proxy-direct link hardening.**
+  - Every request is signed; unsigned mode is gone.
+  - The listener binds to `127.0.0.1` by default.
+  - New settings: an `allowedClients` IP/CIDR allowlist and TLS with optional client certificates (`tls`, `keystore`, `truststore`, `*PasswordEnv`).
+  - A non-loopback bind requires `tls: true`, or an explicit `tls: false`, which logs a warning.
+- **Redis connection options.** Redis connections support TLS (`tls: true` or a `rediss://` host), Redis 6 ACL usernames, and reading the password from an environment variable (`passwordEnv`, default `RTP_REDIS_PASSWORD`). A password left in YAML logs a one-time warning.
+- **Redis reply limits.** The Redis reply reader caps line length (64 KiB), nesting depth (32) and total elements per reply.
+- **Token logging.** Reservation tokens are no longer logged in full; token IDs appear only as a short prefix at debug level.
 
 ---
 

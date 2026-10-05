@@ -1,103 +1,94 @@
-# RTP — Performance Results
+# RTP - Performance Results
 
-> **Headline.** RTP delivers `/rtp` in **under 10 ms** p99 on Spigot, **under 4 ms** on Paper, and keeps Folia regions at full TPS while competing plugins block their region thread for over a second per teleport.
+> **Headline.** On Paper, RTP sustained 18.7 teleports/s at 100 % success under unpaced dispatch with p95 2 ms and TPS never below 17.5. On Folia it held 13.5 TP/s with zero watchdog stalls while EzRTP froze a region for 20.4 s.
 
-Measured against the most-installed alternatives on three platforms with the same harness, same world, same hardware, and the same two real connected clients. Full methodology, raw CSVs, spark profiles, and reproduction harness: [`helpers/StressTestRTP/`](./).
+Measured against currently-shipping alternatives with the same harness, world, and hardware, using real connected clients. Methodology, per-run analyses, retractions, and known confounds: [`PRE_WRITEUP.md`](./PRE_WRITEUP.md). Harness source: [`helpers/StressTestRTP/`](./). Per-attempt CSVs are kept locally under `runs/` (gitignored) and are not published in this repository.
+
+Only runs against competitor versions that are still current are listed. The earlier Spigot / Paper 1.20.1 passes were dropped once every competitor in them had shipped a newer release, and the 1.07 / 35.9 / 64.0 chunks-per-attempt figures from those runs are retracted (worldgen artefacts; see ADR-080).
 
 ---
 
 ## Cross-platform summary
 
-| Platform | Plugin | `/rtp` per second | p99 latency | Success |
-|---|---|---:|---:|---:|
-| **Spigot 1.20.1** | **RTP** | **1.25** | **8 ms** | 100 % |
-| Spigot 1.20.1 | BetterRTP | 1.05 | 4 229 ms | 100 % |
-| Spigot 1.20.1 | HuskHomes | ~0.7 | 5 124 ms | 100 % |
-| **Paper 1.20.1** ‡ | **RTP** (`cacheCap: 100, period: 1`) | **19.9** | **3–4 ms** | 100 % |
-| Paper 1.20.1 | JakesRTP | 19.9 | 54–89 ms | 100 % |
-| Paper 1.20.1 | HuskHomes | ~6 | 313–372 ms | 100 % |
-| Paper 1.20.1 | BetterRTP | ~7 | 722–852 ms | 100 % |
-| **Folia 1.21.11** | **RTP** | **9.87** | **157 ms** | 99.97 % |
-| Folia 1.21.11 | BetterRTP | 3.82 | 1 200 ms | 100 % |
-| Folia 1.21.11 | HuskHomes | 3.32 | 901 ms | 100 % |
+| Run | Platform | Plugin | TP/s | p95 | Min TPS | Success |
+|---|---|---|---:|---:|---:|---:|
+| `20260617-232754` | Paper 26.1, unpaced | **RTP (Pro)** | **18.7** | **2 ms** | **17.5** | 100 % |
+| `20260617-232754` | Paper 26.1, unpaced | EzRTP | 13.1 | 189 ms | 10.3 | 98.3 % |
+| `20260617-232754` | Paper 26.1, unpaced | BetterRTP | 6.0 | 3 217 ms | 2.5 | 98.3 % |
+| `20260617-191448` | Folia 26.1 | **RTP (Pro)** | **13.5** | - | - | ~100 % |
+| `20260617-205614` | Folia 26.1 | **RTP (Lite)** | **12.5** | - | 16 | 100 % |
+| `20260617-191448` | Folia 26.1 | EzRTP | 5.3 | - | - | 96.2 % |
 
-‡ Reproduced across two consecutive runs (n=2, ±2.5 % `/rtp`/s, ±1 ms p99). All other rows are n=1 on a single rig and should be read as "this rig, this version, this configuration", not as universal claims.
-
-**RTP wins p99 on every platform tested** — by **530×** on Spigot, **5–280×** on Paper, and **6–8×** on Folia.
+All rows are n=1 on a single rig except the Folia watchdog-stall count, which reproduced across two runs. Read them as "this rig, this version, this configuration", not as universal claims.
 
 ---
 
-## Spigot 1.20.1 — `/rtp` latency under load
+## Paper 26.1 - unpaced dispatch (`20260617-232754`)
 
-> RTP serves `/rtp` from its L1 cache in under 10 ms p99 while every non-queueing competitor falls to multi-second tails.
+> The per-player gap set to 0: 3 clients, up to 4 teleports in flight, each client sends the next `/rtp` as soon as the last one lands. ~600 s per plugin.
 
-| Plugin | Cold | p50 | p99 | Chunks loaded / attempt |
-|---|---:|---:|---:|---:|
-| **RTP** | **2 ms** | **3 ms** | **8 ms** | **1.07** |
-| BetterRTP | — | 1 200 ms | 4 229 ms | 35.9 |
-| HuskHomes | 3 178 ms | 1 032 ms | 5 124 ms | 64.0 |
+| Plugin | Att / Succ | TP/s | p50 | p95 | p99 | Min TPS | MSPT p99 / max |
+|---|---|---:|---:|---:|---:|---:|---:|
+| **RTP (Pro)** | 16560 / 16560 | **18.7** | **1 ms** | **2 ms** | **46 ms** | **17.5** | 85.8 / 98.4 ms |
+| EzRTP | 7137 / 7018 | 13.1 | 30 ms | 189 ms | 322 ms | 10.3 | 156.8 / 292 ms |
+| BetterRTP | 1633 / 1606 | 6.0 | 480 ms | 3 217 ms | 4 402 ms | 2.5 | 859 / 3 663 ms |
 
-Three independent axes (latency, chunks-per-attempt, main-thread CPU per attempt) converge on the same ranking. On Spigot the main thread saturates at the platform's chunk-generation ceiling regardless of plugin choice — the differentiator is whether the plugin pre-warms locations into a queue (RTP does; the others do not, or do not effectively).
-
----
-
-## Paper 1.20.1 — `/rtp` at saturating offered load
-
-> With RTP's recommended `cacheCap: 100, period: 1`, p99 collapses **38×** vs the default config and lands at the scheduler-noise floor.
-
-| Plugin | `/rtp` per second | p50 | p99 | Main-CPU / attempt |
-|---|---:|---:|---:|---:|
-| **RTP** (`cacheCap: 100, period: 1`) ‡ | **19.9** | **<1 ms** | **3–4 ms** | 14–17 ms |
-| JakesRTP | 19.9 | <1 ms | 54–89 ms | 19–26 ms |
-| HuskHomes | 6.2 | 117 ms | 313–372 ms | 47–52 ms |
-| BetterRTP | 7.3 | 240 ms | 722–852 ms | 43–58 ms |
-
-‡ n=2 reproduced. Paper's async chunk pipeline lifts **every** plugin's throughput dramatically (Spigot→Paper: RTP 1.25→19.9, BetterRTP 1.05→7.3, HuskHomes 0.7→6.2). Choosing Paper matters more than choosing an RTP plugin — but among RTP plugins on Paper, RTP is still 18× faster than BetterRTP at the tail.
-
-### Recommended RTP configuration (Paper 1.20.1)
-
-```yaml
-# RTP/regions/default.yml
-cacheCap: 100         # L1 queue depth
-activeChunkCap: 100   # L2 queue depth
-
-# RTP/performance.yml
-period: 1             # background scan/refill: every tick
-```
-
-Defaults (`cacheCap: 10`, `period: 10`) are appropriate for low-traffic servers; tune up as above for sustained load.
+About 95 % of RTP teleports are served from the pre-verified queue; the slowest 1 % pay one bounded async chunk load. The Paper adapter and engine are identical in Lite.
 
 ---
 
-## Folia 1.21.11 — region-parallel teleports
+## Folia 26.1 - region safety (`20260617-191448`, Lite: `20260617-205614`)
 
-> On Folia, slow plugins drag only their *own* region's tick rate. With RTP, **even the teleporting player doesn't wait** — sub-200 ms p99 vs 0.9–1.2 s on competitors.
+| Metric | RTP-Pro | RTP-Lite | EzRTP |
+|---|---:|---:|---:|
+| Throughput (TP/s) | **13.5** | 12.5 | 5.3 |
+| Main-thread CPU / attempt | **3.96 ms** | 4.15 ms | 6.34 ms |
+| Process CPU / attempt | 199 ms | 177 ms | 593 ms |
+| Folia watchdog stalls | **0** | **0** | 7 (worst region 20.4 s) |
 
-| Plugin | `/rtp` per second | p50 | p99 | Main-CPU / attempt |
+The stalls are from the server's own `latest.log`, independent of the harness: EzRTP calls synchronous `World.loadChunk` on region threads. The stall count reproduced at 7 across two runs (worst 21.0 s and 20.4 s).
+
+---
+
+## Chunk loads and CPU per teleport - Folia 26.1, 6 GB pinned heap (`20260921-134507`, 4,096 teleports per plugin)
+
+Chunk loads are counted from the server's chunk-load events, so they include the area the server loads around every arrival (a 5x5 block, up to 25 chunks) on top of whatever the plugin loads while searching. Depending on the world, close to half of random candidates are unsafe, so a plugin that loads a chunk to check it pays for the rejects too. RTP checks candidates against region files first, so under 5 % of them ever get loaded, and it pins one chunk: the destination.
+
+| Metric | RTP | EzRTP | JustRTP |
+|---|---:|---:|---:|
+| Successes | **4,096 / 4,096** | 4,030 / 4,096 | 4,020 / 4,096 |
+| Throughput (TP/s) | **13.9** | 6.7 | 2.5 |
+| Chunks loaded / teleport | 26.1 | 22.1 | 75.1 (2.9x RTP) |
+| Process CPU / teleport | **182.4 ms** | 208.9 ms | 729.0 ms (4.0x) |
+| Region-thread CPU / teleport | **7.9 ms** | 21.4 ms (2.7x) | 79.6 ms (10x) |
+| JVM allocation / teleport | **85.3 MB** | 190.4 MB | 569.0 MB |
+| Total GC pause (phase) | **21.7 s** | 47.9 s | 138.8 s |
+
+EzRTP loads slightly fewer chunks per teleport than RTP; its cost shows up on the region thread instead. In the unpaced 4,096-teleport Paper 26.1 run on the storefront, the ratio against JustRTP was larger (about 17 vs 76 chunks per teleport).
+
+---
+
+## Where players landed (`20260923-000854`, 4,096 teleports per plugin)
+
+| Plugin | Exact duplicates | Pairs within 48 blocks | Nearest pair | Clark-Evans R |
 |---|---:|---:|---:|---:|
-| **RTP** | **9.87** | **101 ms** | **157 ms** | **4.0 ms** ★ |
-| BetterRTP | 3.82 | 399 ms | 1 200 ms | 8.1 ms |
-| HuskHomes | 3.32 | 350 ms | 901 ms | 14.6 ms |
-
-★ **Lowest per-attempt CPU cost measured on any platform.** Folia's region scheduler eliminates the main-thread serialization that bounds Spigot/Paper, so RTP's queue-served path runs at its theoretical floor.
-
-Server TPS held at **19.75–20.00** across all 30 minutes of measured Folia time, on every plugin — this is Folia's whole point. The marketing line for Folia operators: *"on Spigot, slow plugins drag everyone down; on Folia, only the teleporting player waits — and with RTP, even they don't."*
+| **RTP** | **0** | **0** | **78.4 blocks** | **1.04** (uniform) |
+| EzRTP | - | 107 | 0 blocks | - |
+| JustRTP | 167 (4.1 %) | 324 | 0 blocks | 0.83 (clustered) |
 
 ---
 
 ## Methodology
 
-- **Two real OPed clients**, positioned in the same world. Folia run had clients in different regions to exercise per-region parallelism.
-- **Queues enabled** where the plugin offers them (RTP, BetterRTP, JakesRTP). HuskHomes has no queue concept.
-- **`per-player-gap-ticks: 0`** (saturating offered load) on Paper/Folia; default pacing on Spigot.
-- **Phase length**: 2 min per plugin on Spigot/Paper, 10 min per plugin on Folia. 60 s warm-up before measurement.
-- **Cooldowns / delays / countdowns**: zeroed in every tested plugin's config to remove gating confounds.
-- **Server TPS** held at 20.00 throughout all Paper and Folia runs; Spigot saturated to 3.5–4.5 TPS across every plugin (platform chunk-gen ceiling, not plugin-specific). It is therefore not a per-plugin discriminator and is omitted from the headline tables.
-- **Single test rig**, MC versions as listed (Spigot/Paper 1.20.1, Folia 1.21.11). Numbers are not predictions for your server — your hardware, view distance, world generation state, other plugins, and player count will move them.
-- Full per-attempt CSVs, phase aggregates, spark profiles, and the harness source: [`helpers/StressTestRTP/`](./). Detailed per-run analyses with retractions, reproducibility bands, and known confounds: [`PRE_WRITEUP.md`](./PRE_WRITEUP.md).
+- **3 real OPed clients**, concurrency 4, cooldowns / delays / countdowns zeroed in every plugin, queues enabled where the plugin offers them.
+- **Phase length** ~600 s per plugin with a 240 s settle gap, 30 s warm-up; the 4,096-teleport runs use a fixed quota instead.
+- **Rig**: Ryzen 9 3900X, one rig for every row. Heap 16 GiB except the pinned 6 GB run.
+- **CPU** is measured directly from the JVM (`CpuSampler`: process CPU and main/region-thread CPU per phase, divided by attempts). The `cpu_ms_with_chunks*` columns use an uncalibrated chunk-cost constant and are not quoted.
+- Numbers are not predictions for your server - hardware, view distance, how much of your world is unsafe, whether it is pregenerated, other plugins, and player count will move them.
 
 ### What this benchmark does *not* claim
 
-- It does not claim BetterRTP, HuskHomes, or JakesRTP are "bad". They are tested at their default queue configurations against RTP at its recommended one; in many real-server scenarios, defaults are what users get.
-- It does not extrapolate beyond 2 concurrent clients. Higher-concurrency saturation curves require a bot harness and are pending future work.
-- It does not measure correctness, safety, claim-plugin compatibility, or any axis other than dispatch-to-arrival latency, per-attempt cost, and success rate.
+- It does not claim EzRTP, BetterRTP, or JustRTP are "bad". They are tested at their default queue configurations against RTP at its recommended one.
+- It does not extrapolate beyond 3-4 concurrent clients.
+- It does not measure correctness, safety, or claim-plugin compatibility - only dispatch-to-arrival latency, per-attempt cost, success rate, and landing spread.
+- The region-file precheck needs terrain that already exists; chunks that have never been generated have to be generated whichever plugin asks.

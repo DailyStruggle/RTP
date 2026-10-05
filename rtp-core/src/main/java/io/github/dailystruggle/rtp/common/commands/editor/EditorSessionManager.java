@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -11,6 +12,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -18,6 +20,7 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
 import java.util.logging.Level;
 
 /**
@@ -31,9 +34,22 @@ public final class EditorSessionManager {
     private static final EditorSessionManager INSTANCE = new EditorSessionManager();
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final Map<String, String> activeSessions = new ConcurrentHashMap<>();
+    /** Local session lifetime: the hosted relay's TTL. */
+    static final long SESSION_TTL_MILLIS = 30L * 60L * 1000L;
+    static final int MAX_SESSIONS = 32;
+
+    private record Session(String payload, long createdAt) {
+    }
+
+    private final Map<String, Session> activeSessions = new ConcurrentHashMap<>();
+    private final LongSupplier clock;
 
     public EditorSessionManager() {
+        this(System::currentTimeMillis);
+    }
+
+    EditorSessionManager(LongSupplier clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     public static EditorSessionManager getInstance() {
@@ -51,23 +67,43 @@ public final class EditorSessionManager {
         byte[] tokenBytes = new byte[16];
         RANDOM.nextBytes(tokenBytes);
         String token = HexFormat.of().formatHex(tokenBytes);
-        activeSessions.put(token, jsonPayload);
+        long now = clock.getAsLong();
+        evictSessions(now);
+        // Oldest first past the cap
+        while (activeSessions.size() >= MAX_SESSIONS) {
+            activeSessions.entrySet().stream().min(Comparator.comparingLong(e -> e.getValue().createdAt()))
+                    .ifPresent(e -> activeSessions.remove(e.getKey(), e.getValue()));
+        }
+        activeSessions.put(token, new Session(jsonPayload, now));
         return token;
     }
 
     /**
-     * Retrieves an active session payload by token.
+     * Retrieves an active session payload by token; {@code null} once it is older than
+     * {@link #SESSION_TTL_MILLIS} or was applied.
      */
     public String getSession(String token) {
         if (token == null) return null;
-        return activeSessions.get(token);
+        evictSessions(clock.getAsLong());
+        Session s = activeSessions.get(token);
+        return s == null ? null : s.payload();
+    }
+
+    /** Drops a session (after its payload was applied). */
+    public boolean removeSession(String token) {
+        return token != null && activeSessions.remove(token) != null;
     }
 
     /**
      * Returns an unmodifiable set of all active local session tokens.
      */
     public Set<String> getActiveTokens() {
+        evictSessions(clock.getAsLong());
         return Collections.unmodifiableSet(activeSessions.keySet());
+    }
+
+    private void evictSessions(long now) {
+        activeSessions.entrySet().removeIf(e -> now - e.getValue().createdAt() >= SESSION_TTL_MILLIS);
     }
 
     /**
@@ -317,7 +353,17 @@ public final class EditorSessionManager {
         }
 
         String html = embedPayload(loadEditorTemplate(), payloadJson);
-        Files.writeString(targetFile, html, StandardCharsets.UTF_8);
+        // The page embeds the loopback channel token: owner-only, restricted before it holds anything
+        Path tmp = targetFile.resolveSibling(targetFile.getFileName() + ".tmp");
+        Files.deleteIfExists(tmp);
+        Files.createFile(tmp);
+        EditorKeys.restrictToOwner(tmp);
+        Files.writeString(tmp, html, StandardCharsets.UTF_8);
+        try {
+            Files.move(tmp, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(tmp, targetFile, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     /** Seed walk-path vertices per region (~32 KB of JSON); full resolution streams as live tiles. */
@@ -419,8 +465,10 @@ public final class EditorSessionManager {
     }
 
     /**
-     * Collects all active configuration files as relative path to raw file content.
-     * Conforms to S-006 (fails closed if RTP core or configs are not initialized).
+     * Collects all active configuration files as relative path to file content, secret values
+     * (passwords, tokens, API keys, URL credentials) replaced by {@code "<redacted>"}: the result is
+     * uploaded to a public byte store or embedded in an exported page. Applying a sentinel keeps the
+     * on-disk value. Conforms to S-006 (fails closed if RTP core or configs are not initialized).
      *
      * @return map of relative file path (e.g. "config.yml", "regions/default.yml") to text
      */
@@ -477,16 +525,23 @@ public final class EditorSessionManager {
                                 if (!configMap.containsKey(rel)) {
                                     try {
                                         configMap.put(rel, Files.readString(p, StandardCharsets.UTF_8));
-                                    } catch (IOException ignored) {
+                                    } catch (IOException e) {
+                                        RTP.log(Level.WARNING, "[editor] " + rel + " left out of the editor session: "
+                                                + e.getMessage(), e);
                                     }
                                 }
                             });
                 }
             }
-        } catch (IOException ignored) {
+        } catch (IOException | java.io.UncheckedIOException e) {
+            RTP.log(Level.WARNING, "[editor] plugin folder scan incomplete; the editor session may miss files: "
+                    + e.getMessage(), e);
         }
 
-        return configMap;
+        // Declared addon YAML at any depth, symlink-checked (ADR-107 §7)
+        EditorExtensions.addConfigFiles(pluginDir.toPath(), configMap);
+
+        return EditorSecurity.redactConfigs(configMap);
     }
 
     private static boolean isPathHidden(String path) {
@@ -594,7 +649,9 @@ public final class EditorSessionManager {
         String telemetryJson = buildTelemetrySnapshotJson();
         Map<String, String> curveSources = new TreeMap<>();
         String regionModelsJson = regionModelsToJson(collectAllRegionVisualizationPayloads(curveSources));
-        String curveCodeJson = buildCurveCodeJson(curveSources);
+        Map<String, Map<String, Object>> curveSamples = new TreeMap<>();
+        addRegisteredCurveHelpers(curveSources, curveSamples);
+        String curveCodeJson = buildCurveCodeJson(curveSources, curveSamples);
         String worldBiomesJson = buildWorldBiomesJson(fullLand);
         String schemaJson = buildSchemaJson();
 
@@ -602,10 +659,12 @@ public final class EditorSessionManager {
         Map<String, String> rawDocs = Collections.emptyMap();
         try {
             rawDocs = DocsRegistry.getInstance().getAllRawSources();
-        } catch (IllegalStateException ignored) {
-            // docs registry not initialized yet
+        } catch (IllegalStateException notReady) {
+            RTP.log(Level.WARNING, "[editor] docs registry not ready; the session carries no docs");
         }
         String editorData = editorDataMembers();
+        // protocol + addon extension descriptors (ADR-107 §5.2); extension calls are guarded inside
+        String extensions = EditorExtensions.payloadMembers();
 
         return "{" +
                 "\"version\":1," +
@@ -618,7 +677,8 @@ public final class EditorSessionManager {
                 "\"regionModels\":" + regionModelsJson + "," +
                 "\"worldBiomes\":" + worldBiomesJson + "," +
                 "\"schema\":" + schemaJson + "," +
-                "\"docs\":" + buildJsonMap(rawDocs) +
+                "\"docs\":" + buildJsonMap(rawDocs) + "," +
+                extensions +
                 (editorData.isEmpty() ? "" : "," + editorData) +
                 "}";
     }
@@ -746,31 +806,49 @@ public final class EditorSessionManager {
 
     /**
      * World biome bins already in {@link WorldBiomeStore} for each region world (ADR-104 §4.6):
-     * {@code {world: {palette:[...], layers:{y:[[rx,rz,level,base64Runs],...]}, bins, truncated}}},
-     * nearest region file (0, 0) first. Reads no region file (the store may load its cache file), so
-     * the page opens with the map already filled. {@code full=false} collapses each bin to one run.
-     * Off-tick only.
+     * {@code {world: {palette:[...], layers:{y:[[rx,rz,level,base64Runs],...]}, bins, truncated}}}.
+     * Reads no region file (the store may load its cache file), so the page opens with the map
+     * already filled. {@code full} (local export): every bin at its stored detail, up to
+     * {@link #EMBED_FULL_CHARS_PER_WORLD}. Otherwise (hosted) bins inside a region's view
+     * ({@link EditorLiveFeed#regionViewBins}: finite for any world size) go first at stored detail,
+     * within the same budget, the rest one run each; the live feed sends the view the page asks for
+     * later and skips what this embedded ({@link EditorLiveFeed#noteEmbeddedLand}). Off-tick only.
      */
     public String buildWorldBiomesJson(boolean full) {
         Map<String, Object> worlds = new LinkedHashMap<>();
+        Map<String, List<int[]>> views = full ? Map.of() : EditorLiveFeed.regionViewsByWorld();
+        Map<String, Long> embedded = new HashMap<>();
         for (String world : EditorLiveFeed.regionWorlds().keySet()) {
             WorldBiomeStore store = WorldBiomeStore.of(world);
+            List<int[]> rects = views.getOrDefault(world, List.of());
             Map<String, List<Object>> layers = new TreeMap<>();
             long chars = 0;
             int count = 0;
             boolean truncated = false;
-            for (WorldBiomeStore.BinView b : store.binsNearestFirst()) {
+            List<WorldBiomeStore.BinView> bins = store.binsNearestFirst();
+            if (!rects.isEmpty()) {
+                // Region views first: the count cap must never cut the detailed part
+                List<WorldBiomeStore.BinView> ordered = new ArrayList<>(bins.size());
+                for (WorldBiomeStore.BinView b : bins) if (inView(rects, b)) ordered.add(b);
+                for (WorldBiomeStore.BinView b : bins) if (!inView(rects, b)) ordered.add(b);
+                bins = ordered;
+            }
+            for (WorldBiomeStore.BinView b : bins) {
                 if (full ? chars >= EMBED_FULL_CHARS_PER_WORLD : count >= EMBED_COARSE_BINS_PER_WORLD) {
                     truncated = true;
                     break;
                 }
                 count++;
+                boolean detail = full || (chars < EMBED_FULL_CHARS_PER_WORLD && inView(rects, b));
                 for (WorldBiomeStore.Layer l : b.layers()) {
-                    byte[] runs = full ? l.runs() : WorldBiomeStore.coarsen(l.runs());
+                    byte[] runs = detail ? l.runs() : WorldBiomeStore.coarsen(l.runs());
                     String b64 = Base64.getEncoder().encodeToString(runs);
-                    chars += b64.length();
+                    if (detail) chars += b64.length();
                     layers.computeIfAbsent(String.valueOf(l.y()), k -> new ArrayList<>())
-                            .add(List.of(b.rx(), b.rz(), full ? Math.max(-1, l.level()) : 0, b64));
+                            .add(List.of(b.rx(), b.rz(), detail ? Math.max(-1, l.level()) : 0, b64));
+                    if (detail && !full && l.level() >= 0) {
+                        embedded.put(EditorLiveFeed.landKey(world, l.y(), b.rx(), b.rz()), b.version());
+                    }
                 }
             }
             Map<String, Object> w = new LinkedHashMap<>();
@@ -780,7 +858,15 @@ public final class EditorSessionManager {
             w.put("truncated", truncated);
             worlds.put(world, w);
         }
+        if (!full) EditorLiveFeed.noteEmbeddedLand(embedded);
         return mapToJson(worlds);
+    }
+
+    private static boolean inView(List<int[]> rects, WorldBiomeStore.BinView b) {
+        for (int[] r : rects) {
+            if (b.rx() >= r[0] && b.rx() <= r[2] && b.rz() >= r[1] && b.rz() <= r[3]) return true;
+        }
+        return false;
     }
 
     /**
@@ -796,9 +882,47 @@ public final class EditorSessionManager {
      * name in use by a region drawn from a helper, keyed as that region's {@code curve.shape}.
      */
     static String buildCurveCodeJson(Map<String, String> curveSources) {
+        return buildCurveCodeJson(curveSources, Collections.emptyMap());
+    }
+
+    /**
+     * As {@link #buildCurveCodeJson(Map)}; an entry with a sample also carries {@code sample:
+     * {shape, params, state, hash}}, the curve block of the registered shape at its defaults.
+     */
+    static String buildCurveCodeJson(Map<String, String> curveSources, Map<String, Map<String, Object>> samples) {
         Map<String, Object> code = new TreeMap<>();
-        curveSources.forEach((shape, js) -> code.put(shape, EditorCurveModel.codeEntry(js)));
+        curveSources.forEach((shape, js) -> {
+            Map<String, Object> entry = EditorCurveModel.codeEntry(js);
+            Map<String, Object> sample = samples.get(shape);
+            if (sample != null) entry.put("sample", sample);
+            code.put(shape, entry);
+        });
         return mapToJson(code);
+    }
+
+    /**
+     * Every registered memory shape with a helper joins {@code curveSources}, so a shape no region
+     * uses yet (a planned one on the page) still draws from its helper. Each gets a sample: the curve
+     * block of a clone of the registered template, which the page checks its helper against when no
+     * region of that shape exists. A name already carrying another class's helper keeps it.
+     */
+    static void addRegisteredCurveHelpers(Map<String, String> curveSources, Map<String, Map<String, Object>> samples) {
+        io.github.dailystruggle.rtp.common.factory.Factory<?> factory = RTP.factoryMap.get(RTP.factoryNames.shape);
+        if (factory == null) return;
+        for (io.github.dailystruggle.rtp.common.factory.FactoryValue<?> value : factory.map.values()) {
+            if (!(value instanceof MemoryShape<?> template)) continue;
+            String name = EditorCurveModel.registeredName(template);
+            try {
+                String js = template.toJavaScript();
+                if (js == null) continue;
+                String prior = curveSources.putIfAbsent(name, js);
+                if (prior != null && !prior.equals(js)) continue;
+                samples.put(name, EditorCurveModel.curve(template.clone(), js));
+            } catch (RuntimeException e) {
+                // The helper still ships; the page then checks it against live regions only
+                RTP.log(Level.FINE, "[editor] no curve sample for registered shape " + name, e);
+            }
+        }
     }
 
     private static String regionModelsToJson(Map<String, Map<String, Object>> models) {
@@ -1085,6 +1209,13 @@ public final class EditorSessionManager {
         public Map<String, String> files() { return files; }
     }
 
+    /** A remotely fetched payload without the {@code sha256} it must carry (ADR-104 §4.2). */
+    public static final class MissingDigestException extends IllegalArgumentException {
+        public MissingDigestException() {
+            super("Payload has no sha256 digest; payloads fetched from the byte store must carry one");
+        }
+    }
+
     /**
      * Parses and validates a JSON payload according to ADR-104.
      * Enforces:
@@ -1098,6 +1229,14 @@ public final class EditorSessionManager {
      * @throws IllegalArgumentException on any validation failure (S-004)
      */
     public ParsedPayload parseAndValidatePayload(String json) {
+        return parseAndValidatePayload(json, false);
+    }
+
+    /**
+     * As {@link #parseAndValidatePayload(String)}; {@code requireDigest} (payloads fetched from the
+     * byte store) rejects a payload without {@code sha256} with a {@link MissingDigestException}.
+     */
+    public ParsedPayload parseAndValidatePayload(String json, boolean requireDigest) {
         if (json == null || json.isBlank()) {
             throw new IllegalArgumentException("Payload cannot be null or empty");
         }
@@ -1132,6 +1271,9 @@ public final class EditorSessionManager {
 
         // Extract declared SHA-256 if present
         String declaredSha = extractStringField(json, "sha256");
+        if (requireDigest && (declaredSha == null || declaredSha.isBlank())) {
+            throw new MissingDigestException();
+        }
         if (declaredSha != null && !declaredSha.isBlank()) {
             String computedRawSha = EditorHttpTransport.computeSha256(filesBlock);
             String computedCanonicalSha = computeCanonicalFilesSha256(files);
@@ -1164,22 +1306,19 @@ public final class EditorSessionManager {
             String fileName = entry.getKey();
             String content = entry.getValue();
 
-            if (fileName == null || fileName.isBlank() || fileName.contains("..")) {
-                throw new IllegalArgumentException("Illegal file path in payload: '" + fileName + "'");
+            // Relative YAML only, nothing hidden or under editor/ (keys, trusted list, page)
+            EditorSecurity.checkConfigPath(fileName);
+
+            RtpYamlConfig parsedYaml;
+            try {
+                parsedYaml = RtpYamlConfig.parse(content);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("AST validation error in file '" + fileName + "': " + e.getMessage(), e);
             }
 
-            if (fileName.endsWith(".yml") || fileName.endsWith(".yaml")) {
-                RtpYamlConfig parsedYaml;
-                try {
-                    parsedYaml = RtpYamlConfig.parse(content);
-                } catch (Exception e) {
-                    throw new IllegalArgumentException("AST validation error in file '" + fileName + "': " + e.getMessage(), e);
-                }
-
-                // If region file, validate geometry constraints
-                if (fileName.startsWith("regions/") || fileName.equals("regions.yml") || fileName.contains("region")) {
-                    validateRegionGeometry(fileName, parsedYaml);
-                }
+            // If region file, validate geometry constraints
+            if (fileName.startsWith("regions/") || fileName.equals("regions.yml") || fileName.contains("region")) {
+                validateRegionGeometry(fileName, parsedYaml);
             }
         }
 
@@ -1221,13 +1360,22 @@ public final class EditorSessionManager {
      * @return CompletableFuture resolving when apply and reload are completed
      */
     public CompletableFuture<Void> applyPayload(String json) {
+        return applyPayload(json, false);
+    }
+
+    /**
+     * As {@link #applyPayload(String)}; {@code requireDigest} for payloads fetched from the byte store
+     * (see {@link #parseAndValidatePayload(String, boolean)}). A {@code "<redacted>"} value keeps the
+     * on-disk value of its key. Runs on {@code RTP.scheduler}'s async pool.
+     */
+    public CompletableFuture<Void> applyPayload(String json, boolean requireDigest) {
         if (RTP.configs == null || RTP.serverAccessor == null) {
             return CompletableFuture.failedFuture(
                     new IllegalStateException("RTP core or configurations not initialized (S-006 fail-closed)"));
         }
 
-        return CompletableFuture.runAsync(() -> {
-            ParsedPayload parsed = parseAndValidatePayload(json);
+        return EditorSecurity.runAsync(() -> {
+            ParsedPayload validated = parseAndValidatePayload(json, requireDigest);
 
             File pluginDir = RTP.serverAccessor.getPluginDirectory();
             if (pluginDir == null) {
@@ -1238,6 +1386,34 @@ public final class EditorSessionManager {
             }
 
             Path pluginPath = pluginDir.toPath();
+
+            // Redaction round trip: sentinels take the on-disk value (symlink-checked first)
+            Map<String, String> files = new LinkedHashMap<>();
+            for (Map.Entry<String, String> entry : validated.files().entrySet()) {
+                String relPath = entry.getKey();
+                Path target = pluginPath.resolve(relPath).normalize();
+                if (!target.startsWith(pluginPath.normalize())) {
+                    throw new IllegalArgumentException("Path traversal attempt: " + relPath);
+                }
+                EditorSecurity.checkRealPath(pluginPath, target, relPath);
+                String text = entry.getValue();
+                if (text != null && text.contains(EditorSecurity.REDACTED)) {
+                    String current;
+                    try {
+                        current = Files.isRegularFile(target) ? Files.readString(target, StandardCharsets.UTF_8) : null;
+                    } catch (IOException e) {
+                        throw new IllegalArgumentException("cannot read " + relPath + " to keep its redacted values: "
+                                + e.getMessage(), e);
+                    }
+                    text = EditorSecurity.restoreRedacted(relPath, text, current);
+                }
+                files.put(relPath, text);
+            }
+            ParsedPayload parsed = new ParsedPayload(validated.version(), validated.pluginVersion(),
+                    validated.timestamp(), validated.sha256(), files);
+
+            // Owning addons validate their declared files; any error fails the whole apply (ADR-107 §7, S-004)
+            Map<String, String> addonFiles = EditorExtensions.validateFiles(pluginPath, parsed.files());
 
             // Backup all dirty files
             for (Map.Entry<String, String> entry : parsed.files().entrySet()) {
@@ -1291,11 +1467,17 @@ public final class EditorSessionManager {
                             RtpYamlConfig parsedYaml = RtpYamlConfig.load(target.toFile());
                             lookup.put(baseName, parsedYaml);
                             lookup.put(target.getFileName().toString(), parsedYaml);
-                        } catch (Exception ignored) {
+                        } catch (Exception e) {
+                            // The reload below re-reads the file; the cached copy stays stale until then
+                            RTP.log(Level.WARNING, "[editor] cached copy of " + relPath + " not refreshed after apply: "
+                                    + e.getMessage(), e);
                         }
                     }
                 }
             }
+
+            // Addons reload their own files; core does not (ADR-107 §7)
+            EditorExtensions.applied(addonFiles);
 
             // Trigger hot-reload on configs
             try {

@@ -122,6 +122,97 @@ class NetworkConfigTest {
     }
 
     @Test
+    @org.junit.jupiter.api.DisplayName("REQ-RTP-PROXY-007: a set but non-Base64 / weak secret fails closed (not just a non-empty check)")
+    void secretEnvSetButInvalidWhileEnabledFailsClosed() {
+        Map<String, Object> root = minimalDisabled();
+        ((Map<String, Object>) root.get("network")).put("enabled", true);
+        // PATH is always set and never a >= 32-byte Base64 secret.
+        ((Map<String, Object>) root.get("network")).put("secretEnv", "PATH");
+        for (String type : new String[]{"redis", "sql", "proxy-direct"}) {
+            Map<String, Object> t = new LinkedHashMap<>();
+            t.put("type", type);
+            root.put("transport", t);
+            NetworkConfigException ex = assertThrows(NetworkConfigException.class,
+                    () -> NetworkConfig.fromMap(root, velocityAccessor("p1")), type);
+            org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("disabled"),
+                    "message must state network mode is disabled: " + ex.getMessage());
+        }
+        // The proxy-direct listener on a JVM-local transport also needs the real secret.
+        Map<String, Object> t = new LinkedHashMap<>();
+        t.put("type", "in-memory");
+        t.put("direct", new LinkedHashMap<>(Map.of("enabled", true)));
+        root.put("transport", t);
+        assertThrows(NetworkConfigException.class, () -> NetworkConfig.fromMap(root, velocityAccessor("p1")));
+
+        // Non-signing JVM-local tier keeps the presence-only check.
+        root.put("transport", new LinkedHashMap<>(Map.of("type", "in-memory")));
+        org.junit.jupiter.api.Assertions.assertTrue(NetworkConfig.fromMap(root, velocityAccessor("p1")).enabled());
+    }
+
+    private static Map<String, Object> withRedis(Map<String, Object> redis) {
+        Map<String, Object> root = minimalDisabled();
+        Map<String, Object> t = new LinkedHashMap<>();
+        t.put("type", "redis");
+        t.put("redis", redis);
+        root.put("transport", t);
+        return root;
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("REQ-RTP-PROXY-007: redis tls + username compose a secret-free rediss:// host for RespPool")
+    void redisTlsAndUsernameComposeUri() {
+        Map<String, Object> redis = new LinkedHashMap<>();
+        redis.put("host", "redis.internal");
+        redis.put("port", 6380);
+        redis.put("tls", true);
+        redis.put("username", "rtp");
+        NetworkConfig cfg = NetworkConfig.fromMap(withRedis(redis), velocityAccessor("p1"), k -> null);
+        assertEquals("rediss://rtp@redis.internal:6380", cfg.redisHost());
+        assertEquals(6380, cfg.redisPort());
+        org.junit.jupiter.api.Assertions.assertTrue(cfg.redisTls());
+        assertEquals("rtp", cfg.redisUsername());
+    }
+
+    @Test
+    void redisUrlFormHostAccepted_andPlainHostUnchanged() {
+        Map<String, Object> redis = new LinkedHashMap<>();
+        redis.put("host", "rediss://acl-user@10.0.0.5:6390");
+        NetworkConfig cfg = NetworkConfig.fromMap(withRedis(redis), velocityAccessor("p1"), k -> null);
+        org.junit.jupiter.api.Assertions.assertTrue(cfg.redisTls());
+        assertEquals("acl-user", cfg.redisUsername());
+        assertEquals(6390, cfg.redisPort());
+
+        Map<String, Object> plain = new LinkedHashMap<>();
+        plain.put("host", "localhost");
+        NetworkConfig p = NetworkConfig.fromMap(withRedis(plain), velocityAccessor("p1"), k -> null);
+        assertEquals("localhost", p.redisHost());
+        assertFalse(p.redisTls());
+    }
+
+    @Test
+    void redisUrlWithEmbeddedPasswordRejected() {
+        Map<String, Object> redis = new LinkedHashMap<>();
+        redis.put("host", "rediss://user:hunter2@redis.internal:6380");
+        NetworkConfigException ex = assertThrows(NetworkConfigException.class,
+                () -> NetworkConfig.fromMap(withRedis(redis), velocityAccessor("p1"), k -> null));
+        assertFalse(ex.getMessage().contains("hunter2"), "secret must not be echoed: " + ex.getMessage());
+    }
+
+    @Test
+    void redisPasswordEnvPreferredOverYaml() {
+        Map<String, Object> redis = new LinkedHashMap<>();
+        redis.put("host", "localhost");
+        redis.put("password", "from-yaml");
+        redis.put("passwordEnv", "RTP_TEST_REDIS_PW");
+        NetworkConfig fromEnv = NetworkConfig.fromMap(withRedis(redis), velocityAccessor("p1"),
+                k -> k.equals("RTP_TEST_REDIS_PW") ? "from-env" : null);
+        assertEquals("from-env", fromEnv.redisPassword());
+
+        NetworkConfig fallback = NetworkConfig.fromMap(withRedis(redis), velocityAccessor("p1"), k -> null);
+        assertEquals("from-yaml", fallback.redisPassword());
+    }
+
+    @Test
     void customHeartbeatIntervalsHonored() {
         Map<String, Object> root = minimalDisabled();
         Map<String, Object> hb = new LinkedHashMap<>();

@@ -5,7 +5,9 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
+import io.github.dailystruggle.rtp.common.RTP;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
@@ -20,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 
 /**
  * In-memory registry and cache of lowered Markdown documentation models (ADR-045, ADR-104).
@@ -45,6 +48,48 @@ public final class DocsRegistry {
 
     public static DocsRegistry getInstance() {
         return INSTANCE;
+    }
+
+    /**
+     * Schedules a rebuild of the shared registry from {@code <dataFolder>/docs} on
+     * {@link RTP#scheduler} (file I/O only, never the main thread). Platforms call this after
+     * their synchronous {@code extractDocs}; {@code /rtp reload} calls it again. Never throws:
+     * every failure is logged at WARNING (S-004).
+     *
+     * @param dataFolder plugin / mod data folder holding the extracted {@code docs/} tree
+     */
+    public static void rebuildFromDataFolder(File dataFolder) {
+        if (dataFolder == null) {
+            RTP.log(Level.WARNING, "[docs] no data folder; shipped docs not indexed");
+            return;
+        }
+        Path docsRoot = new File(dataFolder, "docs").toPath();
+        if (RTP.scheduler == null) {
+            RTP.log(Level.WARNING, "[docs] scheduler not ready; shipped docs at " + docsRoot + " not indexed");
+            return;
+        }
+        RTP.scheduler.runTaskAsynchronously(() -> INSTANCE.rebuildOrWarn(docsRoot, DocsLoweringOptions.defaults()));
+    }
+
+    /**
+     * {@link #rebuild} that logs instead of throwing. A missing folder still initializes an
+     * empty registry (synthetic index only) so readers get an empty set, not "not ready".
+     *
+     * @return {@code true} if the rebuild completed
+     */
+    boolean rebuildOrWarn(Path docsRoot, DocsLoweringOptions options) {
+        if (!Files.isDirectory(docsRoot)) {
+            RTP.log(Level.WARNING, "[docs] docs folder missing at " + docsRoot
+                    + " (extraction failed or skipped); /rtp docs and the editor carry no shipped docs");
+        }
+        try {
+            rebuild(docsRoot, options);
+            RTP.log(Level.FINE, "[docs] indexed " + rawSourceCache.get().size() + " docs from " + docsRoot);
+            return true;
+        } catch (IOException | RuntimeException e) {
+            RTP.log(Level.WARNING, "[docs] failed to index shipped docs at " + docsRoot + ": " + e.getMessage(), e);
+            return false;
+        }
     }
 
     /**

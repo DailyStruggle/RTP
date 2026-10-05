@@ -7,16 +7,20 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,6 +41,15 @@ class ProxyDirectNetworkBindingTest {
 
     private FakeProxyServer server;
 
+    /** Shared test secret; proxy-direct has no unsigned mode. */
+    private static final HmacVerifier V = verifier((byte) 0);
+
+    private static HmacVerifier verifier(byte offset) {
+        byte[] s = new byte[32];
+        for (int i = 0; i < s.length; i++) s[i] = (byte) (i + offset);
+        return HmacVerifier.forTesting(s, 1, 1);
+    }
+
     @AfterEach
     void tearDown() {
         if (server != null) server.stop();
@@ -51,9 +64,13 @@ class ProxyDirectNetworkBindingTest {
         private final AtomicBoolean running = new AtomicBoolean(true);
 
         FakeProxyServer(HmacVerifier verifier, int schema) throws Exception {
+            this(verifier, schema, new ServerSocket());
+        }
+
+        FakeProxyServer(HmacVerifier verifier, int schema, ServerSocket unbound) throws Exception {
             this.verifier = verifier;
             this.schema = schema;
-            this.socket = new ServerSocket();
+            this.socket = unbound;
             this.socket.bind(new InetSocketAddress("127.0.0.1", 0));
             Thread t = new Thread(this::loop, "fake-proxy-direct");
             t.setDaemon(true);
@@ -114,10 +131,10 @@ class ProxyDirectNetworkBindingTest {
     @Test
     @DisplayName("publish dials the proxy, pushes the row, and reads the merged snapshot back")
     void publishThenReadSnapshotRoundTrip() throws Exception {
-        server = new FakeProxyServer(null, 1); // unsigned
+        server = new FakeProxyServer(V, 1);
         ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
                 List.of(InetSocketAddress.createUnresolved("127.0.0.1", server.port())),
-                null, 1, 5000L, 1000, 2000, () -> 1000L);
+                V, 1, 5000L, 1000, 2000, () -> 1000L);
 
         binding.publishBackendHeartbeat(hb("backend-a", List.of("default", "nether"))).get();
 
@@ -171,10 +188,10 @@ class ProxyDirectNetworkBindingTest {
     @Test
     @DisplayName("findReservation + redeem RPC round-trip against the proxy store")
     void findReservationAndRedeemRpc() throws Exception {
-        server = new FakeProxyServer(null, 1);
+        server = new FakeProxyServer(V, 1);
         ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
                 List.of(InetSocketAddress.createUnresolved("127.0.0.1", server.port())),
-                null, 1, 5000L, 1000, 2000, () -> 1000L);
+                V, 1, 5000L, 1000, 2000, () -> 1000L);
         java.util.UUID player = java.util.UUID.randomUUID();
 
         ReservationToken tok = binding.findReservation(player).get().orElse(null);
@@ -193,7 +210,7 @@ class ProxyDirectNetworkBindingTest {
         // Point at a port nothing is listening on; publish must still complete.
         ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
                 List.of(InetSocketAddress.createUnresolved("127.0.0.1", 1)),
-                null, 1, 5000L, 300, 300, () -> 1000L);
+                V, 1, 5000L, 300, 300, () -> 1000L);
         binding.publishBackendHeartbeat(hb("backend-a", List.of("default"))).get();
         assertEquals(0, binding.livePeerCount());
         binding.close();
@@ -203,13 +220,13 @@ class ProxyDirectNetworkBindingTest {
     @DisplayName("constructor validation and lifecycle guards")
     void constructorAndLifecycleGuards() {
         org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class,
-                () -> new ProxyDirectNetworkBinding(null, null, 1, 5000L, 100, 100, null));
+                () -> new ProxyDirectNetworkBinding(null, V, 1, 5000L, 100, 100, null));
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                () -> new ProxyDirectNetworkBinding(List.of(), null, 1, 5000L, 100, 100, null));
+                () -> new ProxyDirectNetworkBinding(List.of(), V, 1, 5000L, 100, 100, null));
 
         ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
                 List.of(InetSocketAddress.createUnresolved("127.0.0.1", 1)),
-                null, 1, 0L, 0, 0, null);
+                V, 1, 0L, 0, 0, null);
 
         binding.close();
 
@@ -228,7 +245,7 @@ class ProxyDirectNetworkBindingTest {
     void proxyLocalOperations() {
         ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
                 List.of(InetSocketAddress.createUnresolved("127.0.0.1", 1)),
-                null, 1, 5000L, 100, 100, null);
+                V, 1, 5000L, 100, 100, null);
 
         // claim is unsupported on backend
         assertTrue(binding.claim("s", java.util.UUID.randomUUID(), java.time.Duration.ofSeconds(10)).isCompletedExceptionally());
@@ -253,10 +270,10 @@ class ProxyDirectNetworkBindingTest {
     @Test
     @DisplayName("subscriptions receive updates on heartbeat ingestion")
     void subscriptionLifecycle() throws Exception {
-        server = new FakeProxyServer(null, 1);
+        server = new FakeProxyServer(V, 1);
         ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
                 List.of(InetSocketAddress.createUnresolved("127.0.0.1", server.port())),
-                null, 1, 5000L, 1000, 2000, () -> 1000L);
+                V, 1, 5000L, 1000, 2000, () -> 1000L);
 
         java.util.List<BackendHeartbeat> received = new java.util.concurrent.CopyOnWriteArrayList<>();
         io.github.dailystruggle.rtp.proxy.common.spi.Subscription sub = binding.subscribeBackendHeartbeats(received::add);
@@ -275,5 +292,102 @@ class ProxyDirectNetworkBindingTest {
         assertEquals(1, received.size());
 
         binding.close();
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: null verifier is rejected at construction (no unsigned proxy-direct)")
+    void nullVerifierRejected() {
+        List<InetSocketAddress> one = List.of(InetSocketAddress.createUnresolved("127.0.0.1", 1));
+        IllegalArgumentException ex = org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new ProxyDirectNetworkBinding(one, null, 1, 5000L, 100, 100, null));
+        assertTrue(ex.getMessage().contains("HMAC"), ex.getMessage());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new ProxyDirectNetworkBinding(one, null, 1, 5000L, 100, 100, null,
+                        ProxyDirectTlsConfig.unset()));
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: an unsigned (legacy) proxy reply is dropped, not trusted")
+    void unsignedProxyReplyDropped() throws Exception {
+        // A rogue listener that answers with empty-HMAC frames.
+        ServerSocket rogue = new ServerSocket();
+        rogue.bind(new InetSocketAddress("127.0.0.1", 0));
+        Thread t = new Thread(() -> {
+            try (Socket s = rogue.accept()) {
+                DataInputStream in = new DataInputStream(s.getInputStream());
+                ProxyDirectWire.readOpcode(in);
+                ProxyDirectWire.readSignedPayload(in, V);
+                DataOutputStream out = new DataOutputStream(s.getOutputStream());
+                out.writeInt(1);
+                out.writeInt(1);
+                out.writeUTF("");
+                out.writeUTF(BackendHeartbeatCodec.encode(hb("evil", List.of("x"))));
+                out.flush();
+            } catch (Exception ignored) {
+                // test double
+            }
+        }, "rogue-proxy-direct");
+        t.setDaemon(true);
+        t.start();
+        try {
+            ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
+                    List.of(InetSocketAddress.createUnresolved("127.0.0.1", rogue.getLocalPort())),
+                    V, 1, 5000L, 1000, 2000, () -> 1000L);
+            binding.publishBackendHeartbeat(hb("backend-a", List.of("default"))).get();
+            assertEquals(0, binding.livePeerCount(), "unsigned row must not be ingested");
+            binding.close();
+        } finally {
+            rogue.close();
+        }
+    }
+
+    private static void keytool(String... args) throws Exception {
+        String exe = Path.of(System.getProperty("java.home"), "bin",
+                System.getProperty("os.name").toLowerCase().contains("win") ? "keytool.exe" : "keytool").toString();
+        List<String> cmd = new ArrayList<>();
+        cmd.add(exe);
+        cmd.addAll(List.of(args));
+        Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+        p.getInputStream().readAllBytes();
+        assertEquals(0, p.waitFor(), "keytool failed: " + cmd);
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: TLS client binding round-trips against a TLS proxy with hostname verification")
+    void tlsRoundTrip(@TempDir Path dir) throws Exception {
+        String pass = "changeit";
+        Path ks = dir.resolve("proxy.p12");
+        Path cert = dir.resolve("proxy.cer");
+        Path ts = dir.resolve("trust.p12");
+        keytool("-genkeypair", "-alias", "rtp", "-keyalg", "EC", "-groupname", "secp256r1",
+                "-dname", "CN=localhost", "-ext", "SAN=dns:localhost,ip:127.0.0.1",
+                "-validity", "2", "-storetype", "PKCS12", "-keystore", ks.toString(),
+                "-storepass", pass, "-keypass", pass);
+        keytool("-exportcert", "-alias", "rtp", "-keystore", ks.toString(), "-storepass", pass,
+                "-file", cert.toString());
+        keytool("-importcert", "-noprompt", "-alias", "rtp", "-file", cert.toString(),
+                "-storetype", "PKCS12", "-keystore", ts.toString(), "-storepass", pass);
+
+        ProxyDirectTlsConfig serverTls = ProxyDirectTlsConfig.enabled(ks.toString(), pass.toCharArray(),
+                null, null, true);
+        server = new FakeProxyServer(V, 1, serverTls.createServerSocket());
+        ProxyDirectTlsConfig clientTls = ProxyDirectTlsConfig.enabled(null, null,
+                ts.toString(), pass.toCharArray(), true);
+
+        ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
+                List.of(InetSocketAddress.createUnresolved("localhost", server.port())),
+                V, 1, 5000L, 2000, 3000, () -> 1000L, clientTls);
+        binding.publishBackendHeartbeat(hb("backend-tls", List.of("default"))).get();
+        assertTrue(binding.readSnapshot().get().backend("backend-tls").isPresent(),
+                "TLS round trip must deliver the snapshot");
+        binding.close();
+
+        // Plain client against the TLS proxy: no rows.
+        ProxyDirectNetworkBinding plain = new ProxyDirectNetworkBinding(
+                List.of(InetSocketAddress.createUnresolved("127.0.0.1", server.port())),
+                V, 1, 5000L, 1000, 1000, () -> 1000L);
+        plain.publishBackendHeartbeat(hb("backend-plain", List.of("default"))).get();
+        assertEquals(0, plain.livePeerCount());
+        plain.close();
     }
 }

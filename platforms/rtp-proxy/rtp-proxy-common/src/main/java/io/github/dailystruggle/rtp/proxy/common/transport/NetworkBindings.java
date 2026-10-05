@@ -88,20 +88,10 @@ public final class NetworkBindings {
                             "NetworkBindings.open: transport.type=sql requires a non-null DataSource "
                                     + "(typically the host's AbstractSQLDatabaseAccessor pool).");
                 }
-                // Load the HMAC envelope verifier the same way as the Redis
-                // branch. Loader failure degrades to disabled (InMemory
-                // fallback) per the network-mode failure-mode policy.
-                HmacVerifier sqlVerifier;
-                try {
-                    sqlVerifier = HmacVerifier.loadFromEnv(
-                            cfg.secretEnv(), cfg.schemaVersion(), cfg.schemaVersion());
-                } catch (NetworkConfigException e) {
-                    LOG.log(Level.WARNING,
-                            "NetworkBindings.open: HMAC verifier load failed for sql transport; "
-                                    + "falling back to in-memory transport (network disabled): "
-                                    + e.getMessage());
-                    return new InMemoryNetworkStateBinding();
-                }
+                // HMAC envelope verifier, same as the Redis branch. Loader
+                // failure fails closed (rtp-proxy-ADR-010): no silent swap to
+                // an in-memory store that would look healthy but be isolated.
+                HmacVerifier sqlVerifier = loadVerifierOrFail(cfg, "sql");
                 return new SqlNetworkStateBinding(
                         dataSource, cfg.heartbeatIntervalMs(),
                         sqlVerifier, cfg.schemaVersion());
@@ -111,17 +101,7 @@ public final class NetworkBindings {
                 // network.secretEnv (REQ-RTP-PROXY-007); loader failure is the
                 // single fail-fast on the security path - other Redis-side
                 // faults (connect, SCRIPT LOAD, pub/sub) degrade to disabled.
-                HmacVerifier verifier;
-                try {
-                    verifier = HmacVerifier.loadFromEnv(
-                            cfg.secretEnv(), cfg.schemaVersion(), cfg.schemaVersion());
-                } catch (NetworkConfigException e) {
-                    LOG.log(Level.WARNING,
-                            "NetworkBindings.open: HMAC verifier load failed; "
-                                    + "falling back to in-memory transport (network disabled): "
-                                    + e.getMessage());
-                    return new InMemoryNetworkStateBinding();
-                }
+                HmacVerifier verifier = loadVerifierOrFail(cfg, "redis");
                 return new RedisNetworkStateBinding(
                         cfg.redisHost(), cfg.redisPort(), cfg.redisPassword(),
                         cfg.heartbeatIntervalMs(), verifier, cfg.schemaVersion());
@@ -129,6 +109,24 @@ public final class NetworkBindings {
                 throw new IllegalArgumentException(
                         "NetworkBindings.open: unrecognised transport.type '" + cfg.transportType()
                                 + "' (expected 'in-memory', 'sql', or 'redis').");
+        }
+    }
+
+    /**
+     * Load the shared HMAC verifier for a signing transport, or log SEVERE and
+     * throw. Callers treat the exception as "network mode disabled".
+     *
+     * @throws NetworkConfigException when the secret is unset, not Base64, or &lt; 32 bytes
+     */
+    private static HmacVerifier loadVerifierOrFail(NetworkConfig cfg, String transport) {
+        try {
+            return HmacVerifier.loadFromEnv(cfg.secretEnv(), cfg.schemaVersion(), cfg.schemaVersion());
+        } catch (NetworkConfigException e) {
+            LOG.log(Level.SEVERE,
+                    "NetworkBindings.open: HMAC verifier load failed for " + transport
+                            + " transport; network mode DISABLED (no in-memory fallback): "
+                            + e.getMessage());
+            throw e;
         }
     }
 
@@ -156,6 +154,11 @@ public final class NetworkBindings {
      * {@link RedisNetworkRequestQueue}; open-time failures degrade to
      * in-memory per the network-mode failure-mode policy.</p>
      *
+     * <p>{@code sql} / {@code redis} queues are HMAC-signed (rtp-proxy-ADR-010)
+     * with a verifier loaded from {@code network.secretEnv}; load failure
+     * throws {@link NetworkConfigException} (fail closed), mirroring
+     * {@link #open(NetworkConfig, DataSource)}.</p>
+     *
      * @param cfg        validated config (must have {@code enabled() == true})
      * @param dataSource shared JDBC source for the {@code sql} branch;
      *                   may be {@code null} for {@code in-memory} / {@code redis}
@@ -163,6 +166,32 @@ public final class NetworkBindings {
      *         lifecycle
      */
     public static NetworkRequestQueue openRequestQueue(NetworkConfig cfg, DataSource dataSource) {
+        Objects.requireNonNull(cfg, "cfg");
+        String t = cfg.transportType() == null ? "in-memory" : cfg.transportType().toLowerCase(Locale.ROOT);
+        if (!"sql".equals(t) && !"redis".equals(t)) {
+            return openRequestQueue(cfg, dataSource, null);
+        }
+        if ("sql".equals(t) && dataSource == null) {
+            throw new IllegalArgumentException(
+                    "NetworkBindings.openRequestQueue: transport.type=sql requires a "
+                            + "non-null DataSource (typically the host's "
+                            + "AbstractSQLDatabaseAccessor pool).");
+        }
+        // Fail closed like open(): an unloadable secret throws
+        // NetworkConfigException rather than opening an unsigned shared queue.
+        HmacVerifier queueVerifier = HmacVerifier.loadFromEnv(
+                cfg.secretEnv(), cfg.schemaVersion(), cfg.schemaVersion());
+        return openRequestQueue(cfg, dataSource, queueVerifier);
+    }
+
+    /**
+     * Variant of {@link #openRequestQueue(NetworkConfig, DataSource)} with a
+     * caller-supplied HMAC verifier (e.g. the one already loaded for the
+     * transport). {@code verifier == null} opens {@code sql} / {@code redis}
+     * queues unsigned; production callers should pass a verifier.
+     */
+    public static NetworkRequestQueue openRequestQueue(NetworkConfig cfg, DataSource dataSource,
+                                                       HmacVerifier verifier) {
         Objects.requireNonNull(cfg, "cfg");
         String t = cfg.transportType() == null ? "in-memory" : cfg.transportType().toLowerCase(Locale.ROOT);
         switch (t) {
@@ -185,7 +214,7 @@ public final class NetworkBindings {
                                     + "AbstractSQLDatabaseAccessor pool).");
                 }
                 try {
-                    return new SqlNetworkRequestQueue(dataSource);
+                    return new SqlNetworkRequestQueue(dataSource, verifier, cfg.schemaVersion());
                 } catch (RuntimeException e) {
                     LOG.log(Level.WARNING,
                             "NetworkBindings.openRequestQueue: sql queue open failed; "
@@ -202,7 +231,8 @@ public final class NetworkBindings {
                 // crashed-backend path is not yet wired.
                 try {
                     return new RedisNetworkRequestQueue(
-                            cfg.redisHost(), cfg.redisPort(), cfg.redisPassword(), 0);
+                            cfg.redisHost(), cfg.redisPort(), cfg.redisPassword(), 0,
+                            verifier, cfg.schemaVersion());
                 } catch (RuntimeException e) {
                     LOG.log(Level.WARNING,
                             "NetworkBindings.openRequestQueue: redis queue open failed; "

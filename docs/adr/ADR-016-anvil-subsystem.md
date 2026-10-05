@@ -148,6 +148,18 @@ Gated by `PerformanceKeys.visitorEnabled`. Observational mode inherits the secti
 
 The adapter `logGateSkip` suppresses `reason=chunk-already-loaded` entirely — the `RTP.log(...)` call is skipped while the counter in `GATE_SKIP_COUNTERS` still increments, preserving the metric surface for `rtp test/anvil-prefilter` and future telemetry consumers. On Paper/Folia this reason is the steady-state outcome for every candidate that reaches the adapter path after `LocationGenerator`'s call-site probe (section 1.1), so surfacing it at any operator-visible level carries no diagnostic signal and drowns the log. All other gate-skip reasons (`dimension-unsupported`, `world-save-disabled`, `config-disabled(...)`) retain the rate-limited INFO→FINE budget and remain operator-actionable.
 
+### 15. Chunk-payload codecs (amended 2026-10-05)
+
+Region files are untrusted input. `.mca` chunk payloads shall be decompressed only by the JDK (`GZIPInputStream`, `InflaterInputStream` for modes 1 and 2) or by in-house pure-Java code in `rtp-anvil`. Third-party codec libraries shall not be runtime dependencies of the `.mca` decode path.
+
+- Mode 4 (`region-file-compression=lz4`, lz4-java `LZ4BlockOutputStream` container) is decoded by `Lz4BlockDecoder`: header validation, LZ4 block decode, and the 28-bit-masked XXHash32 block checksum (seed `0x9747b28c`).
+- The decoder shall operate on `byte[]` with explicit bounds checks and shall not use `sun.misc.Unsafe` or JNI.
+- Declared decompressed sizes shall be validated against `AnvilReader.MAX_DECOMPRESSED_CHUNK_BYTES` and the per-block level bound before any output allocation.
+- Every malformed stream shall surface as `CorruptRegionEntryException` (section 2 fall-through to `Verdict.UNKNOWN`).
+- lz4-java is a test-scope reference only (differential tests in `Lz4BlockDecoderTest`, Jazzer target in `AnvilRegionFuzzTest`).
+
+Rationale: two memory-safety CVEs in lz4-java's native/`Unsafe` paths within a year (CVE-2025-12183, CVE-2026-59949) against roughly 250 lines of fuzzable code for a fixed, simple container format. `.linear` (ADR-077) retains the pure-Java aircompressor ZStandard decoder until that format is retired.
+
 ## Consequences
 
 **Positive:**
@@ -184,4 +196,4 @@ The adapter `logGateSkip` suppresses `reason=chunk-already-loaded` entirely — 
 - ADR-004 "Count-Bound Task Pipe on Folia".
 - ADR-006 "Async Queue Pre-Generation".
 - ADR-015 "Stale-Chunk Guard for Count-Bound Pipes".
-- Regression guards: `AnvilPrefilterTest`, `AnvilFixtureParityTest`, `AnvilChunkViewTest`, `PaletteNormalizerTest`, `AnvilPackageBoundaryArchTest`, `ReqRtpS004NullChunkAttributionTest`, `ReqRtpAnvilFirstTest`, `TestBiomeSourceCmdTest`, `TestFullCmdTest`.
+- Regression guards: `AnvilPrefilterTest`, `AnvilFixtureParityTest`, `AnvilChunkViewTest`, `PaletteNormalizerTest`, `AnvilPackageBoundaryArchTest`, `ReqRtpS004NullChunkAttributionTest`, `ReqRtpAnvilFirstTest`, `TestBiomeSourceCmdTest`, `TestFullCmdTest`, `Lz4BlockDecoderTest`, `AnvilLz4CompressionTest`, `AnvilRegionFuzzTest`.

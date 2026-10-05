@@ -498,5 +498,12 @@ editorTrustUsage: "&c[P0] Gebruik: /rtp editor trust nonce=<code die de editorpa
 editorChannelOpened: "&a[P0] Webeditorkanaal geopend. Vertrouw je browser wanneer daarom wordt gevraagd om voorbeelden en Hot-Apply in te schakelen."
 editorChannelLost: "&e[P1] Webeditorkanaal verloren: [reason]. De pagina blijft werken vanuit haar momentopname."
 editorChannelExpired: "&7[P0] Webeditorkanaal verlopen na [minutes] minuten. Voer het editorcommando opnieuw uit om verder te gaan."
+editorTrustRateLimited: "&c[P0] Te veel foute vertrouwenscodes voor de editor. Wacht een minuut en probeer het opnieuw."
+editorUntrustUsage: "&c[P0] Gebruik: /rtp editor untrust key=<begin van de vingerafdruk, minstens 4 tekens | all>"
+editorUntrustRemoved: "&a[P0] Vertrouwen ingetrokken voor [count] webeditor-browser(s); ze moeten opnieuw vertrouwd worden voor voorbeelden of Hot-Apply."
+editorUntrustNone: "&7[P0] Geen vertrouwde editorbrowser komt overeen met [key]."
+editorUntrustFailed: "&c[P0] De lijst met vertrouwde editors kon niet worden bijgewerkt: [reason]"
+editorApplyDigestMissing: "&c[P0] De editorpayload heeft geen sha256-controlesom en is niet toegepast. Bevestig opnieuw vanaf een bijgewerkte editorpagina."
+editorApplyFileUnreadable: "&e[P1] Het offline toepassingsbestand kon niet worden gelezen ([reason]); de bytestore wordt geprobeerd."
 
 version: 1.0

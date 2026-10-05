@@ -681,13 +681,14 @@ Mapped to bStats v3 chart types (`SimplePie`, `AdvancedPie`, `DrilldownPie`, `Si
 - All bStats lambdas shall read pre-cached values from `Metrics.snapshot()` rather than invoking platform calls inline. Bucketisation happens once per snapshot, not once per chart fetch.
 - Submission cadence respects bStats defaults; do not add custom timers.
 - Chart IDs registered on bStats.org should be locked into a small constants class (`BStatsChartIds`) so a typo in one place doesn't silently break a chart.
-- The bStats integration ships in `rtp-plugin` (Bukkit family) and `rtp-fabric` (when bStats-Fabric is wired in Phase M2). Velocity / BungeeCord proxies get a separate, smaller bStats chart set in Phase M3 once the proxy adapter exists — the proxy chart set deliberately omits backend-shape charts to avoid fingerprinting backend pools.
+- No bStats library is bundled. The dependency-free v2 client lives in the reusable `:bstats-api` module ([bstats-api-ADR-001](../../api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)): payload, endpoint (`/api/v2/data/<platform>`), jitter (3-6 min initial, 30 min period) and opt-out match the upstream `MetricsBase`, and `BStatsPlatform` maps neutral server facts onto the `bukkit` endpoint's wire fields. The existing shared `bStats/config.yml` / `config.txt` is read, never rewritten, so the server UUID and install counts carry over.
+- Every backend starts bStats through one entry point, `RtpBStats` in `rtp-core` `common.metrics.bstats`, which adapts `RTP.scheduler` / `RTP.log` and registers the single chart catalogue (`RtpBStatsCatalogue`). Platforms supply only a `Host` (platform label, chunk-load mode, server facts, optional addon whitelist): Bukkit uses `BukkitBStatsHost` (main-thread collection, async send); Fabric and NeoForge use the core-state default `Host.of(loader)`. All report to one service (`bukkit` endpoint, id 30865 full / 12277 lite), separable via the `platform` chart. Proxies (Velocity / BungeeCord) do not report to bStats: they have no server metrics, and the backends already report their own.
 
 #### Phasing
 
 - **Phase M1**: ship the *Configuration adoption* group (low effort, immediate insight).
 - **Phase M2**: add the *Runtime health* group once `Metrics.snapshot()` is live on Folia/Fabric.
-- **Phase M3**: add the *Feature-shape rollups* and the proxy-side chart set.
+- **Phase M3**: add the *Feature-shape rollups*.
 
 ---
 

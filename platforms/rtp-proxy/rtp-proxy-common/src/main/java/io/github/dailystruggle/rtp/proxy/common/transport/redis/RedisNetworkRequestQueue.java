@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
+import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
+import io.github.dailystruggle.rtp.proxy.common.transport.CanonicalEnvelopes;
 import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
 import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 
@@ -47,6 +49,14 @@ import java.util.logging.Logger;
  * <p>Operational invariants of the scripts (atomicity, terminal-state env
  * cleanup, LPOS positioning) are exercised end-to-end by the opt-in
  * {@code RedisNetworkRequestQueueIT}.</p>
+ *
+ * <p><strong>HMAC envelope (rtp-proxy-ADR-010).</strong> With a verifier,
+ * every envelope is signed at flush over
+ * {@link CanonicalEnvelopes#canonicalQueueEnvelope} and verified on dequeue;
+ * unsigned / tampered / delimiter-bearing envelopes are dropped with a
+ * REQ-RTP-S-004 WARNING and never reach the dispatcher. A second envelope
+ * for a player with an undequeued entry is skipped (one pending request per
+ * player).</p>
  */
 public final class RedisNetworkRequestQueue implements NetworkRequestQueue, AutoCloseable {
 
@@ -73,6 +83,9 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
     private final RedisLuaScripts transitionScript;
     /** Head-scan window for ownership-aware dequeue (rtp-proxy-ADR-016). */
     private static final int OWNED_DEQUEUE_MAX_SCAN = 16;
+    /** HMAC envelope verifier; {@code null} disables signing and verification. */
+    private final HmacVerifier verifier;
+    private final int schemaVersion;
 
     /**
      * Production constructor. Opens its own {@link RespPool} and pre-loads
@@ -87,7 +100,20 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
      *                   their terminal transition deletes them).
      */
     public RedisNetworkRequestQueue(String host, int port, String password, int ttlSeconds) {
-        this(buildPool(host, port, password), true, ttlSeconds);
+        this(buildPool(host, port, password), true, ttlSeconds, null, 1);
+    }
+
+    /**
+     * Signed production constructor (rtp-proxy-ADR-010). Every participant
+     * on the queue (enrolling backends and dequeuing proxies) must share the
+     * same secret and {@code schemaVersion}.
+     *
+     * @param verifier      HMAC verifier; {@code null} disables signing
+     * @param schemaVersion schema version passed to {@link HmacVerifier}
+     */
+    public RedisNetworkRequestQueue(String host, int port, String password, int ttlSeconds,
+                                    HmacVerifier verifier, int schemaVersion) {
+        this(buildPool(host, port, password), true, ttlSeconds, verifier, schemaVersion);
     }
 
     /**
@@ -97,16 +123,25 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
      * binding's {@link #close()} only shuts down its executor.
      */
     public RedisNetworkRequestQueue(RespPool pool, int ttlSeconds) {
-        this(Objects.requireNonNull(pool, "pool"), false, ttlSeconds);
+        this(Objects.requireNonNull(pool, "pool"), false, ttlSeconds, null, 1);
     }
 
-    private RedisNetworkRequestQueue(RespPool pool, boolean ownsPool, int ttlSeconds) {
+    /** Pool-injection constructor with HMAC envelope; see the signed host/port constructor. */
+    public RedisNetworkRequestQueue(RespPool pool, int ttlSeconds,
+                                    HmacVerifier verifier, int schemaVersion) {
+        this(Objects.requireNonNull(pool, "pool"), false, ttlSeconds, verifier, schemaVersion);
+    }
+
+    private RedisNetworkRequestQueue(RespPool pool, boolean ownsPool, int ttlSeconds,
+                                     HmacVerifier verifier, int schemaVersion) {
         if (ttlSeconds < 0) {
             throw new IllegalArgumentException("ttlSeconds must be >= 0");
         }
         this.pool = pool;
         this.ownsPool = ownsPool;
         this.ttlSeconds = ttlSeconds;
+        this.verifier = verifier;
+        this.schemaVersion = schemaVersion;
 
         // Eagerly validate connectivity. A bad host should fail at open() time,
         // not silently in flush loops.
@@ -149,10 +184,18 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
 
     // ---- SPI ------------------------------------------------------------
 
+    /**
+     * Single enrolment. Unlike {@link #flushPending}, a skipped envelope
+     * (duplicate player, delimiter-bearing field) resolves
+     * {@link EnrolOutcome#REJECTED}.
+     */
     @Override
     public CompletableFuture<EnrolOutcome> enrol(EnrolmentEnvelope envelope) {
         Objects.requireNonNull(envelope, "envelope");
-        return flushPending(java.util.Collections.singletonList(envelope));
+        return runAsync(() -> {
+            int[] counts = enqueue(java.util.Collections.singletonList(envelope));
+            return counts[1] > 0 ? EnrolOutcome.REJECTED : EnrolOutcome.ACCEPTED;
+        });
     }
 
     @Override
@@ -161,29 +204,77 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
         if (batch.isEmpty()) {
             return CompletableFuture.completedFuture(EnrolOutcome.ACCEPTED);
         }
+        // Skipped envelopes (duplicate player / unsafe field) are logged and
+        // the batch still resolves ACCEPTED: the backend buffer re-enqueues a
+        // non-ACCEPTED batch, so rejecting would loop forever on a bad row.
         return runAsync(() -> {
-            List<String> argv = new ArrayList<>(batch.size() * 7);
-            long now = System.currentTimeMillis();
-            for (EnrolmentEnvelope env : batch) {
-                if (env == null) continue;
-                argv.add(env.correlationId().toString());
-                argv.add(env.playerId().toString());
-                argv.add(env.regionKey().orElse(""));
-                argv.add(env.serverHint().orElse(""));
-                argv.add(Long.toString(env.createdAtMs()));
-                argv.add(Integer.toString(ttlSeconds));
-                argv.add(Long.toString(now));
-            }
-            if (argv.isEmpty()) return EnrolOutcome.ACCEPTED;
-            try (RespConnection j = pool.getResource()) {
-                enqueueBatchScript.evalsha(j, Arrays.asList(READY_KEY, SEEN_KEY), argv);
-                return EnrolOutcome.ACCEPTED;
-            } catch (RuntimeException e) {
-                LOG.log(Level.WARNING, "RedisNetworkRequestQueue.flushPending failed: "
-                        + e.getClass().getSimpleName() + ": " + e.getMessage());
-                throw e;
-            }
+            enqueue(batch);
+            return EnrolOutcome.ACCEPTED;
         });
+    }
+
+    /**
+     * Sign + ship envelopes via enqueue_batch.lua.
+     *
+     * @return {@code {accepted, skipped}} where skipped counts duplicate-player
+     *         and delimiter-bearing envelopes (each logged at WARNING)
+     */
+    private int[] enqueue(List<EnrolmentEnvelope> batch) {
+        List<String> argv = new ArrayList<>(batch.size() * 8);
+        long now = System.currentTimeMillis();
+        int skipped = 0;
+        for (EnrolmentEnvelope env : batch) {
+            if (env == null) continue;
+            String cid = env.correlationId().toString();
+            String pid = env.playerId().toString();
+            String region = env.regionKey().orElse("");
+            String hint = env.serverHint().orElse("");
+            String created = Long.toString(env.createdAtMs());
+            String hmac;
+            try {
+                hmac = verifier == null ? "" : CanonicalEnvelopes.signQueueEnvelope(
+                        verifier, schemaVersion, cid, pid, region, hint, created);
+                if (verifier == null && (!CanonicalEnvelopes.isSafeField(region)
+                        || !CanonicalEnvelopes.isSafeField(hint))) {
+                    throw new IllegalArgumentException("regionKey/serverHint contains a reserved delimiter character");
+                }
+            } catch (IllegalArgumentException iae) {
+                skipped++;
+                LOG.log(Level.WARNING, "RedisNetworkRequestQueue: dropping envelope for player " + pid
+                        + " (correlationId=" + cid + "): " + iae.getMessage() + " (REQ-RTP-S-004)");
+                continue;
+            }
+            argv.add(cid);
+            argv.add(pid);
+            argv.add(region);
+            argv.add(hint);
+            argv.add(created);
+            argv.add(Integer.toString(ttlSeconds));
+            argv.add(Long.toString(now));
+            argv.add(hmac);
+        }
+        if (argv.isEmpty()) return new int[]{0, skipped};
+        Object raw;
+        try (RespConnection j = pool.getResource()) {
+            raw = enqueueBatchScript.evalsha(j, Arrays.asList(READY_KEY, SEEN_KEY), argv);
+        } catch (RuntimeException e) {
+            LOG.log(Level.WARNING, "RedisNetworkRequestQueue.flushPending failed: "
+                    + e.getClass().getSimpleName() + ": " + e.getMessage());
+            throw e;
+        }
+        int accepted = 0;
+        int duplicates = 0;
+        if (raw instanceof List<?> l && l.size() >= 2) {
+            accepted = parseIntSafe(asString(l.get(0)), 0);
+            duplicates = parseIntSafe(asString(l.get(1)), 0);
+        } else if (raw instanceof Number n) {
+            accepted = n.intValue();
+        }
+        if (duplicates > 0) {
+            LOG.log(Level.WARNING, "RedisNetworkRequestQueue: skipped " + duplicates
+                    + " envelope(s) for players that already have a pending request (REQ-RTP-S-004)");
+        }
+        return new int[]{accepted, skipped + duplicates};
     }
 
     @Override
@@ -245,25 +336,9 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
                             java.util.Collections.singletonList(READY_KEY),
                             Arrays.asList(Long.toString(now), Integer.toString(ttlSeconds)));
                     if (raw instanceof List && !((List<?>) raw).isEmpty()) {
-                        Map<String, String> kv = flattenAlternating((List<?>) raw, 0);
-                        UUID pid;
-                        UUID cid;
-                        try {
-                            pid = UUID.fromString(kv.getOrDefault("playerId", ""));
-                            cid = UUID.fromString(kv.getOrDefault("correlationId", ""));
-                        } catch (IllegalArgumentException iae) {
-                            continue; // malformed row; drop and re-poll
-                        }
-                        String region = kv.getOrDefault("regionKey", "");
-                        String hint = kv.getOrDefault("serverHint", "");
-                        long createdAt = parseLongSafe(kv.get("createdAtMs"), now);
-                        long dequeuedAt = parseLongSafe(kv.get("dequeuedAtMs"), now);
-                        return Optional.of(new QueueEnvelope(
-                                pid, cid,
-                                region.isEmpty() ? Optional.empty() : Optional.of(region),
-                                hint.isEmpty() ? Optional.empty() : Optional.of(hint),
-                                createdAt,
-                                dequeuedAt));
+                        QueueEnvelope env = toEnvelope(flattenAlternating((List<?>) raw, 0), now);
+                        // null = malformed / unverified row, already dropped; fall through to re-poll.
+                        if (env != null) return Optional.of(env);
                     }
                     if (System.nanoTime() >= deadline) {
                         return Optional.<QueueEnvelope>empty();
@@ -307,25 +382,8 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
                                     Integer.toString(ttlSeconds),
                                     Integer.toString(OWNED_DEQUEUE_MAX_SCAN)));
                     if (raw instanceof List && !((List<?>) raw).isEmpty()) {
-                        Map<String, String> kv = flattenAlternating((List<?>) raw, 0);
-                        UUID pid;
-                        UUID cid;
-                        try {
-                            pid = UUID.fromString(kv.getOrDefault("playerId", ""));
-                            cid = UUID.fromString(kv.getOrDefault("correlationId", ""));
-                        } catch (IllegalArgumentException iae) {
-                            continue;
-                        }
-                        String region = kv.getOrDefault("regionKey", "");
-                        String hint = kv.getOrDefault("serverHint", "");
-                        long createdAt = parseLongSafe(kv.get("createdAtMs"), now);
-                        long dequeuedAt = parseLongSafe(kv.get("dequeuedAtMs"), now);
-                        return Optional.of(new QueueEnvelope(
-                                pid, cid,
-                                region.isEmpty() ? Optional.empty() : Optional.of(region),
-                                hint.isEmpty() ? Optional.empty() : Optional.of(hint),
-                                createdAt,
-                                dequeuedAt));
+                        QueueEnvelope env = toEnvelope(flattenAlternating((List<?>) raw, 0), now);
+                        if (env != null) return Optional.of(env);
                     }
                     if (System.nanoTime() >= deadline) {
                         return Optional.<QueueEnvelope>empty();
@@ -413,6 +471,46 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
             catch (Throwable t) { f.completeExceptionally(t); }
         });
         return f;
+    }
+
+    /**
+     * Decode + verify a dequeued envelope. Returns {@code null} (row dropped,
+     * WARNING logged on HMAC failure) for malformed ids or a missing /
+     * mismatched / delimiter-bearing signature under signed mode. The
+     * signed {@code createdAtMs} string is verified verbatim.
+     */
+    private QueueEnvelope toEnvelope(Map<String, String> kv, long now) {
+        String pidStr = kv.getOrDefault("playerId", "");
+        String cidStr = kv.getOrDefault("correlationId", "");
+        UUID pid;
+        UUID cid;
+        try {
+            pid = UUID.fromString(pidStr);
+            cid = UUID.fromString(cidStr);
+        } catch (IllegalArgumentException iae) {
+            LOG.log(Level.WARNING, "RedisNetworkRequestQueue: dropping malformed envelope (bad ids)");
+            return null;
+        }
+        String region = kv.getOrDefault("regionKey", "");
+        String hint = kv.getOrDefault("serverHint", "");
+        String createdStr = kv.getOrDefault("createdAtMs", "");
+        if (verifier != null && !CanonicalEnvelopes.verifyQueueEnvelope(verifier, schemaVersion,
+                cidStr, pidStr, region, hint, createdStr, kv.getOrDefault("hmac", ""))) {
+            LOG.log(Level.WARNING, "RedisNetworkRequestQueue: HMAC verification failed for envelope "
+                    + cidStr + "; dropping (REQ-RTP-S-004)");
+            return null;
+        }
+        if (verifier == null && (!CanonicalEnvelopes.isSafeField(region) || !CanonicalEnvelopes.isSafeField(hint))) {
+            LOG.log(Level.WARNING, "RedisNetworkRequestQueue: dropping envelope " + cidStr
+                    + " with delimiter-bearing regionKey/serverHint (REQ-RTP-S-004)");
+            return null;
+        }
+        return new QueueEnvelope(
+                pid, cid,
+                region.isEmpty() ? Optional.empty() : Optional.of(region),
+                hint.isEmpty() ? Optional.empty() : Optional.of(hint),
+                parseLongSafe(createdStr, now),
+                parseLongSafe(kv.get("dequeuedAtMs"), now));
     }
 
     /**

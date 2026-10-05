@@ -77,6 +77,32 @@ To guarantee system stability and prevent server exhaustion, RTP employs a rigor
 The `rtp-api` module provides a strict, defined interface for external integrations:
 - **Safe Extensibility**: Developers can inject custom `Shape` algorithms or claim-plugin validations (e.g., GriefPrevention) via the API without modifying or compromising the reliability guarantees of the `rtp-core` module.
 
+### Web Editor Extensions
+Addons contribute data, message handlers and tabs to the web editor through `RTPAPI.hooks().editorExtensions()` ([ADR-107](../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation.md), extending [ADR-106](../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel.md)). This follows the GUI-addon pattern: the GUI reads typed `rtp-api` objects that core fills from the network snapshot, and never reads heartbeats. In the same way, an editor extension supplies values, and core decides when and how they travel.
+
+Ownership split:
+
+| Concern | Owner |
+|---------|-------|
+| Transport, envelope, signing, trust, challenge / `seq` checks | core (`EditorChannel`, never published) |
+| Schedule: snapshot build, live-state polling, push pacing, bundles | core (`EditorSessionManager`, `EditorLiveFeed`) |
+| Type prefixing (`<id>.<type>`), routing, inbound rate limit | core (`EditorChannelWiring`) |
+| Budget shares and drop priority | core |
+| Snapshot data, live state, tab descriptors, message handling | extension (`EditorExtension`) |
+| Addon YAML validation and reload after Hot-Apply | extension (`validate`, `applied`) |
+| Rendering of tier 1 widgets; sandbox for tier 2 frames | page (`docs/editor/index.html`) |
+
+Invariants:
+- **Namespace.** Undotted types belong to core in every release. Extension types are `<id>.<local>`, and core adds and strips the prefix, so an extension can't send or receive another extension's or core's types.
+- **Negotiation.** The snapshot carries `protocol {channel, extensions}` and an `extensions[]` descriptor list, and `hello-reply` repeats them. Each peer ignores what it doesn't know: unknown members, unknown descriptor fields, unknown widget kinds as placeholders, and well-formed bundle items or frames with no handler, ignored without a drop. Neither side infers features from `pluginVersion`.
+- **Delivery.** Every message is `reply`, `latest` (coalesced, droppable) or `ordered` (held in order, refused when full). Pacing and bundling read the class, not a fixed type list.
+- **Budget.** Extension traffic counts against the session budget (2 MiB/min). It is also capped per extension (256 KiB/min) and for all extensions together (25 % of the budget), and it is dropped before core `land` / `hazard-delta`. Replies and `curve` are never dropped.
+- **Threading (S-005).** Snapshot and descriptor getters run on the async payload build. `stateJson()` runs on the feed's async tick. `onMessage` runs on the transport thread and must not block. `validate` / `applied` run on the Hot-Apply pipeline. None runs on a main or region thread. Work that needs the world is scheduled through `RTP.scheduler`.
+- **Isolation.** Every extension call is wrapped. An exception or an oversized result is logged, rate-limited to one line per extension per minute, and refused. Three failures mark the extension `failed` for that session, and core and other extensions carry on.
+- **No page-origin code.** Tier 1 descriptors are data rendered by the page as text and sanitised markdown. Tier 2 code runs only in an opaque-origin sandboxed iframe, checked by SHA-256 and reached over `postMessage`. It sees only its own extension's data, and it can stage but never apply.
+- **One write path (S-004).** Addon YAML listed in `configFiles()` joins the session `files` map and goes through Hot-Apply only: path checks, structural checks, then `validate`, `.bak`, atomic write and `applied`. Errors return in `apply_ack`.
+- **Fail closed (S-006).** The registry throws `IllegalStateException` before core loads. A session's extension list is fixed when its snapshot is built.
+
 ## Platform Adapter Design Details
 
 ### rtp-core Implementation Notes

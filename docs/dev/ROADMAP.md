@@ -10,7 +10,7 @@ commit/ADR that closed it.
 Tier ordering reflects priority, not chronology:
 
 - **Tier 0** — must-ship items before `3.0.0` loses the `-beta.1` tag. *(All Tier 0 items complete; `3.0.0` shipped.)*
-- **Tier 1** — directly narrows a caveat currently documented in `docs/FRONT_PAGE.bbcode` or
+- **Tier 1** — directly narrows a caveat currently documented in `docs/publishing/FRONT_PAGE.md` or
   `docs/admin/`.
 - **Tier 2** — new capability that earns a `3.1.0` / `3.1.x` release note.
 - **Tier 3** — polish, long-tail, and infrastructure.
@@ -113,8 +113,8 @@ reproducible by readers".
   size, methodology, and per-dimension safe-fraction columns for Overworld / Nether / End. Until
   this exists, the ~45% figure is an author claim, not a reproducible one.~~
 - [x] ~~**Extend the existing bStats integration with custom charts.** Default metrics are already
-  wired (`RTPBukkitPlugin` → bStats ID `30865`, relocated `org.bstats` →
-  `io.github.dailystruggle.rtp.bstats`); what is missing is `addCustomChart(...)` for RTP-specific
+  wired (bStats ID `30865`, now sent by the in-tree `bstats-api` client per
+  [bstats-api-ADR-001](../../api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)); what is missing is `addCustomChart(...)` for RTP-specific
   aggregates — platform split, region count, queue depth, and observed safe-fraction histograms per
   dimension.~~
 - [x] ~~**Replace the qualitative Nether/End phrasing** on the front page with measured figures once
@@ -511,8 +511,9 @@ reproducible by readers".
 - Completed items: do **not** delete the line. Strike it through and append the commit short-SHA or
   ADR number that closed it. This preserves the velocity signal.
 - New caveats discovered between releases: add under the appropriate Tier 1 subsection and mirror
-  the front-page entry in `docs/FRONT_PAGE.bbcode`'s "Roadmap" block with a vague, non-technical
-  summary (no REQ-*, no ADR identifiers — those stay in this document).
+  it in the Caveats or FAQ section of `docs/publishing/FRONT_PAGE.md` (then rebuild with
+  `scripts/release/build_front_pages.py`) as a plain, non-technical summary (no REQ-*, no ADR
+  identifiers — those stay in this document).
 - Features requested by operators: land in Tier 2 with the requesting issue linked, or get
   explicitly declined with a one-line rationale.
 - This file is the only TODO source of truth for release planning. Do not duplicate it into

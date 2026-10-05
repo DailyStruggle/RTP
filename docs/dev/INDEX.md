@@ -78,7 +78,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md) | Repo-wide plan to make the quality and compatibility claims externally verifiable: measured per-module coverage baseline, enforced gates, supply chain, support matrix. |
 | [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) | Platform family x Minecraft version x Java version support matrix. |
 | [`SEMVER.md`](SEMVER.md) | Semantic versioning contract: public API vs internal boundaries, deprecation rules. |
-| [`LICENSING.md`](LICENSING.md) | Open-core dual-licensing model, MIT vs PolyForm boundaries, Pro vs Lite editions. |
+| [`LICENSING.md`](LICENSING.md) | All-MIT licensing (ADR-108), per-module licence matrix, Pro (support tier) vs Lite editions. |
 | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) | Deprecation lifecycle, notice window, and compiler annotation policy. |
 | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) | Active Fabric frontier status. |
 | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) | Proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated. |

@@ -506,5 +506,12 @@ editorTrustUsage: "&c[P0] Uso: /rtp editor trust nonce=<codice mostrato dalla pa
 editorChannelOpened: "&a[P0] Canale dell'editor web aperto. Quando richiesto, considera attendibile il browser per attivare anteprime e Hot-Apply."
 editorChannelLost: "&e[P1] Canale dell'editor web perso: [reason]. La pagina continua a funzionare dalla sua istantanea."
 editorChannelExpired: "&7[P0] Il canale dell'editor web è scaduto dopo [minutes] minuti. Esegui di nuovo il comando dell'editor per riprendere."
+editorTrustRateLimited: "&c[P0] Troppi codici di fiducia dell'editor errati. Attendi un minuto e riprova."
+editorUntrustUsage: "&c[P0] Uso: /rtp editor untrust key=<prefisso dell'impronta, almeno 4 caratteri | all>"
+editorUntrustRemoved: "&a[P0] Fiducia revocata a [count] browser dell'editor web; dovranno essere di nuovo considerati attendibili per anteprime o Hot-Apply."
+editorUntrustNone: "&7[P0] Nessun browser attendibile dell'editor corrisponde a [key]."
+editorUntrustFailed: "&c[P0] Impossibile aggiornare l'elenco degli editor attendibili: [reason]"
+editorApplyDigestMissing: "&c[P0] Il payload dell'editor non ha un checksum sha256, quindi non è stato applicato. Conferma di nuovo da una pagina dell'editor aggiornata."
+editorApplyFileUnreadable: "&e[P1] Impossibile leggere il file di applicazione offline ([reason]); provo con l'archivio di byte."
 
 version: 1.0

@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry;
 import io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry;
 import io.github.dailystruggle.rtp.api.hooks.EconomyProviderRegistry;
+import io.github.dailystruggle.rtp.api.hooks.EditorExtensionRegistry;
 import io.github.dailystruggle.rtp.api.hooks.PlaceholderProviderRegistry;
 import io.github.dailystruggle.rtp.api.hooks.PlatformCreatorRegistry;
 import io.github.dailystruggle.rtp.api.hooks.PvPCombatStateRegistry;
@@ -16,6 +17,7 @@ import io.github.dailystruggle.rtp.api.hooks.WorldBorderProviderRegistry;
 import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.editor.EditorExtensions;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -246,5 +248,11 @@ public final class DefaultRTPHooks implements RTPHooks {
   @Override
   public ClaimBoundaryRegistry claimBoundaries() {
     return claimBoundaryRegistry;
+  }
+
+  /** Process-wide: editor sessions read the same registry whichever facade an addon used. */
+  @Override
+  public EditorExtensionRegistry editorExtensions() {
+    return EditorExtensions.registry();
   }
 }

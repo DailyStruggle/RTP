@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
-import net.jpountz.lz4.LZ4FrameInputStream;
 
 /**
  * Read-only Anvil region-file parser used by the pre-filter (ADR-016).
@@ -25,10 +24,12 @@ import net.jpountz.lz4.LZ4FrameInputStream;
  * <p><b>Compression support.</b> Per observed fixtures across 1.20.4 / 1.21.5 / 26.1 (data
  * versions 3465 / 4671 / 4788), vanilla servers ship Anvil chunks as Minecraft compression
  * mode {@code 2} (zlib-wrapped Deflate). Mode {@code 1} (gzip) is supported for forward
- * compatibility. Mode {@code 3} (uncompressed) is supported. Mode {@code 4} (LZ4) and the
- * {@code 0x80}-or'd "external" variants are rejected with {@link UnsupportedAnvilFormatException}
- * so the pre-filter returns {@link Verdict#UNKNOWN} and the live load path takes over - this
- * is the deliberate safe fallback for formats we have not yet validated against real data.
+ * compatibility. Mode {@code 3} (uncompressed) is supported. Mode {@code 4} (LZ4, written when
+ * {@code region-file-compression=lz4}) is lz4-java's {@code LZ4BlockOutputStream} stream format,
+ * not the LZ4 frame format, decoded in-house by {@link Lz4BlockDecoder}. Unknown modes and the
+ * {@code 0x80}-or'd "external" variants are rejected with
+ * {@link UnsupportedAnvilFormatException} so the pre-filter returns
+ * {@link Verdict#UNKNOWN} and the live load path takes over.
  *
  * <p>All methods are thread-safe: the class is stateless and operates on caller-owned buffers.
  */
@@ -64,8 +65,20 @@ public final class AnvilReader implements RegionFileReader {
         if (sectorOffset < 2 || sectorCount == 0) {
             return false;
         }
-        long payloadEnd = (long) sectorOffset * SECTOR_SIZE + (long) sectorCount * SECTOR_SIZE;
-        return payloadEnd <= regionBytes.length;
+        return readableRun(regionBytes, (long) sectorOffset * SECTOR_SIZE, (long) sectorCount * SECTOR_SIZE) >= 0;
+    }
+
+    /**
+     * Readable length of the sector run {@code [start, start + budget)} in {@code buf}, or
+     * {@code -1}. The final sector is padded only on region close, so a tail run may end at EOF
+     * before its budget; it is accepted only when its length prefix proves the payload is whole.
+     */
+    static int readableRun(byte[] buf, long start, long budget) {
+        if (start + budget <= buf.length) return (int) budget;
+        if (start + 5 > buf.length) return -1;
+        int avail = (int) (buf.length - start);
+        int declared = ByteBuffer.wrap(buf, (int) start, 4).getInt();
+        return (declared >= 1 && 4L + declared <= avail) ? avail : -1;
     }
 
     /**
@@ -142,11 +155,12 @@ public final class AnvilReader implements RegionFileReader {
         // long math: sectorOffset is 24-bit, so sectorOffset * SECTOR_SIZE overflows int on corrupt headers.
         long payloadStartLong = (long) sectorOffset * SECTOR_SIZE;
         long payloadBudgetLong = (long) sectorCount * SECTOR_SIZE;
-        if (payloadStartLong + payloadBudgetLong > regionBytes.length) {
+        int run = readableRun(regionBytes, payloadStartLong, payloadBudgetLong);
+        if (run < 0) {
             throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") spans past end of file: start="
                     + payloadStartLong + " budget=" + payloadBudgetLong + " fileLen=" + regionBytes.length);
         }
-        return decodeSectorPayload(regionBytes, (int) payloadStartLong, (int) payloadBudgetLong, cx, cz);
+        return decodeSectorPayload(regionBytes, (int) payloadStartLong, run, cx, cz);
     }
 
     /**
@@ -180,7 +194,8 @@ public final class AnvilReader implements RegionFileReader {
     /**
      * Decodes a single chunk from its own sector run rather than the whole region buffer.
      * {@code sectorBytes} holds exactly the bytes at file offset {@code sectorOffset * 4096}
-     * spanning {@code sectorCount * 4096} (the location-table entry), so callers can read one
+     * spanning {@code sectorCount * 4096} (the location-table entry; shorter for an unpadded tail
+     * run ending at EOF, the length prefix is still bounds-checked), so callers can read one
      * chunk positionally without loading the full {@code .mca}. Same compression support and
      * corruption checks as {@link #readChunkView}.
      *
@@ -223,8 +238,9 @@ public final class AnvilReader implements RegionFileReader {
                 System.arraycopy(src, off, copy, 0, len);
                 return copy;
             case 4:
-                wrapped = new LZ4FrameInputStream(new ByteArrayInputStream(src, off, len));
-                break;
+                // Vanilla RegionFileVersion.VERSION_LZ4 = LZ4BlockOutputStream ("LZ4Block" magic).
+                // In-house decoder: caps declared size before allocating, no JNI/Unsafe.
+                return Lz4BlockDecoder.decode(src, off, len, MAX_DECOMPRESSED_CHUNK_BYTES);
             default:
                 throw new UnsupportedAnvilFormatException("Unknown Anvil compression mode " + mode);
         }

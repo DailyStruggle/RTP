@@ -94,7 +94,28 @@ public final class EditorLiveFeed {
     /** Edge of the focus rectangle whose bins are pushed, in region-file bins (clamped around its centre). */
     static final int MAX_FOCUS_EDGE = 64;
     static final int MAX_PAGE_MESSAGE_CHARS = 16 * 1024;
+    /**
+     * A pushed head that shows nothing new is skipped; one is pushed anyway after this long so the
+     * page sees the feed is alive (it marks it stale after 90 s). Under a minute, plus the bundle
+     * delay: the relay's proxy drops a page socket that receives nothing for about that long.
+     */
+    static final long FEED_HEARTBEAT_MILLIS = 40_000L;
+    /**
+     * Hosted land (bytebin hand-off): at most one upload this often, none while no bin in view
+     * changed. Each costs one {@code land-ref} item on the relay, whatever its size.
+     */
+    static final long LAND_UPLOAD_MILLIS = 30_000L;
+    /** Bins around the page's view (and a region's snapshot view) sent with it. */
+    static final int LAND_PAD_BINS = 2;
+    /** Base64 run characters per land upload; the rest go with the next one. Page cap: 8 MiB. */
+    static final int LAND_UPLOAD_MAX_CHARS = 3_000_000;
+    /** Curve samples taken for a region's extent ({@link #regionViewBins}). */
+    static final int REGION_VIEW_SAMPLES = 4_096;
 
+    private static final Pattern FEED_CLOCK = Pattern.compile("\"seq\":-?\\d+,\"timestamp\":-?\\d+,");
+    /** Telemetry gauges that jitter every tick; compared with a tolerance ({@link #gaugeTolerance}). */
+    private static final Pattern FEED_GAUGE = Pattern.compile(
+            "\"(tps1m|tps5m|tps15m|msptMean|msptMax|budgetUtil|heapUsedGb|heapTotalGb)\":(-?\\d+(?:\\.\\d+)?)");
     private static final Pattern OWN_FILE = Pattern.compile("(feed|(land|path|hazard|heat)-[0-9_\\-]+)\\.js(\\.tmp)?");
     private static final Pattern FOCUS_TYPE = Pattern.compile("\"type\"\\s*:\\s*\"focus\"");
     private static final Pattern WORLD_FIELD = Pattern.compile("\"world\"\\s*:\\s*\"([^\"\\\\]{1,128})\"");
@@ -181,6 +202,9 @@ public final class EditorLiveFeed {
     /** {@code "<kind>|<layer>|<gx>|<gz>"} to version (feed seq it was written at). */
     private final Map<String, Long> groupVersions = new LinkedHashMap<>();
     private volatile Consumer<String> push;
+    /** Last head pushed and when; tick thread only. {@code null} forces the next push. */
+    private FeedSignature lastPushed;
+    private long lastPushedAt;
     private volatile EditorChannel ownChannel;
     /** Uploads text to bytebin, completing with its key; {@code null} without a byte store (local). */
     private volatile Function<String, CompletableFuture<String>> handoff;
@@ -189,7 +213,22 @@ public final class EditorLiveFeed {
     private Focus focus;
     /** {@code "rx,rz"} of focus bins still to push; tick thread only. */
     private final Set<String> landQueue = new LinkedHashSet<>();
-    private int landPaletteSent = -1;
+    /** {@link #landKey} to the bin version the page holds: snapshot embed, then uploads; tick thread only. */
+    private final Map<String, Long> landHeld = new HashMap<>();
+    /** What the session snapshot embedded at full detail: a (re)connected page holds exactly this. */
+    private final Map<String, Long> landSeed = new HashMap<>();
+    /** Set by a trusted hello or a page's {@code landReset}: {@link #landHeld} falls back to the seed. */
+    private volatile boolean landHeldReset;
+    private long lastLandUploadAt = Long.MIN_VALUE / 2;
+    /** Set on the tick thread, cleared from the upload's completion thread. */
+    private volatile boolean landUploadBusy;
+    private volatile boolean landUploadWarned;
+    /** Finished uploads: the {@code land-ref} to send ({@code null} after a failure) and the bins it marked. */
+    record LandUpload(String refJson, Map<String, Long> marked) {
+    }
+    private final Queue<LandUpload> landUploads = new ConcurrentLinkedQueue<>();
+    /** Snapshot embed of the newest hosted payload, taken by the next {@link #startHosted}. */
+    private static volatile Map<String, Long> embeddedLand = Map.of();
     private volatile boolean stopped;
     private volatile String stopReason;
     private volatile Object taskHandle;
@@ -282,6 +321,9 @@ public final class EditorLiveFeed {
                 EditorLiveFeed::configuredShapes, EditorLiveFeed::liveSurvey,
                 () -> EditorSessionManager.getInstance().buildTelemetrySnapshotJson(),
                 DEFAULT_TTL_MILLIS, System::currentTimeMillis);
+        Map<String, Long> embedded = embeddedLand;
+        embeddedLand = Map.of();
+        feed.seedLand(embedded);
         feed.attachChannel(ch, handoff);
         EditorLiveFeed old;
         synchronized (LOCK) {
@@ -298,6 +340,82 @@ public final class EditorLiveFeed {
     void attachChannel(EditorChannel ch, Function<String, CompletableFuture<String>> handoff) {
         this.ownChannel = ch;
         this.handoff = handoff;
+        // A (re)connected page holds the snapshot only: earlier uploads must go again
+        ch.onTrustedHello(() -> landHeldReset = true);
+    }
+
+    /** Bins the session snapshot embedded at full detail ({@link #landKey} to bin version); before the first tick. */
+    void seedLand(Map<String, Long> embedded) {
+        landSeed.clear();
+        if (embedded != null) landSeed.putAll(embedded);
+        landHeld.clear();
+        landHeld.putAll(landSeed);
+    }
+
+    /** Records what a hosted snapshot embedded at full detail, for the feed started next. */
+    static void noteEmbeddedLand(Map<String, Long> embedded) {
+        embeddedLand = Map.copyOf(embedded);
+    }
+
+    static String landKey(String world, int y, int rx, int rz) {
+        return world + '|' + y + '|' + rx + ',' + rz;
+    }
+
+    /**
+     * Bin rectangle {@code {minRx, minRz, maxRx, maxRz}} around a region: the extent of
+     * {@link #REGION_VIEW_SAMPLES} curve positions plus {@link #LAND_PAD_BINS}, centre-clamped to
+     * {@link #MAX_FOCUS_EDGE}, so it stays finite for any region size. Any shape: positions come from
+     * {@code locationToXZ}. {@code null} without a range or on a shape failure.
+     */
+    static int[] regionViewBins(MemoryShape<?> shape) {
+        if (shape == null) return null;
+        long minX = Long.MAX_VALUE, minZ = Long.MAX_VALUE, maxX = Long.MIN_VALUE, maxZ = Long.MIN_VALUE;
+        try {
+            long range = shape.getRange();
+            if (range <= 0) return null;
+            int n = (int) Math.min(range, REGION_VIEW_SAMPLES);
+            for (int i = 0; i < n; i++) {
+                long loc = (n == range) ? i : (long) ((double) i * (range - 1) / Math.max(1, n - 1));
+                int[] xz = shape.locationToXZ(loc);
+                if (xz == null || xz.length < 2) continue;
+                minX = Math.min(minX, xz[0]);
+                maxX = Math.max(maxX, xz[0]);
+                minZ = Math.min(minZ, xz[1]);
+                maxZ = Math.max(maxZ, xz[1]);
+            }
+        } catch (RuntimeException e) {
+            RTP.log(Level.FINE, "[editor] region extent lookup failed for " + shape.getClass().getSimpleName(), e);
+            return null;
+        }
+        if (minX > maxX) return null;
+        int[] x = clampEdge((int) Math.floorDiv(minX, 32L) - LAND_PAD_BINS, (int) Math.floorDiv(maxX, 32L) + LAND_PAD_BINS);
+        int[] z = clampEdge((int) Math.floorDiv(minZ, 32L) - LAND_PAD_BINS, (int) Math.floorDiv(maxZ, 32L) + LAND_PAD_BINS);
+        return new int[]{x[0], z[0], x[1], z[1]};
+    }
+
+    private static int[] clampEdge(int lo, int hi) {
+        if (hi - lo + 1 <= MAX_FOCUS_EDGE) return new int[]{lo, hi};
+        int c = lo + (hi - lo) / 2;
+        int a = c - MAX_FOCUS_EDGE / 2;
+        return new int[]{a, a + MAX_FOCUS_EDGE - 1};
+    }
+
+    /** {@link #regionViewBins} of every configured region with a live world, by world name. */
+    static Map<String, List<int[]>> regionViewsByWorld() {
+        Map<String, List<int[]>> out = new LinkedHashMap<>();
+        for (Region r : configuredRegions().values()) {
+            if (r == null || !(r.shape instanceof MemoryShape<?> ms)) continue;
+            RTPWorld<?> w;
+            try {
+                w = r.getWorld();
+            } catch (RuntimeException e) {
+                w = null;
+            }
+            if (w == null) continue;
+            int[] view = regionViewBins(ms);
+            if (view != null) out.computeIfAbsent(w.name(), k -> new ArrayList<>()).add(view);
+        }
+        return out;
     }
 
     public static EditorLiveFeed exportAndStart(Path indexHtml, Map<String, String> configs) throws IOException {
@@ -530,6 +648,7 @@ public final class EditorLiveFeed {
             if (regionSource != null && (seq == 1 || seq % REGION_CHECK_TICKS == 0)) syncRegions();
             publishCurves();
             publishHazards();
+            EditorExtensions.pollStates();
 
             // One survey per tick: the one serving a viewport request, else the first unfinished
             for (WorldLandSurvey survey : surveys) {
@@ -538,7 +657,9 @@ public final class EditorLiveFeed {
                 break;
             }
             writeLandGroups();
-            publishLand();
+            // Hosted: bytebin by reference (relay frames are counted, not sized); local: frames
+            if (handoff != null) publishLandUploads(now);
+            else publishLand();
 
             for (RegionTrack t : tracks) {
                 // A verified region's path is drawn from its helper on the page
@@ -563,10 +684,16 @@ public final class EditorLiveFeed {
             String head = (files || sink != null) ? feedJson(now, telemetryJson.get()) : null;
             if (files) write(liveDir.resolve(FEED_FILE), feedScript(head));
             if (sink != null) {
-                try {
-                    sink.accept("{\"type\":\"feed\",\"data\":" + head + "}");
-                } catch (RuntimeException e) {
-                    RTP.log(Level.FINE, "[editor] live feed push failed: " + e.getMessage());
+                // Only a visible change, or the heartbeat, costs a relay frame (bytesocks counts per IP)
+                FeedSignature sig = FeedSignature.of(head);
+                if (sig.changedFrom(lastPushed) || now - lastPushedAt >= FEED_HEARTBEAT_MILLIS) {
+                    lastPushed = sig;
+                    lastPushedAt = now;
+                    try {
+                        sink.accept("{\"type\":\"feed\",\"data\":" + head + "}");
+                    } catch (RuntimeException e) {
+                        RTP.log(Level.FINE, "[editor] live feed push failed: " + e.getMessage());
+                    }
                 }
             }
             consecutiveFailures = 0;
@@ -597,6 +724,8 @@ public final class EditorLiveFeed {
             if (FOCUS_TYPE.matcher(msg).find()) latestFocus = msg;
         }
         if (latestFocus == null) return;
+        // A page that just (re)connected sends focus first: give it the current head now
+        lastPushed = null;
         pageState(latestFocus);
         Matcher wm = WORLD_FIELD.matcher(latestFocus);
         Integer minRx = intField(latestFocus, "minRx");
@@ -628,6 +757,8 @@ public final class EditorLiveFeed {
             return;
         }
         if (!(root instanceof Map<?, ?> m)) return;
+        // The page lost a land upload: everything beyond the snapshot goes again
+        if (Boolean.TRUE.equals(m.get("landReset"))) landHeldReset = true;
         if (m.get("verified") instanceof List<?> list) {
             verified.clear();
             for (Object o : list) {
@@ -644,7 +775,10 @@ public final class EditorLiveFeed {
         }
     }
 
-    /** A new view: push every stored bin of it (newest view wins), centre-clamped to {@link #MAX_FOCUS_EDGE}. */
+    /**
+     * A view: push every stored bin of it (newest view wins), centre-clamped to {@link #MAX_FOCUS_EDGE}.
+     * The same view again (a reloaded or reconnected page) is pushed again unless its bins still wait.
+     */
     private void focusLand(WorldLandSurvey target, int minRx, int minRz, int maxRx, int maxRz) {
         int x0 = Math.min(minRx, maxRx), x1 = Math.max(minRx, maxRx);
         int z0 = Math.min(minRz, maxRz), z1 = Math.max(minRz, maxRz);
@@ -659,27 +793,156 @@ public final class EditorLiveFeed {
             z1 = z0 + MAX_FOCUS_EDGE - 1;
         }
         Focus f = new Focus(target.world(), target.y(), x0, z0, x1, z1);
-        if (f.equals(focus)) return;
+        if (f.equals(focus) && !landQueue.isEmpty()) return;
         focus = f;
         landQueue.clear();
+        // Hosted: publishLandUploads diffs the view against landHeld itself
+        if (handoff != null) return;
         WorldBiomeStore store = target.store();
+        List<long[]> found = new ArrayList<>();
         for (int rz = z0; rz <= z1; rz++) {
             for (int rx = x0; rx <= x1; rx++) {
-                if (landRow(store, rx, rz, f.layerY()) != null) landQueue.add(rx + "," + rz);
+                if (landRow(store, rx, rz, f.layerY()) != null) found.add(new long[]{walkOrder(rx, rz, x0 + x1, z0 + z1), rx, rz});
             }
         }
+        found.sort(Comparator.comparingLong((long[] b) -> b[0]).thenComparingLong(b -> b[1]).thenComparingLong(b -> b[2]));
+        for (long[] b : found) landQueue.add(b[1] + "," + b[2]);
+    }
+
+    /** Chunk offsets inside a bin probed for its curve position: centre, then the quarter centres. */
+    private static final int[][] BIN_PROBES = {{16, 16}, {8, 8}, {24, 8}, {8, 24}, {24, 24}};
+
+    /**
+     * Push order of a bin: inside a tracked region, the earliest curve position among its probe
+     * chunks (the walk, centre outward); others after, by Chebyshev ring around the view centre.
+     * {@code cx2, cz2} are twice the view centre in bins.
+     */
+    private long walkOrder(int rx, int rz, int cx2, int cz2) {
+        long best = Long.MAX_VALUE;
+        for (RegionTrack t : tracks) {
+            if (t.shape == null || t.range <= 0) continue;
+            try {
+                for (int[] o : BIN_PROBES) {
+                    long loc = t.shape.xzToLocation(((long) rx << 5) + o[0], ((long) rz << 5) + o[1]);
+                    if (loc >= 0 && loc < t.range && loc < best) best = loc;
+                }
+            } catch (RuntimeException e) {
+                RTP.log(Level.FINE, "[editor] curve position lookup failed for " + t.name, e);
+            }
+        }
+        if (best != Long.MAX_VALUE) return best;
+        long ring = Math.max(Math.abs(2L * rx - cx2), Math.abs(2L * rz - cz2));
+        return Long.MAX_VALUE / 2 + ring;
     }
 
     /** {@code [rx, rz, level, base64Runs]} of a read bin layer, or {@code null}. */
     private static String landRow(WorldBiomeStore store, int rx, int rz, int y) {
-        WorldBiomeStore.BinView b = store == null ? null : store.bin(rx, rz);
+        return landRow(store == null ? null : store.bin(rx, rz), y);
+    }
+
+    private static String landRow(WorldBiomeStore.BinView b, int y) {
         if (b == null) return null;
         for (WorldBiomeStore.Layer l : b.layers()) {
             if (l.y() == y && l.level() >= 0 && l.runs() != null) {
-                return "[" + rx + "," + rz + "," + l.level() + ",\"" + b64(l.runs()) + "\"]";
+                return "[" + b.rx() + "," + b.rz() + "," + l.level() + ",\"" + b64(l.runs()) + "\"]";
             }
         }
         return null;
+    }
+
+    private static String paletteJson(WorldBiomeStore store) {
+        List<String> palette = store.palette();
+        StringBuilder out = new StringBuilder("[");
+        for (int i = 0; i < palette.size(); i++) {
+            if (i > 0) out.append(',');
+            out.append(EditorLoopbackJson.quote(palette.get(i)));
+        }
+        return out.append(']').toString();
+    }
+
+    /**
+     * Hosted land (ADR-106 §5.3): bins of the page's view plus {@link #LAND_PAD_BINS} whose store
+     * version differs from what the page holds ({@link #landHeld}: snapshot embed, then uploads) go
+     * to bytebin as {@code {world, y, palette, bins: [[rx, rz, level, runs]]}}, in walk order, up to
+     * {@link #LAND_UPLOAD_MAX_CHARS}; the page gets {@code land-ref {world, y, bins, bytebinKey,
+     * sha256}}. One upload per {@link #LAND_UPLOAD_MILLIS} while bins change, none while idle. A
+     * failed upload un-marks its bins; a ref the channel skips (outbound budget) goes next tick.
+     */
+    private void publishLandUploads(long now) {
+        EditorChannel ch = ownChannel;
+        Function<String, CompletableFuture<String>> upload = handoff;
+        if (ch == null || upload == null) return;
+        if (landHeldReset) {
+            landHeldReset = false;
+            landHeld.clear();
+            landHeld.putAll(landSeed);
+        }
+        LandUpload done;
+        while ((done = landUploads.peek()) != null) {
+            if (done.refJson() != null && !ch.send(done.refJson())) break;
+            landUploads.poll();
+            if (done.refJson() == null) done.marked().forEach(landHeld::remove);
+        }
+        Focus f = focus;
+        if (f == null || landUploadBusy || now - lastLandUploadAt < LAND_UPLOAD_MILLIS) return;
+        WorldBiomeStore store = storeOf(f.world());
+        if (store == null) return;
+        int x0 = f.minRx() - LAND_PAD_BINS, x1 = f.maxRx() + LAND_PAD_BINS;
+        int z0 = f.minRz() - LAND_PAD_BINS, z1 = f.maxRz() + LAND_PAD_BINS;
+        List<long[]> dirty = new ArrayList<>();
+        Map<String, WorldBiomeStore.BinView> views = new HashMap<>();
+        for (int rz = z0; rz <= z1; rz++) {
+            for (int rx = x0; rx <= x1; rx++) {
+                WorldBiomeStore.BinView b = store.bin(rx, rz);
+                if (b == null || landRow(b, f.layerY()) == null) continue;
+                String key = landKey(f.world(), f.layerY(), rx, rz);
+                Long held = landHeld.get(key);
+                if (held != null && held == b.version()) continue;
+                views.put(key, b);
+                dirty.add(new long[]{walkOrder(rx, rz, x0 + x1, z0 + z1), rx, rz});
+            }
+        }
+        if (dirty.isEmpty()) return;
+        dirty.sort(Comparator.comparingLong((long[] b) -> b[0]).thenComparingLong(b -> b[1]).thenComparingLong(b -> b[2]));
+        StringBuilder rows = new StringBuilder();
+        Map<String, Long> marked = new HashMap<>();
+        for (long[] d : dirty) {
+            String key = landKey(f.world(), f.layerY(), (int) d[1], (int) d[2]);
+            WorldBiomeStore.BinView b = views.get(key);
+            String row = landRow(b, f.layerY());
+            if (rows.length() > 0 && rows.length() + row.length() + 1 > LAND_UPLOAD_MAX_CHARS) break;
+            if (rows.length() > 0) rows.append(',');
+            rows.append(row);
+            marked.put(key, b.version());
+        }
+        String content = "{\"world\":" + EditorLoopbackJson.quote(f.world()) + ",\"y\":" + f.layerY()
+                + ",\"palette\":" + paletteJson(store) + ",\"bins\":[" + rows + "]}";
+        String sha = EditorHttpTransport.computeSha256(content);
+        String head = "{\"type\":\"land-ref\",\"world\":" + EditorLoopbackJson.quote(f.world()) + ",\"y\":" + f.layerY()
+                + ",\"bins\":" + marked.size();
+        landHeld.putAll(marked);
+        landUploadBusy = true;
+        lastLandUploadAt = now;
+        CompletableFuture<String> fut;
+        try {
+            fut = Objects.requireNonNull(upload.apply(content), "hand-off returned null");
+        } catch (RuntimeException e) {
+            fut = CompletableFuture.failedFuture(e);
+        }
+        fut.whenComplete((key, err) -> {
+            if (err != null || key == null) {
+                // Once at WARNING (S-004): a byte store outage would repeat this every upload period
+                Level level = landUploadWarned ? Level.FINE : Level.WARNING;
+                landUploadWarned = true;
+                RTP.log(level, "[editor] land upload of " + marked.size() + " bins failed; retrying in "
+                        + (LAND_UPLOAD_MILLIS / 1000L) + " s: " + (err == null ? "no key" : err.getMessage()), err);
+                landUploads.add(new LandUpload(null, marked));
+            } else {
+                landUploads.add(new LandUpload(head + ",\"bytebinKey\":" + EditorLoopbackJson.quote(key)
+                        + ",\"sha256\":\"" + sha + "\"}", marked));
+            }
+            landUploadBusy = false;
+        });
     }
 
     private WorldBiomeStore storeOf(String world) {
@@ -688,9 +951,10 @@ public final class EditorLiveFeed {
     }
 
     /**
-     * Pushes queued focus bins as {@code land {world, y, palette?, bins: [[rx, rz, level, runs]]}},
-     * at most {@link #LAND_FRAMES_PER_TICK} frames; the palette rides along whenever it grew. A frame
-     * the channel skips (outbound budget, relay down) stays queued.
+     * Pushes queued focus bins as {@code land {world, y, palette, bins: [[rx, rz, level, runs]]}},
+     * at most {@link #LAND_FRAMES_PER_TICK} frames. Every frame carries the world's whole palette, so a
+     * page that (re)connects, or misses a frame, still names every cell. A frame the channel skips
+     * (outbound budget, relay down) stays queued.
      */
     private void publishLand() {
         EditorChannel ch = ownChannel;
@@ -701,18 +965,11 @@ public final class EditorLiveFeed {
             landQueue.clear();
             return;
         }
-        List<String> palette = store.palette();
-        StringBuilder paletteJson = new StringBuilder("[");
-        for (int i = 0; i < palette.size(); i++) {
-            if (i > 0) paletteJson.append(',');
-            paletteJson.append(EditorLoopbackJson.quote(palette.get(i)));
-        }
-        paletteJson.append(']');
+        String paletteJson = paletteJson(store);
         List<String> keys = new ArrayList<>(landQueue);
         int i = 0;
         for (int frames = 0; frames < LAND_FRAMES_PER_TICK && i < keys.size(); frames++) {
-            boolean withPalette = palette.size() != landPaletteSent;
-            int budget = Math.max(2048, LAND_FRAME_TARGET_CHARS - (withPalette ? 2 * paletteJson.length() : 0));
+            int budget = Math.max(2048, LAND_FRAME_TARGET_CHARS - 2 * paletteJson.length());
             StringBuilder rows = new StringBuilder();
             List<String> taken = new ArrayList<>();
             while (i < keys.size()) {
@@ -732,14 +989,13 @@ public final class EditorLiveFeed {
             }
             if (taken.isEmpty()) break;
             String msg = "{\"type\":\"land\",\"world\":" + EditorLoopbackJson.quote(f.world()) + ",\"y\":" + f.layerY()
-                    + (withPalette ? ",\"palette\":" + paletteJson : "") + ",\"bins\":[" + rows + "]}";
+                    + ",\"palette\":" + paletteJson + ",\"bins\":[" + rows + "]}";
             if (!EditorChannel.fitsFrame(msg)) {
                 taken.forEach(landQueue::remove);
                 RTP.log(Level.FINE, "[editor] land batch over the frame cap dropped (" + taken.size() + " bins)");
                 continue;
             }
             if (!ch.send(msg)) break;
-            if (withPalette) landPaletteSent = palette.size();
             taken.forEach(landQueue::remove);
         }
     }
@@ -770,8 +1026,8 @@ public final class EditorLiveFeed {
 
     /**
      * Hazard runs in curve space ({@link EditorCurveModel#encodeHazardRuns}, spacing marks left out),
-     * every tick: a change becomes {@code hazard-delta {region, from, to, add, remove}}; the first
-     * push, a delta over the frame cap and a resync become {@code {region, to, reset: true, runs}},
+     * every tick: a change becomes {@code hazard-delta {region, base, version, add, remove}}; the first
+     * push, a delta over the frame cap and a resync become {@code {region, version, reset: true, runs}},
      * by bytebin key ({@code bytebinKey, sha256}) when that exceeds a frame too.
      */
     private void publishHazards() {
@@ -800,8 +1056,9 @@ public final class EditorLiveFeed {
                     List<long[]> add = new ArrayList<>();
                     List<long[]> remove = new ArrayList<>();
                     EditorCurveModel.diffRuns(t.hazardRuns, next, add, remove);
-                    delta = "{\"type\":\"hazard-delta\",\"region\":" + EditorLoopbackJson.quote(t.name) + ",\"from\":" + from
-                            + ",\"to\":" + (from + 1) + ",\"add\":\"" + b64(EditorCurveModel.encodeRuns(add))
+                    // base/version, not from/to: those are channel header fields (sender, recipient)
+                    delta = "{\"type\":\"hazard-delta\",\"region\":" + EditorLoopbackJson.quote(t.name) + ",\"base\":" + from
+                            + ",\"version\":" + (from + 1) + ",\"add\":\"" + b64(EditorCurveModel.encodeRuns(add))
                             + "\",\"remove\":\"" + b64(EditorCurveModel.encodeRuns(remove)) + "\"}";
                     if (!EditorChannel.fitsFrame(delta)) delta = null;
                 }
@@ -820,7 +1077,7 @@ public final class EditorLiveFeed {
         String region = EditorLoopbackJson.quote(t.name);
         long version = t.hazardVersion;
         String runs = b64(t.hazardBytes);
-        String inline = "{\"type\":\"hazard-delta\",\"region\":" + region + ",\"to\":" + version
+        String inline = "{\"type\":\"hazard-delta\",\"region\":" + region + ",\"version\":" + version
                 + ",\"reset\":true,\"runs\":\"" + runs + "\"}";
         if (EditorChannel.fitsFrame(inline)) return ch.send(inline);
         Function<String, CompletableFuture<String>> upload = handoff;
@@ -848,7 +1105,7 @@ public final class EditorLiveFeed {
                         + (err == null ? "no key" : err.getMessage()), err);
                 return;
             }
-            ch.send("{\"type\":\"hazard-delta\",\"region\":" + region + ",\"to\":" + version
+            ch.send("{\"type\":\"hazard-delta\",\"region\":" + region + ",\"version\":" + version
                     + ",\"reset\":true,\"bytebinKey\":" + EditorLoopbackJson.quote(key) + ",\"sha256\":\"" + sha + "\"}");
         });
         return true;
@@ -1134,6 +1391,43 @@ public final class EditorLiveFeed {
         m.put("groups", groups);
         String json = EditorSessionManager.mapToJson(m);
         return json.substring(0, json.length() - 1) + ",\"telemetry\":" + (telemetry == null ? "null" : telemetry) + "}";
+    }
+
+    /**
+     * What a page would see in a feed head: everything but {@code seq} / {@code timestamp} exactly,
+     * plus the jittery telemetry gauges, which count as changed only beyond {@link #gaugeTolerance}.
+     */
+    record FeedSignature(String stable, Map<String, Double> gauges) {
+        static FeedSignature of(String head) {
+            Matcher m = FEED_GAUGE.matcher(FEED_CLOCK.matcher(head).replaceFirst(""));
+            Map<String, Double> gauges = new HashMap<>();
+            StringBuilder stable = new StringBuilder(head.length());
+            while (m.find()) {
+                gauges.put(m.group(1), Double.parseDouble(m.group(2)));
+                m.appendReplacement(stable, "\"$1\":~");
+            }
+            m.appendTail(stable);
+            return new FeedSignature(stable.toString(), gauges);
+        }
+
+        boolean changedFrom(FeedSignature sent) {
+            if (sent == null || !stable.equals(sent.stable) || !gauges.keySet().equals(sent.gauges.keySet())) return true;
+            for (Map.Entry<String, Double> g : gauges.entrySet()) {
+                double before = sent.gauges.get(g.getKey());
+                if (Math.abs(g.getValue() - before) >= gaugeTolerance(g.getKey(), before)) return true;
+            }
+            return false;
+        }
+    }
+
+    /** Smallest gauge move worth a frame: TPS 0.5, MSPT 1 ms or 20 %, tick budget 5 %, heap 0.25 GB. */
+    static double gaugeTolerance(String gauge, double sent) {
+        return switch (gauge) {
+            case "tps1m", "tps5m", "tps15m" -> 0.5;
+            case "msptMean", "msptMax" -> Math.max(1.0, Math.abs(sent) * 0.2);
+            case "budgetUtil" -> 5.0;
+            default -> 0.25;
+        };
     }
 
     private static String feedScript(String json) {

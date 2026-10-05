@@ -1,6 +1,6 @@
 # ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
 
-**Status:** Proposed
+**Status:** Not adopted - alternative considered (2026-10-05). Never implemented; the shipped run storage is the ADR-081 blocked table under the ADR-085 key space, with the ADR-092 hazard table.
 **Date:** 2026-09-05
 
 ## Context

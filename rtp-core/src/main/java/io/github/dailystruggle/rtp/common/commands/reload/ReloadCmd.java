@@ -94,6 +94,10 @@ public class ReloadCmd extends BaseRTPCmdImpl {
       // re-read on the next teleport instead of serving the stale in-memory copy (ADR-058).
       io.github.dailystruggle.rtp.api.schematic.AbstractFileSchematicPaster.clearCache();
 
+      // Re-index <dataFolder>/docs so edited shipped docs reach /rtp docs and the editor.
+      io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry.rebuildFromDataFolder(
+          RTP.serverAccessor.getPluginDirectory());
+
       String msgReloaded = msg(SystemMessages.reloaded, "");
       if (!msgReloaded.isEmpty()) {
         msgReloaded =

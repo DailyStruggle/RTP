@@ -323,9 +323,16 @@ public class RegionConfigLoader {
     }
 
     private static int parseCoord(Object o) {
-        if (o instanceof Number number) return number.intValue();
+        if (o instanceof Number number) return (int) Math.round(number.doubleValue());
         if (o == null) throw new NumberFormatException("null");
-        return (int) Math.round(Double.parseDouble(o.toString().trim()));
+        String s = o.toString().trim();
+        io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance parsed =
+            io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.parse(
+                s, io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK);
+        if (parsed != null) {
+            return (int) Math.round(parsed.toChunks());
+        }
+        return (int) Math.round(Double.parseDouble(s));
     }
 
     @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type

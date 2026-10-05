@@ -3,8 +3,11 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.PolygonMemoryShapeParams;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
@@ -310,10 +313,12 @@ public class Polygon extends Square {
     return abx * acz - abz * acx;
   }
 
+  /** {@link PolygonMemoryShapeParams} names; the bounding-square keys come from the vertices. */
+  private static final Collection<String> POLYGON_KEYS =
+      Arrays.stream(PolygonMemoryShapeParams.values()).map(Enum::name).toList();
+
   @Override
-  public java.util.Collection<String> keys() {
-    // Reuse Square's key set; polygon-specific 'vertices' is handled outside the
-    // generic CommandParameter surface (it's a structured config value).
-    return super.keys();
+  public Collection<String> keys() {
+    return POLYGON_KEYS;
   }
 }

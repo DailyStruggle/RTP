@@ -11,6 +11,9 @@
 -- ARGV[3] = expectedServerId
 -- ARGV[4] = consumedAtEpochMs (string)
 -- ARGV[5] = nowEpochMs (string, for expiry comparison)
+-- ARGV[6] = expectedHmac (string; '' when the verifier is disabled). Java
+--           verified the row's HMAC before EVALSHA; the transition only
+--           proceeds if the stored 'hmac' field still equals it (CAS).
 --
 -- Returns one of (strings, never nil):
 --   "REDEEMED"          state transitioned CLAIMED -> CONSUMED on this call
@@ -19,6 +22,7 @@
 --   "ALREADY_CONSUMED"  state was already CONSUMED or RELEASED
 --   "EXPIRED"           expiresAtMs <= nowEpochMs and state not yet terminal
 --   "BAD_STATE"         state is something other than the expected set
+--   "HMAC_INVALID"      stored hmac differs from the Java-verified ARGV[6]
 if redis.call('EXISTS', KEYS[1]) == 0 then
     return 'NOT_FOUND'
 end
@@ -38,6 +42,13 @@ if expires and expires > 0 and now and expires <= now then
 end
 if state ~= 'CLAIMED' and state ~= 'PENDING' then
     return 'BAD_STATE'
+end
+local expectedHmac = ARGV[6]
+if expectedHmac and expectedHmac ~= '' then
+    local storedHmac = redis.call('HGET', KEYS[1], 'hmac')
+    if storedHmac ~= expectedHmac then
+        return 'HMAC_INVALID'
+    end
 end
 redis.call('HSET', KEYS[1],
     'state', 'CONSUMED',

@@ -1,6 +1,6 @@
 # ADR-100 — Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-10-05 by [ADR-108](ADR-108-all-mit-licensing-pro-as-support.md): section 2 "Commercial Indemnity & Grant" withdrawn - all source is MIT)
 **Date:** 2026-10-01
 **Supersedes:** [ADR-024](ADR-024-rtp-lite-assembly-variant.md) (RTP-lite Assembly Variant)
 **Relevant Requirements:** REQ-RTP-SYS-001, REQ-RTP-F-013, REQ-RTP-S-004

@@ -2,6 +2,10 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 /**
  * Configurable parameters for the {@code Polygon} memory shape (ADR-034).
+ *
+ * <p>{@code Polygon.keys()} reports these names to the web editor's schema. The bounding-square
+ * settings (radius, centre, centerRadius, expand) are not configurable: they are derived from the
+ * vertices.</p>
  */
 public enum PolygonMemoryShapeParams {
   /**
@@ -15,18 +19,6 @@ public enum PolygonMemoryShapeParams {
    * Admin-authored vertex list as {@code [x, z]} coordinate pairs in traversal order.
    */
   vertices,
-
-  /**
-   * Optional x-coordinate of the shape's center. Defaults to the centroid of the
-   * polygon's axis-aligned bounding box when unset.
-   */
-  centerX,
-
-  /**
-   * Optional z-coordinate of the shape's center. Defaults to the centroid of the
-   * polygon's axis-aligned bounding box when unset.
-   */
-  centerZ,
 
   /**
    * A weighting factor that influences the distribution of random selections.
