@@ -3681,6 +3681,27 @@
   
   
     <li class="md-nav__item">
+      <a href="ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4285,6 +4306,11 @@
 <td><a href="ADR-105-intent-based-documentation-architecture-and-operator-routing/">ADR-105</a></td>
 <td>Intent-Based Documentation Architecture, Operator-Centric Routing, and Documentation Lifecycle Refinement (four intent pillars: Get Started, Configure, Operate, Extend; MkDocs navigation overhaul; wiki stubs targeting live docs site; untracked scratch hygiene)</td>
 <td>Accepted (2026-10-03)</td>
+</tr>
+<tr>
+<td><a href="ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a></td>
+<td>Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel (extends ADR-104; each shape supplies its curve as JavaScript via <code>MemoryShape.toJavaScript()</code> / <code>editor-curve/&lt;SimpleClassName&gt;.js</code>, with settings as inputs and optional <code>curveState()</code>; helpers run only in a sandboxed opaque-origin iframe/Worker, checked by SHA-256 and a 256-sample FNV-1a curve hash, failing closed to the sketch or tiles; typed settings form from <code>getParameters()</code>; hazards as curve-space runs with <code>uniquePlacement</code> filtered; LuckPerms-style <code>{msg, signature}</code> SHA256withRSA channel with in-game key trust, over bytesocks (hosted), the loopback (local) or in memory (tests); 32 KiB frames, 2 MiB/min outbound, bytebin hand-off, snapshot-only fallback on relay failure; generated helpers, more run layers, binary frames and a self-hosted relay deferred)</td>
+<td>Accepted (2026-10-04)</td>
 </tr>
 </tbody>
 </table>

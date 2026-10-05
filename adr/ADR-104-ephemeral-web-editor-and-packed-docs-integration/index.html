@@ -3699,6 +3699,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#46-local-live-feed-biome-distribution-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.6 Local Live Feed &amp; Biome Distribution Sources
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3758,6 +3767,27 @@
   
   <span class="md-ellipsis">
     ADR-105 — Intent-Based Documentation Architecture, Operator-Centric Routing, and Documentation Lifecycle Refinement
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
   </span>
   
 
@@ -3903,6 +3933,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#46-local-live-feed-biome-distribution-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.6 Local Live Feed &amp; Biome Distribution Sources
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3964,7 +4003,8 @@
 <strong>Date:</strong> 2026-10-03
 <strong>Authors:</strong> RTP Core Team
 <strong>Extends:</strong> <a href="../ADR-045-rtp-docs-menu-consumer/">ADR-045</a> (<code>/rtp docs</code> Menu Consumer), <a href="ADR-064-config-node-in-game-hover-doc-sync.md">ADR-064</a> (Config In-Game Hover Sync), <a href="../ADR-086-external-web-map-integration/">ADR-086</a> (External Web Map Integration), <a href="../ADR-099-visual-region-creation-and-interactive-cartography-bridges/">ADR-099</a> (Visual Region Creation and Cartography Models)
-<strong>Related REQs:</strong> S-004, S-005, S-006, S-007, REQ-RTP-F-013</p>
+<strong>Related REQs:</strong> S-004, S-005, S-006, S-007, REQ-RTP-F-013
+<strong>Extended by:</strong> <a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a> (Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel)</p>
 <hr />
 <h2 id="1-context-and-problem-statement">1. Context and Problem Statement<a class="headerlink" href="#1-context-and-problem-statement" title="Permanent link">&para;</a></h2>
 <p>Server operators and addon developers face several discoverability and usability barriers:
@@ -3975,7 +4015,7 @@
 <hr />
 <h2 id="2-decision-drivers">2. Decision Drivers<a class="headerlink" href="#2-decision-drivers" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Zero Inbound Attack Surface:</strong> No embedded HTTP daemons or listening network sockets inside the server JVM.</li>
+<li><strong>Zero Inbound Attack Surface:</strong> No embedded HTTP daemons and no externally reachable listening sockets inside the server JVM. The only listener is the local-export loopback channel (section 4.6): bound to the loopback interface, token-gated, Origin- and Host-checked, and alive only as long as its live feed.</li>
 <li><strong>Zero-Typing Philosophy:</strong> Operators should not be forced into tedious command typing; interactions should be click-driven in-game and visual in the browser.</li>
 <li><strong>Offline / Air-Gapped Autonomy:</strong> Packed documentation bundled inside the plugin jar must remain 100% accessible in-game even without internet connectivity.</li>
 <li><strong>Simultaneous Read &amp; Edit:</strong> Allow operators on remote servers to view full documentation side-by-side with an interactive configuration editor.</li>
@@ -4078,10 +4118,36 @@
 <li>Eliminates manual search friction and screen space underutilization in wide-screen browser panels by providing thorough, website-quality documentation side-by-side with the editor.</li>
 </ul>
 </li>
+<li><strong>Inline Syntax, Schema Diagnostics &amp; Code Editor Ergonomics:</strong><ul>
+<li>The configuration code editor provides a line-number gutter kept aligned with the editor (including its horizontal scrollbar) and client-side schema diagnostics debounced to 150 ms after typing stops, without external npm or CDN dependencies (preserving single-file air-gapped <code>file:///</code> compliance).</li>
+<li><strong>Schema Validation &amp; Gutter Diagnostics:</strong> The active YAML buffer is checked against:</li>
+<li>the server's registered shapes and vertical adjustors with typed parameters (session payload <code>schema</code>: <code>{shape|vert: {NAME: {key: {type, default, options}}}}</code>, the type taken from each implementation's default value as <code>integer | number | boolean | enum | list | string</code>; includes add-on and Chunky shapes; built-in names until a session loads), validated by block (<code>shape.name</code> vs <code>vert.name</code>) and for any key annotated <code>@source: shape|vert</code>. Parameter types and enum options drive the value checks inside shape / vert blocks; comment annotations override them;</li>
+<li>the shipped files' <code>@type</code> / <code>@options</code> / <code>@range</code> annotations (enums, booleans, numeric ranges);</li>
+<li>duplicate keys at any depth, unknown keys inside shape / vert blocks and at the top level of single-instance files, and unrecognised unit suffixes. A <code>POLYGON</code> block warns on <code>radius</code>, <code>centerRadius</code>, <code>centerX</code> and <code>centerZ</code>, which a polygon infers from its vertices.</li>
+<li>Errors and warnings are marked in the gutter (escaped hover text, every message per line), listed in the doc tracker, and summarised for every staged file in the staging diff. Committing with schema errors requires explicit confirmation.</li>
+<li><strong>Unit Slider &amp; Conversion Chips:</strong> When the cursor is on a spatial value (<code>b</code>, <code>c</code>, <code>r</code>, <code>km</code>, <code>mi</code>, e.g. <code>256c</code>, <code>5r</code>), an in-editor chip and the doc tracker show the block conversion (e.g. $256\text{c} = 4{,}096\text{ blocks}$, $5\text{r} = 2{,}560\text{ blocks}$). A slider rewrites the value in its unit, and converter badges rewrite it in another unit where the conversion is exact. Duration suffixes (<code>s</code>, <code>m</code>, <code>h</code>, <code>d</code>, <code>t</code>, <code>ms</code>) are not treated as distances.</li>
+</ul>
+</li>
+<li><strong>Visual Polygon Edge Constraints &amp; Snapping Controls:</strong><ul>
+<li>The Visual Region Editor canvas provides snap-to-grid controls (Free 1-block, Chunk $16 \times 16$, and Region File $512 \times 512$). With a polygon active, the grid is drawn anchored at world $(0, 0)$.</li>
+<li>Polygon vertices are absolute world block coordinates, drawn in the same frame as the region-file land layer. During vertex dragging they snap to the active grid, so polygon edges align with Anvil/Linear region-file and chunk boundaries without manual coordinate entry. The pointer readout shows world coordinates.</li>
+<li>A polygon's bounding square (radius and centre) is derived from its vertices and never stored or written to YAML.</li>
+<li>Canvas geometry is written into the region file's existing <code>shape:</code> block, and only after the canvas geometry changes: <code>name</code> and the geometry keys the shape takes (registry parameters; <code>radius</code> / <code>centerRadius</code> for radial shapes, <code>radius</code> / <code>radius2</code> semi-axes for <code>ELLIPSE</code>, <code>width</code> / <code>height</code> full extents for <code>RECTANGLE</code>, <code>vertices</code> for <code>POLYGON</code>) are set in place. Geometry keys the shape does not take are removed, and every other key and comment is kept. An inherited <code>shape: "@config"</code> becomes a local block only after a canvas edit. Geometry typed in the config editor becomes the canvas model, so staging never writes stale values back.</li>
+<li>The view scale is fixed between fits: dragging vertices or editing the shape shall not rescale the map. Only Reset View and switching region refit and recentre on the region. Wheel zoom is proportional to scroll distance, and middle-button panning suppresses the browser's autoscroll.</li>
+</ul>
+</li>
+<li><strong>Bi-directional Focus &amp; Location Synchronization:</strong><ul>
+<li>Provides bi-directional navigation between the Visual Region Editor and the YAML Config workspace:</li>
+<li><code>[Jump to YAML ↗]</code> writes the region's current (possibly unsaved) geometry into <code>definitions/regions/&lt;name&gt;.yml</code>, opens it in <code>#panel-configs</code>, and selects the selected vertex's <code>- [x, z]</code> entry, or the top-level <code>shape:</code> key when no vertex is selected (resolved through the YAML structure, never a text search).</li>
+<li>Conversely, placing the cursor within a region definition (<code>definitions/regions/&lt;name&gt;.yml</code> or <code>regions/&lt;name&gt;.yml</code>) in <code>#panel-configs</code> surfaces a <code>[View on Map 🗺️]</code> action that switches to <code>#panel-regions</code> and loads that region through the normal region selector, centred and active. Other files show no map action.</li>
+<li>The doc tracker resolves a key by its enclosing block (<code>shape.name</code> and <code>vert.name</code> show different docs).</li>
+</ul>
+</li>
 <li><strong>Bi-directional Synchronization &amp; Back-Propagation:</strong></li>
-<li><strong>Outbound Web Commits:</strong> If an ephemeral WebSocket/long-poll channel is open between server and byte store, clicking <strong>"Hot-Apply"</strong> in the browser transmits the mutation directly, hot-reloading server regions without requiring any manual command pasting.</li>
+<li><strong>Signed two-way channel (<a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a> section 5):</strong> <code>/rtp editor</code> opens a channel on a WebSocket relay (bytesocks, default <code>https://bytesocks.lucko.me</code>, configurable next to the bytebin URL), joins it outbound, and puts <code>channel: {relay, id, pluginKey}</code> in the snapshot. Every message is signed (<code>{msg, signature}</code>, SHA256withRSA). The plugin acts on page edits only from browser keys the operator has trusted in game (<code>/rtp editor trust &lt;nonce&gt;</code>). If the relay can't be created, the session is snapshot-only and the reason is logged (S-004).</li>
+<li><strong>Outbound Web Commits:</strong> With the channel connected and the browser key trusted, clicking <strong>"Hot-Apply"</strong> in the browser transmits the mutation directly (<code>apply</code> / <code>apply_ack</code>, bytebin hand-off above the 32 KiB frame cap), hot-reloading server regions through the same validation pipeline as <code>/rtp editor apply</code> without any manual command pasting.</li>
 <li><strong>Command Fallback (<code>/rtp editor apply &lt;token&gt;</code>):</strong> In offline, restricted, or disconnected environments, clicking "Save" generates the <code>/rtp editor apply &lt;token&gt;</code> command for copy-pasting into chat or console.</li>
-<li><strong>In-Game Back-Propagation:</strong> When mutations occur in-game (e.g., via <code>/rtp region set</code>, WorldEdit selection <code>/rtp region fromselection</code>, or in-game book GUI), the server broadcasts a delta to the active web session, updating the browser canvas and staging diff in real time to prevent stale-overwrite conflicts.</li>
+<li><strong>In-Game Back-Propagation:</strong> When mutations occur in-game (e.g., via <code>/rtp region set</code>, WorldEdit selection <code>/rtp region fromselection</code>, or in-game book GUI), the server broadcasts a delta to the active web session, updating the browser canvas and staging diff in real time to prevent stale-overwrite conflicts. Curve changes (<code>curve</code>, for example after <code>expand</code>), hazard run deltas (<code>hazard-delta</code>) and focus-driven land bins (<code>land</code>) travel over the same channel (ADR-106 section 5.3).</li>
 <li><strong>Commit &amp; Verification (<code>/rtp editor apply &lt;token&gt;</code> or Direct WebSocket Push):</strong></li>
 <li>RTP worker thread receives payload, verifies token authorization, compares schema diffs, backs up dirty files, updates config instances, and triggers hot-reload.</li>
 </ol>
@@ -4098,21 +4164,27 @@
 2. <strong>Integrated Visualization Overlays:</strong>
    - <strong>Hazard &amp; Rejection Overlay (<code>/rtp visualization bad-locations</code>):</strong> Visualizes rejected candidate chunks (oceans, steep terrain, claim exclusions) to guide boundary placement.
    - <strong>Pregenerated Land Map via Chunk-Resolution Biome Data (<code>/rtp visualization biomes</code>):</strong>
-     - Rather than shipping high-overhead block-level voxel data, the visual editor renders a map of actually generated land using <strong>chunk-resolution biome data</strong> derived from generated chunks on disk (<code>.mca</code> presence and cached NBT biomes, adhering to S-005).
+     - Rather than shipping high-overhead block-level voxel data, the visual editor renders a map of actually generated land using <strong>chunk-resolution biome data</strong> read from region files on disk (S-005: no chunk loads). Land data exists to decide where a region goes, so it covers the whole world and shall never be clipped to a configured region's bounds. Export generation shall read no region file; the world-wide survey and its tiling are specified in section 4.6.
      - Biome data is encoded at native chunk granularity ($16 \times 16$ block column per sample), which reflects real generation bounds without wasting bandwidth on redundant block-level geography.
      - <strong>Throttled Progressive Streaming (&gt; 5 FPS Budget):</strong> To prevent client-side UI freezes and ensure the interactive canvas and staging diff stay strictly above $5\text{ FPS}$ during heavy streaming across large worlds, biome chunk batches are sent incrementally ("a little at a time") over WebSocket / long-poll frames, budgeted against client frame rendering and browser event loop times.
      - Provides a lightweight 2D cartography backdrop resembling BlueMap / Dynmap explored-terrain boundaries or in-game biome maps, allowing operators to visually align RTP region radii, donut centers, and polygon vertices against pregenerated world borders.
-   - <strong>Candidate Dispersion Heatmap (<code>/rtp visualization heatmap</code>):</strong> Audits teleport distribution and confirms uniform Archimedean spiral dispersion.
-   - <strong>Spiral Walk Tracer (<code>/rtp visualization walk-path</code>):</strong> Verifies 1D spiral curve coverage across custom polygon geometry (ADR-001).</p>
+   - <strong>Landing Heatmap (<code>/rtp visualization heatmap</code>):</strong> Successful teleport landings counted per chunk (<code>LandingHeatmap</code>, in memory, bounded per region) audit the real distribution. The export carries the per-region total; per-chunk counts stream as live heat tiles (section 4.6).
+   - <strong>Spiral Walk Tracer (<code>/rtp visualization walk-path</code>):</strong> Verifies 1D spiral curve coverage across custom polygon geometry (ADR-001).
+     - The walk-path payload shall declare <code>units: "block"</code> and carry <code>points</code>: a seed polyline of absolute block coordinates (chunk centres) sampled at even intervals along the full curve range, at most 2,048 vertices. The seed is drawn until full-resolution path tiles (section 4.6) cover the view; it is not the path's final resolution. The export carries no other path data: the full path is produced over time as live tiles.
+     - The hazard RLE payload shall declare <code>units: "chunk"</code>; the client scales its bounds to blocks before drawing.
+     - The client shall draw server-computed layers only for the geometry they were computed from. The page carries no built-in curve model: curve code comes only from the payload, as each shape's <code>toJavaScript()</code> helper, run in a sandboxed iframe and verified against a 256-sample hash (ADR-106 section 4). A region drawn from its helper carries no walk-path seed and no 2D hazard RLE; its hazards are curve-space runs (ADR-106 section 4.7). For shapes without a verified helper, after a local shape edit the page requests the walk path of the edited geometry over the channel (section 4.6 item 6), and without the channel it states that the path shows applied geometry only.
+     - Shape names, their parameters and their types come only from the payload's <code>schema</code> (the registered shape and vertical-adjustor factories, add-on shapes included); the page shall hold no built-in shape list, and without a session it skips name checks.</p>
 <h3 id="44-local-self-contained-html-production-file-portable-air-gap-fallback-template-ssot">4.4 Local Self-Contained HTML Production (<code>file:///</code> Portable Air-Gap Fallback) &amp; Template SSOT<a class="headerlink" href="#44-local-self-contained-html-production-file-portable-air-gap-fallback-template-ssot" title="Permanent link">&para;</a></h3>
 <p>In environments where outbound internet access is restricted, the byte store is unreachable, or the operator prefers working completely locally:
 - <code>/rtp editor local</code> (or <code>/rtp docs export</code>) produces a standalone, self-contained single-file HTML bundle directly under <code>&lt;dataFolder&gt;/editor/index.html</code>.
-- The HTML bundle embeds the entire documentation set and the reactive configuration editor along with active config JSON directly in a <code>&lt;script&gt;</code> data block.
+- The HTML bundle embeds the reactive configuration editor and, in a <code>&lt;script&gt;</code> data block, the session payload: active configs, the plugin's documentation set, shipped default configs and field docs.
 - <strong>Single Source of Truth (SSOT) &amp; MkDocs Build Pipeline:</strong>
   - The canonical web editor application template source code resides exclusively under <code>docs/editor/index.html</code> within the tracked documentation tree.
   - The <code>site/</code> folder is a purely generated, gitignored output artifact produced by <code>mkdocs build</code> (<code>mkdocs.yml</code> specifies <code>docs_dir: docs</code>). Source edits shall never target <code>site/</code>.
-  - For runtime plugin operations, the single-file HTML template is packaged as a resource (<code>editor/index.html</code>) within the plugin jar distribution. At runtime, <code>EditorSessionManager</code> loads this packed template and hydrates placeholder tokens (<code>/*__CONFIG_DATA__*/</code>, <code>/*__DOCS_DATA__*/</code>, <code>/*__TELEMETRY_SNAPSHOT__*/</code>) to produce <code>&lt;dataFolder&gt;/editor/index.html</code> dynamically, eliminating duplicate hardcoded HTML markup in compiled Java classes.
-- <strong>Zero server network listener required:</strong> The operator simply downloads <code>index.html</code> via SFTP/FTP/control panel or opens it on their local machine via <code>file:///</code>.
+  - For runtime plugin operations, the single-file HTML template is packaged as a resource (<code>editor/index.html</code>) within the plugin jar distribution. At runtime, <code>EditorSessionManager</code> loads this packed template and inserts one inert <code>&lt;script type="application/json" id="rtp-embedded-payload"&gt;</code> block before <code>&lt;/head&gt;</code> carrying configs, telemetry, region models, schema, live docs and the packaged editor data (every <code>&lt;</code> escaped), producing <code>&lt;dataFolder&gt;/editor/index.html</code> without duplicate HTML markup in compiled Java classes. A missing template shall fail the export with a logged error (S-004), never a reduced fallback page.
+  - The template shall bundle no configs, docs, field docs, search thesaurus, region geometry or demo telemetry; everything it shows comes from the payload. Telemetry cards show <code>-</code> and the default region stays shapeless until the payload or live feed supplies them. <code>scripts/generate_web_editor.py</code> generates <code>docs/editor/editor-data.json</code> (<code>shipped</code> default configs, <code>docTracker</code> field docs and <code>synonyms</code>, copied from the hand-maintained <code>docs/editor/search-synonyms.json</code>), packaged beside the template as <code>editor/editor-data.json</code> and sent in every payload; <code>--check</code> fails when it is stale. Markup and scripts are edited in <code>docs/editor/index.html</code> directly.
+- <strong>No reachable server listener required:</strong> The operator simply downloads <code>index.html</code> via SFTP/FTP/control panel or opens it on their local machine via <code>file:///</code>. The optional loopback channel (section 4.6) only adds two-way features when the browser runs on the server machine.
+- <strong>Same snapshot, same protocol (<a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a>):</strong> the embedded payload uses exactly the uploaded snapshot format, including <code>curveCode</code>, per-region <code>curve</code> and <code>hazardRuns</code>, so a <code>file:///</code> copy draws the full path offline. Its <code>channel</code> block names the loopback address as the relay, and the page runs the same signed handshake and messages as a hosted session. A local session is therefore a faithful test of the hosted flow.
 - Changes made in the offline editor generate a copy-pasteable export snippet or an <code>/rtp editor apply &lt;checksum&gt;</code> token using an in-place file swap (<code>&lt;dataFolder&gt;/editor/pending.json</code>).</p>
 <h3 id="45-intelligent-configuration-discovery-hybrid-semantic-search-engine">4.5 Intelligent Configuration Discovery &amp; Hybrid Semantic Search Engine<a class="headerlink" href="#45-intelligent-configuration-discovery-hybrid-semantic-search-engine" title="Permanent link">&para;</a></h3>
 <p>To surpass the in-game book editor's basic substring search (<code>ConfigSearchResultsBuilder</code>) and solve config discoverability across dozens of configuration files and hundreds of keys:
@@ -4120,7 +4192,7 @@
    - Search indexes three distinct semantic dimensions simultaneously:
      - <strong>AST Nodes &amp; Keys:</strong> Exact and partial config paths across all loaded files (<code>configs</code>), e.g., <code>shape.centerRadius</code>, <code>economy.price</code>, <code>teleport-delay</code>.
      - <strong>Values &amp; Enum Identifiers:</strong> Configured scalar values and enum options, e.g., <code>ACCUMULATE</code>, <code>LINEAR</code>, <code>world_nether</code>, <code>true</code>.
-     - <strong>Contextual Schema &amp; Manual Prose:</strong> Canonical descriptions, units, valid ranges, and gotchas extracted in <code>docTrackerDb</code> and bundled markdown manuals.
+     - <strong>Contextual Schema &amp; Manual Prose:</strong> Canonical descriptions, units, valid ranges, and gotchas extracted in <code>docTrackerDb</code> and the markdown manuals, both received in the session payload.
 2. <strong>Relevance Scoring &amp; Fuzzy Matching:</strong>
    - Evaluates search candidates against a multi-tier relevance scoring matrix:
      - Exact key name match (100 points).
@@ -4129,8 +4201,8 @@
      - Fuzzy Levenshtein match with typo tolerance (40 points).
      - Enum / scalar value match (30 points).
      - Documentation title or prose match (15 points).
-3. <strong>Baked-In Domain Thesaurus (Deterministic Offline Baseline):</strong>
-   - A curated domain dictionary is embedded directly in the web editor template, mapping player and operator vernacular to concrete configuration targets (e.g., <code>"money"</code>, <code>"cost"</code>, <code>"fee"</code> $\rightarrow$ <code>price</code>, <code>economy.yml</code>; <code>"height"</code>, <code>"altitude"</code> $\rightarrow$ <code>minY</code>, <code>maxY</code>, <code>vert</code>; <code>"lag"</code>, <code>"tps"</code> $\rightarrow$ <code>cacheCap</code>, <code>backlogCacheCap</code>, <code>activeChunkCap</code>).
+3. <strong>Packaged Domain Thesaurus (Deterministic Offline Baseline):</strong>
+   - A curated domain dictionary (docs/editor/search-synonyms.json, sent as synonyms in every payload via editor-data.json) maps player and operator vernacular to concrete configuration targets (e.g., <code>"money"</code>, <code>"cost"</code>, <code>"fee"</code> $\rightarrow$ <code>price</code>, <code>economy.yml</code>; <code>"height"</code>, <code>"altitude"</code> $\rightarrow$ <code>minY</code>, <code>maxY</code>, <code>vert</code>; <code>"lag"</code>, <code>"tps"</code> $\rightarrow$ <code>cacheCap</code>, <code>backlogCacheCap</code>, <code>activeChunkCap</code>).
    - Ensures instant, zero-latency ($&lt; 2\text{ ms}$) search responses even when running completely offline in air-gapped environments (<code>file:///</code>).
 4. <strong>Progressive Remote Query Expansion (Online Mode):</strong>
    - When the client browser is connected to the internet (<code>navigator.onLine</code>), queries are debounced ($250\text{ ms}$) and optionally enriched via remote linguistic query expansion (e.g. Datamuse API <code>ml=</code> / "means like").
@@ -4141,18 +4213,71 @@
      - <strong>DOM &amp; Cross-Site Scripting (XSS) Prevention:</strong> Remote search terms are used strictly as passive comparison needles against existing local AST keys. Any dynamic rendering of returned terms or query labels is strictly HTML-escaped (<code>escapeHtml()</code>) before DOM insertion, preventing script tag injection, iframe breakout, or attribute escape vectors.
      - <strong>Database &amp; Query Injection Prevention:</strong> Ingested remote terms are restricted to matching a strict alphanumeric identifier regex (<code>^[a-z][a-z\-]{1,23}$</code>). Any input containing SQL delimiters (quotes, semicolons, dashes <code>--</code>, comments <code>/* */</code>, union/select statements) or YAML/JSON meta-characters (<code>{</code>, <code>}</code>, <code>[</code>, <code>]</code>, <code>:</code>, <code>"</code>, <code>'</code>) is rejected and dropped immediately, ensuring remote data can never pollute persistent storage, database migration scripts, or configuration ASTs.
      - <strong>Silent Fail-Closed Execution:</strong> Any network timeout, HTTP error, malformed JSON, or CORS restriction is silently trapped without interrupting or stalling local search operations.</p>
+<h3 id="46-local-live-feed-biome-distribution-sources">4.6 Local Live Feed &amp; Biome Distribution Sources<a class="headerlink" href="#46-local-live-feed-biome-distribution-sources" title="Permanent link">&para;</a></h3>
+<p>A local export is a snapshot; operators placing regions need land data where no teleport has sampled yet, and data that changes as the server runs. Data that grows over time shall be produced by the live feed, never by export generation, and shall be shipped in one compact format end to end.
+1. <strong>Bin format (<code>BiomeBinCodec</code>, shared by store, wire and page):</strong>
+   - Outer layer: one bin per region file (32 x 32 chunks), keyed by its square-spiral ring index around region file (0, 0); keys are dense and nearest-first order is key order.
+   - Inner layer: an order-5 Hilbert curve over the bin's 1,024 chunks; cells are <code>(value, length)</code> unsigned-varint runs along the curve covering all 1,024 cells. Value 0 is unknown.
+   - Detail levels are aligned curve stretches: level 0 = 1 sample per bin, level 1 = 64 samples (4 x 4 chunk stretches), level 2 = every chunk. A coarse sample fills its stretch; finer samples overwrite it in place, so every level uses the same encoding (~50-150 bytes per bin).
+   - The page keeps the same bytes (<code>Uint8Array</code>), decodes a bin only to paint it into a group atlas (16 x 16 bins per canvas, each bin at the power-of-two pixel size of its screen size, at most 32) cached while on screen, and computes histograms from runs. Atlases are painted under a 12 ms per-frame budget, view centre first, so a whole-world view fills progressively instead of blocking the page. Shared vectors in <code>BiomeBinCodecTest</code> and the page decoder keep both sides identical.
+2. <strong>World biome store (<code>WorldBiomeStore</code>):</strong>
+   - One store per world, at most 65,536 bins and 4 sample-Y layers. Each layer records its detail level; each bin records the <code>.mca</code> modification time it was read at.
+   - Lookups take the nearest stored layer within 16 blocks of the requested Y and report the Y used; a request with no layer in tolerance starts a survey at that Y.
+   - Persisted per world as <code>&lt;dataFolder&gt;/cache/biomes/&lt;world&gt;.rbs</code> (gzip, atomic replace), saved periodically and when the feed stops. A changed <code>.mca</code> mtime keeps the bin drawn but marks it for the full-detail pass only. A corrupt or foreign file is logged and ignored (S-004).
+3. <strong>World land survey (<code>WorldLandSurvey</code>):</strong>
+   - One survey per loaded world with configured regions at Y 64, covering <strong>every region file the world has on disk</strong> (<code>RTPWorld.listRegionFiles()</code>, directory listing only, off-tick), nearest the origin first. An adapter that cannot list falls back to probing a disc of 64 region files around the origin. At most 16,384 region files per world; reaching the cap is reported as truncated.
+   - Three passes over the whole world, level 0 then 1 then 2, so the map fills first and sharpens later. Bins already at a level with an unchanged mtime are skipped without a read. A file whose centre chunk is not generated is sampled at level 1 in the first pass.
+   - Reads go through <code>RTPWorld.sampleBiomesInRegionFile(rcx, rcz, y, indices)</code>: the adapter reads only the region header and the sampled chunks' sectors (<code>AnvilRegionSampler</code>), disk only, off the tick thread (S-005). The per-tick budget counts chunk decodes (2,048) and bin visits (4,096), not files (rule F-002).
+   - Viewport requests (item 6) queue up to 1,024 visible bins that are taken to full detail before the world pass continues.
+   - Biome ids are normalised to namespaced lowercase (<code>minecraft:plains</code>, <code>iris:ash</code>).
+4. <strong>Live feed (<code>EditorLiveFeed</code>, <code>/rtp editor local</code> and the, per-world palettes, per-region rows (session-unique id, path progress, landing total, learned biome histogram) and the version of every tile group.
+   - Tile groups are location-keyed and rewritten only when their content changed, written before the head lists their new version:
+     - Land: <code>live/land-&lt;w&gt;_&lt;y&gt;_&lt;gx&gt;_&lt;gz&gt;.js</code>, the stored bins of 16 x 16 region files, <code>[rx, rz, level, base64Runs]</code>.
+     - Hazards: <code>live/hazard-&lt;r&gt;_&lt;gx&gt;_&lt;gz&gt;.js</code>, the region's learned bad-location memory per chunk (<code>FailTypes</code> ordinal + 1), rescanned round-robin from memory (<code>HazardTiles</code>).
+     - Landings: <code>live/heat-&lt;r&gt;_&lt;gx&gt;_&lt;gz&gt;.js</code>, bucket <code>1 + floor(log2(count))</code> per chunk from <code>LandingHeatmap</code>.
+     - Walk path: <code>live/path-&lt;r&gt;_&lt;tx&gt;_&lt;tz&gt;.js</code> per 32 x 32 chunk tile (each chunk's curve location, <code>-1</code> off the curve), named by immutable <code>live/path-N.js</code> index batches.
+   - Region ids: a new or reshaped region (new shape object or range) gets a new id and restarts its path and hazard producers; the old id's files are deleted, and the page drops ids that leave the head.
+   - The page re-injects <code>feed.js?seq=</code> as a script tag - the only cross-file read browsers permit from <code>file://</code> - and loads only groups that intersect its viewport and are newer than what it loaded (at most 8 requests in flight). Feed files contain passive JSON only.
+   - The feed shall stop 30 minutes after the export, on plugin disable, when superseded by a newer export, or after 5 consecutive write failures; every stop is logged with its reason and the final head tells the page why (S-004). Directory preparation deletes only files matching the feed's own names.
+5. </strong>Export embedding:<strong>
+   - Every export embeds <code>worldBiomes</code>, the bins already in the store, nearest the origin first, so the page opens with the map filled. Local exports embed stored detail up to ~4 MB of base64 per world; online byte-store sessions (immutable, no live feed) embed each bin collapsed to one run, at most 16,384 bins per world.
+   - Region models carry the export-time hazard stream, the learned biome histogram, the landing total and the walk-path seed only. Regions whose shape ships a curve helper carry <code>curve</code> and curve-space <code>hazardRuns</code> instead of the seed and the hazard stream (ADR-106 section 4.4); hosted sessions receive live updates over the relay channel (ADR-106 section 5).
+6. </strong>Loopback channel (<code>EditorLoopbackChannel</code>, local exports):<strong> carries the signed editor protocol of <a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a> section 5 through <code>LoopbackTransport</code>: the same envelope, handshake, trust and message types as the hosted relay, with the 32 KiB frame cap. The rules below stay as the socket's own defence in depth.
+   - A non-blocking RFC 6455 listener bound to the loopback interface on an ephemeral port, driven by an <code>RTP.scheduler</code> timer (no own threads), opened per export and stopped with the feed. The export embeds its <code>ws://127.0.0.1:&lt;port&gt;/rtp-editor-ws?token=&lt;128-bit hex&gt;</code> address.
+   - Handshake rules: loopback peer, loopback <code>Host</code>, Origin absent / <code>null</code> / localhost only, constant-time token compare, at most 4 clients; masked text frames up to 256 KiB, a 2 MiB outbound cap per client.
+   - Server to page: each feed head is pushed as <code>{type: "feed"}</code>, so updates arrive without waiting for the next poll.
+   - Page to server: <code>{type: "focus", world, y, minRx, minRz, maxRx, maxRz}</code> (debounced view rectangle) prioritises those bins; <code>{action: "apply", token, files}</code> Hot-Applies through the same validation pipeline as <code>/rtp editor apply</code> and is acknowledged with <code>apply_ack</code>; <code>{type: "walkpath", region, sig, shape: {name, key: YAML scalar, vertices}}</code> asks for the walk path of edited geometry (<code>EditorWalkPathPreview</code>).
+   - Walk-path previews: the shape is built from the registered factory prototype (clone, scalar settings, polygon vertices) as a region file would build it, with no world access, and answered to the requesting client only as <code>{type: "walkpath", region, sig, data}</code> (the 2,048-point seed) or <code>{..., error}</code>. At most 4 per feed tick, newest request per client and region; messages up to 64 KiB, 1,024 vertices, scalar values only. The page keeps a reply only while its geometry still matches <code>sig</code>.
+   - Without the channel (browser on another machine, channel failed to open: logged), the page works one-way from <code>feed.js</code>.
+7. </strong>Walk path tiles (<code>WalkPathTiles</code>):<strong> skipped, together with <code>HazardTiles</code>, for regions whose curve helper the page reports verified (ADR-106 section 4.7); they remain the local fallback for every other region.
+   - One producer per configured region with a curve-backed shape. Tiles covering the shape's chunk bounds are computed nearest the shape centre first, 16 per tick, using <code>MemoryShape.xzToLocation</code> / <code>locationToXZ</code> only (pure math, no world access). A chunk is on the curve when its location is in range and maps back to it, or to a direct neighbour.
+   - Capped at 4,096 tiles (4.2M chunks) per region; reaching the cap is reported as truncated.
+   - The page joins each on-curve chunk to the chunk holding the next curve location, so the path is exact at any zoom without the browser holding the whole curve.
+8. </strong>Biome distribution source order (Visual Region Editor):**
+   1. Biomes learned by the region's own teleport attempts (<code>MemoryShape</code> biome cache; refreshed from the live feed), when present.
+   2. Otherwise, chunks of the loaded land bins that fall inside the current, possibly unsaved, shape - at the detail each bin reached, coarse bins labelled as estimates - recomputed (debounced 200 ms, cached per shape and store version) on every shape edit and land update, labelled with the chunk count and the share of the shape's area covered.
+   3. Otherwise, when nothing inside the shape is generated, the distribution of all surveyed land of the world, labelled as such, to guide placement.
+   - The source line shall always state which source is shown; an empty list states which inputs were missing.</p>
 <hr />
 <h2 id="5-consequences">5. Consequences<a class="headerlink" href="#5-consequences" title="Permanent link">&para;</a></h2>
 <h3 id="positive">Positive<a class="headerlink" href="#positive" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Simultaneous Read &amp; Edit:</strong> Solves the screen-lock limitation of in-game Minecraft menus.</li>
-<li><strong>Zero Firewall / Port Hassles:</strong> 100% outbound HTTPS; runs on any shared host or personal PC.</li>
+<li><strong>Zero Firewall / Port Hassles:</strong> 100% outbound HTTPS; runs on any shared host or personal PC. The loopback channel is never reachable from another machine.</li>
+<li><strong>Hosted live updates (ADR-106):</strong> hosted sessions get the complete walk path and hazards from the snapshot at any zoom, plus live curve changes, hazard deltas, focus-driven land detail, walk-path previews and Hot-Apply over the signed relay channel, with no inbound listener.</li>
+<li><strong>Fast, persistent land map:</strong> coarse-first passes and sampled region reads fill the world map in minutes; the persisted store makes re-exports and restarts re-read only changed region files.</li>
 <li><strong>Air-Gapped Reliability:</strong> In-game book viewer works fully offline when internet or web browser is unavailable.</li>
 <li><strong>High Usability:</strong> No tedious manual typing of config paths or parameters.</li>
 </ul>
 <h3 id="negative-trade-offs">Negative / Trade-offs<a class="headerlink" href="#negative-trade-offs" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Requires external byte store endpoint for ephemeral session transport. If external network is down, operators fall back to the in-game book editor (<code>/rtp admin</code>) and in-game packed docs (<code>/rtp docs</code>).</li>
+<li>Hosted live updates depend on a third-party WebSocket relay (<code>bytesocks.lucko.me</code> by default, configurable), as uploads depend on bytebin. If the relay can't be reached, the session stays snapshot-only with a logged reason and a page badge. Each new browser key needs one in-game trust action (ADR-106 section 5.2).</li>
+<li>The local <code>feed.js</code> files (section 4.6) exist only for local exports opened from the server's own <code>editor/</code> folder; a copied or downloaded <code>index.html</code> shows WAITING FOR FEED and stays a snapshot (still drawing verified curves from its embedded helpers). The loopback channel additionally needs the browser on the server machine.</li>
+<li>The survey samples biomes at a fixed Y (64 by default), not the surface heightmap; mountain chunks may report cave biomes. Ungenerated land carries no biome data.</li>
+<li>Until the full-detail pass reaches a bin, its biomes are estimates from 1 or 64 samples per region file.</li>
+<li>The loopback channel is a listening socket, a deliberate exception to Option 1's rejection, bounded to loopback, a per-export token and the feed's lifetime.</li>
+<li>Disk costs: the biome store (~1-3 MB per world, gzip) persists under <code>cache/biomes/</code>; live tiles in <code>editor/live/</code> (land groups, overlay groups, up to ~4,096 path tiles per region) are deleted when the next export prepares the directory. Landing counts are in memory only and reset on restart.</li>
 </ul>
 
 

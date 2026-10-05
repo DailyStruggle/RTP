@@ -3603,6 +3603,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3652,6 +3673,15 @@
   <a href="#purpose" class="md-nav__link">
     <span class="md-ellipsis">
       Purpose
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-setups" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common setups
     </span>
   </a>
   
@@ -3847,6 +3877,9 @@ Marketplace listing metadata (current, for SEO reference):
 # LeafRTP-Pro - Random Teleport for Folia, Paper, Spigot, Fabric, and NeoForge
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
+[![Java](https://img.shields.io/badge/Java-21%2B-blue)](https://adoptium.net/)
+[![Platforms](https://img.shields.io/badge/Platforms-Paper%20%7C%20Folia%20%7C%20Fabric%20%7C%20NeoForge%20%7C%20Velocity-orange)](#chunk-loading-by-platform)
+[![Web Editor](https://img.shields.io/badge/Tooling-Visual%20Web%20Editor-2ea44f)](https://dailystruggle.github.io/RTP/editor/)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=DailyStruggle_RTP&metric=coverage)](https://sonarcloud.io/summary/overall?id=DailyStruggle_RTP)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=DailyStruggle_RTP&metric=bugs)](https://sonarcloud.io/summary/overall?id=DailyStruggle_RTP)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=DailyStruggle_RTP&metric=vulnerabilities)](https://sonarcloud.io/summary/overall?id=DailyStruggle_RTP)
@@ -3856,6 +3889,16 @@ Marketplace listing metadata (current, for SEO reference):
 
 <h2 id="purpose">Purpose<a class="headerlink" href="#purpose" title="Permanent link">&para;</a></h2>
 <p><strong>LeafRTP-Pro is a <code>/rtp</code> command.</strong> It teleports a player to a random, safe spot in the world, in the most cpu-efficient way it can, and I keep the proof in the repo.</p>
+<h2 id="common-setups">Common setups<a class="headerlink" href="#common-setups" title="Permanent link">&para;</a></h2>
+<p>Most people just want <code>/rtp</code> to work without lagging the server or dumping watchdog traces, but the engine handles a few specific setups out of the box:</p>
+<ul>
+<li><strong>Spawn portal zones with floating text displays:</strong> define a cuboid trigger (<code>/rtp trigger</code>) over a physical portal frame. Players walk in, see a floating countdown hologram overhead using vanilla 1.19.4+ text display entities, hear rising note-block chimes, and get teleported out. No external hologram plugin or armor-stand scripting needed.</li>
+<li><strong>Group scatter &amp; party drops:</strong> teleport a party or duel queue to random spots while enforcing a minimum block separation between each player (<code>minSeparation: 32</code>), so teams or competitors don't land on top of each other.</li>
+<li><strong>Sky-drops &amp; Elytra launches:</strong> spawn players high above the terrain ($Y=250+$) with built-in slow falling or glider triggers for survival airdrops.</li>
+<li><strong>Faction / Towny perimeter spawns:</strong> teleport players relative to their own town, claim, or faction land (<code>anchor: claimboundary</code>) instead of a static map center.</li>
+<li><strong>1v1 Arena matchmaking:</strong> pair two queued players into a dedicated subspace bounding box with temporary boundaries, an automatic countdown, and cleanup on exit.</li>
+<li><strong>1-command import from other plugins:</strong> <code>/rtp config import</code> auto-detects folders left behind by BetterRTP, JustRTP, EzRTP, or JakesRTP and non-destructively translates worlds, shapes, radii, cooldowns, and portal zones into LeafRTP files.</li>
+</ul>
 <h2 id="who-this-is-for">Who this is for<a class="headerlink" href="#who-this-is-for" title="Permanent link">&para;</a></h2>
 <p>Large servers, Folia deployments, Velocity networks, and anyone who wants a support response time and early access to new platforms. If you run one Paper server and want <code>/rtp</code> to stop showing up in your timings report, the <a href="https://modrinth.com/plugin/rtpv3">free build</a> is the same engine and will do that; Pro is what I sell to fund the work and to guarantee the parts that carry a hands-on support burden.</p>
 <p>Configuration, data files, and commands are identical between the two builds. Upgrading or downgrading is a jar swap.</p>

@@ -3603,6 +3603,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3690,6 +3711,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Open">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2026-10-04-web-editor-treats-polygon-vertices-as-blocks-the-plugin-reads-them-as-chunks" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-10-04 — Web editor treats POLYGON vertices as blocks; the plugin reads them as chunks
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2026-10-04-factoryvaluegetnumberconcurrencytest-fails-intermittently-in-the-full-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-10-04 — FactoryValueGetNumberConcurrencyTest fails intermittently in the full suite
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -3740,6 +3785,26 @@
 <span class="k">-</span><span class="w"> </span><span class="gs">**Suggested next step:**</span> &lt;minimal investigation or fix sketch&gt;
 </code></pre></div>
 <h2 id="open">Open<a class="headerlink" href="#open" title="Permanent link">&para;</a></h2>
+<h3 id="2026-10-04-web-editor-treats-polygon-vertices-as-blocks-the-plugin-reads-them-as-chunks">2026-10-04 — Web editor treats POLYGON vertices as blocks; the plugin reads them as chunks<a class="headerlink" href="#2026-10-04-web-editor-treats-polygon-vertices-as-blocks-the-plugin-reads-them-as-chunks" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> Medium</li>
+<li><strong>Status:</strong> Open</li>
+<li><strong>Discovered during:</strong> ADR-106 editor curve runner / typed settings form (page side)</li>
+<li><strong>Location:</strong> <code>docs/editor/index.html</code> (<code>getRegionSpan</code> POLYGON branch, vertex drawing / drag, <code>syncShapeSpecificControls</code> default <code>[[-2000, 3000], ...]</code>) vs <code>RegionConfigLoader.applyPolygonVertices</code> -&gt; <code>Polygon.pointInPolygon(coords.x, coords.z)</code> on <code>locationToXZ</code> chunk coordinates</li>
+<li><strong>Symptom / hypothesis:</strong> The page draws, fits and drags polygon vertices in block units, but Java tests membership with the same numbers as chunk coordinates, so the area the plugin uses is 16x larger than the outline the editor shows. The page's helper path (<code>Polygon.js</code>, chunk params) and the vertex outline therefore don't line up.</li>
+<li><strong>Impact:</strong> Operators drawing a polygon in the editor get a region 16x larger (per axis) than drawn; the path drawn from the helper and the vertex outline disagree on the map.</li>
+<li><strong>Suggested next step:</strong> Confirm the intended unit in REGIONS.md, then either convert in the page (draw vertices x16 and accept unit suffixes) or document vertices as chunks; add a page/Java round-trip test for one polygon.</li>
+</ul>
+<h3 id="2026-10-04-factoryvaluegetnumberconcurrencytest-fails-intermittently-in-the-full-suite">2026-10-04 — <code>FactoryValueGetNumberConcurrencyTest</code> fails intermittently in the full suite<a class="headerlink" href="#2026-10-04-factoryvaluegetnumberconcurrencytest-fails-intermittently-in-the-full-suite" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> Low</li>
+<li><strong>Status:</strong> Open</li>
+<li><strong>Discovered during:</strong> ADR-104 world-wide land survey / tiled walk path rework (full <code>.\gradlew.bat build</code>)</li>
+<li><strong>Location:</strong> <code>rtp-core/src/test/java/io/github/dailystruggle/rtp/common/factory/FactoryValueGetNumberConcurrencyTest.java</code> (<code>getNumber_onAutoString_resolvesCorrectlyWithoutThrowing</code>), <code>FactoryValue.java</code> (both uncommitted)</li>
+<li><strong>Symptom / hypothesis:</strong> In one of two full builds <code>spatialResolution</code> <code>auto</code> resolved to <code>10</code> instead of <code>1</code>; the test passes alone and passed in the other full build, so it likely depends on static/shared config state left by another test class.</li>
+<li><strong>Impact:</strong> CI noise only; possible real ordering dependence in <code>auto</code> resolution if the shared state is production state.</li>
+<li><strong>Suggested next step:</strong> Run <code>:rtp-core:test</code> with a fixed seed/order or <code>--tests "*factory*"</code> plus the editor suites; look for a test mutating the global config that <code>auto</code> reads, and reset it in <code>@AfterEach</code>.</li>
+</ul>
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->
 
 

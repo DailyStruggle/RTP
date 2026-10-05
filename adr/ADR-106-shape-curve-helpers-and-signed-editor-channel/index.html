@@ -1,0 +1,4760 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/">
+      
+      
+        <link rel="prev" href="../ADR-105-intent-based-documentation-architecture-and-operator-routing/">
+      
+      
+        <link rel="next" href="../ADR-TEMPLATE/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-106-shape-curve-helpers-curve-space-run-layers-and-the-signed-two-way-editor-channel" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../site/why/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  Architecture decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ACTIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Actions & arenas
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/WEB_EDITOR_GUIDE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Web Workspace & Editor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Spatial memory TTL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/shape-algorithms/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Shape algorithm testing & charts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Architecture decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-000-development-workflow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-000 - Development Workflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-001 — Archimedean Spiral 1D Mapping for Location Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-002 — H2/SQLite for Spatial Memory Persistence Over Flat-File Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-003 — rtp-plugin as a Separate Bridge Module from rtp-core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-004 — CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-005-paperlib-removal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-005 — Removal of PaperLib in Favour of Native Paper APIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-006-async-queue-pre-generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-006 — Async Queue Pre-Generation Over On-Demand Async Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-007-per-user-isolated-queues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-007 — Per-User Isolated Queues Alongside the Global Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-008 — MemoryTracker as Active Task GC with WeakReference Deallocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-009 — Configurable Spatial Distributions: Flat, Normal, Exponential
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-010 — Versioned Platform Adapter Submodules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-011-rtp-api-separate-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-011 — `rtp-api` as a Separately Published Addon Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-012 — `ChunkReservation` as an Internal Chunk Ticket Abstraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-013 — Addons as External Gradle Projects Rather Than Built-In Optional Modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-015 — Stale-Chunk Guard for Count-Bound Pipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-016-anvil-subsystem/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-016 — Anvil Read-Only Subsystem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-017 — Block Tags and Block-State Predicates in Safety Lists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-018 — `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-020 — Language Bootstrap and Locale-Aware ConfigParser
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-022 — Region Shape Cache Key: Seed + Canonical Config Hash
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-023-login-reserve-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-023 — Login Reserve Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-024 — RTP-lite Assembly Variant
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-026-external-hook-api-surface/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-026 — Unified External-Hook API Surface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-028-l3-backlog-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-028 — L3 Backlog Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-033 — NeoForge Platform In-Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-034-memory-shape-catalog/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-034 — Memory Shape Catalog and Polygon Shape
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-035-interactive-menus-book-first/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-035 — Interactive Menus via Written Book
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-037 — Harden RTP Config Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-038 — `/rtp admin setup` & Setup Wizards
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-039 — `/rtpadmin` Diagnostic Surfaces
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-043 — `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-044 — `menu-api` Module for Generalized Interactive Menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-045 — `/rtp docs` Menu Consumer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-046-maps-api-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-047 - Declarative Chart Composition Bridge
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-049 - Network-mode plumbing in `rtp-core`, platform-specific via `PlayerLifecycleHook` SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-050 - Concrete Menu Commands Supersede Token Registries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-051 - Two-Tier API Model: Thin `rtp-api` Contract + `rtp-core` Extension API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-052 — Always-on generation outcome metrics and cause-tagged bad-location persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-054 — RTPRunnable Self-Scheduling Thread Routing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-055-pvp-combat-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-055 - Optional PvP / combat-tag pre-flight gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-056-bare-rtp-root-action/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-056 - Pluggable bare-`/rtp` root action
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-057 — Platform-agnostic addon SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-058 — Region-Specific Schematic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-059 — Relative Ground-Distance Safety Predicate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-060 — Emergency-Platform Block-Restoration Timeout
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-061-open-core-dual-licensing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-061 — Open-Core Dual Licensing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-062-biome-probability-weighting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-062 — Biome-probability weighting for location selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-063 — Biome-First Menu with Auto-Region Selection by Biome Availability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-065 — World-Override Regions and the `/rtp` World Menu
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-066-foreign-config-importer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-066 - Foreign Config Importer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-068 - Cross-Server Persisted Teleport Limits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-069 - Claim-Plugin Integrations Extracted to the Bundled `LeafRTPClaimAddon`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-070 - Platform-neutral `/rtp` command root
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-071 - Config Organization and Discoverability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-072: Teleport View-Distance Clamp and Steady Restore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-073-config-default-inheritance-references/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-073 - Config Default Inheritance via `@<file>` References
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-074 - Operator-Facing RTP Throughput and Cost Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-075 - Platform-Neutral Player-Move Event SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-076-config-folder-consolidation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-076 - Config Folder Consolidation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-077-multi-format-region-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-077 - Multi-Format Region Support: Linear
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-081 — Unified Blocked Biome Run Table in `MemoryShape`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-084 - Layered Learned-State Index: Coarse Spiral Directory over Per-Cell Hilbert RLE Blobs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-086-external-web-map-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-089 — Universal MapCanvas Bridge, Biome-Hazard Composite Overlays, and Visual Pipeline Gauges
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-091 — Automated Headless Client for Devstack via Mineflayer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-094-quality-engineering-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-097 — Per-Action Pre-Validated Caches, Anvil Region Pre-Screening, and Bounded Subspace Placement Retries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-098-declarative-command-parameters-permissions-and-defaults/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-098 - Declarative Command Parameters, Per-Parameter Permissions, and Authoritative Defaults
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-099-visual-region-creation-and-interactive-cartography-bridges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-099 — Zero-Overhead Visual Region Creation via Ecosystem Selection Bridges and Cartography Models
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-100-superseding-adr-024-sla-and-support-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-100 — Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-101 — In-House SQL Connection Pool and Retirement of HikariCP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-102 — Coverage-Guided Fuzz Testing and Parser Input Hardening
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-103-multi-version-platform-adapter-deduplication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-103 — Multi-Version Platform Adapter Deduplication and Runtime Coverage Normalization
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-104-ephemeral-web-editor-and-packed-docs-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-104 — Ephemeral Web Editor and In-Game Packed Docs Integration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-105-intent-based-documentation-architecture-and-operator-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-105 — Intent-Based Documentation Architecture, Operator-Centric Routing, and Documentation Lifecycle Refinement
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-context-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Context and Problem Statement
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-decision-drivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Decision Drivers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-considered-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Considered Options
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Considered Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#curve-on-the-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      Curve on the page
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-way-channel-for-hosted-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Two-way channel for hosted sessions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-shape-curve-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Shape Curve Helpers
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Shape Curve Helpers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-shape-spi" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.1 Shape SPI
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-helper-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.2 Helper contract
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-typed-settings-in-the-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.3 Typed settings in the schema
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-snapshot-fields-and-the-curve-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.4 Snapshot fields and the curve hash
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-sandboxed-runner" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.5 Sandboxed runner
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-drawing-and-fallbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.6 Drawing and fallbacks
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-curve-space-run-layers-and-hazard-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.7 Curve-space run layers and hazard runs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-signed-two-way-editor-channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Signed Two-Way Editor Channel
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Signed Two-Way Editor Channel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-keys-and-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.1 Keys and envelope
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-handshake-and-trust" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.2 Handshake and trust
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-message-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.3 Message types
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-transports" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.4 Transports
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-caps-and-the-bytebin-hand-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.5 Caps and the bytebin hand-off
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-relay-failure-behaviour-s-004" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.6 Relay failure behaviour (S-004)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-security-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.7 Security notes
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-snapshot-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Snapshot Size
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Consequences
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positive
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative / Trade-offs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-later-phases-not-decided-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Later Phases (not decided here)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-changes-to-adr-104" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Changes to ADR-104
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-TEMPLATE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-NNN — Title
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-context-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Context and Problem Statement
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-decision-drivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Decision Drivers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-considered-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Considered Options
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Considered Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#curve-on-the-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      Curve on the page
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-way-channel-for-hosted-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Two-way channel for hosted sessions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-shape-curve-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Shape Curve Helpers
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Shape Curve Helpers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-shape-spi" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.1 Shape SPI
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-helper-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.2 Helper contract
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-typed-settings-in-the-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.3 Typed settings in the schema
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-snapshot-fields-and-the-curve-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.4 Snapshot fields and the curve hash
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-sandboxed-runner" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.5 Sandboxed runner
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-drawing-and-fallbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.6 Drawing and fallbacks
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-curve-space-run-layers-and-hazard-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.7 Curve-space run layers and hazard runs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-signed-two-way-editor-channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Signed Two-Way Editor Channel
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Signed Two-Way Editor Channel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-keys-and-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.1 Keys and envelope
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-handshake-and-trust" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.2 Handshake and trust
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-message-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.3 Message types
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-transports" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.4 Transports
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-caps-and-the-bytebin-hand-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.5 Caps and the bytebin hand-off
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-relay-failure-behaviour-s-004" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.6 Relay failure behaviour (S-004)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-security-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.7 Security notes
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-snapshot-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Snapshot Size
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Consequences
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positive
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative / Trade-offs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-later-phases-not-decided-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Later Phases (not decided here)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-changes-to-adr-104" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Changes to ADR-104
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-106-shape-curve-helpers-curve-space-run-layers-and-the-signed-two-way-editor-channel">ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel<a class="headerlink" href="#adr-106-shape-curve-helpers-curve-space-run-layers-and-the-signed-two-way-editor-channel" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-10-04
+<strong>Authors:</strong> RTP Core Team
+<strong>Extends:</strong> <a href="../ADR-104-ephemeral-web-editor-and-packed-docs-integration/">ADR-104</a> (Ephemeral Web Editor), <a href="../ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a> (1D Spiral Mapping), <a href="../ADR-034-memory-shape-catalog/">ADR-034</a> (Memory Shape Catalog), <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/">ADR-052</a> (Cause-Tagged Bad Locations), <a href="../ADR-085-spiral-addressed-hilbert-key-space/">ADR-085</a> (Spiral-Addressed Hilbert Key Space)
+<strong>Related REQs:</strong> S-004, S-005, S-007, REQ-RTP-F-013</p>
+<hr />
+<h2 id="1-context-and-problem-statement">1. Context and Problem Statement<a class="headerlink" href="#1-context-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>The main editor target is the hosted page at <code>https://dailystruggle.github.io/RTP/editor/</code> (ADR-104 section 4.2). <code>/rtp editor</code> uploads one gzip snapshot to bytebin (<code>EditorCmd</code> -&gt; <code>EditorSessionManager.createPayloadJson()</code> -&gt; <code>EditorHttpTransport.postPayload</code>), and the static page reads it once. The hosted page has no live feed, no path tiles and no loopback channel. It gets only a 2,048-point sketch of each region's walk path and a 2D hazard grid taken at export time. The full-resolution path (<code>WalkPathTiles</code>) and live hazards (<code>HazardTiles</code>) exist only for local exports (ADR-104 section 4.6).</p>
+<p>The page can't ship its own model of the curves because <strong>shapes are registered at runtime</strong>:
+- <code>RTP.addShape(Shape)</code> registers the built-ins. <code>CIRCLE</code> and <code>SQUARE</code> are <code>CircleOptimizedDualLayer</code> / <code>SquareOptimizedDualLayer</code> instances registered under a second name.
+- Add-on jars register their own shapes.
+- <code>ChunkyRTPShape</code> instances are created on the fly from Chunky borders.</p>
+<p>A page-side copy of the built-in curves drifts from the Java code, and it can never cover add-ons. A build-time compile of this repository's shapes would miss the same shapes.</p>
+<p>Two-way features (Hot-Apply, walk-path previews of edited geometry, focus-driven land detail) exist only over the local loopback socket (<code>EditorLoopbackChannel</code>). Its messages are unsigned and token-gated, and each handler parses its own JSON.</p>
+<hr />
+<h2 id="2-decision-drivers">2. Decision Drivers<a class="headerlink" href="#2-decision-drivers" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Hosted-first.</strong> The hosted page shall draw the complete walk path and the hazards at any zoom from the snapshot alone, with no further requests.</li>
+<li><strong>Open shape set.</strong> Every registered shape, including add-on and runtime-created shapes, can take part. No page change is needed for a new shape.</li>
+<li><strong>Settings are editable.</strong> When the operator edits a setting, the page redraws the path without a server round-trip.</li>
+<li><strong>Fail closed.</strong> The page shall never draw a wrong curve. Any doubt falls back to the sketch (hosted) or the path tiles (local), and the badge says why.</li>
+<li><strong>No page-origin code execution.</strong> Code carried in a payload is untrusted. A crafted bytebin upload shall not run script on the <code>dailystruggle.github.io</code> origin (extends ADR-104 section 4.5).</li>
+<li><strong>Zero inbound attack surface.</strong> The hosted channel is outbound only. The only listener remains the loopback channel (ADR-104 section 2).</li>
+<li><strong>One protocol.</strong> Hosted, local and test runs share all protocol code except the socket.</li>
+<li><strong>S-004 / S-005.</strong> Relay failures are logged and shown, never silent. Payload building, signing and socket work stay off the main thread and are scheduled through <code>RTP.scheduler</code>.</li>
+<li><strong>Curve stability.</strong> The shapes' Java curve code is not changed, so curve positions and existing <code>.bin</code> data stay valid.</li>
+</ul>
+<hr />
+<h2 id="3-considered-options">3. Considered Options<a class="headerlink" href="#3-considered-options" title="Permanent link">&para;</a></h2>
+<h3 id="curve-on-the-page">Curve on the page<a class="headerlink" href="#curve-on-the-page" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Option A: Page-side models of the built-in shapes</strong> (the client models previously in <code>docs/editor/index.html</code>). <em>Rejected:</em> they drift from Java without a check, and add-on and Chunky shapes are never covered.</li>
+<li><strong>Option B: Build-time translation of this repository's shapes to JS or WASM.</strong> <em>Deferred:</em> it misses shapes registered at runtime. It is kept as a later generator for the contract below (section 8).</li>
+<li><strong>Option C: Stream full-resolution path tiles over a relay.</strong> <em>Rejected:</em> a large region needs thousands of tiles (up to 4,096 per region), well past the relay frame and rate caps (section 5.5). Tiles stay as the local fallback.</li>
+<li><strong>Option D: Each shape supplies its own curve helper as JavaScript (<code>toJavaScript()</code>), run in a sandbox, checked by a hash.</strong> <em>Accepted.</em></li>
+</ul>
+<h3 id="two-way-channel-for-hosted-sessions">Two-way channel for hosted sessions<a class="headerlink" href="#two-way-channel-for-hosted-sessions" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Option E: Embedded HTTP / WebSocket listener.</strong> <em>Rejected:</em> ADR-104 Option 1 (port forwarding, inbound attack surface).</li>
+<li><strong>Option F: Polling bytebin for new uploads.</strong> <em>Rejected:</em> one upload per update, high latency, and it can't carry page-to-plugin messages without a listener.</li>
+<li><strong>Option G: LuckPerms-style signed messages over a public WebSocket relay (bytesocks), joined outbound by the plugin.</strong> <em>Accepted.</em> LuckPerms has used this design in production with the same trust model.</li>
+</ul>
+<hr />
+<h2 id="4-shape-curve-helpers">4. Shape Curve Helpers<a class="headerlink" href="#4-shape-curve-helpers" title="Permanent link">&para;</a></h2>
+<h3 id="41-shape-spi">4.1 Shape SPI<a class="headerlink" href="#41-shape-spi" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>MemoryShape.toJavaScript()</code> shall return the curve helper source for the shape, or <code>null</code> when there is none.</li>
+<li>The default implementation loads the resource <code>editor-curve/&lt;SimpleClassName&gt;.js</code> through the shape class's own classloader (<code>getClass()</code>). If that is missing, it walks up the superclasses, so a subclass inherits its parent's helper. The lookup stops at <code>MemoryShape</code>.</li>
+<li>The result (including "none") is cached per class.</li>
+<li>Sources over <strong>32 KiB</strong> (UTF-8) are refused: the method returns <code>null</code> and logs a warning once per class.</li>
+<li>A shape may override the method, for example to build its helper in code.</li>
+<li><code>MemoryShape.curveState()</code> shall return the runtime values the curve depends on that are not settings, as a <code>Map&lt;String, Object&gt;</code> of numbers. The default is an empty map.</li>
+<li><code>AbstractDualLayerShape</code> and <code>CircleOptimizedDualLayer</code> return <code>{p: getPointEdgeChunks(), rEff: getEffectiveRadius()}</code>. <code>getEffectiveRadius()</code> grows with <code>expand</code>, and the point edge cache only ratchets up, so neither can be derived from settings alone.</li>
+<li>Other shapes override it only when their curve reads such state.</li>
+<li><strong>Add-on convention:</strong> an add-on shape gets a hosted curve by shipping one resource, <code>editor-curve/&lt;SimpleClassName&gt;.js</code>, in its own jar, or by overriding <code>toJavaScript()</code>. It needs no other code. A shape without a helper keeps the sketch (hosted) or the tiles (local).</li>
+<li>Built-in helpers ship in <code>rtp-core/src/main/resources/editor-curve/</code>:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Shapes (registered names)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CircleOptimizedDualLayer.js</code></td>
+<td><code>CIRCLE</code> and the dual-layer circle's own name</td>
+</tr>
+<tr>
+<td><code>SquareOptimizedDualLayer.js</code></td>
+<td><code>SQUARE</code> and the dual-layer square's own name</td>
+</tr>
+<tr>
+<td><code>Circle.js</code>, <code>Square.js</code></td>
+<td>legacy spirals</td>
+</tr>
+<tr>
+<td><code>Rectangle.js</code>, <code>Ellipse.js</code>, <code>Polygon.js</code></td>
+<td>box, ellipse, polygon</td>
+</tr>
+<tr>
+<td><code>Circle_Normal.js</code>, <code>Square_Normal.js</code></td>
+<td>Normal-distribution variants</td>
+</tr>
+</tbody>
+</table>
+<p>Every helper is self-contained: shared parts (the Hilbert walk and the orientation table of ADR-085) are inlined in each dual-layer helper rather than imported.</p>
+<h3 id="42-helper-contract">4.2 Helper contract<a class="headerlink" href="#42-helper-contract" title="Permanent link">&para;</a></h3>
+<p>A helper is <strong>one JavaScript expression</strong> that evaluates to an object with three pure functions:</p>
+<div class="highlight"><pre><span></span><code><span class="p">({</span>
+<span class="w">  </span><span class="nx">range</span><span class="p">(</span><span class="nx">params</span><span class="p">,</span><span class="w"> </span><span class="nx">state</span><span class="p">),</span><span class="w">             </span><span class="c1">// number of curve positions (&gt;= 0)</span>
+<span class="w">  </span><span class="nx">locationToXZ</span><span class="p">(</span><span class="nx">loc</span><span class="p">,</span><span class="w"> </span><span class="nx">params</span><span class="p">,</span><span class="w"> </span><span class="nx">state</span><span class="p">),</span><span class="w"> </span><span class="c1">// [x, z] in chunks, or null when loc is off the curve</span>
+<span class="w">  </span><span class="nx">xzToLocation</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span><span class="w"> </span><span class="nx">z</span><span class="p">,</span><span class="w"> </span><span class="nx">params</span><span class="p">,</span><span class="w"> </span><span class="nx">state</span><span class="p">)</span><span class="w"> </span><span class="c1">// curve position, or -1 when (x, z) is not on the curve</span>
+<span class="p">})</span>
+</code></pre></div>
+<ul>
+<li><strong><code>params</code> are inputs, not constants.</strong> The object is keyed by the shape's setting names (<code>radius</code>, <code>centerRadius</code>, <code>centerX</code>, <code>centerZ</code>, <code>vertices</code>, ...). The plugin normalises the values with its own parsers before sending: distances in chunks, numbers as numbers, booleans as booleans, enums as their names. A helper shall not hard-code a setting's value.</li>
+<li><strong><code>state</code> is optional.</strong> It holds the <code>curveState()</code> values. A helper shall work with <code>state</code> missing or partial, using its own rule for the missing values. The rule shall match a freshly built shape with the same settings: for the dual-layer shapes, <code>rEff = radius</code> and <code>p</code> derived from the radius as the Java constructor derives it. Output drawn this way is labelled "estimated" on the page.</li>
+<li><strong>Numbers</strong> are IEEE doubles, exact below 2^53. Helpers use <code>Math.floor</code>-based floor division to match Java's <code>Math.floorDiv</code> for negative coordinates. Positions above 2^53, or a 1-ulp difference between <code>Math.sin</code> / <code>Math.atan2</code> and Java, show up as a hash mismatch (section 4.4) and the page falls back.</li>
+<li><strong>Purity.</strong> Helpers keep no state between calls, use no randomness, clock or globals beyond <code>Math</code>, and return only numbers, <code>null</code> or arrays of numbers.</li>
+<li><strong>Parity.</strong> For built-in shapes, a test-only GraalJS dependency in <code>rtp-core</code> runs every helper against the Java <code>locationToXZ</code> / <code>xzToLocation</code> / <code>getRange</code> across radii, centre radii, centres (negative included), P sizes and <code>expand</code> on and off, with and without <code>state</code>. GraalJS is never shipped.</li>
+</ul>
+<h3 id="43-typed-settings-in-the-schema">4.3 Typed settings in the schema<a class="headerlink" href="#43-typed-settings-in-the-schema" title="Permanent link">&para;</a></h3>
+<p><code>EditorSessionManager.buildSchemaJson</code> / <code>describeParam</code> extends ADR-104's <code>{type, default, options}</code> per setting with values taken from the shape's <code>getParameters()</code> (<code>Map&lt;String, CommandParameter&gt;</code>):
+- <code>kind</code>: <code>distance</code> (<code>DistanceParameter</code>), <code>integer</code> (<code>IntegerParameter</code>), <code>number</code> (<code>FloatParameter</code>), <code>boolean</code> (<code>BooleanParameter</code>) or <code>enum</code> (<code>EnumParameter</code>);
+- <code>description</code>: the parameter's description;
+- <code>suggestions</code>: the parameter's suggested values (for example <code>radius</code>: 64-1024);
+- plus <code>curveParams</code> per shape: the setting names the helper reads.</p>
+<p>After the shape dropdown, the page builds one input per declared setting:
+- distance values accept the unit suffixes (<code>b</code> / <code>c</code> / <code>r</code> / <code>km</code> / <code>mi</code>);
+- integers and numbers get number inputs with the suggestions as presets;
+- booleans get a checkbox, and enums a select.</p>
+<p>Settings the shape doesn't declare are not shown. Add-on shapes get a form the same way. An edit to a setting in <code>curveParams</code> redraws the path from the helper immediately. When the channel is connected, a <code>curve-state</code> request (section 5.3) replaces the estimated state with the exact one.</p>
+<h3 id="44-snapshot-fields-and-the-curve-hash">4.4 Snapshot fields and the curve hash<a class="headerlink" href="#44-snapshot-fields-and-the-curve-hash" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>curveCode: {SHAPE: {sha256, js}}</code></strong> at the payload top level, one entry per registered shape name in use by a region, keyed by that name. <code>sha256</code> is the lowercase hex SHA-256 of the UTF-8 <code>js</code>. Each source is sent once per snapshot, however many regions use it.</li>
+<li><strong>Per region, <code>curve: {shape, params, state, hash}</code></strong>, about 100-200 bytes:</li>
+<li><code>shape</code>: the registered name, the key into <code>curveCode</code>;</li>
+<li><code>params</code>: the normalised settings in <code>curveParams</code>;</li>
+<li><code>state</code>: <code>curveState()</code>;</li>
+<li><code>hash</code>: <code>CurveHash.of(shape)</code>.</li>
+<li><strong><code>CurveHash.of(MemoryShape)</code></strong>, with <code>R = getRange()</code>:</li>
+<li>The sample positions are <code>s_i = floor(i * R / 256)</code> for <code>i = 0..255</code>, computed in exact integer arithmetic (Java <code>long</code> / <code>BigInteger</code>, page <code>BigInt</code>). For <code>R &lt;= 256</code> they are every position <code>0..R-1</code>. For <code>R = 0</code> there are none.</li>
+<li>The hash is 32-bit FNV-1a over the little-endian bytes of <code>R</code> as a 64-bit integer, followed by each sample's <code>x</code> and <code>z</code> from <code>locationToXZ(s_i)</code> as 32-bit signed integers. An off-curve result (<code>null</code>) is hashed as the pair <code>(0x80000000, 0x80000000)</code>.</li>
+<li>It is sent as 8 lowercase hex digits.</li>
+<li>The page computes the same hash from the helper with the region's <code>params</code> and <code>state</code>. Only a match makes the region "verified".</li>
+<li>Separately, the page checks <code>xzToLocation(locationToXZ(s_i)) == s_i</code> on the same samples. A failure disables only features that need <code>xzToLocation</code> (pointer readout, zoomed-in chunk scan).</li>
+<li>Regions whose shape has a helper drop the 2,048-point sketch (about 30 KB of JSON per region) and the 2D hazard RLE. Regions without a helper, and regions whose snapshot-time self-check fails, keep both.</li>
+</ul>
+<h3 id="45-sandboxed-runner">4.5 Sandboxed runner<a class="headerlink" href="#45-sandboxed-runner" title="Permanent link">&para;</a></h3>
+<p>Helper code shall never run with page privileges, and shall never be <code>eval</code>'d on the page origin.
+- <strong><code>CurveSandbox</code></strong> (page code) creates one <code>&lt;iframe sandbox="allow-scripts"&gt;</code>. It has no <code>allow-same-origin</code>, so its origin is opaque. Its <code>srcdoc</code> is a fixed runner written by the page, never taken from the payload, with the CSP <code>default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; worker-src blob:</code>.
+  - The opaque origin blocks <code>parent.document</code>, cookies, <code>localStorage</code>, <code>indexedDB</code> and the page's WebCrypto keys.
+  - <code>default-src 'none'</code> blocks <code>fetch</code>, XHR, WebSocket, images and nested frames, so helper code has no network.
+  - No <code>allow-popups</code>, <code>allow-forms</code>, <code>allow-modals</code> or <code>allow-top-navigation</code>.
+- Where a blob Worker can be created inside the opaque origin, the runner evaluates helpers inside the Worker, so a runaway helper can be terminated without blocking the iframe. Where it can't, the runner evaluates in the iframe with smaller batches, and a timeout removes the whole iframe. Per-browser support is confirmed by the headless probe.
+- <strong>Loading:</strong> before sending a helper, the page checks its SHA-256 against <code>curveCode[SHAPE].sha256</code> with <code>crypto.subtle.digest</code>. It sends <code>{op: "load", shape, js}</code>, and the runner evaluates the expression once and checks that it has the three functions.
+- <strong>Calls:</strong> <code>{op: "toXZ" | "toLoc" | "range", id, shape, params, state, data: Float64Array}</code>, with up to 16,384 positions per message (transferred, not copied). The reply is <code>{id, data: Float64Array}</code>, with <code>NaN</code> for <code>null</code> / <code>-1</code>.
+- <strong>Page-side checks:</strong> the page accepts a message only from the iframe's <code>contentWindow</code>. It accepts only the expected <code>id</code>, a <code>Float64Array</code> of the expected length, and integral or <code>NaN</code> values. Runner strings are never inserted into the DOM: failures map to a fixed set of reason codes.
+- <strong>Timeouts:</strong> 500 ms per load and 200 ms per batch. On timeout the Worker is terminated, or the iframe removed and recreated, and the shape is marked failed for the session.
+- Hosted and local pages use the same runner, so <code>file://</code> exports work offline: the helpers travel in the embedded payload.</p>
+<h3 id="46-drawing-and-fallbacks">4.6 Drawing and fallbacks<a class="headerlink" href="#46-drawing-and-fallbacks" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Path:</strong> each frame has a time budget (8 ms for the path layer).</li>
+<li>Zoomed out, the page samples curve positions evenly over <code>[0, range)</code> through <code>locationToXZ</code>, with a stride chosen so the batch fits the budget.</li>
+<li>Zoomed in, once the visible chunk count fits the budget, it evaluates <code>xzToLocation</code> for every visible chunk and joins each on-curve chunk to the chunk of the next position, as <code>WalkPathTiles</code> does (ADR-104 section 4.6 item 7). The path is then exact at any zoom.</li>
+<li><strong>Fallback order:</strong> helper (verified) -&gt; path tiles (local feed) -&gt; 2,048-point sketch -&gt; no path. The status badge names the shape and the reason:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Reason</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>no-helper</code></td>
+<td>no <code>curveCode</code> entry for the shape</td>
+</tr>
+<tr>
+<td><code>sha256</code></td>
+<td>source digest differs from <code>sha256</code></td>
+</tr>
+<tr>
+<td><code>load-error</code></td>
+<td>evaluation failed or the object lacks the three functions</td>
+</tr>
+<tr>
+<td><code>throw</code></td>
+<td>a call threw</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>load or batch exceeded its timeout</td>
+</tr>
+<tr>
+<td><code>malformed</code></td>
+<td>output of the wrong type, length or value</td>
+</tr>
+<tr>
+<td><code>hash-mismatch</code></td>
+<td>page hash differs from <code>curve.hash</code></td>
+</tr>
+<tr>
+<td><code>sandbox-unavailable</code></td>
+<td>the iframe could not be created</td>
+</tr>
+</tbody>
+</table>
+<p>A failure never produces a page script error. Drawing from the "estimated" state (state missing, no channel) is labelled as such.</p>
+<h3 id="47-curve-space-run-layers-and-hazard-runs">4.7 Curve-space run layers and hazard runs<a class="headerlink" href="#47-curve-space-run-layers-and-hazard-runs" title="Permanent link">&para;</a></h3>
+<p>A <strong>run layer</strong> is per-region data in curve-position space, <code>{v, runs}</code>. <code>runs</code> is the base64 of an unsigned LEB128 varint stream of <code>[deltaStart, len, value]</code> triples, where <code>deltaStart</code> is the gap since the previous run's end (the first run is relative to position 0). The page maps runs to chunks through the helper's <code>locationToXZ</code>, so a layer lines up with the path by construction.
+- <strong>Hazards</strong> are the only layer built in this phase: <code>hazardRuns: {v: 1, runs}</code>.
+  - They are built from the region's <code>badLocationsSnapshot</code> (the authoritative keys and prefix sums).
+  - <code>value</code> is the <code>LocationGenerator.FailTypes</code> ordinal + 1, the same convention as <code>HazardTiles</code>.
+  - About 2-4 bytes per run.
+- <code>uniquePlacement</code> runs are filtered out. They are spacing marks that retire used ground (ADR-052), not hazards, and the page doesn't show them.
+- <strong>Drawing:</strong> zoomed in, each run's chunks are painted by cause. Zoomed out, each screen cell is painted by coverage (the share of its sampled positions inside runs) under the same frame budget as the path.
+- <strong>Cap:</strong> at most 256 KiB of encoded runs per region in a snapshot. A region over the cap keeps the 2D RLE layer instead, with the badge reason <code>hazard-cap</code>.
+- Regions drawn from code skip <code>WalkPathTiles</code> and <code>HazardTiles</code> in the local feed once the page reports them verified (<code>focus</code>, section 5.3). Locally, a hazard change shows up within one feed cycle.</p>
+<hr />
+<h2 id="5-signed-two-way-editor-channel">5. Signed Two-Way Editor Channel<a class="headerlink" href="#5-signed-two-way-editor-channel" title="Permanent link">&para;</a></h2>
+<h3 id="51-keys-and-envelope">5.1 Keys and envelope<a class="headerlink" href="#51-keys-and-envelope" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Plugin key:</strong> one RSA-2048 key pair per server (<code>EditorKeys</code>), persisted in <code>&lt;dataFolder&gt;/editor/keys/</code> (PKCS#8 private key, X.509 SPKI public key, owner-only file permissions where the platform supports them). A corrupt key file is logged and replaced with a new pair (S-004). The browser then sees a new <code>pluginKey</code> in the next snapshot.</li>
+<li><strong>Browser key:</strong> WebCrypto <code>RSASSA-PKCS1-v1_5</code>, 2048-bit, SHA-256. The private key is non-extractable and kept in IndexedDB, so the same browser stays trusted across sessions. Where IndexedDB is unavailable (some <code>file://</code> contexts), the key lives only for the tab and must be trusted again.</li>
+<li><strong>Fingerprint:</strong> lowercase hex SHA-256 of the SPKI DER.</li>
+<li><strong>Envelope</strong> (the LuckPerms format): every frame is <code>{"msg": "&lt;JSON string&gt;", "signature": "&lt;base64&gt;"}</code>. The signature is SHA256withRSA (RSASSA-PKCS1-v1_5) over the UTF-8 bytes of <code>msg</code>. Java <code>Signature("SHA256withRSA")</code> and WebCrypto produce and verify the same bytes with no format conversion.</li>
+<li><strong>Inner message:</strong> <code>{type, channel, seq, from, challenge?, to?, ...}</code>.</li>
+<li><code>channel</code> is the channel id, so a message can't be replayed into another session.</li>
+<li><code>from</code> is the sender's fingerprint.</li>
+<li><code>seq</code> increases strictly per sender, within a challenge (page) or over the channel lifetime (plugin).</li>
+<li><code>to</code> addresses a reply to one browser key when several tabs share the relay.</li>
+</ul>
+<h3 id="52-handshake-and-trust">5.2 Handshake and trust<a class="headerlink" href="#52-handshake-and-trust" title="Permanent link">&para;</a></h3>
+<ol>
+<li>The snapshot carries <code>channel: {relay, id, pluginKey}</code>. The page accepts only messages signed by that <code>pluginKey</code> and drops anything else without acting on it.</li>
+<li>Page -&gt; <code>hello {publicKey}</code> (base64 SPKI). The plugin answers <code>hello-reply {to, state: "trusted" | "untrusted", challenge}</code>. <code>challenge</code> is 128 random bits, new for every <code>hello</code>. Every later page message shall carry it with <code>seq</code> starting at 1. A replayed old <code>hello</code> therefore earns a challenge the replayer can't sign for.</li>
+<li><strong>Untrusted key:</strong></li>
+<li>The plugin creates a nonce (8 characters, single-use, bound to the session and that key, expires after 5 minutes).</li>
+<li>It sends <strong>one</strong> in-game prompt per key per session to the operator who created the session (the console when the console created it), with a clickable <code>/rtp editor trust &lt;nonce&gt;</code>.</li>
+<li>The page shows "awaiting trust" and the same nonce, so the operator can match them.</li>
+<li><code>/rtp editor trust &lt;nonce&gt;</code> (<code>TrustCmd</code>, permission <code>rtp.editor</code>) adds the fingerprint to <code>TrustedEditors</code>. That is persisted as <code>&lt;dataFolder&gt;/editor/trusted-editors.json</code> with an atomic replace. The plugin then sends <code>hello-reply {state: "trusted"}</code>.</li>
+<li>An expired or unknown nonce is refused with a configurable message.</li>
+<li>A corrupt trusted-editors file is logged and treated as empty, and it is replaced on the next successful trust write.</li>
+<li><strong>Acceptance rules (plugin side):</strong> from untrusted keys the plugin accepts only <code>hello</code> and <code>ping</code>. Any other message needs a trusted key, a valid signature, the current challenge and a higher <code>seq</code>. Forged, replayed, out-of-order, unknown-type and oversized messages are dropped and logged, rate-limited to one line per key per minute.</li>
+<li>The trust prompt, trusted / rejected replies, and channel opened / lost / expired notices are configurable in <code>messages.yml</code>, with locale parity (REQ-RTP-F-013, S-007).</li>
+</ol>
+<h3 id="53-message-types">5.3 Message types<a class="headerlink" href="#53-message-types" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Direction</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hello</code> / <code>hello-reply</code></td>
+<td>page -&gt; plugin / plugin -&gt; page</td>
+<td>handshake (section 5.2)</td>
+</tr>
+<tr>
+<td><code>ping</code> / <code>pong</code></td>
+<td>both</td>
+<td>keepalive every 30 s; 3 missed pongs mark the link lost</td>
+</tr>
+<tr>
+<td><code>feed</code></td>
+<td>plugin -&gt; page</td>
+<td>local feed head push (ADR-104 section 4.6 item 6), unchanged in meaning</td>
+</tr>
+<tr>
+<td><code>curve</code></td>
+<td>plugin -&gt; page</td>
+<td><code>{region, curve: {shape, params, state, hash}}</code> when a region's settings or state change (for example <code>expand</code> grows <code>rEff</code>); the page re-verifies and redraws</td>
+</tr>
+<tr>
+<td><code>curve-state</code></td>
+<td>page -&gt; plugin, reply plugin -&gt; page</td>
+<td>request <code>{reqId, region, shape: {name, key: YAML scalar}}</code> for edited settings; reply <code>{reqId, state, hash, range}</code> or <code>{reqId, error}</code>; evaluated on a temporary shape built as <code>EditorWalkPathPreview</code> builds one, under its build limits (4 per feed tick, newest per client and region, 1,024 vertices, scalar values only) and the section 5.5 frame cap</td>
+</tr>
+<tr>
+<td><code>hazard-delta</code></td>
+<td>plugin -&gt; page</td>
+<td><code>{region, from, to, add: runs, remove: runs}</code> against hazard version <code>from</code>; <code>{region, to, reset: true, runs}</code> when the page's version is unknown or stale</td>
+</tr>
+<tr>
+<td><code>land</code></td>
+<td>plugin -&gt; page</td>
+<td>focus-driven land bins <code>[rx, rz, level, base64Runs]</code> (<code>BiomeBinCodec</code>, ADR-104 section 4.6 item 1)</td>
+</tr>
+<tr>
+<td><code>focus</code></td>
+<td>page -&gt; plugin</td>
+<td>debounced view rectangle <code>{world, y, minRx, minRz, maxRx, maxRz}</code>, plus <code>verified: [regions]</code> and <code>hazardVersions: {region: v}</code></td>
+</tr>
+<tr>
+<td><code>walkpath</code></td>
+<td>page -&gt; plugin, reply plugin -&gt; page</td>
+<td>walk-path preview of edited geometry (ADR-104 section 4.6 item 6), for shapes without a verified helper; a reply over the frame cap is handed off through bytebin (section 5.5)</td>
+</tr>
+<tr>
+<td><code>apply</code> / <code>apply_ack</code></td>
+<td>page -&gt; plugin / plugin -&gt; page</td>
+<td>Hot-Apply: <code>{files}</code> inline, or <code>{bytebinKey, sha256}</code> above the frame cap; runs the full <code>/rtp editor apply</code> validation pipeline; acknowledged with the result</td>
+</tr>
+</tbody>
+</table>
+<p>The handlers (<code>EditorWalkPathPreview</code>, <code>EditorLoopbackApply</code>, the feed's focus queue) register with <code>EditorChannel</code> by <code>type</code> instead of parsing loopback frames themselves.</p>
+<h3 id="54-transports">5.4 Transports<a class="headerlink" href="#54-transports" title="Permanent link">&para;</a></h3>
+<p><code>EditorChannel</code> owns the envelope, signing and verification, trust, the challenge and <code>seq</code> checks, routing by <code>type</code> and the outbound caps. <code>ChannelTransport</code> is only <code>send(String)</code>, an inbound callback and a state / close callback. There are three implementations:
+- <strong><code>BytesocksTransport</code> (hosted):</strong>
+  - It creates a channel with <code>GET &lt;relay&gt;/create</code> (the bytesocks API used by the LuckPerms and spark clients: the relay answers <code>201</code> with the channel id in the <code>Location</code> header) and reads the id from that header. The default relay is <code>https://bytesocks.lucko.me</code>, configurable next to the bytebin URL in <code>EditorHttpTransport</code>.
+  - It then joins <code>wss://&lt;relay host&gt;/&lt;id&gt;</code> outbound through the JDK <code>java.net.http.WebSocket</code> on the existing <code>HttpClient</code>. There is no new dependency and no own threads. Timers and retries run through <code>RTP.scheduler</code>.
+  - It reconnects with backoff (1 s, doubling, at most 60 s) and expires 30 minutes after the session starts, the same lifetime as the local feed.
+- <strong><code>LoopbackTransport</code> (local):</strong> wraps <code>EditorLoopbackChannel</code>. The loopback handshake rules (loopback peer and Host, Origin check, token, at most 4 clients) stay as defence in depth. The local export's <code>channel.relay</code> is the loopback <code>ws://127.0.0.1:&lt;port&gt;/rtp-editor-ws?token=...</code> address, so the page runs the identical handshake and messages.
+- <strong><code>InMemoryTransport</code> (tests):</strong> a connected pair, so JUnit drives the full protocol, including a page stub, without sockets.</p>
+<p>The page has one <code>EditorChannelClient</code> (keys, signing, verification, handshake, reconnect) that connects to <code>snapshot.channel.relay</code>. The existing <code>focus</code> / <code>walkpath</code> / <code>apply</code> callers move onto it.</p>
+<h3 id="55-caps-and-the-bytebin-hand-off">5.5 Caps and the bytebin hand-off<a class="headerlink" href="#55-caps-and-the-bytebin-hand-off" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Frames are capped at <strong>32 KiB</strong> (the envelope included) on every transport, so local runs test the hosted limits. Larger inbound frames are refused and logged.</li>
+<li>Outbound traffic is capped at <strong>2 MiB per session per minute</strong>. Over the cap, <code>land</code> batches are deferred first, then <code>hazard-delta</code>. <code>curve</code> and replies are never dropped, only delayed. Deferral is logged once per minute.</li>
+<li>Data larger than a frame (a large apply, a hazard reset over the cap) goes through bytebin and is referenced as <code>{bytebinKey, sha256}</code>, the LuckPerms pattern. The receiver fetches it, checks the digest and then processes it as if it had been sent inline.</li>
+</ul>
+<h3 id="56-relay-failure-behaviour-s-004">5.6 Relay failure behaviour (S-004)<a class="headerlink" href="#56-relay-failure-behaviour-s-004" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A failed channel create or connect, a disconnect, a reconnect, the expiry and plugin disable are each logged with their reason. The operator gets a configurable in-game notice for "opened", "lost" and "expired".</li>
+<li>If the relay can't be created, <code>/rtp editor</code> still uploads the snapshot without a <code>channel</code> block (snapshot-only session) and logs the reason.</li>
+<li>Opening never blocks a thread (S-005, <code>RTPArchitectureTest</code> rule 2, no exclusion): <code>ChannelTransport.start</code> and <code>EditorChannel.start</code> return futures, and the hosted create-then-join is one chain bounded by its timeouts that completes with no channel on any failure. <code>/rtp editor</code> composes it with the payload build and upload.</li>
+<li>The page's status badge shows one of: <code>connecting</code>, <code>awaiting trust</code>, <code>connected</code>, <code>reconnecting</code>, <code>snapshot only (&lt;reason&gt;)</code>. The page keeps working from the snapshot in every state. Without the channel, drawing stays exact for verified regions, and edited state is labelled "estimated".</li>
+<li>Expiry and plugin disable close the transport. The page sees the close and switches to <code>snapshot only (expired)</code> / <code>snapshot only (closed)</code>.</li>
+</ul>
+<h3 id="57-security-notes">5.7 Security notes<a class="headerlink" href="#57-security-notes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Helper code runs only in the sandbox (section 4.5). Channel messages are passive JSON, never code.</li>
+<li>The relay sees message contents: they are signed but not encrypted, the same as LuckPerms. No secrets go over the channel: no loopback tokens and no keys. Hot-Apply carries only YAML.</li>
+<li>A stolen channel id gives read access to live map data. It is as sensitive as the bytebin key, which is already unlisted. Writes need a trusted, signed browser key.</li>
+<li>The plugin only connects outbound, so the zero-inbound rule of ADR-104 section 2 still holds.</li>
+</ul>
+<hr />
+<h2 id="6-snapshot-size">6. Snapshot Size<a class="headerlink" href="#6-snapshot-size" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Built-in helper</td>
+<td>a few KB each, once per shape type per snapshot (cap 32 KiB)</td>
+</tr>
+<tr>
+<td><code>curve</code> per region</td>
+<td>~100-200 bytes</td>
+</tr>
+<tr>
+<td><code>hazardRuns</code></td>
+<td>~2-4 bytes per run (cap 256 KiB per region)</td>
+</tr>
+<tr>
+<td>Removed for verified regions</td>
+<td>2,048-point sketch (~30 KB JSON) and the 2D hazard RLE</td>
+</tr>
+</tbody>
+</table>
+<p><code>editor-data.json</code> (shipped configs, field docs, synonyms) is still uploaded in every snapshot. Loading it from the site instead is the next traffic saving (section 8).</p>
+<hr />
+<h2 id="7-consequences">7. Consequences<a class="headerlink" href="#7-consequences" title="Permanent link">&para;</a></h2>
+<h3 id="positive">Positive<a class="headerlink" href="#positive" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The hosted page draws the complete walk path and hazards at any zoom from the snapshot alone, for every shape that ships a helper, add-ons included.</li>
+<li>Setting edits redraw the path locally with no server request. The typed settings form works for any registered shape.</li>
+<li>Hosted sessions become two-way: live curve changes, hazard deltas, focus-driven land detail, walk-path previews and Hot-Apply, with in-game trust.</li>
+<li>Local, hosted and test runs share one protocol, so a local session and the in-memory tests exercise everything hosted mode does except the relay hop.</li>
+<li>Snapshots shrink for regions drawn from code.</li>
+</ul>
+<h3 id="negative-trade-offs">Negative / Trade-offs<a class="headerlink" href="#negative-trade-offs" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Helpers are written by hand per shape and can drift from Java. This is guarded by the parity test (built-ins) and the runtime hash (every shape), with a visible fallback.</li>
+<li>Some browsers may not allow a Worker inside an opaque-origin iframe. The iframe-only runner then uses smaller batches, and a timeout costs recreating the iframe.</li>
+<li>Hosted two-way features depend on a third-party relay (<code>bytesocks.lucko.me</code>), as uploads already depend on bytebin. The URL is configurable, and the snapshot-only session is always available.</li>
+<li>Each new browser needs one in-game trust action, and per-tab keys (no IndexedDB) need it every time.</li>
+<li>A test-only GraalJS dependency is added to <code>rtp-core</code>'s test classpath.</li>
+</ul>
+<hr />
+<h2 id="8-later-phases-not-decided-here">8. Later Phases (not decided here)<a class="headerlink" href="#8-later-phases-not-decided-here" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Generated helpers:</strong> translating a shape's bytecode to JS or WASM to fill in <code>toJavaScript()</code> automatically. The contract in section 4.2 is fixed so a generator can produce it without page changes.</li>
+<li>A helper for <code>ChunkyRTPShape</code> and other add-on shapes that ship none (they keep the sketch or tiles).</li>
+<li><strong>More run layers:</strong> landing-heat and learned-biome runs in curve space, using the section 4.7 format. Landing heat stays on the local feed files until then.</li>
+<li><strong>Viewport-interval queries:</strong> the page asks for runs only within the curve intervals in view.</li>
+<li><strong>Binary frames and deflate</strong> on the channel instead of base64 JSON.</li>
+<li><strong>A self-hosted RTP relay.</strong> The relay URL is configurable now, but no relay is built.</li>
+<li>Loading <code>editor-data.json</code> from the site next to the hosted page instead of uploading it in every snapshot.</li>
+<li>Removing local <code>feed.js</code> polling. It stays as the one-way fallback for a page copied off the server machine.</li>
+</ul>
+<hr />
+<h2 id="9-changes-to-adr-104">9. Changes to ADR-104<a class="headerlink" href="#9-changes-to-adr-104" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Section 4.2 item 3: Hot-Apply and back-propagation for hosted sessions run over the relay channel of section 5. <code>/rtp editor apply &lt;token&gt;</code> stays the fallback.</li>
+<li>Section 4.3: the page holds no built-in curve model. Curve code comes only from the payload, per shape, and runs in the sandbox of section 4.5. For verified regions the snapshot carries neither the walk-path seed nor the 2D hazard RLE.</li>
+<li>Section 4.4: the local export carries the same snapshot fields and <code>channel</code> block as an upload, and its helpers travel in the embedded payload.</li>
+<li>Section 4.6: the loopback channel carries the signed protocol of section 5 through <code>LoopbackTransport</code>. The feed skips path and hazard tiles for regions the page reports verified.</li>
+<li>Section 5 (Consequences): hosted sessions get live updates. This replaces the trade-off that live updates exist only for local exports.</li>
+</ul>
+<hr />
+<h2 id="10-references">10. References<a class="headerlink" href="#10-references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>MemoryShape</code>, <code>AbstractDualLayerShape</code>, <code>CircleOptimizedDualLayer</code>, <code>SquareOptimizedDualLayer</code> (<code>rtp-core/.../selection/region/selectors/memory/shapes/</code>).</li>
+<li><code>EditorSessionManager</code>, <code>EditorHttpTransport</code>, <code>EditorCmd</code>, <code>EditorLiveFeed</code>, <code>EditorLoopbackChannel</code>, <code>EditorWalkPathPreview</code>, <code>EditorLoopbackApply</code>, <code>WalkPathTiles</code>, <code>HazardTiles</code>, <code>BiomeBinCodec</code> (<code>rtp-core/.../commands/editor/</code>).</li>
+<li><code>docs/editor/index.html</code> (hosted and packaged editor page).</li>
+<li>LuckPerms web editor socket protocol (bytesocks relay, <code>{msg, signature}</code> envelope, in-game trust).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.3.0
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>
