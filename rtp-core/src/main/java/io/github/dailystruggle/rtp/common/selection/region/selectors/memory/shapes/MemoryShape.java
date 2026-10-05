@@ -200,6 +200,82 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public int getPointEdgeChunks() {
     return 1;
   }
+
+  /** Largest accepted curve helper source, in UTF-8 bytes (ADR-106 section 4.1). */
+  public static final int MAX_CURVE_HELPER_BYTES = 32 * 1024;
+
+  /** Classpath directory holding {@code <SimpleClassName>.js} curve helpers (ADR-106). */
+  public static final String CURVE_HELPER_DIR = "editor-curve/";
+
+  /**
+   * Per-class helper cache, absence included. {@link ClassValue} keeps the entry weakly tied to
+   * the class, so an unloaded add-on jar does not pin its helper source.
+   */
+  private static final ClassValue<Optional<String>> CURVE_HELPERS =
+      new ClassValue<>() {
+        @Override
+        protected Optional<String> computeValue(Class<?> type) {
+          return Optional.ofNullable(loadCurveHelper(type));
+        }
+      };
+
+  /**
+   * JavaScript curve helper for the hosted editor (ADR-106 section 4.2): one expression evaluating
+   * to {@code {range, locationToXZ, xzToLocation}}, taking the shape's settings as inputs.
+   *
+   * <p>Default: resource {@code editor-curve/<SimpleClassName>.js} from the shape class's own
+   * loader, else the nearest superclass's (stops at {@code MemoryShape}), so an add-on ships a
+   * helper by adding one resource. Sources over {@link #MAX_CURVE_HELPER_BYTES} are refused.
+   *
+   * @return helper source, or {@code null} when the shape has none
+   */
+  public String toJavaScript() {
+    return CURVE_HELPERS.get(getClass()).orElse(null);
+  }
+
+  /**
+   * Runtime values the curve reads that are not settings (ADR-106 section 4.1), for example the
+   * ratcheted point edge or the expanded radius. Values are numbers.
+   *
+   * @return state map; empty when the curve depends on settings alone
+   */
+  public Map<String, Object> curveState() {
+    return Map.of();
+  }
+
+  /**
+   * Resolve the helper for {@code type}, walking superclasses. A refused (oversized) source ends
+   * the walk: inheriting a parent's helper would silently draw the parent's curve instead.
+   */
+  static String loadCurveHelper(Class<?> type) {
+    for (Class<?> c = type;
+        c != null && c != MemoryShape.class && MemoryShape.class.isAssignableFrom(c);
+        c = c.getSuperclass()) {
+      // From the binary name, not getSimpleName(): that resolves the declaring class, which
+      // throws IllegalAccessError for a nested add-on class defined by a different loader.
+      String binary = c.getName();
+      String simple = binary.substring(Math.max(binary.lastIndexOf('.'), binary.lastIndexOf('$')) + 1);
+      if (simple.isEmpty() || Character.isDigit(simple.charAt(0))) continue; // anonymous / local: inherit
+      String resource = CURVE_HELPER_DIR + simple + ".js";
+      try (java.io.InputStream in = c.getResourceAsStream("/" + resource)) {
+        if (in == null) continue;
+        byte[] bytes = in.readNBytes(MAX_CURVE_HELPER_BYTES + 1);
+        if (bytes.length > MAX_CURVE_HELPER_BYTES) {
+          RTP.log(
+              Level.WARNING,
+              "[RTP] editor curve helper " + resource + " for " + type.getName()
+                  + " exceeds " + MAX_CURVE_HELPER_BYTES + " bytes; refused (ADR-106)");
+          return null;
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
+      } catch (java.io.IOException e) {
+        RTP.log(Level.WARNING, "[RTP] failed to read editor curve helper " + resource, e);
+        return null;
+      }
+    }
+    return null;
+  }
+
   /**
    * Cross-biome union of the recorded biome runs, blocked so that a run costs 10 bytes resident
    * instead of the 24 a flat {@code long} key + {@code long} prefix sum + {@code short} id would.
@@ -846,6 +922,43 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   public void setSpatialResolution(long spatialResolution) {
     this.spatialResolution = Math.max(1L, spatialResolution);
+  }
+
+  public long resolveSpatialResolution(Object raw) {
+    if (raw == null) return resolveAutoSpatialResolution();
+    if (raw instanceof Number number) {
+      return Math.max(1L, number.longValue());
+    }
+    String s = raw.toString().trim();
+    if (s.equalsIgnoreCase("auto") || s.isEmpty()) {
+      return resolveAutoSpatialResolution();
+    }
+    try {
+      return Math.max(1L, Long.parseLong(s));
+    } catch (NumberFormatException e) {
+      return resolveAutoSpatialResolution();
+    }
+  }
+
+  /**
+   * Dynamically derives the optimal spatialResolution for this shape when configured as "auto".
+   * Scales with domain size up to the macro-tile / continental limit.
+   */
+  protected long resolveAutoSpatialResolution() {
+    long range = getRange();
+    if (range <= 0L) {
+      return 3L;
+    }
+    if (range < 1024L) {
+      return 1L;
+    }
+    if (range < 8192L) {
+      return 3L;
+    }
+    int p = getPointEdgeChunks();
+    long cap = Math.max(4L, (long) p);
+    long derived = 1L << (64 - Long.numberOfLeadingZeros(Math.max(1L, (long) Math.sqrt(range / 1024.0))));
+    return Math.max(1L, Math.min(cap, derived));
   }
 
   /**

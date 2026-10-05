@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.benchmark;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.AnvilRegionBinHazardTable;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -17,7 +18,6 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Deque;
 import java.util.List;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -138,9 +138,9 @@ public class FullPipelineSelectionVisualizerTest {
         bLeft, bRight, bTop, bBottom);
 
     // 5. Draw Visual Chart 1: The Full L3 State Map
-    File l3ChartFile = new File("../full_l3_state_chart.png");
-    drawFullL3Chart(outcomeMap, discardedCartesianBins, fullL3Candidates, activeL3Bins, totalDiscardedBins, l3ChartFile);
-    System.out.println("[DEBUG_LOG] Exported Full L3 State Chart to: " + l3ChartFile.getAbsolutePath());
+    BufferedImage l3ChartImg = renderFullL3Chart(outcomeMap, discardedCartesianBins, fullL3Candidates, activeL3Bins, totalDiscardedBins);
+    ChartOutputHelper.writeChart(l3ChartImg, "pipeline_selection", "full_l3_state_chart.png");
+    System.out.println("[DEBUG_LOG] Exported Full L3 State Chart to canonical destinations");
 
     // 6. Simulate Selection Sequence: L3 -> L2 Promotion -> Final Teleports (1k, 10k, 100k)
     System.out.println("[DEBUG_LOG] Simulating continuous pipeline selection sequence (1k, 10k, 100k)...");
@@ -180,36 +180,18 @@ public class FullPipelineSelectionVisualizerTest {
         selections1k.size(), selections10k.size(), selections100k.size());
 
     // 7. Draw Visual Chart 2: Selection Sequence Comparison (1k, 10k, 100k)
-    File sequenceChartFile = new File("../selection_sequence_comparison_chart.png");
-    drawSelectionSequenceChart(outcomeMap, selections1k, selections10k, selections100k, sequenceChartFile);
-    System.out.println("[DEBUG_LOG] Exported Selection Sequence Comparison Chart to: " + sequenceChartFile.getAbsolutePath());
-
-    // Also mirror to docs/assets/img/ and test server debug
-    File docsL3 = new File("../docs/assets/img/full_l3_state_chart.png");
-    File docsSeq = new File("../docs/assets/img/selection_sequence_comparison_chart.png");
-
-    if (docsL3.getParentFile() != null && !docsL3.getParentFile().exists()) {
-      docsL3.getParentFile().mkdirs();
-    }
-    Files.copy(l3ChartFile.toPath(), docsL3.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-    Files.copy(sequenceChartFile.toPath(), docsSeq.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-
-    File serverDebugDir = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug");
-    if (serverDebugDir.exists()) {
-      Files.copy(l3ChartFile.toPath(), new File(serverDebugDir, "full_l3_state_chart.png").toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-      Files.copy(sequenceChartFile.toPath(), new File(serverDebugDir, "selection_sequence_comparison_chart.png").toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-    }
-    System.out.println("[DEBUG_LOG] Mirrored charts to docs/assets/img/ and root directory");
+    BufferedImage sequenceChartImg = renderSelectionSequenceChart(outcomeMap, selections1k, selections10k, selections100k);
+    ChartOutputHelper.writeChart(sequenceChartImg, "pipeline_selection", "selection_sequence_comparison_chart.png");
+    System.out.println("[DEBUG_LOG] Exported Selection Sequence Comparison Chart to canonical destinations");
     org.junit.jupiter.api.Assertions.assertTrue(totalRange > 0);
   }
 
-  private static void drawFullL3Chart(
+  private static BufferedImage renderFullL3Chart(
       LosslessChunkOutcomeMap outcomeMap,
       BitSet discardedCartesianBins,
       List<ChunkPoint> l3Candidates,
       BitSet activeBins,
-      int totalDiscardedBins,
-      File outFile) throws Exception {
+      int totalDiscardedBins) throws Exception {
 
     int mapDim = 800;
     int width = mapDim + 400; // 1200
@@ -388,15 +370,14 @@ public class FullPipelineSelectionVisualizerTest {
     g.drawString("• Whole world state cached in < 500 KB on disk.", dashX + 20, curY);
 
     g.dispose();
-    ImageIO.write(img, "png", outFile);
+    return img;
   }
 
-  private static void drawSelectionSequenceChart(
+  private static BufferedImage renderSelectionSequenceChart(
       LosslessChunkOutcomeMap outcomeMap,
       List<ChunkPoint> s1k,
       List<ChunkPoint> s10k,
-      List<ChunkPoint> s100k,
-      File outFile) throws Exception {
+      List<ChunkPoint> s100k) throws Exception {
 
     int panelDim = 460;
     int width = panelDim * 3 + 80; // 1460
@@ -448,7 +429,7 @@ public class FullPipelineSelectionVisualizerTest {
     g.drawString("• Full Ergodic Coverage: 100k selections uniformly populate every continent quadrant without center-crowding.", 620, footerY + 38);
 
     g.dispose();
-    ImageIO.write(img, "png", outFile);
+    return img;
   }
 
   private static void drawSequencePanel(

@@ -118,8 +118,8 @@ public class RegionConfigLoaderTest {
                 Arguments.of(RegionKeys.shape, null, null, "null for shape"),
                 Arguments.of(RegionKeys.backlogCacheCap, "malformed_cap", 0L, "String instead of Number for backlogCacheCap"),
                 Arguments.of(RegionKeys.networkReserveSize, "bad_num", 0L, "String instead of Number for networkReserveSize"),
-                Arguments.of(RegionKeys.spatialResolution, "not_a_number", 1L, "String instead of Number for spatialResolution falls back to 1L"),
-                Arguments.of(RegionKeys.spatialResolution, "auto", 1L, "String 'auto' for spatialResolution resolves to 1L"),
+                Arguments.of(RegionKeys.spatialResolution, "not_a_number", 4L, "String instead of Number for spatialResolution falls back to shape resolution"),
+                Arguments.of(RegionKeys.spatialResolution, "auto", 4L, "String 'auto' for spatialResolution resolves via shape"),
                 Arguments.of(RegionKeys.spatialResolution, 5, 5L, "Positive integer 5 for spatialResolution resolves to 5L"),
                 Arguments.of(RegionKeys.requirePermission, "maybe", false, "Invalid boolean string for requirePermission"),
                 Arguments.of(RegionKeys.requirePermission, 1, true, "Integer 1 for requirePermission"),
@@ -434,5 +434,22 @@ public class RegionConfigLoaderTest {
         RegionSettings settings = assertDoesNotThrow(() -> RegionConfigLoader.load(parser));
         org.junit.jupiter.api.Assertions.assertNotNull(settings.shape(), "Shape should fall back to default shape");
         org.junit.jupiter.api.Assertions.assertNotNull(settings.vert(), "Vert should fall back to default adjustor");
+    }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("resolveSpatialResolution resolves 'auto' via MemoryShape")
+    void testResolveSpatialResolutionWithShape() {
+        io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square square =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square();
+        square.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.radius, 256L);
+
+        long res = RegionConfigLoader.resolveSpatialResolution("auto", square);
+        assertEquals(square.resolveSpatialResolution("auto"), res);
+
+        long literalRes = RegionConfigLoader.resolveSpatialResolution("5", square);
+        assertEquals(5L, literalRes);
+
+        long nullShapeRes = RegionConfigLoader.resolveSpatialResolution("auto", null);
+        assertEquals(1L, nullShapeRes);
     }
 }

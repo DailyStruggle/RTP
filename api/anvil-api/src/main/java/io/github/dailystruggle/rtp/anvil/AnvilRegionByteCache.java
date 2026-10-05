@@ -237,6 +237,20 @@ public final class AnvilRegionByteCache {
   }
 
   /**
+   * Non-loading lookup: returns the cached bytes for {@code regionFile} only when an entry is
+   * already resident and its recorded mtime equals {@code currentMtimeMillis}; otherwise
+   * {@code null}. Never reads the file, never populates the cache, does not touch hit/miss
+   * counters. The returned array is shared and must not be mutated.
+   */
+  public static byte[] peek(Path regionFile, long currentMtimeMillis) {
+    if (regionFile == null) return null;
+    synchronized (CACHE) {
+      Entry e = CACHE.get(regionFile);
+      return (e != null && e.mtime == currentMtimeMillis) ? e.bytes : null;
+    }
+  }
+
+  /**
    * Current mtime re-check window in milliseconds; {@code 0} means stat on every
    * {@link #get(Path)}.
    */

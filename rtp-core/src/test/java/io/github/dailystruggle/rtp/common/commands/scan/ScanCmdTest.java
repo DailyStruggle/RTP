@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
@@ -962,5 +963,26 @@ public class ScanCmdTest {
 
         // Biome should now be recorded for pos (MockRTPWorld returns a mock probe with plains)
         assertNotNull(shape.biomeAt(pos));
+    }
+
+    @Test
+    void scanStartCmd_and_scanResetCmd_withAutoSpatialResolution_resolvesCorrectly() {
+        MultiConfigParser<RegionKeys> multiConfigParser =
+                (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
+        ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser("default");
+        when(regionConfig.getData(eq(RegionKeys.spatialResolution))).thenReturn("auto");
+        when(regionConfig.getConfigValue(eq(RegionKeys.spatialResolution), any())).thenReturn("auto");
+
+        boolean startResult = scanStartCmd.onCommand(senderId, paramsWithRegion("default"), null);
+        assertTrue(startResult);
+
+        MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
+        long expected = shape.resolveSpatialResolution("auto");
+        assertEquals(expected, shape.spatialResolution(), "'auto' spatialResolution should resolve via shape on scan start");
+
+        // Now test reset
+        boolean resetResult = scanResetCmd.onCommand(senderId, paramsWithRegion("default"), null);
+        assertTrue(resetResult);
+        assertEquals(expected, shape.spatialResolution(), "'auto' spatialResolution should resolve via shape on scan reset");
     }
 }

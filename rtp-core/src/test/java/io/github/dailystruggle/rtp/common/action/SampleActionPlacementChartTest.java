@@ -579,14 +579,9 @@ class SampleActionPlacementChartTest {
     return g;
   }
 
-  /** Writes the image to the same artifact locations the project's other chart tests use. */
+  /** Writes the image to canonical doc and report locations. */
   private static void writeAll(BufferedImage img, String name) throws Exception {
-    File[] outputs = {
-      new File("build/reports/" + name), new File("docs/assets/img/" + name),
-    };
-    for (File out : outputs) {
-      ChartOutputHelper.writeIfModified(img, out);
-    }
+    ChartOutputHelper.writeChart(img, "actions", name);
     System.out.printf("[DEBUG_LOG] Rendered action chart via Java 2D: %s%n", name);
   }
 }

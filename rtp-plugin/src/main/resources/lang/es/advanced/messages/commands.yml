@@ -486,4 +486,16 @@ docsExportSuccess: "&a[RTP] Paquete HTML de documentación exportado exitosament
 docsExportFailed: "&c[RTP] Error al exportar el paquete de documentación: [reason]."
 
 # NO MODIFICAR EL NÚMERO DE VERSIÓN
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Una página del editor web pide acceso con el código &b[nonce]&e. Si tu página muestra el mismo código, haz clic aquí para confiar en este navegador."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(clave [fingerprint])"
+editorTrustAccepted: "&a[P0] Navegador de confianza: la página del editor con el código [nonce] ya puede previsualizar y usar Hot-Apply."
+editorTrustAlready: "&7[P0] El navegador con el código [nonce] ya era de confianza."
+editorTrustUnknown: "&c[P0] Ninguna sesión abierta del editor emitió el código [nonce]."
+editorTrustExpired: "&c[P0] El código [nonce] ha caducado. Recarga la página del editor para obtener uno nuevo."
+editorTrustUsage: "&c[P0] Uso: /rtp editor trust nonce=<código que muestra la página del editor>"
+editorChannelOpened: "&a[P0] Canal del editor web abierto. Confía en tu navegador cuando se te pida para activar las vistas previas y Hot-Apply."
+editorChannelLost: "&e[P1] Canal del editor web perdido: [reason]. La página sigue funcionando con su instantánea."
+editorChannelExpired: "&7[P0] El canal del editor web caducó tras [minutes] minutos. Vuelve a ejecutar el comando del editor para continuar."
+
 version: 1.0

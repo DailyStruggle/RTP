@@ -489,5 +489,17 @@ docsEmpty: "&c[RTP] Aucun sujet de documentation n'est actuellement enregistré.
 docsExportSuccess: "&a[RTP] Lot HTML de documentation exporté avec succès vers [path]."
 docsExportFailed: "&c[RTP] Échec de l'exportation du lot de documentation: [reason]."
 
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Une page de l'éditeur web demande l'accès avec le code &b[nonce]&e. Si votre page affiche le même code, cliquez ici pour faire confiance à ce navigateur."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(clé [fingerprint])"
+editorTrustAccepted: "&a[P0] Navigateur approuvé : la page de l'éditeur avec le code [nonce] peut maintenant prévisualiser et utiliser Hot-Apply."
+editorTrustAlready: "&7[P0] Le navigateur avec le code [nonce] était déjà approuvé."
+editorTrustUnknown: "&c[P0] Aucune session d'éditeur ouverte n'a émis le code [nonce]."
+editorTrustExpired: "&c[P0] Le code [nonce] a expiré. Rechargez la page de l'éditeur pour en obtenir un nouveau."
+editorTrustUsage: "&c[P0] Utilisation : /rtp editor trust nonce=<code affiché par la page de l'éditeur>"
+editorChannelOpened: "&a[P0] Canal de l'éditeur web ouvert. Approuvez votre navigateur lorsque cela vous est demandé pour activer les aperçus et Hot-Apply."
+editorChannelLost: "&e[P1] Canal de l'éditeur web perdu : [reason]. La page continue de fonctionner à partir de son instantané."
+editorChannelExpired: "&7[P0] Le canal de l'éditeur web a expiré après [minutes] minutes. Relancez la commande de l'éditeur pour reprendre."
+
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

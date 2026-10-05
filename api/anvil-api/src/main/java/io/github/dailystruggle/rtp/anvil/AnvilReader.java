@@ -146,10 +146,21 @@ public final class AnvilReader implements RegionFileReader {
             throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") spans past end of file: start="
                     + payloadStartLong + " budget=" + payloadBudgetLong + " fileLen=" + regionBytes.length);
         }
-        int payloadBudget = (int) payloadBudgetLong;
-        int payloadStart = (int) payloadStartLong;
+        return decodeSectorPayload(regionBytes, (int) payloadStartLong, (int) payloadBudgetLong, cx, cz);
+    }
 
-        ByteBuffer bb = ByteBuffer.wrap(regionBytes, payloadStart, payloadBudget);
+    /**
+     * Decodes one chunk's sector run {@code buf[payloadStart, payloadStart + payloadBudget)}:
+     * 4-byte length prefix, compression byte, compressed NBT. Shared by the whole-file path
+     * ({@link #readRawChunk}) and the sector-only path ({@link #readChunkViewFromSectors}).
+     */
+    private static RawChunk decodeSectorPayload(byte[] buf, int payloadStart, int payloadBudget, int cx, int cz)
+            throws IOException {
+        if (payloadBudget < 5 || (long) payloadStart + payloadBudget > buf.length) {
+            throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") sector run too short: start="
+                    + payloadStart + " budget=" + payloadBudget + " bufLen=" + buf.length);
+        }
+        ByteBuffer bb = ByteBuffer.wrap(buf, payloadStart, payloadBudget);
         int declaredLength = bb.getInt();
         int compressionByte = bb.get() & 0xFF;
         if ((compressionByte & EXTERNAL_FLAG) != 0) {
@@ -162,8 +173,28 @@ public final class AnvilReader implements RegionFileReader {
         }
         int compressedLen = declaredLength - 1;
 
-        byte[] nbtBytes = decompress(regionBytes, payloadStart + 5, compressedLen, compressionByte);
+        byte[] nbtBytes = decompress(buf, payloadStart + 5, compressedLen, compressionByte);
         return new RawChunk(compressionByte, declaredLength, nbtBytes);
+    }
+
+    /**
+     * Decodes a single chunk from its own sector run rather than the whole region buffer.
+     * {@code sectorBytes} holds exactly the bytes at file offset {@code sectorOffset * 4096}
+     * spanning {@code sectorCount * 4096} (the location-table entry), so callers can read one
+     * chunk positionally without loading the full {@code .mca}. Same compression support and
+     * corruption checks as {@link #readChunkView}.
+     *
+     * @param cx region-local chunk x, used only in diagnostics
+     * @param cz region-local chunk z, used only in diagnostics
+     * @throws UnsupportedAnvilFormatException if the compression mode is not supported
+     * @throws IOException                     on malformed payloads or NBT
+     */
+    public static AnvilChunkView readChunkViewFromSectors(byte[] sectorBytes, int cx, int cz) throws IOException {
+        if (sectorBytes == null) {
+            throw new CorruptRegionEntryException("Null sector buffer for chunk (" + cx + "," + cz + ")");
+        }
+        RawChunk raw = decodeSectorPayload(sectorBytes, 0, sectorBytes.length, cx, cz);
+        return toView(Nbt.readRootCompound(raw.nbtBytes));
     }
 
     private static final class RawChunk {

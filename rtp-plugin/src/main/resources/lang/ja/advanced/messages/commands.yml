@@ -474,5 +474,17 @@ docsEmpty: "&c[RTP] 登録されているドキュメントのトピックはあ
 docsExportSuccess: "&a[RTP] ドキュメントのHTMLバンドルが正常に [path] にエクスポートされました。"
 docsExportFailed: "&c[RTP] ドキュメントバンドルのエクスポートに失敗しました: [reason]。"
 
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Webエディターのページがコード &b[nonce]&e でアクセスを求めています。ページに同じコードが表示されている場合は、ここをクリックしてこのブラウザーを信頼してください。"
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(キー [fingerprint])"
+editorTrustAccepted: "&a[P0] ブラウザーを信頼しました: コード [nonce] のエディターページでプレビューとHot-Applyが使えます。"
+editorTrustAlready: "&7[P0] コード [nonce] のブラウザーは既に信頼されています。"
+editorTrustUnknown: "&c[P0] コード [nonce] を発行した開いているエディターセッションはありません。"
+editorTrustExpired: "&c[P0] コード [nonce] は期限切れです。エディターページを再読み込みして新しいコードを取得してください。"
+editorTrustUsage: "&c[P0] 使い方: /rtp editor trust nonce=<エディターページに表示されたコード>"
+editorChannelOpened: "&a[P0] Webエディターのチャンネルを開きました。求められたらブラウザーを信頼すると、プレビューとHot-Applyが有効になります。"
+editorChannelLost: "&e[P1] Webエディターのチャンネルが切断されました: [reason]。ページはスナップショットで動作を続けます。"
+editorChannelExpired: "&7[P0] Webエディターのチャンネルは [minutes] 分で期限切れになりました。続けるにはエディターコマンドを再実行してください。"
+
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

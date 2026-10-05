@@ -76,6 +76,17 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
     return current;
   }
 
+  /**
+   * {@code p}: the point edge only ratchets up (ADR-094), so a shape whose radius shrank keeps a
+   * larger P than its settings derive.
+   */
+  @Override
+  public java.util.Map<String, Object> curveState() {
+    java.util.Map<String, Object> state = new java.util.LinkedHashMap<>();
+    state.put("p", getPointEdgeChunks());
+    return state;
+  }
+
   @Override
   public long rand() {
     for (int attempts = 0; attempts < 100; attempts++) {

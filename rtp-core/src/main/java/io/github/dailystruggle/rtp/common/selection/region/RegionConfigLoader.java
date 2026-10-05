@@ -144,7 +144,7 @@ public class RegionConfigLoader {
                 3,
                 io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.HOT_CACHE_BYTES_PER_ENTRY);
         double price = getNumber(resolveScalar(regionParser, RegionKeys.price, 0.0)).doubleValue();
-        long spatialResolution = resolveSpatialResolution(resolveScalar(regionParser, RegionKeys.spatialResolution, "auto"));
+        long spatialResolution = resolveSpatialResolution(resolveScalar(regionParser, RegionKeys.spatialResolution, "auto"), shape);
 
         if (shape != null && shape instanceof MemoryShape<?> memoryShape) memoryShape.setSpatialResolution(spatialResolution);
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
@@ -371,6 +371,16 @@ public class RegionConfigLoader {
     }
 
     public static long resolveSpatialResolution(Object o) {
+        return resolveSpatialResolution(o, null);
+    }
+
+    public static long resolveSpatialResolution(Object o, Shape<?> shape) {
+        if (ConfigDefaultResolver.isReference(o)) {
+            o = ConfigDefaultResolver.resolve(o, RegionKeys.spatialResolution.name(), "auto");
+        }
+        if (shape instanceof MemoryShape<?> memoryShape) {
+            return memoryShape.resolveSpatialResolution(o);
+        }
         if (o == null) return 1L;
         if (o instanceof Number number) {
             return Math.max(1L, number.longValue());

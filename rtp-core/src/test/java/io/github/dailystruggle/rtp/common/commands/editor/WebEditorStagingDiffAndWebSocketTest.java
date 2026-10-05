@@ -47,11 +47,15 @@ class WebEditorStagingDiffAndWebSocketTest {
         assertTrue(html.contains("WORLD_BORDER_MAX"), "Must check against world border boundary");
         assertTrue(html.contains("collinear"), "Must check collinear vertices");
 
-        // WebSocket client and hot-apply commit
-        assertTrue(html.contains("initWebSocket"), "Must have WebSocket initialization");
+        // Signed editor channel (ADR-106 §5) and hot-apply commit over it
+        assertTrue(html.contains("initWebSocket"), "Must register the channel message handlers");
+        assertTrue(html.contains("var EditorChannelClient"), "Must have the signed EditorChannelClient");
         assertTrue(html.contains("hotApplyWebSocket"), "Must have hotApplyWebSocket commit function");
-        assertTrue(html.contains("/rtp-editor-ws"), "Must connect to /rtp-editor-ws endpoint");
-        assertTrue(html.contains("mutation_broadcast") || html.contains("config_update"), "Must handle server mutation broadcasts");
+        assertTrue(html.contains("EditorChannelClient.send('apply', body)"), "Hot-Apply must travel signed over the channel");
+        assertTrue(html.contains("/rtp-editor-ws"), "Must accept the loopback /rtp-editor-ws relay address");
+        assertFalse(html.contains("mutation_broadcast") || html.contains("config_update"),
+                "Unsigned config-overwrite broadcasts must not be accepted (ADR-106 §5.2)");
+        assertFalse(html.contains("new WebSocket(`"), "No socket outside the signed channel client");
 
         // Copy-to-clipboard fallback
         assertTrue(html.contains("copyApplyCmd"), "Must provide copyApplyCmd fallback");
@@ -68,19 +72,20 @@ class WebEditorStagingDiffAndWebSocketTest {
 
         // ADR-104 Section 4.5: Intelligent Configuration Discovery & Hybrid Semantic Search Engine
         assertTrue(html.contains("search-modal-overlay"), "Must have omnibox/palette modal container");
-        assertTrue(html.contains("CONFIG_SYNONYMS"), "Must contain baked-in domain thesaurus dictionary");
+        assertTrue(html.contains("CONFIG_SYNONYMS"), "Must look up the domain thesaurus dictionary");
         assertTrue(html.contains("computeLevenshtein"), "Must implement Levenshtein fuzzy distance matching");
         assertTrue(html.contains("executeConfigSearch"), "Must implement multi-dimensional config search engine");
         assertTrue(html.contains("triggerRemoteSynonymExpansion"), "Must implement progressive online term expansion");
         assertTrue(html.contains("/^[a-z][a-z\\-]{1,23}$/"), "Must enforce strict regex token whitelisting against code/SQL injection");
 
-        // Multilingual thesaurus tokens (Spanish, French, German, Polish)
-        assertTrue(html.contains("dinero"), "Must include Spanish synonym 'dinero'");
-        assertTrue(html.contains("argent"), "Must include French synonym 'argent'");
-        assertTrue(html.contains("geld"), "Must include German synonym 'geld'");
-        assertTrue(html.contains("pieniadze") || html.contains("pieniądze"), "Must include Polish synonym 'pieniadze'");
-        assertTrue(html.contains("distancia"), "Must include Spanish 'distancia'");
-        assertTrue(html.contains("abstand"), "Must include German 'abstand'");
+        // Multilingual thesaurus (Spanish, French, German, Polish): sent by the plugin, not bundled
+        assertTrue(html.contains("const CONFIG_SYNONYMS = {};"), "index.html must not bundle the thesaurus");
+        assertTrue(html.contains("payload.synonyms"), "index.html must take the thesaurus from the payload");
+        assertFalse(html.contains("dinero:"), "index.html must not bundle synonym entries");
+        String data = Files.readString(docsEditor.resolveSibling("editor-data.json"));
+        for (String token : new String[] {"\"dinero\"", "\"argent\"", "\"geld\"", "\"pieniadze\"", "\"distancia\"", "\"abstand\""}) {
+            assertTrue(data.contains(token), "editor-data.json synonyms must include " + token);
+        }
         assertTrue(html.contains("Doc Match"), "Must support doc description matching");
 
         // MultiConfigParser directory breakdown and Add/Remove capabilities
@@ -112,28 +117,21 @@ class WebEditorStagingDiffAndWebSocketTest {
         assertTrue(html.contains("filterDocs"), "Must provide filterDocs for doc search");
         assertTrue(html.contains("doc-filter-input"), "Must have doc filter input element");
 
-        // Shipped docs verification (all core operator, proxy, and reference manuals embedded)
-        assertTrue(html.contains("\"admin/QUICK_START.md\""), "Must embed admin/QUICK_START.md");
-        assertTrue(html.contains("\"admin/COMMANDS.md\""), "Must embed admin/COMMANDS.md");
-        assertTrue(html.contains("\"admin/RUNBOOK.md\""), "Must embed admin/RUNBOOK.md");
-        assertTrue(html.contains("\"admin/HAZARDS.md\""), "Must embed admin/HAZARDS.md");
-        assertTrue(html.contains("\"admin/WEB_EDITOR_GUIDE.md\""), "Must embed admin/WEB_EDITOR_GUIDE.md");
-        assertTrue(html.contains("\"admin/configuration/REGIONS.md\""), "Must embed admin/configuration/REGIONS.md");
+        // Docs come from the session payload (the plugin's DocsRegistry); the page bundles none
+        assertTrue(html.contains("payload.docs"), "Must ingest docs from the session payload");
+        assertTrue(html.contains("const defaultDocs = {};"), "Must not bundle documentation");
+        assertFalse(html.contains("\"admin/QUICK_START.md\""), "Must not embed admin/QUICK_START.md");
 
         // ADR-104 §4.3 & ADR-084: Chunk-resolution pregenerated land map & throttled streaming
         assertTrue(html.contains("chk-pregen"), "Must have chk-pregen checkbox layer control");
-        assertTrue(html.contains("pregen_chunk_batch") || html.contains("pregen_land"), "Must handle pregen chunk batches");
-        assertTrue(html.contains("ingestPregenBatch"), "Must have ingestPregenBatch function");
+        assertTrue(html.contains("function ingestLandChunkRows"), "Pushed pregen chunk batches merge into location-keyed land tiles");
         assertTrue(html.contains("BIOME_COLORS"), "Must define BIOME_COLORS desaturated cartography palette");
-        assertTrue(html.contains("processPregenQueueSlice"), "Must process pregen queue slices for > 5 FPS budgeting");
-        assertTrue(html.contains("\"admin/configuration/CORE_CONFIG.md\""), "Must embed admin/configuration/CORE_CONFIG.md");
-        assertTrue(html.contains("\"admin/configuration/SAFETY.md\""), "Must embed admin/configuration/SAFETY.md");
-        assertTrue(html.contains("\"admin/configuration/PERFORMANCE.md\""), "Must embed admin/configuration/PERFORMANCE.md");
-        assertTrue(html.contains("\"admin/configuration/ECONOMY.md\""), "Must embed admin/configuration/ECONOMY.md");
-        assertTrue(html.contains("\"admin/proxies/CONFIGURATION.md\""), "Must embed admin/proxies/CONFIGURATION.md");
-        assertTrue(html.contains("\"admin/proxies/INDEX.md\""), "Must embed admin/proxies/INDEX.md");
-        assertTrue(html.contains("\"FOR_SERVER_ADMINS.md\""), "Must embed FOR_SERVER_ADMINS.md");
-        assertTrue(html.contains("\"MAP.md\""), "Must embed MAP.md");
+        // ADR-104 §4.6: frame budget holds because only viewport tiles are drawn and cached
+        assertTrue(html.contains("function drawWorldLand") && html.contains("function requestVisibleTiles"),
+                "Land detail must load per visible tile");
+        assertTrue(html.contains("function evictTiles") && html.contains("evictTiles(atlasCache, MAX_ATLASES)"),
+                "Off-screen bin atlases must be evicted under a fixed cache bound");
+        assertTrue(html.contains("ATLAS_PAINT_BUDGET_MS"), "Atlas painting must run under a per-frame budget");
     }
 
     @Test
@@ -162,14 +160,20 @@ class WebEditorStagingDiffAndWebSocketTest {
     }
 
     @Test
-    @DisplayName("docs/editor/index.html deterministically mirrors all default configuration files from disk")
+    @DisplayName("docs/editor/editor-data.json (sent by the plugin) mirrors all default configuration files; the page bundles none")
     void testDocsEditorMirrorsDefaultConfiguration() throws IOException {
         Path docsEditor = Paths.get("docs", "editor", "index.html");
         if (!Files.exists(docsEditor)) {
             docsEditor = Paths.get("..", "docs", "editor", "index.html");
         }
         assertTrue(Files.exists(docsEditor));
-        String html = Files.readString(docsEditor);
+        String page = Files.readString(docsEditor);
+        assertTrue(page.contains("const defaultConfigs = {};"), "index.html must not bundle configs");
+        assertTrue(page.contains("payload.shipped"), "index.html must take shipped defaults from the payload");
+        Path data = docsEditor.resolveSibling("editor-data.json");
+        assertTrue(Files.exists(data), "docs/editor/editor-data.json must exist (scripts/generate_web_editor.py)");
+        String html = Files.readString(data);
+        assertTrue(html.contains("\"shipped\"") && html.contains("\"docTracker\""), "editor-data.json carries shipped + docTracker");
 
         Path resourcesDir = Paths.get("rtp-plugin", "src", "main", "resources");
         if (!Files.exists(resourcesDir)) {
@@ -189,7 +193,7 @@ class WebEditorStagingDiffAndWebSocketTest {
                         String rel = finalResDir.relativize(p).toString().replace('\\', '/');
                         assertTrue(
                                 html.contains("\"" + rel + "\""),
-                                "docs/editor/index.html must mirror default config file from disk: " + rel
+                                "docs/editor/editor-data.json must mirror default config file from disk: " + rel
                         );
                     });
         }

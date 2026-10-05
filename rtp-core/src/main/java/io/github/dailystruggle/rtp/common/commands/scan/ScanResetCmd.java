@@ -65,15 +65,17 @@ public class ScanResetCmd extends ScanSubCmd {
       ScanTask.delete(region.name);
 
       // restore spatialResolution from config so the region is ready for a fresh scan or normal use
+      long spatialRes = region.getSettings().spatialResolution();
       MultiConfigParser<RegionKeys> multiConfigParser =
           (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
       if (multiConfigParser != null) {
         ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser(region.name);
         if (regionConfig != null) {
-          shape.setSpatialResolution(
-              regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue());
+          spatialRes = io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader.resolveSpatialResolution(
+              regionConfig.getData(RegionKeys.spatialResolution), shape);
         }
       }
+      shape.setSpatialResolution(spatialRes);
 
       if (RTP.configs == null) continue;
       String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanReset, ""));

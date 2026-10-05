@@ -511,5 +511,29 @@ docsExportSuccess: "&a[RTP] Documentation HTML bundle successfully exported to [
 # Placeholder: [reason]
 docsExportFailed: "&c[RTP] Failed to export documentation bundle: [reason]."
 
+# --- Web editor channel (ADR-106) ---
+# Clickable prompt sent to the operator who opened the editor session when a
+# browser asks to edit. Clicking runs /rtp editor trust nonce=<code>; only trust
+# it if your editor page shows the same code. Placeholders: [nonce], [fingerprint].
+editorTrustPrompt: "&e[P1] A web editor page asks for access with code &b[nonce]&e. If your page shows the same code, click here to trust this browser."
+
+# Hover text of the trust prompt. Placeholders: [nonce], [fingerprint].
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(key [fingerprint])"
+
+# Replies to /rtp editor trust. Placeholder: [nonce].
+editorTrustAccepted: "&a[P0] Browser trusted: the editor page with code [nonce] can now preview and Hot-Apply."
+editorTrustAlready: "&7[P0] The browser with code [nonce] was already trusted."
+editorTrustUnknown: "&c[P0] No open editor session issued code [nonce]."
+editorTrustExpired: "&c[P0] Code [nonce] has expired. Reload the editor page to get a new one."
+
+# Sent when /rtp editor trust is run without a code. No placeholders.
+editorTrustUsage: "&c[P0] Usage: /rtp editor trust nonce=<code shown by the editor page>"
+
+# Editor channel notices for the session's operator. [reason] - why the channel
+# closed; [minutes] - the session lifetime. Set a value to "" to silence it.
+editorChannelOpened: "&a[P0] Web editor channel open. Trust your browser when asked to enable previews and Hot-Apply."
+editorChannelLost: "&e[P1] Web editor channel lost: [reason]. The page keeps working from its snapshot."
+editorChannelExpired: "&7[P0] Web editor channel expired after [minutes] minutes. Run the editor command again to resume."
+
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

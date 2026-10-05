@@ -6,13 +6,13 @@ import io.github.dailystruggle.rtp.anvil.AnvilReader;
 import io.github.dailystruggle.rtp.anvil.ColumnProbe;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,7 +23,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -179,21 +178,11 @@ public class McaQualitativeUniquenessBenchmarkTest {
     printQualitativeSummary(qS64);
     printQualitativeSummary(qS256);
 
-    // Render Qualitative Chart PNG
-    File chartFile = new File("mca_qualitative_uniqueness_chart.png");
-    File rootChartFile = new File("../mca_qualitative_uniqueness_chart.png");
-    File reportFile = new File("build/reports/player_distribution/mca_qualitative_uniqueness_chart.png");
-    File rootReportFile = new File("../build/reports/player_distribution/mca_qualitative_uniqueness_chart.png");
+    // Render Qualitative Chart PNG to canonical destinations
+    BufferedImage chartImg = renderQualitativeChart(qS1, qS64, qS256, inscribedR);
+    ChartOutputHelper.writeChart(chartImg, "player_distribution", "mca_qualitative_uniqueness_chart.png");
 
-    renderQualitativeChart(qS1, qS64, qS256, inscribedR, chartFile);
-    renderQualitativeChart(qS1, qS64, qS256, inscribedR, rootChartFile);
-    reportFile.getParentFile().mkdirs();
-    renderQualitativeChart(qS1, qS64, qS256, inscribedR, reportFile);
-    rootReportFile.getParentFile().mkdirs();
-    renderQualitativeChart(qS1, qS64, qS256, inscribedR, rootReportFile);
-
-    assertTrue(chartFile.exists(), "Qualitative uniqueness chart must exist");
-    System.out.println("[DEBUG_LOG] Successfully rendered chart to: " + chartFile.getAbsolutePath());
+    System.out.println("[DEBUG_LOG] Successfully rendered chart to canonical destinations");
   }
 
   private static void printQualitativeSummary(QualitativeMetrics q) {
@@ -426,8 +415,8 @@ public class McaQualitativeUniquenessBenchmarkTest {
     );
   }
 
-  private static void renderQualitativeChart(
-      QualitativeMetrics q1, QualitativeMetrics q2, QualitativeMetrics q3, int R, File outFile) throws Exception {
+  private static BufferedImage renderQualitativeChart(
+      QualitativeMetrics q1, QualitativeMetrics q2, QualitativeMetrics q3, int R) throws Exception {
 
     int width = 1200;
     int height = 750;
@@ -475,7 +464,7 @@ public class McaQualitativeUniquenessBenchmarkTest {
         q1.parNearestPaletteDistances, q2.parNearestPaletteDistances, q3.parNearestPaletteDistances);
 
     g.dispose();
-    ImageIO.write(img, "PNG", outFile);
+    return img;
   }
 
   private static void renderStrategyCard(

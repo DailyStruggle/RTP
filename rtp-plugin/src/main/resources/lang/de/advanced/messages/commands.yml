@@ -489,5 +489,17 @@ docsEmpty: "&c[RTP] Derzeit sind keine Dokumentationsthemen registriert."
 docsExportSuccess: "&a[RTP] Dokumentations-HTML-Paket erfolgreich nach [path] exportiert."
 docsExportFailed: "&c[RTP] Dokumentationspaket konnte nicht exportiert werden: [reason]."
 
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Eine Web-Editor-Seite bittet mit dem Code &b[nonce]&e um Zugriff. Zeigt deine Seite denselben Code, klicke hier, um diesem Browser zu vertrauen."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(Schlüssel [fingerprint])"
+editorTrustAccepted: "&a[P0] Browser vertraut: Die Editor-Seite mit Code [nonce] kann jetzt Vorschauen anzeigen und Hot-Apply nutzen."
+editorTrustAlready: "&7[P0] Dem Browser mit Code [nonce] wurde bereits vertraut."
+editorTrustUnknown: "&c[P0] Keine offene Editor-Sitzung hat den Code [nonce] ausgegeben."
+editorTrustExpired: "&c[P0] Code [nonce] ist abgelaufen. Lade die Editor-Seite neu, um einen neuen zu erhalten."
+editorTrustUsage: "&c[P0] Verwendung: /rtp editor trust nonce=<Code der Editor-Seite>"
+editorChannelOpened: "&a[P0] Web-Editor-Kanal geöffnet. Vertraue deinem Browser, wenn du gefragt wirst, um Vorschauen und Hot-Apply zu aktivieren."
+editorChannelLost: "&e[P1] Web-Editor-Kanal verloren: [reason]. Die Seite arbeitet mit ihrem Snapshot weiter."
+editorChannelExpired: "&7[P0] Web-Editor-Kanal nach [minutes] Minuten abgelaufen. Führe den Editor-Befehl erneut aus, um fortzufahren."
+
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

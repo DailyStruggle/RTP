@@ -186,3 +186,8 @@ __pycache__/
 # Node.js dependencies and devstack client artifacts
 node_modules/
 package-lock.json
+
+# Staging/diagnostic charts at repository root or module root (charts belong in docs/assets/img or build/reports)
+/*.png
+rtp-core/*.png
+rtp-core/docs/

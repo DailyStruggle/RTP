@@ -27,7 +27,8 @@ class FactoryValueGetNumberConcurrencyTest {
     OTHER_NUMERIC,
     OTHER_STRINGY,
     BOOL_TRUE,      // pre-seeded as Boolean true → coerces to 1
-    BOOL_FALSE      // pre-seeded as Boolean false → coerces to 0
+    BOOL_FALSE,     // pre-seeded as Boolean false → coerces to 0
+    AUTO_STR        // pre-seeded as "auto"
   }
 
   /** Concrete subclass exposing only the inherited surface we test. */
@@ -40,7 +41,16 @@ class FactoryValueGetNumberConcurrencyTest {
       data.put(K.OTHER_STRINGY, "1.5");
       data.put(K.BOOL_TRUE, Boolean.TRUE);
       data.put(K.BOOL_FALSE, Boolean.FALSE);
+      data.put(K.AUTO_STR, "auto");
     }
+  }
+
+  @Test
+  void getNumber_onAutoString_resolvesCorrectlyWithoutThrowing() {
+    Probe probe = new Probe();
+    // generic key with 'auto' falls back to def without throwing or logging SEVERE
+    assertEquals(5L, probe.getNumber(K.AUTO_STR, 5L).longValue(),
+        "generic key with 'auto' must resolve to default without throwing");
   }
 
   /**

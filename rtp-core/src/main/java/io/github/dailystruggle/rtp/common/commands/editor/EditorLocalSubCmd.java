@@ -78,7 +78,7 @@ public class EditorLocalSubCmd extends BaseRTPCmdImpl {
         CompletableFuture.runAsync(() -> {
             try {
                 Map<String, String> configs = EditorSessionManager.getInstance().collectCurrentConfigs();
-                EditorSessionManager.getInstance().exportLocalEditorHtml(finalTargetPath, configs);
+                EditorLiveFeed.exportAndStart(finalTargetPath, configs, callerId);
             } catch (Exception e) {
                 RTP.log(Level.WARNING, "Failed to generate local editor HTML bundle at " + finalTargetPath + ": " + e.getMessage(), e);
                 throw new RuntimeException("Failed to generate local editor HTML: " + e.getMessage(), e);
@@ -87,6 +87,8 @@ public class EditorLocalSubCmd extends BaseRTPCmdImpl {
             String successMsg = "RTP: Standalone web editor generated successfully at " + finalTargetPath.toAbsolutePath();
             sendMessage(callerId, successMsg);
             sendMessage(callerId, "RTP: You can open this file directly in any web browser (file:///) offline.");
+            sendMessage(callerId, "RTP: Opened from this folder, the page refreshes metrics and land data every "
+                    + (EditorLiveFeed.PERIOD_MILLIS / 1000L) + "s for " + (EditorLiveFeed.DEFAULT_TTL_MILLIS / 60_000L) + " minutes.");
         }).exceptionally(throwable -> {
             // S-004: Never silently swallow failure
             Throwable cause = (throwable.getCause() != null) ? throwable.getCause() : throwable;

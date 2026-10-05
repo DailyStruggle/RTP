@@ -250,11 +250,13 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       // {@code uniquePlacements}) gets 1/0 rather than a thrown NaN.
       res = b ? 1 : 0;
     } else if (resObj instanceof String s) {
-      String coerced = s.replace(",", ".");
+      String coerced = s.replace(",", ".").trim();
       io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance parsedDist =
           io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.parse(coerced, null);
       if (parsedDist != null && parsedDist.explicitUnit()) {
         res = parsedDist.toChunks();
+      } else if (coerced.equalsIgnoreCase("auto")) {
+        res = def;
       } else {
         try {
           res = Double.parseDouble(coerced);

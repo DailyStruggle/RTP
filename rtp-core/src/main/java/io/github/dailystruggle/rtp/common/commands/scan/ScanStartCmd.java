@@ -67,11 +67,16 @@ public class ScanStartCmd extends ScanSubCmd {
       shape.clear();
       shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
       ScanTask.delete(region.name);
+      long spatialRes = region.getSettings().spatialResolution();
       MultiConfigParser<RegionKeys> multiConfigParser = (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
       if (multiConfigParser != null) {
         ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser(region.name);
-        shape.setSpatialResolution(regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue());
+        if (regionConfig != null) {
+          spatialRes = io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader.resolveSpatialResolution(
+              regionConfig.getData(RegionKeys.spatialResolution), shape);
+        }
       }
+      shape.setSpatialResolution(spatialRes);
 
       ScanTask task = new ScanTask(region, 0L);
       RTP.getInstance().scanTasks.put(region.name, task);

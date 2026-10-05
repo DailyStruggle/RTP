@@ -474,4 +474,16 @@ docsExportSuccess: "&a[RTP] 문서 HTML 번들을 [path]에 성공적으로 내�
 docsExportFailed: "&c[RTP] 문서 번들을 내보내지 못했습니다: [reason]."
 
 # 버전 번호는 변경하지 마세요
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] 웹 편집기 페이지가 코드 &b[nonce]&e(으)로 접근을 요청합니다. 페이지에 같은 코드가 보이면 여기를 클릭해 이 브라우저를 신뢰하세요."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(키 [fingerprint])"
+editorTrustAccepted: "&a[P0] 브라우저 신뢰됨: 코드 [nonce]의 편집기 페이지에서 이제 미리보기와 Hot-Apply를 사용할 수 있습니다."
+editorTrustAlready: "&7[P0] 코드 [nonce]의 브라우저는 이미 신뢰되어 있습니다."
+editorTrustUnknown: "&c[P0] 코드 [nonce]을(를) 발급한 열린 편집기 세션이 없습니다."
+editorTrustExpired: "&c[P0] 코드 [nonce]이(가) 만료되었습니다. 편집기 페이지를 새로 고쳐 새 코드를 받으세요."
+editorTrustUsage: "&c[P0] 사용법: /rtp editor trust nonce=<편집기 페이지에 표시된 코드>"
+editorChannelOpened: "&a[P0] 웹 편집기 채널이 열렸습니다. 요청이 오면 브라우저를 신뢰해 미리보기와 Hot-Apply를 켜세요."
+editorChannelLost: "&e[P1] 웹 편집기 채널 연결 끊김: [reason]. 페이지는 스냅샷으로 계속 동작합니다."
+editorChannelExpired: "&7[P0] 웹 편집기 채널이 [minutes]분 후 만료되었습니다. 계속하려면 편집기 명령을 다시 실행하세요."
+
 version: 1.0

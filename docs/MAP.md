@@ -147,6 +147,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - `ADR-103` Multi-version platform adapter deduplication and runtime coverage normalization.
 - `ADR-104` Ephemeral web editor and in-game packed docs integration.
 - `ADR-105` Intent-based documentation architecture and operator routing.
+- `ADR-106` Shape curve helpers, curve-space run layers and the signed two-way editor channel.
 - Subproject ADRs (`commands-api`, `effects-api`, `maps-api`, `metrics-api`, `rtp-fabric`, `rtp-neoforge`, `rtp-proxy`, addons) — see the *Subproject ADRs* table in [`adr/README.md`](adr/README.md).
 
 ## Architecture slices (`architecture/`)

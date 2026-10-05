@@ -388,5 +388,27 @@ public enum CommandMessages {
   /** Feedback message sent when HTML documentation bundle export succeeds. {@code [path]} placeholder. */
   docsExportSuccess,
   /** Feedback message sent when HTML documentation bundle export fails. {@code [reason]} placeholder. */
-  docsExportFailed
+  docsExportFailed,
+
+  // --- Signed web editor channel (ADR-106 §5) ---
+  /** Clickable prompt to the session's operator: an untrusted browser key said hello. {@code [nonce]}, {@code [fingerprint]}. */
+  editorTrustPrompt,
+  /** Hover text of the trust prompt. {@code [nonce]}, {@code [fingerprint]}. */
+  editorTrustPromptHover,
+  /** {@code /rtp editor trust} succeeded. {@code [nonce]}. */
+  editorTrustAccepted,
+  /** {@code /rtp editor trust}: the key was already trusted. {@code [nonce]}. */
+  editorTrustAlready,
+  /** {@code /rtp editor trust}: no open session issued this code. {@code [nonce]}. */
+  editorTrustUnknown,
+  /** {@code /rtp editor trust}: the code expired. {@code [nonce]}. */
+  editorTrustExpired,
+  /** {@code /rtp editor trust} without a code. No placeholders. */
+  editorTrustUsage,
+  /** The editor channel opened for a session. No placeholders. */
+  editorChannelOpened,
+  /** The editor channel closed unexpectedly. {@code [reason]}. */
+  editorChannelLost,
+  /** The editor channel reached its session lifetime. {@code [minutes]}. */
+  editorChannelExpired
 }

@@ -17,7 +17,6 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -260,18 +259,10 @@ public class L3ComputeSafetyVisualizerTest {
 
     g.dispose();
 
-    // Export image to reports and docs assets
-    File reportDir = new File("build/reports/l3_compute");
-    File chartFile = new File(reportDir, "l3_compute_safety_chart.png");
-    ChartOutputHelper.writeIfModified(img, chartFile);
+    // Export image to canonical reports and docs assets
+    ChartOutputHelper.writeChart(img, "l3_compute", "l3_compute_safety_chart.png");
 
-    File rootFile = new File("l3_compute_safety_chart.png");
-    ChartOutputHelper.writeIfModified(img, rootFile);
-
-    File docsAsset = new File("docs/assets/img/l3_compute_safety_chart.png");
-    ChartOutputHelper.writeIfModified(img, docsAsset);
-
-    System.out.println("[DEBUG_LOG] Successfully rendered diagnostic chart to: " + chartFile.getAbsolutePath());
+    System.out.println("[DEBUG_LOG] Successfully rendered diagnostic chart to canonical destinations: " + ChartOutputHelper.getDocsAssetFile("l3_compute_safety_chart.png").getAbsolutePath());
   }
 
   private void drawSpatialDispersionPanel(Graphics2D g, int x, int y, int w, int h, List<Point> points) {

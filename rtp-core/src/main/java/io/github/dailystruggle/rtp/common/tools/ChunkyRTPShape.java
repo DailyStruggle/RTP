@@ -26,6 +26,16 @@ public class ChunkyRTPShape extends Rectangle {
   }
 
   /**
+   * No hosted curve helper (ADR-106 section 8): the inherited Rectangle helper would draw the
+   * bounding box but not the Chunky boundary that {@link #rand()} enforces, so the page keeps the
+   * sketch or tiles.
+   */
+  @Override
+  public String toJavaScript() {
+    return null;
+  }
+
+  /**
    * Get a random location value within the shape
    *
    * @return the random location value

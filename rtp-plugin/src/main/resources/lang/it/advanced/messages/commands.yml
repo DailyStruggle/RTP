@@ -495,4 +495,16 @@ docsExportSuccess: "&a[RTP] Pacchetto HTML della documentazione esportato con su
 docsExportFailed: "&c[RTP] Impossibile esportare il pacchetto della documentazione: [reason]."
 
 # NON MODIFICARE IL NUMERO DI VERSIONE
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Una pagina dell'editor web chiede l'accesso con il codice &b[nonce]&e. Se la tua pagina mostra lo stesso codice, clicca qui per considerare attendibile questo browser."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(chiave [fingerprint])"
+editorTrustAccepted: "&a[P0] Browser attendibile: la pagina dell'editor con il codice [nonce] ora può mostrare anteprime e usare Hot-Apply."
+editorTrustAlready: "&7[P0] Il browser con il codice [nonce] era già attendibile."
+editorTrustUnknown: "&c[P0] Nessuna sessione dell'editor aperta ha emesso il codice [nonce]."
+editorTrustExpired: "&c[P0] Il codice [nonce] è scaduto. Ricarica la pagina dell'editor per ottenerne uno nuovo."
+editorTrustUsage: "&c[P0] Uso: /rtp editor trust nonce=<codice mostrato dalla pagina dell'editor>"
+editorChannelOpened: "&a[P0] Canale dell'editor web aperto. Quando richiesto, considera attendibile il browser per attivare anteprime e Hot-Apply."
+editorChannelLost: "&e[P1] Canale dell'editor web perso: [reason]. La pagina continua a funzionare dalla sua istantanea."
+editorChannelExpired: "&7[P0] Il canale dell'editor web è scaduto dopo [minutes] minuti. Esegui di nuovo il comando dell'editor per riprendere."
+
 version: 1.0

@@ -78,6 +78,10 @@ dependencies {
     // ENTERPRISE_READINESS.md item 23: jqwik property-based testing framework
     // for spiral math (ADR-001) and MemoryShape bin arithmetic invariants.
     testImplementation libs.jqwik
+    // ADR-106: Java/JS parity gate for the editor-curve/*.js shape helpers. Test-only
+    // (Java 21 has no built-in JS engine); GraalJS is never shipped in any jar.
+    testImplementation 'org.graalvm.polyglot:polyglot:24.1.2'
+    testImplementation 'org.graalvm.polyglot:js-community:24.1.2'
     // ENTERPRISE_READINESS.md item 18: the database/options package is exercised
     // against real MySQL and PostgreSQL servers via Testcontainers (not copied
     // Testable* subclasses), so coverage credits the shipped MySQLDatabaseAccessor
@@ -222,6 +226,7 @@ tasks.register('evaluateSimulationBaseline') {
 processResources {
     from("${rootProject.projectDir}/docs/editor") {
         include 'index.html'
+        include 'editor-data.json'
         into 'editor'
     }
 }

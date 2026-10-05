@@ -493,5 +493,17 @@ docsEmpty: "&c[RTP] Obecnie nie ma zarejestrowanych tematów dokumentacji."
 docsExportSuccess: "&a[RTP] Pakiet HTML dokumentacji został pomyślnie wyeksportowany do [path]."
 docsExportFailed: "&c[RTP] Nie udało się wyeksportować pakietu dokumentacji: [reason]."
 
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Strona edytora WWW prosi o dostęp z kodem &b[nonce]&e. Jeśli Twoja strona pokazuje ten sam kod, kliknij tutaj, aby zaufać tej przeglądarce."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(klucz [fingerprint])"
+editorTrustAccepted: "&a[P0] Przeglądarka zaufana: strona edytora z kodem [nonce] może teraz pokazywać podglądy i używać Hot-Apply."
+editorTrustAlready: "&7[P0] Przeglądarka z kodem [nonce] była już zaufana."
+editorTrustUnknown: "&c[P0] Żadna otwarta sesja edytora nie wydała kodu [nonce]."
+editorTrustExpired: "&c[P0] Kod [nonce] wygasł. Odśwież stronę edytora, aby otrzymać nowy."
+editorTrustUsage: "&c[P0] Użycie: /rtp editor trust nonce=<kod pokazany przez stronę edytora>"
+editorChannelOpened: "&a[P0] Kanał edytora WWW otwarty. Zaufaj przeglądarce, gdy pojawi się prośba, aby włączyć podglądy i Hot-Apply."
+editorChannelLost: "&e[P1] Utracono kanał edytora WWW: [reason]. Strona nadal działa na podstawie migawki."
+editorChannelExpired: "&7[P0] Kanał edytora WWW wygasł po [minutes] minutach. Uruchom ponownie polecenie edytora, aby kontynuować."
+
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

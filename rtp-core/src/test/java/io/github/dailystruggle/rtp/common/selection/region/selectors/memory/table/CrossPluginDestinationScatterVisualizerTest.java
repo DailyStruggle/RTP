@@ -16,8 +16,8 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import javax.imageio.ImageIO;
 import io.github.dailystruggle.rtp.common.benchmark.LosslessChunkOutcomeMap;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -459,33 +459,11 @@ public class CrossPluginDestinationScatterVisualizerTest {
 
     g.dispose();
 
-    // Save outputs
-    File[] targets = new File[] {
-        new File("cross_plugin_destinations_scatter_chart.png"),
-        new File("cross_plugin_destinations_scatter_chart_16k.png"),
-        new File("../cross_plugin_destinations_scatter_chart.png"),
-        new File("../cross_plugin_destinations_scatter_chart_16k.png"),
-        new File("docs/assets/img/cross_plugin_destinations_scatter_chart.png"),
-        new File("docs/assets/img/cross_plugin_destinations_scatter_chart_16k.png"),
-        new File("../docs/assets/img/cross_plugin_destinations_scatter_chart.png"),
-        new File("../docs/assets/img/cross_plugin_destinations_scatter_chart_16k.png"),
-        new File("rtp-core/docs/assets/img/cross_plugin_destinations_scatter_chart.png"),
-        new File("rtp-core/docs/assets/img/cross_plugin_destinations_scatter_chart_16k.png"),
-        new File("../rtp-core/docs/assets/img/cross_plugin_destinations_scatter_chart.png"),
-        new File("../rtp-core/docs/assets/img/cross_plugin_destinations_scatter_chart_16k.png"),
-        new File("build/reports/player_distribution/cross_plugin_destinations_scatter_chart.png"),
-        new File("../build/reports/player_distribution/cross_plugin_destinations_scatter_chart.png")
-    };
-
-    for (File tf : targets) {
-      if (tf.getParentFile() != null && !tf.getParentFile().exists()) {
-        tf.getParentFile().mkdirs();
-      }
-      ImageIO.write(img, "PNG", tf);
-      if (tf.exists()) {
-        System.out.printf("[DEBUG_LOG] Saved chart (%,d bytes) to: %s%n", tf.length(), tf.getAbsolutePath());
-      }
-    }
+    // Save to canonical docs and reports
+    ChartOutputHelper.writeChart(img, "player_distribution", "cross_plugin_destinations_scatter_chart.png");
+    ChartOutputHelper.writeChart(img, "player_distribution", "cross_plugin_destinations_scatter_chart_16k.png");
+    System.out.printf("[DEBUG_LOG] Saved charts to canonical destinations: %s%n",
+        ChartOutputHelper.getDocsAssetFile("cross_plugin_destinations_scatter_chart.png").getAbsolutePath());
   }
 
   private void renderSpatialPanel(Graphics2D g, int x, int y, int size, EngineStats stats, LosslessChunkOutcomeMap outcomeMap) {

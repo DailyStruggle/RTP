@@ -490,4 +490,16 @@ docsExportSuccess: "&a[P0] Scroll HTML bundle safely batted to [path]."
 docsExportFailed: "&c[P0] Failed to bat out scroll bundle: [reason]."
 
 # Do not bite the version number, sacred catnip
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Una pàgina de l'editor web demana accés amb el codi &b[nonce]&e. Si la teva pàgina mostra el mateix codi, fes clic aquí per confiar en aquest navegador."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(clau [fingerprint])"
+editorTrustAccepted: "&a[P0] Navegador de confiança: la pàgina de l'editor amb el codi [nonce] ja pot previsualitzar i fer servir Hot-Apply."
+editorTrustAlready: "&7[P0] El navegador amb el codi [nonce] ja era de confiança."
+editorTrustUnknown: "&c[P0] Cap sessió oberta de l'editor ha emès el codi [nonce]."
+editorTrustExpired: "&c[P0] El codi [nonce] ha caducat. Torna a carregar la pàgina de l'editor per obtenir-ne un de nou."
+editorTrustUsage: "&c[P0] Ús: /rtp editor trust nonce=<codi que mostra la pàgina de l'editor>"
+editorChannelOpened: "&a[P0] Canal de l'editor web obert. Confia en el navegador quan se't demani per activar les previsualitzacions i Hot-Apply."
+editorChannelLost: "&e[P1] S'ha perdut el canal de l'editor web: [reason]. La pàgina continua funcionant amb la seva instantània."
+editorChannelExpired: "&7[P0] El canal de l'editor web ha caducat després de [minutes] minuts. Torna a executar l'ordre de l'editor per continuar."
+
 version: 1.0
