@@ -10,7 +10,6 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.File;
 
 @DisplayName("Visual render test producing Web Editor presentation assets for FRONT_PAGE.md")
 public class WebEditorPresentationChartTest {
@@ -235,12 +234,7 @@ public class WebEditorPresentationChartTest {
 
         g.dispose();
 
-        // Write directly to docs/assets/img/
-        File targetFile = new File("../docs/assets/img/web_editor_region_staging_preview.png");
-        ChartOutputHelper.writeIfModified(img, targetFile);
-
-        // Also write to local docs/assets/img/ if run from root
-        File targetFileRoot = new File("docs/assets/img/web_editor_region_staging_preview.png");
-        ChartOutputHelper.writeIfModified(img, targetFileRoot);
+        // Write directly to canonical docs and reports
+        ChartOutputHelper.writeChart(img, "web_editor", "web_editor_region_staging_preview.png");
     }
 }

@@ -477,6 +477,14 @@ reproducible by readers".
   reads from `RTP.metrics` and writes only to the pool size and the existing `backlogCacheCap` knob;
   all periodic work routes through `RTP.scheduler` (no raw threads). Requires a D-005 proposal before
   implementation; the EWMA window and floor/ceiling pool sizes must be configurable with safe defaults.
+- [ ] **LeafRTP engine workspace setup panel ([ADR-104](../adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration.md)).**
+  Append a visual interactive Setup Wizard panel to the browser-based LeafRTP Web Workspace / ephemeral editor
+  (`docs/editor/`) that achieves full feature and workflow parity with the in-game `/rtp admin setup` command
+  wizard ([ADR-038](../adr/ADR-038-rtpadmin-setup-wizards.md)). Operators can configure first-run or ongoing
+  server topologies through a guided multi-stage UI:
+  - **5-Stage Setup Parity:** Replicate stages 1–5 (Stage 1: World Topology single vs. multi-world auto-expansion; Stage 2: Gameplay Style templates survival / arena / skyblock / oneblock; Stage 3: Performance Profile low / high / folia-tuned; Stage 4: Addon & Effect toggles claim integrations, economy, and cinematic effects; Stage 5: Dry-Run Diff Preview & Atomic Apply).
+  - **Prefab & Recipe Compilation:** Compose user answers into the identical ordered sparse `Prefab` recipe overlay pipeline as `SetupRecipe`, rendering live cumulative deltas across `performance.yml`, `safety.yml`, and `definitions/regions/*.yml` in the editor's Staging Diff Inspector before commit.
+  - **Dual Commit Path:** Support both direct WebSocket hot-apply and offline token-based command fallback (`/rtp editor apply token=<token>`) with server-side validation against geometry invariants (ADR-034) and automated non-destructive `.bak` file backups.
 
 ---
 

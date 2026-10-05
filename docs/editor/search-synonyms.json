@@ -1,0 +1,533 @@
+{
+ "money": [
+  "price",
+  "economy",
+  "vault",
+  "cost",
+  "fee",
+  "refund"
+ ],
+ "cost": [
+  "price",
+  "economy",
+  "paramsPrice",
+  "biomePrice"
+ ],
+ "fee": [
+  "price",
+  "economy",
+  "refund"
+ ],
+ "economy": [
+  "price",
+  "vault",
+  "cost",
+  "balance"
+ ],
+ "currency": [
+  "price",
+  "economy",
+  "vault"
+ ],
+ "funds": [
+  "price",
+  "economy",
+  "vault",
+  "balanceFloor"
+ ],
+ "dinero": [
+  "price",
+  "economy",
+  "vault",
+  "cost"
+ ],
+ "precio": [
+  "price",
+  "paramsPrice",
+  "biomePrice"
+ ],
+ "argent": [
+  "price",
+  "economy",
+  "vault",
+  "cost"
+ ],
+ "prix": [
+  "price",
+  "paramsPrice",
+  "biomePrice"
+ ],
+ "geld": [
+  "price",
+  "economy",
+  "vault",
+  "cost"
+ ],
+ "kosten": [
+  "price",
+  "paramsPrice",
+  "biomePrice"
+ ],
+ "pieniadze": [
+  "price",
+  "economy",
+  "vault"
+ ],
+ "pieniądze": [
+  "price",
+  "economy",
+  "vault"
+ ],
+ "cena": [
+  "price",
+  "paramsPrice",
+  "biomePrice"
+ ],
+ "rad": [
+  "radius",
+  "centerRadius",
+  "minRadius",
+  "maxRadius",
+  "shape",
+  "outer",
+  "bounds",
+  "range",
+  "size",
+  "border"
+ ],
+ "radius": [
+  "centerRadius",
+  "minRadius",
+  "maxRadius",
+  "shape",
+  "outer",
+  "inner",
+  "distance",
+  "range",
+  "size",
+  "bounds",
+  "border",
+  "boundary",
+  "reach",
+  "diameter",
+  "spread",
+  "extent",
+  "width",
+  "length",
+  "perimeter",
+  "area"
+ ],
+ "dist": [
+  "distance",
+  "radius",
+  "centerRadius",
+  "shape",
+  "bounds",
+  "range"
+ ],
+ "distance": [
+  "radius",
+  "centerRadius",
+  "shape",
+  "worldBorderOverride",
+  "minRadius",
+  "maxRadius",
+  "bounds",
+  "range",
+  "reach",
+  "border"
+ ],
+ "range": [
+  "radius",
+  "centerRadius",
+  "bounds",
+  "minY",
+  "maxY",
+  "distance",
+  "extent"
+ ],
+ "size": [
+  "radius",
+  "centerRadius",
+  "shape",
+  "width",
+  "bounds",
+  "diameter"
+ ],
+ "border": [
+  "worldBorderOverride",
+  "radius",
+  "bounds",
+  "boundary",
+  "perimeter",
+  "shape"
+ ],
+ "boundary": [
+  "worldBorderOverride",
+  "radius",
+  "bounds",
+  "border",
+  "perimeter",
+  "shape"
+ ],
+ "bounds": [
+  "radius",
+  "centerRadius",
+  "boundary",
+  "border",
+  "shape",
+  "minY",
+  "maxY",
+  "range"
+ ],
+ "reach": [
+  "radius",
+  "centerRadius",
+  "bounds",
+  "distance"
+ ],
+ "spread": [
+  "radius",
+  "centerRadius",
+  "deviation",
+  "shape",
+  "weight",
+  "distribution"
+ ],
+ "extent": [
+  "radius",
+  "width",
+  "length",
+  "bounds"
+ ],
+ "diameter": [
+  "radius",
+  "centerRadius",
+  "shape",
+  "width"
+ ],
+ "perimeter": [
+  "radius",
+  "bounds",
+  "shape",
+  "border"
+ ],
+ "area": [
+  "radius",
+  "shape",
+  "bounds",
+  "centerRadius"
+ ],
+ "distancia": [
+  "radius",
+  "centerRadius",
+  "shape",
+  "bounds"
+ ],
+ "radio": [
+  "radius",
+  "centerRadius",
+  "shape"
+ ],
+ "abstand": [
+  "radius",
+  "centerRadius",
+  "shape",
+  "bounds"
+ ],
+ "umkreis": [
+  "radius",
+  "centerRadius",
+  "shape"
+ ],
+ "reichweite": [
+  "radius",
+  "centerRadius",
+  "distance"
+ ],
+ "rayon": [
+  "radius",
+  "centerRadius",
+  "shape"
+ ],
+ "odleglosc": [
+  "radius",
+  "centerRadius",
+  "shape"
+ ],
+ "odległość": [
+  "radius",
+  "centerRadius",
+  "shape"
+ ],
+ "promien": [
+  "radius",
+  "centerRadius",
+  "shape"
+ ],
+ "promień": [
+  "radius",
+  "centerRadius",
+  "shape"
+ ],
+ "height": [
+  "vert",
+  "minY",
+  "maxY",
+  "linear",
+  "jump"
+ ],
+ "vertical": [
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "altitude": [
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "elevation": [
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "cave": [
+  "vert",
+  "minY",
+  "maxY",
+  "unsafe-blocks"
+ ],
+ "underground": [
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "altura": [
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "hauteur": [
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "hoehe": [
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "höhe": [
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "wysokosc": [
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "wysokość": [
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "delay": [
+  "teleport-delay",
+  "cooldown",
+  "cancel",
+  "timer"
+ ],
+ "cooldown": [
+  "teleport-delay",
+  "timer",
+  "cancel"
+ ],
+ "speed": [
+  "teleport-delay",
+  "cooldown",
+  "warmup"
+ ],
+ "timer": [
+  "teleport-delay",
+  "cooldown"
+ ],
+ "retraso": [
+  "teleport-delay",
+  "cooldown"
+ ],
+ "delai": [
+  "teleport-delay",
+  "cooldown"
+ ],
+ "délai": [
+  "teleport-delay",
+  "cooldown"
+ ],
+ "wartezeit": [
+  "teleport-delay",
+  "cooldown"
+ ],
+ "opoznienie": [
+  "teleport-delay",
+  "cooldown"
+ ],
+ "opóźnienie": [
+  "teleport-delay",
+  "cooldown"
+ ],
+ "performance": [
+  "cacheCap",
+  "backlogCacheCap",
+  "activeChunkCap",
+  "ttl"
+ ],
+ "lag": [
+  "cacheCap",
+  "backlogCacheCap",
+  "activeChunkCap",
+  "thread",
+  "cpu"
+ ],
+ "tps": [
+  "cacheCap",
+  "backlogCacheCap",
+  "activeChunkCap"
+ ],
+ "memory": [
+  "cacheCap",
+  "activeChunkCap",
+  "ttl",
+  "system_memory_tracker"
+ ],
+ "rendement": [
+  "cacheCap",
+  "backlogCacheCap",
+  "activeChunkCap"
+ ],
+ "leistung": [
+  "cacheCap",
+  "backlogCacheCap",
+  "activeChunkCap"
+ ],
+ "wydajnosc": [
+  "cacheCap",
+  "backlogCacheCap",
+  "activeChunkCap"
+ ],
+ "wydajność": [
+  "cacheCap",
+  "backlogCacheCap",
+  "activeChunkCap"
+ ],
+ "claim": [
+  "safety",
+  "worldguard",
+  "griefprevention",
+  "towny",
+  "lands",
+  "residence"
+ ],
+ "protection": [
+  "safety",
+  "worldguard",
+  "claims",
+  "permission"
+ ],
+ "safety": [
+  "unsafe-blocks",
+  "check-blocks",
+  "claim",
+  "ground",
+  "water"
+ ],
+ "liquid": [
+  "water",
+  "lava",
+  "liquids",
+  "safety"
+ ],
+ "water": [
+  "unsafe-blocks",
+  "safety"
+ ],
+ "lava": [
+  "unsafe-blocks",
+  "safety"
+ ],
+ "seguridad": [
+  "safety",
+  "unsafe-blocks",
+  "check-blocks"
+ ],
+ "securite": [
+  "safety",
+  "unsafe-blocks",
+  "check-blocks"
+ ],
+ "sécurité": [
+  "safety",
+  "unsafe-blocks",
+  "check-blocks"
+ ],
+ "sicherheit": [
+  "safety",
+  "unsafe-blocks",
+  "check-blocks"
+ ],
+ "bezpieczenstwo": [
+  "safety",
+  "unsafe-blocks",
+  "check-blocks"
+ ],
+ "bezpieczeństwo": [
+  "safety",
+  "unsafe-blocks",
+  "check-blocks"
+ ],
+ "nether": [
+  "world_nether",
+  "vert",
+  "minY",
+  "maxY",
+  "ceiling"
+ ],
+ "end": [
+  "world_the_end",
+  "vert",
+  "minY",
+  "maxY"
+ ],
+ "permission": [
+  "permissions",
+  "override",
+  "cooldown",
+  "bypass"
+ ],
+ "permiso": [
+  "permissions",
+  "override"
+ ],
+ "berechtigung": [
+  "permissions",
+  "override"
+ ],
+ "uprawnienia": [
+  "permissions",
+  "override"
+ ],
+ "biomes": [
+  "blocked-biomes",
+  "biomePrice",
+  "weight",
+  "biome"
+ ],
+ "shape": [
+  "circle",
+  "square",
+  "rectangle",
+  "spiral",
+  "polygon"
+ ]
+}

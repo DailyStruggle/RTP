@@ -31,10 +31,13 @@ public class EditorHttpTransport {
 
     public static final String DEFAULT_BYTEBIN_URL = "https://bytebin.lucko.me";
     public static final String DEFAULT_EDITOR_URL = "https://dailystruggle.github.io/RTP/editor/";
+    /** WebSocket relay for the hosted editor channel (ADR-106 §5.4), the bytebin sibling. */
+    public static final String DEFAULT_RELAY_URL = "https://bytesocks.lucko.me";
 
     private final HttpClient httpClient;
     private final String bytebinUrl;
     private final String editorBaseUrl;
+    private final String relayUrl;
 
     public EditorHttpTransport() {
         this(DEFAULT_BYTEBIN_URL, DEFAULT_EDITOR_URL);
@@ -52,9 +55,24 @@ public class EditorHttpTransport {
     }
 
     public EditorHttpTransport(HttpClient httpClient, String bytebinUrl, String editorBaseUrl) {
+        this(httpClient, bytebinUrl, editorBaseUrl, DEFAULT_RELAY_URL);
+    }
+
+    /** As the 3-argument form with the relay ({@code http(s)://host[:port]}) the hosted channel joins. */
+    public EditorHttpTransport(HttpClient httpClient, String bytebinUrl, String editorBaseUrl, String relayUrl) {
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
         this.bytebinUrl = (bytebinUrl != null && !bytebinUrl.isBlank()) ? bytebinUrl.replaceAll("/+$", "") : DEFAULT_BYTEBIN_URL;
         this.editorBaseUrl = (editorBaseUrl != null && !editorBaseUrl.isBlank()) ? editorBaseUrl.replaceAll("/+$", "") : DEFAULT_EDITOR_URL;
+        this.relayUrl = (relayUrl != null && !relayUrl.isBlank()) ? relayUrl.replaceAll("/+$", "") : DEFAULT_RELAY_URL;
+    }
+
+    public String getRelayUrl() {
+        return relayUrl;
+    }
+
+    /** The shared client: bytebin uploads and the relay's WebSocket use the same one. */
+    public HttpClient httpClient() {
+        return httpClient;
     }
 
     public String getBytebinUrl() {
@@ -229,6 +247,9 @@ public class EditorHttpTransport {
                     }
                 }
             }
+            // If the body is a JSON object but contains no "key" property (e.g. {"error": "..."}),
+            // it is an error or invalid response and must not be treated as a token.
+            throw new RuntimeException("Byte-store response is JSON but does not contain a 'key' field: " + body);
         }
         return body.replaceAll("[\"'{}\r\n ]", "");
     }

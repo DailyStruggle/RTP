@@ -406,6 +406,65 @@ public abstract class RTPWorld<T> {
   }
 
   /**
+   * Sampled biome read of a subset of chunks in {@code r.<rcx>.<rcz>.mca} for the coarse-first
+   * world biome survey (ADR-104 section 4.6).
+   *
+   * <p>Blocking, off-tick-thread only (S-005). Same key/value contract as
+   * {@link #readBiomesInRegionFile}, restricted to the requested chunks; absent chunks are
+   * omitted. Default delegates to {@link #readBiomesInRegionFile} and filters (correct, not
+   * cheaper); {@code .mca}-backed adapters SHOULD override with a header + per-chunk sector read.
+   *
+   * @param rcx          region-file X coord ({@code cx >> 5})
+   * @param rcz          region-file Z coord ({@code cz >> 5})
+   * @param y            world-Y at which to sample the biome
+   * @param localIndices region-local chunk indices {@code lz * 32 + lx} ({@code lx = cx & 31},
+   *                     {@code lz = cz & 31}); out-of-range entries are ignored
+   * @return chunk-pos-packed -> biome-name map (never null; may be empty)
+   */
+  public Map<Long, String> sampleBiomesInRegionFile(int rcx, int rcz, int y, int[] localIndices) {
+    if (localIndices == null || localIndices.length == 0) return java.util.Collections.emptyMap();
+    Map<Long, String> all = readBiomesInRegionFile(rcx, rcz, y);
+    if (all == null || all.isEmpty()) return java.util.Collections.emptyMap();
+    Map<Long, String> out = new java.util.HashMap<>(Math.max(16, localIndices.length * 2));
+    for (int idx : localIndices) {
+      if (idx < 0 || idx >= 1024) continue;
+      int cx = (rcx << 5) | (idx & 31);
+      int cz = (rcz << 5) | (idx >>> 5);
+      long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
+      String biome = all.get(key);
+      if (biome != null) out.put(key, biome);
+    }
+    return out;
+  }
+
+  /**
+   * Last-modified time (epoch millis) of {@code r.<rcx>.<rcz>.mca}, letting biome-survey callers
+   * skip re-reading unchanged region files (ADR-104 section 4.6).
+   *
+   * <p>Blocking stat, off-tick-thread only (S-005). Default {@code -1} (unknown).
+   *
+   * @param rcx region-file X coord ({@code cx >> 5})
+   * @param rcz region-file Z coord ({@code cz >> 5})
+   * @return mtime in millis, or {@code -1} when unknown, missing or unreadable
+   */
+  public long regionFileModifiedMillis(int rcx, int rcz) {
+    return -1L;
+  }
+
+  /**
+   * Region-file coordinates {@code [rcx, rcz]} of every {@code r.<rcx>.<rcz>.mca} this dimension
+   * has on disk - the files {@link #readBiomesInRegionFile} can read.
+   *
+   * <p>Blocking directory listing, off-tick-thread only (S-005). Default {@code null}: the adapter
+   * cannot list, and callers probe coordinates instead. An empty list means no generated land.
+   *
+   * @return region-file coordinates, or {@code null} when unsupported or unreadable
+   */
+  public java.util.List<int[]> listRegionFiles() {
+    return null;
+  }
+
+  /**
    * Creates a platform at the specified location if necessary to ensure it is safe.
    *
    * @param location the location to create a platform at

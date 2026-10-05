@@ -13,11 +13,30 @@ Marketplace listing metadata (current, for SEO reference):
 
 # LeafRTP - Random Teleport
 
+[![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
+[![Java](https://img.shields.io/badge/Java-21%2B-blue)](https://adoptium.net/)
+[![Platforms](https://img.shields.io/badge/Platforms-Paper%20%7C%20Folia%20%7C%20Fabric%20%7C%20NeoForge%20%7C%20Velocity-orange)](#requirements)
+[![Web Editor](https://img.shields.io/badge/Tooling-Visual%20Web%20Editor-2ea44f)](https://dailystruggle.github.io/RTP/editor/)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=DailyStruggle_RTP&metric=coverage)](https://sonarcloud.io/summary/overall?id=DailyStruggle_RTP)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=DailyStruggle_RTP&metric=bugs)](https://sonarcloud.io/summary/overall?id=DailyStruggle_RTP)
+[![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=DailyStruggle_RTP&metric=sqale_rating)](https://sonarcloud.io/summary/overall?id=DailyStruggle_RTP)
+
 </div>
 
 ## Purpose
 
 **LeafRTP is a `/rtp` command.** It teleports a player to a random, safe spot in the world, in the most cpu-efficient way it can.
+
+## Common setups
+
+Most people just want `/rtp` to work without lagging the server, but the engine handles a few specific setups out of the box:
+
+- **Spawn portal zones with floating text displays:** define a cuboid trigger (`/rtp trigger`) over a physical portal frame. Players walk in, see a floating countdown hologram overhead using vanilla 1.19.4+ text display entities, hear rising note-block chimes, and get teleported out. No external hologram plugin or armor-stand scripting needed.
+- **Group scatter & party drops:** teleport a party or duel queue to random spots while enforcing a minimum block separation between each player (`minSeparation: 32`), so teams or competitors don't land on top of each other.
+- **Sky-drops & Elytra launches:** spawn players high above the terrain ($Y=250+$) with built-in slow falling or glider triggers for survival airdrops.
+- **Faction / Towny perimeter spawns:** teleport players relative to their own town, claim, or faction land (`anchor: claimboundary`) instead of a static map center.
+- **1v1 Arena matchmaking:** pair two queued players into a dedicated subspace bounding box with temporary boundaries, an automatic countdown, and cleanup on exit.
+- **1-command import from other plugins:** `/rtp config import` auto-detects folders left behind by BetterRTP, JustRTP, EzRTP, or JakesRTP and non-destructively translates worlds, shapes, radii, cooldowns, and portal zones into LeafRTP files.
 
 ## Origin
 

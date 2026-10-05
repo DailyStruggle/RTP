@@ -487,4 +487,16 @@ docsExportSuccess: "&a[RTP] Documentatie HTML-bundel succesvol geëxporteerd naa
 docsExportFailed: "&c[RTP] Kan documentatiebundel niet exporteren: [reason]."
 
 # RAAK HET VERSIENUMMER NIET AAN
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Een webeditorpagina vraagt toegang met code &b[nonce]&e. Toont je pagina dezelfde code, klik dan hier om deze browser te vertrouwen."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(sleutel [fingerprint])"
+editorTrustAccepted: "&a[P0] Browser vertrouwd: de editorpagina met code [nonce] kan nu voorbeelden tonen en Hot-Apply gebruiken."
+editorTrustAlready: "&7[P0] De browser met code [nonce] werd al vertrouwd."
+editorTrustUnknown: "&c[P0] Geen open editorsessie heeft code [nonce] uitgegeven."
+editorTrustExpired: "&c[P0] Code [nonce] is verlopen. Herlaad de editorpagina voor een nieuwe."
+editorTrustUsage: "&c[P0] Gebruik: /rtp editor trust nonce=<code die de editorpagina toont>"
+editorChannelOpened: "&a[P0] Webeditorkanaal geopend. Vertrouw je browser wanneer daarom wordt gevraagd om voorbeelden en Hot-Apply in te schakelen."
+editorChannelLost: "&e[P1] Webeditorkanaal verloren: [reason]. De pagina blijft werken vanuit haar momentopname."
+editorChannelExpired: "&7[P0] Webeditorkanaal verlopen na [minutes] minuten. Voer het editorcommando opnieuw uit om verder te gaan."
+
 version: 1.0

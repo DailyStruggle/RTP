@@ -70,8 +70,8 @@ class PregenBiomeExtractorTest {
     }
 
     @Test
-    @DisplayName("ADR-104: EditorSessionManager visualization payload includes pregenLand")
-    void testVisualizationPayloadIncludesPregenLand() {
+    @DisplayName("ADR-104 §4.6: region payload carries no per-region land scan; land is world-wide")
+    void testVisualizationPayloadHasNoPerRegionLand() {
         Square square = new Square();
         square.set(GenericMemoryShapeParams.radius, 256L);
         square.set(GenericMemoryShapeParams.centerRadius, 64L);
@@ -98,14 +98,8 @@ class PregenBiomeExtractorTest {
 
         Map<String, Object> payload = EditorSessionManager.getInstance().generateVisualizationPayload(region);
         assertNotNull(payload);
-        assertTrue(payload.containsKey("pregenLand"), "Payload must contain 'pregenLand' layer");
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> pregenLand = (Map<String, Object>) payload.get("pregenLand");
-        assertNotNull(pregenLand);
-        assertTrue(pregenLand.containsKey("palette"));
-        assertTrue(pregenLand.containsKey("chunks"));
-        assertTrue(pregenLand.containsKey("totalGenerated"));
+        assertFalse(payload.containsKey("pregenLand"), "land is surveyed world-wide, never clipped to a region");
+        assertTrue(payload.containsKey("walkPathData"), "region geometry layers stay in the payload");
     }
 
     @Test

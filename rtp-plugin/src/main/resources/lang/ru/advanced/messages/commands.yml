@@ -488,4 +488,16 @@ docsExportSuccess: "&a[RTP] HTML-пакет документации успеш�
 docsExportFailed: "&c[RTP] Не удалось экспортировать пакет документации: [reason]."
 
 # НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Страница веб-редактора запрашивает доступ с кодом &b[nonce]&e. Если ваша страница показывает тот же код, нажмите здесь, чтобы доверять этому браузеру."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(ключ [fingerprint])"
+editorTrustAccepted: "&a[P0] Браузеру доверено: страница редактора с кодом [nonce] теперь может показывать предпросмотр и использовать Hot-Apply."
+editorTrustAlready: "&7[P0] Браузеру с кодом [nonce] уже доверено."
+editorTrustUnknown: "&c[P0] Ни одна открытая сессия редактора не выдавала код [nonce]."
+editorTrustExpired: "&c[P0] Срок действия кода [nonce] истёк. Перезагрузите страницу редактора, чтобы получить новый."
+editorTrustUsage: "&c[P0] Использование: /rtp editor trust nonce=<код со страницы редактора>"
+editorChannelOpened: "&a[P0] Канал веб-редактора открыт. Подтвердите доверие браузеру по запросу, чтобы включить предпросмотр и Hot-Apply."
+editorChannelLost: "&e[P1] Канал веб-редактора потерян: [reason]. Страница продолжает работать по своему снимку."
+editorChannelExpired: "&7[P0] Канал веб-редактора истёк через [minutes] мин. Снова выполните команду редактора, чтобы продолжить."
+
 version: 1.0

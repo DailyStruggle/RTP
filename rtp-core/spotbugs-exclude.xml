@@ -277,6 +277,14 @@
         <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD,WMI_WRONG_MAP_ITERATOR,NM_CLASS_NAMING_CONVENTION,SS_SHOULD_BE_STATIC,IM_AVERAGE_COMPUTATION_COULD_OVERFLOW,DB_DUPLICATE_BRANCHES,DP_CREATE_CLASSLOADER_INSIDE_DO_PRIVILEGED"/>
     </Match>
 
+    <!-- CBX_CUSTOM_BUILT_XML: EditorSessionManager.exportLocalEditorHtml builds standalone single-file HTML bundle -->
+    <!-- Justification: Standalone air-gap web editor export (ADR-104) generates an offline HTML/JS/CSS bundle with embedded JSON configs; this is an HTML document generation routine, not structured XML, where external XML templates are inapplicable. -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.commands.editor.EditorSessionManager"/>
+        <Method name="exportLocalEditorHtml"/>
+        <Bug pattern="CBX_CUSTOM_BUILT_XML"/>
+    </Match>
+
     <!-- sb-contrib idiom/style detectors (surfaced by the fb-contrib 7.6.4 -> sb-contrib 7.7.4 upgrade). -->
     <!-- These are advisory code-idiom suggestions, not correctness or safety defects; none originate from -->
     <!-- core SpotBugs. Justifications per pattern:                                                        -->

@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.benchmark;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -16,7 +17,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -242,22 +242,10 @@ public class NativeVsUniqueVsL3VisualizerTest {
 
     g.dispose();
 
-    // Save image to multiple paths
-    File outRoot = new File("../native_vs_unique_vs_l3_comparison_chart.png");
-    if (!outRoot.getParentFile().exists()) outRoot = new File("native_vs_unique_vs_l3_comparison_chart.png");
-    ImageIO.write(img, "png", outRoot);
-    System.out.printf("[DEBUG_LOG] Saved comparison chart to %s (%d KB)%n",
-        outRoot.getAbsolutePath(), outRoot.length() / 1024);
-
-    File outDocs = new File("../docs/assets/img/native_vs_unique_vs_l3_comparison_chart.png");
-    if (!outDocs.getParentFile().exists()) outDocs = new File("docs/assets/img/native_vs_unique_vs_l3_comparison_chart.png");
-    outDocs.getParentFile().mkdirs();
-    ImageIO.write(img, "png", outDocs);
-
-    File outServer = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug\\native_vs_unique_vs_l3_comparison_chart.png");
-    if (outServer.getParentFile().exists()) {
-      ImageIO.write(img, "png", outServer);
-    }
+    // Save image to canonical docs and report destinations
+    ChartOutputHelper.writeChart(img, "player_distribution", "native_vs_unique_vs_l3_comparison_chart.png");
+    System.out.printf("[DEBUG_LOG] Saved comparison chart to canonical destination: %s%n",
+        ChartOutputHelper.getDocsAssetFile("native_vs_unique_vs_l3_comparison_chart.png").getAbsolutePath());
   }
 
   private void renderPanel(

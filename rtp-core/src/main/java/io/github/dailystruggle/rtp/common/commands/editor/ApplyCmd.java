@@ -60,7 +60,7 @@ public class ApplyCmd extends BaseRTPCmdImpl {
             @Nullable CommandsAPICommand nextCommand
     ) {
         if (nextCommand != null) {
-            return nextCommand.onCommand(callerId, parameterValues, null);
+            return true;
         }
 
         // S-006: Pre-init fail-closed guard
@@ -88,14 +88,45 @@ public class ApplyCmd extends BaseRTPCmdImpl {
         token = token.trim();
         sendMessage(callerId, "RTP: Fetching configuration payload for token '" + token + "'...");
 
+        applyToken(callerId, token);
+        return true;
+    }
+
+    /**
+     * Executes the full ADR-104 token apply pipeline asynchronously.
+     *
+     * @param callerId UUID of the invoking sender
+     * @param token session token minted by web editor or local session
+     * @return CompletableFuture completing when the payload is validated, written, and hot-reloaded
+     */
+    public CompletableFuture<Void> applyToken(@Nullable UUID callerId, String token) {
         final String finalToken = token;
-        // Check local ephemeral active sessions first
+        // 1. Check local in-memory ephemeral active sessions first
         String localPayload = EditorSessionManager.getInstance().getSession(finalToken);
+
+        // 2. Check local offline file drop (<pluginDir>/editor/<token>.json or <pluginDir>/editor/apply.json)
+        if (localPayload == null && RTP.serverAccessor != null) {
+            try {
+                java.io.File pluginDir = RTP.serverAccessor.getPluginDirectory();
+                if (pluginDir != null) {
+                    java.nio.file.Path editorDir = pluginDir.toPath().resolve("editor");
+                    java.nio.file.Path tokenFile = editorDir.resolve(finalToken.endsWith(".json") ? finalToken : finalToken + ".json");
+                    if (!java.nio.file.Files.exists(tokenFile) && "apply".equalsIgnoreCase(finalToken)) {
+                        tokenFile = editorDir.resolve("apply.json");
+                    }
+                    if (java.nio.file.Files.isRegularFile(tokenFile)) {
+                        localPayload = java.nio.file.Files.readString(tokenFile, java.nio.charset.StandardCharsets.UTF_8);
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
         CompletableFuture<String> payloadFuture = (localPayload != null)
                 ? CompletableFuture.completedFuture(localPayload)
                 : transport.fetchPayload(finalToken);
 
-        payloadFuture.thenCompose(payloadJson -> {
+        return payloadFuture.thenCompose(payloadJson -> {
             sendMessage(callerId, "RTP: Validating payload integrity and syntax...");
             return EditorSessionManager.getInstance().applyPayload(payloadJson);
         }).thenRun(() -> {
@@ -108,8 +139,6 @@ public class ApplyCmd extends BaseRTPCmdImpl {
             sendMessage(callerId, errMsg);
             return null;
         });
-
-        return true;
     }
 
     private void sendMessage(@Nullable UUID callerId, String msg) {

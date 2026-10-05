@@ -18,7 +18,6 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -498,17 +497,10 @@ public class BacklogStrategyComparisonTest {
     g.dispose();
 
     // Save image to target paths
-    File out1 = new File("build/reports/backlog_comparison_chart.png");
-    ChartOutputHelper.writeIfModified(img, out1);
+    ChartOutputHelper.writeChart(img, "backlog", "backlog_comparison_chart.png");
 
-    File out2 = new File("docs/assets/img/backlog_comparison_chart.png");
-    ChartOutputHelper.writeIfModified(img, out2);
-
-    File out3 = new File("backlog_comparison_chart.png");
-    ChartOutputHelper.writeIfModified(img, out3);
-
-    System.out.printf("[DEBUG_LOG] Visualizer chart successfully rendered to:%n  %s%n  %s%n",
-        out1.getAbsolutePath(), out2.getAbsolutePath());
+    System.out.printf("[DEBUG_LOG] Visualizer chart successfully rendered to canonical destination: %s%n",
+        ChartOutputHelper.getDocsAssetFile("backlog_comparison_chart.png").getAbsolutePath());
   }
 
   private void renderStrategyPanel(Graphics2D g, int x, int y, int w, int h, StrategyMetrics m, Color accent, String title) {

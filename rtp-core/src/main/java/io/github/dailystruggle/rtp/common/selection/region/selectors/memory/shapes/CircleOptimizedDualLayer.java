@@ -74,6 +74,14 @@ public class CircleOptimizedDualLayer extends AbstractDualLayerShape {
     return r;
   }
 
+  /** Adds {@code rEff}: it grows with the learned bad area under {@code expand}. */
+  @Override
+  public Map<String, Object> curveState() {
+    Map<String, Object> state = super.curveState();
+    state.put("rEff", getEffectiveRadius());
+    return state;
+  }
+
   /**
    * Returns the effective outer Chebyshev macro-ring index corresponding to the effective radius.
    *

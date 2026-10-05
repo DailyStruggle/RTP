@@ -163,21 +163,45 @@ class DocsRegistryAndEditorTest {
             Map<String, Object> payload = manager.generateVisualizationPayload(region);
             assertNotNull(payload);
             assertEquals("viz_test_reg", payload.get("region"));
-            assertTrue(payload.containsKey("hazards"));
-            assertTrue(payload.containsKey("spiralWalkPath"));
+            // ADR-106 §4.4: Square ships a curve helper, so curve-space runs replace the 2D RLE
+            assertTrue(payload.containsKey("curve"));
+            assertTrue(payload.containsKey("hazardRuns"));
+            assertFalse(payload.containsKey("hazards"));
+            assertFalse(payload.containsKey("spiralWalkPath"), "duplicate seed path removed");
             assertTrue(payload.containsKey("walkPathData"));
             assertTrue(payload.containsKey("biomes"));
             assertTrue(payload.containsKey("heatmap"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> heatmap = (Map<String, Object>) payload.get("heatmap");
+            assertEquals(0L, ((Number) heatmap.get("landings")).longValue(), "real landing total, no placeholder density");
 
             @SuppressWarnings("unchecked")
             Map<String, Object> walkPathData = (Map<String, Object>) payload.get("walkPathData");
             assertNotNull(walkPathData);
             assertEquals(Square.CURVE_SPIRAL, walkPathData.get("curveType"));
             assertFalse((Boolean) walkPathData.get("isHilbert"));
-            assertTrue(walkPathData.containsKey("bins"));
+            assertFalse(walkPathData.containsKey("bins"), "export-time bins replaced by live path tiles");
+            assertFalse(walkPathData.containsKey("points"), "sketch dropped: the page draws from the helper");
+
+            // ADR-104 §4.6 fallback: a shape without a helper keeps the seed polyline and the 2D RLE
+            Square noHelper = new Square("TEST_VIZ_SQUARE_NOHELPER") {
+                @Override
+                public String toJavaScript() {
+                    return null;
+                }
+            };
+            noHelper.setData(square.getData());
+            Region fallbackRegion = new Region("viz_test_reg_fallback", new RegionSettings(
+                    "viz_test_reg_fallback", null, noHelper, new LinearAdjustor(new ArrayList<>()),
+                    false, false, 10L, 100L, 0L, 5, 0.0, 1L, "", false), true, null);
+            Map<String, Object> fallback = manager.generateVisualizationPayload(fallbackRegion);
+            assertFalse(fallback.containsKey("curve"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fallbackPath = (Map<String, Object>) fallback.get("walkPathData");
+            assertFalse(((java.util.List<?>) fallbackPath.get("points")).isEmpty());
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> hazards = (Map<String, Object>) payload.get("hazards");
+            Map<String, Object> hazards = (Map<String, Object>) fallback.get("hazards");
             assertNotNull(hazards.get("rleBase64"));
             assertTrue(((Number) hazards.get("byteSize")).intValue() < 5120);
             // Verify bounds are derived from shape coordinate extents rather than location count
@@ -194,7 +218,7 @@ class DocsRegistryAndEditorTest {
     }
 
     @Test
-    @DisplayName("Dual-layer Hilbert shape generates oriented Hilbert bins in walk path payload")
+    @DisplayName("Dual-layer Hilbert shape reports its curve and point edge in the walk path seed")
     void hilbertWalkPathPayloadGeneration(@TempDir Path tempDir) {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir.toFile());
@@ -233,7 +257,11 @@ class DocsRegistryAndEditorTest {
             assertEquals("SPIRAL_HILBERT", walkPathData.get("curveType"));
             assertTrue((Boolean) walkPathData.get("isHilbert"));
             assertNotNull(walkPathData.get("pointChunks"));
-            assertTrue(walkPathData.containsKey("bins"));
+            assertFalse(walkPathData.containsKey("points"), "helper region: no sketch");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> curve = (Map<String, Object>) payload.get("curve");
+            assertEquals("TEST_HILBERT_SQUARE", curve.get("shape"));
+            assertEquals(walkPathData.get("pointChunks"), ((Map<?, ?>) curve.get("state")).get("p"));
         } finally {
             io.github.dailystruggle.rtp.common.RTP.serverAccessor = null;
         }

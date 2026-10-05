@@ -569,6 +569,70 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Reads only the region header plus each requested chunk's sectors via {@link
+     * io.github.dailystruggle.rtp.anvil.AnvilRegionSampler} (ADR-104 section 4.6). S-005:
+     * blocking, off-tick only.
+     */
+    @Override
+    public java.util.Map<Long, String> sampleBiomesInRegionFile(
+            int rcx, int rcz, int y, int[] localIndices) {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return java.util.Collections.emptyMap();
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            java.nio.file.Path regionFile =
+                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+                            worldFolder, dimensionRegionSubpath(worldFolder, level), rcx << 5, rcz << 5);
+            if (regionFile == null) return java.util.Collections.emptyMap();
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
+                    regionFile, rcx, rcz, y, localIndices, V26_1_R1FabricRTPWorld::canonicaliseBiome);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][v26_1_R1] sampleBiomesInRegionFile failed for world=" + name
+                            + " region=(" + rcx + "," + rcz + "): "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return java.util.Collections.emptyMap();
+        }
+    }
+
+    /** {@inheritDoc} S-005: blocking stat, off-tick only. */
+    @Override
+    public long regionFileModifiedMillis(int rcx, int rcz) {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return -1L;
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.lastModifiedMillis(
+                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+                            worldFolder, dimensionRegionSubpath(worldFolder, level), rcx << 5, rcz << 5));
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][v26_1_R1] regionFileModifiedMillis failed for world=" + name
+                            + " region=(" + rcx + "," + rcz + "): " + t.getMessage());
+            return -1L;
+        }
+    }
+
+    /** {@inheritDoc} Lists this dimension's region directory; S-005: off-tick only. */
+    @Override
+    public java.util.List<int[]> listRegionFiles() {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return null;
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            return io.github.dailystruggle.rtp.anvil.RegionFileResolver.listAnvilRegionCoords(
+                    io.github.dailystruggle.rtp.anvil.RegionFileResolver.regionDirectoryFor(
+                            worldFolder, dimensionRegionSubpath(worldFolder, level)));
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[RTP][v26_1_R1] listRegionFiles failed for world=" + name + ": " + t.getMessage(), t);
+            return null;
+        }
+    }
+
     private static String canonicaliseBiome(String name) {
         if (name == null) return null;
         String up = name.toUpperCase(java.util.Locale.ROOT);

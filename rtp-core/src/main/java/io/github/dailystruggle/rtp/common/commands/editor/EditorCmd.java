@@ -4,6 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
 /**
@@ -19,6 +21,10 @@ import java.util.logging.Level;
  * <p>Posts active server configurations and documentation to the byte-store transport
  * asynchronously on {@code RTP.scheduler} (S-005) and returns a clickable session URL to
  * the operator, never silently swallowing errors (S-004) and failing closed pre-init (S-006).
+ *
+ * <p>Hosted sessions are two-way (ADR-106 §5.4): a relay channel is opened before the upload, the
+ * snapshot names it, and {@link EditorLiveFeed#startHosted} pushes curve, hazard and land updates
+ * over it for the session lifetime. Without a relay the session is snapshot-only (logged).
  */
 public class EditorCmd extends BaseRTPCmdImpl {
 
@@ -35,6 +41,7 @@ public class EditorCmd extends BaseRTPCmdImpl {
         this.transport = transport;
         addSubCommand(new EditorLocalSubCmd(this));
         addSubCommand(new ApplyCmd(this, transport));
+        addSubCommand(new TrustCmd(this));
     }
 
     @Override
@@ -59,7 +66,7 @@ public class EditorCmd extends BaseRTPCmdImpl {
             @Nullable CommandsAPICommand nextCommand
     ) {
         if (nextCommand != null) {
-            return nextCommand.onCommand(callerId, parameterValues, null);
+            return true;
         }
 
         // S-006: Pre-init fail-closed guard
@@ -70,20 +77,39 @@ public class EditorCmd extends BaseRTPCmdImpl {
 
         sendMessage(callerId, "RTP: Generating editor session payload and uploading...");
 
-        // S-005: 100% async scheduling for network and disk I/O
-        CompletableFuture.supplyAsync(() -> {
+        // S-005: 100% async scheduling for network and disk I/O. ADR-106 §5.6: the relay channel opens
+        // before the upload so the snapshot can name it; without it (null) the session is snapshot-only.
+        // Composed, never awaited: openHosted completes (with null on failure) within its own timeouts.
+        AtomicReference<EditorChannel> hosted = new AtomicReference<>();
+        EditorChannelWiring.openHosted(callerId, transport, EditorLiveFeed::active)
+        .thenApplyAsync(ch -> {
+            hosted.set(ch);
             try {
-                return EditorSessionManager.getInstance().createPayloadJson();
+                EditorSessionManager sessions = EditorSessionManager.getInstance();
+                return sessions.createPayloadJson(sessions.collectCurrentConfigs(), ch == null ? null : ch.snapshotBlock());
             } catch (Exception e) {
                 RTP.log(Level.WARNING, "Failed to create editor session payload: " + e.getMessage(), e);
                 throw new RuntimeException("Failed to prepare payload: " + e.getMessage(), e);
             }
         }).thenCompose(transport::postPayload)
         .thenAccept(token -> {
+            EditorChannel ch = hosted.get();
+            if (ch != null) {
+                try {
+                    // Live curve / hazard / land producers for this session, closed with the channel
+                    EditorLiveFeed.startHosted(ch, transport::postPayload);
+                } catch (RuntimeException e) {
+                    RTP.log(Level.WARNING, "[editor] hosted live updates unavailable; the session is snapshot-only: "
+                            + e.getMessage(), e);
+                    ch.close("live feed failed: " + e.getMessage());
+                }
+            }
             String editorUrl = transport.buildEditorUrl(token);
             sendMessage(callerId, "RTP: Editor session created! Open link to edit: " + editorUrl);
             sendMessage(callerId, "RTP: Apply changes back when done using: /rtp editor apply token=" + token);
         }).exceptionally(throwable -> {
+            EditorChannel ch = hosted.get();
+            if (ch != null) ch.close("upload failed");
             // S-004: Zero silent swallows on HTTP failure
             Throwable cause = (throwable.getCause() != null) ? throwable.getCause() : throwable;
             String errMsg = "RTP: Failed to upload editor session to byte-store: " + cause.getMessage();
@@ -96,7 +122,7 @@ public class EditorCmd extends BaseRTPCmdImpl {
                 if (pluginDir == null) pluginDir = new File(".");
                 java.nio.file.Path localPath = pluginDir.toPath().resolve("editor").resolve("index.html");
                 Map<String, String> configs = EditorSessionManager.getInstance().collectCurrentConfigs();
-                EditorSessionManager.getInstance().exportLocalEditorHtml(localPath, configs);
+                EditorLiveFeed.exportAndStart(localPath, configs, callerId);
                 sendMessage(callerId, "RTP: Generated offline local editor bundle at " + localPath.toAbsolutePath());
             } catch (Exception localEx) {
                 RTP.log(Level.WARNING, "Failed to generate fallback local editor: " + localEx.getMessage(), localEx);

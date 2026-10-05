@@ -963,6 +963,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
               }
               if (aBoolean != null && aBoolean) {
                 computeDistance();
+                // ADR-104 heatmap layer: bounded in-memory per-chunk landing count
+                io.github.dailystruggle.rtp.common.metrics.LandingHeatmap.record(
+                    region != null ? region.name : null, location.x(), location.z());
                 String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
                 RTP.serverAccessor.sendMessage(playerId, message);
 
@@ -1075,6 +1078,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
         }
         if (playerId != null) {
           computeDistance();
+          if (destination != null) {
+            io.github.dailystruggle.rtp.common.metrics.LandingHeatmap.record(
+                region != null ? region.name : null, destination.x(), destination.z());
+          }
           String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
           RTP.serverAccessor.sendMessage(playerId, message);
 
