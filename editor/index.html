@@ -3925,6 +3925,8 @@ const CURVE_OVERVIEW_SAMPLES = 65536;
 const CURVE_RUN_SAMPLES = 16384;
 const CURVE_VIEW_MAX_CHUNKS = 131072;
 const CURVE_EXACT_MIN_CHUNK_PX = 2;
+// Overview blocks narrower than this on screen merge 4 at a time (ring of P-bins when zoomed out)
+const CURVE_OVERVIEW_MIN_BLOCK_PX = 8;
 const CURVE_PATH_BUDGET_MS = 8;
 const CURVE_HELPER_MAX_BYTES = 32 * 1024;
 const CURVE_INT32_LIMIT = 2147483648;
@@ -4373,7 +4375,10 @@ function checkCurve(shape, params, state, hash) {
         onIdx.forEach((i, j) => { pairs[2 * j] = xz[2 * i]; pairs[2 * j + 1] = xz[2 * i + 1]; });
         try {
           const back = await CurveSandbox.toLoc(shape, params, state, pairs);
-          invertible = onIdx.every((i, j) => back[j] === pos[i]);
+          // NaN = chunk outside the region domain (CIRCLE tile corners past the disk): no verdict;
+          // only a different position breaks the inverse
+          invertible = onIdx.some((i, j) => back[j] === pos[i])
+            && onIdx.every((i, j) => back[j] !== back[j] || back[j] === pos[i]);
         } catch (e) {
           if (curveReasonOf(e) === 'timeout' || curveReasonOf(e) === 'restart') throw e;
           invertible = false;
@@ -4495,7 +4500,7 @@ async function prepareCurveModel(name, m) {
 
 /*
  * Overview stride: 1 while the range fits CURVE_OVERVIEW_SAMPLES, else the smallest power of 4
- * that does. Each sample then opens an aligned 4^k block (a whole Hilbert sub-square on tiled
+ * that does. Each sample then stands for an aligned 4^k block (a whole Hilbert sub-square on tiled
  * curves), so successive samples stay neighbours along the walk instead of chords across it.
  */
 function curveOverviewStride(range) {
@@ -4504,11 +4509,43 @@ function curveOverviewStride(range) {
   return stride;
 }
 
+// Block middles: on a Hilbert block, position stride/2 is the chunk beside the block centre, so the
+// samples trace the order-reduced curve (block centre to block centre) rather than block corners
 function curveOverviewPositions(range, stride) {
   const n = range > 0 ? Math.ceil(range / stride) : 0;
+  const mid = stride >= 4 ? stride / 2 : 0;
   const pos = new Float64Array(n);
-  for (let i = 0; i < n; i++) pos[i] = i * stride;
+  for (let i = 0; i < n; i++) pos[i] = Math.min(range - 1, i * stride + mid);
   return pos;
+}
+
+// Merge factor (power of 4) so a drawn block spans at least CURVE_OVERVIEW_MIN_BLOCK_PX on screen
+function curveOverviewFactor(stride, chunkPx, n) {
+  let d = 1;
+  while (Math.sqrt(stride * d) * chunkPx < CURVE_OVERVIEW_MIN_BLOCK_PX && d * 4 <= n) d *= 4;
+  return d;
+}
+
+/*
+ * Overview merged d (power of 4) samples at a time: each merged block is drawn at the sample beside
+ * its middle and kept when that sample is (pen != 0). {idx, pen}; d = 1 returns the samples as is.
+ */
+function curveOverviewMerge(xz, pen, stride, d) {
+  const n = xz.length >> 1;
+  if (d <= 1) return { idx: null, pen };
+  const m = Math.ceil(n / d), off = d >> 1, reach = 2 * stride * d + 1;
+  const idx = new Uint32Array(m), out = new Uint8Array(m);
+  let open = false, lx = 0, lz = 0;
+  for (let c = 0; c < m; c++) {
+    const i = Math.min(n - 1, c * d + off);
+    idx[c] = i;
+    if (pen[i] === 0) { open = false; continue; }
+    const x = xz[2 * i], z = xz[2 * i + 1];
+    out[c] = open && Math.max(Math.abs(x - lx), Math.abs(z - lz)) <= reach ? 1 : 2;
+    open = true;
+    lx = x; lz = z;
+  }
+  return { idx, pen: out };
 }
 
 /*
@@ -4628,21 +4665,25 @@ function curveViewFor(m, wox, woy, scale, cssW, cssH) {
   return null;
 }
 
-// Follows the model's cached pen flags (curveOverviewPen): no sandbox call per frame
+// Follows the model's cached pen flags (curveOverviewPen), merged per zoom: no sandbox call per frame
 function strokeCurveOverview(ov, wox, woy, scale, t0) {
-  const xz = ov.xz, pen = ov.pen;
+  const xz = ov.xz;
   const s16 = 16 * scale, ox = wox + 8 * scale, oz = woy + 8 * scale;
+  const d = curveOverviewFactor(ov.stride, s16, xz.length >> 1);
+  if (!ov.merged || ov.merged.d !== d) ov.merged = Object.assign({ d }, curveOverviewMerge(xz, ov.pen, ov.stride, d));
+  const pen = ov.merged.pen, idx = ov.merged.idx;
   ctx.beginPath();
   let lx = 0, lz = 0;
-  for (let i = 0; i < pen.length; i++) {
-    const p = pen[i];
+  for (let c = 0; c < pen.length; c++) {
+    const p = pen[c];
     if (p === 0) continue;
+    const i = idx ? idx[c] : c;
     const px = ox + xz[2 * i] * s16, pz = oz + xz[2 * i + 1] * s16;
     if (p === 2) { ctx.moveTo(px, pz); lx = px; lz = pz; continue; }
     if (Math.abs(px - lx) < 0.75 && Math.abs(pz - lz) < 0.75) continue;
     ctx.lineTo(px, pz);
     lx = px; lz = pz;
-    if ((i & 8191) === 0 && performance.now() - t0 > CURVE_PATH_BUDGET_MS) break;
+    if ((c & 8191) === 0 && performance.now() - t0 > CURVE_PATH_BUDGET_MS) break;
   }
   ctx.stroke();
 }
@@ -4672,7 +4713,8 @@ function drawCurvePath(wox, woy, scale, cssW, cssH) {
   ctx.save();
   ctx.lineWidth = 1.3;
   ctx.strokeStyle = m.estimated ? 'rgba(249, 226, 175, 0.75)' : 'rgba(166, 227, 161, 0.75)';
-  const view = curveViewFor(m, wox, woy, scale, cssW, cssH);
+  // Chunk-by-chunk only once a chunk is legible; below that the merged overview reads better
+  const view = 16 * scale >= CURVE_OVERVIEW_MIN_BLOCK_PX ? curveViewFor(m, wox, woy, scale, cssW, cssH) : null;
   if (view) strokeCurveView(view, wox, woy, scale, t0);
   else if (m.overview) strokeCurveOverview(m.overview, wox, woy, scale, t0);
   ctx.restore();
@@ -7254,8 +7296,11 @@ function setTxt(id, val) {
 // Messages are passive JSON routed by type, never code.
 const CHANNEL_MAX_FRAME = 32 * 1024;
 const CHANNEL_RELAY_RE = /^(ws:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d{1,5}\/rtp-editor-ws\?token=[0-9a-fA-F]{32,128}|wss:\/\/[A-Za-z0-9.\-]{1,253}(:\d{1,5})?\/[A-Za-z0-9_\-\/]{1,128})$/;
-const CHANNEL_PING_MS = 30000;
-// The plugin pushes a feed head when it changes and at least every 60 s; none for this long means it stalled
+const CHANNEL_PING_MS = 15000;
+// Paced relay: a ping only after this long without a page frame; the relay's proxy drops a socket
+// silent for about a minute, and every text frame counts against the per-IP share
+const CHANNEL_QUIET_PING_MS = 40000;
+// The plugin pushes a feed head when it changes and at least every 40 s; none for this long means it stalled
 const CHANNEL_FEED_STALE_MS = 90000;
 // bytesocks counts frames per IP (30 per 2 minutes, page and plugin often sharing one IP) and closes
 // with 1008 over it; on a wss:// relay the page keeps to its share (the plugin keeps to 18).
@@ -7600,7 +7645,8 @@ var EditorChannelClient = (() => {
         const now = pruneSent();
         // Recent traffic already keeps the peer alive; a full frame share must not be overrun by a ping
         const last = st.sentAt.length ? st.sentAt[st.sentAt.length - 1] : 0;
-        if (st.status === 'connected' && now - last < CHANNEL_PING_MS) return;
+        const helloDue = st.status === 'awaiting-trust' && st.nonceExpiresAt && Date.now() > st.nonceExpiresAt;
+        if (!helloDue && now - last < CHANNEL_QUIET_PING_MS) return;
         if (st.sentAt.length >= CHANNEL_PAGE_FRAMES) return;
       }
       if (++st.missedPongs > 3) { try { ws.close(4000, 'no pong'); } catch (e) { /* closing */ } return; }
