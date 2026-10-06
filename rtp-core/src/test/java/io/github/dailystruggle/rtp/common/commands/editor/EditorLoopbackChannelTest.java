@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.LoopbackTransport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -118,6 +119,41 @@ class EditorLoopbackChannelTest {
     void wrongTokenRejected() {
         assertEquals(401, handshakeStatus(EditorLoopbackChannel.newToken(), null));
         assertEquals(0, channel.clientCount());
+    }
+
+    @Test
+    @DisplayName("ADR-104 / ADR-106: a newer local export rotates the token; the previous export's token is refused")
+    void exportRotatesToken() {
+        // Same sequence as EditorLiveFeed.exportAndStart: the old transport is closed, a new one opens.
+        LoopbackTransport first = new LoopbackTransport(token, (t, l) -> channel);
+        assertTrue(first.start(text -> { }).isDone());
+        String firstUrl = first.relay();
+        first.close("superseded by a newer export");
+        assertFalse(first.isOpen());
+        assertFalse(channel.isOpen(), "superseded export's socket is stopped");
+
+        String rotated = EditorLoopbackChannel.newToken();
+        LoopbackTransport second = new LoopbackTransport(rotated, EditorLoopbackChannel::openUnscheduled);
+        assertTrue(second.start(text -> { }).isDone());
+        channel = second.socket();
+        assertFalse(second.relay().equals(firstUrl));
+        assertTrue(second.relay().endsWith("?token=" + rotated));
+
+        assertEquals(401, handshakeStatus(token, null), "previous export's token");
+        assertEquals(0, channel.clientCount());
+        connect(rotated, "null", new Client());
+        pollUntil(() -> channel.clientCount() == 1, "rotated token admitted");
+    }
+
+    @Test
+    @DisplayName("ADR-104: generated loopback tokens are unique 128-bit hex")
+    void newTokenUnique() {
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (int i = 0; i < 256; i++) {
+            String t = EditorLoopbackChannel.newToken();
+            assertTrue(t.matches("[0-9a-f]{32}"), t);
+            assertTrue(seen.add(t), "duplicate token");
+        }
     }
 
     @Test

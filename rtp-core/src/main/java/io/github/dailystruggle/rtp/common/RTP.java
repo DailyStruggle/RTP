@@ -323,6 +323,12 @@ public class RTP {
         if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.NETWORK) {
           String serverId = target.serverId();
           String regionKey = target.name();
+          if (apiTargetPermissionDenied(player, target, null)) {
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
+                "Missing permission for " + target));
+            return future;
+          }
           io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = networkCommandHook;
           if (hook == null
               || hook == io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY) {
@@ -438,6 +444,15 @@ public class RTP {
           }
         }
 
+        // Permission gate before resolution and any charge: same rules as getTargetStatus,
+        // so a GUI menu opened before a revoke (or any addon) cannot bypass it.
+        if (apiTargetPermissionDenied(player, target, null)) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
+              "Missing permission for " + target));
+          return future;
+        }
+
         Region region;
         try {
           region = resolveApiRegion(target, player);
@@ -451,6 +466,14 @@ public class RTP {
           future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
               io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
               "Could not resolve a region/world for " + target));
+          return future;
+        }
+
+        // REGION's requirePermission is only known once resolved.
+        if (apiTargetPermissionDenied(player, target, region)) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
+              "Missing permission for " + target));
           return future;
         }
 
@@ -773,22 +796,7 @@ public class RTP {
         if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.NETWORK) {
           String serverId = target.serverId();
           String regionKey = target.name();
-          boolean peerRegionGated = false;
-          try {
-            io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap gateLive =
-                io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
-            if (gateLive != null && gateLive.peerRegionRegistry() != null) {
-              peerRegionGated = gateLive.peerRegionRegistry()
-                  .peerRegionRequiresPermission(serverId, regionKey);
-            }
-          } catch (Throwable ignored) {
-            // Defensive: a flaky network layer must not crash status reads.
-          }
-          if ((!player.hasPermission("rtp.servers." + serverId)
-                  && !player.hasPermission("rtp.servers.*"))
-              || (peerRegionGated
-                  && !player.hasPermission("rtp.regions." + regionKey)
-                  && !player.hasPermission("rtp.regions.*"))) {
+          if (apiTargetPermissionDenied(player, target, null)) {
             return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
                 io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION, 0L, 0.0);
           }
@@ -822,37 +830,8 @@ public class RTP {
               0L, 0.0, iconBlock, environment, label);
         }
 
-        // Check target permission first
-        boolean noPerm = false;
-        switch (target.kind()) {
-          case REGION:
-            break;
-          case WORLD: {
-            if (configs != null) {
-              ConfigParser<WorldKeys> worldParser = configs.getWorldParser(target.name());
-              boolean requirePerm = worldParser != null
-                  && Boolean.parseBoolean(
-                      worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
-              if (requirePerm
-                  && !player.hasPermission("rtp.worlds." + target.name())
-                  && !player.hasPermission("rtp.worlds.*")) {
-                noPerm = true;
-              }
-            }
-            break;
-          }
-          case BIOME: {
-            if (!player.hasPermission("rtp.biome." + target.name().toLowerCase(Locale.ROOT))
-                && !player.hasPermission("rtp.biome." + target.name().toUpperCase(Locale.ROOT))
-                && !player.hasPermission("rtp.biome.*")) {
-              noPerm = true;
-            }
-            break;
-          }
-          case DEFAULT:
-          default:
-            break;
-        }
+        // Check target permission first; REGION is gated after resolution below.
+        boolean noPerm = apiTargetPermissionDenied(player, target, null);
 
         Region region;
         try {
@@ -890,9 +869,7 @@ public class RTP {
               null, null, target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME ? "Biome: " + target.name() : null);
         }
 
-        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.REGION
-            && region.getSettings().requirePermission()
-            && !player.hasPermission("rtp.regions." + target.name())) {
+        if (!noPerm && apiTargetPermissionDenied(player, target, region)) {
           noPerm = true;
         }
 
@@ -1029,6 +1006,67 @@ public class RTP {
     getInstance().processingPlayers.add(uuid);
     targetRegion.inFlightCalculations.incrementAndGet();
     scheduler.runTaskAsynchronously(task);
+  }
+
+  /**
+   * Target permission gate shared by {@code RTPAPI.teleport} and {@code getTargetStatus}, so an
+   * addon or stale GUI cannot reach a target its status reports as {@code NO_PERMISSION}.
+   * Rules mirror {@code getAllowedTargets}: WORLD needs {@code rtp.worlds.<w>|*} only when the
+   * world sets requirePermission; BIOME needs {@code rtp.biome.<b>|*}; REGION needs
+   * {@code rtp.regions.<r>} when the region sets requirePermission (evaluated only once
+   * {@code region} is resolved); NETWORK needs {@code rtp.servers.<s>|*}, plus
+   * {@code rtp.regions.<r>|*} when the peer advertises the region as gated.
+   *
+   * @param player online player; {@code null} is denied
+   * @param target requested target; {@code null} is denied
+   * @param region resolved region for REGION targets, or {@code null} to defer that check
+   * @return {@code true} if the player lacks a permission the target requires
+   */
+  static boolean apiTargetPermissionDenied(
+      RTPPlayer player, io.github.dailystruggle.rtp.api.RtpTarget target, Region region) {
+    if (player == null || target == null) return true;
+    switch (target.kind()) {
+      case NETWORK: {
+        String serverId = target.serverId();
+        String regionKey = target.name();
+        boolean peerRegionGated = false;
+        try {
+          io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap live =
+              io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
+          if (live != null && live.peerRegionRegistry() != null) {
+            peerRegionGated = live.peerRegionRegistry().peerRegionRequiresPermission(serverId, regionKey);
+          }
+        } catch (Throwable ignored) {
+          // Defensive: a flaky network layer falls back to the server-level gate only.
+        }
+        return (!player.hasPermission("rtp.servers." + serverId)
+                && !player.hasPermission("rtp.servers.*"))
+            || (peerRegionGated
+                && !player.hasPermission("rtp.regions." + regionKey)
+                && !player.hasPermission("rtp.regions.*"));
+      }
+      case WORLD: {
+        if (configs == null) return false;
+        ConfigParser<WorldKeys> worldParser = configs.getWorldParser(target.name());
+        boolean requirePerm = worldParser != null
+            && Boolean.parseBoolean(
+                worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
+        return requirePerm
+            && !player.hasPermission("rtp.worlds." + target.name())
+            && !player.hasPermission("rtp.worlds.*");
+      }
+      case BIOME:
+        return !player.hasPermission("rtp.biome." + target.name().toLowerCase(Locale.ROOT))
+            && !player.hasPermission("rtp.biome." + target.name().toUpperCase(Locale.ROOT))
+            && !player.hasPermission("rtp.biome.*");
+      case REGION:
+        return region != null
+            && region.getSettings().requirePermission()
+            && !player.hasPermission("rtp.regions." + target.name());
+      case DEFAULT:
+      default:
+        return false;
+    }
   }
 
   /**

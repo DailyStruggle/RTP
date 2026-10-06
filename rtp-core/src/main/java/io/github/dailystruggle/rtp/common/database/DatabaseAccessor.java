@@ -763,6 +763,16 @@ public abstract class DatabaseAccessor<D> {
     if (readQueue.isEmpty() && writeQueue.isEmpty() && deleteQueue.isEmpty()) return;
     D database = connect();
     if (database == null) return;
+    // Every exit (stop flag, budget, exception) must release the handle, or pooled
+    // MySQL/PostgreSQL connections are stranded until the pool times out.
+    try {
+      drainQueries(database, availableTime);
+    } finally {
+      disconnect(database);
+    }
+  }
+
+  private void drainQueries(D database, long availableTime) {
     if (stop.get()) return;
     long dt;
     long start = System.nanoTime();
@@ -836,8 +846,6 @@ public abstract class DatabaseAccessor<D> {
       dt = localStop - start;
       if (dt + avgTimeRead > availableTime) break;
     }
-
-    disconnect(database);
   }
 
   /** Start the database accessor */

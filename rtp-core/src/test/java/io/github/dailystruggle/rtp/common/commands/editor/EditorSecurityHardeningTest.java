@@ -135,6 +135,46 @@ class EditorSecurityHardeningTest {
         assertFalse(Files.exists(pluginDir.resolve("fresh.yml")));
     }
 
+    @Test
+    @DisplayName("Flow-style maps and lists holding a secret are redacted and restored as whole values")
+    void flowStyleSecretsRedacted() {
+        String yaml = "db: {host: h, password: fl0w-a}\n"
+                + "json: {\"user\": \"u\", \"apiKey\": \"fl0w-b\"}\n"
+                + "nested: {auth: {user: u, token: fl0w-c}}\n"
+                + "multi: {user: u,\n"
+                + "  password: fl0w-d}\n"
+                + "servers:\n"
+                + "  - {name: a, secret: fl0w-e}\n"
+                + "  - {name: b}\n"
+                + "indented:\n"
+                + "  {credentials: fl0w-f}\n"
+                + "urls: [\"mysql://root:fl0w-g@db/x\"]\n"
+                + "plain: {size: 4, note: don't}\n"
+                + "after:\n"
+                + "  password: fl0w-h\n";
+        String red = EditorSecurity.redactYaml(yaml);
+        for (String s : new String[]{"fl0w-a", "fl0w-b", "fl0w-c", "fl0w-d", "fl0w-e", "fl0w-f", "fl0w-g", "fl0w-h"}) {
+            assertFalse(red.contains(s), s + " leaked:\n" + red);
+        }
+        assertTrue(red.contains("db: \"<redacted>\""), red);
+        assertTrue(red.contains("  - {name: b}"), "a flow value without secrets stays:\n" + red);
+        assertTrue(red.contains("plain: {size: 4, note: don't}"), red);
+
+        assertEquals(yaml, EditorSecurity.restoreRedacted("f.yml", red, yaml));
+        String edited = red.replace("  - {name: b}", "  - {name: c}");
+        assertEquals(yaml.replace("  - {name: b}", "  - {name: c}"), EditorSecurity.restoreRedacted("f.yml", edited, yaml));
+    }
+
+    @Test
+    @DisplayName("A sentinel the restore cannot place is refused, never written to disk")
+    void unplacedSentinelRefused() {
+        String current = "db: {password: real}\n";
+        String incoming = "db: {password: \"<redacted>\", extra: 1}\n";
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> EditorSecurity.restoreRedacted("f.yml", incoming, current));
+        assertTrue(e.getMessage().contains("<redacted>"), e.getMessage());
+    }
+
     // ---- 2. apply path, digest, transport ----
 
     @Test

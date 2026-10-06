@@ -45,6 +45,7 @@ public final class NetworkConfig {
     private final String proxyId;
     private final Role role;
     private final String secretEnv;
+    private final boolean allowUnsigned;
     private final String transportType;
     private final long heartbeatIntervalMs;
     private final long heartbeatStaleAfterMs;
@@ -69,6 +70,7 @@ public final class NetworkConfig {
         this.proxyId = b.proxyId;
         this.role = Objects.requireNonNull(b.role, "role");
         this.secretEnv = b.secretEnv;
+        this.allowUnsigned = b.allowUnsigned;
         this.transportType = Objects.requireNonNull(b.transportType, "transportType");
         this.heartbeatIntervalMs = b.heartbeatIntervalMs;
         this.heartbeatStaleAfterMs = b.heartbeatStaleAfterMs;
@@ -93,6 +95,13 @@ public final class NetworkConfig {
     public String proxyId() { return proxyId; }
     public Role role() { return role; }
     public String secretEnv() { return secretEnv; }
+    /**
+     * {@code network.allowUnsigned} (default {@code false}): operator opt-in to
+     * accept unauthenticated {@code rtp:net} cache pushes when the secret is not
+     * a usable HMAC key. Mirrors the backend key of the same name
+     * (REQ-RTP-PROXY-007).
+     */
+    public boolean allowUnsigned() { return allowUnsigned; }
     public String transportType() { return transportType; }
     public long heartbeatIntervalMs() { return heartbeatIntervalMs; }
     public long heartbeatStaleAfterMs() { return heartbeatStaleAfterMs; }
@@ -184,6 +193,7 @@ public final class NetworkConfig {
         b.serverId      = asStringOrNull(network, "serverId");
         b.proxyId       = asStringOrNull(network, "proxyId");
         b.secretEnv     = asString(network, "secretEnv", "RTP_NET_SECRET");
+        b.allowUnsigned = asBool(network, "allowUnsigned", false);
 
         String roleStr = asString(network, "role", "auto").toLowerCase(Locale.ROOT);
         Role declared;
@@ -406,6 +416,7 @@ public final class NetworkConfig {
         String proxyId;
         Role role;
         String secretEnv;
+        boolean allowUnsigned;
         String transportType;
         long heartbeatIntervalMs;
         long heartbeatStaleAfterMs;

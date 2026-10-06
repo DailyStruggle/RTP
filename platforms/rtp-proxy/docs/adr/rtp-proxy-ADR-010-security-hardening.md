@@ -9,6 +9,12 @@
 ## Amendments
 
 - **2026-05-18** - Kill-switch propagation channel clarified prior to acceptance: the `KILL_SWITCH` flag is carried as a `boolean killSwitch` field on both `ProxyHeartbeat` and `BackendHeartbeat` (rtp-proxy-ADR-001 SPI value classes), defaulting to `false`. The earlier "first byte of every heartbeat payload" phrasing is replaced by this typed field; transports serialise it however their wire format prefers (Redis HSET column, SQL column, etc.). Operators flip the flag on any one host's `network.killSwitch` config; that host's next heartbeat carries `killSwitch=true` and peers honour it within one heartbeat interval, as before.
+- **2026-10-05** - Signing coverage and fail-closed rules:
+  - Canonical byte layouts live in `CanonicalEnvelopes` (delimiter-bearing fields are rejected, never escaped). Reservation tokens (`tokenSig=2`) also cover `regionKey`; redeem verifies the stored HMAC before the atomic claim (Redis Lua ARGV, SQL `hmac = ?`). Request-queue entries (`queueSig=1`) are signed at flush and verified on dequeue. Redis shared-waitlist entries (`waitlistSig=1`) are signed at enrol and verified on drain; `enrolledAtMs` is excluded because the TTL refresh rewrites it, and unverified entries are removed, never dispatched.
+  - Plugin-message heartbeats and proxy-cache snapshots are signed (`PluginMessageEnvelope`, `pmv=2`). Without a secret these transports stay off unless `network.allowUnsigned: true` is set on that host.
+  - `redis`, `sql` and `proxy-direct` shall refuse to start without a decodable secret of at least 32 bytes; there is no in-memory fallback. `proxy-direct` (rtp-proxy-ADR-017) binds loopback by default, supports `allowedClients`, TLS and mTLS under `transport.direct`, and caps accepted sockets. Redis supports TLS (`tls: true` or `rediss://`), an ACL `username` and `passwordEnv`; RESP replies are line-, depth- and element-capped.
+  - Mixed old/new builds cannot share a store; all hosts upgrade together.
+  - Open gap: the plugin-message path stamps liveness with the receiver's clock and does not yet enforce the *Replay Resistance* heartbeat window below (tracked in `docs/dev/POTENTIAL_BUGS.md`).
 
 ## Context
 

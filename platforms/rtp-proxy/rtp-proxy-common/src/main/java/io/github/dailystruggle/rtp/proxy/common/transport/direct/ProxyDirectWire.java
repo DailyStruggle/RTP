@@ -11,6 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Shared wire protocol for the {@code proxy-direct} transport tier
@@ -36,7 +39,7 @@ import java.util.UUID;
  * mode. A {@code null} verifier fails closed: writers throw, readers reject
  * every payload. Verification failure yields {@code null} from
  * {@link #readSignedPayload}, never an exception - the caller drops the row
- * and logs at WARNING (REQ-RTP-S-004).</p>
+ * and logs at WARNING (REQ-RTP-S-004); {@link #readList} fails the whole list.</p>
  *
  * <p>Pure I/O glue, no threading; the proxy listener thread and the backend's
  * scheduler-driven calls own their own sockets.</p>
@@ -104,6 +107,12 @@ public final class ProxyDirectWire {
 
     /** Characters of a token id kept by {@link #redactToken}. */
     public static final int TOKEN_LOG_PREFIX = 8;
+
+    private static final Logger LOG = Logger.getLogger(ProxyDirectWire.class.getName());
+    /** Minimum gap between rejected-list WARNINGs (tamper / secret-mismatch flood guard). */
+    private static final long REJECT_LOG_INTERVAL_MS = 10_000L;
+    private static final AtomicLong lastRejectLogMs = new AtomicLong(Long.MIN_VALUE);
+    private static final AtomicLong suppressedRejects = new AtomicLong();
 
     private ProxyDirectWire() {
     }
@@ -181,8 +190,11 @@ public final class ProxyDirectWire {
     }
 
     /**
-     * Read a count-framed list. Rows that fail HMAC verification are dropped
-     * (omitted from the returned list) rather than aborting the whole read.
+     * Read a count-framed list. Any row failing HMAC verification fails the
+     * whole list with an {@link IOException} (WARNING logged, throttled): a
+     * partial batch would otherwise pass as success (partial enrolment, missing
+     * status rows) and hide tampering or a secret mismatch (REQ-RTP-S-004).
+     * Every frame is consumed first so the error is not a framing artefact.
      */
     public static List<String> readList(DataInputStream in, HmacVerifier verifier) throws IOException {
         int count = in.readInt();
@@ -190,11 +202,32 @@ public final class ProxyDirectWire {
             throw new IOException("proxy-direct list count out of range: " + count);
         }
         List<String> out = new ArrayList<>(count);
+        int rejected = 0;
         for (int i = 0; i < count; i++) {
             String p = readSignedPayload(in, verifier);
             if (p != null) out.add(p);
+            else rejected++;
+        }
+        if (rejected > 0) {
+            String msg = "proxy-direct: " + rejected + " of " + count + " list row(s) failed HMAC "
+                    + "verification (tampering or network.secretEnv mismatch); rejecting the list";
+            logRejectedList(msg);
+            throw new IOException(msg);
         }
         return out;
+    }
+
+    private static void logRejectedList(String msg) {
+        long now = System.currentTimeMillis();
+        long last = lastRejectLogMs.get();
+        if ((last == Long.MIN_VALUE || now - last >= REJECT_LOG_INTERVAL_MS)
+                && lastRejectLogMs.compareAndSet(last, now)) {
+            long suppressed = suppressedRejects.getAndSet(0L);
+            LOG.log(Level.WARNING, msg + (suppressed > 0 ? " (" + suppressed + " similar suppressed)" : "")
+                    + " (REQ-RTP-S-004)");
+        } else {
+            suppressedRejects.incrementAndGet();
+        }
     }
 
     // Back-compat aliases retained for the heartbeat/snapshot exchange.

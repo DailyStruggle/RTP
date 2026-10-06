@@ -164,9 +164,9 @@ class NetworkBindingsTest {
         NetworkWaitlist sql = NetworkBindings.openWaitlist(config("sql", true, true), ds);
         assertTrue(sql instanceof InMemoryNetworkWaitlist);
 
-        // Redis fallback
-        NetworkWaitlist redisWaitlist = NetworkBindings.openWaitlist(config("redis", true, true), null);
-        assertTrue(redisWaitlist instanceof InMemoryNetworkWaitlist);
+        // PATH is not a >= 32-byte Base64 secret: signed redis waitlist fails closed, no in-memory swap.
+        assertThrows(io.github.dailystruggle.rtp.proxy.common.config.NetworkConfigException.class,
+                () -> NetworkBindings.openWaitlist(config("redis", true, true), null));
 
         assertThrows(IllegalArgumentException.class, () -> NetworkBindings.openWaitlist(config("unknown", true, true), null));
     }
@@ -181,9 +181,12 @@ class NetworkBindingsTest {
         WaitlistLeaderLease sql = NetworkBindings.openLeaderLease(config("sql", true, true), ds);
         assertTrue(sql instanceof AlwaysLeaderLease);
 
-        // Redis fallback
+        // Redis connects lazily: an unreachable host still yields the real lease (whose failed
+        // tryAcquire skips the drain), never the always-leader fallback that would let every
+        // proxy drain the shared waitlist.
         WaitlistLeaderLease redisLease = NetworkBindings.openLeaderLease(config("redis", true, true), null);
-        assertNotNull(redisLease);
+        assertTrue(redisLease instanceof io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisLeaderLease,
+                String.valueOf(redisLease));
 
         assertThrows(IllegalArgumentException.class, () -> NetworkBindings.openLeaderLease(config("unknown", true, true), null));
     }

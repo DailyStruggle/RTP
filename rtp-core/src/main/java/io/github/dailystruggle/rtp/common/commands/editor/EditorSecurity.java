@@ -38,6 +38,10 @@ final class EditorSecurity {
             "(?i)(://[^/\\s@:]*:[^/\\s@]*@)|([?&;]\\s*(password|passwd|pwd)=)");
     private static final Pattern KEY = Pattern.compile("^((['\"]?)([A-Za-z0-9_.\\-]+)\\2\\s*:)(\\s.*|)$");
     private static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9_\\-]{1,64}");
+    /** A mapping key inside flow text ({@code {a: 1, "b": 2}}). */
+    private static final Pattern FLOW_KEY = Pattern.compile(
+            "(?:^|[{,\\[\\s])(['\"]?)([A-Za-z0-9_.\\-]+)\\1\\s*:");
+    private static final String REDACTED_QUOTED = "\"" + REDACTED + "\"";
 
     private EditorSecurity() {
     }
@@ -56,7 +60,9 @@ final class EditorSecurity {
 
     /**
      * Line-level redaction: scalar values of secret-named keys (or under one), and any value carrying
-     * URL credentials, become {@code "<redacted>"}; a secret block scalar loses its body lines.
+     * URL credentials, become {@code "<redacted>"}; a secret block scalar loses its body lines. A flow
+     * collection ({@code {..}} / {@code [..]}, single- or multi-line) holding a secret key or URL
+     * credentials is redacted as a whole value.
      */
     static String redactYaml(String text) {
         if (text == null || text.isEmpty()) return text;
@@ -70,16 +76,17 @@ final class EditorSecurity {
             if (l.path != null) {
                 boolean secret = isSecretPath(l.path);
                 if (l.block) {
-                    if (secret) {
-                        out = l.head() + " \"" + REDACTED + "\"" + l.cr();
+                    if (secret || (l.flow && flowHasSecret(ownedText(lines, k)))) {
+                        out = l.head() + (l.bare ? "" : " ") + REDACTED_QUOTED + l.cr();
                         dropped.add(k);
                     }
                 } else {
                     String[] sv = splitValue(l.rest);
                     String plain = unquote(sv[0]);
                     if (!plain.isEmpty() && !isNullish(sv[0]) && !plain.equals(REDACTED)
-                            && (secret || URL_CREDENTIALS.matcher(plain).find())) {
-                        out = l.head() + " \"" + REDACTED + "\"" + sv[1] + l.cr();
+                            && (secret || URL_CREDENTIALS.matcher(plain).find()
+                                || (l.flow && flowHasSecret(l.rest)))) {
+                        out = l.head() + (l.bare ? "" : " ") + REDACTED_QUOTED + sv[1] + l.cr();
                     }
                 }
             }
@@ -91,9 +98,11 @@ final class EditorSecurity {
 
     /**
      * {@code incoming} with each {@link #REDACTED} value replaced by the value at the same key path in
-     * {@code current} (block scalar bodies included), so a round trip never writes the sentinel.
+     * {@code current} (block scalar and multi-line flow bodies included), so a round trip never writes
+     * the sentinel.
      *
-     * @throws IllegalArgumentException when a sentinel has no current value to keep
+     * @throws IllegalArgumentException when a sentinel has no current value to keep, or any sentinel
+     *     beyond those already on disk would remain in the result
      */
     static String restoreRedacted(String file, String incoming, String current) {
         if (incoming == null || !incoming.contains(REDACTED)) return incoming;
@@ -101,7 +110,11 @@ final class EditorSecurity {
         List<Line> cur = current == null ? List.of() : walk(current);
         Map<String, Integer> byPath = new HashMap<>();
         for (int k = 0; k < cur.size(); k++) {
-            if (cur.get(k).path != null) byPath.putIfAbsent(cur.get(k).path, k);
+            Line c = cur.get(k);
+            if (c.path == null) continue;
+            // A bare value line ("key:" then an indented flow) carries the value of its path.
+            if (c.bare) byPath.put(c.path, k);
+            else byPath.putIfAbsent(c.path, k);
         }
         StringBuilder sb = new StringBuilder(incoming.length() + 64);
         for (int k = 0; k < in.size(); k++) {
@@ -127,7 +140,64 @@ final class EditorSecurity {
             sb.append(out);
             for (String b : body) sb.append('\n').append(b);
         }
+        String result = sb.toString();
+        // Fail closed: an unmatched sentinel would overwrite the real secret on disk.
+        if (countOf(result, REDACTED) > countOf(current == null ? "" : current, REDACTED)) {
+            throw new IllegalArgumentException("'" + file + "' still contains " + REDACTED
+                    + " where no current value could be matched; enter the real value");
+        }
+        return result;
+    }
+
+    private static int countOf(String text, String needle) {
+        int n = 0;
+        for (int i = text.indexOf(needle); i >= 0; i = text.indexOf(needle, i + needle.length())) n++;
+        return n;
+    }
+
+    /** {@code lines[k]}'s value plus its owned continuation lines. */
+    private static String ownedText(List<Line> lines, int k) {
+        StringBuilder sb = new StringBuilder(lines.get(k).rest);
+        for (int j = k + 1; j < lines.size() && lines.get(j).owner == k; j++) sb.append('\n').append(lines.get(j).raw);
         return sb.toString();
+    }
+
+    /** Flow text holding a secret-named key or URL credentials (over-matching only over-redacts). */
+    static boolean flowHasSecret(String text) {
+        if (text == null) return false;
+        if (URL_CREDENTIALS.matcher(text).find()) return true;
+        Matcher m = FLOW_KEY.matcher(text);
+        while (m.find()) {
+            if (isSecretKey(m.group(2))) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Net flow nesting change of one line: brackets outside quotes, up to a comment. A quote opens
+     * only at a token start, so an apostrophe inside a plain scalar does not.
+     */
+    private static int flowDelta(String s) {
+        int d = 0;
+        char q = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (q != 0) {
+                if (q == '"' && c == '\\') {
+                    i++;
+                } else if (c == q) {
+                    q = 0;
+                }
+                continue;
+            }
+            char prev = i == 0 ? ' ' : s.charAt(i - 1);
+            boolean tokenStart = Character.isWhitespace(prev) || prev == '{' || prev == '[' || prev == ',' || prev == ':';
+            if ((c == '"' || c == '\'') && tokenStart) q = c;
+            else if (c == '#' && Character.isWhitespace(prev)) break;
+            else if (c == '{' || c == '[') d++;
+            else if (c == '}' || c == ']') d--;
+        }
+        return d;
     }
 
     static boolean isSecretKey(String key) {
@@ -157,6 +227,10 @@ final class EditorSecurity {
         String rest;
         int headEnd;
         boolean block;
+        /** Value is a flow collection; with {@link #block} it continues on owned lines. */
+        boolean flow;
+        /** Value line without a key (list item or indented value of the enclosing key). */
+        boolean bare;
         int owner = -1;
 
         Line(String raw) {
@@ -176,7 +250,10 @@ final class EditorSecurity {
         }
     }
 
-    /** Indentation-tracked key paths ({@code a.b}, list items {@code a.[0].b}); flow / multi-line scalars are opaque. */
+    /**
+     * Indentation-tracked key paths ({@code a.b}, list items {@code a.[0].b}). A flow collection is one
+     * value (continuation lines owned like a block scalar body); multi-line plain scalars are opaque.
+     */
     private static List<Line> walk(String text) {
         String[] raw = text.split("\n", -1);
         List<Line> out = new ArrayList<>(raw.length);
@@ -185,12 +262,26 @@ final class EditorSecurity {
         Map<String, Integer> items = new HashMap<>();
         int blockOwner = -1;
         int blockIndent = -1;
+        int flowOwner = -1;
+        int flowIndent = -1;
+        int flowDepth = 0;
         for (String r : raw) {
             Line l = new Line(r);
             out.add(l);
             String body = l.body();
             int indent = 0;
             while (indent < body.length() && body.charAt(indent) == ' ') indent++;
+            if (flowOwner >= 0) {
+                String s = body.substring(indent);
+                // Flow lines sit deeper than the owner; a shallower non-closer ends an unbalanced flow.
+                if (body.isBlank() || indent > flowIndent || s.startsWith("}") || s.startsWith("]")) {
+                    l.owner = flowOwner;
+                    flowDepth += flowDelta(body);
+                    if (flowDepth <= 0) flowOwner = -1;
+                    continue;
+                }
+                flowOwner = -1;
+            }
             if (blockOwner >= 0) {
                 if (body.isBlank() || indent > blockIndent) {
                     l.owner = blockOwner;
@@ -219,18 +310,36 @@ final class EditorSecurity {
                 if (t.isEmpty()) continue;
             }
             Matcher m = KEY.matcher(t);
-            if (!m.matches()) continue;
-            pop(indents, keys, keyIndent);
-            indents.add(keyIndent);
-            keys.add(m.group(3));
-            l.path = String.join(".", keys);
-            l.rest = m.group(4);
-            l.headEnd = body.length() - l.rest.length();
+            if (!m.matches()) {
+                boolean flowStart = t.startsWith("{") || t.startsWith("[");
+                if (!flowStart && !splitValue(t)[0].equals(REDACTED_QUOTED)) continue;
+                pop(indents, keys, keyIndent);
+                l.path = String.join(".", keys);
+                l.rest = t;
+                l.headEnd = body.length() - t.length();
+                l.bare = true;
+            } else {
+                pop(indents, keys, keyIndent);
+                indents.add(keyIndent);
+                keys.add(m.group(3));
+                l.path = String.join(".", keys);
+                l.rest = m.group(4);
+                l.headEnd = body.length() - l.rest.length();
+            }
             String v = l.rest.strip();
             if (v.startsWith("|") || v.startsWith(">")) {
                 l.block = true;
                 blockOwner = out.size() - 1;
                 blockIndent = keyIndent;
+            } else if (v.startsWith("{") || v.startsWith("[")) {
+                l.flow = true;
+                int depth = flowDelta(l.rest);
+                if (depth > 0) {
+                    l.block = true;
+                    flowOwner = out.size() - 1;
+                    flowIndent = indent;
+                    flowDepth = depth;
+                }
             }
         }
         return out;

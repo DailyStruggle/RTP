@@ -201,6 +201,33 @@ final class InMemoryNetworkRequestQueueTest {
     }
 
     @Test
+    void terminal_transition_and_cancel_scrub_the_idempotency_set() throws Exception {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        q.enrol(env(a)).get(2, TimeUnit.SECONDS);
+        q.enrol(env(b)).get(2, TimeUnit.SECONDS);
+        assertEquals(2, q.seenCorrelationCount());
+
+        q.transition(a, QueueState.COMPLETED, Optional.empty()).get(2, TimeUnit.SECONDS);
+        q.cancel(b, CancelReason.PLAYER_DISCONNECT).get(2, TimeUnit.SECONDS);
+        assertEquals(0, q.seenCorrelationCount(), "seen ids must not accumulate forever");
+    }
+
+    @Test
+    void ready_depth_is_capped_and_overflow_is_rejected_for_retry() throws Exception {
+        List<EnrolmentEnvelope> batch = new java.util.ArrayList<>();
+        for (int i = 0; i <= InMemoryNetworkRequestQueue.MAX_READY_DEPTH; i++) {
+            batch.add(env(UUID.randomUUID()));
+        }
+        assertEquals(EnrolOutcome.REJECTED, q.flushPending(batch).get(60, TimeUnit.SECONDS));
+        assertEquals(InMemoryNetworkRequestQueue.MAX_READY_DEPTH, q.readyDepth());
+        assertEquals(EnrolOutcome.REJECTED, q.enrol(env(UUID.randomUUID())).get(2, TimeUnit.SECONDS));
+        // The accepted rows replay idempotently when the backend retries the batch.
+        assertEquals(EnrolOutcome.REJECTED, q.flushPending(batch).get(60, TimeUnit.SECONDS));
+        assertEquals(InMemoryNetworkRequestQueue.MAX_READY_DEPTH, q.readyDepth());
+    }
+
+    @Test
     void invoking_an_in_memory_request_then_shutdown_does_not_leak_threads() {
         // best-effort: shutdown must not throw and must be idempotent.
         assertDoesNotThrow(() -> {

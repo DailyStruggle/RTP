@@ -219,12 +219,12 @@ public class ClaimAnchoredRegionTrackerTest {
     targetCircle.set(GenericMemoryShapeParams.centerZ, 0L);
     targetCircle.set(GenericMemoryShapeParams.expand, false);
 
-    // Mark chunk (cx=2, cz=2) -> block center (40, 40) as bad in source
-    long loc1D = sourceCircle.xzToLocation(40, 40);
+    // Shape keys are chunk units: mark chunk (2, 2) (blocks 32..47) as bad in source
+    long loc1D = sourceCircle.xzToLocation(2, 2);
     sourceCircle.addBadChunk(loc1D, LocationGenerator.FailTypes.biome);
-    assertTrue(sourceCircle.isKnownBad(40, 40));
+    assertTrue(sourceCircle.isKnownBad(2, 2));
 
-    assertFalse(targetCircle.isKnownBad(40, 40));
+    assertFalse(targetCircle.isKnownBad(2, 2));
 
     // Claim boundary covering chunk (2, 2)
     RectangularClaimBoundary boundary = new RectangularClaimBoundary("faction_c", "world", 0, 0, 64, 64);
@@ -234,8 +234,9 @@ public class ClaimAnchoredRegionTrackerTest {
     int ingested = ClaimAnchoredRegionTracker.ingestMemoryFromRegion(sourceRegion, targetCircle, boundary);
     assertTrue(ingested > 0, "Ingestion must have imported at least 1 hazard chunk");
     targetCircle.flushAndRebuild(0L);
-    assertTrue(targetCircle.isKnownBad(40, 40), "Target circle must now know that chunk (2, 2) is bad");
-    assertTrue(targetCircle.causeAt(40, 40) >= 0);
+    assertTrue(targetCircle.isKnownBad(2, 2), "Target circle must now know that chunk (2, 2) is bad");
+    assertTrue(targetCircle.causeAt(2, 2) >= 0);
+    assertFalse(targetCircle.isKnownBad(40, 40), "Block-center key (40, 40) is a different chunk");
   }
 
   @Test
@@ -281,24 +282,47 @@ public class ClaimAnchoredRegionTrackerTest {
     hooks.claimBoundaries().register(provider);
     io.github.dailystruggle.rtp.api.RTPAPI.hooks = hooks;
 
-    // Initially, locations inside claim are not known bad
-    assertFalse(circle.isKnownBad(64, 64));
-    assertFalse(circle.isKnownBad(96, 96));
-    assertFalse(circle.isKnownBad(128, 128));
+    // Shape keys are chunk units: blocks [64, 128] are chunks [4, 8]
+    assertFalse(circle.isKnownBad(4, 4));
+    assertFalse(circle.isKnownBad(6, 6));
+    assertFalse(circle.isKnownBad(8, 8));
 
-    // A candidate hit at (80, 80) fails claim verifier -> encapsulateClaim called
+    // A candidate hit at block (80, 80) fails claim verifier -> encapsulateClaim called
     int marked = ClaimAnchoredRegionTracker.encapsulateClaim(circle, "world", 80, 80, null);
     assertTrue(marked > 0, "Must have marked at least 1 coordinate");
+    assertTrue(marked <= 3 * 5 * 5, "At most three spiral indices per claimed chunk, got " + marked);
 
-    // All coordinates/chunks within the claim bounding box must now be known bad!
-    assertTrue(circle.isKnownBad(64, 64), "Min boundary point must be marked bad");
-    assertTrue(circle.isKnownBad(80, 80), "Candidate hit point must be marked bad");
-    assertTrue(circle.isKnownBad(96, 96), "Interior point must be marked bad");
-    assertTrue(circle.isKnownBad(128, 128), "Max boundary point must be marked bad");
+    // Every claimed chunk must now be known bad
+    assertTrue(circle.isKnownBad(4, 4), "Min boundary chunk must be marked bad");
+    assertTrue(circle.isKnownBad(5, 5), "Candidate hit chunk must be marked bad");
+    assertTrue(circle.isKnownBad(6, 6), "Interior chunk must be marked bad");
+    // containsChunk samples the chunk centre: chunk 8 (centre 136) lies outside a claim ending at 128
+    assertTrue(circle.isKnownBad(7, 7), "Last fully claimed chunk must be marked bad");
 
-    // Coordinates outside the claim bounding box remain unaffected
-    assertFalse(circle.isKnownBad(0, 0), "Point outside claim must remain good");
-    assertFalse(circle.isKnownBad(200, 200), "Point outside claim must remain good");
+    // Block coordinates read as chunk keys point ~16x farther out and must stay good
+    assertFalse(circle.isKnownBad(64, 64), "Chunk (64, 64) lies outside the claim");
+    assertFalse(circle.isKnownBad(96, 96), "Chunk (96, 96) lies outside the claim");
+    assertFalse(circle.isKnownBad(128, 128), "Chunk (128, 128) lies outside the claim");
+    assertFalse(circle.isKnownBad(0, 0), "Chunk outside claim must remain good");
+    assertFalse(circle.isKnownBad(12, 12), "Chunk outside claim must remain good");
+  }
+
+  @Test
+  @DisplayName("REQ-RTP-S-003: claim hit without a resolvable boundary marks the hit's chunk, not the block key")
+  void testEncapsulateClaimFallbackUsesChunkOfHit() {
+    Circle circle = new Circle();
+    circle.set(GenericMemoryShapeParams.centerRadius, 0L);
+    circle.set(GenericMemoryShapeParams.radius, 500L);
+    circle.set(GenericMemoryShapeParams.centerX, 0L);
+    circle.set(GenericMemoryShapeParams.centerZ, 0L);
+    circle.set(GenericMemoryShapeParams.expand, false);
+    io.github.dailystruggle.rtp.api.RTPAPI.hooks = new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
+
+    int marked = ClaimAnchoredRegionTracker.encapsulateClaim(circle, "world", 80, 80, null);
+    assertTrue(marked > 0, "Fallback must mark the hit chunk");
+    circle.flushAndRebuild(0L);
+    assertTrue(circle.isKnownBad(5, 5), "Block (80, 80) lies in chunk (5, 5)");
+    assertFalse(circle.isKnownBad(80, 80), "Chunk (80, 80) is ~1,280 blocks away from the hit");
   }
 
   @Test
@@ -346,6 +370,40 @@ public class ClaimAnchoredRegionTrackerTest {
     tracker.invalidate("c1");
     tracker.invalidate(null);
     tracker.clear();
+  }
+
+  @Test
+  @DisplayName("anchorCache stays bounded under claim churn and keeps recently resolved anchors")
+  void testAnchorCacheBoundedUnderChurn() {
+    assertThrows(IllegalArgumentException.class,
+        () -> new ClaimAnchoredRegionTracker(1, TimeUnit.HOURS, 0));
+    ClaimAnchoredRegionTracker tracker = new ClaimAnchoredRegionTracker(1, TimeUnit.HOURS, 10);
+    RectangularClaimBoundary hot = new RectangularClaimBoundary("hot", "world", 10, 10, 50, 50);
+    assertEquals(30, tracker.resolveAnchor(hot, 0L)[0]);
+
+    for (int i = 0; i < 500; i++) {
+      long now = 1_000L + i;
+      tracker.resolveAnchor(new RectangularClaimBoundary("churn_" + i, "world", i, i, i + 16, i + 16), now);
+      tracker.resolveAnchor(hot, now);
+      assertTrue(tracker.size() <= 10, "Cache exceeded cap at insert " + i + ": " + tracker.size());
+    }
+
+    // The hot claim survived eviction: its pinned centre is preserved within the cooldown.
+    hot.updateBounds(15, 15, 55, 55);
+    assertEquals(30, tracker.resolveAnchor(hot, 2_000L)[0], "Recently resolved anchor must not be evicted");
+  }
+
+  @Test
+  @DisplayName("anchorCache drops idle entries once the cap is exceeded")
+  void testAnchorCacheIdleEviction() {
+    ClaimAnchoredRegionTracker tracker = new ClaimAnchoredRegionTracker(1, TimeUnit.MINUTES, 10);
+    for (int i = 0; i < 10; i++) {
+      tracker.resolveAnchor(new RectangularClaimBoundary("old_" + i, "world", 0, 0, 16, 16), 0L);
+    }
+    assertEquals(10, tracker.size());
+    long later = TimeUnit.HOURS.toMillis(2);
+    tracker.resolveAnchor(new RectangularClaimBoundary("fresh", "world", 0, 0, 16, 16), later);
+    assertEquals(1, tracker.size(), "Entries idle beyond the TTL must be dropped on overflow");
   }
 
   @Test

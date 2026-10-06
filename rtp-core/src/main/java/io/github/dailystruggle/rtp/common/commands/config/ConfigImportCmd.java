@@ -361,6 +361,8 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
 
         sendMessage(callerId, "&a[RTP] Discovered groups: &f" + String.join(", ", discoveredGroups));
 
+        Set<String> derivedSources = ConfigImportPermissionsCmd.deriveSourcesFor(callerId, sourceFilter, this::sendMessage);
+
         int totalMigrated = 0;
         int totalPlanned = 0;
 
@@ -375,10 +377,11 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
             if (parsedNodes.isEmpty()) continue;
 
             PermissionMigrationService.MigrationPlan plan =
-                    permissionMigrationService.planMigration("group", group, parsedNodes, sourceFilter, apply);
+                    permissionMigrationService.planMigration("group", group, parsedNodes, sourceFilter, derivedSources, apply);
 
             totalPlanned += plan.getGeneratedCommands().size();
             totalMigrated += plan.getExecutedCommands().size();
+            ConfigImportPermissionsCmd.reportSkippedPrivileged(callerId, group, plan, this::sendMessage);
 
             if (!apply) {
                 for (PermissionMigrationService.PermissionEntry entry : plan.getMappedEntries()) {

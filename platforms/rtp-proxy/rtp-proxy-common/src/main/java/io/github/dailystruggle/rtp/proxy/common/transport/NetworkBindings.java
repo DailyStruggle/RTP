@@ -261,6 +261,11 @@ public final class NetworkBindings {
      * Redis-backed waitlist releases its {@link io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool}.
      * The in-memory waitlist does not implement {@link AutoCloseable} and
      * needs no teardown.</p>
+     *
+     * <p>{@code redis} waitlist entries are HMAC-signed (rtp-proxy-ADR-010)
+     * with a verifier loaded from {@code network.secretEnv}; load failure
+     * throws {@link NetworkConfigException} (fail closed, no in-memory
+     * fallback), mirroring {@link #open(NetworkConfig, DataSource)}.</p>
      */
     public static NetworkWaitlist openWaitlist(NetworkConfig cfg, DataSource dataSource) {
         Objects.requireNonNull(cfg, "cfg");
@@ -284,9 +289,13 @@ public final class NetworkBindings {
                                 + "(cross-proxy waitlist will not propagate via SQL).");
                 return new InMemoryNetworkWaitlist(cfg.waitlistMaxSize());
             case "redis":
+                // Outside the try: NetworkConfigException is a RuntimeException
+                // and must not reach the in-memory fallback below.
+                HmacVerifier waitlistVerifier = loadVerifierOrFail(cfg, "redis waitlist");
                 try {
                     return new RedisNetworkWaitlist(
-                            cfg.redisHost(), cfg.redisPort(), cfg.redisPassword(), cfg.waitlistMaxSize());
+                            cfg.redisHost(), cfg.redisPort(), cfg.redisPassword(), cfg.waitlistMaxSize(),
+                            waitlistVerifier, cfg.schemaVersion());
                 } catch (RuntimeException e) {
                     LOG.log(Level.WARNING,
                             "NetworkBindings.openWaitlist: redis waitlist open failed; "
@@ -308,9 +317,13 @@ public final class NetworkBindings {
      * deployments mutually exclude drain pulses; other kinds fall back to
      * {@link AlwaysLeaderLease}, which is safe only on single-proxy installs.
      *
-     * <p>Open-time failures on the Redis path degrade to {@link AlwaysLeaderLease}
-     * with a WARNING log; a misconfigured Redis host therefore continues to
-     * drain locally rather than freezing the waitlist subsystem.</p>
+     * <p>Open-time failures on the Redis path throw {@link IllegalStateException}
+     * (fail closed): an {@link AlwaysLeaderLease} in front of a Redis waitlist
+     * shared by several proxies would let every proxy drain it at once. Callers
+     * run without the waitlist, so no-backend dispatches resolve as terminal
+     * {@code FAILED} with a status message instead.</p>
+     *
+     * @throws IllegalStateException when the Redis lease cannot be opened
      */
     public static WaitlistLeaderLease openLeaderLease(NetworkConfig cfg, DataSource dataSource) {
         Objects.requireNonNull(cfg, "cfg");
@@ -336,11 +349,12 @@ public final class NetworkBindings {
                 try {
                     return new RedisLeaderLease(cfg.redisHost(), cfg.redisPort(), cfg.redisPassword());
                 } catch (RuntimeException e) {
-                    LOG.log(Level.WARNING,
+                    LOG.log(Level.SEVERE,
                             "NetworkBindings.openLeaderLease: redis leader lease open failed; "
-                                    + "falling back to AlwaysLeaderLease (safe only on single-proxy "
-                                    + "installs): " + e.getMessage());
-                    return new AlwaysLeaderLease();
+                                    + "waitlist DISABLED this session (an unleased drain would race "
+                                    + "other proxies on the shared waitlist): " + e.getMessage());
+                    throw new IllegalStateException(
+                            "redis waitlist leader lease unavailable: " + e.getMessage(), e);
                 }
             default:
                 throw new IllegalArgumentException(

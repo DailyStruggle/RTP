@@ -2,9 +2,11 @@
 # gradlew.bat sets RTP_GRADLE_SELF (its own path) and RTP_GRADLE_RAW_ARGS (its verbatim %*), then runs
 # this file. The arguments are only data here: they are never spliced into PowerShell source, and
 # gradlew.bat is re-run through cmd.exe with the same raw command line, so quoting survives unchanged.
-# Single-module runs (every target under one :module) take a per-module lock after checking that no
-# global build holds the global lock; anything else takes the global lock. A lock left by a killed
-# process is abandoned, which the next waiter treats as acquired.
+# Single-module runs (every target under one :module) take a per-module lock while briefly holding the
+# global lock; anything else takes the global lock and then waits for every module lock named in
+# settings.gradle to drain, so a full build never overlaps a running module build. Both paths take
+# the global lock first, so they cannot deadlock. A lock left by a killed process is abandoned, which
+# the next waiter treats as acquired.
 
 $raw = $env:RTP_GRADLE_RAW_ARGS
 $self = $env:RTP_GRADLE_SELF
@@ -74,6 +76,30 @@ if ($modules.Count -eq 1 -and -not $hasOtherTasks -and $modules[0] -ne '__ROOT__
         }
     }
     $held = $globalMutex
+    # Module runs need the global lock to start, so once each module lock is free it stays free.
+    $settings = Join-Path (Split-Path -Parent $self) 'settings.gradle'
+    $tops = @()
+    if (Test-Path -LiteralPath $settings) {
+        $tops = @([regex]::Matches([IO.File]::ReadAllText($settings), 'include\s*\(?\s*[''"]:?([A-Za-z0-9_.\-]+)') |
+            ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+    }
+    foreach ($top in $tops) {
+        $m = [System.Threading.Mutex]::new($false, ('Global\RTP_Gradle_Lock_' + $top))
+        try {
+            while (-not (Wait-Mutex $m 5000)) {
+                $waited += 5
+                [Console]::Out.WriteLine('[gradlew] Waiting for module build :' + $top + ' to finish... (' + $waited + 's)')
+                if ($waited -ge $timeoutSeconds) {
+                    [Console]::Error.WriteLine('[gradlew] Timed out waiting for module lock :' + $top)
+                    $globalMutex.ReleaseMutex()
+                    exit 1
+                }
+            }
+            $m.ReleaseMutex()
+        } finally {
+            $m.Dispose()
+        }
+    }
 }
 
 # Called at script level, not from a function: a function would capture Gradle's output as its

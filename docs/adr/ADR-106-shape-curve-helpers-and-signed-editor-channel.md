@@ -251,6 +251,13 @@ The page has one `EditorChannelClient` (keys, signing, verification, handshake, 
 - A stolen channel id gives read access to live map data. It is as sensitive as the bytebin key, which is already unlisted. Writes need a trusted, signed browser key.
 - The plugin only connects outbound, so the zero-inbound rule of ADR-104 section 2 still holds.
 
+### 5.8 Amendment (2026-10-05): Snapshot redaction, apply limits, trust lifetime
+- **Redaction:** secret-bearing config values (block and inline/flow style) are replaced by a `<redacted>` sentinel in every snapshot, hosted or local. On apply, a value still equal to the sentinel keeps the on-disk value, so a round trip never writes the placeholder.
+- **Apply limits:** only `.yml` files inside the plugin folder, never under `editor/`, resolved through symlinks before containment is checked. A bytebin hand-off requires its `sha256`; outbound URLs are https / wss except loopback; gzip bodies are capped at 4 MiB.
+- **Trust lifetime:** `/rtp editor untrust key=<fingerprint prefix|all>` revokes trusted browser keys. `editor.trust.maxAgeDays` in `advanced/network.yml` (default `0`, no expiry) expires old trust entries. The trust prompt shows the full fingerprint, and wrong trust codes are limited to 5 per minute.
+- **Sessions:** sessions expire after 30 minutes, at most 32 are open at once, and tokens are logged by prefix only. The key file and local exports are owner-only, Windows included. Each local export closes the previous loopback socket and opens a new one with a fresh token.
+- **Hosted page:** `no-referrer` and a CSP meta tag; `?token=` is removed from the address bar after load; fetched docs HTML is sanitised, and links are limited to an allow-list.
+
 ---
 
 ## 6. Snapshot Size

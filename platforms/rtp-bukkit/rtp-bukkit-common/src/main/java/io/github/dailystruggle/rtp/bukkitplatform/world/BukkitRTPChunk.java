@@ -332,7 +332,8 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
       Set<String> set = (reconciledUnsafe != null) ? reconciledUnsafe : reconciledUnsafeSet;
       return anvilView.isSafe(x & 0xF, y, z & 0xF, set);
     }
-    if (chunk == null) return true;
+    // S-001: no live chunk and no snapshot means the block is unknown, which is unsafe.
+    if (chunk == null) return false;
     // Live chunk path: reconcile both the block's material name and the raw unsafe
     // set to ensure a canonical comparison, matching the Anvil path's logic.
     String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
@@ -378,6 +379,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
       Set<String> plain = (reconciledUnsafe != null) ? reconciledUnsafe : unsafeBlocks.plainMaterials();
       return anvilView.isSafe(x & 0xF, y, z & 0xF, plain);
     }
+    if (chunk == null) return false;
 
     Block block = chunk.getBlock(x & 0xF, y, z & 0xF);
     String materialName = block.getType().name();

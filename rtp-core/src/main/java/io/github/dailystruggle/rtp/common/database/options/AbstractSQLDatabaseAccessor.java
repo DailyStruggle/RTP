@@ -256,6 +256,9 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         }
       } catch (SQLException e) {
         RTP.log(Level.WARNING, "Database connection error during flush", e);
+      } finally {
+        // Pooled backends (MySQL/PostgreSQL) recycle on close; shared SQLite/H2 no-op.
+        disconnect(connection);
       }
     }
   }

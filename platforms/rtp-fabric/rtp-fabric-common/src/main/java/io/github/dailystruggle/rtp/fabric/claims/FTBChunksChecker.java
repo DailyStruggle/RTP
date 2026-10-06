@@ -1,9 +1,7 @@
 package io.github.dailystruggle.rtp.fabric.claims;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
-import java.util.logging.Level;
 
 /**
  * Verifier for FTB Chunks on Fabric/NeoForge.
@@ -12,13 +10,14 @@ import java.util.logging.Level;
  * We resolve the claim lookup reflectively so RTP carries no compile-time dependency
  * on FTB Chunks.
  *
- * <p>When FTB Chunks is not loaded, or when an error occurs during resolution, the
- * verifier disables itself and gracefully returns false (fail-open, S-003/S-004).
+ * <p>A missing or incompatible FTB Chunks API disables the verifier ("not claimed"); an error
+ * raised inside FTB Chunks rejects the location and keeps it active ({@link ModClaimCheckFailure},
+ * S-003).
  */
 public class FTBChunksChecker {
   private FTBChunksChecker() {}
 
-  private static boolean exists = true;
+  private static volatile boolean exists = true;
 
   public static boolean isInClaim(RTPCoords coords) {
     if (!exists || coords == null) return false;
@@ -55,12 +54,7 @@ public class FTBChunksChecker {
 
       return false;
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.WARNING,
-          "[RTP] Disabling FTB Chunks integration for this session: " + t.getMessage(),
-          t);
-      return false;
+      return ModClaimCheckFailure.handle("FTB Chunks", t, () -> exists = false);
     }
   }
 }

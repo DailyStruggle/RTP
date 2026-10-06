@@ -181,6 +181,28 @@ public interface NetworkRequestQueue {
     }
 
     /**
+     * {@code true} when {@link #requeue} can return a popped envelope to a
+     * store shared by several proxies. JVM-local queues keep the default
+     * {@code false}: the popping proxy is the only consumer, so a player it
+     * does not hold is gone and the caller cancels instead.
+     */
+    default boolean supportsRequeue() {
+        return false;
+    }
+
+    /**
+     * Return an envelope popped by {@link #dequeueReady} to the tail of the
+     * ready FIFO (status back to {@link QueueState#QUEUED}), so the proxy that
+     * holds the player's session can dispatch it (rtp-proxy-ADR-016). Atomic and
+     * conditional: resolves {@code false} without side effects when the entry
+     * was cancelled, completed, or replaced by a newer correlation id since the
+     * pop.
+     */
+    default CompletableFuture<Boolean> requeue(QueueEnvelope envelope) {
+        return CompletableFuture.completedFuture(false);
+    }
+
+    /**
      * Single-writer state transition (proposal Section 4.4). Returns the
      * resulting status row, or empty if the player has no live entry.
      */

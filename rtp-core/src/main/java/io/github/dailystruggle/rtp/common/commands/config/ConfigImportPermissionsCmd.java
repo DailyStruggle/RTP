@@ -6,6 +6,7 @@ import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.permission.PermissionMigrationService;
+import io.github.dailystruggle.rtp.common.permission.PermissionSourceResolver;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -107,6 +108,8 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
 
         sendMessage(callerId, "&a[RTP] Discovered groups: &f" + String.join(", ", discoveredGroups));
 
+        Set<String> derivedSources = deriveSourcesFor(callerId, sourceFilter);
+
         int totalMigrated = 0;
         int totalPlanned = 0;
 
@@ -121,10 +124,11 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
             if (parsedNodes.isEmpty()) continue;
 
             PermissionMigrationService.MigrationPlan plan =
-                    migrationService.planMigration("group", group, parsedNodes, sourceFilter, apply);
+                    migrationService.planMigration("group", group, parsedNodes, sourceFilter, derivedSources, apply);
 
             totalPlanned += plan.getGeneratedCommands().size();
             totalMigrated += plan.getExecutedCommands().size();
+            reportSkippedPrivileged(callerId, group, plan);
 
             if (!apply) {
                 for (PermissionMigrationService.PermissionEntry entry : plan.getMappedEntries()) {
@@ -154,6 +158,41 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
         sendMessage(callerId, "  &7Group set:   &f" + migrationService.getGroupSetTemplate());
 
         return true;
+    }
+
+    /**
+     * Without {@code source=}, scopes the generic mapper to plugin folders that look like a foreign rtp
+     * plugin; derived once per run, not per group.
+     */
+    static Set<String> deriveSourcesFor(@Nullable UUID callerId, @Nullable String sourceFilter,
+                                        java.util.function.BiConsumer<UUID, String> out) {
+        if (sourceFilter != null && !sourceFilter.isBlank()) return Collections.emptySet();
+        Set<String> derived = PermissionSourceResolver.deriveSources(PermissionSourceResolver.resolvePluginsDir());
+        if (derived.isEmpty()) {
+            out.accept(callerId, "&e[RTP] No rtp plugin folders detected; only schema-declared equivalences will map."
+                    + " Pass &fsource=<plugin>&e to name one.");
+        } else {
+            out.accept(callerId, "&7[RTP] Derived sources from plugin folders: &f" + String.join(", ", derived));
+        }
+        return derived;
+    }
+
+    static void reportSkippedPrivileged(@Nullable UUID callerId, String group,
+                                        PermissionMigrationService.MigrationPlan plan,
+                                        java.util.function.BiConsumer<UUID, String> out) {
+        for (String skipped : plan.getSkippedPrivileged()) {
+            out.accept(callerId, "  &e[SKIPPED] &f" + group + "&7: &e" + skipped
+                    + " &7(broad target; pass &fsource=<plugin>&7 to migrate)");
+        }
+    }
+
+    private Set<String> deriveSourcesFor(@Nullable UUID callerId, @Nullable String sourceFilter) {
+        return deriveSourcesFor(callerId, sourceFilter, this::sendMessage);
+    }
+
+    private void reportSkippedPrivileged(@Nullable UUID callerId, String group,
+                                         PermissionMigrationService.MigrationPlan plan) {
+        reportSkippedPrivileged(callerId, group, plan, this::sendMessage);
     }
 
     private void sendMessage(@Nullable UUID callerId, String msg) {

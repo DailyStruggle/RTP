@@ -243,6 +243,48 @@ class ProxyDirectListenerTest {
         assertThrows(IllegalArgumentException.class, () -> ProxyDirectAllowlist.parse(List.of("10.0.0.0/33")));
     }
 
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: per-address connection cap closes excess sockets unread and frees slots on close")
+    void perAddressConnectionCap() throws Exception {
+        ProxyDirectListener listener = discoveryListener("127.0.0.1", V, null, null);
+        listener.start();
+        List<Socket> held = new ArrayList<>();
+        try {
+            for (int i = 0; i < ProxyDirectListener.MAX_CONNECTIONS_PER_ADDRESS; i++) {
+                Socket s = new Socket();
+                s.connect(new InetSocketAddress("127.0.0.1", listener.boundPort()), 1000);
+                held.add(s);
+            }
+            long deadline = System.currentTimeMillis() + 2_000L;
+            while (listener.trackedAddressCount() == 0 && System.currentTimeMillis() < deadline) {
+                Thread.sleep(10L);
+            }
+            try (Socket extra = new Socket()) {
+                extra.connect(new InetSocketAddress("127.0.0.1", listener.boundPort()), 1000);
+                extra.setSoTimeout(2000);
+                // Closed by the listener before any byte is read: EOF (or reset), never a hang.
+                int read;
+                try {
+                    read = extra.getInputStream().read();
+                } catch (IOException reset) {
+                    read = -1;
+                }
+                assertEquals(-1, read, "over-cap connection must be closed");
+            }
+        } finally {
+            for (Socket s : held) s.close();
+        }
+        try {
+            long deadline = System.currentTimeMillis() + 5_000L;
+            while (listener.trackedAddressCount() > 0 && System.currentTimeMillis() < deadline) {
+                Thread.sleep(20L);
+            }
+            assertEquals(0, listener.trackedAddressCount(), "slots must be released when clients close");
+        } finally {
+            listener.stop();
+        }
+    }
+
     private static void keytool(String... args) throws Exception {
         String exe = Path.of(System.getProperty("java.home"), "bin",
                 System.getProperty("os.name").toLowerCase().contains("win") ? "keytool.exe" : "keytool").toString();

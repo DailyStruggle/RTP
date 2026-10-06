@@ -81,6 +81,7 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
     private final RedisLuaScripts dequeueReadyScript;
     private final RedisLuaScripts dequeueReadyOwnedScript;
     private final RedisLuaScripts transitionScript;
+    private final RedisLuaScripts requeueScript;
     /** Head-scan window for ownership-aware dequeue (rtp-proxy-ADR-016). */
     private static final int OWNED_DEQUEUE_MAX_SCAN = 16;
     /** HMAC envelope verifier; {@code null} disables signing and verification. */
@@ -160,11 +161,13 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
             this.dequeueReadyScript = RedisLuaScripts.load("dequeueReady");
             this.dequeueReadyOwnedScript = RedisLuaScripts.load("dequeueReadyOwned");
             this.transitionScript = RedisLuaScripts.load("transition");
+            this.requeueScript = RedisLuaScripts.load("requeue");
             this.enqueueBatchScript.scriptLoad(pool);
             this.pollStatusScript.scriptLoad(pool);
             this.dequeueReadyScript.scriptLoad(pool);
             this.dequeueReadyOwnedScript.scriptLoad(pool);
             this.transitionScript.scriptLoad(pool);
+            this.requeueScript.scriptLoad(pool);
         } catch (RuntimeException e) {
             if (ownsPool) pool.close();
             throw e;
@@ -396,6 +399,30 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
                     }
                 }
             }
+        });
+    }
+
+    @Override
+    public boolean supportsRequeue() {
+        return true;
+    }
+
+    /** Conditional hand-back via requeue.lua; see {@link NetworkRequestQueue#requeue}. */
+    @Override
+    public CompletableFuture<Boolean> requeue(QueueEnvelope envelope) {
+        Objects.requireNonNull(envelope, "envelope");
+        return runAsync(() -> {
+            Object raw;
+            try (RespConnection j = pool.getResource()) {
+                raw = requeueScript.evalsha(j,
+                        java.util.Collections.singletonList(READY_KEY),
+                        Arrays.asList(
+                                envelope.correlationId().toString(),
+                                envelope.playerId().toString(),
+                                Long.toString(System.currentTimeMillis()),
+                                Integer.toString(ttlSeconds)));
+            }
+            return raw instanceof Number n ? n.longValue() == 1L : "1".equals(asString(raw));
         });
     }
 

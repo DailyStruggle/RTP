@@ -22,8 +22,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -70,6 +73,16 @@ public final class ProxyDirectListener {
     /** Minimum gap between allowlist-rejection WARNINGs (scanner flood guard). */
     private static final long REJECT_LOG_INTERVAL_MS = 10_000L;
 
+    /**
+     * Concurrent RPC connections across all clients. Each holds one worker for at
+     * most the 3s read timeout plus {@link #RPC_AWAIT_MS}; past the cap new
+     * sockets are closed unread, so a connection flood cannot exhaust threads/FDs.
+     */
+    static final int MAX_CONCURRENT_CONNECTIONS = 64;
+
+    /** Concurrent connections per client address, so one host cannot take every slot. */
+    static final int MAX_CONNECTIONS_PER_ADDRESS = 16;
+
     private final String bindHost;
     private final int port;
     private final HmacVerifier verifier;
@@ -88,6 +101,9 @@ public final class ProxyDirectListener {
     private volatile ExecutorService workers;
     private final AtomicLong lastRejectLogMs = new AtomicLong(0L);
     private final AtomicLong suppressedRejects = new AtomicLong(0L);
+    private final ConcurrentHashMap<InetAddress, Integer> perAddress = new ConcurrentHashMap<>();
+    private final AtomicLong lastCapLogMs = new AtomicLong(0L);
+    private final AtomicLong suppressedCapRejects = new AtomicLong(0L);
 
     /**
      * Discovery-only ctor (heartbeat/snapshot only; no reservation or queue
@@ -174,11 +190,14 @@ public final class ProxyDirectListener {
             ss.setReuseAddress(true);
             ss.bind(new InetSocketAddress(bindHost, port));
             this.serverSocket = ss;
-            this.workers = Executors.newCachedThreadPool(r -> {
-                Thread t = new Thread(r, "rtp-proxy-direct-worker");
-                t.setDaemon(true);
-                return t;
-            });
+            // Bounded: no queue, so saturation rejects instead of buffering sockets.
+            ThreadPoolExecutor pool = new ThreadPoolExecutor(
+                    0, MAX_CONCURRENT_CONNECTIONS, 30L, TimeUnit.SECONDS, new SynchronousQueue<>(), r -> {
+                        Thread t = new Thread(r, "rtp-proxy-direct-worker");
+                        t.setDaemon(true);
+                        return t;
+                    }, new ThreadPoolExecutor.AbortPolicy());
+            this.workers = pool;
             Thread accept = new Thread(this::acceptLoop, "rtp-proxy-direct-accept");
             accept.setDaemon(true);
             this.acceptThread = accept;
@@ -216,10 +235,54 @@ public final class ProxyDirectListener {
                 continue;
             }
             ExecutorService pool = this.workers;
-            if (pool != null) {
-                pool.submit(() -> handle(socket));
+            if (pool == null) {
+                try { socket.close(); } catch (Exception ignored) { }
+                continue;
+            }
+            InetAddress addr = socket.getInetAddress();
+            if (perAddress.merge(addr, 1, Integer::sum) > MAX_CONNECTIONS_PER_ADDRESS) {
+                releaseSlot(addr);
+                rejectOverCap(socket, "per-address limit " + MAX_CONNECTIONS_PER_ADDRESS);
+                continue;
+            }
+            try {
+                pool.execute(() -> {
+                    try {
+                        handle(socket);
+                    } finally {
+                        releaseSlot(addr);
+                    }
+                });
+            } catch (RejectedExecutionException ree) {
+                releaseSlot(addr);
+                rejectOverCap(socket, "connection limit " + MAX_CONCURRENT_CONNECTIONS);
             }
         }
+    }
+
+    /** Atomic per key, so a concurrent acquire never lands on a removed counter. */
+    private void releaseSlot(InetAddress addr) {
+        perAddress.computeIfPresent(addr, (k, n) -> n <= 1 ? null : n - 1);
+    }
+
+    /** Close an over-cap socket unread; WARNING throttled like allowlist rejects. */
+    private void rejectOverCap(Socket socket, String limit) {
+        java.net.SocketAddress remote = socket.getRemoteSocketAddress();
+        try { socket.close(); } catch (Exception ignored) { }
+        long now = System.currentTimeMillis();
+        long last = lastCapLogMs.get();
+        if (now - last >= REJECT_LOG_INTERVAL_MS && lastCapLogMs.compareAndSet(last, now)) {
+            long suppressed = suppressedCapRejects.getAndSet(0L);
+            logger.warn("RTP proxy-direct: closed connection from {} ({} reached){}.", remote, limit,
+                    suppressed > 0 ? "; " + suppressed + " similar rejection(s) suppressed" : "");
+        } else {
+            suppressedCapRejects.incrementAndGet();
+        }
+    }
+
+    /** Visible for tests: tracked client addresses with an open connection. */
+    int trackedAddressCount() {
+        return perAddress.size();
     }
 
     private void handle(Socket socket) {

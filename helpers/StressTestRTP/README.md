@@ -382,6 +382,32 @@ instead - the plugin's own completion instant. `plugin_latency_ms`
 external channels and write `-1` there. Compare `latency_ms` across
 arms only within one `attribution_source`.
 
+**`external_latency_ms`** (per attempt) is dispatch to the first
+`PlayerTeleportEvent` or position-watch sighting, recorded on every arm
+including LeafRTP's. This is the cross-plugin latency column. A LeafRTP row
+is held up to 1 s for the sighting and writes `-1` if none arrives.
+
+**`fail_reason=NOT_AT_DESTINATION`**. LeafRTP fires `PostTeleportEvent`
+whether or not the platform teleport succeeded, so on Post the probe checks
+that the player is within 3 blocks (XZ) of the destination, in the same world.
+
+**`landing_class`** (with `to_world`, `to_y`, `landing_floor/feet/head`) is
+the landing block column read with fixed criteria: `SAFE`, `LAVA`, `WATER`,
+`SUFFOCATING`, `NO_FLOOR`, `HAZARD`, `VOID`, or `UNCHECKED_*` when it could
+not be read without loading a chunk or crossing a region.
+
+**`main_thread_cpu_scope`** (phases) is `main-thread` on Spigot/Paper and
+`folia-region-threads:N` on Folia, where `main_thread_cpu_ms` sums every
+region scheduler thread. Folia rows without this column measured one thread.
+
+**`chunks_sync_requested` / `chunks_sync_by_plugin`** (phases) name the
+plugin that synchronously requested each load, from the `ChunkLoadEvent`
+call stack. They are `-1` unless `chunks_sync_selftest` is `PASS` (one sync
+and one async load of a generated chunk at startup, `sync-load-selftest`).
+`chunks_on_tick` classifies by firing thread, which Paper and Folia make
+near 100% for every plugin; publish chunk counts from
+`chunks_inclusive_per_attempt`.
+
 **`region_tps_*`**. Folia has no server-wide TPS; `Server#getTPS()`
 throws, so the `tps` column there is a wall-clock timer on the *global*
 region, which is never where a teleport lands. It can read 20.0 while

@@ -314,7 +314,8 @@ public final class NeoForgeRTPChunk extends RTPChunk<ChunkAccess> {
         }
         if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
         String name = materialNameAt(x, y, z);
-        if (name.isEmpty()) return true;
+        // S-001: an unresolvable block id fails closed rather than passing the unsafe scan.
+        if (name.isEmpty()) return false;
         if (unsafeBlocks.contains(name)) return false;
         int colon = name.indexOf(':');
         if (colon > 0 && unsafeBlocks.contains(name.substring(colon + 1))) return false;

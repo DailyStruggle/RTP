@@ -580,21 +580,40 @@ public class JumpAdjustorTest {
 
     @Test
     void boundary_binaryNarrowing_earlyExit_when_i_exceeds_maxYMinusItLen() {
-        // In loop:
-        // for (int it_len = step; it_len > 2; it_len = it_len / 2) {
-        //   for (int i = minY; i < maxY; i += it_len) {
-        //     ...
-        //     if (i > maxY - it_len) return false;
-        //     oldY = i;
-        //   }
-        // }
-        // If a column has no valid air gap satisfying the condition during the step loop,
-        // it hits `if (i > maxY - it_len) return false;` and fails immediately.
+        // A coarse-scan miss rejects the column; with every column solid, the chunk is rejected.
         ConfigurableMockChunk solidChunk = new ConfigurableMockChunk(0, 0, world);
         // Make the whole chunk completely solid (no air anywhere)
         for (int y = 0; y < 200; y++) solidChunk.setSolid(y);
         JumpAdjustor adj = buildAdjustor(0, 160, 16);
         assertNull(adj.adjust(solidChunk), "Completely solid chunk should return null when step narrowing exceeds range");
+    }
+
+    /**
+     * A coarse-scan miss in the first test column (7,7) must not abort the remaining columns;
+     * column (2,2) has ground at Y=32..64 and shall yield Y=65.
+     */
+    @Test
+    void coarseMissInFirstColumn_fallsThroughToNextColumn() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world) {
+            @Override
+            public boolean isAir(int x, int y, int z) {
+                if (x == 7 && z == 7) return y > 200 || y < 0;
+                return y > 64 || y < 32;
+            }
+
+            @Override
+            public boolean isSafe(int x, int y, int z, java.util.Set<String> unsafeBlocks) {
+                return true;
+            }
+        };
+
+        JumpAdjustor adj = buildAdjustor(32, 127, 8);
+        RTPCoords result = adj.adjust(chunk);
+
+        assertNotNull(result, "Gapless first column must not reject the whole chunk");
+        assertEquals(65, result.y());
+        assertEquals(2, result.x());
+        assertEquals(2, result.z());
     }
 
     @Test

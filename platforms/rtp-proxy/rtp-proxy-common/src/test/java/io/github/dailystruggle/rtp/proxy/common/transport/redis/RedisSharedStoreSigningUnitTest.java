@@ -4,6 +4,8 @@ import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue.EnrolOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue.EnrolmentEnvelope;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue.QueueEnvelope;
+import io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist;
+import io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist.WaitEnvelope;
 import io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.transport.CanonicalEnvelopes;
@@ -42,7 +44,7 @@ import static org.mockito.Mockito.when;
  * Redis-tier shared-store signing hardening (rtp-proxy-ADR-010) against a
  * mocked RESP connection: v2 token HMAC covers regionKey, redeem verifies
  * before the Lua CAS, queue envelopes are signed at flush and verified on
- * dequeue.
+ * dequeue, shared waitlist entries are signed at enrol and verified on drain.
  */
 class RedisSharedStoreSigningUnitTest {
 
@@ -51,6 +53,7 @@ class RedisSharedStoreSigningUnitTest {
     private HmacVerifier verifier;
     private RedisNetworkStateBinding binding;
     private RedisNetworkRequestQueue queue;
+    private RedisNetworkWaitlist waitlist;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -77,12 +80,14 @@ class RedisSharedStoreSigningUnitTest {
         verifier = HmacVerifier.forTesting(secret, 1, 1);
         binding = new RedisNetworkStateBinding(pool, 1000L, verifier, 1);
         queue = new RedisNetworkRequestQueue(pool, 0, verifier, 1);
+        waitlist = new RedisNetworkWaitlist(pool, 0, verifier, 1);
     }
 
     @AfterEach
     void tearDown() {
         if (binding != null) binding.close();
         if (queue != null) queue.close();
+        if (waitlist != null) waitlist.close();
     }
 
     private Map<String, String> signedTokenRow(String tokenId, String serverId, UUID pid, String region) {
@@ -226,6 +231,70 @@ class RedisSharedStoreSigningUnitTest {
         assertEquals(EnrolOutcome.REJECTED, queue.enrol(env).get(2, TimeUnit.SECONDS));
         // Batch flush skips with WARNING but stays ACCEPTED (backend buffer must not re-enqueue forever).
         assertEquals(EnrolOutcome.ACCEPTED, queue.flushPending(List.of(env)).get(2, TimeUnit.SECONDS));
+    }
+
+    /** Enrols {@code env} through the signed waitlist and returns the JSON payload handed to the Lua script. */
+    @SuppressWarnings("unchecked")
+    private String enrolAndCaptureJson(WaitEnvelope env) throws Exception {
+        when(conn.evalsha(anyString(), anyList(), anyList())).thenReturn("ACCEPTED");
+        assertEquals(NetworkWaitlist.EnrolOutcome.ACCEPTED, waitlist.enrol(env).get(2, TimeUnit.SECONDS));
+        ArgumentCaptor<List<String>> argv = ArgumentCaptor.forClass(List.class);
+        verify(conn).evalsha(anyString(), anyList(), argv.capture());
+        return argv.getValue().get(2);
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-NET-015 / REQ-RTP-PROXY-007: signed waitlist entry drains, also after the TTL refresh rewrites enrolledAtMs")
+    void waitlistEntrySignedAndVerifiedOnDrain() throws Exception {
+        UUID pid = UUID.randomUUID();
+        WaitEnvelope env = new WaitEnvelope(pid, UUID.randomUUID(), Optional.of("east"),
+                Optional.of("srv-a"), "lobby", 1000L);
+        String json = enrolAndCaptureJson(env);
+        assertTrue(json.contains("\"hmac\":\""), "entry carries an hmac field: " + json);
+
+        // Same in-place rewrite as waitlist_refresh_ttl.lua.
+        String refreshed = json.replace("\"enrolledAtMs\":1000", "\"enrolledAtMs\":987654321");
+        when(conn.evalsha(anyString(), anyList(), anyList()))
+                .thenReturn(List.of(refreshed), List.of(refreshed));
+        Map<String, List<WaitEnvelope>> out = waitlist.drainBatch(Map.of("srv-a", 5), 5)
+                .get(2, TimeUnit.SECONDS);
+        assertEquals(1, out.getOrDefault("srv-a", List.of()).size());
+        assertEquals(pid, out.get("srv-a").get(0).playerId());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-NET-015 / REQ-RTP-PROXY-007: tampered and unsigned waitlist entries are removed, never dispatched")
+    @SuppressWarnings("unchecked")
+    void tamperedAndUnsignedWaitlistEntriesPurged() throws Exception {
+        WaitEnvelope env = new WaitEnvelope(UUID.randomUUID(), UUID.randomUUID(), Optional.of("east"),
+                Optional.of("srv-a"), "lobby", 1000L);
+        String tampered = enrolAndCaptureJson(env).replace("\"srv-a\"", "\"srv-evil\"");
+        WaitEnvelope injectedEnv = new WaitEnvelope(UUID.randomUUID(), UUID.randomUUID(), Optional.empty(),
+                Optional.of("srv-a"), "lobby", 1000L);
+        String unsigned = RedisNetworkWaitlist.encode(injectedEnv);
+
+        when(conn.evalsha(anyString(), anyList(), anyList()))
+                .thenReturn(List.of(tampered, unsigned), List.of(tampered, unsigned));
+        Map<String, List<WaitEnvelope>> out = waitlist.drainBatch(Map.of("srv-a", 5, "srv-evil", 5), 5)
+                .get(2, TimeUnit.SECONDS);
+        assertTrue(out.isEmpty(), "no unverified entry may reach the dispatcher: " + out);
+
+        ArgumentCaptor<List<String>> argv = ArgumentCaptor.forClass(List.class);
+        verify(conn, org.mockito.Mockito.atLeast(1)).evalsha(anyString(), anyList(), argv.capture());
+        List<String> purge = argv.getAllValues().get(argv.getAllValues().size() - 1);
+        assertEquals(List.of(env.correlationId().toString(), env.playerId().toString(), tampered,
+                injectedEnv.correlationId().toString(), injectedEnv.playerId().toString(), unsigned), purge);
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-NET-015 / REQ-RTP-PROXY-007: delimiter-injected waitlist field fails enrol without EVALSHA")
+    void waitlistEnrolDelimiterInjectionRejected() throws Exception {
+        WaitEnvelope env = new WaitEnvelope(UUID.randomUUID(), UUID.randomUUID(), Optional.empty(),
+                Optional.empty(), "lobby=x", 1L);
+        ExecutionException ex = assertThrows(ExecutionException.class,
+                () -> waitlist.enrol(env).get(2, TimeUnit.SECONDS));
+        assertInstanceOf(IllegalArgumentException.class, ex.getCause());
+        verify(conn, never()).evalsha(anyString(), any(List.class), any(List.class));
     }
 
     @Test

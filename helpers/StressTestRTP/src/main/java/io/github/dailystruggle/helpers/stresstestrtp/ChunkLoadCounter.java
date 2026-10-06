@@ -72,6 +72,12 @@ import java.util.logging.Level;
 public final class ChunkLoadCounter implements Listener {
 
     private final Plugin plugin;
+    /** Stack-based requester attribution; the on/off-tick split below is by
+     *  firing thread, which Paper and Folia make near-constant (see
+     *  {@link SyncLoadAttributor}). */
+    private final SyncLoadAttributor syncAttributor;
+
+    public SyncLoadAttributor syncAttributor() { return syncAttributor; }
 
     /** Monotonically-increasing total since plugin enable. Used for sanity
      *  checks and to compute background as {@code total - attributed}. */
@@ -193,6 +199,7 @@ public final class ChunkLoadCounter implements Listener {
 
     public ChunkLoadCounter(Plugin plugin) {
         this.plugin = plugin;
+        this.syncAttributor = new SyncLoadAttributor(plugin);
     }
 
     public void register() {
@@ -245,6 +252,7 @@ public final class ChunkLoadCounter implements Listener {
         } else {
             phaseOffTickLoads.incrementAndGet();
         }
+        syncAttributor.onLoad(cx, cz, onTick);
 
         // Plugin-ticket attribution (Paper only).
         if (pluginTicketsSupported) {
@@ -514,6 +522,7 @@ public final class ChunkLoadCounter implements Listener {
      *  correct: an attempt that started near the end of phase N and finishes
      *  in phase N+1 should report its full chunk-load cost on its CSV row. */
     public void resetPhase() {
+        syncAttributor.resetPhase();
         phaseBaselineTotal = totalLoads.get();
         phaseBaselineBackground = phaseBackgroundLoads.get();
         phaseBaselineAttributed = phaseAttributedLoads.get();

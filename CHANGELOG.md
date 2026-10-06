@@ -123,7 +123,13 @@ re-published.
 
 ### Fixed
 
+- **Claim protection no longer switches itself off after a single error (REQ-RTP-S-003).** The `LeafRTPClaimAddon` checkers for WorldGuard, GriefPrevention, GriefDefender, Towny, Lands, RedProtect, Residence, SaberFactions, FactionsBridge, KingdomsX, HuskClaims, HuskTowns, CrashClaim and PlotSquared disabled their integration for the rest of the session on any exception, so every later location counted as unclaimed and players could land inside protected land until a restart. A per-call error now rejects that one location (logged at most once a minute per integration) and the integration stays active; only a missing or incompatible plugin API (missing class or method, linkage error) disables it. WorldGuard also treats a world with region protection disabled as having no regions, and when the `can-rtp-select-here` flag could not be registered (WorldGuard locks its flag registry once it enables) any covering region now blocks the landing instead of none.
+
+- **Cross-server `/rtp` requests no longer vanish on multi-proxy networks.** With more than one Velocity proxy on a shared Redis queue, a proxy that picked up a request for a player connected to a different proxy deleted it, so the player's cross-server `/rtp` silently did nothing. This also happened on a single proxy after a Redis hiccup at login. The proxy now puts the request back for the proxy that holds the player, and only drops it once no proxy has claimed it for 60 seconds. A failure to release a reservation for an unknown target server is now logged instead of ignored. The in-memory proxy queue is capped at 10,000 waiting requests and no longer keeps finished request ids forever.
+
 - **The last chunk of a region file whose final sector isn't padded out now gets the region-file safety check.** A region file's last 4 KiB sector is padded only when the server closes the file, so the final chunk can end before its sector does. RTP treated that chunk as unreadable or ungenerated and fell back to loading it. A test world had 291 of 5,006 region files in this state. Most of them were in the Nether, where 74% of files were affected. A chunk is now read whenever its own length field shows all of its data is in the file.
+
+- **MySQL and PostgreSQL storage no longer stops saving after a few minutes.** Saving teleport history never handed its database connection back, and the cached-location save skipped it when it stopped early. Within a few saves every pooled connection was in use, after which each database call waited 5 seconds and failed, so teleport history and cached locations stopped persisting until a restart. Connections are now always returned and reused, so the pool keeps the same few connections open instead of running out. SQLite, H2 and YAML storage were not affected.
 
 - **Worlds saved with `region-file-compression=lz4` now get the region-file safety check.** LZ4-compressed chunks were read in the wrong LZ4 format, so every check on those worlds fell back to loading the chunk. Default (zlib) worlds were not affected.
 
@@ -148,11 +154,17 @@ re-published.
   - `SQUARE_NORMAL` regions now parse `uniqueplacements` as a chunk radius instead of a boolean, preventing configured integer radii from being misinterpreted as "off" and subsequently overwritten as `false` in config saves.
   - Selection performance on regions with `uniqueplacements` enabled no longer degrades as bad-location memory grows: nearby marks now fold directly into existing records, sorting and collapsing run in batches rather than on every pick, and known-bad checks use a binary search instead of linear scans (reducing a 40,000-candidate fill from ~6s to ~0.2s).
 
+- **The `JUMP` vertical adjustor no longer rejects a whole chunk when only its first test column has no landing spot.** A miss in the coarse scan of one column ended the check for the entire chunk, and the narrowed height bounds carried over into the next column. Each column now starts from the configured `minY`/`maxY`, and a miss only skips that column, so fewer good chunks are wasted.
+
+- **Group placement with a large footprint no longer crashes with `StackOverflowError`.** Slot candidates were checked through one nested callback per candidate, and in loaded chunks the checks finish immediately, so hundreds of candidates overflowed the stack and group placement failed. Candidates are now checked in a loop, and only a check that is still in progress continues from its callback.
+
+- **Claim-anchor memory stays bounded on servers with many claims.** The cache of pinned claim and faction anchors kept one entry per claim forever. It now holds at most 4,096 claims: once full, it first drops entries unused for over an hour (or twice the recompute cooldown, if longer), then the least recently used ones. A dropped claim is re-pinned at its current centre the next time it is used.
+
 ### Security
 
-> **Network mode upgrade note.** Upgrade every backend and proxy together. Reservation tokens, request-queue entries and plugin-message heartbeats now use a new signed format, so servers on this version and on older builds can't share a store or see each other. Tokens and queue entries are short-lived, so a rolling restart clears the old ones. Network mode over `redis`, `sql` or `proxy-direct` now refuses to start without a Base64 `RTP_NET_SECRET` of at least 32 bytes, instead of quietly falling back to an in-memory store.
+> **Network mode upgrade note.** Upgrade every backend and proxy together. Reservation tokens, request-queue entries, shared waitlist entries and plugin-message heartbeats now use a new signed format, so servers on this version and on older builds can't share a store or see each other. Tokens and queue entries are short-lived, so a rolling restart clears the old ones; players still in a Redis waitlist from an older build are dropped from it and need to run the command again. Network mode over `redis`, `sql` or `proxy-direct` now refuses to start without a Base64 `RTP_NET_SECRET` of at least 32 bytes, instead of quietly falling back to an in-memory store. Network mode over `plugin-message`, `proxy-cache` or `auto` also needs the secret, or `network.allowUnsigned: true` in `advanced/network.yml` to keep running unsigned.
 
-- **Web editor uploads no longer contain passwords.** `/rtp editor` used to upload every config file as-is to the public byte store, including the database and Redis passwords in `advanced/database.yml` and `advanced/network.yml`. Values under keys such as `password`, `secret`, `token`, `apikey` and `credentials`, and usernames/passwords inside URLs, are now replaced with `<redacted>` in the hosted upload and the local export. When an edit comes back, `<redacted>` keeps the value already on disk.
+- **Web editor uploads no longer contain passwords.** `/rtp editor` used to upload every config file as-is to the public byte store, including the database and Redis passwords in `advanced/database.yml` and `advanced/network.yml`. Values under keys such as `password`, `secret`, `token`, `apikey` and `credentials`, and usernames/passwords inside URLs, are now replaced with `<redacted>` in the hosted upload and the local export. An inline `{...}` or `[...]` value that contains one of these is replaced as a whole. When an edit comes back, `<redacted>` keeps the value already on disk, and an apply that would write `<redacted>` to disk is refused.
 - **`/rtp editor apply` is stricter about what it writes.**
   - Only relative `.yml`/`.yaml` files outside `editor/` are written, so key files and the trusted-editors list can't be overwritten. Hidden paths, `..` and symlinks that lead outside the plugin folder are refused.
   - Payloads from the byte store must carry a `sha256` checksum.
@@ -173,11 +185,12 @@ re-published.
   - It has a Content-Security-Policy.
   - It removes a `?token=` value from the address bar once it has read it.
   - Field-doc text and fetched documentation pages pass through the same HTML allow-list as addon markdown before display.
-- **Plugin-message heartbeats are signed.** A modded client could send fake `rtp:net` / `bungeecord:main` heartbeats to a game server and add made-up servers or regions. Heartbeats and proxy-cache snapshot replies are now HMAC-signed with the network secret, and unsigned or tampered payloads are dropped with a rate-limited warning. Payload size and field counts are capped, and each side tracks at most 1,024 servers.
+- **Plugin-message heartbeats are signed.** A modded client could send fake `rtp:net` / `bungeecord:main` heartbeats to a game server and add made-up servers or regions. Heartbeats and proxy-cache snapshot replies are now HMAC-signed with the network secret, and unsigned or tampered payloads are dropped with a rate-limited warning. Without a secret these transports stay off unless `network.allowUnsigned: true` is set. The Velocity companion follows the same rule: with no usable secret it doesn't listen on `rtp:net` unless its own `network.allowUnsigned: true` is set. Payload size and field counts are capped, and each side tracks at most 1,024 servers.
 - **Signed shared-store records.**
   - Reservation-token signatures now cover the region, so the region on a valid token can't be changed.
   - Redeeming a token checks its stored signature before using it up.
   - Cross-server request-queue entries are signed on Redis and SQL; unsigned or tampered entries are dropped.
+  - Redis waitlist entries shared between proxies are signed; unsigned or tampered entries are removed from the waitlist instead of being sent to a server. A Redis waitlist now refuses to start without the network secret instead of falling back to a per-proxy waitlist.
   - Signed fields that contain line breaks, `=`, `|` or NUL are rejected.
 - **A proxy only dispatches requests for players connected to it,** one at a time per player, and duplicate requests for a player who already has one pending are refused.
 - **Proxy-direct link hardening.**
@@ -185,9 +198,13 @@ re-published.
   - The listener binds to `127.0.0.1` by default.
   - New settings: an `allowedClients` IP/CIDR allowlist and TLS with optional client certificates (`tls`, `keystore`, `truststore`, `*PasswordEnv`).
   - A non-loopback bind requires `tls: true`, or an explicit `tls: false`, which logs a warning.
-- **Redis connection options.** Redis connections support TLS (`tls: true` or a `rediss://` host), Redis 6 ACL usernames, and reading the password from an environment variable (`passwordEnv`, default `RTP_REDIS_PASSWORD`). A password left in YAML logs a one-time warning.
+  - The listener accepts at most 64 connections at once and 16 per client address; extra connections are closed unread.
+  - A reply list with any row that fails its signature check is rejected as a whole, with a warning, instead of being silently shortened.
+- **Redis connection options.** Redis connections support TLS and Redis 6 ACL usernames through a `rediss://user@host` address (the proxy also accepts `tls: true` and `username`), and can read the password from an environment variable (`passwordEnv`, default `RTP_REDIS_PASSWORD`). A password left in YAML logs a one-time warning.
 - **Redis reply limits.** The Redis reply reader caps line length (64 KiB), nesting depth (32) and total elements per reply.
 - **Token logging.** Reservation tokens are no longer logged in full; token IDs appear only as a short prefix at debug level.
+- **`RTPAPI.teleport` now checks destination permissions.** The addon teleport API (which the GUI menu uses) checked cooldown, price and the in-progress lock, but not `rtp.worlds.*`, `rtp.biome.*`, `rtp.regions.*` or `rtp.servers.*`. A menu opened before a permission was removed, or any addon, could still send a player there. The API now uses the same rules as `getTargetStatus` for every caller, refuses before charging, and returns the new `RTPResult.Reason.NO_PERMISSION`. An addon that relies on teleporting players into gated destinations needs to grant the permission itself.
+- **GUI action buttons check the action permission again when clicked.** The permission was checked only when the menu was built, so a menu left open after a permission removal or a stricter action reload could still start the action. The click now runs the same check and shows the unavailable message if it fails.
 
 ---
 

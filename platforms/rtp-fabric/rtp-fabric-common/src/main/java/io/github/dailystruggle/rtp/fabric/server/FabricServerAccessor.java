@@ -2431,11 +2431,24 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     @Override public RTPCommandSender clone() { return new FabricConsoleSender(server); }
   }
 
+  /** Upper bound an off-thread caller waits for a captured command to run on the server thread. */
+  private static final long CAPTURE_TIMEOUT_SECONDS = 10L;
+
   @Override
   public boolean executeCommand(UUID senderId, String commandLine) {
     if (commandLine == null || commandLine.isBlank()) return false;
     MinecraftServer s = server;
     if (s == null) return false;
+    if (!isPrimaryThread() && RTP.scheduler != null) {
+      // Command dispatch mutates single-threaded server state; queue it onto the server thread.
+      // Off-thread, true means "dispatched"; failures are logged by dispatchCommandNow.
+      RTP.scheduler.runTask(() -> dispatchCommandNow(s, senderId, commandLine));
+      return true;
+    }
+    return dispatchCommandNow(s, senderId, commandLine);
+  }
+
+  private boolean dispatchCommandNow(MinecraftServer s, UUID senderId, String commandLine) {
     try {
       if (senderId != null && !senderId.equals(RTPAPI.serverId)) {
         RTPPlayer player = getPlayer(senderId);
@@ -2457,8 +2470,28 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     if (commandLine == null || commandLine.isBlank()) return false;
     MinecraftServer s = server;
     if (s == null) return false;
+    if (!isPrimaryThread() && RTP.scheduler != null) {
+      // Callers consume the captured lines synchronously, so block on the server-thread run.
+      java.util.concurrent.CompletableFuture<Boolean> done = new java.util.concurrent.CompletableFuture<>();
+      RTP.scheduler.runTask(() -> done.complete(captureCommandNow(s, commandLine, lineConsumer)));
+      try {
+        return done.get(CAPTURE_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        log(Level.WARNING, "[RTP][Fabric] executeCommandWithCapture interrupted for '" + commandLine + "'", e);
+        return false;
+      } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+        log(Level.WARNING, "[RTP][Fabric] executeCommandWithCapture did not complete on the server thread for '"
+            + commandLine + "': " + e, e);
+        return false;
+      }
+    }
+    return captureCommandNow(s, commandLine, lineConsumer);
+  }
+
+  private boolean captureCommandNow(MinecraftServer s, String commandLine,
+                                    java.util.function.Consumer<String> lineConsumer) {
     try {
-      // Create capturing console sender and execute
       RTPCommandSender capturingSender = new FabricCapturingConsoleSender(s, lineConsumer);
       capturingSender.performCommand(null, commandLine);
       return true;
