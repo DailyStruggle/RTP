@@ -8,6 +8,7 @@
 # podczas teleportacji wyswietl to
 juzTeleportowany: "&7[P0] ⚡ już jesteś teleportowany!"
 juzWSesji: "&c[P0] [player] już bierze udział w aktywnej sesji."
+nieWSesji: "&c[P0] Nie bierzesz udziału w meczu tej akcji."
 
 # gdy wtyczka jest aktualnie przeładowywana
 teleportOdmowaPrzeladowanie: "&7[P0] teleportacje są tymczasowo wyłączone, gdy plugin się przeładowuje. Spróbuj ponownie za chwilę."

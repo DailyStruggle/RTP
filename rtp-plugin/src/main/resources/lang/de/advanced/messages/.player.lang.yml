@@ -3,6 +3,7 @@
 # used in player.yml. Co-located dotfile sibling (ADR-076).
 alreadyTeleporting: "wirdBereitsTeleportiert"
 alreadyInSession: "bereitsInSitzung"
+notInSession: "nichtInSitzung"
 teleportDeniedReloading: "teleportVerweigertNeuladen"
 delayMessage: "verzoegerungsNachricht"
 chunkLoading: "chunksLaden"

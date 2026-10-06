@@ -1206,13 +1206,43 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       if (objective != null && !objective.isBlank()) {
         org.bukkit.scoreboard.Objective obj = board.getObjective(objective);
         if (obj != null) {
-          board.resetScores(entry);
+          resetObjectiveScore(board, obj, entry);
         }
       } else {
         board.resetScores(entry);
       }
     } catch (Throwable ignored) {
       // Scoreboard score reset failure ignored on legacy or mocked Bukkit implementations.
+    }
+  }
+
+  /**
+   * Clears {@code entry} from {@code obj} only. {@code Scoreboard.resetScores(entry)} wipes the entry
+   * from every objective on the board (kill counters, datapack economies), so it is used only after
+   * snapshotting the entry's other scores, which are then restored. {@code Score.resetScore()} (1.20.4+)
+   * is preferred when present; the compile target (1.20.1) lacks it, hence reflection.
+   */
+  static void resetObjectiveScore(
+      org.bukkit.scoreboard.Scoreboard board, org.bukkit.scoreboard.Objective obj, String entry) {
+    org.bukkit.scoreboard.Score target = obj.getScore(entry);
+    if (!target.isScoreSet()) return;
+    try {
+      // Resolve on the API interface: CraftScore is package-private, so its own Method is not invokable.
+      java.lang.reflect.Method reset = org.bukkit.scoreboard.Score.class.getMethod("resetScore");
+      reset.invoke(target);
+      return;
+    } catch (ReflectiveOperationException | LinkageError ignored) {
+      // Pre-1.20.4 server: fall through to snapshot-and-restore.
+    }
+    Map<org.bukkit.scoreboard.Objective, Integer> others = new HashMap<>();
+    for (org.bukkit.scoreboard.Objective other : board.getObjectives()) {
+      if (other.getName().equals(obj.getName())) continue;
+      org.bukkit.scoreboard.Score s = other.getScore(entry);
+      if (s.isScoreSet()) others.put(other, s.getScore());
+    }
+    board.resetScores(entry);
+    for (Map.Entry<org.bukkit.scoreboard.Objective, Integer> e : others.entrySet()) {
+      e.getKey().getScore(entry).setScore(e.getValue());
     }
   }
 

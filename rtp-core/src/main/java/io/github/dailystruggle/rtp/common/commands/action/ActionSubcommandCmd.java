@@ -66,32 +66,35 @@ public class ActionSubcommandCmd extends BaseRTPCmdImpl {
       return true;
     }
 
-    // Build context tokens
+    // Subcommands act on the caller's own match (e.g. forfeit kills [player]); refuse outside one.
+    if (!(sender instanceof RTPPlayer player)) {
+      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.consoleCmdNotAllowed);
+      return true;
+    }
+    ActionSessionImpl session = (RTP.actionManager == null) ? null
+        : RTP.actionManager.getSessionForParticipant(player.uuid())
+            .filter(s -> s instanceof ActionSessionImpl)
+            .map(s -> (ActionSessionImpl) s)
+            .filter(s -> actionId.equals(s.actionId()))
+            .orElse(null);
+    if (session == null) {
+      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.notInSession);
+      return true;
+    }
+
+    // Session metadata first; caller identity last so queue metadata (player = first matched
+    // participant, player_name = last merged sender) can never redirect the command to an opponent.
     Map<String, Object> tokens = new HashMap<>();
+    if (session.context() != null && session.context().metadata() != null) {
+      tokens.putAll(session.context().metadata());
+    }
+    tokens.put("session_id", session.sessionId().toString());
     tokens.put("action_id", actionId);
     tokens.put("sender_uuid", senderId);
-
-    if (sender instanceof RTPPlayer player) {
-      tokens.put("sender_name", player.name());
-      tokens.put("player_name", player.name());
-      tokens.put("player_uuid", player.uuid());
-      tokens.put("player", player.uuid());
-    } else {
-      tokens.put("sender_name", "CONSOLE");
-      tokens.put("player_name", "CONSOLE");
-    }
-
-    // If caller is in an active session for this action, augment with session metadata
-    if (RTP.actionManager != null && sender instanceof RTPPlayer player) {
-      RTP.actionManager.getSessionForParticipant(player.uuid()).ifPresent(session -> {
-        if (session instanceof ActionSessionImpl sessionImpl) {
-          tokens.put("session_id", sessionImpl.sessionId().toString());
-          if (sessionImpl.context() != null) {
-            tokens.putAll(sessionImpl.context().metadata());
-          }
-        }
-      });
-    }
+    tokens.put("sender_name", player.name());
+    tokens.put("player_name", player.name());
+    tokens.put("player_uuid", player.uuid());
+    tokens.put("player", player.uuid());
 
     // Execute declared actions
     for (ActionDefinition.CommandAction cmd : spec.actions()) {

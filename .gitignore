@@ -42,6 +42,11 @@ out/
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+replay_pid*
+
+# Jazzer working corpus (regenerated every fuzz run). Crash reproducers that Jazzer
+# writes under src/test/resources/**/<Class>Inputs/ are regression seeds: commit them.
+.cifuzz-corpus/
 
 *~
 

@@ -7,6 +7,7 @@
 # ###############################################################################
 yaTeletransportando: "&7[P0] ⚡ ¡ya te estás teletransportando!"
 yaEnSesion: "&c[P0] [player] ya está en una sesión de partida activa."
+noEnSesion: "&c[P0] No estás en una partida de esta acción."
 
 # si el plugin se está recargando actualmente
 teletransporteDenegadoRecargando: "&7[P0] los teletransportes están desactivados temporalmente mientras el plugin se recarga. Inténtalo de nuevo en unos instantes."

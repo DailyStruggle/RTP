@@ -8,6 +8,7 @@
 # already mid-pounce
 already_pouncing: "&7[P0] ⚡ mrrp! you're already pouncing!"
 already_in_session: "&c[P0] [player] is already doing a zoomie session!"
+not_in_session: "&c[P0] mrrp? you're not in a zoomie match for this!"
 
 # plugin is grooming itself
 pounce_denied_grooming: "&7[P0] pounces are paused while the kitty grooms. try again after a few licks."

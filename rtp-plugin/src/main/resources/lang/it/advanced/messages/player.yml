@@ -8,6 +8,7 @@
 # durante il teletrasporto, mostra questo
 giàTeletrasporto: "&7[P0] ⚡ ti stai già teletrasportando!"
 giàInSessione: "&c[P0] [player] è già in una sessione di partita attiva."
+nonInSessione: "&c[P0] Non sei in una partita di questa azione."
 
 # se il plugin si sta attualmente ricaricando
 teletrasportoNegatoRicaricamento: "&7[P0] i teletrasporti sono temporaneamente disattivati mentre il plugin si ricarica. Riprova tra poco."

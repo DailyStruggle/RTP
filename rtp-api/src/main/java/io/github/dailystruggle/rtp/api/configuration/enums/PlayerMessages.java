@@ -14,6 +14,8 @@ public enum PlayerMessages {
   alreadyTeleporting,
   /** Sent when a player issues an action or teleport while they or a participant are already in an active session. */
   alreadyInSession,
+  /** Sent when a player runs an action subcommand (e.g. {@code leave}) without being in a session of that action. */
+  notInSession,
   /** Sent when a player issues {@code /rtp} while the plugin is reloading its configuration. */
   teleportDeniedReloading,
   /** Sent to the player during the countdown before the teleport fires. */
