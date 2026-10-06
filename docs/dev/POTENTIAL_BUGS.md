@@ -51,4 +51,14 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** CI noise only; possible real ordering dependence in `auto` resolution if the shared state is production state.
 - **Suggested next step:** Run `:rtp-core:test` with a fixed seed/order or `--tests "*factory*"` plus the editor suites; look for a test mutating the global config that `auto` reads, and reset it in `@AfterEach`.
 
+### 2026-10-05 — `PermissionMigrationTest` "5.1 - Load templates from integrations.yml" fails intermittently in the full suite
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** fixing the v3.3.0 CI failure (`ReqRtpF013SpanishLocaleContentTest` unresolved editor keys)
+- **Location:** `rtp-core/src/test/java/io/github/dailystruggle/rtp/common/permission/PermissionMigrationTest.java` (git-clean)
+- **Symptom / hypothesis:** In a local `:rtp-api:test :rtp-core:test :rtp-plugin:test` run the custom `integrations.yml` template was ignored and the default `lp group [group] permission set ...` returned; the test passes alone and passed in CI, so another test likely leaves the integrations config / template cache populated.
+- **Impact:** CI noise only; possible real staleness if the template cache is not reset on config reload.
+- **Suggested next step:** Run `:rtp-core:test --tests "*permission*"` together with the config-reload suites; find the static template holder and reset it in `@BeforeEach`.
+
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

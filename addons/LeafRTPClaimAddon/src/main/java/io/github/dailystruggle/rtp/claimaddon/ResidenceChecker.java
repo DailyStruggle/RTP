@@ -1,9 +1,7 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.logging.Level;
 
 /**
  * Checker for Residence claims.
@@ -59,12 +57,7 @@ public class ResidenceChecker {
       // "in a claim" means a ClaimedResidence covers this location.
       return residence != null;
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling Residence integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("Residence", t, () -> exists = false);
     }
-    return false;
   }
 }

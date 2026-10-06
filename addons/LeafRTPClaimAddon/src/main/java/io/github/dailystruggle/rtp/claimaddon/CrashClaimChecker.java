@@ -1,8 +1,5 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
-import java.util.logging.Level;
-
 /**
  * Checker for CrashClaim claims.
  *
@@ -61,12 +58,7 @@ public class CrashClaimChecker {
       // "in a claim" means a Claim covers this location.
       return claim != null;
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling CrashClaim integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("CrashClaim", t, () -> exists = false);
     }
-    return false;
   }
 }

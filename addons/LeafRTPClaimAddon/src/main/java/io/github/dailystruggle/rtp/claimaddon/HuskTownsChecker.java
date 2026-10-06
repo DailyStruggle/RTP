@@ -1,9 +1,7 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
 import java.util.Optional;
-import java.util.logging.Level;
 
 /**
  * Checker for HuskTowns claims.
@@ -69,13 +67,8 @@ public class HuskTownsChecker {
       }
       return result != null;
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling HuskTowns integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("HuskTowns", t, () -> exists = false);
     }
-    return false;
   }
 
   private static Method findMethod(Class<?> type, String name, Class<?> paramType) {

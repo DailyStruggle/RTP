@@ -1,8 +1,6 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
-import java.util.logging.Level;
 
 /**
  * Checker for PlotSquared plots and plot roads.
@@ -101,13 +99,8 @@ public class PlotSquaredChecker {
 
       return false;
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling PlotSquared integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("PlotSquared", t, () -> exists = false);
     }
-    return false;
   }
 
   private static Method findAtMethod(Class<?> pLocClass) {

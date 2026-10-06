@@ -46,13 +46,8 @@ public class LandsChecker {
       if (location.getWorld() == null) return false;
       return landsIntegration.isClaimed(location.getWorld(), chunkX, chunkZ);
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.WARNING,
-          "[RTP] Lands integration encountered an error during claim check. Disabling Lands integration.",
-          t);
+      return ClaimCheckFailure.handle("Lands", t, () -> exists = false);
     }
-    return false;
   }
 
   /**

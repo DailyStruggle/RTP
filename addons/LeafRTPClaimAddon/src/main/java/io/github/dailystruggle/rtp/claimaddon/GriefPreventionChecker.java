@@ -1,8 +1,6 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import java.util.Collection;
-import java.util.logging.Level;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import org.bukkit.Bukkit;
@@ -36,12 +34,7 @@ public class GriefPreventionChecker {
       Collection<Claim> claims = GriefPrevention.instance.dataStore.getClaims(chunkX, chunkZ);
       return !claims.isEmpty();
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling GriefPrevention integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("GriefPrevention", t, () -> exists = false);
     }
-    return false;
   }
 }

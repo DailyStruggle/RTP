@@ -1,8 +1,6 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
 import br.net.fabiozumbi12.RedProtect.Bukkit.RedProtect;
-import io.github.dailystruggle.rtp.common.RTP;
-import java.util.logging.Level;
 import org.bukkit.Location;
 
 /** Checker for RedProtect regions */
@@ -21,12 +19,7 @@ public class RedProtectChecker {
     try {
       return RedProtect.get().getAPI().getRegion(location) != null;
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling RedProtect integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("RedProtect", t, () -> exists = false);
     }
-    return false;
   }
 }

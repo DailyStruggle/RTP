@@ -1,9 +1,7 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.logging.Level;
 
 /**
  * Checker for KingdomsX (Kingdoms) claimed land.
@@ -73,13 +71,8 @@ public class KingdomsXChecker {
       if (getKingdom == null) return false;
       return getKingdom.invoke(land) != null;
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling KingdomsX integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("KingdomsX", t, () -> exists = false);
     }
-    return false;
   }
 
   private static Method findMethod(Class<?> type, String name, int paramCount, boolean isStatic) {
