@@ -103,6 +103,8 @@ class SampleActionE2ETest {
     RTP.scheduler = accessor.getMockScheduler();
     originalGroupService = RTP.groupPlacementService;
     manager = new ActionManager();
+    // Production has one manager: subcommands resolve the caller's session through RTP.actionManager.
+    RTP.actionManager = manager;
     io.github.dailystruggle.rtp.api.RTPAPI.actionService = manager;
 
     // Deterministic placement stub: every participant lands at a fixed safe slot.
@@ -139,6 +141,7 @@ class SampleActionE2ETest {
   @AfterEach
   void tearDown() {
     RTP.groupPlacementService = originalGroupService;
+    RTP.actionManager = null;
   }
 
   @Test

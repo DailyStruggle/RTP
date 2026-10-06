@@ -3,6 +3,7 @@
 # used in player.yml. Co-located dotfile sibling (ADR-076).
 alreadyTeleporting: "already_pouncing"
 alreadyInSession: "already_in_session"
+notInSession: "not_in_session"
 teleportDeniedReloading: "pounce_denied_grooming"
 delayMessage: "hold_paw_message"
 chunkLoading: "kibble_loading"

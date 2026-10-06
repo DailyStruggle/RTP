@@ -8,6 +8,7 @@
 # lors de la téléportation, afficher ceci
 alreadyTeleporting: "&7[P0] ⚡ vous êtes déjà en téléportation !"
 alreadyInSession: "&c[P0] [player] est déjà dans une session de match active."
+notInSession: "&c[P0] Vous n'êtes dans aucun match de cette action."
 
 # si le plugin est en cours de rechargement
 teleportDeniedReloading: "&7[P0] les téléportations sont temporairement désactivées pendant le rechargement du plugin. Réessayez bientôt."

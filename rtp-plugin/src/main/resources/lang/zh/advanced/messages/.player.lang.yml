@@ -3,6 +3,7 @@
 # used in player.yml. Co-located dotfile sibling (ADR-076).
 alreadyTeleporting: "已在传送"
 alreadyInSession: "已在会话中"
+notInSession: "不在会话中"
 teleportDeniedReloading: "传送被拒_重载中"
 delayMessage: "延迟消息"
 chunkLoading: "区块加载中"

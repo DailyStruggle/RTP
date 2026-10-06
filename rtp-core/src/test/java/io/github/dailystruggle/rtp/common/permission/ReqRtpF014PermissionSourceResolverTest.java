@@ -78,6 +78,26 @@ class ReqRtpF014PermissionSourceResolverTest {
                 history:
                   size: 15
                 """);
+        // Stock EssentialsX keys: cooldown, delay, near/chat radius and teleport-to-center hit every concept.
+        write("Essentials/config.yml", """
+                teleport-safety: true
+                teleport-to-center: true
+                teleport-cooldown: 0
+                teleport-delay: 0
+                teleport-invulnerability: 4
+                heal-cooldown: 60
+                near-radius: 200
+                world-teleport-permissions: false
+                chat:
+                  radius: 0
+                """);
+        // Homes/warps plugin: cooldown and delay alone are not an rtp signal.
+        write("HomesPlus/config.yml", """
+                settings:
+                  teleport-cooldown: 30
+                  teleport-delay: 3
+                  max-homes: 5
+                """);
     }
 
     @AfterEach
@@ -93,7 +113,45 @@ class ReqRtpF014PermissionSourceResolverTest {
         assertTrue(derived.contains("betterrtp"), "BetterRTP must be derived: " + derived);
         assertTrue(derived.contains("foortp"), "an unlisted rtp plugin must be derived: " + derived);
         assertFalse(derived.contains("worldedit"), "WorldEdit must not be derived: " + derived);
+        assertFalse(derived.contains("essentials"), "EssentialsX must not be derived: " + derived);
+        assertFalse(derived.contains("homesplus"), "cooldown/delay alone must not derive: " + derived);
         assertTrue(PermissionSourceResolver.deriveSources(null).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Cooldown and delay without a radius concept never qualify a folder")
+    void radiusConceptRequired() {
+        Path homes = plugins.resolve("HomesPlus");
+        assertEquals(Set.of("cooldown", "delay"), PermissionSourceResolver.conceptHits(homes));
+        assertFalse(PermissionSourceResolver.isRtpLikeFolder(homes));
+        assertTrue(PermissionSourceResolver.isRtpLikeFolder(plugins.resolve("FooRTP")));
+        // Essentials' keys alone would qualify; the suite exclusion is what keeps it out.
+        assertTrue(PermissionSourceResolver.isRtpLikeFolder(plugins.resolve("Essentials")));
+    }
+
+    @Test
+    @DisplayName("Essentials per-world grants never map to RTP world permissions without source=")
+    void essentialsWorldGrantsNotInferred() {
+        Set<String> derived = PermissionSourceResolver.deriveSources(plugins);
+        List<PermissionMigrationService.ParsedNode> nodes = List.of(
+                node("essentials.world"),
+                node("essentials.worlds.survival"),
+                node("essentials.nocooldown"));
+
+        PermissionMigrationService.MigrationPlan plan =
+                service.planMigration("group", "default", nodes, null, derived, false);
+        assertTrue(targets(plan).isEmpty(), targets(plan).toString());
+
+        // Even a derived source whose name contains the suite name must not pull its nodes in.
+        PermissionMigrationService.MigrationPlan lookalike =
+                service.planMigration("group", "default", nodes, null, Set.of("essentials", "essentialsrtp"), false);
+        assertTrue(targets(lookalike).isEmpty(), targets(lookalike).toString());
+        assertFalse(PermissionSourceResolver.matchesSource("cmi.command.rtp", Set.of("cmi")));
+
+        PermissionMigrationService.MigrationPlan namedPlan =
+                service.planMigration("group", "default", nodes, "essentials", Set.of(), false);
+        assertTrue(targets(namedPlan).contains("rtp.worlds.survival"), "explicit source= still maps: "
+                + targets(namedPlan));
     }
 
     @Test
@@ -121,13 +179,13 @@ class ReqRtpF014PermissionSourceResolverTest {
     @DisplayName("Broad targets from a derived source are withheld until source= is named")
     void broadTargetsNeedNamedSource() {
         List<PermissionMigrationService.ParsedNode> nodes = List.of(
-                node("essentials.*"),
-                node("essentials.admin"),
-                node("essentials.reload"),
-                node("essentials.nocooldown"));
+                node("foortp.*"),
+                node("foortp.admin"),
+                node("foortp.reload"),
+                node("foortp.nocooldown"));
 
         PermissionMigrationService.MigrationPlan derivedPlan =
-                service.planMigration("group", "staff", nodes, null, Set.of("essentials"), false);
+                service.planMigration("group", "staff", nodes, null, Set.of("foortp"), false);
         assertEquals(List.of("rtp.noCooldown"), targets(derivedPlan));
         assertEquals(3, derivedPlan.getSkippedPrivileged().size(), derivedPlan.getSkippedPrivileged().toString());
 
@@ -136,7 +194,7 @@ class ReqRtpF014PermissionSourceResolverTest {
         assertEquals(List.of("rtp.noCooldown"), targets(allPlan), "source=all is not a named source");
 
         PermissionMigrationService.MigrationPlan namedPlan =
-                service.planMigration("group", "staff", nodes, "essentials", Set.of(), false);
+                service.planMigration("group", "staff", nodes, "foortp", Set.of(), false);
         assertTrue(targets(namedPlan).containsAll(List.of("rtp.*", "rtp.admin", "rtp.reload", "rtp.noCooldown")),
                 targets(namedPlan).toString());
         assertTrue(namedPlan.getSkippedPrivileged().isEmpty());

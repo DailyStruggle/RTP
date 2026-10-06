@@ -52,15 +52,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** In network mode an empty Fabric (and NeoForge 26.x) backend disappears from routing, so lobby players can never be sent to it. That is exactly when cross-server `/rtp` targets it. Cached-location refill, reapers and other timers also stop while paused. Workaround: `pause-when-empty-seconds=0` in `server.properties`.
 - **Suggested next step:** Drive async repeating tasks from the scheduler's own executor clock (wall time) instead of tick counts, or keep the server awake while network mode is on; add a devstack assertion that a Fabric backend keeps its heartbeat key after 90 s empty.
 
-### 2026-10-06 — Action forfeit (`leave`) can kill the opponent, and kills players who are not in a match
-
-- **Severity:** High
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (action and GUI addons)
-- **Location:** `rtp-core/.../commands/action/ActionSubcommandCmd.java` ~70-94; bundled `leave` subcommands in `addons/LeafRTPActionAddon/.../actions/{challenge,arena,koth,teams}.yml` (`CONSOLE: "kill [player_name]"`)
-- **Symptom / hypothesis:** The caller's `player`/`player_name`/`player_uuid` tokens are set first and then overwritten by `tokens.putAll(session.context().metadata())`. On the queue path that metadata holds `player` = the first matched participant and `player_name` = the last merged entry's sender, so the console kills whichever player is in the metadata. The subcommand also runs when the caller has no session at all.
-- **Impact:** In a duel, `/challenge leave` (or `/duel surrender`) can kill the opponent instead of the caller: a free win. Any player with the default `leave` permission who is not in a match dies and drops their inventory.
-- **Suggested next step:** Apply session metadata first and the caller's own tokens last (or `putIfAbsent` for metadata); refuse the subcommand with a configurable message when the caller is not in a session of this action.
 
 ### 2026-10-06 — Challenge duels: consent is never cross-checked, non-ops cannot accept, prompts go to the wrong player
 
@@ -75,15 +66,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** The headline duel flow forces players into duels with people they did not choose, only works for ops out of the box, and shows confusing or misdirected prompts.
 - **Suggested next step:** Implement reciprocity in the matcher (pair entry A with B only if `A.target == B.sender` and `B.target == A.sender`; never pair a targeted entry with an open one); give action commands a per-action player parameter gated on the declared `ParameterSpec.permission()`; route messages with an explicit recipient key (`MESSAGE_TARGET` / `to: target`) instead of text matching.
 
-### 2026-10-06 — Ending any action session wipes the player's scoreboard scores (Bukkit)
-
-- **Severity:** High
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (action and GUI addons)
-- **Location:** `platforms/rtp-bukkit/rtp-bukkit-common/.../server/AbstractServerAccessor.java` ~1198-1214 (`resetScoreboardScore`); caller `ActionSessionImpl.cleanupScoreboards` ~528-535 from `disarm()`
-- **Symptom / hypothesis:** With an objective named, the code still calls `board.resetScores(entry)`, which clears the entry from every objective on the main scoreboard, not just the `rtp_*` one. `disarm()` runs it for each participant on every session end, including one-shot actions (near-player, near-claim, scatter) that disarm immediately.
-- **Impact:** On Paper/Spigot (and Folia if it shares the adapter), every action use erases the player's kill counters, datapack economies, TAB health scores and similar on the main scoreboard.
-- **Suggested next step:** Reset only the named objective (`obj.getScore(entry).resetScore()` on 1.20+, otherwise `scoreboard players reset <entry> <objective>`); add a test that an unrelated objective survives `disarm()`.
 
 ### 2026-10-06 — Group action placement reports failed teleports as success, teleports twice, and matches offline players
 
@@ -243,6 +225,20 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Large networks lose the operator hub and biome page silently; a modded player who clicks a page button can be random-teleported, with no message if it fails; region names look broken on Fabric/NeoForge.
 - **Suggested next step:** Paginate `MenuModel.build` like the biome menu and reserve the submenu row; fall back to a teleport only for the root `/rtp` open and report the result; expand MiniMessage/hex before stripping (or build styled components).
 
+### 2026-10-06 — Weekly Jazzer job fuzzes one Anvil target for 2 s and passes
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** v3.3.0 pre-release audit (Jazzer fuzz targets)
+- **Location:** `api/anvil-api/src/test/.../AnvilRegionFuzzTest.java` (five `@FuzzTest` methods); `.github/workflows/fuzzing.yml` ~46-55; root `build.gradle` `tasks.withType(Test)` ~147-172
+- **Symptom / hypothesis:**
+  - Jazzer 0.30.0 fuzzes one `@FuzzTest` per run ("Only one fuzz test can be run at a time"). A local `JAZZER_FUZZ=1` run of the class fuzzed `fuzzNbtReaders` for about 3 s and reported the LZ4, Linear, column-probe and chunk-view targets as SKIPPED; the task still passed.
+  - The workflow passes `-Djazzer.duration`, but the option is `jazzer.max_duration`, and Gradle `-D` sets a property on the Gradle JVM, not on the forked test JVM. Every target runs for the annotation's `maxDuration = "2s"`, not the advertised 5 minutes.
+  - `JAZZER_FUZZ` is not a `Test` task input, so a cached `:anvil-api:test` result can be reused and no fuzzing happens at all; a second local run did exactly that.
+  - No seed corpus or `<Class>Inputs/` regression files are committed, so the normal build runs each target on an empty input only.
+- **Impact:** The fuzzing badge gives false assurance: the LZ4 decoder, Linear reader and region view builders (ADR-016's "fuzzable" rationale for the in-house decoder) have effectively never been fuzzed in CI.
+- **Suggested next step:** One `@FuzzTest` per class (or one matrix entry per method with `--tests Class.method`); forward `jazzer.max_duration` with `systemProperty` and declare `JAZZER_FUZZ` as a task input (or `outputs.upToDateWhen { false }` in fuzz mode); seed corpora from the existing `.mca`/`.linear` test fixtures; commit any crash reproducers under `<Class>Inputs/`.
+
 ### 2026-10-05 — Claim/group anchors hardcode Y=64, starving the elevation filter
 
 - **Severity:** Medium
@@ -308,6 +304,20 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
   - GUI: `textReady`/`textUnavailable` are never used (lore is hardcoded), status shows raw enum names, nav and operator labels are hardcoded, `menuRows` has no effect, a mistyped filler fills slots with compasses on Fabric/NeoForge, and Fabric logs two INFO lines per open. Buttons show READY for players locked out by `lockAfterUses` or already teleporting, and the biome page offers biomes the blacklist excludes.
 - **Impact:** Cosmetic or confusing behaviour on the features advertised for 3.3.0; no safety or security impact.
 - **Suggested next step:** Use `CONSOLE: title` and `say`/`tellraw` in the bundled files and add a team win check; move strings to `messages.yml`/`guimenu.yml` with locale parity; drop stale aliases and reserve built-in names; report lock-out in `getTargetStatus` and honour `biomeWhitelist` in `getAllowedTargets`.
+
+### 2026-10-06 — Fuzz targets: unreachable paths, exception-only oracles, missing parsers
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** v3.3.0 pre-release audit (Jazzer fuzz targets)
+- **Location:** `AnvilRegionFuzzTest.java`; `rtp-proxy-common/src/test/.../RespProtocolFuzzTest.java`
+- **Symptom / hypothesis:**
+  - The Linear target always reads chunk `(0, 0)`, so the preceding-length loop with the open uncapped `int` sum (region-file readers entry above) is unreachable. `readChunkView` is only constructed, never queried, so lazy palette decoding is not exercised.
+  - Oracles only check which exception escapes. The open `palette[0]` fail-open returns normally and cannot be detected; no target asserts "malformed input never yields ACCEPT" through `AnvilPrefilter`.
+  - `RespProtocolFuzzTest` tolerates `NumberFormatException` and the Anvil targets tolerate `IllegalArgumentException`, although the parsers convert or never throw these; a regression that leaks them would go unnoticed.
+  - Parsers of untrusted or semi-trusted input with no target: `RtpYamlReader` (imported configs; would find the open depth issue at once), `EditorLoopbackJson`, `EditorSessionManager.parseJsonStringMap`, `PluginMessageEnvelope.open`, `ProxyDirectWire`, `BiomeBinCodec`/`WorldBiomeStore.load`, `TinyJsonReader`, `SafetyTokenParser`, and the Bukkit plugin-message length reader.
+- **Impact:** Coverage gap only; no production defect.
+- **Suggested next step:** Let the fuzzer pick the chunk coordinates (`FuzzedDataProvider`); add a prefilter target asserting the verdict is never ACCEPT on malformed data; narrow the tolerated exceptions; add targets for YAML, editor JSON and the network envelope first.
 
 ### 2026-10-05 — `RespPool.PooledConnection` does not delegate `executeCommandBytes`
 

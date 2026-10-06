@@ -6,17 +6,15 @@ Open items carry full detail in [`POTENTIAL_BUGS.md`](POTENTIAL_BUGS.md); fixed 
 
 ## Result
 
-85 findings: 1 critical, 15 high, 44 medium, 25 low/info. 32 fixed, 53 open. 31 of the open findings come from the action and GUI addon pass (2026-10-06).
+88 findings: 1 critical, 15 high, 45 medium, 27 low/info. 35 fixed, 53 open. 29 of the open findings come from the action and GUI addon pass (2026-10-06); 3 findings come from the Jazzer fuzz-target pass (2026-10-06).
 
-Seven Highs are open: six in the action addon, filed as four entries, plus the Fabric/NeoForge scheduler.
+Five Highs are open: four in the action addon, filed as two entries, plus the Fabric/NeoForge scheduler.
 
 - **Fabric/NeoForge scheduler:** on Fabric (and NeoForge 26.x), RTP's timers stop when vanilla pauses an empty server, so an empty modded backend drops out of network routing (found by the devstack run, workaround `pause-when-empty-seconds=0`).
-- **Duel forfeit:** forfeit can kill the opponent.
 - **Duel consent:** consent is not cross-checked, and non-ops cannot accept.
-- **Scoreboards:** every action end wipes the player's scoreboard scores on Bukkit.
 - **Group placement:** failed teleports are reported as success, and offline queued players are matched.
 
-The action Highs are functional defects in the newest feature code, not security holes. The worst abuse is a player winning a duel by forfeiting, or forcing someone into a duel they didn't choose.
+The action Highs are functional defects in the newest feature code, not security holes. The worst abuse is forcing someone into a duel they didn't choose.
 
 No safety fail-open (S-001..S-005) remains open on valid data; malformed region-file palettes are a latent S-001 on corrupt files only. No authorization gap found by the audit remains open. No item-duplication, command-injection, path-escape (after the fix), or memory-unsafe parsing paths remain in the audited areas.
 
@@ -33,6 +31,8 @@ No safety fail-open (S-001..S-005) remains open on valid data; malformed region-
 | High | Proxy trigger source | A proxy not holding the player cancelled their shared-queue request; cross-server `/rtp` vanished on multi-proxy Redis or after an ownership-tag miss (S-004). Shipped in 3.2.1. | Conditional Redis hand-back (`requeue.lua`); cancel only after a 60 s orphan grace or on JVM-local queues. |
 | High | `ProxyDirectListener` | Unbounded cached thread pool per accepted socket (DoS). | 64 concurrent / 16 per address, excess closed unread. |
 | High | SQL database drain | `AbstractSQLDatabaseAccessor.flush()` never returned its pooled connection and `processQueries` skipped `disconnect` on early returns; on MySQL/PostgreSQL the pool drained within a few flushes and persistence stopped. Shipped in 3.2.1. | Release in `finally` on every exit path; regression test against a 2-slot pool. |
+| High | Action forfeit | `leave`/forfeit subcommands let session metadata overwrite the caller's tokens, so `kill [player_name]` could hit the opponent; they also ran outside a match. | Caller tokens applied last; refused with the configurable `notInSession` message unless the caller is in a session of that action. |
+| High | Bukkit scoreboards | Resetting an `rtp_*` score called `resetScores(entry)`, wiping the player from every objective on each session end. | Only the named objective is cleared (`Score.resetScore()`, else the other scores are snapshotted and restored). |
 | Medium | GUI addon / teleport API | Action and destination clicks reused the permission snapshot from menu build; `RTPAPI.teleport` did not re-check world, biome, region or server permissions. | Action re-checked at click (`MenuModel.canUseAction`); `RTPAPI.teleport` and `getTargetStatus` share one gate (`NO_PERMISSION`), applied before any charge. |
 | Medium | Fabric / NeoForge chunks | `isSafe` treated an unresolvable block id as safe (S-001). | Fails closed in every carrier. |
 | Medium | Fabric 26.x worlds and adapters | `forgetChunks()` dropped the cache without releasing keep-tickets (S-002); no typed cross-dimension teleport; command dispatch and temp tickets could run off the server thread. | Ticket drain; `TeleportTransition` first, `setPos` same-dimension only; server-thread hops. |
@@ -46,14 +46,13 @@ No safety fail-open (S-001..S-005) remains open on valid data; malformed region-
 | Low | `BukkitRTPChunk` | `isSafe` returned safe when neither a live chunk nor a snapshot was present (latent S-001). | Fails closed. |
 | Low | Editor | Docs viewer `javascript:` filter bypass; flow-style secrets survived upload redaction. | Link allow-list; inline-value redaction plus placeholder guard on apply. |
 | Low / Info | Proxy in-memory store, Gradle lock | Unbounded queue / correlation set / teleport-time map; full and module builds could overlap. | Caps and terminal scrubbing; global lock waits for module locks. |
+| Low | Repository hygiene | Jazzer's working corpus (`.cifuzz-corpus/`) and JVM `replay_pid*` files were not ignored. | `.gitignore` entries; `<Class>Inputs/` crash reproducers stay committable as regression seeds. |
 
 ## Open (see `POTENTIAL_BUGS.md`)
 
 - **Fabric/NeoForge scheduler (High):** repeating tasks are tick-driven, so a paused empty server stops heartbeats and drops out of the network.
-- **Action addon (High x4):**
-  - **Forfeit:** `leave`/forfeit subcommands use session metadata that overwrites the caller's own tokens, so they can kill the opponent, and they run outside a match.
+- **Action addon (High x2):**
   - **Challenge flow:** reciprocity gates never compare one player's target with the other's sender; the shared `player` parameter needs `rtp.other`, so non-ops cannot accept; enqueue messages are routed by matching English text.
-  - **Session end:** Bukkit `resetScores(entry)` wipes every objective.
   - **Group placement:** per-player teleport results are ignored and everyone is teleported twice; offline players stay queued, and sessions don't end on quit.
 - **Action addon (Medium x3):**
   - **Session ending:** terminal handlers are not one-shot and drop delayed steps; violations count per block; bundled KOTH/teams DISARM leaves players in adventure mode.
@@ -67,13 +66,15 @@ No safety fail-open (S-001..S-005) remains open on valid data; malformed region-
 - **Release pipeline (Medium x2):** version/step outputs template-injected into `run:` (limited exposure: no secrets for forks); tag pushed before the Pro build, unsigned Lite jar still published, missing marketplace tokens skip silently.
 - **Operator-triggered load (Medium x5):** effects-api firework/glide use `Bukkit.getScheduler()` on Folia and accept unbounded counts; visualization export has no size cap; config import, permission migration and setup/prefab confirm run disk I/O and reload on the main thread; the Bukkit `executeCommandWithCapture` sleeps up to ~3 s per call on the main thread and hooks the root JUL/Log4j loggers unfiltered, so unrelated log lines can reach the migration parser.
 - **Placement availability (Medium, fail closed):** claim/group anchors hardcode Y=64.
-- **Low x10:**
+- **Fuzzing (Medium, assurance):** the weekly Jazzer job fuzzes only one of the five Anvil targets (Jazzer runs one `@FuzzTest` per class; the rest report SKIPPED and the job passes), for the annotation's 2 s instead of the advertised duration (`-Djazzer.duration` is the wrong key and never reaches the test JVM), can reuse a cached test result, and has no seed corpus. The LZ4, Linear and region-view parsers have effectively never been fuzzed in CI.
+- **Low x11:**
   - **Action and GUI polish:** bundled titles run as the player (op only); `broadcast` isn't vanilla; no team win check; hardcoded action and menu text; dead `textReady`/`menuRows` settings; stale aliases after reload; READY shown to locked-out players; blacklisted biomes offered.
   - **YAML and platform:** the YAML reader has no depth/size cap; NeoForge cannot extract bundled docs; noisy GUI renderer trace on Fabric 1.21.x.
   - **API:** new API enum constants break default-less switches; `RTPAPI.checkPermission` soft-fails pre-init.
   - **Devstack:** the GUI step stages a 26.x-only jar into 1.21.x mods.
   - **Editor:** the apply parser has no file-count cap; the trust file is not owner-only and is last-writer-wins.
   - **Network:** unsolicited `GetServer`/`GetServers` topology replies are trusted (proxies drop client-sent ones).
+  - **Fuzz targets:** the Linear target is pinned to chunk `(0, 0)`, so the open preceding-length bug is unreachable; oracles are exception-only, so the `palette[0]` fail-open cannot be seen; tolerated exception sets are broader than the parsers throw; the YAML, editor JSON, plugin-message envelope, proxy-direct wire, biome codec, tag JSON and safety-token parsers have no target.
   - **Misc:** bStats sampler not cancelled; docs export on the common pool; null-probe fail-open, palette, export-name, unpinned-action, devstack hygiene, late Fabric/NeoForge capture output and the hardcoded `NO_PERMISSION` text.
 
 Known design limitations, not filed as bugs: the `sql` transport is single-proxy only (always-leader lease, no queue hand-back), and the database layer runs two independent drain timers (`flush` and `processQueries`) instead of the single batched executor it was designed around; a redesign is pending. Signed heartbeats have no replay-freshness window; filed in `POTENTIAL_BUGS.md` after the audit.
@@ -101,11 +102,12 @@ Found during the earlier hardening pass and tracked in `POTENTIAL_BUGS.md`, not 
 - **Shared Bukkit adapter:** the new plugin-message length reader rejects non-positive and oversized lengths and survives malformed frames; capture handlers are always removed in `finally`; `damagePlayer` hops to the player's scheduler; scoreboard objective names are fixed constants; region-file biome sampling stays off-tick and returns empty on error; Spark reflection uses fixed class names and fails soft.
 - **API compatibility for 3.3.0:** every changed 3.2.1 type is a final class with private constructors and static factories, so added fields are binary-compatible; no existing interface gained an abstract method (new ones are defaults or on new types).
 - **Parsers, second pass:** the YAML reader rejects anchors, aliases, tags and merge keys (no SnakeYAML, no `!!java`); `.mca` sector math uses `long`; zlib/gzip/LZ4 decompression is capped at 32 MiB; NBT reads are depth- and length-checked; thrown decode errors map to UNKNOWN, never ACCEPT.
+- **Fuzz harnesses:** both classes are deterministic, in-memory and side-effect free; the LZ4 and NBT targets accept only the parser's declared checked exception; `RespProtocol` itself is depth-, line-, length- and total-element-capped, so its target raised no parser finding.
 - **CI and supply chain:** no `pull_request_target`/`workflow_run`; privileged workflows pin actions to SHAs; Maven Central fails closed without signatures; HTTPS-only repositories; wrapper URL and checksum validation unchanged; no real secrets committed in devstack.
 
 ## Not covered
 
-- Not audited: S-007 message configurability across all commands, addon modules other than the claim, GUI and action addons (Countdown and Rift are unchanged since 3.2.1), Jazzer fuzz targets, and code unchanged since 3.2.1. The claim boundary providers, anvil-api readers, yaml-api and the rtp-api surface were audited on 2026-10-06. The action system (core, commands, addon and its 11 bundled definitions) and the GUI addon had a functional second pass on 2026-10-06; cooldown bookkeeping in `PhysicalTriggerManager` was not covered.
+- Not audited: S-007 message configurability across all commands, addon modules other than the claim, GUI and action addons (Countdown and Rift are unchanged since 3.2.1), and code unchanged since 3.2.1. The claim boundary providers, anvil-api readers, yaml-api and the rtp-api surface were audited on 2026-10-06. The action system (core, commands, addon and its 11 bundled definitions) and the GUI addon had a functional second pass on 2026-10-06; cooldown bookkeeping in `PhysicalTriggerManager` was not covered. The Jazzer fuzz targets were audited on 2026-10-06, including a local `JAZZER_FUZZ=1` run of `AnvilRegionFuzzTest` (one target fuzzed for about 3 s, four reported SKIPPED).
 - Verified: a full `.\gradlew.bat build` passed on 2026-10-06 against the working tree including the uncommitted fixes listed above, which were each reviewed against their finding.
 - Devstack acceptance (2026-10-06): cross-server roundtrip PASSED (lobby-a to backend-a in 2.6 s over Redis with signed messages); killmidflight PASSED (a claimed reservation was reaped about 33 s after its destination backend was killed); heartbeat convergence FAILED only because the empty Fabric backend paused (the open High above); both proxies and all Paper/Folia instances converged. The modded backends first failed to boot because of a stale 26.x-only GUI jar left in their `mods/` folders by an earlier GUI run (renamed `*.disabled-by-audit`).
 - Node (in Docker): the editor page's inline script parses under V8, and the docs-viewer link filter blocked all 8 scheme-obfuscation payloads while allowing http(s), mailto and relative links.

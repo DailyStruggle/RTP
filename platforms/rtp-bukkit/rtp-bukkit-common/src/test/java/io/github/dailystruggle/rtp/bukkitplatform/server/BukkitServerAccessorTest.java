@@ -322,6 +322,27 @@ class BukkitServerAccessorTest {
     }
 
     @Test
+    @DisplayName("Resetting an rtp_* objective score leaves the player's other objectives intact")
+    void resetScoreboardScoreOnlyClearsNamedObjective() {
+        PlayerMock player = server.addPlayer("ScorePlayer");
+        UUID id = player.getUniqueId();
+        org.bukkit.scoreboard.Scoreboard board = server.getScoreboardManager().getMainScoreboard();
+        org.bukkit.scoreboard.Objective kills = board.registerNewObjective("kills", "dummy", "kills");
+        kills.getScore("ScorePlayer").setScore(42);
+
+        accessor.setScoreboardScore(id, "rtp_alive", 1);
+        org.bukkit.scoreboard.Objective rtpAlive = board.getObjective("rtp_alive");
+        assertNotNull(rtpAlive);
+        assertTrue(rtpAlive.getScore("ScorePlayer").isScoreSet());
+
+        accessor.resetScoreboardScore(id, "rtp_alive");
+
+        assertFalse(rtpAlive.getScore("ScorePlayer").isScoreSet());
+        assertTrue(kills.getScore("ScorePlayer").isScoreSet());
+        assertEquals(42, kills.getScore("ScorePlayer").getScore());
+    }
+
+    @Test
     @DisplayName("Scoreboard tag operations")
     void testScoreboardTags() {
         PlayerMock player = server.addPlayer("ScoreboardPlayer");

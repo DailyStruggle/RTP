@@ -27,6 +27,9 @@ alreadyTeleporting: "&7[P0] ⚡ you're already teleporting!"
 # when participant is already in an active session
 alreadyInSession: "&c[P0] [player] is already in an active match session."
 
+# when an action subcommand (e.g. leave) is used outside a match of that action
+notInSession: "&c[P0] You are not in a match for this action."
+
 # if the plugin is currently reloading
 teleportDeniedReloading: "&7[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
 delayMessage: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teleporting in [delay]. Don't move</gradient>"

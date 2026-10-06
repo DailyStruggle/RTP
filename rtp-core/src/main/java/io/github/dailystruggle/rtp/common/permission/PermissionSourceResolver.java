@@ -24,16 +24,23 @@ import java.util.regex.Pattern;
  * Derives permission-migration sources from the server's plugin folders when no {@code source=} is named.
  *
  * <p>A folder counts as a foreign rtp plugin when its YAML keys hit at least {@link #MIN_CONCEPTS} distinct
- * rtp concepts (radius, center, cooldown, delay, worlds). Keys match a concept through the editor search
- * thesaurus ({@code synonyms} in the packaged {@code /editor/editor-data.json}) plus Levenshtein distance.
- * A node prefix then best-matches a derived source by normalized equality, containment or edit distance,
- * so an unlisted {@code FooRTP} works while {@code worldedit.*} (a {@code config.yml} with only a brush
- * radius) does not.
+ * rtp concepts (radius, center, cooldown, delay, worlds) and one of them is {@link #REQUIRED_CONCEPT}:
+ * cooldown/delay alone are common to every teleport, home or warp plugin. Keys match a concept through the
+ * editor search thesaurus ({@code synonyms} in the packaged {@code /editor/editor-data.json}) plus
+ * Levenshtein distance. General teleport suites ({@link #NON_RTP_SUITES}) never qualify: stock EssentialsX
+ * keys ({@code near-radius}, {@code teleport-to-center}, {@code teleport-delay}) hit every concept, and their
+ * per-world nodes must not become {@code rtp.worlds.*} by inference. A node prefix then best-matches a derived
+ * source by normalized equality, containment or edit distance, so an unlisted {@code FooRTP} works while
+ * {@code worldedit.*} (a {@code config.yml} with only a brush radius) does not.
  */
 public final class PermissionSourceResolver {
 
     /** Distinct rtp concepts a folder's YAML keys must hit to count as a source. */
     static final int MIN_CONCEPTS = 2;
+    /** Concept every source must hit; rtp plugins configure a radius, generic teleport suites rarely do. */
+    static final String REQUIRED_CONCEPT = "radius";
+    /** Normalized folder names / node prefixes of general teleport suites; only {@code source=} maps them. */
+    static final Set<String> NON_RTP_SUITES = Set.of("essentials", "essentialsx", "cmi", "huskhomes");
     /** Maximum edit distance for a fuzzy key or prefix match. */
     static final int MAX_EDIT_DISTANCE = 2;
     /** Terms shorter than this only match exactly (containment / edit distance are too noisy). */
@@ -82,9 +89,9 @@ public final class PermissionSourceResolver {
         Set<String> sources = new LinkedHashSet<>();
         if (pluginsDir == null || !Files.isDirectory(pluginsDir)) return sources;
         for (Map.Entry<String, Path> e : ForeignConfigImporterRegistry.detectAvailableSources(pluginsDir).entrySet()) {
-            if (!isRtpLikeFolder(e.getValue())) continue;
             String folder = normalize(e.getKey());
-            if (folder.isEmpty()) continue;
+            if (folder.isEmpty() || NON_RTP_SUITES.contains(folder)) continue;
+            if (!isRtpLikeFolder(e.getValue())) continue;
             sources.add(folder);
             for (ForeignConfigImporter importer : ForeignConfigImporterRegistry.getAllImporters()) {
                 if (importer instanceof UniversalConfigImporter) continue;
@@ -105,20 +112,25 @@ public final class PermissionSourceResolver {
         String lower = permissionNode.trim().toLowerCase(Locale.ROOT);
         int dot = lower.indexOf('.');
         String prefix = normalize(dot > 0 ? lower.substring(0, dot) : lower);
-        if (prefix.isEmpty() || "rtp".equals(prefix)) return false;
+        if (prefix.isEmpty() || "rtp".equals(prefix) || NON_RTP_SUITES.contains(prefix)) return false;
         for (String s : sources) {
             if (nameMatches(prefix, normalize(s))) return true;
         }
         return false;
     }
 
-    /** True when the folder's YAML keys hit at least {@link #MIN_CONCEPTS} distinct rtp concepts. */
+    /** True when the folder's YAML keys hit {@link #REQUIRED_CONCEPT} and at least {@link #MIN_CONCEPTS} concepts. */
     static boolean isRtpLikeFolder(@Nullable Path dir) {
-        return conceptCount(dir) >= MIN_CONCEPTS;
+        Set<String> hit = conceptHits(dir);
+        return hit.size() >= MIN_CONCEPTS && hit.contains(REQUIRED_CONCEPT);
     }
 
     static int conceptCount(@Nullable Path dir) {
-        if (dir == null || !Files.isDirectory(dir)) return 0;
+        return conceptHits(dir).size();
+    }
+
+    static Set<String> conceptHits(@Nullable Path dir) {
+        if (dir == null || !Files.isDirectory(dir)) return Set.of();
         Set<String> keys = collectYamlKeys(dir);
         Map<String, Set<String>> terms = conceptTerms();
         Set<String> hit = new HashSet<>();
@@ -134,7 +146,7 @@ public final class PermissionSourceResolver {
             }
             if (hit.size() == terms.size()) break;
         }
-        return hit.size();
+        return hit;
     }
 
     static boolean keyMatches(String key, String term) {
