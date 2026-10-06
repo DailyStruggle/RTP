@@ -158,15 +158,29 @@ public final class BStatsConfig {
             int sep = (colon < 0) ? eq : (eq < 0 ? colon : Math.min(colon, eq));
             if (sep <= 0) continue;
             String key = line.substring(0, sep).trim();
-            String value = line.substring(sep + 1).trim();
-            if (value.length() >= 2
-                    && ((value.startsWith("\"") && value.endsWith("\""))
-                    || (value.startsWith("'") && value.endsWith("'")))) {
-                value = value.substring(1, value.length() - 1);
-            }
-            out.putIfAbsent(key, value);
+            out.putIfAbsent(key, parseValue(line.substring(sep + 1)));
         }
         return out;
+    }
+
+    /**
+     * Unquotes a quoted value (text after the closing quote ignored) or strips an
+     * unquoted trailing {@code #} comment, as YAML does: {@code false # privacy}
+     * must read as {@code false} or the operator's opt-out is silently ignored.
+     * An unterminated quote is returned as-is.
+     */
+    static String parseValue(String raw) {
+        String value = raw.trim();
+        if (value.startsWith("\"") || value.startsWith("'")) {
+            int close = value.indexOf(value.charAt(0), 1);
+            return (close > 0) ? value.substring(1, close) : value;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) == '#' && (i == 0 || Character.isWhitespace(value.charAt(i - 1)))) {
+                return value.substring(0, i).trim();
+            }
+        }
+        return value;
     }
 
     private static String first(Map<String, String> kv, String a, String b) {

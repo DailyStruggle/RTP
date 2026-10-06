@@ -59,6 +59,11 @@ target-commands:
   # RTP / RTP-Pro (this project). The plugin.yml command name is `rtp`, so the
   # prefix-qualified form is `rtp:rtp`. Self-form when `dispatch-as-player`
   # is true; the player teleports themselves under default permissions.
+  # If the bundled LeafRTPGuiAddon is installed (plugins/RTP/addons/), a BARE
+  # `/rtp` (no arguments) opens the chest menu instead of teleporting (ADR-056
+  # root action) and every attempt times out. Either delete that jar (a
+  # permanent opt-out) or pass an explicit region, e.g.
+  # `rtp:rtp region=default`; `region=` requires `rtp.region` (default: op).
   - label: "rtp"
     command: "rtp:rtp"
 

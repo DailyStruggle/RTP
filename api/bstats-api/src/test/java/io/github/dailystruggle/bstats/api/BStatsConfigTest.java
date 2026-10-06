@@ -115,6 +115,44 @@ class BStatsConfigTest {
     }
 
     @Test
+    @DisplayName("Inline comments are stripped so an annotated opt-out is honoured")
+    void inlineCommentsStripped() throws Exception {
+        File pluginDir = tmp.resolve("plugins").resolve("RTP").toFile();
+        assertTrue(pluginDir.mkdirs());
+        Path bStats = Files.createDirectories(tmp.resolve("plugins").resolve("bStats"));
+        Files.writeString(bStats.resolve("config.yml"),
+                "enabled: false # disabled for privacy\n"
+                        + "serverUuid: \"" + UUID_A + "\" # keep install counts\n"
+                        + "logFailedRequests: true\t# debug\n",
+                StandardCharsets.UTF_8);
+
+        assertTrue(BStatsConfig.isOptedOut(pluginDir));
+        BStatsConfig cfg = BStatsConfig.load(bStats.toFile(), BStatsConfig.Format.YAML);
+        assertFalse(cfg.enabled());
+        assertEquals(UUID_A, cfg.serverUuid());
+        assertTrue(cfg.logFailedRequests());
+
+        Files.delete(bStats.resolve("config.yml"));
+        Files.writeString(bStats.resolve("config.txt"),
+                "enabled=false # off\nserver-uuid=" + UUID_B + " # id\n", StandardCharsets.UTF_8);
+        assertTrue(BStatsConfig.isOptedOut(pluginDir));
+        assertEquals(UUID_B, BStatsConfig.load(bStats.toFile(), BStatsConfig.Format.TEXT).serverUuid());
+    }
+
+    @Test
+    @DisplayName("Value parsing: quotes, comments, and '#' inside values")
+    void parseValueEdgeCases() {
+        assertEquals("false", BStatsConfig.parseValue(" false # disabled for privacy"));
+        assertEquals("false", BStatsConfig.parseValue("false\t#tab comment"));
+        assertEquals("", BStatsConfig.parseValue(" # nothing set"));
+        assertEquals("a#b", BStatsConfig.parseValue("a#b"));
+        assertEquals("x # y", BStatsConfig.parseValue("\"x # y\" # trailing"));
+        assertEquals(UUID_A, BStatsConfig.parseValue("'" + UUID_A + "'  # comment"));
+        assertEquals("\"unterminated", BStatsConfig.parseValue("\"unterminated"));
+        assertEquals("true", BStatsConfig.parseValue("true"));
+    }
+
+    @Test
     @DisplayName("bStats directory is the plugin directory's sibling")
     void directoryResolution() {
         File pluginDir = tmp.resolve("plugins").resolve("RTP").toFile();
