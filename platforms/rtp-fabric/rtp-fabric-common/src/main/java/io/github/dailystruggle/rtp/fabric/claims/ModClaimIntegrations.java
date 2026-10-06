@@ -6,7 +6,8 @@ import java.util.logging.Level;
 import net.fabricmc.loader.api.FabricLoader;
 
 /**
- * Boots mod-side claim verifiers on Fabric (ADR-026).
+ * Boots mod-side claim verifiers on Fabric (ADR-026). Verifiers return {@code true} to allow a
+ * location, so each checker's "in a claim" verdict is negated.
  */
 public final class ModClaimIntegrations {
   private ModClaimIntegrations() {}
@@ -17,7 +18,8 @@ public final class ModClaimIntegrations {
 
     if (loader.isModLoaded("openpartiesandclaims")) {
       try {
-        RTPAPI.hooks().verifiers().register(OpenPartiesAndClaimsChecker::isInClaim);
+        RTPAPI.hooks().verifiers().register(OpenPartiesAndClaimsChecker.class,
+            coords -> !OpenPartiesAndClaimsChecker.isInClaim(coords));
         RTP.log(Level.INFO, "[RTP] Registered OpenPartiesAndClaims region verifier on Fabric.");
       } catch (Throwable t) {
         RTP.log(Level.WARNING, "[RTP] Failed to register OpenPartiesAndClaims verifier: " + t.getMessage(), t);
@@ -26,7 +28,8 @@ public final class ModClaimIntegrations {
 
     if (loader.isModLoaded("ftbchunks")) {
       try {
-        RTPAPI.hooks().verifiers().register(FTBChunksChecker::isInClaim);
+        RTPAPI.hooks().verifiers().register(FTBChunksChecker.class,
+            coords -> !FTBChunksChecker.isInClaim(coords));
         RTP.log(Level.INFO, "[RTP] Registered FTB Chunks region verifier on Fabric.");
       } catch (Throwable t) {
         RTP.log(Level.WARNING, "[RTP] Failed to register FTB Chunks verifier: " + t.getMessage(), t);

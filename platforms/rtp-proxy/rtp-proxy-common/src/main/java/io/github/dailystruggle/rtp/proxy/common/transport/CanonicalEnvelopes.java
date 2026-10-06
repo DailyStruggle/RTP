@@ -6,7 +6,8 @@ import java.util.Objects;
 
 /**
  * Shared canonical byte sequences for HMAC-signed shared-store records
- * (rtp-proxy-ADR-010): reservation tokens and wait-queue envelopes. Redis
+ * (rtp-proxy-ADR-010): reservation tokens, wait-queue envelopes, and shared
+ * waitlist entries. Redis
  * and SQL bindings sign and verify through this class so the same secret
  * yields identical signatures under either transport.
  *
@@ -27,6 +28,9 @@ public final class CanonicalEnvelopes {
 
     /** Wait-queue envelope signature layout version. */
     public static final int QUEUE_SIG_VERSION = 1;
+
+    /** Shared waitlist entry signature layout version. */
+    public static final int WAITLIST_SIG_VERSION = 1;
 
     private CanonicalEnvelopes() { /* static-only */ }
 
@@ -84,6 +88,25 @@ public final class CanonicalEnvelopes {
                 + "\ncreatedAtMs=" + safe("createdAtMs", createdAtMs);
     }
 
+    /**
+     * Canonical shared-waitlist entry payload. Covers every field that drives
+     * dispatch; {@code enrolledAtMs} is excluded because
+     * {@code waitlist_refresh_ttl.lua} rewrites it in place (it only drives
+     * reap aging, never routing). Optional fields null / empty both encode as empty.
+     *
+     * @throws IllegalArgumentException if any field contains a delimiter
+     */
+    public static String canonicalWaitlistEntry(String correlationId, String playerId,
+                                                String regionKey, String serverHint,
+                                                String originServerId) {
+        return "waitlistSig=" + WAITLIST_SIG_VERSION
+                + "\ncorrelationId=" + safe("correlationId", correlationId)
+                + "\nplayerId=" + safe("playerId", playerId)
+                + "\nregionKey=" + safe("regionKey", regionKey)
+                + "\nserverHint=" + safe("serverHint", serverHint)
+                + "\noriginServerId=" + safe("originServerId", originServerId);
+    }
+
     /** Sign a token; throws {@link IllegalArgumentException} on delimiter injection. */
     public static String signToken(HmacVerifier verifier, int schemaVersion,
                                    String tokenId, String serverId, String playerId,
@@ -128,6 +151,31 @@ public final class CanonicalEnvelopes {
         String canonical;
         try {
             canonical = canonicalQueueEnvelope(correlationId, playerId, regionKey, serverHint, createdAtMs);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        return verifier.verify(schemaVersion, canonical, hmacHex);
+    }
+
+    /** Sign a waitlist entry; throws {@link IllegalArgumentException} on delimiter injection. */
+    public static String signWaitlistEntry(HmacVerifier verifier, int schemaVersion,
+                                           String correlationId, String playerId,
+                                           String regionKey, String serverHint,
+                                           String originServerId) {
+        Objects.requireNonNull(verifier, "verifier");
+        return verifier.sign(schemaVersion,
+                canonicalWaitlistEntry(correlationId, playerId, regionKey, serverHint, originServerId));
+    }
+
+    /** Verify a waitlist entry; delimiter-bearing fields, missing hmac, or mismatch all return {@code false}. */
+    public static boolean verifyWaitlistEntry(HmacVerifier verifier, int schemaVersion,
+                                              String correlationId, String playerId,
+                                              String regionKey, String serverHint,
+                                              String originServerId, String hmacHex) {
+        Objects.requireNonNull(verifier, "verifier");
+        String canonical;
+        try {
+            canonical = canonicalWaitlistEntry(correlationId, playerId, regionKey, serverHint, originServerId);
         } catch (IllegalArgumentException e) {
             return false;
         }

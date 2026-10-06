@@ -67,6 +67,9 @@ LeafRTP resolves these issues using an **outbound ephemeral session architecture
 2. **Cryptographic Tokens:** Sessions use cryptographically random 128-bit hex tokens (`SecureRandom`). Tokens expire automatically and are invalidated once applied.
 3. **Fail-Closed Geometry Validation:** Proposed region boundaries are validated against ADR-034 non-self-intersection rules and world borders before any config file is updated on disk.
 4. **Non-Destructive Backups:** The server automatically writes `.bak` copies of all affected configuration files prior to applying modifications.
+5. **Secrets Stay on the Server:** Passwords and other secret values are uploaded as `<redacted>`. Applying a file that still shows `<redacted>` keeps the value already on disk.
+6. **Trusted Browsers:** A new browser has to be trusted once in-game with `/rtp editor trust <code>`. The code matches the one shown on the page and expires after 5 minutes. To revoke trust, run `/rtp editor untrust key=<fingerprint prefix>`, or `key=all` to revoke every browser.
+7. **Trust Expiry:** Set `editor.trust.maxAgeDays` in `advanced/network.yml` to make trusted browsers expire after that many days. The default `0` never expires them.
 
 ---
 

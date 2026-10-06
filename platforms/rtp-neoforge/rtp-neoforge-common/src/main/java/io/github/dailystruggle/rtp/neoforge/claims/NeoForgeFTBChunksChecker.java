@@ -1,17 +1,15 @@
 package io.github.dailystruggle.rtp.neoforge.claims;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
-import java.util.logging.Level;
 
 /**
- * Verifier for FTB Chunks on NeoForge.
+ * Verifier for FTB Chunks on NeoForge. Failures follow {@link NeoForgeClaimCheckFailure} (S-003).
  */
 public class NeoForgeFTBChunksChecker {
   private NeoForgeFTBChunksChecker() {}
 
-  private static boolean exists = true;
+  private static volatile boolean exists = true;
 
   public static boolean isInClaim(RTPCoords coords) {
     if (!exists || coords == null) return false;
@@ -47,12 +45,7 @@ public class NeoForgeFTBChunksChecker {
 
       return false;
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.WARNING,
-          "[RTP] Disabling FTB Chunks integration for NeoForge: " + t.getMessage(),
-          t);
-      return false;
+      return NeoForgeClaimCheckFailure.handle("FTB Chunks", t, () -> exists = false);
     }
   }
 }

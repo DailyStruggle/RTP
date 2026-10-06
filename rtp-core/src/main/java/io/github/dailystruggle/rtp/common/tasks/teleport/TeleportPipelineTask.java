@@ -132,6 +132,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private double distance = 0.0;
   private double distanceFromCenter = 0.0;
   private RTPLocation destination = null;
+  // First pre-teleport player location; the post-teleport recompute would otherwise read the
+  // player at the destination and report 0 when teleportData.originalCoords is absent.
+  private RTPLocation originSnapshot = null;
 
   /**
    * ADR-058 - region-specific schematic paste. When a {@code schematics/<region>.schem} file
@@ -234,7 +237,19 @@ public final class TeleportPipelineTask extends RTPRunnable {
     return placeholderMap;
   }
 
+  /**
+   * Recompute distance placeholders. Never throws: it runs inside the teleport success callback
+   * ahead of invulnerability/tracking cleanup, so a cosmetic failure must not skip that cleanup.
+   */
   public void computeDistance() {
+    try {
+      computeDistanceUnchecked();
+    } catch (RuntimeException e) {
+      RTP.log(Level.WARNING, "[RTP] distance placeholder computation failed; continuing teleport", e);
+    }
+  }
+
+  private void computeDistanceUnchecked() {
     if (coords == null) return;
     RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
     if (world == null && region != null) world = region.getWorld();
@@ -244,8 +259,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
     if (teleportData != null && teleportData.originalCoords != null) {
       RTPWorld<?> origWorld = RTP.serverAccessor.getRTPWorld(teleportData.originalCoords.worldName());
       origin = new RTPLocation(origWorld, teleportData.originalCoords.x(), teleportData.originalCoords.y(), teleportData.originalCoords.z());
+    } else if (originSnapshot != null) {
+      origin = originSnapshot;
     } else if (context != null && context.player() != null) {
       origin = context.player().getLocation();
+      originSnapshot = origin;
     }
 
     if (origin != null && this.destination != null) {

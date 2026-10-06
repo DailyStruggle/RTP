@@ -170,6 +170,24 @@ class RedisNetworkRequestQueueUnitTest {
     }
 
     @Test
+    void requeue_reportsScriptVerdict_withCidAndPlayer() throws Exception {
+        UUID cid = UUID.randomUUID();
+        UUID pid = UUID.randomUUID();
+        QueueEnvelope env = new QueueEnvelope(pid, cid, Optional.empty(), Optional.empty(), 1L, 2L);
+        assertTrue(queue.supportsRequeue());
+
+        when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenReturn(1L);
+        assertTrue(queue.requeue(env).get());
+        verify(jedis).evalsha(anyString(), eq(List.of("rtp:net:wq:ready")),
+                org.mockito.ArgumentMatchers.argThat((List<String> a) ->
+                        a.get(0).equals(cid.toString()) && a.get(1).equals(pid.toString())));
+
+        // 0 = entry cancelled / replaced since the pop: nothing handed back.
+        when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenReturn(0L);
+        assertFalse(queue.requeue(env).get());
+    }
+
+    @Test
     void transition_dispatchesScript() throws Exception {
         UUID pid = UUID.randomUUID();
         queue.transition(pid, QueueState.ROUTING, Optional.empty()).get();

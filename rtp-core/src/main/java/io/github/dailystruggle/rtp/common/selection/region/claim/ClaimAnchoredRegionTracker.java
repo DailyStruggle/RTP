@@ -7,6 +7,8 @@ import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +42,7 @@ public class ClaimAnchoredRegionTracker {
     private int pinnedCenterX;
     private int pinnedCenterZ;
     private long lastRecomputeEpochMillis;
+    private volatile long lastAccessEpochMillis;
 
     public ClaimAnchorState(String claimId, String world, int centerX, int centerZ, long nowMillis) {
       this.claimId = claimId;
@@ -47,6 +50,15 @@ public class ClaimAnchoredRegionTracker {
       this.pinnedCenterX = centerX;
       this.pinnedCenterZ = centerZ;
       this.lastRecomputeEpochMillis = nowMillis;
+      this.lastAccessEpochMillis = nowMillis;
+    }
+
+    public long getLastAccessEpochMillis() {
+      return lastAccessEpochMillis;
+    }
+
+    void touch(long nowMillis) {
+      this.lastAccessEpochMillis = nowMillis;
     }
 
     public String getClaimId() {
@@ -76,8 +88,18 @@ public class ClaimAnchoredRegionTracker {
     }
   }
 
+  /**
+   * Default cap on tracked claims. Evicting an entry only re-pins that claim at its current
+   * centroid on next resolve, so the bound trades a possible anchor shift for bounded heap.
+   */
+  public static final int DEFAULT_MAX_ENTRIES = 4096;
+
+  private static final long MIN_IDLE_TTL_MILLIS = TimeUnit.HOURS.toMillis(1);
+
   private final ConcurrentHashMap<String, ClaimAnchorState> anchorCache = new ConcurrentHashMap<>();
   private final long cooldownMillis;
+  private final int maxEntries;
+  private final long idleTtlMillis;
 
   /**
    * Constructs a tracker with the given cooldown duration.
@@ -86,10 +108,27 @@ public class ClaimAnchoredRegionTracker {
    * @param unit time unit
    */
   public ClaimAnchoredRegionTracker(long cooldownDuration, TimeUnit unit) {
+    this(cooldownDuration, unit, DEFAULT_MAX_ENTRIES);
+  }
+
+  /**
+   * Constructs a tracker with the given cooldown duration and entry cap.
+   *
+   * @param cooldownDuration duration
+   * @param unit time unit
+   * @param maxEntries maximum tracked claims (&gt;= 1)
+   */
+  public ClaimAnchoredRegionTracker(long cooldownDuration, TimeUnit unit, int maxEntries) {
     if (cooldownDuration < 0) {
       throw new IllegalArgumentException("cooldownDuration cannot be negative: " + cooldownDuration);
     }
+    if (maxEntries < 1) {
+      throw new IllegalArgumentException("maxEntries must be >= 1: " + maxEntries);
+    }
     this.cooldownMillis = Objects.requireNonNull(unit, "unit cannot be null").toMillis(cooldownDuration);
+    this.maxEntries = maxEntries;
+    // Idle TTL never undercuts the cooldown, so an active claim is not re-pinned early by eviction.
+    this.idleTtlMillis = Math.max(MIN_IDLE_TTL_MILLIS, 2 * cooldownMillis);
   }
 
   /**
@@ -124,9 +163,14 @@ public class ClaimAnchoredRegionTracker {
     if (state == null) {
       ClaimAnchorState newState = new ClaimAnchorState(
           id, boundary.world(), currentCentroid[0], currentCentroid[1], nowMillis);
-      anchorCache.put(id, newState);
-      return new int[] {newState.getPinnedCenterX(), newState.getPinnedCenterZ()};
+      ClaimAnchorState prior = anchorCache.putIfAbsent(id, newState);
+      if (prior == null) {
+        evictIfOverCapacity(nowMillis, id);
+        return new int[] {newState.getPinnedCenterX(), newState.getPinnedCenterZ()};
+      }
+      state = prior;
     }
+    state.touch(nowMillis);
 
     synchronized (state) {
       boolean centerInside = boundary.contains(state.getPinnedCenterX(), state.getPinnedCenterZ());
@@ -179,19 +223,16 @@ public class ClaimAnchoredRegionTracker {
           continue;
         }
 
-        // Query source shape at chunk center column
-        int bx = (cx << 4) + 8;
-        int bz = (cz << 4) + 8;
-
-        if (sourceShape.contains(bx, bz) && sourceShape.isKnownBad(bx, bz)) {
-          int causeOrdinal = sourceShape.causeAt(bx, bz);
+        // Memory shapes are keyed in chunk units (PregenTask maps a selection to (c << 4) + 7).
+        if (sourceShape.contains(cx, cz) && sourceShape.isKnownBad(cx, cz)) {
+          int causeOrdinal = sourceShape.causeAt(cx, cz);
           LocationGenerator.FailTypes cause = LocationGenerator.FailTypes.misc;
           if (causeOrdinal >= 0 && causeOrdinal < LocationGenerator.FailTypes.values().length) {
             cause = LocationGenerator.FailTypes.values()[causeOrdinal];
           }
 
-          if (targetShape.contains(bx, bz) && !targetShape.isKnownBad(bx, bz)) {
-            long targetLoc = targetShape.xzToLocation(bx, bz);
+          if (targetShape.contains(cx, cz) && !targetShape.isKnownBad(cx, cz)) {
+            long targetLoc = targetShape.xzToLocation(cx, cz);
             targetShape.addBadChunk(targetLoc, cause);
             ingestedCount++;
           }
@@ -283,8 +324,8 @@ public class ClaimAnchoredRegionTracker {
     }
 
     if (boundary == null) {
-      // Fallback: mark single candidate chunk
-      long loc = shape.xzToLocation(x, z);
+      // Fallback: mark the hit's chunk; shape keys are chunk units, x/z are blocks.
+      long loc = shape.xzToLocation(x >> 4, z >> 4);
       if (loc >= 0) {
         return shape.addBadChunk(loc, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
       }
@@ -302,33 +343,28 @@ public class ClaimAnchoredRegionTracker {
     int bMaxZ = boundary.maxZ();
 
     int marked = 0;
-    // Mark all chunk preimages across chunk bounding box
+    // Every spiral index decoding into a claimed chunk; bounded by the claim's chunk area.
     for (int cx = minCX; cx <= maxCX; cx++) {
       for (int cz = minCZ; cz <= maxCZ; cz++) {
         if (!boundary.containsChunk(cx, cz)) {
           continue;
         }
 
+        // The representative index too: a rounding spiral can leave a chunk with no exact preimage,
+        // and isKnownBad(cx, cz) reads the representative.
+        long representative = shape.xzToLocation(cx, cz);
+        if (representative >= 0 && representative < shape.getEffectiveRange()
+            && !shape.isKnownBad(representative)) {
+          shape.addBadLocation(representative, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
+          marked++;
+        }
         long[] preimages = shape.chunkToLocations(cx, cz);
         if (preimages != null && preimages.length > 0) {
           for (long p : preimages) {
-            if (p >= 0 && p < shape.getEffectiveRange() && !shape.isKnownBad(p)) {
+            if (p >= 0 && p < shape.getEffectiveRange() && p != representative && !shape.isKnownBad(p)) {
               shape.addBadLocation(p, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
               marked++;
             }
-          }
-        }
-      }
-    }
-
-    // Also mark exact coordinates within bounding box
-    for (int bx = bMinX; bx <= bMaxX; bx++) {
-      for (int bz = bMinZ; bz <= bMaxZ; bz++) {
-        if (boundary.contains(bx, bz)) {
-          long loc = shape.xzToLocation(bx, bz);
-          if (loc >= 0 && loc < shape.getEffectiveRange() && !shape.isKnownBad(loc)) {
-            shape.addBadLocation(loc, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
-            marked++;
           }
         }
       }
@@ -360,5 +396,35 @@ public class ClaimAnchoredRegionTracker {
    */
   public void clear() {
     anchorCache.clear();
+  }
+
+  /**
+   * Returns the number of tracked claim anchors.
+   *
+   * @return tracked entry count
+   */
+  public int size() {
+    return anchorCache.size();
+  }
+
+  /**
+   * Drops idle entries, then the least recently resolved ones, once the cap is exceeded. Trims to
+   * ~90% of the cap so steady churn does not rescan the map on every insert.
+   */
+  private void evictIfOverCapacity(long nowMillis, String keepId) {
+    if (anchorCache.size() <= maxEntries) return;
+    anchorCache.entrySet().removeIf(e -> !e.getKey().equals(keepId)
+        && nowMillis - e.getValue().getLastAccessEpochMillis() > idleTtlMillis);
+    int excess = anchorCache.size() - maxEntries;
+    if (excess <= 0) return;
+    List<String> victims = anchorCache.values().stream()
+        .filter(s -> !s.getClaimId().equals(keepId))
+        .sorted(Comparator.comparingLong(ClaimAnchorState::getLastAccessEpochMillis))
+        .limit(excess + maxEntries / 10)
+        .map(ClaimAnchorState::getClaimId)
+        .toList();
+    for (String victim : victims) {
+      anchorCache.remove(victim);
+    }
   }
 }

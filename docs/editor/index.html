@@ -2833,10 +2833,14 @@ function renderMarkdownToHtml(markdown) {
     res = res.replace(/\*([^*]+)\*/g, '<i>$1</i>');
     res = res.replace(/_([^_]+)_/g, '<i>$1</i>');
     res = res.replace(/~~([^~]+)~~/g, '<del>$1</del>');
-    // Links [text](url)
-    // Links [text](url); script-capable schemes render as plain text
-    res = res.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, label, url) =>
-      /^\s*(javascript|vbscript|data):/i.test(url) ? label : `<a href="${url}" target="_blank" rel="noopener">${label}</a>`);
+    // Links [text](url): allow-list http(s)/mailto/relative; browsers drop tabs/newlines inside
+    // a scheme (java&#9;script:), so whitespace and controls are stripped before the check
+    res = res.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, label, url) => {
+      const probe = url.replace(/[\u0000-\u0020\u007f]+/g, '');
+      const scheme = /^([a-z][a-z0-9+.\-]*):/i.exec(probe);
+      const ok = !scheme || /^(https?|mailto)$/i.test(scheme[1]);
+      return ok ? `<a href="${url}" target="_blank" rel="noopener">${label}</a>` : label;
+    });
     // Checkboxes [ ] and [x]
     res = res.replace(/\[ \]/g, '<input type="checkbox" disabled style="margin-right:4px;">');
     res = res.replace(/\[[xX]\]/g, '<input type="checkbox" checked disabled style="margin-right:4px;">');

@@ -101,6 +101,12 @@ public final class MenuActions {
         if (RTPAPI.hasActions()) {
           var actionService = RTPAPI.actions();
           if (actionService != null) {
+            // Re-check at click time: the menu may predate a permission revoke or action reload.
+            var def = actionService.getAction(actionId).orElse(null);
+            if (!MenuModel.canUseAction(playerId, def)) {
+              message(playerId, config.textUnavailable());
+              return;
+            }
             message(playerId, config.textSearching());
             actionService.trigger(
                 actionId,

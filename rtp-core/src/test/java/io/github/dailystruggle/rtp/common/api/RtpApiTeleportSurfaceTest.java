@@ -197,6 +197,56 @@ class RtpApiTeleportSurfaceTest {
     }
 
     @Test
+    @DisplayName("teleportDelegate refuses a biome target without rtp.biome permission (NO_PERMISSION)")
+    void teleportDelegate_biomeWithoutPermission_returnsNoPermission(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        player.setPermission("rtp.biome.plains", false);
+        player.setPermission("rtp.biome.PLAINS", false);
+        player.setPermission("rtp.biome.*", false);
+
+        RtpTarget biome = RtpTarget.biome("plains");
+        RTPResult res = RTPAPI.teleport(playerId, biome).get();
+        assertFalse(res.isSuccess());
+        assertEquals(RTPResult.Reason.NO_PERMISSION, res.reason());
+        assertFalse(RTP.getInstance().processingPlayers.contains(playerId),
+                "A refused request must not leave the player marked in-flight");
+        assertEquals(io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION,
+                RTPAPI.getTargetStatus(playerId, biome).availability(),
+                "Status and teleport must agree on the permission gate");
+    }
+
+    @Test
+    @DisplayName("teleportDelegate refuses a network target without rtp.servers permission (NO_PERMISSION)")
+    void teleportDelegate_networkWithoutPermission_returnsNoPermission(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        player.setPermission("rtp.servers.remoteServer", false);
+        player.setPermission("rtp.servers.*", false);
+
+        java.util.concurrent.atomic.AtomicBoolean routed = new java.util.concurrent.atomic.AtomicBoolean();
+        io.github.dailystruggle.rtp.api.network.NetworkCommandHook priorHook = RTP.networkCommandHook;
+        RTP.networkCommandHook = (pId, args) -> {
+            routed.set(true);
+            return io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.crossServer(
+                    UUID.randomUUID(), "default", "remoteServer");
+        };
+        try {
+            RTPResult res = RTPAPI.teleport(playerId, RtpTarget.network("remoteServer", "default")).get();
+            assertEquals(RTPResult.Reason.NO_PERMISSION, res.reason());
+            assertFalse(routed.get(), "A denied request must not be enrolled cross-server");
+        } finally {
+            RTP.networkCommandHook = priorHook;
+        }
+    }
+
+    @Test
     @DisplayName("teleportDelegate coordinate target local server teleports successfully")
     void teleportDelegate_coordinateTargetLocal(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
         io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());

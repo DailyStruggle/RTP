@@ -1,6 +1,8 @@
 package io.github.dailystruggle.helpers.stresstestrtp;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
@@ -58,13 +60,27 @@ import java.util.logging.Level;
  * by {@link TeleportProbe#setDirectAuthoritative(boolean)} (this probe enables
  * it), which stops those channels from claiming the rtp arm at all.
  *
- * <p>Handlers only do map lookups and timestamp writes; they run on whatever
- * thread the plugin fires from and never touch the world.
+ * <p><b>Outcome check.</b> LeafRTP fires {@code PostTeleportEvent} from its
+ * post-teleport actions whether or not the platform teleport succeeded, so
+ * the event alone is not a success. On Post the probe compares the player's
+ * position with the task's destination: more than
+ * {@link #ARRIVAL_TOLERANCE_BLOCKS} away in XZ, or in another world, is
+ * recorded as {@code NOT_AT_DESTINATION}. Competitor arms complete from
+ * {@code PlayerTeleportEvent}, which a refused teleport never fires, so both
+ * sides now count only teleports that moved the player.
+ *
+ * <p>Handlers do map lookups, timestamp writes and one position read; the
+ * landing block read happens only when the calling thread owns the chunk
+ * (see {@link LandingInspector}).
  */
 public final class DirectTeleportProbe implements Listener {
 
     static final String PRE_EVENT_CLASS = "io.github.dailystruggle.rtp.bukkit.events.PreTeleportEvent";
     static final String POST_EVENT_CLASS = "io.github.dailystruggle.rtp.bukkit.events.PostTeleportEvent";
+    /** XZ slack between the task's destination and the player's position on
+     *  Post. Covers block-centre offsets and platform snaps, far below any
+     *  RTP hop. */
+    static final double ARRIVAL_TOLERANCE_BLOCKS = 3.0;
 
     private final Plugin plugin;
     private final TeleportProbe probe;
@@ -85,8 +101,11 @@ public final class DirectTeleportProbe implements Listener {
     private final Method taskCoords;
     private final Method coordsX;
     private final Method coordsZ;
+    /** {@code RTPCoords#worldName()}; null if absent (world check skipped). */
+    private final Method coordsWorld;
 
     private volatile boolean registered = false;
+    private volatile boolean mismatchLogged = false;
 
     /** Pre-teleport instant per player, captured unconditionally on {@code Pre}
      *  and consumed on the matching {@code Post}. Independent of the probe's
@@ -99,7 +118,8 @@ public final class DirectTeleportProbe implements Listener {
         this.plugin = plugin;
         this.probe = probe;
         Class<? extends Event> pre = null, post = null;
-        Method doTeleport = null, doTeleportPre = null, player = null, uuid = null, coords = null, x = null, z = null;
+        Method doTeleport = null, doTeleportPre = null, player = null, uuid = null, coords = null, x = null, z = null,
+                worldName = null;
         try {
             pre = Class.forName(PRE_EVENT_CLASS).asSubclass(Event.class);
             post = Class.forName(POST_EVENT_CLASS).asSubclass(Event.class);
@@ -114,6 +134,11 @@ public final class DirectTeleportProbe implements Listener {
             coords = task.getMethod("coords");
             x = coords.getReturnType().getMethod("x");
             z = coords.getReturnType().getMethod("z");
+            try {
+                worldName = coords.getReturnType().getMethod("worldName");
+            } catch (NoSuchMethodException ignored) {
+                worldName = null;
+            }
         } catch (ClassNotFoundException | ClassCastException e) {
             pre = null; post = null; doTeleportPre = null; // plugin under test is not LeafRTP
         } catch (NoSuchMethodException | SecurityException e) {
@@ -131,6 +156,7 @@ public final class DirectTeleportProbe implements Listener {
         this.taskCoords = coords;
         this.coordsX = x;
         this.coordsZ = z;
+        this.coordsWorld = worldName;
     }
 
     /** True iff LeafRTP's teleport events are on the classpath. */
@@ -213,7 +239,44 @@ public final class DirectTeleportProbe implements Listener {
         }
         // attributeDirect claims the same attempt instance we just stamped, so
         // onComplete reads the pre/post timestamps we set above.
-        probe.attributeDirect(id, to[0], to[1]);
+        Player p = Bukkit.getPlayer(id);
+        Location at = p != null ? p.getLocation() : null;
+        String expectedWorld = worldOf(event);
+        String fail = arrivalFailure(at, expectedWorld, to[0], to[1]);
+        if (!fail.isEmpty() && !mismatchLogged) {
+            // Once per run: a systematic mismatch (e.g. a world-name format
+            // change) would otherwise read as a plugin failing every teleport.
+            mismatchLogged = true;
+            plugin.getLogger().warning(String.format(java.util.Locale.ROOT,
+                    "[StressTestRTP] first NOT_AT_DESTINATION on the rtp arm: expected %s (%.1f, %.1f), "
+                            + "player at %s", expectedWorld, to[0], to[1], at));
+        }
+        LandingInspector.Landing landing = fail.isEmpty() ? LandingInspector.inspect(at) : null;
+        probe.attributeDirect(id, to[0], to[1], fail.isEmpty(), fail, landing);
+    }
+
+    /** Empty when the player is at the destination, else the fail reason. */
+    static String arrivalFailure(Location at, String expectedWorld, double toX, double toZ) {
+        if (at == null || at.getWorld() == null) return "NOT_AT_DESTINATION";
+        if (expectedWorld != null && !expectedWorld.isEmpty()
+                && !expectedWorld.equalsIgnoreCase(at.getWorld().getName())) {
+            return "NOT_AT_DESTINATION";
+        }
+        double dx = at.getX() - toX, dz = at.getZ() - toZ;
+        return (dx * dx + dz * dz) <= ARRIVAL_TOLERANCE_BLOCKS * ARRIVAL_TOLERANCE_BLOCKS
+                ? "" : "NOT_AT_DESTINATION";
+    }
+
+    private String worldOf(Event event) {
+        if (coordsWorld == null) return null;
+        try {
+            Object task = getDoTeleport.invoke(event);
+            Object coords = task != null ? taskCoords.invoke(task) : null;
+            Object w = coords != null ? coordsWorld.invoke(coords) : null;
+            return w instanceof String s ? s : null;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     private UUID playerOf(Event event) {

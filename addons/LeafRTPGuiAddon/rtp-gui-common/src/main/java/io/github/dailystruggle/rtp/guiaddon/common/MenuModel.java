@@ -146,9 +146,7 @@ public final class MenuModel {
         for (String actionId : actionService.getActionIds()) {
           var defOpt = actionService.getAction(actionId);
           if (defOpt.isEmpty()) continue;
-          var def = defOpt.get();
-          if (!def.isGuiEligible()) continue;
-          if (def.permission() == null || def.permission().isBlank() || RTPAPI.checkPermission(playerId, def.permission()) || RTPAPI.checkPermission(playerId, "rtp.action.*")) {
+          if (canUseAction(playerId, defOpt.get())) {
             hasActions = true;
             break;
           }
@@ -284,6 +282,23 @@ public final class MenuModel {
   }
 
   /**
+   * GUI gate for a scripted action: GUI-eligible and either unpermissioned, or the player holds
+   * its permission or {@code rtp.action.*}. Evaluated at menu build and again at click time, so a
+   * revoke or stricter reload while the menu is open still blocks the trigger.
+   *
+   * @param playerId the player
+   * @param def the action definition; {@code null} is never usable
+   * @return {@code true} if the player may trigger {@code def} from the GUI
+   */
+  public static boolean canUseAction(UUID playerId, io.github.dailystruggle.rtp.api.action.ActionDefinition def) {
+    if (playerId == null || def == null || !def.isGuiEligible()) return false;
+    String perm = def.permission();
+    return perm == null || perm.isBlank()
+        || RTPAPI.checkPermission(playerId, perm)
+        || RTPAPI.checkPermission(playerId, "rtp.action.*");
+  }
+
+  /**
    * Builds the paginated scripted actions sub-menu model for {@code playerId}.
    *
    * @param playerId the viewing player
@@ -302,12 +317,7 @@ public final class MenuModel {
           var defOpt = actionService.getAction(actionId);
           if (defOpt.isEmpty()) continue;
           var def = defOpt.get();
-          if (!def.isGuiEligible()) continue;
-          if (def.permission() != null && !def.permission().isBlank()
-              && !RTPAPI.checkPermission(playerId, def.permission())
-              && !RTPAPI.checkPermission(playerId, "rtp.action.*")) {
-            continue;
-          }
+          if (!canUseAction(playerId, def)) continue;
 
           String title = (def.title() != null && !def.title().isBlank())
               ? def.title()

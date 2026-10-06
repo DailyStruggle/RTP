@@ -230,6 +230,11 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
         if (p == null || command == null) return;
         if (p.level() instanceof ServerLevel lvl) {
             MinecraftServer srv = lvl.getServer();
+            // Command dispatch touches single-threaded server state; hop when called off-thread.
+            if (srv != null && !srv.isSameThread()) {
+                srv.execute(() -> performCommand(player, command));
+                return;
+            }
             try {
                 srv.getCommands().performPrefixedCommand(p.createCommandSourceStack(), command);
             } catch (Throwable t) {
@@ -352,6 +357,16 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
     private static boolean performTeleport(ServerPlayer cur, ServerLevel target,
                                            double x, double y, double z,
                                            float yaw, float pitch) {
+        // Typed TeleportTransition path first: the only reliable cross-dimension move on 26.x.
+        io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+        if (adapter != null) {
+            try {
+                if (adapter.teleport(cur, target, x, y, z, yaw, pitch)) return true;
+            } catch (Throwable t) {
+                RTP.log(Level.FINE, "[RTP][V26_3_R1] adapter teleport failed: " + t);
+            }
+        }
         try {
             java.lang.reflect.Method m = ServerPlayer.class.getMethod(
                     "teleportTo", ServerLevel.class,
@@ -374,18 +389,20 @@ public final class V26_3_R1FabricRTPPlayer implements RTPPlayer,
             RTP.log(Level.FINE,
                     "[RTP][V26_3_R1] same-dim connection.teleport failed: " + t);
         }
+        if (cur.level() != target) {
+            // Never setPos here: it would move the player to the target XZ inside the origin
+            // dimension (possibly underground) while the pipeline reports failure (S-001/S-004).
+            RTP.log(Level.WARNING,
+                    "[RTP][V26_3_R1] cross-dim teleport requested but no stable cross-dim "
+                            + "path on this MC version; player left in place.");
+            return false;
+        }
         try {
             cur.setPos(x, y, z);
             cur.setYRot(yaw);
             cur.setXRot(pitch);
-            if (cur.level() == target) {
-                cur.connection.teleport(x, y, z, yaw, pitch);
-                return true;
-            }
-            RTP.log(Level.WARNING,
-                    "[RTP][V26_3_R1] cross-dim teleport requested but no stable cross-dim "
-                            + "path on this MC version; pos was set in-place.");
-            return false;
+            cur.connection.teleport(x, y, z, yaw, pitch);
+            return true;
         } catch (Throwable t) {
             RTP.log(Level.WARNING, "[RTP][V26_3_R1] fallback teleport failed", t);
             return false;

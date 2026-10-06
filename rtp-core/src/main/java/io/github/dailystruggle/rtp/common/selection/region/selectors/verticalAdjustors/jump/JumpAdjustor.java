@@ -207,8 +207,6 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
       requireSkyLight = (Boolean) o;
     } else requireSkyLight = Boolean.parseBoolean(o.toString());
 
-    int oldY = minY;
-
     // enforce valid inputs
     step = Math.max(step, 1);
     step = Math.min(step, (maxY - minY) / 8);
@@ -217,7 +215,15 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
     Set<String> unsafeBlocks = snap.unsafeBlocks();
     int platformDepth = snap.platformDepth();
 
+    // Narrowing mutates the bounds; each test column starts from the configured window.
+    final int baseMinY = minY;
+    final int baseMaxY = maxY;
+
+    columns:
     for (int j = 0; j < testCoords.size(); j++) {
+      minY = baseMinY;
+      maxY = baseMaxY;
+      int oldY = minY;
       List<Integer> xz = testCoords.get(j);
       int x = xz.get(0);
       int z = xz.get(1);
@@ -244,7 +250,8 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
             maxY = i;
             break;
           }
-          if (i > maxY - it_len) return false;
+          // Coarse miss rejects this column only, not the whole chunk.
+          if (i > maxY - it_len) continue columns;
           oldY = i;
         }
       }

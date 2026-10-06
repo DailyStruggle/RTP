@@ -16,6 +16,7 @@ import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -298,6 +299,49 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
         assertFalse(regionsParser.listParsers().contains("custom_region"));
 
         // Close any open streams/parsers on the temp files so file deletion can happen cleanly
+        RTP.configs = null;
+    }
+
+    @Test
+    @DisplayName("Multi-config ADD / REMOVE require rtp.config; rtp.config.view alone is read-only")
+    void multiConfigMutateRequiresConfigEditPermission() {
+        MenuRedeemSubcommand full = wired(allow());
+        MenuRedeemSubcommand viewOnly = wired(uuid -> perm -> MenuRedeemSubcommand.CONFIG_VIEW_PERMISSION.equals(perm));
+        UUID viewer = UUID.randomUUID();
+
+        MultiConfigParser<?> regionsParser = null;
+        for (MultiConfigParser<?> p : RTP.configs.multiConfigParserMap.values()) {
+            if (p != null && "regions".equalsIgnoreCase(p.name)) {
+                regionsParser = p;
+                break;
+            }
+        }
+        assertNotNull(regionsParser);
+        regionsParser.addParser(new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
+                io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class,
+                "default", "1.0", regionsParser.myDirectory, regionsParser.fileDatabase));
+        MultiConfigParser<?> parser = regionsParser;
+        java.util.function.Predicate<String> present = n ->
+                parser.listParsers().contains(n) || parser.listParsers().contains(n + ".yml");
+
+        List<String> msgs = new ArrayList<>();
+        assertFalse(viewOnly.dispatchMultiConfigMutate(viewer,
+                new MenuAction.MultiConfigMutate("regions", "viewonly_add", MenuAction.MultiConfigMutate.Op.ADD),
+                msgs::add), "view-only ADD must be rejected");
+        assertFalse(msgs.isEmpty(), "rejection must be surfaced");
+        assertFalse(present.test("viewonly_add"), "rejected ADD must not create the entry");
+
+        assertTrue(full.dispatchMultiConfigMutate(viewer,
+                new MenuAction.MultiConfigMutate("regions", "viewonly_keep", MenuAction.MultiConfigMutate.Op.ADD),
+                m -> {}));
+        assertFalse(viewOnly.dispatchMultiConfigMutate(viewer,
+                new MenuAction.MultiConfigMutate("regions", "viewonly_keep", MenuAction.MultiConfigMutate.Op.REMOVE),
+                m -> {}), "view-only REMOVE must be rejected");
+        assertTrue(present.test("viewonly_keep"), "rejected REMOVE must leave the entry in place");
+
+        assertTrue(full.dispatchMultiConfigMutate(viewer,
+                new MenuAction.MultiConfigMutate("regions", "viewonly_keep", MenuAction.MultiConfigMutate.Op.REMOVE),
+                m -> {}));
         RTP.configs = null;
     }
 

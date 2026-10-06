@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProxyDirectWireTest {
 
@@ -94,6 +95,26 @@ class ProxyDirectWireTest {
         assertEquals(4096, ProxyDirectWire.MAX_LIST_COUNT);
         java.util.List<String> oversized = java.util.Collections.nCopies(ProxyDirectWire.MAX_LIST_COUNT + 1, "x");
         assertThrows(IOException.class, () -> ProxyDirectWire.writeList(dos, oversized, verifier, 1));
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-S-004: one HMAC-invalid row fails the whole list instead of a silent partial batch")
+    void list_tamperedRow_failsWholeList() throws Exception {
+        HmacVerifier verifier = HmacVerifier.forTesting(secret32(), 1, 1);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        dos.writeInt(3);
+        ProxyDirectWire.writeSignedPayload(dos, "good-1", verifier, 1);
+        dos.writeInt(1);
+        dos.writeUTF("00".repeat(32));
+        dos.writeUTF("forged");
+        ProxyDirectWire.writeSignedPayload(dos, "good-2", verifier, 1);
+        dos.writeByte(42); // trailing byte: proves every frame was consumed
+
+        DataInputStream dis = new DataInputStream(new ByteArrayInputStream(baos.toByteArray()));
+        IOException ex = assertThrows(IOException.class, () -> ProxyDirectWire.readList(dis, verifier));
+        assertTrue(ex.getMessage().contains("1 of 3"), ex.getMessage());
+        assertEquals(42, dis.readByte());
     }
 
     @Test

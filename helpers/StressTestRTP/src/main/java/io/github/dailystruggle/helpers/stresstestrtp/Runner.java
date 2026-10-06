@@ -491,6 +491,10 @@ public final class Runner {
                 lastProgressEpochMs = now; // re-arm watchdog so it doesn't spam
             }
 
+            // 0.4) Direct-arm rows held for the shared external channel are
+            //      written once their wait elapses, in every mode.
+            recorder.flushDeferred(false);
+
             // 0.5) Spark profile rotation. While a measurement phase is
             //      active and `spark.rotate-seconds` > 0, periodically stop
             //      and restart the spark profile so each slice is flushed to
@@ -566,7 +570,7 @@ public final class Runner {
                             double dx = loc.getX() - fromX;
                             double dz = loc.getZ() - fromZ;
                             if ((dx * dx + dz * dz) >= thr2) {
-                                if (probe.attributeByPosition(id, loc.getX(), loc.getZ())) {
+                                if (probe.attributeByPosition(id, loc)) {
                                     lastProgressEpochMs = System.currentTimeMillis();
                                 }
                             }
@@ -1020,13 +1024,15 @@ public final class Runner {
                 // Identity check, not a null check: a superseding dispatch for
                 // the same player owns its own watcher, and attributing this
                 // one against that one's baseline would mis-time both.
-                if (probe.peek(tid) != attempt) return false;
+                // A direct-arm attempt the plugin already completed stays
+                // watched while its row waits for this external sighting.
+                if (probe.peek(tid) != attempt && probe.awaitingExternal(tid) != attempt) return false;
                 if (!target.isOnline()) return false;
                 Location loc = target.getLocation();
                 double dx = loc.getX() - fromX;
                 double dz = loc.getZ() - fromZ;
                 if ((dx * dx + dz * dz) < thr2) return true;
-                if (probe.attributeByPosition(tid, loc.getX(), loc.getZ())) {
+                if (probe.attributeByPosition(tid, loc)) {
                     lastProgressEpochMs = System.currentTimeMillis();
                 }
                 return false;

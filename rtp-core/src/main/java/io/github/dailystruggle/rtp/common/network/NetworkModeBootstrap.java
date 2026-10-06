@@ -178,6 +178,19 @@ public final class NetworkModeBootstrap {
                             + " - transport.type=" + transportType + " does not sign payloads; continuing.");
         }
 
+        if (verifier == null && isClientForgeableTier(transportType)
+                && !network.getBoolean("allowUnsigned", false)) {
+            // Unsigned plugin-message rows can be injected by a modded client; running
+            // without the secret is an explicit operator opt-in (REQ-RTP-PROXY-007).
+            RTP.log(Level.SEVERE,
+                    "[RTP] transport.type=" + transportType + " has no HMAC secret (secretEnv='"
+                            + secretEnv + "'); network mode stays DISABLED. Set the env var to a Base64"
+                            + " secret of >= 32 bytes on every backend and the proxy, or set"
+                            + " network.allowUnsigned: true to accept unauthenticated heartbeats"
+                            + " (clients can then forge server/region availability).");
+            return;
+        }
+
         NetworkTransport selected;
         try {
             selected = openTransport(transportType, intervalMs, staleAfterMs, transportSec, verifier, schemaVersion);
@@ -979,6 +992,13 @@ public final class NetworkModeBootstrap {
 
     /** Default TCP port for the {@code proxy-direct} transport (rtp-proxy-ADR-017). */
     private static final int PROXY_DIRECT_DEFAULT_PORT = 25599;
+
+    /** Plugin-message tiers: inbound rows ride player connections, so unsigned rows are forgeable. */
+    static boolean isClientForgeableTier(String type) {
+        String t = type == null ? "in-memory" : type.toLowerCase(java.util.Locale.ROOT);
+        return t.equals("plugin-message") || t.equals("pluginmessage")
+                || t.equals("proxy-cache") || t.equals("proxycache") || t.equals("auto");
+    }
 
     /**
      * Open the transport binding matching {@code type}. Supports

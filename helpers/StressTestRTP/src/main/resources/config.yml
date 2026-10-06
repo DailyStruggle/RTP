@@ -447,6 +447,13 @@ output-subdir: "runs"
 # the query is not region-safe) the ticket columns stay at -1 = NOT MEASURED.
 ticket-sample-period-ms: 1000
 
+# Startup check for the phases CSV chunks_sync_* columns, which name the plugin
+# that synchronously requested each chunk load from the event's call stack.
+# 10 s after enable the harness loads one generated, unloaded chunk sync and
+# one async, and writes those columns only if it names itself for the first
+# and nobody for the second (verdict in chunks_sync_selftest and the log).
+sync-load-selftest: true
+
 # Setup-phase calibration of what ONE plugin chunk ticket actually costs.
 # peak_resident_chunks and peak_plugin_tickets are both recorded above, but
 # converting between them needs the platform's ticket footprint: vanilla

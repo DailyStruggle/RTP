@@ -86,6 +86,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`ROADMAP.md`](ROADMAP.md) | Forward-looking work. |
 | [`STAKEHOLDERS.md`](STAKEHOLDERS.md) | Roles and review expectations. |
 | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Dated engineering notes. |
+| [`SECURITY_AUDIT_v3.3.0.md`](SECURITY_AUDIT_v3.3.0.md) | v3.3.0 pre-release security and severe-bug audit: fixed, open, sound and uncovered areas. |
 
 > Plans that shipped or were superseded are removed; the ADR is the durable record. Pre-deletion state is recoverable from git.
 

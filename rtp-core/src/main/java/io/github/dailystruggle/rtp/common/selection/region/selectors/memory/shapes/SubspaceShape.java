@@ -400,24 +400,66 @@ public class SubspaceShape {
       int anchorY,
       List<RTPLocation> acc,
       CandidateValidator validator) {
-    if (acc.size() >= target) {
-      return java.util.concurrent.CompletableFuture.completedFuture(new ArrayList<>(acc));
-    }
-    if (index >= candidates.size()) {
-      return java.util.concurrent.CompletableFuture.completedFuture(
-          acc.size() >= required ? new ArrayList<>(acc) : Collections.emptyList());
-    }
+    java.util.concurrent.CompletableFuture<List<RTPLocation>> result =
+        new java.util.concurrent.CompletableFuture<>();
+    drainSlots(candidates, index, required, target, elevationTolerance, anchorY, acc, validator, result);
+    return result;
+  }
 
-    int[] cell = candidates.get(index);
-    return validator.validateAsync(cell[0], cell[1])
-        .thenCompose(loc -> {
-          if (loc != null && loc.coords() != null
-              && (elevationTolerance < 0 || Math.abs(loc.coords().y() - anchorY) <= elevationTolerance)) {
-            acc.add(loc);
+  /**
+   * Iterative candidate drain. Already-completed validations (resident chunks) are consumed in-loop;
+   * only a pending future resumes the loop from its callback, so stack depth stays O(1) regardless
+   * of footprint size.
+   */
+  private static void drainSlots(
+      List<int[]> candidates,
+      int startIndex,
+      int required,
+      int target,
+      int elevationTolerance,
+      int anchorY,
+      List<RTPLocation> acc,
+      CandidateValidator validator,
+      java.util.concurrent.CompletableFuture<List<RTPLocation>> result) {
+    try {
+      for (int index = startIndex; ; index++) {
+        if (acc.size() >= target) {
+          result.complete(new ArrayList<>(acc));
+          return;
+        }
+        if (index >= candidates.size()) {
+          result.complete(acc.size() >= required ? new ArrayList<>(acc) : Collections.emptyList());
+          return;
+        }
+        int[] cell = candidates.get(index);
+        java.util.concurrent.CompletableFuture<RTPLocation> pending =
+            Objects.requireNonNull(validator.validateAsync(cell[0], cell[1]), "validateAsync returned null");
+        if (pending.isDone()) {
+          // Non-blocking read of a completed future (S-005); exceptional completion throws into the catch.
+          acceptSlot(pending.getNow(null), elevationTolerance, anchorY, acc);
+          continue;
+        }
+        final int next = index + 1;
+        pending.whenComplete((loc, ex) -> {
+          if (ex != null) {
+            result.completeExceptionally(ex);
+            return;
           }
-          return evaluateSlotsSequentially(
-              candidates, index + 1, required, target, elevationTolerance, anchorY, acc, validator);
+          acceptSlot(loc, elevationTolerance, anchorY, acc);
+          drainSlots(candidates, next, required, target, elevationTolerance, anchorY, acc, validator, result);
         });
+        return;
+      }
+    } catch (Throwable t) {
+      result.completeExceptionally(t);
+    }
+  }
+
+  private static void acceptSlot(RTPLocation loc, int elevationTolerance, int anchorY, List<RTPLocation> acc) {
+    if (loc != null && loc.coords() != null
+        && (elevationTolerance < 0 || Math.abs(loc.coords().y() - anchorY) <= elevationTolerance)) {
+      acc.add(loc);
+    }
   }
 
   /**

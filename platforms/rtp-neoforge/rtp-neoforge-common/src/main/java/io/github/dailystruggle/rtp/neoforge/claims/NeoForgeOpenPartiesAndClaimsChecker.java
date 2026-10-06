@@ -1,17 +1,16 @@
 package io.github.dailystruggle.rtp.neoforge.claims;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
-import java.util.logging.Level;
 
 /**
- * Verifier for Open Parties and Claims (OPAC) on NeoForge.
+ * Verifier for Open Parties and Claims (OPAC) on NeoForge. Failures follow
+ * {@link NeoForgeClaimCheckFailure} (S-003).
  */
 public class NeoForgeOpenPartiesAndClaimsChecker {
   private NeoForgeOpenPartiesAndClaimsChecker() {}
 
-  private static boolean exists = true;
+  private static volatile boolean exists = true;
 
   public static boolean isInClaim(RTPCoords coords) {
     if (!exists || coords == null) return false;
@@ -47,12 +46,7 @@ public class NeoForgeOpenPartiesAndClaimsChecker {
 
       return false;
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.WARNING,
-          "[RTP] Disabling OpenPartiesAndClaims integration for NeoForge: " + t.getMessage(),
-          t);
-      return false;
+      return NeoForgeClaimCheckFailure.handle("OpenPartiesAndClaims", t, () -> exists = false);
     }
   }
 }

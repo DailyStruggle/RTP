@@ -173,6 +173,44 @@ public class MenuModelTest {
     }
 
     @Test
+    void canUseAction_enforcesActionPermissionOrWildcard() {
+        UUID testPlayer = UUID.randomUUID();
+        java.util.Set<String> granted = new java.util.HashSet<>();
+        var open = new io.github.dailystruggle.rtp.api.action.ActionDefinition(
+                "open", null, null, null, null, null, null);
+        var gated = new io.github.dailystruggle.rtp.api.action.ActionDefinition(
+                "gated", null, "rtp.action.gated", null, null, null, null);
+        assertTrue(open.isGuiEligible(), "Default action must be GUI-eligible for this test");
+
+        RTPServerAccessor originalAccessor = RTPAPI.serverAccessor;
+        try {
+            RTPCommandSender sender = (RTPCommandSender) java.lang.reflect.Proxy.newProxyInstance(
+                    RTPCommandSender.class.getClassLoader(),
+                    new Class<?>[]{RTPCommandSender.class},
+                    (proxy, method, args) -> "hasPermission".equals(method.getName())
+                            ? granted.contains(String.valueOf(args[0])) : null);
+            RTPAPI.serverAccessor = (RTPServerAccessor) java.lang.reflect.Proxy.newProxyInstance(
+                    RTPServerAccessor.class.getClassLoader(),
+                    new Class<?>[]{RTPServerAccessor.class},
+                    (proxy, method, args) -> "getSender".equals(method.getName()) ? sender : null);
+
+            assertFalse(MenuModel.canUseAction(testPlayer, null), "Missing definition is never usable");
+            assertFalse(MenuModel.canUseAction(null, open));
+            assertTrue(MenuModel.canUseAction(testPlayer, open), "Unpermissioned action is open to all");
+            assertFalse(MenuModel.canUseAction(testPlayer, gated), "Revoked permission must deny");
+
+            granted.add("rtp.action.gated");
+            assertTrue(MenuModel.canUseAction(testPlayer, gated));
+
+            granted.clear();
+            granted.add("rtp.action.*");
+            assertTrue(MenuModel.canUseAction(testPlayer, gated), "Wildcard grants every action");
+        } finally {
+            RTPAPI.serverAccessor = originalAccessor;
+        }
+    }
+
+    @Test
     void entryLore_operatorEntries_haveSpecializedLore() {
         MenuEntry setupEntry = new MenuEntry(
                 RtpTarget.action("action:operator:setup"),

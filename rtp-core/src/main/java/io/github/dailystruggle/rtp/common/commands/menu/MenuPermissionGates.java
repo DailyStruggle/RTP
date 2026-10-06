@@ -18,6 +18,8 @@ final class MenuPermissionGates {
     static final String CONFIG_VIEW_PERMISSION = MenuRedeemSubcommand.CONFIG_VIEW_PERMISSION;
     static final String ADMIN_MENU_PERMISSION = MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
     static final String INFO_PERMISSION = "rtp.info";
+    /** Same node {@code SubConfigCmd} requires for CLI config mutation. */
+    static final String CONFIG_EDIT_PERMISSION = "rtp.config";
 
     private final Function<UUID, Predicate<String>> probeFactory;
 
@@ -27,6 +29,10 @@ final class MenuPermissionGates {
 
     boolean hasConfigView(UUID senderId) {
         return test(senderId, CONFIG_VIEW_PERMISSION, "config-view");
+    }
+
+    boolean hasConfigEdit(UUID senderId) {
+        return test(senderId, CONFIG_EDIT_PERMISSION, "config-edit");
     }
 
     boolean hasAdminMenu(UUID senderId) {

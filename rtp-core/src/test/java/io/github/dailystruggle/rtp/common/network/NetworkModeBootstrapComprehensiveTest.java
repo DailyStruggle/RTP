@@ -292,7 +292,7 @@ class NetworkModeBootstrapComprehensiveTest {
     @DisplayName("boot with plugin-message transport fails when bridge is missing")
     void bootPluginMessageMissingBridge() throws IOException {
         File file = new File(tempDir, "pluginmsg.yml");
-        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\ntransport:\n  type: plugin-message\n");
+        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\n  allowUnsigned: true\ntransport:\n  type: plugin-message\n");
 
         RTP.networkBridgeFactory = null;
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
@@ -305,7 +305,7 @@ class NetworkModeBootstrapComprehensiveTest {
     @DisplayName("boot with proxy-cache transport fails when bridge is missing")
     void bootProxyCacheMissingBridge() throws IOException {
         File file = new File(tempDir, "proxycache.yml");
-        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\ntransport:\n  type: proxy-cache\n");
+        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\n  allowUnsigned: true\ntransport:\n  type: proxy-cache\n");
 
         RTP.networkBridgeFactory = null;
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
@@ -318,7 +318,7 @@ class NetworkModeBootstrapComprehensiveTest {
     @DisplayName("boot with auto transport disables when bridge is missing or passive probe disarmed")
     void bootAutoTransportHandling() throws IOException {
         File file = new File(tempDir, "auto.yml");
-        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\ntransport:\n  type: auto\n");
+        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\n  allowUnsigned: true\ntransport:\n  type: auto\n");
 
         RTP.networkBridgeFactory = null;
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
@@ -339,6 +339,44 @@ class NetworkModeBootstrapComprehensiveTest {
         NetworkModeBootstrap bootstrap2 = new NetworkModeBootstrap();
         bootstrap2.boot(file);
         assertNull(bootstrap2.transport());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: plugin-message tiers without a secret stay disabled unless network.allowUnsigned is true")
+    void bootUnsignedPluginMessageRequiresOptIn() throws IOException {
+        java.util.concurrent.atomic.AtomicInteger inboundRegistrations = new java.util.concurrent.atomic.AtomicInteger();
+        NetworkBridge bridge = new NetworkBridge() {
+            @Override public boolean isAvailable() { return true; }
+            @Override public Optional<UUID> anyOnlinePlayer() { return Optional.empty(); }
+            @Override public void broadcastHeartbeat(byte[] payload) {}
+            @Override public void connect(UUID player, String targetServerId) {}
+            @Override public void registerInbound(Consumer<byte[]> heartbeatSink) { inboundRegistrations.incrementAndGet(); }
+            @Override public ProxyProbe passiveProbe() { return ProxyProbe.ARMED; }
+        };
+        RTP.networkBridgeFactory = () -> bridge;
+        RTP.backendStateSamplerFactory = lobby -> sid -> new BackendHeartbeat(
+                sid, 1, BackendHeartbeat.PluginState.READY, true, System.currentTimeMillis(),
+                20.0, 0, 100, 0L, 1L, 0, List.of(), List.of(), false
+        );
+        String base = "network:\n  enabled: true\n  serverId: s1\n  secretEnv: RTP_TEST_SECRET_THAT_IS_NEVER_SET\n";
+
+        for (String type : List.of("plugin-message", "proxy-cache", "auto")) {
+            File refused = new File(tempDir, "unsigned-" + type + ".yml");
+            Files.writeString(refused.toPath(), base + "transport:\n  type: " + type + "\n");
+            NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
+            bootstrap.boot(refused);
+            assertNull(bootstrap.transport(), type);
+            assertNull(NetworkModeBootstrap.LIVE, type);
+        }
+        assertEquals(0, inboundRegistrations.get(), "refused boots must not open an inbound listener");
+
+        File optIn = new File(tempDir, "unsigned-optin.yml");
+        Files.writeString(optIn.toPath(), base + "  allowUnsigned: true\ntransport:\n  type: plugin-message\n");
+        NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
+        bootstrap.boot(optIn);
+        assertNotNull(bootstrap.transport());
+        assertEquals(1, inboundRegistrations.get());
+        bootstrap.shutdown();
     }
 
     @Test

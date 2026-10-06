@@ -24,15 +24,25 @@ public class PermissionMigrationTest {
 
     private Path tempDir;
     private PermissionMigrationService service;
+    private io.github.dailystruggle.rtp.common.configuration.Configs savedConfigs;
+    private RTPServerAccessor savedAccessor;
 
     @BeforeEach
     void setUp() throws IOException {
+        // loadTemplatesFromConfig prefers RTP.configs.pluginDirectory over the accessor;
+        // a leftover static Configs from another class would mask the per-test integrations.yml.
+        savedConfigs = RTP.configs;
+        savedAccessor = RTP.serverAccessor;
+        RTP.configs = null;
+        RTP.serverAccessor = null;
         tempDir = Files.createTempDirectory("rtp-perm-test");
         service = new PermissionMigrationService();
     }
 
     @AfterEach
     void tearDown() {
+        RTP.configs = savedConfigs;
+        RTP.serverAccessor = savedAccessor;
         if (tempDir != null) {
             try {
                 Files.walk(tempDir)
@@ -178,8 +188,9 @@ public class PermissionMigrationTest {
                 new PermissionMigrationService.ParsedNode("justrtp.world.nether", true, "world=world_nether server=survival")
         );
 
+        // No source= named: the generic mapper only runs for prefixes matching the derived sources.
         PermissionMigrationService.MigrationPlan plan = service.planMigration(
-                "group", "members", parsedNodes, null, false);
+                "group", "members", parsedNodes, null, Set.of("betterrtp", "justrtp"), false);
 
         assertFalse(plan.isApplied());
         assertEquals(3, plan.getMappedEntries().size());
@@ -290,9 +301,14 @@ public class PermissionMigrationTest {
 
     @Test
     @DisplayName("5.3 - ConfigImportPermissionsCmd command execution (dry-run and apply)")
-    void testConfigImportPermissionsCommand() {
+    void testConfigImportPermissionsCommand() throws IOException {
+        // No source= is passed, so the BetterRTP folder beside RTP's data folder is what makes its nodes map.
+        Path rtpDir = Files.createDirectories(tempDir.resolve("RTP"));
+        Path betterDir = Files.createDirectories(tempDir.resolve("BetterRTP"));
+        Files.writeString(betterDir.resolve("config.yml"),
+                "Default:\n  MaxRadius: 1000\n  CenterX: 0\nSettings:\n  Cooldown:\n    Time: 600\n");
         List<String> dispatchedCommands = new ArrayList<>();
-        MockRTPServerAccessor accessor = new MockRTPServerAccessor(tempDir.toFile()) {
+        MockRTPServerAccessor accessor = new MockRTPServerAccessor(rtpDir.toFile()) {
             @Override
             public boolean executeCommand(UUID senderId, String commandLine) {
                 dispatchedCommands.add(commandLine);

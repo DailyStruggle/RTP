@@ -16,6 +16,11 @@ network:
   # @default: "RTP_NET_SECRET"
   secretEnv: "RTP_NET_SECRET"
 
+  # true = run plugin-message / proxy-cache / auto without the secret. Clients can then fake server data.
+  # @type: boolean
+  # @default: false
+  allowUnsigned: false
+
 # Backing store for cross-process state.
 transport:
   # Transport backing store.

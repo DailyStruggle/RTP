@@ -55,12 +55,11 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         sampler = new TpsMsptHeapSampler(this, samplePeriod);
         sampler.start();
 
-        // CPU sampler: records process and main-thread CPU at phase boundaries.
-        // The main-thread id is whichever thread runs a one-shot sync Bukkit
-        // task, which on Spigot/Paper is the server tick thread, and on Folia
-        // is the global region scheduler thread (the closest analogue of "main"
-        // - region threads aren't pinned, but the global scheduler runs on the
-        // primary scheduler dispatch thread).
+        // CPU sampler: records process and tick-thread CPU at phase boundaries.
+        // On Spigot/Paper the tick thread is whichever thread runs a one-shot
+        // sync task. On Folia the sampler sums every region scheduler thread
+        // instead (regions are not pinned to a thread), so the id captured
+        // here only feeds the GC sampler's allocation column there.
         cpuSampler = new CpuSampler();
         Sched.runGlobal(this, () -> {
             cpuSampler.recordCurrentThreadAsMain();
@@ -114,6 +113,12 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         // server-internal chunk-system threads to the calling plugin.
         chunkCounter = new ChunkLoadCounter(this);
         chunkCounter.register();
+        // Validate the stack-based sync-load attribution before any run reads
+        // it: one sync and one async load of a generated, unloaded chunk.
+        // 200 ticks lets worlds and other plugins finish enabling first.
+        if (getConfig().getBoolean("sync-load-selftest", true)) {
+            chunkCounter.syncAttributor().runSelfTestLater(200L);
+        }
 
         // Folia region-context accounting and freeze detection. Gated purely on
         // runtime detection (Sched.isFolia()): off Folia the monitor stays
@@ -416,6 +421,20 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         @Override public void onComplete(Attempt a, boolean ok, String why, double x, double z,
                                          AttributionSource source) {
             MetricsRecorder r = plugin.recorder(); if (r != null) r.onComplete(a, ok, why, x, z, source);
+        }
+        @Override public void onComplete(Attempt a, boolean ok, String why, double x, double z,
+                                         AttributionSource source, boolean deferRow) {
+            MetricsRecorder r = plugin.recorder();
+            if (r != null) r.onComplete(a, ok, why, x, z, source, deferRow);
+        }
+        @Override public boolean releaseDeferred(Attempt a) {
+            MetricsRecorder r = plugin.recorder(); return r != null && r.releaseDeferred(a);
+        }
+        @Override public boolean isDeferred(Attempt a) {
+            MetricsRecorder r = plugin.recorder(); return r != null && r.isDeferred(a);
+        }
+        @Override public void flushDeferred(boolean all) {
+            MetricsRecorder r = plugin.recorder(); if (r != null) r.flushDeferred(all);
         }
         @Override public void onTimeout(Attempt a) {
             MetricsRecorder r = plugin.recorder(); if (r != null) r.onTimeout(a);

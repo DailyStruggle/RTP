@@ -279,8 +279,17 @@ public final class RtpVelocityPlugin {
                 this.leaderLease = NetworkBindings.openLeaderLease(config, /* dataSource */ null);
             } catch (RuntimeException | LinkageError ex) {
                 // LinkageError: lite assembly excludes the durable redis/sql waitlist/lease.
+                // A lease failure must also drop an already-open shared waitlist: the
+                // dispatcher would otherwise park entries no proxy is leased to drain.
                 logger.warn("RTP waitlist/lease open failed ({}); no-backend dispatch will fall "
                         + "back to terminal FAILED this session.", ex.toString());
+                if (this.waitlist instanceof AutoCloseable closeable) {
+                    try {
+                        closeable.close();
+                    } catch (Exception closeEx) {
+                        logger.warn("RTP waitlist close after lease failure failed: {}", closeEx.toString());
+                    }
+                }
                 this.waitlist = null;
                 this.leaderLease = null;
             }
@@ -437,18 +446,34 @@ public final class RtpVelocityPlugin {
                 VelocityProxyAvailabilityCache cache = new VelocityProxyAvailabilityCache(
                         serverRegions, config.heartbeatStaleAfterMs(), System::currentTimeMillis);
                 io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier cacheVerifier = null;
+                String secretProblem = null;
                 try {
                     cacheVerifier = io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier
                             .loadFromEnv(config.secretEnv(), config.schemaVersion(), config.schemaVersion());
                 } catch (RuntimeException ex) {
-                    logger.warn("RTP proxy-cache: secret '{}' unusable ({}); rtp:net payloads stay unsigned.",
-                            config.secretEnv(), ex.getMessage());
+                    secretProblem = ex.getMessage();
                 }
-                this.proxyCacheListener = new VelocityProxyCacheListener(proxyServer, cache, logger, cacheVerifier);
-                this.proxyCacheListener.register();
-                proxyServer.getEventManager().register(this, proxyCacheListener);
-                logger.info("RTP proxy-cache companion active: {} operator-configured server(s) {} on the rtp:net channel.",
-                        serverRegions.size(), serverRegions);
+                if (cacheVerifier == null && !config.allowUnsigned()) {
+                    // Unsigned pushes from any backend could forge availability (REQ-RTP-PROXY-007);
+                    // same opt-in as the backend's network.allowUnsigned.
+                    logger.error("RTP proxy-cache: secret '{}' unusable ({}); rtp:net cache listener NOT "
+                                    + "registered. Set it to a Base64 secret of >= 32 bytes on every backend "
+                                    + "and the proxy, or set network.allowUnsigned: true to accept "
+                                    + "unauthenticated availability pushes.",
+                            config.secretEnv(), secretProblem);
+                    this.proxyCacheListener = null;
+                } else {
+                    if (cacheVerifier == null) {
+                        logger.warn("RTP proxy-cache: secret '{}' unusable ({}); accepting UNSIGNED rtp:net "
+                                        + "payloads (network.allowUnsigned: true).",
+                                config.secretEnv(), secretProblem);
+                    }
+                    this.proxyCacheListener = new VelocityProxyCacheListener(proxyServer, cache, logger, cacheVerifier);
+                    this.proxyCacheListener.register();
+                    proxyServer.getEventManager().register(this, proxyCacheListener);
+                    logger.info("RTP proxy-cache companion active: {} operator-configured server(s) {} on the rtp:net channel.",
+                            serverRegions.size(), serverRegions);
+                }
 
                 // Player-independent proxy-direct TCP listener, sharing the cache.
                 startProxyDirectListener(raw, cache);
@@ -676,9 +701,21 @@ public final class RtpVelocityPlugin {
                     io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.redactToken(token.tokenId()),
                     token.serverId());
             // Release the token so the next attempt doesn't hit the same dead route.
+            String redacted = io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire
+                    .redactToken(token.tokenId());
             try {
-                active.release(token.tokenId(), ReleaseReason.BACKEND_REJECTED);
-            } catch (RuntimeException ignored) { }
+                active.release(token.tokenId(), ReleaseReason.BACKEND_REJECTED)
+                        .whenComplete((v, err) -> {
+                            if (err != null) {
+                                logger.warn("RTP release of reservation {} (unknown server '{}') failed; "
+                                        + "it stays CLAIMED until the TTL reaper runs.",
+                                        redacted, token.serverId(), err);
+                            }
+                        });
+            } catch (RuntimeException ex) {
+                logger.warn("RTP release of reservation {} (unknown server '{}') threw; "
+                        + "it stays CLAIMED until the TTL reaper runs.", redacted, token.serverId(), ex);
+            }
             return;
         }
         // Rewrite the connect target. ServerPreConnectEvent.ServerResult is final;

@@ -775,4 +775,51 @@ public class SubspaceShapeTest {
       }
     }
   }
+
+  @Test
+  @DisplayName("Async slot selection drains a ~12k-candidate footprint of completed futures without StackOverflowError")
+  void testSelectSafeSlotsAsyncLargeFootprintCompletedFutures() throws Exception {
+    String worldName = "test_large_footprint_world";
+    RTPLocation anchor = new RTPLocation(new RTPCoords(worldName, 0, 64, 0), 1);
+    SubspaceShape subspace = new SubspaceShape(anchor, 1024, null);
+
+    java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+    CandidateValidator rejectAll = new CandidateValidator() {
+      @Override
+      public RTPLocation validate(int x, int z) {
+        return null;
+      }
+
+      @Override
+      public java.util.concurrent.CompletableFuture<RTPLocation> validateAsync(int x, int z) {
+        calls.incrementAndGet();
+        return java.util.concurrent.CompletableFuture.completedFuture(null);
+      }
+    };
+
+    List<RTPLocation> none =
+        subspace.selectSafeSlotsAsync(1, 1, 16, 8, null, rejectAll).get(10, java.util.concurrent.TimeUnit.SECONDS);
+    assertTrue(none.isEmpty(), "All-rejecting validator must yield no slots");
+    assertTrue(calls.get() > 10_000, "Every footprint candidate must be evaluated, got " + calls.get());
+
+    // Accept only late candidates: the drain must still reach them on one stack.
+    java.util.concurrent.atomic.AtomicInteger seen = new java.util.concurrent.atomic.AtomicInteger();
+    CandidateValidator acceptLate = new CandidateValidator() {
+      @Override
+      public RTPLocation validate(int x, int z) {
+        return null;
+      }
+
+      @Override
+      public java.util.concurrent.CompletableFuture<RTPLocation> validateAsync(int x, int z) {
+        RTPLocation loc = seen.incrementAndGet() > 10_000
+            ? new RTPLocation(new RTPCoords(worldName, x, 64, z), 1)
+            : null;
+        return java.util.concurrent.CompletableFuture.completedFuture(loc);
+      }
+    };
+    List<RTPLocation> late =
+        subspace.selectSafeSlotsAsync(2, 2, 16, 8, null, acceptLate).get(10, java.util.concurrent.TimeUnit.SECONDS);
+    assertEquals(2, late.size(), "Late-accepted candidates must be selected");
+  }
 }

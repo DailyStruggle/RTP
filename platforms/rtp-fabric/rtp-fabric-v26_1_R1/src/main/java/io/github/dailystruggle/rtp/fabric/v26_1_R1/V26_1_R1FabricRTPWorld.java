@@ -441,6 +441,15 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public void forgetChunks() {
+        // S-002: drain every held keep-ticket before dropping the cache. setForceLoaded(false)
+        // decrements synchronously and hops the native release to the server thread.
+        chunkTickets.forEach((k, count) -> {
+            int cx = (int) (k & 0xffffffffL);
+            int cz = (int) (k >> 32);
+            while (count.get() > 0) {
+                setForceLoaded(cx, cz, false);
+            }
+        });
         chunkCache.clear();
     }
 

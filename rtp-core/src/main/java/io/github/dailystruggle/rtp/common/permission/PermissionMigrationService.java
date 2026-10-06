@@ -163,6 +163,13 @@ public class PermissionMigrationService {
      */
     @NotNull
     public List<String> mapPermission(@Nullable String sourcePermission) {
+        List<String> schema = mapSchemaPermission(sourcePermission);
+        return schema.isEmpty() ? mapGenericPermission(sourcePermission) : schema;
+    }
+
+    /** Explicit per-plugin equivalences declared by registered import schemas. */
+    @NotNull
+    List<String> mapSchemaPermission(@Nullable String sourcePermission) {
         if (sourcePermission == null || sourcePermission.isBlank()) {
             return Collections.emptyList();
         }
@@ -190,9 +197,18 @@ public class PermissionMigrationService {
                 }
             }
         }
-        if (!mapped.isEmpty()) {
-            return Collections.unmodifiableList(mapped);
+        return Collections.unmodifiableList(mapped);
+    }
+
+    /** Suffix-based mapping for any {@code <plugin>.<suffix>} node; callers scope which prefixes reach it. */
+    @NotNull
+    List<String> mapGenericPermission(@Nullable String sourcePermission) {
+        if (sourcePermission == null || sourcePermission.isBlank()) {
+            return Collections.emptyList();
         }
+
+        String lower = sourcePermission.trim().toLowerCase(Locale.ROOT);
+        List<String> mapped = new ArrayList<>();
 
         // Generic permission suffix resolution:
         // Any RTP plugin permission node is structured as <plugin>.<action/target>
@@ -549,10 +565,16 @@ public class PermissionMigrationService {
         private final List<String> generatedCommands = new ArrayList<>();
         private final List<String> executedCommands = new ArrayList<>();
         private final List<String> errors = new ArrayList<>();
+        private final List<String> skippedPrivileged = new ArrayList<>();
         private final boolean applied;
 
         public MigrationPlan(boolean applied) {
             this.applied = applied;
+        }
+
+        /** {@code source -> target} mappings withheld because the target is broad and no source was named. */
+        public List<String> getSkippedPrivileged() {
+            return Collections.unmodifiableList(skippedPrivileged);
         }
 
         public void addEntry(PermissionEntry entry, String command) {
@@ -623,6 +645,17 @@ public class PermissionMigrationService {
         }
     }
 
+    /** Broad RTP targets only ever produced when the operator names {@code source=} explicitly. */
+    static final Set<String> PRIVILEGED_TARGETS = Set.of("rtp.*", "rtp.admin", "rtp.reload");
+
+    static boolean isAllSources(@Nullable String sourceFilter) {
+        return sourceFilter != null && (sourceFilter.trim().equalsIgnoreCase("all") || sourceFilter.trim().equals("*"));
+    }
+
+    static boolean isNamedSource(@Nullable String sourceFilter) {
+        return sourceFilter != null && !sourceFilter.isBlank() && !isAllSources(sourceFilter);
+    }
+
     /**
      * Scans parsed nodes for a given group or user and plans non-destructive append-only migrations.
      * Preserves world-specific and server-specific contexts.
@@ -631,7 +664,8 @@ public class PermissionMigrationService {
      * @param targetType "user" or "group"
      * @param targetName identifier
      * @param parsedNodes parsed nodes held by the target
-     * @param sourceFilter optional filter (e.g. "betterrtp", "justrtp", "ezrtp")
+     * @param sourceFilter optional filter (e.g. "betterrtp", "justrtp", "ezrtp"); without one, sources are
+     *                     derived from the plugin folders ({@link PermissionSourceResolver})
      * @param apply whether to execute generated commands
      * @return MigrationPlan detailing mapped entries and commands
      */
@@ -640,7 +674,30 @@ public class PermissionMigrationService {
                                       Collection<ParsedNode> parsedNodes,
                                       @Nullable String sourceFilter,
                                       boolean apply) {
+        Collection<String> derived = isNamedSource(sourceFilter) || isAllSources(sourceFilter)
+                ? Collections.emptySet()
+                : PermissionSourceResolver.deriveSources(PermissionSourceResolver.resolvePluginsDir());
+        return planMigration(targetType, targetName, parsedNodes, sourceFilter, derived, apply);
+    }
+
+    /**
+     * Same as {@link #planMigration(String, String, Collection, String, boolean)} with the derived sources supplied.
+     *
+     * <p>Scoping: a named {@code sourceFilter} keeps only nodes with that prefix and maps every suffix.
+     * {@code all} / {@code *} maps any prefix. Without a filter, schema equivalences map any node and the
+     * generic suffix mapper only nodes whose prefix matches {@code derivedSources}. Unless a source is
+     * named, broad targets ({@link #PRIVILEGED_TARGETS}) are withheld: another plugin's {@code foo.*} or
+     * {@code foo.admin} must never become RTP wildcard or admin by inference.
+     */
+    public MigrationPlan planMigration(String targetType,
+                                      String targetName,
+                                      Collection<ParsedNode> parsedNodes,
+                                      @Nullable String sourceFilter,
+                                      @Nullable Collection<String> derivedSources,
+                                      boolean apply) {
         MigrationPlan plan = new MigrationPlan(apply);
+        boolean named = isNamedSource(sourceFilter);
+        boolean all = isAllSources(sourceFilter);
         if (parsedNodes == null || parsedNodes.isEmpty()) {
             return plan;
         }
@@ -656,17 +713,23 @@ public class PermissionMigrationService {
             if (node == null || node.getPermission() == null) continue;
             String lower = node.getPermission().trim().toLowerCase(Locale.ROOT);
 
-            if (sourceFilter != null && !sourceFilter.isBlank()
-                    && !sourceFilter.equalsIgnoreCase("all")
-                    && !sourceFilter.equalsIgnoreCase("*")) {
+            if (named) {
                 String sFilter = sourceFilter.trim().toLowerCase(Locale.ROOT);
                 if (!lower.startsWith(sFilter)) {
                     continue;
                 }
             }
 
-            List<String> targetNodes = mapPermission(lower);
+            List<String> targetNodes = mapSchemaPermission(lower);
+            if (targetNodes.isEmpty() && (named || all
+                    || PermissionSourceResolver.matchesSource(lower, derivedSources))) {
+                targetNodes = mapGenericPermission(lower);
+            }
             for (String targetNode : targetNodes) {
+                if (!named && PRIVILEGED_TARGETS.contains(targetNode.toLowerCase(Locale.ROOT))) {
+                    plan.skippedPrivileged.add(node.getPermission() + " -> " + targetNode);
+                    continue;
+                }
                 // If the target permission is not already explicitly present, schedule append-only set
                 if (!existing.contains(targetNode.toLowerCase(Locale.ROOT))) {
                     String cmd;
