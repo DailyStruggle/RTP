@@ -247,7 +247,7 @@ Adventure / Paper `Book` pages render on parchment-yellow backgrounds. Never use
 - **Fail-closed contract:** Public `rtp-api` methods throw `IllegalStateException` when called pre-init (S-006).
 - **Traceable tests:** Reference `REQ-*` IDs in test class names or `@DisplayName`; update `TRACEABILITY.md`.
 - **Test tier selection:** Consult [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md). Unit tests are preferred for fast local verification; headless devstack acceptance (`devstack/run-acceptance.ps1`) is scriptable and available for cross-server network, platform parity, and runtime-attested coverage.
-- **No process notes:** Never commit development shorthand (`Slice X`, `Phase 2e`, `CHECKLIST-*`) in source comments, Javadoc, or config comments.
+- **No process notes:** Never commit development shorthand (`Slice X`, `Phase 2e`, `Phase M2`, `Step 3`, `row C4`, `Section C/F rows`) or planning-doc references (`CHECKLIST-*.md`, `*_PLAN.md` such as `METRICS_PLAN.md`) in source comments, Javadoc, test `@DisplayName`s, or config comments. State the invariant itself; cite an ADR or `REQ-*` ID if provenance is needed. Enforced on added lines by the `.git/hooks/pre-commit` hook.
 - **Telegraphic comments:** Prioritize information density over exposition. State *why* and non-obvious invariants in <=8 lines. Do not narrate obvious code.
 
 ---
@@ -270,6 +270,7 @@ User strings live in `rtp-plugin/src/main/resources/<file>.yml` (English baselin
   - Module build: `.\gradlew.bat :<module>:build` (e.g. `.\gradlew.bat :rtp-core:build`)
   - Targeted tests: `.\gradlew.bat :<module>:test --tests "<pattern>"`
   - Acceptance devstack: `.\devstack\run-acceptance.ps1 -Scenario <scenario>` (or `./devstack/run-acceptance.sh --scenario <scenario>`). Headless and scriptable via Mineflayer bot; see [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md) for when to run unit tests vs devstack acceptance.
+- **Pre-commit gate:** Before handing off staged work, run `sh .git/hooks/pre-commit` (Git Bash `sh.exe` on Windows) against the index and fix every violation (process references, mojibake, BOM, CRLF, trailing whitespace, forbidden `.bak`/scratch files).
 - **Search:** Use `search_project` tool with targeted keywords. Never `grep`/`find`.
 - **Directory listing caution:** Treat empty listings as "unknown"; verify file existence with `git status` or `search_project` before overwriting.
 - **Python scripts:** Stdlib-only scripts live in `scripts/`. On Windows, execute via configured Python 3.12+ interpreter alias. Place temporary or ad-hoc analysis scripts in gitignored `scripts/tmp/`.
