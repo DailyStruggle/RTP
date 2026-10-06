@@ -1,8 +1,6 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
-import java.util.logging.Level;
 
 /**
  * Checker for SaberFactions territory.
@@ -52,12 +50,7 @@ public class SaberFactionsChecker {
       // "in a claim" means the land belongs to a real (non-wilderness) faction.
       return !Boolean.TRUE.equals(wilderness);
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling SaberFactions integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("SaberFactions", t, () -> exists = false);
     }
-    return false;
   }
 }

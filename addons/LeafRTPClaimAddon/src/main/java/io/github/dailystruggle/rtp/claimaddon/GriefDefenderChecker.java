@@ -1,9 +1,7 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
 import com.griefdefender.api.GriefDefender;
-import io.github.dailystruggle.rtp.common.RTP;
-import java.util.Objects;
-import java.util.logging.Level;
+import com.griefdefender.api.claim.Claim;
 
 /** Checker for GriefDefender claims */
 public class GriefDefenderChecker {
@@ -19,14 +17,12 @@ public class GriefDefenderChecker {
   public static Boolean isInClaim(org.bukkit.Location location) {
     if (!exists) return false;
     try {
-      return !Objects.requireNonNull(GriefDefender.getCore().getClaimAt(location)).isWilderness();
+      Claim claim = GriefDefender.getCore().getClaimAt(location);
+      // Null when GriefDefender does not manage this world: no claims, not "in a claim".
+      if (claim == null) return false;
+      return !claim.isWilderness();
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling GriefDefender integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("GriefDefender", t, () -> exists = false);
     }
-    return false;
   }
 }

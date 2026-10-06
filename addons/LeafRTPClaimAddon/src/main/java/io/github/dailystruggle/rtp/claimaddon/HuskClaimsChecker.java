@@ -1,8 +1,6 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
-import java.util.logging.Level;
 
 /**
  * Checker for HuskClaims claims.
@@ -67,13 +65,8 @@ public class HuskClaimsChecker {
       // "in a claim" means a claim covers this position.
       return Boolean.TRUE.equals(result);
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling HuskClaims integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("HuskClaims", t, () -> exists = false);
     }
-    return false;
   }
 
   private static Method findMethod(Class<?> type, String name) {

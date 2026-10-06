@@ -410,5 +410,19 @@ public enum CommandMessages {
   /** The editor channel closed unexpectedly. {@code [reason]}. */
   editorChannelLost,
   /** The editor channel reached its session lifetime. {@code [minutes]}. */
-  editorChannelExpired
+  editorChannelExpired,
+  /** {@code /rtp editor trust} refused after too many wrong codes. No placeholders. */
+  editorTrustRateLimited,
+  /** {@code /rtp editor untrust} without a valid key. No placeholders. */
+  editorUntrustUsage,
+  /** {@code /rtp editor untrust} succeeded. {@code [count]}. */
+  editorUntrustRemoved,
+  /** {@code /rtp editor untrust}: no trusted browser matched. {@code [key]}. */
+  editorUntrustNone,
+  /** {@code /rtp editor untrust}: the trusted list could not be written. {@code [reason]}. */
+  editorUntrustFailed,
+  /** {@code /rtp editor apply}: the byte-store payload has no sha256 checksum. No placeholders. */
+  editorApplyDigestMissing,
+  /** {@code /rtp editor apply}: the offline apply file could not be read. {@code [reason]}. */
+  editorApplyFileUnreadable
 }

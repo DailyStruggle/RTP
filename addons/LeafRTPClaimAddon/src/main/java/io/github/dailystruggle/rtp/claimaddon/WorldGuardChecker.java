@@ -10,9 +10,7 @@ import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
 import com.sk89q.worldguard.protection.managers.RegionManager;
-import io.github.dailystruggle.rtp.common.RTP;
 import java.util.Objects;
-import java.util.logging.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
@@ -21,6 +19,7 @@ public class WorldGuardChecker {
   public static StateFlag CAN_RTP_SELECT_HERE = null;
   private static WorldGuardPlugin worldGuardPlugin = null;
   private static boolean exists = true;
+  private static volatile boolean flagSetupAttempted = false;
 
   public static void setupWGFlag() {
     FlagRegistry registry = WorldGuard.getInstance().getFlagRegistry();
@@ -57,26 +56,28 @@ public class WorldGuardChecker {
     if (!exists) return false;
     try {
       if (getWorldGuard() == null) return false;
-      if (CAN_RTP_SELECT_HERE == null) setupWGFlag();
-      if (CAN_RTP_SELECT_HERE == null) return false;
+      // One attempt only: the registry locks once WorldGuard enables, so a late registration
+      // fails every time and the opt-in flag stays unavailable.
+      if (CAN_RTP_SELECT_HERE == null && !flagSetupAttempted) {
+        flagSetupAttempted = true;
+        setupWGFlag();
+      }
       World world = BukkitAdapter.adapt(Objects.requireNonNull(location.getWorld()));
       BlockVector3 pt = BukkitAdapter.asBlockVector(location);
       RegionManager regionManager =
           WorldGuard.getInstance().getPlatform().getRegionContainer().get(world);
-      ApplicableRegionSet set = Objects.requireNonNull(regionManager).getApplicableRegions(pt);
+      // Null when region protection is disabled for this world: no regions, not "in a claim".
+      if (regionManager == null) return false;
+      ApplicableRegionSet set = regionManager.getApplicableRegions(pt);
       // Wilderness (no applicable WorldGuard region) is selectable: not "in a claim".
       if (set.size() == 0) return false;
-      // Inside one or more regions: this location is protected and shall be rerolled,
-      // unless an admin has explicitly opted-in by setting the can-rtp-select-here flag
-      // to ALLOW on the region(s) covering this point.
-      return !set.testState(null, CAN_RTP_SELECT_HERE);
+      // Inside one or more regions: protected unless the can-rtp-select-here flag is registered
+      // and set to ALLOW on the covering region(s). An unregistered flag cannot opt in.
+      StateFlag optIn = CAN_RTP_SELECT_HERE;
+      if (optIn == null) return true;
+      return !set.testState(null, optIn);
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling WorldGuard integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("WorldGuard", t, () -> exists = false);
     }
-    return false;
   }
 }

@@ -519,8 +519,9 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
 
         // Write definitions/effects/imported_<plugin>_teleport.yml
         String profileName = "imported_" + sourceName() + "_teleport";
-        Path targetEffectFile = destinationDir.resolve("definitions/effects/" + profileName + ".yml");
-        if (!Files.exists(targetEffectFile) || overwrite) {
+        Path targetEffectFile =
+                resolveSafeChild(destinationDir.resolve("definitions/effects"), profileName + ".yml");
+        if (targetEffectFile != null && (!Files.exists(targetEffectFile) || overwrite)) {
             try {
                 if (targetEffectFile.getParent() != null) {
                     Files.createDirectories(targetEffectFile.getParent());
@@ -883,6 +884,30 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
     }
 
     /**
+     * Resolves {@code fileName} as a direct child of {@code dir}, or returns {@code null} when the
+     * name could escape it. Names come from foreign YAML (world/region/zone keys), so separators,
+     * {@code ..}, drive prefixes, reserved and control characters, and leading dots are rejected.
+     */
+    protected static Path resolveSafeChild(Path dir, String fileName) {
+        if (dir == null || fileName == null || fileName.isEmpty() || fileName.length() > 160) {
+            return null;
+        }
+        if (fileName.charAt(0) == '.') return null;
+        for (int i = 0; i < fileName.length(); i++) {
+            char c = fileName.charAt(i);
+            if (c < 0x20 || c == 0x7f || "/\\:*?\"<>|".indexOf(c) >= 0) return null;
+        }
+        Path base = dir.toAbsolutePath().normalize();
+        Path resolved;
+        try {
+            resolved = base.resolve(fileName).normalize();
+        } catch (java.nio.file.InvalidPathException e) {
+            return null;
+        }
+        return base.equals(resolved.getParent()) ? resolved : null;
+    }
+
+    /**
      * Emits region and world YAML files for all discovered world regions.
      */
     protected void emitRegionsAndWorlds(Collection<DiscoveredWorldRegion> regions,
@@ -909,8 +934,13 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
             } else {
                 regionName = r.name().replace("-", "_") + "_region";
             }
-            Path regionFile = regionsDir.resolve(regionName + ".yml");
-            Path worldFile = worldsDir.resolve(r.world() + ".yml");
+            Path regionFile = resolveSafeChild(regionsDir, regionName + ".yml");
+            Path worldFile = resolveSafeChild(worldsDir, r.world() + ".yml");
+            if (regionFile == null || worldFile == null) {
+                errors.add("Skipping region with unsafe file name (region=" + regionName
+                        + ", world=" + r.world() + ")");
+                continue;
+            }
 
             if (!overwrite) {
                 if (Files.exists(regionFile)) {
@@ -963,7 +993,11 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
                     if (addWorld.contains("*") || addWorld.contains("?")) {
                         continue;
                     }
-                    Path addWorldFile = worldsDir.resolve(addWorld + ".yml");
+                    Path addWorldFile = resolveSafeChild(worldsDir, addWorld + ".yml");
+                    if (addWorldFile == null) {
+                        errors.add("Skipping world with unsafe file name: " + addWorld);
+                        continue;
+                    }
                     if (!overwrite && Files.exists(addWorldFile)) {
                         continue;
                     }
@@ -1160,7 +1194,11 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
             if (zoneSec == null) continue;
 
             String zoneId = zoneKey.toLowerCase(Locale.ROOT);
-            Path actionFile = actionsDir.resolve("zone_" + zoneId + ".yml");
+            Path actionFile = resolveSafeChild(actionsDir, "zone_" + zoneId + ".yml");
+            if (actionFile == null) {
+                errors.add("Skipping zone with unsafe file name: " + zoneKey);
+                continue;
+            }
             if (Files.exists(actionFile) && !overwrite) {
                 warnings.add("Skipping zone action (already exists and overwrite=false): " + actionFile);
                 continue;
