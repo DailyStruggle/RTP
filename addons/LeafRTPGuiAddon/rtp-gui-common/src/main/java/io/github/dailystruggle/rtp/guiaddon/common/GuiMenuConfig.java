@@ -212,6 +212,46 @@ public final class GuiMenuConfig {
     return str(GuiMenuKeys.iconBackToMainMenu, "BARRIER");
   }
 
+  public String textPreviousPage() {
+    return str(GuiMenuKeys.textPreviousPage, "&e[Previous Page]");
+  }
+
+  public String textNextPage() {
+    return str(GuiMenuKeys.textNextPage, "&e[Next Page]");
+  }
+
+  public String textBackToMainMenu() {
+    return str(GuiMenuKeys.textBackToMainMenu, "&c[Back to Worlds]");
+  }
+
+  public String titleOperatorSetup() {
+    return str(GuiMenuKeys.titleOperatorSetup, "&a&lSetup Wizard");
+  }
+
+  public String titleOperatorImport() {
+    return str(GuiMenuKeys.titleOperatorImport, "&e&lImport Configs");
+  }
+
+  public String titleOperatorConfig() {
+    return str(GuiMenuKeys.titleOperatorConfig, "&b&lConfig Editor");
+  }
+
+  public String titleOperatorVisualizations() {
+    return str(GuiMenuKeys.titleOperatorVisualizations, "&d&lVisualizations");
+  }
+
+  public String titleOperatorStatus() {
+    return str(GuiMenuKeys.titleOperatorStatus, "&f&lStatus & Metrics");
+  }
+
+  public String titleOperatorAdminBook() {
+    return str(GuiMenuKeys.titleOperatorAdminBook, "&6&lAdmin Book Panel");
+  }
+
+  public String titleOperatorReload() {
+    return str(GuiMenuKeys.titleOperatorReload, "&c&lQuick Reload");
+  }
+
   public String dashboardIconName() {
     return str(GuiMenuKeys.iconDashboard, "PAPER");
   }

@@ -107,6 +107,30 @@ class TrustedEditorsRevocationTest {
         assertOwnerOnly(keys.resolve(EditorKeys.PRIVATE_FILE));
     }
 
+    @Test
+    @DisplayName("trusted-editors.json is owner-only on POSIX and ACL file systems")
+    void trustedEditorsFileOwnerOnly() throws IOException {
+        Path f = dir.resolve("trusted-editors.json");
+        TrustedEditors t = TrustedEditors.load(f);
+        t.add(A, 1000L);
+        assertOwnerOnly(f);
+    }
+
+    @Test
+    @DisplayName("Concurrent writers reload and merge without dropping entries")
+    void concurrentWritersMerge() throws IOException {
+        Path f = dir.resolve("trusted-editors.json");
+        TrustedEditors t1 = TrustedEditors.load(f);
+        TrustedEditors t2 = TrustedEditors.load(f);
+
+        t1.add(A, 1000L);
+        t2.add(B, 2000L);
+
+        TrustedEditors reloaded = TrustedEditors.load(f);
+        assertTrue(reloaded.isTrusted(A), "A from t1 must be retained");
+        assertTrue(reloaded.isTrusted(B), "B from t2 must be retained");
+    }
+
     /** POSIX {@code rw-------}, or every ACL entry granted to the owner. */
     public static void assertOwnerOnly(Path f) throws IOException {
         PosixFileAttributeView posix = Files.getFileAttributeView(f, PosixFileAttributeView.class);

@@ -79,7 +79,12 @@ public final class MenuLayout {
     }
 
     // Total rows = inner content + top border + bottom border, clamped to [3, MAX_ROWS].
-    int rows = Math.max(3, Math.min(MAX_ROWS, contentRows + 2));
+    // If model.rows() is configured (> 0), honour the configured rows (clamped to [3, MAX_ROWS]),
+    // expanding if contentRows + 2 demands more to prevent crowding.
+    int minContentRows = Math.max(3, Math.min(MAX_ROWS, contentRows + 2));
+    int rows = (model.rows() > 0)
+        ? Math.max(Math.max(3, Math.min(MAX_ROWS, model.rows())), minContentRows)
+        : minContentRows;
     int innerRows = rows - 2;
 
     // Reserve submenu rows so that submenus are never crowded out by destination overflow

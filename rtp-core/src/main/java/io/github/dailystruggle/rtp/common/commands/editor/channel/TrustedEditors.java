@@ -35,6 +35,7 @@ public final class TrustedEditors {
     static final Pattern FINGERPRINT = Pattern.compile("[0-9a-f]{64}");
     /** {@code all}, or a fingerprint prefix long enough not to match by accident. */
     private static final Pattern SELECTOR = Pattern.compile("all|[0-9a-f]{4,64}");
+    private static final Object FILE_LOCK = new Object();
 
     private final Path file;
     private final long maxAgeMillis;
@@ -105,6 +106,13 @@ public final class TrustedEditors {
     /** Trusted and, with a max age, still inside it (an expired entry is dropped from memory). */
     public synchronized boolean isTrusted(String fingerprint) {
         Long added = fingerprint == null ? null : trusted.get(fingerprint);
+        if (added == null && file != null && Files.isRegularFile(file)) {
+            TrustedEditors disk = load(file, maxAgeMillis, clock);
+            for (Map.Entry<String, Long> entry : disk.trusted.entrySet()) {
+                trusted.putIfAbsent(entry.getKey(), entry.getValue());
+            }
+            added = fingerprint == null ? null : trusted.get(fingerprint);
+        }
         if (added == null) return false;
         if (expired(added, clock.getAsLong())) {
             trusted.remove(fingerprint);
@@ -125,10 +133,20 @@ public final class TrustedEditors {
      * @return the removed fingerprints
      * @throws IOException when the list cannot be written (the keys stay untrusted for this run)
      */
-    public synchronized Set<String> remove(String selector) throws IOException {
-        Set<String> removed = forget(selector);
-        if (!removed.isEmpty() && file != null) write();
-        return removed;
+    public Set<String> remove(String selector) throws IOException {
+        synchronized (FILE_LOCK) {
+            synchronized (this) {
+                if (file != null && Files.isRegularFile(file)) {
+                    TrustedEditors disk = load(file, maxAgeMillis, clock);
+                    for (Map.Entry<String, Long> entry : disk.trusted.entrySet()) {
+                        trusted.putIfAbsent(entry.getKey(), entry.getValue());
+                    }
+                }
+                Set<String> removed = forget(selector);
+                if (!removed.isEmpty() && file != null) write();
+                return removed;
+            }
+        }
     }
 
     /** As {@link #remove} in memory only: for lists that share their file with a persisted one. */
@@ -151,17 +169,33 @@ public final class TrustedEditors {
      *
      * @throws IOException when the list cannot be written (the key stays trusted for this run)
      */
-    public synchronized void add(String fingerprint, long now) throws IOException {
+    public void add(String fingerprint, long now) throws IOException {
         if (fingerprint == null || !FINGERPRINT.matcher(fingerprint).matches()) {
             throw new IllegalArgumentException("not a key fingerprint");
         }
-        trusted.remove(fingerprint);
-        trusted.put(fingerprint, now);
-        while (trusted.size() > MAX_ENTRIES) trusted.remove(trusted.keySet().iterator().next());
-        if (file != null) write();
+        synchronized (FILE_LOCK) {
+            synchronized (this) {
+                if (file != null && Files.isRegularFile(file)) {
+                    TrustedEditors disk = load(file, maxAgeMillis, clock);
+                    for (Map.Entry<String, Long> entry : disk.trusted.entrySet()) {
+                        trusted.putIfAbsent(entry.getKey(), entry.getValue());
+                    }
+                }
+                trusted.remove(fingerprint);
+                trusted.put(fingerprint, now);
+                while (trusted.size() > MAX_ENTRIES) trusted.remove(trusted.keySet().iterator().next());
+                if (file != null) write();
+            }
+        }
     }
 
     public synchronized Set<String> fingerprints() {
+        if (file != null && Files.isRegularFile(file)) {
+            TrustedEditors disk = load(file, maxAgeMillis, clock);
+            for (Map.Entry<String, Long> entry : disk.trusted.entrySet()) {
+                trusted.putIfAbsent(entry.getKey(), entry.getValue());
+            }
+        }
         return Set.copyOf(trusted.keySet());
     }
 
@@ -176,11 +210,20 @@ public final class TrustedEditors {
         sb.append("]}\n");
         if (file.getParent() != null) Files.createDirectories(file.getParent());
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+        Files.deleteIfExists(tmp);
+        if (java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+            Files.createFile(tmp, java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
+                    java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
+        } else {
+            Files.createFile(tmp);
+            EditorKeys.restrictToOwner(tmp);
+        }
         Files.writeString(tmp, sb, StandardCharsets.UTF_8);
         try {
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException e) {
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
         }
+        EditorKeys.restrictToOwner(file);
     }
 }

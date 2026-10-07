@@ -56,7 +56,7 @@ public class ActionSubCmd extends BaseRTPCmdImpl {
       return true;
     }
 
-    RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Usage: /rtp action <actionId> [player=<name>]");
+    msgInvalidCommand(senderId, "action");
     return true;
   }
 

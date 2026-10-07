@@ -42,12 +42,19 @@ titleOperatorMenu: "&6&lOperator Control Hub"
 titleOperatorSelector: "&6&lOperator Tools..."
 iconOperatorSelector: "COMMAND_BLOCK"
 iconOperatorSetup: "NETHER_STAR"
+titleOperatorSetup: "&a&lSetup Wizard"
 iconOperatorImport: "HOPPER"
+titleOperatorImport: "&e&lImport Configs"
 iconOperatorConfig: "REPEATER"
+titleOperatorConfig: "&b&lConfig Editor"
 iconOperatorVisualizations: "FILLED_MAP"
+titleOperatorVisualizations: "&d&lVisualizations"
 iconOperatorStatus: "CLOCK"
+titleOperatorStatus: "&f&lStatus & Metrics"
 iconOperatorAdminBook: "WRITABLE_BOOK"
+titleOperatorAdminBook: "&6&lAdmin Book Panel"
 iconOperatorReload: "REDSTONE_TORCH"
+titleOperatorReload: "&c&lQuick Reload"
 
 # Group biomes into a dedicated paginated sub-menu from the main menu.
 groupBiomesIntoSubmenu: true
@@ -55,8 +62,11 @@ titleBiomeMenu: "&1&lSelect Biome"
 titleBiomeSelector: "&a&lSelect Biome..."
 iconBiomeSelector: "OAK_SAPLING"
 iconPreviousPage: "ARROW"
+textPreviousPage: "&e[Previous Page]"
 iconNextPage: "ARROW"
+textNextPage: "&e[Next Page]"
 iconBackToMainMenu: "BARRIER"
+textBackToMainMenu: "&c[Back to Worlds]"
 
 # Per-target icon material names. An unknown name falls back to the renderer default.
 # These are the per-kind fallback blocks used when a region has no explicit entry in

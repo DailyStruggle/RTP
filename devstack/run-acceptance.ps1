@@ -836,8 +836,15 @@ function Test-Gui {
   if ($effectiveTarget) {
     if ($effectiveTarget -in @('backend-c', 'backend-d')) {
       $configsToVerify += @{ Server = $effectiveTarget; Path = (Join-Path $PSScriptRoot "$effectiveTarget\rtp-config\addons\guimenu.yml") }
+      # Only stage into mods/ for 26.x modded runtimes (1.21.x lacks container UI components and aborts on load)
+      $is26x = $false
+      $envFile = Join-Path $PSScriptRoot "$effectiveTarget\.env"
+      if (Test-Path $envFile) {
+        $envText = Get-Content -Raw $envFile
+        if ($envText -match 'MC_VERSION=26\.') { $is26x = $true }
+      }
       $targetAddonJar = Join-Path $PSScriptRoot "$effectiveTarget\mods\LeafRTPGuiAddon.jar"
-      if (-not (Test-Path $targetAddonJar)) {
+      if ($is26x -and (-not (Test-Path $targetAddonJar))) {
         Write-Host "[gui] WARN - $targetAddonJar not found on host. Attempting to copy from lobby-a..." -ForegroundColor Yellow
         $srcJar = Join-Path $PSScriptRoot 'lobby-a\plugins\RTP\addons\LeafRTPGuiAddon.jar'
         if (Test-Path $srcJar) {

@@ -76,6 +76,26 @@ public enum GuiMenuKeys {
   iconNextPage,
   /** Icon material name for back to main menu button in sub-menus. */
   iconBackToMainMenu,
+  /** Text for previous page button in paginated menus. */
+  textPreviousPage,
+  /** Text for next page button in paginated menus. */
+  textNextPage,
+  /** Text for back to main menu button in sub-menus. */
+  textBackToMainMenu,
+  /** Display title for the setup wizard button in the operator menu. */
+  titleOperatorSetup,
+  /** Display title for the import button in the operator menu. */
+  titleOperatorImport,
+  /** Display title for the config editor button in the operator menu. */
+  titleOperatorConfig,
+  /** Display title for the visualizations button in the operator menu. */
+  titleOperatorVisualizations,
+  /** Display title for the status/metrics button in the operator menu. */
+  titleOperatorStatus,
+  /** Display title for the master admin book button in the operator menu. */
+  titleOperatorAdminBook,
+  /** Display title for the quick reload button in the operator menu. */
+  titleOperatorReload,
 
   /** Icon material name for the default-region target. */
   iconDefault,

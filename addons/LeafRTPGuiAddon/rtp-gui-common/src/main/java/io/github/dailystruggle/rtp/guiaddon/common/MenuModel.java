@@ -29,6 +29,8 @@ public final class MenuModel {
   private final List<MenuEntry> entries;
   private final MetricsSnapshot metrics;
   private final boolean isRoot;
+  private final String readyText;
+  private final String unavailableText;
 
   MenuModel(
       String title,
@@ -38,7 +40,7 @@ public final class MenuModel {
       String dashboardIconName,
       List<MenuEntry> entries,
       MetricsSnapshot metrics) {
-    this(title, rows, fillerName, showDashboard, dashboardIconName, entries, metrics, false);
+    this(title, rows, fillerName, showDashboard, dashboardIconName, entries, metrics, false, "&aClick to teleport!", "&cUnavailable right now.");
   }
 
   MenuModel(
@@ -50,6 +52,20 @@ public final class MenuModel {
       List<MenuEntry> entries,
       MetricsSnapshot metrics,
       boolean isRoot) {
+    this(title, rows, fillerName, showDashboard, dashboardIconName, entries, metrics, isRoot, "&aClick to teleport!", "&cUnavailable right now.");
+  }
+
+  MenuModel(
+      String title,
+      int rows,
+      String fillerName,
+      boolean showDashboard,
+      String dashboardIconName,
+      List<MenuEntry> entries,
+      MetricsSnapshot metrics,
+      boolean isRoot,
+      String readyText,
+      String unavailableText) {
     this.title = title;
     this.rows = rows;
     this.fillerName = fillerName;
@@ -58,6 +74,16 @@ public final class MenuModel {
     this.entries = Collections.unmodifiableList(entries);
     this.metrics = metrics;
     this.isRoot = isRoot;
+    this.readyText = (readyText != null && !readyText.isEmpty()) ? readyText : "&aClick to teleport!";
+    this.unavailableText = (unavailableText != null && !unavailableText.isEmpty()) ? unavailableText : "&cUnavailable right now.";
+  }
+
+  public String readyText() {
+    return readyText;
+  }
+
+  public String unavailableText() {
+    return unavailableText;
   }
 
   /**
@@ -235,7 +261,7 @@ public final class MenuModel {
             new MenuEntry(
                 RtpTarget.action("menu:main:" + (currentPage - 1)),
                 RtpTargetStatus.Availability.READY,
-                "&e[Previous Page]",
+                config.textPreviousPage(),
                 config.iconPreviousPage(),
                 0L,
                 0.0));
@@ -248,7 +274,7 @@ public final class MenuModel {
             new MenuEntry(
                 RtpTarget.action("menu:main:" + (currentPage + 1)),
                 RtpTargetStatus.Availability.READY,
-                "&e[Next Page]",
+                config.textNextPage(),
                 config.iconNextPage(),
                 0L,
                 0.0));
@@ -268,7 +294,9 @@ public final class MenuModel {
         config.dashboardIconName(),
         finalEntries,
         metrics,
-        currentPage == 0);
+        currentPage == 0,
+        config.textReady(),
+        config.textUnavailable());
   }
 
   /**
@@ -323,7 +351,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("menu:biomes:" + (currentPage - 1)),
               RtpTargetStatus.Availability.READY,
-              "&e[Previous Page]",
+              config.textPreviousPage(),
               config.iconPreviousPage(),
               0L,
               0.0));
@@ -333,7 +361,7 @@ public final class MenuModel {
         new MenuEntry(
             RtpTarget.action("menu:main"),
             RtpTargetStatus.Availability.READY,
-            "&c[Back to Worlds]",
+            config.textBackToMainMenu(),
             config.iconBackToMainMenu(),
             0L,
             0.0));
@@ -343,7 +371,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("menu:biomes:" + (currentPage + 1)),
               RtpTargetStatus.Availability.READY,
-              "&e[Next Page]",
+              config.textNextPage(),
               config.iconNextPage(),
               0L,
               0.0));
@@ -352,12 +380,15 @@ public final class MenuModel {
     MetricsSnapshot metrics = config.showDashboard() ? RTPAPI.getMetricsSnapshot() : null;
     return new MenuModel(
         config.titleBiomeMenu() + " (" + (currentPage + 1) + "/" + (maxPage + 1) + ")",
-        6,
+        config.rows(),
         config.fillerName(),
         config.showDashboard(),
         config.dashboardIconName(),
         pageEntries,
-        metrics);
+        metrics,
+        false,
+        config.textReady(),
+        config.textUnavailable());
   }
 
   /**
@@ -435,7 +466,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("menu:actions:" + (currentPage - 1)),
               RtpTargetStatus.Availability.READY,
-              "&e[Previous Page]",
+              config.textPreviousPage(),
               config.iconPreviousPage(),
               0L,
               0.0));
@@ -444,7 +475,7 @@ public final class MenuModel {
         new MenuEntry(
             RtpTarget.action("menu:main"),
             RtpTargetStatus.Availability.READY,
-            "&c[Back to Worlds]",
+            config.textBackToMainMenu(),
             config.iconBackToMainMenu(),
             0L,
             0.0));
@@ -453,7 +484,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("menu:actions:" + (currentPage + 1)),
               RtpTargetStatus.Availability.READY,
-              "&e[Next Page]",
+              config.textNextPage(),
               config.iconNextPage(),
               0L,
               0.0));
@@ -462,12 +493,15 @@ public final class MenuModel {
     MetricsSnapshot metrics = config.showDashboard() ? RTPAPI.getMetricsSnapshot() : null;
     return new MenuModel(
         config.titleActionsMenu() + (maxPage > 0 ? " (" + (currentPage + 1) + "/" + (maxPage + 1) + ")" : ""),
-        6,
+        config.rows(),
         config.fillerName(),
         config.showDashboard(),
         config.dashboardIconName(),
         pageEntries,
-        metrics);
+        metrics,
+        false,
+        config.textReady(),
+        config.textUnavailable());
   }
 
   /**
@@ -486,7 +520,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("action:operator:setup"),
               RtpTargetStatus.Availability.READY,
-              "&a&lSetup Wizard",
+              config.titleOperatorSetup(),
               config.iconOperatorSetup(),
               0L,
               0.0));
@@ -498,7 +532,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("action:operator:import"),
               RtpTargetStatus.Availability.READY,
-              "&e&lImport Configs",
+              config.titleOperatorImport(),
               config.iconOperatorImport(),
               0L,
               0.0));
@@ -510,7 +544,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("action:operator:config"),
               RtpTargetStatus.Availability.READY,
-              "&b&lConfig Editor",
+              config.titleOperatorConfig(),
               config.iconOperatorConfig(),
               0L,
               0.0));
@@ -522,7 +556,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("action:operator:visualizations"),
               RtpTargetStatus.Availability.READY,
-              "&d&lVisualizations",
+              config.titleOperatorVisualizations(),
               config.iconOperatorVisualizations(),
               0L,
               0.0));
@@ -534,7 +568,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("action:operator:status"),
               RtpTargetStatus.Availability.READY,
-              "&f&lStatus & Metrics",
+              config.titleOperatorStatus(),
               config.iconOperatorStatus(),
               0L,
               0.0));
@@ -546,7 +580,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("action:operator:adminbook"),
               RtpTargetStatus.Availability.READY,
-              "&6&lAdmin Book Panel",
+              config.titleOperatorAdminBook(),
               config.iconOperatorAdminBook(),
               0L,
               0.0));
@@ -558,7 +592,7 @@ public final class MenuModel {
           new MenuEntry(
               RtpTarget.action("action:operator:reload"),
               RtpTargetStatus.Availability.READY,
-              "&c&lQuick Reload",
+              config.titleOperatorReload(),
               config.iconOperatorReload(),
               0L,
               0.0));
@@ -569,7 +603,7 @@ public final class MenuModel {
         new MenuEntry(
             RtpTarget.action("menu:main"),
             RtpTargetStatus.Availability.READY,
-            "&c[Back to Worlds]",
+            config.textBackToMainMenu(),
             config.iconBackToMainMenu(),
             0L,
             0.0));
@@ -577,12 +611,15 @@ public final class MenuModel {
     MetricsSnapshot metrics = config.showDashboard() ? RTPAPI.getMetricsSnapshot() : null;
     return new MenuModel(
         config.titleOperatorMenu(),
-        6,
+        config.rows(),
         config.fillerName(),
         config.showDashboard(),
         config.dashboardIconName(),
         entries,
-        metrics);
+        metrics,
+        false,
+        config.textReady(),
+        config.textUnavailable());
   }
 
   /**

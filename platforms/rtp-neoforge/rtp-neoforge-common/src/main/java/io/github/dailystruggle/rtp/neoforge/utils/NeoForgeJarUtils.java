@@ -74,48 +74,80 @@ public final class NeoForgeJarUtils {
         boolean forceOverwrite = (!lastVersion.isBlank() && !currentVersion.equals(lastVersion));
 
         try {
-            URI uri = NeoForgeJarUtils.class.getProtectionDomain().getCodeSource().getLocation().toURI();
-            File jarFile = new File(uri);
-            if (!jarFile.isFile()) {
-                // Running from a classes directory (dev / unit-test) - there
-                // is no jar to walk. Silently skip; this is the documented
-                // dev-environment fallback and not an error.
-                return;
-            }
-            try (JarFile jar = new JarFile(jarFile)) {
-                Enumeration<JarEntry> entries = jar.entries();
-                boolean extracted = false;
-                while (entries.hasMoreElements()) {
-                    JarEntry entry = entries.nextElement();
-                    String name = entry.getName();
-                    if (!name.startsWith("docs/") || name.equals("docs/")) continue;
-                    File outFile = new File(dataFolder, name);
-                    if (entry.isDirectory()) {
-                        outFile.mkdirs();
-                        continue;
-                    }
-                    File parent = outFile.getParentFile();
-                    if (parent != null) parent.mkdirs();
-                    if (outFile.exists() && !forceOverwrite) continue;
-                    try (InputStream in = jar.getInputStream(entry)) {
-                        Files.copy(in, outFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                        extracted = true;
+            java.net.URL location = NeoForgeJarUtils.class.getProtectionDomain().getCodeSource().getLocation();
+            if (location == null) return;
+            URI uri = location.toURI();
+            boolean extracted = false;
+            if ("file".equalsIgnoreCase(uri.getScheme())) {
+                File jarFile = new File(uri);
+                if (!jarFile.isFile()) {
+                    // Running from a classes directory (dev / unit-test) - there
+                    // is no jar to walk. Silently skip; this is the documented
+                    // dev-environment fallback and not an error.
+                    return;
+                }
+                try (JarFile jar = new JarFile(jarFile)) {
+                    Enumeration<JarEntry> entries = jar.entries();
+                    while (entries.hasMoreElements()) {
+                        JarEntry entry = entries.nextElement();
+                        String name = entry.getName();
+                        if (!name.startsWith("docs/") || name.equals("docs/")) continue;
+                        File outFile = new File(dataFolder, name);
+                        if (entry.isDirectory()) {
+                            outFile.mkdirs();
+                            continue;
+                        }
+                        File parent = outFile.getParentFile();
+                        if (parent != null) parent.mkdirs();
+                        if (outFile.exists() && !forceOverwrite) continue;
+                        try (InputStream in = jar.getInputStream(entry)) {
+                            Files.copy(in, outFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                            extracted = true;
+                        }
                     }
                 }
-                if (extracted) {
-                    if (forceOverwrite) {
-                        RTP.log(Level.INFO,
-                                "[RTP] Documentation updated to version: " + currentVersion);
-                    } else {
-                        RTP.log(Level.INFO,
-                                "[RTP] Documentation extracted to: " + docsDir.getAbsolutePath());
+            } else {
+                // Non-file URI scheme (e.g. union:/ on NeoForge)
+                try {
+                    java.nio.file.Path rootPath = java.nio.file.Path.of(uri);
+                    java.nio.file.Path docsInJar = rootPath.resolve("docs");
+                    if (Files.isDirectory(docsInJar)) {
+                        try (java.util.stream.Stream<java.nio.file.Path> stream = Files.walk(docsInJar)) {
+                            for (java.nio.file.Path p : (Iterable<java.nio.file.Path>) stream::iterator) {
+                                java.nio.file.Path rel = rootPath.relativize(p);
+                                File outFile = new File(dataFolder, rel.toString().replace('\\', '/'));
+                                if (Files.isDirectory(p)) {
+                                    outFile.mkdirs();
+                                    continue;
+                                }
+                                File parent = outFile.getParentFile();
+                                if (parent != null) parent.mkdirs();
+                                if (outFile.exists() && !forceOverwrite) continue;
+                                try (InputStream in = Files.newInputStream(p)) {
+                                    Files.copy(in, outFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                                    extracted = true;
+                                }
+                            }
+                        }
                     }
-                    try {
-                        if (!docsDir.exists()) docsDir.mkdirs();
-                        Files.write(docVersionFile.toPath(), currentVersion.getBytes());
-                    } catch (Exception e) {
-                        RTP.log(Level.WARNING, "[RTP] Failed to save documentation version", e);
-                    }
+                } catch (Exception ex) {
+                    RTP.log(Level.FINE, "[RTP] Path extraction fallback for " + uri + " failed: " + ex.getMessage());
+                }
+            }
+
+            if (extracted) {
+                if (forceOverwrite) {
+                    RTP.log(Level.INFO,
+                            "[RTP] Documentation updated to version: " + currentVersion);
+                } else {
+                    RTP.log(Level.INFO,
+                            "[RTP] Documentation extracted to: " + docsDir.getAbsolutePath());
+                }
+                try {
+                    if (!docsDir.exists()) docsDir.mkdirs();
+                    Files.write(docVersionFile.toPath(), currentVersion.getBytes());
+                } catch (Exception e) {
+                    RTP.log(Level.WARNING, "[RTP] Failed to save documentation version", e);
                 }
             }
         } catch (Exception e) {

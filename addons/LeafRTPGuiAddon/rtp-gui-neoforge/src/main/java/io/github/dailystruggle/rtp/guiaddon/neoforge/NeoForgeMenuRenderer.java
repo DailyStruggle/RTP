@@ -150,7 +150,7 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
     RTP.scheduler.runTaskLater(() -> {
       ServerPlayer player = resolvePlayer(playerId);
       if (player == null) {
-        RTP.log(java.util.logging.Level.INFO,
+        RTP.log(java.util.logging.Level.FINE,
             "[RTP-GUI] NeoForge renderer: could not resolve player at open time for " + playerId
                 + " (offline, or neither the player registry nor a bound server was available)");
         if (model.isRoot()) {

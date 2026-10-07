@@ -31,6 +31,18 @@ public final class MenuIcons {
    * @return an ordered, mutable list of lore lines; never {@code null}
    */
   public static List<String> entryLore(MenuEntry entry) {
+    return entryLore(entry, "&aClick to teleport!", "&cUnavailable right now.");
+  }
+
+  /**
+   * Lore lines for a destination entry with configurable call-to-action strings.
+   *
+   * @param entry the destination row
+   * @param readyText call to action text when ready
+   * @param unavailableText call to action text when unavailable
+   * @return an ordered, mutable list of lore lines; never {@code null}
+   */
+  public static List<String> entryLore(MenuEntry entry, String readyText, String unavailableText) {
     List<String> lore = new ArrayList<>();
     if (entry.target() != null && entry.target().kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.ACTION) {
       String name = entry.target().name();
@@ -113,7 +125,9 @@ public final class MenuIcons {
       lore.add("&7Cost: &6" + entry.cost());
     }
     lore.add("");
-    lore.add(entry.ready() ? "&aClick to teleport!" : "&cUnavailable right now.");
+    String ready = (readyText != null && !readyText.isEmpty()) ? readyText : "&aClick to teleport!";
+    String unavailable = (unavailableText != null && !unavailableText.isEmpty()) ? unavailableText : "&cUnavailable right now.";
+    lore.add(entry.ready() ? ready : unavailable);
     return lore;
   }
 

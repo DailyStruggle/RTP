@@ -70,7 +70,7 @@ public final class DestinationPickerGui implements InventoryHolder {
     for (Map.Entry<Integer, MenuEntry> placed : layout.slotEntries().entrySet()) {
       int slot = placed.getKey();
       MenuEntry entry = placed.getValue();
-      gui.inventory.setItem(slot, icon(entry));
+      gui.inventory.setItem(slot, icon(entry, model));
       gui.slotTargets.put(slot, entry.target());
     }
 
@@ -117,7 +117,7 @@ public final class DestinationPickerGui implements InventoryHolder {
     }
   }
 
-  private static ItemStack icon(MenuEntry entry) {
+  private static ItemStack icon(MenuEntry entry, MenuModel model) {
     ItemStack item = new ItemStack(material(entry.iconName(), Material.COMPASS));
     ItemMeta meta = item.getItemMeta();
     if (meta != null) {
@@ -126,7 +126,7 @@ public final class DestinationPickerGui implements InventoryHolder {
         name = "&b" + name;
       }
       meta.setDisplayName(colorize(name));
-      meta.setLore(translate(MenuIcons.entryLore(entry)));
+      meta.setLore(translate(MenuIcons.entryLore(entry, model.readyText(), model.unavailableText())));
       item.setItemMeta(meta);
     }
     return item;

@@ -61,8 +61,8 @@ lifecycle:
         - CONSOLE: "give [player] iron_sword 1"
         - CONSOLE: "give [player] bow 1"
         - CONSOLE: "give [player] arrow 16"
-        - PLAYER: "title [player] title {\"text\":\"KING OF THE HILL\",\"color\":\"gold\"}"
-        - PLAYER: "title [player] subtitle {\"text\":\"Reach the center extraction zone before time runs out!\",\"color\":\"yellow\"}"
+        - CONSOLE: "title [player] title {\"text\":\"KING OF THE HILL\",\"color\":\"gold\"}"
+        - CONSOLE: "title [player] subtitle {\"text\":\"Reach the center extraction zone before time runs out!\",\"color\":\"yellow\"}"
         - MESSAGE: "<green><bold>Match started! Secure the center extraction beacon before time expires!</bold></green>"
 
   onBoundaryViolation:
@@ -73,13 +73,13 @@ lifecycle:
       run:
         - ACTION: PULL_BACK
         - FOR_EACH:
-            - PLAYER: "title [violator] subtitle {\"text\":\"Stay inside the world border!\",\"color\":\"red\"}"
+            - CONSOLE: "title [violator] subtitle {\"text\":\"Stay inside the world border!\",\"color\":\"red\"}"
     - gate:
         scoreboard:
           objective: "rtp_violations"
           matches: ">= 2"
       run:
-        - CONSOLE: "broadcast &c[violator] was eliminated for leaving the arena!"
+        - CONSOLE: "tellraw @a [{\"text\":\"[violator] was eliminated for leaving the arena!\",\"color\":\"red\"}]"
         - FOR_EACH:
             - CONSOLE: "gamemode survival [player]"
         - ACTION: ELIMINATE
@@ -95,8 +95,8 @@ lifecycle:
         - FOR_EACH:
             - CONSOLE: "give [player] emerald 5"
             - CONSOLE: "give [player] diamond 2"
-            - PLAYER: "title [player] title {\"text\":\"ZONE EXTRACTED!\",\"color\":\"green\"}"
-            - PLAYER: "title [player] subtitle {\"text\":\"You successfully extracted with the loot!\",\"color\":\"yellow\"}"
+            - CONSOLE: "title [player] title {\"text\":\"ZONE EXTRACTED!\",\"color\":\"green\"}"
+            - CONSOLE: "title [player] subtitle {\"text\":\"You successfully extracted with the loot!\",\"color\":\"yellow\"}"
             - MESSAGE: "<green><bold>SUCCESS: You secured the center extraction zone and escaped with 5 Emeralds & 2 Diamonds!</bold></green>"
 
     # 2. Failed extraction: players outside 10 blocks failed to reach the extraction hill
@@ -106,8 +106,8 @@ lifecycle:
           distance: "> 10"
       run:
         - FOR_EACH:
-            - PLAYER: "title [player] title {\"text\":\"EXTRACTION FAILED!\",\"color\":\"red\"}"
-            - PLAYER: "title [player] subtitle {\"text\":\"You failed to reach the center zone in time.\",\"color\":\"gray\"}"
+            - CONSOLE: "title [player] title {\"text\":\"EXTRACTION FAILED!\",\"color\":\"red\"}"
+            - CONSOLE: "title [player] subtitle {\"text\":\"You failed to reach the center zone in time.\",\"color\":\"gray\"}"
             - MESSAGE: "<red>Extraction failed: You did not make it to the extraction beacon in time.</red>"
 
     # 3. Restore survival mode and disarm
@@ -116,9 +116,8 @@ lifecycle:
     - ACTION: DISARM
 
   onDeath:
-    - CONSOLE: "broadcast &6[victim] &cwas eliminated from the extraction match!"
-    - FOR_EACH:
-        - CONSOLE: "gamemode survival [player]"
+    - CONSOLE: "tellraw @a [{\"text\":\"[victim] \",\"color\":\"gold\"},{\"text\":\"was eliminated from the extraction match!\",\"color\":\"red\"}]"
+    - CONSOLE: "gamemode survival [victim]"
 
   onCancel:
     - FOR_EACH:

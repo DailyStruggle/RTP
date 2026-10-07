@@ -210,6 +210,28 @@ class EditorSecurityHardeningTest {
         assertEquals("a: 3\n", Files.readString(config, StandardCharsets.UTF_8));
     }
 
+    @Test
+    @DisplayName("Payload file-count cap (256) and character cap (4 MiB) reject hostile payloads")
+    void payloadLimitsEnforced() {
+        EditorSessionManager m = EditorSessionManager.getInstance();
+
+        // 1. More than 256 files
+        Map<String, String> tooMany = new java.util.HashMap<>();
+        for (int i = 0; i <= 256; i++) {
+            tooMany.put("regions/r" + i + ".yml", "radius: 100\n");
+        }
+        String tooManyJson = m.createPayloadJson(tooMany);
+        IllegalArgumentException countEx = assertThrows(IllegalArgumentException.class,
+                () -> m.parseAndValidatePayload(tooManyJson));
+        assertTrue(countEx.getMessage().contains("Too many configuration files"), countEx.getMessage());
+
+        // 2. Payload larger than 4 MiB
+        String hugePayload = "{\"version\":1,\"files\":{\"large.yml\":\"" + "a".repeat(4 * 1024 * 1024 + 1) + "\"}}";
+        IllegalArgumentException sizeEx = assertThrows(IllegalArgumentException.class,
+                () -> m.parseAndValidatePayload(hugePayload));
+        assertTrue(sizeEx.getMessage().contains("Payload too large"), sizeEx.getMessage());
+    }
+
     private static EditorHttpTransport remote(String body) {
         return new EditorHttpTransport(HttpClient.newHttpClient(), "https://bytebin.invalid", "https://editor.invalid") {
             @Override

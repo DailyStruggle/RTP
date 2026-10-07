@@ -134,6 +134,10 @@ public class ApplyCmd extends BaseRTPCmdImpl {
                         tokenFile = editorDir.resolve("apply.json");
                     }
                     if (java.nio.file.Files.isRegularFile(tokenFile)) {
+                        long size = java.nio.file.Files.size(tokenFile);
+                        if (size > EditorSessionManager.MAX_PAYLOAD_BYTES) {
+                            throw new IllegalArgumentException("offline apply file too large (" + size + " bytes; max " + EditorSessionManager.MAX_PAYLOAD_BYTES + ")");
+                        }
                         localPayload = java.nio.file.Files.readString(tokenFile, java.nio.charset.StandardCharsets.UTF_8);
                     }
                 }
