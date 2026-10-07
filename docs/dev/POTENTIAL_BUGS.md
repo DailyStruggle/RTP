@@ -122,4 +122,16 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Linear:** RTP-28
 
 
+### 2026-10-07 — Web editor reference materialize does not support native undo/redo
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** LeafRTP Web Editor testing (`docs/editor/index.html`)
+- **Location:** `docs/editor/index.html` line 3421 (`materializeCurrentReference`)
+- **Symptom / hypothesis:** In the Config & Prefabs editor panel (`#cfg-editor`), typing characters creates browser-native undo history and responds to `Ctrl+Z`, but clicking `⚡ Materialize` on an inherited reference (e.g. `@config`) replaces text via direct `.value` assignment (`cfgEditor.value = before + replacement + after`). Direct property assignment to a `<textarea>` wipes the browser's native undo manager stack, preventing operators from reverting the materialization or restoring the original reference token via `Ctrl+Z` / `Cmd+Z`.
+- **Impact:** Operators who unpack inherited references in the config editor cannot undo the replacement using keyboard shortcuts (`Ctrl+Z`), leaving the configuration file mutated unless manually rewritten or completely reverted.
+- **Suggested next step:** Replace editor line text using `document.execCommand('insertText', false, replacement)` across the selected line range (with fallback to `setRangeText`), and dispatch an `input` event. This preserves the browser's native undo stack on the textarea while ensuring geometry synchronization (`applyYamlGeometry`), gutter diagnostics, and diff updates execute cleanly without requiring extra server-roundtrip data.
+- **Linear:** RTP-31
+
+
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

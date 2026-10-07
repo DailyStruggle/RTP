@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
@@ -23,6 +24,7 @@ import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.*;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -36,6 +38,7 @@ import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tools.ChunkyChecker;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
+import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
@@ -216,6 +219,9 @@ public class RTP {
     factoryMap.put(factoryNames.singleConfig, new Factory<ConfigParser<?>>());
     factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
 
+    registerDefaultShapes();
+    registerDefaultVerticalAdjustors();
+
     // --- INJECT IMPLEMENTATIONS INTO THE API ---
     // Two-tier API model: custom Shape / VerticalAdjustor registration is an
     // implementation-tier extension served by the typed RTP.addShape(Shape) /
@@ -254,11 +260,23 @@ public class RTP {
         // cleanup the command path performs) so the alreadyTeleporting guard below
         // does not misfire on a finished teleport.
         TeleportData priorData = getInstance().latestTeleportData.get(uuid);
-        long lastTpTime = getEffectiveLastTeleportTime(uuid);
-        if (lastTpTime > 0) {
+        Region reqRegion = null;
+        if (target != null && target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.REGION) {
+          reqRegion = selectionAPI.getRegion(target.name());
+        }
+        RegionSettings regSettings = (reqRegion != null) ? reqRegion.getSettings() : null;
+        boolean hasRegionOverride = (regSettings != null && regSettings.cooldownMillis() != null && regSettings.cooldownMillis() >= 0);
+        long cooldown = getCooldown(player, regSettings);
+        long lastTpTime = hasRegionOverride
+            ? getLastRegionTeleportTime(uuid, reqRegion.name)
+            : getEffectiveLastTeleportTime(uuid);
+        if (hasRegionOverride && lastTpTime <= 0 && priorData != null && priorData.targetRegion != null && reqRegion.name.equalsIgnoreCase(priorData.targetRegion.name)) {
+          lastTpTime = priorData.time;
+        }
+        if (lastTpTime > 0 && cooldown > 0) {
           long dt = System.currentTimeMillis() - lastTpTime;
           if (dt < 0) dt = Long.MAX_VALUE + dt;
-          if (dt < player.cooldown()) {
+          if (dt < cooldown) {
             future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                 io.github.dailystruggle.rtp.api.RTPResult.Reason.COOLDOWN,
                 "Teleport is on cooldown for this player"));
@@ -923,18 +941,47 @@ public class RTP {
           }
         }
 
-        // Remaining cooldown.
+        // Remaining cooldown for this target region.
         long remaining = 0L;
-        long lastTp = getEffectiveLastTeleportTime(uuid);
-        if (lastTp > 0L) {
+        RegionSettings regSettings = region.getSettings();
+        boolean hasRegionOverride = (regSettings != null && regSettings.cooldownMillis() != null && regSettings.cooldownMillis() >= 0);
+        long targetCooldown = getCooldown(player, regSettings);
+        long lastTp = hasRegionOverride
+            ? getLastRegionTeleportTime(uuid, region.name)
+            : getEffectiveLastTeleportTime(uuid);
+        if (hasRegionOverride && lastTp <= 0L) {
+          TeleportData prior = getInstance().latestTeleportData.get(uuid);
+          if (prior != null && prior.targetRegion != null && region.name.equalsIgnoreCase(prior.targetRegion.name)) {
+            lastTp = prior.time;
+          }
+        }
+        if (lastTp > 0L && targetCooldown > 0L) {
           long dt = System.currentTimeMillis() - lastTp;
           if (dt < 0) dt = 0L;
-          remaining = Math.max(0L, player.cooldown() - dt);
+          remaining = Math.max(0L, targetCooldown - dt);
         }
+
+        // PvP Combat Gate check
+        boolean inCombat = false;
+        long combatRemaining = 0L;
+        try {
+          if (io.github.dailystruggle.rtp.common.pvp.PvPGate.isEnabled()
+              && (io.github.dailystruggle.rtp.common.pvp.PvPGate.isInCombat(uuid)
+                  || io.github.dailystruggle.rtp.common.pvp.PvPGate.evaluate(uuid) != io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW)) {
+            inCombat = true;
+            combatRemaining = io.github.dailystruggle.rtp.common.pvp.PvPGate.combatRemainingMillis(uuid);
+            if (combatRemaining <= 0L) combatRemaining = 1000L;
+          }
+        } catch (Throwable ignored) {
+        }
+
+        long targetDelay = getDelay(player, regSettings);
 
         io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability availability;
         if (noPerm) {
           availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION;
+        } else if (inCombat) {
+          availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.IN_COMBAT;
         } else if (remaining > 0L) {
           availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.ON_COOLDOWN;
         } else if (noFunds) {
@@ -968,7 +1015,7 @@ public class RTP {
           // Defensive: env/label enrichment is a cosmetic hint and must never break status.
         }
         return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
-            availability, remaining, Math.max(0.0, cost), null, localEnv, localLabel);
+            availability, remaining, Math.max(0.0, cost), null, localEnv, localLabel, targetDelay, combatRemaining);
       } catch (RuntimeException ex) {
         log(Level.WARNING, "[RTP API] getTargetStatus failed: " + ex.getMessage(), ex);
         return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
@@ -1198,6 +1245,7 @@ public class RTP {
   public RTPTaskPipe cancelTasks;
   public final Map<String, ScanTask> scanTasks = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<UUID, Long> invulnerablePlayers = new ConcurrentHashMap<>();
+  public final ConcurrentHashMap<UUID, Map<String, Long>> regionTeleportTimes = new ConcurrentHashMap<>();
   public final ConcurrentLinkedQueue<RTPChunk<?>> chunksToUnload = new ConcurrentLinkedQueue<>();
   public DatabaseAccessor<?> databaseAccessor;
   /**
@@ -1267,6 +1315,89 @@ public class RTP {
   }
 
   /**
+   * Resolves the timestamp of the player's last teleport to a specific region.
+   *
+   * @param uuid player UUID
+   * @param regionName target region name
+   * @return epoch milliseconds, or 0 if no teleport to this region recorded
+   */
+  public static long getLastRegionTeleportTime(UUID uuid, String regionName) {
+    if (uuid == null || regionName == null) return 0L;
+    RTP inst = instance;
+    if (inst == null) return 0L;
+    Map<String, Long> map = inst.regionTeleportTimes.get(uuid);
+    if (map == null) return 0L;
+    Long time = map.get(regionName.toLowerCase(Locale.ROOT));
+    return time != null ? time : 0L;
+  }
+
+  /**
+   * Records the timestamp of the player's last teleport to a specific region.
+   *
+   * @param uuid player UUID
+   * @param regionName target region name
+   * @param epochMillis timestamp in milliseconds
+   */
+  public static void setLastRegionTeleportTime(UUID uuid, String regionName, long epochMillis) {
+    if (uuid == null || regionName == null) return;
+    RTP inst = instance;
+    if (inst == null) return;
+    inst.regionTeleportTimes
+        .computeIfAbsent(uuid, k -> new ConcurrentHashMap<>())
+        .put(regionName.toLowerCase(Locale.ROOT), epochMillis);
+  }
+
+  /**
+   * Resolves effective last teleport time for a player, preferring region-specific if recorded.
+   */
+  public static long getEffectiveLastTeleportTime(UUID uuid, String regionName) {
+    if (uuid == null) return 0L;
+    if (regionName != null) {
+      long regTime = getLastRegionTeleportTime(uuid, regionName);
+      if (regTime > 0L) return regTime;
+    }
+    return getEffectiveLastTeleportTime(uuid);
+  }
+
+  /**
+   * Resolves warmup delay through the precedence hierarchy:
+   * permission bypass -> permission override -> region setting -> global config default.
+   */
+  public static long getDelay(RTPCommandSender sender, io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings) {
+    if (sender == null) return 0L;
+    if (settings != null && settings.delayMillis() != null && settings.delayMillis() >= 0) {
+      if (sender.hasPermission("rtp.nodelay") || sender.hasPermission("rtp.noDelay")) {
+        return 0L;
+      }
+      int permOverride = ParsePermissions.getInt(sender, "rtp.delay.");
+      if (permOverride >= 0) {
+        return TimeUnit.SECONDS.toMillis(permOverride);
+      }
+      return settings.delayMillis();
+    }
+    return sender.delay();
+  }
+
+  /**
+   * Resolves cooldown through the precedence hierarchy:
+   * permission bypass -> permission override -> region setting -> global config default.
+   */
+  public static long getCooldown(RTPCommandSender sender, io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings) {
+    if (sender == null) return 0L;
+    if (settings != null && settings.cooldownMillis() != null && settings.cooldownMillis() >= 0) {
+      if (sender.hasPermission("rtp.nocooldown") || sender.hasPermission("rtp.noCooldown")) {
+        return 0L;
+      }
+      int permOverride = ParsePermissions.getInt(sender, "rtp.cooldown.");
+      if (permOverride >= 0) {
+        return TimeUnit.SECONDS.toMillis(permOverride);
+      }
+      return settings.cooldownMillis();
+    }
+    return sender.cooldown();
+  }
+
+  /**
    * Wraps the installed platform {@link #scheduler} in a profiling decorator
    * to track wall-clock execution time of sync/async tasks. Idempotent.
    */
@@ -1302,20 +1433,8 @@ public class RTP {
     RTPAPI.setServerAccessor(serverAccessor);
     instance = this;
 
-    addShape(new Circle());
-    addShape(new CircleOptimizedDualLayer());
-    addShape(new CircleOptimizedDualLayer("CIRCLE"));
-    addShape(new Ellipse());
-    addShape(new Square());
-    addShape(new SquareOptimizedDualLayer());
-    addShape(new SquareOptimizedDualLayer("SQUARE"));
-    addShape(new Rectangle());
-    addShape(new Circle_Normal());
-    addShape(new Square_Normal());
-    addShape(new Polygon());
-    addVerticalAdjustor(new LinearAdjustor(new ArrayList<>())); // todo: make this work
-    addVerticalAdjustor(new JumpAdjustor(new ArrayList<>()));
-    addVerticalAdjustor(new FixedAdjustor(new ArrayList<>()));
+    registerDefaultShapes();
+    registerDefaultVerticalAdjustors();
 
     configs = new Configs(serverAccessor.getPluginDirectory());
 
@@ -1449,7 +1568,7 @@ public class RTP {
         }
       }
       addons.loadAll();
-    }, 20));
+    }, 0));
 
   }
 
@@ -1580,15 +1699,60 @@ public class RTP {
     }
   }
 
+  public static void registerDefaultShapes() {
+    Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) factoryMap.get(factoryNames.shape);
+    if (shapeFactory == null) {
+      shapeFactory = new Factory<>();
+      factoryMap.put(factoryNames.shape, shapeFactory);
+    }
+    if (selectionAPI != null && selectionAPI.shapeFactory == null) {
+      selectionAPI.shapeFactory = shapeFactory;
+    }
+    addShape(new Circle());
+    addShape(new CircleOptimizedDualLayer());
+    addShape(new CircleOptimizedDualLayer("CIRCLE"));
+    addShape(new Ellipse());
+    addShape(new Square());
+    addShape(new SquareOptimizedDualLayer());
+    addShape(new SquareOptimizedDualLayer("SQUARE"));
+    addShape(new Rectangle());
+    addShape(new Circle_Normal());
+    addShape(new Square_Normal());
+    addShape(new Polygon());
+  }
+
+  public static void registerDefaultVerticalAdjustors() {
+    Factory<VerticalAdjustor<?>> vertFactory = (Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert);
+    if (vertFactory == null) {
+      vertFactory = new Factory<>();
+      factoryMap.put(factoryNames.vert, vertFactory);
+    }
+    addVerticalAdjustor(new LinearAdjustor(new ArrayList<>()));
+    addVerticalAdjustor(new JumpAdjustor(new ArrayList<>()));
+    addVerticalAdjustor(new FixedAdjustor(new ArrayList<>()));
+  }
+
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public static void addShape(Shape<?> shape) {
-    ((Factory<Shape<?>>) factoryMap.get(factoryNames.shape)).add(shape.name, shape);
+    Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) factoryMap.get(factoryNames.shape);
+    if (shapeFactory == null) {
+      shapeFactory = new Factory<>();
+      factoryMap.put(factoryNames.shape, shapeFactory);
+    }
+    shapeFactory.add(shape.name, shape);
+    if (selectionAPI != null && selectionAPI.shapeFactory == null) {
+      selectionAPI.shapeFactory = shapeFactory;
+    }
   }
 
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public static void addVerticalAdjustor(VerticalAdjustor<?> verticalAdjustor) {
-    ((Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert))
-        .add(verticalAdjustor.name, verticalAdjustor);
+    Factory<VerticalAdjustor<?>> vertFactory = (Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert);
+    if (vertFactory == null) {
+      vertFactory = new Factory<>();
+      factoryMap.put(factoryNames.vert, vertFactory);
+    }
+    vertFactory.add(verticalAdjustor.name, verticalAdjustor);
   }
 
   public static RTP getInstance() {

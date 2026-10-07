@@ -50,11 +50,15 @@ public class RegionConfigLoaderTest {
         dummyDir.mkdirs();
         when(mockAccessor.getPluginDirectory()).thenReturn(dummyDir);
         RTP.serverAccessor = mockAccessor;
+        RTP.registerDefaultShapes();
+        RTP.registerDefaultVerticalAdjustors();
     }
 
     @AfterEach
     void tearDown() {
         rtpMockedStatic.close();
+        RTP.registerDefaultShapes();
+        RTP.registerDefaultVerticalAdjustors();
     }
 
     @ParameterizedTest
@@ -118,8 +122,8 @@ public class RegionConfigLoaderTest {
                 Arguments.of(RegionKeys.shape, null, null, "null for shape"),
                 Arguments.of(RegionKeys.backlogCacheCap, "malformed_cap", 0L, "String instead of Number for backlogCacheCap"),
                 Arguments.of(RegionKeys.networkReserveSize, "bad_num", 0L, "String instead of Number for networkReserveSize"),
-                Arguments.of(RegionKeys.spatialResolution, "not_a_number", 4L, "String instead of Number for spatialResolution falls back to shape resolution"),
-                Arguments.of(RegionKeys.spatialResolution, "auto", 4L, "String 'auto' for spatialResolution resolves via shape"),
+                Arguments.of(RegionKeys.spatialResolution, "not_a_number", 8L, "String instead of Number for spatialResolution falls back to shape resolution"),
+                Arguments.of(RegionKeys.spatialResolution, "auto", 8L, "String 'auto' for spatialResolution resolves via shape"),
                 Arguments.of(RegionKeys.spatialResolution, 5, 5L, "Positive integer 5 for spatialResolution resolves to 5L"),
                 Arguments.of(RegionKeys.requirePermission, "maybe", false, "Invalid boolean string for requirePermission"),
                 Arguments.of(RegionKeys.requirePermission, 1, true, "Integer 1 for requirePermission"),
@@ -350,7 +354,7 @@ public class RegionConfigLoaderTest {
         setupDefaultMocks(parser);
 
         io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
-        shapeFactory.add("CIRCLE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle_Normal());
+        shapeFactory.add("CIRCLE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle());
         RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
 
         io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?>> vertFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
@@ -412,7 +416,7 @@ public class RegionConfigLoaderTest {
         // Factory with defaults available
         io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
         shapeFactory.add("SQUARE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square());
-        shapeFactory.add("CIRCLE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle_Normal());
+        shapeFactory.add("CIRCLE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle());
         RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
 
         io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?>> vertFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();

@@ -34,6 +34,7 @@ dependencies {
     compileOnly project(':rtp-api')
     compileOnly project(':rtp-core')
     testImplementation project(':rtp-core')
+    testImplementation project(':helpers:MockItemPlugins')
     compileOnly project(':metrics-api')
 }
 // NOTE: plugin.yml carries its `version:` literally (1.0.0), NOT a `${version}`

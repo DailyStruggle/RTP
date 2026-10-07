@@ -31,7 +31,7 @@ public final class MenuIcons {
    * @return an ordered, mutable list of lore lines; never {@code null}
    */
   public static List<String> entryLore(MenuEntry entry) {
-    return entryLore(entry, "&aClick to teleport!", "&cUnavailable right now.");
+    return entryLore(entry, GuiMenuConfig.INSTANCE);
   }
 
   /**
@@ -43,6 +43,17 @@ public final class MenuIcons {
    * @return an ordered, mutable list of lore lines; never {@code null}
    */
   public static List<String> entryLore(MenuEntry entry, String readyText, String unavailableText) {
+    return entryLore(entry, GuiMenuConfig.INSTANCE);
+  }
+
+  /**
+   * Lore lines for a destination entry evaluated against configurable lore templates.
+   *
+   * @param entry the destination row
+   * @param config the menu configuration view
+   * @return an ordered, mutable list of lore lines; never {@code null}
+   */
+  public static List<String> entryLore(MenuEntry entry, GuiMenuConfig config) {
     List<String> lore = new ArrayList<>();
     if (entry.target() != null && entry.target().kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.ACTION) {
       String name = entry.target().name();
@@ -114,21 +125,97 @@ public final class MenuIcons {
         }
       }
     }
+
+    if (config == null) config = GuiMenuConfig.INSTANCE;
     RtpTargetStatus.Availability availability = entry.availability();
-    lore.add("&7Status: " + statusColor(availability) + availability.name());
-    if (availability == RtpTargetStatus.Availability.ON_COOLDOWN
-        && entry.remainingCooldownMillis() > 0L) {
-      long secs = (entry.remainingCooldownMillis() + 999L) / 1000L;
-      lore.add("&7Cooldown: &e" + secs + "s");
+    List<String> template;
+    switch (availability) {
+      case READY:
+        template = config.loreReady();
+        break;
+      case ON_COOLDOWN:
+        template = config.loreCooldown();
+        break;
+      case IN_COMBAT:
+        template = config.loreCombat();
+        break;
+      case NO_FUNDS:
+        template = config.loreNoFunds();
+        break;
+      case NO_PERMISSION:
+      case DISABLED:
+      default:
+        template = config.loreNoPermission();
+        break;
     }
-    if (entry.cost() > 0.0) {
-      lore.add("&7Cost: &6" + entry.cost());
+
+    if (template != null) {
+      for (String line : template) {
+        lore.add(expandPlaceholders(line, entry));
+      }
     }
-    lore.add("");
-    String ready = (readyText != null && !readyText.isEmpty()) ? readyText : "&aClick to teleport!";
-    String unavailable = (unavailableText != null && !unavailableText.isEmpty()) ? unavailableText : "&cUnavailable right now.";
-    lore.add(entry.ready() ? ready : unavailable);
     return lore;
+  }
+
+  /**
+   * Expands lore placeholders with concrete values from {@code entry}.
+   * Supports {status}, {cooldown}, {delay}, {cost}, {target}, {world}, {region}.
+   */
+  public static String expandPlaceholders(String line, MenuEntry entry) {
+    if (line == null || !line.contains("{")) return line;
+    RtpTargetStatus.Availability avail = entry.availability();
+    long cdMillis = (avail == RtpTargetStatus.Availability.IN_COMBAT)
+        ? entry.combatRemainingMillis()
+        : entry.remainingCooldownMillis();
+
+    String costStr;
+    if (entry.cost() <= 0.0) {
+      costStr = "Free";
+    } else if (entry.cost() == Math.floor(entry.cost())) {
+      costStr = String.format(java.util.Locale.ROOT, "%.0f", entry.cost());
+    } else {
+      costStr = String.valueOf(entry.cost());
+    }
+
+    String worldName = "";
+    String regionName = "";
+    if (entry.target() != null) {
+      if (entry.target().kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.WORLD) {
+        worldName = entry.target().name() != null ? entry.target().name() : "";
+      } else if (entry.target().kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.REGION) {
+        regionName = entry.target().name() != null ? entry.target().name() : "";
+      }
+    }
+
+    return line.replace("{status}", statusColor(avail) + avail.name())
+        .replace("{cooldown}", formatDuration(cdMillis))
+        .replace("{delay}", formatDuration(entry.delayMillis()))
+        .replace("{cost}", costStr)
+        .replace("{target}", entry.displayName() != null ? entry.displayName() : "")
+        .replace("{world}", worldName)
+        .replace("{region}", regionName);
+  }
+
+  /**
+   * Formats millisecond duration into concise human-readable units (e.g. 45s, 1m 30s, 2h).
+   */
+  public static String formatDuration(long millis) {
+    if (millis <= 0L) return "0s";
+    long totalSeconds = (millis + 999L) / 1000L;
+    if (totalSeconds < 60L) {
+      return totalSeconds + "s";
+    }
+    long minutes = totalSeconds / 60L;
+    long seconds = totalSeconds % 60L;
+    if (minutes < 60L) {
+      return (seconds > 0) ? (minutes + "m " + seconds + "s") : (minutes + "m");
+    }
+    long hours = minutes / 60L;
+    long remainingMinutes = minutes % 60L;
+    if (remainingMinutes > 0) {
+      return hours + "h " + remainingMinutes + "m";
+    }
+    return hours + "h";
   }
 
   /** Display label for the dashboard tile. */

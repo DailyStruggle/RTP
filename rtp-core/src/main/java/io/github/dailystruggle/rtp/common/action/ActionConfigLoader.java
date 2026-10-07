@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
@@ -362,6 +363,40 @@ public final class ActionConfigLoader {
     return result;
   }
 
+  private static io.github.dailystruggle.rtp.api.action.ParameterType parseParameterType(String rawType) {
+    if (rawType == null || rawType.isBlank()) {
+      return io.github.dailystruggle.rtp.api.action.ParameterType.STRING;
+    }
+    Map<String, io.github.dailystruggle.rtp.api.action.ParameterType> candidateMap = new LinkedHashMap<>();
+    for (io.github.dailystruggle.rtp.api.action.ParameterType t : io.github.dailystruggle.rtp.api.action.ParameterType.values()) {
+      candidateMap.put(t.name(), t);
+    }
+    var lookup = FuzzySearchEngine.resolveCandidate(rawType, candidateMap);
+    if (lookup.isExact()) {
+      return lookup.match();
+    } else if (lookup.isPerceptible()) {
+      RTP.log(
+          Level.WARNING,
+          "[RTP Action] Parameter type '"
+              + rawType
+              + "' was not recognized, but closely matches '"
+              + lookup.matchedKey()
+              + "'. Autocorrecting to '"
+              + lookup.matchedKey()
+              + "'.");
+      return lookup.match();
+    } else {
+      RTP.log(
+          Level.WARNING,
+          "[RTP Action] Unknown parameter type: '"
+              + rawType
+              + "' (valid types: "
+              + String.join(", ", lookup.availableCandidates())
+              + "), falling back to STRING");
+      return io.github.dailystruggle.rtp.api.action.ParameterType.STRING;
+    }
+  }
+
   /**
    * Parses declarative command parameters (ADR-098). Each parameter is validated immediately;
    * a symbolic default illegal for the declared type (or a blank name) throws to fail fast at load.
@@ -391,9 +426,8 @@ public final class ActionConfigLoader {
       }
 
       String pName = pMap.containsKey("name") ? String.valueOf(pMap.get("name")) : "";
-      io.github.dailystruggle.rtp.api.action.ParameterType pType =
-          io.github.dailystruggle.rtp.api.action.ParameterType.parse(
-              pMap.containsKey("type") ? String.valueOf(pMap.get("type")) : null);
+      String rawType = pMap.containsKey("type") ? String.valueOf(pMap.get("type")) : null;
+      io.github.dailystruggle.rtp.api.action.ParameterType pType = parseParameterType(rawType);
       boolean required = pMap.get("required") instanceof Boolean b && b;
       String pPerm = pMap.containsKey("permission") ? String.valueOf(pMap.get("permission")) : "";
       String pDefault = pMap.containsKey("default") ? String.valueOf(pMap.get("default")) : "";
@@ -522,20 +556,37 @@ public final class ActionConfigLoader {
     if (map == null || map.isEmpty()) {
       return ActionDefinition.ConfinementSpec.DEFAULT;
     }
-    String bStr = map.containsKey("boundary") ? String.valueOf(map.get("boundary")).toUpperCase() : null;
+    String bStr = map.containsKey("boundary") ? String.valueOf(map.get("boundary")) : null;
     ConfinementBoundary boundary = null;
-    if (bStr != null) {
-      boundary = switch (bStr) {
-        case "REGION" -> ConfinementBoundary.REGION;
-        case "LEASH" -> ConfinementBoundary.LEASH;
-        case "SHAPE" -> ConfinementBoundary.SHAPE;
-        case "NONE" -> ConfinementBoundary.NONE;
-        case "SUBSPACE" -> ConfinementBoundary.SUBSPACE;
-        default -> {
-          RTP.log(Level.WARNING, "[RTP Action] Unknown confinement boundary: '" + bStr + "', falling back to SUBSPACE");
-          yield ConfinementBoundary.SUBSPACE;
-        }
-      };
+    if (bStr != null && !bStr.isBlank()) {
+      Map<String, ConfinementBoundary> boundaryMap = new LinkedHashMap<>();
+      for (ConfinementBoundary b : ConfinementBoundary.values()) {
+        boundaryMap.put(b.name(), b);
+      }
+      var lookup = FuzzySearchEngine.resolveCandidate(bStr, boundaryMap);
+      if (lookup.isExact()) {
+        boundary = lookup.match();
+      } else if (lookup.isPerceptible()) {
+        RTP.log(
+            Level.WARNING,
+            "[RTP Action] Confinement boundary '"
+                + bStr
+                + "' was not recognized, but closely matches '"
+                + lookup.matchedKey()
+                + "'. Autocorrecting to '"
+                + lookup.matchedKey()
+                + "'.");
+        boundary = lookup.match();
+      } else {
+        RTP.log(
+            Level.WARNING,
+            "[RTP Action] Unknown confinement boundary: '"
+                + bStr
+                + "' (valid boundaries: "
+                + String.join(", ", lookup.availableCandidates())
+                + "), falling back to SUBSPACE");
+        boundary = ConfinementBoundary.SUBSPACE;
+      }
     }
 
     String shapeName = "SQUARE";

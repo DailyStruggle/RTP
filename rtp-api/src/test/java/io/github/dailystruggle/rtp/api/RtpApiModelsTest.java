@@ -173,6 +173,8 @@ class RtpApiModelsTest {
     assertTrue(s1.isReady());
     assertEquals(0L, s1.remainingCooldownMillis());
     assertEquals(50.0, s1.cost());
+    assertEquals(0L, s1.delayMillis());
+    assertEquals(0L, s1.combatRemainingMillis());
     assertNull(s1.iconBlock());
     assertNull(s1.environment());
     assertNull(s1.label());
@@ -182,9 +184,19 @@ class RtpApiModelsTest {
     assertFalse(s2.isReady());
     assertEquals(5000L, s2.remainingCooldownMillis());
     assertEquals(0.0, s2.cost()); // negative clamped to 0
+    assertEquals(0L, s2.delayMillis());
+    assertEquals(0L, s2.combatRemainingMillis());
     assertEquals("DIRT", s2.iconBlock());
     assertEquals("NORMAL", s2.environment());
     assertEquals("Wilderness", s2.label());
+
+    RtpTargetStatus sCombat = new RtpTargetStatus(
+        RtpTargetStatus.Availability.IN_COMBAT, 0L, 0.0, "BARRIER", "NORMAL", "Wilderness", 2000L, 12000L);
+    assertFalse(sCombat.isReady());
+    assertEquals(RtpTargetStatus.Availability.IN_COMBAT, sCombat.availability());
+    assertEquals(2000L, sCombat.delayMillis());
+    assertEquals(12000L, sCombat.combatRemainingMillis());
+    assertTrue(sCombat.toString().contains("combatMs=12000"));
 
     RtpTargetStatus s3 = new RtpTargetStatus(
         RtpTargetStatus.Availability.ON_COOLDOWN, 5000L, 0.0, "DIRT", "NORMAL", "Wilderness");

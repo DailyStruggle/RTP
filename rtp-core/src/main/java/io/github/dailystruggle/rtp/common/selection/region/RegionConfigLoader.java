@@ -12,7 +12,11 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -77,10 +81,10 @@ public class RegionConfigLoader {
 //            System.out.println("[RTP-DEBUG] RegionLoader: Shape was already a valid Shape object.");
         } else if (rawShape instanceof RtpYamlSection) {
             RtpYamlSection section = (RtpYamlSection) rawShape;
-            shape = deserializeShape(section.getMapValues(false));
+            shape = deserializeShape(section.getMapValues(false), name);
             if (shape != null) regionParser.set(RegionKeys.shape, shape);
         } else if (rawShape instanceof Map) {
-            shape = deserializeShape((Map<String, Object>) rawShape);
+            shape = deserializeShape((Map<String, Object>) rawShape, name);
             if (shape != null) regionParser.set(RegionKeys.shape, shape);
         }
 
@@ -91,7 +95,7 @@ public class RegionConfigLoader {
             // "Shape for region <name> was invalid. Falling back to SQUARE." in the Region
             // constructor and break location generation. Recover here with the documented
             // default shape so the value is always read as something valid.
-            shape = deserializeShape(new java.util.HashMap<>());
+            shape = deserializeShape(new java.util.HashMap<>(), name);
             if (shape != null) {
                 regionParser.set(RegionKeys.shape, shape);
                 RTP.log(Level.WARNING, "[RTP] Region '" + name
@@ -109,10 +113,10 @@ public class RegionConfigLoader {
 //            System.out.println("[RTP-DEBUG] RegionLoader: Vert was already a valid VerticalAdjustor object.");
         } else if (rawVert instanceof RtpYamlSection) {
             RtpYamlSection section = (RtpYamlSection) rawVert;
-            vert = deserializeVert(section.getMapValues(false));
+            vert = deserializeVert(section.getMapValues(false), name);
             if (vert != null) regionParser.set(RegionKeys.vert, vert);
         } else if (rawVert instanceof Map) {
-            vert = deserializeVert((Map<String, Object>) rawVert);
+            vert = deserializeVert((Map<String, Object>) rawVert, name);
             if (vert != null) regionParser.set(RegionKeys.vert, vert);
         }
 
@@ -123,7 +127,7 @@ public class RegionConfigLoader {
             // documented default vertical adjustor so the value is always read as valid.
             java.util.Map<String, Object> vertDefault = new java.util.HashMap<>();
             vertDefault.put("name", "LINEAR");
-            vert = deserializeVert(vertDefault);
+            vert = deserializeVert(vertDefault, name);
             if (vert != null) {
                 regionParser.set(RegionKeys.vert, vert);
                 RTP.log(Level.WARNING, "[RTP] Region '" + name
@@ -170,6 +174,12 @@ public class RegionConfigLoader {
         io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor.checkRegionWorldBorder(
             name, world, shape, worldBorderOverride);
 
+        Object rawCooldown = resolveScalar(regionParser, RegionKeys.cooldown, null);
+        Long cooldownMillis = parseDurationSetting(rawCooldown);
+
+        Object rawDelay = resolveScalar(regionParser, RegionKeys.delay, null);
+        Long delayMillis = parseDurationSetting(rawDelay);
+
         return new RegionSettings(
                 name,
                 world,
@@ -184,8 +194,34 @@ public class RegionConfigLoader {
                 price,
                 spatialResolution,
                 override,
-                detailedRegionInit
+                detailedRegionInit,
+                cooldownMillis,
+                delayMillis
         );
+    }
+
+    public static Long parseDurationSetting(Object raw) {
+        if (raw == null) return null;
+        if (raw instanceof Number num) {
+            long sec = num.longValue();
+            return (sec < 0) ? -1L : sec * 1000L;
+        }
+        String str = raw.toString().trim();
+        if (str.isEmpty() || str.equalsIgnoreCase("null")) return null;
+        if (str.equals("-1") || str.equalsIgnoreCase("infinite") || str.equalsIgnoreCase("permanent")) {
+            return -1L;
+        }
+        if (str.matches("^0[a-zA-Z]*$")) {
+            return 0L;
+        }
+        if (str.matches("^\\d+$")) {
+            try {
+                long sec = Long.parseLong(str);
+                return (sec < 0) ? -1L : sec * 1000L;
+            } catch (NumberFormatException ignored) {}
+        }
+        long ms = ConfigParser.parseDurationMillis(str, -1L);
+        return (ms < 0) ? -1L : ms;
     }
 
     /**
@@ -220,9 +256,50 @@ public class RegionConfigLoader {
 
     @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
     public static Shape<?> deserializeShape(Map<String, Object> map) {
-        String shapeName = String.valueOf(map.getOrDefault("name", "CIRCLE")).toUpperCase();
+        return deserializeShape(map, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Shape<?> deserializeShape(Map<String, Object> map, @Nullable String regionName) {
+        if (map == null) map = new java.util.HashMap<>();
+        Object rawName = map.get("name");
+        String shapeName = (rawName != null) ? String.valueOf(rawName).trim() : "CIRCLE";
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
-        Shape<?> prototype = (Shape<?>) factory.get(shapeName);
+        if (factory == null || !factory.list().hasMoreElements()) {
+            RTP.registerDefaultShapes();
+            factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        }
+        if (factory == null) return null;
+
+        Map<String, Shape<?>> candidateMap = new LinkedHashMap<>();
+        for (String key : Collections.list(factory.list())) {
+            String cleanName = key.endsWith(".YML") ? key.substring(0, key.length() - 4) : key;
+            Shape<?> proto = (Shape<?>) factory.get(cleanName);
+            if (proto != null) candidateMap.put(cleanName, proto);
+        }
+
+        FuzzySearchEngine.FuzzyLookupResult<Shape<?>> lookup =
+                FuzzySearchEngine.resolveCandidate(shapeName, candidateMap);
+
+        Shape<?> prototype = null;
+        if (lookup.isExact()) {
+            prototype = lookup.match();
+        } else if (lookup.isPerceptible()) {
+            String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
+            RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "shape '" + shapeName
+                    + "' was not recognized, but closely matches '" + lookup.matchedKey()
+                    + "'. Autocorrecting to '" + lookup.matchedKey() + "'.");
+            prototype = lookup.match();
+        } else {
+            String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
+            RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "shape '" + shapeName
+                    + "' is invalid (valid options: " + String.join(", ", lookup.availableCandidates())
+                    + "). Falling back to CIRCLE.");
+            prototype = (Shape<?>) factory.get("CIRCLE");
+            if (prototype == null && !candidateMap.isEmpty()) {
+                prototype = candidateMap.values().iterator().next();
+            }
+        }
 
         if (prototype != null) {
             Shape<?> clone = prototype.clone();
@@ -339,10 +416,50 @@ public class RegionConfigLoader {
     }
 
     @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
-    private static VerticalAdjustor<?> deserializeVert(Map<String, Object> map) {
-        String vertName = String.valueOf(map.getOrDefault("name", "JUMP")).toUpperCase();
+    public static VerticalAdjustor<?> deserializeVert(Map<String, Object> map) {
+        return deserializeVert(map, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static VerticalAdjustor<?> deserializeVert(Map<String, Object> map, @Nullable String regionName) {
+        if (map == null) map = new java.util.HashMap<>();
+        Object rawName = map.get("name");
+        String vertName = (rawName != null) ? String.valueOf(rawName).trim() : "LINEAR";
         Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
-        VerticalAdjustor<?> prototype = (VerticalAdjustor<?>) factory.get(vertName);
+        if (factory == null) return null;
+
+        Map<String, VerticalAdjustor<?>> candidateMap = new LinkedHashMap<>();
+        for (String key : Collections.list(factory.list())) {
+            String cleanName = key.endsWith(".YML") ? key.substring(0, key.length() - 4) : key;
+            VerticalAdjustor<?> proto = (VerticalAdjustor<?>) factory.get(cleanName);
+            if (proto != null) candidateMap.put(cleanName, proto);
+        }
+
+        FuzzySearchEngine.FuzzyLookupResult<VerticalAdjustor<?>> lookup =
+                FuzzySearchEngine.resolveCandidate(vertName, candidateMap);
+
+        VerticalAdjustor<?> prototype = null;
+        if (lookup.isExact()) {
+            prototype = lookup.match();
+        } else if (lookup.isPerceptible()) {
+            String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
+            RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "vert '" + vertName
+                    + "' was not recognized, but closely matches '" + lookup.matchedKey()
+                    + "'. Autocorrecting to '" + lookup.matchedKey() + "'.");
+            prototype = lookup.match();
+        } else {
+            String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
+            RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "vert '" + vertName
+                    + "' is invalid (valid options: " + String.join(", ", lookup.availableCandidates())
+                    + "). Falling back to LINEAR.");
+            prototype = (VerticalAdjustor<?>) factory.get("LINEAR");
+            if (prototype == null) {
+                prototype = (VerticalAdjustor<?>) factory.get("JUMP");
+            }
+            if (prototype == null && !candidateMap.isEmpty()) {
+                prototype = candidateMap.values().iterator().next();
+            }
+        }
 
         if (prototype != null) {
             VerticalAdjustor<?> clone = (VerticalAdjustor<?>) prototype.clone();

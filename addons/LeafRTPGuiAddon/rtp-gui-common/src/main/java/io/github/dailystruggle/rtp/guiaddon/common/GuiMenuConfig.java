@@ -256,6 +256,94 @@ public final class GuiMenuConfig {
     return str(GuiMenuKeys.iconDashboard, "PAPER");
   }
 
+  public boolean barrierOnUnavailable() {
+    return bool(GuiMenuKeys.barrierOnUnavailable, true);
+  }
+
+  public String iconInCombat() {
+    return str(GuiMenuKeys.iconInCombat, "BARRIER");
+  }
+
+  public java.util.List<String> loreReady() {
+    return listStr(GuiMenuKeys.loreReady, defaultLoreReady());
+  }
+
+  public java.util.List<String> loreCooldown() {
+    return listStr(GuiMenuKeys.loreCooldown, defaultLoreCooldown());
+  }
+
+  public java.util.List<String> loreCombat() {
+    return listStr(GuiMenuKeys.loreCombat, defaultLoreCombat());
+  }
+
+  public java.util.List<String> loreNoFunds() {
+    return listStr(GuiMenuKeys.loreNoFunds, defaultLoreNoFunds());
+  }
+
+  public java.util.List<String> loreNoPermission() {
+    return listStr(GuiMenuKeys.loreNoPermission, defaultLoreNoPermission());
+  }
+
+  @SuppressWarnings("unchecked")
+  private java.util.List<String> listStr(GuiMenuKeys key, java.util.List<String> fallback) {
+    ConfigParser<GuiMenuKeys> p = parser();
+    if (p == null) return fallback;
+    Object v = p.getConfigValue(key, fallback);
+    if (v instanceof java.util.List<?> list) {
+      java.util.List<String> result = new java.util.ArrayList<>(list.size());
+      for (Object o : list) {
+        if (o != null) result.add(String.valueOf(o));
+      }
+      return result;
+    }
+    return fallback;
+  }
+
+  private static java.util.List<String> defaultLoreReady() {
+    return java.util.List.of(
+        "&7Status: &aREADY",
+        "&7Cost: &6{cost}",
+        "&7Warmup: &e{delay}",
+        "",
+        "&aClick to teleport!"
+    );
+  }
+
+  private static java.util.List<String> defaultLoreCooldown() {
+    return java.util.List.of(
+        "&7Status: &eON COOLDOWN",
+        "&cCooldown remaining: &e{cooldown}",
+        "",
+        "&cCannot teleport right now."
+    );
+  }
+
+  private static java.util.List<String> defaultLoreCombat() {
+    return java.util.List.of(
+        "&7Status: &cIN COMBAT",
+        "&cCombat tag remaining: &e{cooldown}",
+        "",
+        "&cCannot teleport while in combat."
+    );
+  }
+
+  private static java.util.List<String> defaultLoreNoFunds() {
+    return java.util.List.of(
+        "&7Status: &eINSUFFICIENT FUNDS",
+        "&7Required: &6{cost}",
+        "",
+        "&cYou cannot afford this teleport."
+    );
+  }
+
+  private static java.util.List<String> defaultLoreNoPermission() {
+    return java.util.List.of(
+        "&7Status: &cLOCKED",
+        "",
+        "&cYou lack permission for this region."
+    );
+  }
+
   public String textReady() {
     return str(GuiMenuKeys.textReady, "&aClick to teleport!");
   }
@@ -322,7 +410,15 @@ public final class GuiMenuConfig {
   private String iconName(RtpTarget target, RtpTargetStatus.Availability availability,
       String advertisedBlock, String environment) {
     if (availability != null) {
+      if (barrierOnUnavailable() && availability != RtpTargetStatus.Availability.READY) {
+        if (availability == RtpTargetStatus.Availability.IN_COMBAT) {
+          return iconInCombat();
+        }
+        return str(GuiMenuKeys.iconUnavailable, "BARRIER");
+      }
       switch (availability) {
+        case IN_COMBAT:
+          return iconInCombat();
         case ON_COOLDOWN:
           return str(GuiMenuKeys.iconOnCooldown, "CLOCK");
         case NO_FUNDS:

@@ -1128,12 +1128,12 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       // ADR-060: optional block-restoration timeout. -1 (default) keeps the platform permanent
       // and skips diff capture entirely (zero added cost).
       int restoreSeconds = safety.getNumber(SafetyKeys.platformRestoreSeconds, -1).intValue();
-      Material material;
-      try {
-        material = Material.valueOf(safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS").toString().toUpperCase());
-      } catch (IllegalArgumentException e) {
-        material = Material.GLASS;
-      }
+      Object rawMat = safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS");
+      Material material = BukkitMaterialResolver.resolve(
+          rawMat != null ? rawMat.toString() : "GLASS",
+          Material.GLASS,
+          "Platform material"
+      );
 
       int lx = location.getBlockX();
       int ly = location.getBlockY();

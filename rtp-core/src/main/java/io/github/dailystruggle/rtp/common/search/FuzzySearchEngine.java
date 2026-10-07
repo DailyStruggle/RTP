@@ -49,6 +49,59 @@ public final class FuzzySearchEngine {
         }
     }
 
+    /**
+     * Tri-state candidate resolution status for configuration and enum lookups.
+     */
+    public enum LookupStatus {
+        /** Identical or normalized alphanumeric match. Silent, zero logging. */
+        EXACT,
+        /** Typo within edit distance thresholds with an unambiguous lead. Autocorrect and warn. */
+        PERCEPTIBLE_TYPO,
+        /** Edit distance exceeded or ambiguous match. Fallback to default and warn/error. */
+        IMPERCEPTIBLE
+    }
+
+    /**
+     * Immutable outcome of candidate resolution against a candidate map.
+     *
+     * @param <T> type of resolved target object
+     */
+    public record FuzzyLookupResult<T>(
+            @NotNull LookupStatus status,
+            @Nullable T match,
+            @NotNull String matchedKey,
+            @NotNull String rawInput,
+            int editDistance,
+            @NotNull List<String> availableCandidates
+    ) {
+        public FuzzyLookupResult {
+            Objects.requireNonNull(status, "status");
+            Objects.requireNonNull(matchedKey, "matchedKey");
+            Objects.requireNonNull(rawInput, "rawInput");
+            Objects.requireNonNull(availableCandidates, "availableCandidates");
+        }
+
+        public boolean isExact() {
+            return status == LookupStatus.EXACT;
+        }
+
+        public boolean isPerceptible() {
+            return status == LookupStatus.PERCEPTIBLE_TYPO;
+        }
+
+        public boolean isImperceptible() {
+            return status == LookupStatus.IMPERCEPTIBLE;
+        }
+
+        public boolean hasMatch() {
+            return match != null;
+        }
+
+        public T orElse(T fallback) {
+            return match != null ? match : fallback;
+        }
+    }
+
     private FuzzySearchEngine() {}
 
     /**
@@ -247,5 +300,205 @@ public final class FuzzySearchEngine {
         }
 
         return score > 0 ? new ScoredCandidate(score, reasons) : ScoredCandidate.none();
+    }
+
+    /**
+     * Resolves a raw input string against a candidate map using tri-state candidate resolution:
+     * {@link LookupStatus#EXACT} (silent), {@link LookupStatus#PERCEPTIBLE_TYPO} (warn and autocorrect),
+     * or {@link LookupStatus#IMPERCEPTIBLE} (fallback).
+     *
+     * <p>A candidate is categorized as a perceptible typo when its Levenshtein distance is within
+     * the adaptive threshold (<=1 for length 3-4, <=2 for length >=5) and its score leads the
+     * runner-up candidate by an unambiguity margin of at least 20 points.
+     *
+     * @param rawInput raw configured string to resolve
+     * @param candidateMap map of candidate names to their target objects
+     * @param maxDist maximum permitted edit distance
+     * @param <T> type of resolved object
+     * @return lookup result containing resolution status, match, and candidates
+     */
+    @NotNull
+    public static <T> FuzzyLookupResult<T> resolveCandidate(
+            @Nullable String rawInput,
+            @NotNull Map<String, T> candidateMap,
+            int maxDist
+    ) {
+        List<String> available = candidateMap.keySet().stream()
+                .filter(Objects::nonNull)
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+
+        if (rawInput == null || rawInput.isBlank() || candidateMap.isEmpty()) {
+            return new FuzzyLookupResult<>(
+                    LookupStatus.IMPERCEPTIBLE,
+                    null,
+                    "",
+                    rawInput == null ? "" : rawInput,
+                    -1,
+                    available
+            );
+        }
+
+        String trimmed = rawInput.trim();
+
+        // 1. Direct case-insensitive match (Exact)
+        for (Map.Entry<String, T> entry : candidateMap.entrySet()) {
+            String key = entry.getKey();
+            if (key != null && key.equalsIgnoreCase(trimmed)) {
+                return new FuzzyLookupResult<>(
+                        LookupStatus.EXACT,
+                        entry.getValue(),
+                        key,
+                        rawInput,
+                        0,
+                        available
+                );
+            }
+        }
+
+        // 2. Normalized alphanumeric match (Exact)
+        String normInput = normalize(trimmed);
+        if (!normInput.isEmpty()) {
+            for (Map.Entry<String, T> entry : candidateMap.entrySet()) {
+                String key = entry.getKey();
+                if (key != null && normalize(key).equals(normInput)) {
+                    return new FuzzyLookupResult<>(
+                            LookupStatus.EXACT,
+                            entry.getValue(),
+                            key,
+                            rawInput,
+                            0,
+                            available
+                    );
+                }
+            }
+        }
+
+        // 3. Check minimum length for fuzzy matching
+        if (normInput.length() < MIN_FUZZY_LENGTH) {
+            return new FuzzyLookupResult<>(
+                    LookupStatus.IMPERCEPTIBLE,
+                    null,
+                    "",
+                    rawInput,
+                    -1,
+                    available
+            );
+        }
+
+        // Bounded allowed distance: <= 1 for length 3-4, <= 2 for length 5-8, <= 3 for length >= 9 if maxDist >= 3
+        int allowedDist;
+        if (normInput.length() >= 9 && maxDist >= 3) {
+            allowedDist = 3;
+        } else if (normInput.length() >= LENGTH_THRESHOLD_TWO_EDITS) {
+            allowedDist = Math.min(maxDist, 2);
+        } else {
+            allowedDist = Math.min(maxDist, 1);
+        }
+
+        if (allowedDist < 1) {
+            return new FuzzyLookupResult<>(
+                    LookupStatus.IMPERCEPTIBLE,
+                    null,
+                    "",
+                    rawInput,
+                    -1,
+                    available
+            );
+        }
+
+        // Score and collect fuzzy matches
+        record CandidateMatch<T>(Map.Entry<String, T> entry, int score, int dist) {}
+        List<CandidateMatch<T>> matches = new ArrayList<>();
+
+        for (Map.Entry<String, T> entry : candidateMap.entrySet()) {
+            String key = entry.getKey();
+            if (key == null) continue;
+            String normKey = normalize(key);
+            if (normKey.isEmpty()) continue;
+
+            int dist = levenshtein(normInput, normKey, allowedDist);
+            if (dist <= allowedDist) {
+                int score = 100 - (dist * 25);
+                if (normKey.startsWith(normInput) || normInput.startsWith(normKey)) {
+                    score += 10;
+                }
+                matches.add(new CandidateMatch<>(entry, score, dist));
+            }
+        }
+
+        if (matches.isEmpty()) {
+            return new FuzzyLookupResult<>(
+                    LookupStatus.IMPERCEPTIBLE,
+                    null,
+                    "",
+                    rawInput,
+                    -1,
+                    available
+            );
+        }
+
+        // Sort descending by score, ascending by dist, then alphabetical
+        matches.sort((a, b) -> {
+            int c = Integer.compare(b.score(), a.score());
+            if (c != 0) return c;
+            c = Integer.compare(a.dist(), b.dist());
+            if (c != 0) return c;
+            return String.CASE_INSENSITIVE_ORDER.compare(a.entry().getKey(), b.entry().getKey());
+        });
+
+        CandidateMatch<T> best = matches.get(0);
+        int runnerUpScore = (matches.size() > 1) ? matches.get(1).score() : 0;
+        int delta = best.score() - runnerUpScore;
+
+        // Unambiguity margin guard (delta >= 20)
+        if (delta >= 20) {
+            return new FuzzyLookupResult<>(
+                    LookupStatus.PERCEPTIBLE_TYPO,
+                    best.entry().getValue(),
+                    best.entry().getKey(),
+                    rawInput,
+                    best.dist(),
+                    available
+            );
+        }
+
+        return new FuzzyLookupResult<>(
+                LookupStatus.IMPERCEPTIBLE,
+                null,
+                "",
+                rawInput,
+                best.dist(),
+                available
+        );
+    }
+
+    @NotNull
+    public static <T> FuzzyLookupResult<T> resolveCandidate(
+            @Nullable String rawInput,
+            @NotNull Map<String, T> candidateMap
+    ) {
+        return resolveCandidate(rawInput, candidateMap, MAX_EDIT_DISTANCE);
+    }
+
+    @NotNull
+    public static FuzzyLookupResult<String> resolveCandidate(
+            @Nullable String rawInput,
+            @NotNull Collection<String> candidates,
+            int maxDist
+    ) {
+        Map<String, String> map = new LinkedHashMap<>();
+        for (String c : candidates) {
+            if (c != null) map.put(c, c);
+        }
+        return resolveCandidate(rawInput, map, maxDist);
+    }
+
+    @NotNull
+    public static FuzzyLookupResult<String> resolveCandidate(
+            @Nullable String rawInput,
+            @NotNull Collection<String> candidates
+    ) {
+        return resolveCandidate(rawInput, candidates, MAX_EDIT_DISTANCE);
     }
 }

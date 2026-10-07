@@ -51,6 +51,22 @@ public class SelectionAPI {
   /** A factory for creating {@link Shape} instances. */
   public Factory<Shape<?>> shapeFactory;
 
+  public SelectionAPI() {
+    if (RTP.factoryMap != null) {
+      Factory<Shape<?>> sf = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+      if (sf != null) {
+        this.shapeFactory = sf;
+      }
+    }
+  }
+
+  public Factory<Shape<?>> getShapeFactory() {
+    if (shapeFactory == null && RTP.factoryMap != null) {
+      shapeFactory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+    }
+    return shapeFactory;
+  }
+
   /**
    * Retrieves a region by its name.
    *

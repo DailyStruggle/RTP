@@ -241,15 +241,21 @@ public final class GateEvaluator {
           if (map.containsKey("shape") || map.containsKey("region") || map.containsKey("playerCount")) {
             io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape = null;
             if (map.containsKey("shape") && map.get("shape") instanceof Map<?, ?> smap) {
-              shape = io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader.deserializeShape(
-                  (Map<String, Object>) smap);
+              Map<String, Object> shapeData = new HashMap<>((Map<String, Object>) smap);
+              if (!shapeData.containsKey("centerRadius") && !shapeData.containsKey("centerradius")) {
+                shapeData.put("centerRadius", 0);
+              }
+              shape = io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader.deserializeShape(shapeData);
             } else if (map.containsKey("region")) {
               String rName = String.valueOf(map.get("region"));
               io.github.dailystruggle.rtp.common.selection.region.Region r =
-                  RTP.selectionAPI.getRegion(rName);
+                  (RTP.selectionAPI != null) ? RTP.selectionAPI.getRegion(rName) : null;
               if (r != null) {
                 shape = r.getShape();
               }
+            }
+            if (map.containsKey("shape") && shape == null) {
+              return false;
             }
             if (shape != null) {
               // If context has current coords, check contains

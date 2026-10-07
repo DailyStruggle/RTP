@@ -162,7 +162,13 @@ Every server has different world borders, world routing, and gameplay rules. Siz
 - [**Units & hot reload**](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/): All configuration keys parse distance (`b`, `c`, `r`, `km`), time (`t`, `ms`, `s`, `m`, `h`, `d`), and memory (`kb`, `mb`, `gb`). Apply changes instantly with `/rtp reload` or `/rtp config <file> set <key>=<value>`.
 - **Docs in the jar**: The admin guide for your exact version unpacks into `plugins/RTP/docs/` on first run, in case the website has moved on to a newer version.
 
-![Web editor: a donut region drawn over the world's real terrain, with shape settings, staged diff and detected biomes](../assets/img/web_editor.png)
+![Web editor: 2D vector cartography canvas with space-filling Hilbert walk, invariant checks, and staged diff](../assets/img/web_editor_cartography.png)
+
+*Visual region editor: real-world terrain overlay, space-filling Hilbert walk paths, mathematical invariant validation, and staged diff inspector.*
+
+![Web editor: configuration IDE with contextual documentation tracker, setting schema, and inheritance materialization](../assets/img/web_editor_docs.png)
+
+*Configuration IDE: in-browser YAML editor with contextual documentation tracking your cursor, setting schemas, gotcha warnings, and one-click reference materialization.*
 
 <div align="center">
 
@@ -175,12 +181,14 @@ Every server has different world borders, world routing, and gameplay rules. Siz
 ### For players
 
 - **`/rtp` and `/wild`**: to the world's default region, or pick a region, world or biome (`/rtp region:<name>`, `/rtp biome:<biome>`). `/rtp back` returns players to their prior location.
-- **Menus**: `/rtp menu` provides an interactive player book on Paper, Folia, Fabric and NeoForge (chat pages on Spigot) for teleporting or picking a region, world or biome. The bundled GUI addon provides a chest-based destination picker.
+- **Menus & custom items**: `/rtp menu` provides an interactive player book on Paper, Folia, Fabric and NeoForge (chat pages on Spigot) for teleporting or picking a region, world or biome. The bundled GUI addon provides a chest-based destination picker with at-a-glance barrier indicators for blocked destinations, customizable hover lore, and prefix routing for custom items (`ia:`, `oraxen:`, `nexo:`, `hdb:`, Base64 heads, and CustomModelData; see [item compatibility](https://dailystruggle.github.io/RTP/admin/CUSTOM_ITEMS/)).
 - **Per-player queues** (`rtp.personalqueue`): personal reserve queues alongside the shared queue so high concurrency never delays an individual player's teleport.
 - **Effects**: particles, sounds, fireworks, potions, titles, action bar notices, console or player commands, and holograms on every teleport phase, gated by `rtp.effect.<stage>.*` permissions. Holograms use the 1.19.4+ text display entity directly; DecentHolograms and HolographicDisplays are supported if present.
 - **Landing platforms & safety**: temporary landing platforms with automatic decay (preventing ocean, void, or mid-air falls), post-teleport invulnerability window, movement-cancel, damage-cancel, countdown holograms, and warmup messages.
 
-![GUI addon: destination picker](../assets/img/addongui.png)
+![In-game destination menu with live server health tooltip](../assets/img/menu_server_health.png)
+
+*`/rtp menu`: in-game chest menu with live server health and destination selection.*
 
 ### Gameplay and worlds
 
@@ -247,6 +255,10 @@ The number I care about most is **chunks loaded per teleport**, from the server'
 | Lowest 5 s TPS on the players' region | **18.79** | 13.04 | 15.25 |
 
 JustRTP loaded about 3x the chunks and used 4x the process CPU and 10x the region-thread CPU. EzRTP loaded slightly fewer chunks than LeafRTP; its cost is on the region thread. In an earlier Folia 26.1 run (`20260617-191448`) EzRTP called the synchronous `World.loadChunk` on region threads and tripped Folia's watchdog 7 times, with one region unresponsive for 20.4 s. A second run reproduced the 7. LeafRTP had 0. The stall counts come from the server's own `latest.log`.
+
+![Real-time engine diagnostics and radar dashboard](../assets/img/web_editor_diagnostics.png)
+
+*Real-time engine diagnostics and radar: live tick budget, multi-tier location reservoirs, pipeline latency percentiles, stage duration breakdown, and safety watchdogs.*
 
 The region-file check needs terrain that already exists; a chunk that has never been generated has to be generated whichever plugin asks for it.
 
@@ -572,6 +584,9 @@ A: Run Arclight or Mohist and use this jar. A native Forge adapter isn't planned
 
 **Q: Memory and MSPT: should I worry?**
 A: MSPT, no. Spatial memory stays compact (about 26 bytes per sector segment). Locations kept in the hot queue hold chunk tickets so teleports are instant, and `MemoryTracker` makes sure those tickets are released. Under heap pressure (`maxHeapPercent`, or under 512 MB free) background filling pauses and the held tickets are dropped back to cold storage, which frees the pinned chunks right away.
+
+**Q: Can I use ItemsAdder, Oraxen, Nexo, or CustomModelData in the GUI menu?**
+A: Yes. Icon strings in `guimenu.yml` accept prefix routing for `ia:<id>`, `oraxen:<id>`, `nexo:<id>`, `hdb:<id>`, `head:<player>`, `base64:<hash>`, and `<MATERIAL>:<cmd>`. Because commercial plugins carry closed-source licenses and commercial price tags, automated CI cannot run proprietary binaries; testing relies on mock contract stubs and open-source equivalents, so third-party proprietary compatibility is maintained on a best-effort basis. If an item plugin is absent or changes unexpectedly, LeafRTP degrades gracefully to vanilla fallback materials without crashing. See [Custom Item & Menu Integration](https://dailystruggle.github.io/RTP/admin/CUSTOM_ITEMS/).
 
 <!-- only: bbb-pro -->
 <!-- kind: promo -->

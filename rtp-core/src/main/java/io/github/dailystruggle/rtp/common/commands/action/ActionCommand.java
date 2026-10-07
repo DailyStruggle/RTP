@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionManager;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -16,6 +17,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 
 /**
@@ -118,6 +122,58 @@ public class ActionCommand extends BaseRTPCmdImpl {
 
   public ActionDefinition definition() {
     return definition;
+  }
+
+  @Override
+  public CompletableFuture<Boolean> onCommand(
+      @NotNull UUID callerId,
+      @NotNull Predicate<String> permissionCheckMethod,
+      @NotNull Consumer<String> messageMethod,
+      @NotNull String[] args,
+      int i,
+      @Nullable Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> tempParameters) {
+    if (args != null && i < args.length) {
+      String firstArg = args[i];
+      if (firstArg != null && !firstArg.contains("=") && !firstArg.endsWith("=")) {
+        String upper = firstArg.toUpperCase(java.util.Locale.ROOT);
+        if (!getCommandLookup().containsKey(upper) && !"HELP".equalsIgnoreCase(firstArg)) {
+          // Positional argument fallback: map unrecognized non-subcommand tokens
+          // to the declared 'player' parameter (e.g. /challenge Bob -> player=Bob).
+          io.github.dailystruggle.rtp.api.action.ParameterSpec targetParam =
+              definition.command().firstParameterOfType(io.github.dailystruggle.rtp.api.action.ParameterType.PLAYER);
+          String paramName = (targetParam != null) ? targetParam.name() : (getParameterLookup().containsKey("player") ? "player" : null);
+          if (paramName != null) {
+            String[] rewrittenArgs = args.clone();
+            rewrittenArgs[i] = paramName + "=" + firstArg;
+            return super.onCommand(callerId, permissionCheckMethod, messageMethod, rewrittenArgs, i, tempParameters);
+          }
+        }
+      }
+    }
+    return super.onCommand(callerId, permissionCheckMethod, messageMethod, args, i, tempParameters);
+  }
+
+  @Override
+  public List<String> onTabComplete(
+      @NotNull UUID callerId,
+      @NotNull Predicate<String> permissionCheckMethod,
+      @NotNull String[] args) {
+    List<String> results = new ArrayList<>(super.onTabComplete(callerId, permissionCheckMethod, args));
+    if (args != null && args.length == 1 && !args[0].contains("=")) {
+      io.github.dailystruggle.rtp.api.action.ParameterSpec targetParam =
+          definition.command().firstParameterOfType(io.github.dailystruggle.rtp.api.action.ParameterType.PLAYER);
+      if (targetParam != null && (!targetParam.hasPermission() || permissionCheckMethod.test(targetParam.permission()))) {
+        if (RTP.serverAccessor != null) {
+          String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
+          for (String name : RTP.serverAccessor.getOnlinePlayerNames()) {
+            if (name.toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) {
+              results.add(name);
+            }
+          }
+        }
+      }
+    }
+    return results;
   }
 
   @Override

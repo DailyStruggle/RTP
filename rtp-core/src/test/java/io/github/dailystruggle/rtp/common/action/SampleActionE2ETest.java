@@ -404,9 +404,24 @@ class SampleActionE2ETest {
     assertTrue(registeredCommands.containsKey("duel"), "duel command must be registered top-level on server accessor");
     assertTrue(registeredCommands.containsKey("challenge"), "challenge command must be registered top-level on server accessor");
 
-    // 2. Verify aliases registered top-level
-    assertTrue(registeredCommands.containsKey("fight"), "fight alias must be registered for duel");
-    assertTrue(registeredCommands.containsKey("duelreq"), "duelreq alias must be registered for challenge");
+    // 2. Verify aliases are opt-in on first boot (not registered by default to avoid command bloat)
+    assertFalse(registeredCommands.containsKey("fight"), "fight alias must not be registered by default on first boot (opt-in)");
+    assertFalse(registeredCommands.containsKey("duelreq"), "duelreq alias must not be registered by default on first boot (opt-in)");
+
+    // 2b. Verify opt-in aliases register when an action explicitly defines them
+    io.github.dailystruggle.rtp.api.action.ActionDefinition optInAction = new io.github.dailystruggle.rtp.api.action.ActionDefinition(
+        "customduel", "customduel", "rtp.action.customduel", "Custom duel",
+        io.github.dailystruggle.rtp.api.action.ActionDefinition.PlacementSpec.DEFAULT,
+        io.github.dailystruggle.rtp.api.action.ActionDefinition.ConfinementSpec.DEFAULT,
+        io.github.dailystruggle.rtp.api.action.ActionDefinition.LifecycleSpec.EMPTY,
+        new io.github.dailystruggle.rtp.api.action.ActionDefinition.CommandSpec(
+            "customduel", "rtp.command.customduel", "Custom duel", List.of("customfight"),
+            List.of(), Map.of()
+        )
+    );
+    manager.registerAction(optInAction);
+    manager.registerAllCommands();
+    assertTrue(accessor.getRegisteredCommands().containsKey("customfight"), "opt-in aliases must be registered when specified");
 
     // 3. Verify /rtp command tree integration
     io.github.dailystruggle.rtp.common.commands.CoreRtpRoot root =

@@ -1,0 +1,5 @@
+name: ItemsAdder
+version: 1.0.0-MOCK
+main: io.github.dailystruggle.helpers.mockitems.MockItemsAdderPlugin
+api-version: "1.20"
+description: Mock ItemsAdder stub plugin for testing LeafRTP integrations.

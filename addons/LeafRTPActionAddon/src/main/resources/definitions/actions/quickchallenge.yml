@@ -10,8 +10,10 @@ command:
   name: "quickchallenge"
   permission: "rtp.command.quickchallenge"
   description: "Challenge a player to an instant duel without ongoing session tracking"
-  aliases:
-    - "qduel"
+  # Root command aliases (opt-in; empty by default to keep root command namespace clean)
+  aliases: []
+  # aliases:
+  #   - "qduel"
   parameters:
     - name: "player"
       type: "player"

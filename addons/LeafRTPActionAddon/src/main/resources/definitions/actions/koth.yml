@@ -13,8 +13,10 @@ command:
   name: "koth"
   permission: "rtp.command.koth"
   description: "Queue for a King of the Hill extraction match"
-  aliases:
-    - "extraction"
+  # Root command aliases (opt-in; empty by default to keep root command namespace clean)
+  aliases: []
+  # aliases:
+  #   - "extraction"
   subcommands:
     leave:
       description: "Forfeit the extraction match"

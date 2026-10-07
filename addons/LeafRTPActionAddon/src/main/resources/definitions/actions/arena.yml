@@ -14,9 +14,11 @@ command:
   name: "duel"
   permission: "rtp.command.duel"
   description: "Challenge players to an arena duel"
-  aliases:
-    - "fight"
-    - "arena"
+  # Root command aliases (opt-in; empty by default to keep root command namespace clean)
+  aliases: []
+  # aliases:
+  #   - "fight"
+  #   - "arena"
   subcommands:
     leave:
       description: "Surrender and exit the duel"

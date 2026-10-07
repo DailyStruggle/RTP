@@ -1,0 +1,30 @@
+# Single-server Paper devstack for verifying third-party item compatibility
+# (ItemsAdder, Oraxen, Nexo, HeadDatabase, CustomModelData).
+#
+# Boot:  docker compose -f docker-compose.compat.yml up -d
+# Logs:  docker compose -f docker-compose.compat.yml logs -f
+# Tear:  docker compose -f docker-compose.compat.yml down -v
+
+services:
+  backend-compat:
+    image: itzg/minecraft-server:java25
+    container_name: rtp-devstack-compat
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.11"
+      MEMORY: 4G
+      ONLINE_MODE: "FALSE"
+      SKIP_CHOWN: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+    ports:
+      - "127.0.0.1:25565:25565"
+    volumes:
+      - ./compat/plugins:/data/plugins
+      - ./compat/rtp-config/addons:/data/plugins/RTP/addons
+      - ./compat/world:/data/world
+      - mc-image-cache:/data/.cache
+
+volumes:
+  mc-image-cache:

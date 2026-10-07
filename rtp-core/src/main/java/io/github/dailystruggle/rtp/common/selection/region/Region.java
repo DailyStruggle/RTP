@@ -17,6 +17,7 @@ import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask.ConfigCache;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
@@ -123,12 +124,30 @@ public class Region extends FactoryValue<RegionKeys> {
     boolean shapeRecovered = false;
     boolean vertRecovered = false;
     if (this.shape == null) {
-      this.shape = (Shape<?>) RTP.selectionAPI.shapeFactory.get("SQUARE");
+      Factory<Shape<?>> sf = (RTP.selectionAPI != null) ? RTP.selectionAPI.getShapeFactory() : null;
+      if (sf == null && RTP.factoryMap != null) {
+        sf = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+      }
+      if (sf != null) {
+        this.shape = (Shape<?>) sf.get("SQUARE");
+      }
+      if (this.shape == null) {
+        this.shape = new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square();
+      }
       RTP.log(Level.WARNING, "Shape for region " + name + " was invalid. Falling back to SQUARE.");
       shapeRecovered = true;
     }
     if (vert == null) {
-      vert = (VerticalAdjustor<?>) RTP.factoryMap.get(RTP.factoryNames.vert).get("LINEAR");
+      Factory<VerticalAdjustor<?>> vf = null;
+      if (RTP.factoryMap != null) {
+        vf = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+      }
+      if (vf != null) {
+        vert = (VerticalAdjustor<?>) vf.get("LINEAR");
+      }
+      if (vert == null) {
+        vert = new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new ArrayList<>());
+      }
       RTP.log(Level.WARNING, "Vert for region " + name + " was invalid. Falling back to LINEAR.");
       vertRecovered = true;
     }
